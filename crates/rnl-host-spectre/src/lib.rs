@@ -313,6 +313,7 @@ impl<'a> Reader<'a> {
                 match first {
                     ".end" => {
                         if main {
+                            self.doc.levels[level].end_line = no;
                             break;
                         }
                         continue;
@@ -340,6 +341,7 @@ impl<'a> Reader<'a> {
                         continue;
                     }
                     ".ends" => {
+                        self.doc.levels[st.cur].end_line = no;
                         self.close_subckt(&mut st);
                         continue;
                     }
@@ -389,6 +391,10 @@ impl<'a> Reader<'a> {
         if !st.stack.is_empty() {
             self.sink.error("a subcircuit has no `ends`", Some(Loc::line(&fname, n as u32)));
         }
+        if self.doc.levels[level].end_line == 0 {
+            self.doc.levels[level].end_line = n as u32 + 1;
+        }
+
     }
 
     fn flush(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {
@@ -506,6 +512,7 @@ impl<'a> Reader<'a> {
                 return None;
             }
             "ends" => {
+                self.doc.levels[st.cur].end_line = no;
                 self.close_subckt(st);
                 return None;
             }

@@ -107,6 +107,9 @@ pub struct Level {
     pub instances: Vec<Instance>,
     pub records: Vec<Record>,
     pub line: u32,
+    /// The line before which text added to the end of this level goes: the `.ends` of a
+    /// subcircuit, the `.end` of a main file, or one past the last line of a file (17).
+    pub end_line: u32,
     /// The file path, for `path=` relative to the writing file (16.2, 16.5).
     pub path: String,
     pub case_sensitive: bool,
@@ -125,6 +128,8 @@ impl Level {
             instances: Vec::new(),
             records: Vec::new(),
             line: 0,
+            end_line: 0,
+
             path: path.into(),
             case_sensitive: false,
         }

@@ -340,6 +340,7 @@ impl<'a> Reader<'a> {
             if first == ".end" {
                 if main {
                     ended = true;
+                    self.doc.levels[level].end_line = no;
                 }
                 continue;
             }
@@ -377,6 +378,7 @@ impl<'a> Reader<'a> {
                 continue;
             }
             if first == ".ends" {
+                self.doc.levels[cur].end_line = no;
                 if let Some((c, k)) = sub_stack.pop() {
                     cur = c;
                     circ = k;
@@ -392,6 +394,10 @@ impl<'a> Reader<'a> {
         if !sub_stack.is_empty() {
             self.sink.error("a subcircuit has no `.ends`", Some(Loc::line(&fname, lines.len() as u32)));
         }
+        if self.doc.levels[level].end_line == 0 {
+            self.doc.levels[level].end_line = lines.len() as u32 + 1;
+        }
+
     }
 
     fn flush_run(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {
