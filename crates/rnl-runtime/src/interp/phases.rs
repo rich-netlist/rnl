@@ -55,9 +55,11 @@ impl Interp<'_> {
         }
     }
 
+    /// A diagnostic of the later phases. It concerns what the statement does in this document, even
+    /// when the statement is written in a package, so it is shown like the document's own (7.6).
     fn diag_site(&mut self, sev: Severity, site: &Option<std::rc::Rc<super::ctx::Ctx>>, off: usize, msg: String) {
-        let (loc, origin, pkg) = self.site_loc(site, off);
-        self.sink.add(sev, msg, loc, crate::diag::Extra { cause: None, origin, in_package: pkg });
+        let (loc, origin, _pkg) = self.site_loc(site, off);
+        self.sink.add(sev, msg, loc, crate::diag::Extra { cause: None, origin, in_package: String::new() });
     }
 
     // ---- bundles (11.8)

@@ -1597,12 +1597,12 @@ impl Interp<'_> {
     pub(crate) fn diag_fact(&mut self, sev: crate::diag::Severity, f: &Fact, msg: String) -> Option<DiagId> {
         let c = f.ctx.clone()?;
         let loc = self.rec_loc(c.rec, f.off);
-        let pkg = self.ctx_pkg(&c);
+        // shown like the document's own, as the later phases' diagnostics are (7.6)
         Some(self.sink.add(
             sev,
             msg,
             loc,
-            crate::diag::Extra { cause: None, origin: c.origin.to_string(), in_package: pkg },
+            crate::diag::Extra { cause: None, origin: c.origin.to_string(), in_package: String::new() },
         ))
     }
 }
