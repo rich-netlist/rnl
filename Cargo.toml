@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rnl-runtime",
+    "crates/rnl-host-spice",
+    "crates/rnl-host-spectre",
+    "crates/rnl-render",
+    "crates/rnl-cli",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/rich-netlist/rnl"
+publish = false
+
+[workspace.dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }
+rnl-runtime = { path = "crates/rnl-runtime" }
+rnl-host-spice = { path = "crates/rnl-host-spice" }
+rnl-host-spectre = { path = "crates/rnl-host-spectre" }
+rnl-render = { path = "crates/rnl-render" }
