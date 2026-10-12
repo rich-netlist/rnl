@@ -62,7 +62,12 @@ fn a_solver_record_written_back_reads_back() {
     let doc = read_host(&f, None, &fs, &mut sink).unwrap();
     let record = "@RNL(type=\"generated\", priority=\"high\", author=\"test\") {\n  #V1 @PLACE(0, 0);\n  #R1 @PLACE(6, 8) => @ORIENT(\"R90\");\n  #C1 @PLACE(12, 3)\n}";
     let written = replace_generated(&doc, 0, &text, record);
-    assert!(written.contains("* @RNL(type=\"generated\", priority=\"high\", author=\"test\") {\n*   #V1 @PLACE(0, 0);"));
+    // the record takes the file's line endings, whichever a checkout gave it
+    let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    assert_eq!(written.matches('\n').count(), written.matches(eol).count());
+    assert!(written.contains(&format!(
+        "* @RNL(type=\"generated\", priority=\"high\", author=\"test\") {{{eol}*   #V1 @PLACE(0, 0);"
+    )));
     assert_eq!(host_lines(&written), host_lines(&text));
     let mem = MemoryProvider::new().with(&path, &written);
     let both = Layered { layers: vec![&mem, &fs] };
