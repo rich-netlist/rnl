@@ -8,6 +8,10 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[lib]
+name = "rnl_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "rnl"
 path = "src/main.rs"

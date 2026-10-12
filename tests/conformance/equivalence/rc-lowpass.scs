@@ -1,0 +1,22 @@
+// RC low-pass filter
+V1 (in 0) vsource dc=0
+R1 (in out) resistor r=1k
+C1 (out 0) capacitor c=1n
+// @RNL(type="header") { @VERSION("0.2")}
+// @RNL {
+//   &in @WIRE(mode="vertical-horizontal") {#V1:1 #R1:1};
+//   %j = (12, 6);
+//   &out @WIRE(mode="horizontal-vertical") {#R1:2 %j #C1:1};
+//   %o = (17, 6);
+//   &out @WIRE {%j %o};
+//   $JUNCTION @ATTACH %j => @TEXT("(${p::x}, ${p::y})", dx=0.4, dy=-0.9, size=0.7);
+//   %o @TEXT("V_{out}", dx=0.4, dy=0.8);
+//   #R1 @TEXT("${value} / ${name}", key="value")
+// }
+// @RNL(type="generated", priority="high") {
+//   #V1 @PLACE(0, 0);
+//   #R1 @PLACE(6, 6) => @ORIENT("R90");
+//   #C1 @PLACE(12, 3);
+//   %gs_V1_2 = $GND_STUB @ATTACH #V1:2; %gs_V1_2::g @PLACE(0, -5);
+//   %gs_C1_2 = $GND_STUB @ATTACH #C1:2; %gs_C1_2::g @PLACE(12, -1)
+// }

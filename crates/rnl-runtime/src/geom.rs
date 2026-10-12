@@ -154,3 +154,52 @@ mod tests {
         assert_eq!(fmt_num(-0.5), "-0.5");
     }
 }
+
+/// Points whose bounding box is the extent of a graphic (9.2.3): `shape` is the keyword, points
+/// are the graphic's own (one point for the centred forms).
+pub fn shape_extent_points(shape: &str, pts: &[Pt], width: Option<f64>, height: Option<f64>, radius: Option<f64>) -> Vec<Pt> {
+    match shape {
+        "TEXT" => Vec::new(),
+        "RECTANGLE" | "ELLIPSE" if pts.len() == 1 => {
+            let (w, h) = (width.unwrap_or(0.0) / 2.0, height.unwrap_or(0.0) / 2.0);
+            vec![(pts[0].0 - w, pts[0].1 - h), (pts[0].0 + w, pts[0].1 + h)]
+        }
+        "CIRCLE" => {
+            let (c, r) = if pts.len() == 1 {
+                (pts[0], radius.unwrap_or(0.0))
+            } else if pts.len() >= 2 {
+                (pts[0], ((pts[1].0 - pts[0].0).powi(2) + (pts[1].1 - pts[0].1).powi(2)).sqrt())
+            } else {
+                return Vec::new();
+            };
+            vec![(c.0 - r, c.1 - r), (c.0 + r, c.1 + r)]
+        }
+        "ARC" if pts.len() == 3 => arc_extent_points(pts[0], pts[1], pts[2]),
+        _ => pts.to_vec(),
+    }
+}
+
+/// The ends of an arc through three points and the points where it crosses its circle's axes.
+fn arc_extent_points(a: Pt, b: Pt, c: Pt) -> Vec<Pt> {
+    let d = 2.0 * (a.0 * (b.1 - c.1) + b.0 * (c.1 - a.1) + c.0 * (a.1 - b.1));
+    if d.abs() < 1e-12 {
+        return vec![a, b, c];
+    }
+    let (aa, bb, cc) = (a.0 * a.0 + a.1 * a.1, b.0 * b.0 + b.1 * b.1, c.0 * c.0 + c.1 * c.1);
+    let ux = (aa * (b.1 - c.1) + bb * (c.1 - a.1) + cc * (a.1 - b.1)) / d;
+    let uy = (aa * (c.0 - b.0) + bb * (a.0 - c.0) + cc * (b.0 - a.0)) / d;
+    let r = ((a.0 - ux).powi(2) + (a.1 - uy).powi(2)).sqrt();
+    let ccw = (b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0) > 0.0;
+    let tau = std::f64::consts::TAU;
+    let ang = |p: Pt| (p.1 - uy).atan2(p.0 - ux).rem_euclid(tau);
+    let (ta, tc) = (ang(a), ang(c));
+    let mut out = vec![a, c];
+    for k in 0..4 {
+        let phi = k as f64 * std::f64::consts::FRAC_PI_2;
+        let inside = if ccw { (phi - ta).rem_euclid(tau) <= (tc - ta).rem_euclid(tau) } else { (ta - phi).rem_euclid(tau) <= (ta - tc).rem_euclid(tau) };
+        if inside {
+            out.push((ux + r * phi.cos(), uy + r * phi.sin()));
+        }
+    }
+    out
+}

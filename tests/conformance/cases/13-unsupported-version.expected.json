@@ -1,0 +1,35 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "13-unsupported-version.sp",
+      "kind": "file",
+      "file": "13-unsupported-version.sp",
+      "symbols": [],
+      "items": [],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "#R1",
+        "#C1"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "error",
+      "file": "13-unsupported-version.sp",
+      "line": 5,
+      "col": 25
+    },
+    {
+      "severity": "hint",
+      "file": "13-unsupported-version.sp",
+      "line": 1,
+      "col": 0
+    }
+  ]
+}

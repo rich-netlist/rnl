@@ -1,0 +1,2204 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "08-styles-and-text.sp",
+      "kind": "file",
+      "file": "08-styles-and-text.sp",
+      "symbols": [
+        {
+          "name": "$VSRC",
+          "box": [
+            -1.5,
+            -3.0,
+            1.5,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  3.0
+                ],
+                [
+                  0.0,
+                  1.5
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.5
+                ],
+                [
+                  0.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.4,
+                  0.7
+                ],
+                [
+                  0.4,
+                  0.7
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.3
+                ],
+                [
+                  0.0,
+                  1.1
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.4,
+                  -0.7
+                ],
+                [
+                  0.4,
+                  -0.7
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "a symbol",
+          "box": [
+            -0.6,
+            -3.0,
+            0.6,
+            3.0
+          ],
+          "box_written": false,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  3.0
+                ],
+                [
+                  0.0,
+                  1.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.8
+                ],
+                [
+                  0.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$RES",
+          "box": [
+            -0.6,
+            -3.0,
+            0.6,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  3.0
+                ],
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.6,
+                  1.667
+                ],
+                [
+                  -0.6,
+                  1.0
+                ],
+                [
+                  0.6,
+                  0.333
+                ],
+                [
+                  -0.6,
+                  -0.333
+                ],
+                [
+                  0.6,
+                  -1.0
+                ],
+                [
+                  -0.6,
+                  -1.667
+                ],
+                [
+                  0.0,
+                  -2.0
+                ],
+                [
+                  0.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$OPAMP",
+          "box": [
+            -4.0,
+            -2.5,
+            4.0,
+            2.5
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -4.0,
+                -1.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                -4.0,
+                1.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                4.0,
+                0.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  2.5
+                ],
+                [
+                  3.0,
+                  0.0
+                ],
+                [
+                  -3.0,
+                  -2.5
+                ],
+                [
+                  -3.0,
+                  2.5
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -4.0,
+                  -1.0
+                ],
+                [
+                  -3.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -4.0,
+                  1.0
+                ],
+                [
+                  -3.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  0.0
+                ],
+                [
+                  4.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "TEXT",
+              "points": [
+                [
+                  -2.4,
+                  -1.0
+                ]
+              ],
+              "style": {
+                "size": 0.9
+              }
+            },
+            {
+              "shape": "TEXT",
+              "points": [
+                [
+                  -2.4,
+                  1.0
+                ]
+              ],
+              "style": {
+                "size": 0.9
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$JUNCTION_DOT",
+          "box": [
+            -0.25,
+            -0.25,
+            0.25,
+            0.25
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [],
+          "prims": [
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$GROUND",
+          "box": [
+            -1.0,
+            -1.5,
+            1.0,
+            0.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  0.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  -0.8
+                ],
+                [
+                  1.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.6,
+                  -1.15
+                ],
+                [
+                  0.6,
+                  -1.15
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.2,
+                  -1.5
+                ],
+                [
+                  0.2,
+                  -1.5
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#Vin",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            -4.0,
+            -2.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#Rin",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            2.0,
+            1.0
+          ],
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#9a9a9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#9a9a9a"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#Rf",
+          "kind": "instance",
+          "symbol": 2,
+          "at": [
+            10.0,
+            5.0
+          ],
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#c62828",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#c62828"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#X1",
+          "kind": "instance",
+          "symbol": 3,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {
+            "4": [
+              [
+                {
+                  "text": "+",
+                  "level": 0,
+                  "bold": false,
+                  "italic": false,
+                  "overline": false
+                }
+              ]
+            ],
+            "5": [
+              [
+                {
+                  "text": "−",
+                  "level": 0,
+                  "bold": false,
+                  "italic": false,
+                  "overline": false
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            5.5,
+            1.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            15.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%g",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            -4.0,
+            -7.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%g",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            6.0,
+            -3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "in"
+          ],
+          "points": [
+            [
+              -4.0,
+              1.0
+            ],
+            [
+              -1.0,
+              1.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linestyle": "double",
+            "linewidth": 0.08,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "inn"
+          ],
+          "points": [
+            [
+              5.0,
+              1.0
+            ],
+            [
+              5.5,
+              1.0
+            ],
+            [
+              6.0,
+              1.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "inn"
+          ],
+          "points": [
+            [
+              5.5,
+              1.0
+            ],
+            [
+              5.5,
+              5.0
+            ],
+            [
+              7.0,
+              5.0
+            ]
+          ],
+          "mode": "vertical-horizontal",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linestyle": "dash-dot",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "out"
+          ],
+          "points": [
+            [
+              13.0,
+              5.0
+            ],
+            [
+              15.0,
+              5.0
+            ],
+            [
+              15.0,
+              0.0
+            ]
+          ],
+          "mode": "horizontal-vertical",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "out"
+          ],
+          "points": [
+            [
+              14.0,
+              0.0
+            ],
+            [
+              15.0,
+              0.0
+            ],
+            [
+              18.0,
+              0.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#2e7d32",
+            "linestyle": "bold",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              -4.0,
+              -5.0
+            ],
+            [
+              -4.0,
+              -7.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              6.0,
+              -1.0
+            ],
+            [
+              6.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "shapes": [
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              5.0,
+              0.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#1f4fd81a",
+            "linecolor": "#1f4fd8",
+            "linestyle": "dotted",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "bottom"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              17.0,
+              6.0
+            ],
+            [
+              15.3,
+              0.6
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#c62828",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              16.6,
+              6.95
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#c62828",
+            "linestyle": "none",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "texts": [
+        {
+          "id": "#Rin::name",
+          "anchor": [
+            1.75,
+            2.1
+          ],
+          "lines": [
+            [
+              {
+                "text": "R",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": "in",
+                "level": -1,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#9a9a9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#9a9a9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            18.0,
+            0.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "V",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": "out",
+                "level": -1,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            17.2,
+            6.6
+          ],
+          "lines": [
+            [
+              {
+                "text": "A",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": "v",
+                "level": -1,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": " = −",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "frac": [
+                  [
+                    {
+                      "text": "R",
+                      "level": 0,
+                      "bold": false,
+                      "italic": false,
+                      "overline": false
+                    },
+                    {
+                      "text": "f",
+                      "level": -1,
+                      "bold": false,
+                      "italic": false,
+                      "overline": false
+                    }
+                  ],
+                  [
+                    {
+                      "text": "R",
+                      "level": 0,
+                      "bold": false,
+                      "italic": false,
+                      "overline": false
+                    },
+                    {
+                      "text": "in",
+                      "level": -1,
+                      "bold": false,
+                      "italic": false,
+                      "overline": false
+                    }
+                  ]
+                ]
+              },
+              {
+                "text": " = −10",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#c62828"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -7.0,
+            9.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "Inverting amplifier",
+                "level": 0,
+                "bold": true,
+                "italic": false,
+                "overline": false
+              }
+            ],
+            [
+              {
+                "text": "V",
+                "level": 0,
+                "bold": false,
+                "italic": true,
+                "overline": false
+              },
+              {
+                "text": "DD",
+                "level": -1,
+                "bold": false,
+                "italic": true,
+                "overline": false
+              },
+              {
+                "text": " = 1.8 V, I",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": "D",
+                "level": -1,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": "1",
+                "level": -2,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": " = 10 μA, ",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": "RST",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": true
+              },
+              {
+                "text": " ±5%",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -7.0,
+            -9.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "escapes, a_b $5 ${x} { } C:\\temp, unknown \\sqrt{2}",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 0.8,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -7.0,
+            -11.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "this note is at (-7, -11)",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 0.8,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -9.0,
+            0.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "rot=90 note",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "baseline",
+          "rotate": 90.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 0.8,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Vin::name",
+          "anchor": [
+            -2.1,
+            -1.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "Vin",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Vin::value",
+          "anchor": [
+            -2.1,
+            -2.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "AC 1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Rin::value",
+          "anchor": [
+            2.95,
+            2.1
+          ],
+          "lines": [
+            [
+              {
+                "text": "10k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#9a9a9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#9a9a9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Rf::name",
+          "anchor": [
+            9.75,
+            6.1
+          ],
+          "lines": [
+            [
+              {
+                "text": "Rf",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "bold": true,
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1565c0"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Rf::value",
+          "anchor": [
+            10.95,
+            6.1
+          ],
+          "lines": [
+            [
+              {
+                "text": "100k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#X1::name",
+          "anchor": [
+            10.0,
+            1.85
+          ],
+          "lines": [
+            [
+              {
+                "text": "X1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "ok",
+          "priority": "high"
+        }
+      ],
+      "unplaced": []
+    },
+    {
+      "title": "opamp",
+      "kind": "subckt",
+      "file": "08-styles-and-text.sp",
+      "symbols": [
+        {
+          "name": "$VCVS",
+          "box": [
+            -4.0,
+            -3.0,
+            1.5,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            },
+            {
+              "pos": [
+                -4.0,
+                1.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                -4.0,
+                -1.0
+              ],
+              "terminals": [
+                "4"
+              ],
+              "label": null,
+              "dir": 180
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  3.0
+                ],
+                [
+                  0.0,
+                  1.5
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.5
+                ],
+                [
+                  0.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  1.5
+                ],
+                [
+                  1.5,
+                  0.0
+                ],
+                [
+                  0.0,
+                  -1.5
+                ],
+                [
+                  -1.5,
+                  0.0
+                ],
+                [
+                  0.0,
+                  1.5
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -4.0,
+                  1.0
+                ],
+                [
+                  -3.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -4.0,
+                  -1.0
+                ],
+                [
+                  -3.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "TEXT",
+              "points": [
+                [
+                  -2.5,
+                  1.0
+                ]
+              ],
+              "style": {
+                "size": 0.8
+              }
+            },
+            {
+              "shape": "TEXT",
+              "points": [
+                [
+                  -2.5,
+                  -1.0
+                ]
+              ],
+              "style": {
+                "size": 0.8
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.4,
+                  0.6
+                ],
+                [
+                  0.4,
+                  0.6
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.2
+                ],
+                [
+                  0.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.4,
+                  -0.6
+                ],
+                [
+                  0.4,
+                  -0.6
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$GROUND",
+          "box": [
+            -1.0,
+            -1.5,
+            1.0,
+            0.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  0.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  -0.8
+                ],
+                [
+                  1.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.6,
+                  -1.15
+                ],
+                [
+                  0.6,
+                  -1.15
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.2,
+                  -1.5
+                ],
+                [
+                  0.2,
+                  -1.5
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$PORT_TAG",
+          "box": [
+            -3.0,
+            -0.6,
+            0.0,
+            0.6
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  -0.7,
+                  0.6
+                ],
+                [
+                  -3.0,
+                  0.6
+                ],
+                [
+                  -3.0,
+                  -0.6
+                ],
+                [
+                  -0.7,
+                  -0.6
+                ],
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#E1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {
+            "5": [
+              [
+                {
+                  "text": "+",
+                  "level": 0,
+                  "bold": false,
+                  "italic": false,
+                  "overline": false
+                }
+              ]
+            ],
+            "6": [
+              [
+                {
+                  "text": "−",
+                  "level": 0,
+                  "bold": false,
+                  "italic": false,
+                  "overline": false
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "id": "%g",
+          "kind": "usage",
+          "symbol": 1,
+          "at": [
+            0.0,
+            -5.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $IOPORT",
+          "kind": "usage",
+          "symbol": 2,
+          "at": [
+            -4.0,
+            1.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $IOPORT",
+          "kind": "usage",
+          "symbol": 2,
+          "at": [
+            -4.0,
+            -1.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $IOPORT",
+          "kind": "usage",
+          "symbol": 2,
+          "at": [
+            0.0,
+            3.0
+          ],
+          "orient": "R270",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              0.0,
+              -3.0
+            ],
+            [
+              0.0,
+              -5.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#E1::name",
+          "anchor": [
+            1.9,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "E1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#E1::value",
+          "anchor": [
+            1.9,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1e5",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a usage of $IOPORT::name",
+          "anchor": [
+            -7.3,
+            1.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "inp",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a usage of $IOPORT::name",
+          "anchor": [
+            -7.3,
+            -1.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "inn",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a usage of $IOPORT::name",
+          "anchor": [
+            0.0,
+            6.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "out",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R270",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#37474f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#37474f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "ok",
+          "priority": "high"
+        }
+      ],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "file": "08-styles-and-text.sp",
+      "line": 57,
+      "col": 14
+    },
+    {
+      "severity": "warning",
+      "file": "08-styles-and-text.sp",
+      "line": 57,
+      "col": 14
+    }
+  ]
+}

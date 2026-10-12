@@ -74,8 +74,12 @@ pub struct SymbolView {
     pub prims: Vec<SymbolPrim>,
     pub pins: Vec<PinView>,
     pub nested: Vec<NestedView>,
-    /// The symbol's box (9.2.3), or None when it gives none.
-    pub bbox: Option<[f64; 4]>,
+    /// The symbol's box (9.2.3): x1, y1, x2, y2 in local coordinates. When the symbol writes no
+    /// `box=`, the extent of all its graphics, text excluded.
+    pub bbox: [f64; 4],
+    /// The symbol writes `box=`.
+    pub box_written: bool,
+
     /// The viewer's own stand-in for an instance with no symbol (9.2.6).
     pub default: bool,
 }

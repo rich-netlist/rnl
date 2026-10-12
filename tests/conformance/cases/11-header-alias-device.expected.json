@@ -1,0 +1,1516 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "11-header-alias-device.sp",
+      "kind": "file",
+      "file": "11-header-alias-device.sp",
+      "symbols": [
+        {
+          "name": "$NMOS_ACME",
+          "box": [
+            -3.0,
+            -2.0,
+            0.0,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -1.5,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.5,
+                  -1.0
+                ],
+                [
+                  -1.5,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  -1.2
+                ],
+                [
+                  -1.0,
+                  1.2
+                ]
+              ],
+              "style": {
+                "linestyle": "bold"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  0.8
+                ],
+                [
+                  0.0,
+                  0.8
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  -0.8
+                ],
+                [
+                  0.0,
+                  -0.8
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  -1.0,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            }
+          ],
+          "nested": [
+            {
+              "symbol": 1,
+              "at": [
+                -0.45,
+                -0.8
+              ],
+              "orient": "R0"
+            }
+          ]
+        },
+        {
+          "name": "$ARROW_HEAD",
+          "box": [
+            -0.35,
+            -0.3,
+            0.35,
+            0.3
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.35,
+                  0.0
+                ],
+                [
+                  -0.35,
+                  0.3
+                ],
+                [
+                  -0.35,
+                  -0.3
+                ],
+                [
+                  0.35,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$PMOS",
+          "box": [
+            -3.0,
+            -2.0,
+            0.0,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 270
+            },
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 90
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -1.5,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.5,
+                  -1.0
+                ],
+                [
+                  -1.5,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  -1.2
+                ],
+                [
+                  -1.0,
+                  1.2
+                ]
+              ],
+              "style": {
+                "linestyle": "bold"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  0.8
+                ],
+                [
+                  0.0,
+                  0.8
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  -0.8
+                ],
+                [
+                  0.0,
+                  -0.8
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": [
+            {
+              "symbol": 1,
+              "at": [
+                -0.55,
+                0.8
+              ],
+              "orient": "R180"
+            }
+          ]
+        },
+        {
+          "name": "$VSRC",
+          "box": [
+            -1.5,
+            -3.0,
+            1.5,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  3.0
+                ],
+                [
+                  0.0,
+                  1.5
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.5
+                ],
+                [
+                  0.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.4,
+                  0.7
+                ],
+                [
+                  0.4,
+                  0.7
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.3
+                ],
+                [
+                  0.0,
+                  1.1
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.4,
+                  -0.7
+                ],
+                [
+                  0.4,
+                  -0.7
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$JUNCTION_DOT",
+          "box": [
+            -0.25,
+            -0.25,
+            0.25,
+            0.25
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [],
+          "prims": [
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$GROUND",
+          "box": [
+            -1.0,
+            -1.5,
+            1.0,
+            0.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  0.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  -0.8
+                ],
+                [
+                  1.0,
+                  -0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.6,
+                  -1.15
+                ],
+                [
+                  0.6,
+                  -1.15
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.2,
+                  -1.5
+                ],
+                [
+                  0.2,
+                  -1.5
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$SUPPLY_BAR",
+          "box": [
+            -1.0,
+            0.0,
+            1.0,
+            0.8
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.8
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  0.8
+                ],
+                [
+                  1.0,
+                  0.8
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#XM1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#XM2",
+          "kind": "instance",
+          "symbol": 2,
+          "at": [
+            0.0,
+            6.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#V1",
+          "kind": "instance",
+          "symbol": 3,
+          "at": [
+            9.0,
+            4.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#V2",
+          "kind": "instance",
+          "symbol": 3,
+          "at": [
+            -8.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            0.0,
+            3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "a usage of $JUNCTION",
+          "kind": "usage",
+          "symbol": 4,
+          "at": [
+            -3.0,
+            3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%g",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            0.0,
+            -4.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%g",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            9.0,
+            -1.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%g",
+          "kind": "usage",
+          "symbol": 5,
+          "at": [
+            -8.0,
+            -5.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%s",
+          "kind": "usage",
+          "symbol": 6,
+          "at": [
+            0.0,
+            10.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "%s",
+          "kind": "usage",
+          "symbol": 6,
+          "at": [
+            9.0,
+            9.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "out"
+          ],
+          "points": [
+            [
+              0.0,
+              4.0
+            ],
+            [
+              0.0,
+              3.0
+            ],
+            [
+              0.0,
+              2.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "out"
+          ],
+          "points": [
+            [
+              0.0,
+              3.0
+            ],
+            [
+              5.0,
+              3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "in"
+          ],
+          "points": [
+            [
+              -3.0,
+              6.0
+            ],
+            [
+              -3.0,
+              3.0
+            ],
+            [
+              -3.0,
+              0.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "in"
+          ],
+          "points": [
+            [
+              -3.0,
+              3.0
+            ],
+            [
+              -8.0,
+              3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              0.0,
+              -2.0
+            ],
+            [
+              0.0,
+              -4.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              9.0,
+              1.0
+            ],
+            [
+              9.0,
+              -1.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              -8.0,
+              -3.0
+            ],
+            [
+              -8.0,
+              -5.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "vdd"
+          ],
+          "points": [
+            [
+              0.0,
+              8.0
+            ],
+            [
+              0.0,
+              10.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "vdd"
+          ],
+          "points": [
+            [
+              9.0,
+              7.0
+            ],
+            [
+              9.0,
+              9.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#XM1::label",
+          "anchor": [
+            3.0,
+            -3.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "XM1，W=1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            5.0,
+            3.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "V",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              },
+              {
+                "text": "out",
+                "level": -1,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#XM1::name",
+          "anchor": [
+            0.5,
+            1.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "XM1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#XM1::model",
+          "anchor": [
+            0.5,
+            -1.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "sky130_fd_pr__nfet_01v8",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#XM2::name",
+          "anchor": [
+            0.5,
+            7.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "XM2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#XM2::model",
+          "anchor": [
+            0.5,
+            4.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "sky130_fd_pr__pfet_01v8",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#V1::name",
+          "anchor": [
+            10.9,
+            4.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "V1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#V1::value",
+          "anchor": [
+            10.9,
+            3.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "1.8",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#V2::name",
+          "anchor": [
+            -6.1,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "V2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#V2::value",
+          "anchor": [
+            -6.1,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "0.9",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#6a1b9a",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#6a1b9a"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%s::name",
+          "anchor": [
+            0.0,
+            11.1
+          ],
+          "lines": [
+            [
+              {
+                "text": "vdd",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "%s::name",
+          "anchor": [
+            9.0,
+            10.1
+          ],
+          "lines": [
+            [
+              {
+                "text": "vdd",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "ok",
+          "priority": "high"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "ok",
+          "priority": "high"
+        }
+      ],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "file": "11-header-alias-device.sp",
+      "line": 16,
+      "col": 5
+    }
+  ]
+}

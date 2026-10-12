@@ -1,17 +1,12 @@
 //! `rnl`: check and draw Rich Netlist documents.
 
-mod dump;
-mod provider;
-
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
+use rnl_cli::{dump, path_str, FsProvider};
 use rnl_runtime::diag::{Severity, Sink};
-use rnl_runtime::host::HostDocument;
 use rnl_runtime::source::Provider;
 use rnl_runtime::{Interpretation, Options};
-
-use provider::FsProvider;
 
 const USAGE: &str = "usage:
   rnl check FILE [options]          print the diagnostics; exit 1 on errors
@@ -76,55 +71,15 @@ fn main() -> ExitCode {
     }
 }
 
-/// Is the main file Spectre? By extension, or a `simulator lang=spectre` before any element.
-fn is_spectre(path: &Path, text: &str, dialect: &Option<String>) -> bool {
-    if let Some(d) = dialect {
-        return d == "spectre";
-    }
-    if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("scs")) {
-        return true;
-    }
-    text.lines().take(50).any(|l| {
-        let l = l.trim().to_lowercase();
-        l.starts_with("simulator") && l.contains("lang") && l.contains("spectre")
-    })
-}
-
-fn read_document(args: &Args, provider: &dyn Provider, sink: &mut Sink) -> Result<HostDocument, String> {
-    let path = provider::path_str(&args.file);
-    let text = provider.read(&path).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
-    let doc = if is_spectre(&args.file, &text, &args.dialect) {
-        rnl_host_spectre::read(&path, provider, sink)
-    } else {
-        rnl_host_spice::read(&path, provider, sink)
-    };
-    doc.ok_or_else(|| format!("cannot read {}", args.file.display()))
-}
-
-/// Read and interpret the file named on the command line.
-fn interpret_file(args: &Args, provider: &FsProvider) -> Result<Interpretation, String> {
-    let options = Options { std: args.std };
-    let path = provider::path_str(&args.file);
-    if args.file.extension().is_some_and(|e| e.eq_ignore_ascii_case("rnl")) {
-        return Ok(rnl_runtime::check_package(&path, provider, &options));
-    }
-    let mut host_sink = Sink::new();
-    let doc = read_document(args, provider, &mut host_sink)?;
-    let mut result = rnl_runtime::interpret(doc, provider, &options);
-    // the adapter's own diagnostics come first
-    let mut sink = host_sink;
-    for d in result.sink.all() {
-        sink.add(d.severity, d.message.clone(), d.loc.clone(), rnl_runtime::diag::Extra { cause: None, origin: d.origin.clone(), in_package: d.in_package.clone() });
-    }
-    let _ = &mut result;
-    Ok(Interpretation { sink, ..result })
+fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, String> {
+    rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), provider, &Options { std: args.std })
 }
 
 fn run(args: &Args) -> Result<ExitCode, String> {
     let provider = FsProvider::new(&args.package_dirs);
     match args.command.as_str() {
         "check" => {
-            let r = interpret_file(args, &provider)?;
+            let r = interpret(args, &provider)?;
             let shown = r.diagnostics();
             for d in &shown {
                 println!("{}", r.sink.render(d));
@@ -135,12 +90,12 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             Ok(if e > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS })
         }
         "dump" => {
-            let r = interpret_file(args, &provider)?;
+            let r = interpret(args, &provider)?;
             println!("{}", serde_json::to_string_pretty(&dump::interpretation(&r)).unwrap());
             Ok(ExitCode::SUCCESS)
         }
         "render" => {
-            let r = interpret_file(args, &provider)?;
+            let r = interpret(args, &provider)?;
             let out = args.out.clone().ok_or("render needs -o DIR")?;
             std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
             let stem = args.file.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "out".into());
@@ -158,10 +113,10 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         }
         "strip-generated" => {
             let out = args.out.clone().ok_or("strip-generated needs -o OUT")?;
-            let path = provider::path_str(&args.file);
+            let path = path_str(&args.file);
             let text = provider.read(&path).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
             let mut sink = Sink::new();
-            let doc = read_document(args, &provider, &mut sink)?;
+            let doc = rnl_cli::read_host(&args.file, args.dialect.as_deref(), &provider, &mut sink)?;
             let main = doc.main().file.clone();
             let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, &text);
             std::fs::write(&out, stripped).map_err(|e| e.to_string())?;

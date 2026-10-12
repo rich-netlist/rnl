@@ -1,5 +1,7 @@
-/* Prototype standard package (spec-draft appendix B, U1, U3). Everything here is a placeholder
-   until the package is built for real after the prototype. Coordinates are y-up, 1 unit = 1 grid. */
+/* The standard package rnl-std (spec-draft appendix B, 16.3, U3). Its content is a draft: it is
+   the Python prototype's package (rnl-dev tools/rnl-lang/stdlib, 2026-10-12) with the symbols
+   reviewed, an explicit box= on every symbol (9.2.3), and symbol rules for Spectre primitives and
+   model cards. Coordinates are y-up; one unit is one grid step, and pins sit on integer points. */
 @RNL(type="header") { @VERSION("0.2"); @PACKAGE(name="rnl-std", version="0.2")}
 
 /* ---------------------------------------------------------------- styles (9.3) */
@@ -15,16 +17,16 @@
 @RNL {
   /* the arrow head drawn inside other symbols (9.2.7) */
   $ARROW = @DEFINE(roles=[["p", "point"]]) {};
-  $ARROW_HEAD = @DEFINE-SYMBOL { @LINE(fill="linecolor", linestyle="none") {(0.35, 0) (-0.35, 0.3) (-0.35, -0.3) (0.35, 0)}};
+  $ARROW_HEAD = @DEFINE-SYMBOL(box=[-0.35, -0.3, 0.35, 0.3]) { @LINE(fill="linecolor", linestyle="none") {(0.35, 0) (-0.35, 0.3) (-0.35, -0.3) (0.35, 0)}};
 
-  $RES = @DEFINE-SYMBOL {
+  $RES = @DEFINE-SYMBOL(box=[-0.6, -3, 0.6, 3]) {
     (0, 3) @PIN(terminal=1, direction="up");
     (0, -3) @PIN(terminal=2, direction="down");
     @LINE {(0, 3) (0, 2) (0.6, 1.667) (-0.6, 1) (0.6, 0.333) (-0.6, -0.333) (0.6, -1) (-0.6, -1.667) (0, -2) (0, -3)};
     ? @TEXT("${name}", key="name") => @PLACE(1.1, 0.25);
     ? @TEXT("${value}", key="value") => @PLACE(1.1, -0.95)
   };
-  $CAP = @DEFINE-SYMBOL {
+  $CAP = @DEFINE-SYMBOL(box=[-1, -2, 1, 2]) {
     (0, 2) @PIN(terminal=1, direction="up");
     (0, -2) @PIN(terminal=2, direction="down");
     @LINE {(0, 2) (0, 0.3)};
@@ -34,7 +36,7 @@
     ? @TEXT("${name}", key="name") => @PLACE(1.4, 0.35);
     ? @TEXT("${value}", key="value") => @PLACE(1.4, -1.05)
   };
-  $IND = @DEFINE-SYMBOL {
+  $IND = @DEFINE-SYMBOL(box=[-0.5, -3, 0.5, 3]) {
     (0, 3) @PIN(terminal=1, direction="up");
     (0, -3) @PIN(terminal=2, direction="down");
     @LINE {(0, 3) (0, 2)};
@@ -55,17 +57,17 @@
     ? @TEXT("${name}", key="name") => @PLACE(1.9, 0.25);
     ? @TEXT("${value}", key="value") => @PLACE(1.9, -0.95)
   };
-  $VSRC = @DEFINE-SYMBOL {
+  $VSRC = @DEFINE-SYMBOL(box=[-1.5, -3, 1.5, 3]) {
     %SOURCE_BODY;
     @LINE {(-0.4, 0.7) (0.4, 0.7)};
     @LINE {(0, 0.3) (0, 1.1)};
     @LINE {(-0.4, -0.7) (0.4, -0.7)}
   };
-  $ISRC = @DEFINE-SYMBOL {
+  $ISRC = @DEFINE-SYMBOL(box=[-1.5, -3, 1.5, 3]) {
     %SOURCE_BODY;
     @LINE(arrow="end") {(0, 0.9) (0, -0.9)}
   };
-  $DIODE = @DEFINE-SYMBOL {
+  $DIODE = @DEFINE-SYMBOL(box=[-0.7, -2, 0.7, 2]) {
     (0, 2) @PIN(terminal=1, direction="up");
     (0, -2) @PIN(terminal=2, direction="down");
     @LINE {(0, 2) (0, 0.5)};
@@ -89,13 +91,13 @@
     ? @TEXT("${name}", key="name") => @PLACE(1.9, 0.25);
     ? @TEXT("${value}", key="value") => @PLACE(1.9, -0.95)
   };
-  $VCVS = @DEFINE-SYMBOL {
+  $VCVS = @DEFINE-SYMBOL(box=[-4, -3, 1.5, 3]) {
     %CTRL_BODY;
     @LINE {(-0.4, 0.6) (0.4, 0.6)};
     @LINE {(0, 0.2) (0, 1)};
     @LINE {(-0.4, -0.6) (0.4, -0.6)}
   };
-  $VCCS = @DEFINE-SYMBOL {
+  $VCCS = @DEFINE-SYMBOL(box=[-4, -3, 1.5, 3]) {
     %CTRL_BODY;
     @LINE(arrow="end") {(0, 0.8) (0, -0.8)}
   };
@@ -115,20 +117,20 @@
     (1, 0) @PIN(terminal=4, direction="right");
     @LINE {(-1, 0) (1, 0)}
   };
-  $NMOS = @DEFINE-SYMBOL {
+  $NMOS = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %MOS_CHANNEL;
     (0, 2) @PIN(terminal=1, direction="up");
     (0, -2) @PIN(terminal=3, direction="down");
     $ARROW @ATTACH (-0.45, -0.8) => @SET-SYMBOL $ARROW_HEAD
   };
-  $PMOS = @DEFINE-SYMBOL {
+  $PMOS = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %MOS_CHANNEL;
     (0, -2) @PIN(terminal=1, direction="down");
     (0, 2) @PIN(terminal=3, direction="up");
     $ARROW @ATTACH (-0.55, 0.8) => @SET-SYMBOL $ARROW_HEAD => @ORIENT("R180")
   };
-  $NMOS4 = @DEFINE-SYMBOL {$NMOS; %BULK};
-  $PMOS4 = @DEFINE-SYMBOL {$PMOS; %BULK};
+  $NMOS4 = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {$NMOS; %BULK};
+  $PMOS4 = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {$PMOS; %BULK};
 
   /* BJT: terminals c b e = 1 2 3. NPN collector up, PNP emitter up. */
   %BJT_BASE = @DEFINE-SYMBOL {
@@ -138,7 +140,7 @@
     ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
     ? @TEXT("${model}", key="model") => @PLACE(0.5, -1.75)
   };
-  $NPN = @DEFINE-SYMBOL {
+  $NPN = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %BJT_BASE;
     (0, 2) @PIN(terminal=1, direction="up");
     (0, -2) @PIN(terminal=3, direction="down");
@@ -146,7 +148,7 @@
     @LINE {(0, -1.1) (0, -2)};
     @LINE(arrow="end") {(-1, -0.5) (0, -1.1)}
   };
-  $PNP = @DEFINE-SYMBOL {
+  $PNP = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
     %BJT_BASE;
     (0, -2) @PIN(terminal=1, direction="down");
     (0, 2) @PIN(terminal=3, direction="up");
@@ -156,7 +158,7 @@
   };
 
   /* a generic op-amp: terminals in+ in- out = 1 2 3 */
-  $OPAMP = @DEFINE-SYMBOL {
+  $OPAMP = @DEFINE-SYMBOL(box=[-4, -2.5, 4, 2.5]) {
     (-4, -1) @PIN(terminal=1, direction="left");
     (-4, 1) @PIN(terminal=2, direction="left");
     (4, 0) @PIN(terminal=3, direction="right");
@@ -171,31 +173,31 @@
 
   /* virtual elements (12.5, 12.6, 13.2, 15.2). Their role is p (net is a standard subobject name, 9.4);
      ${p} shows the net, or the net of the terminal when drawn on a pin (13.6, PR1). */
-  $GROUND = @DEFINE-SYMBOL {
+  $GROUND = @DEFINE-SYMBOL(box=[-1, -1.5, 1, 0]) {
     (0, 0) @PIN(terminal=1, direction="up");
     @LINE {(0, 0) (0, -0.8)};
     @LINE {(-1, -0.8) (1, -0.8)};
     @LINE {(-0.6, -1.15) (0.6, -1.15)};
     @LINE {(-0.2, -1.5) (0.2, -1.5)}
   };
-  $SUPPLY_BAR = @DEFINE-SYMBOL {
+  $SUPPLY_BAR = @DEFINE-SYMBOL(box=[-1, 0, 1, 0.8]) {
     (0, 0) @PIN(terminal=1, direction="down");
     @LINE {(0, 0) (0, 0.8)};
     @LINE {(-1, 0.8) (1, 0.8)};
     ? @TEXT("${p}", key="name", halign="middle", valign="bottom") => @PLACE(0, 1.1)
   };
-  $PORT_TAG = @DEFINE-SYMBOL {
+  $PORT_TAG = @DEFINE-SYMBOL(box=[-3, -0.6, 0, 0.6]) {
     (0, 0) @PIN(terminal=1, direction="right");
     @LINE {(0, 0) (-0.7, 0.6) (-3, 0.6) (-3, -0.6) (-0.7, -0.6) (0, 0)};
     ? @TEXT("${p}", key="name", halign="end", valign="middle") => @PLACE(-3.3, 0)
   };
-  $NC_CROSS = @DEFINE-SYMBOL {
+  $NC_CROSS = @DEFINE-SYMBOL(box=[-0.5, -0.5, 0.5, 0.5]) {
     @LINE {(-0.5, -0.5) (0.5, 0.5)};
     @LINE {(-0.5, 0.5) (0.5, -0.5)}
   };
-  $JUNCTION_DOT = @DEFINE-SYMBOL {(0, 0) @CIRCLE(radius=0.25, fill="linecolor", linestyle="none")};
+  $JUNCTION_DOT = @DEFINE-SYMBOL(box=[-0.25, -0.25, 0.25, 0.25]) {(0, 0) @CIRCLE(radius=0.25, fill="linecolor", linestyle="none")};
   /* points right; ORIENT("R270") points down (15.2) */
-  $CURRENT_ARROW_SYM = @DEFINE-SYMBOL { @LINE(arrow="end") {(-0.6, 0.5) (0.6, 0.5)}}
+  $CURRENT_ARROW_SYM = @DEFINE-SYMBOL(box=[-0.6, 0.25, 0.6, 0.75]) { @LINE(arrow="end") {(-0.6, 0.5) (0.6, 0.5)}}
 }
 
 /* ---------------------------------------------------------------- definitions (9.4, 12, 14.6, 15.1) */
@@ -268,8 +270,23 @@
   # @SELECT-INSTANCE(name="E*") => @SET-SYMBOL $VCVS;
   # @SELECT-INSTANCE(name="G*") => @SET-SYMBOL $VCCS;
   # @SELECT-INSTANCE(name="M*") => @SET-SYMBOL $NMOS4;
-  # @SELECT-INSTANCE(type="pmos") => @SET-SYMBOL $PMOS4;
   # @SELECT-INSTANCE(name="Q*") => @SET-SYMBOL $NPN;
+
+  /* Spectre names carry no element letter: its primitives by master, model cards by type (6.12, 10.1) */
+  # @SELECT-INSTANCE(model="resistor") => @SET-SYMBOL $RES;
+  # @SELECT-INSTANCE(model="capacitor") => @SET-SYMBOL $CAP;
+  # @SELECT-INSTANCE(model="inductor") => @SET-SYMBOL $IND;
+  # @SELECT-INSTANCE(model="vsource") => @SET-SYMBOL $VSRC;
+  # @SELECT-INSTANCE(model="isource") => @SET-SYMBOL $ISRC;
+  # @SELECT-INSTANCE(model="diode") => @SET-SYMBOL $DIODE;
+  # @SELECT-INSTANCE(model="vcvs") => @SET-SYMBOL $VCVS;
+  # @SELECT-INSTANCE(model="vccs") => @SET-SYMBOL $VCCS;
+  # @SELECT-INSTANCE(type="d") => @SET-SYMBOL $DIODE;
+  # @SELECT-INSTANCE(type="nmos") => @SET-SYMBOL $NMOS4;
+  # @SELECT-INSTANCE(type="npn") => @SET-SYMBOL $NPN;
+
+  /* narrow: the model type picks the P variants */
+  # @SELECT-INSTANCE(type="pmos") => @SET-SYMBOL $PMOS4;
   # @SELECT-INSTANCE(type="pnp") => @SET-SYMBOL $PNP;
 
   # @SELECT-USAGE $GND => @SET-SYMBOL $GROUND;

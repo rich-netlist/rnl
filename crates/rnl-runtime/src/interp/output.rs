@@ -70,7 +70,20 @@ impl Interp<'_> {
         let k = out.len();
         table.insert(sym, k);
         let sd = self.symbol(sym).clone();
-        out.push(SymbolView { name: self.label(sym), prims: Vec::new(), pins: Vec::new(), nested: Vec::new(), bbox: sd.bbox, default: sd.default });
+        let bbox = match sd.bbox {
+            Some(b) => b,
+            None => self.symbol_extent(sym, 0),
+        };
+        out.push(SymbolView {
+            name: self.label(sym),
+            prims: Vec::new(),
+            pins: Vec::new(),
+            nested: Vec::new(),
+            bbox,
+            box_written: sd.bbox.is_some(),
+            default: sd.default,
+        });
+
         let prims = sd
             .prims
             .iter()
@@ -119,7 +132,53 @@ impl Interp<'_> {
         k
     }
 
+    /// The extent of a symbol's graphics, text excluded, with the symbols drawn in it (9.2.3).
+    pub(crate) fn symbol_extent(&self, sym: ObjId, depth: usize) -> [f64; 4] {
+        let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+        fn add(b: &mut [f64; 4], p: (f64, f64)) {
+            b[0] = b[0].min(p.0);
+            b[1] = b[1].min(p.1);
+            b[2] = b[2].max(p.0);
+            b[3] = b[3].max(p.1);
+        }
+        let sd = self.symbol(sym);
+        for p in &sd.prims {
+            for q in crate::geom::shape_extent_points(p.shape.as_str(), &p.points, p.params.width, p.params.height, p.params.radius) {
+                add(&mut b, q);
+            }
+        }
+        if depth < 8 {
+            for a in &sd.usages {
+                let u = self.usage(*a);
+                let (Some(inner), Some((_, pt))) = (u.sym_symbol, u.roles.first()) else { continue };
+                if !matches!(self.o(inner), ObjData::Symbol(_)) {
+                    continue;
+                }
+                let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(*pt) else { continue };
+                let ib = self.symbol_extent(inner, depth + 1);
+                if ib[0] > ib[2] {
+                    continue;
+                }
+                for c in [(ib[0], ib[1]), (ib[0], ib[3]), (ib[2], ib[1]), (ib[2], ib[3])] {
+                    let d = u.sym_orient.apply(c);
+                    add(&mut b, (x + d.0, y + d.1));
+                }
+            }
+        }
+        if b[0] > b[2] {
+            for pin in &sd.pins {
+                add(&mut b, pin.pos);
+            }
+
+        }
+        if b[0] > b[2] {
+            return [0.0; 4];
+        }
+        b
+    }
+
     /// The fixed texts of a symbol drawn for `owner`, with `${…}` read from the owner.
+
     fn symbol_texts(&mut self, s: SceneId, sym: ObjId, owner: ObjId, prefix: &str, out: &mut BTreeMap<String, Vec<markup::Line>>, depth: usize) {
         if depth > 8 {
             return;

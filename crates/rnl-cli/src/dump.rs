@@ -47,6 +47,8 @@ pub fn level(lv: &LevelView) -> Value {
         "symbols": lv.symbols.iter().map(|s| json!({
             "name": s.name,
             "box": s.bbox,
+            "box_written": s.box_written,
+
             "default": s.default,
             "pins": s.pins.iter().map(|p| json!({"pos": pt(&p.pos), "terminals": p.terminals, "label": p.label, "dir": p.dir})).collect::<Vec<_>>(),
             "prims": s.prims.iter().map(|p| json!({"shape": p.shape.as_str(), "points": p.points.iter().map(pt).collect::<Vec<_>>(), "style": style(&p.style)})).collect::<Vec<_>>(),
@@ -85,6 +87,21 @@ pub fn interpretation(r: &Interpretation) -> Value {
             "line": d.loc.as_ref().map(|l| l.line),
             "col": d.loc.as_ref().map(|l| l.col),
             "origin": d.origin,
+        })).collect::<Vec<_>>(),
+    })
+}
+
+/// What the conformance corpus records (7.6): the effective model, and each diagnostic's level
+/// and place. Messages are left out: their wording is the implementation's.
+pub fn conformance(r: &Interpretation) -> Value {
+    json!({
+        "failed": r.model.failed.is_some(),
+        "levels": r.model.levels.iter().map(level).collect::<Vec<_>>(),
+        "diagnostics": r.diagnostics().iter().map(|d| json!({
+            "severity": d.severity.as_str(),
+            "file": d.loc.as_ref().map(|l| l.file.clone()),
+            "line": d.loc.as_ref().map(|l| l.line),
+            "col": d.loc.as_ref().map(|l| l.col),
         })).collect::<Vec<_>>(),
     })
 }

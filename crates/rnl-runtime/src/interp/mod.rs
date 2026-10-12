@@ -103,12 +103,12 @@ pub struct Interp<'p> {
 }
 
 impl<'p> Interp<'p> {
-    fn blank(doc: HostDocument, provider: &'p dyn Provider, options: &Options) -> Interp<'p> {
+    fn blank(doc: HostDocument, provider: &'p dyn Provider, options: &Options, sink: Sink) -> Interp<'p> {
         let nlevels = doc.levels.len();
         let mut it = Interp {
             doc,
             provider,
-            sink: Sink::new(),
+            sink,
             objs: Vec::new(),
             units: Vec::new(),
             level_unit: vec![0; nlevels],
@@ -147,8 +147,9 @@ impl<'p> Interp<'p> {
     }
 
     /// Prepare the interpretation of a host document: read every level's records and headers.
-    pub fn new(doc: HostDocument, provider: &'p dyn Provider, options: &Options) -> Interp<'p> {
-        let mut it = Interp::blank(doc, provider, options);
+    /// `sink` may already hold the host adapter's diagnostics.
+    pub fn new(doc: HostDocument, provider: &'p dyn Provider, options: &Options, sink: Sink) -> Interp<'p> {
+        let mut it = Interp::blank(doc, provider, options, sink);
         for lv in 0..it.doc.levels.len() {
             let mut u = Unit::new(UnitKind::Level, &it.doc.levels[lv].title());
             u.level = Some(lv);
@@ -170,7 +171,7 @@ impl<'p> Interp<'p> {
         let name = crate::host::file_name(path).to_string();
         let main = Level::new(LevelKind::File, &name, &name, path);
         let doc = HostDocument::new(main, crate::host::Dialect { name: "none".into(), case_sensitive: false, ground_aliases: Vec::new() });
-        let mut it = Interp::blank(doc, provider, options);
+        let mut it = Interp::blank(doc, provider, options, Sink::new());
         let mut u = Unit::new(UnitKind::Level, &name);
         u.level = Some(0);
         u.ok = false;
@@ -492,12 +493,14 @@ impl<'p> Interp<'p> {
         Interpretation { model, sink: std::mem::take(&mut self.sink), checking_package: checking, sources }
     }}
 
-/// Interpret a host document: the effective model and the diagnostics.
-pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options) -> Interpretation {
-    let mut it = Interp::new(doc, provider, options);
+/// Interpret a host document: the effective model and the diagnostics. `sink` holds what the
+/// host adapter reported, if anything.
+pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, sink: Sink) -> Interpretation {
+    let mut it = Interp::new(doc, provider, options, sink);
     it.run();
     it.finish()
 }
+
 
 /// Check a package file on its own (2.7).
 pub fn check_package(path: &str, provider: &dyn Provider, options: &Options) -> Interpretation {
