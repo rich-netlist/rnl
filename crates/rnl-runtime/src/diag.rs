@@ -97,7 +97,9 @@ impl Sink {
             let pos = self
                 .items
                 .iter()
-                .position(|d| d.severity == severity && d.message == message && d.loc == loc && d.origin == extra.origin)
+                .position(|d| {
+                    d.severity == severity && d.message == message && d.loc == loc && d.origin == extra.origin
+                })
                 .unwrap_or(0);
             return DiagId(pos as u32);
         }

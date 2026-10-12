@@ -93,7 +93,11 @@ pub struct UseDecl {
     pub pkg: Option<UnitId>,
 }
 
+/// The aliases scoped to one definition: (alias, (original, where it is declared)).
+pub type ScopedAliases = Vec<(String, (String, Loc))>;
+
 /// A DEVICE statement (6.12).
+
 #[derive(Clone, Debug)]
 pub struct DeviceDecl {
     pub name: String,
@@ -134,7 +138,7 @@ pub struct Unit {
     /// Definition-scoped aliases as declared: (definition, alias, original, loc, source package).
     pub scoped_raw: Vec<(String, String, String, Loc, String)>,
     /// "$NAME" -> [(alias, (original, loc))].
-    pub scoped: HashMap<String, Vec<(String, (String, Loc))>>,
+    pub scoped: HashMap<String, ScopedAliases>,
     pub header_kws: Vec<String>,
     pub other_records: usize,
     pub devices: Vec<DeviceDecl>,
@@ -324,7 +328,13 @@ impl Interp<'_> {
         rec.map(|r| self.recs[r].loc(off))
     }
 
-    pub(crate) fn diag_in(&mut self, sev: Severity, msg: impl Into<String>, loc: Option<Loc>, pkg: &str) -> crate::diag::DiagId {
+    pub(crate) fn diag_in(
+        &mut self,
+        sev: Severity,
+        msg: impl Into<String>,
+        loc: Option<Loc>,
+        pkg: &str,
+    ) -> crate::diag::DiagId {
         self.sink.add(sev, msg, loc, Extra { in_package: pkg.to_string(), ..Extra::default() })
     }
 
@@ -394,8 +404,12 @@ impl Interp<'_> {
             // `$` aliases replace whole name tokens, in references and bindings alike (16.5)
             let mut ast_body = ast.body.clone().unwrap();
             if let Some(fu) = self.file_unit(u) {
-                let table: HashMap<String, String> =
-                    self.units[fu].aliases.iter().filter(|(a, _)| a.starts_with('$')).map(|(a, o)| (a.clone(), o.clone())).collect();
+                let table: HashMap<String, String> = self.units[fu]
+                    .aliases
+                    .iter()
+                    .filter(|(a, _)| a.starts_with('$'))
+                    .map(|(a, o)| (a.clone(), o.clone()))
+                    .collect();
                 if !table.is_empty() {
                     let mut b = (*ast_body).clone();
                     rename_dollar_set(&mut b, &table);
@@ -416,7 +430,13 @@ impl Interp<'_> {
                     self.diag_in(Severity::Error, err.clone(), Some(loc), &pkg);
                     continue;
                 }
-                self.units[u].members.push(UnitMember { rec: Some(rec), k, embedded: false, m: m.clone(), header: header.clone() });
+                self.units[u].members.push(UnitMember {
+                    rec: Some(rec),
+                    k,
+                    embedded: false,
+                    m: m.clone(),
+                    header: header.clone(),
+                });
                 self.declare(u, Some(rec), k, false, m, &header);
                 self.free_word_warnings(u, rec, m);
                 // USE-PACKAGE written in the level (16.2)
@@ -430,7 +450,11 @@ impl Interp<'_> {
                 }
             }
         }
-        if is_file_level && self.units[u].header_record.is_none() && level_kind == Some(LevelKind::File) && self.units[u].level == Some(0) {
+        if is_file_level
+            && self.units[u].header_record.is_none()
+            && level_kind == Some(LevelKind::File)
+            && self.units[u].level == Some(0)
+        {
             // the header record may be left out; tools write it when they save the file (16.1, TR5)
             let file = self.doc.levels[0].file.clone();
             self.sink.hint(
@@ -495,18 +519,33 @@ impl Interp<'_> {
         let Some(params) = &ast.header else { return h };
         if !params.positional.is_empty() {
             let loc = self.recs[rec].loc(params.start);
-            self.diag_in(Severity::Error, "record header fields are written by name; positional values are ignored (2.8)", Some(loc), &pkg);
+            self.diag_in(
+                Severity::Error,
+                "record header fields are written by name; positional values are ignored (2.8)",
+                Some(loc),
+                &pkg,
+            );
         }
         for n in &params.named {
             let loc = self.recs[rec].loc(n.off);
             let Some(spec) = words().header_field(&n.name) else {
                 let close = closest(&n.name, words().header_fields.iter().map(|f| f.name.as_str()));
                 let hint = close.map(|c| format!(", did you mean {c}?")).unwrap_or_default();
-                self.diag_in(Severity::Warning, format!("unknown record header field {} is ignored (2.8){hint}", n.name), Some(loc), &pkg);
+                self.diag_in(
+                    Severity::Warning,
+                    format!("unknown record header field {} is ignored (2.8){hint}", n.name),
+                    Some(loc),
+                    &pkg,
+                );
                 continue;
             };
             let Value::Str(v) = &n.value else {
-                self.diag_in(Severity::Error, format!("record header field {} takes a string; treated as not written (2.8)", n.name), Some(loc), &pkg);
+                self.diag_in(
+                    Severity::Error,
+                    format!("record header field {} takes a string; treated as not written (2.8)", n.name),
+                    Some(loc),
+                    &pkg,
+                );
                 continue;
             };
             if let Some(vals) = &spec.values {
@@ -564,7 +603,12 @@ impl Interp<'_> {
             self.units[u].header_kws.push(kw.clone());
             let loc = self.recs[rec].loc(call.start);
             if !HEADER_KW.contains(&kw.as_str()) && kw != "USE-PACKAGE" {
-                self.diag_in(Severity::Error, format!("@{kw} cannot be written in a header record (2.8)"), Some(loc), &pkg);
+                self.diag_in(
+                    Severity::Error,
+                    format!("@{kw} cannot be written in a header record (2.8)"),
+                    Some(loc),
+                    &pkg,
+                );
                 continue;
             }
             if kw == "USE-PACKAGE" {
@@ -595,7 +639,8 @@ impl Interp<'_> {
                 }
                 "PACKAGE" => {
                     if self.units[u].kind != UnitKind::Package {
-                        self.sink.error("@PACKAGE is written only in the header record of a package file (2.7)", Some(loc));
+                        self.sink
+                            .error("@PACKAGE is written only in the header record of a package file (2.7)", Some(loc));
                         continue;
                     }
                     self.units[u].pkg_name = str_val(p.get("name")).unwrap_or_default();
@@ -604,7 +649,12 @@ impl Interp<'_> {
                 "USE-ALIASES" => self.use_aliases(u, &p, &loc),
                 "ALIAS" => {
                     let (Some(alias), Some(orig)) = (str_val(p.get("alias")), str_val(p.get("original"))) else {
-                        self.diag_in(Severity::Error, "@ALIAS takes two strings: the alias and the original; definition= is a string too (16.5)", Some(loc), &pkg);
+                        self.diag_in(
+                            Severity::Error,
+                            "@ALIAS takes two strings: the alias and the original; definition= is a string too (16.5)",
+                            Some(loc),
+                            &pkg,
+                        );
                         continue;
                     };
                     let dfn = match p.get("definition") {
@@ -662,11 +712,17 @@ impl Interp<'_> {
         }
     }
 
-
     /// Parameters of a statement read when the file is read (header statements, USE-PACKAGE):
     /// positional ones first in the signature's order, then names; nothing twice (4.2 rule 9).
     /// The header is in the standard form; elsewhere an unquoted name may be an alias (16.5).
-    pub(crate) fn header_params(&mut self, kw: &str, p: Option<&Params>, u: UnitId, loc: &Loc, std_form: bool) -> Option<HashMap<String, Value>> {
+    pub(crate) fn header_params(
+        &mut self,
+        kw: &str,
+        p: Option<&Params>,
+        u: UnitId,
+        loc: &Loc,
+        std_form: bool,
+    ) -> Option<HashMap<String, Value>> {
         let pkg = self.units[u].pkg().to_string();
         let spec = words().keyword(kw).unwrap();
         let names: Vec<&str> = spec.param_list().iter().map(|q| q.name.as_str()).collect();
@@ -721,7 +777,12 @@ impl Interp<'_> {
                     return None;
                 }
                 if out.contains_key(&std) {
-                    self.diag_in(Severity::Error, format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"), Some(loc.clone()), &pkg);
+                    self.diag_in(
+                        Severity::Error,
+                        format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"),
+                        Some(loc.clone()),
+                        &pkg,
+                    );
                     return None;
                 }
                 out.insert(std, n.value.clone());
@@ -729,7 +790,12 @@ impl Interp<'_> {
         }
         for q in spec.param_list() {
             if q.required && !out.contains_key(&q.name) {
-                self.diag_in(Severity::Error, format!("@{kw} lacks the parameter {} (5.3)", q.name), Some(loc.clone()), &pkg);
+                self.diag_in(
+                    Severity::Error,
+                    format!("@{kw} lacks the parameter {} (5.3)", q.name),
+                    Some(loc.clone()),
+                    &pkg,
+                );
                 return None;
             }
         }
@@ -769,7 +835,10 @@ impl Interp<'_> {
             return Some((alias.into(), orig.into(), Some(def.into())));
         }
         if alias.starts_with('$') || orig.starts_with('$') {
-            if !(alias.starts_with('$') && orig.starts_with('$')) || alias.chars().count() < 2 || orig.chars().count() < 2 {
+            if !(alias.starts_with('$') && orig.starts_with('$'))
+                || alias.chars().count() < 2
+                || orig.chars().count() < 2
+            {
                 return bad(self, "the alias and the original of a name both carry `$`, such as @ALIAS(\"$差分对\", \"$DIFFPAIR\") (16.5)".into());
             }
             if alias == orig {
@@ -778,21 +847,30 @@ impl Interp<'_> {
             return Some((alias.into(), orig.into(), None));
         }
         if orig.starts_with('@') != alias.starts_with('@') {
-            return bad(self, "the original and the alias of a keyword both carry `@`; other words carry neither (16.5)".into());
+            return bad(
+                self,
+                "the original and the alias of a keyword both carry `@`; other words carry neither (16.5)".into(),
+            );
         }
         if let Some(base) = orig.strip_prefix('@') {
             if matches!(base, "RNL" | "VERSION" | "ALIAS") {
                 return bad(self, format!("{orig} belongs to the outer form and cannot have an alias (16.5)"));
             }
             if base == "USE-ALIASES" {
-                return bad(self, "@USE-ALIASES cannot have an alias: the aliases are not known before it is read (16.5)".into());
+                return bad(
+                    self,
+                    "@USE-ALIASES cannot have an alias: the aliases are not known before it is read (16.5)".into(),
+                );
             }
             if check_original && !standard_original(orig) {
                 return bad(self, format!("the original {orig} is not a standard keyword (16.5)"));
             }
             let a = &alias[1..];
             if words().is_keyword(a) || a.is_empty() || !a.chars().all(syntax::is_word_char) {
-                return bad(self, format!("the alias {alias} is not well formed or is the name of a standard keyword (16.5)"));
+                return bad(
+                    self,
+                    format!("the alias {alias} is not well formed or is the name of a standard keyword (16.5)"),
+                );
             }
         } else {
             if check_original && !standard_original(orig) {
@@ -812,12 +890,20 @@ impl Interp<'_> {
         let wher = if source.is_empty() { String::new() } else { format!("in alias package {source}, ") };
         if let Some(def) = definition {
             self.units[u].scoped_raw.push((def.clone(), alias.clone(), orig.clone(), loc.clone(), source.to_string()));
-            self.units[u].alias_decls.push(AliasDecl { alias, original: orig, definition: Some(def), loc: loc.clone() });
+            self.units[u].alias_decls.push(AliasDecl {
+                alias,
+                original: orig,
+                definition: Some(def),
+                loc: loc.clone(),
+            });
             return;
         }
         if let Some(old) = self.units[u].aliases.get(&alias).cloned() {
             if old != orig {
-                self.sink.error(format!("{wher}the alias {alias} is already declared for {old} and cannot also be {orig} (16.5)"), Some(loc.clone()));
+                self.sink.error(
+                    format!("{wher}the alias {alias} is already declared for {old} and cannot also be {orig} (16.5)"),
+                    Some(loc.clone()),
+                );
             }
             return;
         }
@@ -827,7 +913,10 @@ impl Interp<'_> {
                 return;
             }
             if self.units[u].aliases.values().any(|o| *o == alias) {
-                self.sink.error(format!("{wher}{alias} is already the original of another alias and cannot be an alias (16.5)"), Some(loc.clone()));
+                self.sink.error(
+                    format!("{wher}{alias} is already the original of another alias and cannot be an alias (16.5)"),
+                    Some(loc.clone()),
+                );
                 return;
             }
         }
@@ -1079,7 +1168,13 @@ impl Interp<'_> {
 
     /// Find a package by path= or in the package directories (16.2). path= is relative to the
     /// directory of the file that writes the USE-PACKAGE or USE-ALIASES.
-    pub(crate) fn resolve_package(&mut self, decl: &UseDecl, loc: Loc, base: Option<String>, what: &str) -> Option<UnitId> {
+    pub(crate) fn resolve_package(
+        &mut self,
+        decl: &UseDecl,
+        loc: Loc,
+        base: Option<String>,
+        what: &str,
+    ) -> Option<UnitId> {
         let sec = if what == "USE-ALIASES" { "16.5" } else { "16.2" };
         let kind = if what == "USE-ALIASES" { "alias package" } else { "package" };
         if let Some(body) = &decl.body {
@@ -1124,8 +1219,10 @@ impl Interp<'_> {
                 if let Some(c) = same.iter().find(|c| c.1 == *want) {
                     cand = Some(c.clone());
                 } else {
-                    let mut newer: Vec<&(String, String, String)> =
-                        same.iter().filter(|c| same_major(&c.1, want) && version_key(&c.1) > version_key(want)).collect();
+                    let mut newer: Vec<&(String, String, String)> = same
+                        .iter()
+                        .filter(|c| same_major(&c.1, want) && version_key(&c.1) > version_key(want))
+                        .collect();
                     newer.sort_by_key(|c| version_key(&c.1));
                     if let Some(c) = newer.first() {
                         self.sink.warning(
@@ -1136,14 +1233,20 @@ impl Interp<'_> {
                     }
                 }
             } else if let Some(c) = same.iter().max_by_key(|c| version_key(&c.1)) {
-                self.sink.hint(format!("{what} {} names no version; using the newest found, {} ({sec})", decl.name, c.1), Some(loc.clone()));
+                self.sink.hint(
+                    format!("{what} {} names no version; using the newest found, {} ({sec})", decl.name, c.1),
+                    Some(loc.clone()),
+                );
                 cand = Some(c.clone());
             }
         }
         let Some((n, v, path)) = cand else {
             let then = if what == "USE-ALIASES" { "; statements using its aliases fail" } else { "" };
             let ver = decl.version.as_ref().map(|v| format!(" {v}")).unwrap_or_default();
-            self.sink.error(format!("{kind} {}{ver} cannot be found: this {what} fails{then} ({sec})", decl.name), Some(loc));
+            self.sink.error(
+                format!("{kind} {}{ver} cannot be found: this {what} fails{then} ({sec})", decl.name),
+                Some(loc),
+            );
             return None;
         };
         if let Some(&u) = self.packages.get(&(n.clone(), v.clone())) {
@@ -1174,7 +1277,10 @@ impl Interp<'_> {
         self.unit_recs.push(rec_ids);
         self.read_unit(id);
         if self.units[id].header_record.is_none() || self.units[id].pkg_name.is_empty() {
-            self.sink.error(format!("{fname} has no @PACKAGE and is not a package (2.7)"), Some(Loc::line(fname.clone(), 1)));
+            self.sink.error(
+                format!("{fname} has no @PACKAGE and is not a package (2.7)"),
+                Some(Loc::line(fname.clone(), 1)),
+            );
             self.units[id].ok = false;
         }
         if !self.units[id].alias_pending.is_empty() && !is_alias_package(&self.units[id]) {
@@ -1220,7 +1326,8 @@ impl Interp<'_> {
             return s;
         }
         self.scan_packages();
-        let same: Vec<(String, String, String)> = self.pkg_files.as_ref().unwrap().iter().filter(|c| c.0 == "rnl-std").cloned().collect();
+        let same: Vec<(String, String, String)> =
+            self.pkg_files.as_ref().unwrap().iter().filter(|c| c.0 == "rnl-std").cloned().collect();
         let mut out = None;
         if let Some(c) = same.iter().max_by_key(|c| version_key(&c.1)) {
             let key = (c.0.clone(), c.1.clone());
@@ -1276,7 +1383,11 @@ impl Interp<'_> {
             }
             for d in uses.iter().filter(|d| !d.in_header) {
                 if let Some(pk) = d.pkg {
-                    put(&mut eff, &d.name, EffPackage { decl: Some(d.clone()), unit: pk, place: Place::Level(lv, d.pos) });
+                    put(
+                        &mut eff,
+                        &d.name,
+                        EffPackage { decl: Some(d.clone()), unit: pk, place: Place::Level(lv, d.pos) },
+                    );
                 } else {
                     eff.retain(|(n, _)| *n != d.name);
                 }
@@ -1316,10 +1427,22 @@ impl Interp<'_> {
 
     // ------------------------------------------------------------------ names (6.6)
 
-    pub(crate) fn declare(&mut self, u: UnitId, rec: Option<RecId>, k: usize, embedded: bool, m: &Rc<Member>, header: &Rc<Header>) {
+    pub(crate) fn declare(
+        &mut self,
+        u: UnitId,
+        rec: Option<RecId>,
+        k: usize,
+        embedded: bool,
+        m: &Rc<Member>,
+        header: &Rc<Header>,
+    ) {
         for b in &m.binds {
             let key = (b.prefix, b.name.clone());
-            let written = m.written.get(&format!("{}{}", b.prefix, b.name)).cloned().unwrap_or_else(|| format!("{}{}", b.prefix, b.name));
+            let written = m
+                .written
+                .get(&format!("{}{}", b.prefix, b.name))
+                .cloned()
+                .unwrap_or_else(|| format!("{}{}", b.prefix, b.name));
             let binding = Binding {
                 prefix: b.prefix,
                 name: b.name.clone(),
@@ -1414,6 +1537,11 @@ mod tests {
     fn similarity_like_difflib() {
         assert!((similarity("alig", "align") - 0.888).abs() < 0.01);
         assert_eq!(closest("priorty", ["type", "scope", "priority", "author"]).as_deref(), Some("priority"));
-        assert_eq!(scan_package_decl("@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"rnl-std\", version=\"0.2\")}"), Some(("rnl-std".into(), "0.2".into())));
+        assert_eq!(
+            scan_package_decl(
+                "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"rnl-std\", version=\"0.2\")}"
+            ),
+            Some(("rnl-std".into(), "0.2".into()))
+        );
     }
 }

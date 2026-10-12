@@ -47,7 +47,14 @@ impl W {
                 PathSeg::Arc { r, large, ccw, to } => {
                     let (x, y) = self.px(*to);
                     // SVG's y points down: counter-clockwise in y-up is sweep-flag 0
-                    let _ = write!(d, " A{:.2},{:.2} 0 {} {} {x:.2},{y:.2}", r * self.s, r * self.s, u8::from(*large), u8::from(!*ccw));
+                    let _ = write!(
+                        d,
+                        " A{:.2},{:.2} 0 {} {} {x:.2},{y:.2}",
+                        r * self.s,
+                        r * self.s,
+                        u8::from(*large),
+                        u8::from(!*ccw)
+                    );
                 }
                 PathSeg::Cubic(a, b, c) => {
                     let (a, b, c) = (self.px(*a), self.px(*b), self.px(*c));
@@ -128,7 +135,12 @@ impl W {
             }
             Kind::Circle { c, r, stroke, fill } => {
                 let (x, y) = self.px(*c);
-                format!("<circle cx=\"{x:.2}\" cy=\"{y:.2}\" r=\"{:.2}\" fill=\"{}\" {}/>", r * self.s, Self::fill(fill), self.stroke_attrs(stroke))
+                format!(
+                    "<circle cx=\"{x:.2}\" cy=\"{y:.2}\" r=\"{:.2}\" fill=\"{}\" {}/>",
+                    r * self.s,
+                    Self::fill(fill),
+                    self.stroke_attrs(stroke)
+                )
             }
             Kind::Ellipse { c, rx, ry, stroke, fill } => {
                 let (x, y) = self.px(*c);
@@ -205,8 +217,22 @@ impl W {
     /// widths and each piece is held to its width with textLength; numerator and denominator are
     /// centred over a bar as wide as the wider of them.
     #[allow(clippy::too_many_arguments)]
-    fn text_with_fractions(&self, t: &TextPrim, x: f64, y: f64, fs: f64, first: f64, lh: f64, family: &str, font_attrs: &str, rot: &str) -> String {
-        let mut out = format!("<g transform=\"translate({x:.2},{y:.2}){rot}\" fill=\"{}\" font-family=\"{family}\"{font_attrs}>", esc(&t.color));
+    fn text_with_fractions(
+        &self,
+        t: &TextPrim,
+        x: f64,
+        y: f64,
+        fs: f64,
+        first: f64,
+        lh: f64,
+        family: &str,
+        font_attrs: &str,
+        rot: &str,
+    ) -> String {
+        let mut out = format!(
+            "<g transform=\"translate({x:.2},{y:.2}){rot}\" fill=\"{}\" font-family=\"{family}\"{font_attrs}>",
+            esc(&t.color)
+        );
         let small = fs * FRAC_SIZE;
         let held = |runs: &[Run], x: f64, y: f64, size: f64, anchor: &str| -> String {
             let w: f64 = runs.iter().map(run_width).sum::<f64>() * size;
@@ -254,7 +280,6 @@ impl W {
     }
 }
 
-
 /// Write primitives as an SVG document framing everything drawn, with a margin.
 pub fn svg_document(prims: &[Primitive], o: &RenderOptions) -> String {
     let w = W { s: o.scale };
@@ -272,7 +297,12 @@ pub fn svg_document(prims: &[Primitive], o: &RenderOptions) -> String {
         x0 * o.scale,
         -y1 * o.scale
     );
-    let _ = write!(s, "\n<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{vw:.2}\" height=\"{vh:.2}\" fill=\"#ffffff\"/>", x0 * o.scale, -y1 * o.scale);
+    let _ = write!(
+        s,
+        "\n<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{vw:.2}\" height=\"{vh:.2}\" fill=\"#ffffff\"/>",
+        x0 * o.scale,
+        -y1 * o.scale
+    );
     for p in prims {
         s.push('\n');
         if p.owner.is_empty() {

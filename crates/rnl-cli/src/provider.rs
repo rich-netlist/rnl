@@ -47,7 +47,10 @@ impl Provider for FsProvider {
         let mut out = Vec::new();
         for d in &self.dirs {
             let mut files: Vec<PathBuf> = match std::fs::read_dir(d) {
-                Ok(rd) => rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|x| x == "rnl")).collect(),
+                Ok(rd) => rd
+                    .filter_map(|e| e.ok().map(|e| e.path()))
+                    .filter(|p| p.extension().is_some_and(|x| x == "rnl"))
+                    .collect(),
                 Err(_) => Vec::new(),
             };
             files.sort();

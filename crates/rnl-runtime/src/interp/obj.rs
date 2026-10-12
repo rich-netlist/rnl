@@ -27,7 +27,6 @@ pub const OWNER: ObjId = ObjId(1);
 /// No object: what a statement without a result gives.
 pub const NOTHING: ObjId = ObjId(2);
 
-
 /// A string with the unit whose text it is written in: a string passed into a definition is
 /// read with the aliases of the file that wrote it (16.5).
 #[derive(Clone, Debug, PartialEq)]
@@ -434,8 +433,12 @@ pub enum SetKind {
         off: usize,
     },
     /// A generated set (10.5): filled per drawing level in the generation phase.
-    Gen { by_scene: HashMap<SceneId, Vec<ObjId>> },
-    Union { source: ObjId },
+    Gen {
+        by_scene: HashMap<SceneId, Vec<ObjId>>,
+    },
+    Union {
+        source: ObjId,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -460,13 +463,33 @@ impl SetData {
 pub enum ObjData {
     Failed(Option<DiagId>),
     Marker,
-    LevelObj { scene: SceneId },
-    Inst { scene: SceneId, idx: usize, bundle: Option<ObjId> },
-    Net { scene: SceneId, key: String, display: String },
-    Term { owner: ObjId, index: u32, name: Option<String> },
-    Point { x: Option<f64>, y: Option<f64>, local: bool },
+    LevelObj {
+        scene: SceneId,
+    },
+    Inst {
+        scene: SceneId,
+        idx: usize,
+        bundle: Option<ObjId>,
+    },
+    Net {
+        scene: SceneId,
+        key: String,
+        display: String,
+    },
+    Term {
+        owner: ObjId,
+        index: u32,
+        name: Option<String>,
+    },
+    Point {
+        x: Option<f64>,
+        y: Option<f64>,
+        local: bool,
+    },
     /// `X::position` (6.5).
-    Pos { parent: ObjId },
+    Pos {
+        parent: ObjId,
+    },
     Wire {
         nets: Vec<ObjId>,
         bus: bool,
@@ -478,8 +501,17 @@ pub enum ObjData {
         site: Option<Rc<Ctx>>,
         off: usize,
     },
-    Route { net: ObjId, mode: String, style: StyleMap },
-    Prim { shape: Shape, points: Vec<ObjId>, params: PrimParams, style: StyleMap },
+    Route {
+        net: ObjId,
+        mode: String,
+        style: StyleMap,
+    },
+    Prim {
+        shape: Shape,
+        points: Vec<ObjId>,
+        params: PrimParams,
+        style: StyleMap,
+    },
     Text {
         attach: ObjId,
         items: TextItems,
@@ -503,14 +535,21 @@ pub enum ObjData {
         off: usize,
     },
     Usage(Box<UsageData>),
-    Bundle { members: Vec<ObjId>, empty: bool, site: Option<Rc<Ctx>> },
+    Bundle {
+        members: Vec<ObjId>,
+        empty: bool,
+        site: Option<Rc<Ctx>>,
+    },
     Constraint(Box<ConstraintData>),
     Set(Box<SetData>),
     Symbol(Box<SymbolDef>),
     Style(StyleMap),
     Definition(Box<DefData>),
     /// A label in a symbol body that a PLACE in the body positions.
-    SymLabel { symbol: ObjId, index: usize },
+    SymLabel {
+        symbol: ObjId,
+        index: usize,
+    },
 }
 
 #[derive(Clone, Debug)]

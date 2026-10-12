@@ -11,7 +11,11 @@ use rnl_runtime::Options;
 
 fn cases() -> Vec<PathBuf> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases");
-    let mut out: Vec<PathBuf> = std::fs::read_dir(dir).unwrap().filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|e| e == "sp")).collect();
+    let mut out: Vec<PathBuf> = std::fs::read_dir(dir)
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|e| e == "sp"))
+        .collect();
     out.sort();
     out
 }
@@ -37,7 +41,11 @@ fn stripping_generated_records_keeps_the_rest() {
         let mut sink = Sink::new();
         let again = read_host(&f, None, &both, &mut sink).unwrap();
         let count = |d: &rnl_runtime::host::HostDocument, generated: bool| {
-            d.levels.iter().flat_map(|l| l.records.iter()).filter(|r| r.file == main && (record_type(r) == "generated") == generated).count()
+            d.levels
+                .iter()
+                .flat_map(|l| l.records.iter())
+                .filter(|r| r.file == main && (record_type(r) == "generated") == generated)
+                .count()
         };
         assert_eq!(count(&again, true), 0, "{}", f.display());
         assert_eq!(count(&again, false), count(&doc, false), "{}", f.display());

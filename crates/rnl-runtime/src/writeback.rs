@@ -109,7 +109,8 @@ pub fn carrier(doc: &HostDocument, file: &str, text: &str) -> &'static str {
         }
     }
     let spectre_mode = doc.dialect.name == "spectre"
-        && (file.to_lowercase().ends_with(".scs") || text.lines().take(5).any(|l| l.trim().to_lowercase().starts_with("simulator") && l.contains("spectre")));
+        && (file.to_lowercase().ends_with(".scs")
+            || text.lines().take(5).any(|l| l.trim().to_lowercase().starts_with("simulator") && l.contains("spectre")));
     if spectre_mode {
         "//"
     } else {
@@ -141,7 +142,8 @@ fn span(r: &Record) -> ((u32, u32), (u32, u32)) {
 pub fn remove_records(doc: &HostDocument, file: &str, text: &str, pred: impl Fn(LevelId, &Record) -> bool) -> String {
     let marker = carrier(doc, file, text);
     let mut lines = Lines::new(text);
-    let mut spans: Vec<((u32, u32), (u32, u32))> = records_of(doc, file).into_iter().filter(|(lv, r)| pred(*lv, r)).map(|(_, r)| span(r)).collect();
+    let mut spans: Vec<((u32, u32), (u32, u32))> =
+        records_of(doc, file).into_iter().filter(|(lv, r)| pred(*lv, r)).map(|(_, r)| span(r)).collect();
     spans.sort();
     for (a, b) in spans.into_iter().rev() {
         lines.remove(a, b, marker);
@@ -191,7 +193,8 @@ pub fn replace_generated(doc: &HostDocument, level: LevelId, text: &str, record:
     let with = append_record(doc, level, text, record);
     let marker = carrier(doc, &file, text);
     let mut lines = Lines::new(&with);
-    let mut spans: Vec<((u32, u32), (u32, u32))> = lv.records.iter().filter(|r| r.file == file && record_type(r) == "generated").map(span).collect();
+    let mut spans: Vec<((u32, u32), (u32, u32))> =
+        lv.records.iter().filter(|r| r.file == file && record_type(r) == "generated").map(span).collect();
     spans.sort();
     for (a, b) in spans.into_iter().rev() {
         lines.remove(a, b, marker);
@@ -202,14 +205,21 @@ pub fn replace_generated(doc: &HostDocument, level: LevelId, text: &str, record:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::host::{Dialect, Level};
+    use crate::host::{Dialect, Level, LevelKind};
     use crate::records::{scan_run, CarrierLine};
 
     /// A tiny SPICE reader for these tests: `*` carriers, `.subckt`/`.ends` levels.
     fn doc(text: &str, file: &str, marker: &str) -> HostDocument {
         let mut main = Level::new(LevelKind::File, file, file, file);
         main.circuit = true;
-        let mut d = HostDocument::new(main, Dialect { name: if marker == "//" { "spectre".into() } else { "spice".into() }, case_sensitive: false, ground_aliases: vec![] });
+        let mut d = HostDocument::new(
+            main,
+            Dialect {
+                name: if marker == "//" { "spectre".into() } else { "spice".into() },
+                case_sensitive: false,
+                ground_aliases: vec![],
+            },
+        );
         let mut sink = crate::diag::Sink::new();
         let mut cur = 0;
         let mut run: Vec<CarrierLine> = Vec::new();
@@ -260,7 +270,8 @@ mod tests {
 
     #[test]
     fn replace_in_a_subcircuit() {
-        let net = "* t\n.subckt s a b\nR1 a b 1k\n* @RNL(type=\"generated\") {#R1 @PLACE(0, 0)}\n* @RNL {#R1}\n.ends\n.end\n";
+        let net =
+            "* t\n.subckt s a b\nR1 a b 1k\n* @RNL(type=\"generated\") {#R1 @PLACE(0, 0)}\n* @RNL {#R1}\n.ends\n.end\n";
         let d = doc(net, "a.sp", "*");
         let out = replace_generated(&d, 1, net, "@RNL(type=\"generated\", priority=\"high\") {\n  #R1 @PLACE(4, 4)\n}");
         assert_eq!(out, "* t\n.subckt s a b\nR1 a b 1k\n* @RNL {#R1}\n* @RNL(type=\"generated\", priority=\"high\") {\n*   #R1 @PLACE(4, 4)\n* }\n.ends\n.end\n");

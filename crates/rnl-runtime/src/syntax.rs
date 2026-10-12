@@ -35,7 +35,10 @@ pub fn is_name_char(c: char) -> bool {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
-    Num { value: f64, text: String },
+    Num {
+        value: f64,
+        text: String,
+    },
     Str(String),
     Bool(bool),
     Arr(Vec<Value>),
@@ -354,14 +357,7 @@ impl Parser {
     }
 
     fn starts_with_at(&self, at: usize, s: &str) -> bool {
-        let mut j = at;
-        for c in s.chars() {
-            if self.t.get(j) != Some(&c) {
-                return false;
-            }
-            j += 1;
-        }
-        true
+        s.chars().enumerate().all(|(k, c)| self.t.get(at + k) == Some(&c))
     }
 
     fn peek_in(&self, set: &str) -> bool {
@@ -428,7 +424,8 @@ impl Parser {
                 if c == '|' && words.is_some() {
                     self.notes.push(Note {
                         off: self.i,
-                        message: "`|` in free text: a pipe is written `=>` (4.2 rule 3; it was `|` before round D)".into(),
+                        message: "`|` in free text: a pipe is written `=>` (4.2 rule 3; it was `|` before round D)"
+                            .into(),
                         kw: None,
                     });
                 }
@@ -846,7 +843,9 @@ impl Parser {
                 } else {
                     match self.ascii_name() {
                         Some(n) => (n, false),
-                        None => return self.err("write a name after `::` (non-ASCII names and aliases in quotes, 16.5)"),
+                        None => {
+                            return self.err("write a name after `::` (non-ASCII names and aliases in quotes, 16.5)")
+                        }
                     }
                 };
                 if self.peek_in("<[") {
@@ -1001,7 +1000,9 @@ impl Parser {
         self.i += 1;
         let mut j = self.i;
         let n = self.n();
-        while j < n && (is_word_char(self.t[j]) || (self.t[j] == '-' && j > self.i && j + 1 < n && is_word_char(self.t[j + 1]))) {
+        while j < n
+            && (is_word_char(self.t[j]) || (self.t[j] == '-' && j > self.i && j + 1 < n && is_word_char(self.t[j + 1])))
+        {
             j += 1;
         }
         if j == self.i {
@@ -1079,7 +1080,9 @@ impl Parser {
                     self.i += 1;
                     break;
                 }
-                _ => return self.err("parameters are separated by `,`; there is no free text inside parentheses (3.3)"),
+                _ => {
+                    return self.err("parameters are separated by `,`; there is no free text inside parentheses (3.3)")
+                }
             }
         }
         p.end = self.i;
@@ -1128,7 +1131,9 @@ impl Parser {
                     _ => Value::Word(w),
                 })
             }
-            Some(c) if "#&%$({<".contains(c) => self.err("parameters hold literals only; objects are written outside the parentheses (4.4)"),
+            Some(c) if "#&%$({<".contains(c) => {
+                self.err("parameters hold literals only; objects are written outside the parentheses (4.4)")
+            }
             _ => self.expected("expected a value here"),
         }
     }
@@ -1323,7 +1328,9 @@ fn walk_obj<'a>(o: &'a ObjExpr, out: &mut Vec<RefOrHole<'a>>) {
         ObjExpr::Set(s) => {
             for m in &s.members {
                 let defines = m.segments.iter().any(|sg| {
-                    sg.call.as_ref().is_some_and(|c| matches!(c.kw.as_str(), "DEFINE-SYMBOL" | "DEFINE" | "DEFINE-STYLE"))
+                    sg.call
+                        .as_ref()
+                        .is_some_and(|c| matches!(c.kw.as_str(), "DEFINE-SYMBOL" | "DEFINE" | "DEFINE-STYLE"))
                 });
                 if !defines {
                     walk_refs(m, out);
@@ -1372,7 +1379,9 @@ mod tests {
 
     #[test]
     fn free_text_and_points() {
-        let b = body("@RNL { the pair: {#M1 #M2} @ALIGN(\"y\"), i.e., same y; #M5 is at @PLACE(20, 6) => it @ORIENT(\"R0\")}");
+        let b = body(
+            "@RNL { the pair: {#M1 #M2} @ALIGN(\"y\"), i.e., same y; #M5 is at @PLACE(20, 6) => it @ORIENT(\"R0\")}",
+        );
         assert_eq!(b.members.len(), 2);
         assert!(b.members[0].error.is_none());
         let b = body("@RNL {%p = (1.5, _); (0, -2.5E1) @TEXT(\"x\")}");

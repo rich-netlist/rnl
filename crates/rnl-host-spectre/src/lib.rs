@@ -46,11 +46,43 @@ const PRIMITIVES: [(&str, &[&str], Option<&str>); 13] = [
 fn family(master: &str) -> Option<&'static str> {
     let m = master.to_lowercase();
     let mos = [
-        "bsim1", "bsim2", "bsim3", "bsim3v3", "bsim4", "bsim6", "bsimbulk", "bsimsoi", "bsimcmg", "bsimimg", "b3soipd", "mos0", "mos1", "mos2",
-        "mos3", "mos9", "mos11", "mos705", "mos902", "mos903", "psp102", "psp103", "psp104", "pspnqs102", "pspnqs103", "ekv", "hisim",
-        "hisim2", "hisimhv", "hvmos", "bta_soi", "ucsd_hvmos",
+        "bsim1",
+        "bsim2",
+        "bsim3",
+        "bsim3v3",
+        "bsim4",
+        "bsim6",
+        "bsimbulk",
+        "bsimsoi",
+        "bsimcmg",
+        "bsimimg",
+        "b3soipd",
+        "mos0",
+        "mos1",
+        "mos2",
+        "mos3",
+        "mos9",
+        "mos11",
+        "mos705",
+        "mos902",
+        "mos903",
+        "psp102",
+        "psp103",
+        "psp104",
+        "pspnqs102",
+        "pspnqs103",
+        "ekv",
+        "hisim",
+        "hisim2",
+        "hisimhv",
+        "hvmos",
+        "bta_soi",
+        "ucsd_hvmos",
     ];
-    let bjt = ["bjt", "bjt500", "bjt503", "bjt504", "bjt504t", "bjt3500", "bjt301", "vbic", "hicum", "hicum0", "hicum2", "mextram"];
+    let bjt = [
+        "bjt", "bjt500", "bjt503", "bjt504", "bjt504t", "bjt3500", "bjt301", "vbic", "hicum", "hicum0", "hicum2",
+        "mextram",
+    ];
     if mos.contains(&m.as_str()) {
         Some("mos")
     } else if bjt.contains(&m.as_str()) {
@@ -108,15 +140,68 @@ fn family_type(f: &str, params: &[(String, String)]) -> Option<String> {
 
 /// Statements whose second word names an analysis or control: not instances.
 const ANALYSES: [&str; 44] = [
-    "ac", "dc", "tran", "noise", "pss", "pac", "pnoise", "pxf", "psp", "pstb", "qpss", "qpac", "qpnoise", "qpxf", "qpsp", "hb", "hbac",
-    "hbnoise", "hbsp", "hbxf", "hbstb", "sp", "stb", "xf", "info", "options", "set", "shell", "alter", "altergroup", "check", "checklimit",
-    "montecarlo", "sweep", "envlp", "dcmatch", "reliability", "sens", "fourier", "loadpull", "pz", "sprobe", "assert", "tdr",
+    "ac",
+    "dc",
+    "tran",
+    "noise",
+    "pss",
+    "pac",
+    "pnoise",
+    "pxf",
+    "psp",
+    "pstb",
+    "qpss",
+    "qpac",
+    "qpnoise",
+    "qpxf",
+    "qpsp",
+    "hb",
+    "hbac",
+    "hbnoise",
+    "hbsp",
+    "hbxf",
+    "hbstb",
+    "sp",
+    "stb",
+    "xf",
+    "info",
+    "options",
+    "set",
+    "shell",
+    "alter",
+    "altergroup",
+    "check",
+    "checklimit",
+    "montecarlo",
+    "sweep",
+    "envlp",
+    "dcmatch",
+    "reliability",
+    "sens",
+    "fourier",
+    "loadpull",
+    "pz",
+    "sprobe",
+    "assert",
+    "tdr",
 ];
 
 /// Statements that are not instances, by their first word.
 const DIRECTIVES: [&str; 14] = [
-    "parameters", "statistics", "real", "ic", "nodeset", "save", "paramset", "ahdl_include", "hdl_include", "pspice_include", "dspf_include",
-    "export", "function", "if",
+    "parameters",
+    "statistics",
+    "real",
+    "ic",
+    "nodeset",
+    "save",
+    "paramset",
+    "ahdl_include",
+    "hdl_include",
+    "pspice_include",
+    "dspf_include",
+    "export",
+    "function",
+    "if",
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -218,7 +303,16 @@ impl<'a> Reader<'a> {
 
     /// Read one file. `section`: read only this library section.
     #[allow(clippy::too_many_arguments)]
-    fn read_file(&mut self, path: &str, level: LevelId, circ: LevelId, main: bool, mode: Mode, stack: &[String], section: Option<&str>) {
+    fn read_file(
+        &mut self,
+        path: &str,
+        level: LevelId,
+        circ: LevelId,
+        main: bool,
+        mode: Mode,
+        stack: &[String],
+        section: Option<&str>,
+    ) {
         let Some(text) = self.provider.read(path) else { return };
         let fname = self.display(path);
         if !self.doc.sources.iter().any(|(f, _)| *f == fname) {
@@ -252,10 +346,15 @@ impl<'a> Reader<'a> {
                 let words: Vec<&str> = low.split_whitespace().collect();
                 let first = words.first().copied().unwrap_or("");
                 if let Some(name) = &skip_section {
-                    if (first == "endsection" || first == ".endl") && words.get(1).is_none_or(|w| w.eq_ignore_ascii_case(name)) {
+                    if (first == "endsection" || first == ".endl")
+                        && words.get(1).is_none_or(|w| w.eq_ignore_ascii_case(name))
+                    {
                         skip_section = None;
                     } else if raw.contains("@RNL") {
-                        self.sink.warning("RNL in a library section that is not selected is not read (2.2)", Some(Loc::line(&fname, no)));
+                        self.sink.warning(
+                            "RNL in a library section that is not selected is not read (2.2)",
+                            Some(Loc::line(&fname, no)),
+                        );
                     }
                     continue;
                 }
@@ -266,14 +365,19 @@ impl<'a> Reader<'a> {
                         // each section sets its own language; it starts in SPICE mode (S1 p498)
                         st.mode = if first == "section" { Mode::Spectre } else { Mode::Spice };
                     } else if raw.contains("@RNL") {
-                        self.sink.warning("RNL outside the selected library section is not read (2.2)", Some(Loc::line(&fname, no)));
+                        self.sink.warning(
+                            "RNL outside the selected library section is not read (2.2)",
+                            Some(Loc::line(&fname, no)),
+                        );
                     }
                     continue;
                 }
             }
             // carriers
             let carrier_rest = match st.mode {
-                Mode::Spectre => raw.strip_prefix("//").map(|r| (r, 2)).or_else(|| raw.strip_prefix('*').map(|r| (r, 1))),
+                Mode::Spectre => {
+                    raw.strip_prefix("//").map(|r| (r, 2)).or_else(|| raw.strip_prefix('*').map(|r| (r, 1)))
+                }
                 Mode::Spice => raw.strip_prefix('*').map(|r| (r, 1)),
             };
             if let Some((rest, col)) = carrier_rest {
@@ -295,7 +399,10 @@ impl<'a> Reader<'a> {
                 continue;
             }
             if raw.contains("@RNL") {
-                self.sink.warning("@RNL in an end-of-line comment or a host statement is host text (2.2)", Some(Loc::line(&fname, no)));
+                self.sink.warning(
+                    "@RNL in an end-of-line comment or a host statement is host text (2.2)",
+                    Some(Loc::line(&fname, no)),
+                );
             }
             if st.mode == Mode::Spice {
                 if let Some(cont) = stripped.strip_prefix('+') {
@@ -394,7 +501,6 @@ impl<'a> Reader<'a> {
         if self.doc.levels[level].end_line == 0 {
             self.doc.levels[level].end_line = n as u32 + 1;
         }
-
     }
 
     fn flush(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {
@@ -407,7 +513,16 @@ impl<'a> Reader<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn open_subckt(&mut self, name: &str, ports: Vec<String>, fname: &str, path: &str, no: u32, st: &mut State, spectre: bool) {
+    fn open_subckt(
+        &mut self,
+        name: &str,
+        ports: Vec<String>,
+        fname: &str,
+        path: &str,
+        no: u32,
+        st: &mut State,
+        spectre: bool,
+    ) {
         let mut lv = Level::new(LevelKind::Subckt, name, fname, path);
         lv.circuit = true;
         lv.line = no;
@@ -429,7 +544,17 @@ impl<'a> Reader<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn include(&mut self, target: &str, section: Option<&str>, no: u32, fname: &str, path: &str, st: &State, stack: &[String], parent_mode: Mode) {
+    fn include(
+        &mut self,
+        target: &str,
+        section: Option<&str>,
+        no: u32,
+        fname: &str,
+        path: &str,
+        st: &State,
+        stack: &[String],
+        parent_mode: Mode,
+    ) {
         let full = join(&dirname(path), target);
         let key = format!("{}#{}", full, section.unwrap_or("").to_lowercase());
         if stack.contains(&key) {
@@ -463,7 +588,16 @@ impl<'a> Reader<'a> {
 
     /// One Spectre statement; returns Some(true) at the end of the selected section.
     #[allow(clippy::too_many_arguments)]
-    fn spectre_statement(&mut self, stmt: &str, no: u32, fname: &str, path: &str, st: &mut State, stack: &[String], section: Option<&str>) -> Option<bool> {
+    fn spectre_statement(
+        &mut self,
+        stmt: &str,
+        no: u32,
+        fname: &str,
+        path: &str,
+        st: &mut State,
+        stack: &[String],
+        section: Option<&str>,
+    ) -> Option<bool> {
         let toks = tokens(stmt);
         let first = toks.first()?.clone();
         let low = first.to_lowercase();
@@ -494,7 +628,10 @@ impl<'a> Reader<'a> {
                 if toks.len() >= 3 {
                     let name = toks[1].clone();
                     let master = toks[2].clone();
-                    let params = toks[3..].iter().filter_map(|t| t.split_once('=').map(|(k, v)| (k.to_string(), v.to_string()))).collect();
+                    let params = toks[3..]
+                        .iter()
+                        .filter_map(|t| t.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
+                        .collect();
                     // binned models `nch.1`, `nch.2` stand for `nch`
                     let base = match name.rsplit_once('.') {
                         Some((b, k)) if k.chars().all(|c| c.is_ascii_digit()) => b.to_string(),
@@ -507,7 +644,12 @@ impl<'a> Reader<'a> {
             "subckt" | "inline" => {
                 let rest: Vec<&String> = toks.iter().skip(if low == "inline" { 2 } else { 1 }).collect();
                 let name = rest.first().map(|s| s.as_str()).unwrap_or("?").to_string();
-                let ports: Vec<String> = rest.iter().skip(1).filter(|t| t.as_str() != "(" && t.as_str() != ")" && !t.contains('=')).map(|t| t.to_string()).collect();
+                let ports: Vec<String> = rest
+                    .iter()
+                    .skip(1)
+                    .filter(|t| t.as_str() != "(" && t.as_str() != ")" && !t.contains('='))
+                    .map(|t| t.to_string())
+                    .collect();
                 self.open_subckt(&name, ports, fname, path, no, st, true);
                 return None;
             }
@@ -523,7 +665,8 @@ impl<'a> Reader<'a> {
         }
         // an instance: `name (nodes) master params` or `name nodes master params`
         let name = first;
-        let (nodes, master, rest): (Vec<String>, String, Vec<String>) = if toks.get(1).map(|s| s.as_str()) == Some("(") {
+        let (nodes, master, rest): (Vec<String>, String, Vec<String>) = if toks.get(1).map(|s| s.as_str()) == Some("(")
+        {
             let close = toks.iter().position(|t| t == ")")?;
             let nodes = toks[2..close].to_vec();
             let master = toks.get(close + 1)?.clone();
@@ -539,7 +682,8 @@ impl<'a> Reader<'a> {
         if ANALYSES.contains(&master.to_lowercase().as_str()) {
             return None;
         }
-        let params: Vec<(String, String)> = rest.iter().filter_map(|t| t.split_once('=').map(|(k, v)| (k.to_string(), v.to_string()))).collect();
+        let params: Vec<(String, String)> =
+            rest.iter().filter_map(|t| t.split_once('=').map(|(k, v)| (k.to_string(), v.to_string()))).collect();
         let inst = Instance {
             name: name.clone(),
             letter: None,
@@ -570,7 +714,8 @@ impl<'a> Reader<'a> {
             return;
         }
         if first == ".model" {
-            let toks: Vec<&str> = body.split(|c: char| c.is_whitespace() || c == '(').filter(|t| !t.is_empty()).collect();
+            let toks: Vec<&str> =
+                body.split(|c: char| c.is_whitespace() || c == '(').filter(|t| !t.is_empty()).collect();
             if toks.len() >= 3 {
                 self.spice_models.insert(toks[1].to_lowercase(), toks[2].to_lowercase());
             }
@@ -628,19 +773,20 @@ impl<'a> Reader<'a> {
                     continue;
                 }
                 let master = inst.model.clone().unwrap_or_default();
-                let (terms, value_param, mtype, is_subckt) = if let Some((_, t, v)) = PRIMITIVES.iter().find(|(m, _, _)| *m == master) {
-                    (Some(t.iter().map(|s| s.to_string()).collect::<Vec<_>>()), v.map(String::from), None, false)
-                } else if let Some(m) = self.models.get(&master) {
-                    match family(&m.master) {
-                        Some(f) => (family_terminals(f), None, family_type(f, &m.params), false),
-                        None => (None, None, None, false),
-                    }
-                } else if subckt_keys.contains(&master) {
-                    (None, None, None, true)
-                } else {
-                    // neither a primitive nor a model card: a subcircuit defined elsewhere, such as a PDK device (6.4)
-                    (None, None, None, true)
-                };
+                let (terms, value_param, mtype, is_subckt) =
+                    if let Some((_, t, v)) = PRIMITIVES.iter().find(|(m, _, _)| *m == master) {
+                        (Some(t.iter().map(|s| s.to_string()).collect::<Vec<_>>()), v.map(String::from), None, false)
+                    } else if let Some(m) = self.models.get(&master) {
+                        match family(&m.master) {
+                            Some(f) => (family_terminals(f), None, family_type(f, &m.params), false),
+                            None => (None, None, None, false),
+                        }
+                    } else if subckt_keys.contains(&master) {
+                        (None, None, None, true)
+                    } else {
+                        // neither a primitive nor a model card: a subcircuit defined elsewhere, such as a PDK device (6.4)
+                        (None, None, None, true)
+                    };
                 let inst = &mut self.doc.levels[lv].instances[k];
                 inst.default_terminals = terms;
                 inst.mtype = mtype;

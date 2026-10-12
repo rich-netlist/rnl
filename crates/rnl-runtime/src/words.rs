@@ -153,7 +153,10 @@ impl Words {
         for (name, spec) in obj.get("header_fields").and_then(Value::as_object).ok_or("header_fields")? {
             header_fields.push(HeaderField {
                 name: name.clone(),
-                values: spec.get("values").and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()),
+                values: spec
+                    .get("values")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()),
                 affects: spec.get("affects").and_then(Value::as_bool).unwrap_or(false),
             });
         }

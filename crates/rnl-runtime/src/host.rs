@@ -180,7 +180,13 @@ pub struct HostDocument {
 
 impl HostDocument {
     pub fn new(main: Level, dialect: Dialect) -> HostDocument {
-        HostDocument { levels: vec![main], dialect, subckts: HashMap::new(), globals: HashSet::new(), sources: Vec::new() }
+        HostDocument {
+            levels: vec![main],
+            dialect,
+            subckts: HashMap::new(),
+            globals: HashSet::new(),
+            sources: Vec::new(),
+        }
     }
 
     pub fn main(&self) -> &Level {

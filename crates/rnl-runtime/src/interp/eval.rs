@@ -54,11 +54,17 @@ pub enum Found {
 
 pub type Bound = Vec<((char, String), ObjId)>;
 
+/// Alias -> original.
+pub type Aliases = Vec<(String, String)>;
+
+/// Reads a written parameter name: (name, quoted, offset) -> the name it stands for.
+pub type NameReader<'a, 'p> = &'a dyn Fn(&mut Interp<'p>, &str, bool, usize) -> R<String>;
+
 pub fn ptr<T>(r: &T) -> usize {
     r as *const T as usize
 }
 
-impl Interp<'_> {
+impl<'p> Interp<'p> {
     // ------------------------------------------------------------------ objects
 
     pub(crate) fn new_obj(&mut self, data: ObjData) -> ObjId {
@@ -180,7 +186,11 @@ impl Interp<'_> {
             ObjData::Inst { .. } => format!("#{}", self.inst_name(id)),
             ObjData::Net { display, .. } => format!("&{display}"),
             ObjData::Term { owner, index, name } => {
-                let base = if matches!(self.o(*owner), ObjData::LevelObj { .. }) { "#".to_string() } else { self.label(*owner) };
+                let base = if matches!(self.o(*owner), ObjData::LevelObj { .. }) {
+                    "#".to_string()
+                } else {
+                    self.label(*owner)
+                };
                 match name {
                     Some(n) => format!("{base}:{n}"),
                     None => format!("{base}:{index}"),
@@ -232,17 +242,33 @@ impl Interp<'_> {
                         SetKind::Gen { .. } => "a generated set".into(),
                         _ => "a set".into(),
                     }
-                } else if o.name.starts_with('$') {
-                    o.name.clone()
-                } else if matches!(s.kind, SetKind::Select { .. } | SetKind::Gen { .. }) {
+                } else if o.name.starts_with('$') || matches!(s.kind, SetKind::Select { .. } | SetKind::Gen { .. }) {
                     o.name.clone()
                 } else {
                     format!("%{}", o.name)
                 }
             }
-            ObjData::Symbol(_) => if o.name.is_empty() { "a symbol".into() } else { o.name.clone() },
-            ObjData::Style(_) => if o.name.is_empty() { "a style".into() } else { o.name.clone() },
-            ObjData::Definition(_) => if o.name.is_empty() { "a definition".into() } else { o.name.clone() },
+            ObjData::Symbol(_) => {
+                if o.name.is_empty() {
+                    "a symbol".into()
+                } else {
+                    o.name.clone()
+                }
+            }
+            ObjData::Style(_) => {
+                if o.name.is_empty() {
+                    "a style".into()
+                } else {
+                    o.name.clone()
+                }
+            }
+            ObjData::Definition(_) => {
+                if o.name.is_empty() {
+                    "a definition".into()
+                } else {
+                    o.name.clone()
+                }
+            }
         }
     }
 
@@ -306,7 +332,12 @@ impl Interp<'_> {
     pub(crate) fn warn(&mut self, ctx: &Ctx, msg: impl Into<String>, off: usize) {
         let loc = self.rec_loc(ctx.rec, off);
         let pkg = self.ctx_pkg(ctx);
-        self.sink.add(Severity::Warning, msg, loc, Extra { cause: None, origin: ctx.origin.to_string(), in_package: pkg });
+        self.sink.add(
+            Severity::Warning,
+            msg,
+            loc,
+            Extra { cause: None, origin: ctx.origin.to_string(), in_package: pkg },
+        );
     }
 
     pub(crate) fn hint_at(&mut self, ctx: &Ctx, msg: impl Into<String>, off: usize) {
@@ -453,7 +484,7 @@ impl Interp<'_> {
                 _ => None,
             })
             .collect();
-        roots.sort_by(|a, b| b.0.cmp(&a.0));
+        roots.sort_by_key(|r| std::cmp::Reverse(r.0));
         for (_, pu) in roots {
             if let Some(b) = self.units[pu].names.get(&key) {
                 return Some(b.clone());
@@ -485,7 +516,8 @@ impl Interp<'_> {
         let home = self.home_scene(b.owner);
         let scene = if home.is_some() && ctx.scene == home { ctx.scene } else { home };
         let mkey = b.key();
-        let val = self.eval_member_at(b.owner, b.rec, b.index, b.embedded, &b.member, scene, b.header.clone(), None, "")?;
+        let val =
+            self.eval_member_at(b.owner, b.rec, b.index, b.embedded, &b.member, scene, b.header.clone(), None, "")?;
         let val = self.bound_value(&mkey, scene, b.prefix, &b.name, val);
         if ctx.scene.is_some() && scene != ctx.scene && self.scene_bound(val) {
             return Err(Stop::LocalRef);
@@ -493,7 +525,14 @@ impl Interp<'_> {
         Ok(val)
     }
 
-    pub(crate) fn bound_value(&self, mkey: &MemberKey, scene: Option<SceneId>, prefix: char, name: &str, default: ObjId) -> ObjId {
+    pub(crate) fn bound_value(
+        &self,
+        mkey: &MemberKey,
+        scene: Option<SceneId>,
+        prefix: char,
+        name: &str,
+        default: ObjId,
+    ) -> ObjId {
         if let Some(bound) = self.bound_memo.get(&(mkey.clone(), scene)) {
             if let Some((_, v)) = bound.iter().find(|(k, _)| k.0 == prefix && k.1 == name) {
                 return *v;
@@ -616,7 +655,8 @@ impl Interp<'_> {
                             | ObjData::Definition(_)
                     );
                     if nameable && self.objs[val.0 as usize].name.is_empty() {
-                        self.objs[val.0 as usize].name = if b.prefix == '%' { b.name.clone() } else { format!("${}", b.name) };
+                        self.objs[val.0 as usize].name =
+                            if b.prefix == '%' { b.name.clone() } else { format!("${}", b.name) };
                     }
                 }
             }
@@ -627,7 +667,13 @@ impl Interp<'_> {
         (Ok(val), bound)
     }
 
-    pub(crate) fn eval_segment(&mut self, seg: &Segment, ctx: &Ctx, piped: Option<(ObjId, bool)>, member: &Rc<Member>) -> R<(ObjId, bool)> {
+    pub(crate) fn eval_segment(
+        &mut self,
+        seg: &Segment,
+        ctx: &Ctx,
+        piped: Option<(ObjId, bool)>,
+        member: &Rc<Member>,
+    ) -> R<(ObjId, bool)> {
         let mut args: Vec<ArgV> = Vec::new();
         if let Some((p, s)) = piped {
             args.push(ArgV { obj: p, role: None, role_quoted: false, sel: s, off: seg.start, explicit: false });
@@ -637,7 +683,14 @@ impl Interp<'_> {
             if let Some(k) = &kw0 {
                 if matches!(k.as_str(), "DEFINE-SYMBOL" | "DEFINE-STYLE" | "DEFINE" | "USE-PACKAGE") {
                     // a definition body is encapsulated: it is not evaluated as statements here (5.4)
-                    args.push(ArgV { obj: NOTHING, role: a.role.clone(), role_quoted: a.role_quoted, sel: false, off: a.start, explicit: true });
+                    args.push(ArgV {
+                        obj: NOTHING,
+                        role: a.role.clone(),
+                        role_quoted: a.role_quoted,
+                        sel: false,
+                        off: a.start,
+                        explicit: true,
+                    });
                     continue;
                 }
             }
@@ -680,7 +733,11 @@ impl Interp<'_> {
                 .max_by_key(|k| k.len())
                 .cloned();
             if let Some(pre) = pre {
-                return self.fail(ctx, format!("unknown keyword @{written}: is a space missing after `@{pre}`? (16.5)"), call.start);
+                return self.fail(
+                    ctx,
+                    format!("unknown keyword @{written}: is a space missing after `@{pre}`? (16.5)"),
+                    call.start,
+                );
             }
             let close = closest(&kw, words().keywords.iter().map(|k| k.name.as_str()));
             let mut msg = format!("unknown keyword @{written}");
@@ -741,7 +798,13 @@ impl Interp<'_> {
     fn hole_value(&mut self, name: &str, ctx: &Ctx, off: usize) -> R<Option<Lit>> {
         let fr = match &ctx.frame {
             Some(f) if f.borrow().kind == FrameKind::Definition => f.clone(),
-            _ => return self.fail(ctx, format!("?{name} is written only in the body of an ordinary definition (6.10)"), off),
+            _ => {
+                return self.fail(
+                    ctx,
+                    format!("?{name} is written only in the body of an ordinary definition (6.10)"),
+                    off,
+                )
+            }
         };
         let v = fr.borrow().param(name).cloned();
         match v {
@@ -752,12 +815,15 @@ impl Interp<'_> {
 
     pub(crate) fn make_set(&mut self, e: &Rc<SetExpr>, ctx: &Ctx) -> R<(ObjId, bool)> {
         let mut items: Vec<(ObjId, bool)> = Vec::new();
-        let nested: super::ctx::NestedRef = Rc::new(RefCell::new(ctx.nested.as_ref().map(|n| n.borrow().clone()).unwrap_or_default()));
+        let nested: super::ctx::NestedRef =
+            Rc::new(RefCell::new(ctx.nested.as_ref().map(|n| n.borrow().clone()).unwrap_or_default()));
         let mut lazy = false;
         // names bound inside a nested set are local to it (D4)
         for (k, m) in e.members.iter().enumerate() {
             for b in &m.binds {
-                nested.borrow_mut().insert((b.prefix, b.name.clone()), Nested::Member(MemberRef { rec: ctx.rec, m: m.clone() }, k));
+                nested
+                    .borrow_mut()
+                    .insert((b.prefix, b.name.clone()), Nested::Member(MemberRef { rec: ctx.rec, m: m.clone() }, k));
             }
         }
         for (k, m) in e.members.iter().enumerate() {
@@ -850,7 +916,12 @@ impl Interp<'_> {
                 }
                 None => {
                     let close = {
-                        let names: Vec<String> = self.units[ctx.unit].names.keys().filter(|(p, _)| *p == e.prefix).map(|(_, n)| n.clone()).collect();
+                        let names: Vec<String> = self.units[ctx.unit]
+                            .names
+                            .keys()
+                            .filter(|(p, _)| *p == e.prefix)
+                            .map(|(_, n)| n.clone())
+                            .collect();
                         closest(&name, names.iter().map(String::as_str))
                     };
                     let hint = close.map(|c| format!(", did you mean {}{c}?", e.prefix)).unwrap_or_default();
@@ -890,12 +961,20 @@ impl Interp<'_> {
         let fk = ctx.frame_kind();
         let Some(name) = &e.name else {
             if fk != Some(FrameKind::Symbol) {
-                return self.fail(ctx, "a bare `?` is written only in a symbol body, meaning the object the symbol draws (13.3)", e.start);
+                return self.fail(
+                    ctx,
+                    "a bare `?` is written only in a symbol body, meaning the object the symbol draws (13.3)",
+                    e.start,
+                );
             }
             return Ok(OWNER);
         };
         if fk != Some(FrameKind::Definition) {
-            return self.fail(ctx, format!("?{name} is written only in the body of an ordinary definition (6.10)"), e.start);
+            return self.fail(
+                ctx,
+                format!("?{name} is written only in the body of an ordinary definition (6.10)"),
+                e.start,
+            );
         }
         let fr = ctx.frame.clone().unwrap();
         let (role, is_param) = {
@@ -906,23 +985,39 @@ impl Interp<'_> {
             return Ok(r);
         }
         if is_param {
-            return self.fail(ctx, format!("?{name} is a parameter and is written only where a literal goes (6.10)"), e.start);
+            return self.fail(
+                ctx,
+                format!("?{name} is a parameter and is written only where a literal goes (6.10)"),
+                e.start,
+            );
         }
         self.fail(ctx, format!("?{name} is not in the role list or the parameter list (6.10)"), e.start)
     }
 
     fn resolve_host(&mut self, e: &Ref, ctx: &Ctx) -> R<ObjId> {
         if matches!(ctx.frame_kind(), Some(FrameKind::Definition) | Some(FrameKind::Symbol)) {
-            return self.fail(ctx, "a definition body cannot reference host objects; they come in through roles (6.9)", e.start);
+            return self.fail(
+                ctx,
+                "a definition body cannot reference host objects; they come in through roles (6.9)",
+                e.start,
+            );
         }
         if e.is_bare_level() {
             return Ok(LEVEL);
         }
         let Some(scene) = ctx.scene else {
             if self.units[ctx.unit].kind == UnitKind::Package {
-                return self.fail(ctx, "a package has no circuit of its own: statements that name host objects fail (16.2)", e.start);
+                return self.fail(
+                    ctx,
+                    "a package has no circuit of its own: statements that name host objects fail (16.2)",
+                    e.start,
+                );
             }
-            return self.fail(ctx, "the file level of an included file has no circuit of its own: host references fail (6.1)", e.start);
+            return self.fail(
+                ctx,
+                "the file level of an included file has no circuit of its own: host references fail (6.1)",
+                e.start,
+            );
         };
         if self.units[ctx.unit].level != Some(self.scenes[scene].level) && !ctx.scope_in {
             return Err(Stop::LocalRef);
@@ -1005,7 +1100,13 @@ impl Interp<'_> {
         }
         let keyable = matches!(
             self.o(obj),
-            ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. } | ObjData::Term { .. } | ObjData::Wire { .. } | ObjData::Prim { .. } | ObjData::Net { .. }
+            ObjData::Inst { .. }
+                | ObjData::Usage(_)
+                | ObjData::Bundle { .. }
+                | ObjData::Term { .. }
+                | ObjData::Wire { .. }
+                | ObjData::Prim { .. }
+                | ObjData::Net { .. }
         );
         if keyable {
             let Some(s) = ctx.scene else { return self.fail(ctx, "there is no circuit here", e.start) };
@@ -1045,7 +1146,7 @@ impl Interp<'_> {
 
     /// What `::` reaches on a usage before its text keys (6.5, 16.5): its role and local names
     /// ("role name" or "local name"), and the aliases scoped to its definition of those names.
-    pub(crate) fn usage_subnames(&mut self, obj: ObjId, u: UnitId) -> (Vec<(String, &'static str)>, Vec<(String, String)>) {
+    pub(crate) fn usage_subnames(&mut self, obj: ObjId, u: UnitId) -> (Vec<(String, &'static str)>, Aliases) {
         let ud = self.usage(obj).clone();
         let dfn = ud.definition;
         let d = self.def(dfn).clone();
@@ -1102,11 +1203,16 @@ impl Interp<'_> {
             }
         }
         let names: Vec<String> = match &p.sub {
-            Some(sub) if sub.single().is_none() => sub.expand().into_iter().map(|k| format!("{}{}", p.name, sub.text(k))).collect(),
+            Some(sub) if sub.single().is_none() => {
+                sub.expand().into_iter().map(|k| format!("{}{}", p.name, sub.text(k))).collect()
+            }
             Some(sub) => vec![format!("{}{}", p.name, sub.text(sub.single().unwrap()))],
             None => vec![p.name.clone()],
         };
-        let ok_owner = matches!(self.o(obj), ObjData::Usage(_) | ObjData::Inst { .. } | ObjData::Bundle { .. } | ObjData::LevelObj { .. });
+        let ok_owner = matches!(
+            self.o(obj),
+            ObjData::Usage(_) | ObjData::Inst { .. } | ObjData::Bundle { .. } | ObjData::LevelObj { .. }
+        );
         if !ok_owner {
             let l = self.label(obj);
             return self.fail(ctx, format!("{l} has no terminals (6.4)"), e.start);
@@ -1147,8 +1253,16 @@ impl Interp<'_> {
     // ------------------------------------------------------------------ objects to positions (5.2.1)
 
     /// Map written objects to signature positions: position name -> argument.
-    pub(crate) fn map_args(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx, positions: &[crate::words::PositionSpec]) -> R<HashMap<String, ArgV>> {
-        let mut defs: Vec<&crate::words::PositionSpec> = positions.iter().filter(|p| matches!(p.takes, Takes::Def(_))).collect();
+    pub(crate) fn map_args(
+        &mut self,
+        kw: &str,
+        args: &[ArgV],
+        seg: &Segment,
+        ctx: &Ctx,
+        positions: &[crate::words::PositionSpec],
+    ) -> R<HashMap<String, ArgV>> {
+        let mut defs: Vec<&crate::words::PositionSpec> =
+            positions.iter().filter(|p| matches!(p.takes, Takes::Def(_))).collect();
         let mut objs: Vec<ArgV> = args.to_vec();
         let mut mapped: HashMap<String, ArgV> = HashMap::new();
         if let Some(d0) = defs.first() {
@@ -1181,7 +1295,8 @@ impl Interp<'_> {
             }
             mapped.insert(d0.name.clone(), last);
         }
-        let rest: Vec<&crate::words::PositionSpec> = positions.iter().filter(|p| !matches!(p.takes, Takes::Def(_))).collect();
+        let rest: Vec<&crate::words::PositionSpec> =
+            positions.iter().filter(|p| !matches!(p.takes, Takes::Def(_))).collect();
         let labeled = objs.iter().filter(|a| a.role.is_some()).count();
         if labeled > 0 && labeled != objs.len() {
             return self.fail(ctx, "label the roles of all objects or of none (4.2 rule 6)", seg.start);
@@ -1215,7 +1330,14 @@ impl Interp<'_> {
             let items = self.set(a.obj).items.clone();
             objs = items
                 .into_iter()
-                .map(|(o, spread)| ArgV { obj: o, role: None, role_quoted: false, sel: a.sel, off: a.off, explicit: !spread })
+                .map(|(o, spread)| ArgV {
+                    obj: o,
+                    role: None,
+                    role_quoted: false,
+                    sel: a.sel,
+                    off: a.off,
+                    explicit: !spread,
+                })
                 .collect();
             unpacked_from = Some(a);
         }
@@ -1239,12 +1361,19 @@ impl Interp<'_> {
                 let items: Vec<(ObjId, bool)> = objs.iter().map(|a| (a.obj, !a.explicit)).collect();
                 let sel = objs.iter().any(|a| a.sel);
                 let s = self.new_obj(ObjData::Set(Box::new(SetData::plain(items, false))));
-                mapped.insert(p.name.clone(), ArgV { obj: s, role: None, role_quoted: false, sel, off: objs[0].off, explicit: false });
+                mapped.insert(
+                    p.name.clone(),
+                    ArgV { obj: s, role: None, role_quoted: false, sel, off: objs[0].off, explicit: false },
+                );
             }
             return Ok(mapped);
         }
         if objs.len() != rest.len() {
-            return self.fail(ctx, format!("@{kw} takes {} objects, {} are written (5.2.1)", rest.len(), objs.len()), seg.start);
+            return self.fail(
+                ctx,
+                format!("@{kw} takes {} objects, {} are written (5.2.1)", rest.len(), objs.len()),
+                seg.start,
+            );
         }
         for (p, a) in rest.iter().zip(objs) {
             mapped.insert(p.name.clone(), a);
@@ -1282,7 +1411,7 @@ impl Interp<'_> {
         spec: &[ParamSpec],
         positional: Option<&[String]>,
         open_style: bool,
-        resolve: Option<&dyn Fn(&mut Self, &str, bool, usize) -> R<String>>,
+        resolve: Option<NameReader<'_, 'p>>,
     ) -> R<Vec<(String, Lit)>> {
         let call = seg.call.as_ref().unwrap();
         let mut out: Vec<(String, Option<Lit>)> = Vec::new();
@@ -1294,13 +1423,28 @@ impl Interp<'_> {
         let order: Vec<String> = positional.map(|p| p.to_vec()).unwrap_or(default_order);
         if !p.positional.is_empty() {
             if order.is_empty() {
-                let ex = if kw == "DEFINE" { ", such as @DEFINE(roles=[\"a\", \"b\"], parameters=[[\"gap\", 2]])" } else { ", as name=value" };
-                return self.fail(ctx, format!("the parameters of @{kw} cannot be written by position; write each by name{ex} (4.2 rule 9)"), p.start);
+                let ex = if kw == "DEFINE" {
+                    ", such as @DEFINE(roles=[\"a\", \"b\"], parameters=[[\"gap\", 2]])"
+                } else {
+                    ", as name=value"
+                };
+                return self.fail(
+                    ctx,
+                    format!(
+                        "the parameters of @{kw} cannot be written by position; write each by name{ex} (4.2 rule 9)"
+                    ),
+                    p.start,
+                );
             }
             if p.positional.len() > order.len() {
                 return self.fail(
                     ctx,
-                    format!("@{kw} takes at most {} parameters by position ({}), {} are written (4.2 rule 9)", order.len(), order.join(", "), p.positional.len()),
+                    format!(
+                        "@{kw} takes at most {} parameters by position ({}), {} are written (4.2 rule 9)",
+                        order.len(),
+                        order.join(", "),
+                        p.positional.len()
+                    ),
                     p.start,
                 );
             }
@@ -1400,7 +1544,11 @@ impl Interp<'_> {
                         crate::words::Literal::Num(n) => crate::geom::fmt_num(*n),
                     })
                     .collect();
-                return self.fail(ctx, format!("the {name} of @{kw} cannot be {}; one of {} (16.4)", val.show(), shown.join(", ")), off);
+                return self.fail(
+                    ctx,
+                    format!("the {name} of @{kw} cannot be {}; one of {} (16.4)", val.show(), shown.join(", ")),
+                    off,
+                );
             }
             return Ok(v);
         }
@@ -1410,7 +1558,11 @@ impl Interp<'_> {
             ParamType::Color => {
                 if let Lit::Str(s) = &val {
                     if !is_color(s.as_str()) {
-                        return self.fail(ctx, format!("a colour is written like \"#RRGGBB\" (9.3), not {:?}", s.as_str()), off);
+                        return self.fail(
+                            ctx,
+                            format!("a colour is written like \"#RRGGBB\" (9.3), not {:?}", s.as_str()),
+                            off,
+                        );
                     }
                     true
                 } else {
@@ -1454,7 +1606,13 @@ impl Interp<'_> {
             Value::Hole(name) => {
                 let fr = match &ctx.frame {
                     Some(f) if f.borrow().kind == FrameKind::Definition => f.clone(),
-                    _ => return self.fail(ctx, format!("?{name} is written only in the body of an ordinary definition (6.10)"), off),
+                    _ => {
+                        return self.fail(
+                            ctx,
+                            format!("?{name} is written only in the body of an ordinary definition (6.10)"),
+                            off,
+                        )
+                    }
                 };
                 let (param, is_role) = {
                     let f = fr.borrow();
@@ -1464,7 +1622,11 @@ impl Interp<'_> {
                     return Ok(v);
                 }
                 if is_role {
-                    return self.fail(ctx, format!("?{name} is a role and cannot stand where a literal goes (6.10)"), off);
+                    return self.fail(
+                        ctx,
+                        format!("?{name} is a role and cannot stand where a literal goes (6.10)"),
+                        off,
+                    );
                 }
                 self.fail(ctx, format!("?{name} is not in the parameter list (6.10)"), off)
             }
@@ -1482,7 +1644,11 @@ impl Interp<'_> {
     /// A statement that only draws a scene object, written where there is no circuit.
     pub(crate) fn scene_only<T>(&mut self, ctx: &Ctx, off: usize) -> R<T> {
         if self.units[ctx.unit].kind == UnitKind::Package {
-            return self.fail(ctx, "a statement that only draws a scene object has no level to draw in, in a package (16.2)", off);
+            return self.fail(
+                ctx,
+                "a statement that only draws a scene object has no level to draw in, in a package (16.2)",
+                off,
+            );
         }
         self.fail(ctx, "the file level of an included file has no circuit: a statement that only draws a scene object has no level to draw in (6.1)", off)
     }

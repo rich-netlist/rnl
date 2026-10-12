@@ -132,32 +132,15 @@ pub fn fmt_num(v: f64) -> String {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn codes() {
-        assert_eq!(Orient::R90.apply((1.0, 0.0)), (0.0, 1.0));
-        assert_eq!(Orient::MYR90.apply((1.0, 2.0)), (-2.0, -1.0));
-        assert_eq!(Orient::MXR90.apply((1.0, 2.0)), (2.0, 1.0));
-        // MYR90 is MY then R90
-        assert_eq!(Orient::MY.then(Orient::R90), Orient::MYR90);
-        assert_eq!(Orient::R90.then(Orient::R90), Orient::R180);
-    }
-
-    #[test]
-    fn routes() {
-        assert_eq!(route(&[(0.0, 0.0), (4.0, 2.0)], "manhattan"), vec![(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (4.0, 2.0)]);
-        assert_eq!(route(&[(0.0, 0.0), (4.0, 2.0)], "manhattan45"), vec![(0.0, 0.0), (1.0, 0.0), (3.0, 2.0), (4.0, 2.0)]);
-        assert_eq!(fmt_num(2.0), "2");
-        assert_eq!(fmt_num(-0.5), "-0.5");
-    }
-}
-
 /// Points whose bounding box is the extent of a graphic (9.2.3): `shape` is the keyword, points
 /// are the graphic's own (one point for the centred forms).
-pub fn shape_extent_points(shape: &str, pts: &[Pt], width: Option<f64>, height: Option<f64>, radius: Option<f64>) -> Vec<Pt> {
+pub fn shape_extent_points(
+    shape: &str,
+    pts: &[Pt],
+    width: Option<f64>,
+    height: Option<f64>,
+    radius: Option<f64>,
+) -> Vec<Pt> {
     match shape {
         "TEXT" => Vec::new(),
         "RECTANGLE" | "ELLIPSE" if pts.len() == 1 => {
@@ -196,10 +179,40 @@ fn arc_extent_points(a: Pt, b: Pt, c: Pt) -> Vec<Pt> {
     let mut out = vec![a, c];
     for k in 0..4 {
         let phi = k as f64 * std::f64::consts::FRAC_PI_2;
-        let inside = if ccw { (phi - ta).rem_euclid(tau) <= (tc - ta).rem_euclid(tau) } else { (ta - phi).rem_euclid(tau) <= (ta - tc).rem_euclid(tau) };
+        let inside = if ccw {
+            (phi - ta).rem_euclid(tau) <= (tc - ta).rem_euclid(tau)
+        } else {
+            (ta - phi).rem_euclid(tau) <= (ta - tc).rem_euclid(tau)
+        };
         if inside {
             out.push((ux + r * phi.cos(), uy + r * phi.sin()));
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codes() {
+        assert_eq!(Orient::R90.apply((1.0, 0.0)), (0.0, 1.0));
+        assert_eq!(Orient::MYR90.apply((1.0, 2.0)), (-2.0, -1.0));
+        assert_eq!(Orient::MXR90.apply((1.0, 2.0)), (2.0, 1.0));
+        // MYR90 is MY then R90
+        assert_eq!(Orient::MY.then(Orient::R90), Orient::MYR90);
+        assert_eq!(Orient::R90.then(Orient::R90), Orient::R180);
+    }
+
+    #[test]
+    fn routes() {
+        assert_eq!(route(&[(0.0, 0.0), (4.0, 2.0)], "manhattan"), vec![(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (4.0, 2.0)]);
+        assert_eq!(
+            route(&[(0.0, 0.0), (4.0, 2.0)], "manhattan45"),
+            vec![(0.0, 0.0), (1.0, 0.0), (3.0, 2.0), (4.0, 2.0)]
+        );
+        assert_eq!(fmt_num(2.0), "2");
+        assert_eq!(fmt_num(-0.5), "-0.5");
+    }
 }

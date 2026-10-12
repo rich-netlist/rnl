@@ -257,11 +257,16 @@ impl Interp<'_> {
                 Some(m) => inst.model.as_ref().is_some_and(|im| glob(m, im, cs)),
             };
             if glob(&d.name, &inst.name, cs) && model_ok {
-                found = Some(d.terminals.iter().map(|t| match t {
-                    Lit::Str(s) => s.as_str().to_string(),
-                    Lit::Num(n) => crate::geom::fmt_num(*n),
-                    other => other.show(),
-                }).collect());
+                found = Some(
+                    d.terminals
+                        .iter()
+                        .map(|t| match t {
+                            Lit::Str(s) => s.as_str().to_string(),
+                            Lit::Num(n) => crate::geom::fmt_num(*n),
+                            other => other.show(),
+                        })
+                        .collect(),
+                );
             }
         }
         found.or_else(|| inst.default_terminals.clone())
@@ -285,7 +290,12 @@ impl Interp<'_> {
             }
             ObjData::Usage(u) => {
                 let d = self.def(u.definition);
-                d.roles.iter().enumerate().filter(|(_, r)| !r.is_set).map(|(k, r)| (k as u32 + 1, Some(r.name.clone()))).collect()
+                d.roles
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, r)| !r.is_set)
+                    .map(|(k, r)| (k as u32 + 1, Some(r.name.clone())))
+                    .collect()
             }
             _ => Vec::new(),
         }
@@ -298,7 +308,13 @@ impl Interp<'_> {
         }
     }
 
-    pub(crate) fn scene_term(&mut self, s: SceneId, owner: ObjId, name: Option<&str>, number: Option<u32>) -> Option<ObjId> {
+    pub(crate) fn scene_term(
+        &mut self,
+        s: SceneId,
+        owner: ObjId,
+        name: Option<&str>,
+        number: Option<u32>,
+    ) -> Option<ObjId> {
         let cs = self.host_case(owner);
         for (idx, tname) in self.owner_terms(s, owner) {
             let by_num = number.is_some_and(|n| n == idx);
@@ -353,7 +369,10 @@ impl Interp<'_> {
                 if nets.iter().all(|n| *n == nets[0]) {
                     return Ok(nets[0]);
                 }
-                return Ok(self.new_obj(ObjData::Set(Box::new(SetData::plain(nets.into_iter().map(|n| (n, true)).collect(), false)))));
+                return Ok(self.new_obj(ObjData::Set(Box::new(SetData::plain(
+                    nets.into_iter().map(|n| (n, true)).collect(),
+                    false,
+                )))));
             }
             ObjData::Usage(u) => {
                 if let Some(mem) = name.as_ref().and_then(|n| u.role(n)) {
@@ -471,7 +490,16 @@ impl Interp<'_> {
         fp.push(PosElem::Tag("p"));
         for (axis, v) in [('x', x), ('y', y)] {
             if let Some(v) = v {
-                sc.at.push(Fact { pos: fp.clone(), target: p, data: FactData::Coord(axis, v), priority: None, ctx: None, off: 0, direct: true, chain: Vec::new() });
+                sc.at.push(Fact {
+                    pos: fp.clone(),
+                    target: p,
+                    data: FactData::Coord(axis, v),
+                    priority: None,
+                    ctx: None,
+                    off: 0,
+                    direct: true,
+                    chain: Vec::new(),
+                });
             }
         }
     }
@@ -490,7 +518,16 @@ impl Interp<'_> {
         sc.prims.push(prim);
         sc.created.insert(prim, at.clone());
         if !style.is_empty() {
-            sc.styles.push(Fact { pos: at, target: prim, data: FactData::OwnStyle(style), priority: None, ctx: Some(Rc::new(ctx.clone())), off: 0, direct: true, chain: Vec::new() });
+            sc.styles.push(Fact {
+                pos: at,
+                target: prim,
+                data: FactData::OwnStyle(style),
+                priority: None,
+                ctx: Some(Rc::new(ctx.clone())),
+                off: 0,
+                direct: true,
+                chain: Vec::new(),
+            });
         }
     }
 
@@ -523,9 +560,25 @@ impl Interp<'_> {
                 if items.text.is_none() {
                     return self.fail(ctx, "the text= of TEXT must be written (13.3)", 0);
                 }
-                self.new_obj(ObjData::Text { attach: att, items, style, from_symbol: false, sym_pos: None, generated, failed: false, site, off: 0 })
+                self.new_obj(ObjData::Text {
+                    attach: att,
+                    items,
+                    style,
+                    from_symbol: false,
+                    sym_pos: None,
+                    generated,
+                    failed: false,
+                    site,
+                    off: 0,
+                })
             }
-            ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. } | ObjData::Term { .. } | ObjData::Wire { .. } | ObjData::Prim { .. } | ObjData::Net { .. } => {
+            ObjData::Inst { .. }
+            | ObjData::Usage(_)
+            | ObjData::Bundle { .. }
+            | ObjData::Term { .. }
+            | ObjData::Wire { .. }
+            | ObjData::Prim { .. }
+            | ObjData::Net { .. } => {
                 if let (Some(k), ObjData::Usage(_)) = (&key, &kind) {
                     // not spelled like a role or local name of the usage, or an alias of one (6.5, 13.3)
                     if let Some(clash) = self.key_clash(k, key_unit, Some(att)) {
@@ -553,7 +606,17 @@ impl Interp<'_> {
                 if has_offset && matches!(kind, ObjData::Wire { .. } | ObjData::Net { .. }) {
                     return self.fail(ctx, "a text attached to a wire or a net takes no dx, dy (13.3)", 0);
                 }
-                self.new_obj(ObjData::Text { attach: att, items, style, from_symbol: false, sym_pos: None, generated, failed: false, site, off: 0 })
+                self.new_obj(ObjData::Text {
+                    attach: att,
+                    items,
+                    style,
+                    from_symbol: false,
+                    sym_pos: None,
+                    generated,
+                    failed: false,
+                    site,
+                    off: 0,
+                })
             }
             _ => {
                 let l = self.label(att);
@@ -574,7 +637,16 @@ impl Interp<'_> {
         sc.wires.push(w);
         sc.created.insert(w, at.clone());
         if !style.is_empty() {
-            sc.styles.push(Fact { pos: at, target: w, data: FactData::OwnStyle(style), priority: None, ctx: Some(Rc::new(ctx.clone())), off: 0, direct: true, chain: Vec::new() });
+            sc.styles.push(Fact {
+                pos: at,
+                target: w,
+                data: FactData::OwnStyle(style),
+                priority: None,
+                ctx: Some(Rc::new(ctx.clone())),
+                off: 0,
+                direct: true,
+                chain: Vec::new(),
+            });
         }
     }
 
@@ -589,7 +661,15 @@ impl Interp<'_> {
     }
 
     /// Apply a single-object statement to one object.
-    pub(crate) fn apply_op(&mut self, s: SceneId, op: &TargetOp, obj: ObjId, at: Pos, direct: bool, ctx: &Ctx) -> R<()> {
+    pub(crate) fn apply_op(
+        &mut self,
+        s: SceneId,
+        op: &TargetOp,
+        obj: ObjId,
+        at: Pos,
+        direct: bool,
+        ctx: &Ctx,
+    ) -> R<()> {
         let chain = self.apply_chain(ctx);
         let site = Some(Rc::new(ctx.clone()));
         match op {
@@ -599,27 +679,83 @@ impl Interp<'_> {
                 let mut py = at;
                 py.push(PosElem::Int(1));
                 if let Some(x) = x {
-                    self.scenes[s].at.push(Fact { pos: px, target: obj, data: FactData::Coord('x', *x), priority: *priority, ctx: site.clone(), off: *off, direct, chain: chain.clone() });
+                    self.scenes[s].at.push(Fact {
+                        pos: px,
+                        target: obj,
+                        data: FactData::Coord('x', *x),
+                        priority: *priority,
+                        ctx: site.clone(),
+                        off: *off,
+                        direct,
+                        chain: chain.clone(),
+                    });
                 }
                 if let Some(y) = y {
-                    self.scenes[s].at.push(Fact { pos: py, target: obj, data: FactData::Coord('y', *y), priority: *priority, ctx: site, off: *off, direct, chain });
+                    self.scenes[s].at.push(Fact {
+                        pos: py,
+                        target: obj,
+                        data: FactData::Coord('y', *y),
+                        priority: *priority,
+                        ctx: site,
+                        off: *off,
+                        direct,
+                        chain,
+                    });
                 }
             }
             TargetOp::Orient { code, priority, off } => {
-                self.scenes[s].orient.push(Fact { pos: at, target: obj, data: FactData::Orient(*code), priority: *priority, ctx: site, off: *off, direct, chain });
+                self.scenes[s].orient.push(Fact {
+                    pos: at,
+                    target: obj,
+                    data: FactData::Orient(*code),
+                    priority: *priority,
+                    ctx: site,
+                    off: *off,
+                    direct,
+                    chain,
+                });
             }
             TargetOp::Layer { layer, off } => {
-                self.scenes[s].layers.push(Fact { pos: at, target: obj, data: FactData::Layer(layer.clone()), priority: None, ctx: site, off: *off, direct, chain: Vec::new() });
+                self.scenes[s].layers.push(Fact {
+                    pos: at,
+                    target: obj,
+                    data: FactData::Layer(layer.clone()),
+                    priority: None,
+                    ctx: site,
+                    off: *off,
+                    direct,
+                    chain: Vec::new(),
+                });
             }
             TargetOp::Symbol { symbol, off } => {
-                self.scenes[s].appear.push(Fact { pos: at, target: obj, data: FactData::Symbol(*symbol), priority: None, ctx: site, off: *off, direct, chain: Vec::new() });
+                self.scenes[s].appear.push(Fact {
+                    pos: at,
+                    target: obj,
+                    data: FactData::Symbol(*symbol),
+                    priority: None,
+                    ctx: site,
+                    off: *off,
+                    direct,
+                    chain: Vec::new(),
+                });
             }
             TargetOp::Style { style, off } => {
-                self.scenes[s].styles.push(Fact { pos: at, target: obj, data: FactData::Style(*style), priority: None, ctx: site, off: *off, direct, chain: Vec::new() });
+                self.scenes[s].styles.push(Fact {
+                    pos: at,
+                    target: obj,
+                    data: FactData::Style(*style),
+                    priority: None,
+                    ctx: site,
+                    off: *off,
+                    direct,
+                    chain: Vec::new(),
+                });
             }
             TargetOp::Current { direction, off } => {
                 let ok = match self.o(obj) {
-                    ObjData::Term { owner, .. } => matches!(self.o(*owner), ObjData::Inst { .. } | ObjData::LevelObj { .. }),
+                    ObjData::Term { owner, .. } => {
+                        matches!(self.o(*owner), ObjData::Inst { .. } | ObjData::LevelObj { .. })
+                    }
                     _ => false,
                 };
                 if !ok {
@@ -631,9 +767,22 @@ impl Interp<'_> {
             TargetOp::Priority { priority, off } => {
                 if !matches!(self.o(obj), ObjData::Constraint(_) | ObjData::Usage(_) | ObjData::Set(_)) {
                     let l = self.label(obj);
-                    return self.fail(ctx, format!("PRIORITY takes constraints, usages and grouped sets only, not {l} (14.8)"), *off);
+                    return self.fail(
+                        ctx,
+                        format!("PRIORITY takes constraints, usages and grouped sets only, not {l} (14.8)"),
+                        *off,
+                    );
                 }
-                self.scenes[s].prioritys.push(Fact { pos: at, target: obj, data: FactData::Priority(*priority), priority: None, ctx: site, off: *off, direct, chain: Vec::new() });
+                self.scenes[s].prioritys.push(Fact {
+                    pos: at,
+                    target: obj,
+                    data: FactData::Priority(*priority),
+                    priority: None,
+                    ctx: site,
+                    off: *off,
+                    direct,
+                    chain: Vec::new(),
+                });
             }
             TargetOp::Route { mode, style, off } => {
                 if !matches!(self.o(obj), ObjData::Net { .. }) {
@@ -679,7 +828,8 @@ impl Interp<'_> {
         if self.scenes[s].busy.contains(&key) {
             let removing = self.set(obj).mods.iter().any(|m| !m.add);
             if removing {
-                let msg = "a cycle of sets with removals has no definite result; the whole interpretation fails (5.2.2)";
+                let msg =
+                    "a cycle of sets with removals has no definite result; the whole interpretation fails (5.2.2)";
                 self.failed_doc = Some(msg.to_string());
                 let loc = ctx.and_then(|c| self.rec_loc(c.rec, 0));
                 self.sink.error(msg, loc);
@@ -701,7 +851,8 @@ impl Interp<'_> {
                 let mut seen = HashSet::new();
                 let mut out = Vec::new();
                 for m in self.items_of(s, *source, phase, ctx) {
-                    let xs = if self.is_set(m) && !self.set(m).explicit { self.items_of(s, m, phase, ctx) } else { vec![m] };
+                    let xs =
+                        if self.is_set(m) && !self.set(m).explicit { self.items_of(s, m, phase, ctx) } else { vec![m] };
                     for x in xs {
                         if seen.insert(x) {
                             out.push(x);
@@ -733,7 +884,8 @@ impl Interp<'_> {
             if m.ctx.scene != Some(s) {
                 continue;
             }
-            let srcm = if self.is_set(m.source) { self.items_of(s, m.source, phase, Some(&m.ctx)) } else { vec![m.source] };
+            let srcm =
+                if self.is_set(m.source) { self.items_of(s, m.source, phase, Some(&m.ctx)) } else { vec![m.source] };
             if m.add {
                 base.extend(srcm);
             } else {
@@ -755,9 +907,13 @@ impl Interp<'_> {
                 _ => self.belongs(s, *owner),
             },
             ObjData::LevelObj { .. } => x == self.scenes[s].levelobj,
-            ObjData::Usage(_) | ObjData::Wire { .. } | ObjData::Prim { .. } | ObjData::Text { .. } | ObjData::Bundle { .. } | ObjData::Constraint(_) | ObjData::Point { .. } => {
-                self.scenes[s].created.contains_key(&x) || self.scenes[s].points.contains(&x)
-            }
+            ObjData::Usage(_)
+            | ObjData::Wire { .. }
+            | ObjData::Prim { .. }
+            | ObjData::Text { .. }
+            | ObjData::Bundle { .. }
+            | ObjData::Constraint(_)
+            | ObjData::Point { .. } => self.scenes[s].created.contains_key(&x) || self.scenes[s].points.contains(&x),
             _ => true,
         }
     }
@@ -765,7 +921,10 @@ impl Interp<'_> {
     // ------------------------------------------------------------------ selections (10.1)
 
     fn select(&mut self, s: SceneId, sel: ObjId, phase: usize, ctx: Option<&Ctx>) -> Vec<ObjId> {
-        let SetKind::Select { keyword, scope, params, writer, definition, site, off } = self.set(sel).kind.clone() else { unreachable!() };
+        let SetKind::Select { keyword, scope, params, writer, definition, site, off } = self.set(sel).kind.clone()
+        else {
+            unreachable!()
+        };
         if params.get("recursive").and_then(Lit::boolean) == Some(false) {
             let w = &self.units[writer];
             if w.kind == UnitKind::Level && w.level != Some(self.scenes[s].level) {
@@ -803,7 +962,9 @@ impl Interp<'_> {
                             match self.o(o).clone() {
                                 ObjData::Inst { .. } | ObjData::Bundle { .. } => cands.push(self.bundle_of(o)),
                                 _ if via.contains(&o) => {}
-                                ObjData::Term { owner, .. } if matches!(self.o(owner), ObjData::Inst { .. } | ObjData::Bundle { .. }) => {
+                                ObjData::Term { owner, .. }
+                                    if matches!(self.o(owner), ObjData::Inst { .. } | ObjData::Bundle { .. }) =>
+                                {
                                     if self.drawn(s, o, phase) {
                                         cands.push(self.bundle_of(owner));
                                     }
@@ -976,13 +1137,22 @@ impl Interp<'_> {
                 out
             }
             "SELECT-WIRE" => {
-                let wires: Vec<ObjId> = self.drawables(s, snapshot).into_iter().filter(|o| matches!(self.o(*o), ObjData::Wire { .. })).collect();
+                let wires: Vec<ObjId> = self
+                    .drawables(s, snapshot)
+                    .into_iter()
+                    .filter(|o| matches!(self.o(*o), ObjData::Wire { .. }))
+                    .collect();
                 let cands: Vec<ObjId> = match &pool {
                     None => wires,
                     Some(pool) => {
                         // a net in the scope gives the wires drawn on it; nets that are only usage members are not scopes (PR16)
-                        let nets: HashSet<ObjId> = pool.iter().filter(|o| matches!(self.o(**o), ObjData::Net { .. }) && !via.contains(o)).copied().collect();
-                        let ids: HashSet<ObjId> = pool.iter().filter(|o| matches!(self.o(**o), ObjData::Wire { .. })).copied().collect();
+                        let nets: HashSet<ObjId> = pool
+                            .iter()
+                            .filter(|o| matches!(self.o(**o), ObjData::Net { .. }) && !via.contains(o))
+                            .copied()
+                            .collect();
+                        let ids: HashSet<ObjId> =
+                            pool.iter().filter(|o| matches!(self.o(**o), ObjData::Wire { .. })).copied().collect();
                         wires
                             .into_iter()
                             .filter(|w| ids.contains(w) || matches!(self.o(*w), ObjData::Wire { nets: wn, .. } if wn.iter().any(|n| nets.contains(n))))
@@ -993,7 +1163,9 @@ impl Interp<'_> {
                 for w in cands {
                     let ObjData::Wire { nets, bus, .. } = self.o(w).clone() else { continue };
                     if let Some(net) = params.get("net").and_then(Lit::str) {
-                        let ok = nets.iter().any(|n| matches!(self.o(*n), ObjData::Net { key, .. } if name_match(self, net, key)));
+                        let ok = nets
+                            .iter()
+                            .any(|n| matches!(self.o(*n), ObjData::Net { key, .. } if name_match(self, net, key)));
                         if !ok {
                             continue;
                         }
@@ -1008,14 +1180,18 @@ impl Interp<'_> {
                 out
             }
             "SELECT-LABEL" => {
-                let labels: Vec<ObjId> = self.drawables(s, snapshot).into_iter().filter(|o| self.obj_kind(*o) == Some("label")).collect();
+                let labels: Vec<ObjId> =
+                    self.drawables(s, snapshot).into_iter().filter(|o| self.obj_kind(*o) == Some("label")).collect();
                 let cands: Vec<ObjId> = match &pool {
                     None => labels,
                     Some(pool) => {
                         // an object in the scope gives the labels attached to it; a label in the scope is taken itself
                         let ids: HashSet<ObjId> = pool
                             .iter()
-                            .filter(|o| !via.contains(o) || matches!(self.o(**o), ObjData::Text { .. } | ObjData::KeyText { .. }))
+                            .filter(|o| {
+                                !via.contains(o)
+                                    || matches!(self.o(**o), ObjData::Text { .. } | ObjData::KeyText { .. })
+                            })
                             .copied()
                             .collect();
                         labels.into_iter().filter(|x| ids.contains(x) || ids.contains(&self.text_attach(*x))).collect()
@@ -1085,10 +1261,20 @@ impl Interp<'_> {
             };
             let mut found = Vec::new();
             let mut seen = HashSet::new();
-            let others: Vec<ObjId> = pool.iter().filter(|o| !matches!(self.o(**o), ObjData::Usage(_))).copied().collect();
-            let mut stack: Vec<ObjId> = pool.iter().filter(|o| matches!(self.o(**o), ObjData::Usage(_))).copied().rev().collect();
+            let others: Vec<ObjId> =
+                pool.iter().filter(|o| !matches!(self.o(**o), ObjData::Usage(_))).copied().collect();
+            let mut stack: Vec<ObjId> =
+                pool.iter().filter(|o| matches!(self.o(**o), ObjData::Usage(_))).copied().rev().collect();
             // depth-first, in order
-            fn inward(it: &mut Interp, s: SceneId, u: ObjId, phase: usize, ctx: Option<&Ctx>, seen: &mut HashSet<ObjId>, found: &mut Vec<ObjId>) {
+            fn inward(
+                it: &mut Interp,
+                s: SceneId,
+                u: ObjId,
+                phase: usize,
+                ctx: Option<&Ctx>,
+                seen: &mut HashSet<ObjId>,
+                found: &mut Vec<ObjId>,
+            ) {
                 if !seen.insert(u) {
                     return;
                 }
@@ -1110,7 +1296,10 @@ impl Interp<'_> {
                 }
             }
             let ids: HashSet<ObjId> = usages.into_iter().collect();
-            return found.into_iter().filter(|a| dfn.is_none_or(|d| self.usage(*a).definition == d) && ids.contains(a)).collect();
+            return found
+                .into_iter()
+                .filter(|a| dfn.is_none_or(|d| self.usage(*a).definition == d) && ids.contains(a))
+                .collect();
         }
         let ids: HashSet<ObjId> = pool.unwrap_or_default().into_iter().collect();
         let mut out = Vec::new();
@@ -1141,7 +1330,14 @@ impl Interp<'_> {
     }
 
     /// Role members of a usage, and of the usages among them, all the way in.
-    fn all_members(&mut self, s: SceneId, u: ObjId, phase: usize, ctx: Option<&Ctx>, seen: &mut HashSet<ObjId>) -> Vec<ObjId> {
+    fn all_members(
+        &mut self,
+        s: SceneId,
+        u: ObjId,
+        phase: usize,
+        ctx: Option<&Ctx>,
+        seen: &mut HashSet<ObjId>,
+    ) -> Vec<ObjId> {
         if !seen.insert(u) {
             return Vec::new();
         }
@@ -1167,6 +1363,7 @@ impl Interp<'_> {
             Some(Lit::Str(w)) => w.unit.unwrap_or(writer),
             _ => writer,
         };
+        #[allow(clippy::too_many_arguments)]
         fn walk(
             it: &mut Interp,
             o: ObjId,
@@ -1197,7 +1394,8 @@ impl Interp<'_> {
                     if top && role.is_some() && Some(r) != want.as_ref() {
                         continue;
                     }
-                    let items: Vec<ObjId> = if it.is_set(*v) { it.set(*v).items.iter().map(|(x, _)| *x).collect() } else { vec![*v] };
+                    let items: Vec<ObjId> =
+                        if it.is_set(*v) { it.set(*v).items.iter().map(|(x, _)| *x).collect() } else { vec![*v] };
                     for m in items {
                         walk(it, m, false, role, unit, seen, out, direct, member);
                     }
@@ -1283,7 +1481,10 @@ impl Interp<'_> {
         if a == b {
             return true;
         }
-        let (ObjData::Term { owner: oa, .. }, ObjData::Term { owner: ob, .. }) = (self.o(a).clone(), self.o(b).clone()) else { return false };
+        let (ObjData::Term { owner: oa, .. }, ObjData::Term { owner: ob, .. }) = (self.o(a).clone(), self.o(b).clone())
+        else {
+            return false;
+        };
         if oa != ob {
             return false;
         }
@@ -1397,5 +1598,11 @@ impl Interp<'_> {
         let c = f.ctx.clone()?;
         let loc = self.rec_loc(c.rec, f.off);
         let pkg = self.ctx_pkg(&c);
-        Some(self.sink.add(sev, msg, loc, crate::diag::Extra { cause: None, origin: c.origin.to_string(), in_package: pkg }))
-    }}
+        Some(self.sink.add(
+            sev,
+            msg,
+            loc,
+            crate::diag::Extra { cause: None, origin: c.origin.to_string(), in_package: pkg },
+        ))
+    }
+}

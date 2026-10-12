@@ -72,7 +72,12 @@ impl Interp<'_> {
                 if let Some(prev) = owner.get(&m) {
                     if *prev != b {
                         let l = self.label(m);
-                        self.diag_site(Severity::Hint, &site, 0, format!("{l} is written into several bundles and goes to the later one (11.8)"));
+                        self.diag_site(
+                            Severity::Hint,
+                            &site,
+                            0,
+                            format!("{l} is written into several bundles and goes to the later one (11.8)"),
+                        );
                     }
                 }
                 owner.insert(m, b);
@@ -83,7 +88,13 @@ impl Interp<'_> {
             let kept: Vec<ObjId> = members.into_iter().filter(|m| owner.get(m) == Some(&b)).collect();
             let empty = kept.is_empty();
             if empty {
-                self.diag_site(Severity::Warning, &site, 0, "every member of the bundle was taken by later bundles; the empty bundle is not drawn (11.8)".into());
+                self.diag_site(
+                    Severity::Warning,
+                    &site,
+                    0,
+                    "every member of the bundle was taken by later bundles; the empty bundle is not drawn (11.8)"
+                        .into(),
+                );
             }
             for &m in &kept {
                 if let ObjData::Inst { bundle, .. } = self.om(m) {
@@ -99,7 +110,12 @@ impl Interp<'_> {
                         && i.nodes.len() == f.nodes.len()
                         && i.params == f.params;
                     if !same {
-                        self.diag_site(Severity::Warning, &site, 0, format!("the bundle member {} is not the same kind as {} (11.8)", i.name, f.name));
+                        self.diag_site(
+                            Severity::Warning,
+                            &site,
+                            0,
+                            format!("the bundle member {} is not the same kind as {} (11.8)", i.name, f.name),
+                        );
                     }
                 }
             }
@@ -200,7 +216,11 @@ impl Interp<'_> {
             return;
         }
         let l = self.label(member);
-        self.diag_fact(Severity::Error, f, format!("{l} is in a bundle and is not drawn on its own: this description fails (11.8)"));
+        self.diag_fact(
+            Severity::Error,
+            f,
+            format!("{l} is in a bundle and is not drawn on its own: this description fails (11.8)"),
+        );
     }
 
     /// The renderer's own default for an instance no symbol is given to (9.2.6, F18; principle 2.7).
@@ -213,17 +233,39 @@ impl Interp<'_> {
         let mut sym = SymbolDef { default: true, ..SymbolDef::default() };
         let mut dashed = StyleMap::new();
         dashed.insert("linestyle".into(), Lit::Str(WStr::new("dashed", None)));
-        sym.prims.push(SymPrim { shape: Shape::Rectangle, points: vec![(-2.0, -h / 2.0), (2.0, h / 2.0)], params: PrimParams::default(), style: dashed, text: None });
+        sym.prims.push(SymPrim {
+            shape: Shape::Rectangle,
+            points: vec![(-2.0, -h / 2.0), (2.0, h / 2.0)],
+            params: PrimParams::default(),
+            style: dashed,
+            text: None,
+        });
         for (side, x0, x1, dir) in [(&left, -3.0, -2.0, 180u16), (&right, 3.0, 2.0, 0u16)] {
             for (k, (idx, name)) in side.iter().enumerate() {
                 let y = h / 2.0 - 1.0 - 2.0 * k as f64;
-                sym.pins.push(Pin { terms: vec![TermKey::Num(*idx)], pos: (x0, y), label: name.clone(), dir: Some(dir) });
-                sym.prims.push(SymPrim { shape: Shape::Line, points: vec![(x0, y), (x1, y)], params: PrimParams::default(), style: StyleMap::new(), text: None });
+                sym.pins.push(Pin {
+                    terms: vec![TermKey::Num(*idx)],
+                    pos: (x0, y),
+                    label: name.clone(),
+                    dir: Some(dir),
+                });
+                sym.prims.push(SymPrim {
+                    shape: Shape::Line,
+                    points: vec![(x0, y), (x1, y)],
+                    params: PrimParams::default(),
+                    style: StyleMap::new(),
+                    text: None,
+                });
             }
         }
         sym.labels.push(SymLabel {
             key: Some("name".into()),
-            items: TextItems { text: Some(WStr::new("${name}", None)), halign: Some("middle".into()), valign: Some("bottom".into()), ..TextItems::default() },
+            items: TextItems {
+                text: Some(WStr::new("${name}", None)),
+                halign: Some("middle".into()),
+                valign: Some("bottom".into()),
+                ..TextItems::default()
+            },
             position: Some((0.0, h / 2.0 + 0.3)),
             style: StyleMap::new(),
             unit: 0,
@@ -248,7 +290,12 @@ impl Interp<'_> {
                         // it is drawn on, or an alias of one; the text is left out (6.5, 13.3)
                         if let Some(clash) = self.key_clash(key, lab.unit, Some(owner)) {
                             let l = self.label(owner);
-                            self.diag_site(Severity::Error, &lab.site, lab.off, format!("{clash}; a text written in the symbol, drawn on {l}"));
+                            self.diag_site(
+                                Severity::Error,
+                                &lab.site,
+                                lab.off,
+                                format!("{clash}; a text written in the symbol, drawn on {l}"),
+                            );
                             continue;
                         }
                     }
@@ -287,7 +334,13 @@ impl Interp<'_> {
 
     /// From low to high: header default < own parameter < PRIORITY statements < the priority of the
     /// enclosing usages (outermost that has one) < PRIORITY written on the local from outside.
-    pub(crate) fn eff_priority(&self, s: SceneId, priority: Option<Priority>, chain: &[ObjId], own: Option<ObjId>) -> Priority {
+    pub(crate) fn eff_priority(
+        &self,
+        s: SceneId,
+        priority: Option<Priority>,
+        chain: &[ObjId],
+        own: Option<ObjId>,
+    ) -> Priority {
         let sc = &self.scenes[s];
         let mut p = priority;
         let mut inner: Vec<&Fact> = Vec::new();
@@ -295,7 +348,7 @@ impl Interp<'_> {
         if let Some(own) = own {
             for g in &sc.prioritys {
                 if g.target == own {
-                    if self.from_outside(g, chain) {
+                    if self.reaches_from_outside(g, chain) {
                         outer.push(g);
                     } else {
                         inner.push(g);
@@ -330,7 +383,7 @@ impl Interp<'_> {
     }
 
     /// A PRIORITY reaches a definition's local from outside when it is not written in that usage's body.
-    fn from_outside(&self, g: &Fact, chain: &[ObjId]) -> bool {
+    fn reaches_from_outside(&self, g: &Fact, chain: &[ObjId]) -> bool {
         let Some(last) = chain.last() else { return false };
         let mut inside = g.ctx.as_ref().and_then(|c| c.frame_usage());
         while let Some(u) = inside {
@@ -492,7 +545,11 @@ impl Interp<'_> {
                         Severity::Warning,
                         &site,
                         off,
-                        format!("the wire is marked on net {}, but the terminal {ql} it reaches is on {} (13.1)", wn.join(","), names.join(",")),
+                        format!(
+                            "the wire is marked on net {}, but the terminal {ql} it reaches is on {} (13.1)",
+                            wn.join(","),
+                            names.join(",")
+                        ),
                     );
                 }
             }
@@ -507,7 +564,12 @@ impl Interp<'_> {
                 }
                 if self.bundle_field(owner).is_some() {
                     let l = self.label(owner);
-                    self.diag_site(Severity::Error, &site, off, format!("{l} is in a bundle; wires go to the terminals of the bundle (11.8)"));
+                    self.diag_site(
+                        Severity::Error,
+                        &site,
+                        off,
+                        format!("{l} is in a bundle; wires go to the terminals of the bundle (11.8)"),
+                    );
                     self.set_failed(w);
                     break;
                 }
@@ -524,20 +586,35 @@ impl Interp<'_> {
                 ObjData::Usage(_) if !self.scenes[s].symbol.contains_key(&att) && !from_symbol => {
                     if site.is_some() {
                         let l = self.label(att);
-                        self.diag_site(Severity::Error, &site, off, format!("{l} has no symbol and no drawing meaning: this TEXT fails (12.1, 13.3)"));
+                        self.diag_site(
+                            Severity::Error,
+                            &site,
+                            off,
+                            format!("{l} has no symbol and no drawing meaning: this TEXT fails (12.1, 13.3)"),
+                        );
                     }
                     failed = true;
                 }
                 ObjData::Term { .. } if !self.has_pin(s, att) => {
                     if site.is_some() {
                         let l = self.label(att);
-                        self.diag_site(Severity::Error, &site, off, format!("{l} has no pin in its symbol: this TEXT fails (9.2.4, 13.3)"));
+                        self.diag_site(
+                            Severity::Error,
+                            &site,
+                            off,
+                            format!("{l} has no pin in its symbol: this TEXT fails (9.2.4, 13.3)"),
+                        );
                     }
                     failed = true;
                 }
                 ObjData::Inst { bundle: Some(_), .. } if site.is_some() => {
                     let l = self.label(att);
-                    self.diag_site(Severity::Error, &site, off, format!("{l} is in a bundle and is not drawn on its own: this TEXT fails (11.8)"));
+                    self.diag_site(
+                        Severity::Error,
+                        &site,
+                        off,
+                        format!("{l} is in a bundle and is not drawn on its own: this TEXT fails (11.8)"),
+                    );
                     failed = true;
                 }
                 _ => {}
@@ -556,7 +633,14 @@ impl Interp<'_> {
                 if !layers.is_empty() && !layers.iter().any(|(_, it, _)| it.text.is_some()) {
                     if site.is_some() {
                         let l = self.label(t);
-                        self.diag_site(Severity::Error, &site, off, format!("{l} has no content: the symbol has no such key and the scene wrote no text= (13.3)"));
+                        self.diag_site(
+                            Severity::Error,
+                            &site,
+                            off,
+                            format!(
+                                "{l} has no content: the symbol has no such key and the scene wrote no text= (13.3)"
+                            ),
+                        );
                     }
                     self.set_failed(t);
                 }
@@ -600,7 +684,9 @@ impl Interp<'_> {
 
     pub(crate) fn set_failed(&mut self, o: ObjId) {
         match self.om(o) {
-            ObjData::Wire { failed, .. } | ObjData::Text { failed, .. } | ObjData::KeyText { failed, .. } => *failed = true,
+            ObjData::Wire { failed, .. } | ObjData::Text { failed, .. } | ObjData::KeyText { failed, .. } => {
+                *failed = true
+            }
             ObjData::Constraint(c) => c.failed = true,
             _ => {}
         }
@@ -655,7 +741,11 @@ impl Interp<'_> {
         self.scenes[s].dropped += 1;
         let a = self.fact_text(loser);
         let b = self.fact_text(winner);
-        self.diag_fact(Severity::Hint, loser, format!("{a} conflicts with {b} and is dropped in the order of 8.5 (8.5)"));
+        self.diag_fact(
+            Severity::Hint,
+            loser,
+            format!("{a} conflicts with {b} and is dropped in the order of 8.5 (8.5)"),
+        );
     }
 
     fn fact_text(&self, f: &Fact) -> String {
@@ -679,7 +769,11 @@ impl Interp<'_> {
             ObjData::Usage(_) => {
                 if !self.scenes[s].symbol.contains_key(&obj) {
                     let l = self.label(obj);
-                    self.diag_fact(Severity::Error, f, format!("{l} has no symbol and no drawing meaning: {what} fails (12.1)"));
+                    self.diag_fact(
+                        Severity::Error,
+                        f,
+                        format!("{l} has no symbol and no drawing meaning: {what} fails (12.1)"),
+                    );
                     return false;
                 }
                 if what == "PLACE" && self.at_point(obj) {
@@ -690,21 +784,32 @@ impl Interp<'_> {
             }
             ObjData::Pos { parent } if matches!(self.o(parent), ObjData::Usage(_)) && self.at_point(parent) => {
                 let l = self.label(parent);
-                self.diag_fact(Severity::Error, f, format!("{l} is drawn on the point of its main object: PLACE fails (12.1)"));
+                self.diag_fact(
+                    Severity::Error,
+                    f,
+                    format!("{l} is drawn on the point of its main object: PLACE fails (12.1)"),
+                );
                 return false;
             }
             _ => {}
         }
         let place_ok = matches!(
             self.o(obj),
-            ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. } | ObjData::Point { .. } | ObjData::Text { .. } | ObjData::KeyText { .. } | ObjData::Pos { .. }
+            ObjData::Inst { .. }
+                | ObjData::Usage(_)
+                | ObjData::Bundle { .. }
+                | ObjData::Point { .. }
+                | ObjData::Text { .. }
+                | ObjData::KeyText { .. }
+                | ObjData::Pos { .. }
         );
         if what == "PLACE" && !place_ok {
             let l = self.label(obj);
             self.diag_fact(Severity::Error, f, format!("PLACE does not take {l} (11.1)"));
             return false;
         }
-        if what == "ORIENT" && !matches!(self.o(obj), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. }) {
+        if what == "ORIENT" && !matches!(self.o(obj), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. })
+        {
             let l = self.label(obj);
             self.diag_fact(Severity::Error, f, format!("ORIENT does not take {l} (11.2)"));
             return false;
@@ -721,21 +826,45 @@ impl Interp<'_> {
 
     pub(crate) fn at_point(&self, a: ObjId) -> bool {
         match self.main_of(a) {
-            Some(m) => matches!(self.o(m), ObjData::Term { .. } | ObjData::Inst { .. } | ObjData::Point { .. } | ObjData::Pos { .. } | ObjData::Bundle { .. }),
+            Some(m) => matches!(
+                self.o(m),
+                ObjData::Term { .. }
+                    | ObjData::Inst { .. }
+                    | ObjData::Point { .. }
+                    | ObjData::Pos { .. }
+                    | ObjData::Bundle { .. }
+            ),
             None => false,
         }
     }
 
-    fn term_drawable(&mut self, s: SceneId, t: ObjId, site: &Option<std::rc::Rc<super::ctx::Ctx>>, off: usize, what: &str) -> bool {
+    fn term_drawable(
+        &mut self,
+        s: SceneId,
+        t: ObjId,
+        site: &Option<std::rc::Rc<super::ctx::Ctx>>,
+        off: usize,
+        what: &str,
+    ) -> bool {
         let ObjData::Term { owner, .. } = self.o(t).clone() else { return true };
         if matches!(self.o(owner), ObjData::Usage(_)) && !self.scenes[s].symbol.contains_key(&owner) {
             let l = self.label(owner);
-            self.diag_site(Severity::Error, site, off, format!("{l} has no symbol: a {what} to its terminal fails (12.1)"));
+            self.diag_site(
+                Severity::Error,
+                site,
+                off,
+                format!("{l} has no symbol: a {what} to its terminal fails (12.1)"),
+            );
             return false;
         }
         if !self.has_pin(s, t) {
             let l = self.label(t);
-            self.diag_site(Severity::Error, site, off, format!("{l} has no pin in its symbol: the {what} fails (9.2.4)"));
+            self.diag_site(
+                Severity::Error,
+                site,
+                off,
+                format!("{l} has no pin in its symbol: the {what} fails (9.2.4)"),
+            );
             return false;
         }
         true
@@ -831,7 +960,12 @@ impl Interp<'_> {
         let att = self.text_attach(t);
         let items = self.text_items(t);
         let base = match self.o(att) {
-            ObjData::Point { .. } | ObjData::Pos { .. } | ObjData::Term { .. } | ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. } => self.point_of(s, att),
+            ObjData::Point { .. }
+            | ObjData::Pos { .. }
+            | ObjData::Term { .. }
+            | ObjData::Inst { .. }
+            | ObjData::Usage(_)
+            | ObjData::Bundle { .. } => self.point_of(s, att),
             _ => None,
         };
         let sym_pos = self.text_sym_pos(t);
@@ -846,7 +980,11 @@ impl Interp<'_> {
                     let ats: Vec<Pos> = self.scenes[s]
                         .at
                         .iter()
-                        .filter(|f| f.target == t && matches!(f.data, FactData::Coord(a, _) if a == axis) && self.fact_priority(s, f) != Priority::Disabled)
+                        .filter(|f| {
+                            f.target == t
+                                && matches!(f.data, FactData::Coord(a, _) if a == axis)
+                                && self.fact_priority(s, f) != Priority::Disabled
+                        })
                         .map(|f| f.pos.clone())
                         .collect();
                     let off = self.offset_pos(s, t, k == 0);
@@ -1055,7 +1193,12 @@ impl Interp<'_> {
             }
             if let Some(why) = bad {
                 let l = self.label(c);
-                self.diag_site(Severity::Error, &site, cd.off, format!("a member of {l}: {why}; this constraint fails (14.1)"));
+                self.diag_site(
+                    Severity::Error,
+                    &site,
+                    cd.off,
+                    format!("a member of {l}: {why}; this constraint fails (14.1)"),
+                );
                 self.constraint_mut(c).failed = true;
                 continue;
             }
@@ -1084,8 +1227,12 @@ impl Interp<'_> {
                         ObjData::Term { owner, .. } => *owner,
                         _ => *m,
                     };
-                    let mut ks: Vec<usize> =
-                        self.scenes[s].at_best.iter().filter(|((o, _), _)| *o == target).map(|(_, (_, _, k))| *k).collect();
+                    let mut ks: Vec<usize> = self.scenes[s]
+                        .at_best
+                        .iter()
+                        .filter(|((o, _), _)| *o == target)
+                        .map(|(_, (_, _, k))| *k)
+                        .collect();
                     ks.sort();
                     for k in ks {
                         involved.push(self.scenes[s].at[k].clone());
@@ -1098,7 +1245,12 @@ impl Interp<'_> {
             if !involved.is_empty() && !weaker {
                 self.constraint_mut(c).status = Some("dropped");
                 if p != Priority::Low {
-                    self.diag_site(Severity::Hint, &site, cd.off, format!("{l} conflicts with fixed {what} and is dropped in the order of 8.5 (8.5)"));
+                    self.diag_site(
+                        Severity::Hint,
+                        &site,
+                        cd.off,
+                        format!("{l} conflicts with fixed {what} and is dropped in the order of 8.5 (8.5)"),
+                    );
                 }
             } else {
                 self.constraint_mut(c).status = Some("needs-solver");
@@ -1144,7 +1296,9 @@ impl Interp<'_> {
                 }
                 None
             }
-            ObjData::Wire { .. } | ObjData::Net { .. } | ObjData::Constraint(_) => Some(format!("{l} cannot be located")),
+            ObjData::Wire { .. } | ObjData::Net { .. } | ObjData::Constraint(_) => {
+                Some(format!("{l} cannot be located"))
+            }
             ObjData::Term { .. } if !self.has_pin(s, m) => Some(format!("{l} has no pin in its symbol")),
             ObjData::Inst { bundle: Some(_), .. } => Some(format!("{l} is in a bundle")),
             _ => None,
@@ -1283,7 +1437,12 @@ impl Interp<'_> {
         }
     }
 
-    fn style_entries(&mut self, s: SceneId, o: ObjId, own: &HashMap<ObjId, Vec<(Pos, StyleMap)>>) -> BTreeMap<String, (Lit, Pos)> {
+    fn style_entries(
+        &mut self,
+        s: SceneId,
+        o: ObjId,
+        own: &HashMap<ObjId, Vec<(Pos, StyleMap)>>,
+    ) -> BTreeMap<String, (Lit, Pos)> {
         let mut direct: BTreeMap<String, (Lit, Pos)> = BTreeMap::new();
         let mut other: BTreeMap<String, (Lit, Pos)> = BTreeMap::new();
         fn put(d: &mut BTreeMap<String, (Lit, Pos)>, props: &StyleMap, p: &Pos) {
@@ -1335,7 +1494,14 @@ impl Interp<'_> {
         // passed down: labels take the style of the object they are attached to (8.3)
         let src = match self.o(o) {
             ObjData::Text { attach, .. } | ObjData::KeyText { attach, .. } => {
-                if matches!(self.o(*attach), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. } | ObjData::Wire { .. } | ObjData::Prim { .. }) {
+                if matches!(
+                    self.o(*attach),
+                    ObjData::Inst { .. }
+                        | ObjData::Usage(_)
+                        | ObjData::Bundle { .. }
+                        | ObjData::Wire { .. }
+                        | ObjData::Prim { .. }
+                ) {
                     Some(*attach)
                 } else {
                     None

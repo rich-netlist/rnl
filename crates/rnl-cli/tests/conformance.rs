@@ -45,15 +45,14 @@ fn cases_match_their_expected_models() {
             std::fs::write(&expected, &text).unwrap();
             continue;
         }
-        let want = std::fs::read_to_string(&expected).unwrap_or_else(|_| panic!("{} has no expected file; run with RNL_BLESS=1", f.display()));
+        let want = std::fs::read_to_string(&expected)
+            .unwrap_or_else(|_| panic!("{} has no expected file; run with RNL_BLESS=1", f.display()));
         // compared as text: numbers are written in their shortest exact form, line endings may differ
         if want.replace("\r\n", "\n") != text {
-
             // the model as computed now, next to the expected one, to compare
             let _ = std::fs::write(f.with_extension("actual.json"), &text);
             failed.push(f.file_name().unwrap().to_string_lossy().to_string());
         }
-
     }
     assert!(failed.is_empty(), "the effective model differs from the expected one: {failed:?}");
 }

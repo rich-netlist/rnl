@@ -33,16 +33,8 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
     }
     let t = chars;
     let n = t.len();
-    let starts = |at: usize, s: &str| -> bool {
-        let mut j = at;
-        for c in s.chars() {
-            if t.get(j) != Some(&c) {
-                return false;
-            }
-            j += 1;
-        }
-        true
-    };
+    let starts = |at: usize, s: &str| -> bool { s.chars().enumerate().all(|(k, c)| t.get(at + k) == Some(&c)) };
+
     let find = |from: usize, s: &str| -> Option<usize> { (from..n).find(|&j| starts(j, s)) };
     let line_of = |pos: usize| -> Loc {
         let mut seg = &segs[0];
@@ -88,7 +80,10 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
             let glued = i + 4 < n && name_char(t[i + 4]);
             if i == 0 || t[i - 1] != ' ' || glued {
                 if !glued {
-                    sink.warning("@RNL is not preceded by a space, so it is not a record entry (2.3)", Some(line_of(i)));
+                    sink.warning(
+                        "@RNL is not preceded by a space, so it is not a record entry (2.3)",
+                        Some(line_of(i)),
+                    );
                 }
                 i += 4;
                 continue;
@@ -251,7 +246,11 @@ mod tests {
     #[test]
     fn records_across_lines() {
         let mut sink = Sink::new();
-        let recs = scan_run(&lines(&[" @RNL {", "   #M1 @PLACE(1, 2);", "", "   #M2 @PLACE(3, 4)", " } @RNL {#M3}"]), "a.sp", &mut sink);
+        let recs = scan_run(
+            &lines(&[" @RNL {", "   #M1 @PLACE(1, 2);", "", "   #M2 @PLACE(3, 4)", " } @RNL {#M3}"]),
+            "a.sp",
+            &mut sink,
+        );
         assert_eq!(recs.len(), 2);
         assert!(sink.all().is_empty(), "{:?}", sink.all());
         assert_eq!(recs[0].loc(0), Loc::new("a.sp", 2, 3));

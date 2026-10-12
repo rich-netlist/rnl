@@ -11,7 +11,7 @@ mod text;
 use rnl_runtime::geom::{Orient, Pt};
 use rnl_runtime::interp::obj::{Lit, PrimParams, Shape};
 use rnl_runtime::markup::{self, Line};
-use rnl_runtime::model::{LevelView, Layer, Style, SymbolView};
+use rnl_runtime::model::{Layer, LevelView, Style, SymbolView};
 
 pub use svg::svg_document;
 pub use text::{line_width, text_width};
@@ -53,20 +53,48 @@ pub enum PathSeg {
     Move(Pt),
     Line(Pt),
     /// A circular arc to `to` with radius `r`; `ccw` turns counter-clockwise (y up).
-    Arc { r: f64, large: bool, ccw: bool, to: Pt },
+    Arc {
+        r: f64,
+        large: bool,
+        ccw: bool,
+        to: Pt,
+    },
     Cubic(Pt, Pt, Pt),
     Close,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Kind {
-    Path { segs: Vec<PathSeg>, stroke: Option<Stroke>, fill: Option<String> },
-    Rect { min: Pt, max: Pt, stroke: Option<Stroke>, fill: Option<String> },
-    Circle { c: Pt, r: f64, stroke: Option<Stroke>, fill: Option<String> },
-    Ellipse { c: Pt, rx: f64, ry: f64, stroke: Option<Stroke>, fill: Option<String> },
+    Path {
+        segs: Vec<PathSeg>,
+        stroke: Option<Stroke>,
+        fill: Option<String>,
+    },
+    Rect {
+        min: Pt,
+        max: Pt,
+        stroke: Option<Stroke>,
+        fill: Option<String>,
+    },
+    Circle {
+        c: Pt,
+        r: f64,
+        stroke: Option<Stroke>,
+        fill: Option<String>,
+    },
+    Ellipse {
+        c: Pt,
+        rx: f64,
+        ry: f64,
+        stroke: Option<Stroke>,
+        fill: Option<String>,
+    },
     Text(TextPrim),
     /// A line a viewer may show for a connection not drawn yet (13.7); not a wire.
-    Flyline { a: Pt, b: Pt },
+    Flyline {
+        a: Pt,
+        b: Pt,
+    },
 }
 
 /// A laid-out text: the anchor and the direction it reads in.
@@ -122,7 +150,8 @@ struct Eff {
 
 impl Eff {
     fn from(st: &Style) -> Eff {
-        let s = |k: &str, d: &str| style_get(st, k).and_then(Lit::str).map(String::from).unwrap_or_else(|| d.to_string());
+        let s =
+            |k: &str, d: &str| style_get(st, k).and_then(Lit::str).map(String::from).unwrap_or_else(|| d.to_string());
         let n = |k: &str, d: f64| style_get(st, k).and_then(Lit::num).unwrap_or(d);
         let b = |k: &str| style_get(st, k).and_then(Lit::boolean).unwrap_or(false);
         Eff {
@@ -196,7 +225,16 @@ impl Out {
 
     /// A graphic (9.2.5) at scene points.
     #[allow(clippy::too_many_arguments)]
-    fn shape(&mut self, owner: &str, shape: Shape, pts: &[Pt], params: &PrimParams, st: &Style, layer: Layer, order: Vec<f64>) {
+    fn shape(
+        &mut self,
+        owner: &str,
+        shape: Shape,
+        pts: &[Pt],
+        params: &PrimParams,
+        st: &Style,
+        layer: Layer,
+        order: Vec<f64>,
+    ) {
         let e = Eff::from(st);
         let fill = match params.fill.as_deref() {
             Some("linecolor") => Some(e.linecolor.clone()),
@@ -206,7 +244,9 @@ impl Out {
         let stroke = e.stroke();
         match shape {
             Shape::Line => {
-                let closed = pts.len() > 2 && (pts[0].0 - pts[pts.len() - 1].0).abs() < 1e-9 && (pts[0].1 - pts[pts.len() - 1].1).abs() < 1e-9;
+                let closed = pts.len() > 2
+                    && (pts[0].0 - pts[pts.len() - 1].0).abs() < 1e-9
+                    && (pts[0].1 - pts[pts.len() - 1].1).abs() < 1e-9;
                 let mut segs = vec![PathSeg::Move(pts[0])];
                 segs.extend(pts[1..].iter().map(|p| PathSeg::Line(*p)));
                 if closed {
@@ -227,16 +267,36 @@ impl Out {
                 self.push(owner, layer, order, Kind::Rect { min, max, stroke, fill }, &[min, max]);
             }
             Shape::Circle => {
-                let (c, r) = if pts.len() == 1 { (pts[0], params.radius.unwrap_or(0.0)) } else { (pts[0], dist(pts[0], pts[1])) };
-                self.push(owner, layer, order, Kind::Circle { c, r, stroke, fill }, &[(c.0 - r, c.1 - r), (c.0 + r, c.1 + r)]);
+                let (c, r) = if pts.len() == 1 {
+                    (pts[0], params.radius.unwrap_or(0.0))
+                } else {
+                    (pts[0], dist(pts[0], pts[1]))
+                };
+                self.push(
+                    owner,
+                    layer,
+                    order,
+                    Kind::Circle { c, r, stroke, fill },
+                    &[(c.0 - r, c.1 - r), (c.0 + r, c.1 + r)],
+                );
             }
             Shape::Ellipse => {
                 let (c, rx, ry) = if pts.len() == 1 {
                     (pts[0], params.width.unwrap_or(0.0) / 2.0, params.height.unwrap_or(0.0) / 2.0)
                 } else {
-                    (((pts[0].0 + pts[1].0) / 2.0, (pts[0].1 + pts[1].1) / 2.0), (pts[0].0 - pts[1].0).abs() / 2.0, (pts[0].1 - pts[1].1).abs() / 2.0)
+                    (
+                        ((pts[0].0 + pts[1].0) / 2.0, (pts[0].1 + pts[1].1) / 2.0),
+                        (pts[0].0 - pts[1].0).abs() / 2.0,
+                        (pts[0].1 - pts[1].1).abs() / 2.0,
+                    )
                 };
-                self.push(owner, layer, order, Kind::Ellipse { c, rx, ry, stroke, fill }, &[(c.0 - rx, c.1 - ry), (c.0 + rx, c.1 + ry)]);
+                self.push(
+                    owner,
+                    layer,
+                    order,
+                    Kind::Ellipse { c, rx, ry, stroke, fill },
+                    &[(c.0 - rx, c.1 - ry), (c.0 + rx, c.1 + ry)],
+                );
             }
             Shape::Arc => {
                 let segs = arc_segs(pts[0], pts[1], pts[2]);
@@ -259,7 +319,16 @@ impl Out {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn path(&mut self, owner: &str, segs: Vec<PathSeg>, stroke: Option<Stroke>, fill: Option<String>, layer: Layer, order: Vec<f64>, pts: &[Pt]) {
+    fn path(
+        &mut self,
+        owner: &str,
+        segs: Vec<PathSeg>,
+        stroke: Option<Stroke>,
+        fill: Option<String>,
+        layer: Layer,
+        order: Vec<f64>,
+        pts: &[Pt],
+    ) {
         if stroke.is_none() && fill.is_none() {
             return;
         }
@@ -268,7 +337,16 @@ impl Out {
 
     /// Arrow heads at the ends of a line (9.2.5): filled triangles in the line colour.
     #[allow(clippy::too_many_arguments)]
-    fn arrows(&mut self, owner: &str, pts: &[Pt], params: &PrimParams, e: &Eff, layer: Layer, order: Vec<f64>, arc: bool) {
+    fn arrows(
+        &mut self,
+        owner: &str,
+        pts: &[Pt],
+        params: &PrimParams,
+        e: &Eff,
+        layer: Layer,
+        order: Vec<f64>,
+        arc: bool,
+    ) {
         if e.linestyle == "none" {
             return; // the heads belong to the line (9.3)
         }
@@ -280,7 +358,8 @@ impl Out {
         };
         let size = if e.arrowsize > 0.0 { e.arrowsize } else { 0.6 };
         for end in ends {
-            let (tip, mut prev) = if *end == "end" { (pts[pts.len() - 1], pts[pts.len() - 2]) } else { (pts[0], pts[1]) };
+            let (tip, mut prev) =
+                if *end == "end" { (pts[pts.len() - 1], pts[pts.len() - 2]) } else { (pts[0], pts[1]) };
             if arc {
                 if let Some((c, _r)) = circle3(pts[0], pts[1], pts[2]) {
                     let (rx, ry) = (tip.0 - c.0, tip.1 - c.1);
@@ -300,14 +379,32 @@ impl Out {
             let p1 = (b.0 - uy * w, b.1 + ux * w);
             let p2 = (b.0 + uy * w, b.1 - ux * w);
             let segs = vec![PathSeg::Move(tip), PathSeg::Line(p1), PathSeg::Line(p2), PathSeg::Close];
-            self.push(owner, layer, sub(&order, 0.5), Kind::Path { segs, stroke: None, fill: Some(e.linecolor.clone()) }, &[tip, p1, p2]);
+            self.push(
+                owner,
+                layer,
+                sub(&order, 0.5),
+                Kind::Path { segs, stroke: None, fill: Some(e.linecolor.clone()) },
+                &[tip, p1, p2],
+            );
         }
     }
 
     /// A text at an anchor (9.2.5, 13.6): the box sits by the alignment and turns with `rotate`
     /// and the instance's orientation, but the glyphs always read upright.
     #[allow(clippy::too_many_arguments)]
-    fn text(&mut self, owner: &str, anchor: Pt, lines: Vec<Line>, halign: &str, valign: &str, rotate: f64, st: &Style, layer: Layer, order: Vec<f64>, code: Orient) {
+    fn text(
+        &mut self,
+        owner: &str,
+        anchor: Pt,
+        lines: Vec<Line>,
+        halign: &str,
+        valign: &str,
+        rotate: f64,
+        st: &Style,
+        layer: Layer,
+        order: Vec<f64>,
+        code: Orient,
+    ) {
         if lines.iter().all(|l| l.is_empty()) {
             return;
         }
@@ -338,7 +435,7 @@ impl Out {
             };
         }
         // a rough extent for the bounding box
-        let width = lines.iter().map(|l| text::line_width(l)).fold(0.0, f64::max) * size;
+        let width = lines.iter().map(text::line_width).fold(0.0, f64::max) * size;
         let n = lines.len() as f64;
         let hgt = n * size * 1.15;
         let (lo, hi) = match halign.as_str() {
@@ -353,19 +450,53 @@ impl Out {
         } else {
             [(anchor.0 + lo, anchor.1 - hgt), (anchor.0 + hi, anchor.1 + hgt)]
         };
-        let t = TextPrim { anchor, lines, size, color, font: e.font.clone(), bold: e.bold, italic: e.italic, halign, valign, vertical };
+        let t = TextPrim {
+            anchor,
+            lines,
+            size,
+            color,
+            font: e.font.clone(),
+            bold: e.bold,
+            italic: e.italic,
+            halign,
+            valign,
+            vertical,
+        };
         self.push(owner, layer, sub(&order, 0.9), Kind::Text(t), &pts);
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn symbol(&mut self, lv: &LevelView, owner: &str, sym: &SymbolView, base: Pt, code: Orient, own: &Style, layer: Layer, order: &[f64], texts: &std::collections::BTreeMap<String, Vec<Line>>, path: &str) {
+    fn symbol(
+        &mut self,
+        lv: &LevelView,
+        owner: &str,
+        sym: &SymbolView,
+        base: Pt,
+        code: Orient,
+        own: &Style,
+        layer: Layer,
+        order: &[f64],
+        texts: &std::collections::BTreeMap<String, Vec<Line>>,
+        path: &str,
+    ) {
         for (k, p) in sym.prims.iter().enumerate() {
             let st = merged(own, &p.style);
             let gpts: Vec<Pt> = p.points.iter().map(|q| place(base, code, *q)).collect();
             let key = sub(order, k as f64);
             if p.shape == Shape::Text {
                 let lines = texts.get(&format!("{path}{k}")).cloned().unwrap_or_default();
-                self.text(owner, gpts[0], lines, p.halign.as_deref().unwrap_or("start"), p.valign.as_deref().unwrap_or("baseline"), p.rotate.unwrap_or(0.0), &st, layer, key, code);
+                self.text(
+                    owner,
+                    gpts[0],
+                    lines,
+                    p.halign.as_deref().unwrap_or("start"),
+                    p.valign.as_deref().unwrap_or("baseline"),
+                    p.rotate.unwrap_or(0.0),
+                    &st,
+                    layer,
+                    key,
+                    code,
+                );
                 continue;
             }
             let mut params = p.params.clone();
@@ -385,17 +516,51 @@ impl Out {
                 _ => (0.0, 1.0),
             };
             let at = (pin.pos.0 + 0.45 * inward.0, pin.pos.1 + 0.45 * inward.1);
-            let halign = if inward == (-1.0, 0.0) { "end" } else if inward == (1.0, 0.0) { "start" } else { "middle" };
-            let valign = if inward == (0.0, -1.0) { "top" } else if inward == (0.0, 1.0) { "bottom" } else { "middle" };
+            let halign = if inward == (-1.0, 0.0) {
+                "end"
+            } else if inward == (1.0, 0.0) {
+                "start"
+            } else {
+                "middle"
+            };
+            let valign = if inward == (0.0, -1.0) {
+                "top"
+            } else if inward == (0.0, 1.0) {
+                "bottom"
+            } else {
+                "middle"
+            };
             let mut st = own.clone();
             st.insert("size".into(), Lit::Num(0.55));
             st.insert("textcolor".into(), Lit::Str(rnl_runtime::interp::obj::WStr::new("#6b6b70", None)));
-            self.text(owner, place(base, code, at), markup::parse(label), halign, valign, 0.0, &st, layer, sub(order, 200.0 + k as f64), code);
+            self.text(
+                owner,
+                place(base, code, at),
+                markup::parse(label),
+                halign,
+                valign,
+                0.0,
+                &st,
+                layer,
+                sub(order, 200.0 + k as f64),
+                code,
+            );
         }
         for (k, n) in sym.nested.iter().enumerate() {
             let inner = &lv.symbols[n.symbol];
             let p = place(base, code, n.at);
-            self.symbol(lv, owner, inner, p, n.orient.then(code), own, layer, &sub(order, 100.0 + k as f64), texts, &format!("{path}{k}/"));
+            self.symbol(
+                lv,
+                owner,
+                inner,
+                p,
+                n.orient.then(code),
+                own,
+                layer,
+                &sub(order, 100.0 + k as f64),
+                texts,
+                &format!("{path}{k}/"),
+            );
         }
     }
 }
@@ -458,7 +623,18 @@ pub fn primitives(lv: &LevelView) -> Vec<Primitive> {
         out.shape("", s.shape, &s.points, &s.params, &s.style, s.layer, s.order.clone());
     }
     for t in &lv.texts {
-        out.text(&t.id, t.anchor, t.lines.clone(), &t.halign, &t.valign, t.rotate, &t.style, t.layer, t.order.clone(), t.orient);
+        out.text(
+            &t.id,
+            t.anchor,
+            t.lines.clone(),
+            &t.halign,
+            &t.valign,
+            t.rotate,
+            &t.style,
+            t.layer,
+            t.order.clone(),
+            t.orient,
+        );
     }
     let mut prims = out.prims;
     prims.sort_by(|a, b| {

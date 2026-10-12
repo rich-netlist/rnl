@@ -148,7 +148,10 @@ pub fn parse_element(body: &str, file: &str, line: u32, sink: &mut Sink) -> Opti
         }
         'K' => return None,
         _ => {
-            sink.warning(format!("element {name} is not in the supported SPICE subset and is skipped"), Some(Loc::line(file, line)));
+            sink.warning(
+                format!("element {name} is not in the supported SPICE subset and is skipped"),
+                Some(Loc::line(file, line)),
+            );
             return None;
         }
     }
@@ -221,7 +224,17 @@ impl<'a> Reader<'a> {
         p
     }
 
-    fn new_level(&mut self, kind: LevelKind, name: &str, file: &str, path: &str, parent: LevelId, circuit: bool, line: u32) -> LevelId {
+    #[allow(clippy::too_many_arguments)]
+    fn new_level(
+        &mut self,
+        kind: LevelKind,
+        name: &str,
+        file: &str,
+        path: &str,
+        parent: LevelId,
+        circuit: bool,
+        line: u32,
+    ) -> LevelId {
         let mut lv = Level::new(kind, name, file, path);
         lv.circuit = circuit;
         lv.line = line;
@@ -230,7 +243,15 @@ impl<'a> Reader<'a> {
 
     /// Read one host file into `level`; elements outside subcircuits go to `circ` (6.1).
     /// `section`: read only this `.lib` section of the file.
-    fn read_file(&mut self, path: &str, level: LevelId, circ: LevelId, main: bool, stack: &[String], section: Option<&str>) {
+    fn read_file(
+        &mut self,
+        path: &str,
+        level: LevelId,
+        circ: LevelId,
+        main: bool,
+        stack: &[String],
+        section: Option<&str>,
+    ) {
         let Some(text) = self.provider.read(path) else {
             return;
         };
@@ -257,7 +278,10 @@ impl<'a> Reader<'a> {
             let low = stripped.to_lowercase();
             if no == 1 {
                 if raw.contains("@RNL") {
-                    self.sink.warning("the first line of a file is a title and is not read as RNL (2.2)", Some(Loc::line(&fname, 1)));
+                    self.sink.warning(
+                        "the first line of a file is a title and is not read as RNL (2.2)",
+                        Some(Loc::line(&fname, 1)),
+                    );
                 }
                 if main || raw.starts_with('*') {
                     continue;
@@ -265,7 +289,8 @@ impl<'a> Reader<'a> {
             }
             if ended {
                 if raw.contains("@RNL") {
-                    self.sink.warning("RNL after `.end` of the main file is not read (2.2)", Some(Loc::line(&fname, no)));
+                    self.sink
+                        .warning("RNL after `.end` of the main file is not read (2.2)", Some(Loc::line(&fname, no)));
                 }
                 continue;
             }
@@ -278,14 +303,20 @@ impl<'a> Reader<'a> {
                     if is_endl && toks.get(1).is_none_or(|t| t.eq_ignore_ascii_case(name)) {
                         skip_lib = None;
                     } else if raw.contains("@RNL") {
-                        self.sink.warning("RNL in a `.lib` section that is not selected is not read (2.2)", Some(Loc::line(&fname, no)));
+                        self.sink.warning(
+                            "RNL in a `.lib` section that is not selected is not read (2.2)",
+                            Some(Loc::line(&fname, no)),
+                        );
                     }
                     continue;
                 }
                 if is_lib && toks.len() == 2 && section.is_some_and(|s| s.eq_ignore_ascii_case(toks[1])) {
                     in_section = true;
                 } else if raw.contains("@RNL") {
-                    self.sink.warning("RNL outside the selected `.lib` section is not read (2.2)", Some(Loc::line(&fname, no)));
+                    self.sink.warning(
+                        "RNL outside the selected `.lib` section is not read (2.2)",
+                        Some(Loc::line(&fname, no)),
+                    );
                 }
                 continue;
             }
@@ -324,7 +355,10 @@ impl<'a> Reader<'a> {
                 continue;
             }
             if raw.contains("@RNL") && !stripped.starts_with('+') {
-                self.sink.warning("@RNL in an end-of-line comment or a host statement is host text (2.2)", Some(Loc::line(&fname, no)));
+                self.sink.warning(
+                    "@RNL in an end-of-line comment or a host statement is host text (2.2)",
+                    Some(Loc::line(&fname, no)),
+                );
             }
             if let Some(cont) = stripped.strip_prefix('+') {
                 if let Some(p) = pending.as_mut() {
@@ -397,7 +431,6 @@ impl<'a> Reader<'a> {
         if self.doc.levels[level].end_line == 0 {
             self.doc.levels[level].end_line = lines.len() as u32 + 1;
         }
-
     }
 
     fn flush_run(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {
@@ -410,7 +443,17 @@ impl<'a> Reader<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn include(&mut self, target: &str, section: Option<&str>, no: u32, fname: &str, path: &str, cur: LevelId, circ: LevelId, stack: &[String]) {
+    fn include(
+        &mut self,
+        target: &str,
+        section: Option<&str>,
+        no: u32,
+        fname: &str,
+        path: &str,
+        cur: LevelId,
+        circ: LevelId,
+        stack: &[String],
+    ) {
         let full = join(&dirname(path), target);
         let key = format!("{}#{}", full, section.unwrap_or("").to_lowercase());
         if stack.contains(&key) {
@@ -433,7 +476,16 @@ impl<'a> Reader<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn statement(&mut self, text: &str, no: u32, fname: &str, path: &str, cur: LevelId, circ: LevelId, stack: &[String]) {
+    fn statement(
+        &mut self,
+        text: &str,
+        no: u32,
+        fname: &str,
+        path: &str,
+        cur: LevelId,
+        circ: LevelId,
+        stack: &[String],
+    ) {
         let body = strip_inline_comment(text);
         if body.is_empty() {
             return;
@@ -448,7 +500,8 @@ impl<'a> Reader<'a> {
             return;
         }
         if first == ".model" {
-            let toks: Vec<&str> = body.split(|c: char| c.is_whitespace() || c == '(').filter(|t| !t.is_empty()).collect();
+            let toks: Vec<&str> =
+                body.split(|c: char| c.is_whitespace() || c == '(').filter(|t| !t.is_empty()).collect();
             if toks.len() >= 3 {
                 self.models.insert(toks[1].to_lowercase(), toks[2].to_lowercase());
             }

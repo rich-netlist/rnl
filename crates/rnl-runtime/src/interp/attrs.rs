@@ -20,7 +20,13 @@ const INST_ATTRS: [&str; 4] = ["name", "value", "model", "type"];
 impl Interp<'_> {
     /// Take attributes step by step; the last value is shown by its kind. `unit` is where the text
     /// is written, whose aliases the names are read with (16.5).
-    pub(crate) fn eval_path(&mut self, s: SceneId, att: ObjId, path: &str, unit: Option<UnitId>) -> Result<String, String> {
+    pub(crate) fn eval_path(
+        &mut self,
+        s: SceneId,
+        att: ObjId,
+        path: &str,
+        unit: Option<UnitId>,
+    ) -> Result<String, String> {
         let mut v = AVal::Obj(att);
         for step in path.split("::") {
             let step = step.trim();
@@ -190,14 +196,22 @@ impl Interp<'_> {
                         Ok(out.join(","))
                     }
                     ObjData::Inst { .. } => Ok(self.inst_of(o).name.clone()),
-                    ObjData::Bundle { members, .. } => Ok(members.iter().map(|m| self.inst_of(*m).name.clone()).collect::<Vec<_>>().join(",")),
+                    ObjData::Bundle { members, .. } => {
+                        Ok(members.iter().map(|m| self.inst_of(*m).name.clone()).collect::<Vec<_>>().join(","))
+                    }
                     ObjData::Net { display, .. } => Ok(display),
                     ObjData::Term { .. } => {
                         let nets = self.term_nets(s, o);
-                        let v = if nets.len() == 1 { AVal::Obj(nets[0]) } else { AVal::List(nets.into_iter().map(AVal::Obj).collect()) };
+                        let v = if nets.len() == 1 {
+                            AVal::Obj(nets[0])
+                        } else {
+                            AVal::List(nets.into_iter().map(AVal::Obj).collect())
+                        };
                         self.display(s, &v)
                     }
-                    ObjData::Wire { nets, .. } => Ok(nets.iter().map(|n| self.net_display(*n)).collect::<Vec<_>>().join(",")),
+                    ObjData::Wire { nets, .. } => {
+                        Ok(nets.iter().map(|n| self.net_display(*n)).collect::<Vec<_>>().join(","))
+                    }
                     _ => {
                         let l = self.label(o);
                         Err(format!("{l} cannot be shown; take one of its attributes, such as `::x`"))

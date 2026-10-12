@@ -37,7 +37,11 @@ impl Interp<'_> {
     }
 
     fn style_of(&self, s: SceneId, o: ObjId) -> Style {
-        self.scenes[s].style.get(&o).map(|m| m.iter().map(|(k, (v, _))| (k.clone(), v.clone())).collect()).unwrap_or_default()
+        self.scenes[s]
+            .style
+            .get(&o)
+            .map(|m| m.iter().map(|(k, (v, _))| (k.clone(), v.clone())).collect())
+            .unwrap_or_default()
     }
 
     fn layer_of(&self, s: SceneId, o: ObjId) -> Layer {
@@ -50,7 +54,14 @@ impl Interp<'_> {
             ObjData::Inst { .. } => vec![0.0, self.inst_of(o).order as f64],
             ObjData::Bundle { members, .. } => vec![0.0, self.inst_of(members[0]).order as f64],
             ObjData::Usage(_) => {
-                let p = sc.appear.iter().filter(|f| f.target == o).map(|f| f.pos.clone()).max().or_else(|| sc.created.get(&o).cloned()).unwrap_or_else(|| pos(&[9]));
+                let p = sc
+                    .appear
+                    .iter()
+                    .filter(|f| f.target == o)
+                    .map(|f| f.pos.clone())
+                    .max()
+                    .or_else(|| sc.created.get(&o).cloned())
+                    .unwrap_or_else(|| pos(&[9]));
                 let mut k = vec![1.0];
                 k.extend(flat(&p));
                 k
@@ -143,7 +154,13 @@ impl Interp<'_> {
         }
         let sd = self.symbol(sym);
         for p in &sd.prims {
-            for q in crate::geom::shape_extent_points(p.shape.as_str(), &p.points, p.params.width, p.params.height, p.params.radius) {
+            for q in crate::geom::shape_extent_points(
+                p.shape.as_str(),
+                &p.points,
+                p.params.width,
+                p.params.height,
+                p.params.radius,
+            ) {
                 add(&mut b, q);
             }
         }
@@ -169,7 +186,6 @@ impl Interp<'_> {
             for pin in &sd.pins {
                 add(&mut b, pin.pos);
             }
-
         }
         if b[0] > b[2] {
             return [0.0; 4];
@@ -178,8 +194,15 @@ impl Interp<'_> {
     }
 
     /// The fixed texts of a symbol drawn for `owner`, with `${…}` read from the owner.
-
-    fn symbol_texts(&mut self, s: SceneId, sym: ObjId, owner: ObjId, prefix: &str, out: &mut BTreeMap<String, Vec<markup::Line>>, depth: usize) {
+    fn symbol_texts(
+        &mut self,
+        s: SceneId,
+        sym: ObjId,
+        owner: ObjId,
+        prefix: &str,
+        out: &mut BTreeMap<String, Vec<markup::Line>>,
+        depth: usize,
+    ) {
         if depth > 8 {
             return;
         }
@@ -278,7 +301,14 @@ impl Interp<'_> {
             if !ok {
                 continue;
             }
-            shapes.push(ShapeView { shape, points: pts, params, style: self.style_of(s, p), layer: self.layer_of(s, p), order: self.key_of(s, p) });
+            shapes.push(ShapeView {
+                shape,
+                points: pts,
+                params,
+                style: self.style_of(s, p),
+                layer: self.layer_of(s, p),
+                order: self.key_of(s, p),
+            });
         }
         let mut texts = Vec::new();
         for t in self.scenes[s].texts.clone() {
@@ -291,7 +321,11 @@ impl Interp<'_> {
             let att = self.text_attach(t);
             let drawable_att = matches!(self.o(att), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. });
             let explicit = self.xy(s, t).is_some();
-            let orient = if self.text_sym_pos(t).is_some() && drawable_att && !explicit { self.orientation(s, att) } else { Orient::R0 };
+            let orient = if self.text_sym_pos(t).is_some() && drawable_att && !explicit {
+                self.orientation(s, att)
+            } else {
+                Orient::R0
+            };
             let expanded = self.expand_text(s, &text, att);
             let mut layer = self.layer_of(s, t);
             if drawable_att && layer == Layer::Middle {

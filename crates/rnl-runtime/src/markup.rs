@@ -6,9 +6,16 @@ pub const LITERAL: char = '\u{0}';
 /// One run of text in a line.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Run {
-    Text { text: String, style: RunStyle },
+    Text {
+        text: String,
+        style: RunStyle,
+    },
     /// `\frac{…}{…}`: numerator over denominator.
-    Frac { num: Vec<Run>, den: Vec<Run>, style: RunStyle },
+    Frac {
+        num: Vec<Run>,
+        den: Vec<Run>,
+        style: RunStyle,
+    },
 }
 
 /// Level: 0 normal, 1 superscript, -1 subscript (nested levels add up).

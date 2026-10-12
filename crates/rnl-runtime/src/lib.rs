@@ -5,15 +5,15 @@
 //! files itself: host adapters and the embedding application provide file contents.
 
 pub mod diag;
-pub mod syntax;
-pub mod words;
-pub mod host;
-pub mod records;
-pub mod source;
 pub mod geom;
+pub mod host;
 pub mod interp;
 pub mod markup;
 pub mod model;
+pub mod records;
+pub mod source;
+pub mod syntax;
+pub mod words;
 
 pub use interp::{check_package, interpret, Interpretation, Options};
 pub mod writeback;

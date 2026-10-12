@@ -170,7 +170,10 @@ impl<'p> Interp<'p> {
     pub fn new_package(path: &str, provider: &'p dyn Provider, options: &Options) -> Interp<'p> {
         let name = crate::host::file_name(path).to_string();
         let main = Level::new(LevelKind::File, &name, &name, path);
-        let doc = HostDocument::new(main, crate::host::Dialect { name: "none".into(), case_sensitive: false, ground_aliases: Vec::new() });
+        let doc = HostDocument::new(
+            main,
+            crate::host::Dialect { name: "none".into(), case_sensitive: false, ground_aliases: Vec::new() },
+        );
         let mut it = Interp::blank(doc, provider, options, Sink::new());
         let mut u = Unit::new(UnitKind::Level, &name);
         u.level = Some(0);
@@ -188,7 +191,13 @@ impl<'p> Interp<'p> {
             self.classify(pm);
             return;
         }
-        let mut todo: Vec<UnitId> = self.units.iter().enumerate().filter(|(_, u)| u.kind == UnitKind::Package && !u.embedded).map(|(i, _)| i).collect();
+        let mut todo: Vec<UnitId> = self
+            .units
+            .iter()
+            .enumerate()
+            .filter(|(_, u)| u.kind == UnitKind::Package && !u.embedded)
+            .map(|(i, _)| i)
+            .collect();
         if let Some(s) = self.std_package() {
             todo.push(s);
         }
@@ -278,7 +287,13 @@ impl<'p> Interp<'p> {
                             continue;
                         }
                         let p = pos(&[4, -((anc_up.len() - depth) as i64), rec as i64, k as i64]);
-                        let um = unit::UnitMember { rec: Some(rec), k, embedded: false, m: m.clone(), header: header.clone() };
+                        let um = unit::UnitMember {
+                            rec: Some(rec),
+                            k,
+                            embedded: false,
+                            m: m.clone(),
+                            header: header.clone(),
+                        };
                         work.push(Work { u: unit, m: um, pos: Some(p), scope_in: true });
                     }
                 }
@@ -289,17 +304,20 @@ impl<'p> Interp<'p> {
                 self.eval_scope_in(w.u, &w.m, w.pos.unwrap(), s);
                 continue;
             }
-            match self.eval_member_at(w.u, w.m.rec, w.m.k, w.m.embedded, &w.m.m, Some(s), w.m.header.clone(), None, "") {
-                Err(Stop::LocalRef) => {
-                    // a selection whose scope is this level's host objects is just empty below (10.3);
-                    // the 10.5 warning is for the other roles of a generating AS or ATTACH
-                    if self.units[w.u].level != Some(lv) && !self.scoped_selection(&w.m.m, w.u) {
-                        let at = w.m.m.segments.first().map(|sg| sg.start).unwrap_or(w.m.m.start);
-                        let loc = self.rec_loc(w.m.rec, at);
-                        self.sink.warning("this rule uses objects of the level it is written in, so it takes effect only there (10.5)", loc);
-                    }
-                }
-                _ => {}
+            let r =
+                self.eval_member_at(w.u, w.m.rec, w.m.k, w.m.embedded, &w.m.m, Some(s), w.m.header.clone(), None, "");
+            // a selection whose scope is this level's host objects is just empty below (10.3);
+            // the 10.5 warning is for the other roles of a generating AS or ATTACH
+            if matches!(r, Err(Stop::LocalRef))
+                && self.units[w.u].level != Some(lv)
+                && !self.scoped_selection(&w.m.m, w.u)
+            {
+                let at = w.m.m.segments.first().map(|sg| sg.start).unwrap_or(w.m.m.start);
+                let loc = self.rec_loc(w.m.rec, at);
+                self.sink.warning(
+                    "this rule uses objects of the level it is written in, so it takes effect only there (10.5)",
+                    loc,
+                );
             }
         }
         // a name bound twice in the same level (6.6)
@@ -318,7 +336,13 @@ impl<'p> Interp<'p> {
             if let (Some(a), Some(c)) = (v1, v2) {
                 if a != c {
                     let loc = self.rec_loc(b.rec, b.member.start);
-                    self.sink.error(format!("{}{} is already bound to another object in this level; the first binding is kept (6.6)", b.prefix, b.name), loc);
+                    self.sink.error(
+                        format!(
+                            "{}{} is already bound to another object in this level; the first binding is kept (6.6)",
+                            b.prefix, b.name
+                        ),
+                        loc,
+                    );
                 }
             }
         }
@@ -420,9 +444,11 @@ impl<'p> Interp<'p> {
                 continue;
             }
             let pk = self.effective_packages(lv);
-            let mut mine: Vec<&unit::EffPackage> = pk.iter().filter(|e| matches!(e.place, unit::Place::Level(l, _) if l == lv)).collect();
+            let mut mine: Vec<&unit::EffPackage> =
+                pk.iter().filter(|e| matches!(e.place, unit::Place::Level(l, _) if l == lv)).collect();
             mine.sort_by_key(|e| e.decl.as_ref().map(|d| d.pos).unwrap_or((0, 0)));
-            let mut roots: Vec<&unit::EffPackage> = pk.iter().filter(|e| matches!(e.place, unit::Place::Root(_))).collect();
+            let mut roots: Vec<&unit::EffPackage> =
+                pk.iter().filter(|e| matches!(e.place, unit::Place::Root(_))).collect();
             roots.sort_by_key(|e| match e.place {
                 unit::Place::Root(k) => k,
                 _ => 0,
@@ -444,7 +470,8 @@ impl<'p> Interp<'p> {
                         }
                         let b = self.units[p].names[&key].clone();
                         let name = format!("${}", key.1);
-                        let written = if b.written == name { b.written.clone() } else { format!("{} ({name})", b.written) };
+                        let written =
+                            if b.written == name { b.written.clone() } else { format!("{} ({name})", b.written) };
                         let what = if self.units[prev].pkg_name == "rnl-std" {
                             format!("the standard package {}", self.units[prev].pkg_name)
                         } else {
@@ -491,7 +518,8 @@ impl<'p> Interp<'p> {
         let mut sources = self.doc.sources.clone();
         sources.extend(self.pkg_sources.clone());
         Interpretation { model, sink: std::mem::take(&mut self.sink), checking_package: checking, sources }
-    }}
+    }
+}
 
 /// Interpret a host document: the effective model and the diagnostics. `sink` holds what the
 /// host adapter reported, if anything.
@@ -500,7 +528,6 @@ pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, 
     it.run();
     it.finish()
 }
-
 
 /// Check a package file on its own (2.7).
 pub fn check_package(path: &str, provider: &dyn Provider, options: &Options) -> Interpretation {
