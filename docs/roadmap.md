@@ -31,6 +31,7 @@ This is the central TODO list. A checked box means work present in this reposito
 - [x] Implement the shared renderer (primitives and SVG) and the draft standard package with its symbols ([`libraries/standard/`](../libraries/standard/README.md)); every symbol writes its box.
 - [ ] Add standard symbols for the elements that still lack one (J, F, H, B and others).
 - [x] Add the CLI: check, render, dump, and strip generated records.
+- [x] Add a desktop viewer that opens a netlist, draws its levels, lists its diagnostics, and moves and zooms the view ([`apps/desktop/`](../apps/desktop/README.md)). It calls the Rust runtime directly through Tauri; it does not edit or solve.
 - [ ] Add the runtime WASM binding, TypeScript runtime package, and framework independent viewer core.
 - [ ] Add the React/Vite web application and Tauri desktop shell; measure startup and document loading.
 

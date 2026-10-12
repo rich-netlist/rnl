@@ -2,7 +2,7 @@
 
 RNL is a proposed way to attach circuit meaning and presentation information to native netlists. This independent repository is intended to grow into a portable RNL runtime, solver, viewer, editor, and standard symbol library.
 
-**Status:** This repository contains the RNL documents migrated from Analog Canvas and a first Rust toolkit without a solver. The toolkit reads SPICE and Spectre netlists with RNL records, reports diagnostics, builds the effective model, draws what has coordinates as SVG, and writes records back; it ships the draft standard package and symbols and the `rnl` command. It implements language draft 0.2, which is not yet in [`spec/`](spec/README.md); the drafts there are older. There is no solver, WASM binding, viewer, application, or released package. The language documents are drafts, not a published or frozen standard.
+**Status:** This repository contains the RNL documents migrated from Analog Canvas and a first Rust toolkit without a solver. The toolkit reads SPICE and Spectre netlists with RNL records, reports diagnostics, builds the effective model, draws what has coordinates as SVG, and writes records back; it ships the draft standard package and symbols and the `rnl` command. It implements language draft 0.2, which is not yet in [`spec/`](spec/README.md); the drafts there are older. A small desktop viewer ([`apps/desktop`](apps/desktop/README.md)) opens a netlist, draws it, and lists its diagnostics. There is no solver, WASM binding, shared viewer package, editor, or released package. The language documents are drafts, not a published or frozen standard.
 
 ## Repository map
 
@@ -12,7 +12,7 @@ RNL is a proposed way to attach circuit meaning and presentation information to 
 | [`crates/`](crates/README.md) | Rust runtime, SPICE and Spectre host adapters, shared renderer, and CLI; the solver is future work. |
 | [`bindings/`](bindings/README.md) | Separate runtime and solver WASM entry points. |
 | [`packages/`](packages/README.md) | TypeScript SDKs and framework independent viewer/editor cores. |
-| [`apps/`](apps/README.md) | Web application and desktop shell. |
+| [`apps/`](apps/README.md) | Desktop viewer; future web application. |
 | [`libraries/`](libraries/README.md) | External data libraries: the standard package with its symbols, and the Chinese alias package. |
 | [`tests/`](tests/README.md) | Conformance corpus; future roundtrip and integration corpora. |
 | [`examples/`](examples/README.md) | Future example documents. |
@@ -30,7 +30,11 @@ cargo run --release -p rnl-cli -- check tests/conformance/cases/03-five-transist
 cargo run --release -p rnl-cli -- render tests/conformance/cases/03-five-transistor-ota.sp -o target/svg
 ```
 
-See [`crates/rnl-cli`](crates/rnl-cli/README.md) for the other commands.
+See [`crates/rnl-cli`](crates/rnl-cli/README.md) for the other commands. To look at a netlist in the desktop viewer instead:
+
+```bash
+cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-five-transistor-ota.sp
+```
 
 ## Next step
 

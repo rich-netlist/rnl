@@ -1,0 +1,22 @@
+[package]
+name = "rnl-viewer"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+description = "Desktop viewer for Rich Netlist (RNL) documents"
+
+# A workspace of its own: the WebView dependencies stay out of the library crates' builds.
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+rnl-runtime = { path = "../../crates/rnl-runtime" }
+rnl-render = { path = "../../crates/rnl-render" }
+rnl-cli = { path = "../../crates/rnl-cli" }
