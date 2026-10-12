@@ -955,6 +955,9 @@ impl<'p> Interp<'p> {
         for p in &e.path {
             obj = self.subobject(obj, p, ctx, e)?;
         }
+        if e.prefix == '#' && e.path.first().is_some_and(|p| p.sep == Sep::Term) {
+            self.note_terminal_ref(ctx, e, obj);
+        }
         Ok((obj, sel))
     }
 
@@ -1086,6 +1089,49 @@ impl<'p> Interp<'p> {
                 _ => continue,
             };
             let r = HostRef { loc: loc.clone(), len, level, target };
+            if self.refs_seen.insert(r.clone()) {
+                self.refs.push(r);
+            }
+        }
+    }
+
+    /// Note the nets a terminal reference such as `#M1:d` reaches, for tools (`HostRef`). The place
+    /// runs from the `#` to the end of the terminal, so it covers the instance's name as well.
+    fn note_terminal_ref(&mut self, ctx: &Ctx, e: &Ref, obj: ObjId) {
+        let (Some(rec), Some(scene)) = (ctx.rec, ctx.scene) else { return };
+        let Some(loc) = self.rec_loc(Some(rec), e.start) else { return };
+        // up to the `::` of a further path, outside quotes
+        let mut len = 0u32;
+        let mut quoted = false;
+        let mut colons = 0;
+        for c in self.recs[rec].text.chars().skip(e.start).take(e.end.saturating_sub(e.start)) {
+            if c == '"' {
+                quoted = !quoted;
+            }
+            if c == ':' && !quoted {
+                colons += 1;
+                if colons == 2 {
+                    break;
+                }
+            }
+            len += 1;
+        }
+        let reached: Vec<ObjId> = match self.o(obj) {
+            ObjData::Set(s) => s.items.iter().map(|(o, _)| *o).collect(),
+            _ => vec![obj],
+        };
+        let mut nets = Vec::new();
+        for o in reached {
+            match self.o(o) {
+                ObjData::Term { .. } => nets.extend(self.term_nets(scene, o)),
+                ObjData::Net { .. } => nets.push(o),
+                _ => {}
+            }
+        }
+        let level = self.scenes[scene].level;
+        for n in nets {
+            let ObjData::Net { key, .. } = self.o(n) else { continue };
+            let r = HostRef { loc: loc.clone(), len, level, target: RefTarget::Net(key.clone()) };
             if self.refs_seen.insert(r.clone()) {
                 self.refs.push(r);
             }

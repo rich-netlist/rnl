@@ -36,6 +36,9 @@ fn references_name_their_instances_and_nets() {
     let v = at(8, "#V1:1");
     assert_eq!((v[0].len, &v[0].target, v[0].level), (3, &RefTarget::Instance(v1), 0));
     assert_eq!(at(8, "#R1:1")[0].target, RefTarget::Instance(r1));
+    // a terminal reference also reaches the net at the terminal: `#R1:1` is on `in`
+    let t = at(8, "#R1:1");
+    assert!(t.iter().any(|x| x.len == 5 && x.target == RefTarget::Net("in".into())), "{t:?}");
     // the solver's record names them too
     assert_eq!(at(19, "#R1")[0].target, RefTarget::Instance(r1));
     // each place once, however often it was evaluated

@@ -187,13 +187,16 @@ pub struct Model {
 pub struct HostRef {
     /// Where the reference starts: its `#` or `&`.
     pub loc: crate::diag::Loc,
-    /// How many characters the prefix and the name take, without any `:` or `::` path after them.
+    /// How many characters the reference takes: the prefix and the name, without any path after
+    /// them; for the net of a terminal such as `#M1:d`, up to the end of the terminal.
     pub len: u32,
     /// The host level the name is resolved in.
     pub level: usize,
     pub target: RefTarget,
 }
 
+/// What a reference reaches. `#M1:d` gives two: the instance M1 (`#M1`), and the net at its
+/// terminal d (`#M1:d`).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RefTarget {
     /// An instance, by its index in the level's instances.
