@@ -1,8 +1,8 @@
 "use strict";
 
 // The page of the RNL Viewer. The app reads the file and draws it (src/document.rs); this page
-// shows the drawing, the netlist text and the diagnostics, and follows a selected instance or net
-// between the drawing and the text.
+// shows the drawing, the netlist text, the diagnostics and the subcircuit hierarchy, and follows
+// a selected instance or net between the drawing and the text.
 
 const tauri = window.__TAURI__;
 const invoke = (cmd, args) => tauri.core.invoke(cmd, args);
@@ -12,6 +12,8 @@ const app = $("app");
 const canvas = $("canvas");
 const source = $("source");
 const sidebar = $("sidebar");
+const netlistPane = $("pane-netlist");
+const hierarchyPane = $("pane-hierarchy");
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 50;
@@ -23,6 +25,8 @@ const SIDEBAR_MIN = 220;
 const DRAWING_MIN = 280;
 const PROBLEMS_MIN = 60;
 const SOURCE_MIN = 120;
+const INDEX_MIN = 120;
+const TREE_MIN = 100;
 
 let doc = null; // what open_document returned
 let lastPath = null; // the file last opened, also when it failed to open, for reloading
@@ -41,6 +45,10 @@ let selected = null; // the selected object, an index into doc.objects
 let fileShown = 0; // the file in the text pane
 let fileViews = []; // per file: { el, lines: [line elements], scroll }
 let lineOwners = []; // per file: line number -> the instance whose statement it is
+let pendingReveal = null; // a line to bring into view once the text pane is shown
+
+let expanded = new Set(["0"]); // the open branches of the hierarchy tree, by path
+let treeActive = null; // the path of the tree row that opened the level shown, if one did
 
 // ------------------------------------------------------------------ opening
 
@@ -58,6 +66,7 @@ async function openPath(path, keep) {
     doc = null;
     clearDrawing(`Could not open ${path}`);
     clearSource("The file could not be read.");
+    renderHierarchy();
     renderDiagnostics([{ severity: "error", message: String(e), file: "", line: 0, col: 0, origin: "" }]);
     setProblems(true);
   } finally {
@@ -86,6 +95,8 @@ function snapshot() {
     files: doc.files.map((f, k) => ({ path: f.path, scroll: fileViews[k] ? fileViews[k].scroll : 0 })),
     file: doc.files[fileShown] ? doc.files[fileShown].path : null,
     selected: sel && { kind: sel.kind, name: sel.name, level: sel.level },
+    expanded,
+    treeActive,
   };
 }
 
@@ -93,22 +104,14 @@ function snapshot() {
 
 function showDocument(before) {
   selected = null;
+  expanded = before ? before.expanded : new Set(["0"]);
+  treeActive = before ? before.treeActive : null;
   renderFiles();
   const diags = doc.diagnostics.slice();
   if (doc.failed) diags.unshift({ severity: "error", message: doc.failed, file: "", line: 0, col: 0, origin: "" });
   renderDiagnostics(diags);
   markDiagnostics(diags);
-
-  const nav = $("levels");
-  nav.replaceChildren();
-  doc.levels.forEach((lv, i) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = lv.title;
-    b.title = lv.kind === "subckt" ? `Subcircuit ${lv.title}` : lv.title;
-    b.addEventListener("click", () => showLevel(i, null));
-    nav.append(b);
-  });
+  $("search").value = "";
 
   if (before) {
     for (const f of before.files) {
@@ -121,6 +124,7 @@ function showDocument(before) {
 
   if (doc.levels.length === 0) {
     clearDrawing("Nothing to draw.");
+    renderHierarchy();
     return;
   }
   const level = before ? doc.levels.findIndex((l) => l.title === before.level) : -1;
@@ -135,16 +139,20 @@ function showDocument(before) {
 
 // ------------------------------------------------------------------ the drawing
 
-function showLevel(i, keptView) {
+/** Draw level `i`. `treePath` is the hierarchy row that asked for it, if one did. */
+function showLevel(i, keptView, treePath) {
   current = i;
   const lv = doc.levels[i];
-  [...$("levels").children].forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
+  treeActive = treePath !== undefined ? treePath : treeActive;
+  $("level-name").textContent = lv.title;
+  $("level-kind").textContent = i === 0 ? "top level" : lv.kind === "subckt" ? "subcircuit" : "file level";
   $("status").textContent = lv.status ? `Not drawn without a solver: ${lv.status}` : "";
   $("status").title = $("status").textContent;
   if (svg) svg.remove();
   svg = null;
   overlay = null;
   groups = new Map();
+  updateHierarchy();
   if (lv.empty) {
     view = null;
     $("zoom").textContent = "";
@@ -189,7 +197,8 @@ function clearDrawing(message) {
   view = null;
   $("empty").textContent = message;
   $("empty").hidden = false;
-  $("levels").replaceChildren();
+  $("level-name").textContent = "";
+  $("level-kind").textContent = "";
   $("status").textContent = "";
   $("zoom").textContent = "";
   $("selection").textContent = "";
@@ -350,13 +359,13 @@ function segmentDistance(u, v, a, b) {
 
 /** Select an object. `from` is "drawing", "source" or "reload". */
 function select(o, from) {
-  if (!doc || o === undefined || o === null) return;
+  if (!doc || o === undefined || o === null || !doc.objects[o]) return;
   selected = o;
   const obj = doc.objects[o];
   // a name picked in the text is shown on the level that has it
   if (from === "source" && (!doc.levels[current] || doc.levels[current].host !== obj.level)) {
     const k = doc.levels.findIndex((l) => l.host === obj.level);
-    if (k >= 0) showLevel(k, null);
+    if (k >= 0) showLevel(k, null, null);
   }
   paintDrawingSelection();
   paintSourceSelection(from === "drawing");
@@ -415,7 +424,7 @@ function paintSourceSelection(reveal) {
     const [f, a, b] = obj.lines;
     for (let n = a; n <= b; n++) fileViews[f].lines[n - 1]?.classList.add("hl-line");
   }
-  for (const el of source.querySelectorAll(`[data-obj="${selected}"]`)) el.classList.add("hl");
+  for (const el of source.querySelectorAll(`[data-obj~="${selected}"]`)) el.classList.add("hl");
   if (!reveal) return;
   const spans = doc.spans.filter((s) => s.object === selected);
   const target = spans.find((s) => s.kind === "name") || spans.find((s) => s.file === fileShown) || spans[0];
@@ -473,11 +482,23 @@ function showFile(f) {
   source.scrollTop = fileViews[f].scroll;
 }
 
-/** Show a line of a file in the middle of the text pane; with `flash`, blink it. */
+/** Whether the text pane is on screen, so that lines can be scrolled to. */
+function sourceShown() {
+  return !app.classList.contains("sidebar-hidden") && !netlistPane.hidden;
+}
+
+/**
+ * Show a line of a file in the middle of the text pane; with `flash`, blink it. While the text
+ * pane is hidden, the line waits until it is shown again.
+ */
 function revealLine(f, line, flash) {
   if (f === null || f === undefined || !fileViews[f] || !line) return;
-  if (app.classList.contains("sidebar-hidden")) setSidebar(true);
   showFile(f);
+  if (!sourceShown()) {
+    pendingReveal = { f, line, flash };
+    return;
+  }
+  pendingReveal = null;
   const el = fileViews[f].lines[line - 1];
   if (!el) return;
   const top = el.offsetTop - source.clientHeight / 2 + el.offsetHeight / 2;
@@ -489,11 +510,19 @@ function revealLine(f, line, flash) {
   }
 }
 
+function revealPending() {
+  if (pendingReveal && sourceShown()) {
+    const { f, line, flash } = pendingReveal;
+    revealLine(f, line, flash);
+  }
+}
+
 source.addEventListener("click", (e) => {
   if (!doc || String(window.getSelection())) return; // selecting text is not a click
   const s = e.target.closest("[data-obj]");
   if (s) {
-    select(Number(s.dataset.obj), "source");
+    // the first object of a place is the one written most narrowly: `#M1` in `#M1:d` is M1
+    select(Number(s.dataset.obj.split(" ")[0]), "source");
     return;
   }
   const ln = e.target.closest(".ln");
@@ -533,7 +562,6 @@ function renderLines(file, f) {
   let joined = false; // the previous host line ends with `\`
   lines.forEach((text, i) => {
     const cls = new Array(text.length).fill("");
-    const obj = new Array(text.length).fill(-1);
     if (i === 0 && f === 0 && doc.dialect === "spice") {
       mark(cls, 0, text.length, "comment"); // the title line
     } else if (rnl[i].length) {
@@ -547,10 +575,15 @@ function renderLines(file, f) {
       const cont = joined || /^\s*\+/.test(text);
       joined = hostLine(text, cls, cont, null);
     }
-    for (const s of spans[i]) {
-      for (let c = s.col - 1; c < s.col - 1 + s.len && c < text.length; c++) obj[c] = s.object;
+    // the objects named at each character, the most narrowly named first
+    const objs = new Array(text.length).fill(null);
+    for (const s of spans[i].slice().sort((a, b) => a.len - b.len)) {
+      for (let c = s.col - 1; c < s.col - 1 + s.len && c < text.length; c++) {
+        if (!objs[c]) objs[c] = [];
+        if (!objs[c].includes(s.object)) objs[c].push(s.object);
+      }
     }
-    out.push(lineElement(text, i + 1, cls, obj));
+    out.push(lineElement(text, i + 1, cls, objs.map((o) => (o ? o.join(" ") : ""))));
   });
   return out;
 }
@@ -569,15 +602,15 @@ function lineElement(text, n, cls, obj) {
     let j = i + 1;
     while (j < text.length && cls[j] === cls[i] && obj[j] === obj[i]) j++;
     const piece = text.slice(i, j);
-    if (!cls[i] && obj[i] < 0) {
+    if (!cls[i] && !obj[i]) {
       code.append(piece);
     } else {
       const s = document.createElement("span");
       s.textContent = piece;
       if (cls[i]) s.className = `s-${cls[i]}`;
-      if (obj[i] >= 0) {
+      if (obj[i]) {
         s.classList.add("obj");
-        s.dataset.obj = String(obj[i]);
+        s.dataset.obj = obj[i];
       }
       code.append(s);
     }
@@ -798,6 +831,221 @@ function span(cls, text) {
   return s;
 }
 
+// ------------------------------------------------------------------ the hierarchy
+
+function renderHierarchy() {
+  renderTree();
+  renderIndex();
+}
+
+/** The tree of subcircuit instances under the top level; only open branches are listed. */
+function renderTree() {
+  const tree = $("tree");
+  tree.replaceChildren();
+  if (!doc || doc.levels.length === 0) return;
+  const walk = (level, path, depth, child, above) => {
+    const lv = doc.levels[level];
+    const cycle = above.includes(level);
+    const branches = cycle ? [] : lv.children;
+    const open = branches.length > 0 && expanded.has(path);
+    tree.append(treeRow({ level, path, depth, child, branches: branches.length, open, cycle }));
+    if (!open) return;
+    branches.forEach((c, k) => {
+      const p = `${path}/${k}`;
+      if (c.level === null) tree.append(treeRow({ level: null, path: p, depth: depth + 1, child: c, branches: 0 }));
+      else walk(c.level, p, depth + 1, c, above.concat(level));
+    });
+  };
+  walk(0, "0", 0, null, []);
+}
+
+function treeRow({ level, path, depth, child, branches, open, cycle }) {
+  const row = document.createElement("div");
+  row.className = "tree-row";
+  row.setAttribute("role", "treeitem");
+  row.dataset.path = path;
+  row.style.paddingLeft = `${4 + depth * 16}px`;
+  const twisty = document.createElement("button");
+  twisty.type = "button";
+  twisty.className = branches ? "twisty" : "twisty leaf";
+  twisty.tabIndex = -1;
+  if (branches) {
+    twisty.setAttribute("aria-expanded", String(open));
+    twisty.setAttribute("aria-label", open ? "Collapse" : "Expand");
+    twisty.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleBranch(path);
+    });
+  }
+  row.append(twisty);
+  if (child === null) {
+    row.append(span("inst", doc.levels[0].title), span("badge", "top"));
+  } else {
+    row.append(span("inst", child.instance), span("master", child.master));
+    if (level === null) row.append(span("badge", "not defined"));
+    if (cycle) row.append(span("badge", "recursive"));
+  }
+  if (level === null) {
+    row.classList.add("undefined");
+    row.title = `${child.master} is not defined in the netlist`;
+    return row;
+  }
+  row.dataset.level = String(level);
+  if (level === current) row.classList.add("current");
+  if (path === treeActive) row.classList.add("active");
+  row.addEventListener("click", () => openLevel(level, path));
+  row.addEventListener("dblclick", () => { if (branches) toggleBranch(path); });
+  return row;
+}
+
+function toggleBranch(path) {
+  if (expanded.has(path)) expanded.delete(path);
+  else expanded.add(path);
+  renderTree();
+}
+
+/** The first path in the tree that reaches `level`, opening the branches above it; or null. */
+function pathTo(level) {
+  const find = (l, path, above) => {
+    if (l === level) return path;
+    if (above.includes(l)) return null;
+    const kids = doc.levels[l].children;
+    for (let k = 0; k < kids.length; k++) {
+      if (kids[k].level === null) continue;
+      const p = find(kids[k].level, `${path}/${k}`, above.concat(l));
+      if (p) return p;
+    }
+    return null;
+  };
+  return find(0, "0", []);
+}
+
+/** The subcircuits by name, under their initials; the top level always first. */
+function renderIndex() {
+  const list = $("index");
+  const letters = $("letters");
+  list.replaceChildren();
+  letters.replaceChildren();
+  $("index-count").textContent = "";
+  if (!doc || doc.levels.length === 0) return;
+  const q = $("search").value.trim().toLowerCase();
+  const uses = doc.levels.map(() => 0);
+  for (const lv of doc.levels) for (const c of lv.children) if (c.level !== null) uses[c.level]++;
+  list.append(indexRow(0, "", null));
+  const all = doc.levels.map((l, k) => ({ title: l.title, k })).filter((x) => x.k !== 0);
+  const shown = all
+    .filter((x) => !q || x.title.toLowerCase().includes(q))
+    .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }));
+  $("index-count").textContent = q ? `${shown.length} of ${all.length}` : String(all.length);
+  let group = null;
+  for (const x of shown) {
+    const initial = initialOf(x.title);
+    if (initial !== group) {
+      group = initial;
+      const h = document.createElement("div");
+      h.className = "index-group";
+      h.id = `initial-${initial}`;
+      h.textContent = initial;
+      list.append(h);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = initial;
+      b.title = `Subcircuits starting with ${initial}`;
+      b.addEventListener("click", () => {
+        list.scrollTop = h.offsetTop - list.querySelector(".index-row.top").offsetHeight;
+      });
+      letters.append(b);
+    }
+    list.append(indexRow(x.k, q, uses[x.k]));
+  }
+  if (all.length > 0 && shown.length === 0) {
+    const p = document.createElement("div");
+    p.className = "nothing";
+    p.textContent = "No subcircuit matches.";
+    list.append(p);
+  }
+}
+
+function initialOf(name) {
+  const c = name.charAt(0).toUpperCase();
+  return /\p{L}/u.test(c) ? c : "#";
+}
+
+function indexRow(level, q, count) {
+  const row = document.createElement("div");
+  row.className = level === 0 ? "index-row top" : "index-row";
+  row.setAttribute("role", "option");
+  row.dataset.level = String(level);
+  const name = document.createElement("span");
+  name.className = "name";
+  const title = doc.levels[level].title;
+  const at = q ? title.toLowerCase().indexOf(q) : -1;
+  if (at >= 0) {
+    const m = document.createElement("mark");
+    m.textContent = title.slice(at, at + q.length);
+    name.append(title.slice(0, at), m, title.slice(at + q.length));
+  } else {
+    name.textContent = title;
+  }
+  row.append(name);
+  if (level === 0) row.append(span("uses", "top level"));
+  else row.append(span("uses", count === 1 ? "1 use" : `${count} uses`));
+  if (level === current) {
+    row.classList.add("current");
+    row.setAttribute("aria-selected", "true");
+  }
+  row.addEventListener("click", () => openLevel(level, null));
+  return row;
+}
+
+/** Open a level from the hierarchy: from a tree row (`path`) or from the index (null). */
+function openLevel(level, path) {
+  if (!doc) return;
+  if (level !== current) showLevel(level, null, path);
+  else {
+    treeActive = path;
+    updateHierarchy();
+  }
+}
+
+/** Mark the level shown in the tree and the index, and bring it into view in both. */
+function updateHierarchy() {
+  if (!doc) return;
+  if (treeActive !== null) {
+    const parts = treeActive.split("/").map(Number);
+    let l = 0;
+    for (const k of parts.slice(1)) l = doc.levels[l] && doc.levels[l].children[k] ? doc.levels[l].children[k].level : null;
+    if (l !== current) treeActive = null;
+  }
+  if (treeActive === null) treeActive = pathTo(current);
+  if (treeActive) {
+    const parts = treeActive.split("/");
+    for (let k = 1; k < parts.length; k++) expanded.add(parts.slice(0, k).join("/"));
+  }
+  renderHierarchy();
+  for (const id of ["tree", "index"]) {
+    const box = $(id);
+    const row = box.querySelector(id === "tree" ? ".tree-row.active" : ".index-row.current:not(.top)");
+    if (!row) continue;
+    const top = row.offsetTop - box.offsetTop;
+    if (top < box.scrollTop || top + row.offsetHeight > box.scrollTop + box.clientHeight) {
+      box.scrollTop = Math.max(0, top - box.clientHeight / 2);
+    }
+  }
+}
+
+$("search").addEventListener("input", renderIndex);
+$("search").addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && $("search").value) {
+    $("search").value = "";
+    renderIndex();
+    e.stopPropagation();
+  } else if (e.key === "Enter") {
+    const first = $("index").querySelector(".index-row:not(.top)");
+    if (first) openLevel(Number(first.dataset.level), null);
+  }
+});
+
 // ------------------------------------------------------------------ panels and their sizes
 
 function load(key, fallback) {
@@ -821,11 +1069,29 @@ function setSidebar(shown) {
   app.classList.toggle("sidebar-hidden", !shown);
   save("sidebar-shown", shown);
   invoke("set_view_check", { panel: "netlist", shown }).catch(() => {});
+  if (shown) revealPending();
+}
+
+/** Show the "netlist" or the "hierarchy" view of the side panel. */
+function setPane(name) {
+  const netlist = name !== "hierarchy";
+  netlistPane.hidden = !netlist;
+  hierarchyPane.hidden = netlist;
+  $("tab-netlist").setAttribute("aria-selected", String(netlist));
+  $("tab-hierarchy").setAttribute("aria-selected", String(!netlist));
+  save("side-pane", netlist ? "netlist" : "hierarchy");
+  if (netlist) {
+    setProblemsHeight(load("problems-height", 180));
+    revealPending();
+  } else {
+    setIndexHeight(load("index-height", 260));
+    updateHierarchy();
+  }
 }
 
 function setProblems(shown) {
   $("problems-head").setAttribute("aria-expanded", String(shown));
-  sidebar.classList.toggle("problems-folded", !shown);
+  netlistPane.classList.toggle("problems-folded", !shown);
   save("problems-shown", shown);
   invoke("set_view_check", { panel: "problems", shown }).catch(() => {});
 }
@@ -835,24 +1101,29 @@ function sidebarWidthLimits() {
   return [SIDEBAR_MIN, Math.max(SIDEBAR_MIN, Math.min(w * 0.75, w - DRAWING_MIN))];
 }
 
+// a hidden pane has no height yet: its size is taken as it is, and limited once it is shown
 function problemsHeightLimits() {
-  const head = $("problems-head").offsetHeight + document.querySelector(".pane-head").offsetHeight;
-  return [PROBLEMS_MIN, Math.max(PROBLEMS_MIN, sidebar.clientHeight - head - SOURCE_MIN)];
+  if (netlistPane.clientHeight === 0) return [PROBLEMS_MIN, Infinity];
+  const fixed = $("problems-head").offsetHeight + $("file-tabs").offsetHeight;
+  return [PROBLEMS_MIN, Math.max(PROBLEMS_MIN, netlistPane.clientHeight - fixed - SOURCE_MIN)];
 }
 
-function setSidebarWidth(px) {
-  const [lo, hi] = sidebarWidthLimits();
-  const w = Math.round(clamp(px, lo, hi));
-  document.documentElement.style.setProperty("--sidebar-w", `${w}px`);
-  return w;
+function indexHeightLimits() {
+  if (hierarchyPane.clientHeight === 0) return [INDEX_MIN, Infinity];
+  const fixed = hierarchyPane.querySelector(".sub-head").offsetHeight;
+  return [INDEX_MIN, Math.max(INDEX_MIN, hierarchyPane.clientHeight - fixed - TREE_MIN)];
 }
 
-function setProblemsHeight(px) {
-  const [lo, hi] = problemsHeightLimits();
-  const h = Math.round(clamp(px, lo, hi));
-  document.documentElement.style.setProperty("--problems-h", `${h}px`);
-  return h;
+function setSize(name, px, limits) {
+  const [lo, hi] = limits();
+  const v = Math.round(clamp(px, lo, hi));
+  document.documentElement.style.setProperty(name, `${v}px`);
+  return v;
 }
+
+const setSidebarWidth = (px) => setSize("--sidebar-w", px, sidebarWidthLimits);
+const setProblemsHeight = (px) => setSize("--problems-h", px, problemsHeightLimits);
+const setIndexHeight = (px) => setSize("--index-h", px, indexHeightLimits);
 
 /** Drag a splitter: `axis` "x" or "y"; `get` the size when the drag starts; `set` the new size. */
 function splitter(el, axis, sign, get, set, key) {
@@ -885,15 +1156,21 @@ function splitter(el, axis, sign, get, set, key) {
 
 splitter($("vsplit"), "x", 1, () => sidebar.getBoundingClientRect().width, setSidebarWidth, "sidebar-width");
 splitter($("hsplit"), "y", -1, () => $("problems-body").getBoundingClientRect().height, setProblemsHeight, "problems-height");
+splitter($("hsplit2"), "y", -1, () => $("index-section").getBoundingClientRect().height, setIndexHeight, "index-height");
 
 window.addEventListener("resize", () => {
   setSidebarWidth(sidebar.getBoundingClientRect().width || load("sidebar-width", 420));
-  if (!sidebar.classList.contains("problems-folded")) setProblemsHeight($("problems-body").getBoundingClientRect().height);
+  if (!netlistPane.hidden && !netlistPane.classList.contains("problems-folded")) {
+    setProblemsHeight($("problems-body").getBoundingClientRect().height);
+  }
+  if (!hierarchyPane.hidden) setIndexHeight($("index-section").getBoundingClientRect().height);
 });
 
 $("hide-sidebar").addEventListener("click", () => setSidebar(false));
 $("show-sidebar").addEventListener("click", () => setSidebar(true));
-$("problems-head").addEventListener("click", () => setProblems(sidebar.classList.contains("problems-folded")));
+$("problems-head").addEventListener("click", () => setProblems(netlistPane.classList.contains("problems-folded")));
+$("tab-netlist").addEventListener("click", () => setPane("netlist"));
+$("tab-hierarchy").addEventListener("click", () => setPane("hierarchy"));
 
 // ------------------------------------------------------------------ commands: menu and keys
 
@@ -905,7 +1182,7 @@ function command(id) {
     case "zoom-in": zoomCenter(1.25); break;
     case "zoom-out": zoomCenter(0.8); break;
     case "toggle-netlist": setSidebar(app.classList.contains("sidebar-hidden")); break;
-    case "toggle-problems": setProblems(sidebar.classList.contains("problems-folded")); break;
+    case "toggle-problems": setProblems(netlistPane.classList.contains("problems-folded")); break;
     default: break;
   }
 }
@@ -915,6 +1192,7 @@ tauri.event.listen("menu", (e) => command(e.payload));
 document.addEventListener("keydown", (e) => {
   const ctrl = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
+  const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
   let id = null;
   if (ctrl && !e.shiftKey && key === "o") id = "open";
   else if (e.key === "F5" || (ctrl && key === "r")) id = "reload"; // re-read the file, not the page
@@ -922,6 +1200,7 @@ document.addEventListener("keydown", (e) => {
   else if (ctrl && e.shiftKey && key === "m") id = "toggle-problems";
   else if (ctrl && (e.key === "=" || e.key === "+")) id = "zoom-in";
   else if (ctrl && e.key === "-") id = "zoom-out";
+  else if (typing) return;
   else if (!ctrl && !e.altKey && (key === "f" || key === "0")) id = "fit";
   else if (e.key === "Escape") {
     clearSelection();
@@ -940,6 +1219,8 @@ setSidebarWidth(load("sidebar-width", 420));
 setProblemsHeight(load("problems-height", 180));
 setSidebar(load("sidebar-shown", true));
 setProblems(load("problems-shown", true));
+setPane(load("side-pane", "netlist"));
+setIndexHeight(load("index-height", 260));
 {
   const li = document.createElement("li");
   li.className = "nothing";

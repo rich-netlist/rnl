@@ -8,30 +8,54 @@
 </head>
 <body>
 <div id="app" class="app">
-  <aside id="sidebar" class="sidebar" aria-label="Netlist">
-    <div class="pane-head">
-      <span class="pane-title">Netlist</span>
-      <nav id="file-tabs" class="tabs file-tabs" aria-label="Files"></nav>
-      <button id="hide-sidebar" class="icon" type="button" title="Hide the netlist panel (Ctrl+B)" aria-label="Hide the netlist panel">&#x2039;</button>
+  <aside id="sidebar" class="sidebar" aria-label="Side panel">
+    <div class="side-head">
+      <nav class="tabs view-tabs" role="tablist" aria-label="Side panel views">
+        <button id="tab-netlist" type="button" role="tab" aria-controls="pane-netlist" aria-selected="true">Netlist</button>
+        <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false">Hierarchy</button>
+      </nav>
+      <button id="hide-sidebar" class="icon" type="button" title="Hide the side panel (Ctrl+B)" aria-label="Hide the side panel">&#x2039;</button>
     </div>
-    <div id="source" class="source"><p class="placeholder">No file is open.</p></div>
-    <div id="hsplit" class="hsplit" role="separator" aria-orientation="horizontal" title="Drag to resize"></div>
-    <section id="problems" class="problems">
-      <button id="problems-head" class="problems-head" type="button" aria-expanded="true" aria-controls="problems-body">
-        <span class="chevron" aria-hidden="true"></span>
-        <span class="pane-title">Problems</span>
-        <span id="counts" class="counts"></span>
-      </button>
-      <div id="problems-body" class="problems-body">
-        <ul id="diags" class="diags"></ul>
-      </div>
-    </section>
+
+    <div id="pane-netlist" class="pane netlist-pane" role="tabpanel">
+      <nav id="file-tabs" class="tabs file-tabs" aria-label="Files"></nav>
+      <div id="source" class="source"><p class="placeholder">No file is open.</p></div>
+      <div id="hsplit" class="hsplit" role="separator" aria-orientation="horizontal" title="Drag to resize"></div>
+      <section id="problems" class="problems">
+        <button id="problems-head" class="problems-head" type="button" aria-expanded="true" aria-controls="problems-body">
+          <span class="chevron" aria-hidden="true"></span>
+          <span class="pane-title">Problems</span>
+          <span id="counts" class="counts"></span>
+        </button>
+        <div id="problems-body" class="problems-body">
+          <ul id="diags" class="diags"></ul>
+        </div>
+      </section>
+    </div>
+
+    <div id="pane-hierarchy" class="pane hierarchy-pane" role="tabpanel" hidden>
+      <div class="sub-head"><span class="pane-title">Hierarchy</span></div>
+      <div id="tree" class="tree" role="tree" aria-label="Subcircuit hierarchy"></div>
+      <div id="hsplit2" class="hsplit" role="separator" aria-orientation="horizontal" title="Drag to resize"></div>
+      <section id="index-section" class="index-section">
+        <div class="sub-head">
+          <span class="pane-title">Subcircuits</span>
+          <span id="index-count" class="index-count"></span>
+        </div>
+        <div class="search-row">
+          <input id="search" type="search" placeholder="Search by name" spellcheck="false" autocomplete="off" aria-label="Search subcircuits by name">
+        </div>
+        <nav id="letters" class="letters" aria-label="Initials"></nav>
+        <div id="index" class="index-list" role="listbox" aria-label="Subcircuits by name"></div>
+      </section>
+    </div>
   </aside>
   <div id="vsplit" class="vsplit" role="separator" aria-orientation="vertical" title="Drag to resize"></div>
   <main class="drawing">
     <div class="level-bar">
-      <button id="show-sidebar" class="icon" type="button" title="Show the netlist panel (Ctrl+B)" aria-label="Show the netlist panel">&#x203A;</button>
-      <nav id="levels" class="tabs levels" aria-label="Drawing levels"></nav>
+      <button id="show-sidebar" class="icon" type="button" title="Show the side panel (Ctrl+B)" aria-label="Show the side panel">&#x203A;</button>
+      <span id="level-name" class="level-name"></span>
+      <span id="level-kind" class="level-kind"></span>
     </div>
     <div id="canvas" class="canvas">
       <p id="empty" class="empty">Open a SPICE or Spectre netlist with File &#x203A; Open (Ctrl+O).<br>Drag to move the view, scroll to zoom, click a symbol or a wire to find it in the netlist.</p>

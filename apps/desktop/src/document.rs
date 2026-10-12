@@ -50,6 +50,19 @@ pub struct Level {
     pub status: Option<String>,
     /// What can be clicked on the drawing, in SVG coordinates.
     pub hits: Vec<Hit>,
+    /// The subcircuit instances of the level, in netlist order: the hierarchy below it.
+    pub children: Vec<Child>,
+}
+
+/// A subcircuit instance, as a branch of the hierarchy.
+#[derive(Serialize, Debug)]
+pub struct Child {
+    pub instance: String,
+    /// The subcircuit it instantiates, as written.
+    pub master: String,
+    /// The level that draws the subcircuit, an index into `Document::levels`; None when the
+    /// netlist does not define it.
+    pub level: Option<usize>,
 }
 
 /// Something on a drawing that stands for objects.
@@ -147,7 +160,20 @@ pub fn load(path: &Path) -> Result<Document, String> {
         };
         ix.spans.push(Span { object, file, line: h.loc.line, col: h.loc.col, len: h.len, kind: "ref" });
     }
-    let levels = r.model.levels.iter().map(|lv| ix.level(lv)).collect();
+    let mut levels: Vec<Level> = r.model.levels.iter().map(|lv| ix.level(lv)).collect();
+    let drawn: HashMap<usize, usize> = r.model.levels.iter().enumerate().map(|(k, lv)| (lv.level, k)).collect();
+    for (k, lv) in r.model.levels.iter().enumerate() {
+        levels[k].children = r.doc.levels[lv.level]
+            .instances
+            .iter()
+            .filter(|i| i.is_subckt)
+            .map(|i| {
+                let master = i.model.clone().unwrap_or_default();
+                let level = r.doc.subckt(&master).and_then(|h| drawn.get(&h).copied());
+                Child { instance: i.name.clone(), master, level }
+            })
+            .collect();
+    }
 
     let diagnostic = |d: &Diag, sink: &Sink| {
         let (file, line, col) = match &d.loc {
@@ -367,6 +393,7 @@ impl<'a> Index<'a> {
             empty: prims.is_empty(),
             status: rnl_cli::level_status(lv),
             hits,
+            children: Vec::new(),
         }
     }
 }
@@ -527,6 +554,19 @@ mod tests {
         // a ground symbol stands for the ground net
         let gnd = d.objects.iter().position(|o| o.kind == "net" && o.name == "0").unwrap();
         assert!(hits.iter().any(|h| h.kind == "box" && h.objects == vec![gnd]));
+    }
+
+    #[test]
+    fn each_level_lists_the_subcircuits_below_it() {
+        let d = load(&case("04-hierarchy.sp")).unwrap();
+        let top: Vec<(&str, &str)> = d.levels[0]
+            .children
+            .iter()
+            .map(|c| (c.instance.as_str(), d.levels[c.level.unwrap()].title.as_str()))
+            .collect();
+        assert!(top.contains(&("X1", "amp")) && top.iter().any(|(_, l)| *l == "rdiv"), "{top:?}");
+        let amp = d.levels.iter().find(|l| l.title == "amp").unwrap();
+        assert!(amp.children.is_empty());
     }
 
     #[test]
