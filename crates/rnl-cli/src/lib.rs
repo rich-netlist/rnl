@@ -8,6 +8,7 @@ use std::path::Path;
 
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::HostDocument;
+use rnl_runtime::model::LevelView;
 use rnl_runtime::source::Provider;
 use rnl_runtime::{Interpretation, Options};
 
@@ -58,4 +59,31 @@ pub fn interpret_file(
     let mut sink = Sink::new();
     let doc = read_host(file, dialect, provider, &mut sink)?;
     Ok(rnl_runtime::interpret(doc, provider, options, sink))
+}
+
+/// What a drawing level still lacks without a solver: objects without a position, and the
+/// constraints by the status their check against the written coordinates gave. None when
+/// everything is placed and every constraint holds.
+pub fn level_status(lv: &LevelView) -> Option<String> {
+    let mut parts = Vec::new();
+    if !lv.unplaced.is_empty() {
+        parts.push(format!("{} without a position", lv.unplaced.len()));
+    }
+    let mut by_status: Vec<(&str, usize)> = Vec::new();
+    for c in &lv.constraints {
+        match by_status.iter_mut().find(|(s, _)| *s == c.status) {
+            Some((_, n)) => *n += 1,
+            None => by_status.push((&c.status, 1)),
+        }
+    }
+    if by_status.iter().any(|(s, _)| *s != "ok") {
+        let list: Vec<String> = by_status.iter().map(|(s, n)| format!("{n} {s}")).collect();
+        parts.push(format!("constraints: {}", list.join(", ")));
+    }
+    (!parts.is_empty()).then(|| parts.join("; "))
+}
+
+/// The status of every level that lacks something, one line each, as `rnl check` prints them.
+pub fn status_lines(r: &Interpretation) -> Vec<String> {
+    r.model.levels.iter().filter_map(|lv| level_status(lv).map(|s| format!("status {}: {s}", lv.title))).collect()
 }
