@@ -98,6 +98,11 @@ pub struct ItemView {
     /// The fixed texts of the symbol with their `${…}` values, by path: "3" is prim 3, "1/3" is
     /// prim 3 of nested symbol 1.
     pub texts: BTreeMap<String, Vec<Line>>,
+    /// The host instances drawn: the index of each in its level's instances. One for an
+    /// instance, its members for a bundle, none for a usage.
+    pub host: Vec<usize>,
+    /// The nets at each pin of the symbol, by pin index, as the nets are displayed.
+    pub pin_nets: Vec<Vec<String>>,
 }
 
 #[derive(Clone, Debug)]
@@ -149,6 +154,8 @@ pub struct ConstraintView {
 
 #[derive(Clone, Debug)]
 pub struct LevelView {
+    /// The host level drawn: its index in the host document's levels.
+    pub level: usize,
     pub title: String,
     pub kind: &'static str,
     pub name: String,
@@ -171,4 +178,26 @@ pub struct Model {
     pub levels: Vec<LevelView>,
     /// Set when the whole interpretation failed (1.5 rule 3, 7.6).
     pub failed: Option<String>,
+}
+
+/// A reference to a host object written in a record (6.3), found while interpreting: where the
+/// name is written and what it reaches. A tool uses these to go from a name to its object and
+/// back; the interpretation itself does not need them.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct HostRef {
+    /// Where the reference starts: its `#` or `&`.
+    pub loc: crate::diag::Loc,
+    /// How many characters the prefix and the name take, without any `:` or `::` path after them.
+    pub len: u32,
+    /// The host level the name is resolved in.
+    pub level: usize,
+    pub target: RefTarget,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum RefTarget {
+    /// An instance, by its index in the level's instances.
+    Instance(usize),
+    /// A net, by its key (`HostDocument::net_key`).
+    Net(String),
 }

@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::diag::{DiagId, Extra, Severity};
+use crate::model::{HostRef, RefTarget};
 use crate::syntax::{Coord, Member, ObjExpr, Params, PathItem, Point, Ref, Segment, Sep, SetExpr, Value};
 use crate::words::{words, ParamSpec, ParamType, Takes};
 
@@ -1052,11 +1053,43 @@ impl<'p> Interp<'p> {
             };
             objs.push(o);
         }
+        self.note_ref(ctx, e, scene, &objs);
         if group {
             let sd = SetData::plain(objs.into_iter().map(|o| (o, true)).collect(), false);
             return Ok(self.new_obj(ObjData::Set(Box::new(sd))));
         }
         Ok(objs[0])
+    }
+
+    /// Note a resolved host reference for tools (`HostRef`): where its name is written and the
+    /// instances or nets it reaches.
+    fn note_ref(&mut self, ctx: &Ctx, e: &Ref, scene: SceneId, objs: &[ObjId]) {
+        let Some(rec) = ctx.rec else { return };
+        let Some(loc) = self.rec_loc(Some(rec), e.start) else { return };
+        // the prefix and the name, up to the `:` of a path outside quotes
+        let mut len = 0u32;
+        let mut quoted = false;
+        for c in self.recs[rec].text.chars().skip(e.start).take(e.end.saturating_sub(e.start)) {
+            if c == '"' {
+                quoted = !quoted;
+            }
+            if c == ':' && !quoted && len > 0 {
+                break;
+            }
+            len += 1;
+        }
+        let level = self.scenes[scene].level;
+        for &o in objs {
+            let target = match self.o(o) {
+                ObjData::Inst { idx, .. } => RefTarget::Instance(*idx),
+                ObjData::Net { key, .. } => RefTarget::Net(key.clone()),
+                _ => continue,
+            };
+            let r = HostRef { loc: loc.clone(), len, level, target };
+            if self.refs_seen.insert(r.clone()) {
+                self.refs.push(r);
+            }
+        }
     }
 
     fn subobject(&mut self, obj: ObjId, p: &PathItem, ctx: &Ctx, e: &Ref) -> R<ObjId> {

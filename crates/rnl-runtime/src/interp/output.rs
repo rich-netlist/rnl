@@ -246,11 +246,31 @@ impl Interp<'_> {
             let si = self.symbol_view(sym, &mut table, &mut symbols);
             let mut texts = BTreeMap::new();
             self.symbol_texts(s, sym, o, "", &mut texts, 0);
-            let kind = match self.o(o) {
-                ObjData::Inst { .. } => "instance",
-                ObjData::Bundle { .. } => "bundle",
-                _ => "usage",
+            let (kind, host) = match self.o(o).clone() {
+                ObjData::Inst { idx, .. } => ("instance", vec![idx]),
+                ObjData::Bundle { members, .. } => (
+                    "bundle",
+                    members
+                        .iter()
+                        .filter_map(|m| match self.o(*m) {
+                            ObjData::Inst { idx, .. } => Some(*idx),
+                            _ => None,
+                        })
+                        .collect(),
+                ),
+                _ => ("usage", Vec::new()),
             };
+            let mut pin_nets = vec![Vec::new(); self.symbol(sym).pins.len()];
+            for t in self.terms_of(s, o) {
+                if let Some(k) = self.pin_for(s, o, t) {
+                    for n in self.term_nets(s, t) {
+                        let d = self.net_display(n);
+                        if !pin_nets[k].contains(&d) {
+                            pin_nets[k].push(d);
+                        }
+                    }
+                }
+            }
             items.push(ItemView {
                 id: self.label(o),
                 kind,
@@ -261,6 +281,8 @@ impl Interp<'_> {
                 layer: self.layer_of(s, o),
                 order: self.key_of(s, o),
                 texts,
+                host,
+                pin_nets,
             });
         }
         let mut wires = Vec::new();
@@ -356,6 +378,7 @@ impl Interp<'_> {
             });
         }
         LevelView {
+            level: lv,
             title: level.title(),
             kind: if level.kind == LevelKind::Subckt { "subckt" } else { "file" },
             name: level.name.clone(),

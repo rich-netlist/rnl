@@ -20,7 +20,7 @@ use std::rc::Rc;
 
 use crate::diag::{DiagId, Sink};
 use crate::host::{HostDocument, Level, LevelKind, Record};
-use crate::model::Model;
+use crate::model::{HostRef, Model};
 use crate::source::Provider;
 use crate::syntax::RecordAst;
 
@@ -56,6 +56,10 @@ pub struct Interpretation {
     pub checking_package: String,
     /// File texts by name: the host files and the package files read.
     pub sources: Vec<(String, String)>,
+    /// The host document interpreted.
+    pub doc: HostDocument,
+    /// The references to host objects in the document's records, in the order they were resolved.
+    pub refs: Vec<HostRef>,
 }
 
 impl Interpretation {
@@ -100,6 +104,9 @@ pub struct Interp<'p> {
     /// The package file checked on its own (2.7).
     pub(crate) package_main: Option<UnitId>,
     pub(crate) checking_path: Option<String>,
+    /// The host references resolved so far, each once.
+    pub(crate) refs: Vec<HostRef>,
+    pub(crate) refs_seen: HashSet<HostRef>,
 }
 
 impl<'p> Interp<'p> {
@@ -137,6 +144,8 @@ impl<'p> Interp<'p> {
             scoped_memo: HashMap::new(),
             body_errors: HashMap::new(),
             made_routes: Vec::new(),
+            refs: Vec::new(),
+            refs_seen: HashSet::new(),
             package_main: None,
             checking_path: None,
         };
@@ -517,7 +526,14 @@ impl<'p> Interp<'p> {
         let checking = self.package_main.map(|p| self.units[p].pkg_name.clone()).unwrap_or_default();
         let mut sources = self.doc.sources.clone();
         sources.extend(self.pkg_sources.clone());
-        Interpretation { model, sink: std::mem::take(&mut self.sink), checking_package: checking, sources }
+        Interpretation {
+            model,
+            sink: std::mem::take(&mut self.sink),
+            checking_package: checking,
+            sources,
+            refs: std::mem::take(&mut self.refs),
+            doc: self.doc,
+        }
     }
 }
 
