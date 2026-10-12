@@ -86,6 +86,9 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             }
             let count = |sev| shown.iter().filter(|d| d.severity == sev).count();
             let (e, w, h) = (count(Severity::Error), count(Severity::Warning), count(Severity::Hint));
+            for line in status_lines(&r) {
+                println!("{line}");
+            }
             println!("{e} errors, {w} warnings, {h} hints");
             Ok(if e > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS })
         }
@@ -124,6 +127,34 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         }
         _ => Err(format!("unknown command {}\n{USAGE}", args.command)),
     }
+}
+
+/// What a drawing level still lacks without a solver: objects without a position, and the
+/// constraints by the status their check against the written coordinates gave. Levels where
+/// everything is placed and every constraint holds are left out.
+fn status_lines(r: &Interpretation) -> Vec<String> {
+    let mut out = Vec::new();
+    for lv in &r.model.levels {
+        let mut parts = Vec::new();
+        if !lv.unplaced.is_empty() {
+            parts.push(format!("{} without a position", lv.unplaced.len()));
+        }
+        let mut by_status: Vec<(&str, usize)> = Vec::new();
+        for c in &lv.constraints {
+            match by_status.iter_mut().find(|(s, _)| *s == c.status) {
+                Some((_, n)) => *n += 1,
+                None => by_status.push((&c.status, 1)),
+            }
+        }
+        if by_status.iter().any(|(s, _)| *s != "ok") {
+            let list: Vec<String> = by_status.iter().map(|(s, n)| format!("{n} {s}")).collect();
+            parts.push(format!("constraints: {}", list.join(", ")));
+        }
+        if !parts.is_empty() {
+            out.push(format!("status {}: {}", lv.title, parts.join("; ")));
+        }
+    }
+    out
 }
 
 fn sanitize(s: &str) -> String {

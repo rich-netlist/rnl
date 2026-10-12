@@ -18,15 +18,20 @@ This is the central TODO list. A checked box means work present in this reposito
 
 ## Toolchain foundation
 
-- [ ] Establish real Cargo and pnpm workspaces when the first implementable packages are ready.
-- [ ] Define module APIs, package names, versioning, build targets, and meaningful CI gates.
-- [ ] Define the supported draft language profile and assemble conformance and roundtrip corpora.
+- [x] Establish the Cargo workspace ([`crates/`](../crates/README.md)) with a CI workflow: formatting, lints, tests on Linux, Windows and macOS, and a WebAssembly build of the core crates.
+- [ ] Establish the pnpm workspace when the first TypeScript package is ready.
+- [ ] Define module APIs, package names, versioning, and build targets.
+- [x] Assemble a conformance corpus for language draft 0.2 ([`tests/conformance/`](../tests/conformance/README.md)): 15 cases with their expected effective models and diagnostic places, and 3 circuits written in both SPICE and Spectre.
+- [ ] Bring language draft 0.2 into [`spec/`](../spec/README.md), with a decision record that supersedes [decision 0001](decisions/0001-canonical-rnl-documents.md) on where language work happens.
+- [ ] Add dedicated roundtrip cases; the writeback checks run over the conformance cases for now.
 
 ## Reading and rendering
 
-- [ ] Implement the Rust runtime and SPICE/Spectre host adapters for an agreed structural subset.
-- [ ] Implement the shared renderer and external standard symbol data.
-- [ ] Add the CLI, runtime WASM binding, TypeScript runtime package, and framework independent viewer core.
+- [x] Implement the Rust runtime and the SPICE and Spectre host adapters for language draft 0.2, without a solver: constraints are checked against the written coordinates and unplaced objects are reported.
+- [x] Implement the shared renderer (primitives and SVG) and the draft standard package with its symbols ([`libraries/standard/`](../libraries/standard/README.md)); every symbol writes its box.
+- [ ] Add standard symbols for the elements that still lack one (J, F, H, B and others).
+- [x] Add the CLI: check, render, dump, and strip generated records.
+- [ ] Add the runtime WASM binding, TypeScript runtime package, and framework independent viewer core.
 - [ ] Add the React/Vite web application and Tauri desktop shell; measure startup and document loading.
 
 ## Solving and editing

@@ -24,6 +24,6 @@ The `rnl` command bundles both, so a document can use them without a package dir
 
 Every symbol writes its box (`box=`): the extent of its graphics, which a viewer uses for selection and a solver for keeping symbols apart. Pins sit on integer points, so instances on integer points keep wires on the grid.
 
-The geometry comes from the language prototype's standard package, reviewed against the terminal order of the SPICE elements. The rules that pick symbols by Spectre master and by model type are new: Spectre instance names carry no element letter. Elements without a standard symbol yet (J, F, H, B and others) are drawn with the viewer's own stand-in, a dashed box with the terminals on its sides.
+The geometry comes from the language prototype's standard package, reviewed against the terminal order of the SPICE elements. The prototype took it from Analog Canvas's symbols; their copyright holder publishes it here under CC0-1.0, like the rest of this directory. The rules that pick symbols by Spectre master and by model type are new: Spectre instance names carry no element letter. Elements without a standard symbol yet (J, F, H, B and others) are drawn with the viewer's own stand-in, a dashed box with the terminals on its sides.
 
 The data in this directory is licensed under CC0-1.0, so symbol definitions can be copied into netlists freely.
