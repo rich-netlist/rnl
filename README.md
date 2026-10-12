@@ -19,7 +19,7 @@ RNL is a proposed way to attach circuit meaning and presentation information to 
 | [`scripts/`](scripts/README.md) | Future project maintenance scripts. |
 | [`.github/workflows/`](.github/workflows/README.md) | Future CI workflow location. |
 | [`docs/`](docs/README.md) | Toolchain architecture proposal, roadmap, and decision records. |
-| [`site/`](site/README.md) | Static introduction page for circuit designers, in Chinese and English, built from one bilingual source by `site/build.py`. |
+| [`site/`](site/README.md) | Static introduction page and language tour for circuit designers, in Chinese and English, built from one bilingual source by `site/build.py`. |
 
 Start with the [documentation map](docs/README.md), the [toolchain architecture proposal](docs/rnl-toolchain-architecture.md) (in Chinese), and the [roadmap](docs/roadmap.md). Each component directory contains a short README describing its planned role.
 

@@ -1,4 +1,4 @@
-# Builds the introduction page in site/ and publishes it to GitHub Pages.
+# Builds the introduction pages in site/ and publishes them to GitHub Pages.
 # Pull requests only run the build, which fails when a text is missing one of its languages.
 # Requires Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
 name: Pages
@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Writes site/dist/: the Chinese page at the root and the English page under en/.
+      # Writes site/dist/: the Chinese pages at the root and the English pages under en/.
       # site/README.md, site/build.py and site/src/ stay out of the published site.
       - name: Build the site
         run: python3 site/build.py

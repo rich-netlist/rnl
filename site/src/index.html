@@ -80,6 +80,7 @@
       <a href="#language"><zh>语言</zh><en>Language</en></a>
       <a href="#examples"><zh>例子</zh><en>Examples</en></a>
       <a href="#status"><zh>现状</zh><en>Status</en></a>
+      <a class="toc-page" href="language.html"><zh>语言导览</zh><en>Language tour</en><svg class="ico"><use href="#i-arrow"/></svg></a>
     </nav>
     <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>打开目录</zh><en>Open the section list</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
     <a class="lang-link" href="<zh>en/</zh><en>../</en>" hreflang="<zh>en</zh><en>zh-CN</en>" lang="<zh>en</zh><en>zh-CN</en>" aria-label="<zh>English version</zh><en>中文版</en>" data-lang-link><zh>EN</zh><en>中文</en></a>
@@ -103,14 +104,15 @@
         <div class="cta">
           <a class="btn btn-primary" href="#overview"><zh>三分钟速览</zh><en>Three-minute tour</en> <svg class="ico"><use href="#i-down"/></svg></a>
           <a class="btn" href="#journey"><zh>看它一步步画出来</zh><en>Watch it draw, step by step</en></a>
+          <a class="btn" href="language.html"><zh>语言导览</zh><en>Language tour</en> <svg class="ico"><use href="#i-arrow"/></svg></a>
         </div>
       </div>
       <dl class="titleblock" aria-label="<zh>项目信息</zh><en>Project facts</en>">
         <div class="tb-main"><dt><zh>项目</zh><en>Project</en></dt><dd>Rich Netlist (RNL)</dd></div>
         <div><dt><zh>是什么</zh><en>What</en></dt><dd><zh>附着在网表上的元数据扩展</zh><en>A metadata extension attached to netlists</en></dd></div>
         <div><dt><zh>宿主</zh><en>Hosts</en></dt><dd><zh>SPICE、Spectre 等网表，写在注释里</zh><en>SPICE, Spectre and other netlists, inside comments</en></dd></div>
-        <div><dt><zh>阶段</zh><en>Stage</en></dt><dd><zh>原型；语言标准逐条讨论中</zh><en>Prototype; the language is being settled topic by topic</en></dd></div>
-        <div><dt><zh>语言稿</zh><en>Language</en></dt><dd><span class="mono"><zh>1.16 方案 · 2026-09-29</zh><en>Scheme 1.16 · 2026-09-29</en></span></dd></div>
+        <div><dt><zh>阶段</zh><en>Stage</en></dt><dd><zh>原型；语言草稿 0.2 试写中</zh><en>Prototype; language draft 0.2 being tried out</en></dd></div>
+        <div><dt><zh>语言稿</zh><en>Language</en></dt><dd><span class="mono"><zh>0.2 草稿 · 2026-10-12</zh><en>Draft 0.2 · 2026-10-12</en></span></dd></div>
         <div><dt><zh>许可</zh><en>License</en></dt><dd><zh>代码 MIT · 规范 CC-BY-4.0 · 数据 CC0</zh><en>Code MIT · spec CC-BY-4.0 · data CC0</en></dd></div>
       </dl>
     </div>
@@ -146,8 +148,8 @@
       <div class="hd-out hd-view panel">
         <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><zh>RNL 查看器</zh><en>RNL viewer</en></span><span class="ph-right"><span class="chip chip-rnl" id="hero-view-chip"><zh>网表 + RNL</zh><en>Netlist + RNL</en></span></span></div>
         <div class="fig"><svg id="hero-svg" role="img" aria-label="<zh>由同一个文件画出的 RC 低通原理图</zh><en>RC low-pass schematic drawn from the same file</en>"></svg></div>
-        <p class="cap"><zh>同一个文件画出的原理图：源在左、负载在右，地符号和网络名来自 RNL。</zh>
-          <en>The schematic drawn from the same file: source on the left, load on the right; the ground symbol and the net name come from RNL.</en></p>
+        <p class="cap"><zh>同一个文件画出的原理图：源在左、负载在右，网络名来自 RNL；地符号由标准包补上，不用写。</zh>
+          <en>The schematic drawn from the same file: source on the left, load on the right, the net name from RNL; the standard package adds the ground symbols without a line written.</en></p>
       </div>
       <p class="hero-note"><svg class="ico"><use href="#i-info"/></svg><span id="hero-note-text"></span></p>
     </div>
@@ -182,8 +184,8 @@
       </li>
       <li>
         <span class="brief-k"><svg class="ico"><use href="#i-flask"/></svg><zh>现状</zh><en>Status</en></span>
-        <p><zh>原型阶段。语言正在逐条讨论，已有布局求解和解释器原型；正式的运行库、求解器和查看器在规划中。</zh>
-          <en>Prototype stage. The language is being settled topic by topic, and there are prototypes of the layout solver and an interpreter; the production runtime, solver and viewer are planned.</en></p>
+        <p><zh>原型阶段。语言草稿 0.2 已经成形，正在试写；已有布局求解和解释器原型，正式的运行库、求解器和查看器在规划中。</zh>
+          <en>Prototype stage. Language draft 0.2 has taken shape and is being tried out; there are prototypes of the layout solver and an interpreter, and the production runtime, solver and viewer are planned.</en></p>
         <a href="#status"><zh>进度 →</zh><en>Progress →</en></a>
       </li>
     </ol>
@@ -230,11 +232,11 @@
         <ul>
           <li><button type="button" data-own="semantic"><span class="dot"></span><span><zh>结构<small>差分对、电流镜、输入级</small></zh>
             <en>Structure<small>differential pair, current mirror, input stage</small></en></span></button></li>
-          <li><button type="button" data-own="intent"><span class="dot"></span><span><zh>意图<small>对称、居中、信号流向、电流方向</small></zh>
-            <en>Intent<small>symmetry, centering, signal flow, current direction</small></en></span></button></li>
+          <li><button type="button" data-own="intent"><span class="dot"></span><span><zh>意图<small>对称、居中、上下次序、电流方向</small></zh>
+            <en>Intent<small>symmetry, centering, order, current direction</small></en></span></button></li>
           <li><button type="button" data-own="geometry"><span class="dot"></span><span><zh>画法<small>位置、朝向、导线</small></zh><en>Drawing<small>positions, orientations, wires</small></en></span></button></li>
-          <li><button type="button" data-own="virtual"><span class="dot"></span><span><zh>显示元素<small>电源、地这类只为显示的符号</small></zh>
-            <en>Display elements<small>supply and ground symbols that exist only for display</small></en></span></button></li>
+          <li><button type="button" data-own="virtual"><span class="dot"></span><span><zh>显示元素<small>电源、地、端口这类只为显示的符号</small></zh>
+            <en>Display elements<small>supply, ground and port symbols, only for display</small></en></span></button></li>
         </ul>
       </div>
     </div>
@@ -419,8 +421,8 @@
     </div>
 
     <h3 class="sub-h" id="journey"><zh>从一份网表到一张好图</zh><en>From a netlist to a good drawing</en></h3>
-    <p class="sub-lead"><zh>同一个五管运放，每一步多写几句 RNL。左边是文件，右边是查看器画出来的样子；把鼠标放到某一行上，看它管图里的哪一部分。</zh>
-      <en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls.</en></p>
+    <p class="sub-lead"><zh>同一个五管运放，每一步多写几句 RNL。左边是文件，右边是查看器画出来的样子；把鼠标放到某一行上，看它管图里的哪一部分。文件上方可以换写法：只写记号、英文例句或中文例句，机器读到的语句完全相同。</zh>
+      <en>The same five-transistor OTA, with a few more RNL lines at each step. The file is on the left, the viewer’s drawing on the right; hover over a line to see which part of the drawing it controls. Above the file you can switch the writing style between bare notation, English sentences and Chinese sentences; machines read exactly the same statements.</en></p>
     <div class="journey">
       <div class="jr-steps" id="jr-steps" role="tablist" aria-label="<zh>步骤</zh><en>Steps</en>">
         <button type="button" role="tab" data-i="0"><span class="n">STEP 0</span><span class="t"><zh>只有网表</zh><en>Netlist only</en></span></button>
@@ -432,8 +434,14 @@
       </div>
       <div class="jr-body">
         <div class="jr-code panel">
-          <div class="ph"><svg class="ico"><use href="#i-file"/></svg><span class="ph-title">ota5t.sp</span><span class="ph-right"><span class="chip chip-ok"><zh>新增的行</zh><en>Added lines</en></span><span class="chip chip-warn"><zh>改写的行</zh><en>Rewritten lines</en></span></span></div>
+          <div class="ph"><svg class="ico"><use href="#i-file"/></svg><span class="ph-title">ota5t.sp</span><span class="ph-right">
+            <span class="seg" id="jr-style" role="group" aria-label="<zh>写法</zh><en>Writing style</en>">
+              <button type="button" data-style="bare" aria-pressed="false"><zh>只写记号</zh><en>Notation</en></button>
+              <button type="button" data-style="en" aria-pressed="true"><zh>英文例句</zh><en>English</en></button>
+              <button type="button" data-style="zh" aria-pressed="false"><zh>中文例句</zh><en>Chinese</en></button>
+            </span></span></div>
           <div class="code" id="jr-code"></div>
+          <div class="jr-legend"><span class="chip chip-ok"><zh>新增的行</zh><en>Added lines</en></span><span class="chip chip-warn"><zh>改写的行</zh><en>Rewritten lines</en></span><span class="chip chip-rnl"><zh>RNL 记录</zh><en>RNL records</en></span></div>
         </div>
         <div class="jr-fig panel">
           <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><zh>RNL 查看器</zh><en>RNL viewer</en></span><span class="ph-right metric" id="jr-metrics"></span></div>
@@ -539,9 +547,10 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
               <div class="bubble"><div class="minicode" data-hl="M1 x inp tail vss nch W=2u L=0.5u
 …
 * @RNL {
-*   %dp1 = #M1(in_p) and #M2(in_n) are @AS $DIFFPAIR;
-*   %cm1 = #M3(ref) and #M4(out) are @AS $CURRENT_MIRROR;
-*   #M1(a) and #M2(b) about %ax(axis) @APPLY $MIRROR_PAIR
+*   %dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFPAIR;
+*   %cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR;
+*   %ax = (_, _);
+*   #M1(a), #M2(b) and %ax(axis) are treated @AS $MIRROR_PAIR
 * }"></div></div>
               <svg class="thumb" id="ai-thumb" role="img" aria-label="<zh>据此画出的五管运放</zh><en>The five-transistor OTA drawn from it</en>"></svg>
             </div>
@@ -582,9 +591,9 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
         </div>
         <div class="vs-side rnl">
           <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><zh>用 RNL</zh><en>With RNL</en></div>
-          <div class="vs-fig"><div class="minicode term"><div class="dim">$ git diff ota5t.sp</div><div class="dim">@@ -31,3 +31,6 @@</div><div> * }</div><div class="add">+* @RNL(source="user") {</div><div class="add">+*   moved by hand, #M2 @AT(x=30)</div><div class="add">+* }</div><div> .ends ota5t</div></div></div>
-          <p class="vs-text"><zh>每处改动都是能读懂的一行：M2 被手动移到 x = 30。求解器的输出带来源标记，可以整段重新生成。</zh>
-            <en>Every change is one readable line: M2 was moved by hand to x = 30. Solver output carries a source tag and can be regenerated as a whole.</en></p>
+          <div class="vs-fig"><div class="minicode term"><div class="dim">$ git diff ota5t.sp</div><div class="dim">@@ -31,2 +31,3 @@</div><div> * }</div><div class="add">+* @RNL(author="rnl-editor") { #M2 @PLACE(x=30, priority="high")}</div><div> .ends ota5t</div></div></div>
+          <p class="vs-text"><zh>每处改动都是能读懂的一行：编辑器把 M2 移到了 x = 30。求解器写的记录标着 type="generated"，可以整段重新生成。</zh>
+            <en>Every change is one readable line: the editor moved M2 to x = 30. The solver’s record is marked type="generated" and can be regenerated as a whole.</en></p>
         </div>
       </div>
       <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><zh>原理图的修改也能评审、能回滚。</zh><en>Schematic changes can be reviewed and rolled back too.</en></p>
@@ -614,8 +623,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
               <text class="cd-big" x="150" y="92"><zh>交叉 ≠ 连接</zh><en><tspan x="132" dy="-6">crossing</tspan><tspan x="132" dy="17">≠ connection</tspan></en></text>
             </svg>
           </div>
-          <p class="vs-text"><zh>连接只由网表定义。RNL 只能引用器件和网络，不能增删器件或连接；图上两条线交叉、端点重合，都不会变成连接。</zh>
-            <en>Connectivity is defined only by the netlist. RNL can only reference devices and nets, never add or remove devices or connections; two lines crossing, or endpoints landing on each other, never become a connection.</en></p>
+          <p class="vs-text"><zh>连接只由网表定义。RNL 只能引用器件和网络，不能增删器件或连接；图上两条线交叉、端点重合，都不会变成连接。画导线时也一样：只有共用同一个点或端子的线才接在一起。</zh>
+            <en>Connectivity is defined only by the netlist. RNL can only reference devices and nets, never add or remove devices or connections; two lines crossing, or endpoints landing on each other, never become a connection. Drawn wires work the same way: they join only where they share a point or a terminal.</en></p>
         </div>
       </div>
       <p class="vs-diff"><svg class="ico"><use href="#i-arrow"/></svg><zh>电路只有一份真相，就是网表。</zh><en>The circuit has one source of truth: the netlist.</en></p>
@@ -643,8 +652,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
           <div class="vs-head"><svg class="ico"><use href="#i-check"/></svg><zh>用 RNL</zh><en>With RNL</en></div>
           <div class="vs-fig">
             <div class="two-hosts">
-              <div class="minicode" data-hl="* @RNL {#M1 @AT(12, 20)}"><span class="host-tag">SPICE</span></div>
-              <div class="minicode" data-hl="// @RNL {#M1 @AT(12, 20)}"><span class="host-tag">Spectre</span></div>
+              <div class="minicode" data-hl="* @RNL {#M1 @PLACE(12, 20)}"><span class="host-tag">SPICE</span></div>
+              <div class="minicode" data-hl="// @RNL {#M1 @PLACE(12, 20)}"><span class="host-tag">Spectre</span></div>
               <p class="fig-note"><zh>注释前缀随网表格式变，RNL 内容一字不差。</zh>
                 <en>The comment prefix follows the netlist format; the RNL content stays identical.</en></p>
             </div>
@@ -720,8 +729,14 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
       </div>
       <div class="proto">
         <h4><svg class="ico"><use href="#i-cpu"/></svg><zh>rnl-lang 解释器</zh><en>rnl-lang interpreter</en></h4>
-        <p><zh>按当前语言方案实现的解释器和渲染器，119 项测试。示例工程的 13 张原图都能转成 RNL 读回，9 张非层次图渲染后导线与原图完全吻合。</zh>
-          <en>Interpreter and renderer for the current language scheme, with 119 tests. All 13 original drawings from the example projects convert to RNL and read back; for the 9 non-hierarchical ones, the rendered wires match the originals exactly.</en></p>
+        <p><zh>按语言草稿 0.2 重写的解释器和渲染器，不含求解器：46 个关键字、标准包和中文代称包 rnl-zh。9 个示例工程的 13 张原图导出成 RNL 再画出来，都没有错误，184 条导线与原图形状相同。</zh>
+          <en>Interpreter and renderer rewritten for language draft 0.2, without a solver: 46 keywords, the standard package and the Chinese alias package rnl-zh. The 13 original drawings from 9 example projects, exported to RNL and drawn again, come out without errors, and all 184 wires match the originals in shape.</en></p>
+        <code class="muted"><zh>研究仓库，尚未公开</zh><en>research repository, not public yet</en></code>
+      </div>
+      <div class="proto">
+        <h4><svg class="ico"><use href="#i-chat"/></svg><zh>多模型试写</zh><en>Writing trial with models</en></h4>
+        <p><zh>11 个模型照着参考写 6 道题，每题分中文、英文，参考分简版和完整规范，共 264 次；228 次原型检查没有错误。简版参考明显好于完整规范，中英文差不多；试写发现的问题直接改进了语言。</zh>
+          <en>11 models wrote 6 tasks from a reference, each in Chinese and in English, with either a short reference or the full spec: 264 runs, 228 of them without errors in the prototype check. The short reference did clearly better than the full spec, and the two languages about the same; what the trial found went straight back into the language.</en></p>
         <code class="muted"><zh>研究仓库，尚未公开</zh><en>research repository, not public yet</en></code>
       </div>
     </div>
@@ -742,8 +757,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
       <article class="pc">
         <div class="pc-fig p1">
           <div class="p1-lines">
-            <div class="minicode" data-hl="*  @RNL {#M1 @AT(10, 20)}"><span class="host-tag">SPICE</span></div>
-            <div class="minicode" data-hl="// @RNL {#M1 @AT(10, 20)}"><span class="host-tag">Spectre</span></div>
+            <div class="p1-row"><span class="p1-host">SPICE</span><div class="minicode" data-hl="*  @RNL {#M1 @PLACE(10, 20)}"></div></div>
+            <div class="p1-row"><span class="p1-host">Spectre</span><div class="minicode" data-hl="// @RNL {#M1 @PLACE(10, 20)}"></div></div>
           </div>
           <div class="p1-legend"><span class="chip chip-mute"><zh>仿真器：注释，跳过</zh><en>Simulator: comment, skipped</en></span><span class="chip chip-rnl"><zh>RNL 工具：读取</zh><en>RNL tools: read</en></span></div>
           <span class="p-scan" aria-hidden="true"></span>
@@ -790,22 +805,23 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
       <article class="pc">
         <div class="pc-fig">
           <svg class="p4" viewBox="0 0 240 130" aria-hidden="true">
-            <text class="p4-code" x="120" y="22" text-anchor="middle">{#A #B #C} @ORDER(axis="x")</text>
+            <text class="p4-code" x="120" y="22" text-anchor="middle">{#A #B #C} @ORDER("x")</text>
             <g class="p4-a"><rect x="-15" y="-15" width="30" height="30" rx="4"/><text y="1">A</text></g>
             <g class="p4-b"><rect x="-15" y="-15" width="30" height="30" rx="4"/><text y="1">B</text></g>
             <g class="p4-c"><rect x="-15" y="-15" width="30" height="30" rx="4"/><text y="1">C</text></g>
             <text class="p4-ok" x="120" y="112" text-anchor="middle"><zh>✓ 从左到右、从右到左都满足</zh><en>✓ either direction satisfies it</en></text>
           </svg>
         </div>
-        <div class="pc-body"><h3><zh>描述意图，不规定唯一画法</zh><en>Describe intent, not one drawing</en></h3><p><zh>“沿 x 排序”没有规定从左到右还是从右到左。满足意图的画法都算对，由求解器按风格挑选。</zh>
-          <en>“Order along x” does not say left-to-right or right-to-left. Any drawing that meets the intent is correct; the solver picks one to suit its style.</en></p></div>
+        <div class="pc-body"><h3><zh>描述意图，不规定唯一画法</zh><en>Describe intent, not one drawing</en></h3><p><zh>@ORDER("x") 只定轴，不定方向：从左到右、从右到左都满足；要定方向就写 "left-to-right"。满足意图的画法都算对，由求解器按风格挑选。</zh>
+          <en>@ORDER("x") fixes the axis, not the direction: left-to-right and right-to-left both satisfy it; write "left-to-right" to fix it. Any drawing that meets the intent is correct; the solver picks one to suit its style.</en></p></div>
       </article>
 
       <article class="pc">
         <div class="pc-fig p5">
           <div class="p5-lines">
-            <div class="minicode p5-l1" data-hl="#M1 @AT(10, 20)"></div>
-            <div class="minicode p5-l2" data-hl="#M1 @AT(x=14)"></div>
+            <div class="minicode p5-l1" data-hl="#M1 @PLACE(10, 20)"></div>
+            <div class="minicode p5-l2" data-hl="#M1 @PLACE(x=14)"></div>
+            <div class="minicode p5-l3" data-hl='#M1 @PLACE(x=6, priority="low")'></div>
           </div>
           <svg viewBox="0 0 240 78" aria-hidden="true">
             <line class="p5-axis" x1="10" y1="56" x2="230" y2="56"/>
@@ -814,16 +830,16 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
             <g class="p5-m"><rect x="-16" y="-16" width="32" height="32" rx="4"/><text y="1">M1</text></g>
           </svg>
         </div>
-        <div class="pc-body"><h3><zh>后写的覆盖先写的</zh><en>Later statements win</en></h3><p><zh>同一属性写了两次，以后写的为准；没冲突的部分都保留：x 改成 14，y 还是 20。修改既可以就地改，也可以追加在后面。</zh>
-          <en>When the same property is written twice, the later one wins, and whatever does not conflict is kept: x becomes 14, y stays 20. Changes can be made in place or appended.</en></p></div>
+        <div class="pc-body"><h3><zh>冲突按优先级取舍</zh><en>Conflicts resolve by priority</en></h3><p><zh>互相冲突的事实先比优先级，同一档里后写的为准；没冲突的部分都保留：x 改成 14，y 还是 20，low 的 x = 6 被丢弃。修改既可以就地改，也可以追加在后面。</zh>
+          <en>Among conflicting facts priority decides first, and within one priority the later statement wins; whatever does not conflict is kept: x becomes 14, y stays 20, and the low x = 6 is dropped. Changes can be made in place or appended.</en></p></div>
       </article>
 
       <article class="pc">
         <div class="pc-fig p6">
           <div class="p6-lines">
-            <div class="minicode" data-hl="#M1 @AT(10, 20);"></div>
-            <div class="minicode is-err" data-hl="#M2 @AT(2O, 20);"></div>
-            <div class="minicode" data-hl="#M3 @AT(30, 20)"></div>
+            <div class="minicode" data-hl="#M1 @PLACE(10, 20);"></div>
+            <div class="minicode is-err" data-hl="#M2 @PLACE(2O, 20);"></div>
+            <div class="minicode" data-hl="#M3 @PLACE(30, 20)"></div>
           </div>
           <div class="p6-legend"><span class="chip chip-err"><zh>检查工具：1 个错误</zh><en>Checker: 1 error</en></span><span class="chip chip-ok"><zh>查看器：照常显示</zh><en>Viewer: displays as usual</en></span></div>
         </div>
@@ -841,8 +857,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
             <button type="button" data-m="machine" aria-pressed="false"><zh>机器读到的</zh><en>What machines read</en></button>
           </span></div>
         </div>
-        <div class="pc-body"><h3><zh>人和模型都读得懂</zh><en>Readable by people and models</en></h3><p><zh>正式记号之间可以夹说明文字，方便没有渲染器时阅读；但说明文字没有含义，写 “do not move” 也挡不住后面的 @AT。</zh>
-          <en>Free text can sit between the formal tokens, for reading without a renderer; but it has no meaning, so writing “do not move” does not stop the @AT that follows.</en></p></div>
+        <div class="pc-body"><h3><zh>人和模型都读得懂</zh><en>Readable by people and models</en></h3><p><zh>正式记号之间可以夹自由文本；照标准例句写，语句读起来就是一句话，没有渲染器也能读。但自由文本没有含义，写 “do not move” 也挡不住后面的 @PLACE。</zh>
+          <en>Free text can sit between the formal tokens; written as a standard sentence, a statement reads as prose, even without a renderer. But free text has no meaning, so writing “do not move” does not stop the @PLACE that follows.</en></p></div>
       </article>
 
       <article class="pc">
@@ -850,7 +866,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
           <svg class="p8" viewBox="0 0 240 130" aria-hidden="true">
             <rect class="p8-top" x="8" y="8" width="224" height="114" rx="8"/>
             <text class="p8-k" x="18" y="26"><zh>顶层</zh><en>Top</en></text>
-            <text class="p8-code" x="60" y="26">$NMOS = @SYMBOL {…}</text>
+            <text class="p8-code" x="50" y="26">$NMOS = @DEFINE-SYMBOL {…}</text>
             <path class="p8-flow" d="M112 34v26"/><path class="p8-head" d="M112 64l-5-8h10z"/>
             <text class="p8-note" x="120" y="52"><zh>向下继承</zh><en>inherits downward</en></text>
             <rect class="p8-sub" x="26" y="66" width="188" height="46" rx="6"/>
@@ -858,12 +874,14 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
             <text class="p8-code" x="36" y="102"><zh>%dp1 只在这一层可见</zh><en>%dp1: local to this level</en></text>
           </svg>
         </div>
-        <div class="pc-body"><h3><zh>作用域跟着电路层次走</zh><en>Scope follows the circuit hierarchy</en></h3><p><zh>写在子电路里的描述只管这个子电路。$ 开头的定义沿层级向下继承、可以被覆盖；% 开头的名字只在本层。</zh>
-          <en>A description written in a subcircuit applies only to that subcircuit. Definitions starting with $ are inherited downward and can be overridden; names starting with % stay on their own level.</en></p></div>
+        <div class="pc-body"><h3><zh>作用域跟着电路层次走</zh><en>Scope follows the circuit hierarchy</en></h3><p><zh>写在子电路里的描述只管这个子电路。一个名字在一层里只绑定一次；$ 开头的定义向下继承，下层可以重新定义；% 开头的名字只在本层。规则在写它的这一层和下面每一层各求一次。</zh>
+          <en>A description written in a subcircuit applies only to that subcircuit. A name is bound once per level; definitions starting with $ are inherited downward and can be redefined below; names starting with % stay on their own level. A rule is evaluated on its own level and once on each level below.</en></p></div>
       </article>
     </div>
     <p class="pc-foot"><svg class="ico"><use href="#i-shield"/></svg><zh>另外，RNL 是纯数据：处理时不执行任何代码，也不会因为出现某个类型名就自动联网下载。</zh>
       <en>Also, RNL is pure data: processing it runs no code, and a type name never triggers a network download.</en></p>
+    <p class="pc-foot"><svg class="ico"><use href="#i-book"/></svg><zh>差分对、镜像对这些定义，默认符号，补地、补端口的规则，都在标准包里，本身用 RNL 写成；语言只规定怎么写、怎么生效，不认识具体的电路词汇。</zh>
+      <en>Definitions such as the differential pair and the mirror pair, the default symbols and the rules that add grounds and port tags all live in the standard package, itself written in RNL; the language only says how things are written and take effect, and has no circuit vocabulary of its own.</en></p>
   </div>
 </section>
 
@@ -871,10 +889,10 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
 <section id="language" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>07 · 语言框架</zh><en>07 · Language</en></p>
+      <p class="sheet-no"><zh>07 · 语言</zh><en>07 · Language</en></p>
       <h2><zh>RNL 语言长什么样。</zh><en>What the RNL language looks like.</en></h2>
-      <p class="lead"><zh>以下写法来自正在进行的语言讨论（1.16 方案，2026-09-29），还没有写进 spec/ 里的语法草案；解释器原型已经验证它能实现、没有自相矛盾，关键字名和细节仍会调整。</zh>
-        <en>The notation below comes from the ongoing language discussion (scheme 1.16, 2026-09-29) and is not yet in the syntax draft in spec/. The interpreter prototype has shown that it can be implemented and is consistent; keyword names and details will still change.</en></p>
+      <p class="lead"><zh>以下写法来自语言草稿 0.2（2026-10-12）：46 个关键字；照标准例句写，语句读起来就是一句话，也可以用中文写。草稿还没有并入 spec/；解释器原型实现了全部关键字，名字和细节仍会调整。</zh>
+        <en>The notation below follows language draft 0.2 (2026-10-12): 46 keywords; written as standard sentences, statements read as prose, and they can be written in Chinese too. The draft is not yet merged into spec/; the interpreter prototype implements every keyword, and names and details will still change.</en></p>
     </header>
 
     <h3 class="sub-h"><zh>一条语句的解剖</zh><en>Anatomy of a statement</en></h3>
@@ -885,66 +903,74 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
           <span><i style="background: var(--t-inst)"></i><zh>网表对象</zh><en>Netlist object</en></span>
           <span><i style="background: var(--t-obj)"></i><zh>本层名字</zh><en>Local name</en></span>
           <span><i style="background: var(--t-def)"></i><zh>定义</zh><en>Definition</en></span>
-          <span><i style="background: var(--t-free)"></i><zh>说明文字</zh><en>Free text</en></span>
+          <span><i style="background: var(--t-free)"></i><zh>自由文本</zh><en>Free text</en></span>
         </div>
         <span class="seg" id="an-seg" role="group" aria-label="<zh>视角</zh><en>Point of view</en>">
           <button type="button" data-m="human" aria-pressed="true"><zh>人看到的</zh><en>What people see</en></button>
           <button type="button" data-m="machine" aria-pressed="false"><zh>机器读到的</zh><en>What machines read</en></button>
         </span>
       </div>
-      <div class="an-line" id="an-line"><span class="tok t-pref" data-k="pref" tabindex="0">*</span> <span class="tok t-rec" data-k="rec" tabindex="0">@RNL</span><span class="tok" data-k="src" tabindex="0"><span class="t-punct">(</span><span class="t-pn">source</span><span class="t-punct">=</span><span class="t-str">"user"</span><span class="t-punct">)</span></span> <span class="tok t-punct" data-k="brace" tabindex="0">{</span>
-<span class="t-pref">*</span>   <span class="tok t-free" data-k="free" tabindex="0">Input pair,</span> <span class="tok" data-k="name" tabindex="0"><span class="t-obj">%dp1</span> <span class="t-punct">=</span></span> <span class="tok t-inst" data-k="inst" tabindex="0">#M1</span><span class="tok t-role" data-k="role" tabindex="0">(in_p)</span> <span class="tok t-free" data-k="free" tabindex="0">and</span> <span class="tok t-inst" data-k="inst" tabindex="0">#M2</span><span class="tok t-role" data-k="role" tabindex="0">(in_n)</span> <span class="tok t-free" data-k="free" tabindex="0">are</span> <span class="tok t-kw" data-k="kw" tabindex="0">@AS</span> <span class="tok t-def" data-k="def" tabindex="0">$DIFFPAIR</span><span class="tok t-punct" data-k="semi" tabindex="0">;</span>
+      <div class="an-line" id="an-line"><span class="tok t-pref" data-k="pref" tabindex="0">*</span> <span class="tok t-rec" data-k="rec" tabindex="0">@RNL</span><span class="tok" data-k="src" tabindex="0"><span class="t-punct">(</span><span class="t-pn">author</span><span class="t-punct">=</span><span class="t-str">"designer"</span><span class="t-punct">)</span></span> <span class="tok t-punct" data-k="brace" tabindex="0">{</span>
+<span class="t-pref">*</span>   <span class="tok t-free" data-k="free" tabindex="0">Input pair:</span> <span class="tok" data-k="name" tabindex="0"><span class="t-obj">%dp1</span> <span class="t-punct">=</span></span> <span class="tok t-inst" data-k="inst" tabindex="0">#M1</span><span class="tok t-role" data-k="role" tabindex="0">(in_p)</span> <span class="tok t-free" data-k="free" tabindex="0">and</span> <span class="tok t-inst" data-k="inst" tabindex="0">#M2</span><span class="tok t-role" data-k="role" tabindex="0">(in_n)</span> <span class="tok t-free" data-k="free" tabindex="0">treated</span> <span class="tok t-kw" data-k="kw" tabindex="0">@AS</span> <span class="tok t-def" data-k="def" tabindex="0">$DIFFPAIR</span><span class="tok t-punct" data-k="semi" tabindex="0">;</span>
 <span class="t-pref">*</span> <span class="tok t-punct" data-k="brace" tabindex="0">}</span></div>
       <div class="an-tip" id="an-tip"><span class="k"><zh>提示</zh><en>Tip</en></span><span><zh>把鼠标放到任意一段上，或用 Tab 键逐个查看。</zh><en>Hover over any part, or press Tab to step through them.</en></span></div>
+    </div>
+
+    <h3 class="sub-h"><zh>三种写法，同一句话</zh><en>Three ways to write one statement</en></h3>
+    <p class="sub-lead"><zh>自由文本只给人看，所以同一句可以只写记号，也可以照标准例句写成英文或中文。机器读到的完全相同，工具也可以在几种写法之间来回转换。</zh>
+      <en>Free text is only for people, so one statement can be bare notation, or a standard sentence in English or in Chinese. Machines read exactly the same thing, and tools can convert between the styles either way.</en></p>
+    <div class="ways">
+      <div class="way"><span class="k"><zh>只写记号</zh><en>Notation</en></span><code data-hl="%dp1 = #M1(in_p) #M2(in_n) @AS $DIFFPAIR;"></code></div>
+      <div class="way"><span class="k"><zh>英文例句</zh><en>English</en></span><code data-hl="%dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFPAIR;"></code></div>
+      <div class="way"><span class="k"><zh>中文例句</zh><en>Chinese</en></span><code lang="zh-CN" data-hl='%dp1 = #M1(正输入) 和 #M2(负输入) @视作 $"差分对";'></code></div>
+      <p class="way-note"><svg class="ico"><use href="#i-info"/></svg><span><zh>中文写法要在文件开头的头段记录里加载代称包 rnl-zh：</zh><en>For Chinese, load the alias package rnl-zh in the header record at the top of the file: </en><code data-hl='* @RNL(type="header") { @VERSION("0.2"); @USE-ALIASES(name="rnl-zh")}'></code></span></p>
     </div>
 
     <h3 class="sub-h"><zh>引用记号</zh><en>Reference sigils</en></h3>
     <p class="sub-lead"><zh>一眼就能分清谁是网表里的东西、谁是 RNL 自己的东西。</zh>
       <en>Tell at a glance what belongs to the netlist and what belongs to RNL.</en></p>
     <div class="sigils">
-      <div class="sg"><code class="t-inst">#M1</code><b><zh>网表里的器件或实例</zh><en>Device or instance in the netlist</en></b><span><zh>只引用，不创建</zh><en>referenced, never created</en></span></div>
-      <div class="sg"><code class="t-net">&amp;vss</code><b><zh>网络</zh><en>Net</en></b><span><zh>网表里的节点</zh><en>a node in the netlist</en></span></div>
-      <div class="sg"><code class="t-inst">#M1:d</code><b><zh>端子</zh><en>Terminal</en></b><span><zh>按端子名，或按序号（从 1 起）</zh><en>by terminal name or by position (from 1)</en></span></div>
-      <div class="sg"><code class="t-inst">#:inp</code><b><zh>本层子电路的端口</zh><en>Port of this subcircuit</en></b><span><zh>由 .subckt 定义</zh><en>defined by .subckt</en></span></div>
-      <div class="sg"><code class="t-obj">%dp1</code><b><zh>本层的 RNL 对象</zh><en>RNL object on this level</en></b><span><zh>只在这一层可见</zh><en>visible only on this level</en></span></div>
-      <div class="sg"><code class="t-def">$DIFFPAIR</code><b><zh>定义</zh><en>Definition</en></b><span><zh>类型、符号、样式、模式；向下继承</zh><en>type, symbol, style, pattern; inherited downward</en></span></div>
-      <div class="sg"><code class="t-pt">&lt;10, _&gt;</code><b><zh>点</zh><en>Point</en></b><span><zh>“_” 表示这一轴留给求解器</zh><en>“_” leaves that axis to the solver</en></span></div>
-      <div class="sg"><code class="t-slot">?a</code><b><zh>模板里的空位</zh><en>Slot in a template</en></b><span><zh>套用模板时填入</zh><en>filled in when the template is applied</en></span></div>
-      <div class="sg"><code class="t-inst">#M1::name</code><b><zh>子对象</zh><en>Sub-object</en></b><span><zh>比如器件名标签</zh><en>such as a device’s name label</en></span></div>
+      <div class="sg"><code data-hl="#M1"></code><b><zh>网表里的元件</zh><en>Instance in the netlist</en></b><span><zh>只引用，不创建</zh><en>referenced, never created</en></span></div>
+      <div class="sg"><code data-hl="&amp;vdd"></code><b><zh>网络</zh><en>Net</en></b><span><zh>网表里的节点</zh><en>a node in the netlist</en></span></div>
+      <div class="sg"><code data-hl="#M1:d"></code><b><zh>端子</zh><en>Terminal</en></b><span><zh>按端子名，或按序号，如 #M1:1（从 1 起）</zh><en>by name, or by position such as #M1:1 (from 1)</en></span></div>
+      <div class="sg"><code data-hl="#:inp"></code><b><zh>本层子电路的端口</zh><en>Port of this subcircuit</en></b><span><zh>由 .subckt 定义；单独一个 # 指这个子电路本身</zh><en>defined by .subckt; a lone # is the subcircuit itself</en></span></div>
+      <div class="sg"><code data-hl="%dp1"></code><b><zh>本层的名字</zh><en>Name on this level</en></b><span><zh>一层里只绑定一次，只在这一层可见</zh><en>bound once per level, visible only there</en></span></div>
+      <div class="sg"><code data-hl="$DIFFPAIR"></code><b><zh>定义</zh><en>Definition</en></b><span><zh>符号、样式、普通定义或集合；向下继承</zh><en>a symbol, style, definition or set; inherited downward</en></span></div>
+      <div class="sg"><code data-hl="?t"></code><b><zh>定义里的角色</zh><en>Role in a definition</en></b><span><zh>套用时由对象填入；符号里单独一个 ? 指用它画的元件</zh><en>filled by objects when applied; in a symbol, a lone ? is the instance drawn with it</en></span></div>
+      <div class="sg"><code data-hl="(10, _)"></code><b><zh>点</zh><en>Point</en></b><span><zh>“_” 表示这一轴留给求解器；%j = (10, 10) 是有名字的点</zh><en>“_” leaves that axis to the solver; %j = (10, 10) is a named point</en></span></div>
+      <div class="sg"><code data-hl="{#M1 #M2}"></code><b><zh>集合</zh><en>Set</en></b><span><zh>有序；放进另一个集合时展开一层，{{…}} 保持为一个成员</zh><en>ordered; spreads one level inside another set, while {{…}} stays one member</en></span></div>
+      <div class="sg"><code data-hl="&amp;D&lt;3:0&gt;"></code><b><zh>总线</zh><en>Bus</en></b><span><zh>带下标的一组网络或元件，如 #XI&lt;3:0&gt;</zh><en>a group of nets or instances with indices, such as #XI&lt;3:0&gt;</en></span></div>
+      <div class="sg"><code data-hl="#M1::wl"></code><b><zh>子对象</zh><en>Child object</en></b><span><zh>比如用 key 命名的标签</zh><en>such as a label named with key</en></span></div>
+      <div class="sg"><code data-hl="=&gt; %x"></code><b><zh>管道</zh><en>Pipe</en></b><span><zh>把前一段的结果交给后一段；=&gt; %x 给它起名</zh><en>passes a result on to the next part; =&gt; %x names it</en></span></div>
     </div>
 
     <h3 class="sub-h"><zh>语句的几种形态</zh><en>Statement shapes</en></h3>
     <div class="shapes">
-      <div class="shape"><span class="k"><zh>对象 + 关键字</zh><en>Object + keyword</en></span><code data-hl="#M1 @AT(10, 20)"></code><p><zh>把 M1 放在 (10, 20)。只写 x 或只写 y 也行，没写的一轴保持自由。</zh>
-        <en>Place M1 at (10, 20). Giving only x or only y is fine; the unwritten axis stays free.</en></p></div>
-      <div class="shape"><span class="k"><zh>集合</zh><en>Set</en></span><code data-hl='{#M1 #M2} @ALIGN(axis="y")'></code><p><zh>花括号是有序的一组对象：M1、M2 的 y 坐标相同。</zh>
+      <div class="shape"><span class="k"><zh>对象 + 关键字</zh><en>Object + keyword</en></span><code data-hl="#M1 @PLACE(10, 20)"></code><p><zh>把 M1 放在 (10, 20)。也可以只写一轴，如 @PLACE(x=10)，另一轴留给求解器。</zh>
+        <en>Puts M1 at (10, 20). One axis is fine too, as in @PLACE(x=10); the other is left to the solver.</en></p></div>
+      <div class="shape"><span class="k"><zh>集合</zh><en>Set</en></span><code data-hl='{#M1 #M2} @ALIGN("y")'></code><p><zh>花括号是有序的一组对象：M1、M2 的 y 坐标相同。</zh>
         <en>Braces hold an ordered group of objects: M1 and M2 share the same y.</en></p></div>
-      <div class="shape"><span class="k"><zh>角色</zh><en>Roles</en></span><code data-hl="#M1(in_p) and #M2(in_n) are @AS $DIFFPAIR"></code><p><zh>括号紧跟对象，说明它在这句里的角色；and、are 是说明文字。</zh>
-        <en>Parentheses right after an object give its role in the statement; “and” and “are” are free text.</en></p></div>
-      <div class="shape"><span class="k"><zh>命名</zh><en>Naming</en></span><code data-hl="%g0 = &amp;vss @VIRTUAL $GND"></code><p><zh>给结果起名，之后可以引用 %g0，例如给它定位置。</zh><en>Name the result, then refer to %g0 later, for example to place it.</en></p></div>
-      <div class="shape"><span class="k"><zh>管道</zh><en>Pipe</en></span><code data-hl='#M2 @AT(30, 20) | @ORIENT("MY")'></code><p><zh>前一段的结果交给下一段：先放好位置，再左右镜像。</zh>
-        <en>Each stage passes its result to the next: place it first, then mirror it left to right.</en></p></div>
-      <div class="shape"><span class="k"><zh>记录</zh><en>Record</en></span><code data-hl='* @RNL(source="solver") { #M1 @AT(12, 20); #M2 @AT(28, 20) }'></code><p><zh>一段记录，里面的语句用分号分开；source 标明是谁写的。</zh>
-        <en>One record; the statements inside are separated by semicolons, and source says who wrote it.</en></p></div>
+      <div class="shape"><span class="k"><zh>角色</zh><en>Roles</en></span><code data-hl="#M1(in_p) and #M2(in_n) are treated @AS $DIFFPAIR"></code><p><zh>括号紧跟对象，说明它填定义的哪个角色；and、are treated 是自由文本。</zh>
+        <en>Parentheses right after an object say which role of the definition it fills; “and” and “are treated” are free text.</en></p></div>
+      <div class="shape"><span class="k"><zh>命名</zh><en>Naming</en></span><code data-hl="%g0 = $GND @ATTACH &amp;vss"></code><p><zh>给语句产生的对象起名，之后就能引用 %g0，比如给它定位置；写在末尾的 =&gt; %g0 也一样。</zh>
+        <en>Names the object the statement makes, so %g0 can be used later, for example to place it; =&gt; %g0 at the end does the same.</en></p></div>
+      <div class="shape"><span class="k"><zh>管道</zh><en>Pipe</en></span><code data-hl='#M2 @PLACE(30, 20) =&gt; @ORIENT("MY")'></code><p><zh>前一段的结果交给后一段：先放好位置，再左右镜像。</zh>
+        <en>Each part passes its result to the next: place it first, then mirror it left to right.</en></p></div>
+      <div class="shape"><span class="k"><zh>记录</zh><en>Record</en></span><code data-hl='* @RNL(author="rnl-solver", priority="high") { #M1 @PLACE(12, 20); #M2 @PLACE(28, 20)}'></code><p><zh>一段记录，语句用分号分开。记录头作用于里面每一句：author 说明谁写的，priority 是它们的优先级。</zh>
+        <en>One record, statements separated by semicolons. The header applies to every statement inside: author says who wrote it, priority gives their priority.</en></p></div>
     </div>
 
     <h3 class="sub-h"><zh>关键字家族</zh><en>Keyword families</en></h3>
-    <p class="sub-lead"><zh>点一个关键字看它的用途和写法。</zh><en>Click a keyword to see what it does and how it is written.</en></p>
+    <p class="sub-lead"><zh><span id="kw-count">46</span> 个关键字分成九组。点一个，看它的用途、标准例句和中文写法。</zh>
+      <en>The <span id="kw-count">46</span> keywords fall into nine families. Click one to see what it does, its standard sentence and its Chinese form.</en></p>
     <div class="kwfam">
-      <div class="fams" id="fams">
-        <div class="fam"><span><zh>电路语义</zh><en>Semantics</en></span><div><button type="button" class="kw">@AS</button><button type="button" class="kw">@CURRENT</button><button type="button" class="kw">@FLOW</button><button type="button" class="kw">@GROUP</button></div></div>
-        <div class="fam"><span><zh>布局意图</zh><en>Layout intent</en></span><div><button type="button" class="kw">@ALIGN</button><button type="button" class="kw">@ORDER</button><button type="button" class="kw">@DISTRIBUTE</button><button type="button" class="kw">@DISTANCE</button><button type="button" class="kw">@APPLY</button></div></div>
-        <div class="fam"><span><zh>精确几何</zh><en>Geometry</en></span><div><button type="button" class="kw">@AT</button><button type="button" class="kw">@ORIENT</button><button type="button" class="kw">@WIRE</button><button type="button" class="kw">@JUNCTION</button><button type="button" class="kw">@LABEL</button><button type="button" class="kw">@NOTE</button></div></div>
-        <div class="fam"><span><zh>虚元件与外观</zh><en>Appearance</en></span><div><button type="button" class="kw">@VIRTUAL</button><button type="button" class="kw">@APPEAR</button><button type="button" class="kw">@SELECT_INST</button><button type="button" class="kw">@SELECT_TERM</button><button type="button" class="kw">@STYLE_APPLY</button></div></div>
-        <div class="fam"><span><zh>定义</zh><en>Definitions</en></span><div><button type="button" class="kw">@SYMBOL</button><button type="button" class="kw">@STYLE</button><button type="button" class="kw">@TYPE</button><button type="button" class="kw">@PATTERN</button></div></div>
-        <div class="fam"><span><zh>文件与记录</zh><en>Records</en></span><div><button type="button" class="kw">@RNL</button><button type="button" class="kw">@VERSION</button><button type="button" class="kw">@USE</button></div></div>
-      </div>
+      <div class="fams" id="fams"></div>
       <div class="panel kw-card" id="kw-card" aria-live="polite"></div>
     </div>
 
-    <h3 class="sub-h"><zh>四种布局原子</zh><en>Four layout atoms</en></h3>
-    <p class="sub-lead"><zh>布局意图最终都落到四种关系上，都作用于投影坐标（x、y，原型里还有 x+y、x−y 两条对角线）。它们不规定方向，只有 signed 的距离规定先后。</zh>
-      <en>All layout intent comes down to four relations, each acting on projected coordinates (x and y; the prototype also has the diagonals x+y and x−y). They do not fix a direction; only a signed distance fixes which comes first.</en></p>
+    <h3 class="sub-h"><zh>五种布局约束</zh><en>Five layout constraints</en></h3>
+    <p class="sub-lead"><zh>布局意图最终都落到这几种关系上：前四种作用于 x 或 y 坐标，第五种作用于朝向。只写轴的约束不定方向，写了 "left-to-right" 这样的方向才定先后。</zh>
+      <en>All layout intent comes down to these relations: the first four act on x or y coordinates, the fifth on orientations. A constraint that names only an axis fixes no direction; a direction such as "left-to-right" fixes which comes first.</en></p>
     <div class="atoms">
       <div class="atom">
         <div class="atom-fig">
@@ -955,7 +981,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
             <g class="ab al-c"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>C</text></g>
           </svg>
         </div>
-        <div class="atom-body"><code data-hl='{#A #B #C} @ALIGN(axis="y")'></code><p><zh>对齐：y 坐标相同，排成一行。</zh><en>Align: same y, in one row.</en></p></div>
+        <div class="atom-body"><code data-hl='{#A #B #C} @ALIGN("y")'></code><p><zh>对齐：y 坐标相同，排成一行。</zh><en>Align: same y, in one row.</en></p></div>
       </div>
       <div class="atom">
         <div class="atom-fig">
@@ -967,7 +993,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
             <text class="gtext or-t2" x="110" y="112" text-anchor="middle"><zh>C ← B ← A 也 ✓</zh><en>C ← B ← A also ✓</en></text>
           </svg>
         </div>
-        <div class="atom-body"><code data-hl='{#A #B #C} @ORDER(axis="x")'></code><p><zh>顺序：沿 x 严格排开，正序倒序都算满足。</zh><en>Order: strictly spaced along x; forward or reverse both satisfy it.</en></p></div>
+        <div class="atom-body"><code data-hl='{#A #B #C} @ORDER("x")'></code><p><zh>顺序：沿 x 严格排开。只写轴，正序倒序都满足；写 "left-to-right" 才定方向。</zh><en>Order: strictly along x. With only the axis, forward and reverse both satisfy it; "left-to-right" fixes the direction.</en></p></div>
       </div>
       <div class="atom">
         <div class="atom-fig">
@@ -978,7 +1004,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
             <g class="di-dims"><path class="guide" d="M40 98h70M110 98h70M40 92v12M110 92v12M180 92v12"/><text class="gtext" x="75" y="116" text-anchor="middle">d</text><text class="gtext" x="145" y="116" text-anchor="middle">d</text></g>
           </svg>
         </div>
-        <div class="atom-body"><code data-hl='{#A #B #C} @DISTRIBUTE(axis="x")'></code><p><zh>匀布：相邻间距相等，比如让尾管居中。</zh><en>Distribute: equal gaps between neighbors, for example to center the tail.</en></p></div>
+        <div class="atom-body"><code data-hl='{#A #B #C} @DISTRIBUTE("x")'></code><p><zh>等距：相邻间距相等，比如让尾管居中。</zh><en>Distribute: equal steps between neighbors, for example to center the tail.</en></p></div>
       </div>
       <div class="atom">
         <div class="atom-fig">
@@ -988,16 +1014,33 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
             <g class="ds-dims"><path class="guide" d="M50 100h90M50 94v12M140 94v12"/><text class="gtext" x="95" y="119" text-anchor="middle"><zh>≥ 3 格</zh><en>≥ 3 units</en></text></g>
           </svg>
         </div>
-        <div class="atom-body"><code data-hl='#A #B @DISTANCE(axis="x", mode="signed", min=3)'></code><p><zh>距离：B 在 A 右边至少 3 格；absolute 模式则不管先后。</zh>
-          <en>Distance: B at least 3 units right of A; absolute mode ignores which comes first.</en></p></div>
+        <div class="atom-body"><code data-hl='#A #B @DISTANCE("left-to-right", min=3)'></code><p><zh>距离：B 在 A 右边至少 3 格；方向写成 "x" 就不分先后。</zh><en>Distance: B at least 3 units right of A; with "x" as the direction, either may come first.</en></p></div>
+      </div>
+      <div class="atom">
+        <div class="atom-fig">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <g transform="translate(72 60)"><g class="orr orr-a"><path class="orr-p" d="M-18 0H-7M-7 -11V11M0 -9H11V-20M0 9H11V20"/><path class="orr-ch" d="M-2 -15V15"/><path class="orr-f" d="M10 9l-6 -3.5v7z"/></g></g>
+            <g transform="translate(148 60)"><g class="orr orr-b"><path class="orr-p" d="M-18 0H-7M-7 -11V11M0 -9H11V-20M0 9H11V20"/><path class="orr-ch" d="M-2 -15V15"/><path class="orr-f" d="M10 9l-6 -3.5v7z"/></g></g>
+            <text class="orr-l" x="72" y="104" text-anchor="middle">A</text>
+            <text class="orr-l" x="148" y="104" text-anchor="middle">B</text>
+            <text class="gtext" x="110" y="64" text-anchor="middle">MY</text>
+          </svg>
+        </div>
+        <div class="atom-body"><code data-hl='#A #B @ORIENT-RELATION("MY")'></code><p><zh>朝向关系：B 的朝向是 A 的左右镜像；两个各朝哪边，由求解器定。</zh><en>Orientation relation: B is A mirrored left to right; which way each one faces is up to the solver.</en></p></div>
       </div>
     </div>
 
     <h3 class="sub-h"><zh>一层电路是怎样生效的</zh><en>How one level of a circuit takes effect</en></h3>
-    <p class="sub-lead"><zh>整层读完以后按固定阶段处理。所以语句可以先用后定义，出错的语句只影响自己。</zh>
-      <en>Once a whole level is read, it is processed in fixed phases. That is why a statement can use something defined later, and why a bad statement affects only itself.</en></p>
+    <p class="sub-lead"><zh>整层读完以后，按九个固定阶段处理。所以名字可以先用后定义，出错的语句只影响自己；规则生成的对象，比如标准包补上的地，也照样定符号、排位置。</zh>
+      <en>Once a whole level is read, it is processed in nine fixed phases. That is why a name can be used before it is defined and a bad statement affects only itself; objects generated by rules, such as the grounds the standard package adds, still get symbols and positions.</en></p>
     <div class="pipe" id="pipe" role="group" aria-label="<zh>生效阶段</zh><en>Phases</en>"></div>
     <p class="pipe-cap" id="pipe-cap"></p>
+
+    <a class="tour-cta" href="language.html">
+      <span class="tour-cta-ico"><svg class="ico"><use href="#i-book"/></svg></span>
+      <span class="tour-cta-body"><b><zh>语言导览</zh><en>Language tour</en></b><span><zh>九个可以动手试的小节：句子和中文写法、定义、标准包的默认行为、集合与选择、导线、文字、朝向、优先级、文件头。</zh><en>Nine hands-on sections: sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en></span></span>
+      <svg class="ico tour-cta-arrow"><use href="#i-arrow"/></svg>
+    </a>
   </div>
 </section>
 
@@ -1011,11 +1054,11 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
         <en>The file is on the left, the drawing on the right. Hover over a line to see which part of the drawing it controls; hover over a part of the drawing to mark the lines that refer to it.</en></p>
     </header>
     <div class="tabs" role="tablist" id="ex-tabs" aria-label="<zh>例子</zh><en>Examples</en>">
-      <button type="button" role="tab" data-ex="e1" aria-selected="true"><zh>RLC · 一句语义</zh><en>RLC · one statement</en></button>
+      <button type="button" role="tab" data-ex="e1" aria-selected="true"><zh>RLC · 是什么与怎么排</zh><en>RLC · what and how</en></button>
       <button type="button" role="tab" data-ex="e2" aria-selected="false"><zh>测试平台 · 层次</zh><en>Testbench · hierarchy</en></button>
       <button type="button" role="tab" data-ex="e3" aria-selected="false"><zh>自定义符号</zh><en>Custom symbol</en></button>
       <button type="button" role="tab" data-ex="e4" aria-selected="false"><zh>规则与补位</zh><en>Rules & fill-ins</en></button>
-      <button type="button" role="tab" data-ex="e5" aria-selected="false"><zh>修改与容错</zh><en>Edits & errors</en></button>
+      <button type="button" role="tab" data-ex="e5" aria-selected="false"><zh>修改、冲突与容错</zh><en>Edits, conflicts, errors</en></button>
     </div>
     <div class="ex" id="ex-body" role="tabpanel">
       <div class="panel">
@@ -1038,8 +1081,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
     <header class="sheet-head">
       <p class="sheet-no"><zh>09 · 现状</zh><en>09 · Status</en></p>
       <h2><zh>现在走到哪一步。</zh><en>Where things stand.</en></h2>
-      <p class="lead"><zh>原则已经定下，语言在逐条讨论，求解和解释都有能运行的原型；正式工具链还没开始实现。</zh>
-        <en>The principles are settled, the language is being settled topic by topic, and both solving and interpreting have working prototypes; the production toolchain has not been started.</en></p>
+      <p class="lead"><zh>原则已经定下，语言草稿 0.2 已经成形、正在试写，求解和解释都有能运行的原型；正式工具链还没开始实现。</zh>
+        <en>The principles are settled, language draft 0.2 has taken shape and is being tried out, and both solving and interpreting have working prototypes; the production toolchain has not been started.</en></p>
     </header>
     <div class="status-grid">
       <ol class="tl">
@@ -1057,13 +1100,23 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
           <en>rnl as the release repository (code MIT, spec CC-BY-4.0, data CC0); prototypes and experiments kept in a separate research repository.</en></p></li>
         <li><time><zh>2026-09-25 起</zh><en>From 2026-09-25</en></time><b><zh>语言标准逐条讨论</zh><en>Language standard, topic by topic</en></b><p><zh>先做三轮多模型头脑风暴，再按议题逐项决定。</zh>
           <en>Three rounds of multi-model brainstorming first, then decisions topic by topic.</en></p></li>
-        <li class="now"><time>2026-09-28</time><b><zh>语言方案 1.16 与解释器原型</zh><en>Language scheme 1.16 and interpreter prototype</en></b><p><zh>119 项测试通过；示例工程的原图转成 RNL 后都能读回并渲染。</zh>
+        <li><time>2026-09-28</time><b><zh>语言方案 1.16 与解释器原型</zh><en>Language scheme 1.16 and interpreter prototype</en></b><p><zh>119 项测试通过；示例工程的原图转成 RNL 后都能读回并渲染。</zh>
           <en>119 tests pass; the example projects’ original drawings convert to RNL, read back and render.</en></p></li>
+        <li><time><zh>2026-09-30 至 10-09</zh><en>2026-09-30 to 10-09</en></time><b><zh>语义与对象模型</zh><en>Semantics and object model</en></b><p><zh>AS、ATTACH、DEFINE 三分；选择在每一层各求一次；优先级和冲突的规则；坐标 x 向右、y 向上；导线只有共用同一个点才接在一起；图元、引脚、文字、样式、总线、包和版本。</zh>
+          <en>AS, ATTACH and DEFINE split apart; selections evaluated once per level; rules for priority and conflicts; coordinates with x to the right and y up; wires join only by sharing a point; primitives, pins, text, styles, buses, packages and versions.</en></p></li>
+        <li><time>2026-10-10</time><b><zh>关键字定名</zh><en>Keywords named</en></b><p><zh>全部关键字和参数名定下，如 PLACE、SET-SYMBOL、SELECT-INSTANCE；管道和命名都用 =&gt;，点写成 (x, y)。</zh>
+          <en>All keyword and parameter names settled, such as PLACE, SET-SYMBOL and SELECT-INSTANCE; pipes and naming both use =&gt;, and points are written (x, y).</en></p></li>
+        <li><time>2026-10-11</time><b><zh>第一轮试写</zh><en>First writing trial</en></b><p><zh>11 个模型写 6 道题，共 264 次；据此加了 ORIENT-RELATION、SELECT-WIRE 等关键字，放宽了自由文本的限制。</zh>
+          <en>11 models wrote 6 tasks, 264 runs in all; as a result, keywords such as ORIENT-RELATION and SELECT-WIRE were added and the limits on free text were relaxed.</en></p></li>
+        <li class="now"><time>2026-10-12</time><b><zh>语言草稿 0.2：标准例句</zh><en>Language draft 0.2: standard sentences</en></b><p><zh>46 个关键字；语句读作事实，照标准例句写读起来就是一句话；中文代称包 rnl-zh；ATTACH 的定义写在前面，标准包的集合名带 _SET。</zh>
+          <en>46 keywords; statements read as facts, and written as standard sentences they read as prose; the Chinese alias package rnl-zh; ATTACH puts the definition first, and the standard package’s set names end in _SET.</en></p></li>
         <li class="tl-sep"><zh>接下来</zh><en>Next</en></li>
+        <li class="next"><b><zh>第一份完整规范</zh><en>The first complete specification</en></b><p><zh>把语言草稿整理成正式规范，并入本仓库的 spec/。</zh>
+          <en>Turn the language draft into a proper specification and merge it into spec/ in this repository.</en></p></li>
         <li class="next"><b><zh>精确 RNL 阅读闭环</zh><en>Exact-RNL reading loop</en></b><p><zh>运行库、SPICE 与 Spectre 适配器、统一渲染器、查看器：不装求解器也能打开完整描述的文件。</zh>
           <en>Runtime, SPICE and Spectre adapters, shared renderer, viewer: open a fully described file without a solver.</en></p></li>
-        <li class="next"><b><zh>求解闭环</zh><en>Solving loop</en></b><p><zh>求解器输出带来源标记和指纹的精确 RNL，边算边刷新。</zh>
-          <en>The solver outputs exact RNL with a source tag and a fingerprint, refreshing as it computes.</en></p></li>
+        <li class="next"><b><zh>求解闭环</zh><en>Solving loop</en></b><p><zh>求解器把结果写成 type="generated" 的记录，带输入的 hash，边算边刷新。</zh>
+          <en>The solver writes its result as a record with type="generated" and a hash of its input, refreshing as it computes.</en></p></li>
         <li class="next"><b><zh>编辑闭环</zh><en>Editing loop</en></b><p><zh>追加式编辑、撤销重做、重新求解。</zh><en>Append-only edits, undo and redo, solving again.</en></p></li>
         <li class="next"><b><zh>发行闭环</zh><en>Release loop</en></b><p><zh>npm 包、命令行和桌面应用。</zh><en>npm packages, CLI and desktop app.</en></p></li>
       </ol>
@@ -1096,13 +1149,18 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
         </details>
         <details>
           <summary><zh>为什么常提到 AI？</zh><en>Why does AI come up so often?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>大模型擅长读写网表这样的文本。RNL 让“画法”也变成文本，模型能直接写出、局部修改。语句之间可以夹说明文字方便人读，但说明文字不改变机器含义。</zh>
-            <en>Language models are good at reading and writing text such as netlists. RNL makes the drawing text too, so a model can write it directly and edit it in place. Free text between statements helps people read, but it never changes what machines understand.</en></p>
+          <p><zh>大模型擅长读写网表这样的文本。RNL 让“画法”也变成文本，模型能直接写出、局部修改。第一轮试写里，11 个模型照着参考写了 264 次，大多数写出了能用的 RNL。语句之间可以夹自由文本方便人读，但自由文本不改变机器读到的含义。</zh>
+            <en>Language models are good at reading and writing text such as netlists. RNL makes the drawing text too, so a model can write it directly and edit it in place. In the first writing trial, 11 models wrote 264 runs from a reference, and most produced usable RNL. Free text between statements helps people read, but it never changes what machines understand.</en></p>
+        </details>
+        <details>
+          <summary><zh>可以用中文写 RNL 吗？</zh><en>Can RNL be written in Chinese?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><zh>可以。关键字和标准包里的名字都有中文代称，在文件头段记录里写 <code>@USE-ALIASES(name="rnl-zh")</code> 就能用，比如 <code lang="zh-CN">#M1 @位于(10, 20)</code>。代称只是另一种拼写：中英文写法可以混用，机器读到的完全相同；头段记录本身总按标准写法读。</zh>
+            <en>Yes. Keywords and the names in the standard package have Chinese aliases; write <code>@USE-ALIASES(name="rnl-zh")</code> in the file’s header record and use them, as in <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is only another spelling: the two can be mixed, and machines read exactly the same thing; the header record itself is always read in standard spelling.</en></p>
         </details>
         <details>
           <summary><zh>现在能用吗？</zh><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>还不能当产品用。语言在逐条讨论，已有布局求解和解释器原型；正式的运行库、求解器和查看器在规划中。</zh>
-            <en>Not as a product yet. The language is being settled topic by topic, and there are layout-solver and interpreter prototypes; the production runtime, solver and viewer are planned.</en></p>
+          <p><zh>还不能当产品用。语言草稿 0.2 正在试写，已有布局求解和解释器原型；正式的运行库、求解器和查看器在规划中。</zh>
+            <en>Not as a product yet. Language draft 0.2 is being tried out, and there are layout-solver and interpreter prototypes; the production runtime, solver and viewer are planned.</en></p>
         </details>
       </div>
     </div>
@@ -1115,16 +1173,16 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
   <div class="wrap foot-grid">
     <div>
       <span class="brand-mark">RNL</span>
-      <p><zh>Rich Netlist（RNL）。本页用于介绍项目：语法均为当前讨论稿的示意，不是已发布的格式；图中的坐标由本页手工排布，符号由本页自绘。</zh>
-        <en>Rich Netlist (RNL). This page introduces the project: all syntax is illustrative, taken from the current discussion draft, not a published format; the coordinates in the drawings were placed by hand and the symbols were drawn for this page.</en></p>
+      <p><zh>Rich Netlist（RNL）。本页用于介绍项目：语法来自语言草稿 0.2，仅作示意，不是已发布的格式；图中的坐标由本页手工排布，符号由本页自绘，引脚位置与标准包一致。</zh>
+        <en>Rich Netlist (RNL). This page introduces the project: the syntax follows language draft 0.2 and is illustrative, not a published format; the coordinates in the drawings were placed by hand and the symbols were drawn for this page, with pins where the standard package puts them.</en></p>
     </div>
     <div>
       <h4><zh>资料来源</zh><en>Sources</en></h4>
       <ul>
         <li><zh>原则草案：</zh><en>Principles draft: </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md"><code>spec/rich-netlist.md</code></a></li>
-        <li><zh>语法草案：</zh><en>Syntax draft: </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/RNL-Syntax-0.1-draft.2.md"><code>spec/RNL-Syntax-0.1-draft.2.md</code></a></li>
-        <li><zh>当前语言方案：语言讨论记录（1.16 方案），尚未并入 <code>spec/</code></zh>
-          <en>Current language scheme: the language discussion notes (scheme 1.16), not yet merged into <code>spec/</code></en></li>
+        <li><zh>早期语法草案（已被语言草稿 0.2 取代）：</zh><en>Early syntax draft (superseded by language draft 0.2): </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/RNL-Syntax-0.1-draft.2.md"><code>spec/RNL-Syntax-0.1-draft.2.md</code></a></li>
+        <li><zh>当前语言：0.2 草稿（2026-10-12），尚未并入 <code>spec/</code>；本站的<a href="language.html">语言导览</a>按它编写</zh>
+          <en>Current language: draft 0.2 (2026-10-12), not yet merged into <code>spec/</code>; this site’s <a href="language.html">language tour</a> follows it</en></li>
         <li><zh>工具链架构：</zh><en>Toolchain architecture: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/rnl-toolchain-architecture.md"><code>docs/rnl-toolchain-architecture.md</code></a></li>
         <li><zh>路线图：</zh><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a><zh>；布局求解原型和解释器原型在研究仓库中，尚未公开</zh><en>; the layout-solver and interpreter prototypes are in a research repository that is not public yet</en></li>
       </ul>
@@ -1135,6 +1193,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
 <script src="assets/schem.js"></script>
 <script src="assets/rnl-code.js"></script>
 <script src="assets/scenes.js"></script>
+<script src="assets/common.js"></script>
 <script src="assets/intro.js"></script>
 </body>
 </html>

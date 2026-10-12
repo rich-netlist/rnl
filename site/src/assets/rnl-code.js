@@ -2,9 +2,9 @@
  *
  * Display-only highlighting, not a parser: host netlist lines, ordinary comment lines and @RNL
  * records (which may span lines) are handled separately.
- * Inside a record, tokens are colored by the current draft's notation: #instance &net %local-object
- * $definition ?slot <point>, keywords @XX and their parameters, a (role) right after an object;
- * everything else is free text.
+ * Inside a record, tokens are colored by the language draft's notation: keywords @PLACE (and their
+ * aliases, such as the Chinese ones) with their parameters in tight parentheses, #instance &net %name $definition ?role,
+ * a (role) tight after an object, points (x, y), sets {…}, the pipe =>; everything else is free text.
  */
 (function (global) {
   'use strict';
@@ -34,20 +34,24 @@
 
   /* ---------- RNL records ---------- */
 
+  var Q = '"(?:[^"]|"")*"';
+  var NAME = '(?:' + Q + '|[\\p{L}\\p{N}_]+)';
+  var SUB = '(?:<[^<>\\s]*>)?';
+  var KIDS = '(?:::' + NAME + ')*';
   var RE = {
     ws: /\s+/y,
-    str: /"(?:[^"\\]|\\.)*"?/y,
-    kw: /@[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/y,
-    pt: /<[^<>\n]*>/y,
-    inst: /#(?:"[^"]*"|[A-Za-z0-9_]+)?(?::(?:"[^"]*"|[A-Za-z0-9_]+))*(?:::[A-Za-z0-9_]+)?/y,
-    net: /&(?:"[^"]*"|[A-Za-z0-9_]+)(?:::[A-Za-z0-9_]+)?/y,
-    obj: /%(?:"[^"]*"|[A-Za-z0-9_]+)(?:\/[A-Za-z0-9_]+)?(?::(?:"[^"]*"|[A-Za-z0-9_]+))?(?:::[A-Za-z0-9_]+)?/y,
-    def: /\$(?:"[^"]*"|[A-Za-z0-9_]+)/y,
-    slot: /\?[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z0-9_]+)?(?::[A-Za-z0-9_]+)?/y,
+    str: /"(?:[^"]|"")*"?/y,
+    kw: /@[\p{L}\p{N}_]+(?:-[\p{L}\p{N}_]+)*/uy,
+    inst: new RegExp('#' + NAME + '?' + SUB + '(?::' + NAME + SUB + ')?' + KIDS, 'uy'),
+    net: new RegExp('&' + NAME + SUB + KIDS, 'uy'),
+    obj: new RegExp('%' + NAME + '(?::' + NAME + ')?' + KIDS, 'uy'),
+    def: new RegExp('\\$' + NAME, 'uy'),
+    slot: new RegExp('\\?' + NAME + '?' + KIDS + '(?::' + NAME + ')?', 'uy'),
+    pt: /\((?:[^()"\n]|"(?:[^"]|"")*")*\)/y,
     num: /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/y,
-    ident: /[A-Za-z_][A-Za-z0-9_]*/y,
-    role: /\(\s*(?:"[^"]*"|[A-Za-z_][A-Za-z0-9_]*)\s*\)/y,
-    word: /[^\s{}();|=\[\],<>"@#&%$?]+/y
+    ident: /[\p{L}_][\p{L}\p{N}_-]*/uy,
+    role: new RegExp('\\(\\s*' + NAME + '\\s*\\)', 'uy'),
+    word: /[^\s{}();=\[\],<>"@#&%$?]+/y
   };
 
   function at(re, s, i) {
@@ -62,12 +66,12 @@
     this.opened = false;
     this.inCmt = false;
     this.paren = 0;
-    this.brack = 0;
   }
 
   function hlRnl(s, st) {
     var out = '', i = 0, n = s.length, m;
-    var afterKw = false, lastRef = false;
+    /* prev: what the last token was, when nothing separates it from the next character */
+    var prev = '';
     while (i < n) {
       if (st.inCmt) {
         var e = s.indexOf('*/', i);
@@ -79,74 +83,74 @@
       }
       if (!st.inRec) {
         var rest = s.slice(i);
-        var k = rest.search(/@rnl\b/i);
+        var k = rest.search(/@RNL\b/);
         if (k < 0) { out += span('t-cmt', rest); return out; }
         if (k > 0) out += span('t-cmt', rest.slice(0, k));
         i += k;
-        out += span('t-rec', s.substr(i, 4));
+        out += span('t-rec', '@RNL');
         i += 4;
-        st.inRec = true; st.depth = 0; st.opened = false; st.paren = 0; st.brack = 0;
-        afterKw = true; lastRef = false;
+        st.inRec = true; st.depth = 0; st.opened = false; st.paren = 0;
+        prev = 'kw';
         continue;
       }
       var c = s.charAt(i);
-      if (/\s/.test(c)) { m = at(RE.ws, s, i); out += m; i += m.length; continue; }
-      if (c === '/' && s.charAt(i + 1) === '*') { st.inCmt = true; continue; }
       var inParams = st.paren > 0;
+      if (/\s/.test(c)) { m = at(RE.ws, s, i); out += m; i += m.length; prev = ''; continue; }
+      if (c === '/' && s.charAt(i + 1) === '*') { st.inCmt = true; continue; }
       if (c === '(') {
-        if (afterKw) { st.paren++; out += span('t-punct', '('); i++; afterKw = false; lastRef = false; continue; }
-        if (lastRef && (m = at(RE.role, s, i))) { out += span('t-role', m); i += m.length; lastRef = false; continue; }
-        if (inParams) { st.paren++; out += span('t-punct', '('); i++; continue; }
-        out += span('t-free', '('); i++; continue;
+        if (prev === 'kw') { st.paren++; out += span('t-punct', '('); i++; prev = ''; continue; }
+        if (prev === 'ref' && !inParams && (m = at(RE.role, s, i))) { out += span('t-role', m); i += m.length; prev = ''; continue; }
+        if (inParams) { st.paren++; out += span('t-punct', '('); i++; prev = ''; continue; }
+        if ((m = at(RE.pt, s, i))) { out += span('t-pt', m); i += m.length; prev = 'ref'; continue; }
+        out += span('t-free', '('); i++; prev = ''; continue;
       }
-      afterKw = false;
       if (c === ')') {
         if (st.paren > 0) { st.paren--; out += span('t-punct', ')'); } else out += span('t-free', ')');
-        i++; lastRef = false; continue;
+        i++; prev = ''; continue;
       }
       if (c === '{') {
         if (inParams) { out += span('t-punct', '{'); i++; continue; }
-        st.depth++; st.opened = true; out += span('t-punct', '{'); i++; lastRef = false; continue;
+        st.depth++; st.opened = true; out += span('t-punct', '{'); i++; prev = ''; continue;
       }
       if (c === '}') {
         if (inParams) { out += span('t-punct', '}'); i++; continue; }
-        st.depth--; out += span('t-punct', '}'); i++; lastRef = false;
+        st.depth--; out += span('t-punct', '}'); i++; prev = 'ref';
         if (st.opened && st.depth <= 0) { st.inRec = false; st.depth = 0; }
         continue;
       }
-      if (c === '"') { m = at(RE.str, s, i); out += span(inParams ? 't-str' : 't-free', m); i += m.length; lastRef = false; continue; }
-      if (c === '@') {
-        m = at(RE.kw, s, i);
-        if (m) { out += span(/^@rnl$/i.test(m) ? 't-rec' : 't-kw', m); i += m.length; afterKw = true; lastRef = false; continue; }
+      if (c === '"') { m = at(RE.str, s, i); out += span('t-str', m); i += m.length; prev = ''; continue; }
+      if (c === '@' && (m = at(RE.kw, s, i))) {
+        out += span(m === '@RNL' ? 't-rec' : 't-kw', m); i += m.length; prev = 'kw'; continue;
       }
-      if (c === '#' && (m = at(RE.inst, s, i))) { out += span('t-inst', m); i += m.length; lastRef = true; continue; }
-      if (c === '&' && (m = at(RE.net, s, i))) { out += span('t-net', m); i += m.length; lastRef = true; continue; }
-      if (c === '%' && (m = at(RE.obj, s, i))) { out += span('t-obj', m); i += m.length; lastRef = true; continue; }
-      if (c === '$' && (m = at(RE.def, s, i))) { out += span('t-def', m); i += m.length; lastRef = false; continue; }
-      if (c === '?' && (m = at(RE.slot, s, i))) { out += span('t-slot', m); i += m.length; lastRef = true; continue; }
-      if (c === '<' && (m = at(RE.pt, s, i))) { out += span('t-pt', m); i += m.length; lastRef = true; continue; }
-      if (c === '[') { st.brack++; out += span(inParams ? 't-punct' : 't-free', c); i++; continue; }
-      if (c === ']') { st.brack = Math.max(0, st.brack - 1); out += span(inParams ? 't-punct' : 't-free', c); i++; continue; }
-      if (c === ';' || c === '|' || c === '=') { out += span('t-punct', c); i++; lastRef = false; continue; }
-      if (c === ',') { out += span(inParams ? 't-punct' : 't-free', c); i++; continue; }
-      if (/[-+.\d]/.test(c) && (m = at(RE.num, s, i))) {
+      if (c === '#' && (m = at(RE.inst, s, i))) { out += span('t-inst', m); i += m.length; prev = 'ref'; continue; }
+      if (c === '&' && (m = at(RE.net, s, i))) { out += span('t-net', m); i += m.length; prev = 'ref'; continue; }
+      if (c === '%' && (m = at(RE.obj, s, i))) { out += span('t-obj', m); i += m.length; prev = 'ref'; continue; }
+      if (c === '$' && (m = at(RE.def, s, i))) { out += span('t-def', m); i += m.length; prev = ''; continue; }
+      if (c === '?') {
+        m = at(RE.slot, s, i) || '?';
+        out += span('t-slot', m); i += m.length; prev = 'ref'; continue;
+      }
+      if (c === '=' && s.charAt(i + 1) === '>') { out += span('t-punct t-pipe', '=>'); i += 2; prev = ''; continue; }
+      if (c === ';' || c === '=') { out += span('t-punct', c); i++; prev = ''; continue; }
+      if (c === '[' || c === ']' || c === ',') { out += span(inParams ? 't-punct' : 't-free', c); i++; prev = ''; continue; }
+      if (inParams && /[-+.\d]/.test(c) && (m = at(RE.num, s, i))) {
         /* A number followed directly by a letter (such as 2O) is not a valid number: flag it */
-        var glued = inParams && /[A-Za-z_]/.test(s.charAt(i + m.length));
-        out += span(glued ? 't-bad' : inParams ? 't-num' : 't-free', m); i += m.length; lastRef = false; continue;
+        var glued = /[\p{L}_]/u.test(s.charAt(i + m.length));
+        if (glued) {
+          var tail = at(RE.ident, s, i + m.length) || '';
+          out += span('t-bad', m + tail); i += m.length + tail.length;
+        } else { out += span('t-num', m); i += m.length; }
+        prev = ''; continue;
       }
-      if (/[A-Za-z_]/.test(c) && (m = at(RE.ident, s, i))) {
-        if (inParams && /\d/.test(s.charAt(i - 1))) {
-          out += span('t-bad', m);
-        } else if (inParams) {
-          var j = i + m.length;
-          while (j < n && s.charAt(j) === ' ') j++;
-          out += span(s.charAt(j) === '=' ? 't-pn' : 't-lit', m);
-        } else out += span('t-free', m);
-        i += m.length; lastRef = false; continue;
+      if (inParams && (m = at(RE.ident, s, i))) {
+        var j = i + m.length;
+        while (j < n && s.charAt(j) === ' ') j++;
+        out += span(s.charAt(j) === '=' && s.charAt(j + 1) !== '>' ? 't-pn' : 't-lit', m);
+        i += m.length; prev = ''; continue;
       }
       m = at(RE.word, s, i);
-      if (m) { out += span('t-free', m); i += m.length; lastRef = false; continue; }
-      out += span('t-free', c); i++;
+      if (m) { out += span('t-free', m); i += m.length; prev = ''; continue; }
+      out += span('t-free', c); i++; prev = '';
     }
     return out;
   }
@@ -156,7 +160,7 @@
     var st = new State();
     return texts.map(function (text) {
       var m = /^(\s*)(\*|\/\/)(.*)$/.exec(text);
-      if (m && (st.inRec || st.inCmt || /@rnl\b/i.test(m[3]))) {
+      if (m && (st.inRec || st.inCmt || /@RNL\b/.test(m[3]))) {
         return { html: esc(m[1]) + span('t-pref', m[2]) + hlRnl(m[3], st), rnl: true };
       }
       if (m) return { html: esc(m[1]) + span('t-pref', m[2]) + span('t-cmt', m[3]), cmt: true };
@@ -169,13 +173,19 @@
   function hlSnippet(text) {
     var st = new State();
     st.inRec = true; st.opened = true; st.depth = 1;
-    return hlRnl(text, st);
+    return text.split('\n').map(function (line) { return hlRnl(line, st); }).join('\n');
+  }
+
+  /* A whole file when any line starts with a host comment prefix or nothing in it looks like RNL
+     (plain netlist lines); otherwise a fragment inside a record */
+  function hlAuto(text) {
+    if (/^\s*(\*|\/\/)/m.test(text) || !/[@#&%$]/.test(text)) return hlFile(text.split('\n')).map(function (h) { return h.html; }).join('\n');
+    return hlSnippet(text);
   }
 
   /* ---------- Code panels ---------- */
 
-  function render(container, lines, opts) {
-    opts = opts || {};
+  function render(container, lines) {
     var hl = hlFile(lines.map(function (l) { return l.t; }));
     var html = '';
     lines.forEach(function (l, i) {
@@ -235,5 +245,5 @@
     };
   }
 
-  global.RNLCode = { hlFile: hlFile, hlSnippet: hlSnippet, render: render, link: link, esc: esc };
+  global.RNLCode = { hlFile: hlFile, hlSnippet: hlSnippet, hlAuto: hlAuto, render: render, link: link, esc: esc };
 })(window);
