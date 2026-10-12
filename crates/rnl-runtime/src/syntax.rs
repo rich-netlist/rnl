@@ -5,6 +5,7 @@
 //! or at the end of the enclosing set. Offsets are character indices into the record text.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub type Off = usize;
 
@@ -176,7 +177,7 @@ pub struct Point {
 #[derive(Clone, Debug, PartialEq)]
 pub struct SetExpr {
     pub id: NodeId,
-    pub members: Vec<Member>,
+    pub members: Vec<Rc<Member>>,
     pub start: Off,
     pub end: Off,
 }
@@ -185,7 +186,7 @@ pub struct SetExpr {
 pub enum ObjExpr {
     Ref(Ref),
     Point(Point),
-    Set(SetExpr),
+    Set(Rc<SetExpr>),
 }
 
 impl ObjExpr {
@@ -302,7 +303,7 @@ pub struct Note {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecordAst {
     pub header: Option<Params>,
-    pub body: Option<SetExpr>,
+    pub body: Option<Rc<SetExpr>>,
     pub error: Option<(String, Off)>,
     pub notes: Vec<Note>,
 }
@@ -443,7 +444,7 @@ impl Parser {
         debug_assert!(self.starts_with("@RNL"));
         self.i = 4;
         let mut header = None;
-        let r = (|| -> PResult<SetExpr> {
+        let r = (|| -> PResult<Rc<SetExpr>> {
             self.skip_ws()?;
             if self.peek() == Some('(') {
                 header = Some(self.params()?);
@@ -452,7 +453,7 @@ impl Parser {
             if self.peek() != Some('{') {
                 return self.err("the record has no braces: write @RNL {…} (2.4)");
             }
-            self.set_expr()
+            Ok(Rc::new(self.set_expr()?))
         })();
         let notes = std::mem::take(&mut self.notes);
         match r {
@@ -470,7 +471,7 @@ impl Parser {
         let mut members = Vec::new();
         loop {
             if let Some(m) = self.member() {
-                members.push(m);
+                members.push(Rc::new(m));
             }
             self.skip_ws()?;
             match self.peek() {
@@ -793,7 +794,7 @@ impl Parser {
 
     fn obj(&mut self) -> PResult<ObjExpr> {
         match self.peek() {
-            Some('{') => Ok(ObjExpr::Set(self.set_expr()?)),
+            Some('{') => Ok(ObjExpr::Set(Rc::new(self.set_expr()?))),
             Some('(') => Ok(ObjExpr::Point(self.point()?)),
             Some(c) if "#&%$?".contains(c) => Ok(ObjExpr::Ref(self.reference()?)),
             _ => self.expected("expected an object here"),
@@ -1348,7 +1349,7 @@ fn walk_val<'a>(v: &'a Value, out: &mut Vec<RefOrHole<'a>>) {
 mod tests {
     use super::*;
 
-    fn body(text: &str) -> SetExpr {
+    fn body(text: &str) -> Rc<SetExpr> {
         let r = parse_record(text);
         assert!(r.error.is_none(), "{:?}", r.error);
         r.body.unwrap()

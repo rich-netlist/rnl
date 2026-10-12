@@ -10,3 +10,10 @@ pub mod words;
 pub mod host;
 pub mod records;
 pub mod source;
+pub mod geom;
+pub mod interp;
+pub mod markup;
+pub mod model;
+
+pub use interp::{check_package, interpret, Interpretation, Options};
+pub mod writeback;
