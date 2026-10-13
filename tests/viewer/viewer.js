@@ -86,8 +86,23 @@ class Viewer {
     return this.page.locator("#canvas > svg").getAttribute("viewBox");
   }
 
+  /**
+   * Wait until the view fits the canvas's size: when a panel is shown or hidden, the page moves the
+   * view once the canvas has its new size, before the next frame.
+   */
+  async settled() {
+    await this.page.waitForFunction(() => {
+      const canvas = document.getElementById("canvas");
+      const svg = document.querySelector("#canvas > svg");
+      if (!svg) return true;
+      const [, , w, h] = svg.getAttribute("viewBox").split(" ").map(Number);
+      return Math.abs(w * canvas.clientHeight - h * canvas.clientWidth) <= 1e-6 * w * canvas.clientHeight;
+    });
+  }
+
   /** The page point of a point of the drawing shown, in its own units, as a click there hits it. */
-  point(u, v) {
+  async point(u, v) {
+    await this.settled();
     return this.page.evaluate(
       ([u, v]) => {
         const canvas = document.getElementById("canvas");
