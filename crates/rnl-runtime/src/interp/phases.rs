@@ -240,7 +240,8 @@ impl Interp<'_> {
     /// A statement whose symbols lose in the queue of every object it gives one to takes no
     /// effect: it is overridden (7.5, 8.3).
     fn note_overridden_symbols(&mut self, s: SceneId) {
-        let mut won: HashMap<(Option<RecId>, usize), bool> = HashMap::new();
+        // by record and place, so that the statements are noted in the same order every time
+        let mut won: BTreeMap<(Option<RecId>, usize), bool> = BTreeMap::new();
         for (k, f) in self.scenes[s].appear.iter().enumerate() {
             if !matches!(f.data, FactData::Symbol(_)) || !self.scenes[s].symbol_weighed.contains(&k) {
                 continue;

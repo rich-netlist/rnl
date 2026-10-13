@@ -919,12 +919,14 @@ impl<'p> Interp<'p> {
                 }
                 None => {
                     let close = {
-                        let names: Vec<String> = self.units[ctx.unit]
+                        let mut names: Vec<String> = self.units[ctx.unit]
                             .names
                             .keys()
                             .filter(|(p, _)| *p == e.prefix)
                             .map(|(_, n)| n.clone())
                             .collect();
+                        // in name order, not the map's: of names equally close the first is named
+                        names.sort_unstable();
                         closest(&name, names.iter().map(String::as_str))
                     };
                     let hint = close.map(|c| format!(", did you mean {}{c}?", e.prefix)).unwrap_or_default();
