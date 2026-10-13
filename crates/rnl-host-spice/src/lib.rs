@@ -267,6 +267,7 @@ impl<'a> Reader<'a> {
         let mut in_control = false;
         let mut ended = false;
         let mut pending: Option<Pending> = None;
+        let mut continued = Continued::default();
         // `.lib` sections: inside the selected one when reading a section; skipping an unselected one
         let mut in_section = section.is_none();
         let mut skip_lib: Option<String> = None;
@@ -331,7 +332,7 @@ impl<'a> Reader<'a> {
             }
             if let Some(rest) = raw.strip_prefix('*') {
                 if rest.trim().is_empty() || rest.starts_with(' ') {
-                    if pending.is_some() && next_is_continuation(&lines, idx) {
+                    if pending.is_some() && continued.after(&lines, idx) {
                         self.sink.warning(
                             "a comment line between a statement and its continuation: read, but hosts treat it differently (2.2)",
                             Some(Loc::line(&fname, no)),
@@ -528,12 +529,9 @@ impl<'a> Reader<'a> {
             self.sink.error(format!("element {} is defined twice", el.inst.name), Some(Loc::line(fname, no)));
             return;
         }
-        let mut inst = el.inst;
-        inst.order = lv.instances.len();
-        let needs = matches!(inst.letter, Some('M') | Some('Q'));
-        lv.instances.push(inst);
+        let needs = matches!(el.inst.letter, Some('M') | Some('Q'));
+        let k = lv.add_instance(el.inst);
         if needs {
-            let k = lv.instances.len() - 1;
             self.unresolved.push((circ, k, el.plain));
         }
     }
@@ -543,14 +541,27 @@ fn unquote(s: &str) -> String {
     s.trim_matches(|c| c == '\'' || c == '"').to_string()
 }
 
-fn next_is_continuation(lines: &[&str], idx: usize) -> bool {
-    for s in &lines[idx + 1..] {
-        if s.starts_with('*') {
-            continue;
+/// The answer of [`Continued::after`] for one run of comment lines: it is the same for all the
+/// lines of the run, so each run is looked through once.
+#[derive(Default)]
+struct Continued {
+    /// The answer holds for the lines from `from` up to the one before `next`, the first line after
+    /// `from` that is not a comment line.
+    from: usize,
+    next: usize,
+    answer: bool,
+}
+
+impl Continued {
+    /// Whether the first line after line `idx` that is not a comment line is a continuation line.
+    fn after(&mut self, lines: &[&str], idx: usize) -> bool {
+        if !(self.from..self.next).contains(&idx) {
+            let next = (idx + 1..lines.len()).find(|&k| !lines[k].starts_with('*')).unwrap_or(lines.len());
+            let answer = lines.get(next).is_some_and(|s| s.trim().starts_with('+'));
+            *self = Continued { from: idx, next, answer };
         }
-        return s.trim().starts_with('+');
+        self.answer
     }
-    false
 }
 
 /// Read a SPICE document whose main file is `path`.
