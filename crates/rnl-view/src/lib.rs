@@ -358,6 +358,36 @@ R2 p q 1k
     }
 
     #[test]
+    fn a_file_above_the_root_is_the_providers_to_give() {
+        // `../x.inc` above an entry at the root is not `x.inc` beside it: the core asks for
+        // `/../x.inc`, which a workspace in memory does not have unless it is given
+        let top = "* top
+.include \"x.inc\"
+.include \"../x.inc\"
+X1 a b inner
+.end
+";
+        let inner = "* inner
+.subckt inner p q
+R1 p q 1k
+.ends
+";
+        let files = MemoryProvider::new().with("/top.sp", top).with("/x.inc", inner);
+        let d = build("/top.sp", &files, &BuildOptions::default()).unwrap();
+        let paths: Vec<&str> = d.files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(paths, ["top.sp", "x.inc"]);
+        assert_eq!(d.missing, ["/../x.inc"]);
+        let error = d.diagnostics.iter().find(|x| x.message == "the included file ../x.inc cannot be found");
+        assert_eq!(error.map(|x| (x.file_index, x.line)), Some((Some(0), 3)), "{:?}", d.diagnostics);
+
+        // given, it is named by its path, as a file outside the entry's directory is
+        let d = build("/top.sp", &files.with("/../x.inc", "* above\n"), &BuildOptions::default()).unwrap();
+        let paths: Vec<&str> = d.files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(paths, ["top.sp", "x.inc", "/../x.inc"]);
+        assert!(d.missing.is_empty(), "{:?}", d.missing);
+    }
+
+    #[test]
     fn the_dialect_can_be_given() {
         // Spectre's instance syntax; without the override, the `.sp` name says SPICE
         let text = "// t\nr1 (a 0) resistor r=1k\n";
