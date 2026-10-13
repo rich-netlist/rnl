@@ -5,9 +5,10 @@
 //! Geometry is in scene units, x to the right and y up, as in the model. The SVG and the hits are
 //! in pixels with y down: a point (x, y) is at (x·scale, −y·scale) there (`Level::scale`).
 //!
-//! The SVG writer still decides how a line style is drawn and where the pieces of a text go. The
-//! types say how, in pixels of the SVG, so that a frontend can draw as the SVG does; a test holds
-//! the SVG writer to what they say.
+//! The renderer resolves each line style into strokes, which the SVG writes as they are: a
+//! frontend that strokes with a colour, a width, dashes, a cap and a join draws the lines as the
+//! SVG does. The SVG writer still decides where the pieces of a text go; the types say how, in
+//! pixels of the SVG. A test holds the SVG writer to what the types say.
 
 use rnl_runtime::geom::Pt;
 use rnl_runtime::markup;
@@ -48,18 +49,23 @@ pub enum Layer {
 /// lines, arcs and curves (9.2.5), and arrow heads, which are filled triangles; "rect", with its
 /// sides along the axes, by its lowest and highest corners; "circle"; "ellipse", with its axes
 /// along x and y; "text"; "flyline", a line a viewer may show for a connection that is not drawn
-/// yet (13.7), not a wire, by its two ends. The SVG draws a flyline 1 pixel wide in #8a8a8a, with
-/// dashes 4 pixels long and gaps of 3.
+/// yet (13.7), not a wire, by its two ends.
+///
+/// A shape is filled first and then stroked along its outline with each of its `strokes`, first to
+/// last; with no strokes it has no outline. The outline, and so its dashes, starts where a path or
+/// a flyline starts; at a rectangle's corner of lowest x and highest y, along the side of highest
+/// y first; and at the point of a circle or an ellipse of highest x. It goes round a rectangle,
+/// circle or ellipse clockwise, as SVG and Canvas draw them on a screen with y down.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Shape {
-    Path { segments: Vec<Segment>, stroke: Option<Stroke>, fill: Option<Color> },
-    Rect { min: [f64; 2], max: [f64; 2], stroke: Option<Stroke>, fill: Option<Color> },
-    Circle { center: [f64; 2], r: f64, stroke: Option<Stroke>, fill: Option<Color> },
-    Ellipse { center: [f64; 2], rx: f64, ry: f64, stroke: Option<Stroke>, fill: Option<Color> },
+    Path { segments: Vec<Segment>, strokes: Vec<Stroke>, fill: Option<Color> },
+    Rect { min: [f64; 2], max: [f64; 2], strokes: Vec<Stroke>, fill: Option<Color> },
+    Circle { center: [f64; 2], r: f64, strokes: Vec<Stroke>, fill: Option<Color> },
+    Ellipse { center: [f64; 2], rx: f64, ry: f64, strokes: Vec<Stroke>, fill: Option<Color> },
     Text(Text),
-    Flyline { points: [[f64; 2]; 2] },
+    Flyline { points: [[f64; 2]; 2], strokes: Vec<Stroke> },
 }
 
 /// A colour as the language writes it (9.3), which is as CSS does: `#` and 3, 4, 6 or 8
@@ -85,38 +91,39 @@ pub enum Segment {
     Close,
 }
 
-/// How a line is drawn, after the style queue and the renderer's defaults (9.3).
+/// One stroke along a shape's outline, a line style (9.3) as the renderer resolved it: a frontend
+/// draws it with these and nothing else. A "solid", "dashed", "dotted" or "dash-dot" line is one
+/// stroke, the last three with their dashes; a "bold" line, one stroke twice as wide; a "double"
+/// line, two strokes with butt caps and miter joins, one in the line's colour three times as wide
+/// as each of its two lines and then one in the colour between them as wide as the gap; "none",
+/// no stroke.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct Stroke {
     pub color: Color,
-    /// The width in scene units; 0 is the hairline, the thin line that keeps its width at every
-    /// zoom (9.3), which the SVG draws 1.2 pixels wide.
+    /// The width in the stroke's `unit`, centred on the outline.
     pub width: f64,
-    pub style: LineStyle,
+    pub unit: Unit,
+    /// The lengths of the dashes and of the gaps between them, in turn, in the stroke's `unit`,
+    /// repeated along the outline; empty for an unbroken line.
+    pub dashes: Vec<f64>,
+    /// How far into the dashes the outline starts, in the stroke's `unit`: with 0, the first dash
+    /// starts where the outline starts.
+    pub dash_offset: f64,
     pub cap: Cap,
     pub join: Join,
-    /// For a "double" line, the colour between its two lines; null for the other styles.
-    pub inner: Option<Color>,
 }
 
-/// A line's style (9.3). The SVG draws it with w, the width in its pixels (1.2 for the hairline),
-/// and m, the larger of w and 1: "solid" is a line w wide; "dashed" has dashes 4m long and gaps of
-/// 3m; "dotted", dots m long and gaps of 2.5m; "dash-dot", a dash of 5m, a gap of 2m, a dot of m
-/// and a gap of 2m; "bold" is a solid line 2w wide. On a path, "double" is a line in the colour 3d
-/// wide under a line in the inner colour d wide, where d is the width in scene units, at least
-/// 0.12, times the scale, with butt caps and miter joins, whatever the stroke's cap and join; a
-/// rectangle, circle or ellipse draws "double" as "solid".
+/// The unit of a stroke's width and dashes: "scene", scene units, which zoom with the drawing;
+/// "pixel", pixels of the screen, the same at every zoom. The hairline, a line 0 wide in the style
+/// (9.3), is 1.2 pixels wide and a flyline 1 pixel. The SVG is the drawing at the level's `scale`,
+/// where a pixel is one of the SVG's own; no dash or gap is shorter than a pixel there.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
-#[serde(rename_all = "kebab-case")]
-pub enum LineStyle {
-    Solid,
-    Dashed,
-    Dotted,
-    DashDot,
-    Double,
-    Bold,
+#[serde(rename_all = "lowercase")]
+pub enum Unit {
+    Scene,
+    Pixel,
 }
 
 /// The ends of an open line and of its dashes (9.3).
@@ -129,7 +136,8 @@ pub enum Cap {
     Square,
 }
 
-/// The corners of a line (9.3).
+/// The corners of a line (9.3). A miter that would be more than 4 times as long as the line is wide
+/// is drawn as a bevel, as SVG does; Canvas's limit is 10 unless it is set.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "lowercase")]
@@ -218,23 +226,23 @@ pub(crate) fn primitives(prims: &[rnl_render::Primitive]) -> Vec<Primitive> {
 
 fn primitive(p: &rnl_render::Primitive) -> Primitive {
     use rnl_render::Kind;
-    let stroke = |s: &Option<rnl_render::Stroke>| s.as_ref().map(self::stroke);
+    let strokes = |s: &[rnl_render::Stroke]| s.iter().map(stroke).collect();
     let color = |c: &Option<String>| c.clone().map(Color);
     let shape = match &p.kind {
-        Kind::Path { segs, stroke: s, fill } => {
-            Shape::Path { segments: segs.iter().map(segment).collect(), stroke: stroke(s), fill: color(fill) }
+        Kind::Path { segs, strokes: s, fill } => {
+            Shape::Path { segments: segs.iter().map(segment).collect(), strokes: strokes(s), fill: color(fill) }
         }
-        Kind::Rect { min, max, stroke: s, fill } => {
-            Shape::Rect { min: pt(*min), max: pt(*max), stroke: stroke(s), fill: color(fill) }
+        Kind::Rect { min, max, strokes: s, fill } => {
+            Shape::Rect { min: pt(*min), max: pt(*max), strokes: strokes(s), fill: color(fill) }
         }
-        Kind::Circle { c, r, stroke: s, fill } => {
-            Shape::Circle { center: pt(*c), r: *r, stroke: stroke(s), fill: color(fill) }
+        Kind::Circle { c, r, strokes: s, fill } => {
+            Shape::Circle { center: pt(*c), r: *r, strokes: strokes(s), fill: color(fill) }
         }
-        Kind::Ellipse { c, rx, ry, stroke: s, fill } => {
-            Shape::Ellipse { center: pt(*c), rx: *rx, ry: *ry, stroke: stroke(s), fill: color(fill) }
+        Kind::Ellipse { c, rx, ry, strokes: s, fill } => {
+            Shape::Ellipse { center: pt(*c), rx: *rx, ry: *ry, strokes: strokes(s), fill: color(fill) }
         }
         Kind::Text(t) => Shape::Text(text(t)),
-        Kind::Flyline { a, b } => Shape::Flyline { points: [pt(*a), pt(*b)] },
+        Kind::Flyline { a, b, strokes: s } => Shape::Flyline { points: [pt(*a), pt(*b)], strokes: strokes(s) },
     };
     Primitive { owner: p.owner.clone(), layer: layer(p.layer), order: p.order.clone(), bbox: p.bbox, shape }
 }
@@ -262,17 +270,9 @@ fn segment(s: &rnl_render::PathSeg) -> Segment {
     }
 }
 
-/// A stroke in the view's types. The language allows no other styles, caps and joins than those
-/// of the enums (9.3); the SVG draws an unknown style as solid.
+/// A stroke in the view's types. The language allows no other caps and joins than those of the
+/// enums (9.3).
 fn stroke(s: &rnl_render::Stroke) -> Stroke {
-    let style = match s.style.as_str() {
-        "dashed" => LineStyle::Dashed,
-        "dotted" => LineStyle::Dotted,
-        "dash-dot" => LineStyle::DashDot,
-        "double" => LineStyle::Double,
-        "bold" => LineStyle::Bold,
-        _ => LineStyle::Solid,
-    };
     let cap = match s.cap.as_str() {
         "butt" => Cap::Butt,
         "square" => Cap::Square,
@@ -283,8 +283,15 @@ fn stroke(s: &rnl_render::Stroke) -> Stroke {
         "bevel" => Join::Bevel,
         _ => Join::Round,
     };
-    let inner = (style == LineStyle::Double).then(|| Color(s.inner.clone()));
-    Stroke { color: Color(s.color.clone()), width: s.width, style, cap, join, inner }
+    Stroke {
+        color: Color(s.color.clone()),
+        width: s.width,
+        unit: if s.pixels { Unit::Pixel } else { Unit::Scene },
+        dashes: s.dashes.clone(),
+        dash_offset: s.dash_offset,
+        cap,
+        join,
+    }
 }
 
 /// A text in the view's types. The SVG anchors an unknown alignment at the start along the lines
@@ -363,22 +370,26 @@ mod tests {
         serde_json::to_value(value).unwrap().as_str().unwrap().to_string()
     }
 
-    /// A primitive back in the renderer's types; a stroke that is not "double" has no inner colour.
+    /// A stroke back in the renderer's types.
+    fn back_stroke(s: &Stroke) -> rnl_render::Stroke {
+        rnl_render::Stroke {
+            color: s.color.0.clone(),
+            width: s.width,
+            pixels: s.unit == Unit::Pixel,
+            dashes: s.dashes.clone(),
+            dash_offset: s.dash_offset,
+            cap: name(s.cap),
+            join: name(s.join),
+        }
+    }
+
+    /// A primitive back in the renderer's types.
     fn back(p: &Primitive) -> rnl_render::Primitive {
         let pt = |p: [f64; 2]| (p[0], p[1]);
-        let stroke = |s: &Option<Stroke>| {
-            s.as_ref().map(|s| rnl_render::Stroke {
-                color: s.color.0.clone(),
-                width: s.width,
-                style: name(s.style),
-                cap: name(s.cap),
-                join: name(s.join),
-                inner: s.inner.clone().map(|c| c.0).unwrap_or_default(),
-            })
-        };
+        let stroke = |s: &[Stroke]| s.iter().map(back_stroke).collect();
         let color = |c: &Option<Color>| c.clone().map(|c| c.0);
         let kind = match &p.shape {
-            Shape::Path { segments, stroke: s, fill } => {
+            Shape::Path { segments, strokes: s, fill } => {
                 let segs = segments
                     .iter()
                     .map(|s| match s {
@@ -391,16 +402,16 @@ mod tests {
                         Segment::Close => PathSeg::Close,
                     })
                     .collect();
-                Kind::Path { segs, stroke: stroke(s), fill: color(fill) }
+                Kind::Path { segs, strokes: stroke(s), fill: color(fill) }
             }
-            Shape::Rect { min, max, stroke: s, fill } => {
-                Kind::Rect { min: pt(*min), max: pt(*max), stroke: stroke(s), fill: color(fill) }
+            Shape::Rect { min, max, strokes: s, fill } => {
+                Kind::Rect { min: pt(*min), max: pt(*max), strokes: stroke(s), fill: color(fill) }
             }
-            Shape::Circle { center, r, stroke: s, fill } => {
-                Kind::Circle { c: pt(*center), r: *r, stroke: stroke(s), fill: color(fill) }
+            Shape::Circle { center, r, strokes: s, fill } => {
+                Kind::Circle { c: pt(*center), r: *r, strokes: stroke(s), fill: color(fill) }
             }
-            Shape::Ellipse { center, rx, ry, stroke: s, fill } => {
-                Kind::Ellipse { c: pt(*center), rx: *rx, ry: *ry, stroke: stroke(s), fill: color(fill) }
+            Shape::Ellipse { center, rx, ry, strokes: s, fill } => {
+                Kind::Ellipse { c: pt(*center), rx: *rx, ry: *ry, strokes: stroke(s), fill: color(fill) }
             }
             Shape::Text(t) => Kind::Text(rnl_render::TextPrim {
                 anchor: pt(t.anchor),
@@ -414,7 +425,9 @@ mod tests {
                 valign: name(t.valign),
                 vertical: t.vertical,
             }),
-            Shape::Flyline { points } => Kind::Flyline { a: pt(points[0]), b: pt(points[1]) },
+            Shape::Flyline { points, strokes: s } => {
+                Kind::Flyline { a: pt(points[0]), b: pt(points[1]), strokes: stroke(s) }
+            }
         };
         let layer = model::Layer::parse(&name(p.layer));
         rnl_render::Primitive { owner: p.owner.clone(), layer, order: p.order.clone(), kind, bbox: p.bbox }
@@ -431,22 +444,6 @@ mod tests {
                 style: style(s),
             },
         }
-    }
-
-    /// A renderer's primitive without the inner colour of a stroke that is not "double", which
-    /// nothing draws.
-    fn drawn(p: &rnl_render::Primitive) -> rnl_render::Primitive {
-        let mut p = p.clone();
-        if let Kind::Path { stroke: Some(s), .. }
-        | Kind::Rect { stroke: Some(s), .. }
-        | Kind::Circle { stroke: Some(s), .. }
-        | Kind::Ellipse { stroke: Some(s), .. } = &mut p.kind
-        {
-            if s.style != "double" {
-                s.inner.clear();
-            }
-        }
-        p
     }
 
     fn kind(p: &rnl_render::Primitive) -> &'static str {
@@ -467,30 +464,30 @@ mod tests {
     }
 
     #[test]
-    fn every_line_style_and_alignment_of_the_language_is_kept() {
+    fn every_cap_join_and_alignment_of_the_language_is_kept() {
         let w = words();
         let style = |k: &str| values(&w.style_prop(k).unwrap().ty);
         let text = |k: &str| values(&w.keyword("TEXT").unwrap().param_list().iter().find(|p| p.name == k).unwrap().ty);
         let s = rnl_render::Stroke {
             color: "#1d1d1f".into(),
-            width: 0.0,
-            style: "solid".into(),
+            width: 1.2,
+            pixels: true,
+            dashes: vec![4.8, 3.6],
+            dash_offset: 0.5,
             cap: "round".into(),
             join: "round".into(),
-            inner: "#ffffff".into(),
         };
-        // "none" draws no line at all (9.3)
-        for v in style("linestyle").into_iter().filter(|v| v != "none") {
-            assert_eq!(name(stroke(&rnl_render::Stroke { style: v.clone(), ..s.clone() }).style), v);
-        }
         for v in style("cap") {
             assert_eq!(name(stroke(&rnl_render::Stroke { cap: v.clone(), ..s.clone() }).cap), v);
         }
         for v in style("join") {
             assert_eq!(name(stroke(&rnl_render::Stroke { join: v.clone(), ..s.clone() }).join), v);
         }
-        let double = stroke(&rnl_render::Stroke { style: "double".into(), ..s.clone() });
-        assert_eq!((stroke(&s).inner, double.inner), (None, Some(Color("#ffffff".into()))));
+        // a stroke reads back as it was, in either unit
+        for pixels in [true, false] {
+            let s = rnl_render::Stroke { pixels, ..s.clone() };
+            assert_eq!(back_stroke(&stroke(&s)), s);
+        }
         let t = rnl_render::TextPrim {
             anchor: (0.0, 0.0),
             lines: Vec::new(),
@@ -525,7 +522,7 @@ mod tests {
             let r = crate::interpret(&f, None, &Disk, &Options::default()).unwrap();
             assert_eq!(d.levels.len(), r.model.levels.len(), "{f}");
             for (level, lv) in d.levels.iter().zip(&r.model.levels) {
-                let want = rnl_render::primitives(&with_page_ids(lv));
+                let want = rnl_render::primitives(&with_page_ids(lv), &RenderOptions::default());
                 let prims = level.primitives.as_ref().unwrap();
                 // the same primitives, kind by kind
                 let json = serde_json::to_value(prims).unwrap();
@@ -535,7 +532,7 @@ mod tests {
                 let read: Vec<Primitive> = serde_json::from_str(&serde_json::to_string(prims).unwrap()).unwrap();
                 assert!(read == *prims, "{f}: {}", level.title);
                 let read: Vec<rnl_render::Primitive> = read.iter().map(back).collect();
-                assert!(read == want.iter().map(drawn).collect::<Vec<_>>(), "{f}: {}", level.title);
+                assert!(read == want, "{f}: {}", level.title);
                 // the SVG written from them is the level's
                 let svg = rnl_render::svg_document(&read, &RenderOptions::default());
                 assert!(Some(svg) == level.svg, "{f}: {}", level.title);
@@ -571,16 +568,15 @@ mod tests {
                         named += 1;
                         shared += usize::from(prims.iter().filter(|q| q.owner == owner).count() > 1);
                     }
-                    let (stroke, fill, color) = match &p.shape {
-                        Shape::Path { stroke, fill, .. }
-                        | Shape::Rect { stroke, fill, .. }
-                        | Shape::Circle { stroke, fill, .. }
-                        | Shape::Ellipse { stroke, fill, .. } => (stroke.as_ref(), fill.as_ref(), None),
-                        Shape::Text(t) => (None, None, Some(&t.color)),
-                        Shape::Flyline { .. } => (None, None, None),
+                    let (strokes, fill, color) = match &p.shape {
+                        Shape::Path { strokes, fill, .. }
+                        | Shape::Rect { strokes, fill, .. }
+                        | Shape::Circle { strokes, fill, .. }
+                        | Shape::Ellipse { strokes, fill, .. } => (&strokes[..], fill.as_ref(), None),
+                        Shape::Text(t) => (&[][..], None, Some(&t.color)),
+                        Shape::Flyline { strokes, .. } => (&strokes[..], None, None),
                     };
-                    let strokes = stroke.into_iter().flat_map(|s| std::iter::once(&s.color).chain(&s.inner));
-                    for Color(c) in strokes.chain(fill).chain(color) {
+                    for Color(c) in strokes.iter().map(|s| &s.color).chain(fill).chain(color) {
                         let digits = c.strip_prefix('#').unwrap_or_default();
                         let ok = [3, 4, 6, 8].contains(&digits.len()) && digits.chars().all(|c| c.is_ascii_hexdigit());
                         assert!(ok, "{f}: {c}");
@@ -592,8 +588,8 @@ mod tests {
         assert!(named > 100 && shared > 0 && opacities > 0, "{named} {shared} {opacities}");
     }
 
-    /// The SVG draws lines and places texts as the types' documentation says (`Stroke`,
-    /// `LineStyle`, `Shape`, `Text`, `VAlign`, `Run`, `RunStyle`), so that a frontend can draw as
+    /// The SVG draws lines and places texts as the types' documentation says (`Shape`, `Stroke`,
+    /// `Unit`, `Cap`, `Join`, `Text`, `VAlign`, `Run`, `RunStyle`), so that a frontend can draw as
     /// it does. When the SVG writer changes, so does the documentation.
     #[test]
     fn the_svg_draws_as_the_types_say() {
@@ -608,64 +604,78 @@ mod tests {
             };
             rnl_render::svg_document(&[p], &o)
         };
-        let stroke = |width: f64, style: &str| rnl_render::Stroke {
-            color: "#102030".into(),
-            width,
-            style: style.into(),
-            cap: "square".into(),
-            join: "bevel".into(),
-            inner: "#405060".into(),
+        let stroke = |color: &str, width: f64, unit: Unit, dashes: &[f64], dash_offset: f64, cap: Cap, join: Join| {
+            Stroke { color: Color(color.into()), width, unit, dashes: dashes.to_vec(), dash_offset, cap, join }
         };
-        let path: fn(rnl_render::Stroke) -> Kind = |s| Kind::Path {
-            segs: vec![PathSeg::Move((0.0, 0.0)), PathSeg::Line((1.0, 0.0))],
-            stroke: Some(s),
-            fill: None,
-        };
-        let others: [fn(rnl_render::Stroke) -> Kind; 3] = [
-            |s| Kind::Rect { min: (0.0, 0.0), max: (1.0, 1.0), stroke: Some(s), fill: None },
-            |s| Kind::Circle { c: (0.0, 0.0), r: 1.0, stroke: Some(s), fill: None },
-            |s| Kind::Ellipse { c: (0.0, 0.0), rx: 1.0, ry: 2.0, stroke: Some(s), fill: None },
+        // filled, and stroked with each of its strokes in turn; SVG starts the outline of a rect at
+        // its x and y, the corner of lowest x and highest y, along the top side, and those of a
+        // circle and an ellipse at cx + r, all clockwise on the screen
+        type Stroked = fn(Vec<rnl_render::Stroke>) -> Kind;
+        let shapes: [(&str, Stroked); 4] = [
+            ("<path d=\"M0.00,-0.00 L14.00,-0.00\"", |strokes| Kind::Path {
+                segs: vec![PathSeg::Move((0.0, 0.0)), PathSeg::Line((1.0, 0.0))],
+                strokes,
+                fill: Some("#eeeeee".into()),
+            }),
+            ("<rect x=\"0.00\" y=\"-28.00\" width=\"14.00\" height=\"28.00\"", |strokes| Kind::Rect {
+                min: (0.0, 0.0),
+                max: (1.0, 2.0),
+                strokes,
+                fill: Some("#eeeeee".into()),
+            }),
+            ("<circle cx=\"0.00\" cy=\"-0.00\" r=\"14.00\"", |strokes| Kind::Circle {
+                c: (0.0, 0.0),
+                r: 1.0,
+                strokes,
+                fill: Some("#eeeeee".into()),
+            }),
+            ("<ellipse cx=\"0.00\" cy=\"-0.00\" rx=\"14.00\" ry=\"28.00\"", |strokes| Kind::Ellipse {
+                c: (0.0, 0.0),
+                rx: 1.0,
+                ry: 2.0,
+                strokes,
+                fill: Some("#eeeeee".into()),
+            }),
         ];
-        for width in [0.0, 0.05, 0.2] {
-            // w, the width in pixels, and m, the larger of w and 1
-            let w = if width > 0.0 { width * o.scale } else { 1.2 };
-            let m = w.max(1.0);
-            let line = |w: f64, dashes: &[f64]| {
-                let mut a = format!(
-                    "stroke=\"#102030\" stroke-width=\"{w:.2}\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\""
-                );
-                if !dashes.is_empty() {
-                    let d: Vec<String> = dashes.iter().map(|d| format!("{d:.1}")).collect();
-                    a += &format!(" stroke-dasharray=\"{}\"", d.join(","));
-                }
-                a + "/>"
-            };
-            for (style, want) in [
-                ("solid", line(w, &[])),
-                ("bold", line(2.0 * w, &[])),
-                ("dashed", line(w, &[4.0 * m, 3.0 * m])),
-                ("dotted", line(w, &[m, 2.5 * m])),
-                ("dash-dot", line(w, &[5.0 * m, 2.0 * m, m, 2.0 * m])),
-            ] {
-                for shape in std::iter::once(path).chain(others) {
-                    let svg = svg(shape(stroke(width, style)));
-                    assert!(svg.contains(&want), "{style} {width}: {svg}");
-                }
-            }
-            // "double" on a path: the colour 3d wide under the inner colour d wide, with SVG's own
-            // caps and joins, butt and miter
-            let d = width.max(0.12) * o.scale;
-            let double = svg(path(stroke(width, "double")));
-            assert!(double.contains(&format!("stroke=\"#102030\" stroke-width=\"{:.2}\"/>", 3.0 * d)), "{double}");
-            assert!(double.contains(&format!("stroke=\"#405060\" stroke-width=\"{d:.2}\"/>")), "{double}");
-            assert!(!double.contains("stroke-linecap") && !double.contains("stroke-linejoin"), "{double}");
-            // and as "solid" on the other shapes
-            for shape in others {
-                assert_eq!(svg(shape(stroke(width, "double"))), svg(shape(stroke(width, "solid"))));
+        for unit in [Unit::Scene, Unit::Pixel] {
+            // a length in pixels of the SVG: scene units times the scale, pixels as they are
+            let px = |x: f64| if unit == Unit::Scene { x * o.scale } else { x };
+            let dashed = stroke("#102030", 0.75, unit, &[0.5, 0.25, 0.125, 0.25], 0.375, Cap::Square, Join::Bevel);
+            let round = stroke("#405060", 0.25, unit, &[], 0.0, Cap::Round, Join::Round);
+            // butt caps, miter joins and no offset are what SVG draws when it is not told
+            let plain = stroke("#506070", 0.5, unit, &[0.5, 0.5], 0.0, Cap::Butt, Join::Miter);
+            let want = [
+                format!(
+                    "stroke=\"#102030\" stroke-width=\"{:.2}\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-dasharray=\"{:.1},{:.1},{:.1},{:.1}\" stroke-dashoffset=\"{:.1}\"/>",
+                    px(0.75),
+                    px(0.5),
+                    px(0.25),
+                    px(0.125),
+                    px(0.25),
+                    px(0.375)
+                ),
+                format!("stroke=\"#405060\" stroke-width=\"{:.2}\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", px(0.25)),
+                format!("stroke=\"#506070\" stroke-width=\"{:.2}\" stroke-dasharray=\"{:.1},{:.1}\"/>", px(0.5), px(0.5), px(0.5)),
+            ];
+            let strokes: Vec<rnl_render::Stroke> = [dashed, round, plain].iter().map(back_stroke).collect();
+            for (head, shape) in shapes {
+                let drawn = svg(shape(strokes.clone()));
+                let elements: Vec<&str> = drawn.lines().filter(|l| l.starts_with(head)).collect();
+                assert_eq!(elements.len(), 1, "{drawn}");
+                // the shape once for each stroke, the first with the fill
+                let fills = ["#eeeeee", "none", "none"];
+                let want: String = fills.iter().zip(&want).map(|(f, w)| format!("{head} fill=\"{f}\" {w}")).collect();
+                assert_eq!(elements[0], want);
+                // with no strokes, no outline
+                let fill = svg(shape(Vec::new()));
+                assert!(fill.contains(&format!("{head} fill=\"#eeeeee\" stroke=\"none\"/>")), "{fill}");
             }
         }
-        let flyline = svg(Kind::Flyline { a: (0.0, 0.0), b: (1.0, 0.0) });
-        assert!(flyline.contains("stroke=\"#8a8a8a\" stroke-width=\"1\" stroke-dasharray=\"4,3\""), "{flyline}");
+        // a flyline as a line, its numbers written short
+        let flyline = stroke("#8a8a8a", 1.0, Unit::Pixel, &[4.0, 3.0], 0.0, Cap::Butt, Join::Miter);
+        let flyline = svg(Kind::Flyline { a: (0.0, 0.0), b: (1.0, 0.0), strokes: vec![back_stroke(&flyline)] });
+        let want = "<line x1=\"0.00\" y1=\"-0.00\" x2=\"14.00\" y2=\"-0.00\" stroke=\"#8a8a8a\" stroke-width=\"1\" stroke-dasharray=\"4,3\"/>";
+        assert!(flyline.contains(want), "{flyline}");
 
         // texts of size 1, with a font that the SVG falls back from
         let (fs, lh) = (o.scale, 1.15 * o.scale);

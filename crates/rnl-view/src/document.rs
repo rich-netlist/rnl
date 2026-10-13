@@ -397,8 +397,8 @@ impl<'a> Index<'a> {
     /// The drawing of a level, as `options` ask, and what on it can be clicked.
     fn level(&mut self, lv: &LevelView, options: &BuildOptions) -> Level {
         let lv = &with_page_ids(lv);
-        let prims = rnl_render::primitives(lv);
         let render = rnl_render::RenderOptions::default();
+        let prims = rnl_render::primitives(lv, &render);
         let px = |p: Pt| [p.0 * render.scale, -p.1 * render.scale];
         let mut hits = Vec::new();
         for it in &lv.items {
