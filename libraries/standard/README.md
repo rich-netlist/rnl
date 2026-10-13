@@ -7,7 +7,7 @@ The standard packages of the RNL language draft 0.2. Both are drafts: the conten
 | [`rnl-std.rnl`](rnl-std.rnl) | `rnl-std` 0.2 | Used implicitly at the root of every document: styles, symbols, semantic and layout definitions, virtual elements (ground, supply, port, no-connect, junction, current arrow), the sets that decide where ground, supply and port symbols are filled in, and the default rules that give symbols and styles. |
 | [`rnl-zh.rnl`](rnl-zh.rnl) | `rnl-zh` 0.2 | Chinese aliases of the standard words and of the standard package's names. A file loads it with `@USE-ALIASES(name="rnl-zh", version="0.2")` in its header record. |
 
-The `rnl` command bundles both, so a document can use them without a package directory.
+The core interface [`rnl-view`](../../crates/rnl-view/README.md) bundles both, so the `rnl` command and the viewers can use them without a package directory.
 
 ## Symbols
 

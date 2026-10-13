@@ -9,7 +9,7 @@ RNL is a proposed way to attach circuit meaning and presentation information to 
 | Path | Intended responsibility |
 | --- | --- |
 | [`spec/`](spec/README.md) | RNL principles and syntax drafts; the only maintained location for language work. |
-| [`crates/`](crates/README.md) | Rust runtime, SPICE and Spectre host adapters, shared renderer, and CLI; the solver is future work. |
+| [`crates/`](crates/README.md) | Rust runtime, SPICE and Spectre host adapters, shared renderer, the core interface for viewers, and CLI; the solver is future work. |
 | [`bindings/`](bindings/README.md) | Separate runtime and solver WASM entry points. |
 | [`packages/`](packages/README.md) | TypeScript SDKs and framework independent viewer/editor cores. |
 | [`apps/`](apps/README.md) | Desktop viewer; future web application. |
