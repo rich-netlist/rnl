@@ -35,8 +35,9 @@ async function start() {
   openSource(await shell.initial(), false);
 }
 
+// a shell may reject with a plain message, as Tauri's invoke does
 start().catch((e) => {
-  $("empty").textContent = e.message;
+  $("empty").textContent = e instanceof Error ? e.message : String(e);
 });
 
 // A handle for tests and the console, which cannot see into the modules.
