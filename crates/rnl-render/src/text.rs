@@ -156,7 +156,7 @@ impl Face {
 }
 
 /// The size and the baseline's shift of a run `level` levels away from where its size is `s`.
-fn level(level: i32, s: f64) -> (f64, f64) {
+fn script(level: i32, s: f64) -> (f64, f64) {
     let (mut size, mut shift) = (s, 0.0);
     for _ in 0..level.unsigned_abs() {
         shift += if level > 0 { RAISE * size } else { -DROP * size };
@@ -207,11 +207,11 @@ impl Lay {
         runs.iter()
             .map(|r| match r {
                 Run::Text { text, style } => {
-                    let (size, _) = level(i32::from(style.level) - base, s);
+                    let (size, _) = script(i32::from(style.level) - base, s);
                     self.face(style.bold).width(text) * size
                 }
                 Run::Frac { num, den, style } => {
-                    let (size, _) = level(i32::from(style.level) - base, s);
+                    let (size, _) = script(i32::from(style.level) - base, s);
                     let small = size * FRAC_SIZE;
                     let base = i32::from(style.level);
                     self.width(num, base, small).max(self.width(den, base, small)) + FRAC_SPACE * size
@@ -226,7 +226,7 @@ impl Lay {
         for r in runs {
             match r {
                 Run::Text { text, style } => {
-                    let (size, shift) = level(i32::from(style.level) - base, s);
+                    let (size, shift) = script(i32::from(style.level) - base, s);
                     let face = self.face(style.bold);
                     let width = face.width(text) * size;
                     if style.overline {
@@ -238,7 +238,7 @@ impl Lay {
                     u += width;
                 }
                 Run::Frac { num, den, style } => {
-                    let (size, shift) = level(i32::from(style.level) - base, s);
+                    let (size, shift) = script(i32::from(style.level) - base, s);
                     let (v, small, base) = (v + shift, size * FRAC_SIZE, i32::from(style.level));
                     let (wn, wd) = (self.width(num, base, small), self.width(den, base, small));
                     let w = wn.max(wd) + FRAC_SPACE * size;

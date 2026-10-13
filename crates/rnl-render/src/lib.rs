@@ -432,8 +432,9 @@ impl Out {
         }
     }
 
-    /// A text at an anchor (9.2.5, 13.6): the box sits by the alignment and turns with `rotate`
-    /// and the instance's orientation, but the glyphs always read upright.
+    /// A text at an anchor (9.2.5, 13.6), laid out with the shipped fonts' metrics: the box sits by
+    /// the alignment and turns with `rotate` and the instance's orientation, but the glyphs always
+    /// read upright.
     #[allow(clippy::too_many_arguments)]
     fn text(
         &mut self,

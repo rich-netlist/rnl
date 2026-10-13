@@ -700,9 +700,10 @@ mod tests {
         assert!(named > 100 && shared > 0 && opacities > 0, "{named} {shared} {opacities}");
     }
 
-    /// The SVG draws lines and places texts as the types' documentation says (`Shape`, `Stroke`,
-    /// `Unit`, `Cap`, `Join`, `Text`, `VAlign`, `Run`, `RunStyle`), so that a frontend can draw as
-    /// it does. When the SVG writer changes, so does the documentation.
+    /// The SVG draws lines and texts, and the renderer lays out texts, as the types' documentation
+    /// says (`Shape`, `Stroke`, `Unit`, `Cap`, `Join`, `Text`, `TextRun`, `Bar`, `VAlign`, `Run`,
+    /// `RunStyle`), so that a frontend can draw as the SVG does. When the SVG writer or the layout
+    /// changes, so does the documentation.
     #[test]
     fn the_svg_draws_as_the_types_say() {
         let o = RenderOptions::default();
@@ -926,7 +927,10 @@ mod tests {
         let t = laid("x^{y^{z}}_{i}", "baseline", 1.0);
         let levels: Vec<(f64, f64)> = t.runs.iter().map(|r| (r.size, r.at[1])).collect();
         let want = [(1.0, 0.0), (0.7, 0.35), (0.49, 0.35 + 0.35 * 0.7), (0.7, -0.15)];
-        assert!(levels.iter().zip(want).all(|(a, b)| close(a.0, b.0) && close(a.1, b.1)), "{levels:?}");
+        assert!(
+            levels.len() == 4 && levels.iter().zip(want).all(|(a, b)| close(a.0, b.0) && close(a.1, b.1)),
+            "{levels:?}"
+        );
         assert!(close(t.runs[1].at[0], regular.width("x")) && close(t.runs[1].width, 0.7 * regular.width("y")));
         // a fraction and its bar, and an overline
         let t = laid("\\frac{ab}{c}\\overline{d}", "baseline", 1.0);
@@ -934,7 +938,10 @@ mod tests {
         let w = wn + 0.15;
         let places: Vec<[f64; 3]> = t.runs.iter().map(|r| [r.at[0], r.at[1], r.size]).collect();
         let want = [[(w - wn) / 2.0, 0.72, 0.8], [(w - wd) / 2.0, -0.42, 0.8], [w, 0.0, 1.0]];
-        assert!(places.iter().zip(want).all(|(a, b)| (0..3).all(|k| close(a[k], b[k]))), "{places:?}");
+        assert!(
+            places.len() == 3 && places.iter().zip(want).all(|(a, b)| (0..3).all(|k| close(a[k], b[k]))),
+            "{places:?}"
+        );
         let bars: Vec<[f64; 5]> = t
             .bars
             .iter()
@@ -942,7 +949,7 @@ mod tests {
             .collect();
         let d = w + regular.width("d");
         let want = [[0.06, 0.3, w - 0.06, 0.3, 0.06], [w, 0.88, d, 0.88, 0.06]];
-        assert!(bars.iter().zip(want).all(|(a, b)| (0..5).all(|k| close(a[k], b[k]))), "{bars:?}");
+        assert!(bars.len() == 2 && bars.iter().zip(want).all(|(a, b)| (0..5).all(|k| close(a[k], b[k]))), "{bars:?}");
         assert!(t.bars.iter().all(|b| b.stroke.cap == Cap::Butt && b.stroke.unit == Unit::Scene), "{t:?}");
         // at least 0.8 pixels wide
         let t = laid("\\frac{a}{b}", "baseline", 0.5);
