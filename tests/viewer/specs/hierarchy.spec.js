@@ -44,14 +44,29 @@ test("the tree lists the instances under the top level and opens their levels", 
   await expect(twisty).toHaveAttribute("aria-expanded", "false");
   await twisty.click();
   await expect(rows).toHaveCount(4);
-  // so does a double click on the row
-  await row("0").dblclick();
-  await expect(rows).toHaveCount(1);
   await expect(page.locator("#level-name")).toHaveText(TOP);
   // opening a level below a folded branch unfolds it again
+  await twisty.click();
+  await expect(rows).toHaveCount(1);
   await page.locator("#index .index-row", { hasText: "rdiv" }).click();
   await expect(rows).toHaveCount(4);
   await expect(row("0/2")).toHaveClass(/\bactive\b/);
+});
+
+test("a double click on the top row folds and unfolds the tree", async ({ browserName, page, viewer }) => {
+  // A row's click draws the tree again, so the row that the second click of a double click pressed
+  // is out of the page when the dblclick comes. Chromium and WebKit still send it there, and that
+  // row's listener folds the tree; Firefox sends none (hierarchy.js, treeRow).
+  test.fail(browserName === "firefox", "Firefox sends no dblclick to a row that its click took out of the page");
+  await viewer.open("04-hierarchy");
+  await page.locator("#tab-hierarchy").click();
+  const rows = page.locator("#tree .tree-row");
+  await expect(rows).toHaveCount(4);
+  await rows.first().dblclick();
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator("#level-name")).toHaveText(TOP);
+  await rows.first().dblclick();
+  await expect(rows).toHaveCount(4);
 });
 
 test("the index lists the subcircuits under their initials and opens them", async ({ page, viewer }) => {
@@ -104,7 +119,6 @@ test("the search narrows the index; Enter opens the first match and Escape empti
   await search.press("Escape");
   await viewer.selected(`instance X3 in ${TOP}`);
 });
-
 
 test.describe("with a subcircuit for each initial", () => {
   /** The subcircuits under an initial, "#" for those that start with no letter. */
