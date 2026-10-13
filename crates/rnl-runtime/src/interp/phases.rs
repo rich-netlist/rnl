@@ -498,15 +498,17 @@ impl Interp<'_> {
             }
         }
         let mut targets: Vec<(ObjId, [Option<f64>; 2])> = Vec::new();
+        let mut target_at: HashMap<ObjId, usize> = HashMap::new();
         for key in &best_order {
             let (_, _, k) = best[key];
             let FactData::Coord(axis, v) = at[k].data else { continue };
             let i = if axis == 'x' { 0 } else { 1 };
-            match targets.iter_mut().find(|(o, _)| *o == key.0) {
-                Some(t) => t.1[i] = Some(v),
+            match target_at.get(&key.0) {
+                Some(&t) => targets[t].1[i] = Some(v),
                 None => {
                     let mut xy = [None, None];
                     xy[i] = Some(v);
+                    target_at.insert(key.0, targets.len());
                     targets.push((key.0, xy));
                 }
             }

@@ -48,20 +48,26 @@ impl Interp<'_> {
         self.scenes[s].layer.get(&o).map(|(l, _)| Layer::parse(l)).unwrap_or_default()
     }
 
-    fn key_of(&self, s: SceneId, o: ObjId) -> Vec<f64> {
+    /// Where the latest symbol of each object of a scene is given.
+    fn last_symbol_pos(&self, s: SceneId) -> HashMap<ObjId, Pos> {
+        let mut out: HashMap<ObjId, Pos> = HashMap::new();
+        for f in &self.scenes[s].appear {
+            if out.get(&f.target).is_none_or(|p| f.pos > *p) {
+                out.insert(f.target, f.pos.clone());
+            }
+        }
+        out
+    }
+
+    /// The key that orders an object among those drawn; `last_symbol` is what `last_symbol_pos` gives.
+    fn key_of(&self, s: SceneId, o: ObjId, last_symbol: &HashMap<ObjId, Pos>) -> Vec<f64> {
         let sc = &self.scenes[s];
         match self.o(o) {
             ObjData::Inst { .. } => vec![0.0, self.inst_of(o).order as f64],
             ObjData::Bundle { members, .. } => vec![0.0, self.inst_of(members[0]).order as f64],
             ObjData::Usage(_) => {
-                let p = sc
-                    .appear
-                    .iter()
-                    .filter(|f| f.target == o)
-                    .map(|f| f.pos.clone())
-                    .max()
-                    .or_else(|| sc.created.get(&o).cloned())
-                    .unwrap_or_else(|| pos(&[9]));
+                let p =
+                    last_symbol.get(&o).cloned().or_else(|| sc.created.get(&o).cloned()).unwrap_or_else(|| pos(&[9]));
                 let mut k = vec![1.0];
                 k.extend(flat(&p));
                 k
@@ -233,6 +239,7 @@ impl Interp<'_> {
         let mut table: HashMap<ObjId, usize> = HashMap::new();
         let mut symbols: Vec<SymbolView> = Vec::new();
         let mut items = Vec::new();
+        let last_symbol = self.last_symbol_pos(s);
         let mut drawn: Vec<ObjId> = self.inst_like(s).into_iter().filter(|o| !self.bundle_empty(*o)).collect();
         for &a in &self.scenes[s].usages {
             let u = self.usage(a);
@@ -279,7 +286,7 @@ impl Interp<'_> {
                 orient: self.orientation(s, o),
                 style: self.style_of(s, o),
                 layer: self.layer_of(s, o),
-                order: self.key_of(s, o),
+                order: self.key_of(s, o, &last_symbol),
                 texts,
                 host,
                 pin_nets,
@@ -299,7 +306,7 @@ impl Interp<'_> {
                 mode,
                 style: self.style_of(s, w),
                 layer: self.layer_of(s, w),
-                order: self.key_of(s, w),
+                order: self.key_of(s, w, &last_symbol),
             });
         }
         let mut flylines = Vec::new();
@@ -329,7 +336,7 @@ impl Interp<'_> {
                 params,
                 style: self.style_of(s, p),
                 layer: self.layer_of(s, p),
-                order: self.key_of(s, p),
+                order: self.key_of(s, p, &last_symbol),
             });
         }
         let mut texts = Vec::new();
@@ -363,7 +370,7 @@ impl Interp<'_> {
                 orient,
                 style: self.style_of(s, t),
                 layer,
-                order: self.key_of(s, t),
+                order: self.key_of(s, t, &last_symbol),
             });
         }
         let mut constraints = Vec::new();
