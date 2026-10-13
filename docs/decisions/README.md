@@ -14,3 +14,4 @@ Decisions made before this log started, including those from the first architect
 | [0004](0004-contribution-terms.md) | Contributions are licensed under the path's license, without sign-off or CLA | accepted |
 | [0005](0005-github-organization.md) | The repository lives in the `rich-netlist` GitHub organization | accepted |
 | [0006](0006-shared-core-per-platform-frontends.md) | One shared Rust core decides the drawing; frontends are per platform | accepted |
+| [0007](0007-fonts-shipped-with-the-core.md) | The core ships Noto Sans SC and lays out text with its metrics | accepted |

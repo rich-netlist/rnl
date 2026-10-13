@@ -1,6 +1,6 @@
 # Builds the web viewer in apps/web: the core as WebAssembly with its JavaScript modules, and the page
-# of apps/viewer-ui with the web shell, assembled into a static site; checks its scripts, and that the
-# site is served with the MIME types a browser needs.
+# of apps/viewer-ui with the web shell and its web fonts, assembled into a static site; checks its
+# scripts, and that the site is served with the MIME types a browser needs.
 name: Web viewer
 
 on:
@@ -12,6 +12,7 @@ on:
       - "bindings/**"
       - "crates/**"
       - "libraries/**"
+      - "scripts/fonts.py"
       - "tests/conformance/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -23,6 +24,7 @@ on:
       - "bindings/**"
       - "crates/**"
       - "libraries/**"
+      - "scripts/fonts.py"
       - "tests/conformance/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -46,6 +48,13 @@ jobs:
         run: |
           node --version
           find apps/web apps/viewer-ui bindings/runtime-wasm/js \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n 1 node --check
+      - name: Install Python for the web fonts
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # downloads the pinned fonts and writes apps/viewer-ui/fonts/, the drawing's web fonts
+      - name: Write the web fonts
+        run: pip install fonttools brotli && python scripts/fonts.py web
       - name: Build the site, with the samples
         run: node apps/web/build.mjs --samples
       - name: Serve the site
@@ -58,5 +67,7 @@ jobs:
           test "$(served core/rnl_runtime_wasm.wasm)" = "application/wasm"
           test "$(served commands.json)" = "application/json"
           test "$(served style.css)" = "text/css; charset=utf-8"
+          test "$(served fonts/fonts.css)" = "text/css; charset=utf-8"
+          test "$(served fonts/noto-sans-sc-400-latin.woff2)" = "font/woff2"
           test "$(served samples/cases/04-hierarchy-lib.inc)" = "application/octet-stream"
           if curl -fs -o /dev/null http://127.0.0.1:8000/shells/desktop.js; then echo "the desktop shell is in the site"; exit 1; fi

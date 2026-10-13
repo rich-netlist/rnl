@@ -1,5 +1,7 @@
 // Build the web viewer: a static site in apps/web/dist/, which git ignores, with the page of
-// apps/viewer-ui and the core as WebAssembly with its JavaScript modules in core/:
+// apps/viewer-ui, its web fonts in fonts/ when python scripts/fonts.py web has written them, the
+// fonts' licence in fonts/OFL.txt in any case, and the core as WebAssembly with its JavaScript
+// modules in core/:
 //
 //   node apps/web/build.mjs [--no-core] [--samples]
 //
@@ -8,7 +10,7 @@
 // the viewer with ?url=samples/cases/04-hierarchy.sp and for tests.
 
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -42,9 +44,23 @@ if (!existsSync(join(core, "rnl_runtime_wasm.wasm"))) {
 rmSync(out, { recursive: true, force: true });
 
 // The page, but what only Node and the desktop viewer read: the README, the package.json that makes
-// Node read the scripts as modules, and the desktop shell.
+// Node read the scripts as modules, and the desktop shell. Its fonts/ comes with it.
 const leftOut = new Set(["README.md", "package.json", join("shells", "desktop.js")]);
 cpSync(page, out, { recursive: true, filter: (from) => !leftOut.has(relative(page, from)) });
+const fonts = existsSync(join(out, "fonts", "fonts.css"));
+if (!fonts) {
+  console.warn("no web fonts in apps/viewer-ui/fonts/, so texts fall back on sans-serif: write them with python scripts/fonts.py web");
+}
+// The core lays out texts with the fonts' metrics, which are under the fonts' licence (decision
+// 0007), so the site carries it, with their copyright as scripts/fonts.py writes it, even without
+// the fonts.
+const licence = join(out, "fonts", "OFL.txt");
+if (!existsSync(licence)) {
+  const copyright = "Copyright 2014-2021 Adobe (http://www.adobe.com/). Noto is a trademark of Google Inc.";
+  const ofl = readFileSync(join(root, "LICENSES", "OFL-1.1.txt"), "utf8").replace(/\r\n/g, "\n");
+  mkdirSync(dirname(licence), { recursive: true });
+  writeFileSync(licence, `${copyright}\n\n${ofl}`);
+}
 
 // The core, which the web shell imports from core/client.js, without the package.json for Node.
 cpSync(core, join(out, "core"), { recursive: true, filter: (from) => relative(core, from) !== "package.json" });
@@ -80,3 +96,7 @@ const kib = (n) => `${(n / 1024).toFixed(0)} KiB`;
 console.log(out);
 const packed = gzipSync(wasm, { level: 9 }).length;
 console.log(`${all.length} files, ${kib(bytes)}; the core ${kib(wasm.length)}, ${kib(packed)} gzip-compressed`);
+if (fonts) {
+  const font = all.filter((f) => f.startsWith("fonts/"));
+  console.log(`the web fonts: ${font.length} files, ${kib(font.reduce((n, f) => n + statSync(join(out, f)).size, 0))}`);
+}

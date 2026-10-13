@@ -1,5 +1,6 @@
-# Builds and tests the Rust workspace: formatting, lints and tests on three platforms; and the core
-# for WebAssembly, whose Documents must be those of the native build (decision 0006).
+# Builds and tests the Rust workspace: formatting, lints and tests on three platforms; the core for
+# WebAssembly, whose Documents must be those of the native build (decision 0006); and checks that the
+# renderer's font metrics are those of the shipped fonts (decision 0007).
 name: Rust
 
 on:
@@ -11,6 +12,7 @@ on:
       - "libraries/**"
       - "tests/**"
       - "!tests/viewer/**"
+      - "scripts/fonts.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rustfmt.toml"
@@ -22,6 +24,7 @@ on:
       - "libraries/**"
       - "tests/**"
       - "!tests/viewer/**"
+      - "scripts/fonts.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rustfmt.toml"
@@ -74,3 +77,16 @@ jobs:
         run: |
           node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl
           node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl --view --primitives --request '{"primitives": true}'
+
+  fonts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install fontTools
+        run: pip install fonttools
+      # downloads the pinned fonts and fails when crates/rnl-render/fonts/ is not what they give
+      - name: The renderer's font metrics are those of the shipped fonts
+        run: python scripts/fonts.py metrics --check

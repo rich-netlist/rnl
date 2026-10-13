@@ -1,13 +1,22 @@
 //! The SVG backend: primitives in scene units (y up) to an SVG document (y down). It writes the
-//! strokes as the renderer resolved them and decides nothing about how a line looks.
+//! strokes as the renderer resolved them and decides nothing about how a line looks, and the runs
+//! of a text where the renderer laid them out, in the shipped fonts (decision 0007).
 
 use std::fmt::Write;
 
 use rnl_runtime::geom::Pt;
-use rnl_runtime::markup::Run;
 
-use crate::text::{run_width, FRAC_SIZE};
+use crate::text::{FAMILY, SLANT};
 use crate::{Kind, PathSeg, Primitive, RenderOptions, Stroke, TextPrim};
+
+/// The font families of the texts after the shipped one: the same design under the names it is
+/// installed by (the full Noto Sans CJK, and Adobe's Source Han Sans), then sans-serif.
+const FALLBACK: &str = "Noto Sans CJK SC, Source Han Sans SC, sans-serif";
+/// Nothing that changes the advances: no kerning, no ligatures, no trimming of the space between
+/// full-width punctuation (which an installed Noto Sans CJK or Source Han Sans would do), and no
+/// space added between ideographs and letters.
+const TEXT_STYLE: &str =
+    "font-kerning:none;font-variant-ligatures:none;text-spacing-trim:space-all;text-autospace:no-autospace";
 
 fn esc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -173,122 +182,46 @@ impl W {
         }
     }
 
-    fn tspan(r: &Run, fs: f64) -> String {
-        let Run::Text { text, style } = r else { return String::new() };
-        let mut attrs = Vec::new();
-        if style.level != 0 {
-            attrs.push(format!("font-size=\"{:.2}\"", fs * 0.7));
-            attrs.push(format!("baseline-shift=\"{}\"", if style.level > 0 { "super" } else { "sub" }));
-        }
-        if style.bold {
-            attrs.push("font-weight=\"bold\"".into());
-        }
-        if style.italic {
-            attrs.push("font-style=\"italic\"".into());
-        }
-        if style.overline {
-            attrs.push("text-decoration=\"overline\"".into());
-        }
-        if attrs.is_empty() {
-            esc(text)
-        } else {
-            format!("<tspan {}>{}</tspan>", attrs.join(" "), esc(text))
-        }
-    }
-
+    /// A text as the renderer laid it out: each run a `text` element at the start of its baseline,
+    /// held to its width with textLength, turned a quarter about that point when the text is
+    /// vertical, and leaning when italic; the bars as lines. Each element keeps its spaces with an
+    /// xml:space of its own: Chrome and WebKit collapse the spaces of a `text` element, those at
+    /// its ends included, whatever its ancestors say.
     fn text(&self, t: &TextPrim) -> String {
-        let (x, y) = self.px(t.anchor);
-        let fs = t.size * self.s;
-        let n = t.lines.len() as f64;
-        let lh = fs * 1.15;
-        let first = match t.valign.as_str() {
-            "baseline" => 0.0,
-            "top" => fs * 0.8,
-            "bottom" => -(n - 1.0) * lh - fs * 0.2,
-            _ => fs * 0.35 - (n - 1.0) * lh / 2.0,
-        };
-        let weight = if t.bold { " font-weight=\"bold\"" } else { "" };
-        let style = if t.italic { " font-style=\"italic\"" } else { "" };
-        let family = format!("{}, sans-serif", esc(&t.font)); // the font is a hint (9.3)
-        let rot = if t.vertical { " rotate(-90)" } else { "" };
-        if t.lines.iter().flatten().any(|r| matches!(r, Run::Frac { .. })) {
-            return self.text_with_fractions(t, x, y, fs, first, lh, &family, &format!("{weight}{style}"), rot);
-        }
-        let mut body = String::new();
-        for (k, runs) in t.lines.iter().enumerate() {
-            let spans: String = runs.iter().map(|r| Self::tspan(r, fs)).collect();
-            let _ = write!(body, "<tspan x=\"0\" dy=\"{:.2}\">{spans}</tspan>", if k == 0 { first } else { lh });
-        }
-        format!(
-            "<text transform=\"translate({x:.2},{y:.2}){rot}\" font-size=\"{fs:.2}\" font-family=\"{family}\" fill=\"{}\" text-anchor=\"{}\"{weight}{style}>{body}</text>",
-            esc(&t.color),
-            esc(&t.halign)
-        )
-    }
-
-    /// A line holding `\frac` (13.6). SVG has no text layout, so the pieces are placed by estimated
-    /// widths and each piece is held to its width with textLength; numerator and denominator are
-    /// centred over a bar as wide as the wider of them.
-    #[allow(clippy::too_many_arguments)]
-    fn text_with_fractions(
-        &self,
-        t: &TextPrim,
-        x: f64,
-        y: f64,
-        fs: f64,
-        first: f64,
-        lh: f64,
-        family: &str,
-        font_attrs: &str,
-        rot: &str,
-    ) -> String {
-        let mut out = format!(
-            "<g transform=\"translate({x:.2},{y:.2}){rot}\" fill=\"{}\" font-family=\"{family}\"{font_attrs}>",
-            esc(&t.color)
-        );
-        let small = fs * FRAC_SIZE;
-        let held = |runs: &[Run], x: f64, y: f64, size: f64, anchor: &str| -> String {
-            let w: f64 = runs.iter().map(run_width).sum::<f64>() * size;
-            if w <= 0.0 {
-                return String::new();
+        let mut out = String::new();
+        for r in &t.runs {
+            let (x, y) = self.px(r.at);
+            let mut turn = Vec::new();
+            if t.vertical {
+                turn.push(format!("rotate(-90 {x:.2} {y:.2})"));
             }
-            let spans: String = runs.iter().map(|r| Self::tspan(r, size)).collect();
-            format!(
-                "<text x=\"{x:.2}\" y=\"{y:.2}\" font-size=\"{size:.2}\" text-anchor=\"{anchor}\" textLength=\"{w:.2}\" lengthAdjust=\"spacingAndGlyphs\">{spans}</text>"
-            )
-        };
-        for (k, runs) in t.lines.iter().enumerate() {
-            let yb = first + k as f64 * lh;
-            let total: f64 = runs.iter().map(run_width).sum::<f64>() * fs;
-            let mut cx = match t.halign.as_str() {
-                "middle" => -total / 2.0,
-                "end" => -total,
-                _ => 0.0,
-            };
-            for r in runs {
-                let w = run_width(r) * fs;
-                match r {
-                    Run::Frac { num, den, .. } => {
-                        let mid = cx + w / 2.0;
-                        out.push_str(&held(num, mid, yb - fs * 0.72, small, "middle"));
-                        let _ = write!(
-                            out,
-                            "<line x1=\"{:.2}\" y1=\"{:.2}\" x2=\"{:.2}\" y2=\"{:.2}\" stroke=\"{}\" stroke-width=\"{:.2}\"/>",
-                            cx + fs * 0.06,
-                            yb - fs * 0.3,
-                            cx + w - fs * 0.06,
-                            yb - fs * 0.3,
-                            esc(&t.color),
-                            (fs * 0.06).max(0.8)
-                        );
-                        out.push_str(&held(den, mid, yb + fs * 0.42, small, "middle"));
-                    }
-                    _ => out.push_str(&held(std::slice::from_ref(r), cx, yb, fs, "start")),
-                }
-                cx += w;
+            if r.italic {
+                // a point h above the baseline moves forward by SLANT·h
+                turn.push(format!("matrix(1 0 {:.2} 1 {:.2} 0)", -SLANT, SLANT * y));
             }
+            let _ = write!(
+                out,
+                "<text x=\"{x:.2}\" y=\"{y:.2}\" font-size=\"{:.2}\"{}{} textLength=\"{:.2}\" lengthAdjust=\"spacingAndGlyphs\" fill=\"{}\" xml:space=\"preserve\">{}</text>",
+                r.size * self.s,
+                if r.bold { " font-weight=\"bold\"" } else { "" },
+                if turn.is_empty() { String::new() } else { format!(" transform=\"{}\"", turn.join(" ")) },
+                r.width * self.s,
+                esc(&t.color),
+                esc(&r.text)
+            );
         }
-        out.push_str("</g>");
+        for b in &t.bars {
+            let (a, c) = (self.px(b.a), self.px(b.b));
+            let _ = write!(
+                out,
+                "<line x1=\"{:.2}\" y1=\"{:.2}\" x2=\"{:.2}\" y2=\"{:.2}\" {}/>",
+                a.0,
+                a.1,
+                c.0,
+                c.1,
+                self.stroke_attrs(&b.stroke, false)
+            );
+        }
         out
     }
 }
@@ -305,8 +238,10 @@ pub fn svg_document(prims: &[Primitive], o: &RenderOptions) -> String {
     let x1 = prims.iter().map(|p| p.bbox[2]).fold(f64::MIN, f64::max) + pad;
     let y1 = prims.iter().map(|p| p.bbox[3]).fold(f64::MIN, f64::max) + pad;
     let (vw, vh) = ((x1 - x0) * o.scale, (y1 - y0) * o.scale);
+    // texts in the shipped family, or one with the same metrics, with nothing that changes the
+    // advances
     let mut s = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{vw:.0}\" height=\"{vh:.0}\" viewBox=\"{:.2} {:.2} {vw:.2} {vh:.2}\">",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{vw:.0}\" height=\"{vh:.0}\" viewBox=\"{:.2} {:.2} {vw:.2} {vh:.2}\" font-family=\"{FAMILY}, {FALLBACK}\" style=\"{TEXT_STYLE}\">",
         x0 * o.scale,
         -y1 * o.scale
     );

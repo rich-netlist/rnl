@@ -20,12 +20,21 @@ node apps/web/build.mjs
 
 builds the core with [`bindings/runtime-wasm/build.mjs`](../../bindings/runtime-wasm/README.md#building) and puts the site into `apps/web/dist/`, which git ignores: the page from `apps/viewer-ui` without its README, its `package.json` and the desktop shell; the binding's modules and the WebAssembly module in `core/`; and `about.json`, the version of the workspace and the commit for the About box. It needs Rust with the `wasm32-unknown-unknown` target and Node 18 or later, and no npm packages.
 
+The page's `fonts/`, the drawing's web fonts ([decision 0007](../../docs/decisions/0007-fonts-shipped-with-the-core.md)), comes with it when it is there. Write it first, with Python 3, fontTools and brotli:
+
+```bash
+pip install fonttools brotli
+python scripts/fonts.py web
+```
+
+Without it the build says so, and the drawing falls back on the fonts installed on the computer ([Fonts](../viewer-ui/README.md#fonts)).
+
 | Option | |
 | --- | --- |
 | `--no-core` | Take the core as `bindings/runtime-wasm/build.mjs` last built it, without building it again. |
 | `--samples` | Copy the conformance corpus's [`cases`](../../tests/conformance/README.md) and `equivalence` files into `samples/`, for trying the viewer and for tests. |
 
-The site is 25 files and 1.36 MB, of which the core is 1.22 MB, 412 KB gzip-compressed; the samples add 0.70 MB.
+The site is 26 files and 1.36 MB, the licence of the fonts' metrics in `fonts/OFL.txt` among them, of which the core is 1.22 MB, 412 KB gzip-compressed; the web fonts add 232 files and 17.6 MB, of which a browser downloads only the slices a drawing uses, and the samples 0.70 MB.
 
 ## Serving
 
@@ -41,7 +50,8 @@ Any static host serves the site: copy `dist/` as it is, at the root or under a p
 
 - JavaScript (`.js`) as `text/javascript`: the page and the core's Worker are ES modules, which a browser runs only with a JavaScript type;
 - `style.css` as `text/css` and the page as `text/html`;
-- the core (`.wasm`) as `application/wasm`, so that the browser compiles it while it downloads; with another type it is compiled once downloaded.
+- the core (`.wasm`) as `application/wasm`, so that the browser compiles it while it downloads; with another type it is compiled once downloaded;
+- the web fonts (`.woff2`) as `font/woff2`.
 
 The core's module Worker must come from the page's own origin, so `core/` stays next to the page. A netlist opened by URL from another origin can only be read when that server allows the site's origin with CORS headers.
 

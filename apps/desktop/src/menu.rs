@@ -161,12 +161,19 @@ pub fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     Menu::with_items(app, &items)
 }
 
+/// The About box. Its copyright, which every platform shows, is the notice of the fonts the drawing
+/// is in, which the app embeds with the page (decision 0007, OFL 2).
 fn about() -> AboutMetadata<'static> {
     AboutMetadata {
         name: Some("RNL Viewer".into()),
         version: Some(env!("CARGO_PKG_VERSION").into()),
         comments: Some(
             "Draws netlists with Rich Netlist (RNL) records. It only reads: it neither edits nor solves.".into(),
+        ),
+        copyright: Some(
+            "Texts are drawn in Noto Sans SC, copyright 2014-2021 Adobe (http://www.adobe.com/), under the SIL Open \
+             Font License 1.1 (https://openfontlicense.org)."
+                .into(),
         ),
         ..Default::default()
     }
@@ -263,6 +270,15 @@ mod tests {
             ("&Help".to_string(), vec![Shown::About("&About RNL Viewer".into())]),
         ];
         assert_eq!(menus, expected);
+    }
+
+    /// The About box names the fonts the app embeds, their copyright and their licence.
+    #[test]
+    fn the_about_box_names_the_fonts_and_their_licence() {
+        let notice = about().copyright.unwrap_or_default();
+        for part in ["Noto Sans SC", "copyright 2014-2021 Adobe", "SIL Open Font License 1.1"] {
+            assert!(notice.contains(part), "{notice}");
+        }
     }
 
     /// Separators stand only between two items, whichever items a platform leaves out.

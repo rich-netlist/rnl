@@ -3,8 +3,10 @@
 //! and a bounding box; an output backend then writes them, here as SVG.
 //!
 //! The renderer draws what the model says and nothing more. Its defaults (colours, line width,
-//! font, the pin names) are this implementation's own choices (principle 2.7, 9.3), and so is how
-//! it draws a line style: it resolves each into strokes, which every output draws as they are.
+//! the pin names) are this implementation's own choices (principle 2.7, 9.3), and so is how it
+//! draws a line style: it resolves each into strokes, which every output draws as they are. It lays
+//! out texts with the metrics of the fonts shipped with the core (decision 0007), in runs at their
+//! places and bars as strokes, which every output draws as they are in those fonts.
 //!
 //! Sines, cosines and arc tangents come from `libm`, a math library in Rust, so that native and
 //! WebAssembly builds compute the same bits (decision 0006).
@@ -19,7 +21,7 @@ use rnl_runtime::markup::{self, Line};
 use rnl_runtime::model::{Layer, LevelView, Style, SymbolView};
 
 pub use svg::svg_document;
-pub use text::{line_width, text_width};
+pub use text::{lay_out, Face};
 
 /// Options of the drawing.
 #[derive(Clone, Debug)]
@@ -110,14 +112,15 @@ pub enum Kind {
     },
 }
 
-/// A laid-out text: the anchor and the direction it reads in.
+/// A text at an anchor, and how `lay_out` laid it out: its runs and bars.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextPrim {
     pub anchor: Pt,
     pub lines: Vec<Line>,
-    /// Text height in scene units.
+    /// Text height, the em of the font, in scene units.
     pub size: f64,
     pub color: String,
+    /// The font the style names, a hint (9.3): the text is laid out in the shipped family.
     pub font: String,
     pub bold: bool,
     pub italic: bool,
@@ -127,6 +130,31 @@ pub struct TextPrim {
     pub valign: String,
     /// Reads from bottom to top.
     pub vertical: bool,
+    pub runs: Vec<TextRun>,
+    pub bars: Vec<TextBar>,
+}
+
+/// A run of a laid-out text: `text` in one face and size from `at`, the start of its baseline.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextRun {
+    pub text: String,
+    pub at: Pt,
+    /// The em in scene units.
+    pub size: f64,
+    /// The sum of its characters' advances, in scene units.
+    pub width: f64,
+    /// In the bold face.
+    pub bold: bool,
+    /// Leaning by `SLANT`, with the upright advances.
+    pub italic: bool,
+}
+
+/// A straight line of a laid-out text, a fraction's bar or an overline, from `a` to `b`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextBar {
+    pub a: Pt,
+    pub b: Pt,
+    pub stroke: Stroke,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -404,8 +432,9 @@ impl Out {
         }
     }
 
-    /// A text at an anchor (9.2.5, 13.6): the box sits by the alignment and turns with `rotate`
-    /// and the instance's orientation, but the glyphs always read upright.
+    /// A text at an anchor (9.2.5, 13.6), laid out with the shipped fonts' metrics: the box sits by
+    /// the alignment and turns with `rotate` and the instance's orientation, but the glyphs always
+    /// read upright.
     #[allow(clippy::too_many_arguments)]
     fn text(
         &mut self,
@@ -449,23 +478,7 @@ impl Out {
                 h => h.into(),
             };
         }
-        // a rough extent for the bounding box
-        let width = lines.iter().map(text::line_width).fold(0.0, f64::max) * size;
-        let n = lines.len() as f64;
-        let hgt = n * size * 1.15;
-        let (lo, hi) = match halign.as_str() {
-            "middle" => (-width / 2.0, width / 2.0),
-            "end" => (-width, 0.0),
-            _ => (0.0, width),
-        };
-        let has_frac = lines.iter().flatten().any(|r| matches!(r, markup::Run::Frac { .. }));
-        let hgt = if has_frac { (n + 0.8) * size * 1.15 } else { hgt };
-        let pts = if vertical {
-            [(anchor.0 - hgt, anchor.1 + lo), (anchor.0 + hgt, anchor.1 + hi)]
-        } else {
-            [(anchor.0 + lo, anchor.1 - hgt), (anchor.0 + hi, anchor.1 + hgt)]
-        };
-        let t = TextPrim {
+        let mut t = TextPrim {
             anchor,
             lines,
             size,
@@ -476,8 +489,11 @@ impl Out {
             halign,
             valign,
             vertical,
+            runs: Vec::new(),
+            bars: Vec::new(),
         };
-        self.push(owner, layer, sub(&order, 0.9), Kind::Text(t), &pts);
+        let [x0, y0, x1, y1] = lay_out(&mut t, self.scale);
+        self.push(owner, layer, sub(&order, 0.9), Kind::Text(t), &[(x0, y0), (x1, y1)]);
     }
 
     #[allow(clippy::too_many_arguments)]

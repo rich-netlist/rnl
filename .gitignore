@@ -9,3 +9,6 @@ target/
 node_modules/
 dist/
 coverage/
+
+# Web fonts written by scripts/fonts.py web
+apps/viewer-ui/fonts/
