@@ -1,0 +1,2 @@
+# Font metrics written by scripts/fonts.py, read as bytes by the renderer
+crates/rnl-render/fonts/*.metrics binary
