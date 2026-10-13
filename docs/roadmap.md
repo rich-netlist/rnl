@@ -30,6 +30,7 @@ This is the central TODO list. A checked box means work present in this reposito
 - [x] Implement the Rust runtime and the SPICE and Spectre host adapters for language draft 0.2, without a solver: constraints are checked against the written coordinates and unplaced objects are reported.
 - [x] Implement the shared renderer (primitives and SVG) and the draft standard package with its symbols ([`libraries/standard/`](../libraries/standard/README.md)); every symbol writes its box.
 - [ ] Add standard symbols for the elements that still lack one (J, F, H, B and others).
+- [ ] Make reading SPICE and Spectre netlists linear in their size. Each reader looks for an element's name among all the elements of its level read before it, so reading 32,000 resistors takes about 1.6 s instead of 0.05 s; the SPICE reader also looks ahead over all the comment lines that follow a pending statement.
 - [x] Add the CLI: check, render, dump, and strip generated records.
 - [x] Add a desktop viewer that opens a netlist, draws its levels, shows the netlist text and its diagnostics, follows a selected instance or net between the drawing and the text, and moves and zooms the view ([`apps/desktop/`](../apps/desktop/README.md)). It calls the Rust runtime directly through Tauri; it does not edit or solve.
 - [x] Measure the desktop viewer's startup: on Windows 11 the first drawing appears after 0.6 to 1.0 s, most of it the WebView engine starting.
