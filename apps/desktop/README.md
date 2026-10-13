@@ -38,7 +38,7 @@ cargo tauri build
 | --- | --- |
 | `src/main.rs` | The Tauri application: the menu bar, and the commands to open a file, ask for a file, read the file named on the command line, and set the View menu's check marks. |
 | `src/document.rs` | Reading a file into what the page shows: one SVG per level with what on it can be clicked, the source files with the places of their records, the instances and nets of every level with the places that name them, and the diagnostics. The references in the records come from the runtime (`Interpretation::refs`), so aliases, scopes and subscripts are resolved as the language says. |
-| `ui/` | The page: plain HTML, CSS and JavaScript with no build step. It moves the view by changing the SVG's `viewBox` and finds what a click hits from the boxes, pins and wires `document.rs` gives. |
+| [`../viewer-ui/`](../viewer-ui/) | The page, in a directory of its own so that the web viewer can share it: plain HTML, CSS and JavaScript with no build step. It moves the view by changing the SVG's `viewBox` and finds what a click hits from the boxes, pins and wires `document.rs` gives. |
 | `tauri.conf.json`, `capabilities/` | The window, the content security policy, and what the page may call. |
 | `icons/` | The application icon. |
 
