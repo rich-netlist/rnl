@@ -1,6 +1,7 @@
 // The core in a module Worker: it loads core.js and the module next to it, and answers each message
-// { id, request } with { id, document } or { id, error }, in the order they came. It runs in browsers
-// and, for the tests, as a Node worker thread.
+// { id, request } with { id, document } or { id, error }, in the order they came. The request is an
+// object or, as client.js sends it, its JSON text. It runs in browsers and, for the tests, as a Node
+// worker thread.
 
 import { loadCore } from "./core.js";
 

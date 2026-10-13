@@ -18,12 +18,28 @@
  * The core, loaded.
  *
  * @typedef {object} Core
- * @property {(request: Request) => object} build Build the Document of a request. Throws an Error with
- *   the core's message when there is none, such as when the entry is not among the files.
+ * @property {(request: Request | string) => object} build Build the Document of a request, given as
+ *   an object or as the JSON text `requestText` makes of one. Throws an Error with the core's message
+ *   when there is none, such as when the entry is not among the files.
  */
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+const REPLACEMENT = String.fromCharCode(0xfffd);
+
+/**
+ * A request as the JSON text the core reads: what JSON.stringify makes of it, so that functions
+ * are left out and a Proxy is read through. A lone surrogate, which JSON.stringify writes as an
+ * escape the core refuses, becomes U+FFFD, as TextEncoder makes it.
+ *
+ * @param {Request} request
+ * @returns {string}
+ */
+export function requestText(request) {
+  // escapes are read one at a time, so that an escaped backslash is not taken for the start of one
+  const escape = /\\(?:u(d[89a-f][0-9a-f]{2})|[^])/g;
+  return (JSON.stringify(request) ?? "null").replace(escape, (e, lone) => (lone ? REPLACEMENT : e));
+}
 
 /**
  * Load the core.
@@ -52,7 +68,7 @@ export async function loadCore(wasm) {
   function build(request) {
     if (!instance) throw new Error("The core is starting again after a failure; build again in a moment.");
     const exports = instance.exports;
-    const bytes = encoder.encode(JSON.stringify(request));
+    const bytes = encoder.encode(typeof request === "string" ? request : requestText(request));
     let answer;
     try {
       const at = exports.rnl_request(bytes.length) >>> 0;

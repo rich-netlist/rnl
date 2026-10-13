@@ -13,8 +13,9 @@
 // given with it, as a frontend does.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -43,7 +44,7 @@ if (!existsSync(rnl) && existsSync(`${rnl}.exe`)) rnl = `${rnl}.exe`;
 if (!existsSync(rnl)) fail(`${rnl} is not there: build it with \`cargo build -p rnl-cli\`, or give --rnl`);
 if (!existsSync(join(dist, "rnl_runtime_wasm.wasm"))) fail(`${dist} has no core: run build.mjs, or give --dist`);
 const { loadCore } = await import(pathToFileURL(join(dist, "core.js")));
-const { collect } = await import(pathToFileURL(join(dist, "client.js")));
+const { collect, decodeText } = await import(pathToFileURL(join(dist, "client.js")));
 const core = await loadCore(pathToFileURL(join(dist, "rnl_runtime_wasm.wasm")));
 
 const entries = [];
@@ -52,6 +53,12 @@ for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "
   entries.push(...names.sort().map((name) => join(root, dir, name)));
 }
 if (entries.length < 20) fail(`only ${entries.length} files found under ${root}`);
+// and a file that is not UTF-8, which rnl reads as Latin-1
+const temp = mkdtempSync(join(tmpdir(), "rnl-equality-"));
+process.on("exit", () => rmSync(temp, { recursive: true, force: true }));
+const [micro, degree, c1] = [0xb5, 0xb0, 0x80].map((c) => String.fromCharCode(c));
+entries.push(join(temp, "latin1.sp"));
+writeFileSync(entries.at(-1), Buffer.from(`* 10${micro}s at 25${degree}C ${c1}\nR1 a 0 1k\n.end\n`, "latin1"));
 
 const packages = {};
 for (const dir of extra.package_dirs ?? []) {
@@ -65,7 +72,7 @@ let builds = 0;
 for (const entry of entries) {
   const want = native(entry);
   const [got, read] = await webAssembly(entry);
-  const name = relative(root, entry).replaceAll("\\", "/");
+  const name = (entry.startsWith(temp) ? relative(temp, entry) : relative(root, entry)).replaceAll("\\", "/");
   const d = difference(want, got, "");
   if (d) {
     differ++;
@@ -105,10 +112,7 @@ async function webAssembly(entry) {
   }
 }
 
-/**
- * A file's text as `rnl` reads it (FsProvider): UTF-8 without a byte order mark, or Latin-1 when it
- * is not UTF-8; null when it cannot be read.
- */
+/** A file's text as `rnl` reads it, decoded by client.js's decodeText; null when it cannot be read. */
 async function readText(path) {
   let bytes;
   try {
@@ -116,12 +120,7 @@ async function readText(path) {
   } catch {
     return null;
   }
-  try {
-    const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
-    return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-  } catch {
-    return bytes.toString("latin1");
-  }
+  return decodeText(bytes);
 }
 
 /**

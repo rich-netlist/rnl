@@ -2,12 +2,15 @@
 // page, and the files a document needs, collected through the frontend's own reading. In Node the
 // Worker is a worker thread.
 
+import { requestText } from "./core.js";
+
 /**
  * The core, running in a Worker.
  *
  * @typedef {object} CoreWorker
  * @property {(request: import("./core.js").Request) => Promise<object>} build Build the Document of a
- *   request; rejects with an Error with the core's message when there is none.
+ *   request; rejects with an Error with the core's message when there is none. The request is sent
+ *   as the JSON text `requestText` makes of it, so it is read as loadCore's build reads it.
  * @property {() => void} terminate Stop the Worker; builds still waiting, and later ones, reject.
  */
 
@@ -44,10 +47,26 @@ export function startCore(options = {}) {
   return {
     build(request) {
       if (stopped) return Promise.reject(stopped);
+      let text;
+      try {
+        text = requestText(request);
+      } catch (e) {
+        return Promise.reject(e);
+      }
       const id = next++;
       return new Promise((resolve, reject) => {
         waiting.set(id, { resolve, reject });
-        worker.then((w) => w.postMessage({ id, request }), () => {});
+        worker.then(
+          (w) => {
+            try {
+              w.postMessage({ id, request: text });
+            } catch (e) {
+              waiting.delete(id);
+              reject(e);
+            }
+          },
+          () => {},
+        );
       });
     },
     terminate() {
@@ -84,7 +103,7 @@ async function spawn(url, receive, stop) {
  *   from startCore, or from core.js's loadCore.
  * @param {import("./core.js").Request} request What to build; its `files` are the files known so far.
  * @param {(path: string) => Promise<string | null>} read Read a file by the path the core asked for:
- *   its text, or null when there is none.
+ *   its text, or null when there is none. `decodeText` makes the text of its bytes as rnl does.
  * @returns {Promise<{ document: object, files: Record<string, string> }>} The last Document, and the
  *   files it was built from.
  */
@@ -107,5 +126,27 @@ export async function collect(core, request, read) {
     document = await core.build({ ...request, files });
     wanted = document.missing.filter((path) => !tried.has(path));
     if (wanted.length === 0) return { document, files };
+  }
+}
+
+/**
+ * A file's text, from its bytes, as rnl reads a file: UTF-8 without a byte order mark, or Latin-1,
+ * each byte the character of that code, when it is not UTF-8. A frontend that reads bytes, from a
+ * fetch or a dropped file, decodes them with this, so that its Documents are the CLI's and the
+ * desktop viewer's.
+ *
+ * @param {BufferSource} bytes
+ * @returns {string}
+ */
+export function decodeText(bytes) {
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  } catch {
+    // not TextDecoder's "latin1", which is windows-1252
+    const b = ArrayBuffer.isView(bytes) ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength) : new Uint8Array(bytes);
+    let text = "";
+    for (let k = 0; k < b.length; k += 0x8000) text += String.fromCharCode(...b.subarray(k, k + 0x8000));
+    return text;
   }
 }
