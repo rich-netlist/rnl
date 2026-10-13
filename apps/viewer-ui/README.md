@@ -34,8 +34,22 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `dialog.js` | Dialogs in the page's style for what a shell asks: one of a list, with a filter; a line of text; a message. They are modal: the page's keys and its menu bar wait while one is shown. |
 | `util.js` | Small helpers for building the page. |
 | `commands.json` | The command table. |
+| `fonts/` | The drawing's web fonts, which [`scripts/fonts.py`](../../scripts/README.md) writes and git ignores (see [Fonts](#fonts)). |
 
 The modules import each other in cycles. At its top level a module only looks up its elements, keeps its own state and adds listeners; it calls nothing of another module there, so no imported binding is read before its module has run.
+
+## Fonts
+
+The core lays out the drawing's texts with the metrics of Noto Sans SC Regular and Bold ([decision 0007](../../docs/decisions/0007-fonts-shipped-with-the-core.md)), and the SVG names that family first. `fonts/` holds the two faces as web fonts for the page: WOFF2 files split by Unicode ranges, so that a browser downloads only the slices a drawing uses (Latin with the symbols of the markup, the other symbols, the CJK punctuation, the 3755 common hanzi of GB 2312 in slices of 50, its 3008 others in slices of 250, and the rest in slices of 1000 code points); `fonts.css`, which `index.html` links, with their `@font-face` rules; and `OFL.txt`, their licence. Write them with Python 3, [fontTools](https://github.com/fonttools/fonttools) and brotli:
+
+```bash
+pip install fonttools brotli
+python scripts/fonts.py web
+```
+
+It downloads the pinned fonts into `target/fonts/` first. The page works without `fonts/`: the drawing then takes the family under the names it is installed by (Noto Sans CJK SC, Source Han Sans SC), or else sans-serif, each run still where the core placed it and as wide. The desktop app embeds `fonts/` with the page, and the web viewer's build copies it into the site.
+
+The slices of both faces are 17.3 MB in all; the Latin slice of the regular face is 45 KB, and `fonts.css` is 229 KB, 69 KB gzip-compressed. A drawing with a few Chinese labels downloads a few hundred KB: corpus case 15, with 9 hanzi on its drawing, 205 KB in 11 slices (Latin, CJK punctuation and 9 of hanzi); case 14, with 23, 379 KB in 23 slices.
 
 ## The shell
 
