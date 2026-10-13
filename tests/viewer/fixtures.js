@@ -57,10 +57,19 @@ export const CONTINUED = {
   ],
 };
 
-/** Build the rnl command and return its path. */
+/**
+ * Build the rnl command and return its path, in the target directory that cargo builds into, which
+ * CARGO_TARGET_DIR or cargo's configuration may move.
+ */
 export function buildRnl() {
   execFileSync("cargo", ["build", "-p", "rnl-cli"], { cwd: root, stdio: "inherit" });
-  return path.join(root, "target", "debug", process.platform === "win32" ? "rnl.exe" : "rnl");
+  const metadata = execFileSync("cargo", ["metadata", "--format-version", "1", "--no-deps"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1 << 26,
+  });
+  const target = JSON.parse(metadata).target_directory;
+  return path.join(target, "debug", process.platform === "win32" ? "rnl.exe" : "rnl");
 }
 
 /** The Document of a file as `rnl view` prints it, the file named relative to `cwd`. */
