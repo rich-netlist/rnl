@@ -18,6 +18,6 @@ options:
 
 Without a solver, `render` draws only what has coordinates. `check` says what is missing: after the diagnostics it prints, for each drawing level, how many objects have no position and how many constraints hold, need a solver to move something, or could not be checked. `view` prints the Document of [`rnl-view`](../rnl-view/README.md), what the desktop viewer shows, for tools and for comparing builds. The standard packages in [`libraries/standard`](../../libraries/standard/README.md) are built into the command through `rnl-view`; this crate adds the files and package directories on disk (`FsProvider`).
 
-The crate's integration tests run the [conformance corpus](../../tests/conformance/README.md) and the writeback round trips.
+The crate's integration tests run the [conformance corpus](../../tests/conformance/README.md) and the writeback round trips, and build the Document over the disk as the desktop viewer does: by absolute paths, with the files read by `FsProvider`.
 
 See the [roadmap](../../docs/roadmap.md) for planned work.
