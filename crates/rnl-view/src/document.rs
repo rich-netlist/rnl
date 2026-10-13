@@ -12,7 +12,7 @@ use rnl_runtime::diag::{Diag, Sink};
 use rnl_runtime::geom::{Orient, Pt};
 use rnl_runtime::host::{file_name, HostDocument, LevelKind};
 use rnl_runtime::model::{LevelView, RefTarget};
-use rnl_runtime::source::dirname;
+use rnl_runtime::source::{dirname, relative_to};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
 
@@ -184,10 +184,7 @@ pub struct Diagnostic {
 /// objects to their places. `missing` is [`Document::missing`].
 pub(crate) fn document(entry: &str, r: &Interpretation, missing: Vec<String>, options: &BuildOptions) -> Document {
     let dir = dirname(entry);
-    let shown_file = |file: &str| match file.strip_prefix(&dir).and_then(|f| f.strip_prefix('/')) {
-        Some(rel) if !dir.is_empty() => rel.to_string(),
-        _ => file.to_string(),
-    };
+    let shown_file = |file: &str| relative_to(file, &dir).unwrap_or(file).to_string();
 
     let mut files = source_files(&r.doc, &shown_file);
     for f in &r.failed {
@@ -602,6 +599,44 @@ mod tests {
     #[test]
     fn a_missing_file_is_an_error() {
         assert!(load(&case("no-such-case.sp")).is_err());
+    }
+
+    #[test]
+    fn an_entry_at_the_root_names_its_files_as_one_in_a_directory_does() {
+        // a file beside the entry and one below it, each with a record that refers to nothing, and
+        // an include that is missing; no header record, so the runtime gives a hint at the main
+        // file by its level's file
+        let top = "* top\n.include \"x.inc\"\n.include \"sub/y.inc\"\n.include \"gone.inc\"\nR1 a 0 1k\n* @RNL {#R9 @PLACE(0, 0)}\n.end\n";
+        let x = "* x\n.subckt inner p q\nR2 p q 1k\n* @RNL {#R8 @PLACE(0, 0)}\n.ends\n";
+        let y = "* y\n.subckt lower p q\nR3 p q 1k\n* @RNL {#R7 @PLACE(0, 0)}\n.ends\n";
+        let build = |dir: &str| {
+            let files = rnl_runtime::source::MemoryProvider::new()
+                .with(&format!("{dir}/top.sp"), top)
+                .with(&format!("{dir}/x.inc"), x)
+                .with(&format!("{dir}/sub/y.inc"), y);
+            crate::build(&format!("{dir}/top.sp"), &files, &BuildOptions::default()).unwrap()
+        };
+        let (root, w) = (build(""), build("/w"));
+        let names: Vec<(&str, &str)> = root.files.iter().map(|f| (f.path.as_str(), f.name.as_str())).collect();
+        assert_eq!(names, [("top.sp", "top.sp"), ("x.inc", "x.inc"), ("sub/y.inc", "sub/y.inc")]);
+        assert_eq!(root.missing, ["/gone.inc"]);
+        // every diagnostic is at a line of one of the files, and names it as the file's tab does
+        for x in &root.diagnostics {
+            let file = x.file_index.map(|k| root.files[k].name.as_str());
+            assert!(x.line > 0 && file == Some(x.file.as_str()) && x.full_path == x.file, "{x:?}");
+        }
+        let lines = |d: &Document| d.diagnostics.iter().map(|x| (x.file_index, x.line)).collect::<Vec<_>>();
+        let want = [(0, 4), (0, 2), (0, 6), (0, 1), (1, 4), (1, 2), (2, 4), (2, 2)].map(|(k, line)| (Some(k), line));
+        assert_eq!(lines(&root), want);
+        // the same Document as in a directory, but for the paths that name the entry and what is missing
+        let json = |d: &Document| {
+            let mut v = serde_json::to_value(d).unwrap();
+            v["path"] = serde_json::Value::Null;
+            v["missing"] = serde_json::Value::Null;
+            v
+        };
+        assert_eq!(json(&root), json(&w));
+        assert_eq!((w.path.as_str(), w.missing.as_slice()), ("/w/top.sp", ["/w/gone.inc".to_string()].as_slice()));
     }
 
     #[test]

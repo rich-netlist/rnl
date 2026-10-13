@@ -81,6 +81,16 @@ pub fn dirname(path: &str) -> String {
     }
 }
 
+/// `path` relative to the directory `dir` when it is in it or below, such as `sub/x.inc` for
+/// `/w/sub/x.inc` in `/w`, or `x.inc` for `/x.inc` in the root `/`; None when it is not, or `dir`
+/// is "".
+pub fn relative_to<'a>(path: &'a str, dir: &str) -> Option<&'a str> {
+    if dir.is_empty() {
+        return None;
+    }
+    path.strip_prefix(dir.trim_end_matches('/'))?.strip_prefix('/')
+}
+
 /// `rel` relative to the directory `base`; an absolute `rel` stands alone.
 pub fn join(base: &str, rel: &str) -> String {
     let rel = rel.replace('\\', "/");
@@ -128,6 +138,14 @@ mod tests {
         assert_eq!(join("D:/w", "lib/x.rnl"), "D:/w/lib/x.rnl");
         assert_eq!(dirname("a/b/c.sp"), "a/b");
         assert_eq!(dirname("c.sp"), "");
+        assert_eq!(dirname("/c.sp"), "/");
+        assert_eq!(relative_to("/w/sub/x.inc", "/w"), Some("sub/x.inc"));
+        assert_eq!(relative_to("/x.inc", "/"), Some("x.inc"));
+        assert_eq!(relative_to("/sub/x.inc", &dirname("/top.sp")), Some("sub/x.inc"));
+        assert_eq!(relative_to("D:/w/x.inc", &dirname("D:/w/top.sp")), Some("x.inc"));
+        assert_eq!(relative_to("/wx/a.inc", "/w"), None);
+        assert_eq!(relative_to("/w", "/w"), None);
+        assert_eq!(relative_to("x.inc", ""), None);
     }
 
     #[test]

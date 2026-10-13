@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 use rnl_runtime::diag::{Loc, Sink};
 use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
 use rnl_runtime::records::{scan_run, CarrierLine};
-use rnl_runtime::source::{dirname, join, normalize, Provider};
+use rnl_runtime::source::{dirname, join, normalize, relative_to, Provider};
 
 /// The Spectre dialect: names compare by case; `0` is ground.
 pub fn dialect() -> Dialect {
@@ -294,14 +294,14 @@ struct State {
 }
 
 impl<'a> Reader<'a> {
+    /// A file's name in the document: relative to the main file's directory when it is in it or
+    /// below, the root included, else its path.
     fn display(&self, path: &str) -> String {
         let p = normalize(path);
-        if !self.main_dir.is_empty() {
-            if let Some(rest) = p.strip_prefix(&format!("{}/", self.main_dir)) {
-                return rest.to_string();
-            }
+        match relative_to(&p, &self.main_dir) {
+            Some(rest) => rest.to_string(),
+            None => p,
         }
-        p
     }
 
     /// Read one file. `section`: read only this library section.
@@ -890,5 +890,26 @@ mod tests {
         assert_eq!(names, vec!["R1", "r1"]);
         assert_eq!(doc.main().instances[1].order, 1);
         assert_eq!(doc.levels[1].instances.len(), 1);
+    }
+
+    #[test]
+    fn files_are_named_relative_to_the_main_file_at_the_root_too() {
+        // a file beside the main file and one below it, each with RNL in a library section not selected
+        let top = "// top\nsimulator lang=spectre\ninclude \"x.scs\" section=tt\ninclude \"sub/y.scs\" section=tt\n";
+        let lib = "library models\nsection ff\n// @RNL {#X}\nendsection ff\nsection tt\nendsection tt\nendlibrary\n";
+        for dir in ["", "/w"] {
+            let p = MemoryProvider::new()
+                .with(&format!("{dir}/top.scs"), top)
+                .with(&format!("{dir}/x.scs"), lib)
+                .with(&format!("{dir}/sub/y.scs"), lib);
+            let mut sink = Sink::new();
+            let doc = read(&format!("{dir}/top.scs"), &p, &mut sink).unwrap();
+            let sources: Vec<&str> = doc.sources.iter().map(|(f, _)| f.as_str()).collect();
+            assert_eq!(sources, ["top.scs", "x.scs", "sub/y.scs"], "{dir}");
+            let files: Vec<&str> = doc.levels.iter().map(|l| l.file.as_str()).collect();
+            assert_eq!(files, ["top.scs", "x.scs", "sub/y.scs"], "{dir}");
+            let places: Vec<Option<Loc>> = sink.all().iter().map(|d| d.loc.clone()).collect();
+            assert_eq!(places, [Some(Loc::line("x.scs", 3)), Some(Loc::line("sub/y.scs", 3))], "{dir}");
+        }
     }
 }
