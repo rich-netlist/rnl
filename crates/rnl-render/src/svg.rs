@@ -24,6 +24,17 @@ fn esc(s: &str) -> String {
     out
 }
 
+/// The class of a shape's `k`th stroke, from 0: the strokes after the first, such as the narrower
+/// one in the colour between the lines of a double line, are `inner`, so that a viewer that colours
+/// a selected shape's strokes can leave them as they are.
+fn inner(k: usize) -> &'static str {
+    if k == 0 {
+        ""
+    } else {
+        " class=\"inner\""
+    }
+}
+
 struct W {
     s: f64,
 }
@@ -118,7 +129,7 @@ impl W {
         let mut out = String::new();
         for (k, st) in strokes.iter().enumerate() {
             let fill = if k == 0 { Self::fill(fill) } else { "none".into() };
-            let _ = write!(out, "{head} fill=\"{fill}\" {}/>", self.stroke_attrs(st, false));
+            let _ = write!(out, "{head}{} fill=\"{fill}\" {}/>", inner(k), self.stroke_attrs(st, false));
         }
         out
     }

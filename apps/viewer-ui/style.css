@@ -293,8 +293,9 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
   display: block;
 }
 
-/* a selected symbol, wire or ground: its lines and texts in the selection colour */
-.canvas svg g.sel [stroke]:not([stroke="none"]) { stroke: var(--select); }
+/* a selected symbol, wire or ground: its lines and texts in the selection colour, but for the
+   strokes over a shape's first, such as the colour between the lines of a double line */
+.canvas svg g.sel [stroke]:not([stroke="none"]):not(.inner) { stroke: var(--select); }
 .canvas svg g.sel [fill]:not([fill="none"]):not([fill="#ffffff"]):not([fill="white"]) { fill: var(--select); }
 .canvas.sel-sub, .source.sel-sub, .selection.sel-sub {
   --select: var(--sub);
