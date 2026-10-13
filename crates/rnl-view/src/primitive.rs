@@ -4,6 +4,10 @@
 //!
 //! Geometry is in scene units, x to the right and y up, as in the model. The SVG and the hits are
 //! in pixels with y down: a point (x, y) is at (x·scale, −y·scale) there (`Level::scale`).
+//!
+//! The SVG writer still decides how a line style is drawn and where the pieces of a text go. The
+//! types say how, in pixels of the SVG, so that a frontend can draw as the SVG does; a test holds
+//! the SVG writer to what they say.
 
 use rnl_runtime::geom::Pt;
 use rnl_runtime::markup;
@@ -15,8 +19,11 @@ use serde::Serialize;
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct Primitive {
-    /// The object it draws, as `Hit::id` and the SVG's `data-id` name it, such as "item-3" or
-    /// "wire-0"; empty for a shape written in the scene and for a flyline.
+    /// The `data-id` of the SVG group that draws it; empty for a shape written in the scene and
+    /// for a flyline. A symbol's drawing, its pin names included, has its item, such as "item-3",
+    /// and a wire's drawing its wire, such as "wire-0", as `Hit::id` names them. Any other text
+    /// has the name the diagnostics give it, such as "#R1::name" for an instance's name or
+    /// "a text" for a text written in the scene: several texts can share it, and no hit has it.
     pub owner: String,
     pub layer: Layer,
     /// Its place within the layer, compared element by element (11.6).
@@ -41,18 +48,27 @@ pub enum Layer {
 /// lines, arcs and curves (9.2.5), and arrow heads, which are filled triangles; "rect", with its
 /// sides along the axes, by its lowest and highest corners; "circle"; "ellipse", with its axes
 /// along x and y; "text"; "flyline", a line a viewer may show for a connection that is not drawn
-/// yet (13.7), not a wire, by its two ends. The SVG draws a flyline as a thin grey dashed line.
+/// yet (13.7), not a wire, by its two ends. The SVG draws a flyline 1 pixel wide in #8a8a8a, with
+/// dashes 4 pixels long and gaps of 3.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Shape {
-    Path { segments: Vec<Segment>, stroke: Option<Stroke>, fill: Option<String> },
-    Rect { min: [f64; 2], max: [f64; 2], stroke: Option<Stroke>, fill: Option<String> },
-    Circle { center: [f64; 2], r: f64, stroke: Option<Stroke>, fill: Option<String> },
-    Ellipse { center: [f64; 2], rx: f64, ry: f64, stroke: Option<Stroke>, fill: Option<String> },
+    Path { segments: Vec<Segment>, stroke: Option<Stroke>, fill: Option<Color> },
+    Rect { min: [f64; 2], max: [f64; 2], stroke: Option<Stroke>, fill: Option<Color> },
+    Circle { center: [f64; 2], r: f64, stroke: Option<Stroke>, fill: Option<Color> },
+    Ellipse { center: [f64; 2], rx: f64, ry: f64, stroke: Option<Stroke>, fill: Option<Color> },
     Text(Text),
     Flyline { points: [[f64; 2]; 2] },
 }
+
+/// A colour as the language writes it (9.3), which is as CSS does: `#` and 3, 4, 6 or 8
+/// hexadecimal digits of either case, for red, green and blue and then, with 4 or 8, the opacity.
+/// So "#1f4fd81a" is a faint blue; a reader that takes the opacity first, as Qt's and Android's
+/// do, has to move it.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
+pub struct Color(pub String);
 
 /// A piece of a path, by its `kind`: "move" starts a new part of the path at `to`, as every path
 /// starts; "line" goes straight to `to`; "arc" is a circular arc of radius `r` to `to`, the longer
@@ -73,20 +89,24 @@ pub enum Segment {
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct Stroke {
-    pub color: String,
+    pub color: Color,
     /// The width in scene units; 0 is the hairline, the thin line that keeps its width at every
-    /// zoom (9.3).
+    /// zoom (9.3), which the SVG draws 1.2 pixels wide.
     pub width: f64,
     pub style: LineStyle,
     pub cap: Cap,
     pub join: Join,
     /// For a "double" line, the colour between its two lines; null for the other styles.
-    pub inner: Option<String>,
+    pub inner: Option<Color>,
 }
 
-/// A line's style (9.3). Dashes, dots and the gaps between them grow with the width; "double" is
-/// two lines in the colour with the inner colour between them, three times the width in all;
-/// "bold" is twice the width.
+/// A line's style (9.3). The SVG draws it with w, the width in its pixels (1.2 for the hairline),
+/// and m, the larger of w and 1: "solid" is a line w wide; "dashed" has dashes 4m long and gaps of
+/// 3m; "dotted", dots m long and gaps of 2.5m; "dash-dot", a dash of 5m, a gap of 2m, a dot of m
+/// and a gap of 2m; "bold" is a solid line 2w wide. On a path, "double" is a line in the colour 3d
+/// wide under a line in the inner colour d wide, where d is the width in scene units, at least
+/// 0.12, times the scale, with butt caps and miter joins, whatever the stroke's cap and join; a
+/// rectangle, circle or ellipse draws "double" as "solid".
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "kebab-case")]
@@ -99,7 +119,7 @@ pub enum LineStyle {
     Bold,
 }
 
-/// The ends of an open line (9.3).
+/// The ends of an open line and of its dashes (9.3).
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "lowercase")]
@@ -129,8 +149,8 @@ pub struct Text {
     pub lines: Vec<Vec<Run>>,
     /// The text height in scene units; the lines are 1.15 times it apart.
     pub size: f64,
-    pub color: String,
-    /// The font family the style names, a hint (9.3).
+    pub color: Color,
+    /// The font family the style names, a hint (9.3); the SVG falls back on sans-serif.
     pub font: String,
     pub bold: bool,
     pub italic: bool,
@@ -152,8 +172,11 @@ pub enum HAlign {
     End,
 }
 
-/// Where a text's anchor is across its lines: on the first line's baseline, at the top, middle or
-/// bottom.
+/// Where a text's anchor is across its lines: on the first line's baseline, or at the top, middle
+/// or bottom of the lines. Until texts are laid out with the fonts' metrics, the SVG places them
+/// by the size: at the top, the first baseline is 0.8 times the size below the anchor; at the
+/// bottom, the last baseline is 0.2 times the size above it; in the middle, the point halfway
+/// between the first and last baselines is 0.35 times the size below it.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "lowercase")]
@@ -165,7 +188,8 @@ pub enum VAlign {
 }
 
 /// A piece of a line of text in one style (13.6), by its `kind`: "text", or "frac" for
-/// `\frac{…}{…}`, the numerator over the denominator.
+/// `\frac{…}{…}`, the numerator over the denominator. The SVG places the pieces of a line that
+/// holds a fraction by estimated widths, with the numerator and denominator at 0.8 of the size.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -178,7 +202,9 @@ pub enum Run {
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct RunStyle {
-    /// 0 on the line, 1 raised, −1 lowered; nested levels add up.
+    /// How far the run is raised: each `^` it is in adds 1 and each `_` takes 1 away, so the z of
+    /// `x^{y^{z}}` is at 2. The SVG draws a run at any level but 0 at 0.7 of the size, raised once
+    /// when it is above 0 and lowered once when below.
     pub level: i8,
     pub bold: bool,
     pub italic: bool,
@@ -193,18 +219,19 @@ pub(crate) fn primitives(prims: &[rnl_render::Primitive]) -> Vec<Primitive> {
 fn primitive(p: &rnl_render::Primitive) -> Primitive {
     use rnl_render::Kind;
     let stroke = |s: &Option<rnl_render::Stroke>| s.as_ref().map(self::stroke);
+    let color = |c: &Option<String>| c.clone().map(Color);
     let shape = match &p.kind {
         Kind::Path { segs, stroke: s, fill } => {
-            Shape::Path { segments: segs.iter().map(segment).collect(), stroke: stroke(s), fill: fill.clone() }
+            Shape::Path { segments: segs.iter().map(segment).collect(), stroke: stroke(s), fill: color(fill) }
         }
         Kind::Rect { min, max, stroke: s, fill } => {
-            Shape::Rect { min: pt(*min), max: pt(*max), stroke: stroke(s), fill: fill.clone() }
+            Shape::Rect { min: pt(*min), max: pt(*max), stroke: stroke(s), fill: color(fill) }
         }
         Kind::Circle { c, r, stroke: s, fill } => {
-            Shape::Circle { center: pt(*c), r: *r, stroke: stroke(s), fill: fill.clone() }
+            Shape::Circle { center: pt(*c), r: *r, stroke: stroke(s), fill: color(fill) }
         }
         Kind::Ellipse { c, rx, ry, stroke: s, fill } => {
-            Shape::Ellipse { center: pt(*c), rx: *rx, ry: *ry, stroke: stroke(s), fill: fill.clone() }
+            Shape::Ellipse { center: pt(*c), rx: *rx, ry: *ry, stroke: stroke(s), fill: color(fill) }
         }
         Kind::Text(t) => Shape::Text(text(t)),
         Kind::Flyline { a, b } => Shape::Flyline { points: [pt(*a), pt(*b)] },
@@ -256,8 +283,8 @@ fn stroke(s: &rnl_render::Stroke) -> Stroke {
         "bevel" => Join::Bevel,
         _ => Join::Round,
     };
-    let inner = (style == LineStyle::Double).then(|| s.inner.clone());
-    Stroke { color: s.color.clone(), width: s.width, style, cap, join, inner }
+    let inner = (style == LineStyle::Double).then(|| Color(s.inner.clone()));
+    Stroke { color: Color(s.color.clone()), width: s.width, style, cap, join, inner }
 }
 
 /// A text in the view's types. The SVG anchors an unknown alignment at the start along the lines
@@ -278,7 +305,7 @@ fn text(t: &rnl_render::TextPrim) -> Text {
         anchor: pt(t.anchor),
         lines: t.lines.iter().map(|l| l.iter().map(run).collect()).collect(),
         size: t.size,
-        color: t.color.clone(),
+        color: Color(t.color.clone()),
         font: t.font.clone(),
         bold: t.bold,
         italic: t.italic,
@@ -341,14 +368,15 @@ mod tests {
         let pt = |p: [f64; 2]| (p[0], p[1]);
         let stroke = |s: &Option<Stroke>| {
             s.as_ref().map(|s| rnl_render::Stroke {
-                color: s.color.clone(),
+                color: s.color.0.clone(),
                 width: s.width,
                 style: name(s.style),
                 cap: name(s.cap),
                 join: name(s.join),
-                inner: s.inner.clone().unwrap_or_default(),
+                inner: s.inner.clone().map(|c| c.0).unwrap_or_default(),
             })
         };
+        let color = |c: &Option<Color>| c.clone().map(|c| c.0);
         let kind = match &p.shape {
             Shape::Path { segments, stroke: s, fill } => {
                 let segs = segments
@@ -363,22 +391,22 @@ mod tests {
                         Segment::Close => PathSeg::Close,
                     })
                     .collect();
-                Kind::Path { segs, stroke: stroke(s), fill: fill.clone() }
+                Kind::Path { segs, stroke: stroke(s), fill: color(fill) }
             }
             Shape::Rect { min, max, stroke: s, fill } => {
-                Kind::Rect { min: pt(*min), max: pt(*max), stroke: stroke(s), fill: fill.clone() }
+                Kind::Rect { min: pt(*min), max: pt(*max), stroke: stroke(s), fill: color(fill) }
             }
             Shape::Circle { center, r, stroke: s, fill } => {
-                Kind::Circle { c: pt(*center), r: *r, stroke: stroke(s), fill: fill.clone() }
+                Kind::Circle { c: pt(*center), r: *r, stroke: stroke(s), fill: color(fill) }
             }
             Shape::Ellipse { center, rx, ry, stroke: s, fill } => {
-                Kind::Ellipse { c: pt(*center), rx: *rx, ry: *ry, stroke: stroke(s), fill: fill.clone() }
+                Kind::Ellipse { c: pt(*center), rx: *rx, ry: *ry, stroke: stroke(s), fill: color(fill) }
             }
             Shape::Text(t) => Kind::Text(rnl_render::TextPrim {
                 anchor: pt(t.anchor),
                 lines: t.lines.iter().map(|l| l.iter().map(markup_run).collect()).collect(),
                 size: t.size,
-                color: t.color.clone(),
+                color: t.color.0.clone(),
                 font: t.font.clone(),
                 bold: t.bold,
                 italic: t.italic,
@@ -462,7 +490,7 @@ mod tests {
             assert_eq!(name(stroke(&rnl_render::Stroke { join: v.clone(), ..s.clone() }).join), v);
         }
         let double = stroke(&rnl_render::Stroke { style: "double".into(), ..s.clone() });
-        assert_eq!((stroke(&s).inner, double.inner), (None, Some("#ffffff".into())));
+        assert_eq!((stroke(&s).inner, double.inner), (None, Some(Color("#ffffff".into()))));
         let t = rnl_render::TextPrim {
             anchor: (0.0, 0.0),
             lines: Vec::new(),
@@ -516,5 +544,174 @@ mod tests {
             }
         }
         assert!(count > 1000, "{count}");
+    }
+
+    #[test]
+    fn the_owners_and_the_colours_are_as_the_types_say() {
+        let options = BuildOptions { primitives: true, ..BuildOptions::default() };
+        let (mut named, mut shared, mut opacities) = (0, 0, 0);
+        for f in corpus() {
+            let d = crate::build(&f, &Disk, &options).unwrap();
+            for level in &d.levels {
+                let ids: Vec<&str> = level.hits.iter().filter_map(|h| h.id.as_deref()).collect();
+                let prims = level.primitives.as_ref().unwrap();
+                for p in prims {
+                    let owner = p.owner.as_str();
+                    let numbered =
+                        |prefix: &str| owner.strip_prefix(prefix).is_some_and(|k| k.parse::<usize>().is_ok());
+                    let text = matches!(p.shape, Shape::Text(_));
+                    if owner.is_empty() || matches!(p.shape, Shape::Flyline { .. }) {
+                        // a shape written in the scene, or a flyline
+                        assert!(owner.is_empty() && !text, "{f}: {p:?}");
+                    } else if numbered("item-") || numbered("wire-") {
+                        assert!(ids.contains(&owner), "{f}: {owner}");
+                    } else {
+                        // any other text has a name of the diagnostics, which no hit has
+                        assert!(text && !ids.contains(&owner), "{f}: {p:?}");
+                        named += 1;
+                        shared += usize::from(prims.iter().filter(|q| q.owner == owner).count() > 1);
+                    }
+                    let (stroke, fill, color) = match &p.shape {
+                        Shape::Path { stroke, fill, .. }
+                        | Shape::Rect { stroke, fill, .. }
+                        | Shape::Circle { stroke, fill, .. }
+                        | Shape::Ellipse { stroke, fill, .. } => (stroke.as_ref(), fill.as_ref(), None),
+                        Shape::Text(t) => (None, None, Some(&t.color)),
+                        Shape::Flyline { .. } => (None, None, None),
+                    };
+                    let strokes = stroke.into_iter().flat_map(|s| std::iter::once(&s.color).chain(&s.inner));
+                    for Color(c) in strokes.chain(fill).chain(color) {
+                        let digits = c.strip_prefix('#').unwrap_or_default();
+                        let ok = [3, 4, 6, 8].contains(&digits.len()) && digits.chars().all(|c| c.is_ascii_hexdigit());
+                        assert!(ok, "{f}: {c}");
+                        opacities += usize::from(digits.len() == 8);
+                    }
+                }
+            }
+        }
+        assert!(named > 100 && shared > 0 && opacities > 0, "{named} {shared} {opacities}");
+    }
+
+    /// The SVG draws lines and places texts as the types' documentation says (`Stroke`,
+    /// `LineStyle`, `Shape`, `Text`, `VAlign`, `Run`, `RunStyle`), so that a frontend can draw as
+    /// it does. When the SVG writer changes, so does the documentation.
+    #[test]
+    fn the_svg_draws_as_the_types_say() {
+        let o = RenderOptions::default();
+        let svg = |kind: Kind| {
+            let p = rnl_render::Primitive {
+                owner: String::new(),
+                layer: model::Layer::Middle,
+                order: Vec::new(),
+                kind,
+                bbox: [0.0, 0.0, 1.0, 1.0],
+            };
+            rnl_render::svg_document(&[p], &o)
+        };
+        let stroke = |width: f64, style: &str| rnl_render::Stroke {
+            color: "#102030".into(),
+            width,
+            style: style.into(),
+            cap: "square".into(),
+            join: "bevel".into(),
+            inner: "#405060".into(),
+        };
+        let path: fn(rnl_render::Stroke) -> Kind = |s| Kind::Path {
+            segs: vec![PathSeg::Move((0.0, 0.0)), PathSeg::Line((1.0, 0.0))],
+            stroke: Some(s),
+            fill: None,
+        };
+        let others: [fn(rnl_render::Stroke) -> Kind; 3] = [
+            |s| Kind::Rect { min: (0.0, 0.0), max: (1.0, 1.0), stroke: Some(s), fill: None },
+            |s| Kind::Circle { c: (0.0, 0.0), r: 1.0, stroke: Some(s), fill: None },
+            |s| Kind::Ellipse { c: (0.0, 0.0), rx: 1.0, ry: 2.0, stroke: Some(s), fill: None },
+        ];
+        for width in [0.0, 0.05, 0.2] {
+            // w, the width in pixels, and m, the larger of w and 1
+            let w = if width > 0.0 { width * o.scale } else { 1.2 };
+            let m = w.max(1.0);
+            let line = |w: f64, dashes: &[f64]| {
+                let mut a = format!(
+                    "stroke=\"#102030\" stroke-width=\"{w:.2}\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\""
+                );
+                if !dashes.is_empty() {
+                    let d: Vec<String> = dashes.iter().map(|d| format!("{d:.1}")).collect();
+                    a += &format!(" stroke-dasharray=\"{}\"", d.join(","));
+                }
+                a + "/>"
+            };
+            for (style, want) in [
+                ("solid", line(w, &[])),
+                ("bold", line(2.0 * w, &[])),
+                ("dashed", line(w, &[4.0 * m, 3.0 * m])),
+                ("dotted", line(w, &[m, 2.5 * m])),
+                ("dash-dot", line(w, &[5.0 * m, 2.0 * m, m, 2.0 * m])),
+            ] {
+                for shape in std::iter::once(path).chain(others) {
+                    let svg = svg(shape(stroke(width, style)));
+                    assert!(svg.contains(&want), "{style} {width}: {svg}");
+                }
+            }
+            // "double" on a path: the colour 3d wide under the inner colour d wide, with SVG's own
+            // caps and joins, butt and miter
+            let d = width.max(0.12) * o.scale;
+            let double = svg(path(stroke(width, "double")));
+            assert!(double.contains(&format!("stroke=\"#102030\" stroke-width=\"{:.2}\"/>", 3.0 * d)), "{double}");
+            assert!(double.contains(&format!("stroke=\"#405060\" stroke-width=\"{d:.2}\"/>")), "{double}");
+            assert!(!double.contains("stroke-linecap") && !double.contains("stroke-linejoin"), "{double}");
+            // and as "solid" on the other shapes
+            for shape in others {
+                assert_eq!(svg(shape(stroke(width, "double"))), svg(shape(stroke(width, "solid"))));
+            }
+        }
+        let flyline = svg(Kind::Flyline { a: (0.0, 0.0), b: (1.0, 0.0) });
+        assert!(flyline.contains("stroke=\"#8a8a8a\" stroke-width=\"1\" stroke-dasharray=\"4,3\""), "{flyline}");
+
+        // texts of size 1, with a font that the SVG falls back from
+        let (fs, lh) = (o.scale, 1.15 * o.scale);
+        let run = |text: &str, level: i8| markup::Run::Text {
+            text: text.into(),
+            style: markup::RunStyle { level, ..markup::RunStyle::default() },
+        };
+        let text = |lines: Vec<markup::Line>, valign: &str| {
+            svg(Kind::Text(rnl_render::TextPrim {
+                anchor: (0.0, 0.0),
+                lines,
+                size: 1.0,
+                color: "#102030".into(),
+                font: "Serif".into(),
+                bold: false,
+                italic: false,
+                halign: "start".into(),
+                valign: valign.into(),
+                vertical: false,
+            }))
+        };
+        // the first baseline of three lines, below the anchor
+        let n = 3.0;
+        for (valign, first) in [
+            ("baseline", 0.0),
+            ("top", 0.8 * fs),
+            // the last baseline above it
+            ("bottom", -0.2 * fs - (n - 1.0) * lh),
+            // the point halfway between the first and the last baseline below it
+            ("middle", 0.35 * fs - (n - 1.0) * lh / 2.0),
+        ] {
+            let svg = text(vec![vec![run("a", 0)]; 3], valign);
+            let want = format!("<tspan x=\"0\" dy=\"{first:.2}\">a</tspan><tspan x=\"0\" dy=\"{lh:.2}\">a</tspan>");
+            assert!(svg.contains(&want) && svg.contains("font-family=\"Serif, sans-serif\""), "{valign}: {svg}");
+        }
+        // raised and lowered once, whatever the level
+        let svg = text(vec![vec![run("x", 0), run("y", 1), run("z", 2), run("i", -2)]], "baseline");
+        let small = format!("font-size=\"{:.2}\"", 0.7 * fs);
+        let want = format!(
+            "x<tspan {small} baseline-shift=\"super\">y</tspan><tspan {small} baseline-shift=\"super\">z</tspan><tspan {small} baseline-shift=\"sub\">i</tspan>"
+        );
+        assert!(svg.contains(&want), "{svg}");
+        // the numerator and the denominator of a fraction at 0.8 of the size
+        let frac =
+            markup::Run::Frac { num: vec![run("a", 0)], den: vec![run("b", 0)], style: markup::RunStyle::default() };
+        let svg = text(vec![vec![frac]], "baseline");
+        assert_eq!(svg.matches(&format!("font-size=\"{:.2}\"", 0.8 * fs)).count(), 2, "{svg}");
     }
 }

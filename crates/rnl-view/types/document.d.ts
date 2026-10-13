@@ -236,8 +236,11 @@ export type Diagnostic = {
  */
 export type Primitive = {
   /**
-   * The object it draws, as `Hit::id` and the SVG's `data-id` name it, such as "item-3" or
-   * "wire-0"; empty for a shape written in the scene and for a flyline.
+   * The `data-id` of the SVG group that draws it; empty for a shape written in the scene and
+   * for a flyline. A symbol's drawing, its pin names included, has its item, such as "item-3",
+   * and a wire's drawing its wire, such as "wire-0", as `Hit::id` names them. Any other text
+   * has the name the diagnostics give it, such as "#R1::name" for an instance's name or
+   * "a text" for a text written in the scene: several texts can share it, and no hit has it.
    */
   owner: string,
   layer: Layer,
@@ -261,13 +264,14 @@ export type Layer = "bottom" | "middle" | "top";
  * lines, arcs and curves (9.2.5), and arrow heads, which are filled triangles; "rect", with its
  * sides along the axes, by its lowest and highest corners; "circle"; "ellipse", with its axes
  * along x and y; "text"; "flyline", a line a viewer may show for a connection that is not drawn
- * yet (13.7), not a wire, by its two ends. The SVG draws a flyline as a thin grey dashed line.
+ * yet (13.7), not a wire, by its two ends. The SVG draws a flyline 1 pixel wide in #8a8a8a, with
+ * dashes 4 pixels long and gaps of 3.
  */
 export type Shape =
-  | { "kind": "path", segments: Array<Segment>, stroke: Stroke | null, fill: string | null }
-  | { "kind": "rect", min: [number, number], max: [number, number], stroke: Stroke | null, fill: string | null }
-  | { "kind": "circle", center: [number, number], r: number, stroke: Stroke | null, fill: string | null }
-  | { "kind": "ellipse", center: [number, number], rx: number, ry: number, stroke: Stroke | null, fill: string | null }
+  | { "kind": "path", segments: Array<Segment>, stroke: Stroke | null, fill: Color | null }
+  | { "kind": "rect", min: [number, number], max: [number, number], stroke: Stroke | null, fill: Color | null }
+  | { "kind": "circle", center: [number, number], r: number, stroke: Stroke | null, fill: Color | null }
+  | { "kind": "ellipse", center: [number, number], rx: number, ry: number, stroke: Stroke | null, fill: Color | null }
   | { "kind": "text" } & Text
   | { "kind": "flyline", points: [[number, number], [number, number]] };
 
@@ -285,13 +289,21 @@ export type Segment =
   | { "kind": "close" };
 
 /**
+ * A colour as the language writes it (9.3), which is as CSS does: `#` and 3, 4, 6 or 8
+ * hexadecimal digits of either case, for red, green and blue and then, with 4 or 8, the opacity.
+ * So "#1f4fd81a" is a faint blue; a reader that takes the opacity first, as Qt's and Android's
+ * do, has to move it.
+ */
+export type Color = string;
+
+/**
  * How a line is drawn, after the style queue and the renderer's defaults (9.3).
  */
 export type Stroke = {
-  color: string,
+  color: Color,
   /**
    * The width in scene units; 0 is the hairline, the thin line that keeps its width at every
-   * zoom (9.3).
+   * zoom (9.3), which the SVG draws 1.2 pixels wide.
    */
   width: number,
   style: LineStyle,
@@ -300,18 +312,22 @@ export type Stroke = {
   /**
    * For a "double" line, the colour between its two lines; null for the other styles.
    */
-  inner: string | null,
+  inner: Color | null,
 };
 
 /**
- * A line's style (9.3). Dashes, dots and the gaps between them grow with the width; "double" is
- * two lines in the colour with the inner colour between them, three times the width in all;
- * "bold" is twice the width.
+ * A line's style (9.3). The SVG draws it with w, the width in its pixels (1.2 for the hairline),
+ * and m, the larger of w and 1: "solid" is a line w wide; "dashed" has dashes 4m long and gaps of
+ * 3m; "dotted", dots m long and gaps of 2.5m; "dash-dot", a dash of 5m, a gap of 2m, a dot of m
+ * and a gap of 2m; "bold" is a solid line 2w wide. On a path, "double" is a line in the colour 3d
+ * wide under a line in the inner colour d wide, where d is the width in scene units, at least
+ * 0.12, times the scale, with butt caps and miter joins, whatever the stroke's cap and join; a
+ * rectangle, circle or ellipse draws "double" as "solid".
  */
 export type LineStyle = "solid" | "dashed" | "dotted" | "dash-dot" | "double" | "bold";
 
 /**
- * The ends of an open line (9.3).
+ * The ends of an open line and of its dashes (9.3).
  */
 export type Cap = "butt" | "round" | "square";
 
@@ -334,9 +350,9 @@ export type Text = {
    * The text height in scene units; the lines are 1.15 times it apart.
    */
   size: number,
-  color: string,
+  color: Color,
   /**
-   * The font family the style names, a hint (9.3).
+   * The font family the style names, a hint (9.3); the SVG falls back on sans-serif.
    */
   font: string,
   bold: boolean,
@@ -361,14 +377,18 @@ export type Text = {
 export type HAlign = "start" | "middle" | "end";
 
 /**
- * Where a text's anchor is across its lines: on the first line's baseline, at the top, middle or
- * bottom.
+ * Where a text's anchor is across its lines: on the first line's baseline, or at the top, middle
+ * or bottom of the lines. Until texts are laid out with the fonts' metrics, the SVG places them
+ * by the size: at the top, the first baseline is 0.8 times the size below the anchor; at the
+ * bottom, the last baseline is 0.2 times the size above it; in the middle, the point halfway
+ * between the first and last baselines is 0.35 times the size below it.
  */
 export type VAlign = "baseline" | "top" | "middle" | "bottom";
 
 /**
  * A piece of a line of text in one style (13.6), by its `kind`: "text", or "frac" for
- * `\frac{…}{…}`, the numerator over the denominator.
+ * `\frac{…}{…}`, the numerator over the denominator. The SVG places the pieces of a line that
+ * holds a fraction by estimated widths, with the numerator and denominator at 0.8 of the size.
  */
 export type Run =
   | { "kind": "text", text: string, style: RunStyle }
@@ -379,7 +399,9 @@ export type Run =
  */
 export type RunStyle = {
   /**
-   * 0 on the line, 1 raised, −1 lowered; nested levels add up.
+   * How far the run is raised: each `^` it is in adds 1 and each `_` takes 1 away, so the z of
+   * `x^{y^{z}}` is at 2. The SVG draws a run at any level but 0 at 0.7 of the size, raised once
+   * when it is above 0 and lowered once when below.
    */
   level: number,
   bold: boolean,
