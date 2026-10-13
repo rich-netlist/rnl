@@ -5,6 +5,7 @@
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
@@ -47,11 +48,18 @@ function rnlView(file) {
 
 /**
  * A Document without what names its files in the workspace: the entry's path, and the paths of the
- * files missing, which keep only what is below the entry's directory.
+ * files missing, which keep only where they are from the entry's directory, such as ../x.inc.
  */
 function unnamed(doc) {
-  const dir = doc.path.replaceAll("\\", "/").replace(/[^/]*$/, "");
-  return { ...doc, path: null, missing: doc.missing.map((m) => (m.startsWith(dir) ? m.slice(dir.length) : m)) };
+  const names = (p) => p.replaceAll("\\", "/").split("/").filter(Boolean);
+  const dir = names(doc.path).slice(0, -1);
+  const fromDir = (file) => {
+    const to = names(file);
+    let k = 0;
+    while (k < dir.length && k < to.length - 1 && to[k] === dir[k]) k += 1;
+    return [...dir.slice(k).map(() => ".."), ...to.slice(k)].join("/");
+  };
+  return { ...doc, path: null, missing: doc.missing.map(fromDir) };
 }
 
 /** The same Document as `rnl view` builds for `file`, but for the paths that name the files. */
@@ -59,11 +67,33 @@ function sameAsRnl(doc, file) {
   expect(unnamed(doc)).toEqual(unnamed(rnlView(file)));
 }
 
-/** The directories the test made, removed after it. */
+/** The directories the test made, removed after it, and the servers it started, stopped after it. */
 const dirs = [];
-test.afterEach(() => {
+const servers = [];
+test.afterEach(async () => {
   for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+  for (const s of servers.splice(0)) {
+    s.closeAllConnections();
+    await new Promise((resolve) => s.close(resolve));
+  }
 });
+
+/**
+ * A web server of the test's own on 127.0.0.1, which lets any page read what it serves (CORS): each
+ * of `files` by its path, and a redirect for each path of `moved` to the path it gives. Its address.
+ */
+async function server(files, moved = {}) {
+  const s = http.createServer((request, response) => {
+    const at = decodeURIComponent(new URL(request.url, "http://host").pathname);
+    response.setHeader("Access-Control-Allow-Origin", "*");
+    if (at in moved) response.writeHead(302, { Location: moved[at] }).end();
+    else if (at in files) response.writeHead(200, { "Content-Type": "text/plain" }).end(files[at]);
+    else response.writeHead(404).end();
+  });
+  servers.push(s);
+  await new Promise((resolve) => s.listen(0, "127.0.0.1", resolve));
+  return `http://127.0.0.1:${s.address().port}`;
+}
 
 /** A new directory under `parent` with files, each a text or bytes by its path in it. */
 function folder(files, parent = os.tmpdir()) {
@@ -140,6 +170,47 @@ test("a URL's include is read from its server, and the levels, files and problem
   const [e] = errors;
   await expect(page.locator("#diags .diag.error .loc").first()).toHaveText(`${e.file}:${e.line}${e.col ? `:${e.col}` : ""}`);
   expect(diagnostics.diagnostics.filter((d) => d.line > 0).every((d) => d.file_index === 0)).toBe(true);
+});
+
+test("a URL that redirects opens as the one it redirects to, with its includes above it", async ({ page }) => {
+  const base = await server(
+    {
+      "/a/b/top.sp": "* top\n.include \"x.inc\"\n.include \"../lib.inc\"\nX1 a 0 inner\nX2 a 0 outer\n.end\n",
+      "/a/b/x.inc": "* x\n.subckt inner p q\nR1 p q 1k\n.ends\n",
+      "/a/lib.inc": "* lib\n.subckt outer p q\nR2 p q 1k\n.ends\n",
+    },
+    { "/short": "/a/b/top.sp", "/top.sp": "/a/b/top.sp" },
+  );
+  await start(page, `?url=${base}/a/b/top.sp`);
+  const doc = await shown(page);
+  expect(doc.path).toBe("/a/b/top.sp");
+  expect(doc.files.map((f) => f.path)).toEqual(["top.sp", "x.inc", "/a/lib.inc"]);
+  expect(doc.missing).toEqual([]);
+  expect(doc.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+  // a short address, and a netlist at the server's root, that the server sends on to it
+  for (const from of ["/short", "/top.sp"]) {
+    await start(page, `?url=${base}${from}`);
+    expect(await shown(page)).toEqual(doc);
+  }
+  await showsDocument(page, doc);
+});
+
+test("a netlist served at the root of its server is named after the server", async ({ page }) => {
+  // named as the page names it, for rnl view
+  const files = {
+    "127.0.0.1": "* top\n.include \"x.inc\"\nX1 a 0 inner\n.end\n",
+    "x.inc": "* x\n.subckt inner p q\nR1 p q 1k\n.ends\n",
+  };
+  const base = await server({ "/": files["127.0.0.1"], "/x.inc": files["x.inc"] });
+  await start(page, `?url=${base}/`);
+  const doc = await shown(page);
+  expect([doc.path, doc.name]).toEqual(["/127.0.0.1", "127.0.0.1"]);
+  expect(doc.files.map((f) => f.path)).toEqual(["127.0.0.1", "x.inc"]);
+  // every problem is at a line of one of the files
+  expect(doc.diagnostics.length).toBeGreaterThan(0);
+  for (const d of doc.diagnostics) expect(doc.files[d.file_index]?.name).toBe(d.file);
+  sameAsRnl(doc, path.join(folder(files), "127.0.0.1"));
+  await showsDocument(page, doc);
 });
 
 test("files set on the file input open as with Open, and the page asks which is the netlist", async ({ page }) => {
@@ -244,6 +315,24 @@ test("an include that is not there is missing, and a problem at its line", async
   sameAsRnl(doc, path.join(folder({ "top.sp": text }), "top.sp"));
   await expect(page.locator("#diags .diag.error .msg")).toContainText(["gone.inc cannot be found"]);
   await expect(page.locator("#source .ln").nth(1)).toHaveClass(/\bd-error\b/);
+});
+
+test("an include above the files opened is missing, not a file of that name opened with them", async ({ page }) => {
+  await start(page);
+  // top.sp and x.inc chosen in sub/, whose top.sp includes the x.inc above it, which is not there
+  const dir = folder({
+    "sub/top.sp": "* top\n.include \"../x.inc\"\nX1 a 0 inner\n.end\n",
+    "sub/x.inc": "* sub's own x.inc\n.subckt inner p q\nR1 p q 1k\n.ends\n",
+  });
+  const doc = await opened(page, () =>
+    page.locator("#file-input").setInputFiles(["top.sp", "x.inc"].map((name) => path.join(dir, "sub", name))),
+  );
+  expect(doc.path).toBe("/top.sp");
+  expect(doc.files.map((f) => f.path)).toEqual(["top.sp"]);
+  expect(doc.missing).toEqual(["/../x.inc"]);
+  const problem = doc.diagnostics.find((d) => d.message === "the included file ../x.inc cannot be found");
+  expect(problem).toMatchObject({ severity: "error", file: "top.sp", file_index: 0, line: 2 });
+  sameAsRnl(doc, path.join(dir, "sub", "top.sp"));
 });
 
 test("Reload reads a served netlist again after it changed, with an include that now is there", async ({ page }) => {

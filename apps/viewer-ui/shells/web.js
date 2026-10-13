@@ -23,10 +23,12 @@ let lastUrl = ""; // the URL opened last, which Open URL offers again
  *
  * @typedef {object} WebSource
  * @property {string} name How the page names it: the entry's file name, its path in a folder, or the URL.
- * @property {string} entry The entry's path in the workspace, rooted, such as "/top.sp".
- * @property {(path: string, again: boolean) => Promise<string | null>} read A file's text by its path
- *   in the workspace, or null when there is no such file; rejects with an Error that says why when
- *   the file is there but cannot be read. `again` when the source is read again (File > Reload).
+ * @property {(again: boolean) => Promise<{ path: string, text: string }>} open Read the entry: its
+ *   path in the workspace, rooted, such as "/top.sp", and its text; rejects with an Error that says
+ *   why it cannot be read. `again` when the source is read again (File > Reload).
+ * @property {(path: string, again: boolean) => Promise<string | null>} read Another file's text by
+ *   its path in the workspace, or null when there is no such file; rejects with an Error that says
+ *   why when the file is there but cannot be read.
  */
 
 /**
@@ -39,20 +41,23 @@ let lastUrl = ""; // the URL opened last, which Open URL offers again
  * @returns {WebSource}
  */
 function filesSource(files, entry) {
+  async function read(path) {
+    const file = files.get(path);
+    if (!file) return null;
+    try {
+      return decodeText(await (await file()).arrayBuffer());
+    } catch {
+      // a browser reads a chosen file only as it was when it was chosen
+      const why = "it may have changed or been removed since it was opened. Open it again.";
+      throw new Error(`The browser could not read ${path.slice(1)}: ${why}`);
+    }
+  }
   return {
     name: entry.slice(1),
-    entry,
-    async read(path) {
-      const file = files.get(path);
-      if (!file) return null;
-      try {
-        return decodeText(await (await file()).arrayBuffer());
-      } catch {
-        // a browser reads a chosen file only as it was when it was chosen
-        const why = "it may have changed or been removed since it was opened. Open it again.";
-        throw new Error(`The browser could not read ${path.slice(1)}: ${why}`);
-      }
+    async open() {
+      return { path: entry, text: await read(entry) };
     },
+    read,
   };
 }
 
@@ -63,32 +68,44 @@ function within(path, dir) {
 
 /**
  * A file on a web server, and the files it includes, fetched relative to the address the file was
- * served from, after any redirect. The workspace names each file by its path on the server, such as
- * /netlists/a/top.sp or /top.sp, so that relative includes, ../ included, resolve as there. A file
- * that cannot be fetched is missing; the entry is an error.
+ * served from, after any redirect. The workspace names each file by its path on that server, such
+ * as /netlists/a/top.sp or /top.sp, so that relative includes, ../ included, resolve as there: a URL
+ * that redirects opens as the one it redirects to. A file that cannot be fetched is missing; the
+ * entry is an error.
  *
  * @param {URL} url
  * @returns {WebSource}
  */
 function urlSource(url) {
-  const entry = url.pathname.split("/").map(decode).join("/");
-  const dir = entry.split("/").slice(0, -1); // the entry's directory in the workspace, by its names
   let served = url; // where the entry was served from when it was last read
+  let dir = []; // the entry's directory in the workspace, by its names
   return {
     name: url.href,
-    entry,
+    async open(again) {
+      const got = await fetchBytes(url.href, again);
+      if (!got.bytes) throw new Error(`${url.href} could not be fetched: ${got.why}.`);
+      served = new URL(got.url || url.href);
+      const path = serverPath(served);
+      dir = path.split("/").slice(0, -1);
+      return { path, text: decodeText(got.bytes) };
+    },
     async read(path, again) {
       if (!path.startsWith("/")) return null; // such as C:/models/x.lib
-      const href = path === entry ? url.href : new URL(relative(dir, path), served).href;
-      const got = await fetchBytes(href, again);
-      if (got.bytes) {
-        if (path === entry) served = new URL(got.url || href);
-        return decodeText(got.bytes);
-      }
-      if (path === entry) throw new Error(`${href} could not be fetched: ${got.why}.`);
-      return null;
+      const got = await fetchBytes(new URL(relative(dir, path), served).href, again);
+      return got.bytes ? decodeText(got.bytes) : null;
     },
   };
+}
+
+/**
+ * The path in the workspace of the file at `url`: its path on the server, each name decoded. The
+ * address of a directory names the file after the directory, and the server's root after the
+ * server: /netlists/ is /netlists/netlists, and / is /example.org.
+ */
+function serverPath(url) {
+  const names = url.pathname.split("/").map(decode);
+  if (names[names.length - 1] === "") names[names.length - 1] = names[names.length - 2] || url.hostname;
+  return names.join("/");
 }
 
 /**
@@ -402,17 +419,18 @@ export default {
     return Promise.resolve(null);
   },
   /** Read the files the document needs, as SVG for the page to draw, and name the browser tab. */
-  build(source) {
+  async build(source) {
     const again = built.has(source);
     built.add(source);
-    const request = { entry: source.entry, svg: true, primitives: false };
-    return collect(core, request, (path) => source.read(path, again)).then(
-      ({ document: doc }) => {
-        document.title = `${doc.name} - RNL Viewer`;
-        return doc;
-      },
-      (e) => Promise.reject(e instanceof Error ? e.message : String(e)),
-    );
+    try {
+      const entry = await source.open(again);
+      const request = { entry: entry.path, files: { [entry.path]: entry.text }, svg: true, primitives: false };
+      const { document: doc } = await collect(core, request, (path) => source.read(path, again));
+      document.title = `${doc.name} - RNL Viewer`;
+      return doc;
+    } catch (e) {
+      throw e instanceof Error ? e.message : String(e);
+    }
   },
   setCheck() {}, // the page's own menu bar shows the check marks
   onCommand() {}, // and runs its commands itself
