@@ -6,6 +6,8 @@
 
 mod document;
 mod primitive;
+#[cfg(test)]
+mod types;
 
 use std::cell::RefCell;
 

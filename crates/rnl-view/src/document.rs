@@ -21,6 +21,7 @@ use crate::BuildOptions;
 
 /// What a viewer shows of a document, as [`crate::build`] gives it.
 #[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Document {
     /// The entry as the frontend named it, for building again.
     pub path: String,
@@ -49,6 +50,7 @@ pub struct Document {
 /// A drawing level. Its SVG and its hits are in pixels with y down; its primitives are in scene
 /// units with y up, `scale` pixels each.
 #[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Level {
     /// The host level drawn, as `Object::level` names it.
     pub host: usize,
@@ -58,14 +60,17 @@ pub struct Level {
     /// The drawing as an SVG document, written from the primitives; absent unless
     /// `BuildOptions::svg` asks for it, as it does by default.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub svg: Option<String>,
     /// The drawing as primitives in drawing order (decision 0006); absent unless
     /// `BuildOptions::primitives` asks for them.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub primitives: Option<Vec<Primitive>>,
     /// Pixels per scene unit in the SVG and the hits, given with the primitives: a point (x, y) of
     /// a primitive is at (x·scale, −y·scale) in them.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub scale: Option<f64>,
     /// Nothing on the level can be drawn: no object has a position yet.
     pub empty: bool,
@@ -79,6 +84,7 @@ pub struct Level {
 
 /// A subcircuit instance, as a branch of the hierarchy.
 #[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Child {
     pub instance: String,
     /// The subcircuit it instantiates, as written.
@@ -90,6 +96,7 @@ pub struct Child {
 
 /// Something on a drawing that stands for objects.
 #[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Hit {
     /// "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
     /// "wire": a wire, its vertices.
@@ -103,6 +110,7 @@ pub struct Hit {
 }
 
 #[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SourceFile {
     /// The file as the runtime knows it: relative to the opened file's directory when it is in it
     /// or below, otherwise as the provider names it. With a rooted or absolute entry, the entry's
@@ -122,6 +130,7 @@ pub struct SourceFile {
 }
 
 #[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Object {
     /// "instance" or "net".
     pub kind: &'static str,
@@ -137,6 +146,7 @@ pub struct Object {
 }
 
 #[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Span {
     pub object: usize,
     pub file: usize,
@@ -150,6 +160,7 @@ pub struct Span {
 }
 
 #[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Diagnostic {
     /// "error", "warning" or "hint".
     pub severity: &'static str,

@@ -27,4 +27,14 @@ A level's drawing comes in the outputs the frontend asks for. A level has an `sv
 - The primitives (decision 0006) are what the renderer draws, in drawing order: paths, rectangles, circles, ellipses, texts and flylines, each with the object it draws (`owner`, the `id` of its hits and the `data-id` of its SVG group), its layer and place in the drawing order (11.6), and its bounding box. Everything is resolved, so a frontend draws them without reading the model: strokes with their colour, width (0 for the hairline), style, cap, join and the inner colour of a double line; fills; texts as lines of runs with their markup styles and fractions (13.6), with their size, colour, font, alignment after turning and direction. They are this crate's own serializable types, converted from the renderer's, which stay free to change. In the JSON, a primitive, a path segment and a run each name their `kind`, and a point is an `[x, y]` array.
 - The primitives are in scene units, x to the right and y up, as in the model. The SVG and the hits are in pixels, x to the right and y down: a point (x, y) of a primitive is at (x·scale, −y·scale) in them, with the level's `scale`. The SVG is written from the same primitives, and its view box frames them with a margin.
 
+## Type definitions
+
+[`types/document.d.ts`](types/document.d.ts) declares the Document and everything in it in TypeScript, for frontends and their checks; the page in [`apps/viewer-ui`](../../apps/viewer-ui/README.md) refers to it. It is generated from the Rust types by [ts-rs](https://crates.io/crates/ts-rs), which the types derive in the tests only, and laid out by the test to be read. The test fails when the file is not what the types give; after a change to them that is meant, write it with:
+
+```bash
+RNL_BLESS=1 cargo test -p rnl-view types
+```
+
+The serde field names are the contract, and the declarations keep them as they are.
+
 See the [roadmap](../../docs/roadmap.md) for planned work.

@@ -13,7 +13,7 @@ use serde::Serialize;
 /// One thing drawn on a level: a shape or a text, with the object it draws and its place in the
 /// drawing order (11.6). A level lists its primitives in drawing order already.
 #[derive(Serialize, Clone, Debug, PartialEq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct Primitive {
     /// The object it draws, as `Hit::id` and the SVG's `data-id` name it, such as "item-3" or
     /// "wire-0"; empty for a shape written in the scene and for a flyline.
@@ -29,7 +29,7 @@ pub struct Primitive {
 
 /// The layers, drawn bottom first (11.6).
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "lowercase")]
 pub enum Layer {
     Bottom,
@@ -43,7 +43,7 @@ pub enum Layer {
 /// along x and y; "text"; "flyline", a line a viewer may show for a connection that is not drawn
 /// yet (13.7), not a wire, by its two ends. The SVG draws a flyline as a thin grey dashed line.
 #[derive(Serialize, Clone, Debug, PartialEq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Shape {
     Path { segments: Vec<Segment>, stroke: Option<Stroke>, fill: Option<String> },
@@ -59,7 +59,7 @@ pub enum Shape {
 /// way round when `large`, counter-clockwise (y up) when `ccw`; "cubic" is a cubic Bézier curve
 /// to `to` with the control points `c1` and `c2`; "close" goes back to where the part started.
 #[derive(Serialize, Clone, Debug, PartialEq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Segment {
     Move { to: [f64; 2] },
@@ -71,7 +71,7 @@ pub enum Segment {
 
 /// How a line is drawn, after the style queue and the renderer's defaults (9.3).
 #[derive(Serialize, Clone, Debug, PartialEq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct Stroke {
     pub color: String,
     /// The width in scene units; 0 is the hairline, the thin line that keeps its width at every
@@ -88,7 +88,7 @@ pub struct Stroke {
 /// two lines in the colour with the inner colour between them, three times the width in all;
 /// "bold" is twice the width.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "kebab-case")]
 pub enum LineStyle {
     Solid,
@@ -101,7 +101,7 @@ pub enum LineStyle {
 
 /// The ends of an open line (9.3).
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "lowercase")]
 pub enum Cap {
     Butt,
@@ -111,7 +111,7 @@ pub enum Cap {
 
 /// The corners of a line (9.3).
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "lowercase")]
 pub enum Join {
     Miter,
@@ -122,7 +122,7 @@ pub enum Join {
 /// A text laid out at an anchor (9.2.5, 13.6). Its glyphs read upright whatever turns it, or from
 /// bottom to top when it is vertical.
 #[derive(Serialize, Clone, Debug, PartialEq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct Text {
     pub anchor: [f64; 2],
     /// The lines, first to last, each a list of runs.
@@ -144,7 +144,7 @@ pub struct Text {
 
 /// Where a text's anchor is along its lines: at their start, middle or end.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "lowercase")]
 pub enum HAlign {
     Start,
@@ -155,7 +155,7 @@ pub enum HAlign {
 /// Where a text's anchor is across its lines: on the first line's baseline, at the top, middle or
 /// bottom.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "lowercase")]
 pub enum VAlign {
     Baseline,
@@ -167,7 +167,7 @@ pub enum VAlign {
 /// A piece of a line of text in one style (13.6), by its `kind`: "text", or "frac" for
 /// `\frac{…}{…}`, the numerator over the denominator.
 #[derive(Serialize, Clone, Debug, PartialEq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Run {
     Text { text: String, style: RunStyle },
@@ -176,7 +176,7 @@ pub enum Run {
 
 /// The style the markup gives a run (13.6).
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(test, derive(serde::Deserialize))]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct RunStyle {
     /// 0 on the line, 1 raised, −1 lowered; nested levels add up.
     pub level: i8,
