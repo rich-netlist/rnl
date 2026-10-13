@@ -1,4 +1,5 @@
-//! The `rnl` command itself: exit codes, the status lines of `check`, `view` and `strip-generated`.
+//! The `rnl` command itself: exit codes, the status lines of `check`, `view` and its outputs, and
+//! `strip-generated`.
 
 use std::path::Path;
 use std::process::Command;
@@ -47,6 +48,21 @@ fn view_prints_the_document_a_viewer_shows() {
     assert_eq!(d["files"][1]["name"], "04-hierarchy-lib.inc");
     assert_eq!(d["missing"], serde_json::json!([]));
     assert_eq!(rnl(&["view", &case("no-such-case.sp")]).0, 2);
+}
+
+#[test]
+fn view_gives_the_primitives_and_the_svg_as_asked() {
+    let (code, out) = rnl(&["view", &case("01-rc-lowpass.sp"), "--primitives", "--no-svg"]);
+    assert_eq!(code, 0, "{out}");
+    let d: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let level = &d["levels"][0];
+    assert!(level.get("svg").is_none() && level["scale"] == 14.0);
+    let kinds: Vec<&str> =
+        level["primitives"].as_array().unwrap().iter().map(|p| p["kind"].as_str().unwrap()).collect();
+    assert!(kinds.contains(&"path") && kinds.contains(&"text"), "{kinds:?}");
+    // without the flags, the SVG and no primitives
+    let d: serde_json::Value = serde_json::from_str(&rnl(&["view", &case("01-rc-lowpass.sp")]).1).unwrap();
+    assert!(d["levels"][0]["svg"].is_string() && d["levels"][0].get("primitives").is_none());
 }
 
 #[test]

@@ -19,7 +19,10 @@ FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
 options:
   --package-dir DIR   look for packages in DIR as well (16.2); repeatable
   --no-std            do not use the standard package at the root (16.3)
-  --dialect NAME      spice or spectre, instead of guessing from the file";
+  --dialect NAME      spice or spectre, instead of guessing from the file
+view options:
+  --primitives        give each level's primitives, in scene units with y up
+  --no-svg            leave out each level's SVG";
 
 struct Args {
     command: String,
@@ -28,6 +31,8 @@ struct Args {
     package_dirs: Vec<PathBuf>,
     std: bool,
     dialect: Option<String>,
+    svg: bool,
+    primitives: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -41,18 +46,21 @@ fn parse_args() -> Result<Args, String> {
     let mut package_dirs = Vec::new();
     let mut std = true;
     let mut dialect = None;
+    let (mut svg, mut primitives) = (true, false);
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
             "--package-dir" => package_dirs.push(PathBuf::from(it.next().ok_or("--package-dir needs a directory")?)),
             "--no-std" => std = false,
             "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
+            "--no-svg" => svg = false,
+            "--primitives" => primitives = true,
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
     }
     let file = file.ok_or(USAGE)?;
-    Ok(Args { command, file, out, package_dirs, std, dialect })
+    Ok(Args { command, file, out, package_dirs, std, dialect, svg, primitives })
 }
 
 fn main() -> ExitCode {
@@ -102,7 +110,8 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             let options = BuildOptions {
                 dialect: args.dialect.clone(),
                 runtime: Options { std: args.std },
-                ..BuildOptions::default()
+                svg: args.svg,
+                primitives: args.primitives,
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&doc).unwrap());
