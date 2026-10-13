@@ -4,6 +4,7 @@
 // drawing and the text. Each part is a module of its own (README.md); this one starts the page.
 
 import { command, startCommands } from "./commands.js";
+import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
 import {
   load, setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
@@ -30,6 +31,7 @@ setIndexHeight(load("index-height", 260));
 async function start() {
   const shell = await loadShell();
   await startCommands();
+  if (!shell.nativeMenu) showMenuBar(true);
   openSource(await shell.initial(), false);
 }
 
@@ -53,4 +55,6 @@ window.viewer = {
   },
   /** Run a command by its id, as its menu item does. */
   command,
+  /** Show or hide the page's own menu bar, whatever the shell says. */
+  menuBar: showMenuBar,
 };

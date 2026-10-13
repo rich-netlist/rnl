@@ -1,7 +1,7 @@
 // The commands and the keys that run them. Both come from the command table, commands.json, which
 // the desktop viewer also builds its native menu from: the menus, their items, and per item its id,
 // its label, its keys and the platforms that offer it. A command runs by its id, whether it comes
-// from the platform's menu or a key.
+// from the platform's menu, the HTML menu bar or a key.
 
 import { fit, zoomCenter } from "./drawing.js";
 import { pickAndOpen, reload } from "./open.js";
@@ -42,15 +42,45 @@ export function command(id) {
   }
 }
 
-/** Set the state of a check-mark command, such as "toggle-netlist", in the platform's menu. */
+/** Set the state of a check-mark command, such as "toggle-netlist", in the menus that show it. */
 export function setCheck(id, checked) {
   checks.set(id, checked);
   if (shell) shell.setCheck(id, checked);
 }
 
+/** Whether a check-mark command is checked. */
+export function isChecked(id) {
+  return checks.get(id) === true;
+}
+
 /** Whether this platform offers a command; one that names no platforms is offered on all. */
 function offered(item) {
   return !item.platforms || item.platforms.includes(shell.platform);
+}
+
+/** The menus with the items this platform offers, and a separator ("-") only between two items. */
+export function menus() {
+  return table.menus
+    .map((m) => {
+      const items = [];
+      let gap = false;
+      for (const item of m.items) {
+        if (item === "-") {
+          gap = items.length > 0;
+        } else if (offered(item)) {
+          if (gap) items.push("-");
+          items.push(item);
+          gap = false;
+        }
+      }
+      return { label: m.label, items };
+    })
+    .filter((m) => m.items.length > 0);
+}
+
+/** How a menu shows an item's keys: its `shown` text, or else its first key. */
+export function shortcut(item) {
+  return item.shown || (item.keys ? item.keys[0] : "");
 }
 
 /**
