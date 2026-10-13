@@ -12,8 +12,11 @@ use crate::{Kind, PathSeg, Primitive, RenderOptions, Stroke, TextPrim};
 /// The font families of the texts after the shipped one: the same design under the names it is
 /// installed by (the full Noto Sans CJK, and Adobe's Source Han Sans), then sans-serif.
 const FALLBACK: &str = "Noto Sans CJK SC, Source Han Sans SC, sans-serif";
-/// No kerning and no ligatures, which would change the advances, and spaces kept as they are.
-const TEXT_STYLE: &str = "font-kerning:none;font-variant-ligatures:none;white-space:pre";
+/// Nothing that changes the advances: no kerning, no ligatures, no trimming of the space between
+/// full-width punctuation (which an installed Noto Sans CJK or Source Han Sans would do), and no
+/// space added between ideographs and letters.
+const TEXT_STYLE: &str =
+    "font-kerning:none;font-variant-ligatures:none;text-spacing-trim:space-all;text-autospace:no-autospace";
 
 fn esc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -170,7 +173,9 @@ impl W {
 
     /// A text as the renderer laid it out: each run a `text` element at the start of its baseline,
     /// held to its width with textLength, turned a quarter about that point when the text is
-    /// vertical, and leaning when italic; the bars as lines.
+    /// vertical, and leaning when italic; the bars as lines. Each element keeps its spaces with an
+    /// xml:space of its own: Chrome and WebKit collapse the spaces of a `text` element, those at
+    /// its ends included, whatever its ancestors say.
     fn text(&self, t: &TextPrim) -> String {
         let mut out = String::new();
         for r in &t.runs {
@@ -185,7 +190,7 @@ impl W {
             }
             let _ = write!(
                 out,
-                "<text x=\"{x:.2}\" y=\"{y:.2}\" font-size=\"{:.2}\"{}{} textLength=\"{:.2}\" lengthAdjust=\"spacingAndGlyphs\" fill=\"{}\">{}</text>",
+                "<text x=\"{x:.2}\" y=\"{y:.2}\" font-size=\"{:.2}\"{}{} textLength=\"{:.2}\" lengthAdjust=\"spacingAndGlyphs\" fill=\"{}\" xml:space=\"preserve\">{}</text>",
                 r.size * self.s,
                 if r.bold { " font-weight=\"bold\"" } else { "" },
                 if turn.is_empty() { String::new() } else { format!(" transform=\"{}\"", turn.join(" ")) },
@@ -223,9 +228,9 @@ pub fn svg_document(prims: &[Primitive], o: &RenderOptions) -> String {
     let y1 = prims.iter().map(|p| p.bbox[3]).fold(f64::MIN, f64::max) + pad;
     let (vw, vh) = ((x1 - x0) * o.scale, (y1 - y0) * o.scale);
     // texts in the shipped family, or one with the same metrics, with nothing that changes the
-    // advances and with their spaces as they are
+    // advances
     let mut s = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{vw:.0}\" height=\"{vh:.0}\" viewBox=\"{:.2} {:.2} {vw:.2} {vh:.2}\" font-family=\"{FAMILY}, {FALLBACK}\" style=\"{TEXT_STYLE}\" xml:space=\"preserve\">",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{vw:.0}\" height=\"{vh:.0}\" viewBox=\"{:.2} {:.2} {vw:.2} {vh:.2}\" font-family=\"{FAMILY}, {FALLBACK}\" style=\"{TEXT_STYLE}\">",
         x0 * o.scale,
         -y1 * o.scale
     );

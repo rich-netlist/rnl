@@ -407,8 +407,10 @@ export type Text = {
 /**
  * A run of a laid-out text: `text` in one face and size, drawn from `at`, the start of its
  * baseline. Its glyphs follow each other by their advances in the face, with no kerning,
- * ligatures or other shaping, so that the run is `width` long; in CSS, `font-kerning: none` and
- * `font-variant-ligatures: none`. Its spaces are drawn as they are.
+ * ligatures, spacing of punctuation or other shaping, so that the run is `width` long; in CSS,
+ * `font-kerning: none`, `font-variant-ligatures: none`, `text-spacing-trim: space-all` and
+ * `text-autospace: no-autospace`. Its spaces are drawn as they are, those at its ends too; in
+ * SVG, with `xml:space="preserve"` on its own `text` element.
  */
 export type TextRun = {
   text: string,

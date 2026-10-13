@@ -190,8 +190,10 @@ pub struct Text {
 
 /// A run of a laid-out text: `text` in one face and size, drawn from `at`, the start of its
 /// baseline. Its glyphs follow each other by their advances in the face, with no kerning,
-/// ligatures or other shaping, so that the run is `width` long; in CSS, `font-kerning: none` and
-/// `font-variant-ligatures: none`. Its spaces are drawn as they are.
+/// ligatures, spacing of punctuation or other shaping, so that the run is `width` long; in CSS,
+/// `font-kerning: none`, `font-variant-ligatures: none`, `text-spacing-trim: space-all` and
+/// `text-autospace: no-autospace`. Its spaces are drawn as they are, those at its ends too; in
+/// SVG, with `xml:space="preserve"` on its own `text` element.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct TextRun {
@@ -820,12 +822,14 @@ mod tests {
             assert!(drawn.contains(want), "{drawn}");
         }
 
-        // the texts in the shipped family, with no kerning or ligatures and their spaces as they are
-        let fonts = "font-family=\"Noto Sans SC, Noto Sans CJK SC, Source Han Sans SC, sans-serif\" style=\"font-kerning:none;font-variant-ligatures:none;white-space:pre\" xml:space=\"preserve\">";
+        // the texts in the shipped family, with no kerning, ligatures or other change to the
+        // advances
+        let fonts = "font-family=\"Noto Sans SC, Noto Sans CJK SC, Source Han Sans SC, sans-serif\" style=\"font-kerning:none;font-variant-ligatures:none;text-spacing-trim:space-all;text-autospace:no-autospace\">";
         assert!(svg(Kind::Path { segs: Vec::new(), strokes: Vec::new(), fill: None }).contains(fonts));
         // each run at the start of its baseline, in the text's colour and its size, held to its
-        // width; bold in the bold face; an italic run leaning by 0.25 of the height above its
-        // baseline, and a vertical text's runs turned a quarter counter-clockwise about their start
+        // width, with its spaces, those at its ends too; bold in the bold face; an italic run
+        // leaning by 0.25 of the height above its baseline, and a vertical text's runs turned a
+        // quarter counter-clockwise about their start
         let run = |text: &str, bold: bool, italic: bool| TextRun {
             text: text.into(),
             at: [1.0, 2.0],
@@ -863,11 +867,11 @@ mod tests {
             rnl_render::svg_document(&[back(&p)], &o)
         };
         let head = "<text x=\"14.00\" y=\"-28.00\" font-size=\"7.00\"";
-        let tail = " textLength=\"4.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#102030\">";
+        let tail = " textLength=\"4.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#102030\" xml:space=\"preserve\">";
         let lean = "matrix(1 0 -0.25 1 -7.00 0)";
         let turn = "rotate(-90 14.00 -28.00)";
         for (runs, vertical, want) in [
-            (vec![run("a  b<", false, false)], false, format!("{head}{tail}a  b&lt;</text>")),
+            (vec![run(" a  b< ", false, false)], false, format!("{head}{tail} a  b&lt; </text>")),
             (vec![run("V", true, false)], false, format!("{head} font-weight=\"bold\"{tail}V</text>")),
             (vec![run("V", false, true)], false, format!("{head} transform=\"{lean}\"{tail}V</text>")),
             (vec![run("V", false, false)], true, format!("{head} transform=\"{turn}\"{tail}V</text>")),
