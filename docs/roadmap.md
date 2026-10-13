@@ -42,6 +42,7 @@ One shared Rust core decides the drawing; the frontends are per platform ([decis
 - [x] Make style resolution linear in the number of objects. A chain of 2,000 resistors takes 0.17 s to check instead of 36 s, and doubling the chain about doubles the time (0.78 s for 8,000).
 - [x] Add `crates/rnl-view`, the core interface (a workspace in, a Document out). It takes over the desktop viewer's document builder and the parts of `rnl-cli` that read no files: dialect detection, the bundled standard packages, level status. The desktop viewer and the CLI use it.
 - [x] Give the Document each level's primitives in serializable form, with SVG written from them; generate type definitions for frontends. The frontend chooses the outputs; by default the Document is as before. The TypeScript declarations are in [`crates/rnl-view/types`](../crates/rnl-view/README.md#type-definitions).
+- [ ] Draw line styles in the renderer rather than the SVG writer (the hairline's width, dashes, double lines on every shape, flylines), and give them in the primitives, so that every frontend draws them as the SVG does.
 - [ ] Ship fonts with the core and lay out text with their metrics; choose the font set, including Chinese, and its licence.
 - [ ] Use a pure-Rust math library in the core, and test in CI that native and WebAssembly builds give identical Documents on the conformance corpus.
 - [ ] Add the WebAssembly binding in [`bindings/`](../bindings/README.md), run in a Worker.
