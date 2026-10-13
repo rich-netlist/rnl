@@ -13,8 +13,10 @@
  *   the file named on the command line.
  * @property {(kind: string) => Promise<Source | null>} pick Ask for something to open: kind "file", and on
  *   the web also "folder" or "url". Null when nothing is chosen.
- * @property {(source: Source) => Promise<object>} build Read a source and build its Document; rejects with
- *   a message when it cannot.
+ * @property {(source: Source) => Promise<import("../../crates/rnl-view/types/document.js").Document>} build
+ *   Read a source and build its Document; rejects with a message when it cannot. The Document's
+ *   types are generated from the core's Rust types into crates/rnl-view/types/document.d.ts, for
+ *   checking the page; nothing is loaded from there at run time.
  * @property {(id: string, checked: boolean) => void} setCheck Show a check-mark command's state, such as
  *   "toggle-netlist", in the platform's menu.
  * @property {(handler: (id: string) => void) => void} onCommand Call `handler` with the id of each command

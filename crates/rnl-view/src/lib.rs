@@ -5,6 +5,9 @@
 //! The crate does no file I/O, so it builds for `wasm32-unknown-unknown`.
 
 mod document;
+mod primitive;
+#[cfg(test)]
+mod types;
 
 use std::cell::RefCell;
 
@@ -15,6 +18,9 @@ use rnl_runtime::source::{MemoryProvider, Provider};
 use rnl_runtime::{Interpretation, Options};
 
 pub use document::{Child, Diagnostic, Document, Hit, Level, Object, SourceFile, Span};
+pub use primitive::{
+    Cap, Color, HAlign, Join, Layer, LineStyle, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, VAlign,
+};
 
 /// The standard packages bundled with the core (16.2, 16.3).
 const BUNDLED: [(&str, &str); 2] = [
@@ -34,13 +40,23 @@ pub fn bundled() -> MemoryProvider {
     p
 }
 
-/// How to build a Document.
-#[derive(Clone, Debug, Default)]
+/// How to build a Document, and what to give of each level's drawing.
+#[derive(Clone, Debug)]
 pub struct BuildOptions {
     /// "spice" or "spectre", instead of guessing from the entry.
     pub dialect: Option<String>,
     /// The runtime's options, such as using the standard package at the root (16.3).
     pub runtime: Options,
+    /// Write each level's SVG ([`Level::svg`]); on by default.
+    pub svg: bool,
+    /// Give each level's primitives and their scale ([`Level::primitives`]); off by default.
+    pub primitives: bool,
+}
+
+impl Default for BuildOptions {
+    fn default() -> BuildOptions {
+        BuildOptions { dialect: None, runtime: Options::default(), svg: true, primitives: false }
+    }
 }
 
 /// Build the Document of `entry`, the path of the file to open as the frontend names it,
@@ -56,7 +72,7 @@ pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Resul
         return Err(format!("cannot read {entry}"));
     }
     let r = interpret_in(entry, options.dialect.as_deref(), &ws, &options.runtime)?;
-    Ok(document::document(entry, &r, ws.missing.into_inner()))
+    Ok(document::document(entry, &r, ws.missing.into_inner(), options))
 }
 
 /// Is the entry Spectre? By `dialect`, by the `.scs` extension, or a `simulator lang=spectre`
@@ -240,7 +256,7 @@ C1 a 0 1p
         assert_eq!((d.files[0].path.as_str(), d.files[0].text.as_str()), ("untitled-1", NETLIST));
         // the standard package draws the resistor and the capacitor
         assert!(d.diagnostics.iter().all(|x| x.severity != "error"), "{:?}", d.diagnostics);
-        assert!(d.levels[0].svg.starts_with("<svg") && !d.levels[0].empty);
+        assert!(d.levels[0].svg.as_ref().is_some_and(|s| s.starts_with("<svg")) && !d.levels[0].empty);
         assert_eq!(d.levels[0].hits.iter().filter(|h| h.kind == "box").count(), 2);
         assert!(d.missing.is_empty(), "{:?}", d.missing);
     }
@@ -437,6 +453,27 @@ R2 p q 1k
             ["path", "name", "dialect", "levels", "diagnostics", "failed", "files", "objects", "spans", "missing"];
         assert_eq!(keys, want);
         assert_eq!(v["missing"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn the_frontend_chooses_the_outputs() {
+        let files = MemoryProvider::new().with("a.sp", NETLIST);
+        let level = |svg: bool, primitives: bool| {
+            let options = BuildOptions { svg, primitives, ..BuildOptions::default() };
+            let d = build("a.sp", &files, &options).unwrap();
+            serde_json::to_value(&d).unwrap()["levels"][0].as_object().unwrap().clone()
+        };
+        let keys = |l: &serde_json::Map<String, serde_json::Value>| l.keys().cloned().collect::<Vec<_>>().join(" ");
+        // by default the SVG and no primitives, as the viewers have read the Document so far
+        let default = BuildOptions::default();
+        let l = level(default.svg, default.primitives);
+        assert_eq!(keys(&l), "host title kind svg empty status hits children");
+        let l = level(true, true);
+        assert_eq!(keys(&l), "host title kind svg primitives scale empty status hits children");
+        assert_eq!(l["scale"], 14.0);
+        assert!(l["primitives"].as_array().is_some_and(|p| p.len() > 2));
+        assert_eq!(keys(&level(false, true)), "host title kind primitives scale empty status hits children");
+        assert_eq!(keys(&level(false, false)), "host title kind empty status hits children");
     }
 
     #[test]

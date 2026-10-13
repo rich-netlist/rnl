@@ -43,7 +43,7 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 | `nativeMenu` | Whether the platform shows the menu bar itself; if not, the page shows its own. |
 | `initial()` | What to open at start, or null; on the desktop, the file on the command line. |
 | `pick(kind)` | Ask for something to open: `"file"`, and on the web also `"folder"` or `"url"`; null when nothing is chosen. |
-| `build(source)` | Read a source and return its Document; rejects with a message when it cannot. |
+| `build(source)` | Read a source and return its Document; rejects with a message when it cannot. The Document's TypeScript declarations are generated from the core's Rust types ([`crates/rnl-view/types`](../../crates/rnl-view/README.md#type-definitions)); `shell.js` refers to them in its JSDoc, which loads nothing at run time. |
 | `setCheck(id, checked)` | Show a check-mark command's state in the platform's menu. |
 | `onCommand(handler)` | Call `handler(id)` for each command chosen in the platform's menu. |
 
