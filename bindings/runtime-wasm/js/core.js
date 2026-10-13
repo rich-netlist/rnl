@@ -61,7 +61,7 @@ export async function loadCore(wasm) {
       answer = text(exports.memory, exports.rnl_response(), length);
     } catch (e) {
       // a panic, or a trap such as running out of memory
-      const message = panicMessage(exports);
+      const message = stopMessage(exports);
       restart();
       throw new Error(`The core stopped: ${message || e.message}`, { cause: e });
     }
@@ -94,10 +94,18 @@ async function fetchModule(url) {
   return readFile(url);
 }
 
-/** The message the panic hook kept, or "" when there is none or it cannot be read. */
-function panicMessage(exports) {
+/**
+ * Why the last call stopped: the message the panic hook kept, or that an allocation failed, which
+ * aborts without a panic; "" when the module does not say or cannot be read.
+ */
+function stopMessage(exports) {
   try {
-    return text(exports.memory, exports.rnl_panic_message(), exports.rnl_panic_len() >>> 0);
+    const length = exports.rnl_panic_len() >>> 0;
+    if (length) return text(exports.memory, exports.rnl_panic_message(), length);
+    const failed = exports.rnl_alloc_failed() >>> 0;
+    if (!failed) return "";
+    const used = Math.round(exports.memory.buffer.byteLength / 2 ** 20);
+    return `it ran out of memory, with ${used} MB in use, when it asked for ${failed} bytes more`;
   } catch {
     return "";
   }

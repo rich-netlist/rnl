@@ -11,14 +11,18 @@
 //!
 //! A panic traps: the call throws in JavaScript, and the instance must not be used for another
 //! request. The panic hook keeps the message first, so the caller can read it with
-//! `rnl_panic_len()` and `rnl_panic_message()` before it replaces the instance.
+//! `rnl_panic_len()` and `rnl_panic_message()` before it replaces the instance. Running out of
+//! memory traps without a panic; `rnl_alloc_failed()` then says how much could not be allocated.
 //!
 //! Addresses and lengths are `usize`, an `i32` to WebAssembly. The buffers are statics owned by
 //! the module, so the exports need no unsafe code: the caller writes only into the room
-//! `rnl_request` made, and reads only what the other exports point to.
+//! `rnl_request` made, and reads only what the other exports point to. The only unsafe code passes
+//! allocations on to the system allocator, to note one that fails.
 
+use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::BTreeMap;
 use std::fmt::Write;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
 use rnl_runtime::source::{normalize, MemoryProvider};
@@ -46,6 +50,10 @@ pub struct Request {
     /// Panic with this message, to test that the caller still gets an answer.
     #[cfg(feature = "test-panic")]
     pub panic: Option<String>,
+    /// Allocate until there is no memory left, to test that the caller learns why the core stopped.
+    #[cfg(feature = "test-panic")]
+    #[serde(default)]
+    pub out_of_memory: bool,
 }
 
 fn yes() -> bool {
@@ -72,6 +80,14 @@ pub fn respond(request: &[u8]) -> Response {
     if let Some(message) = &request.panic {
         panic!("{message}");
     }
+    #[cfg(feature = "test-panic")]
+    if request.out_of_memory {
+        // room that is never written, so that it costs address space rather than pages
+        let mut kept: Vec<Vec<u8>> = Vec::new();
+        loop {
+            kept.push(Vec::with_capacity(1 << 30));
+        }
+    }
     let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions { dialect: request.dialect, runtime: Options { std: request.std } };
@@ -92,11 +108,48 @@ static REQUEST: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 static RESPONSE: Mutex<String> = Mutex::new(String::new());
 /// The message of the last panic, kept by the panic hook for the caller to read after the trap.
 static PANIC: Mutex<String> = Mutex::new(String::new());
+/// The size of an allocation that failed in the last call; 0 when none did.
+static FAILED_ALLOCATION: AtomicUsize = AtomicUsize::new(0);
+
+/// The system allocator, noting the size of an allocation that fails. Running out of memory
+/// aborts without calling the panic hook, so this is how the caller learns of it.
+struct NotingAllocator;
+
+#[global_allocator]
+static ALLOCATOR: NotingAllocator = NotingAllocator;
+
+// SAFETY: every call goes to `System` as it came, with the caller's guarantees; a failure is noted
+// in an atomic, which does not allocate.
+unsafe impl GlobalAlloc for NotingAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        noted(System.alloc(layout), layout.size())
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        noted(System.alloc_zeroed(layout), layout.size())
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        noted(System.realloc(ptr, layout, new_size), new_size)
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        System.dealloc(ptr, layout)
+    }
+}
+
+/// An allocation's result, after noting its size when it failed.
+fn noted(ptr: *mut u8, size: usize) -> *mut u8 {
+    if ptr.is_null() {
+        FAILED_ALLOCATION.store(size, Ordering::Relaxed);
+    }
+    ptr
+}
 
 /// Make room for a request of `len` bytes and return where to write it.
 #[no_mangle]
 pub extern "C" fn rnl_request(len: usize) -> *mut u8 {
-    keep_panic_messages();
+    begin();
     let mut request = lock(&REQUEST);
     request.clear();
     request.resize(len, 0);
@@ -106,8 +159,7 @@ pub extern "C" fn rnl_request(len: usize) -> *mut u8 {
 /// Answer the request written where [`rnl_request`] said, and return the length of the answer.
 #[no_mangle]
 pub extern "C" fn rnl_build() -> usize {
-    keep_panic_messages();
-    lock(&PANIC).clear();
+    begin();
     let request = std::mem::take(&mut *lock(&REQUEST));
     let answer = respond_json(&request);
     let mut response = lock(&RESPONSE);
@@ -121,16 +173,29 @@ pub extern "C" fn rnl_response() -> *const u8 {
     lock(&RESPONSE).as_ptr()
 }
 
-/// The length of the message of the last panic; 0 when the last request did not panic.
+/// The length of the message of the panic that stopped the last call; 0 when none did.
 #[no_mangle]
 pub extern "C" fn rnl_panic_len() -> usize {
     lock(&PANIC).len()
 }
 
-/// Where the message of the last panic is.
+/// Where the message of the panic that stopped the last call is.
 #[no_mangle]
 pub extern "C" fn rnl_panic_message() -> *const u8 {
     lock(&PANIC).as_ptr()
+}
+
+/// The size in bytes of the allocation that failed in the last call; 0 when none did.
+#[no_mangle]
+pub extern "C" fn rnl_alloc_failed() -> usize {
+    FAILED_ALLOCATION.load(Ordering::Relaxed)
+}
+
+/// Start a call: keep the messages of panics, and forget what stopped the call before.
+fn begin() {
+    keep_panic_messages();
+    lock(&PANIC).clear();
+    FAILED_ALLOCATION.store(0, Ordering::Relaxed);
 }
 
 /// A buffer behind its lock. A panic that held the lock leaves nothing half done that matters:
@@ -285,6 +350,13 @@ R1 a 0 1k
         // SAFETY: `rnl_build` left `len` bytes of answer at `rnl_response()`, until the next call.
         let answer = unsafe { std::slice::from_raw_parts(rnl_response(), len) };
         assert_eq!(answer, respond_json(request.as_bytes()).as_bytes());
-        assert_eq!(rnl_panic_len(), 0);
+        assert_eq!((rnl_panic_len(), rnl_alloc_failed()), (0, 0));
+        // an allocation that fails is noted for the caller, until the next call
+        let huge = Layout::from_size_align(usize::MAX / 4, 1).unwrap();
+        // SAFETY: the layout's size is not zero; the null pointer that comes back is not used.
+        assert!(unsafe { ALLOCATOR.alloc(huge) }.is_null());
+        assert_eq!(rnl_alloc_failed(), usize::MAX / 4);
+        rnl_request(0);
+        assert_eq!(rnl_alloc_failed(), 0);
     }
 }

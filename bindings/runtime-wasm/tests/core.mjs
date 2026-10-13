@@ -1,11 +1,11 @@
 // The JavaScript modules on their own: core.js builds from memory, lists what is missing, throws the
-// core's errors and survives a panic; client.js collects the files a document needs and runs the
-// core in a Worker, here a Node worker thread.
+// core's errors and survives a panic or running out of memory; client.js collects the files a
+// document needs and runs the core in a Worker, here a Node worker thread.
 //
 //   node bindings/runtime-wasm/tests/core.mjs [DIR]
 //
-// DIR is what build.mjs wrote, dist/ by default. The panic tests need a module built with the
-// test-panic feature, and are skipped without it:
+// DIR is what build.mjs wrote, dist/ by default. The tests that stop the core need a module built
+// with the test-panic feature, and are skipped without it:
 //
 //   node bindings/runtime-wasm/build.mjs --features test-panic --out target/wasm-test
 //   node bindings/runtime-wasm/tests/core.mjs target/wasm-test
@@ -98,6 +98,15 @@ test("a panic is thrown with its message, and a new instance answers", { skip: !
   } finally {
     WebAssembly.Instance = Instance;
   }
+});
+
+test("running out of memory is thrown as such, and a new instance answers", { skip: !panics && "no test-panic feature" }, () => {
+  assert.throws(() => core.build({ ...untitled, out_of_memory: true }), (e) => {
+    assert.match(e.message, /^The core stopped: it ran out of memory, with \d+ MB in use, when it asked for 1073741824 bytes more$/);
+    assert.ok(e.cause instanceof WebAssembly.RuntimeError);
+    return true;
+  });
+  assert.equal(core.build(untitled).path, "untitled-1");
 });
 
 test("collect reads what is missing until nothing new can be read", async () => {
