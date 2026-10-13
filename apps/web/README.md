@@ -47,7 +47,11 @@ The core's module Worker must come from the page's own origin, so `core/` stays 
 
 ## Browsers
 
-The page keeps the browser baseline of decision 0006: Chromium 109, the last Chrome and Edge on Windows 7 and 8.1, and Safari 16; and Firefox from 114, the first with module Workers. It uses no newer feature, such as JSON import attributes, CSS nesting or `Array.prototype.toSorted`; it reads files through `<input type="file">`, a folder through its `webkitdirectory`, and dropped folders through `webkitGetAsEntry`, which all three have, and not through `showOpenFilePicker`, which only Chromium has. It has been tried in headless Chrome 155 and Edge 155.
+The page keeps the browser baseline of decision 0006: Chromium 109, the last Chrome and Edge on Windows 7 and 8.1, and Safari 16; and Firefox from 114, the first with module Workers. It uses no newer feature, such as JSON import attributes, CSS nesting or `Array.prototype.toSorted`; it reads files through `<input type="file">`, a folder through its `webkitdirectory`, and dropped folders through `webkitGetAsEntry`, which all three have, and not through `showOpenFilePicker`, which only Chromium has. Its smoke tests pass in headless Chrome 155, and in Playwright's Firefox 155 and WebKit 26.6 ([Testing](#testing)).
+
+## Testing
+
+[`tests/viewer`](../../tests/viewer/README.md#the-web-viewer) smoke-tests the site in Chromium, Firefox and WebKit with Playwright: it builds the site with the samples, serves it with `serve.mjs`, and opens netlists by `?url=`, files and a folder set on the file inputs, dropped files, a Latin-1 file and a missing include, reads a served netlist again after it changed, and shows the About box. Each Document must be `rnl view`'s for the same files but for the paths that name them. [`viewer.yml`](../../.github/workflows/viewer.yml) runs them in CI.
 
 ## How it differs from the desktop viewer
 

@@ -8,7 +8,7 @@ It is plain HTML, CSS and ES modules, with no dependencies and no build step. It
 find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 ```
 
-[`tests/viewer`](../../tests/viewer/README.md) tests the page in Chromium, Firefox and WebKit against a fake shell.
+[`tests/viewer`](../../tests/viewer/README.md) tests the page in Chromium, Firefox and WebKit against a fake shell, and smoke-tests the web viewer with its own shell and the core.
 
 ## Modules
 
