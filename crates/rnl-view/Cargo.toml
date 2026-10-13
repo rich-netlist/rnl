@@ -1,0 +1,19 @@
+[package]
+name = "rnl-view"
+description = "The Rich Netlist (RNL) core interface: a workspace in, a Document out"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rnl-runtime.workspace = true
+rnl-host-spice.workspace = true
+rnl-host-spectre.workspace = true
+rnl-render.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

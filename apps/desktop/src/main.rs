@@ -5,11 +5,10 @@
 // no console window behind the app in release builds on Windows
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod document;
-
 use std::path::PathBuf;
 
-use document::Document;
+use rnl_cli::FsProvider;
+use rnl_view::{BuildOptions, Document};
 use tauri::menu::{
     AboutMetadata, CheckMenuItem, CheckMenuItemBuilder, Menu, MenuItem, MenuItemBuilder, PredefinedMenuItem,
     SubmenuBuilder,
@@ -23,9 +22,12 @@ const NETLISTS: [&str; 10] = ["sp", "spi", "spice", "cir", "ckt", "net", "inc", 
 /// Read and draw a file, and name the window after it.
 #[tauri::command]
 async fn open_document(window: WebviewWindow, path: String) -> Result<Document, String> {
-    let doc = tauri::async_runtime::spawn_blocking(move || document::load(&PathBuf::from(path)))
-        .await
-        .map_err(|e| e.to_string())??;
+    let doc = tauri::async_runtime::spawn_blocking(move || {
+        let path = std::path::absolute(&path).map_err(|e| format!("{path}: {e}"))?;
+        rnl_view::build(&path.to_string_lossy(), &FsProvider::new(&[]), &BuildOptions::default())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     let _ = window.set_title(&format!("{} - RNL Viewer", doc.name));
     Ok(doc)
 }

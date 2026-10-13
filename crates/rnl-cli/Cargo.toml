@@ -18,7 +18,6 @@ path = "src/main.rs"
 
 [dependencies]
 rnl-runtime.workspace = true
-rnl-host-spice.workspace = true
-rnl-host-spectre.workspace = true
 rnl-render.workspace = true
+rnl-view.workspace = true
 serde_json.workspace = true

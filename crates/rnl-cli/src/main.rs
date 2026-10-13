@@ -3,15 +3,16 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use rnl_cli::{dump, path_str, FsProvider};
+use rnl_cli::{dump, FsProvider};
 use rnl_runtime::diag::{Severity, Sink};
-use rnl_runtime::source::Provider;
 use rnl_runtime::{Interpretation, Options};
+use rnl_view::BuildOptions;
 
 const USAGE: &str = "usage:
   rnl check FILE [options]          print the diagnostics; exit 1 on errors
   rnl render FILE -o DIR [options]  write one SVG per drawing level
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
+  rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
@@ -97,6 +98,12 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             println!("{}", serde_json::to_string_pretty(&dump::interpretation(&r)).unwrap());
             Ok(ExitCode::SUCCESS)
         }
+        "view" => {
+            let options = BuildOptions { dialect: args.dialect.clone(), runtime: Options { std: args.std } };
+            let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
+            println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
         "render" => {
             let r = interpret(args, &provider)?;
             let out = args.out.clone().ok_or("render needs -o DIR")?;
@@ -116,12 +123,12 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         }
         "strip-generated" => {
             let out = args.out.clone().ok_or("strip-generated needs -o OUT")?;
-            let path = path_str(&args.file);
-            let text = provider.read(&path).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
             let mut sink = Sink::new();
             let doc = rnl_cli::read_host(&args.file, args.dialect.as_deref(), &provider, &mut sink)?;
             let main = doc.main().file.clone();
-            let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, &text);
+            // the text as the adapter read it, so a bundled package file can be stripped too
+            let text = doc.source(&main).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
+            let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);
             std::fs::write(&out, stripped).map_err(|e| e.to_string())?;
             Ok(ExitCode::SUCCESS)
         }
