@@ -450,6 +450,10 @@ pub struct SetData {
     pub mods: Vec<SetMod>,
     /// The indexes in `mods` of the edits made in each scene, in order; `add_mod` keeps it.
     pub mods_by_scene: HashMap<SceneId, Vec<usize>>,
+    /// The sources in `mods` that are lazy or can become so (10.3), in order; `add_mod` keeps it.
+    pub lazy_sources: Vec<ObjId>,
+    /// Whether one of `mods` is a REMOVE-FROM; `add_mod` keeps it.
+    pub removes: bool,
     /// The host level unit that wrote it.
     pub writer: Option<UnitId>,
     pub kind: SetKind,
@@ -457,14 +461,27 @@ pub struct SetData {
 
 impl SetData {
     pub fn plain(items: Vec<(ObjId, bool)>, explicit: bool) -> SetData {
-        SetData { items, explicit, mods: Vec::new(), mods_by_scene: HashMap::new(), writer: None, kind: SetKind::Plain }
+        SetData {
+            items,
+            explicit,
+            mods: Vec::new(),
+            mods_by_scene: HashMap::new(),
+            lazy_sources: Vec::new(),
+            removes: false,
+            writer: None,
+            kind: SetKind::Plain,
+        }
     }
 
-    /// Add an ADD-TO or REMOVE-FROM (5.2.2).
-    pub fn add_mod(&mut self, m: SetMod) {
+    /// Add an ADD-TO or REMOVE-FROM (5.2.2); `lazy` tells whether its source is lazy or can become so.
+    pub fn add_mod(&mut self, m: SetMod, lazy: bool) {
         if let Some(s) = m.ctx.scene {
             self.mods_by_scene.entry(s).or_default().push(self.mods.len());
         }
+        if lazy {
+            self.lazy_sources.push(m.source);
+        }
+        self.removes |= !m.add;
         self.mods.push(m);
     }
 }

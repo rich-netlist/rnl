@@ -283,13 +283,31 @@ impl<'p> Interp<'p> {
                 SetKind::Select { .. } | SetKind::Gen { .. } => true,
                 SetKind::Union { source } => self.is_lazy(*source),
                 SetKind::Plain => {
-                    if !s.mods.is_empty() && s.mods.iter().any(|m| self.is_lazy(m.source)) {
+                    // the sources of the edits that are never lazy are not kept (`never_lazy`)
+                    if s.lazy_sources.iter().any(|o| self.is_lazy(*o)) {
                         return false;
                     }
                     s.items.iter().any(|(o, _)| self.is_lazy(*o))
                 }
             },
             _ => false,
+        }
+    }
+
+    /// Is a value not lazy now and never so later? Only the edits of a set change with time, and
+    /// they can only make a plain set not lazy, so a plain set is never lazy when none of its
+    /// members can be.
+    pub(crate) fn never_lazy(&self, id: ObjId) -> bool {
+        if id == LEVEL {
+            return false;
+        }
+        match self.o(id) {
+            ObjData::Set(s) => match &s.kind {
+                SetKind::Select { .. } | SetKind::Gen { .. } => false,
+                SetKind::Union { source } => self.never_lazy(*source),
+                SetKind::Plain => s.items.iter().all(|(o, _)| self.never_lazy(*o)),
+            },
+            _ => true,
         }
     }
 

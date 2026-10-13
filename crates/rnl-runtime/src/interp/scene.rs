@@ -852,8 +852,7 @@ impl Interp<'_> {
             return v.clone();
         }
         if self.scenes[s].busy.contains(&key) {
-            let removing = self.set(obj).mods.iter().any(|m| !m.add);
-            if removing {
+            if self.set(obj).removes {
                 let msg =
                     "a cycle of sets with removals has no definite result; the whole interpretation fails (5.2.2)";
                 self.failed_doc = Some(msg.to_string());
