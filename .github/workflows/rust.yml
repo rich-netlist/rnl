@@ -57,4 +57,4 @@ jobs:
         run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
       # the core reads no files itself, so it builds for the browser as it is
       - name: Build the core for WebAssembly
-        run: cargo build --target wasm32-unknown-unknown -p rnl-runtime -p rnl-render -p rnl-host-spice -p rnl-host-spectre
+        run: cargo build --target wasm32-unknown-unknown -p rnl-runtime -p rnl-render -p rnl-host-spice -p rnl-host-spectre -p rnl-view

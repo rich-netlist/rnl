@@ -2513,10 +2513,9 @@ dependencies = [
 name = "rnl-cli"
 version = "0.0.1"
 dependencies = [
- "rnl-host-spectre",
- "rnl-host-spice",
  "rnl-render",
  "rnl-runtime",
+ "rnl-view",
  "serde_json",
 ]
 
@@ -2548,6 +2547,15 @@ name = "rnl-runtime"
 version = "0.0.1"
 dependencies = [
  "serde_json",
+]
+
+[[package]]
+name = "rnl-view"
+version = "0.0.1"
+dependencies = [
+ "rnl-host-spectre",
+ "rnl-host-spice",
+ "rnl-runtime",
 ]
 
 [[package]]

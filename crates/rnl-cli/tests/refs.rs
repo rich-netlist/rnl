@@ -113,9 +113,8 @@ R2 a b 1k
     let mem = MemoryProvider::new().with("doc.sp", text);
     let fs = FsProvider::new(&[]);
     let both = rnl_runtime::source::Layered { layers: vec![&mem, &fs] };
-    let mut sink = rnl_runtime::diag::Sink::new();
-    let doc = rnl_cli::read_host(Path::new("doc.sp"), None, &both, &mut sink).unwrap();
-    let r = rnl_runtime::interpret(doc, &both, &Options::default(), sink);
+    // with the bundled standard packages under the files, as `rnl` reads a document
+    let r = interpret_file(Path::new("doc.sp"), None, &both, &Options::default()).unwrap();
     let lines: Vec<String> = text.lines().map(String::from).collect();
     let mut over: Vec<String> =
         r.failed.iter().filter(|f| f.conflict && f.start.file == "doc.sp").map(|f| failed_text(&lines, f)).collect();

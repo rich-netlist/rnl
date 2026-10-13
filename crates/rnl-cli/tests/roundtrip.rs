@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use rnl_cli::{path_str, read_host, FsProvider};
+use rnl_cli::{interpret_file, path_str, read_host, FsProvider};
 use rnl_runtime::diag::Sink;
 use rnl_runtime::source::{Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{record_type, remove_records, replace_generated, strip_generated};
@@ -71,9 +71,7 @@ fn a_solver_record_written_back_reads_back() {
     assert_eq!(host_lines(&written), host_lines(&text));
     let mem = MemoryProvider::new().with(&path, &written);
     let both = Layered { layers: vec![&mem, &fs] };
-    let mut sink = Sink::new();
-    let again = read_host(&f, None, &both, &mut sink).unwrap();
-    let r = rnl_runtime::interpret(again, &both, &Options::default(), sink);
+    let r = interpret_file(&f, None, &both, &Options::default()).unwrap();
     let r1 = r.model.levels[0].items.iter().find(|i| i.id == "#R1").unwrap();
     assert_eq!(r1.at, (6.0, 8.0));
     assert_eq!(r1.orient.as_str(), "R90");

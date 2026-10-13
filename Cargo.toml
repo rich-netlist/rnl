@@ -5,6 +5,7 @@ members = [
     "crates/rnl-host-spice",
     "crates/rnl-host-spectre",
     "crates/rnl-render",
+    "crates/rnl-view",
     "crates/rnl-cli",
 ]
 
@@ -22,3 +23,4 @@ rnl-runtime = { path = "crates/rnl-runtime" }
 rnl-host-spice = { path = "crates/rnl-host-spice" }
 rnl-host-spectre = { path = "crates/rnl-host-spectre" }
 rnl-render = { path = "crates/rnl-render" }
+rnl-view = { path = "crates/rnl-view" }

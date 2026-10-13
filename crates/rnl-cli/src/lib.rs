@@ -1,5 +1,6 @@
-//! The pieces of the `rnl` command: reading files, the bundled packages, and JSON output.
-//! The conformance tests use them too.
+//! The pieces of the `rnl` command: reading files and JSON output. What reads no files, such as
+//! dialect detection, the bundled packages and the level status, comes from `rnl-view`. The
+//! conformance tests use them too.
 
 pub mod dump;
 pub mod provider;
@@ -8,26 +9,11 @@ use std::path::Path;
 
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::HostDocument;
-use rnl_runtime::model::LevelView;
 use rnl_runtime::source::Provider;
 use rnl_runtime::{Interpretation, Options};
 
 pub use provider::{path_str, FsProvider};
-
-/// Is the main file Spectre? By `dialect`, by the `.scs` extension, or a `simulator lang=spectre`
-/// near the top.
-pub fn is_spectre(path: &Path, text: &str, dialect: Option<&str>) -> bool {
-    if let Some(d) = dialect {
-        return d == "spectre";
-    }
-    if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("scs")) {
-        return true;
-    }
-    text.lines().take(50).any(|l| {
-        let l = l.trim().to_lowercase();
-        l.starts_with("simulator") && l.contains("lang") && l.contains("spectre")
-    })
-}
+pub use rnl_view::{bundled, is_spectre, level_status, status_lines};
 
 /// Read a host document with the adapter its dialect needs.
 pub fn read_host(
@@ -36,54 +22,16 @@ pub fn read_host(
     provider: &dyn Provider,
     sink: &mut Sink,
 ) -> Result<HostDocument, String> {
-    let path = path_str(file);
-    let text = provider.read(&path).ok_or_else(|| format!("cannot read {}", file.display()))?;
-    let doc = if is_spectre(file, &text, dialect) {
-        rnl_host_spectre::read(&path, provider, sink)
-    } else {
-        rnl_host_spice::read(&path, provider, sink)
-    };
-    doc.ok_or_else(|| format!("cannot read {}", file.display()))
+    rnl_view::read_host(&file.to_string_lossy(), dialect, provider, sink)
 }
 
-/// Read and interpret a file: a netlist, or a package file (`.rnl`) checked on its own.
+/// Read and interpret a file: a netlist, or a package file (`.rnl`) checked on its own, with the
+/// bundled packages under `provider`.
 pub fn interpret_file(
     file: &Path,
     dialect: Option<&str>,
     provider: &dyn Provider,
     options: &Options,
 ) -> Result<Interpretation, String> {
-    if file.extension().is_some_and(|e| e.eq_ignore_ascii_case("rnl")) {
-        return Ok(rnl_runtime::check_package(&path_str(file), provider, options));
-    }
-    let mut sink = Sink::new();
-    let doc = read_host(file, dialect, provider, &mut sink)?;
-    Ok(rnl_runtime::interpret(doc, provider, options, sink))
-}
-
-/// What a drawing level still lacks without a solver: objects without a position, and the
-/// constraints by the status their check against the written coordinates gave. None when
-/// everything is placed and every constraint holds.
-pub fn level_status(lv: &LevelView) -> Option<String> {
-    let mut parts = Vec::new();
-    if !lv.unplaced.is_empty() {
-        parts.push(format!("{} without a position", lv.unplaced.len()));
-    }
-    let mut by_status: Vec<(&str, usize)> = Vec::new();
-    for c in &lv.constraints {
-        match by_status.iter_mut().find(|(s, _)| *s == c.status) {
-            Some((_, n)) => *n += 1,
-            None => by_status.push((&c.status, 1)),
-        }
-    }
-    if by_status.iter().any(|(s, _)| *s != "ok") {
-        let list: Vec<String> = by_status.iter().map(|(s, n)| format!("{n} {s}")).collect();
-        parts.push(format!("constraints: {}", list.join(", ")));
-    }
-    (!parts.is_empty()).then(|| parts.join("; "))
-}
-
-/// The status of every level that lacks something, one line each, as `rnl check` prints them.
-pub fn status_lines(r: &Interpretation) -> Vec<String> {
-    r.model.levels.iter().filter_map(|lv| level_status(lv).map(|s| format!("status {}: {s}", lv.title))).collect()
+    rnl_view::interpret(&file.to_string_lossy(), dialect, provider, options)
 }

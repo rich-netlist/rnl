@@ -8,6 +8,7 @@ The Rust workspace ([`../Cargo.toml`](../Cargo.toml)). The crates implement the 
 | [`rnl-host-spice`](rnl-host-spice/README.md) | Reads SPICE netlists into the runtime's host document. |
 | [`rnl-host-spectre`](rnl-host-spectre/README.md) | Reads Spectre netlists, including `simulator lang=spice` parts. |
 | [`rnl-render`](rnl-render/README.md) | Draws an effective model as basic primitives and SVG. |
+| [`rnl-view`](rnl-view/README.md) | What the frontends share: dialect detection, interpretation with the standard packages bundled, level status. Reads no files. |
 | [`rnl-cli`](rnl-cli/README.md) | The `rnl` command: check, render, dump, and strip generated records. |
 | [`rnl-solver`](rnl-solver/README.md) | Future solver; no crate yet. |
 
@@ -16,6 +17,6 @@ cargo build --release -p rnl-cli
 cargo test --workspace
 ```
 
-The runtime, the renderer and both host adapters build for `wasm32-unknown-unknown`; CI checks this, although no WASM binding exists yet.
+The runtime, the renderer, both host adapters and `rnl-view` build for `wasm32-unknown-unknown`; CI checks this, although no WASM binding exists yet.
 
 The crates are not published. See the [roadmap](../docs/roadmap.md) for planned work.

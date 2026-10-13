@@ -1,28 +1,17 @@
-//! Files from the file system, and the packages that ship with the tool (16.2, 16.3).
+//! Files from the file system, and the package directories given on the command line (16.2). The
+//! packages that ship with the tool come from `rnl-view`, which layers them under these.
 
 use std::path::{Path, PathBuf};
 
-use rnl_runtime::source::{MemoryProvider, Provider};
-
-/// The standard packages bundled with the tool.
-const BUNDLED: [(&str, &str); 2] = [
-    ("rnl-std.rnl", include_str!("../../../libraries/standard/rnl-std.rnl")),
-    ("rnl-zh.rnl", include_str!("../../../libraries/standard/rnl-zh.rnl")),
-];
-const BUNDLED_DIR: &str = "<bundled>";
+use rnl_runtime::source::Provider;
 
 pub struct FsProvider {
     dirs: Vec<PathBuf>,
-    bundled: MemoryProvider,
 }
 
 impl FsProvider {
     pub fn new(dirs: &[PathBuf]) -> FsProvider {
-        let mut bundled = MemoryProvider { package_dirs: vec![BUNDLED_DIR.into()], ..MemoryProvider::default() };
-        for (name, text) in BUNDLED {
-            bundled.insert(&format!("{BUNDLED_DIR}/{name}"), text);
-        }
-        FsProvider { dirs: dirs.to_vec(), bundled }
+        FsProvider { dirs: dirs.to_vec() }
     }
 }
 
@@ -32,9 +21,6 @@ pub fn path_str(p: &Path) -> String {
 
 impl Provider for FsProvider {
     fn read(&self, path: &str) -> Option<String> {
-        if path.starts_with(BUNDLED_DIR) {
-            return self.bundled.read(path);
-        }
         let bytes = std::fs::read(path).ok()?;
         Some(match String::from_utf8(bytes) {
             Ok(s) => s.strip_prefix('\u{feff}').map(String::from).unwrap_or(s),
@@ -42,7 +28,7 @@ impl Provider for FsProvider {
         })
     }
 
-    /// The package directories given on the command line, then the bundled packages (16.2).
+    /// The package directories given on the command line (16.2).
     fn package_files(&self) -> Vec<String> {
         let mut out = Vec::new();
         for d in &self.dirs {
@@ -56,7 +42,6 @@ impl Provider for FsProvider {
             files.sort();
             out.extend(files.iter().map(|p| path_str(p)));
         }
-        out.extend(self.bundled.package_files());
         out
     }
 }
