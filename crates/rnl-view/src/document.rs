@@ -34,9 +34,11 @@ pub struct Document {
     pub objects: Vec<Object>,
     /// The places in the files that name an object.
     pub spans: Vec<Span>,
-    /// The files the core asked for and did not get, such as an include or a package file that
-    /// is not in the workspace: each once, in the order first asked. A frontend that can read
-    /// them adds them to the workspace and builds again. The bundled packages are never missing.
+    /// The files the core asked for by path and did not get, such as an include or a package
+    /// file named by `path=` that is not in the workspace: each once, as the provider was asked
+    /// for it, in the order first asked. A frontend that can read them adds them to the
+    /// workspace and builds again. The bundled packages are never missing, and neither is a
+    /// package found by name: that comes only from the provider's package directories (16.2).
     pub missing: Vec<String>,
 }
 
@@ -84,7 +86,12 @@ pub struct Hit {
 
 #[derive(Serialize, Debug)]
 pub struct SourceFile {
-    /// The file as the runtime knows it.
+    /// The file as the runtime knows it: relative to the opened file's directory when it is in it
+    /// or below, otherwise as the provider names it. With a rooted or absolute entry, the entry's
+    /// directory joined with this path (`rnl_runtime::source::join`) is the file in the
+    /// workspace. With a relative entry in a directory, a file outside that directory keeps a
+    /// relative name, which can be that of a file inside it; the Document then holds only one of
+    /// the two.
     pub path: String,
     /// The file as shown: relative to the opened file's directory when it is inside it.
     pub name: String,

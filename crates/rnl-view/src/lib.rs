@@ -47,6 +47,9 @@ pub struct BuildOptions {
 /// `/`-separated (a `\` is read as `/`). `files` is the frontend's file access: the disk, or texts
 /// held in memory, untitled ones included. The bundled packages are layered under it. Fails when
 /// the entry itself cannot be read.
+///
+/// Name the files of a workspace by rooted paths, such as `/w/top.sp`, as the desktop names them
+/// by absolute ones: see [`SourceFile::path`] for what a relative entry in a directory loses.
 pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Document, String> {
     let ws = Workspace::new(files);
     if ws.read(&slashed(entry)).is_none() {
@@ -250,19 +253,19 @@ C1 a 0 1p
 X1 a b part
 .end
 ";
-        let files = MemoryProvider::new().with("w/top.sp", text);
-        let d = build("w/top.sp", &files, &BuildOptions::default()).unwrap();
-        assert_eq!(d.missing, ["w/lib/parts.inc"]);
+        let files = MemoryProvider::new().with("/w/top.sp", text);
+        let d = build("/w/top.sp", &files, &BuildOptions::default()).unwrap();
+        assert_eq!(d.missing, ["/w/lib/parts.inc"]);
         let errors: Vec<_> = d.diagnostics.iter().filter(|x| x.severity == "error").collect();
         let found = errors.iter().any(|x| x.message.contains("lib/parts.inc cannot be found") && x.line == 2);
         assert!(found, "{errors:?}");
         // the same diagnostics as before the core noted what was missing
-        let again = interpret("w/top.sp", None, &files, &Options::default()).unwrap();
+        let again = interpret("/w/top.sp", None, &files, &Options::default()).unwrap();
         assert_eq!(d.diagnostics.len(), again.diagnostics().len());
 
         // once the frontend has the file, nothing is missing and its subcircuit is drawn
-        let files = files.with("w/lib/parts.inc", ".subckt part p q\nR1 p q 1k\n.ends\n");
-        let d = build("w/top.sp", &files, &BuildOptions::default()).unwrap();
+        let files = files.with("/w/lib/parts.inc", ".subckt part p q\nR1 p q 1k\n.ends\n");
+        let d = build("/w/top.sp", &files, &BuildOptions::default()).unwrap();
         assert!(d.missing.is_empty(), "{:?}", d.missing);
         assert_eq!(d.files.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(), ["top.sp", "lib/parts.inc"]);
         assert!(d.levels.iter().any(|l| l.title == "part"));
@@ -281,6 +284,61 @@ R1 a 0 1k
         assert_eq!(d.missing, ["pkg/acme.rnl"]);
         // the bundled packages are read as well, but are never missing
         assert!(d.missing.iter().all(|m| !m.starts_with(BUNDLED_DIR)));
+    }
+
+    #[test]
+    fn a_package_by_name_comes_from_the_package_directories_and_is_never_missing() {
+        let text = "* top
+R1 a 0 1k
+* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}
+.end
+";
+        let files = MemoryProvider::new().with("/w/top.sp", text);
+        let d = build("/w/top.sp", &files, &BuildOptions::default()).unwrap();
+        assert!(d.missing.is_empty(), "{:?}", d.missing);
+        let error = |d: &Document| d.diagnostics.iter().any(|x| x.message.contains("acme 1.0 cannot be found"));
+        assert!(error(&d), "{:?}", d.diagnostics);
+
+        // a frontend gives its package directories before it builds
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"acme\", version=\"1.0\")}";
+        let mut files = files.with("/w/packages/acme.rnl", package);
+        files.package_dirs.push("/w/packages".into());
+        let d = build("/w/top.sp", &files, &BuildOptions::default()).unwrap();
+        assert!(d.diagnostics.iter().all(|x| x.severity != "error"), "{:?}", d.diagnostics);
+        assert!(d.missing.is_empty(), "{:?}", d.missing);
+    }
+
+    #[test]
+    fn rooted_paths_keep_the_files_outside_the_entry_directory_apart() {
+        // `x.inc` beside the entry and `../x.inc` above it
+        let top = "* top
+.include \"x.inc\"
+.include \"../x.inc\"
+X1 a b inner
+X2 a b outer
+.end
+";
+        let inner = "* inner
+.subckt inner p q
+R1 p q 1k
+.ends
+";
+        let outer = "* outer
+.subckt outer p q
+R2 p q 1k
+.ends
+";
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/x.inc", inner).with("/x.inc", outer);
+        let d = build("/w/top.sp", &files, &BuildOptions::default()).unwrap();
+        let paths: Vec<&str> = d.files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(paths, ["top.sp", "x.inc", "/x.inc"]);
+        let lines = |name: &str| d.objects.iter().find(|o| o.name == name).and_then(|o| o.lines);
+        assert_eq!((lines("R1"), lines("R2")), (Some([1, 3, 3]), Some([2, 3, 3])));
+        // the entry's directory joined with a file's path is the file in the workspace
+        let dir = rnl_runtime::source::dirname(&d.path);
+        let keys: Vec<String> = paths.iter().map(|p| rnl_runtime::source::join(&dir, p)).collect();
+        assert_eq!(keys, ["/w/top.sp", "/w/x.inc", "/x.inc"]);
+        assert!(keys.iter().all(|k| files.read(k).is_some()));
     }
 
     #[test]
