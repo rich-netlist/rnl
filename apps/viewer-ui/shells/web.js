@@ -16,6 +16,8 @@ const PARTS = ["inc", "lib", "rnl"];
  * not relative to the entry, and then loses the file of some diagnostics; a directory avoids that.
  */
 const LOCAL = "/files";
+/** How long a server may send nothing, before or during its answer, until a fetch is given up (ms). */
+const STALL = 30000;
 
 const core = startCore();
 const built = new WeakSet(); // the sources built before: building one again reads it again
@@ -88,21 +90,59 @@ function urlSource(url) {
     async read(path, again) {
       if (!path.startsWith("/")) return null; // such as C:/models/x.lib
       const href = path === entry ? url.href : new URL(relative(dir, path), served).href;
-      let why;
-      try {
-        const response = await fetch(href, { cache: again ? "reload" : "no-cache" });
-        if (response.ok) {
-          if (path === entry) served = new URL(response.url || href);
-          return decodeText(await response.arrayBuffer());
-        }
-        why = `${response.status} ${response.statusText}`.trim();
-      } catch {
-        why = "the server did not answer, or it does not let this page read the file (CORS)";
+      const got = await fetchBytes(href, again);
+      if (got.bytes) {
+        if (path === entry) served = new URL(got.url || href);
+        return decodeText(got.bytes);
       }
-      if (path === entry) throw new Error(`${href} could not be fetched: ${why}.`);
+      if (path === entry) throw new Error(`${href} could not be fetched: ${got.why}.`);
       return null;
     },
   };
+}
+
+/**
+ * The bytes at `href` and the address they came from, or why they could not be fetched. `again`
+ * fetches past the browser's cache. A server that sends nothing for STALL ms is given up.
+ *
+ * @param {string} href
+ * @param {boolean} again
+ * @returns {Promise<{ bytes: Uint8Array, url: string } | { bytes?: undefined, why: string }>}
+ */
+async function fetchBytes(href, again) {
+  const stop = new AbortController();
+  let timer = 0;
+  const wait = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => stop.abort(), STALL);
+  };
+  wait();
+  try {
+    const response = await fetch(href, { cache: again ? "reload" : "no-cache", signal: stop.signal });
+    if (!response.ok) return { why: `${response.status} ${response.statusText}`.trim() };
+    const chunks = [];
+    if (response.body) {
+      const reader = response.body.getReader();
+      for (;;) {
+        wait();
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+    }
+    const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+    let at = 0;
+    for (const c of chunks) {
+      bytes.set(c, at);
+      at += c.length;
+    }
+    return { bytes, url: response.url };
+  } catch {
+    if (stop.signal.aborted) return { why: `the server sent nothing for ${STALL / 1000} seconds` };
+    return { why: "the server did not answer, or it does not let this page read the file (CORS)" };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** A segment of a URL's path, decoded; as it is when it is not percent-encoded UTF-8. */
