@@ -1,5 +1,5 @@
-# Builds and tests the Rust workspace: formatting, lints and tests on three platforms, and the
-# core crates for WebAssembly, which the viewer will use.
+# Builds and tests the Rust workspace: formatting, lints and tests on three platforms; and the core
+# for WebAssembly, whose Documents must be those of the native build (decision 0006).
 name: Rust
 
 on:
@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - "crates/**"
+      - "bindings/**"
       - "libraries/**"
       - "tests/**"
       - "Cargo.toml"
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - "crates/**"
+      - "bindings/**"
       - "libraries/**"
       - "tests/**"
       - "Cargo.toml"
@@ -57,4 +59,14 @@ jobs:
         run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
       # the core reads no files itself, so it builds for the browser as it is
       - name: Build the core for WebAssembly
-        run: cargo build --target wasm32-unknown-unknown -p rnl-runtime -p rnl-render -p rnl-host-spice -p rnl-host-spectre -p rnl-view
+        run: cargo build --target wasm32-unknown-unknown -p rnl-runtime -p rnl-render -p rnl-host-spice -p rnl-host-spectre -p rnl-view -p rnl-runtime-wasm
+      - name: Build the WebAssembly binding
+        run: node --version && node bindings/runtime-wasm/build.mjs
+      - name: Test the binding's JavaScript modules, with a module that panics on request
+        run: |
+          node bindings/runtime-wasm/build.mjs --features test-panic --out target/wasm-test
+          node bindings/runtime-wasm/tests/core.mjs target/wasm-test
+      - name: Build the CLI
+        run: cargo build -p rnl-cli
+      - name: Native and WebAssembly builds give identical Documents
+        run: node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl
