@@ -44,6 +44,8 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
     let mut i = 0usize;
     let mut disabled = false;
     let mut after_record = false;
+    // no `*/` starts here or after (see record_extent)
+    let mut unclosed = n;
     while i < n {
         if disabled {
             match find(i, "*/") {
@@ -62,10 +64,12 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
             continue;
         }
         if starts(i, "/*") {
-            // `/*` at the start of a line or right after a record disables what follows (2.5)
-            let line_start = (0..i).rev().find(|&k| t[k] == '\n').map(|k| k + 1).unwrap_or(0);
-            let before: String = t[line_start..i].iter().collect();
-            if after_record || before.trim().is_empty() {
+            // `/*` at the start of a line or right after a record disables what follows (2.5); only
+            // the blanks right before it are looked at, so many `/*` on a line do not each go back
+            // to the start of the line
+            let at_line_start =
+                t[..i].iter().rev().find(|&&c| c == '\n' || !c.is_whitespace()).is_none_or(|&c| c == '\n');
+            if after_record || at_line_start {
                 disabled = true;
             }
             i += 2;
@@ -83,7 +87,7 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
                 i += 4;
                 continue;
             }
-            match record_extent(&t, i) {
+            match record_extent(&t, i, &mut unclosed) {
                 Err((msg, pos)) => {
                     sink.error(msg, Some(line_of(pos)));
                     if pos > i {
@@ -143,8 +147,10 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
     out
 }
 
-/// The end of the record starting at `start`, or why it is incomplete (2.4).
-fn record_extent(t: &[char], start: usize) -> Result<usize, (String, usize)> {
+/// The end of the record starting at `start`, or why it is incomplete (2.4). No `*/` starts at
+/// `unclosed` or after it; a comment found not closed moves `unclosed` back to that comment, so
+/// that the records of a run that each leave a comment open do not each look to its end.
+fn record_extent(t: &[char], start: usize, unclosed: &mut usize) -> Result<usize, (String, usize)> {
     let n = t.len();
     let mut i = start + 4;
     let mut depth = 0i64;
@@ -172,12 +178,15 @@ fn record_extent(t: &[char], start: usize) -> Result<usize, (String, usize)> {
             continue;
         }
         if starts(i, "/*") {
-            match (i + 2..n).find(|&j| starts(j, "*/")) {
+            match (i + 2..*unclosed).find(|&j| starts(j, "*/")) {
                 Some(j) => {
                     i = j + 2;
                     continue;
                 }
-                None => return Err(("the comment is not closed, so the record is incomplete (2.4)".into(), i)),
+                None => {
+                    *unclosed = (*unclosed).min(i + 2);
+                    return Err(("the comment is not closed, so the record is incomplete (2.4)".into(), i));
+                }
             }
         }
         if starts(i, "@RNL") && i > 0 && t[i - 1] == ' ' && !(i + 4 < n && name_char(t[i + 4])) {
@@ -266,6 +275,27 @@ mod tests {
         assert_eq!(recs.len(), 1);
         assert_eq!(sink.all().len(), 1);
         assert!(sink.all()[0].message.contains("incomplete"));
+    }
+
+    #[test]
+    fn unclosed_comments() {
+        let mut sink = Sink::new();
+        let recs = scan_run(
+            &lines(&[
+                "  /* @RNL {#M1} */ @RNL {#M2}",
+                " x /* /* @RNL {#M3}",
+                " @RNL {#M4 /* a }",
+                " @RNL {#M5 /* b }",
+                " @RNL {#M6}",
+            ]),
+            "a.sp",
+            &mut sink,
+        );
+        // `/*` after other text on its line disables nothing; a comment left open fails its record
+        let texts: Vec<&str> = recs.iter().map(|r| r.text.as_str()).collect();
+        assert_eq!(texts, vec!["@RNL {#M2}", "@RNL {#M3}", "@RNL {#M6}"]);
+        let errs: Vec<Loc> = sink.all().iter().map(|d| d.loc.clone().unwrap()).collect();
+        assert_eq!(errs, vec![Loc::new("a.sp", 4, 13), Loc::new("a.sp", 5, 13)]);
     }
 
     #[test]

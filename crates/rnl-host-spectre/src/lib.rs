@@ -13,7 +13,7 @@
 //! Names compare by case (3.6). A backslash escapes the next character of a name, so
 //! `D\<3\>` is read as `D<3>` (6.11). Only `0` is ground.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rnl_runtime::diag::{Loc, Sink};
 use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
@@ -279,6 +279,9 @@ struct Reader<'a> {
     doc: HostDocument,
     models: HashMap<String, Model>,
     spice_models: HashMap<String, String>,
+    /// The [`Level::name_key`]s of each level's instances, to find a name defined twice without
+    /// looking through the level's instances.
+    names: HashMap<LevelId, HashSet<String>>,
     pending_spice: Vec<(LevelId, usize, Vec<String>)>,
     main_dir: String,
 }
@@ -467,8 +470,8 @@ impl<'a> Reader<'a> {
             let mut stmt = strip_comment(stripped);
             let mut last = no;
             loop {
-                if let Some(s) = stmt.strip_suffix('\\') {
-                    stmt = s.to_string();
+                if stmt.ends_with('\\') {
+                    stmt.pop();
                     if idx < n {
                         stmt.push(' ');
                         stmt.push_str(&strip_comment(lines[idx].trim()));
@@ -741,7 +744,7 @@ impl<'a> Reader<'a> {
             return;
         }
         let lv = &mut self.doc.levels[circ];
-        if lv.inst(&inst.name).is_some() {
+        if !self.names.entry(circ).or_default().insert(lv.name_key(&inst.name)) {
             self.sink.error(format!("instance {} is defined twice", inst.name), Some(Loc::line(fname, no)));
             return;
         }
@@ -759,7 +762,6 @@ impl<'a> Reader<'a> {
         for (lv, k, plain) in std::mem::take(&mut self.pending_spice) {
             rnl_host_spice::resolve_nodes(&mut self.doc.levels[lv].instances[k], &plain, &spice_models);
         }
-        let subckt_keys: Vec<String> = self.doc.subckts.keys().cloned().collect();
         for lv in 0..self.doc.levels.len() {
             for k in 0..self.doc.levels[lv].instances.len() {
                 let inst = &self.doc.levels[lv].instances[k];
@@ -781,7 +783,7 @@ impl<'a> Reader<'a> {
                             Some(f) => (family_terminals(f), None, family_type(f, &m.params), false),
                             None => (None, None, None, false),
                         }
-                    } else if subckt_keys.contains(&master) {
+                    } else if self.doc.subckts.contains_key(&master) {
                         (None, None, None, true)
                     } else {
                         // neither a primitive nor a model card: a subcircuit defined elsewhere, such as a PDK device (6.4)
@@ -822,6 +824,7 @@ pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<Host
         doc,
         models: HashMap::new(),
         spice_models: HashMap::new(),
+        names: HashMap::new(),
         pending_spice: Vec::new(),
         main_dir,
     };
@@ -872,5 +875,20 @@ mod tests {
         assert_eq!(doc.main().instances[0].value.as_deref(), Some("1k"));
         assert_eq!(doc.main().records.len(), 1);
         assert_eq!(doc.levels[1].name, "lib.scs (tt)");
+    }
+
+    #[test]
+    fn names_defined_twice() {
+        // names compare by case in SPICE mode too, and each subcircuit has names of its own
+        let net = "// t\nsimulator lang=spectre\nR1 (a 0) resistor r=1k\nr1 (a 0) resistor r=1k\nsimulator lang=spice\nR1 a 0 2k\nsimulator lang=spectre\nsubckt cell (a)\nR1 (a 0) resistor r=1k\nends cell\n";
+        let p = MemoryProvider::new().with("a.scs", net);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        let msgs: Vec<&str> = sink.all().iter().map(|d| d.message.as_str()).collect();
+        assert_eq!(msgs, vec!["instance R1 is defined twice"]);
+        let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["R1", "r1"]);
+        assert_eq!(doc.main().instances[1].order, 1);
+        assert_eq!(doc.levels[1].instances.len(), 1);
     }
 }

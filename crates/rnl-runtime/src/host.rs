@@ -145,8 +145,20 @@ impl Level {
         }
     }
 
+    /// The index of the instance named `name`, the first if there are several. It looks through
+    /// every instance; a reader that checks each new name keeps their [`Level::name_key`]s instead.
     pub fn inst(&self, name: &str) -> Option<usize> {
         self.instances.iter().position(|i| self.same_name(&i.name, name))
+    }
+
+    /// The key a name is compared by in this level: as written, or with its ASCII letters in lower
+    /// case. Two names are the same by [`Level::same_name`] exactly when their keys are equal.
+    pub fn name_key(&self, name: &str) -> String {
+        if self.case_sensitive {
+            name.to_string()
+        } else {
+            name.to_ascii_lowercase()
+        }
     }
 }
 
@@ -294,5 +306,28 @@ mod tests {
         assert!(glob("*", "", false));
         assert!(glob("a*b*c", "aXXbYc", true));
         assert!(!glob("a*b", "aXXbY", true));
+    }
+
+    #[test]
+    fn instances_by_name() {
+        let mut lv = Level::new(LevelKind::File, "t.sp", "t.sp", "t.sp");
+        for name in ["R1", "RÄ", "X1", "x1"] {
+            lv.instances.push(Instance { name: name.into(), ..Instance::default() });
+        }
+        // only ASCII letters ignore case, as same_name compares; the first of a name is found
+        assert_eq!(lv.inst("r1"), Some(0));
+        assert_eq!(lv.inst("rÄ"), Some(1));
+        assert_eq!(lv.inst("rä"), None);
+        assert_eq!(lv.inst("x1"), Some(2));
+        for cs in [false, true] {
+            lv.case_sensitive = cs;
+            for (a, b) in [("R1", "r1"), ("RÄ", "rÄ"), ("RÄ", "rä"), ("X1", "X2"), ("x1", "x1")] {
+                assert_eq!(lv.name_key(a) == lv.name_key(b), lv.same_name(a, b), "{a} {b} {cs}");
+            }
+        }
+        // the answer follows the instances and the case rule as they are now
+        assert_eq!(lv.inst("x1"), Some(3));
+        lv.instances[0].name = "R2".into();
+        assert_eq!((lv.inst("R1"), lv.inst("R2")), (None, Some(0)));
     }
 }

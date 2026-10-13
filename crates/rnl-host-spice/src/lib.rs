@@ -9,7 +9,7 @@
 //! A carrier is a whole-line comment with `*` in column 1 followed by a space, or a bare `*`
 //! (2.2). The first line of every file is a title and never a carrier.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rnl_runtime::diag::{Loc, Sink};
 use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
@@ -209,6 +209,9 @@ pub struct Reader<'a> {
     pub sink: &'a mut Sink,
     pub doc: HostDocument,
     models: HashMap<String, String>,
+    /// The [`Level::name_key`]s of each level's instances, to find a name defined twice without
+    /// looking through the level's instances.
+    names: HashMap<LevelId, HashSet<String>>,
     unresolved: Vec<(LevelId, usize, Vec<String>)>,
     main_dir: String,
 }
@@ -267,6 +270,7 @@ impl<'a> Reader<'a> {
         let mut in_control = false;
         let mut ended = false;
         let mut pending: Option<Pending> = None;
+        let mut continued = Continued::default();
         // `.lib` sections: inside the selected one when reading a section; skipping an unselected one
         let mut in_section = section.is_none();
         let mut skip_lib: Option<String> = None;
@@ -331,7 +335,7 @@ impl<'a> Reader<'a> {
             }
             if let Some(rest) = raw.strip_prefix('*') {
                 if rest.trim().is_empty() || rest.starts_with(' ') {
-                    if pending.is_some() && next_is_continuation(&lines, idx) {
+                    if pending.is_some() && continued.after(&lines, idx) {
                         self.sink.warning(
                             "a comment line between a statement and its continuation: read, but hosts treat it differently (2.2)",
                             Some(Loc::line(&fname, no)),
@@ -524,7 +528,7 @@ impl<'a> Reader<'a> {
             return;
         }
         let lv = &mut self.doc.levels[circ];
-        if lv.inst(&el.inst.name).is_some() {
+        if !self.names.entry(circ).or_default().insert(lv.name_key(&el.inst.name)) {
             self.sink.error(format!("element {} is defined twice", el.inst.name), Some(Loc::line(fname, no)));
             return;
         }
@@ -543,14 +547,27 @@ fn unquote(s: &str) -> String {
     s.trim_matches(|c| c == '\'' || c == '"').to_string()
 }
 
-fn next_is_continuation(lines: &[&str], idx: usize) -> bool {
-    for s in &lines[idx + 1..] {
-        if s.starts_with('*') {
-            continue;
+/// The answer of [`Continued::after`] for one run of comment lines: it is the same for all the
+/// lines of the run, so each run is looked through once.
+#[derive(Default)]
+struct Continued {
+    /// The answer holds for the lines from `from` up to the one before `next`, the first line after
+    /// `from` that is not a comment line.
+    from: usize,
+    next: usize,
+    answer: bool,
+}
+
+impl Continued {
+    /// Whether the first line after line `idx` that is not a comment line is a continuation line.
+    fn after(&mut self, lines: &[&str], idx: usize) -> bool {
+        if !(self.from..self.next).contains(&idx) {
+            let next = (idx + 1..lines.len()).find(|&k| !lines[k].starts_with('*')).unwrap_or(lines.len());
+            let answer = lines.get(next).is_some_and(|s| s.trim().starts_with('+'));
+            *self = Continued { from: idx, next, answer };
         }
-        return s.trim().starts_with('+');
+        self.answer
     }
-    false
 }
 
 /// Read a SPICE document whose main file is `path`.
@@ -562,7 +579,8 @@ pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<Host
     let mut main = Level::new(LevelKind::File, fname.clone(), fname, path.clone());
     main.circuit = true;
     let doc = HostDocument::new(main, dialect());
-    let mut r = Reader { provider, sink, doc, models: HashMap::new(), unresolved: Vec::new(), main_dir };
+    let mut r =
+        Reader { provider, sink, doc, models: HashMap::new(), names: HashMap::new(), unresolved: Vec::new(), main_dir };
     r.read_file(&path, 0, 0, true, &[format!("{path}#")], None);
     finish(&mut r.doc, &r.models, std::mem::take(&mut r.unresolved));
     Some(r.doc)
@@ -623,6 +641,21 @@ mod tests {
         assert!(doc.subckt("CELL").is_some());
         assert_eq!(sink.all().len(), 1);
         assert_eq!(doc.main().instances[0].mtype.as_deref(), Some("nmos"));
+    }
+
+    #[test]
+    fn names_defined_twice() {
+        // names ignore case in their ASCII letters only, and each subcircuit has names of its own
+        let net = "* t\nR1 a 0 1k\nr1 a 0 2k\nRÄ a 0 1k\nRä a 0 1k\n.subckt cell a\nR1 a 0 1k\n.ends\n.end\n";
+        let p = MemoryProvider::new().with("t.sp", net);
+        let mut sink = Sink::new();
+        let doc = read("t.sp", &p, &mut sink).unwrap();
+        let msgs: Vec<&str> = sink.all().iter().map(|d| d.message.as_str()).collect();
+        assert_eq!(msgs, vec!["element r1 is defined twice"]);
+        let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["R1", "RÄ", "Rä"]);
+        assert_eq!(doc.main().instances[2].order, 2);
+        assert_eq!(doc.levels[1].instances.len(), 1);
     }
 
     #[test]
