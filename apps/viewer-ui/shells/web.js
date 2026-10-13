@@ -67,25 +67,34 @@ function within(path, dir) {
 }
 
 /**
- * A file on a web server, and the files it includes, fetched from the same origin. The workspace
- * names each file by its path there, such as /netlists/a/top.sp, so that relative includes resolve
- * as on the server. A file that cannot be fetched is missing; the entry is an error.
+ * A file on a web server, and the files it includes, fetched relative to the address the file was
+ * served from, after any redirect. The workspace names each file by its path on the server, such as
+ * /netlists/a/top.sp, so that relative includes, ../ included, resolve as there. A file at the root
+ * of the server goes under a directory named after the server, such as /example.org/top.sp, as files
+ * chosen go under LOCAL. A file that cannot be fetched is missing; the entry is an error.
  *
  * @param {URL} url
  * @returns {WebSource}
  */
 function urlSource(url) {
-  const entry = url.pathname.split("/").map(decode).join("/");
+  const names = url.pathname.split("/").map(decode);
+  if (names.length === 2) names.splice(1, 0, url.hostname);
+  const entry = names.join("/");
+  const dir = entry.split("/").slice(0, -1); // the entry's directory in the workspace, by its names
+  let served = url; // where the entry was served from when it was last read
   return {
     name: url.href,
     entry,
     async read(path, again) {
       if (!path.startsWith("/")) return null; // such as C:/models/x.lib
-      const href = path === entry ? url.href : url.origin + path.split("/").map(encodeURIComponent).join("/");
+      const href = path === entry ? url.href : new URL(relative(dir, path), served).href;
       let why;
       try {
         const response = await fetch(href, { cache: again ? "reload" : "no-cache" });
-        if (response.ok) return decodeText(await response.arrayBuffer());
+        if (response.ok) {
+          if (path === entry) served = new URL(response.url || href);
+          return decodeText(await response.arrayBuffer());
+        }
         why = `${response.status} ${response.statusText}`.trim();
       } catch {
         why = "the server did not answer, or it does not let this page read the file (CORS)";
@@ -103,6 +112,18 @@ function decode(segment) {
   } catch {
     return segment;
   }
+}
+
+/**
+ * The relative URL of the workspace path `path` from the directory whose names are `dir`, each name
+ * percent-encoded, such as "../b/x.inc". Resolved against the address of the file in `dir`, it keeps
+ * the server's own spelling of the names the two share.
+ */
+function relative(dir, path) {
+  const names = path.split("/");
+  let k = 0;
+  while (k < dir.length && k < names.length - 1 && names[k] === dir[k]) k += 1;
+  return "../".repeat(dir.length - k) + names.slice(k).map(encodeURIComponent).join("/");
 }
 
 /** The http or https URL a text names, resolved against the page; null when it names none. */
