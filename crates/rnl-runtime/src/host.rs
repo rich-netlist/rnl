@@ -71,6 +71,7 @@ pub struct Seg {
 pub struct Record {
     /// From `@RNL` to the matching `}`; carrier prefixes removed, lines joined by "\n".
     pub text: String,
+    /// In the order of the text, each starting after the one before.
     pub segs: Vec<Seg>,
     /// Lines of the host file the record occupies (first, last), for writeback.
     pub lines: (u32, u32),
@@ -80,14 +81,8 @@ pub struct Record {
 impl Record {
     /// The location of a character offset in the record text.
     pub fn loc(&self, offset: usize) -> Loc {
-        let mut seg = &self.segs[0];
-        for s in &self.segs {
-            if s.off <= offset {
-                seg = s;
-            } else {
-                break;
-            }
-        }
+        // the last segment that starts at or before the offset, else the first
+        let seg = &self.segs[self.segs.partition_point(|s| s.off <= offset).saturating_sub(1)];
         let col = seg.col + (offset as i64 - seg.off as i64) + 1;
         Loc::new(seg.file.clone(), seg.line, col.max(1) as u32)
     }

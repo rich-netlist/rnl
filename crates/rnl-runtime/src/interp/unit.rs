@@ -351,7 +351,18 @@ impl Interp<'_> {
     pub(crate) fn add_record(&mut self, r: crate::host::Record) -> RecId {
         self.recs.push(r);
         self.asts.push(None);
+        self.rec_chars.push(None);
         self.recs.len() - 1
+    }
+
+    /// The characters of a record's text, collected once: offsets into a record count characters.
+    pub(crate) fn record_chars(&mut self, rec: RecId) -> Rc<[char]> {
+        if let Some(c) = &self.rec_chars[rec] {
+            return c.clone();
+        }
+        let c: Rc<[char]> = self.recs[rec].text.chars().collect();
+        self.rec_chars[rec] = Some(c.clone());
+        c
     }
 
     /// The records of a unit's level, in text order.

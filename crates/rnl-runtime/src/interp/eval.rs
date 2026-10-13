@@ -1074,7 +1074,7 @@ impl<'p> Interp<'p> {
         // the prefix and the name, up to the `:` of a path outside quotes
         let mut len = 0u32;
         let mut quoted = false;
-        for c in self.recs[rec].text.chars().skip(e.start).take(e.end.saturating_sub(e.start)) {
+        for &c in char_span(&self.record_chars(rec), e.start, e.end) {
             if c == '"' {
                 quoted = !quoted;
             }
@@ -1101,7 +1101,7 @@ impl<'p> Interp<'p> {
     /// or with `conflict` it lost a conflict (8.5). Surrounding blanks are left out.
     pub(crate) fn note_failed(&mut self, rec: Option<RecId>, start: usize, end: usize, conflict: bool) {
         let Some(rec) = rec else { return };
-        let text: Vec<char> = self.recs[rec].text.chars().collect();
+        let text = self.record_chars(rec);
         let (mut a, mut b) = (start.min(text.len()), end.min(text.len()));
         while a < b && text[a].is_whitespace() {
             a += 1;
@@ -1138,7 +1138,7 @@ impl<'p> Interp<'p> {
         let mut len = 0u32;
         let mut quoted = false;
         let mut colons = 0;
-        for c in self.recs[rec].text.chars().skip(e.start).take(e.end.saturating_sub(e.start)) {
+        for &c in char_span(&self.record_chars(rec), e.start, e.end) {
             if c == '"' {
                 quoted = !quoted;
             }
@@ -1821,6 +1821,12 @@ pub fn get<'a>(p: &'a [(String, Lit)], name: &str) -> Option<&'a Lit> {
 /// The parameters of an `@RNL(…)` header or a call, as written.
 pub fn named_value<'a>(p: &'a Params, name: &str) -> Option<&'a Value> {
     p.get(name)
+}
+
+/// The characters `start..end` of a text, as far as it goes.
+fn char_span(chars: &[char], start: usize, end: usize) -> &[char] {
+    let a = start.min(chars.len());
+    &chars[a..end.min(chars.len()).max(a)]
 }
 
 /// The innermost segment around a record offset, or the statement when it is outside its segments.

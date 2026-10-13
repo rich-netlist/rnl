@@ -82,6 +82,8 @@ pub struct Interp<'p> {
     pub(crate) unit_recs: Vec<Vec<RecId>>,
     pub(crate) recs: Vec<Record>,
     pub(crate) asts: Vec<Option<Rc<RecordAst>>>,
+    /// The characters of each record's text, collected when an offset into it is first read.
+    pub(crate) rec_chars: Vec<Option<Rc<[char]>>>,
     pub(crate) pkg_levels: Vec<Level>,
     pub(crate) pkg_sources: Vec<(String, String)>,
     pub(crate) packages: HashMap<(String, String), UnitId>,
@@ -128,6 +130,7 @@ impl<'p> Interp<'p> {
             unit_recs: Vec::new(),
             recs: Vec::new(),
             asts: Vec::new(),
+            rec_chars: Vec::new(),
             pkg_levels: Vec::new(),
             pkg_sources: Vec::new(),
             packages: HashMap::new(),

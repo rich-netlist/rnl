@@ -37,12 +37,7 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
 
     let find = |from: usize, s: &str| -> Option<usize> { (from..n).find(|&j| starts(j, s)) };
     let line_of = |pos: usize| -> Loc {
-        let mut seg = &segs[0];
-        for s in &segs {
-            if s.off <= pos {
-                seg = s;
-            }
-        }
+        let seg = &segs[segs.partition_point(|s| s.off <= pos).saturating_sub(1)];
         Loc::new(file, seg.line, (seg.col + pos as i64 - seg.off as i64 + 1).max(1) as u32)
     };
     let mut out = Vec::new();
@@ -101,8 +96,12 @@ pub fn scan_run(run: &[CarrierLine], file: &str, sink: &mut Sink) -> Vec<Record>
                 Ok(end) => {
                     for nl in i..end {
                         if t[nl] == '\n' {
-                            let line: String = t[i..nl].iter().collect();
-                            if line.trim_end_matches([' ', '\t']).ends_with('\\') {
+                            // whether the line ends with a backslash, blanks after it aside
+                            let mut k = nl;
+                            while k > i && matches!(t[k - 1], ' ' | '\t') {
+                                k -= 1;
+                            }
+                            if k > i && t[k - 1] == '\\' {
                                 sink.warning(
                                     "a line of RNL ends with `\\`: some hosts join the next line to this comment (2.2)",
                                     Some(line_of(nl - 1)),
@@ -209,10 +208,11 @@ fn record_extent(t: &[char], start: usize) -> Result<usize, (String, usize)> {
 
 fn rebase(segs: &[Seg], start: usize, end: usize) -> Vec<Seg> {
     let mut out = Vec::new();
-    for (k, s) in segs.iter().enumerate() {
-        let next = segs.get(k + 1).map(|x| x.off).unwrap_or(usize::MAX);
-        if next <= start || s.off >= end {
-            continue;
+    // the segments are in text order: skip those that end at or before `start`, then stop at `end`
+    let first = segs.get(1..).map_or(0, |rest| rest.partition_point(|s| s.off <= start));
+    for s in &segs[first..] {
+        if s.off >= end {
+            break;
         }
         if s.off <= start {
             out.push(Seg { off: 0, file: s.file.clone(), line: s.line, col: s.col + (start - s.off) as i64 });
