@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::diag::{DiagId, Extra, Severity};
-use crate::model::{HostRef, RefTarget};
+use crate::model::{FailedSpan, HostRef, RefTarget};
 use crate::syntax::{Coord, Member, ObjExpr, Params, PathItem, Point, Ref, Segment, Sep, SetExpr, Value};
 use crate::words::{words, ParamSpec, ParamType, Takes};
 
@@ -622,6 +622,7 @@ impl<'p> Interp<'p> {
                     sel = s;
                 }
                 Err(Stop::Fail(d)) => {
+                    self.note_failed(ctx.rec, seg.start, seg.end, false);
                     let out = seg
                         .call
                         .as_ref()
@@ -831,6 +832,7 @@ impl<'p> Interp<'p> {
             if let Some(err) = &m.error {
                 let msg = err.clone();
                 self.err(ctx, msg, m.error_pos);
+                self.note_failed(ctx.rec, m.start, m.end, false);
                 let f = self.new_obj(ObjData::Failed(None));
                 items.push((f, false));
                 continue;
@@ -1092,6 +1094,38 @@ impl<'p> Interp<'p> {
             if self.refs_seen.insert(r.clone()) {
                 self.refs.push(r);
             }
+        }
+    }
+
+    /// Note that the text `start..end` of a record does not take effect (`FailedSpan`): it failed,
+    /// or with `conflict` it lost a conflict (8.5). Surrounding blanks are left out.
+    pub(crate) fn note_failed(&mut self, rec: Option<RecId>, start: usize, end: usize, conflict: bool) {
+        let Some(rec) = rec else { return };
+        let text: Vec<char> = self.recs[rec].text.chars().collect();
+        let (mut a, mut b) = (start.min(text.len()), end.min(text.len()));
+        while a < b && text[a].is_whitespace() {
+            a += 1;
+        }
+        while b > a && text[b - 1].is_whitespace() {
+            b -= 1;
+        }
+        if a == b {
+            return;
+        }
+        let f = FailedSpan { start: self.recs[rec].loc(a), end: self.recs[rec].loc(b - 1), conflict };
+        if self.failed_seen.insert(f.clone()) {
+            self.failed_spans.push(f);
+        }
+    }
+
+    /// Note that the statement written at `off` does not take effect: the innermost segment of the
+    /// record around it, or the statement when the place is outside its segments.
+    pub(crate) fn note_failed_at(&mut self, rec: Option<RecId>, off: usize, conflict: bool) {
+        let Some(r) = rec else { return };
+        let ast = self.parse(r);
+        let found = ast.body.as_ref().and_then(|b| innermost(b, off));
+        if let Some((a, b)) = found {
+            self.note_failed(rec, a, b, conflict);
         }
     }
 
@@ -1787,4 +1821,30 @@ pub fn get<'a>(p: &'a [(String, Lit)], name: &str) -> Option<&'a Lit> {
 /// The parameters of an `@RNL(…)` header or a call, as written.
 pub fn named_value<'a>(p: &'a Params, name: &str) -> Option<&'a Value> {
     p.get(name)
+}
+
+/// The innermost segment around a record offset, or the statement when it is outside its segments.
+fn innermost(set: &SetExpr, off: usize) -> Option<(usize, usize)> {
+    for m in &set.members {
+        if off < m.start || off >= m.end.max(m.start + 1) {
+            continue;
+        }
+        for seg in &m.segments {
+            if off < seg.start || off >= seg.end {
+                continue;
+            }
+            for a in &seg.args {
+                if let ObjExpr::Set(s) = &a.obj {
+                    if off >= s.start && off < s.end {
+                        if let Some(x) = innermost(s, off) {
+                            return Some(x);
+                        }
+                    }
+                }
+            }
+            return Some((seg.start, seg.end));
+        }
+        return Some((m.start, m.end));
+    }
+    None
 }

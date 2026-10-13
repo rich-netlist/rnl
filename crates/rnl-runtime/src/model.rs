@@ -204,3 +204,15 @@ pub enum RefTarget {
     /// A net, by its key (`HostDocument::net_key`).
     Net(String),
 }
+
+/// A statement, or a part of one, that does not take effect, found while interpreting: where it
+/// is written, and whether it failed (an error, 7.2) or lost a conflict to another statement (8.5).
+/// A tool uses these to mark dead text; the interpretation itself does not need them.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FailedSpan {
+    pub start: crate::diag::Loc,
+    /// The last character, included.
+    pub end: crate::diag::Loc,
+    /// Dropped in a conflict (8.5), as opposed to failed.
+    pub conflict: bool,
+}

@@ -95,6 +95,9 @@ pub struct Scene {
     pub layer: HashMap<ObjId, (String, Pos)>,
     pub unplaced: Vec<String>,
     pub failed_facts: HashSet<(u8, usize)>,
+    /// The symbol facts weighed for some object, and those that won (8.3), by index in `appear`.
+    pub symbol_weighed: HashSet<usize>,
+    pub symbol_won: HashSet<usize>,
     /// The fact kept per (object, axis) and per object's orientation: (priority, position, index).
     pub at_best: HashMap<(ObjId, char), (Priority, Pos, usize)>,
     pub ori_best: HashMap<ObjId, (Priority, Pos, usize)>,
@@ -144,6 +147,8 @@ impl Scene {
             layer: HashMap::new(),
             unplaced: Vec::new(),
             failed_facts: HashSet::new(),
+            symbol_weighed: HashSet::new(),
+            symbol_won: HashSet::new(),
             at_best: HashMap::new(),
             ori_best: HashMap::new(),
             devices: None,
@@ -1596,6 +1601,9 @@ impl Interp<'_> {
 
     pub(crate) fn diag_fact(&mut self, sev: crate::diag::Severity, f: &Fact, msg: String) -> Option<DiagId> {
         let c = f.ctx.clone()?;
+        if sev == crate::diag::Severity::Error {
+            self.note_failed_at(c.rec, f.off, false);
+        }
         let loc = self.rec_loc(c.rec, f.off);
         // shown like the document's own, as the later phases' diagnostics are (7.6)
         Some(self.sink.add(

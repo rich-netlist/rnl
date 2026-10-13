@@ -20,7 +20,7 @@ use std::rc::Rc;
 
 use crate::diag::{DiagId, Sink};
 use crate::host::{HostDocument, Level, LevelKind, Record};
-use crate::model::{HostRef, Model};
+use crate::model::{FailedSpan, HostRef, Model};
 use crate::source::Provider;
 use crate::syntax::RecordAst;
 
@@ -60,6 +60,8 @@ pub struct Interpretation {
     pub doc: HostDocument,
     /// The references to host objects in the document's records, in the order they were resolved.
     pub refs: Vec<HostRef>,
+    /// The statements, or parts of them, that do not take effect: failed or dropped in a conflict.
+    pub failed: Vec<FailedSpan>,
 }
 
 impl Interpretation {
@@ -107,6 +109,9 @@ pub struct Interp<'p> {
     /// The host references resolved so far, each once.
     pub(crate) refs: Vec<HostRef>,
     pub(crate) refs_seen: HashSet<HostRef>,
+    /// The statements found not to take effect so far, each once.
+    pub(crate) failed_spans: Vec<FailedSpan>,
+    pub(crate) failed_seen: HashSet<FailedSpan>,
 }
 
 impl<'p> Interp<'p> {
@@ -146,6 +151,8 @@ impl<'p> Interp<'p> {
             made_routes: Vec::new(),
             refs: Vec::new(),
             refs_seen: HashSet::new(),
+            failed_spans: Vec::new(),
+            failed_seen: HashSet::new(),
             package_main: None,
             checking_path: None,
         };
@@ -406,6 +413,8 @@ impl<'p> Interp<'p> {
                 if !ok {
                     let loc = self.rec_loc(Some(rec), 0);
                     self.sink.error(format!("scope=\"{target}\" finds no subcircuit below this level: the statements of the record fail (2.6)"), loc);
+                    let n = self.recs[rec].text.chars().count();
+                    self.note_failed(Some(rec), 0, n, false);
                 }
             }
         }
@@ -532,6 +541,7 @@ impl<'p> Interp<'p> {
             checking_package: checking,
             sources,
             refs: std::mem::take(&mut self.refs),
+            failed: std::mem::take(&mut self.failed_spans),
             doc: self.doc,
         }
     }

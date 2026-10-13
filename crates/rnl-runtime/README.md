@@ -11,7 +11,7 @@ The language core of RNL draft 0.2. It takes a host document that a host adapter
 | `source` | The `Provider` trait through which the runtime asks for included files and packages, and an in-memory provider. |
 | `interp` | Interpretation: headers, aliases, packages, lazy name resolution, definitions, usages, selections, symbol and style queues, geometry facts and their priorities, constraint statuses. |
 | `markup` | Text markup and `${…}` attribute paths (13). |
-| `model` | The effective model handed to renderers and tools. Each drawn item names the host instances it draws and the nets at its pins, and `Interpretation::refs` lists where the records refer to instances and nets, so a viewer can go from a name to its drawing and back. |
+| `model` | The effective model handed to renderers and tools. Each drawn item names the host instances it draws and the nets at its pins, and `Interpretation::refs` lists where the records refer to instances and nets, so a viewer can go from a name to its drawing and back. `Interpretation::failed` lists the statements, or parts of them, that do not take effect: failed with an error (7.2, 7.4), or overridden in a conflict (7.5): dropped in the order of 8.5, or a symbol that loses the appearance queue of every object it is given to (8.3). |
 | `writeback` | Removing, appending and replacing records in host text while keeping everything else byte for byte. |
 | `diag` | Diagnostics with level, place and cause. |
 

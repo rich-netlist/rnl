@@ -380,6 +380,8 @@ impl Interp<'_> {
             if let Some((msg, pos)) = &ast.error {
                 let loc = self.recs[rec].loc(*pos);
                 self.diag_in(Severity::Error, msg.clone(), Some(loc), &pkg);
+                let n = self.recs[rec].text.chars().count();
+                self.note_failed(Some(rec), 0, n, false);
                 self.units[u].other_records += 1;
                 continue;
             }
@@ -428,6 +430,7 @@ impl Interp<'_> {
                 if let Some(err) = &m.error {
                     let loc = self.recs[rec].loc(m.error_pos);
                     self.diag_in(Severity::Error, err.clone(), Some(loc), &pkg);
+                    self.note_failed(Some(rec), m.start, m.end, false);
                     continue;
                 }
                 self.units[u].members.push(UnitMember {
@@ -583,6 +586,7 @@ impl Interp<'_> {
             if let Some(err) = &m.error {
                 let loc = self.recs[rec].loc(m.error_pos);
                 self.diag_in(Severity::Error, err.clone(), Some(loc), &pkg);
+                self.note_failed(Some(rec), m.start, m.end, false);
                 self.units[u].header_kws.push("?".into());
                 continue;
             }
@@ -1310,6 +1314,7 @@ impl Interp<'_> {
             if let Some(err) = &m.error {
                 let loc = self.rec_loc(rec, m.error_pos);
                 self.sink.error(err.clone(), loc);
+                self.note_failed(rec, m.start, m.end, false);
                 continue;
             }
             self.units[u].members.push(UnitMember { rec, k, embedded: true, m: m.clone(), header: header.clone() });

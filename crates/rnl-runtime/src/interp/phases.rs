@@ -30,6 +30,7 @@ impl Interp<'_> {
         self.scenes[s].phase = 6;
         self.run_tasks(s, 6);
         self.resolve_symbols(s, true);
+        self.note_overridden_symbols(s);
         self.symbol_labels(s);
         self.scenes[s].phase = 7;
         self.run_tasks(s, 7);
@@ -58,6 +59,11 @@ impl Interp<'_> {
     /// A diagnostic of the later phases. It concerns what the statement does in this document, even
     /// when the statement is written in a package, so it is shown like the document's own (7.6).
     fn diag_site(&mut self, sev: Severity, site: &Option<std::rc::Rc<super::ctx::Ctx>>, off: usize, msg: String) {
+        if sev == Severity::Error {
+            if let Some(c) = site {
+                self.note_failed_at(c.rec, off, false);
+            }
+        }
         let (loc, origin, _pkg) = self.site_loc(site, off);
         self.sink.add(sev, msg, loc, crate::diag::Extra { cause: None, origin, in_package: String::new() });
     }
@@ -158,8 +164,9 @@ impl Interp<'_> {
         }
         let appear = self.scenes[s].appear.clone();
         for o in objs {
-            let mut direct: Vec<(Pos, ObjId)> = Vec::new();
-            let mut other: Vec<(Pos, ObjId)> = Vec::new();
+            // each candidate with the index of its fact in `appear`; a block symbol has none
+            let mut direct: Vec<(Pos, ObjId, Option<usize>)> = Vec::new();
+            let mut other: Vec<(Pos, ObjId, Option<usize>)> = Vec::new();
             let (base, members) = match self.o(o) {
                 ObjData::Bundle { members, .. } => (members[0], members.clone()),
                 _ => (o, Vec::new()),
@@ -173,7 +180,7 @@ impl Interp<'_> {
                             for (p, sym) in blocks.values() {
                                 let mut pp = vec![PosElem::Int(1)];
                                 pp.extend(p.iter().cloned());
-                                other.push((pp, *sym));
+                                other.push((pp, *sym, None));
                             }
                         }
                     }
@@ -182,10 +189,11 @@ impl Interp<'_> {
             for (k, f) in appear.iter().enumerate() {
                 let FactData::Symbol(sym) = f.data else { continue };
                 if f.target == o {
+                    self.scenes[s].symbol_weighed.insert(k);
                     if f.direct {
-                        direct.push((f.pos.clone(), sym));
+                        direct.push((f.pos.clone(), sym, Some(k)));
                     } else {
-                        other.push((f.pos.clone(), sym));
+                        other.push((f.pos.clone(), sym, Some(k)));
                     }
                 } else if members.contains(&f.target) {
                     self.member_draw_error(s, 'a', k, f, f.target);
@@ -196,12 +204,33 @@ impl Interp<'_> {
             } else {
                 other.into_iter().max_by(|a, b| a.0.cmp(&b.0))
             };
-            if let Some((_, sym)) = pick {
+            if let Some((_, sym, fact)) = pick {
+                if let Some(k) = fact {
+                    self.scenes[s].symbol_won.insert(k);
+                }
                 self.set_symbol(s, o, sym);
             } else if matches!(self.o(o), ObjData::Inst { .. } | ObjData::Bundle { .. }) {
                 let d = self.default_symbol(s, base);
                 self.set_symbol(s, o, d);
                 self.scenes[s].default_symbol.insert(o);
+            }
+        }
+    }
+
+    /// A statement whose symbols lose in the queue of every object it gives one to takes no
+    /// effect: it is overridden (7.5, 8.3).
+    fn note_overridden_symbols(&mut self, s: SceneId) {
+        let mut won: HashMap<(Option<RecId>, usize), bool> = HashMap::new();
+        for (k, f) in self.scenes[s].appear.iter().enumerate() {
+            if !matches!(f.data, FactData::Symbol(_)) || !self.scenes[s].symbol_weighed.contains(&k) {
+                continue;
+            }
+            let Some(c) = &f.ctx else { continue };
+            *won.entry((c.rec, f.off)).or_insert(false) |= self.scenes[s].symbol_won.contains(&k);
+        }
+        for ((rec, off), w) in won {
+            if !w {
+                self.note_failed_at(rec, off, true);
             }
         }
     }
@@ -741,6 +770,9 @@ impl Interp<'_> {
             return;
         }
         self.scenes[s].dropped += 1;
+        if let Some(c) = &loser.ctx {
+            self.note_failed_at(c.rec, loser.off, true);
+        }
         let a = self.fact_text(loser);
         let b = self.fact_text(winner);
         self.diag_fact(
@@ -1247,6 +1279,9 @@ impl Interp<'_> {
             if !involved.is_empty() && !weaker {
                 self.constraint_mut(c).status = Some("dropped");
                 if p != Priority::Low {
+                    if let Some(sc) = &site {
+                        self.note_failed_at(sc.rec, cd.off, true);
+                    }
                     self.diag_site(
                         Severity::Hint,
                         &site,

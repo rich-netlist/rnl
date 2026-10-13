@@ -479,6 +479,7 @@ impl Interp<'_> {
             if let Some(err) = &m.error {
                 let e = err.clone();
                 self.err(ctx, e, m.error_pos);
+                self.note_failed(ctx.rec, m.start, m.end, false);
                 continue;
             }
             for b in m.binds.iter().filter(|b| b.prefix == '%') {
@@ -504,6 +505,7 @@ impl Interp<'_> {
                     crate::syntax::RefOrHole::Ref(r) => {
                         if r.prefix == '#' || r.prefix == '&' {
                             self.err(ctx, "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)", r.start);
+                            self.note_failed_at(ctx.rec, r.start, false);
                         }
                         if r.prefix == '$' || r.prefix == '%' {
                             let n = r.name.clone().unwrap_or_default();
@@ -514,6 +516,7 @@ impl Interp<'_> {
                                         let msg = super::eval::no_outer_message(r);
                                         let diag = self.err(ctx, msg, r.start);
                                         self.body_errors.insert(super::eval::ptr(r), diag);
+                                        self.note_failed_at(ctx.rec, r.start, false);
                                     }
                                 }
                             }
