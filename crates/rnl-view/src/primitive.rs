@@ -543,6 +543,40 @@ mod tests {
         assert!(count > 1000, "{count}");
     }
 
+    /// Corpus case 17 draws every line style on every shape kind. A "double" line is two strokes
+    /// on each, in scene units with butt caps and miter joins: the colour three times as wide as
+    /// the colour between the lines.
+    #[test]
+    fn a_double_line_is_two_strokes_on_every_shape() {
+        let options = BuildOptions { primitives: true, ..BuildOptions::default() };
+        let d = crate::build(&crate::tests::corpus("cases/17-line-styles.sp"), &Disk, &options).unwrap();
+        let mut doubles = Vec::new();
+        for p in d.levels[0].primitives.as_ref().unwrap() {
+            let (kind, strokes) = match &p.shape {
+                Shape::Path { strokes, .. } => ("path", strokes),
+                Shape::Rect { strokes, .. } => ("rect", strokes),
+                Shape::Circle { strokes, .. } => ("circle", strokes),
+                Shape::Ellipse { strokes, .. } => ("ellipse", strokes),
+                _ => continue,
+            };
+            if let [outer, inner] = &strokes[..] {
+                assert_eq!(outer.width, 3.0 * inner.width, "{p:?}");
+                for s in [outer, inner] {
+                    let plain = s.unit == Unit::Scene && s.dashes.is_empty() && s.dash_offset == 0.0;
+                    assert!(plain && s.cap == Cap::Butt && s.join == Join::Miter, "{p:?}");
+                }
+                doubles.push((kind, p.owner.as_str()));
+            }
+        }
+        for kind in ["path", "rect", "circle", "ellipse"] {
+            assert!(doubles.contains(&(kind, "")), "{kind}: {doubles:?}");
+        }
+        // in a symbol by its own style and by the instance's, and on a wire
+        for drawn in [("rect", "item-0"), ("path", "item-1"), ("path", "wire-0")] {
+            assert!(doubles.contains(&drawn), "{drawn:?}: {doubles:?}");
+        }
+    }
+
     #[test]
     fn the_owners_and_the_colours_are_as_the_types_say() {
         let options = BuildOptions { primitives: true, ..BuildOptions::default() };

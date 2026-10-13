@@ -1,0 +1,2220 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "17-line-styles.sp",
+      "kind": "file",
+      "file": "17-line-styles.sp",
+      "symbols": [
+        {
+          "name": "$TWIN",
+          "box": [
+            -3.0,
+            -0.6,
+            3.0,
+            0.6
+          ],
+          "box_written": false,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "a",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "b",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -1.5,
+                  -0.6
+                ],
+                [
+                  1.5,
+                  0.6
+                ]
+              ],
+              "style": {
+                "linestyle": "double"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -1.5,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  1.5,
+                  0.0
+                ],
+                [
+                  3.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$RES",
+          "box": [
+            -0.6,
+            -3.0,
+            0.6,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  3.0
+                ],
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.6,
+                  1.667
+                ],
+                [
+                  -0.6,
+                  1.0
+                ],
+                [
+                  0.6,
+                  0.333
+                ],
+                [
+                  -0.6,
+                  -0.333
+                ],
+                [
+                  0.6,
+                  -1.0
+                ],
+                [
+                  -0.6,
+                  -1.667
+                ],
+                [
+                  0.0,
+                  -2.0
+                ],
+                [
+                  0.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            62.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R2",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            56.0,
+            -10.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "a"
+          ],
+          "points": [
+            [
+              59.0,
+              0.0
+            ],
+            [
+              56.0,
+              0.0
+            ],
+            [
+              56.0,
+              -7.0
+            ]
+          ],
+          "mode": "horizontal-vertical",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.15,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "shapes": [
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              0.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              0.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              0.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              21.5,
+              -1.5
+            ],
+            [
+              24.0,
+              1.5
+            ],
+            [
+              26.5,
+              -1.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -1.5
+            ],
+            [
+              34.5,
+              -1.5
+            ],
+            [
+              32.0,
+              1.5
+            ],
+            [
+              29.5,
+              -1.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ARC",
+          "points": [
+            [
+              37.5,
+              -1.0
+            ],
+            [
+              40.0,
+              1.5
+            ],
+            [
+              42.5,
+              -1.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "BEZIER",
+          "points": [
+            [
+              45.5,
+              0.0
+            ],
+            [
+              47.0,
+              3.0
+            ],
+            [
+              49.0,
+              -3.0
+            ],
+            [
+              50.5,
+              0.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              -5.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              -5.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              -5.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              21.5,
+              -6.5
+            ],
+            [
+              24.0,
+              -3.5
+            ],
+            [
+              26.5,
+              -6.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -6.5
+            ],
+            [
+              34.5,
+              -6.5
+            ],
+            [
+              32.0,
+              -3.5
+            ],
+            [
+              29.5,
+              -6.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ARC",
+          "points": [
+            [
+              37.5,
+              -6.0
+            ],
+            [
+              40.0,
+              -3.5
+            ],
+            [
+              42.5,
+              -6.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "BEZIER",
+          "points": [
+            [
+              45.5,
+              -5.0
+            ],
+            [
+              47.0,
+              -2.0
+            ],
+            [
+              49.0,
+              -8.0
+            ],
+            [
+              50.5,
+              -5.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              -10.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dotted",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              -10.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dotted",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              -10.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dotted",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              21.5,
+              -11.5
+            ],
+            [
+              24.0,
+              -8.5
+            ],
+            [
+              26.5,
+              -11.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dotted",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -11.5
+            ],
+            [
+              34.5,
+              -11.5
+            ],
+            [
+              32.0,
+              -8.5
+            ],
+            [
+              29.5,
+              -11.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dotted",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ARC",
+          "points": [
+            [
+              37.5,
+              -11.0
+            ],
+            [
+              40.0,
+              -8.5
+            ],
+            [
+              42.5,
+              -11.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dotted",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "BEZIER",
+          "points": [
+            [
+              45.5,
+              -10.0
+            ],
+            [
+              47.0,
+              -7.0
+            ],
+            [
+              49.0,
+              -13.0
+            ],
+            [
+              50.5,
+              -10.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dotted",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              -15.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dash-dot",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              -15.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dash-dot",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              -15.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dash-dot",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              21.5,
+              -16.5
+            ],
+            [
+              24.0,
+              -13.5
+            ],
+            [
+              26.5,
+              -16.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dash-dot",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -16.5
+            ],
+            [
+              34.5,
+              -16.5
+            ],
+            [
+              32.0,
+              -13.5
+            ],
+            [
+              29.5,
+              -16.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dash-dot",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ARC",
+          "points": [
+            [
+              37.5,
+              -16.0
+            ],
+            [
+              40.0,
+              -13.5
+            ],
+            [
+              42.5,
+              -16.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dash-dot",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "BEZIER",
+          "points": [
+            [
+              45.5,
+              -15.0
+            ],
+            [
+              47.0,
+              -12.0
+            ],
+            [
+              49.0,
+              -18.0
+            ],
+            [
+              50.5,
+              -15.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dash-dot",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              -20.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "bold",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              -20.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "bold",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              -20.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "bold",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              21.5,
+              -21.5
+            ],
+            [
+              24.0,
+              -18.5
+            ],
+            [
+              26.5,
+              -21.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "bold",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -21.5
+            ],
+            [
+              34.5,
+              -21.5
+            ],
+            [
+              32.0,
+              -18.5
+            ],
+            [
+              29.5,
+              -21.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "bold",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ARC",
+          "points": [
+            [
+              37.5,
+              -21.0
+            ],
+            [
+              40.0,
+              -18.5
+            ],
+            [
+              42.5,
+              -21.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "bold",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "BEZIER",
+          "points": [
+            [
+              45.5,
+              -20.0
+            ],
+            [
+              47.0,
+              -17.0
+            ],
+            [
+              49.0,
+              -23.0
+            ],
+            [
+              50.5,
+              -20.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "bold",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              -25.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              -25.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              -25.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              21.5,
+              -26.5
+            ],
+            [
+              24.0,
+              -23.5
+            ],
+            [
+              26.5,
+              -26.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -26.5
+            ],
+            [
+              34.5,
+              -26.5
+            ],
+            [
+              32.0,
+              -23.5
+            ],
+            [
+              29.5,
+              -26.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ARC",
+          "points": [
+            [
+              37.5,
+              -26.0
+            ],
+            [
+              40.0,
+              -23.5
+            ],
+            [
+              42.5,
+              -26.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "BEZIER",
+          "points": [
+            [
+              45.5,
+              -25.0
+            ],
+            [
+              47.0,
+              -22.0
+            ],
+            [
+              49.0,
+              -28.0
+            ],
+            [
+              50.5,
+              -25.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              -30.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffe0b2",
+            "linecolor": "#1f4fd8",
+            "linestyle": "double",
+            "linewidth": 0.25,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              -30.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffe0b2",
+            "linecolor": "#1f4fd8",
+            "linestyle": "double",
+            "linewidth": 0.25,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              -30.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffe0b2",
+            "linecolor": "#1f4fd8",
+            "linestyle": "double",
+            "linewidth": 0.25,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              21.5,
+              -31.5
+            ],
+            [
+              24.0,
+              -28.5
+            ],
+            [
+              26.5,
+              -31.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffe0b2",
+            "linecolor": "#1f4fd8",
+            "linestyle": "double",
+            "linewidth": 0.25,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -31.5
+            ],
+            [
+              34.5,
+              -31.5
+            ],
+            [
+              32.0,
+              -28.5
+            ],
+            [
+              29.5,
+              -31.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffe0b2",
+            "linecolor": "#1f4fd8",
+            "linestyle": "double",
+            "linewidth": 0.25,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ARC",
+          "points": [
+            [
+              37.5,
+              -31.0
+            ],
+            [
+              40.0,
+              -28.5
+            ],
+            [
+              42.5,
+              -31.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffe0b2",
+            "linecolor": "#1f4fd8",
+            "linestyle": "double",
+            "linewidth": 0.25,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "BEZIER",
+          "points": [
+            [
+              45.5,
+              -30.0
+            ],
+            [
+              47.0,
+              -27.0
+            ],
+            [
+              49.0,
+              -33.0
+            ],
+            [
+              50.5,
+              -30.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#ffe0b2",
+            "linecolor": "#1f4fd8",
+            "linestyle": "double",
+            "linewidth": 0.25,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              -35.0
+            ]
+          ],
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.15,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              -35.0
+            ]
+          ],
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.15,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              -35.0
+            ]
+          ],
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.15,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              21.5,
+              -36.5
+            ],
+            [
+              24.0,
+              -33.5
+            ],
+            [
+              26.5,
+              -36.5
+            ]
+          ],
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.15,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -36.5
+            ],
+            [
+              34.5,
+              -36.5
+            ],
+            [
+              32.0,
+              -33.5
+            ],
+            [
+              29.5,
+              -36.5
+            ]
+          ],
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.15,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ARC",
+          "points": [
+            [
+              37.5,
+              -36.0
+            ],
+            [
+              40.0,
+              -33.5
+            ],
+            [
+              42.5,
+              -36.0
+            ]
+          ],
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.15,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "BEZIER",
+          "points": [
+            [
+              45.5,
+              -35.0
+            ],
+            [
+              47.0,
+              -32.0
+            ],
+            [
+              49.0,
+              -38.0
+            ],
+            [
+              50.5,
+              -35.0
+            ]
+          ],
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linestyle": "dashed",
+            "linewidth": 0.15,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              -40.0
+            ]
+          ],
+          "style": {
+            "cap": "square",
+            "fillcolor": "#ffffff",
+            "join": "bevel",
+            "linecolor": "#c62828",
+            "linestyle": "dotted",
+            "linewidth": 0.05,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              -40.0
+            ]
+          ],
+          "style": {
+            "cap": "square",
+            "fillcolor": "#ffffff",
+            "join": "bevel",
+            "linecolor": "#c62828",
+            "linestyle": "dotted",
+            "linewidth": 0.05,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              -40.0
+            ]
+          ],
+          "style": {
+            "cap": "square",
+            "fillcolor": "#ffffff",
+            "join": "bevel",
+            "linecolor": "#c62828",
+            "linestyle": "dotted",
+            "linewidth": 0.05,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              21.5,
+              -41.5
+            ],
+            [
+              24.0,
+              -38.5
+            ],
+            [
+              26.5,
+              -41.5
+            ]
+          ],
+          "style": {
+            "cap": "square",
+            "fillcolor": "#ffffff",
+            "join": "bevel",
+            "linecolor": "#c62828",
+            "linestyle": "dotted",
+            "linewidth": 0.05,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -41.5
+            ],
+            [
+              34.5,
+              -41.5
+            ],
+            [
+              32.0,
+              -38.5
+            ],
+            [
+              29.5,
+              -41.5
+            ]
+          ],
+          "style": {
+            "cap": "square",
+            "fillcolor": "#ffffff",
+            "join": "bevel",
+            "linecolor": "#c62828",
+            "linestyle": "dotted",
+            "linewidth": 0.05,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ARC",
+          "points": [
+            [
+              37.5,
+              -41.0
+            ],
+            [
+              40.0,
+              -38.5
+            ],
+            [
+              42.5,
+              -41.0
+            ]
+          ],
+          "style": {
+            "cap": "square",
+            "fillcolor": "#ffffff",
+            "join": "bevel",
+            "linecolor": "#c62828",
+            "linestyle": "dotted",
+            "linewidth": 0.05,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "BEZIER",
+          "points": [
+            [
+              45.5,
+              -40.0
+            ],
+            [
+              47.0,
+              -37.0
+            ],
+            [
+              49.0,
+              -43.0
+            ],
+            [
+              50.5,
+              -40.0
+            ]
+          ],
+          "style": {
+            "cap": "square",
+            "fillcolor": "#ffffff",
+            "join": "bevel",
+            "linecolor": "#c62828",
+            "linestyle": "dotted",
+            "linewidth": 0.05,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "RECTANGLE",
+          "points": [
+            [
+              0.0,
+              -45.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#c8e6c9",
+            "linecolor": "#1d1d1f",
+            "linestyle": "none",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "CIRCLE",
+          "points": [
+            [
+              8.0,
+              -45.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#c8e6c9",
+            "linecolor": "#1d1d1f",
+            "linestyle": "none",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "ELLIPSE",
+          "points": [
+            [
+              16.0,
+              -45.0
+            ]
+          ],
+          "style": {
+            "fillcolor": "#c8e6c9",
+            "linecolor": "#1d1d1f",
+            "linestyle": "none",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "shape": "LINE",
+          "points": [
+            [
+              29.5,
+              -46.5
+            ],
+            [
+              34.5,
+              -46.5
+            ],
+            [
+              32.0,
+              -43.5
+            ],
+            [
+              29.5,
+              -46.5
+            ]
+          ],
+          "style": {
+            "fillcolor": "#c8e6c9",
+            "linecolor": "#1d1d1f",
+            "linestyle": "none",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "texts": [
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            0.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "solid",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            -5.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "dashed",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            -10.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "dotted",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            -15.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "dash-dot",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            -20.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "bold",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            -25.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "double",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            -30.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "double 0.25",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            -35.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "dashed 0.15",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            -40.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "dotted 0.05",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a text",
+          "anchor": [
+            -3.0,
+            -45.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "none",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "end",
+          "valign": "middle",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R2::name",
+          "anchor": [
+            57.1,
+            -9.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "R2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R2::value",
+          "anchor": [
+            57.1,
+            -10.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linestyle": "double",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": []
+}
