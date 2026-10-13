@@ -4,7 +4,7 @@
 //! existing handles. Objects live in one arena and are referred to by [`ObjId`]. Host objects
 //! (the level, instances, nets, terminals) are unique per drawing level.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::diag::DiagId;
@@ -592,6 +592,37 @@ pub enum MemberKey {
     None,
     M { unit: UnitId, rec: RecId, k: usize, embedded: bool },
     Scope { rec: RecId, k: usize },
+}
+
+/// The members found to be rules, evaluated again in every level below (10.3), with how many
+/// each unit has.
+#[derive(Default)]
+pub struct Rules {
+    keys: HashSet<MemberKey>,
+    per_unit: HashMap<UnitId, usize>,
+}
+
+impl Rules {
+    pub fn insert(&mut self, key: MemberKey) {
+        let unit = match key {
+            MemberKey::M { unit, .. } => Some(unit),
+            _ => None,
+        };
+        if self.keys.insert(key) {
+            if let Some(u) = unit {
+                *self.per_unit.entry(u).or_default() += 1;
+            }
+        }
+    }
+
+    pub fn contains(&self, key: &MemberKey) -> bool {
+        self.keys.contains(key)
+    }
+
+    /// The number of rules among the members of a unit.
+    pub fn count(&self, u: UnitId) -> usize {
+        self.per_unit.get(&u).copied().unwrap_or(0)
+    }
 }
 
 /// A shared member of a record's syntax tree, with the record it is in.

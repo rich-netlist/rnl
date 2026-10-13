@@ -36,6 +36,10 @@ pub enum Memo {
     LocalRef,
 }
 
+/// The members of a unit that are rules, in order, with the unit's numbers of members and rules
+/// when they were taken.
+pub(crate) type RuleMembers = ((usize, usize), Rc<Vec<unit::UnitMember>>);
+
 #[derive(Clone, Debug)]
 pub struct Options {
     /// Use the standard package implicitly at the root (16.3).
@@ -95,7 +99,9 @@ pub struct Interp<'p> {
     pub(crate) tm_memo: HashMap<(usize, ObjId), ObjId>,
     pub(crate) tm_in_progress: HashSet<(usize, ObjId)>,
     pub(crate) node_memo: HashMap<(&'static str, usize, usize, usize), ObjId>,
-    pub(crate) rules: HashSet<MemberKey>,
+    pub(crate) rules: Rules,
+    /// The members of each unit that are rules, as `rule_members` took them last.
+    pub(crate) rule_members: HashMap<UnitId, RuleMembers>,
     pub(crate) block_symbols: HashMap<String, BTreeMap<MemberKey, (Pos, ObjId)>>,
     pub(crate) scenes: Vec<Scene>,
     pub(crate) symbol_order: HashMap<SceneId, Vec<ObjId>>,
@@ -142,7 +148,8 @@ impl<'p> Interp<'p> {
             tm_memo: HashMap::new(),
             tm_in_progress: HashSet::new(),
             node_memo: HashMap::new(),
-            rules: HashSet::new(),
+            rules: Rules::default(),
+            rule_members: HashMap::new(),
             block_symbols: HashMap::new(),
             scenes: Vec::new(),
             symbol_order: HashMap::new(),
@@ -271,10 +278,8 @@ impl<'p> Interp<'p> {
         }
         let mut work: Vec<Work> = Vec::new();
         for e in self.effective_packages(lv) {
-            for m in self.units[e.unit].members.clone() {
-                if self.rules.contains(&m.key(e.unit)) {
-                    work.push(Work { u: e.unit, m, pos: None, scope_in: false });
-                }
+            for m in self.rule_members(e.unit).iter() {
+                work.push(Work { u: e.unit, m: m.clone(), pos: None, scope_in: false });
             }
         }
         let mut anc = self.doc.ancestors(lv);
@@ -284,10 +289,8 @@ impl<'p> Interp<'p> {
                 continue;
             }
             let au = self.level_unit[*a];
-            for m in self.units[au].members.clone() {
-                if self.rules.contains(&m.key(au)) {
-                    work.push(Work { u: au, m, pos: None, scope_in: false });
-                }
+            for m in self.rule_members(au).iter() {
+                work.push(Work { u: au, m: m.clone(), pos: None, scope_in: false });
             }
         }
         for m in self.units[unit].members.clone() {
@@ -361,6 +364,22 @@ impl<'p> Interp<'p> {
             }
         }
         self.run_scene(s);
+    }
+
+    /// The members of a unit that are rules, in order. They are taken again only when the unit
+    /// has new members or new rules, so that a level does not go through every member above it.
+    fn rule_members(&mut self, u: UnitId) -> Rc<Vec<unit::UnitMember>> {
+        let counts = (self.units[u].members.len(), self.rules.count(u));
+        if let Some((c, ms)) = self.rule_members.get(&u) {
+            if *c == counts {
+                return ms.clone();
+            }
+        }
+        let ms: Vec<unit::UnitMember> =
+            self.units[u].members.iter().filter(|m| self.rules.contains(&m.key(u))).cloned().collect();
+        let ms = Rc::new(ms);
+        self.rule_members.insert(u, (counts, ms.clone()));
+        ms
     }
 
     fn scoped_selection(&self, m: &crate::syntax::Member, u: UnitId) -> bool {
