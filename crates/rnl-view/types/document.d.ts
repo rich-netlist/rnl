@@ -271,6 +271,12 @@ export type Layer = "bottom" | "middle" | "top";
  * a flyline starts; at a rectangle's corner of lowest x and highest y, along the side of highest
  * y first; and at the point of a circle or an ellipse of highest x. It goes round a rectangle,
  * circle or ellipse clockwise, as SVG and Canvas draw them on a screen with y down.
+ *
+ * A shape of no size is drawn as SVG draws it, which Canvas 2D does not always do: a rectangle
+ * with no width or no height, and a circle or an ellipse with a radius of 0, draw nothing, filled
+ * or stroked; a part of a path that stays at one point, such as a wire from a point to itself,
+ * draws with each stroke only its caps, a dot as wide as the stroke with round caps, a square with
+ * square caps and nothing with butt caps.
  */
 export type Shape =
   | { "kind": "path", segments: Array<Segment>, strokes: Array<Stroke>, fill: Color | null }
@@ -401,7 +407,11 @@ export type VAlign = "baseline" | "top" | "middle" | "bottom";
 /**
  * A piece of a line of text in one style (13.6), by its `kind`: "text", or "frac" for
  * `\frac{…}{…}`, the numerator over the denominator. The SVG places the pieces of a line that
- * holds a fraction by estimated widths, with the numerator and denominator at 0.8 of the size.
+ * holds a fraction by estimated widths. It draws the numerator and the denominator at 0.8 of the
+ * size, centred on the fraction, with their baselines 0.72 of the size above the line's and 0.42
+ * below it, and between them a bar in the text's colour with butt caps: 0.3 of the size above the
+ * baseline, as long as the fraction less 0.06 of the size at each end, and 0.06 of the size wide
+ * but at least 0.8 pixels.
  */
 export type Run =
   | { "kind": "text", text: string, style: RunStyle }

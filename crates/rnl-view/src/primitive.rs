@@ -7,8 +7,8 @@
 //!
 //! The renderer resolves each line style into strokes, which the SVG writes as they are: a
 //! frontend that strokes with a colour, a width, dashes, a cap and a join draws the lines as the
-//! SVG does. The SVG writer still decides where the pieces of a text go; the types say how, in
-//! pixels of the SVG. A test holds the SVG writer to what the types say.
+//! SVG does. The SVG writer still decides where the pieces of a text go, and draws a fraction's
+//! bar; the types say how, in pixels of the SVG. A test holds the SVG writer to what the types say.
 
 use rnl_runtime::geom::Pt;
 use rnl_runtime::markup;
@@ -56,6 +56,12 @@ pub enum Layer {
 /// a flyline starts; at a rectangle's corner of lowest x and highest y, along the side of highest
 /// y first; and at the point of a circle or an ellipse of highest x. It goes round a rectangle,
 /// circle or ellipse clockwise, as SVG and Canvas draw them on a screen with y down.
+///
+/// A shape of no size is drawn as SVG draws it, which Canvas 2D does not always do: a rectangle
+/// with no width or no height, and a circle or an ellipse with a radius of 0, draw nothing, filled
+/// or stroked; a part of a path that stays at one point, such as a wire from a point to itself,
+/// draws with each stroke only its caps, a dot as wide as the stroke with round caps, a square with
+/// square caps and nothing with butt caps.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -197,7 +203,11 @@ pub enum VAlign {
 
 /// A piece of a line of text in one style (13.6), by its `kind`: "text", or "frac" for
 /// `\frac{…}{…}`, the numerator over the denominator. The SVG places the pieces of a line that
-/// holds a fraction by estimated widths, with the numerator and denominator at 0.8 of the size.
+/// holds a fraction by estimated widths. It draws the numerator and the denominator at 0.8 of the
+/// size, centred on the fraction, with their baselines 0.72 of the size above the line's and 0.42
+/// below it, and between them a bar in the text's colour with butt caps: 0.3 of the size above the
+/// baseline, as long as the fraction less 0.06 of the size at each end, and 0.06 of the size wide
+/// but at least 0.8 pixels.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -715,18 +725,43 @@ mod tests {
         let flyline = svg(Kind::Flyline { a: (0.0, 0.0), b: (1.0, 0.0), strokes: vec![back_stroke(&flyline)] });
         let want = "<line x1=\"0.00\" y1=\"-0.00\" x2=\"14.00\" y2=\"-0.00\" stroke=\"#8a8a8a\" stroke-width=\"1\" stroke-dasharray=\"4,3\"/>";
         assert!(flyline.contains(want), "{flyline}");
+        // shapes of no size written as they are, so that SVG's rules for them hold: it draws no
+        // rect with no width, no circle or ellipse with a radius of 0, and only the caps of a path
+        // that stays at one point
+        let round = vec![back_stroke(&stroke("#102030", 1.2, Unit::Pixel, &[], 0.0, Cap::Round, Join::Round))];
+        for (kind, want) in [
+            (
+                Kind::Rect { min: (0.0, 0.0), max: (0.0, 2.0), strokes: round.clone(), fill: Some("#eeeeee".into()) },
+                "<rect x=\"0.00\" y=\"-28.00\" width=\"0.00\" height=\"28.00\" fill=\"#eeeeee\" stroke=\"#102030\"",
+            ),
+            (
+                Kind::Circle { c: (0.0, 0.0), r: 0.0, strokes: round.clone(), fill: Some("#eeeeee".into()) },
+                "<circle cx=\"0.00\" cy=\"-0.00\" r=\"0.00\" fill=\"#eeeeee\" stroke=\"#102030\"",
+            ),
+            (
+                Kind::Ellipse { c: (0.0, 0.0), rx: 1.0, ry: 0.0, strokes: round.clone(), fill: Some("#eeeeee".into()) },
+                "<ellipse cx=\"0.00\" cy=\"-0.00\" rx=\"14.00\" ry=\"0.00\" fill=\"#eeeeee\" stroke=\"#102030\"",
+            ),
+            (
+                Kind::Path { segs: vec![PathSeg::Move((1.0, 1.0)), PathSeg::Line((1.0, 1.0))], strokes: round, fill: None },
+                "<path d=\"M14.00,-14.00 L14.00,-14.00\" fill=\"none\" stroke=\"#102030\" stroke-width=\"1.20\" stroke-linecap=\"round\"",
+            ),
+        ] {
+            let drawn = svg(kind);
+            assert!(drawn.contains(want), "{drawn}");
+        }
 
-        // texts of size 1, with a font that the SVG falls back from
+        // texts with a font that the SVG falls back from, of size 1 but where said
         let (fs, lh) = (o.scale, 1.15 * o.scale);
         let run = |text: &str, level: i8| markup::Run::Text {
             text: text.into(),
             style: markup::RunStyle { level, ..markup::RunStyle::default() },
         };
-        let text = |lines: Vec<markup::Line>, valign: &str| {
+        let sized = |lines: Vec<markup::Line>, valign: &str, size: f64| {
             svg(Kind::Text(rnl_render::TextPrim {
                 anchor: (0.0, 0.0),
                 lines,
-                size: 1.0,
+                size,
                 color: "#102030".into(),
                 font: "Serif".into(),
                 bold: false,
@@ -736,6 +771,7 @@ mod tests {
                 vertical: false,
             }))
         };
+        let text = |lines: Vec<markup::Line>, valign: &str| sized(lines, valign, 1.0);
         // the first baseline of three lines, below the anchor
         let n = 3.0;
         for (valign, first) in [
@@ -757,10 +793,37 @@ mod tests {
             "x<tspan {small} baseline-shift=\"super\">y</tspan><tspan {small} baseline-shift=\"super\">z</tspan><tspan {small} baseline-shift=\"sub\">i</tspan>"
         );
         assert!(svg.contains(&want), "{svg}");
-        // the numerator and the denominator of a fraction at 0.8 of the size
+        // the numerator and the denominator of a fraction at 0.8 of the size, centred on it, with
+        // their baselines 0.72 of the size above the line's and 0.42 below it
         let frac =
             markup::Run::Frac { num: vec![run("a", 0)], den: vec![run("b", 0)], style: markup::RunStyle::default() };
-        let svg = text(vec![vec![frac]], "baseline");
+        let line = vec![frac];
+        let w = rnl_render::line_width(&line) * fs;
+        let svg = text(vec![line.clone()], "baseline");
         assert_eq!(svg.matches(&format!("font-size=\"{:.2}\"", 0.8 * fs)).count(), 2, "{svg}");
+        for (y, piece) in [(-0.72 * fs, "a"), (0.42 * fs, "b")] {
+            let want = format!(
+                "<text x=\"{:.2}\" y=\"{y:.2}\" font-size=\"{:.2}\" text-anchor=\"middle\" textLength=\"{:.2}\" lengthAdjust=\"spacingAndGlyphs\">{piece}</text>",
+                w / 2.0,
+                0.8 * fs,
+                rnl_render::text_width(piece) * 0.8 * fs
+            );
+            assert!(svg.contains(&want), "{want}: {svg}");
+        }
+        // the bar in the text's colour with butt caps, 0.3 of the size above the baseline and 0.06
+        // of the size short of each end of the fraction, 0.06 of the size wide but at least 0.8
+        // pixels
+        let bar = |fs: f64, width: &str| {
+            format!(
+                "<line x1=\"{:.2}\" y1=\"{:.2}\" x2=\"{:.2}\" y2=\"{:.2}\" stroke=\"#102030\" stroke-width=\"{width}\"/>",
+                0.06 * fs,
+                -0.3 * fs,
+                rnl_render::line_width(&line) * fs - 0.06 * fs,
+                -0.3 * fs
+            )
+        };
+        assert!(svg.contains(&bar(fs, "0.84")), "{svg}");
+        let svg = sized(vec![line.clone()], "baseline", 0.5);
+        assert!(svg.contains(&bar(0.5 * fs, "0.80")), "{svg}");
     }
 }
