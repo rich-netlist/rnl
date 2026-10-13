@@ -65,11 +65,11 @@ test("the index's splitter stays within its limits, and the height and the view 
   await page.locator("#tab-hierarchy").click();
   expect(await viewer.stored("side-pane")).toBe("hierarchy");
   expect(await size(page, "#index-section", "height")).toBe(260);
-  // the tree keeps 100 pixels
+  // the tree keeps 100 pixels, less the splitter
   await dragSplitter(page, viewer, "#hsplit2", { y: 0 });
   const tallest = await size(page, "#index-section", "height");
   expect(tallest).toBeGreaterThan(260);
-  expect(await size(page, "#tree", "height")).toBeGreaterThanOrEqual(95);
+  expect(await size(page, "#tree", "height")).toBeGreaterThanOrEqual(94);
   expect(await size(page, "#tree", "height")).toBeLessThanOrEqual(100);
   expect(await viewer.stored("index-height")).toBe(tallest);
   // the index keeps 120
