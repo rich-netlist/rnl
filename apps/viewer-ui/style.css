@@ -610,3 +610,54 @@ mark { background: rgba(255, 196, 61, 0.55); color: inherit; border-radius: 2px;
 .up-button[hidden] { display: none; }
 .up-button svg { width: 15px; height: 15px; flex-shrink: 0; }
 .up-button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ------------------------------------------------------------------ menu bar */
+
+/* the page's own menu bar, shown where the platform shows none */
+body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
+.menubar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  user-select: none;
+}
+.menubar[hidden] { display: none; }
+.menubar .menu { position: relative; }
+.menubar u { text-decoration: none; }
+.menubar.keys u { text-decoration: underline; }
+.menu-title { padding: 1px 8px; }
+.menu-title.at { background: var(--hover); }
+.menu-list {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  min-width: 240px;
+  padding: 4px 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.menu-list[hidden] { display: none; }
+.menu-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  padding: 3px 12px 3px 4px;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.menu-item.active { background: var(--hover); }
+.menu-item .check { text-align: center; color: var(--accent); }
+.menu-item[aria-checked="true"] .check::before { content: "\2713"; }
+.menu-item .keys { padding-left: 28px; color: var(--muted); font-size: 12px; }
+.menu-separator { height: 1px; margin: 4px 0; background: var(--line); }
