@@ -1,0 +1,60 @@
+# Builds the web viewer in apps/web: the core as WebAssembly with its JavaScript modules, and the page
+# of apps/viewer-ui with the web shell, assembled into a static site; checks its scripts, and that the
+# site is served with the MIME types a browser needs.
+name: Web viewer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "apps/viewer-ui/**"
+      - "bindings/**"
+      - "crates/**"
+      - "libraries/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "apps/viewer-ui/**"
+      - "bindings/**"
+      - "crates/**"
+      - "libraries/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
+      - name: Check the scripts
+        run: |
+          node --version
+          find apps/web apps/viewer-ui bindings/runtime-wasm/js \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n 1 node --check
+      - name: Build the site, with the samples
+        run: node apps/web/build.mjs --samples
+      - name: Serve the site
+        run: |
+          node apps/web/serve.mjs --port 8000 &
+          served() { curl -fsS --retry 10 --retry-connrefused --retry-delay 1 -o /dev/null -w '%{content_type}' "http://127.0.0.1:8000/$1"; }
+          test "$(served)" = "text/html; charset=utf-8"
+          test "$(served shells/web.js)" = "text/javascript; charset=utf-8"
+          test "$(served core/worker.js)" = "text/javascript; charset=utf-8"
+          test "$(served core/rnl_runtime_wasm.wasm)" = "application/wasm"
+          test "$(served commands.json)" = "application/json"
+          test "$(served style.css)" = "text/css; charset=utf-8"
+          test "$(served samples/cases/04-hierarchy-lib.inc)" = "application/octet-stream"
+          if curl -fs -o /dev/null http://127.0.0.1:8000/shells/desktop.js; then echo "the desktop shell is in the site"; exit 1; fi
