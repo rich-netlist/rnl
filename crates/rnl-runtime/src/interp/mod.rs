@@ -36,6 +36,10 @@ pub enum Memo {
     LocalRef,
 }
 
+/// The members of a unit that are rules, in order, with the unit's numbers of members and rules
+/// when they were taken.
+pub(crate) type RuleMembers = ((usize, usize), Rc<Vec<unit::UnitMember>>);
+
 #[derive(Clone, Debug)]
 pub struct Options {
     /// Use the standard package implicitly at the root (16.3).
@@ -95,7 +99,9 @@ pub struct Interp<'p> {
     pub(crate) tm_memo: HashMap<(usize, ObjId), ObjId>,
     pub(crate) tm_in_progress: HashSet<(usize, ObjId)>,
     pub(crate) node_memo: HashMap<(&'static str, usize, usize, usize), ObjId>,
-    pub(crate) rules: HashSet<MemberKey>,
+    pub(crate) rules: Rules,
+    /// The members of each unit that are rules, as `rule_members` took them last.
+    pub(crate) rule_members: HashMap<UnitId, RuleMembers>,
     pub(crate) block_symbols: HashMap<String, BTreeMap<MemberKey, (Pos, ObjId)>>,
     pub(crate) scenes: Vec<Scene>,
     pub(crate) symbol_order: HashMap<SceneId, Vec<ObjId>>,
@@ -142,7 +148,8 @@ impl<'p> Interp<'p> {
             tm_memo: HashMap::new(),
             tm_in_progress: HashSet::new(),
             node_memo: HashMap::new(),
-            rules: HashSet::new(),
+            rules: Rules::default(),
+            rule_members: HashMap::new(),
             block_symbols: HashMap::new(),
             scenes: Vec::new(),
             symbol_order: HashMap::new(),
@@ -271,10 +278,8 @@ impl<'p> Interp<'p> {
         }
         let mut work: Vec<Work> = Vec::new();
         for e in self.effective_packages(lv) {
-            for m in self.units[e.unit].members.clone() {
-                if self.rules.contains(&m.key(e.unit)) {
-                    work.push(Work { u: e.unit, m, pos: None, scope_in: false });
-                }
+            for m in self.rule_members(e.unit).iter() {
+                work.push(Work { u: e.unit, m: m.clone(), pos: None, scope_in: false });
             }
         }
         let mut anc = self.doc.ancestors(lv);
@@ -284,10 +289,8 @@ impl<'p> Interp<'p> {
                 continue;
             }
             let au = self.level_unit[*a];
-            for m in self.units[au].members.clone() {
-                if self.rules.contains(&m.key(au)) {
-                    work.push(Work { u: au, m, pos: None, scope_in: false });
-                }
+            for m in self.rule_members(au).iter() {
+                work.push(Work { u: au, m: m.clone(), pos: None, scope_in: false });
             }
         }
         for m in self.units[unit].members.clone() {
@@ -295,26 +298,21 @@ impl<'p> Interp<'p> {
         }
         // records written above with scope= this subcircuit (2.6)
         let anc_up = self.doc.ancestors(lv);
+        let lvl = &self.doc.levels[lv];
+        let key = if lvl.kind == LevelKind::Subckt { Some(self.doc.key(&lvl.name)) } else { None };
         for (depth, a) in anc_up.iter().enumerate() {
             let au = self.level_unit[*a];
-            for (rec, ast, header) in self.units[au].scope_records.clone() {
-                let target = header.scope.clone().unwrap_or_default();
-                let lvl = &self.doc.levels[lv];
-                if lvl.kind == LevelKind::Subckt && self.doc.key(&target) == self.doc.key(&lvl.name) {
-                    for (k, m) in ast.body.as_ref().unwrap().members.iter().enumerate() {
-                        if m.error.is_some() {
-                            continue;
-                        }
-                        let p = pos(&[4, -((anc_up.len() - depth) as i64), rec as i64, k as i64]);
-                        let um = unit::UnitMember {
-                            rec: Some(rec),
-                            k,
-                            embedded: false,
-                            m: m.clone(),
-                            header: header.clone(),
-                        };
-                        work.push(Work { u: unit, m: um, pos: Some(p), scope_in: true });
+            let Some(ks) = key.as_ref().and_then(|k| self.units[au].scope_index.get(k)) else { continue };
+            for i in ks.clone() {
+                let (rec, ast, header) = self.units[au].scope_records[i].clone();
+                for (k, m) in ast.body.as_ref().unwrap().members.iter().enumerate() {
+                    if m.error.is_some() {
+                        continue;
                     }
+                    let p = pos(&[4, -((anc_up.len() - depth) as i64), rec as i64, k as i64]);
+                    let um =
+                        unit::UnitMember { rec: Some(rec), k, embedded: false, m: m.clone(), header: header.clone() };
+                    work.push(Work { u: unit, m: um, pos: Some(p), scope_in: true });
                 }
             }
         }
@@ -368,6 +366,22 @@ impl<'p> Interp<'p> {
         self.run_scene(s);
     }
 
+    /// The members of a unit that are rules, in order. They are taken again only when the unit
+    /// has new members or new rules, so that a level does not go through every member above it.
+    fn rule_members(&mut self, u: UnitId) -> Rc<Vec<unit::UnitMember>> {
+        let counts = (self.units[u].members.len(), self.rules.count(u));
+        if let Some((c, ms)) = self.rule_members.get(&u) {
+            if *c == counts {
+                return ms.clone();
+            }
+        }
+        let ms: Vec<unit::UnitMember> =
+            self.units[u].members.iter().filter(|m| self.rules.contains(&m.key(u))).cloned().collect();
+        let ms = Rc::new(ms);
+        self.rule_members.insert(u, (counts, ms.clone()));
+        ms
+    }
+
     fn scoped_selection(&self, m: &crate::syntax::Member, u: UnitId) -> bool {
         let Some(seg) = m.segments.first() else { return false };
         let Some(call) = &seg.call else { return false };
@@ -407,13 +421,20 @@ impl<'p> Interp<'p> {
     fn check_scopes(&mut self) {
         for u in 0..self.units.len() {
             let Some(lv) = self.units[u].level.filter(|_| self.units[u].kind == UnitKind::Level) else { continue };
+            if self.units[u].scope_records.is_empty() {
+                continue;
+            }
+            let below: HashSet<String> = self
+                .doc
+                .descendants(lv)
+                .iter()
+                .map(|d| &self.doc.levels[*d])
+                .filter(|l| l.kind == LevelKind::Subckt)
+                .map(|l| self.doc.key(&l.name))
+                .collect();
             for (rec, _ast, header) in self.units[u].scope_records.clone() {
                 let target = header.scope.clone().unwrap_or_default();
-                let ok = self.doc.descendants(lv).iter().any(|d| {
-                    let l = &self.doc.levels[*d];
-                    l.kind == LevelKind::Subckt && self.doc.key(&l.name) == self.doc.key(&target)
-                });
-                if !ok {
+                if !below.contains(&self.doc.key(&target)) {
                     let loc = self.rec_loc(Some(rec), 0);
                     self.sink.error(format!("scope=\"{target}\" finds no subcircuit below this level: the statements of the record fail (2.6)"), loc);
                     let n = self.recs[rec].text.chars().count();

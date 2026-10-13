@@ -145,6 +145,8 @@ pub struct Unit {
     pub std: Option<UnitId>,
     pub ok: bool,
     pub scope_records: Vec<(RecId, Rc<RecordAst>, Rc<Header>)>,
+    /// The indexes in `scope_records` by the key of the subcircuit named in scope=, in order.
+    pub scope_index: HashMap<String, Vec<usize>>,
     pub classified: bool,
     /// An embedded package reads with the aliases of the file it is written in (16.5).
     pub alias_from: Option<UnitId>,
@@ -179,6 +181,7 @@ impl Unit {
             std: None,
             ok: true,
             scope_records: Vec::new(),
+            scope_index: HashMap::new(),
             classified: false,
             alias_from: None,
             embedded: false,
@@ -434,9 +437,12 @@ impl Interp<'_> {
                     self.asts[rec] = Some(Rc::new(a2));
                 }
             }
-            if header.scope.is_some() {
+            if let Some(target) = &header.scope {
                 let a = self.asts[rec].clone().unwrap();
-                self.units[u].scope_records.push((rec, a, header));
+                let key = self.doc.key(target);
+                let unit = &mut self.units[u];
+                unit.scope_index.entry(key).or_default().push(unit.scope_records.len());
+                unit.scope_records.push((rec, a, header));
                 continue;
             }
             for (k, m) in ast_body.members.iter().enumerate() {

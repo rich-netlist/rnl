@@ -68,7 +68,11 @@ pub fn ptr<T>(r: &T) -> usize {
 impl<'p> Interp<'p> {
     // ------------------------------------------------------------------ objects
 
-    pub(crate) fn new_obj(&mut self, data: ObjData) -> ObjId {
+    pub(crate) fn new_obj(&mut self, mut data: ObjData) -> ObjId {
+        if let ObjData::Set(s) = &mut data {
+            // the members of a set never change, so one none of whose members can be lazy never is (10.3)
+            s.not_lazy = matches!(s.kind, SetKind::Plain) && s.items.iter().all(|(o, _)| self.stays_not_lazy(*o));
+        }
         self.objs.push(Obj { data, name: String::new() });
         ObjId(self.objs.len() as u32 - 1)
     }
@@ -283,11 +287,45 @@ impl<'p> Interp<'p> {
                 SetKind::Select { .. } | SetKind::Gen { .. } => true,
                 SetKind::Union { source } => self.is_lazy(*source),
                 SetKind::Plain => {
-                    if !s.mods.is_empty() && s.mods.iter().any(|m| self.is_lazy(m.source)) {
+                    // a set that stays not lazy, such as $SUPPLY_NET_SET, which has no members, does
+                    // not go through the edits that every level makes; nor does any set go through
+                    // those whose sources stay not lazy, which are not kept (`add_mod`)
+                    if s.not_lazy || s.lazy_sources.iter().any(|o| self.is_lazy(*o)) {
                         return false;
                     }
                     s.items.iter().any(|(o, _)| self.is_lazy(*o))
                 }
+            },
+            _ => false,
+        }
+    }
+
+    /// Is a value not lazy now and never so later? Only the edits of a set change with time, and
+    /// they can only make a plain set not lazy (`SetData::not_lazy`).
+    pub(crate) fn stays_not_lazy(&self, id: ObjId) -> bool {
+        if id == LEVEL {
+            return false;
+        }
+        match self.o(id) {
+            ObjData::Set(s) => match &s.kind {
+                SetKind::Select { .. } | SetKind::Gen { .. } => false,
+                SetKind::Union { source } => self.stays_not_lazy(*source),
+                SetKind::Plain => s.not_lazy,
+            },
+            _ => true,
+        }
+    }
+
+    /// Is a value lazy now and for good? A plain set is not, since an edit can make it not lazy.
+    pub(crate) fn lazy_for_good(&self, id: ObjId) -> bool {
+        if id == LEVEL {
+            return true;
+        }
+        match self.o(id) {
+            ObjData::Set(s) => match &s.kind {
+                SetKind::Select { .. } | SetKind::Gen { .. } => true,
+                SetKind::Union { source } => self.lazy_for_good(*source),
+                SetKind::Plain => false,
             },
             _ => false,
         }
