@@ -109,6 +109,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rnl-runtime-wasm"
+version = "0.0.1"
+dependencies = [
+ "rnl-runtime",
+ "rnl-view",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rnl-view"
 version = "0.0.1"
 dependencies = [

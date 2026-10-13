@@ -7,6 +7,7 @@ members = [
     "crates/rnl-render",
     "crates/rnl-view",
     "crates/rnl-cli",
+    "bindings/runtime-wasm",
 ]
 
 [workspace.package]
@@ -26,3 +27,13 @@ rnl-host-spice = { path = "crates/rnl-host-spice" }
 rnl-host-spectre = { path = "crates/rnl-host-spectre" }
 rnl-render = { path = "crates/rnl-render" }
 rnl-view = { path = "crates/rnl-view" }
+
+# The WebAssembly binding, small rather than fast, since a document takes milliseconds either way:
+# `cargo build --profile wasm --target wasm32-unknown-unknown -p rnl-runtime-wasm`. The CLI keeps
+# the release profile.
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
