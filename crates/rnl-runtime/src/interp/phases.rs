@@ -1073,9 +1073,10 @@ impl Interp<'_> {
         }
         match self.o(att).clone() {
             ObjData::Net { .. } => {
-                for k in 0..self.scenes[s].wires.len() {
-                    let w = self.scenes[s].wires[k];
-                    if !matches!(self.o(w), ObjData::Wire { nets, failed: false, .. } if nets.contains(&att)) {
+                // the first wire on the net that has its points
+                let ws = self.scenes[s].wires_by_net.get(&att).cloned().unwrap_or_default();
+                for w in ws {
+                    if !matches!(self.o(w), ObjData::Wire { failed: false, .. }) {
                         continue;
                     }
                     if let Some(pts) = self.wire_points(s, w) {

@@ -73,6 +73,8 @@ pub struct Scene {
     /// The key texts already in `texts`.
     pub listed_keytexts: HashSet<ObjId>,
     pub wires: Vec<ObjId>,
+    /// The wires on each net, in the order of `wires`; `scene_add_wire` keeps it.
+    pub wires_by_net: HashMap<ObjId, Vec<ObjId>>,
     pub bundles: Vec<ObjId>,
     pub constraints: Vec<ObjId>,
     pub routes: Vec<ObjId>,
@@ -134,6 +136,7 @@ impl Scene {
             texts: Vec::new(),
             listed_keytexts: HashSet::new(),
             wires: Vec::new(),
+            wires_by_net: HashMap::new(),
             bundles: Vec::new(),
             constraints: Vec::new(),
             routes: Vec::new(),
@@ -646,12 +649,18 @@ impl Interp<'_> {
     }
 
     pub(crate) fn scene_add_wire(&mut self, s: SceneId, w: ObjId, at: Pos, ctx: &Ctx) {
-        let style = match self.o(w) {
-            ObjData::Wire { style, .. } => style.clone(),
-            _ => StyleMap::new(),
+        let (style, nets) = match self.o(w) {
+            ObjData::Wire { style, nets, .. } => (style.clone(), nets.clone()),
+            _ => (StyleMap::new(), Vec::new()),
         };
         let sc = &mut self.scenes[s];
         sc.wires.push(w);
+        // a wire's nets do not change after it is made
+        for (k, n) in nets.iter().enumerate() {
+            if !nets[..k].contains(n) {
+                sc.wires_by_net.entry(*n).or_default().push(w);
+            }
+        }
         sc.created.insert(w, at.clone());
         if !style.is_empty() {
             sc.styles.push(Fact {
