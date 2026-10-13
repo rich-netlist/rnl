@@ -204,7 +204,9 @@ def web(out):
             options.drop_tables += ["vhea", "vmtx", "VORG"]
             # the names, the copyright, the trademark and the licence (OFL 2, 4)
             options.name_IDs = [0, 1, 2, 3, 4, 5, 6, 7, 13, 14]
-            font = TTFont(path)
+            # with the font's own head.modified rather than now, so that the files are the same
+            # every time
+            font = TTFont(path, recalcTimestamp=False)
             subsetter = subset.Subsetter(options)
             subsetter.populate(unicodes=cps)
             subsetter.subset(font)
