@@ -6,9 +6,9 @@
 import { collect, decodeText, startCore } from "../core/client.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 
-/** The extensions of netlists that are opened on their own, offered first as the file to open. */
+/** The extensions of netlists that are opened on their own, listed first as the file to open. */
 const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "scs"];
-/** The extensions of files mostly included or used by a netlist, offered after them. */
+/** The extensions of files mostly included or used by a netlist, listed after the netlists. */
 const PARTS = ["inc", "lib", "rnl"];
 /**
  * The directory of the workspace that holds the files chosen with Open or dropped, such as
@@ -188,11 +188,12 @@ function extension(path) {
 const byPath = (a, b) => a.localeCompare(b, undefined, { numeric: true });
 
 /**
- * The entry among `files`, by path, each shown relative to the directory `dir`. Of files chosen or
- * dropped, the only netlist is the entry, or the only file of those mostly included, or the only
+ * The entry among `files`, by path, each shown relative to the directory `dir`. Any file can be the
+ * netlist, whatever its name: the netlists are listed first, then the files mostly included, then
+ * the others. Of files chosen or dropped, the entry is the only one not mostly included, or the only
  * file; when more than one could be, the user picks. In a folder, named by `folder` ("" for several
- * things dropped, a folder among them), the user always picks among its netlists and then the files
- * they include, with a filter. Null when the user cancels.
+ * things dropped, a folder among them), the user always picks, with a filter. Null when the user
+ * cancels.
  *
  * @param {Map<string, unknown>} files
  * @param {string} dir
@@ -200,15 +201,12 @@ const byPath = (a, b) => a.localeCompare(b, undefined, { numeric: true });
  * @returns {Promise<string | null>}
  */
 function chooseEntry(files, dir, folder) {
-  const paths = [...files.keys()].sort(byPath);
-  const netlists = paths.filter((p) => NETLISTS.includes(extension(p)));
-  const parts = paths.filter((p) => PARTS.includes(extension(p)));
-  let offered;
+  const rank = (p) => (NETLISTS.includes(extension(p)) ? 0 : PARTS.includes(extension(p)) ? 1 : 2);
+  const offered = [...files.keys()].sort((a, b) => rank(a) - rank(b) || byPath(a, b));
   if (folder === null) {
-    offered = netlists.length > 0 ? netlists : parts.length > 0 ? parts : paths;
+    const entries = offered.filter((p) => rank(p) !== 1);
+    if (entries.length === 1) return Promise.resolve(entries[0]);
     if (offered.length === 1) return Promise.resolve(offered[0]);
-  } else {
-    offered = netlists.length + parts.length > 0 ? [...netlists, ...parts] : paths;
   }
   let text = "Several of the files could be the netlist to open. Which one?";
   if (folder !== null) text = folder ? `The netlist to open in ${folder}:` : "The netlist to open:";
