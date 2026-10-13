@@ -47,6 +47,12 @@ pub struct Request {
     /// Use the standard package at the root (16.3); true when not given.
     #[serde(default = "yes")]
     pub std: bool,
+    /// Write each level's SVG; true when not given.
+    #[serde(default = "yes")]
+    pub svg: bool,
+    /// Give each level's primitives; false when not given.
+    #[serde(default)]
+    pub primitives: bool,
     /// Panic with this message, to test that the caller still gets an answer.
     #[cfg(feature = "test-panic")]
     pub panic: Option<String>,
@@ -90,7 +96,12 @@ pub fn respond(request: &[u8]) -> Response {
     }
     let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
-    let options = BuildOptions { dialect: request.dialect, runtime: Options { std: request.std } };
+    let options = BuildOptions {
+        dialect: request.dialect,
+        runtime: Options { std: request.std },
+        svg: request.svg,
+        primitives: request.primitives,
+    };
     match rnl_view::build(&request.entry, &files, &options) {
         Ok(d) => Response::Document(Box::new(d)),
         Err(e) => Response::Error(e),

@@ -69,4 +69,6 @@ jobs:
       - name: Build the CLI
         run: cargo build -p rnl-cli
       - name: Native and WebAssembly builds give identical Documents
-        run: node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl
+        run: |
+          node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl
+          node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl --view --primitives --request '{"primitives": true}'

@@ -12,6 +12,8 @@
  *   found by name.
  * @property {"spice" | "spectre"} [dialect] The dialect, instead of guessing it from the entry.
  * @property {boolean} [std] Use the standard package at the root; true when not given.
+ * @property {boolean} [svg] Write each level's SVG; true when not given.
+ * @property {boolean} [primitives] Give each level's primitives; false when not given.
  */
 
 /**

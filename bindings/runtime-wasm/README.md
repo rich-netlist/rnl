@@ -59,6 +59,8 @@ A call writes the request as UTF-8 JSON, calls `rnl_build`, and reads the answer
 | `package_dirs` | The directories, among the paths of `files`, whose `.rnl` files are packages found by name (16.2). |
 | `dialect` | `"spice"` or `"spectre"`, instead of guessing from the entry. |
 | `std` | Whether the standard package is used at the root (16.3); true when not given. |
+| `svg` | Whether each level's SVG is written; true when not given. |
+| `primitives` | Whether each level's primitives are given; false when not given. |
 
 Fields the core does not know are ignored, so that a frontend can ask for an option that an older core does not have. The answer is `{"document": ...}`, the Document of `rnl-view` as `rnl view` prints it, or `{"error": "..."}` when the request is not JSON of this shape or the entry is not among the files. `Document.missing` lists the files the core asked for and did not get; give them and build again.
 
