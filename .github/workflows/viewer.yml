@@ -1,5 +1,6 @@
 # Tests the viewers' shared page in apps/viewer-ui in Chromium, Firefox and WebKit with Playwright,
-# against a fake shell that serves Documents the rnl command built natively (tests/viewer).
+# against a fake shell that serves Documents the rnl command built natively, and smoke-tests the web
+# viewer of apps/web, its site built with the core as WebAssembly (tests/viewer).
 name: Viewer page
 
 on:
@@ -7,6 +8,8 @@ on:
     branches: [main]
     paths:
       - "apps/viewer-ui/**"
+      - "apps/web/**"
+      - "bindings/**"
       - "tests/viewer/**"
       - "tests/conformance/**"
       - "crates/**"
@@ -17,6 +20,8 @@ on:
   pull_request:
     paths:
       - "apps/viewer-ui/**"
+      - "apps/web/**"
+      - "bindings/**"
       - "tests/viewer/**"
       - "tests/conformance/**"
       - "crates/**"
@@ -41,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install Rust
-        run: rustup toolchain install stable --profile minimal && rustup default stable
+        run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -49,8 +54,9 @@ jobs:
         run: npm ci
       - name: Install the browsers and what they need
         run: npx playwright install --with-deps chromium firefox webkit
-      # the global setup builds the rnl command and writes the fixtures
-      - name: Test the page in Chromium, Firefox and WebKit
+      # the web server builds the web viewer's site and serves it; the global setup builds the rnl
+      # command and writes the fixtures
+      - name: Test the page and the web viewer in Chromium, Firefox and WebKit
         run: npx playwright test
       - name: Keep the report of a failed run
         if: failure()
