@@ -36,12 +36,11 @@ cargo tauri build
 
 | Path | Content |
 | --- | --- |
-| `src/main.rs` | The Tauri application: the menu bar, and the commands to open a file, ask for a file, read the file named on the command line, and set the View menu's check marks. |
-| `src/document.rs` | Reading a file into what the page shows: one SVG per level with what on it can be clicked, the source files with the places of their records, the instances and nets of every level with the places that name them, and the diagnostics. The references in the records come from the runtime (`Interpretation::refs`), so aliases, scopes and subscripts are resolved as the language says. |
-| `ui/` | The page: plain HTML, CSS and JavaScript with no build step. It moves the view by changing the SVG's `viewBox` and finds what a click hits from the boxes, pins and wires `document.rs` gives. |
+| `src/main.rs` | The Tauri application: the menu bar, and the commands to open a file, ask for a file, read the file named on the command line, and set the View menu's check marks. Opening a file builds its Document with [`rnl-view`](../../crates/rnl-view/README.md) from the files on disk: one SVG per level with what on it can be clicked, the source files with the places of their records, the instances and nets of every level with the places that name them, and the diagnostics. |
+| `ui/` | The page: plain HTML, CSS and JavaScript with no build step. It moves the view by changing the SVG's `viewBox` and finds what a click hits from the boxes, pins and wires the Document gives. |
 | `tauri.conf.json`, `capabilities/` | The window, the content security policy, and what the page may call. |
 | `icons/` | The application icon. |
 
 This directory is a Cargo workspace of its own, so the WebView dependencies stay out of the library crates' builds; [`desktop.yml`](../../.github/workflows/desktop.yml) builds it on Linux, Windows and macOS.
 
-The [architecture proposal](../../docs/rnl-toolchain-architecture.md) plans a desktop shell around the shared TypeScript viewer and the runtime compiled to WebAssembly. Neither exists yet, so this viewer calls the Rust runtime directly; its page is small enough to replace when the shared viewer arrives.
+The viewer calls the shared Rust core natively, through `rnl-view`, as [decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md) decides; the web viewer will call the same core through WebAssembly.

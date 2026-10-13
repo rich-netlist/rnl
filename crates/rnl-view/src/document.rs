@@ -1,4 +1,4 @@
-//! Reading a file into what the page shows: one SVG per drawing level, the diagnostics, the
+//! An interpretation as a viewer shows it: one SVG per drawing level, the diagnostics, the
 //! source files, and the links between them. The same runtime and renderer as `rnl render`.
 //!
 //! The links are objects (the host instances and nets of every level) and the places that show
@@ -6,19 +6,19 @@
 //! and what on each drawing stands for one (a symbol's box, a pin, a wire).
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 
-use rnl_cli::{interpret_file, path_str, FsProvider};
 use rnl_runtime::diag::{Diag, Sink};
 use rnl_runtime::geom::{Orient, Pt};
-use rnl_runtime::host::{HostDocument, LevelKind};
+use rnl_runtime::host::{file_name, HostDocument, LevelKind};
 use rnl_runtime::model::{LevelView, RefTarget};
-use rnl_runtime::Options;
+use rnl_runtime::source::dirname;
+use rnl_runtime::Interpretation;
 use serde::Serialize;
 
+/// What a viewer shows of a document, as [`crate::build`] gives it.
 #[derive(Serialize, Debug)]
 pub struct Document {
-    /// The file as opened, for reloading.
+    /// The entry as the frontend named it, for building again.
     pub path: String,
     /// Its file name, for the title bar.
     pub name: String,
@@ -34,6 +34,10 @@ pub struct Document {
     pub objects: Vec<Object>,
     /// The places in the files that name an object.
     pub spans: Vec<Span>,
+    /// The files the core asked for and did not get, such as an include or a package file that
+    /// is not in the workspace: each once, in the order first asked. A frontend that can read
+    /// them adds them to the workspace and builds again. The bundled packages are never missing.
+    pub missing: Vec<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -46,7 +50,7 @@ pub struct Level {
     pub svg: String,
     /// Nothing on the level can be drawn: no object has a position yet.
     pub empty: bool,
-    /// What the level lacks without a solver; see [`rnl_cli::level_status`].
+    /// What the level lacks without a solver; see [`crate::level_status`].
     pub status: Option<String>,
     /// What can be clicked on the drawing, in SVG coordinates.
     pub hits: Vec<Hit>,
@@ -140,12 +144,10 @@ pub struct Diagnostic {
     pub cause: Option<String>,
 }
 
-/// Read and interpret `path` with the bundled standard packages, and draw every level.
-pub fn load(path: &Path) -> Result<Document, String> {
-    let path: PathBuf = std::path::absolute(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let provider = FsProvider::new(&[]);
-    let r = interpret_file(&path, None, &provider, &Options::default())?;
-    let dir = path_str(path.parent().unwrap_or(Path::new("")));
+/// The Document of `entry` from its interpretation: draw every level and link the objects to
+/// their places. `missing` is [`Document::missing`].
+pub(crate) fn document(entry: &str, r: &Interpretation, missing: Vec<String>) -> Document {
+    let dir = dirname(entry);
     let shown_file = |file: &str| match file.strip_prefix(&dir).and_then(|f| f.strip_prefix('/')) {
         Some(rel) if !dir.is_empty() => rel.to_string(),
         _ => file.to_string(),
@@ -219,9 +221,9 @@ pub fn load(path: &Path) -> Result<Document, String> {
     };
     let diagnostics = r.diagnostics().into_iter().map(|d| diagnostic(d, &r.sink)).collect();
     let (objects, spans) = (ix.objects, ix.spans);
-    Ok(Document {
-        path: path.to_string_lossy().into_owned(),
-        name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+    Document {
+        path: entry.to_string(),
+        name: file_name(entry).to_string(),
         dialect: r.doc.dialect.name.clone(),
         levels,
         diagnostics,
@@ -229,7 +231,8 @@ pub fn load(path: &Path) -> Result<Document, String> {
         files,
         objects,
         spans,
-    })
+        missing,
+    }
 }
 
 /// The host files with the places of their records; the opened file comes first.
@@ -417,7 +420,7 @@ impl<'a> Index<'a> {
             kind: lv.kind,
             svg: rnl_render::svg_document(&prims, &options),
             empty: prims.is_empty(),
-            status: rnl_cli::level_status(lv),
+            status: crate::level_status(lv),
             hits,
             children: Vec::new(),
         }
@@ -508,13 +511,19 @@ fn col_suffix(col: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::{corpus, Disk};
+    use crate::BuildOptions;
 
-    fn case(name: &str) -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases").join(name)
+    fn load(entry: &str) -> Result<Document, String> {
+        crate::build(entry, &Disk, &BuildOptions::default())
     }
 
-    fn equivalence(name: &str) -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/equivalence").join(name)
+    fn case(name: &str) -> String {
+        corpus(&format!("cases/{name}"))
+    }
+
+    fn equivalence(name: &str) -> String {
+        corpus(&format!("equivalence/{name}"))
     }
 
     /// The text of a span.

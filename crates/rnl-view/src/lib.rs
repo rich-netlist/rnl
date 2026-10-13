@@ -1,14 +1,20 @@
-//! What every frontend of decision 0006 shares that reads no files: dialect detection, reading
-//! and interpreting a document through the frontend's own file access with the standard packages
-//! bundled here, and the status of a drawing level.
+//! The core interface of decision 0006: a workspace in, a Document out. A frontend names the file
+//! to open and gives its own file access; the core reads what the document needs through it, with
+//! the standard packages bundled here, and returns what a viewer shows.
 //!
 //! The crate does no file I/O, so it builds for `wasm32-unknown-unknown`.
+
+mod document;
+
+use std::cell::RefCell;
 
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::{file_name, HostDocument};
 use rnl_runtime::model::LevelView;
 use rnl_runtime::source::{MemoryProvider, Provider};
 use rnl_runtime::{Interpretation, Options};
+
+pub use document::{Child, Diagnostic, Document, Hit, Level, Object, SourceFile, Span};
 
 /// The standard packages bundled with the core (16.2, 16.3).
 const BUNDLED: [(&str, &str); 2] = [
@@ -26,6 +32,28 @@ pub fn bundled() -> MemoryProvider {
         p.insert(&format!("{BUNDLED_DIR}/{name}"), text);
     }
     p
+}
+
+/// How to build a Document.
+#[derive(Clone, Debug, Default)]
+pub struct BuildOptions {
+    /// "spice" or "spectre", instead of guessing from the entry.
+    pub dialect: Option<String>,
+    /// The runtime's options, such as using the standard package at the root (16.3).
+    pub runtime: Options,
+}
+
+/// Build the Document of `entry`, the path of the file to open as the frontend names it,
+/// `/`-separated (a `\` is read as `/`). `files` is the frontend's file access: the disk, or texts
+/// held in memory, untitled ones included. The bundled packages are layered under it. Fails when
+/// the entry itself cannot be read.
+pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Document, String> {
+    let ws = Workspace::new(files);
+    if ws.read(&slashed(entry)).is_none() {
+        return Err(format!("cannot read {entry}"));
+    }
+    let r = interpret_in(entry, options.dialect.as_deref(), &ws, &options.runtime)?;
+    Ok(document::document(entry, &r, ws.missing.into_inner()))
 }
 
 /// Is the entry Spectre? By `dialect`, by the `.scs` extension, or a `simulator lang=spectre`
@@ -113,15 +141,17 @@ pub fn status_lines(r: &Interpretation) -> Vec<String> {
     r.model.levels.iter().filter_map(|lv| level_status(lv).map(|s| format!("status {}: {s}", lv.title))).collect()
 }
 
-/// The frontend's files with the bundled packages under them.
+/// The frontend's files with the bundled packages under them. It notes the files asked for that
+/// the frontend does not have.
 struct Workspace<'a> {
     files: &'a dyn Provider,
     bundled: MemoryProvider,
+    missing: RefCell<Vec<String>>,
 }
 
 impl Workspace<'_> {
     fn new(files: &dyn Provider) -> Workspace<'_> {
-        Workspace { files, bundled: bundled() }
+        Workspace { files, bundled: bundled(), missing: RefCell::new(Vec::new()) }
     }
 }
 
@@ -130,7 +160,14 @@ impl Provider for Workspace<'_> {
         if path.starts_with(BUNDLED_DIR) {
             return self.bundled.read(path);
         }
-        self.files.read(path)
+        let text = self.files.read(path);
+        if text.is_none() {
+            let mut missing = self.missing.borrow_mut();
+            if !missing.iter().any(|m| m == path) {
+                missing.push(path.to_string());
+            }
+        }
+        text
     }
 
     /// The frontend's package directories, then the bundled packages (16.2).
@@ -160,6 +197,20 @@ mod tests {
     use super::*;
     use rnl_runtime::diag::Severity;
 
+    /// The frontend's file access in the tests: the files of the repository, read from the disk.
+    pub(crate) struct Disk;
+
+    impl Provider for Disk {
+        fn read(&self, path: &str) -> Option<String> {
+            std::fs::read_to_string(path).ok()
+        }
+    }
+
+    /// A file of the conformance corpus, such as `cases/01-rc-lowpass.sp`.
+    pub(crate) fn corpus(name: &str) -> String {
+        rnl_runtime::source::normalize(&format!("{}/../../tests/conformance/{name}", env!("CARGO_MANIFEST_DIR")))
+    }
+
     const NETLIST: &str = "* untitled
 R1 a 0 1k
 C1 a 0 1p
@@ -170,6 +221,112 @@ C1 a 0 1p
 * }
 .end
 ";
+
+    #[test]
+    fn an_untitled_text_is_an_entry_in_memory() {
+        let files = MemoryProvider::new().with("untitled-1", NETLIST);
+        let d = build("untitled-1", &files, &BuildOptions::default()).unwrap();
+        assert_eq!((d.path.as_str(), d.name.as_str(), d.dialect.as_str()), ("untitled-1", "untitled-1", "spice"));
+        assert_eq!(d.files.len(), 1);
+        assert_eq!((d.files[0].path.as_str(), d.files[0].text.as_str()), ("untitled-1", NETLIST));
+        // the standard package draws the resistor and the capacitor
+        assert!(d.diagnostics.iter().all(|x| x.severity != "error"), "{:?}", d.diagnostics);
+        assert!(d.levels[0].svg.starts_with("<svg") && !d.levels[0].empty);
+        assert_eq!(d.levels[0].hits.iter().filter(|h| h.kind == "box").count(), 2);
+        assert!(d.missing.is_empty(), "{:?}", d.missing);
+    }
+
+    #[test]
+    fn a_missing_include_is_listed_once_and_diagnosed() {
+        let text = "* top
+.include \"lib/parts.inc\"
+.include \"lib/parts.inc\"
+X1 a b part
+.end
+";
+        let files = MemoryProvider::new().with("w/top.sp", text);
+        let d = build("w/top.sp", &files, &BuildOptions::default()).unwrap();
+        assert_eq!(d.missing, ["w/lib/parts.inc"]);
+        let errors: Vec<_> = d.diagnostics.iter().filter(|x| x.severity == "error").collect();
+        let found = errors.iter().any(|x| x.message.contains("lib/parts.inc cannot be found") && x.line == 2);
+        assert!(found, "{errors:?}");
+        // the same diagnostics as before the core noted what was missing
+        let again = interpret("w/top.sp", None, &files, &Options::default()).unwrap();
+        assert_eq!(d.diagnostics.len(), again.diagnostics().len());
+
+        // once the frontend has the file, nothing is missing and its subcircuit is drawn
+        let files = files.with("w/lib/parts.inc", ".subckt part p q\nR1 p q 1k\n.ends\n");
+        let d = build("w/top.sp", &files, &BuildOptions::default()).unwrap();
+        assert!(d.missing.is_empty(), "{:?}", d.missing);
+        assert_eq!(d.files.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(), ["top.sp", "lib/parts.inc"]);
+        assert!(d.levels.iter().any(|l| l.title == "part"));
+        assert!(!d.diagnostics.iter().any(|x| x.message.contains("cannot be found")), "{:?}", d.diagnostics);
+    }
+
+    #[test]
+    fn a_package_file_by_path_is_missing_until_given() {
+        let text = "* top
+R1 a 0 1k
+* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"acme\", path=\"pkg/acme.rnl\")}
+.end
+";
+        let files = MemoryProvider::new().with("top.sp", text);
+        let d = build("top.sp", &files, &BuildOptions::default()).unwrap();
+        assert_eq!(d.missing, ["pkg/acme.rnl"]);
+        // the bundled packages are read as well, but are never missing
+        assert!(d.missing.iter().all(|m| !m.starts_with(BUNDLED_DIR)));
+    }
+
+    #[test]
+    fn the_dialect_can_be_given() {
+        // Spectre's instance syntax; without the override, the `.sp` name says SPICE
+        let text = "// t\nr1 (a 0) resistor r=1k\n";
+        let files = MemoryProvider::new().with("chain.sp", text);
+        let guessed = build("chain.sp", &files, &BuildOptions::default()).unwrap();
+        assert_eq!(guessed.dialect, "spice");
+        let options = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
+        let given = build("chain.sp", &files, &options).unwrap();
+        assert_eq!(given.dialect, "spectre");
+        assert!(given.objects.iter().any(|o| o.kind == "instance" && o.name == "r1"), "{:?}", given.objects);
+        // and the other way round
+        let files = MemoryProvider::new().with("chain.scs", "* t\nR1 a 0 1k\n.end\n");
+        let options = BuildOptions { dialect: Some("spice".into()), ..BuildOptions::default() };
+        assert_eq!(build("chain.scs", &files, &options).unwrap().dialect, "spice");
+        assert_eq!(build("chain.scs", &files, &BuildOptions::default()).unwrap().dialect, "spectre");
+    }
+
+    #[test]
+    fn a_missing_entry_is_an_error() {
+        let files = MemoryProvider::new().with("a.sp", NETLIST);
+        for entry in ["b.sp", "b.scs", "pkg/b.rnl"] {
+            assert_eq!(build(entry, &files, &BuildOptions::default()).unwrap_err(), format!("cannot read {entry}"));
+        }
+    }
+
+    #[test]
+    fn the_standard_package_can_be_left_out() {
+        let files = MemoryProvider::new().with("a.sp", NETLIST);
+        let options = BuildOptions { runtime: Options { std: false }, ..BuildOptions::default() };
+        let without = build("a.sp", &files, &options).unwrap();
+        let with = build("a.sp", &files, &BuildOptions::default()).unwrap();
+        assert_ne!(without.diagnostics.len(), with.diagnostics.len());
+    }
+
+    #[test]
+    fn a_package_file_is_checked_on_its_own() {
+        let d = build(&format!("{BUNDLED_DIR}/rnl-std.rnl"), &MemoryProvider::new(), &BuildOptions::default());
+        let d = d.unwrap();
+        assert!(d.diagnostics.is_empty(), "{:?}", d.diagnostics);
+        assert!(d.missing.is_empty());
+    }
+
+    #[test]
+    fn backslashes_separate_directories_too() {
+        let d = build(r"w\top.sp", &MemoryProvider::new().with("w/top.sp", NETLIST), &BuildOptions::default());
+        let d = d.unwrap();
+        assert_eq!((d.path.as_str(), d.name.as_str()), (r"w\top.sp", "top.sp"));
+        assert_eq!(d.files[0].path, "top.sp");
+    }
 
     #[test]
     fn extensions_are_those_of_the_file_name() {
@@ -197,5 +354,24 @@ C1 a 0 1p
         let path = format!("{BUNDLED_DIR}/rnl-std.rnl");
         let package = interpret(&path, None, &MemoryProvider::new(), &Options::default()).unwrap();
         assert!(package.diagnostics().is_empty());
+    }
+
+    #[test]
+    fn the_document_keeps_the_field_names_the_viewers_read() {
+        let d = build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &BuildOptions::default()).unwrap();
+        let v = serde_json::to_value(&d).unwrap();
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        let want =
+            ["path", "name", "dialect", "levels", "diagnostics", "failed", "files", "objects", "spans", "missing"];
+        assert_eq!(keys, want);
+        assert_eq!(v["missing"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn a_corpus_case_builds_from_the_disk() {
+        let d = build(&corpus("cases/04-hierarchy.sp"), &Disk, &BuildOptions::default()).unwrap();
+        let names: Vec<&str> = d.files.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["04-hierarchy.sp", "04-hierarchy-lib.inc"]);
+        assert!(d.missing.is_empty(), "{:?}", d.missing);
     }
 }

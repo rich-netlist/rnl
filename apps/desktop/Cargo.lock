@@ -2555,7 +2555,9 @@ version = "0.0.1"
 dependencies = [
  "rnl-host-spectre",
  "rnl-host-spice",
+ "rnl-render",
  "rnl-runtime",
+ "serde",
 ]
 
 [[package]]
@@ -2563,9 +2565,7 @@ name = "rnl-viewer"
 version = "0.0.1"
 dependencies = [
  "rnl-cli",
- "rnl-render",
- "rnl-runtime",
- "serde",
+ "rnl-view",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

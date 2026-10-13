@@ -12,3 +12,8 @@ publish.workspace = true
 rnl-runtime.workspace = true
 rnl-host-spice.workspace = true
 rnl-host-spectre.workspace = true
+rnl-render.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
