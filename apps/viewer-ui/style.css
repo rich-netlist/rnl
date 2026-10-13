@@ -126,6 +126,7 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .sidebar {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   background: var(--panel);
@@ -136,12 +137,16 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .netlist-pane {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) 5px auto;
+  grid-template-columns: minmax(0, 1fr);
 }
+/* the problems keep the last row when the splitter above them is hidden */
+.netlist-pane .problems { grid-row: 4; }
 .netlist-pane.problems-folded { grid-template-rows: auto minmax(0, 1fr) 0 auto; }
 .netlist-pane.problems-folded .hsplit { display: none; }
 .hierarchy-pane {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) 5px var(--index-h);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .vsplit, .hsplit {
@@ -189,6 +194,7 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
   padding: 3px 8px 3px 6px;
   border-bottom: 1px solid var(--line);
 }
