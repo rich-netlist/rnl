@@ -20,6 +20,7 @@ publish = false
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+libm = "0.2"
 rnl-runtime = { path = "crates/rnl-runtime" }
 rnl-host-spice = { path = "crates/rnl-host-spice" }
 rnl-host-spectre = { path = "crates/rnl-host-spectre" }

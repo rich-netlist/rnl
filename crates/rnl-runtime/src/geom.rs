@@ -1,4 +1,7 @@
 //! Orientation codes and the routing of wires (spec-draft 11.2, 11.7, 13.1).
+//!
+//! Sines, cosines and arc tangents come from `libm`, a math library in Rust, so that native and
+//! WebAssembly builds compute the same bits (decision 0006).
 
 /// A point in scene or symbol coordinates: x to the right, y up (11.7).
 pub type Pt = (f64, f64);
@@ -151,7 +154,8 @@ pub fn shape_extent_points(
             let (c, r) = if pts.len() == 1 {
                 (pts[0], radius.unwrap_or(0.0))
             } else if pts.len() >= 2 {
-                (pts[0], ((pts[1].0 - pts[0].0).powi(2) + (pts[1].1 - pts[0].1).powi(2)).sqrt())
+                let (dx, dy) = (pts[1].0 - pts[0].0, pts[1].1 - pts[0].1);
+                (pts[0], (dx * dx + dy * dy).sqrt())
             } else {
                 return Vec::new();
             };
@@ -171,10 +175,11 @@ fn arc_extent_points(a: Pt, b: Pt, c: Pt) -> Vec<Pt> {
     let (aa, bb, cc) = (a.0 * a.0 + a.1 * a.1, b.0 * b.0 + b.1 * b.1, c.0 * c.0 + c.1 * c.1);
     let ux = (aa * (b.1 - c.1) + bb * (c.1 - a.1) + cc * (a.1 - b.1)) / d;
     let uy = (aa * (c.0 - b.0) + bb * (a.0 - c.0) + cc * (b.0 - a.0)) / d;
-    let r = ((a.0 - ux).powi(2) + (a.1 - uy).powi(2)).sqrt();
+    let (dx, dy) = (a.0 - ux, a.1 - uy);
+    let r = (dx * dx + dy * dy).sqrt();
     let ccw = (b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0) > 0.0;
     let tau = std::f64::consts::TAU;
-    let ang = |p: Pt| (p.1 - uy).atan2(p.0 - ux).rem_euclid(tau);
+    let ang = |p: Pt| libm::atan2(p.1 - uy, p.0 - ux).rem_euclid(tau);
     let (ta, tc) = (ang(a), ang(c));
     let mut out = vec![a, c];
     for k in 0..4 {
@@ -185,7 +190,7 @@ fn arc_extent_points(a: Pt, b: Pt, c: Pt) -> Vec<Pt> {
             (ta - phi).rem_euclid(tau) <= (ta - tc).rem_euclid(tau)
         };
         if inside {
-            out.push((ux + r * phi.cos(), uy + r * phi.sin()));
+            out.push((ux + r * libm::cos(phi), uy + r * libm::sin(phi)));
         }
     }
     out
