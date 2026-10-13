@@ -19,7 +19,7 @@ use rnl_runtime::{Interpretation, Options};
 
 pub use document::{Child, Diagnostic, Document, Hit, Level, Object, SourceFile, Span};
 pub use primitive::{
-    Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, Unit, VAlign,
+    Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
 };
 
 /// The standard packages bundled with the core (16.2, 16.3).

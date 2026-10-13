@@ -7,8 +7,10 @@
 //!
 //! The renderer resolves each line style into strokes, which the SVG writes as they are: a
 //! frontend that strokes with a colour, a width, dashes, a cap and a join draws the lines as the
-//! SVG does. The SVG writer still decides where the pieces of a text go, and draws a fraction's
-//! bar; the types say how, in pixels of the SVG. A test holds the SVG writer to what the types say.
+//! SVG does. It lays out each text with the metrics of the fonts shipped with the core (decision
+//! 0007), and gives its runs at their places and its bars as strokes, which the SVG writes as they
+//! are in those fonts: a frontend that draws them in the same fonts draws the texts as the SVG
+//! does. A test holds the SVG writer to what the types say.
 
 use rnl_runtime::geom::Pt;
 use rnl_runtime::markup;
@@ -29,7 +31,8 @@ pub struct Primitive {
     pub layer: Layer,
     /// Its place within the layer, compared element by element (11.6).
     pub order: Vec<f64>,
-    /// x0, y0, x1, y1: what it covers, in scene units; for a text, an estimate.
+    /// x0, y0, x1, y1: what it covers, in scene units; for a text, each run from its face's
+    /// ascender to its descender, leaning with it when italic, and the bars.
     pub bbox: [f64; 4],
     #[serde(flatten)]
     pub shape: Shape,
@@ -153,18 +156,22 @@ pub enum Join {
     Bevel,
 }
 
-/// A text laid out at an anchor (9.2.5, 13.6). Its glyphs read upright whatever turns it, or from
+/// A text (9.2.5, 13.6) as the core laid it out, with the metrics of the fonts shipped with it,
+/// Noto Sans SC Regular and Bold (decision 0007). A frontend draws its `runs` and its `bars` and
+/// nothing else, so it needs no alignment, baseline or measuring of its own; the other fields say
+/// what the text is and how it was placed. Its glyphs read upright whatever turns it, or from
 /// bottom to top when it is vertical.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct Text {
     pub anchor: [f64; 2],
-    /// The lines, first to last, each a list of runs.
+    /// The lines, first to last, each a list of runs of the markup.
     pub lines: Vec<Vec<Run>>,
-    /// The text height in scene units; the lines are 1.15 times it apart.
+    /// The text height, the em of the font, in scene units.
     pub size: f64,
     pub color: Color,
-    /// The font family the style names, a hint (9.3); the SVG falls back on sans-serif.
+    /// The font family the style names, a hint (9.3): texts are laid out and drawn in the shipped
+    /// family.
     pub font: String,
     pub bold: bool,
     pub italic: bool,
@@ -172,8 +179,45 @@ pub struct Text {
     pub halign: HAlign,
     /// Where the anchor is across the lines, after turning.
     pub valign: VAlign,
-    /// Turned a quarter counter-clockwise: the lines read from bottom to top.
+    /// Turned a quarter counter-clockwise: the lines read from bottom to top, and each run is drawn
+    /// turned a quarter counter-clockwise about its `at`.
     pub vertical: bool,
+    /// The runs as laid out, drawn in the text's colour.
+    pub runs: Vec<TextRun>,
+    /// The bars of its fractions and the lines over its overlined runs.
+    pub bars: Vec<Bar>,
+}
+
+/// A run of a laid-out text: `text` in one face and size, drawn from `at`, the start of its
+/// baseline. Its glyphs follow each other by their advances in the face, with no kerning,
+/// ligatures or other shaping, so that the run is `width` long; in CSS, `font-kerning: none` and
+/// `font-variant-ligatures: none`. Its spaces are drawn as they are.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
+pub struct TextRun {
+    pub text: String,
+    /// The start of its baseline, in scene units.
+    pub at: [f64; 2],
+    /// The font size, the em, in scene units.
+    pub size: f64,
+    /// The sum of its characters' advances in its face, in scene units. A character the fonts do
+    /// not map is 1 em wide, as the box they draw for it.
+    pub width: f64,
+    /// In Noto Sans SC Bold, else Regular.
+    pub bold: bool,
+    /// Leaning, since the fonts have no italic face: a point of a glyph moves forward along the
+    /// baseline by 0.25 times its height above it, about 14°. Its advances are the upright face's.
+    pub italic: bool,
+}
+
+/// A straight line of a text, the bar of a fraction or the line over an overlined run (13.6),
+/// between its two `points`, drawn with its stroke: in the text's colour, in scene units, with butt
+/// caps.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
+pub struct Bar {
+    pub points: [[f64; 2]; 2],
+    pub stroke: Stroke,
 }
 
 /// Where a text's anchor is along its lines: at their start, middle or end.
@@ -186,11 +230,10 @@ pub enum HAlign {
     End,
 }
 
-/// Where a text's anchor is across its lines: on the first line's baseline, or at the top, middle
-/// or bottom of the lines. Until texts are laid out with the fonts' metrics, the SVG places them
-/// by the size: at the top, the first baseline is 0.8 times the size below the anchor; at the
-/// bottom, the last baseline is 0.2 times the size above it; in the middle, the point halfway
-/// between the first and last baselines is 0.35 times the size below it.
+/// Where a text's anchor is across its lines: on the first line's baseline; at the top, the first
+/// line's ascender, 1.16 times the size above its baseline; at the bottom, the last line's
+/// descender, 0.288 times the size below its baseline; or in the middle, halfway between the two.
+/// The lines are the fonts' line height apart, 1.448 times the size.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(rename_all = "lowercase")]
@@ -202,12 +245,13 @@ pub enum VAlign {
 }
 
 /// A piece of a line of text in one style (13.6), by its `kind`: "text", or "frac" for
-/// `\frac{…}{…}`, the numerator over the denominator. The SVG places the pieces of a line that
-/// holds a fraction by estimated widths. It draws the numerator and the denominator at 0.8 of the
-/// size, centred on the fraction, with their baselines 0.72 of the size above the line's and 0.42
-/// below it, and between them a bar in the text's colour with butt caps: 0.3 of the size above the
-/// baseline, as long as the fraction less 0.06 of the size at each end, and 0.06 of the size wide
-/// but at least 0.8 pixels.
+/// `\frac{…}{…}`, the numerator over the denominator. Laid out, the numerator and the denominator
+/// are at 0.8 of the fraction's size and centred on it, with their baselines 0.72 of the size above
+/// its baseline and 0.42 below it; the fraction is as wide as the wider of them and 0.15 of the
+/// size, and its bar is 0.3 of the size above the baseline and 0.06 of it short of each end. A
+/// fraction's bar and an overline are 0.06 of their size wide, but at least 0.8 pixels at the
+/// level's `scale`; an overline is 0.88 of its run's size above the run's baseline, at the top of
+/// the em box.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -221,8 +265,9 @@ pub enum Run {
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct RunStyle {
     /// How far the run is raised: each `^` it is in adds 1 and each `_` takes 1 away, so the z of
-    /// `x^{y^{z}}` is at 2. The SVG draws a run at any level but 0 at 0.7 of the size, raised once
-    /// when it is above 0 and lowered once when below.
+    /// `x^{y^{z}}` is at 2. Laid out, each level is 0.7 of the size of the level next to it towards
+    /// 0, with its baseline 0.35 of that size higher, or 0.15 of it lower; in a fraction, the levels
+    /// count from the fraction's.
     pub level: i8,
     pub bold: bool,
     pub italic: bool,
@@ -329,7 +374,13 @@ fn text(t: &rnl_render::TextPrim) -> Text {
         halign,
         valign,
         vertical: t.vertical,
+        runs: t.runs.iter().map(text_run).collect(),
+        bars: t.bars.iter().map(|b| Bar { points: [pt(b.a), pt(b.b)], stroke: stroke(&b.stroke) }).collect(),
     }
+}
+
+fn text_run(r: &rnl_render::TextRun) -> TextRun {
+    TextRun { text: r.text.clone(), at: pt(r.at), size: r.size, width: r.width, bold: r.bold, italic: r.italic }
 }
 
 fn run(r: &markup::Run) -> Run {
@@ -434,6 +485,16 @@ mod tests {
                 halign: name(t.halign),
                 valign: name(t.valign),
                 vertical: t.vertical,
+                runs: t.runs.iter().map(back_run).collect(),
+                bars: t
+                    .bars
+                    .iter()
+                    .map(|b| rnl_render::TextBar {
+                        a: pt(b.points[0]),
+                        b: pt(b.points[1]),
+                        stroke: back_stroke(&b.stroke),
+                    })
+                    .collect(),
             }),
             Shape::Flyline { points, strokes: s } => {
                 Kind::Flyline { a: pt(points[0]), b: pt(points[1]), strokes: stroke(s) }
@@ -441,6 +502,11 @@ mod tests {
         };
         let layer = model::Layer::parse(&name(p.layer));
         rnl_render::Primitive { owner: p.owner.clone(), layer, order: p.order.clone(), kind, bbox: p.bbox }
+    }
+
+    fn back_run(r: &TextRun) -> rnl_render::TextRun {
+        let at = (r.at[0], r.at[1]);
+        rnl_render::TextRun { text: r.text.clone(), at, size: r.size, width: r.width, bold: r.bold, italic: r.italic }
     }
 
     fn markup_run(r: &Run) -> markup::Run {
@@ -509,6 +575,8 @@ mod tests {
             halign: "start".into(),
             valign: "baseline".into(),
             vertical: false,
+            runs: Vec::new(),
+            bars: Vec::new(),
         };
         for v in text("halign") {
             assert_eq!(name(super::text(&rnl_render::TextPrim { halign: v.clone(), ..t.clone() }).halign), v);
@@ -751,79 +819,135 @@ mod tests {
             assert!(drawn.contains(want), "{drawn}");
         }
 
-        // texts with a font that the SVG falls back from, of size 1 but where said
-        let (fs, lh) = (o.scale, 1.15 * o.scale);
-        let run = |text: &str, level: i8| markup::Run::Text {
+        // the texts in the shipped family, with no kerning or ligatures and their spaces as they are
+        let fonts = "font-family=\"Noto Sans SC, Noto Sans CJK SC, Source Han Sans SC, sans-serif\" style=\"font-kerning:none;font-variant-ligatures:none;white-space:pre\" xml:space=\"preserve\">";
+        assert!(svg(Kind::Path { segs: Vec::new(), strokes: Vec::new(), fill: None }).contains(fonts));
+        // each run at the start of its baseline, in the text's colour and its size, held to its
+        // width; bold in the bold face; an italic run leaning by 0.25 of the height above its
+        // baseline, and a vertical text's runs turned a quarter counter-clockwise about their start
+        let run = |text: &str, bold: bool, italic: bool| TextRun {
             text: text.into(),
-            style: markup::RunStyle { level, ..markup::RunStyle::default() },
+            at: [1.0, 2.0],
+            size: 0.5,
+            width: 0.3,
+            bold,
+            italic,
         };
-        let sized = |lines: Vec<markup::Line>, valign: &str, size: f64| {
-            svg(Kind::Text(rnl_render::TextPrim {
+        let bar = Bar {
+            points: [[1.0, 2.0], [1.5, 2.0]],
+            stroke: stroke("#102030", 0.06, Unit::Scene, &[], 0.0, Cap::Butt, Join::Miter),
+        };
+        let text = |runs: Vec<TextRun>, bars: Vec<Bar>, vertical: bool| {
+            let t = Text {
+                anchor: [0.0, 0.0],
+                lines: Vec::new(),
+                size: 1.0,
+                color: Color("#102030".into()),
+                font: "serif".into(),
+                bold: false,
+                italic: false,
+                halign: HAlign::Start,
+                valign: VAlign::Baseline,
+                vertical,
+                runs,
+                bars,
+            };
+            let p = Primitive {
+                owner: String::new(),
+                layer: Layer::Middle,
+                order: Vec::new(),
+                bbox: [0.0; 4],
+                shape: Shape::Text(t),
+            };
+            rnl_render::svg_document(&[back(&p)], &o)
+        };
+        let head = "<text x=\"14.00\" y=\"-28.00\" font-size=\"7.00\"";
+        let tail = " textLength=\"4.20\" lengthAdjust=\"spacingAndGlyphs\" fill=\"#102030\">";
+        let lean = "matrix(1 0 -0.25 1 -7.00 0)";
+        let turn = "rotate(-90 14.00 -28.00)";
+        for (runs, vertical, want) in [
+            (vec![run("a  b<", false, false)], false, format!("{head}{tail}a  b&lt;</text>")),
+            (vec![run("V", true, false)], false, format!("{head} font-weight=\"bold\"{tail}V</text>")),
+            (vec![run("V", false, true)], false, format!("{head} transform=\"{lean}\"{tail}V</text>")),
+            (vec![run("V", false, false)], true, format!("{head} transform=\"{turn}\"{tail}V</text>")),
+            (
+                vec![run("V", true, true)],
+                true,
+                format!("{head} font-weight=\"bold\" transform=\"{turn} {lean}\"{tail}V</text>"),
+            ),
+        ] {
+            let drawn = text(runs, Vec::new(), vertical);
+            assert!(drawn.contains(&format!("\n{want}\n")), "{want}: {drawn}");
+        }
+        // the bars as lines with their strokes, after the runs
+        let drawn = text(vec![run("V", false, false)], vec![bar], false);
+        let want = format!(
+            "{head}{tail}V</text><line x1=\"14.00\" y1=\"-28.00\" x2=\"21.00\" y2=\"-28.00\" stroke=\"#102030\" stroke-width=\"0.84\"/>"
+        );
+        assert!(drawn.contains(&want), "{drawn}");
+
+        // the layout the types describe: the advances of the shipped faces, sub- and superscripts,
+        // fractions, overlines, and the anchor on the lines
+        let laid = |lines: &str, valign: &str, size: f64| {
+            let mut t = rnl_render::TextPrim {
                 anchor: (0.0, 0.0),
-                lines,
+                lines: markup::parse(lines),
                 size,
                 color: "#102030".into(),
-                font: "Serif".into(),
+                font: "serif".into(),
                 bold: false,
                 italic: false,
                 halign: "start".into(),
                 valign: valign.into(),
                 vertical: false,
-            }))
+                runs: Vec::new(),
+                bars: Vec::new(),
+            };
+            rnl_render::lay_out(&mut t, o.scale);
+            super::text(&t)
         };
-        let text = |lines: Vec<markup::Line>, valign: &str| sized(lines, valign, 1.0);
-        // the first baseline of three lines, below the anchor
-        let n = 3.0;
+        let close = |a: f64, b: f64| (a - b).abs() < 1e-12;
+        let regular = rnl_render::Face::REGULAR;
+        // the lines, from the first ascender to the last descender
         for (valign, first) in [
             ("baseline", 0.0),
-            ("top", 0.8 * fs),
-            // the last baseline above it
-            ("bottom", -0.2 * fs - (n - 1.0) * lh),
-            // the point halfway between the first and the last baseline below it
-            ("middle", 0.35 * fs - (n - 1.0) * lh / 2.0),
+            ("top", -1.16),
+            ("bottom", 0.288 + 2.0 * 1.448),
+            ("middle", (2.0 * 1.448 - 1.16 + 0.288) / 2.0),
         ] {
-            let svg = text(vec![vec![run("a", 0)]; 3], valign);
-            let want = format!("<tspan x=\"0\" dy=\"{first:.2}\">a</tspan><tspan x=\"0\" dy=\"{lh:.2}\">a</tspan>");
-            assert!(svg.contains(&want) && svg.contains("font-family=\"Serif, sans-serif\""), "{valign}: {svg}");
-        }
-        // raised and lowered once, whatever the level
-        let svg = text(vec![vec![run("x", 0), run("y", 1), run("z", 2), run("i", -2)]], "baseline");
-        let small = format!("font-size=\"{:.2}\"", 0.7 * fs);
-        let want = format!(
-            "x<tspan {small} baseline-shift=\"super\">y</tspan><tspan {small} baseline-shift=\"super\">z</tspan><tspan {small} baseline-shift=\"sub\">i</tspan>"
-        );
-        assert!(svg.contains(&want), "{svg}");
-        // the numerator and the denominator of a fraction at 0.8 of the size, centred on it, with
-        // their baselines 0.72 of the size above the line's and 0.42 below it
-        let frac =
-            markup::Run::Frac { num: vec![run("a", 0)], den: vec![run("b", 0)], style: markup::RunStyle::default() };
-        let line = vec![frac];
-        let w = rnl_render::line_width(&line) * fs;
-        let svg = text(vec![line.clone()], "baseline");
-        assert_eq!(svg.matches(&format!("font-size=\"{:.2}\"", 0.8 * fs)).count(), 2, "{svg}");
-        for (y, piece) in [(-0.72 * fs, "a"), (0.42 * fs, "b")] {
-            let want = format!(
-                "<text x=\"{:.2}\" y=\"{y:.2}\" font-size=\"{:.2}\" text-anchor=\"middle\" textLength=\"{:.2}\" lengthAdjust=\"spacingAndGlyphs\">{piece}</text>",
-                w / 2.0,
-                0.8 * fs,
-                rnl_render::text_width(piece) * 0.8 * fs
+            let t = laid("a\\\\b\\\\c", valign, 1.0);
+            let ys: Vec<f64> = t.runs.iter().map(|r| r.at[1]).collect();
+            assert!(
+                close(ys[0], first) && close(ys[1], first - 1.448) && close(ys[2], first - 2.0 * 1.448),
+                "{valign}: {ys:?}"
             );
-            assert!(svg.contains(&want), "{want}: {svg}");
         }
-        // the bar in the text's colour with butt caps, 0.3 of the size above the baseline and 0.06
-        // of the size short of each end of the fraction, 0.06 of the size wide but at least 0.8
-        // pixels
-        let bar = |fs: f64, width: &str| {
-            format!(
-                "<line x1=\"{:.2}\" y1=\"{:.2}\" x2=\"{:.2}\" y2=\"{:.2}\" stroke=\"#102030\" stroke-width=\"{width}\"/>",
-                0.06 * fs,
-                -0.3 * fs,
-                rnl_render::line_width(&line) * fs - 0.06 * fs,
-                -0.3 * fs
-            )
-        };
-        assert!(svg.contains(&bar(fs, "0.84")), "{svg}");
-        let svg = sized(vec![line.clone()], "baseline", 0.5);
-        assert!(svg.contains(&bar(0.5 * fs, "0.80")), "{svg}");
+        // the levels, each 0.7 of the size of the next towards 0, 0.35 of it higher or 0.15 lower
+        let t = laid("x^{y^{z}}_{i}", "baseline", 1.0);
+        let levels: Vec<(f64, f64)> = t.runs.iter().map(|r| (r.size, r.at[1])).collect();
+        let want = [(1.0, 0.0), (0.7, 0.35), (0.49, 0.35 + 0.35 * 0.7), (0.7, -0.15)];
+        assert!(levels.iter().zip(want).all(|(a, b)| close(a.0, b.0) && close(a.1, b.1)), "{levels:?}");
+        assert!(close(t.runs[1].at[0], regular.width("x")) && close(t.runs[1].width, 0.7 * regular.width("y")));
+        // a fraction and its bar, and an overline
+        let t = laid("\\frac{ab}{c}\\overline{d}", "baseline", 1.0);
+        let (wn, wd) = (0.8 * regular.width("ab"), 0.8 * regular.width("c"));
+        let w = wn + 0.15;
+        let places: Vec<[f64; 3]> = t.runs.iter().map(|r| [r.at[0], r.at[1], r.size]).collect();
+        let want = [[(w - wn) / 2.0, 0.72, 0.8], [(w - wd) / 2.0, -0.42, 0.8], [w, 0.0, 1.0]];
+        assert!(places.iter().zip(want).all(|(a, b)| (0..3).all(|k| close(a[k], b[k]))), "{places:?}");
+        let bars: Vec<[f64; 5]> = t
+            .bars
+            .iter()
+            .map(|b| [b.points[0][0], b.points[0][1], b.points[1][0], b.points[1][1], b.stroke.width])
+            .collect();
+        let d = w + regular.width("d");
+        let want = [[0.06, 0.3, w - 0.06, 0.3, 0.06], [w, 0.88, d, 0.88, 0.06]];
+        assert!(bars.iter().zip(want).all(|(a, b)| (0..5).all(|k| close(a[k], b[k]))), "{bars:?}");
+        assert!(t.bars.iter().all(|b| b.stroke.cap == Cap::Butt && b.stroke.unit == Unit::Scene), "{t:?}");
+        // at least 0.8 pixels wide
+        let t = laid("\\frac{a}{b}", "baseline", 0.5);
+        assert!(close(t.bars[0].stroke.width, 0.8 / o.scale), "{t:?}");
+        // a character the fonts do not map is 1 em wide
+        assert!(close(laid("\u{10FFFF}", "baseline", 2.0).runs[0].width, 2.0));
     }
 }

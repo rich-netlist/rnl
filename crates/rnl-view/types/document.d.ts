@@ -249,7 +249,8 @@ export type Primitive = {
    */
   order: Array<number>,
   /**
-   * x0, y0, x1, y1: what it covers, in scene units; for a text, an estimate.
+   * x0, y0, x1, y1: what it covers, in scene units; for a text, each run from its face's
+   * ascender to its descender, leaning with it when italic, and the bars.
    */
   bbox: [number, number, number, number],
 } & Shape;
@@ -356,22 +357,26 @@ export type Cap = "butt" | "round" | "square";
 export type Join = "miter" | "round" | "bevel";
 
 /**
- * A text laid out at an anchor (9.2.5, 13.6). Its glyphs read upright whatever turns it, or from
+ * A text (9.2.5, 13.6) as the core laid it out, with the metrics of the fonts shipped with it,
+ * Noto Sans SC Regular and Bold (decision 0007). A frontend draws its `runs` and its `bars` and
+ * nothing else, so it needs no alignment, baseline or measuring of its own; the other fields say
+ * what the text is and how it was placed. Its glyphs read upright whatever turns it, or from
  * bottom to top when it is vertical.
  */
 export type Text = {
   anchor: [number, number],
   /**
-   * The lines, first to last, each a list of runs.
+   * The lines, first to last, each a list of runs of the markup.
    */
   lines: Array<Array<Run>>,
   /**
-   * The text height in scene units; the lines are 1.15 times it apart.
+   * The text height, the em of the font, in scene units.
    */
   size: number,
   color: Color,
   /**
-   * The font family the style names, a hint (9.3); the SVG falls back on sans-serif.
+   * The font family the style names, a hint (9.3): texts are laid out and drawn in the shipped
+   * family.
    */
   font: string,
   bold: boolean,
@@ -385,10 +390,58 @@ export type Text = {
    */
   valign: VAlign,
   /**
-   * Turned a quarter counter-clockwise: the lines read from bottom to top.
+   * Turned a quarter counter-clockwise: the lines read from bottom to top, and each run is drawn
+   * turned a quarter counter-clockwise about its `at`.
    */
   vertical: boolean,
+  /**
+   * The runs as laid out, drawn in the text's colour.
+   */
+  runs: Array<TextRun>,
+  /**
+   * The bars of its fractions and the lines over its overlined runs.
+   */
+  bars: Array<Bar>,
 };
+
+/**
+ * A run of a laid-out text: `text` in one face and size, drawn from `at`, the start of its
+ * baseline. Its glyphs follow each other by their advances in the face, with no kerning,
+ * ligatures or other shaping, so that the run is `width` long; in CSS, `font-kerning: none` and
+ * `font-variant-ligatures: none`. Its spaces are drawn as they are.
+ */
+export type TextRun = {
+  text: string,
+  /**
+   * The start of its baseline, in scene units.
+   */
+  at: [number, number],
+  /**
+   * The font size, the em, in scene units.
+   */
+  size: number,
+  /**
+   * The sum of its characters' advances in its face, in scene units. A character the fonts do
+   * not map is 1 em wide, as the box they draw for it.
+   */
+  width: number,
+  /**
+   * In Noto Sans SC Bold, else Regular.
+   */
+  bold: boolean,
+  /**
+   * Leaning, since the fonts have no italic face: a point of a glyph moves forward along the
+   * baseline by 0.25 times its height above it, about 14°. Its advances are the upright face's.
+   */
+  italic: boolean,
+};
+
+/**
+ * A straight line of a text, the bar of a fraction or the line over an overlined run (13.6),
+ * between its two `points`, drawn with its stroke: in the text's colour, in scene units, with butt
+ * caps.
+ */
+export type Bar = { points: [[number, number], [number, number]], stroke: Stroke };
 
 /**
  * Where a text's anchor is along its lines: at their start, middle or end.
@@ -396,22 +449,22 @@ export type Text = {
 export type HAlign = "start" | "middle" | "end";
 
 /**
- * Where a text's anchor is across its lines: on the first line's baseline, or at the top, middle
- * or bottom of the lines. Until texts are laid out with the fonts' metrics, the SVG places them
- * by the size: at the top, the first baseline is 0.8 times the size below the anchor; at the
- * bottom, the last baseline is 0.2 times the size above it; in the middle, the point halfway
- * between the first and last baselines is 0.35 times the size below it.
+ * Where a text's anchor is across its lines: on the first line's baseline; at the top, the first
+ * line's ascender, 1.16 times the size above its baseline; at the bottom, the last line's
+ * descender, 0.288 times the size below its baseline; or in the middle, halfway between the two.
+ * The lines are the fonts' line height apart, 1.448 times the size.
  */
 export type VAlign = "baseline" | "top" | "middle" | "bottom";
 
 /**
  * A piece of a line of text in one style (13.6), by its `kind`: "text", or "frac" for
- * `\frac{…}{…}`, the numerator over the denominator. The SVG places the pieces of a line that
- * holds a fraction by estimated widths. It draws the numerator and the denominator at 0.8 of the
- * size, centred on the fraction, with their baselines 0.72 of the size above the line's and 0.42
- * below it, and between them a bar in the text's colour with butt caps: 0.3 of the size above the
- * baseline, as long as the fraction less 0.06 of the size at each end, and 0.06 of the size wide
- * but at least 0.8 pixels.
+ * `\frac{…}{…}`, the numerator over the denominator. Laid out, the numerator and the denominator
+ * are at 0.8 of the fraction's size and centred on it, with their baselines 0.72 of the size above
+ * its baseline and 0.42 below it; the fraction is as wide as the wider of them and 0.15 of the
+ * size, and its bar is 0.3 of the size above the baseline and 0.06 of it short of each end. A
+ * fraction's bar and an overline are 0.06 of their size wide, but at least 0.8 pixels at the
+ * level's `scale`; an overline is 0.88 of its run's size above the run's baseline, at the top of
+ * the em box.
  */
 export type Run =
   | { "kind": "text", text: string, style: RunStyle }
@@ -423,8 +476,9 @@ export type Run =
 export type RunStyle = {
   /**
    * How far the run is raised: each `^` it is in adds 1 and each `_` takes 1 away, so the z of
-   * `x^{y^{z}}` is at 2. The SVG draws a run at any level but 0 at 0.7 of the size, raised once
-   * when it is above 0 and lowered once when below.
+   * `x^{y^{z}}` is at 2. Laid out, each level is 0.7 of the size of the level next to it towards
+   * 0, with its baseline 0.35 of that size higher, or 0.15 of it lower; in a fraction, the levels
+   * count from the fraction's.
    */
   level: number,
   bold: boolean,
