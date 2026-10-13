@@ -48,7 +48,10 @@ test("clicking a symbol selects its instance and marks its statement and the pla
 });
 
 test("clicking a wire, a pin or a ground selects the net", async ({ page, viewer }) => {
-  for (const [name, kind] of [["b", "wire"], ["a", "pin"], ["0", "box"]]) {
+  // d has no wire, and its pin is on X3's symbol: only the pin tells the net from the instance there
+  const d = await viewer.object("net", "d", TOP);
+  expect(await page.evaluate((o) => window.viewer.doc.levels[0].hits.filter((h) => h.objects.includes(o)).map((h) => h.kind), d)).toEqual(["pin"]);
+  for (const [name, kind] of [["b", "wire"], ["d", "pin"], ["0", "box"]]) {
     const net = await viewer.object("net", name, TOP);
     await viewer.click(name, kind);
     await viewer.selected(`net ${name} in ${TOP}`);
@@ -98,6 +101,24 @@ test("clicking a statement or a node in the text selects it on the drawing, on i
   expect(await viewer.selectedGroups()).toEqual(await groupsOf(page, mid));
 });
 
+test("a terminal's reference names its instance and, all of it, the net at the terminal", async ({ page, viewer }) => {
+  // line 60, &c @WIRE(...) {#X2:out #X3:top}: #X3 is X3, and #X3:top, like #X2:out, is the net c
+  const [x3, c] = [await viewer.object("instance", "X3", TOP), await viewer.object("net", "c", TOP)];
+  const marked = () => viewer.line(60).locator(".hl").evaluateAll((els) => els.map((e) => e.textContent).join(""));
+  await viewer.click("X3");
+  await viewer.selected(`instance X3 in ${TOP}`);
+  expect(await marked()).toBe("#X3");
+  await viewer.click("c", "wire");
+  await viewer.selected(`net c in ${TOP}`);
+  expect(await marked()).toBe("&c#X2:out#X3:top");
+  // a click on the terminal's name selects the net, and on the instance's the instance
+  await viewer.click("X1");
+  await viewer.line(60).locator(`[data-obj="${c}"]`, { hasText: "top" }).click();
+  await viewer.selected(`net c in ${TOP}`);
+  await viewer.line(60).locator(`[data-obj="${x3} ${c}"]`).click();
+  await viewer.selected(`instance X3 in ${TOP}`);
+});
+
 test("Escape and a click on an empty place clear the selection", async ({ page, viewer }) => {
   const cleared = async () => {
     await viewer.selected(null);
@@ -125,16 +146,22 @@ test("Escape and a click on an empty place clear the selection", async ({ page, 
   await cleared();
 });
 
-test("dragging moves the view and selects nothing", async ({ page, viewer }) => {
+test("dragging with the left or the middle button moves the view and selects nothing", async ({ page, viewer }) => {
   await viewer.click("X2");
   await viewer.selected(`instance X2 in ${TOP}`);
-  const before = (await viewer.viewBox()).split(" ").map(Number);
-  const from = await viewer.where("X1");
-  await viewer.drag(from, { x: from.x + 120, y: from.y + 40 });
-  const after = (await viewer.viewBox()).split(" ").map(Number);
-  const k = (await page.locator("#canvas").evaluate((c) => c.clientWidth)) / before[2];
-  expect(after[0]).toBeCloseTo(before[0] - 120 / k, 6);
-  expect(after[1]).toBeCloseTo(before[1] - 40 / k, 6);
-  expect(after.slice(2)).toEqual(before.slice(2));
+  for (const [button, dx, dy] of [["left", 120, 40], ["middle", -120, -40]]) {
+    const before = (await viewer.viewBox()).split(" ").map(Number);
+    const from = await viewer.where("X1");
+    await viewer.drag(from, { x: from.x + dx, y: from.y + dy }, button);
+    const after = (await viewer.viewBox()).split(" ").map(Number);
+    const k = (await page.locator("#canvas").evaluate((c) => c.clientWidth)) / before[2];
+    expect(after[0]).toBeCloseTo(before[0] - dx / k, 6);
+    expect(after[1]).toBeCloseTo(before[1] - dy / k, 6);
+    expect(after.slice(2)).toEqual(before.slice(2));
+    await viewer.selected(`instance X2 in ${TOP}`);
+  }
+  // a click of the middle button selects nothing either
+  const x1 = await viewer.where("X1");
+  await page.mouse.click(x1.x, x1.y, { button: "middle" });
   await viewer.selected(`instance X2 in ${TOP}`);
 });

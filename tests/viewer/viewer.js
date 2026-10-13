@@ -207,12 +207,12 @@ class Viewer {
     return this.page.locator(`#menubar .menu-item[data-id="${id}"]`);
   }
 
-  /** Drag from one page point to another with the left button, in steps. */
-  async drag(from, to) {
+  /** Drag from one page point to another, in steps, with the left button or the one named. */
+  async drag(from, to, button = "left") {
     await this.page.mouse.move(from.x, from.y);
-    await this.page.mouse.down();
+    await this.page.mouse.down({ button });
     await this.page.mouse.move(to.x, to.y, { steps: 8 });
-    await this.page.mouse.up();
+    await this.page.mouse.up({ button });
   }
 
   /** The middle of an element, in page pixels. */

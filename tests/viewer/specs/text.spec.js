@@ -1,9 +1,99 @@
-// The text pane: the statements that do not take effect and the box that marks them, the problems
+// The text pane: the highlighting of the host statements and the records, the statements over
+// several lines, the statements that do not take effect and the box that marks them, the problems
 // that show their lines, the file tabs, and a line that waits for the text pane to be shown.
 
 import { expect, test } from "../viewer.js";
 
 const TOP = "04-hierarchy.sp";
+
+/**
+ * The highlighting of a line of the file shown: the pieces of its text that syntax.js gives a class,
+ * each as [text, class] without the "s-", in order; the text between them is left out.
+ */
+function highlighted(viewer, n) {
+  return viewer.line(n).locator(".code").evaluate((code) => {
+    const pieces = [];
+    for (const node of code.childNodes) {
+      const s = node.nodeType === 1 ? [...node.classList].find((c) => c.startsWith("s-")) : undefined;
+      const cls = s ? s.slice(2) : "";
+      const last = pieces[pieces.length - 1];
+      // a name of an object or a failed statement splits a piece into elements
+      if (last && last[1] === cls) last[0] += node.textContent;
+      else pieces.push([node.textContent, cls]);
+    }
+    return pieces.filter(([, cls]) => cls);
+  });
+}
+
+test("the host statements and the records are highlighted", async ({ viewer }) => {
+  await viewer.open("04-hierarchy");
+  // the title line, directives, and an instance's name and parameters
+  expect(await highlighted(viewer, 1)).toEqual([["* Two-stage buffer with subcircuits", "comment"]]);
+  expect(await highlighted(viewer, 6)).toEqual([[".model", "directive"], ["level", "param"]]);
+  expect(await highlighted(viewer, 8)).toEqual([["M1", "inst"], ["w", "param"], ["l", "param"]]);
+  // records: the comment marker, keywords, references of each kind, parameters, strings and numbers
+  expect(await highlighted(viewer, 10)).toEqual([["* ", "marker"], ["@RNL", "keyword"], ["{", "punct"]]);
+  expect(await highlighted(viewer, 16)).toEqual([
+    ["*", "marker"], ["?", "local"], ["@TEXT", "keyword"], ["(", "punct"], ['"${name}"', "string"], [",", "punct"],
+    ["key", "param"], ["=", "punct"], ['"name"', "string"], [")", "punct"], ["=>", "punct"], ["@PLACE", "keyword"],
+    ["(", "punct"], ["1.1", "number"], [",", "punct"], ["0.25", "number"], [");", "punct"],
+  ]);
+  expect(await highlighted(viewer, 19)).toEqual([
+    ["*", "marker"], ["#", "host"], ["@SELECT-INSTANCE", "keyword"], ["(", "punct"], ["name", "param"], ["=", "punct"],
+    ['"R*"', "string"], [")", "punct"], ["=>", "punct"], ["@SET-SYMBOL", "keyword"], ["$RES_IEC", "def"],
+  ]);
+  expect(await highlighted(viewer, 21)).toEqual([
+    ["*", "marker"], ["%amp_block", "local"], ["=", "punct"], ["@DEFINE-SYMBOL", "keyword"], ["{", "punct"],
+  ]);
+  expect(await highlighted(viewer, 60)).toEqual([
+    ["*", "marker"], ["&c", "host"], ["@WIRE", "keyword"], ["(", "punct"], ["mode", "param"], ["=", "punct"],
+    ['"vertical-horizontal"', "string"], [")", "punct"], ["{", "punct"], ["#X2", "host"], [":", "punct"],
+    ["#X3", "host"], [":", "punct"], ["}", "punct"],
+  ]);
+
+  // Spectre: its comments, its own directives, and records after //
+  await viewer.open("inverter-chain");
+  expect((await highlighted(viewer, 1)).map(([, cls]) => cls)).toEqual(["comment"]);
+  expect(await highlighted(viewer, 3)).toEqual([["model", "directive"], ["type", "param"]]);
+  expect(await highlighted(viewer, 5)).toEqual([["subckt", "directive"]]);
+  expect(await highlighted(viewer, 6)).toEqual([["MP", "inst"], ["w", "param"], ["l", "param"]]);
+  expect(await highlighted(viewer, 8)).toEqual([["// ", "marker"], ["@RNL", "keyword"], ["{", "punct"]]);
+});
+
+test("a statement over several lines is marked on each of them, and highlighted as one", async ({ viewer }) => {
+  // SPICE: X1 on lines 5 and 6, R2 on 7 and 8
+  await viewer.open("continued");
+  await viewer.click("X1");
+  await viewer.selected("instance X1 in continued.sp");
+  expect(await viewer.markedLines()).toEqual([5, 6]);
+  await viewer.line(8).locator(".no").click();
+  await viewer.selected("instance R2 in continued.sp");
+  expect(await viewer.markedLines()).toEqual([7, 8]);
+  // a later line starts with +, and its first word is no statement's; $ starts a comment
+  expect(await highlighted(viewer, 6)).toEqual([["+", "punct"]]);
+  expect(await highlighted(viewer, 8)).toEqual([["+", "punct"], ["r", "param"], ["$ the value", "comment"]]);
+  // a comment of a record over two lines, and a string with a quote in it
+  expect(await highlighted(viewer, 10)).toEqual([
+    ["*", "marker"], ["#X1", "host"], ["@PLACE", "keyword"], ["(", "punct"], ["0", "number"], [",", "punct"],
+    ["0", "number"], [");", "punct"], ["/* placed", "comment"],
+  ]);
+  expect(await highlighted(viewer, 11)).toEqual([
+    ["*", "marker"], ["   by hand */", "comment"], ["#R2", "host"], ["@PLACE", "keyword"], ["(", "punct"],
+    ["6", "number"], [",", "punct"], ["0", "number"], [")", "punct"], ["=>", "punct"], ["@TEXT", "keyword"],
+    ["(", "punct"], ['"a ""quoted"" text"', "string"], [",", "punct"], ["key", "param"], ["=", "punct"],
+    ['"note"', "string"], [")", "punct"],
+  ]);
+
+  // Spectre: a line that ends with \ goes on on the next, X1 on lines 6 and 7
+  await viewer.open("continued-spectre");
+  await viewer.line(7).locator(".no").click();
+  await viewer.selected("instance X1 in continued.scs");
+  expect(await viewer.markedLines()).toEqual([6, 7]);
+  expect(await highlighted(viewer, 2)).toEqual([["simulator", "directive"], ["lang", "param"]]);
+  expect(await highlighted(viewer, 6)).toEqual([["X1", "inst"]]);
+  expect(await highlighted(viewer, 7)).toEqual([]);
+  expect(await highlighted(viewer, 9)).toEqual([["r", "param"]]);
+});
 
 test("failed and overridden statements are marked, and the checkbox turns the marks off", async ({ page, viewer }) => {
   await viewer.open("12-diagnostics");

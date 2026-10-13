@@ -44,12 +44,36 @@ test("the problems are listed, the most serious first, and their lines are colou
   const first = diags.find((d) => d.severity === "error" && d.line);
   await expect(items.filter({ hasText: first.message }).first()).toContainText(`${first.file}:${first.line}:${first.col}`);
   await expect(viewer.line(first.line)).toHaveClass(/\bd-error\b/);
+  // the line numbers of warnings and hints too; a line takes the colour of its most serious problem,
+  // such as line 53, with a warning before an error
+  const colours = (n) => viewer.line(n).evaluate((e) => [...e.classList].filter((c) => c.startsWith("d-")));
+  expect(diags.filter((d) => d.line === 53).map((d) => d.severity)).toEqual(["warning", "error"]);
+  expect(await colours(53)).toEqual(["d-error"]);
+  expect(diags.filter((d) => d.line === 63).map((d) => d.severity)).toEqual(["warning"]);
+  expect(await colours(63)).toEqual(["d-warning"]);
+  expect(diags.filter((d) => d.line === 60).map((d) => d.severity)).toEqual(["hint", "hint"]);
+  expect(await colours(60)).toEqual(["d-hint"]);
+  expect(await colours(61)).toEqual([]);
+  const number = (n) => viewer.line(n).locator(".no").evaluate((e) => getComputedStyle(e).color);
+  expect(new Set([await number(53), await number(63), await number(61)]).size).toBe(3);
   // a level without positions is not drawn
   await page.locator("#tab-hierarchy").click();
   await page.locator("#index .index-row", { hasText: "sub" }).click();
   await expect(page.locator("#empty")).toBeVisible();
   await expect(page.locator("#empty")).toHaveText("Nothing on this level has a position yet, so nothing is drawn.");
   await expect(page.locator("#status")).toHaveText("Not drawn without a solver: 3 without a position");
+});
+
+test("the status bar shows the constraints that need a solver or could not be checked", async ({ page, viewer }) => {
+  await viewer.open("10-constraints-and-priority");
+  const status = await page.evaluate(() => window.viewer.doc.levels[0].status);
+  for (const kind of ["ok", "dropped", "disabled", "unsolved", "needs-solver"]) expect(status).toMatch(new RegExp(`\\d+ ${kind}\\b`));
+  await expect(page.locator("#status")).toHaveText(`Not drawn without a solver: ${status}`);
+  await expect(page.locator("#status")).toHaveAttribute("title", `Not drawn without a solver: ${status}`);
+  // a level that lacks nothing shows nothing there
+  await page.evaluate(() => window.fakeShell.picks.push("04-hierarchy"));
+  await viewer.build(() => page.keyboard.press("Control+O"));
+  await expect(page.locator("#status")).toHaveText("");
 });
 
 test("a Spectre netlist is drawn with its subcircuit", async ({ page, viewer }) => {

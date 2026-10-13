@@ -1,6 +1,6 @@
-// Reading the document again, by F5 or Ctrl+R: the level, the view, the selection, the file shown
-// and its scroll stay, also when the file has changed; a reading that fails is shown, and the next
-// one shows the document again.
+// Reading the document again, by F5 or Ctrl+R: the level, the view, the selection, the views left on
+// other levels, the folded branches of the tree, the file shown and its scroll stay, also when the
+// file has changed; a reading that fails is shown, and the next one shows the document again.
 
 import { expect, test } from "../viewer.js";
 
@@ -35,6 +35,27 @@ test("F5 and Ctrl+R read the document again and keep the level, the view and the
   await page.keyboard.press("Backspace");
   await expect(page.locator("#level-name")).toHaveText(TOP);
   await viewer.selected(`instance X2 in ${TOP}`);
+});
+
+test("reading again keeps the views left on other levels, and the tree's folded branches", async ({ page, viewer }) => {
+  await page.keyboard.press("Control+-"); // a view of the top level that fitting would not give
+  const top = await viewer.viewBox();
+  await viewer.click("X3");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#level-name")).toHaveText("rdiv");
+  await viewer.build(() => page.keyboard.press("F5"));
+  await page.keyboard.press("Backspace");
+  await expect(page.locator("#level-name")).toHaveText(TOP);
+  expect(await viewer.viewBox()).toBe(top);
+
+  // the tree folded at the top level stays folded
+  await page.locator("#tab-hierarchy").click();
+  const rows = page.locator("#tree .tree-row");
+  await page.locator('#tree .tree-row[data-path="0"] .twisty').click();
+  await expect(rows).toHaveCount(1);
+  await viewer.build(() => page.keyboard.press("F5"));
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator('#tree .tree-row[data-path="0"] .twisty')).toHaveAttribute("aria-expanded", "false");
 });
 
 test("a file that changed keeps the selection on its statement, which moved", async ({ page, viewer }) => {

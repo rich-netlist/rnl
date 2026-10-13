@@ -28,7 +28,7 @@ In CI, [`viewer.yml`](../../.github/workflows/viewer.yml) installs Playwright's 
 | --- | --- |
 | `playwright.config.js` | The three projects, the browser of each, and `RNL_CHANNEL`. |
 | `global-setup.js` | Builds the rnl command, writes the fixtures and starts the server; the tests find it at `RNL_VIEWER_URL`. |
-| `fixtures.js` | The fixtures: `rnl view` of the corpus files `01-rc-lowpass.sp`, `04-hierarchy.sp`, `10-constraints-and-priority.sp`, `12-diagnostics.sp` and `inverter-chain.scs`; `04-hierarchy-changed`, the same netlist after it changed; and `subcircuits`, a netlist with a subcircuit for each initial. |
+| `fixtures.js` | The fixtures: `rnl view` of the corpus files `01-rc-lowpass.sp`, `04-hierarchy.sp`, `10-constraints-and-priority.sp`, `12-diagnostics.sp` and `inverter-chain.scs`; `04-hierarchy-changed`, the same netlist after it changed; `subcircuits`, a netlist with a subcircuit for each initial; and `continued` and `continued-spectre`, statements over several lines in each dialect. |
 | `server.js` | The test server, Node with no dependencies: `apps/viewer-ui` as it is, the fake shell as `shells/fake.js`, and the fixtures under `fixtures/`. Nothing of the tests goes into the page. |
 | `fake-shell.js` | The fake shell. |
 | `viewer.js` | What the tests share: opening the page, waiting for a build, the page's state, and where an object of the drawing is on the screen. |

@@ -1,6 +1,7 @@
 // The Documents the fake shell serves: `rnl view` of a few files of the conformance corpus, built
-// natively before the tests run; a changed copy of one of them, for reading a file again; and a
-// netlist with many subcircuits, for the subcircuit index.
+// natively before the tests run; a changed copy of one of them, for reading a file again; a netlist
+// with many subcircuits, for the subcircuit index; and statements over several lines in both
+// dialects, which the corpus has none of.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -26,6 +27,36 @@ export const SUBCIRCUITS = [
   "xor", "yield", "zero", "2stage",
 ];
 
+/** The statements over several lines: a SPICE netlist with `+` lines, and a Spectre one with `\`. */
+export const CONTINUED = {
+  "continued.sp": [
+    "* statements over several lines",
+    ".subckt cell p q",
+    "R1 p q 1k",
+    ".ends",
+    "X1 a",
+    "+ b cell",
+    "R2 b 0",
+    "+ r=2k $ the value",
+    "* @RNL {",
+    "*   #X1 @PLACE(0, 0); /* placed",
+    '*   by hand */ #R2 @PLACE(6, 0) => @TEXT("a ""quoted"" text", key="note")',
+    "* }",
+    ".end",
+  ],
+  "continued.scs": [
+    "// statements over several lines",
+    "simulator lang=spectre",
+    "subckt cell (p q)",
+    "R1 (p q) resistor r=1k",
+    "ends cell",
+    "X1 (a b) \\",
+    "    cell",
+    "R2 (b 0) resistor \\",
+    "    r=2k",
+  ],
+};
+
 /** Build the rnl command and return its path. */
 export function buildRnl() {
   execFileSync("cargo", ["build", "-p", "rnl-cli"], { cwd: root, stdio: "inherit" });
@@ -41,7 +72,8 @@ function view(rnl, file, cwd) {
  * Write the fixtures into `dir`, each as NAME.json: those of FILES; "04-hierarchy-changed", the
  * Document of 04-hierarchy.sp after a comment line was added below its title and Vin's value
  * changed, so that every statement below the title moved down a line, with the same file names;
- * and "subcircuits", a netlist that instantiates each of SUBCIRCUITS once at the top level.
+ * "subcircuits", a netlist that instantiates each of SUBCIRCUITS once at the top level; and
+ * "continued" and "continued-spectre", the netlists of CONTINUED.
  */
 export function writeFixtures(rnl, dir) {
   for (const [name, file] of Object.entries(FILES)) {
@@ -64,4 +96,10 @@ export function writeFixtures(rnl, dir) {
   lines.push(".end", "");
   fs.writeFileSync(path.join(dir, "subcircuits.sp"), lines.join("\n"));
   fs.writeFileSync(path.join(dir, "subcircuits.json"), view(rnl, "subcircuits.sp", dir));
+
+  for (const [file, text] of Object.entries(CONTINUED)) {
+    fs.writeFileSync(path.join(dir, file), text.concat("").join("\n"));
+    const name = file.endsWith(".scs") ? "continued-spectre" : "continued";
+    fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, dir));
+  }
 }
