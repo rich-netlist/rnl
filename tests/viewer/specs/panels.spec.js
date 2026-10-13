@@ -176,9 +176,8 @@ test("at its narrowest the side panel stays beside its splitter", async ({ page,
 });
 
 test("at its narrowest the side panel keeps a tab of each file within reach", async ({ page, viewer }) => {
-  // The failed statements' box does not shrink, and at 220 pixels it takes the whole file bar: the
-  // file tabs get no width, and the box covers them (style.css, .file-bar).
-  test.fail(true, "the failed statements' box covers the file tabs");
+  // The failed statements' box does not shrink: as the file bar narrows, it leaves out its legend,
+  // then its caption, and keeps its checkbox (style.css, .failed-toggle).
   /** Per file tab, whether a part of it is what a click there hits. */
   const reached = () =>
     page.locator("#file-tabs button").evaluateAll((tabs) =>

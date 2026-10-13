@@ -190,6 +190,7 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 }
 
 .file-bar {
+  container-type: inline-size;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -221,6 +222,14 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 }
 .failed-toggle .swatch.x-failed { background: var(--failed-bg); }
 .failed-toggle .swatch.x-overridden { background: var(--overridden-bg); }
+/* the failed statements' box gives way to the file tabs as the bar narrows: first its legend, then
+   its caption, so that a tab of each file stays within reach; its title still says what it marks */
+@container (max-width: 399px) {
+  .failed-toggle .swatch, .failed-toggle .legend { display: none; }
+}
+@container (max-width: 299px) {
+  .failed-toggle .caption { display: none; }
+}
 
 .sub-head {
   display: flex;
