@@ -99,7 +99,11 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         "view" => {
-            let options = BuildOptions { dialect: args.dialect.clone(), runtime: Options { std: args.std } };
+            let options = BuildOptions {
+                dialect: args.dialect.clone(),
+                runtime: Options { std: args.std },
+                ..BuildOptions::default()
+            };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&doc).unwrap());
             Ok(ExitCode::SUCCESS)

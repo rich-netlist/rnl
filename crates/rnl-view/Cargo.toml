@@ -16,4 +16,5 @@ rnl-render.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
+# exact floats when reading the JSON back in the tests
+serde_json = { workspace = true, features = ["float_roundtrip"] }

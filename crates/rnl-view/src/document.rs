@@ -1,5 +1,6 @@
-//! An interpretation as a viewer shows it: one SVG per drawing level, the diagnostics, the
-//! source files, and the links between them. The same runtime and renderer as `rnl render`.
+//! An interpretation as a viewer shows it: each drawing level as SVG or primitives, the
+//! diagnostics, the source files, and the links between them. The same runtime and renderer as
+//! `rnl render`.
 //!
 //! The links are objects (the host instances and nets of every level) and the places that show
 //! them: where the netlist names an instance or one of its nodes, where a record refers to one,
@@ -14,6 +15,9 @@ use rnl_runtime::model::{LevelView, RefTarget};
 use rnl_runtime::source::dirname;
 use rnl_runtime::Interpretation;
 use serde::Serialize;
+
+use crate::primitive::{self, Primitive};
+use crate::BuildOptions;
 
 /// What a viewer shows of a document, as [`crate::build`] gives it.
 #[derive(Serialize, Debug)]
@@ -42,6 +46,8 @@ pub struct Document {
     pub missing: Vec<String>,
 }
 
+/// A drawing level. Its SVG and its hits are in pixels with y down; its primitives are in scene
+/// units with y up, `scale` pixels each.
 #[derive(Serialize, Debug)]
 pub struct Level {
     /// The host level drawn, as `Object::level` names it.
@@ -49,12 +55,23 @@ pub struct Level {
     pub title: String,
     /// "file" or "subckt".
     pub kind: &'static str,
-    pub svg: String,
+    /// The drawing as an SVG document, written from the primitives; absent unless
+    /// `BuildOptions::svg` asks for it, as it does by default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub svg: Option<String>,
+    /// The drawing as primitives in drawing order (decision 0006); absent unless
+    /// `BuildOptions::primitives` asks for them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primitives: Option<Vec<Primitive>>,
+    /// Pixels per scene unit in the SVG and the hits, given with the primitives: a point (x, y) of
+    /// a primitive is at (x·scale, −y·scale) in them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scale: Option<f64>,
     /// Nothing on the level can be drawn: no object has a position yet.
     pub empty: bool,
     /// What the level lacks without a solver; see [`crate::level_status`].
     pub status: Option<String>,
-    /// What can be clicked on the drawing, in SVG coordinates.
+    /// What can be clicked on the drawing, in SVG pixels.
     pub hits: Vec<Hit>,
     /// The subcircuit instances of the level, in netlist order: the hierarchy below it.
     pub children: Vec<Child>,
@@ -77,10 +94,11 @@ pub struct Hit {
     /// "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
     /// "wire": a wire, its vertices.
     pub kind: &'static str,
+    /// In SVG pixels, y down.
     pub points: Vec<[f64; 2]>,
     /// The objects it stands for: an instance (several for a bundle), or nets.
     pub objects: Vec<usize>,
-    /// The `data-id` of the SVG groups that draw it.
+    /// The `data-id` of the SVG groups that draw it, and the owner of its primitives.
     pub id: Option<String>,
 }
 
@@ -151,9 +169,9 @@ pub struct Diagnostic {
     pub cause: Option<String>,
 }
 
-/// The Document of `entry` from its interpretation: draw every level and link the objects to
-/// their places. `missing` is [`Document::missing`].
-pub(crate) fn document(entry: &str, r: &Interpretation, missing: Vec<String>) -> Document {
+/// The Document of `entry` from its interpretation: draw every level as `options` ask and link the
+/// objects to their places. `missing` is [`Document::missing`].
+pub(crate) fn document(entry: &str, r: &Interpretation, missing: Vec<String>, options: &BuildOptions) -> Document {
     let dir = dirname(entry);
     let shown_file = |file: &str| match file.strip_prefix(&dir).and_then(|f| f.strip_prefix('/')) {
         Some(rel) if !dir.is_empty() => rel.to_string(),
@@ -180,7 +198,7 @@ pub(crate) fn document(entry: &str, r: &Interpretation, missing: Vec<String>) ->
         };
         ix.spans.push(Span { object, file, line: h.loc.line, col: h.loc.col, len: h.len, kind: "ref" });
     }
-    let mut levels: Vec<Level> = r.model.levels.iter().map(|lv| ix.level(lv)).collect();
+    let mut levels: Vec<Level> = r.model.levels.iter().map(|lv| ix.level(lv, options)).collect();
     let drawn: HashMap<usize, usize> = r.model.levels.iter().enumerate().map(|(k, lv)| (lv.level, k)).collect();
     for (k, lv) in r.model.levels.iter().enumerate() {
         levels[k].children = r.doc.levels[lv.level]
@@ -365,21 +383,12 @@ impl<'a> Index<'a> {
         }
     }
 
-    /// The drawing of a level and what on it can be clicked.
-    fn level(&mut self, lv: &LevelView) -> Level {
-        // the model names items and wires for people ("a wire"); the page needs each SVG group to
-        // say which one it draws
-        let mut lv = lv.clone();
-        for (k, it) in lv.items.iter_mut().enumerate() {
-            it.id = format!("item-{k}");
-        }
-        for (k, w) in lv.wires.iter_mut().enumerate() {
-            w.id = format!("wire-{k}");
-        }
-        let lv = &lv;
+    /// The drawing of a level, as `options` ask, and what on it can be clicked.
+    fn level(&mut self, lv: &LevelView, options: &BuildOptions) -> Level {
+        let lv = &with_page_ids(lv);
         let prims = rnl_render::primitives(lv);
-        let options = rnl_render::RenderOptions::default();
-        let px = |p: Pt| [p.0 * options.scale, -p.1 * options.scale];
+        let render = rnl_render::RenderOptions::default();
+        let px = |p: Pt| [p.0 * render.scale, -p.1 * render.scale];
         let mut hits = Vec::new();
         for it in &lv.items {
             let sym = &lv.symbols[it.symbol];
@@ -425,13 +434,29 @@ impl<'a> Index<'a> {
             host: lv.level,
             title: lv.title.clone(),
             kind: lv.kind,
-            svg: rnl_render::svg_document(&prims, &options),
+            svg: options.svg.then(|| rnl_render::svg_document(&prims, &render)),
+            primitives: options.primitives.then(|| primitive::primitives(&prims)),
+            scale: options.primitives.then_some(render.scale),
             empty: prims.is_empty(),
             status: crate::level_status(lv),
             hits,
             children: Vec::new(),
         }
     }
+}
+
+/// A level with its items and wires named for the page, "item-K" and "wire-K" by their index. The
+/// model names them for people ("a wire"); the page needs each SVG group and primitive to say
+/// which one it draws.
+pub(crate) fn with_page_ids(lv: &LevelView) -> LevelView {
+    let mut lv = lv.clone();
+    for (k, it) in lv.items.iter_mut().enumerate() {
+        it.id = format!("item-{k}");
+    }
+    for (k, w) in lv.wires.iter_mut().enumerate() {
+        w.id = format!("wire-{k}");
+    }
+    lv
 }
 
 fn place(at: Pt, orient: Orient, p: Pt) -> Pt {
@@ -544,7 +569,7 @@ mod tests {
         let d = load(&case("04-hierarchy.sp")).unwrap();
         assert_eq!(d.name, "04-hierarchy.sp");
         assert!(d.levels.len() >= 3, "{:?}", d.levels.iter().map(|l| &l.title).collect::<Vec<_>>());
-        assert!(d.levels.iter().all(|l| l.svg.starts_with("<svg") && !l.empty));
+        assert!(d.levels.iter().all(|l| l.svg.as_ref().is_some_and(|s| s.starts_with("<svg")) && !l.empty));
         let d = load(&case("10-constraints-and-priority.sp")).unwrap();
         assert!(d.levels[0].status.as_deref().is_some_and(|s| s.contains("needs-solver")));
     }
@@ -591,11 +616,41 @@ mod tests {
         // each wire has its own group, so a net's wires can be marked alone
         let ids: Vec<&str> = hits.iter().filter(|h| h.kind == "wire").filter_map(|h| h.id.as_deref()).collect();
         assert!(ids.iter().all(|id| ids.iter().filter(|x| *x == id).count() == 1), "{ids:?}");
-        assert!(ids.iter().all(|id| d.levels[0].svg.contains(&format!("data-id=\"{id}\""))));
+        let svg = d.levels[0].svg.as_deref().unwrap();
+        assert!(ids.iter().all(|id| svg.contains(&format!("data-id=\"{id}\""))));
         assert!(hits.iter().any(|h| h.kind == "pin" && h.objects.contains(&out)));
         // a ground symbol stands for the ground net
         let gnd = d.objects.iter().position(|o| o.kind == "net" && o.name == "0").unwrap();
         assert!(hits.iter().any(|h| h.kind == "box" && h.objects == vec![gnd]));
+    }
+
+    #[test]
+    fn the_hits_and_the_primitives_name_the_same_drawing() {
+        let options = BuildOptions { primitives: true, ..BuildOptions::default() };
+        let d = crate::build(&case("01-rc-lowpass.sp"), &Disk, &options).unwrap();
+        let level = &d.levels[0];
+        let (prims, scale) = (level.primitives.as_ref().unwrap(), level.scale.unwrap());
+        let svg = level.svg.as_deref().unwrap();
+        let mut wires = 0;
+        for h in &level.hits {
+            let Some(id) = &h.id else { continue };
+            let owned: Vec<&Primitive> = prims.iter().filter(|p| p.owner == *id).collect();
+            assert!(!owned.is_empty() && svg.contains(&format!("data-id=\"{id}\"")), "{id}");
+            if h.kind == "wire" {
+                // a wire's vertices in SVG pixels are those of its path in scene units
+                let crate::Shape::Path { segments, .. } = &owned[0].shape else { panic!("{:?}", owned[0]) };
+                let points: Vec<[f64; 2]> = segments
+                    .iter()
+                    .map(|s| match s {
+                        crate::Segment::Move { to } | crate::Segment::Line { to } => [to[0] * scale, -to[1] * scale],
+                        s => panic!("{s:?}"),
+                    })
+                    .collect();
+                assert_eq!(points, h.points);
+                wires += 1;
+            }
+        }
+        assert!(wires > 2);
     }
 
     #[test]
