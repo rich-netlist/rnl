@@ -2558,6 +2558,7 @@ dependencies = [
  "rnl-render",
  "rnl-runtime",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

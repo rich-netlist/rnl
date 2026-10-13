@@ -1,5 +1,7 @@
-// The commands and the keys that run them. A command runs by its id, whether it comes from the
-// platform's menu or a key.
+// The commands and the keys that run them. Both come from the command table, commands.json, which
+// the desktop viewer also builds its native menu from: the menus, their items, and per item its id,
+// its label, its keys and the platforms that offer it. A command runs by its id, whether it comes
+// from the platform's menu or a key.
 
 import { fit, zoomCenter } from "./drawing.js";
 import { pickAndOpen, reload } from "./open.js";
@@ -10,18 +12,24 @@ import { selected } from "./state.js";
 import { ascend, descend, opens } from "./subcircuits.js";
 import { $ } from "./util.js";
 
+let table = null; // commands.json, once loaded
 const checks = new Map(); // the id of a check-mark command -> whether it is checked
 
-/** Pass the shell the check marks set so far, and the commands of its menu. */
-export function startCommands() {
+/** Load the command table, and pass the shell the check marks and the commands of its menu. */
+export async function startCommands() {
+  const response = await fetch("commands.json");
+  if (!response.ok) throw new Error(`The page could not load its command table (${response.status}).`);
+  table = await response.json();
   for (const [id, checked] of checks) shell.setCheck(id, checked);
   shell.onCommand(command);
 }
 
-/** Run a command by its id. */
+/** Run a command by its id. Exit and About are the platform's own, so the page has nothing to do. */
 export function command(id) {
   switch (id) {
     case "open": pickAndOpen("file"); break;
+    case "open-folder": pickAndOpen("folder"); break;
+    case "open-url": pickAndOpen("url"); break;
     case "reload": reload(); break;
     case "fit": fit(); break;
     case "zoom-in": zoomCenter(1.25); break;
@@ -40,26 +48,53 @@ export function setCheck(id, checked) {
   if (shell) shell.setCheck(id, checked);
 }
 
+/** Whether this platform offers a command; one that names no platforms is offered on all. */
+function offered(item) {
+  return !item.platforms || item.platforms.includes(shell.platform);
+}
+
+/**
+ * Whether a key event is the key `spec` names, such as "Ctrl+Shift+M", "F" or "Enter"; Ctrl stands
+ * for Cmd too. A key with Ctrl compares Shift only for a letter, since typing "+" may need Shift.
+ * A key without Ctrl that types or deletes does not count while Ctrl, Cmd or Alt is held; other
+ * keys, such as Enter and F5, count whatever is held with them.
+ */
+function matches(e, spec) {
+  const parts = spec.split(/\+(?=.)/);
+  const key = parts.pop().toLowerCase();
+  if (e.key.toLowerCase() !== key) return false;
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (parts.includes("Ctrl")) return ctrl && (!/^[a-z]$/.test(key) || e.shiftKey === parts.includes("Shift"));
+  return !(ctrl || e.altKey) || !(key.length === 1 || key === "backspace");
+}
+
+/** The command a key runs, or null. In a text box only keys with Ctrl and function keys count. */
+function keyCommand(e, typing) {
+  if (!table) return null;
+  for (const m of table.menus) {
+    for (const item of m.items) {
+      if (item === "-" || !offered(item)) continue;
+      for (const spec of item.keys || []) {
+        if (typing && !/^(Ctrl\+|F\d+$)/.test(spec)) continue;
+        if (matches(e, spec)) return item.id;
+      }
+    }
+  }
+  return null;
+}
+
 document.addEventListener("keydown", (e) => {
   const ctrl = e.ctrlKey || e.metaKey;
-  const key = e.key.toLowerCase();
   const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
   let id = null;
-  if (ctrl && !e.shiftKey && key === "o") id = "open";
-  else if (e.key === "F5" || (ctrl && key === "r")) id = "reload"; // re-read the file, not the page
-  else if (ctrl && !e.shiftKey && key === "b") id = "toggle-netlist";
-  else if (ctrl && e.shiftKey && key === "m") id = "toggle-problems";
-  else if (ctrl && (e.key === "=" || e.key === "+")) id = "zoom-in";
-  else if (ctrl && e.key === "-") id = "zoom-out";
-  else if (typing) return;
-  else if (!ctrl && !e.altKey && (key === "f" || key === "0")) id = "fit";
-  else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement) && opens(selected) !== null) id = "descend";
-  else if (e.key === "Backspace" && !ctrl && !e.altKey) id = "ascend";
-  else if (e.key === "Escape") {
+  if (e.key === "F5" || (ctrl && e.key.toLowerCase() === "r")) id = "reload"; // re-read the file, not the page
+  else if (e.key === "Escape" && !typing) {
     clearSelection();
     e.preventDefault();
     return;
-  }
+  } else id = keyCommand(e, typing);
+  // Enter opens a selected subcircuit instance, and presses a button that has the focus
+  if (id === "descend" && (e.target instanceof HTMLButtonElement || opens(selected) === null)) return;
   if (id) {
     e.preventDefault();
     command(id);

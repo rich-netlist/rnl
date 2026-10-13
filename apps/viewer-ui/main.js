@@ -26,10 +26,10 @@ setIndexHeight(load("index-height", 260));
   $("diags").append(li);
 }
 
-/** Load the shell and connect the commands to it, then open what the shell has for the start. */
+/** Load the shell and the command table, then open what the shell has for the start. */
 async function start() {
   const shell = await loadShell();
-  startCommands();
+  await startCommands();
   openSource(await shell.initial(), false);
 }
 

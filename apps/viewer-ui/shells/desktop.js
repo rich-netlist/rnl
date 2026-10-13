@@ -15,8 +15,7 @@ export default {
   pick: (kind) => (kind === "file" ? invoke("pick_file").then(file) : Promise.resolve(null)),
   build: (source) => invoke("open_document", { path: source.path }),
   setCheck(id, checked) {
-    // the app's View menu names its check marks after the panels: "netlist", "problems"
-    invoke("set_view_check", { panel: id.replace(/^toggle-/, ""), shown: checked }).catch(() => {});
+    invoke("set_view_check", { id, checked }).catch(() => {});
   },
   onCommand(handler) {
     tauri.event.listen("menu", (e) => handler(e.payload));
