@@ -248,12 +248,16 @@ pub enum VAlign {
 
 /// A piece of a line of text in one style (13.6), by its `kind`: "text", or "frac" for
 /// `\frac{…}{…}`, the numerator over the denominator. Laid out, the numerator and the denominator
-/// are at 0.8 of the fraction's size and centred on it, with their baselines 0.72 of the size above
-/// its baseline and 0.42 below it; the fraction is as wide as the wider of them and 0.15 of the
-/// size, and its bar is 0.3 of the size above the baseline and 0.06 of it short of each end. A
-/// fraction's bar and an overline are 0.06 of their size wide, but at least 0.8 pixels at the
-/// level's `scale`; an overline is 0.88 of its run's size above the run's baseline, at the top of
-/// the em box.
+/// are at 0.8 of the fraction's size and centred on it; the fraction is as wide as the wider of
+/// them and 0.15 of the size. The middle of its bar is at the middle of the em box, 0.38 of the
+/// size above the baseline (the em box, which the ideographs fill, reaches from 0.12 of a run's
+/// size below its baseline to 0.88 above it), and the bar is 0.06 of the size short of each end.
+/// The numerator sits as low, and the denominator as high, as keeps the em boxes of their runs,
+/// and their overlines, 0.1 of the size from the middle of the bar: with no scripts, fractions or
+/// overlines in them, their baselines are 0.576 of the size above the fraction's and 0.424 below
+/// it. A fraction's bar and an overline are 0.06 of their size wide, but at least 0.8 pixels at
+/// the level's `scale`; the middle of an overline is 0.94 of its run's size above the run's
+/// baseline, 0.06 above the top of the em box.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -941,7 +945,7 @@ mod tests {
         let (wn, wd) = (0.8 * regular.width("ab"), 0.8 * regular.width("c"));
         let w = wn + 0.15;
         let places: Vec<[f64; 3]> = t.runs.iter().map(|r| [r.at[0], r.at[1], r.size]).collect();
-        let want = [[(w - wn) / 2.0, 0.72, 0.8], [(w - wd) / 2.0, -0.42, 0.8], [w, 0.0, 1.0]];
+        let want = [[(w - wn) / 2.0, 0.576, 0.8], [(w - wd) / 2.0, -0.424, 0.8], [w, 0.0, 1.0]];
         assert!(
             places.len() == 3 && places.iter().zip(want).all(|(a, b)| (0..3).all(|k| close(a[k], b[k]))),
             "{places:?}"
@@ -952,7 +956,7 @@ mod tests {
             .map(|b| [b.points[0][0], b.points[0][1], b.points[1][0], b.points[1][1], b.stroke.width])
             .collect();
         let d = w + regular.width("d");
-        let want = [[0.06, 0.3, w - 0.06, 0.3, 0.06], [w, 0.88, d, 0.88, 0.06]];
+        let want = [[0.06, 0.38, w - 0.06, 0.38, 0.06], [w, 0.94, d, 0.94, 0.06]];
         assert!(bars.len() == 2 && bars.iter().zip(want).all(|(a, b)| (0..5).all(|k| close(a[k], b[k]))), "{bars:?}");
         assert!(t.bars.iter().all(|b| b.stroke.cap == Cap::Butt && b.stroke.unit == Unit::Scene), "{t:?}");
         // at least 0.8 pixels wide
