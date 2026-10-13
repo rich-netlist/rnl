@@ -78,6 +78,8 @@ pub struct Scene {
     pub routes: Vec<ObjId>,
     pub keytexts: HashMap<(ObjId, String), ObjId>,
     pub at: Vec<Fact>,
+    /// The indexes in `at` of each object's facts, in order; `add_at` keeps it.
+    pub at_by_target: HashMap<ObjId, Vec<usize>>,
     pub orient: Vec<Fact>,
     pub appear: Vec<Fact>,
     pub styles: Vec<Fact>,
@@ -110,6 +112,12 @@ pub struct Scene {
 }
 
 impl Scene {
+    /// Add a coordinate fact (PLACE, or the coordinates of a point).
+    pub(crate) fn add_at(&mut self, f: Fact) {
+        self.at_by_target.entry(f.target).or_default().push(self.at.len());
+        self.at.push(f);
+    }
+
     fn new(level: LevelId, levelobj: ObjId) -> Scene {
         Scene {
             level,
@@ -131,6 +139,7 @@ impl Scene {
             routes: Vec::new(),
             keytexts: HashMap::new(),
             at: Vec::new(),
+            at_by_target: HashMap::new(),
             orient: Vec::new(),
             appear: Vec::new(),
             styles: Vec::new(),
@@ -498,7 +507,7 @@ impl Interp<'_> {
         fp.push(PosElem::Tag("p"));
         for (axis, v) in [('x', x), ('y', y)] {
             if let Some(v) = v {
-                sc.at.push(Fact {
+                sc.add_at(Fact {
                     pos: fp.clone(),
                     target: p,
                     data: FactData::Coord(axis, v),
@@ -687,7 +696,7 @@ impl Interp<'_> {
                 let mut py = at;
                 py.push(PosElem::Int(1));
                 if let Some(x) = x {
-                    self.scenes[s].at.push(Fact {
+                    self.scenes[s].add_at(Fact {
                         pos: px,
                         target: obj,
                         data: FactData::Coord('x', *x),
@@ -699,7 +708,7 @@ impl Interp<'_> {
                     });
                 }
                 if let Some(y) = y {
-                    self.scenes[s].at.push(Fact {
+                    self.scenes[s].add_at(Fact {
                         pos: py,
                         target: obj,
                         data: FactData::Coord('y', *y),

@@ -1031,12 +1031,15 @@ impl Interp<'_> {
                 let mut xy = cur;
                 for (k, axis, item) in [(0usize, 'x', items.dx), (1, 'y', items.dy)] {
                     let Some(d) = item else { continue };
-                    let ats: Vec<Pos> = self.scenes[s]
-                        .at
-                        .iter()
+                    let sc = &self.scenes[s];
+                    let ats: Vec<Pos> = sc
+                        .at_by_target
+                        .get(&t)
+                        .into_iter()
+                        .flatten()
+                        .map(|&j| &sc.at[j])
                         .filter(|f| {
-                            f.target == t
-                                && matches!(f.data, FactData::Coord(a, _) if a == axis)
+                            matches!(f.data, FactData::Coord(a, _) if a == axis)
                                 && self.fact_priority(s, f) != Priority::Disabled
                         })
                         .map(|f| f.pos.clone())
@@ -1068,12 +1071,13 @@ impl Interp<'_> {
         }
         match self.o(att).clone() {
             ObjData::Net { .. } => {
-                for w in self.scenes[s].wires.clone() {
-                    let ObjData::Wire { nets, failed, .. } = self.o(w).clone() else { continue };
-                    if nets.contains(&att) && !failed {
-                        if let Some(pts) = self.wire_points(s, w) {
-                            return pts.first().copied();
-                        }
+                for k in 0..self.scenes[s].wires.len() {
+                    let w = self.scenes[s].wires[k];
+                    if !matches!(self.o(w), ObjData::Wire { nets, failed: false, .. } if nets.contains(&att)) {
+                        continue;
+                    }
+                    if let Some(pts) = self.wire_points(s, w) {
+                        return pts.first().copied();
                     }
                 }
                 None
@@ -1210,6 +1214,11 @@ impl Interp<'_> {
     // ---- constraints (14)
 
     fn check_constraints(&mut self, s: SceneId) {
+        // the kept coordinate facts of each object, for the constraints that are violated
+        let mut kept: HashMap<ObjId, Vec<usize>> = HashMap::new();
+        for (&(o, _), &(_, _, k)) in &self.scenes[s].at_best {
+            kept.entry(o).or_default().push(k);
+        }
         for c in self.scenes[s].constraints.clone() {
             let ObjData::Constraint(cd) = self.o(c).clone() else { continue };
             let site = cd.site.clone();
@@ -1281,12 +1290,7 @@ impl Interp<'_> {
                         ObjData::Term { owner, .. } => *owner,
                         _ => *m,
                     };
-                    let mut ks: Vec<usize> = self.scenes[s]
-                        .at_best
-                        .iter()
-                        .filter(|((o, _), _)| *o == target)
-                        .map(|(_, (_, _, k))| *k)
-                        .collect();
+                    let mut ks = kept.get(&target).cloned().unwrap_or_default();
                     ks.sort();
                     for k in ks {
                         involved.push(self.scenes[s].at[k].clone());
