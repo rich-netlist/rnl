@@ -3,8 +3,8 @@
 // named after the file, a click selects an instance, Enter opens its subcircuit and Backspace comes
 // back, and the native menu has the items of the command table, runs them, and follows the page's
 // check marks. The app runs with a WebView2 profile of its own in a temporary directory, so that the
-// user's layout stays as it was, and is stopped by its process ID. Node 22 or later, with no
-// dependencies.
+// user's layout stays as it was, and is stopped by its process ID. The test fails at once when the
+// app exits, and a step fails when the page stops answering. Node 22 or later, with no dependencies.
 //
 //   node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build]
 //
@@ -18,7 +18,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const exe = path.join(root, "apps", "desktop", "target", "debug", "rnl-viewer.exe");
+const manifest = path.join(root, "apps", "desktop", "Cargo.toml");
 const netlist = path.join(root, "tests", "conformance", "cases", "04-hierarchy.sp");
 const TOP = "04-hierarchy.sp";
 /** The command table, which the native menu is built from. */
@@ -48,7 +48,10 @@ function freePort() {
   });
 }
 
-/** Wait until `check` gives a value that is not false, and return it. */
+/**
+ * Wait until `check` gives a value that is not false, and return it. A check that throws is tried
+ * again, unless its error is final, as when the page's DevTools connection is gone.
+ */
 async function until(what, check, timeout = TIMEOUT) {
   const t0 = Date.now();
   let last = null;
@@ -57,6 +60,7 @@ async function until(what, check, timeout = TIMEOUT) {
       const v = await check();
       if (v) return v;
     } catch (e) {
+      if (e.final) throw new Error(`Gave up waiting for ${what}: ${e.message}`);
       last = e;
     }
     if (Date.now() - t0 > timeout) throw new Error(`Timed out waiting for ${what}${last ? `: ${last.message}` : ""}.`);
@@ -72,7 +76,21 @@ function same(got, want, what) {
   check(JSON.stringify(got) === JSON.stringify(want), `${what}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 }
 
-/** Connect to the page's DevTools target; resolves to send(), evaluate() and the page's errors. */
+/** The app as cargo builds it, in the target directory that CARGO_TARGET_DIR or cargo's configuration may move. */
+function appPath() {
+  const metadata = execFileSync("cargo", ["metadata", "--manifest-path", manifest, "--format-version", "1", "--no-deps"], {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 1 << 26,
+  });
+  return path.join(JSON.parse(metadata).target_directory, "debug", "rnl-viewer.exe");
+}
+
+/**
+ * Connect to the page's DevTools target; resolves to send(), evaluate() and the page's errors. A
+ * call rejects when it has no answer within TIMEOUT, and every call rejects, with a final error,
+ * once the connection is gone.
+ */
 async function connect(port) {
   const target = await until("the page's DevTools target", async () => {
     const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
@@ -84,8 +102,17 @@ async function connect(port) {
     ws.addEventListener("error", () => reject(new Error("The DevTools connection failed.")));
   });
   let id = 0;
-  const pending = new Map();
+  const pending = new Map(); // the calls waiting for their answers, by id
   const errors = [];
+  let gone = null; // the error of every call once the connection is gone
+  const lose = (why) => {
+    if (gone) return;
+    gone = Object.assign(new Error(why), { final: true });
+    for (const { reject } of pending.values()) reject(gone);
+    pending.clear();
+  };
+  ws.addEventListener("close", () => lose("the DevTools connection closed"));
+  ws.addEventListener("error", () => lose("the DevTools connection failed"));
   ws.addEventListener("message", (m) => {
     const d = JSON.parse(m.data);
     if (d.id && pending.has(d.id)) {
@@ -102,8 +129,18 @@ async function connect(port) {
   });
   const send = (method, params = {}) =>
     new Promise((resolve, reject) => {
-      pending.set(++id, { resolve, reject, method });
-      ws.send(JSON.stringify({ id, method, params }));
+      if (gone) return reject(gone);
+      const n = ++id;
+      const timer = setTimeout(() => {
+        pending.delete(n);
+        reject(new Error(`${method} had no answer in ${TIMEOUT / 1000} s`));
+      }, TIMEOUT);
+      const settle = (f) => (v) => {
+        clearTimeout(timer);
+        f(v);
+      };
+      pending.set(n, { resolve: settle(resolve), reject: settle(reject), method });
+      ws.send(JSON.stringify({ id: n, method, params }));
     });
   const evaluate = async (expression) => {
     const r = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
@@ -240,10 +277,64 @@ function tableMenus() {
   return menus;
 }
 
+/** Drive the app's page through the DevTools port and check what it shows; `session` keeps the connection. */
+async function drive(app, port, profile, t0, session) {
+  const page = await connect(port);
+  session.page = page;
+  // the page keeps its layout in the profile of the WebView: it must be this one, not the user's
+  check(fs.readdirSync(profile).length > 0, `WebView2 did not take ${profile} as its profile.`);
+
+  const s = await until("the drawing", async () => {
+    const s = await shown(page);
+    return s.doc && s.drawn && !s.busy && s;
+  });
+  console.log(`drawn ${s.level} in ${Date.now() - t0} ms, at ${s.zoom}`);
+  same(s.level, TOP, "the level drawn");
+  await until("the window's title", () => windowTitle(app.pid) === `${TOP} - RNL Viewer`, 10_000);
+
+  // a click selects an instance; Enter opens its subcircuit and Backspace comes back
+  await click(page, await symbol(page, "X2"));
+  await until("X2 to be selected", async () => (await shown(page)).selected === "instance X2", 10_000);
+  await press(page, "Enter", "Enter", 13);
+  await until("the subcircuit amp", async () => (await shown(page)).level === "amp", 10_000);
+  await press(page, "Backspace", "Backspace", 8);
+  const back = await until("the top level", async () => {
+    const s = await shown(page);
+    return s.level === TOP && s;
+  }, 10_000);
+  same(back.selected, "instance X2", "the selection after going back up");
+  console.log("selected X2, opened amp and came back");
+
+  // the native menu: the command table's items, with the page's check marks
+  const want = tableMenus();
+  same(nativeMenu(app.pid), want, "the native menu");
+  // a key in the page clears a check mark, and an item chosen in the menu reaches the page
+  const view = want.findIndex((m) => m.text === "&View");
+  const item = (id) => {
+    const label = table.menus.flatMap((m) => m.items).find((i) => i.id === id).label;
+    return want[view].items.findIndex((i) => i.text.split("\t")[0] === label);
+  };
+  const checked = (id) => nativeMenu(app.pid)[view].items[item(id)].checked;
+  await press(page, "b", "KeyB", 66, 2);
+  await until("the side panel to be hidden", async () => !(await shown(page)).sidebar, 10_000);
+  await until("Netlist Panel's check mark to clear", () => !checked("toggle-netlist"), 10_000);
+  chooseItem(app.pid, view, item("toggle-netlist"));
+  await until("the side panel to be shown", async () => (await shown(page)).sidebar, 10_000);
+  await until("Netlist Panel's check mark", () => checked("toggle-netlist"), 10_000);
+  const zoom = (await shown(page)).zoom;
+  chooseItem(app.pid, view, item("zoom-in"));
+  await until("View > Zoom In", async () => (await shown(page)).zoom !== zoom, 10_000);
+  console.log("the native menu has the command table's items and follows the page");
+
+  same(page.errors, [], "the page's errors");
+}
+
 async function main() {
   if (!process.argv.includes("--no-build")) {
-    execFileSync("cargo", ["build", "--manifest-path", path.join(root, "apps", "desktop", "Cargo.toml")], { cwd: root, stdio: "inherit" });
+    execFileSync("cargo", ["build", "--manifest-path", manifest], { cwd: root, stdio: "inherit" });
   }
+  const exe = appPath();
+  check(fs.existsSync(exe), `There is no ${exe} to start: build the app, or leave out --no-build.`);
   const port = Number(option("--port")) || (await freePort());
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-smoke-"));
   const t0 = Date.now();
@@ -256,63 +347,35 @@ async function main() {
     },
     stdio: ["ignore", "inherit", "inherit"],
   });
-  const exited = new Promise((resolve) => app.once("exit", resolve));
-  let page = null;
-  try {
-    page = await connect(port);
-    // the page keeps its layout in the profile of the WebView: it must be this one, not the user's
-    check(fs.readdirSync(profile).length > 0, `WebView2 did not take ${profile} as its profile.`);
-
-    const s = await until("the drawing", async () => {
-      const s = await shown(page);
-      return s.doc && s.drawn && !s.busy && s;
+  let end = null; // how the app ended, or why it did not start
+  const exited = new Promise((resolve) => {
+    app.once("exit", (code, signal) => {
+      end = signal || `code ${code}`;
+      resolve();
     });
-    console.log(`drawn ${s.level} in ${Date.now() - t0} ms, at ${s.zoom}`);
-    same(s.level, TOP, "the level drawn");
-    await until("the window's title", () => windowTitle(app.pid) === `${TOP} - RNL Viewer`, 10_000);
-
-    // a click selects an instance; Enter opens its subcircuit and Backspace comes back
-    await click(page, await symbol(page, "X2"));
-    await until("X2 to be selected", async () => (await shown(page)).selected === "instance X2", 10_000);
-    await press(page, "Enter", "Enter", 13);
-    await until("the subcircuit amp", async () => (await shown(page)).level === "amp", 10_000);
-    await press(page, "Backspace", "Backspace", 8);
-    const back = await until("the top level", async () => {
-      const s = await shown(page);
-      return s.level === TOP && s;
-    }, 10_000);
-    same(back.selected, "instance X2", "the selection after going back up");
-    console.log("selected X2, opened amp and came back");
-
-    // the native menu: the command table's items, with the page's check marks
-    const want = tableMenus();
-    same(nativeMenu(app.pid), want, "the native menu");
-    // a key in the page clears a check mark, and an item chosen in the menu reaches the page
-    const view = want.findIndex((m) => m.text === "&View");
-    const item = (id) => {
-      const label = table.menus.flatMap((m) => m.items).find((i) => i.id === id).label;
-      return want[view].items.findIndex((i) => i.text.split("\t")[0] === label);
-    };
-    const checked = (id) => nativeMenu(app.pid)[view].items[item(id)].checked;
-    await press(page, "b", "KeyB", 66, 2);
-    await until("the side panel to be hidden", async () => !(await shown(page)).sidebar, 10_000);
-    await until("Netlist Panel's check mark to clear", () => !checked("toggle-netlist"), 10_000);
-    chooseItem(app.pid, view, item("toggle-netlist"));
-    await until("the side panel to be shown", async () => (await shown(page)).sidebar, 10_000);
-    await until("Netlist Panel's check mark", () => checked("toggle-netlist"), 10_000);
-    const zoom = (await shown(page)).zoom;
-    chooseItem(app.pid, view, item("zoom-in"));
-    await until("View > Zoom In", async () => (await shown(page)).zoom !== zoom, 10_000);
-    console.log("the native menu has the command table's items and follows the page");
-
-    same(page.errors, [], "the page's errors");
+    app.once("error", (e) => {
+      end = e.message;
+      resolve();
+    });
+  });
+  // the test fails at once when the app ends before it is stopped
+  const early = exited.then(() => {
+    throw new Error(`The app ended (${end}) before the test was done.`);
+  });
+  early.catch(() => {}); // the race below reports it; the end of the app after the test is expected
+  const session = { page: null };
+  try {
+    await Promise.race([drive(app, port, profile, t0, session), early]);
   } finally {
-    if (page) page.ws.close();
-    // stop the app and its WebView by the app's own process ID
-    try {
-      execFileSync("taskkill", ["/PID", String(app.pid), "/T", "/F"], { stdio: "ignore" });
-    } catch {
-      // it has exited already
+    if (session.page) session.page.ws.close();
+    // stop the app and its WebView by the app's own process ID while it is still the app's: Node
+    // holds the process until it has seen it exit, and after that Windows may give the ID to another
+    if (app.pid !== undefined && app.exitCode === null && app.signalCode === null) {
+      try {
+        execFileSync("taskkill", ["/PID", String(app.pid), "/T", "/F"], { stdio: "ignore" });
+      } catch {
+        // it has exited already
+      }
     }
     await exited;
     // the WebView's own processes let go of the profile a little after the app is gone
@@ -328,4 +391,9 @@ async function main() {
   console.log("the desktop smoke test passed");
 }
 
-await main();
+try {
+  await main();
+} catch (e) {
+  console.error(`The desktop smoke test failed: ${e.message}`);
+  process.exit(1);
+}

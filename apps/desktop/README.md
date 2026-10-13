@@ -40,7 +40,7 @@ cargo tauri build
 node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build]
 ```
 
-The app runs with a WebView2 profile of its own in a temporary directory, so the layout kept in your profile is left as it was, and is stopped by its process ID. The page itself is tested in three browsers against a fake shell in [`tests/viewer`](../../tests/viewer/README.md).
+The app runs with a WebView2 profile of its own in a temporary directory, so the layout kept in your profile is left as it was, and is stopped by its process ID. The test fails at once when the app ends early, and a step fails when the page stops answering. The page itself is tested in three browsers against a fake shell in [`tests/viewer`](../../tests/viewer/README.md).
 
 ## Structure
 
