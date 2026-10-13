@@ -99,6 +99,9 @@ pub struct Object {
     pub level_title: String,
     /// An instance's statement: file index, first and last line.
     pub lines: Option<[u32; 3]>,
+    /// For a subcircuit instance, the level that draws its subcircuit, an index into
+    /// `Document::levels`.
+    pub opens: Option<usize>,
 }
 
 #[derive(Serialize, Debug)]
@@ -173,6 +176,13 @@ pub fn load(path: &Path) -> Result<Document, String> {
                 Child { instance: i.name.clone(), master, level }
             })
             .collect();
+    }
+    for (&(lv, i), &o) in &ix.insts {
+        let inst = &r.doc.levels[lv].instances[i];
+        if inst.is_subckt {
+            let master = inst.model.as_deref().unwrap_or_default();
+            ix.objects[o].opens = r.doc.subckt(master).and_then(|h| drawn.get(&h).copied());
+        }
     }
 
     let diagnostic = |d: &Diag, sink: &Sink| {
@@ -272,6 +282,7 @@ impl<'a> Index<'a> {
             level,
             level_title: self.doc.levels[level].title(),
             lines: None,
+            opens: None,
         });
         self.nets.insert((level, key.to_string()), self.objects.len() - 1);
         self.objects.len() - 1
@@ -293,6 +304,7 @@ impl<'a> Index<'a> {
                     level: lv,
                     level_title: level.title(),
                     lines: statement.as_ref().map(|(f, last, _)| [*f as u32, inst.line, *last as u32 + 1]),
+                    opens: None,
                 });
                 let object = self.objects.len() - 1;
                 self.insts.insert((lv, i), object);
@@ -567,6 +579,10 @@ mod tests {
         assert!(top.contains(&("X1", "amp")) && top.iter().any(|(_, l)| *l == "rdiv"), "{top:?}");
         let amp = d.levels.iter().find(|l| l.title == "amp").unwrap();
         assert!(amp.children.is_empty());
+        // a subcircuit instance knows the drawing it opens; others open none
+        let x1 = d.objects.iter().find(|o| o.kind == "instance" && o.name == "X1").unwrap();
+        assert_eq!(x1.opens.map(|l| d.levels[l].title.as_str()), Some("amp"));
+        assert!(d.objects.iter().filter(|o| o.name.starts_with('R') || o.kind == "net").all(|o| o.opens.is_none()));
     }
 
     #[test]

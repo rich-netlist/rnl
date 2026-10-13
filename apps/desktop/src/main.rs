@@ -86,6 +86,13 @@ fn item(app: &AppHandle, id: &str, text: &str, shortcut: Option<(&str, &str)>) -
     b.build(app)
 }
 
+/// A menu item whose key the page always handles, such as Enter or Backspace: a menu
+/// accelerator would take the key from the search box too. The key is only shown, on Windows.
+fn page_key_item(app: &AppHandle, id: &str, text: &str, shown: &str) -> tauri::Result<MenuItem<Wry>> {
+    let text = if cfg!(windows) { format!("{text}\t{shown}") } else { text.to_string() };
+    MenuItemBuilder::with_id(id, text).build(app)
+}
+
 fn check(app: &AppHandle, id: &str, text: &str, shortcut: (&str, &str)) -> tauri::Result<CheckMenuItem<Wry>> {
     let (text, accel) = labelled(text, Some(shortcut));
     let mut b = CheckMenuItemBuilder::with_id(id, text).checked(true);
@@ -110,6 +117,9 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&item(app, "fit", "&Fit to Window", Some(("F", "F")))?)
         .item(&item(app, "zoom-in", "Zoom &In", Some(("CmdOrCtrl+=", "Ctrl++")))?)
         .item(&item(app, "zoom-out", "Zoom &Out", Some(("CmdOrCtrl+-", "Ctrl+-")))?)
+        .separator()
+        .item(&page_key_item(app, "descend", "Open &Subcircuit", "Enter")?)
+        .item(&page_key_item(app, "ascend", "&Up to Parent Level", "Backspace")?)
         .separator()
         .item(&netlist)
         .item(&problems)

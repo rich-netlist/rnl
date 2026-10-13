@@ -15,6 +15,12 @@
   --select: #e8590c;
   --select-text: rgba(232, 89, 12, 0.22);
   --select-line: rgba(232, 89, 12, 0.08);
+  --select-fill: rgba(232, 89, 12, 0.07);
+  /* the selection when it is a subcircuit instance, which can be opened */
+  --sub: #c2255c;
+  --sub-text: rgba(194, 37, 92, 0.18);
+  --sub-line: rgba(194, 37, 92, 0.07);
+  --sub-fill: rgba(194, 37, 92, 0.06);
   --flash: rgba(47, 109, 181, 0.22);
   /* syntax */
   --syn-comment: #6a737d;
@@ -49,6 +55,8 @@
     --hint: #74a7e8;
     --select-text: rgba(255, 140, 70, 0.3);
     --select-line: rgba(255, 140, 70, 0.1);
+    --sub-text: rgba(240, 101, 149, 0.28);
+    --sub-line: rgba(240, 101, 149, 0.1);
     --flash: rgba(116, 167, 232, 0.28);
     --syn-comment: #8b949e;
     --syn-marker: #6e6e76;
@@ -242,8 +250,15 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 /* a selected symbol, wire or ground: its lines and texts in the selection colour */
 .canvas svg g.sel [stroke]:not([stroke="none"]) { stroke: var(--select); }
 .canvas svg g.sel [fill]:not([fill="none"]):not([fill="#ffffff"]):not([fill="white"]) { fill: var(--select); }
+.canvas.sel-sub, .source.sel-sub, .selection.sel-sub {
+  --select: var(--sub);
+  --select-text: var(--sub-text);
+  --select-line: var(--sub-line);
+  --select-fill: var(--sub-fill);
+}
+.canvas:focus, .source:focus { outline: none; }
 .canvas svg .overlay rect {
-  fill: rgba(232, 89, 12, 0.07);
+  fill: var(--select-fill);
   stroke: var(--select);
   stroke-width: 1.5;
   stroke-dasharray: 5 3;
@@ -524,3 +539,39 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 }
 .index-list .nothing { padding: 6px 10px; color: var(--muted); }
 mark { background: rgba(255, 196, 61, 0.55); color: inherit; border-radius: 2px; }
+
+/* ------------------------------------------------------------------ subcircuits */
+
+.enter-badge {
+  position: absolute;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  color: #ffffff;
+  background: var(--sub);
+  border: 0;
+  border-radius: 5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.enter-badge:hover:not(:disabled) { background: var(--sub); filter: brightness(1.15); }
+.enter-badge[hidden] { display: none; }
+.enter-badge svg { width: 16px; height: 16px; }
+
+.up-button {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  max-width: 45%;
+  border-color: var(--line);
+  background: var(--tab);
+}
+.up-button[hidden] { display: none; }
+.up-button svg { width: 15px; height: 15px; flex-shrink: 0; }
+.up-button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

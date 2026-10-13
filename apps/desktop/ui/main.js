@@ -49,6 +49,8 @@ let pendingReveal = null; // a line to bring into view once the text pane is sho
 
 let expanded = new Set(["0"]); // the open branches of the hierarchy tree, by path
 let treeActive = null; // the path of the tree row that opened the level shown, if one did
+let viewCache = new Map(); // tree path -> the view a level had when it was left
+let badgeAt = null; // the drawing point of the open badge: a selected subcircuit's box corner
 
 // ------------------------------------------------------------------ opening
 
@@ -97,6 +99,7 @@ function snapshot() {
     selected: sel && { kind: sel.kind, name: sel.name, level: sel.level },
     expanded,
     treeActive,
+    viewCache,
   };
 }
 
@@ -106,6 +109,7 @@ function showDocument(before) {
   selected = null;
   expanded = before ? before.expanded : new Set(["0"]);
   treeActive = before ? before.treeActive : null;
+  viewCache = before ? before.viewCache : new Map();
   renderFiles();
   const diags = doc.diagnostics.slice();
   if (doc.failed) diags.unshift({ severity: "error", message: doc.failed, file: "", line: 0, col: 0, origin: "" });
@@ -153,6 +157,9 @@ function showLevel(i, keptView, treePath) {
   overlay = null;
   groups = new Map();
   updateHierarchy();
+  updateUp();
+  badgeAt = null;
+  positionBadge();
   if (lv.empty) {
     view = null;
     $("zoom").textContent = "";
@@ -199,6 +206,9 @@ function clearDrawing(message) {
   $("empty").hidden = false;
   $("level-name").textContent = "";
   $("level-kind").textContent = "";
+  $("up").hidden = true;
+  badgeAt = null;
+  positionBadge();
   $("status").textContent = "";
   $("zoom").textContent = "";
   $("selection").textContent = "";
@@ -213,6 +223,7 @@ function apply() {
   size = canvasSize();
   svg.setAttribute("viewBox", `${view.x} ${view.y} ${size.w / view.k} ${size.h / view.k}`);
   $("zoom").textContent = `${Math.round(view.k * 100)}%`;
+  positionBadge();
 }
 
 function fit() {
@@ -263,6 +274,7 @@ canvas.addEventListener(
 canvas.addEventListener("pointerdown", (e) => {
   if (!view || (e.button !== 0 && e.button !== 1)) return;
   e.preventDefault();
+  canvas.focus({ preventScroll: true }); // so that Enter and Backspace act on the drawing
   canvas.setPointerCapture(e.pointerId);
   press = { id: e.pointerId, button: e.button, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, drag: false };
 });
@@ -298,7 +310,14 @@ canvas.addEventListener("pointercancel", (e) => endPress(e, true));
 // no autoscroll on the middle button, no page menu on the drawing
 canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-canvas.addEventListener("dblclick", fit);
+// a double click opens a subcircuit instance, and fits the drawing anywhere else
+canvas.addEventListener("dblclick", (e) => {
+  if (e.target.closest("#enter-badge")) return;
+  const box = boxAt(canvasPoint(e));
+  const o = box ? box.objects.find((k) => opens(k) !== null) : undefined;
+  if (o !== undefined) descend(o);
+  else fit();
+});
 
 // keep the middle of the view in place when the window or a panel changes size
 new ResizeObserver(() => {
@@ -347,6 +366,23 @@ function hitAt(p) {
   return best;
 }
 
+/** The smallest symbol box around a canvas point, whatever pin or wire is on it; or null. */
+function boxAt(p) {
+  if (!view || !doc || !doc.levels[current]) return null;
+  const u = view.x + p.x / view.k;
+  const v = view.y + p.y / view.k;
+  let best = null;
+  let bestArea = Infinity;
+  for (const h of doc.levels[current].hits) {
+    if (h.kind !== "box" || h.objects.length === 0) continue;
+    const [[x0, y0], [x1, y1]] = h.points;
+    if (u < x0 || u > x1 || v < y0 || v > y1) continue;
+    const area = (x1 - x0) * (y1 - y0);
+    if (area < bestArea) [best, bestArea] = [h, area];
+  }
+  return best;
+}
+
 function segmentDistance(u, v, a, b) {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
@@ -367,25 +403,43 @@ function select(o, from) {
     const k = doc.levels.findIndex((l) => l.host === obj.level);
     if (k >= 0) showLevel(k, null, null);
   }
+  markSubcircuit(opens(o) !== null);
   paintDrawingSelection();
   paintSourceSelection(from === "drawing");
-  const what = obj.kind === "instance" ? "instance" : "net";
   const sel = $("selection");
   sel.replaceChildren();
   const b = document.createElement("b");
   b.textContent = obj.name;
-  sel.append(b, ` ${what} in ${obj.level_title}`);
+  if (opens(o) !== null) {
+    sel.append(b, ` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · Enter opens it`);
+  } else {
+    sel.append(b, ` ${obj.kind === "instance" ? "instance" : "net"} in ${obj.level_title}`);
+  }
 }
 
 function clearSelection() {
   if (selected === null) return;
   selected = null;
+  markSubcircuit(false);
   paintDrawingSelection();
   paintSourceSelection(false);
   $("selection").textContent = "";
 }
 
+/** The level a subcircuit instance opens, or null. */
+function opens(o) {
+  const obj = doc && o !== null && o !== undefined ? doc.objects[o] : null;
+  return obj && obj.kind === "instance" && obj.opens !== null && obj.opens !== undefined ? obj.opens : null;
+}
+
+/** A selected subcircuit instance is marked in its own colour, in the drawing and the text. */
+function markSubcircuit(on) {
+  for (const el of [canvas, source, $("selection")]) el.classList.toggle("sel-sub", on);
+}
+
 function paintDrawingSelection() {
+  badgeAt = null;
+  positionBadge();
   if (!svg) return;
   for (const g of svg.querySelectorAll(".sel")) g.classList.remove("sel");
   overlay.replaceChildren();
@@ -397,6 +451,7 @@ function paintDrawingSelection() {
     if (h.id) for (const g of groups.get(h.id) || []) g.classList.add("sel");
     if (h.kind === "box" && isInstance) {
       const [[x0, y0], [x1, y1]] = h.points;
+      if (opens(selected) !== null && !badgeAt) badgeAt = [x1 + pad, y0 - pad];
       const r = svgElement("rect", { x: x0 - pad, y: y0 - pad, width: x1 - x0 + 2 * pad, height: y1 - y0 + 2 * pad });
       r.setAttribute("vector-effect", "non-scaling-stroke");
       overlay.append(r);
@@ -406,7 +461,91 @@ function paintDrawingSelection() {
       overlay.append(c);
     }
   }
+  positionBadge();
 }
+
+/** Put the open badge on its corner of the drawing, at the same size whatever the zoom. */
+function positionBadge() {
+  const badge = $("enter-badge");
+  if (!badgeAt || !view || !svg) {
+    badge.hidden = true;
+    return;
+  }
+  badge.hidden = false;
+  badge.style.left = `${(badgeAt[0] - view.x) * view.k}px`;
+  badge.style.top = `${(badgeAt[1] - view.y) * view.k}px`;
+}
+
+$("enter-badge").addEventListener("pointerdown", (e) => e.stopPropagation());
+$("enter-badge").addEventListener("click", () => descend(selected));
+
+// ------------------------------------------------------------------ going down and up the hierarchy
+
+/** The tree path of the level shown: the row that opened it, or the first row that reaches it. */
+function herePath() {
+  return treeActive !== null ? treeActive : pathTo(current);
+}
+
+/** The level a tree path reaches. */
+function levelAt(path) {
+  let l = 0;
+  for (const k of path.split("/").slice(1).map(Number)) l = doc.levels[l].children[k].level;
+  return l;
+}
+
+function rememberView() {
+  const here = herePath();
+  if (here !== null && view) viewCache.set(here, view);
+}
+
+/** Open the subcircuit of instance `o`, below the level shown. */
+function descend(o) {
+  const level = opens(o);
+  if (level === null) return;
+  const name = doc.objects[o].name;
+  const here = herePath();
+  const k = doc.levels[current].children.findIndex((c) => c.instance === name);
+  const path = here !== null && k >= 0 ? `${here}/${k}` : null;
+  rememberView();
+  clearSelection();
+  showLevel(level, path !== null ? viewCache.get(path) || null : null, path);
+}
+
+/** The level above the one shown, along its tree path, and the instance that leads down; or null. */
+function parentOf() {
+  if (!doc || doc.levels.length === 0 || current === 0) return null;
+  const here = herePath();
+  // a subcircuit nothing instantiates still goes up to the top level
+  if (here === null || !here.includes("/")) return { level: 0, path: "0", via: null };
+  const parts = here.split("/");
+  const path = parts.slice(0, -1).join("/");
+  const level = levelAt(path);
+  const child = doc.levels[level].children[Number(parts[parts.length - 1])];
+  return { level, path, via: child ? child.instance : null };
+}
+
+function ascend() {
+  const p = parentOf();
+  if (!p) return;
+  rememberView();
+  showLevel(p.level, viewCache.get(p.path) || null, p.path);
+  if (p.via === null) return;
+  // the instance we came out of stays selected, so the way back down is one Enter away
+  const host = doc.levels[p.level].host;
+  const o = doc.objects.findIndex((x) => x.kind === "instance" && x.level === host && x.name === p.via);
+  if (o >= 0) select(o, "ascend");
+}
+
+function updateUp() {
+  const p = parentOf();
+  $("up").hidden = !p;
+  if (!p) return;
+  const name = doc.levels[p.level].title;
+  $("up-name").textContent = name;
+  $("up").title = `Up to ${name} (Backspace)`;
+}
+
+$("up").addEventListener("click", ascend);
 
 function svgElement(name, attrs) {
   const el = document.createElementNS("http://www.w3.org/2000/svg", name);
@@ -529,6 +668,18 @@ source.addEventListener("click", (e) => {
   const owner = ln ? lineOwners[fileShown].get(Number(ln.dataset.line)) : undefined;
   if (owner !== undefined) select(owner, "source");
   else clearSelection();
+});
+
+source.addEventListener("dblclick", (e) => {
+  if (!doc) return;
+  const s = e.target.closest("[data-obj]");
+  const ln = e.target.closest(".ln");
+  const o = s
+    ? s.dataset.obj.split(" ").map(Number).find((k) => opens(k) !== null)
+    : ln ? lineOwners[fileShown].get(Number(ln.dataset.line)) : undefined;
+  if (opens(o) === null) return;
+  window.getSelection().removeAllRanges(); // the word the double click selected
+  descend(o);
 });
 
 // ---- syntax
@@ -1001,8 +1152,11 @@ function indexRow(level, q, count) {
 /** Open a level from the hierarchy: from a tree row (`path`) or from the index (null). */
 function openLevel(level, path) {
   if (!doc) return;
-  if (level !== current) showLevel(level, null, path);
-  else {
+  if (level !== current) {
+    rememberView();
+    const p = path !== null ? path : pathTo(level);
+    showLevel(level, p !== null ? viewCache.get(p) || null : null, path);
+  } else {
     treeActive = path;
     updateHierarchy();
   }
@@ -1183,6 +1337,8 @@ function command(id) {
     case "zoom-out": zoomCenter(0.8); break;
     case "toggle-netlist": setSidebar(app.classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems(netlistPane.classList.contains("problems-folded")); break;
+    case "descend": descend(selected); break;
+    case "ascend": ascend(); break;
     default: break;
   }
 }
@@ -1202,6 +1358,8 @@ document.addEventListener("keydown", (e) => {
   else if (ctrl && e.key === "-") id = "zoom-out";
   else if (typing) return;
   else if (!ctrl && !e.altKey && (key === "f" || key === "0")) id = "fit";
+  else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement) && opens(selected) !== null) id = "descend";
+  else if (e.key === "Backspace" && !ctrl && !e.altKey) id = "ascend";
   else if (e.key === "Escape") {
     clearSelection();
     e.preventDefault();
