@@ -24,7 +24,7 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; what a click hits, from the boxes, pins and wires the Document gives; the selection marks and the open badge. |
 | `selection.js` | Selecting an instance or a net. |
 | `subcircuits.js` | Going down into a subcircuit instance and back up, each level with the view it had. |
-| `text.js` | The text pane: the lines of each file, the statements that do not take effect, the places of the selection, revealing a line, and clicks in the text. |
+| `text.js` | The text pane: the tabs and the lines of each file, the statements that do not take effect, the places of the selection, revealing a line, and clicks in the text. |
 | `syntax.js` | Highlighting the host statements and the RNL records. |
 | `problems.js` | The problems list and the coloured line numbers. |
 | `hierarchy.js` | The hierarchy view: the instance tree, and the subcircuit index with its search and initials. |

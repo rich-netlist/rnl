@@ -223,12 +223,20 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .failed-toggle .swatch.x-failed { background: var(--failed-bg); }
 .failed-toggle .swatch.x-overridden { background: var(--overridden-bg); }
 /* the failed statements' box gives way to the file tabs as the bar narrows: first its legend, then
-   its caption, so that a tab of each file stays within reach; its title still says what it marks */
+   its caption, so that a tab of each file stays within reach; its title still says what it marks,
+   and the caption, out of sight, still names the checkbox */
 @container (max-width: 399px) {
   .failed-toggle .swatch, .failed-toggle .legend { display: none; }
 }
 @container (max-width: 299px) {
-  .failed-toggle .caption { display: none; }
+  .failed-toggle .caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .sub-head {
