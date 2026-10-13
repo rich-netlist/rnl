@@ -51,7 +51,7 @@ test("an untitled text is built from memory", () => {
   assert.equal(d.dialect, "spice");
   assert.equal(d.files[0].text, NETLIST);
   assert.equal(d.levels.length, 1);
-  assert.ok(d.levels[0].svg.startsWith("<svg"));
+  assert.equal(d.levels[0].empty, false);
   assert.equal(d.levels[0].hits.filter((h) => h.kind === "box").length, 2);
   assert.deepEqual(d.missing, []);
 });

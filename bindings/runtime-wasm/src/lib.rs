@@ -185,7 +185,7 @@ C1 a 0 1p
         assert_eq!((&d["path"], &d["dialect"]), (&json!("untitled-1"), &json!("spice")));
         assert_eq!(d["files"][0]["text"], NETLIST);
         assert_eq!(d["missing"], json!([]));
-        assert!(d["levels"][0]["svg"].as_str().unwrap().starts_with("<svg"));
+        assert_eq!(d["levels"][0]["empty"], false);
     }
 
     #[test]
@@ -240,7 +240,7 @@ R1 a 0 1k
 
     #[test]
     fn unknown_fields_are_ignored() {
-        let v = answer(json!({ "entry": "a.sp", "files": { "a.sp": NETLIST }, "primitives": true, "svg": false }));
+        let v = answer(json!({ "entry": "a.sp", "files": { "a.sp": NETLIST }, "unknown": { "of": [1, 2] } }));
         assert!(v["document"].is_object(), "{v}");
     }
 
