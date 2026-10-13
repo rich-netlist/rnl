@@ -1658,9 +1658,17 @@ impl Interp<'_> {
         if ctx.scene.is_none() && !per_level {
             return self.scene_only(ctx, seg.start);
         }
+        // the sources kept last that have since come to stay not lazy, such as a level's set edited
+        // with a selection after it was added here, are let go, so later levels do not go through them
+        while let Some(&o) = self.set(target.obj).lazy_sources.last() {
+            if !self.stays_not_lazy(o) {
+                break;
+            }
+            self.set_mut(target.obj).lazy_sources.pop();
+        }
         let m = SetMod { pos: ctx.pos.clone(), add, source: items, ctx: Rc::new(ctx.clone()) };
-        let lazy = !self.never_lazy(items);
-        self.set_mut(target.obj).add_mod(m, lazy);
+        let (lazy, for_good) = (!self.stays_not_lazy(items), self.lazy_for_good(items));
+        self.set_mut(target.obj).add_mod(m, lazy, for_good);
         Ok((target.obj, self.is_lazy(target.obj)))
     }
 

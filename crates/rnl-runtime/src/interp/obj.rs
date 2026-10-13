@@ -450,8 +450,13 @@ pub struct SetData {
     pub mods: Vec<SetMod>,
     /// The indexes in `mods` of the edits made in each scene, in order; `add_mod` keeps it.
     pub mods_by_scene: HashMap<SceneId, Vec<usize>>,
-    /// The sources in `mods` that are lazy or can become so (10.3), in order; `add_mod` keeps it.
+    /// The sources in `mods` that are lazy or can become so (10.3), in order, while the set itself
+    /// can be lazy; `add_mod` keeps it, and ADD-TO and REMOVE-FROM let go of the last ones once they
+    /// stay not lazy.
     pub lazy_sources: Vec<ObjId>,
+    /// A plain set that is not lazy now and never will be (10.3): none of its members can be lazy
+    /// (`new_obj` sets it), or the source of one of `mods` is lazy for good (`add_mod` sets it).
+    pub not_lazy: bool,
     /// Whether one of `mods` is a REMOVE-FROM; `add_mod` keeps it.
     pub removes: bool,
     /// The host level unit that wrote it.
@@ -467,18 +472,23 @@ impl SetData {
             mods: Vec::new(),
             mods_by_scene: HashMap::new(),
             lazy_sources: Vec::new(),
+            not_lazy: false,
             removes: false,
             writer: None,
             kind: SetKind::Plain,
         }
     }
 
-    /// Add an ADD-TO or REMOVE-FROM (5.2.2); `lazy` tells whether its source is lazy or can become so.
-    pub fn add_mod(&mut self, m: SetMod, lazy: bool) {
+    /// Add an ADD-TO or REMOVE-FROM (5.2.2), given whether its source is lazy or can become so, and
+    /// whether it is lazy for good, such as a selection.
+    pub fn add_mod(&mut self, m: SetMod, lazy: bool, lazy_for_good: bool) {
         if let Some(s) = m.ctx.scene {
             self.mods_by_scene.entry(s).or_default().push(self.mods.len());
         }
-        if lazy {
+        if lazy_for_good && matches!(self.kind, SetKind::Plain) {
+            self.not_lazy = true;
+            self.lazy_sources = Vec::new();
+        } else if lazy && !self.not_lazy {
             self.lazy_sources.push(m.source);
         }
         self.removes |= !m.add;
