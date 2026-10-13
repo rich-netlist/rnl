@@ -32,10 +32,25 @@ This is the central TODO list. A checked box means work present in this reposito
 - [ ] Add standard symbols for the elements that still lack one (J, F, H, B and others).
 - [x] Add the CLI: check, render, dump, and strip generated records.
 - [x] Add a desktop viewer that opens a netlist, draws its levels, shows the netlist text and its diagnostics, follows a selected instance or net between the drawing and the text, and moves and zooms the view ([`apps/desktop/`](../apps/desktop/README.md)). It calls the Rust runtime directly through Tauri; it does not edit or solve.
-- [ ] Add the runtime WASM binding, TypeScript runtime package, and framework independent viewer core.
-- [ ] Add the React/Vite web application and Tauri desktop shell; measure startup and document loading.
+- [x] Measure the desktop viewer's startup: on Windows 11 the first drawing appears after 0.6 to 1.0 s, most of it the WebView engine starting.
+
+## Shared core and web viewer
+
+One shared Rust core decides the drawing; the frontends are per platform ([decision 0006](decisions/0006-shared-core-per-platform-frontends.md)). In order:
+
+- [ ] Make style resolution linear in the number of objects. It grows quadratically today: a chain of 2,000 resistors takes 36 s.
+- [ ] Add `crates/rnl-view`, the core interface (a workspace in, a Document out). It takes over the desktop viewer's document builder and the parts of `rnl-cli` that read no files: dialect detection, the bundled standard packages, level status. The desktop viewer and the CLI use it.
+- [ ] Give the Document each level's primitives in serializable form, with SVG written from them; generate type definitions for frontends.
+- [ ] Ship fonts with the core and lay out text with their metrics; choose the font set, including Chinese, and its licence.
+- [ ] Use a pure-Rust math library in the core, and test in CI that native and WebAssembly builds give identical Documents on the conformance corpus.
+- [ ] Add the WebAssembly binding in [`bindings/`](../bindings/README.md), run in a Worker.
+- [ ] Split the desktop viewer's page into modules behind a shell interface and a command table, so that the web viewer can reuse it.
+- [ ] Add the web viewer in [`apps/web/`](../apps/web/README.md): open files, a folder or a URL, collect the included files, an HTML menu bar, and the panels of the desktop viewer.
+- [ ] Test the shared page in Chromium, WebKit and Firefox against a fake shell, and smoke-test both viewers.
 
 ## Solving and editing
+
+- [ ] Edit RNL text in the viewers and redraw on request (a refresh button and a shortcut), including a netlist pasted without a file ([decision 0006](decisions/0006-shared-core-per-platform-frontends.md)).
 
 - [ ] Define the precise RNL output contract, source metadata, and input fingerprint in the language draft.
 - [ ] Implement the solver, separate solver WASM binding/package, and native/WASM consistency checks.
