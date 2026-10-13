@@ -199,6 +199,7 @@ const fileInput = input("file-input", false);
 const folderInput = input("folder-input", true);
 let waiting = null; // resolves the chooser shown with the files chosen
 
+/** A hidden file input in the page, for files or, with `folder`, a folder. */
 function input(id, folder) {
   const el = document.createElement("input");
   el.type = "file";
@@ -226,6 +227,7 @@ function chooseFiles(el) {
   });
 }
 
+/** End the chooser that is waiting, if any, with the files chosen in it. */
 function chosen(files) {
   const resolve = waiting;
   waiting = null;
