@@ -49,7 +49,8 @@ One shared Rust core decides the drawing; the frontends are per platform ([decis
 - [x] Add the WebAssembly binding in [`bindings/`](../bindings/README.md), run in a Worker ([`bindings/runtime-wasm`](../bindings/runtime-wasm/README.md)): a JSON request in and a Document out, with no generated glue, and JavaScript modules that load it, run it in a Worker and collect the files a document needs. The module is 1.20 MB, 407 KB gzip-compressed.
 - [x] Split the desktop viewer's page into modules behind a shell interface and a command table, so that the web viewer can reuse it.
 - [x] Add the web viewer in [`apps/web/`](../apps/web/README.md): open files, a folder or a URL, collect the included files, an HTML menu bar, and the panels of the desktop viewer. It is a static site of 1.36 MB with the core, and for the same files its Documents are `rnl view`'s but for the paths that name the files.
-- [ ] Test the shared page in Chromium, WebKit and Firefox against a fake shell, and smoke-test both viewers.
+- [x] Test the shared page in Chromium, WebKit and Firefox against a fake shell, and smoke-test the desktop viewer. [`tests/viewer`](../tests/viewer/README.md) runs 58 tests of the page per engine with Playwright, on Documents that `rnl view` built from the corpus; on Windows the desktop viewer's smoke test drives the app through WebView2's DevTools port. The tests found that an initial of the subcircuit index scrolls to the end of the list, that in Firefox a double click on a row of the tree does not fold it, and that the narrowest side panel covers the file tabs; those tests are marked as failing until the page is fixed.
+- [ ] Smoke-test the web viewer.
 
 ## Solving and editing
 
