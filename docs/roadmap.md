@@ -44,7 +44,7 @@ One shared Rust core decides the drawing; the frontends are per platform ([decis
 - [ ] Ship fonts with the core and lay out text with their metrics; choose the font set, including Chinese, and its licence.
 - [ ] Use a pure-Rust math library in the core, and test in CI that native and WebAssembly builds give identical Documents on the conformance corpus.
 - [ ] Add the WebAssembly binding in [`bindings/`](../bindings/README.md), run in a Worker.
-- [ ] Split the desktop viewer's page into modules behind a shell interface and a command table, so that the web viewer can reuse it.
+- [x] Split the desktop viewer's page into modules behind a shell interface and a command table, so that the web viewer can reuse it.
 - [ ] Add the web viewer in [`apps/web/`](../apps/web/README.md): open files, a folder or a URL, collect the included files, an HTML menu bar, and the panels of the desktop viewer.
 - [ ] Test the shared page in Chromium, WebKit and Firefox against a fake shell, and smoke-test both viewers.
 

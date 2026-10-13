@@ -18,7 +18,7 @@ From the repository root:
 cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-five-transistor-ota.sp
 ```
 
-On Windows the page handles the shortcut keys and the menu only shows them, because the keys reach the WebView first; on macOS and Linux the menu handles them.
+The menus and their keys come from the page's command table ([`commands.json`](../viewer-ui/README.md#the-command-table)). On Windows the page handles the shortcut keys and the menu only shows them, because the keys reach the WebView first; on macOS and Linux the menu handles them.
 
 On Linux the build needs the WebKitGTK development packages that Tauri lists, for example `libwebkit2gtk-4.1-dev`, `libgtk-3-dev` and `librsvg2-dev` on Debian and Ubuntu. Windows needs the WebView2 runtime, which Windows 10 and 11 normally have.
 
@@ -36,12 +36,13 @@ cargo tauri build
 
 | Path | Content |
 | --- | --- |
-| `src/main.rs` | The Tauri application: the menu bar, and the commands to open a file, ask for a file, read the file named on the command line, and set the View menu's check marks. |
+| `src/main.rs` | The Tauri application, and the commands to open a file, ask for a file and read the file named on the command line. |
+| `src/menu.rs` | The menu bar, built from the page's command table, and the command that sets its check marks. |
 | `src/document.rs` | Reading a file into what the page shows: one SVG per level with what on it can be clicked, the source files with the places of their records, the instances and nets of every level with the places that name them, and the diagnostics. The references in the records come from the runtime (`Interpretation::refs`), so aliases, scopes and subscripts are resolved as the language says. |
-| [`../viewer-ui/`](../viewer-ui/) | The page, in a directory of its own so that the web viewer can share it: plain HTML, CSS and JavaScript with no build step. It moves the view by changing the SVG's `viewBox` and finds what a click hits from the boxes, pins and wires `document.rs` gives. |
-| `tauri.conf.json`, `capabilities/` | The window, the content security policy, and what the page may call. |
+| [`../viewer-ui/`](../viewer-ui/README.md) | The page, which the web viewer will share: plain HTML, CSS and ES modules with no build step. It reaches the app only through its desktop shell, `shells/desktop.js`. |
+| `tauri.conf.json`, `capabilities/` | The window, where the page is, the content security policy, and what the page may call. |
 | `icons/` | The application icon. |
 
 This directory is a Cargo workspace of its own, so the WebView dependencies stay out of the library crates' builds; [`desktop.yml`](../../.github/workflows/desktop.yml) builds it on Linux, Windows and macOS.
 
-The [architecture proposal](../../docs/rnl-toolchain-architecture.md) plans a desktop shell around the shared TypeScript viewer and the runtime compiled to WebAssembly. Neither exists yet, so this viewer calls the Rust runtime directly; its page is small enough to replace when the shared viewer arrives.
+The viewer calls the Rust runtime natively, as [decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md) decides; its page, in [`apps/viewer-ui`](../viewer-ui/README.md), is the one the web viewer will share.
