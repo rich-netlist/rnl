@@ -1,8 +1,8 @@
 // The page's own menu bar, for a platform that shows none (shell.nativeMenu false), built from the
 // command table. A click on a title opens its menu, pointing at another title while a menu is open
-// switches to it, and Escape or a click elsewhere closes it. From the keyboard, Alt alone or F10
-// moves to the bar and Alt with an underlined letter opens a menu; then the arrows move, Enter
-// chooses, and the underlined letters choose too.
+// switches to it, and Escape or a click elsewhere closes it; that click does nothing else. From the
+// keyboard, Alt alone or F10 moves to the bar and Alt with an underlined letter opens a menu; then
+// the arrows move, Enter chooses, and the underlined letters choose too.
 
 import { command, isChecked, menus, shortcut } from "./commands.js";
 import { $ } from "./util.js";
@@ -13,6 +13,9 @@ let at = -1; // the menu whose title is marked, or -1 while the bar is not in us
 let open = false; // whether that menu's list is shown
 let keyboard = false; // whether the bar is in use from the keyboard, which underlines the letters
 let altAlone = false; // Alt is down, and no other key or click came since
+let presses = 0; // the pointer presses so far
+let closedBy = 0; // the press that last closed an open menu, or 0
+let closing = false; // that press is not over yet
 
 /** Show or hide the menu bar. */
 export function showMenuBar(shown) {
@@ -241,13 +244,64 @@ document.addEventListener(
   true,
 );
 
+const swallow = (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+};
+
+// a press anywhere but on a menu leaves the bar; as in a native menu, one that closes an open menu
+// does nothing else: it neither selects nor clears the selection, nor starts a drag
 document.addEventListener(
   "pointerdown",
   (e) => {
     altAlone = false;
-    if (at >= 0 && !bar.contains(e.target)) leave();
+    presses += 1;
+    closing = false;
+    if (at < 0 || e.target.closest("#menubar .menu")) return;
+    if (open) {
+      closing = true;
+      closedBy = presses;
+      swallow(e);
+    }
+    leave();
   },
   true,
 );
+
+// the rest of that press: its release, and the click or page menu that the release makes in the
+// same task; the press is over in the next task, or at a key, which clicks on its own. A double
+// click that the press begins goes too.
+for (const type of ["pointerup", "pointercancel"]) {
+  document.addEventListener(
+    type,
+    (e) => {
+      if (!closing) return;
+      swallow(e);
+      const press = presses;
+      setTimeout(() => {
+        if (presses === press) closing = false;
+      });
+    },
+    true,
+  );
+}
+
+document.addEventListener(
+  "keydown",
+  () => {
+    closing = false;
+  },
+  true,
+);
+
+for (const type of ["click", "auxclick", "contextmenu", "dblclick"]) {
+  document.addEventListener(
+    type,
+    (e) => {
+      if (closing || (type === "dblclick" && closedBy > 0 && presses === closedBy + 1)) swallow(e);
+    },
+    true,
+  );
+}
 
 window.addEventListener("blur", leave);
