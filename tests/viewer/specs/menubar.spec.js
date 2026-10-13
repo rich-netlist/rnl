@@ -1,6 +1,7 @@
-// The page's own menu bar, shown on a platform without a native one: opening, switching and closing
-// its menus by the mouse and the keyboard, a click outside that only closes a menu, the commands,
-// and the check marks. With a native menu the page shows no bar and tells the shell the marks.
+// The page's own menu bar, shown on a platform without a native one: the menus the command table
+// gives the web, opening, switching and closing them by the mouse and the keyboard, a click outside
+// that only closes a menu, the commands, and the check marks. With a native menu the page shows no
+// bar and tells the shell the marks.
 
 import { expect, test } from "../viewer.js";
 
@@ -9,22 +10,55 @@ const TOP = "04-hierarchy.sp";
 /** The list of a menu, by its title. */
 const list = (page, title) => page.locator("#menubar .menu", { has: page.locator(".menu-title", { hasText: title }) }).locator(".menu-list");
 
+/**
+ * The menus that the command table gives the web, as its menu bar shows them: per menu its title,
+ * the letter underlined in it, and its items' texts with their keys, "" for a separator. Only the
+ * items the web offers, a separator only between two of them, and no menu left without items.
+ */
+async function webMenus(page) {
+  const table = await page.evaluate(() => fetch("commands.json").then((r) => r.json()));
+  const plain = (label) => label.replace("&", "");
+  const menus = [];
+  for (const m of table.menus) {
+    const items = [];
+    let gap = false;
+    for (const item of m.items) {
+      if (item === "-") {
+        gap = items.length > 0;
+      } else if (!item.platforms || item.platforms.includes("web")) {
+        if (gap) items.push("");
+        items.push(plain(item.label) + (item.shown || (item.keys ? item.keys[0] : "")));
+        gap = false;
+      }
+    }
+    if (items.length > 0) menus.push({ title: plain(m.label), letter: m.label[m.label.indexOf("&") + 1], items });
+  }
+  return menus;
+}
+
 test.describe("on the web", () => {
   test.beforeEach(async ({ viewer }) => {
     await viewer.open("04-hierarchy");
   });
 
-  test("the menu bar has the web's menus and their keys", async ({ page }) => {
+  test("the menu bar has the web's menus of the command table, and their keys", async ({ page }) => {
     await expect(page.locator("#menubar")).toBeVisible();
-    // Help has only the desktop's About, so it is not shown
-    await expect(page.locator("#menubar .menu-title")).toHaveText(["File", "View"]);
-    await expect(page.locator("#menubar .menu-title u")).toHaveText(["F", "V"]);
-    await expect(list(page, "File").locator(".menu-item")).toHaveText(["Open...Ctrl+O", "Open Folder...", "Open URL...", "ReloadF5"]);
-    await expect(list(page, "File").locator(".menu-separator")).toHaveCount(0);
-    await expect(list(page, "View").locator(".menu-item, .menu-separator")).toHaveText([
-      "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "",
-      "Open SubcircuitEnter", "Up to Parent LevelBackspace", "",
-      "Netlist PanelCtrl+B", "ProblemsCtrl+Shift+M",
+    const menus = await webMenus(page);
+    await expect(page.locator("#menubar .menu-title")).toHaveText(menus.map((m) => m.title));
+    await expect(page.locator("#menubar .menu-title u")).toHaveText(menus.map((m) => m.letter));
+    for (const m of menus) await expect(list(page, m.title).locator(".menu-item, .menu-separator")).toHaveText(m.items);
+    // File has the web's own items, and not the desktop's Exit nor the separator above it
+    expect(menus.slice(0, 2)).toEqual([
+      { title: "File", letter: "F", items: ["Open...Ctrl+O", "Open Folder...", "Open URL...", "ReloadF5"] },
+      {
+        title: "View",
+        letter: "V",
+        items: [
+          "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "",
+          "Open SubcircuitEnter", "Up to Parent LevelBackspace", "",
+          "Netlist PanelCtrl+B", "ProblemsCtrl+Shift+M",
+        ],
+      },
     ]);
   });
 
