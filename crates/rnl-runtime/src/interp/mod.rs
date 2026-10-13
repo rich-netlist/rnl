@@ -295,26 +295,21 @@ impl<'p> Interp<'p> {
         }
         // records written above with scope= this subcircuit (2.6)
         let anc_up = self.doc.ancestors(lv);
+        let lvl = &self.doc.levels[lv];
+        let key = if lvl.kind == LevelKind::Subckt { Some(self.doc.key(&lvl.name)) } else { None };
         for (depth, a) in anc_up.iter().enumerate() {
             let au = self.level_unit[*a];
-            for (rec, ast, header) in self.units[au].scope_records.clone() {
-                let target = header.scope.clone().unwrap_or_default();
-                let lvl = &self.doc.levels[lv];
-                if lvl.kind == LevelKind::Subckt && self.doc.key(&target) == self.doc.key(&lvl.name) {
-                    for (k, m) in ast.body.as_ref().unwrap().members.iter().enumerate() {
-                        if m.error.is_some() {
-                            continue;
-                        }
-                        let p = pos(&[4, -((anc_up.len() - depth) as i64), rec as i64, k as i64]);
-                        let um = unit::UnitMember {
-                            rec: Some(rec),
-                            k,
-                            embedded: false,
-                            m: m.clone(),
-                            header: header.clone(),
-                        };
-                        work.push(Work { u: unit, m: um, pos: Some(p), scope_in: true });
+            let Some(ks) = key.as_ref().and_then(|k| self.units[au].scope_index.get(k)) else { continue };
+            for i in ks.clone() {
+                let (rec, ast, header) = self.units[au].scope_records[i].clone();
+                for (k, m) in ast.body.as_ref().unwrap().members.iter().enumerate() {
+                    if m.error.is_some() {
+                        continue;
                     }
+                    let p = pos(&[4, -((anc_up.len() - depth) as i64), rec as i64, k as i64]);
+                    let um =
+                        unit::UnitMember { rec: Some(rec), k, embedded: false, m: m.clone(), header: header.clone() };
+                    work.push(Work { u: unit, m: um, pos: Some(p), scope_in: true });
                 }
             }
         }
@@ -407,13 +402,20 @@ impl<'p> Interp<'p> {
     fn check_scopes(&mut self) {
         for u in 0..self.units.len() {
             let Some(lv) = self.units[u].level.filter(|_| self.units[u].kind == UnitKind::Level) else { continue };
+            if self.units[u].scope_records.is_empty() {
+                continue;
+            }
+            let below: HashSet<String> = self
+                .doc
+                .descendants(lv)
+                .iter()
+                .map(|d| &self.doc.levels[*d])
+                .filter(|l| l.kind == LevelKind::Subckt)
+                .map(|l| self.doc.key(&l.name))
+                .collect();
             for (rec, _ast, header) in self.units[u].scope_records.clone() {
                 let target = header.scope.clone().unwrap_or_default();
-                let ok = self.doc.descendants(lv).iter().any(|d| {
-                    let l = &self.doc.levels[*d];
-                    l.kind == LevelKind::Subckt && self.doc.key(&l.name) == self.doc.key(&target)
-                });
-                if !ok {
+                if !below.contains(&self.doc.key(&target)) {
                     let loc = self.rec_loc(Some(rec), 0);
                     self.sink.error(format!("scope=\"{target}\" finds no subcircuit below this level: the statements of the record fail (2.6)"), loc);
                     let n = self.recs[rec].text.chars().count();
