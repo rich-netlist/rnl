@@ -3,11 +3,13 @@
 //! and a bounding box; an output backend then writes them, here as SVG.
 //!
 //! The renderer draws what the model says and nothing more. Its defaults (colours, line width,
-//! font, the pin names) are this implementation's own choices (principle 2.7, 9.3).
+//! font, the pin names) are this implementation's own choices (principle 2.7, 9.3), and so is how
+//! it draws a line style: it resolves each into strokes, which every output draws as they are.
 //!
 //! Sines, cosines and arc tangents come from `libm`, a math library in Rust, so that native and
 //! WebAssembly builds compute the same bits (decision 0006).
 
+mod line;
 mod svg;
 mod text;
 
@@ -19,10 +21,10 @@ use rnl_runtime::model::{Layer, LevelView, Style, SymbolView};
 pub use svg::svg_document;
 pub use text::{line_width, text_width};
 
-/// Options of the SVG output.
+/// Options of the drawing.
 #[derive(Clone, Debug)]
 pub struct RenderOptions {
-    /// Pixels per scene unit.
+    /// Pixels per scene unit in the SVG; the primitives give no dash shorter than a pixel at it.
     pub scale: f64,
 }
 
@@ -34,21 +36,28 @@ impl Default for RenderOptions {
 
 /// Draw one level as an SVG document.
 pub fn svg(lv: &LevelView, o: &RenderOptions) -> String {
-    svg_document(&primitives(lv), o)
+    svg_document(&primitives(lv, o), o)
 }
 
-/// How a line is drawn, after the style queue and the renderer's defaults.
+/// One stroke of a line, its style resolved (9.3): a shape's strokes are drawn along its outline,
+/// first to last, over its fill.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Stroke {
     pub color: String,
-    /// Width in scene units; 0 is the thin line that keeps its width at every zoom (9.3).
+    /// In scene units, or in pixels when `pixels`.
     pub width: f64,
-    /// "solid", "dashed", "dotted", "dash-dot", "double", "bold".
-    pub style: String,
+    /// The width and the dashes are in pixels, the same at every zoom: the hairline (9.3) and
+    /// flylines. Otherwise they are in scene units.
+    pub pixels: bool,
+    /// The lengths of the dashes and of the gaps between them, in turn, in the width's unit,
+    /// starting with a dash; empty for an unbroken line.
+    pub dashes: Vec<f64>,
+    /// How far into the dashes the outline starts, in the width's unit.
+    pub dash_offset: f64,
+    /// "butt", "round" or "square".
     pub cap: String,
+    /// "miter", "round" or "bevel".
     pub join: String,
-    /// For "double": the colour between the two lines.
-    pub inner: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -70,26 +79,26 @@ pub enum PathSeg {
 pub enum Kind {
     Path {
         segs: Vec<PathSeg>,
-        stroke: Option<Stroke>,
+        strokes: Vec<Stroke>,
         fill: Option<String>,
     },
     Rect {
         min: Pt,
         max: Pt,
-        stroke: Option<Stroke>,
+        strokes: Vec<Stroke>,
         fill: Option<String>,
     },
     Circle {
         c: Pt,
         r: f64,
-        stroke: Option<Stroke>,
+        strokes: Vec<Stroke>,
         fill: Option<String>,
     },
     Ellipse {
         c: Pt,
         rx: f64,
         ry: f64,
-        stroke: Option<Stroke>,
+        strokes: Vec<Stroke>,
         fill: Option<String>,
     },
     Text(TextPrim),
@@ -97,6 +106,7 @@ pub enum Kind {
     Flyline {
         a: Pt,
         b: Pt,
+        strokes: Vec<Stroke>,
     },
 }
 
@@ -173,18 +183,18 @@ impl Eff {
         }
     }
 
-    fn stroke(&self) -> Option<Stroke> {
-        if self.linestyle == "none" {
-            return None;
-        }
-        Some(Stroke {
-            color: self.linecolor.clone(),
+    /// The strokes of a line in this style, at `scale` pixels per scene unit; the fill colour is
+    /// the one between the two lines of a "double" line.
+    fn strokes(&self, scale: f64) -> Vec<Stroke> {
+        line::Line {
+            style: &self.linestyle,
             width: self.linewidth,
-            style: self.linestyle.clone(),
-            cap: self.cap.clone(),
-            join: self.join.clone(),
-            inner: self.fillcolor.clone(),
-        })
+            color: &self.linecolor,
+            inner: &self.fillcolor,
+            cap: &self.cap,
+            join: &self.join,
+        }
+        .strokes(scale)
     }
 }
 
@@ -209,6 +219,8 @@ fn sub(order: &[f64], k: f64) -> Vec<f64> {
 
 struct Out {
     prims: Vec<Primitive>,
+    /// Pixels per scene unit, at which the strokes are resolved.
+    scale: f64,
 }
 
 impl Out {
@@ -244,7 +256,7 @@ impl Out {
             Some("fillcolor") => Some(e.fillcolor.clone()),
             _ => None,
         };
-        let stroke = e.stroke();
+        let strokes = e.strokes(self.scale);
         match shape {
             Shape::Line => {
                 let closed = pts.len() > 2
@@ -255,7 +267,7 @@ impl Out {
                 if closed {
                     segs.push(PathSeg::Close);
                 }
-                self.path(owner, segs, stroke, fill, layer, order.clone(), pts);
+                self.path(owner, segs, strokes, fill, layer, order.clone(), pts);
                 self.arrows(owner, pts, params, &e, layer, order, false);
             }
             Shape::Rectangle => {
@@ -267,7 +279,7 @@ impl Out {
                 };
                 let min = (a.0.min(b.0), a.1.min(b.1));
                 let max = (a.0.max(b.0), a.1.max(b.1));
-                self.push(owner, layer, order, Kind::Rect { min, max, stroke, fill }, &[min, max]);
+                self.push(owner, layer, order, Kind::Rect { min, max, strokes, fill }, &[min, max]);
             }
             Shape::Circle => {
                 let (c, r) = if pts.len() == 1 {
@@ -279,7 +291,7 @@ impl Out {
                     owner,
                     layer,
                     order,
-                    Kind::Circle { c, r, stroke, fill },
+                    Kind::Circle { c, r, strokes, fill },
                     &[(c.0 - r, c.1 - r), (c.0 + r, c.1 + r)],
                 );
             }
@@ -297,13 +309,13 @@ impl Out {
                     owner,
                     layer,
                     order,
-                    Kind::Ellipse { c, rx, ry, stroke, fill },
+                    Kind::Ellipse { c, rx, ry, strokes, fill },
                     &[(c.0 - rx, c.1 - ry), (c.0 + rx, c.1 + ry)],
                 );
             }
             Shape::Arc => {
                 let segs = arc_segs(pts[0], pts[1], pts[2]);
-                self.path(owner, segs, stroke, fill, layer, order.clone(), pts);
+                self.path(owner, segs, strokes, fill, layer, order.clone(), pts);
                 self.arrows(owner, pts, params, &e, layer, order, true);
             }
             Shape::Bezier => {
@@ -314,7 +326,7 @@ impl Out {
                     k += 3;
                 }
 
-                self.path(owner, segs, stroke, fill, layer, order.clone(), pts);
+                self.path(owner, segs, strokes, fill, layer, order.clone(), pts);
                 self.arrows(owner, pts, params, &e, layer, order, false);
             }
             Shape::Text => {}
@@ -326,16 +338,16 @@ impl Out {
         &mut self,
         owner: &str,
         segs: Vec<PathSeg>,
-        stroke: Option<Stroke>,
+        strokes: Vec<Stroke>,
         fill: Option<String>,
         layer: Layer,
         order: Vec<f64>,
         pts: &[Pt],
     ) {
-        if stroke.is_none() && fill.is_none() {
+        if strokes.is_empty() && fill.is_none() {
             return;
         }
-        self.push(owner, layer, order, Kind::Path { segs, stroke, fill }, pts);
+        self.push(owner, layer, order, Kind::Path { segs, strokes, fill }, pts);
     }
 
     /// Arrow heads at the ends of a line (9.2.5): filled triangles in the line colour.
@@ -386,7 +398,7 @@ impl Out {
                 owner,
                 layer,
                 sub(&order, 0.5),
-                Kind::Path { segs, stroke: None, fill: Some(e.linecolor.clone()) },
+                Kind::Path { segs, strokes: Vec::new(), fill: Some(e.linecolor.clone()) },
                 &[tip, p1, p2],
             );
         }
@@ -605,9 +617,10 @@ fn arc_segs(a: Pt, b: Pt, c: Pt) -> Vec<PathSeg> {
     vec![PathSeg::Move(a), PathSeg::Arc { r, large: span > std::f64::consts::PI, ccw, to: c }]
 }
 
-/// The primitives of one level, in drawing order: by layer, then by position (11.6).
-pub fn primitives(lv: &LevelView) -> Vec<Primitive> {
-    let mut out = Out { prims: Vec::new() };
+/// The primitives of one level, in drawing order: by layer, then by position (11.6), with their
+/// strokes resolved at the scale of `o`.
+pub fn primitives(lv: &LevelView, o: &RenderOptions) -> Vec<Primitive> {
+    let mut out = Out { prims: Vec::new(), scale: o.scale };
     for it in &lv.items {
         let sym = &lv.symbols[it.symbol];
         out.symbol(lv, &it.id, sym, it.at, it.orient, &it.style, it.layer, &it.order, &it.texts, "");
@@ -619,10 +632,11 @@ pub fn primitives(lv: &LevelView) -> Vec<Primitive> {
         }
         let mut segs = vec![PathSeg::Move(w.points[0])];
         segs.extend(w.points[1..].iter().map(|p| PathSeg::Line(*p)));
-        out.path(&w.id, segs, e.stroke(), None, w.layer, w.order.clone(), &w.points);
+        out.path(&w.id, segs, e.strokes(o.scale), None, w.layer, w.order.clone(), &w.points);
     }
     for (a, b) in &lv.flylines {
-        out.push("", Layer::Middle, vec![2.0, 0.0], Kind::Flyline { a: *a, b: *b }, &[*a, *b]);
+        let kind = Kind::Flyline { a: *a, b: *b, strokes: vec![line::flyline()] };
+        out.push("", Layer::Middle, vec![2.0, 0.0], kind, &[*a, *b]);
     }
     for s in &lv.shapes {
         out.shape("", s.shape, &s.points, &s.params, &s.style, s.layer, s.order.clone());

@@ -1,4 +1,5 @@
-//! The SVG backend: primitives in scene units (y up) to an SVG document (y down).
+//! The SVG backend: primitives in scene units (y up) to an SVG document (y down). It writes the
+//! strokes as the renderer resolved them and decides nothing about how a line looks.
 
 use std::fmt::Write;
 
@@ -66,35 +67,60 @@ impl W {
         d
     }
 
-    fn width(&self, st: &Stroke) -> f64 {
-        let w = if st.width > 0.0 { st.width * self.s } else { 1.2 };
-        if st.style == "bold" {
-            w * 2.0
+    /// A length of a stroke in pixels: as it is when the stroke is in pixels, else times the scale.
+    fn len(&self, st: &Stroke, x: f64) -> f64 {
+        if st.pixels {
+            x
         } else {
-            w
+            x * self.s
         }
     }
 
-    fn stroke_attrs(&self, st: &Option<Stroke>) -> String {
-        let Some(st) = st else { return "stroke=\"none\"".into() };
-        let w = self.width(st);
-        let m = w.max(1.0);
-        let dash = match st.style.as_str() {
-            "dashed" => Some(format!("{:.1},{:.1}", 4.0 * m, 3.0 * m)),
-            "dotted" => Some(format!("{:.1},{:.1}", m, 2.5 * m)),
-            "dash-dot" => Some(format!("{:.1},{:.1},{:.1},{:.1}", 5.0 * m, 2.0 * m, m, 2.0 * m)),
-            _ => None,
+    /// The attributes that draw a stroke. The width is written to 2 decimals, and the dashes and
+    /// their offset to as many as they need, at least 1 and at most 6, so that a long dashed line
+    /// keeps in step with the primitives' dashes (rounded to a tenth of a pixel, the error of each
+    /// period adds up along the line). When `short`, each number has no more decimals than it
+    /// needs. What SVG draws when it is not said, butt caps, miter joins and no dash offset, is
+    /// left out.
+    fn stroke_attrs(&self, st: &Stroke, short: bool) -> String {
+        // x to `decimals` decimals, less the zeros at the end after the first `keep` decimals, or
+        // all of them when `short`
+        let num = |x: f64, decimals: usize, keep: usize| {
+            let s = format!("{x:.decimals$}");
+            let Some(point) = s.find('.') else { return s };
+            let digits = s[point + 1..].trim_end_matches('0').len().max(if short { 0 } else { keep });
+            s[..if digits == 0 { point } else { point + 1 + digits }].to_string()
         };
-        let mut a = format!(
-            "stroke=\"{}\" stroke-width=\"{w:.2}\" stroke-linecap=\"{}\" stroke-linejoin=\"{}\"",
-            esc(&st.color),
-            esc(&st.cap),
-            esc(&st.join)
-        );
-        if let Some(d) = dash {
-            let _ = write!(a, " stroke-dasharray=\"{d}\"");
+        let dash = |x: f64| num(self.len(st, x), 6, 1);
+        let mut a = format!("stroke=\"{}\" stroke-width=\"{}\"", esc(&st.color), num(self.len(st, st.width), 2, 2));
+        if st.cap != "butt" {
+            let _ = write!(a, " stroke-linecap=\"{}\"", esc(&st.cap));
+        }
+        if st.join != "miter" {
+            let _ = write!(a, " stroke-linejoin=\"{}\"", esc(&st.join));
+        }
+        if !st.dashes.is_empty() {
+            let d: Vec<String> = st.dashes.iter().map(|d| dash(*d)).collect();
+            let _ = write!(a, " stroke-dasharray=\"{}\"", d.join(","));
+            if st.dash_offset != 0.0 {
+                let _ = write!(a, " stroke-dashoffset=\"{}\"", dash(st.dash_offset));
+            }
         }
         a
+    }
+
+    /// The element once for each stroke, first to last, the first with the fill and the others
+    /// without; `head` is the element up to its fill. With no stroke, the fill alone.
+    fn stroked(&self, head: &str, fill: &Option<String>, strokes: &[Stroke]) -> String {
+        if strokes.is_empty() {
+            return format!("{head} fill=\"{}\" stroke=\"none\"/>", Self::fill(fill));
+        }
+        let mut out = String::new();
+        for (k, st) in strokes.iter().enumerate() {
+            let fill = if k == 0 { Self::fill(fill) } else { "none".into() };
+            let _ = write!(out, "{head} fill=\"{fill}\" {}/>", self.stroke_attrs(st, false));
+        }
+        out
     }
 
     fn fill(f: &Option<String>) -> String {
@@ -106,55 +132,31 @@ impl W {
 
     fn prim(&self, p: &Primitive) -> String {
         match &p.kind {
-            Kind::Path { segs, stroke, fill } => {
-                let d = self.d(segs);
-                match stroke {
-                    None => format!("<path d=\"{d}\" fill=\"{}\" stroke=\"none\"/>", Self::fill(fill)),
-                    Some(st) if st.style == "double" => {
-                        let w = st.width.max(0.12) * self.s;
-                        format!(
-                            "<path d=\"{d}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"{:.2}\"/><path d=\"{d}\" fill=\"none\" stroke=\"{}\" stroke-width=\"{w:.2}\"/>",
-                            Self::fill(fill),
-                            esc(&st.color),
-                            w * 3.0,
-                            esc(&st.inner)
-                        )
-                    }
-                    Some(_) => format!("<path d=\"{d}\" fill=\"{}\" {}/>", Self::fill(fill), self.stroke_attrs(stroke)),
-                }
-            }
-            Kind::Rect { min, max, stroke, fill } => {
+            Kind::Path { segs, strokes, fill } => self.stroked(&format!("<path d=\"{}\"", self.d(segs)), fill, strokes),
+            Kind::Rect { min, max, strokes, fill } => {
                 let (x, y) = self.px((min.0, max.1));
-                format!(
-                    "<rect x=\"{x:.2}\" y=\"{y:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"{}\" {}/>",
+                let head = format!(
+                    "<rect x=\"{x:.2}\" y=\"{y:.2}\" width=\"{:.2}\" height=\"{:.2}\"",
                     (max.0 - min.0) * self.s,
-                    (max.1 - min.1) * self.s,
-                    Self::fill(fill),
-                    self.stroke_attrs(stroke)
-                )
+                    (max.1 - min.1) * self.s
+                );
+                self.stroked(&head, fill, strokes)
             }
-            Kind::Circle { c, r, stroke, fill } => {
+            Kind::Circle { c, r, strokes, fill } => {
                 let (x, y) = self.px(*c);
-                format!(
-                    "<circle cx=\"{x:.2}\" cy=\"{y:.2}\" r=\"{:.2}\" fill=\"{}\" {}/>",
-                    r * self.s,
-                    Self::fill(fill),
-                    self.stroke_attrs(stroke)
-                )
+                self.stroked(&format!("<circle cx=\"{x:.2}\" cy=\"{y:.2}\" r=\"{:.2}\"", r * self.s), fill, strokes)
             }
-            Kind::Ellipse { c, rx, ry, stroke, fill } => {
+            Kind::Ellipse { c, rx, ry, strokes, fill } => {
                 let (x, y) = self.px(*c);
-                format!(
-                    "<ellipse cx=\"{x:.2}\" cy=\"{y:.2}\" rx=\"{:.2}\" ry=\"{:.2}\" fill=\"{}\" {}/>",
-                    rx * self.s,
-                    ry * self.s,
-                    Self::fill(fill),
-                    self.stroke_attrs(stroke)
-                )
+                let head =
+                    format!("<ellipse cx=\"{x:.2}\" cy=\"{y:.2}\" rx=\"{:.2}\" ry=\"{:.2}\"", rx * self.s, ry * self.s);
+                self.stroked(&head, fill, strokes)
             }
-            Kind::Flyline { a, b } => {
+            Kind::Flyline { a, b, strokes } => {
+                // a line, with no fill and its numbers written short
                 let (a, b) = (self.px(*a), self.px(*b));
-                format!("<line x1=\"{:.2}\" y1=\"{:.2}\" x2=\"{:.2}\" y2=\"{:.2}\" stroke=\"#8a8a8a\" stroke-width=\"1\" stroke-dasharray=\"4,3\"/>", a.0, a.1, b.0, b.1)
+                let head = format!("<line x1=\"{:.2}\" y1=\"{:.2}\" x2=\"{:.2}\" y2=\"{:.2}\"", a.0, a.1, b.0, b.1);
+                strokes.iter().map(|st| format!("{head} {}/>", self.stroke_attrs(st, true))).collect()
             }
             Kind::Text(t) => self.text(t),
         }

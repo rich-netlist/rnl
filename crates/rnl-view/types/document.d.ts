@@ -264,16 +264,27 @@ export type Layer = "bottom" | "middle" | "top";
  * lines, arcs and curves (9.2.5), and arrow heads, which are filled triangles; "rect", with its
  * sides along the axes, by its lowest and highest corners; "circle"; "ellipse", with its axes
  * along x and y; "text"; "flyline", a line a viewer may show for a connection that is not drawn
- * yet (13.7), not a wire, by its two ends. The SVG draws a flyline 1 pixel wide in #8a8a8a, with
- * dashes 4 pixels long and gaps of 3.
+ * yet (13.7), not a wire, by its two ends.
+ *
+ * A shape is filled first and then stroked along its outline with each of its `strokes`, first to
+ * last; with no strokes it has no outline. The outline, and so its dashes, starts where a path or
+ * a flyline starts; at a rectangle's corner of lowest x and highest y, along the side of highest
+ * y first; and at the point of a circle or an ellipse of highest x. It goes round a rectangle,
+ * circle or ellipse clockwise, as SVG and Canvas draw them on a screen with y down.
+ *
+ * A shape of no size is drawn as SVG draws it, which Canvas 2D does not always do: a rectangle
+ * with no width or no height, and a circle or an ellipse with a radius of 0, draw nothing, filled
+ * or stroked; a part of a path that stays at one point, such as a wire from a point to itself,
+ * draws with each stroke only its caps, a dot as wide as the stroke with round caps, a square with
+ * square caps and nothing with butt caps.
  */
 export type Shape =
-  | { "kind": "path", segments: Array<Segment>, stroke: Stroke | null, fill: Color | null }
-  | { "kind": "rect", min: [number, number], max: [number, number], stroke: Stroke | null, fill: Color | null }
-  | { "kind": "circle", center: [number, number], r: number, stroke: Stroke | null, fill: Color | null }
-  | { "kind": "ellipse", center: [number, number], rx: number, ry: number, stroke: Stroke | null, fill: Color | null }
+  | { "kind": "path", segments: Array<Segment>, strokes: Array<Stroke>, fill: Color | null }
+  | { "kind": "rect", min: [number, number], max: [number, number], strokes: Array<Stroke>, fill: Color | null }
+  | { "kind": "circle", center: [number, number], r: number, strokes: Array<Stroke>, fill: Color | null }
+  | { "kind": "ellipse", center: [number, number], rx: number, ry: number, strokes: Array<Stroke>, fill: Color | null }
   | { "kind": "text" } & Text
-  | { "kind": "flyline", points: [[number, number], [number, number]] };
+  | { "kind": "flyline", points: [[number, number], [number, number]], strokes: Array<Stroke> };
 
 /**
  * A piece of a path, by its `kind`: "move" starts a new part of the path at `to`, as every path
@@ -297,34 +308,41 @@ export type Segment =
 export type Color = string;
 
 /**
- * How a line is drawn, after the style queue and the renderer's defaults (9.3).
+ * One stroke along a shape's outline, a line style (9.3) as the renderer resolved it: a frontend
+ * draws it with these and nothing else. A "solid", "dashed", "dotted" or "dash-dot" line is one
+ * stroke, the last three with their dashes; a "bold" line, one stroke twice as wide; a "double"
+ * line, two strokes with butt caps and miter joins, one in the line's colour three times as wide
+ * as each of its two lines and then one in the colour between them as wide as the gap; "none",
+ * no stroke.
  */
 export type Stroke = {
   color: Color,
   /**
-   * The width in scene units; 0 is the hairline, the thin line that keeps its width at every
-   * zoom (9.3), which the SVG draws 1.2 pixels wide.
+   * The width in the stroke's `unit`, centred on the outline.
    */
   width: number,
-  style: LineStyle,
+  unit: Unit,
+  /**
+   * The lengths of the dashes and of the gaps between them, in turn, in the stroke's `unit`,
+   * repeated along the outline; empty for an unbroken line.
+   */
+  dashes: Array<number>,
+  /**
+   * How far into the dashes the outline starts, in the stroke's `unit`: with 0, the first dash
+   * starts where the outline starts.
+   */
+  dash_offset: number,
   cap: Cap,
   join: Join,
-  /**
-   * For a "double" line, the colour between its two lines; null for the other styles.
-   */
-  inner: Color | null,
 };
 
 /**
- * A line's style (9.3). The SVG draws it with w, the width in its pixels (1.2 for the hairline),
- * and m, the larger of w and 1: "solid" is a line w wide; "dashed" has dashes 4m long and gaps of
- * 3m; "dotted", dots m long and gaps of 2.5m; "dash-dot", a dash of 5m, a gap of 2m, a dot of m
- * and a gap of 2m; "bold" is a solid line 2w wide. On a path, "double" is a line in the colour 3d
- * wide under a line in the inner colour d wide, where d is the width in scene units, at least
- * 0.12, times the scale, with butt caps and miter joins, whatever the stroke's cap and join; a
- * rectangle, circle or ellipse draws "double" as "solid".
+ * The unit of a stroke's width and dashes: "scene", scene units, which zoom with the drawing;
+ * "pixel", pixels of the screen, the same at every zoom. The hairline, a line 0 wide in the style
+ * (9.3), is 1.2 pixels wide and a flyline 1 pixel. The SVG is the drawing at the level's `scale`,
+ * where a pixel is one of the SVG's own; no dash or gap is shorter than a pixel there.
  */
-export type LineStyle = "solid" | "dashed" | "dotted" | "dash-dot" | "double" | "bold";
+export type Unit = "scene" | "pixel";
 
 /**
  * The ends of an open line and of its dashes (9.3).
@@ -332,7 +350,8 @@ export type LineStyle = "solid" | "dashed" | "dotted" | "dash-dot" | "double" | 
 export type Cap = "butt" | "round" | "square";
 
 /**
- * The corners of a line (9.3).
+ * The corners of a line (9.3). A miter that would be more than 4 times as long as the line is wide
+ * is drawn as a bevel, as SVG does; Canvas's limit is 10 unless it is set.
  */
 export type Join = "miter" | "round" | "bevel";
 
@@ -388,7 +407,11 @@ export type VAlign = "baseline" | "top" | "middle" | "bottom";
 /**
  * A piece of a line of text in one style (13.6), by its `kind`: "text", or "frac" for
  * `\frac{…}{…}`, the numerator over the denominator. The SVG places the pieces of a line that
- * holds a fraction by estimated widths, with the numerator and denominator at 0.8 of the size.
+ * holds a fraction by estimated widths. It draws the numerator and the denominator at 0.8 of the
+ * size, centred on the fraction, with their baselines 0.72 of the size above the line's and 0.42
+ * below it, and between them a bar in the text's colour with butt caps: 0.3 of the size above the
+ * baseline, as long as the fraction less 0.06 of the size at each end, and 0.06 of the size wide
+ * but at least 0.8 pixels.
  */
 export type Run =
   | { "kind": "text", text: string, style: RunStyle }

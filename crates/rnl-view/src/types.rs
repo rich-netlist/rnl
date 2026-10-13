@@ -7,8 +7,8 @@ use std::path::Path;
 use ts_rs::{Config, TS};
 
 use crate::{
-    Cap, Child, Color, Diagnostic, Document, HAlign, Hit, Join, Layer, Level, LineStyle, Object, Primitive, Run,
-    RunStyle, Segment, Shape, SourceFile, Span, Stroke, Text, VAlign,
+    Cap, Child, Color, Diagnostic, Document, HAlign, Hit, Join, Layer, Level, Object, Primitive, Run, RunStyle,
+    Segment, Shape, SourceFile, Span, Stroke, Text, Unit, VAlign,
 };
 
 const HEADER: &str = "\
@@ -42,7 +42,7 @@ fn all() -> Vec<(String, String)> {
         one::<Segment>(&cfg),
         one::<Color>(&cfg),
         one::<Stroke>(&cfg),
-        one::<LineStyle>(&cfg),
+        one::<Unit>(&cfg),
         one::<Cap>(&cfg),
         one::<Join>(&cfg),
         one::<Text>(&cfg),
