@@ -2,7 +2,7 @@
 
 RNL is a proposed way to attach circuit meaning and presentation information to native netlists. This independent repository is intended to grow into a portable RNL runtime, solver, viewer, editor, and standard symbol library.
 
-**Status:** This repository contains the RNL documents migrated from Analog Canvas and a first Rust toolkit without a solver. The toolkit reads SPICE and Spectre netlists with RNL records, reports diagnostics, builds the effective model, draws what has coordinates as SVG, and writes records back; it ships the draft standard package and symbols and the `rnl` command. It implements language draft 0.2, which is not yet in [`spec/`](spec/README.md); the drafts there are older. A small desktop viewer ([`apps/desktop`](apps/desktop/README.md)) opens a netlist, draws it, and lists its diagnostics. There is no solver, WASM binding, shared viewer package, editor, or released package. The language documents are drafts, not a published or frozen standard.
+**Status:** This repository contains the RNL documents migrated from Analog Canvas and a first Rust toolkit without a solver. The toolkit reads SPICE and Spectre netlists with RNL records, reports diagnostics, builds the effective model, draws what has coordinates as SVG, and writes records back; it ships the draft standard package and symbols and the `rnl` command. It implements language draft 0.2, which is not yet in [`spec/`](spec/README.md); the drafts there are older. A small desktop viewer ([`apps/desktop`](apps/desktop/README.md)) opens a netlist, draws it, and lists its diagnostics. The core also builds for WebAssembly ([`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)) and gives the same Documents there. There is no solver, web viewer, shared viewer package, editor, or released package. The language documents are drafts, not a published or frozen standard.
 
 ## Repository map
 
@@ -10,7 +10,7 @@ RNL is a proposed way to attach circuit meaning and presentation information to 
 | --- | --- |
 | [`spec/`](spec/README.md) | RNL principles and syntax drafts; the only maintained location for language work. |
 | [`crates/`](crates/README.md) | Rust runtime, SPICE and Spectre host adapters, shared renderer, the core interface for viewers, and CLI; the solver is future work. |
-| [`bindings/`](bindings/README.md) | Separate runtime and solver WASM entry points. |
+| [`bindings/`](bindings/README.md) | The core as WebAssembly, with JavaScript modules to run it in a Worker; the solver's binding, separate, is future work. |
 | [`packages/`](packages/README.md) | TypeScript SDKs and framework independent viewer/editor cores. |
 | [`apps/`](apps/README.md) | Desktop viewer; future web application. |
 | [`libraries/`](libraries/README.md) | External data libraries: the standard package with its symbols, and the Chinese alias package. |
@@ -38,7 +38,7 @@ cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-
 
 ## Next step
 
-Bring language draft 0.2 into `spec/`, so that the toolkit and its corpus refer to a draft in this repository. Then define the solver's input and output, and add the runtime WASM binding and the viewer core. The [roadmap](docs/roadmap.md) tracks this work without presenting it as complete.
+Bring language draft 0.2 into `spec/`, so that the toolkit and its corpus refer to a draft in this repository. Then define the solver's input and output, and add the web viewer and the viewer core. The [roadmap](docs/roadmap.md) tracks this work without presenting it as complete.
 
 ## License
 

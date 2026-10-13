@@ -4,6 +4,9 @@
 //!
 //! The renderer draws what the model says and nothing more. Its defaults (colours, line width,
 //! font, the pin names) are this implementation's own choices (principle 2.7, 9.3).
+//!
+//! Sines, cosines and arc tangents come from `libm`, a math library in Rust, so that native and
+//! WebAssembly builds compute the same bits (decision 0006).
 
 mod svg;
 mod text;
@@ -567,11 +570,13 @@ impl Out {
 
 fn rot_vec(v: Pt, deg: i64) -> Pt {
     let r = (deg as f64).to_radians();
-    ((v.0 * r.cos() - v.1 * r.sin()).round(), (v.0 * r.sin() + v.1 * r.cos()).round())
+    let (sin, cos) = (libm::sin(r), libm::cos(r));
+    ((v.0 * cos - v.1 * sin).round(), (v.0 * sin + v.1 * cos).round())
 }
 
 fn dist(a: Pt, b: Pt) -> f64 {
-    ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt()
+    let (dx, dy) = (a.0 - b.0, a.1 - b.1);
+    (dx * dx + dy * dy).sqrt()
 }
 
 /// The circle through three points.
@@ -593,7 +598,7 @@ fn arc_segs(a: Pt, b: Pt, c: Pt) -> Vec<PathSeg> {
     };
     let cross = (b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0);
     let ccw = cross > 0.0; // in y-up coordinates a -> b -> c turns counter-clockwise
-    let ang = |p: Pt| (p.1 - uy).atan2(p.0 - ux);
+    let ang = |p: Pt| libm::atan2(p.1 - uy, p.0 - ux);
     let two_pi = std::f64::consts::TAU;
     let sweep_ccw = (ang(c) - ang(a)).rem_euclid(two_pi);
     let span = if ccw { sweep_ccw } else { two_pi - sweep_ccw };

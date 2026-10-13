@@ -17,6 +17,6 @@ cargo build --release -p rnl-cli
 cargo test --workspace
 ```
 
-The runtime, the renderer, both host adapters and `rnl-view` build for `wasm32-unknown-unknown`; CI checks this, although no WASM binding exists yet.
+The runtime, the renderer, both host adapters and `rnl-view` build for `wasm32-unknown-unknown`, and take their sines, cosines and arc tangents from `libm`, so that native and WebAssembly builds compute the same bits. The binding in [`bindings/runtime-wasm`](../bindings/runtime-wasm/README.md) builds them into one module; CI requires that its Documents are those of the native build.
 
 The crates are not published. See the [roadmap](../docs/roadmap.md) for planned work.

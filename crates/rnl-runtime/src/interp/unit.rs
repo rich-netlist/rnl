@@ -210,6 +210,8 @@ pub struct EffPackage {
     pub place: Place,
 }
 
+/// The option most like `word`, ignoring case, when it is like enough; of options equally like it,
+/// the first. The caller gives the options in a fixed order, so that the answer is the same every time.
 pub fn closest<'a>(word: &str, options: impl IntoIterator<Item = &'a str>) -> Option<String> {
     let mut best = None;
     let mut score = 0.0;

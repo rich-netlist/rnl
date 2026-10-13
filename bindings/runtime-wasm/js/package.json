@@ -1,0 +1,5 @@
+{
+  "name": "rnl-runtime-wasm",
+  "private": true,
+  "type": "module"
+}

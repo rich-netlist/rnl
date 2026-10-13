@@ -11,3 +11,4 @@ publish.workspace = true
 [dependencies]
 rnl-runtime.workspace = true
 serde_json.workspace = true
+libm.workspace = true
