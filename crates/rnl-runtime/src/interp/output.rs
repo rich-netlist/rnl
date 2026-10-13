@@ -310,8 +310,12 @@ impl Interp<'_> {
             });
         }
         let mut flylines = Vec::new();
-        for r in self.scenes[s].routes.clone() {
-            flylines.extend(self.flywires(s, r));
+        let routes = self.scenes[s].routes.clone();
+        if !routes.is_empty() {
+            let terms = self.route_terms(s);
+            for r in routes {
+                flylines.extend(self.flywires(s, r, &terms));
+            }
         }
         let mut shapes = Vec::new();
         for p in self.scenes[s].prims.clone() {

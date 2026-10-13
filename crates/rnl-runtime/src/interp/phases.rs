@@ -1111,8 +1111,44 @@ impl Interp<'_> {
         }
     }
 
+    /// The terminals a ROUTE looks among, by net, gathered once per scene: those of the instances
+    /// and bundles on the net, then those of drawn usages whose role is the net, each as (owner,
+    /// terminal, index) in the order of the scene (13.7).
+    pub(crate) fn route_terms(&mut self, s: SceneId) -> HashMap<ObjId, Vec<(ObjId, ObjId, u32)>> {
+        let mut out: HashMap<ObjId, Vec<(ObjId, ObjId, u32)>> = HashMap::new();
+        for ow in self.inst_like(s) {
+            for t in self.terms_of(s, ow) {
+                let ObjData::Term { index: i, .. } = *self.o(t) else { continue };
+                let nets = self.tnets(s, t);
+                for (k, n) in nets.iter().enumerate() {
+                    if !nets[..k].contains(n) {
+                        out.entry(*n).or_default().push((ow, t, i));
+                    }
+                }
+            }
+        }
+        for a in self.scenes[s].usages.clone() {
+            if self.usage(a).in_symbol || !self.scenes[s].symbol.contains_key(&a) {
+                continue;
+            }
+            for t in self.terms_of(s, a) {
+                let ObjData::Term { index: i, name, .. } = self.o(t).clone() else { continue };
+                if let Some(role) = name.as_ref().and_then(|n| self.usage(a).role(n)) {
+                    out.entry(role).or_default().push((a, t, i));
+                }
+            }
+        }
+        out
+    }
+
     /// The pins a ROUTE still has to connect, as segments of a minimum spanning tree (the viewer's choice).
-    pub(crate) fn flywires(&mut self, s: SceneId, r: ObjId) -> Vec<(Pt, Pt)> {
+    /// `terms` is what `route_terms` gives.
+    pub(crate) fn flywires(
+        &mut self,
+        s: SceneId,
+        r: ObjId,
+        terms: &HashMap<ObjId, Vec<(ObjId, ObjId, u32)>>,
+    ) -> Vec<(Pt, Pt)> {
         let ObjData::Route { net, .. } = self.o(r).clone() else { return Vec::new() };
         let mut nodes: Vec<Pt> = Vec::new();
         let mut index: HashMap<(u8, ObjId, u32), usize> = HashMap::new();
@@ -1123,26 +1159,10 @@ impl Interp<'_> {
             }
             index.get(&key).copied()
         };
-        for ow in self.inst_like(s) {
-            for t in self.terms_of(s, ow) {
-                if self.tnet_has(s, t, net) && self.has_pin(s, t) {
-                    let ObjData::Term { index: i, .. } = self.o(t).clone() else { continue };
-                    let p = self.point_of(s, t);
-                    node((0, ow, i), p, &mut nodes);
-                }
-            }
-        }
-        for a in self.scenes[s].usages.clone() {
-            if self.usage(a).in_symbol || !self.scenes[s].symbol.contains_key(&a) {
-                continue;
-            }
-            for t in self.terms_of(s, a) {
-                let ObjData::Term { index: i, name, .. } = self.o(t).clone() else { continue };
-                let role = name.as_ref().and_then(|n| self.usage(a).role(n));
-                if role == Some(net) && self.has_pin(s, t) {
-                    let p = self.point_of(s, t);
-                    node((0, a, i), p, &mut nodes);
-                }
+        for &(ow, t, i) in terms.get(&net).into_iter().flatten() {
+            if self.has_pin(s, t) {
+                let p = self.point_of(s, t);
+                node((0, ow, i), p, &mut nodes);
             }
         }
         let mut parent: Vec<usize> = (0..nodes.len()).collect();
@@ -1153,11 +1173,10 @@ impl Interp<'_> {
             }
             i
         }
-        for w in self.scenes[s].wires.clone() {
-            let ObjData::Wire { nets, points, failed, .. } = self.o(w).clone() else { continue };
-            if !nets.contains(&net) || failed {
-                continue;
-            }
+        let ws = self.scenes[s].wires_by_net.get(&net).cloned().unwrap_or_default();
+        for w in ws {
+            let ObjData::Wire { points, failed: false, .. } = self.o(w) else { continue };
+            let points = points.clone();
             let mut keys = Vec::new();
             for q in points {
                 let k = match self.o(q).clone() {
