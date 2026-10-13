@@ -3,6 +3,7 @@
 // its label, its keys and the platforms that offer it. A command runs by its id, whether it comes
 // from the platform's menu, the HTML menu bar or a key.
 
+import { inform } from "./dialog.js";
 import { fit, zoomCenter } from "./drawing.js";
 import { pickAndOpen, reload } from "./open.js";
 import { setProblems, setSidebar } from "./panels.js";
@@ -26,7 +27,7 @@ export async function startCommands() {
 
 /**
  * Run a command by its id. Exit and About are the platform's own: the page has nothing to do for
- * Exit, and shows About through the shell, which has it when the page's menu bar offers it.
+ * Exit, and shows the shell's About box, or a plain one (about).
  */
 export function command(id) {
   switch (id) {
@@ -41,8 +42,20 @@ export function command(id) {
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "descend": descend(selected); break;
     case "ascend": ascend(); break;
-    case "about": if (shell.about) shell.about(); break;
+    case "about": about(); break;
     default: break;
+  }
+}
+
+/**
+ * The About box: the shell's, or, when it has none and the page shows the menu bar, a plain one of
+ * the page's own. A platform whose menu shows About itself shows its own box.
+ */
+function about() {
+  if (shell.about) shell.about();
+  else if (!shell.nativeMenu) {
+    const text = "Draws netlists with Rich Netlist (RNL) records. It only reads: it neither edits nor solves.";
+    inform({ title: "About RNL Viewer", paragraphs: [text] });
   }
 }
 
