@@ -16,14 +16,14 @@ cargo build --profile wasm --target wasm32-unknown-unknown -p rnl-runtime-wasm
 
 does, and puts it with the JavaScript modules into `dist/`, which git ignores and the web viewer copies: `rnl_runtime_wasm.wasm`, `core.js`, `worker.js`, `client.js`, and a `package.json` that makes Node read the modules as ES modules. It needs Rust with the `wasm32-unknown-unknown` target and Node 18 or later. `--out DIR` writes into another directory, and `--features test-panic` builds the module the tests use.
 
-The `wasm` profile is the release profile with `opt-level = "s"`, LTO, one codegen unit and no symbols; the CLI keeps the release profile. A document takes milliseconds either way, so the profile favours size; `opt-level = "z"` would save another 63 KB compressed, but builds take a third longer. Measured with Rust 1.97 and Node 24 on Windows 11, building each of the 23 files of the conformance corpus once from memory:
+The `wasm` profile is the release profile with `opt-level = "s"`, LTO, one codegen unit and no symbols; the CLI keeps the release profile. A document takes milliseconds either way, so the profile favours size; `opt-level = "z"` would save another 63 KB compressed, but builds take 40% longer. Measured with Rust 1.97 and Node 24 on Windows 11, building each of the 23 files of the conformance corpus once from memory:
 
 | Settings | Size (bytes) | gzip, level 9 | The 23 files |
 | --- | --- | --- | --- |
-| `--release` (`opt-level = 3`) | 1,797,797 | 542,581 | 64 ms |
-| `opt-level = 3`, LTO, one unit, no symbols | 1,420,932 | 498,618 | 61 ms |
-| `opt-level = "s"`, LTO, one unit, no symbols: the `wasm` profile | 1,192,958 | 404,998 | 71 ms |
-| `opt-level = "z"`, LTO, one unit, no symbols | 1,011,232 | 342,149 | 97 ms |
+| `--release` (`opt-level = 3`) | 1,797,847 | 542,388 | 62 ms |
+| `opt-level = 3`, LTO, one unit, no symbols | 1,420,914 | 498,668 | 61 ms |
+| `opt-level = "s"`, LTO, one unit, no symbols: the `wasm` profile | 1,193,045 | 404,999 | 71 ms |
+| `opt-level = "z"`, LTO, one unit, no symbols | 1,011,284 | 342,166 | 100 ms |
 
 The module uses the WebAssembly features the target enables by default: bulk memory, sign extension, non-trapping float-to-int conversion, multiple values, reference types and mutable globals. Chromium 109, Safari 16 and Node 18 have them all.
 
