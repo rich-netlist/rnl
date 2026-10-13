@@ -10,6 +10,12 @@ import { ask, choose, inform, modal } from "../dialog.js";
 const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "scs"];
 /** The extensions of files mostly included or used by a netlist, offered after them. */
 const PARTS = ["inc", "lib", "rnl"];
+/**
+ * The directory of the workspace that holds the files chosen with Open or dropped, such as
+ * /files/top.sp. The core names a file at the root of the workspace by its path, "/top.sp", and
+ * not relative to the entry, and then loses the file of some diagnostics; a directory avoids that.
+ */
+const LOCAL = "/files";
 
 const core = startCore();
 const built = new WeakSet(); // the sources built before: building one again reads it again
@@ -20,8 +26,8 @@ let lastUrl = ""; // the URL opened last, which Open URL offers again
  * A source of this shell: files chosen or dropped, a folder, or a URL; later a text being edited.
  *
  * @typedef {object} WebSource
- * @property {string} name How the page names it: the entry's path, or the URL.
- * @property {string} entry The entry's path in the workspace, rooted, such as "/top.sp".
+ * @property {string} name How the page names it: the entry's file name, its path in a folder, or the URL.
+ * @property {string} entry The entry's path in the workspace, rooted, such as "/files/top.sp".
  * @property {(path: string, again: boolean) => Promise<string | null>} read A file's text by its path
  *   in the workspace, or null when there is no such file; rejects with an Error that says why when
  *   the file is there but cannot be read. `again` when the source is read again (File > Reload).
@@ -29,15 +35,17 @@ let lastUrl = ""; // the URL opened last, which Open URL offers again
 
 /**
  * Files held by the page, each by its rooted path in the workspace and a function that gives its
- * File: chosen, in a folder, or dropped. A file is read only when the core asks for it.
+ * File: chosen, in a folder, or dropped. A file is read only when the core asks for it. The user
+ * sees the paths relative to the directory `base`.
  *
  * @param {Map<string, () => File | Promise<File>>} files
  * @param {string} entry
+ * @param {string} base
  * @returns {WebSource}
  */
-function filesSource(files, entry) {
+function filesSource(files, entry, base) {
   return {
-    name: entry.slice(1),
+    name: within(entry, base),
     entry,
     async read(path) {
       const file = files.get(path);
@@ -46,12 +54,16 @@ function filesSource(files, entry) {
         return decodeText(await (await file()).arrayBuffer());
       } catch {
         // a browser reads a chosen file only as it was when it was chosen
-        throw new Error(
-          `The browser could not read ${path.slice(1)}: it may have changed or been removed since it was opened. Open it again.`,
-        );
+        const why = "it may have changed or been removed since it was opened. Open it again.";
+        throw new Error(`The browser could not read ${within(path, base)}: ${why}`);
       }
     },
   };
+}
+
+/** A path relative to the directory `dir` when it is in it ("" for the root), else as it is. */
+function within(path, dir) {
+  return path.startsWith(`${dir}/`) ? path.slice(dir.length + 1) : path;
 }
 
 /**
@@ -115,16 +127,18 @@ function extension(path) {
 const byPath = (a, b) => a.localeCompare(b, undefined, { numeric: true });
 
 /**
- * The entry among `files`, by path. Of files chosen or dropped, the only netlist is the entry, or
- * the only file of those mostly included, or the only file; when more than one could be, the user
- * picks. In a folder, named by `folder` ("" for several things dropped, a folder among them), the
- * user always picks among its netlists, with a filter. Null when the user cancels.
+ * The entry among `files`, by path, each shown relative to the directory `dir`. Of files chosen or
+ * dropped, the only netlist is the entry, or the only file of those mostly included, or the only
+ * file; when more than one could be, the user picks. In a folder, named by `folder` ("" for several
+ * things dropped, a folder among them), the user always picks among its netlists and then the files
+ * they include, with a filter. Null when the user cancels.
  *
  * @param {Map<string, unknown>} files
+ * @param {string} dir
  * @param {string | null} folder
  * @returns {Promise<string | null>}
  */
-function chooseEntry(files, folder) {
+function chooseEntry(files, dir, folder) {
   const paths = [...files.keys()].sort(byPath);
   const netlists = paths.filter((p) => NETLISTS.includes(extension(p)));
   const parts = paths.filter((p) => PARTS.includes(extension(p)));
@@ -135,23 +149,22 @@ function chooseEntry(files, folder) {
   } else {
     offered = netlists.length + parts.length > 0 ? [...netlists, ...parts] : paths;
   }
-  const prefix = folder ? `/${folder}/` : "/";
-  const text =
-    folder === null ? "Several of the files could be the netlist to open. Which one?" : folder ? `The netlist to open in ${folder}:` : "The netlist to open:";
+  let text = "Several of the files could be the netlist to open. Which one?";
+  if (folder !== null) text = folder ? `The netlist to open in ${folder}:` : "The netlist to open:";
   return choose({
     title: folder === null ? "Open" : "Open Folder",
     text,
-    items: offered.map((p) => ({ label: p.startsWith(prefix) ? p.slice(prefix.length) : p, value: p })),
+    items: offered.map((p) => ({ label: within(p, dir), value: p })),
     filter: folder !== null,
   });
 }
 
-/** Files chosen, or dropped without a folder: each at the root of the workspace. */
+/** Files chosen, or dropped without a folder: each at /files/<name> in the workspace. */
 async function openFiles(files) {
   if (files.length === 0) return null;
-  const all = new Map(files.map((f) => [`/${f.name}`, () => f]));
-  const entry = await chooseEntry(all, null);
-  return entry && filesSource(all, entry);
+  const all = new Map(files.map((f) => [`${LOCAL}/${f.name}`, () => f]));
+  const entry = await chooseEntry(all, LOCAL, null);
+  return entry && filesSource(all, entry, LOCAL);
 }
 
 /** The files of a folder, each at /<folder>/<sub>/<name> in the workspace. */
@@ -159,8 +172,8 @@ async function openFolder(files) {
   if (files.length === 0) return null;
   const all = new Map(files.map((f) => [`/${f.webkitRelativePath || f.name}`, () => f]));
   const folder = (files[0].webkitRelativePath || "").split("/")[0];
-  const entry = await chooseEntry(all, folder);
-  return entry && filesSource(all, entry);
+  const entry = await chooseEntry(all, `/${folder}`, folder);
+  return entry && filesSource(all, entry, "");
 }
 
 /** Ask for a URL, resolved against the page. */
@@ -262,32 +275,34 @@ document.addEventListener("drop", (e) => {
 });
 
 /**
- * The source of the files and folders dropped, each at its `fullPath`: a file at the root of the
- * workspace, a folder's files at /<folder>/<sub>/<name>. With a folder among them the user picks the
- * netlist. Only files, as a browser without entries gives them, open as with Open.
+ * The source of the files and folders dropped, each by its `fullPath`, as Open and Open Folder put
+ * them: folders alone at /<folder>/<sub>/<name>, and files, with any folders dropped with them,
+ * under /files. With a folder among them the user picks the netlist. Only files, as a browser
+ * without entries gives them, open as with Open.
  */
 async function dropped(entries, files) {
   if (entries.length === 0 || !entries.every(Boolean)) return openFiles(files);
-  const all = new Map();
-  for (const entry of entries) await walk(entry, all);
-  if (all.size === 0) return null;
   const folders = entries.filter((entry) => entry.isDirectory);
+  const base = folders.length === entries.length ? "" : LOCAL;
+  const all = new Map();
+  for (const entry of entries) await walk(entry, base, all);
+  if (all.size === 0) return null;
   const folder = folders.length === 0 ? null : entries.length === 1 ? folders[0].name : "";
-  const entry = await chooseEntry(all, folder);
-  return entry && filesSource(all, entry);
+  const entry = await chooseEntry(all, entries.length === 1 && folder ? `/${folder}` : base, folder);
+  return entry && filesSource(all, entry, base);
 }
 
-/** Add the files of a dropped entry, a file or a folder, by their paths (`fullPath`, rooted). */
-async function walk(entry, files) {
+/** Add the files of a dropped entry, a file or a folder, by their paths (`fullPath`) under `base`. */
+async function walk(entry, base, files) {
   if (entry.isFile) {
-    files.set(entry.fullPath, () => new Promise((resolve, reject) => entry.file(resolve, reject)));
+    files.set(base + entry.fullPath, () => new Promise((resolve, reject) => entry.file(resolve, reject)));
     return;
   }
   const reader = entry.createReader();
   for (;;) {
     const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
     if (batch.length === 0) return;
-    for (const child of batch) await walk(child, files);
+    for (const child of batch) await walk(child, base, files);
   }
 }
 
@@ -309,7 +324,8 @@ async function about() {
     paragraphs: [
       name,
       "Draws netlists with Rich Netlist (RNL) records. It only reads: it neither edits nor solves.",
-      "The RNL core runs in this page as WebAssembly. Files opened from this computer are read here and sent nowhere; a URL's files are fetched from its server.",
+      "The RNL core runs in this page as WebAssembly. Files opened from this computer are read here " +
+        "and sent nowhere; a URL's files are fetched from its server.",
     ],
   });
 }
