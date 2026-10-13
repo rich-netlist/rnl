@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 use rnl_runtime::diag::{Loc, Sink};
 use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
 use rnl_runtime::records::{scan_run, CarrierLine};
-use rnl_runtime::source::{dirname, join, normalize, Provider};
+use rnl_runtime::source::{dirname, join, normalize, relative_to, Provider};
 
 /// The SPICE dialect: names ignore case; ngspice's `gnd` is ground (6.3).
 pub fn dialect() -> Dialect {
@@ -217,14 +217,14 @@ pub struct Reader<'a> {
 }
 
 impl<'a> Reader<'a> {
+    /// A file's name in the document: relative to the main file's directory when it is in it or
+    /// below, the root included, else its path.
     fn display(&self, path: &str) -> String {
         let p = normalize(path);
-        if !self.main_dir.is_empty() {
-            if let Some(rest) = p.strip_prefix(&format!("{}/", self.main_dir)) {
-                return rest.to_string();
-            }
+        match relative_to(&p, &self.main_dir) {
+            Some(rest) => rest.to_string(),
+            None => p,
         }
-        p
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -656,6 +656,27 @@ mod tests {
         assert_eq!(names, vec!["R1", "RÄ", "Rä"]);
         assert_eq!(doc.main().instances[2].order, 2);
         assert_eq!(doc.levels[1].instances.len(), 1);
+    }
+
+    #[test]
+    fn files_are_named_relative_to_the_main_file_at_the_root_too() {
+        // a file beside the main file and one below it, each with RNL on its title line
+        let top = "* top\n.include \"x.inc\"\n.include \"sub/y.inc\"\n.end\n";
+        let (x, y) = ("* @RNL {#R1}\n.model nch nmos\n", "* @RNL {#R2}\n.model pch pmos\n");
+        for dir in ["", "/w"] {
+            let p = MemoryProvider::new()
+                .with(&format!("{dir}/top.sp"), top)
+                .with(&format!("{dir}/x.inc"), x)
+                .with(&format!("{dir}/sub/y.inc"), y);
+            let mut sink = Sink::new();
+            let doc = read(&format!("{dir}/top.sp"), &p, &mut sink).unwrap();
+            let sources: Vec<&str> = doc.sources.iter().map(|(f, _)| f.as_str()).collect();
+            assert_eq!(sources, ["top.sp", "x.inc", "sub/y.inc"], "{dir}");
+            let files: Vec<&str> = doc.levels.iter().map(|l| l.file.as_str()).collect();
+            assert_eq!(files, ["top.sp", "x.inc", "sub/y.inc"], "{dir}");
+            let places: Vec<Option<Loc>> = sink.all().iter().map(|d| d.loc.clone()).collect();
+            assert_eq!(places, [Some(Loc::line("x.inc", 1)), Some(Loc::line("sub/y.inc", 1))], "{dir}");
+        }
     }
 
     #[test]

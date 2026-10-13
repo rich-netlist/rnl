@@ -8,7 +8,7 @@ It is plain HTML, CSS and ES modules, with no dependencies and no build step. It
 find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 ```
 
-[`tests/viewer`](../../tests/viewer/README.md) tests the page in Chromium, Firefox and WebKit against a fake shell.
+[`tests/viewer`](../../tests/viewer/README.md) tests the page in Chromium, Firefox and WebKit against a fake shell, and smoke-tests the web viewer with its own shell and the core.
 
 ## Modules
 
@@ -24,7 +24,7 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; what a click hits, from the boxes, pins and wires the Document gives; the selection marks and the open badge. |
 | `selection.js` | Selecting an instance or a net. |
 | `subcircuits.js` | Going down into a subcircuit instance and back up, each level with the view it had. |
-| `text.js` | The text pane: the lines of each file, the statements that do not take effect, the places of the selection, revealing a line, and clicks in the text. |
+| `text.js` | The text pane: the tabs and the lines of each file, the statements that do not take effect, the places of the selection, revealing a line, and clicks in the text. |
 | `syntax.js` | Highlighting the host statements and the RNL records. |
 | `problems.js` | The problems list and the coloured line numbers. |
 | `hierarchy.js` | The hierarchy view: the instance tree, and the subcircuit index with its search and initials. |
@@ -53,9 +53,9 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 | `onOpen(handler)` | Optional. Call `handler(source)` for each source opened without `pick`, such as files dropped on the page. |
 | `about()` | Optional. Show the platform's About box, for Help > About in the page's own menu bar; without it the page shows a plain one. A platform whose menu shows its own About box has none. |
 
-A Source is the shell's own object: the page keeps it to read it again and shows its `name`, and knows nothing else of it. On the desktop it is a path; on the web, files chosen or dropped, a folder or a URL, each with its entry's path in the workspace and a way to read its files, and later a text being edited.
+A Source is the shell's own object: the page keeps it to read it again and shows its `name`, and knows nothing else of it. On the desktop it is a path; on the web, files chosen or dropped, a folder or a URL, each with a way to read its entry, which gives the entry's path in the workspace, and its other files, and later a text being edited.
 
-The web shell builds with the core as WebAssembly in a module Worker, one for the page's lifetime, from `core/client.js` next to the page ([`bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md), which [`apps/web`](../web/README.md) puts there), and asks for the SVG only. `collect` reads the files a document needs, decoded with `decodeText`: files chosen with Open or dropped at `/files/NAME`, a folder's at `/FOLDER/SUB/NAME`, a URL's from its server by their paths there, relative to the address the netlist was served from, and under `/HOST` for a netlist at the server's root; a server that sends nothing for 30 seconds is given up. When more than one file could be the netlist, it asks which with `dialog.js`. It names the browser tab after the document, as the desktop app names its window. Its file inputs have the ids `file-input` and `folder-input`, for tests: files set on one while no chooser is shown open as if chosen with Open or Open Folder.
+The web shell builds with the core as WebAssembly in a module Worker, one for the page's lifetime, from `core/client.js` next to the page ([`bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md), which [`apps/web`](../web/README.md) puts there), and asks for the SVG only. `collect` reads the files a document needs, decoded with `decodeText`, each named in the workspace by a rooted path: files chosen with Open or dropped at `/NAME`, a folder's at `/FOLDER/SUB/NAME`, and a URL's by their paths on the server that served the netlist, after any redirect, fetched relative to that address; a server that sends nothing for 30 seconds is given up. When more than one file could be the netlist, it asks which with `dialog.js`. It names the browser tab after the document, as the desktop app names its window. Its file inputs have the ids `file-input` and `folder-input`, for tests: files set on one while no chooser is shown open as if chosen with Open or Open Folder.
 
 ## The command table
 

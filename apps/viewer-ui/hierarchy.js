@@ -124,9 +124,7 @@ function renderIndex() {
       b.type = "button";
       b.textContent = initial;
       b.title = `Subcircuits starting with ${initial}`;
-      b.addEventListener("click", () => {
-        list.scrollTop = h.offsetTop - list.querySelector(".index-row.top").offsetHeight;
-      });
+      b.addEventListener("click", () => scrollToGroup(list, h));
       letters.append(b);
     }
     list.append(indexRow(x.k, q, uses[x.k]));
@@ -137,6 +135,17 @@ function renderIndex() {
     p.textContent = "No subcircuit matches.";
     list.append(p);
   }
+}
+
+/**
+ * Scroll the index so that the group under the heading `h` starts at its top. The headings stick to
+ * the top of the list, so a heading's own place may be where it sticks; the group's first row gives
+ * where the group starts, and it shows below its heading.
+ */
+function scrollToGroup(list, h) {
+  const row = h.nextElementSibling;
+  const top = list.getBoundingClientRect().top + list.clientTop + h.offsetHeight;
+  list.scrollTop += row.getBoundingClientRect().top - top;
 }
 
 function initialOf(name) {
@@ -171,14 +180,19 @@ function indexRow(level, q, count) {
   return row;
 }
 
-/** Open a level from the hierarchy: from a tree row (`path`) or from the index (null). */
+/**
+ * Open a level from the hierarchy: from a tree row (`path`) or from the index (null). The row of the
+ * level shown that is marked already changes nothing, and the tree is not drawn again, so that the
+ * second click of a double click presses the row the first did: Firefox sends no dblclick to a row
+ * that is out of the page.
+ */
 export function openLevel(level, path) {
   if (!doc) return;
   if (level !== current) {
     rememberView();
     const p = path !== null ? path : pathTo(level);
     showLevel(level, p !== null ? viewCache.get(p) || null : null, path);
-  } else {
+  } else if (path === null || path !== treeActive) {
     setTreeActive(path);
     updateHierarchy();
   }

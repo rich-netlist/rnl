@@ -53,11 +53,10 @@ test("the tree lists the instances under the top level and opens their levels", 
   await expect(row("0/2")).toHaveClass(/\bactive\b/);
 });
 
-test("a double click on the top row folds and unfolds the tree", async ({ browserName, page, viewer }) => {
-  // A row's click draws the tree again, so the row that the second click of a double click pressed
-  // is out of the page when the dblclick comes. Chromium and WebKit still send it there, and that
-  // row's listener folds the tree; Firefox sends none (hierarchy.js, treeRow).
-  test.fail(browserName === "firefox", "Firefox sends no dblclick to a row that its click took out of the page");
+test("a double click on the top row folds and unfolds the tree", async ({ page, viewer }) => {
+  // The click on a row that is marked already does not draw the tree again, so the second click of
+  // the double click presses the same row, and the dblclick comes to it: Firefox sends none to a row
+  // out of the page (hierarchy.js, openLevel).
   await viewer.open("04-hierarchy");
   await page.locator("#tab-hierarchy").click();
   const rows = page.locator("#tree .tree-row");
@@ -143,13 +142,16 @@ test.describe("with a subcircuit for each initial", () => {
   });
 
   test("an initial scrolls the index to its subcircuits", async ({ page, viewer }) => {
-    // The page scrolls the list by the heading's offsetTop (hierarchy.js, renderIndex). That counts
-    // from the page's body, not from the list, so every initial scrolls to the end of the list. Taking
-    // the list's own offsetTop off is not enough: the headings are sticky, and once the list has
-    // scrolled, a heading that sticks at its top gives the offsetTop of where it sticks, not of where
-    // its group starts, so going back up to an initial does not scroll. The group's first row gives it.
-    test.fail(true, "an initial scrolls to the end of the index");
+    // The headings are sticky: once the list has scrolled, a heading that sticks at its top is not
+    // where its group starts, so the page scrolls by the group's first row (hierarchy.js,
+    // scrollToGroup). Going back up to an initial scrolls too. No heading covers the rows shown.
     const list = page.locator("#index");
+    /** Whether a click in the middle of a row hits it. */
+    const uncovered = (row) =>
+      row.evaluate((e) => {
+        const r = e.getBoundingClientRect();
+        return e.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+      });
     expect(await list.evaluate((l) => l.scrollHeight > 2 * l.clientHeight)).toBe(true);
     expect(await viewer.within(page.locator("#index .index-row", { hasText: "zero" }), "#index")).toBe(false);
     for (const initial of ["M", "Z", "#", "C"]) {
@@ -157,6 +159,7 @@ test.describe("with a subcircuit for each initial", () => {
       for (const name of under(initial)) {
         const row = page.locator("#index .index-row", { hasText: name });
         await expect.poll(() => viewer.within(row, "#index"), { timeout: 2000 }).toBe(true);
+        expect(await uncovered(row)).toBe(true);
       }
     }
   });

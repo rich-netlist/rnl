@@ -238,7 +238,8 @@ mod tests {
                 }
             }
             // "double": the colour 3d wide under the inner colour d wide, with SVG's own caps and
-            // joins, butt and miter; on a path as before, and now on the other shapes too
+            // joins, butt and miter; on a path as before, and now on the other shapes too. The
+            // inner stroke has the class "inner", which a selection leaves as it is.
             let d = width.max(0.12) * scale;
             for shape in SHAPES {
                 let svg = svg(shape, line("double", width).strokes(scale));
@@ -246,6 +247,8 @@ mod tests {
                 assert_eq!(elements.len(), 1, "{width}: {svg}");
                 let strokes: Vec<&str> = elements[0].split("/>").filter(|e| !e.is_empty()).collect();
                 assert_eq!(strokes.len(), 2, "{width}: {svg}");
+                let classes: Vec<bool> = strokes.iter().map(|e| e.contains(" class=\"inner\" fill=")).collect();
+                assert_eq!(classes, [false, true], "{width}: {svg}");
                 for (element, (color, w)) in strokes.iter().zip([("#102030", 3.0 * d), ("#405060", d)]) {
                     let end = format!("fill=\"none\" stroke=\"{color}\" stroke-width=\"");
                     let at = element.find(&end).unwrap_or_else(|| panic!("{width}: {svg}")) + end.len();

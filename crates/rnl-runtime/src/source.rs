@@ -81,6 +81,17 @@ pub fn dirname(path: &str) -> String {
     }
 }
 
+/// `path` relative to the directory `dir` when it is in it or below, such as `sub/x.inc` for
+/// `/w/sub/x.inc` in `/w`, or `x.inc` for `/x.inc` in the root `/`; None when it is not, as
+/// `/../x.inc` is not in `/`, or when `dir` is "". Both are normalized paths ([`normalize`]).
+pub fn relative_to<'a>(path: &'a str, dir: &str) -> Option<&'a str> {
+    if dir.is_empty() {
+        return None;
+    }
+    let rest = path.strip_prefix(dir.trim_end_matches('/'))?.strip_prefix('/')?;
+    (rest != ".." && !rest.starts_with("../")).then_some(rest)
+}
+
 /// `rel` relative to the directory `base`; an absolute `rel` stands alone.
 pub fn join(base: &str, rel: &str) -> String {
     let rel = rel.replace('\\', "/");
@@ -90,7 +101,10 @@ pub fn join(base: &str, rel: &str) -> String {
     normalize(&format!("{}/{}", base.trim_end_matches('/'), rel))
 }
 
-/// Remove `.` and `..` components and doubled separators.
+/// Remove `.` and `..` components and doubled separators. A `..` that climbs above the start of the
+/// path stays, as in `../x.inc`, and in a rooted path too, as in `/../x.inc`: what is above the root
+/// is for the provider to say. A file system reads `/../x.inc` as `/x.inc`; a workspace of files in
+/// memory has nothing there.
 pub fn normalize(path: &str) -> String {
     let p = path.replace('\\', "/");
     let absolute = p.starts_with('/');
@@ -101,7 +115,7 @@ pub fn normalize(path: &str) -> String {
             ".." => {
                 if parts.last().is_some_and(|l| *l != "..") {
                     parts.pop();
-                } else if !absolute {
+                } else {
                     parts.push("..");
                 }
             }
@@ -126,8 +140,24 @@ mod tests {
         assert_eq!(join("", "x/y.sp"), "x/y.sp");
         assert_eq!(join("/p/q", "./r"), "/p/q/r");
         assert_eq!(join("D:/w", "lib/x.rnl"), "D:/w/lib/x.rnl");
+        // a `..` above the start stays, of a rooted path too
+        assert_eq!(join("a", "../../c.inc"), "../c.inc");
+        assert_eq!(join("/", "../c.inc"), "/../c.inc");
+        assert_eq!(join("/w", "../../c.inc"), "/../c.inc");
+        assert_eq!(join("/w", "../w/./c.inc"), "/w/c.inc");
+        assert_eq!(normalize("/../../c.inc"), "/../../c.inc");
         assert_eq!(dirname("a/b/c.sp"), "a/b");
         assert_eq!(dirname("c.sp"), "");
+        assert_eq!(dirname("/c.sp"), "/");
+        assert_eq!(relative_to("/w/sub/x.inc", "/w"), Some("sub/x.inc"));
+        assert_eq!(relative_to("/x.inc", "/"), Some("x.inc"));
+        assert_eq!(relative_to("/sub/x.inc", &dirname("/top.sp")), Some("sub/x.inc"));
+        assert_eq!(relative_to("D:/w/x.inc", &dirname("D:/w/top.sp")), Some("x.inc"));
+        assert_eq!(relative_to("/wx/a.inc", "/w"), None);
+        assert_eq!(relative_to("/w", "/w"), None);
+        assert_eq!(relative_to("/../x.inc", "/"), None);
+        assert_eq!(relative_to("/..", "/"), None);
+        assert_eq!(relative_to("x.inc", ""), None);
     }
 
     #[test]

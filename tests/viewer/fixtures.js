@@ -17,6 +17,7 @@ export const FILES = {
   "04-hierarchy": "tests/conformance/cases/04-hierarchy.sp",
   "10-constraints-and-priority": "tests/conformance/cases/10-constraints-and-priority.sp",
   "12-diagnostics": "tests/conformance/cases/12-diagnostics.sp",
+  "17-line-styles": "tests/conformance/cases/17-line-styles.sp",
   "inverter-chain": "tests/conformance/equivalence/inverter-chain.scs",
 };
 

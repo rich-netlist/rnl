@@ -10,7 +10,7 @@ The web viewer: the page of the RNL viewers ([`apps/viewer-ui`](../viewer-ui/REA
 - **Help › About** names the version and the commit the site was built from. The browser tab is named after the document.
 - Packages found by name (16.2) are only the bundled standard packages, as with `rnl` without `--package-dir`; a package file named by path is read like an include.
 
-Text is decoded as `rnl` decodes it, UTF-8 or else Latin-1, so a document is the one `rnl view` and the desktop viewer give for the same files, but for the paths that name them. Files opened from the computer are named in the workspace as `/files/NAME`, and a folder's as `/FOLDER/SUB/NAME`; a URL's files by their paths on the server, such as `/netlists/a/top.sp`, and those of a netlist at the root of its server under a directory named after the server, such as `/example.org/top.sp`. At the root of the workspace the core would name a file by its path, `/top.sp`, and lose the file of some of its problems.
+Text is decoded as `rnl` decodes it, UTF-8 or else Latin-1, so a document is the one `rnl view` and the desktop viewer give for the same files, but for the paths that name them. Files opened from the computer are named in the workspace as `/NAME`, and a folder's as `/FOLDER/SUB/NAME`; a URL's files by their paths on the server that served the netlist, after any redirect, such as `/netlists/a/top.sp`, or `/top.sp` at its root, so that a URL that redirects opens as the one it redirects to. A netlist served at a directory's address is named after the directory, or after the server at its root, such as `/example.org`. The workspace has nothing above its root: an include such as `../x.inc` of a file opened from the computer is missing, not a file of that name opened with it.
 
 ## Building
 
@@ -47,7 +47,11 @@ The core's module Worker must come from the page's own origin, so `core/` stays 
 
 ## Browsers
 
-The page keeps the browser baseline of decision 0006: Chromium 109, the last Chrome and Edge on Windows 7 and 8.1, and Safari 16; and Firefox from 114, the first with module Workers. It uses no newer feature, such as JSON import attributes, CSS nesting or `Array.prototype.toSorted`; it reads files through `<input type="file">`, a folder through its `webkitdirectory`, and dropped folders through `webkitGetAsEntry`, which all three have, and not through `showOpenFilePicker`, which only Chromium has. It has been tried in headless Chrome 155 and Edge 155.
+The page keeps the browser baseline of decision 0006: Chromium 109, the last Chrome and Edge on Windows 7 and 8.1, and Safari 16; and Firefox from 114, the first with module Workers. It uses no newer feature, such as JSON import attributes, CSS nesting or `Array.prototype.toSorted`; it reads files through `<input type="file">`, a folder through its `webkitdirectory`, and dropped folders through `webkitGetAsEntry`, which all three have, and not through `showOpenFilePicker`, which only Chromium has. Its smoke tests pass in headless Chrome 155, and in Playwright's Firefox 155 and WebKit 26.6 ([Testing](#testing)).
+
+## Testing
+
+[`tests/viewer`](../../tests/viewer/README.md#the-web-viewer) smoke-tests the site in Chromium, Firefox and WebKit with Playwright: it builds the site with the samples, serves it with `serve.mjs`, and opens netlists by `?url=`, also by an address that redirects and at a server's root, files and a folder set on the file inputs, dropped files, a Latin-1 file, a missing include and one above the files opened, reads a served netlist again after it changed, and shows the About box. Each Document must be `rnl view`'s for the same files but for the paths that name them. [`viewer.yml`](../../.github/workflows/viewer.yml) runs them in CI.
 
 ## How it differs from the desktop viewer
 

@@ -1,5 +1,6 @@
 // Before the tests: build the rnl command, write the fixtures into a temporary directory and serve
-// them with the page. The tests find the server at RNL_VIEWER_URL, which the workers inherit.
+// them with the page. The tests find the server at RNL_VIEWER_URL and the rnl command at RNL_BIN,
+// which the workers inherit.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -9,7 +10,9 @@ import { serve } from "./server.js";
 
 export default async function globalSetup() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-"));
-  writeFixtures(buildRnl(), dir);
+  const rnl = buildRnl();
+  process.env.RNL_BIN = rnl;
+  writeFixtures(rnl, dir);
   const server = await serve(dir);
   process.env.RNL_VIEWER_URL = server.url;
   return async () => {

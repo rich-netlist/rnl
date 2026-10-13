@@ -119,6 +119,38 @@ test("a terminal's reference names its instance and, all of it, the net at the t
   await viewer.selected(`instance X3 in ${TOP}`);
 });
 
+test("a selected double line keeps the colour between its lines", async ({ page, viewer }) => {
+  // R1's symbol is a double rectangle, R2 is drawn in the double style and the wire of a is double:
+  // each is two strokes, the second narrower in the colour between the lines (class "inner")
+  const LEVEL = "17-line-styles.sp";
+  await viewer.open("17-line-styles");
+  /** The computed stroke of each stroked element of the groups that draw an object, and whether it is inner. */
+  const strokes = (o) =>
+    page.evaluate((o) => {
+      const v = window.viewer;
+      const ids = new Set(v.doc.levels[v.level].hits.filter((h) => h.id && h.objects.includes(o)).map((h) => h.id));
+      const groups = [...document.querySelectorAll("#canvas > svg g[data-id]")].filter((g) => ids.has(g.dataset.id));
+      return groups
+        .flatMap((g) => [...g.querySelectorAll("[stroke]:not([stroke=none])")])
+        .map((e) => [getComputedStyle(e).stroke, e.classList.contains("inner")]);
+    }, o);
+  for (const [name, kind, what] of [["R1", "box", "instance"], ["R2", "box", "instance"], ["a", "wire", "net"]]) {
+    const o = await viewer.object(what, name, LEVEL);
+    const before = await strokes(o);
+    expect(before.filter(([, inner]) => inner).length).toBeGreaterThan(0);
+    await viewer.click(name, kind);
+    await viewer.selected(`${what} ${name} in ${LEVEL}`);
+    const after = await strokes(o);
+    // the inner strokes as they were, and the others all in the selection's colour
+    expect(after.filter(([, inner]) => inner)).toEqual(before.filter(([, inner]) => inner));
+    const selected = after.filter(([, inner]) => !inner).map(([stroke]) => stroke);
+    expect(new Set(selected).size).toBe(1);
+    expect(before.map(([stroke]) => stroke)).not.toContain(selected[0]);
+    await page.keyboard.press("Escape");
+    await viewer.selected(null);
+  }
+});
+
 test("Escape and a click on an empty place clear the selection", async ({ page, viewer }) => {
   const cleared = async () => {
     await viewer.selected(null);

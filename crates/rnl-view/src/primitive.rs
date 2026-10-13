@@ -711,9 +711,10 @@ mod tests {
                 let drawn = svg(shape(strokes.clone()));
                 let elements: Vec<&str> = drawn.lines().filter(|l| l.starts_with(head)).collect();
                 assert_eq!(elements.len(), 1, "{drawn}");
-                // the shape once for each stroke, the first with the fill
-                let fills = ["#eeeeee", "none", "none"];
-                let want: String = fills.iter().zip(&want).map(|(f, w)| format!("{head} fill=\"{f}\" {w}")).collect();
+                // the shape once for each stroke, the first with the fill, and the others without
+                // and of the class "inner"
+                let fills = ["fill=\"#eeeeee\"", "class=\"inner\" fill=\"none\"", "class=\"inner\" fill=\"none\""];
+                let want: String = fills.iter().zip(&want).map(|(f, w)| format!("{head} {f} {w}")).collect();
                 assert_eq!(elements[0], want);
                 // with no strokes, no outline
                 let fill = svg(shape(Vec::new()));

@@ -1,6 +1,6 @@
 // The side panel and its parts: the splitters within their limits and kept for the next start, the
 // side panel and the problems folded, the folded problems' header within reach, and the narrowest
-// side panel beside its splitter, with its file tabs within reach.
+// side panel beside its splitter, with its file tabs within reach and scrolled by the wheel.
 
 import { expect, test } from "../viewer.js";
 
@@ -176,9 +176,8 @@ test("at its narrowest the side panel stays beside its splitter", async ({ page,
 });
 
 test("at its narrowest the side panel keeps a tab of each file within reach", async ({ page, viewer }) => {
-  // The failed statements' box does not shrink, and at 220 pixels it takes the whole file bar: the
-  // file tabs get no width, and the box covers them (style.css, .file-bar).
-  test.fail(true, "the failed statements' box covers the file tabs");
+  // The failed statements' box does not shrink: as the file bar narrows, it leaves out its legend,
+  // then its caption, and keeps its checkbox (style.css, .failed-toggle).
   /** Per file tab, whether a part of it is what a click there hits. */
   const reached = () =>
     page.locator("#file-tabs button").evaluateAll((tabs) =>
@@ -188,11 +187,49 @@ test("at its narrowest the side panel keeps a tab of each file within reach", as
         return false;
       }),
     );
+  // the checkbox keeps its name, the caption's, also when the caption is out of sight
+  const checkbox = page.getByRole("checkbox", { name: "Failed statements" });
   await viewer.open("04-hierarchy");
   expect(await reached()).toEqual([true, true]);
+  await expect(checkbox).toBeVisible();
   await dragSplitter(page, viewer, "#vsplit", { x: 0 });
   expect(await size(page, "#sidebar", "width")).toBe(220);
   expect(await reached()).toEqual([true, true]);
+  expect(await page.locator(".failed-toggle .caption").evaluate((e) => e.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
+  await expect(checkbox).toBeVisible();
   await page.locator("#file-tabs button", { hasText: "04-hierarchy-lib.inc" }).click({ timeout: 2000 });
   await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");
+});
+
+test("the file tabs scroll with the wheel, and the tab of the file shown comes into view", async ({ page, viewer }) => {
+  const tabs = page.locator("#file-tabs");
+  /** Per file tab, whether it is wholly within the strip of tabs. */
+  const inView = () =>
+    tabs.evaluate((strip) => {
+      const s = strip.getBoundingClientRect();
+      return [...strip.children].map((b) => {
+        const r = b.getBoundingClientRect();
+        return r.left >= s.left - 0.5 && r.right <= s.right + 0.5;
+      });
+    });
+  await viewer.open("04-hierarchy");
+  await dragSplitter(page, viewer, "#vsplit", { x: 0 });
+  // the two tabs are wider than the strip, which shows no scrollbar
+  expect(await tabs.evaluate((s) => s.scrollWidth > s.clientWidth)).toBe(true);
+  expect(await inView()).toEqual([true, false]);
+  // a wheel turned over the tabs scrolls them sideways, to the end
+  const strip = await viewer.middle(tabs);
+  await page.mouse.move(strip.x, strip.y);
+  await page.mouse.wheel(0, 400);
+  await expect.poll(inView).toEqual([false, true]);
+  await page.mouse.wheel(0, -400);
+  await expect.poll(inView).toEqual([true, false]);
+  // a part of the include selected shows its file, and the file's tab
+  await page.locator("#tab-hierarchy").click();
+  await page.locator("#index .index-row", { hasText: "rdiv" }).click();
+  await expect(page.locator("#level-name")).toHaveText("rdiv");
+  await page.locator("#tab-netlist").click();
+  await viewer.click("R1");
+  await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");
+  expect(await inView()).toEqual([false, true]);
 });

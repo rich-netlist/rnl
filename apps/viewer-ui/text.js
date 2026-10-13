@@ -11,6 +11,7 @@ import { $ } from "./util.js";
 const app = $("app");
 const source = $("source");
 const netlistPane = $("pane-netlist");
+const tabs = $("file-tabs");
 
 export let fileShown = 0; // the file in the text pane
 export let fileViews = []; // per file: { el, lines: [line elements], scroll }
@@ -37,7 +38,7 @@ export function paintSourceSelection(reveal) {
 export function clearSource(message) {
   fileViews = [];
   lineOwners = [];
-  $("file-tabs").replaceChildren();
+  tabs.replaceChildren();
   source.replaceChildren();
   const p = document.createElement("p");
   p.className = "placeholder";
@@ -54,7 +55,6 @@ export function renderFiles() {
     const [f, a, b] = o.lines;
     for (let n = a; n <= b; n++) lineOwners[f].set(n, k);
   });
-  const tabs = $("file-tabs");
   tabs.replaceChildren();
   doc.files.forEach((file, f) => {
     const el = document.createElement("div");
@@ -78,10 +78,31 @@ export function showFile(f) {
   if (!fileViews[f]) return;
   if (fileViews[fileShown] && fileShown !== f) fileViews[fileShown].scroll = source.scrollTop;
   fileViews.forEach((v, k) => { v.el.hidden = k !== f; });
-  [...$("file-tabs").children].forEach((b, k) => b.setAttribute("aria-selected", String(k === f)));
+  [...tabs.children].forEach((b, k) => b.setAttribute("aria-selected", String(k === f)));
   fileShown = f;
   source.scrollTop = fileViews[f].scroll;
+  tabInView(tabs.children[f]);
 }
+
+// The file tabs scroll sideways with no scrollbar: the tab of the file shown is kept in view, and a
+// wheel turned over them scrolls them, as a sideways swipe does.
+
+/** Scroll the file tabs, when they must, so that `tab` is in view, or as much of it as fits. */
+function tabInView(tab) {
+  const [s, t] = [tabs.getBoundingClientRect(), tab.getBoundingClientRect()];
+  if (t.left < s.left) tabs.scrollLeft -= s.left - t.left;
+  else if (t.right > s.right) tabs.scrollLeft += Math.min(t.right - s.right, t.left - s.left);
+}
+
+tabs.addEventListener(
+  "wheel",
+  (e) => {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || tabs.scrollWidth <= tabs.clientWidth) return;
+    e.preventDefault();
+    tabs.scrollLeft += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * tabs.clientWidth : e.deltaY;
+  },
+  { passive: false },
+);
 
 /** Whether the text pane is on screen, so that lines can be scrolled to. */
 function sourceShown() {
