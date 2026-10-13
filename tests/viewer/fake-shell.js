@@ -3,9 +3,10 @@
 // the global setup built natively with `rnl view`; it records what the page asks of it, and does
 // what a test tells it through `window.fakeShell`.
 //
-// The URL sets it up: `open=NAME` opens the fixture NAME at start, and `platform=desktop` offers the
-// desktop's commands with the menu shown natively, as the desktop shell does; otherwise it offers
-// the web's commands and the page shows its own menu bar.
+// The URL sets it up: `open=NAME` opens the fixture NAME at start; `fail-start=MESSAGE` rejects the
+// question of what to open at start with that plain message, as Tauri's invoke rejects; and
+// `platform=desktop` offers the desktop's commands with the menu shown natively, as the desktop
+// shell does; otherwise it offers the web's commands and the page shows its own menu bar.
 
 const params = new URLSearchParams(location.search);
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";
@@ -40,6 +41,7 @@ export default {
   nativeMenu: platform === "desktop",
   async initial() {
     fake.calls.push(["initial"]);
+    if (params.has("fail-start")) throw params.get("fail-start");
     return source(params.get("open"));
   },
   async pick(kind) {

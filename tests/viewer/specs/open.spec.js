@@ -93,6 +93,18 @@ test("a source the shell cannot find at start is reported", async ({ page, viewe
   await expect(page.locator("#diags li.diag.error")).toHaveText(/no-such-netlist: there is no such fixture/);
 });
 
+test("a start that fails is reported, also with a plain message", async ({ page, viewer }) => {
+  await viewer.open(null, { "fail-start": "the command line names no readable file" });
+  await expect(page.locator("#empty")).toHaveText("the command line names no readable file");
+  expect(await viewer.calls("build")).toEqual([]);
+
+  // a shell that cannot be loaded
+  await page.goto(`${process.env.RNL_VIEWER_URL}/index.html?shell=nosuch`);
+  await expect(page.locator("#empty")).toHaveText(/^The page could not load its "nosuch" shell: /);
+  await page.goto(`${process.env.RNL_VIEWER_URL}/index.html?shell=..%2Ffake`);
+  await expect(page.locator("#empty")).toHaveText('"../fake" is not the name of a shell.');
+});
+
 test("with nothing open, the page says how to open a netlist", async ({ page, viewer }) => {
   await viewer.open(null);
   await expect(page.locator("#empty")).toContainText("Open a SPICE or Spectre netlist");
@@ -109,7 +121,7 @@ test.describe("in dark mode", () => {
   test.use({ colorScheme: "dark" });
 
   test("the page takes the dark colours", async ({ page, viewer }) => {
-    await viewer.open("04-hierarchy");
+    await viewer.open("12-diagnostics");
     const colours = () =>
       page.evaluate(() => {
         const style = (sel) => getComputedStyle(document.querySelector(sel));
@@ -119,6 +131,8 @@ test.describe("in dark mode", () => {
           text: style("body").color,
           panel: style("#sidebar").backgroundColor,
           search: style("#search").backgroundColor,
+          error: style("#diags .diag.error .sev").color,
+          canvas: style("#canvas").backgroundColor,
         };
       });
     expect(await colours()).toEqual({
@@ -127,6 +141,9 @@ test.describe("in dark mode", () => {
       text: "rgb(232, 232, 234)",
       panel: "rgb(35, 35, 39)",
       search: "rgb(43, 43, 48)",
+      error: "rgb(239, 107, 107)",
+      // the drawing stays on white
+      canvas: "rgb(255, 255, 255)",
     });
     await page.emulateMedia({ colorScheme: "light" });
     expect(await colours()).toEqual({
@@ -135,6 +152,8 @@ test.describe("in dark mode", () => {
       text: "rgb(29, 29, 31)",
       panel: "rgb(251, 251, 250)",
       search: "rgb(255, 255, 255)",
+      error: "rgb(198, 40, 40)",
+      canvas: "rgb(255, 255, 255)",
     });
   });
 });
