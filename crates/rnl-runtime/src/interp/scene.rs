@@ -863,8 +863,15 @@ impl Interp<'_> {
             return Vec::new();
         }
         self.scenes[s].busy.insert(key);
-        let sd = self.set(obj).clone();
-        let mut base: Vec<ObjId> = match &sd.kind {
+        // this scene's edits as they are now, in the order of their positions; the edits of the
+        // other scenes are not looked at
+        let mods: Vec<(bool, ObjId, Rc<Ctx>)> = {
+            let sd = self.set(obj);
+            let mut ks = sd.mods_by_scene.get(&s).cloned().unwrap_or_default();
+            ks.sort_by(|a, b| sd.mods[*a].pos.cmp(&sd.mods[*b].pos));
+            ks.into_iter().map(|k| (sd.mods[k].add, sd.mods[k].source, sd.mods[k].ctx.clone())).collect()
+        };
+        let mut base: Vec<ObjId> = match &self.set(obj).kind {
             SetKind::Select { .. } => self.select(s, obj, phase, ctx),
             SetKind::Gen { by_scene } => {
                 if phase >= 5 {
@@ -873,10 +880,10 @@ impl Interp<'_> {
                     Vec::new()
                 }
             }
-            SetKind::Union { source } => {
+            &SetKind::Union { source } => {
                 let mut seen = HashSet::new();
                 let mut out = Vec::new();
-                for m in self.items_of(s, *source, phase, ctx) {
+                for m in self.items_of(s, source, phase, ctx) {
                     let xs =
                         if self.is_set(m) && !self.set(m).explicit { self.items_of(s, m, phase, ctx) } else { vec![m] };
                     for x in xs {
@@ -889,30 +896,24 @@ impl Interp<'_> {
             }
             SetKind::Plain => {
                 let mut out = Vec::new();
-                for (o, spread) in &sd.items {
-                    if self.is_failed(*o) {
+                for (o, spread) in self.set(obj).items.clone() {
+                    if self.is_failed(o) {
                         continue;
                     }
-                    if *o == LEVEL {
+                    if o == LEVEL {
                         out.push(self.scenes[s].levelobj);
-                    } else if self.is_set(*o) && (*spread || !self.set(*o).explicit) {
-                        out.extend(self.items_of(s, *o, phase, ctx));
+                    } else if self.is_set(o) && (spread || !self.set(o).explicit) {
+                        out.extend(self.items_of(s, o, phase, ctx));
                     } else {
-                        out.push(*o);
+                        out.push(o);
                     }
                 }
                 out
             }
         };
-        let mut mods = sd.mods.clone();
-        mods.sort_by(|a, b| a.pos.cmp(&b.pos));
-        for m in mods {
-            if m.ctx.scene != Some(s) {
-                continue;
-            }
-            let srcm =
-                if self.is_set(m.source) { self.items_of(s, m.source, phase, Some(&m.ctx)) } else { vec![m.source] };
-            if m.add {
+        for (add, source, mctx) in mods {
+            let srcm = if self.is_set(source) { self.items_of(s, source, phase, Some(&mctx)) } else { vec![source] };
+            if add {
                 base.extend(srcm);
             } else {
                 let ids: HashSet<ObjId> = srcm.into_iter().collect();

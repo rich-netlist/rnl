@@ -1659,7 +1659,7 @@ impl Interp<'_> {
             return self.scene_only(ctx, seg.start);
         }
         let m = SetMod { pos: ctx.pos.clone(), add, source: items, ctx: Rc::new(ctx.clone()) };
-        self.set_mut(target.obj).mods.push(m);
+        self.set_mut(target.obj).add_mod(m);
         Ok((target.obj, self.is_lazy(target.obj)))
     }
 

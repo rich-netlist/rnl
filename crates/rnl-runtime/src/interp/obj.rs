@@ -448,6 +448,8 @@ pub struct SetData {
     /// A written `{…}` stays a member inside another set.
     pub explicit: bool,
     pub mods: Vec<SetMod>,
+    /// The indexes in `mods` of the edits made in each scene, in order; `add_mod` keeps it.
+    pub mods_by_scene: HashMap<SceneId, Vec<usize>>,
     /// The host level unit that wrote it.
     pub writer: Option<UnitId>,
     pub kind: SetKind,
@@ -455,7 +457,15 @@ pub struct SetData {
 
 impl SetData {
     pub fn plain(items: Vec<(ObjId, bool)>, explicit: bool) -> SetData {
-        SetData { items, explicit, mods: Vec::new(), writer: None, kind: SetKind::Plain }
+        SetData { items, explicit, mods: Vec::new(), mods_by_scene: HashMap::new(), writer: None, kind: SetKind::Plain }
+    }
+
+    /// Add an ADD-TO or REMOVE-FROM (5.2.2).
+    pub fn add_mod(&mut self, m: SetMod) {
+        if let Some(s) = m.ctx.scene {
+            self.mods_by_scene.entry(s).or_default().push(self.mods.len());
+        }
+        self.mods.push(m);
     }
 }
 
