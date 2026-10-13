@@ -1037,6 +1037,7 @@ impl Interp<'_> {
                         out
                     }
                 };
+                let ends = if params.contains_key("wired") { self.wire_ends(s) } else { HashMap::new() };
                 let mut out = Vec::new();
                 for t in terms {
                     let ObjData::Term { owner, index, name } = self.o(t).clone() else { continue };
@@ -1065,7 +1066,7 @@ impl Interp<'_> {
                         }
                     }
                     if let Some(w) = params.get("wired").and_then(Lit::boolean) {
-                        if self.wired(s, t) != w {
+                        if self.wired(s, t, &ends) != w {
                             continue;
                         }
                     }
@@ -1114,6 +1115,7 @@ impl Interp<'_> {
                 };
                 let lv = self.scenes[s].level;
                 let ports: Vec<String> = self.doc.levels[lv].ports.iter().map(|p| self.doc.net_key(p)).collect();
+                let ends = if params.contains_key("wired") { self.wire_ends(s) } else { HashMap::new() };
                 let mut out = Vec::new();
                 for n in cands {
                     let key = match self.o(n) {
@@ -1136,7 +1138,7 @@ impl Interp<'_> {
                         }
                     }
                     if let Some(w) = params.get("wired").and_then(Lit::boolean) {
-                        if self.net_wired(s, n) != w {
+                        if self.net_wired(s, n, &ends) != w {
                             continue;
                         }
                     }
@@ -1468,18 +1470,27 @@ impl Interp<'_> {
         self.tnets(s, t).contains(&net)
     }
 
-    /// 10.2: a terminal is wired when an explicit wire touches it (or its bus pin).
-    pub(crate) fn wired(&mut self, s: SceneId, t: ObjId) -> bool {
-        let wires = self.scenes[s].wires.clone();
-        for w in wires {
-            let ObjData::Wire { points, generated, .. } = self.o(w).clone() else { continue };
-            if generated {
-                continue;
-            }
-            for q in points {
-                if matches!(self.o(q), ObjData::Term { .. }) && self.same_pin(s, q, t) {
-                    return true;
+    /// The terminals that explicit wires touch, by owner: what `wired` looks among (10.2).
+    pub(crate) fn wire_ends(&self, s: SceneId) -> HashMap<ObjId, Vec<ObjId>> {
+        let mut ends: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
+        for &w in &self.scenes[s].wires {
+            let ObjData::Wire { points, generated: false, .. } = self.o(w) else { continue };
+            for &q in points {
+                if let ObjData::Term { owner, .. } = self.o(q) {
+                    ends.entry(*owner).or_default().push(q);
                 }
+            }
+        }
+        ends
+    }
+
+    /// 10.2: a terminal is wired when an explicit wire touches it (or its bus pin). `ends` is what
+    /// `wire_ends` gives while the wires stay as they are.
+    pub(crate) fn wired(&mut self, s: SceneId, t: ObjId, ends: &HashMap<ObjId, Vec<ObjId>>) -> bool {
+        let ObjData::Term { owner, .. } = *self.o(t) else { return false };
+        for &q in ends.get(&owner).into_iter().flatten() {
+            if self.same_pin(s, q, t) {
+                return true;
             }
         }
         false
@@ -1505,10 +1516,10 @@ impl Interp<'_> {
         }
     }
 
-    pub(crate) fn net_wired(&mut self, s: SceneId, n: ObjId) -> bool {
+    pub(crate) fn net_wired(&mut self, s: SceneId, n: ObjId, ends: &HashMap<ObjId, Vec<ObjId>>) -> bool {
         for ow in self.inst_like(s) {
             for t in self.terms_of(s, ow) {
-                if self.tnet_has(s, t, n) && self.wired(s, t) {
+                if self.tnet_has(s, t, n) && self.wired(s, t, ends) {
                     return true;
                 }
             }
