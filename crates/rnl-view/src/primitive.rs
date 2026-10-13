@@ -671,26 +671,31 @@ mod tests {
                 fill: Some("#eeeeee".into()),
             }),
         ];
-        for unit in [Unit::Scene, Unit::Pixel] {
-            // a length in pixels of the SVG: scene units times the scale, pixels as they are
-            let px = |x: f64| if unit == Unit::Scene { x * o.scale } else { x };
-            let dashed = stroke("#102030", 0.75, unit, &[0.5, 0.25, 0.125, 0.25], 0.375, Cap::Square, Join::Bevel);
+        // the lengths in pixels of the SVG, scene units times the scale and pixels as they are: the
+        // width to 2 decimals, and the dashes and their offset as they are, to 6 at most, so that
+        // a long line's dashes keep in step
+        for (unit, want) in [
+            (
+                Unit::Scene,
+                [
+                    "stroke=\"#102030\" stroke-width=\"10.50\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-dasharray=\"4.2,3.15,1.05,3.15\" stroke-dashoffset=\"1.575\"/>",
+                    "stroke=\"#405060\" stroke-width=\"3.50\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+                    "stroke=\"#506070\" stroke-width=\"7.00\" stroke-dasharray=\"7.0,7.0\"/>",
+                ],
+            ),
+            (
+                Unit::Pixel,
+                [
+                    "stroke=\"#102030\" stroke-width=\"0.75\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-dasharray=\"0.3,0.225,0.075,0.225\" stroke-dashoffset=\"0.1125\"/>",
+                    "stroke=\"#405060\" stroke-width=\"0.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+                    "stroke=\"#506070\" stroke-width=\"0.50\" stroke-dasharray=\"0.5,0.5\"/>",
+                ],
+            ),
+        ] {
+            let dashed = stroke("#102030", 0.75, unit, &[0.3, 0.225, 0.075, 0.225], 0.1125, Cap::Square, Join::Bevel);
             let round = stroke("#405060", 0.25, unit, &[], 0.0, Cap::Round, Join::Round);
             // butt caps, miter joins and no offset are what SVG draws when it is not told
             let plain = stroke("#506070", 0.5, unit, &[0.5, 0.5], 0.0, Cap::Butt, Join::Miter);
-            let want = [
-                format!(
-                    "stroke=\"#102030\" stroke-width=\"{:.2}\" stroke-linecap=\"square\" stroke-linejoin=\"bevel\" stroke-dasharray=\"{:.1},{:.1},{:.1},{:.1}\" stroke-dashoffset=\"{:.1}\"/>",
-                    px(0.75),
-                    px(0.5),
-                    px(0.25),
-                    px(0.125),
-                    px(0.25),
-                    px(0.375)
-                ),
-                format!("stroke=\"#405060\" stroke-width=\"{:.2}\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>", px(0.25)),
-                format!("stroke=\"#506070\" stroke-width=\"{:.2}\" stroke-dasharray=\"{:.1},{:.1}\"/>", px(0.5), px(0.5), px(0.5)),
-            ];
             let strokes: Vec<rnl_render::Stroke> = [dashed, round, plain].iter().map(back_stroke).collect();
             for (head, shape) in shapes {
                 let drawn = svg(shape(strokes.clone()));

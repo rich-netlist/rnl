@@ -76,19 +76,23 @@ impl W {
         }
     }
 
-    /// The attributes that draw a stroke, with the width to 2 decimals and the dashes to 1, or each
-    /// with no more decimals than it needs when `short`. What SVG draws when it is not said, butt
-    /// caps, miter joins and no dash offset, is left out.
+    /// The attributes that draw a stroke. The width is written to 2 decimals, and the dashes and
+    /// their offset to as many as they need, at least 1 and at most 6, so that a long dashed line
+    /// keeps in step with the primitives' dashes (rounded to a tenth of a pixel, the error of each
+    /// period adds up along the line). When `short`, each number has no more decimals than it
+    /// needs. What SVG draws when it is not said, butt caps, miter joins and no dash offset, is
+    /// left out.
     fn stroke_attrs(&self, st: &Stroke, short: bool) -> String {
-        let num = |x: f64, decimals: usize| {
+        // x to `decimals` decimals, less the zeros at the end after the first `keep` decimals, or
+        // all of them when `short`
+        let num = |x: f64, decimals: usize, keep: usize| {
             let s = format!("{x:.decimals$}");
-            if short && s.contains('.') {
-                s.trim_end_matches('0').trim_end_matches('.').to_string()
-            } else {
-                s
-            }
+            let Some(point) = s.find('.') else { return s };
+            let digits = s[point + 1..].trim_end_matches('0').len().max(if short { 0 } else { keep });
+            s[..if digits == 0 { point } else { point + 1 + digits }].to_string()
         };
-        let mut a = format!("stroke=\"{}\" stroke-width=\"{}\"", esc(&st.color), num(self.len(st, st.width), 2));
+        let dash = |x: f64| num(self.len(st, x), 6, 1);
+        let mut a = format!("stroke=\"{}\" stroke-width=\"{}\"", esc(&st.color), num(self.len(st, st.width), 2, 2));
         if st.cap != "butt" {
             let _ = write!(a, " stroke-linecap=\"{}\"", esc(&st.cap));
         }
@@ -96,10 +100,10 @@ impl W {
             let _ = write!(a, " stroke-linejoin=\"{}\"", esc(&st.join));
         }
         if !st.dashes.is_empty() {
-            let d: Vec<String> = st.dashes.iter().map(|d| num(self.len(st, *d), 1)).collect();
+            let d: Vec<String> = st.dashes.iter().map(|d| dash(*d)).collect();
             let _ = write!(a, " stroke-dasharray=\"{}\"", d.join(","));
             if st.dash_offset != 0.0 {
-                let _ = write!(a, " stroke-dashoffset=\"{}\"", num(self.len(st, st.dash_offset), 1));
+                let _ = write!(a, " stroke-dashoffset=\"{}\"", dash(st.dash_offset));
             }
         }
         a

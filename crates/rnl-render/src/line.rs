@@ -186,9 +186,10 @@ mod tests {
     /// The SVG of each line style on each shape draws what the SVG writer drew before the renderer
     /// resolved the styles: w is the width in pixels, 1.2 for the hairline, and m the larger of w
     /// and 1. Only "double" on a rectangle, circle or ellipse changed: it was drawn as "solid".
-    /// The numbers are those written before, but where a number is halfway between two that can
-    /// be written, such as a gap of 3.15 pixels, either may be (3.1 or 3.2): the scale now
-    /// multiplies the dashes rather than the width.
+    /// The numbers are those written before, except a dash or a gap that is not a whole number of
+    /// tenths of a pixel, such as a gap of 3.15 pixels: that was rounded to a tenth, which put a
+    /// long line's dashes out of step with the primitives', and is now written to at most 6
+    /// decimals.
     #[test]
     fn the_svg_draws_each_style_as_before() {
         let scale = RenderOptions::default().scale;
@@ -197,6 +198,18 @@ mod tests {
             let x: f64 = written.parse().unwrap();
             let half = 0.5 / 10f64.powi(decimals as i32);
             (x - want).abs() <= half + 1e-9 && written.split_once('.').is_some_and(|(_, d)| d.len() == decimals)
+        };
+        // a dash written as before when it is a whole number of tenths, and else to 6 decimals
+        // with no trailing zero
+        let dash = |written: &str, want: f64| {
+            let tenths = (want * 10.0 - (want * 10.0).round()).abs() < 1e-9;
+            let (_, decimals) = written.split_once('.').unwrap();
+            let x: f64 = written.parse().unwrap();
+            if tenths {
+                written == format!("{want:.1}")
+            } else {
+                (x - want).abs() <= 0.5e-6 + 1e-12 && decimals.len() <= 6 && !decimals.ends_with('0')
+            }
         };
         // the widths from 0 to 2 scene units in steps of 0.005
         for k in 0..=400 {
@@ -220,7 +233,7 @@ mod tests {
                         stroke_attr(&svg, "stroke-dasharray").map_or(vec![], |d| d.split(',').collect());
                     assert_eq!(written.len(), dashes.len(), "{style} {width}: {svg}");
                     for (written, want) in written.iter().zip(&dashes) {
-                        assert!(near(written, *want, 1), "{style} {width}: {svg}");
+                        assert!(dash(written, *want), "{style} {width}: {svg}");
                     }
                 }
             }
@@ -244,5 +257,22 @@ mod tests {
         }
         let flyline = svg(|strokes| Kind::Flyline { a: (0.0, 0.0), b: (1.0, 0.0), strokes }, vec![flyline()]);
         assert!(flyline.contains("stroke=\"#8a8a8a\" stroke-width=\"1\" stroke-dasharray=\"4,3\"/>"), "{flyline}");
+    }
+
+    /// The SVG's dashes are the primitives', not rounded to a tenth of a pixel: rounded, the gaps
+    /// of a dashed line 0.075 wide, 3.15 pixels, would be 0.05 pixels off, and its dashes a whole
+    /// period out of step with the primitives' within 1400 pixels.
+    #[test]
+    fn a_long_dashed_line_keeps_in_step() {
+        let scale = RenderOptions::default().scale;
+        for (style, width, want) in [
+            ("dashed", 0.075, "4.2,3.15"),
+            ("dotted", 0.25, "3.5,8.75"),
+            ("dash-dot", 0.125, "8.75,3.5,1.75,3.5"),
+            ("dotted", 0.1234, "1.7276,4.319"),
+        ] {
+            let svg = svg(SHAPES[0], line(style, width).strokes(scale));
+            assert_eq!(stroke_attr(&svg, "stroke-dasharray"), Some(want), "{style} {width}: {svg}");
+        }
     }
 }
