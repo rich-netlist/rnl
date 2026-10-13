@@ -7,11 +7,13 @@ use rnl_cli::{dump, path_str, FsProvider};
 use rnl_runtime::diag::{Severity, Sink};
 use rnl_runtime::source::Provider;
 use rnl_runtime::{Interpretation, Options};
+use rnl_view::BuildOptions;
 
 const USAGE: &str = "usage:
   rnl check FILE [options]          print the diagnostics; exit 1 on errors
   rnl render FILE -o DIR [options]  write one SVG per drawing level
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
+  rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
@@ -95,6 +97,12 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         "dump" => {
             let r = interpret(args, &provider)?;
             println!("{}", serde_json::to_string_pretty(&dump::interpretation(&r)).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
+        "view" => {
+            let options = BuildOptions { dialect: args.dialect.clone(), runtime: Options { std: args.std } };
+            let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
+            println!("{}", serde_json::to_string_pretty(&doc).unwrap());
             Ok(ExitCode::SUCCESS)
         }
         "render" => {

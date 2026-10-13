@@ -1,4 +1,4 @@
-//! The `rnl` command itself: exit codes and the status lines of `check`.
+//! The `rnl` command itself: exit codes, the status lines of `check`, and `view`.
 
 use std::path::Path;
 use std::process::Command;
@@ -35,4 +35,16 @@ fn check_fails_on_errors_and_lists_unplaced_objects() {
 fn usage_errors_exit_with_two() {
     assert_eq!(rnl(&["check"]).0, 2);
     assert_eq!(rnl(&["frobnicate", &case("01-rc-lowpass.sp")]).0, 2);
+}
+
+#[test]
+fn view_prints_the_document_a_viewer_shows() {
+    let (code, out) = rnl(&["view", &case("04-hierarchy.sp")]);
+    assert_eq!(code, 0, "{out}");
+    let d: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(d["name"], "04-hierarchy.sp");
+    assert!(d["levels"].as_array().unwrap().iter().all(|l| l["svg"].as_str().unwrap().starts_with("<svg")));
+    assert_eq!(d["files"][1]["name"], "04-hierarchy-lib.inc");
+    assert_eq!(d["missing"], serde_json::json!([]));
+    assert_eq!(rnl(&["view", &case("no-such-case.sp")]).0, 2);
 }

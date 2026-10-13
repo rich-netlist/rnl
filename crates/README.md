@@ -9,7 +9,7 @@ The Rust workspace ([`../Cargo.toml`](../Cargo.toml)). The crates implement the 
 | [`rnl-host-spectre`](rnl-host-spectre/README.md) | Reads Spectre netlists, including `simulator lang=spice` parts. |
 | [`rnl-render`](rnl-render/README.md) | Draws an effective model as basic primitives and SVG. |
 | [`rnl-view`](rnl-view/README.md) | The core interface for frontends: a workspace in, a Document out, with the standard packages bundled. Reads no files. |
-| [`rnl-cli`](rnl-cli/README.md) | The `rnl` command: check, render, dump, and strip generated records. Its `FsProvider` reads files for the desktop viewer too. |
+| [`rnl-cli`](rnl-cli/README.md) | The `rnl` command: check, render, dump, view, and strip generated records. Its `FsProvider` reads files for the desktop viewer too. |
 | [`rnl-solver`](rnl-solver/README.md) | Future solver; no crate yet. |
 
 ```bash

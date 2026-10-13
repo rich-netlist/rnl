@@ -6,6 +6,7 @@ The `rnl` command.
 rnl check FILE [options]          print the diagnostics; exit 1 on errors
 rnl render FILE -o DIR [options]  write one SVG per drawing level
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
+rnl view FILE [options]           print the Document a viewer shows, as JSON
 rnl strip-generated FILE -o OUT   write FILE without its type="generated" records
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
@@ -15,7 +16,7 @@ options:
   --dialect NAME      spice or spectre, instead of guessing from the file
 ```
 
-Without a solver, `render` draws only what has coordinates. `check` says what is missing: after the diagnostics it prints, for each drawing level, how many objects have no position and how many constraints hold, need a solver to move something, or could not be checked. The standard packages in [`libraries/standard`](../../libraries/standard/README.md) are built into the command.
+Without a solver, `render` draws only what has coordinates. `check` says what is missing: after the diagnostics it prints, for each drawing level, how many objects have no position and how many constraints hold, need a solver to move something, or could not be checked. `view` prints the Document of [`rnl-view`](../rnl-view/README.md), what the desktop viewer shows, for tools and for comparing builds. The standard packages in [`libraries/standard`](../../libraries/standard/README.md) are built into the command through `rnl-view`; this crate adds the files and package directories on disk (`FsProvider`).
 
 The crate's integration tests run the [conformance corpus](../../tests/conformance/README.md) and the writeback round trips.
 
