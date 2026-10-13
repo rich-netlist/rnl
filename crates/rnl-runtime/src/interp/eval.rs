@@ -1831,26 +1831,26 @@ fn char_span(chars: &[char], start: usize, end: usize) -> &[char] {
 
 /// The innermost segment around a record offset, or the statement when it is outside its segments.
 fn innermost(set: &SetExpr, off: usize) -> Option<(usize, usize)> {
-    for m in &set.members {
-        if off < m.start || off >= m.end.max(m.start + 1) {
+    // the members follow one another without overlapping: only the last that starts at or before
+    // the offset can hold it
+    let m = &set.members[set.members.partition_point(|m| m.start <= off).checked_sub(1)?];
+    if off >= m.end.max(m.start + 1) {
+        return None;
+    }
+    for seg in &m.segments {
+        if off < seg.start || off >= seg.end {
             continue;
         }
-        for seg in &m.segments {
-            if off < seg.start || off >= seg.end {
-                continue;
-            }
-            for a in &seg.args {
-                if let ObjExpr::Set(s) = &a.obj {
-                    if off >= s.start && off < s.end {
-                        if let Some(x) = innermost(s, off) {
-                            return Some(x);
-                        }
+        for a in &seg.args {
+            if let ObjExpr::Set(s) = &a.obj {
+                if off >= s.start && off < s.end {
+                    if let Some(x) = innermost(s, off) {
+                        return Some(x);
                     }
                 }
             }
-            return Some((seg.start, seg.end));
         }
-        return Some((m.start, m.end));
+        return Some((seg.start, seg.end));
     }
-    None
+    Some((m.start, m.end))
 }

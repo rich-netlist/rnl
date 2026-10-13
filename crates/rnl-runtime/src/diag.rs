@@ -4,7 +4,7 @@
 //! An error means an item failed; a warning flags something legal that is probably not what the
 //! author meant; a hint reports a common override, shadowing or trade-off.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fmt;
 
 /// How serious a diagnostic is (7.6).
@@ -74,7 +74,8 @@ pub struct Diag {
 #[derive(Default, Debug)]
 pub struct Sink {
     items: Vec<Diag>,
-    seen: HashSet<(Severity, String, Option<Loc>, String)>,
+    /// Each diagnostic kept, by what makes it the same, with its index in `items`.
+    seen: HashMap<(Severity, String, Option<Loc>, String), u32>,
 }
 
 /// Optional parts of a diagnostic.
@@ -93,17 +94,10 @@ impl Sink {
     pub fn add(&mut self, severity: Severity, message: impl Into<String>, loc: Option<Loc>, extra: Extra) -> DiagId {
         let message = message.into();
         let key = (severity, message.clone(), loc.clone(), extra.origin.clone());
-        if self.seen.contains(&key) {
-            let pos = self
-                .items
-                .iter()
-                .position(|d| {
-                    d.severity == severity && d.message == message && d.loc == loc && d.origin == extra.origin
-                })
-                .unwrap_or(0);
-            return DiagId(pos as u32);
+        if let Some(&k) = self.seen.get(&key) {
+            return DiagId(k);
         }
-        self.seen.insert(key);
+        self.seen.insert(key, self.items.len() as u32);
         self.items.push(Diag {
             severity,
             message,
