@@ -1,5 +1,6 @@
 // The Documents the fake shell serves: `rnl view` of a few files of the conformance corpus, built
-// natively before the tests run, and a changed copy of one of them, for reading a file again.
+// natively before the tests run; a changed copy of one of them, for reading a file again; and a
+// netlist with many subcircuits, for the subcircuit index.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -18,6 +19,13 @@ export const FILES = {
   "inverter-chain": "tests/conformance/equivalence/inverter-chain.scs",
 };
 
+/** The subcircuits of the "subcircuits" fixture: two under M, one under each other initial, and one under #. */
+export const SUBCIRCUITS = [
+  "adder", "buffer", "clock", "driver", "encoder", "filter", "gate", "hold", "inverter", "jitter", "keeper", "latch",
+  "mixer", "mux", "nand", "oscillator", "pump", "quantizer", "regulator", "sampler", "timer", "unity", "vco", "window",
+  "xor", "yield", "zero", "2stage",
+];
+
 /** Build the rnl command and return its path. */
 export function buildRnl() {
   execFileSync("cargo", ["build", "-p", "rnl-cli"], { cwd: root, stdio: "inherit" });
@@ -30,14 +38,16 @@ function view(rnl, file, cwd) {
 }
 
 /**
- * Write the fixtures into `dir`, each as NAME.json: those of FILES, and "04-hierarchy-changed", the
+ * Write the fixtures into `dir`, each as NAME.json: those of FILES; "04-hierarchy-changed", the
  * Document of 04-hierarchy.sp after a comment line was added below its title and Vin's value
- * changed, so that every statement below the title moved down a line.
+ * changed, so that every statement below the title moved down a line, with the same file names;
+ * and "subcircuits", a netlist that instantiates each of SUBCIRCUITS once at the top level.
  */
 export function writeFixtures(rnl, dir) {
   for (const [name, file] of Object.entries(FILES)) {
     fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, root));
   }
+
   const changed = path.join(dir, "changed");
   fs.mkdirSync(changed, { recursive: true });
   const cases = path.join(root, "tests/conformance/cases");
@@ -46,5 +56,12 @@ export function writeFixtures(rnl, dir) {
   const edited = text.replace(/^(.*\r?\n)/, "$1* changed after it was opened\n").replace("Vin a 0 0.9", "Vin a 0 1.2");
   if (!edited.includes("Vin a 0 1.2")) throw new Error("04-hierarchy.sp no longer has the line the changed copy edits");
   fs.writeFileSync(path.join(changed, "04-hierarchy.sp"), edited);
-  fs.writeFileSync(path.join(dir, "04-hierarchy-changed.json"), view(rnl, "changed/04-hierarchy.sp", dir));
+  fs.writeFileSync(path.join(dir, "04-hierarchy-changed.json"), view(rnl, "04-hierarchy.sp", changed));
+
+  const lines = ["* a subcircuit for each initial"];
+  for (const name of SUBCIRCUITS) lines.push(`.subckt ${name} p q`, "R1 p q 1k", ".ends");
+  SUBCIRCUITS.forEach((name, k) => lines.push(`X${k + 1} n${k + 1} 0 ${name}`));
+  lines.push(".end", "");
+  fs.writeFileSync(path.join(dir, "subcircuits.sp"), lines.join("\n"));
+  fs.writeFileSync(path.join(dir, "subcircuits.json"), view(rnl, "subcircuits.sp", dir));
 }

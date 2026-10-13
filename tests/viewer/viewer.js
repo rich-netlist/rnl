@@ -117,7 +117,12 @@ class Viewer {
       },
       [name, kind],
     );
-    return this.point(u, v);
+    const p = await this.point(u, v);
+    const r = await this.page.locator("#canvas").boundingBox();
+    if (p.x < r.x || p.x > r.x + r.width || p.y < r.y || p.y > r.y + r.height) {
+      throw new Error(`the ${kind} of ${name} is outside the view`);
+    }
+    return p;
   }
 
   /** Click where an object of the level shown is drawn; see where(). */
@@ -135,6 +140,14 @@ class Viewer {
   /** A line of the file shown in the text pane. */
   line(n) {
     return this.page.locator(`#source .file:not([hidden]) .ln[data-line="${n}"]`);
+  }
+
+  /** Whether an element is wholly within the scrolled view of the box around it, such as #source. */
+  within(locator, box = "#source") {
+    return locator.evaluate((e, box) => {
+      const [r, b] = [document.querySelector(box).getBoundingClientRect(), e.getBoundingClientRect()];
+      return b.height > 0 && b.top >= r.top - 0.5 && b.bottom <= r.bottom + 0.5;
+    }, box);
   }
 
   /** The places of the text pane's file shown that name an object, by its index in doc.objects. */
