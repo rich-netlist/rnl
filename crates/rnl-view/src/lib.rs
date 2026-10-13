@@ -71,19 +71,25 @@ pub fn is_spectre(entry: &str, text: &str, dialect: Option<&str>) -> bool {
     })
 }
 
-/// Read a host document with the adapter its dialect needs.
+/// Read a host document with the adapter its dialect needs. The bundled packages are layered
+/// under `files`, so an entry among them can be read as well.
 pub fn read_host(
     entry: &str,
     dialect: Option<&str>,
     files: &dyn Provider,
     sink: &mut Sink,
 ) -> Result<HostDocument, String> {
+    read_host_in(entry, dialect, &Workspace::new(files), sink)
+}
+
+/// [`read_host`] in a workspace, which has the bundled packages already.
+fn read_host_in(entry: &str, dialect: Option<&str>, ws: &Workspace, sink: &mut Sink) -> Result<HostDocument, String> {
     let path = slashed(entry);
-    let text = files.read(&path).ok_or_else(|| format!("cannot read {entry}"))?;
+    let text = ws.read(&path).ok_or_else(|| format!("cannot read {entry}"))?;
     let doc = if is_spectre(&path, &text, dialect) {
-        rnl_host_spectre::read(&path, files, sink)
+        rnl_host_spectre::read(&path, ws, sink)
     } else {
-        rnl_host_spice::read(&path, files, sink)
+        rnl_host_spice::read(&path, ws, sink)
     };
     doc.ok_or_else(|| format!("cannot read {entry}"))
 }
@@ -110,7 +116,7 @@ fn interpret_in(
         return Ok(rnl_runtime::check_package(&slashed(entry), ws, options));
     }
     let mut sink = Sink::new();
-    let doc = read_host(entry, dialect, ws, &mut sink)?;
+    let doc = read_host_in(entry, dialect, ws, &mut sink)?;
     Ok(rnl_runtime::interpret(doc, ws, options, sink))
 }
 
@@ -318,6 +324,14 @@ R1 a 0 1k
         let d = d.unwrap();
         assert!(d.diagnostics.is_empty(), "{:?}", d.diagnostics);
         assert!(d.missing.is_empty());
+    }
+
+    #[test]
+    fn a_bundled_package_file_is_read_like_any_host_file() {
+        let mut sink = Sink::new();
+        let doc = read_host(&format!("{BUNDLED_DIR}/rnl-std.rnl"), None, &MemoryProvider::new(), &mut sink).unwrap();
+        assert_eq!(doc.main().file, "rnl-std.rnl");
+        assert_eq!(doc.source("rnl-std.rnl"), Some(BUNDLED[0].1));
     }
 
     #[test]

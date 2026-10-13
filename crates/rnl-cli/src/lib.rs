@@ -15,7 +15,8 @@ use rnl_runtime::{Interpretation, Options};
 pub use provider::{path_str, FsProvider};
 pub use rnl_view::{bundled, is_spectre, level_status, status_lines};
 
-/// Read a host document with the adapter its dialect needs.
+/// Read a host document with the adapter its dialect needs, with the bundled packages under
+/// `provider`.
 pub fn read_host(
     file: &Path,
     dialect: Option<&str>,

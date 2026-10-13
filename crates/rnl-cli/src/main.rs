@@ -3,9 +3,8 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use rnl_cli::{dump, path_str, FsProvider};
+use rnl_cli::{dump, FsProvider};
 use rnl_runtime::diag::{Severity, Sink};
-use rnl_runtime::source::Provider;
 use rnl_runtime::{Interpretation, Options};
 use rnl_view::BuildOptions;
 
@@ -124,12 +123,12 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         }
         "strip-generated" => {
             let out = args.out.clone().ok_or("strip-generated needs -o OUT")?;
-            let path = path_str(&args.file);
-            let text = provider.read(&path).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
             let mut sink = Sink::new();
             let doc = rnl_cli::read_host(&args.file, args.dialect.as_deref(), &provider, &mut sink)?;
             let main = doc.main().file.clone();
-            let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, &text);
+            // the text as the adapter read it, so a bundled package file can be stripped too
+            let text = doc.source(&main).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
+            let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);
             std::fs::write(&out, stripped).map_err(|e| e.to_string())?;
             Ok(ExitCode::SUCCESS)
         }
