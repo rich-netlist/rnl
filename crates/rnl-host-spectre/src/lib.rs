@@ -467,8 +467,8 @@ impl<'a> Reader<'a> {
             let mut stmt = strip_comment(stripped);
             let mut last = no;
             loop {
-                if let Some(s) = stmt.strip_suffix('\\') {
-                    stmt = s.to_string();
+                if stmt.ends_with('\\') {
+                    stmt.pop();
                     if idx < n {
                         stmt.push(' ');
                         stmt.push_str(&strip_comment(lines[idx].trim()));
@@ -736,7 +736,7 @@ impl<'a> Reader<'a> {
         self.add_instance(el.inst, st.circ, fname, no, if needs { Some(el.plain) } else { None });
     }
 
-    fn add_instance(&mut self, mut inst: Instance, circ: LevelId, fname: &str, no: u32, plain: Option<Vec<String>>) {
+    fn add_instance(&mut self, inst: Instance, circ: LevelId, fname: &str, no: u32, plain: Option<Vec<String>>) {
         if !self.doc.levels[circ].circuit {
             return;
         }
@@ -745,10 +745,8 @@ impl<'a> Reader<'a> {
             self.sink.error(format!("instance {} is defined twice", inst.name), Some(Loc::line(fname, no)));
             return;
         }
-        inst.order = lv.instances.len();
-        lv.instances.push(inst);
+        let k = lv.add_instance(inst);
         if let Some(p) = plain {
-            let k = lv.instances.len() - 1;
             self.pending_spice.push((circ, k, p));
         }
     }
@@ -759,7 +757,6 @@ impl<'a> Reader<'a> {
         for (lv, k, plain) in std::mem::take(&mut self.pending_spice) {
             rnl_host_spice::resolve_nodes(&mut self.doc.levels[lv].instances[k], &plain, &spice_models);
         }
-        let subckt_keys: Vec<String> = self.doc.subckts.keys().cloned().collect();
         for lv in 0..self.doc.levels.len() {
             for k in 0..self.doc.levels[lv].instances.len() {
                 let inst = &self.doc.levels[lv].instances[k];
@@ -781,7 +778,7 @@ impl<'a> Reader<'a> {
                             Some(f) => (family_terminals(f), None, family_type(f, &m.params), false),
                             None => (None, None, None, false),
                         }
-                    } else if subckt_keys.contains(&master) {
+                    } else if self.doc.subckts.contains_key(&master) {
                         (None, None, None, true)
                     } else {
                         // neither a primitive nor a model card: a subcircuit defined elsewhere, such as a PDK device (6.4)
