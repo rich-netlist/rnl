@@ -9,7 +9,7 @@
 //! A carrier is a whole-line comment with `*` in column 1 followed by a space, or a bare `*`
 //! (2.2). The first line of every file is a title and never a carrier.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rnl_runtime::diag::{Loc, Sink};
 use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
@@ -209,6 +209,9 @@ pub struct Reader<'a> {
     pub sink: &'a mut Sink,
     pub doc: HostDocument,
     models: HashMap<String, String>,
+    /// The [`Level::name_key`]s of each level's instances, to find a name defined twice without
+    /// looking through the level's instances.
+    names: HashMap<LevelId, HashSet<String>>,
     unresolved: Vec<(LevelId, usize, Vec<String>)>,
     main_dir: String,
 }
@@ -525,13 +528,16 @@ impl<'a> Reader<'a> {
             return;
         }
         let lv = &mut self.doc.levels[circ];
-        if lv.inst(&el.inst.name).is_some() {
+        if !self.names.entry(circ).or_default().insert(lv.name_key(&el.inst.name)) {
             self.sink.error(format!("element {} is defined twice", el.inst.name), Some(Loc::line(fname, no)));
             return;
         }
-        let needs = matches!(el.inst.letter, Some('M') | Some('Q'));
-        let k = lv.add_instance(el.inst);
+        let mut inst = el.inst;
+        inst.order = lv.instances.len();
+        let needs = matches!(inst.letter, Some('M') | Some('Q'));
+        lv.instances.push(inst);
         if needs {
+            let k = lv.instances.len() - 1;
             self.unresolved.push((circ, k, el.plain));
         }
     }
@@ -573,7 +579,8 @@ pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<Host
     let mut main = Level::new(LevelKind::File, fname.clone(), fname, path.clone());
     main.circuit = true;
     let doc = HostDocument::new(main, dialect());
-    let mut r = Reader { provider, sink, doc, models: HashMap::new(), unresolved: Vec::new(), main_dir };
+    let mut r =
+        Reader { provider, sink, doc, models: HashMap::new(), names: HashMap::new(), unresolved: Vec::new(), main_dir };
     r.read_file(&path, 0, 0, true, &[format!("{path}#")], None);
     finish(&mut r.doc, &r.models, std::mem::take(&mut r.unresolved));
     Some(r.doc)
@@ -634,6 +641,21 @@ mod tests {
         assert!(doc.subckt("CELL").is_some());
         assert_eq!(sink.all().len(), 1);
         assert_eq!(doc.main().instances[0].mtype.as_deref(), Some("nmos"));
+    }
+
+    #[test]
+    fn names_defined_twice() {
+        // names ignore case in their ASCII letters only, and each subcircuit has names of its own
+        let net = "* t\nR1 a 0 1k\nr1 a 0 2k\nRÄ a 0 1k\nRä a 0 1k\n.subckt cell a\nR1 a 0 1k\n.ends\n.end\n";
+        let p = MemoryProvider::new().with("t.sp", net);
+        let mut sink = Sink::new();
+        let doc = read("t.sp", &p, &mut sink).unwrap();
+        let msgs: Vec<&str> = sink.all().iter().map(|d| d.message.as_str()).collect();
+        assert_eq!(msgs, vec!["element r1 is defined twice"]);
+        let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["R1", "RÄ", "Rä"]);
+        assert_eq!(doc.main().instances[2].order, 2);
+        assert_eq!(doc.levels[1].instances.len(), 1);
     }
 
     #[test]

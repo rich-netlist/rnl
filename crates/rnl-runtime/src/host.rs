@@ -108,9 +108,6 @@ pub struct Level {
     /// The file path, for `path=` relative to the writing file (16.2, 16.5).
     pub path: String,
     pub case_sensitive: bool,
-    /// The index of the first instance of each name, by the level's case rule; kept by
-    /// [`Level::add_instance`] for [`Level::inst`].
-    names: HashMap<String, usize>,
 }
 
 impl Level {
@@ -130,7 +127,6 @@ impl Level {
 
             path: path.into(),
             case_sensitive: false,
-            names: HashMap::new(),
         }
     }
 
@@ -149,29 +145,15 @@ impl Level {
         }
     }
 
-    /// The index of the instance named `name`, the first if there are several.
+    /// The index of the instance named `name`, the first if there are several. It looks through
+    /// every instance; a reader that checks each new name keeps their [`Level::name_key`]s instead.
     pub fn inst(&self, name: &str) -> Option<usize> {
-        if self.names.len() == self.instances.len() {
-            return self.names.get(&self.name_key(name)).copied();
-        }
-        // some instances were not added by add_instance, or share a name: look through them all
         self.instances.iter().position(|i| self.same_name(&i.name, name))
     }
 
-    /// Add an instance after the others in netlist order (11.6) and return its index. A level
-    /// holds one instance of a name, so readers look for the name with [`Level::inst`] first.
-    pub fn add_instance(&mut self, mut inst: Instance) -> usize {
-        let k = self.instances.len();
-        inst.order = k;
-        let key = self.name_key(&inst.name);
-        self.names.entry(key).or_insert(k);
-        self.instances.push(inst);
-        k
-    }
-
-    /// The key a name is compared by in this level, as [`Level::same_name`] compares names: as
-    /// written, or with its ASCII letters in lower case.
-    fn name_key(&self, name: &str) -> String {
+    /// The key a name is compared by in this level: as written, or with its ASCII letters in lower
+    /// case. Two names are the same by [`Level::same_name`] exactly when their keys are equal.
+    pub fn name_key(&self, name: &str) -> String {
         if self.case_sensitive {
             name.to_string()
         } else {
@@ -329,18 +311,23 @@ mod tests {
     #[test]
     fn instances_by_name() {
         let mut lv = Level::new(LevelKind::File, "t.sp", "t.sp", "t.sp");
-        for name in ["R1", "RÄ", "X1"] {
-            lv.add_instance(Instance { name: name.into(), ..Instance::default() });
+        for name in ["R1", "RÄ", "X1", "x1"] {
+            lv.instances.push(Instance { name: name.into(), ..Instance::default() });
         }
+        // only ASCII letters ignore case, as same_name compares; the first of a name is found
         assert_eq!(lv.inst("r1"), Some(0));
-        // only ASCII letters ignore case, as same_name compares
         assert_eq!(lv.inst("rÄ"), Some(1));
         assert_eq!(lv.inst("rä"), None);
-        assert_eq!(lv.instances[2].order, 2);
-        // instances pushed directly, or twice of a name, are found as well: the first of a name
-        lv.instances.push(Instance { name: "C1".into(), ..Instance::default() });
-        assert_eq!(lv.inst("c1"), Some(3));
-        lv.add_instance(Instance { name: "x1".into(), ..Instance::default() });
-        assert_eq!(lv.inst("X1"), Some(2));
+        assert_eq!(lv.inst("x1"), Some(2));
+        for cs in [false, true] {
+            lv.case_sensitive = cs;
+            for (a, b) in [("R1", "r1"), ("RÄ", "rÄ"), ("RÄ", "rä"), ("X1", "X2"), ("x1", "x1")] {
+                assert_eq!(lv.name_key(a) == lv.name_key(b), lv.same_name(a, b), "{a} {b} {cs}");
+            }
+        }
+        // the answer follows the instances and the case rule as they are now
+        assert_eq!(lv.inst("x1"), Some(3));
+        lv.instances[0].name = "R2".into();
+        assert_eq!((lv.inst("R1"), lv.inst("R2")), (None, Some(0)));
     }
 }
