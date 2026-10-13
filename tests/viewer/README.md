@@ -12,26 +12,21 @@ Node 20 or later and Rust; from this directory, once:
 npm ci
 ```
 
-The global setup builds the rnl command with Cargo and writes the fixtures into a temporary directory. With Playwright's browsers installed (`npx playwright install --with-deps`, as [`viewer.yml`](../../.github/workflows/viewer.yml) does in CI), all three engines run:
+The global setup builds the rnl command with Cargo and writes the fixtures into a temporary directory. The chromium project drives the installed Google Chrome, headless and with a profile of its own, so no Chromium is downloaded; `RNL_CHANNEL` names another of Playwright's channels instead, such as `chromium` for Playwright's own build. Firefox and WebKit need Playwright's builds, `npx playwright install firefox webkit` once. Two workers run at a time, each with a browser of its own.
 
 ```bash
-npx playwright test
+npx playwright test --project chromium
 npx playwright test --project firefox
+npx playwright test                      # all three
 ```
 
-Without downloading browsers, `RNL_CHANNEL` names an installed Chromium browser that Playwright drives instead, `msedge` or `chrome`, and only the chromium project runs:
-
-```bash
-RNL_CHANNEL=msedge npx playwright test
-```
-
-In PowerShell, `$env:RNL_CHANNEL = "msedge"` first. To look at the page with the fake shell outside the tests, `node server.js [PORT]` builds the fixtures and serves them, for example at `http://127.0.0.1:PORT/?shell=fake&open=04-hierarchy`.
+In CI, [`viewer.yml`](../../.github/workflows/viewer.yml) installs Playwright's three browsers with what they need (`npx playwright install --with-deps`) and runs all three projects in them. To look at the page with the fake shell outside the tests, `node server.js [PORT]` builds the fixtures and serves them, for example at `http://127.0.0.1:PORT/?shell=fake&open=04-hierarchy`.
 
 ## Files
 
 | Path | Content |
 | --- | --- |
-| `playwright.config.js` | The three projects, and `RNL_CHANNEL`. |
+| `playwright.config.js` | The three projects, the browser of each, and `RNL_CHANNEL`. |
 | `global-setup.js` | Builds the rnl command, writes the fixtures and starts the server; the tests find it at `RNL_VIEWER_URL`. |
 | `fixtures.js` | The fixtures: `rnl view` of the corpus files `01-rc-lowpass.sp`, `04-hierarchy.sp`, `10-constraints-and-priority.sp`, `12-diagnostics.sp` and `inverter-chain.scs`; `04-hierarchy-changed`, the same netlist after it changed; and `subcircuits`, a netlist with a subcircuit for each initial. |
 | `server.js` | The test server, Node with no dependencies: `apps/viewer-ui` as it is, the fake shell as `shells/fake.js`, and the fixtures under `fixtures/`. Nothing of the tests goes into the page. |
