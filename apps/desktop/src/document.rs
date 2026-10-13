@@ -87,6 +87,9 @@ pub struct SourceFile {
     pub text: String,
     /// Where each record is: first line, first column, last line, last column (1-based, inclusive).
     pub records: Vec<[u32; 4]>,
+    /// The statements, or parts of them, that do not take effect: first line, first column, last
+    /// line, last column, and 0 when they failed or 1 when a conflict overrode them (7.5).
+    pub failed: Vec<[u32; 5]>,
 }
 
 #[derive(Serialize, Debug)]
@@ -148,7 +151,12 @@ pub fn load(path: &Path) -> Result<Document, String> {
         _ => file.to_string(),
     };
 
-    let files = source_files(&r.doc, &shown_file);
+    let mut files = source_files(&r.doc, &shown_file);
+    for f in &r.failed {
+        if let Some(file) = files.iter_mut().find(|x| x.path == f.start.file) {
+            file.failed.push([f.start.line, f.start.col, f.end.line, f.end.col, u32::from(f.conflict)]);
+        }
+    }
     let file_index: HashMap<String, usize> = files.iter().enumerate().map(|(k, f)| (f.path.clone(), k)).collect();
     let mut ix = Index::new(&r.doc, &file_index);
     ix.netlist(&files);
@@ -229,7 +237,13 @@ fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<Sourc
     let mut files: Vec<SourceFile> = doc
         .sources
         .iter()
-        .map(|(p, text)| SourceFile { path: p.clone(), name: shown(p), text: text.clone(), records: Vec::new() })
+        .map(|(p, text)| SourceFile {
+            path: p.clone(),
+            name: shown(p),
+            text: text.clone(),
+            records: Vec::new(),
+            failed: Vec::new(),
+        })
         .collect();
     let main = doc.main().file.clone();
     if let Some(k) = files.iter().position(|f| f.path == main) {
@@ -583,6 +597,16 @@ mod tests {
         let x1 = d.objects.iter().find(|o| o.kind == "instance" && o.name == "X1").unwrap();
         assert_eq!(x1.opens.map(|l| d.levels[l].title.as_str()), Some("amp"));
         assert!(d.objects.iter().filter(|o| o.name.starts_with('R') || o.kind == "net").all(|o| o.opens.is_none()));
+    }
+
+    #[test]
+    fn failed_and_overridden_statements_are_given_per_file() {
+        let d = load(&case("10-constraints-and-priority.sp")).unwrap();
+        assert!(!d.files[0].failed.is_empty());
+        assert!(d.files[0].failed.iter().all(|f| f[4] == 1 && f[0] <= f[2]));
+        let d = load(&case("12-diagnostics.sp")).unwrap();
+        assert!(d.files[0].failed.iter().any(|f| f[4] == 0) && d.files[0].failed.iter().any(|f| f[4] == 1));
+        assert!(load(&case("01-rc-lowpass.sp")).unwrap().files[0].failed.is_empty());
     }
 
     #[test]

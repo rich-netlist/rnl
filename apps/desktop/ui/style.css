@@ -22,6 +22,9 @@
   --sub-line: rgba(194, 37, 92, 0.07);
   --sub-fill: rgba(194, 37, 92, 0.06);
   --flash: rgba(47, 109, 181, 0.22);
+  /* statements that do not take effect: failed with an error, or overridden in a conflict */
+  --failed-bg: rgba(229, 72, 77, 0.09);
+  --overridden-bg: rgba(214, 150, 20, 0.16);
   /* syntax */
   --syn-comment: #6a737d;
   --syn-marker: #a0a0a6;
@@ -58,6 +61,8 @@
     --sub-text: rgba(240, 101, 149, 0.28);
     --sub-line: rgba(240, 101, 149, 0.1);
     --flash: rgba(116, 167, 232, 0.28);
+    --failed-bg: rgba(255, 110, 110, 0.12);
+    --overridden-bg: rgba(240, 180, 70, 0.11);
     --syn-comment: #8b949e;
     --syn-marker: #6e6e76;
     --syn-keyword: #c792ea;
@@ -179,11 +184,37 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
   font-weight: 600;
 }
 
-.file-tabs {
-  padding: 3px 6px;
+.file-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 8px 3px 6px;
   border-bottom: 1px solid var(--line);
-  flex: 0 0 auto;
 }
+.file-tabs { flex: 1 1 auto; }
+
+.failed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.failed-toggle input { margin: 0 2px 0 0; accent-color: var(--accent); }
+.failed-toggle .swatch {
+  width: 10px;
+  height: 10px;
+  margin-left: 4px;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+}
+.failed-toggle .swatch.x-failed { background: var(--failed-bg); }
+.failed-toggle .swatch.x-overridden { background: var(--overridden-bg); }
 
 .sub-head {
   display: flex;
@@ -333,6 +364,10 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .s-inst { color: var(--syn-inst); font-weight: 600; }
 .s-directive { color: var(--syn-directive); font-weight: 600; }
 .s-punct { color: var(--muted); }
+
+.x-failed { background: var(--failed-bg); }
+.x-overridden { background: var(--overridden-bg); }
+.source.hide-failed .x-failed, .source.hide-failed .x-overridden { background: none; }
 
 .obj { cursor: pointer; }
 .obj:hover { text-decoration: underline; text-decoration-color: var(--select); text-underline-offset: 2px; }

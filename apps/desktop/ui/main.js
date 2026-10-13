@@ -707,6 +707,15 @@ function renderLines(file, f) {
   }
   const spans = lines.map(() => []);
   for (const s of doc.spans) if (s.file === f && spans[s.line - 1]) spans[s.line - 1].push(s);
+  // the statements that do not take effect, per line: [from, to) and why
+  const failedOn = lines.map(() => []);
+  for (const [l0, c0, l1, c1, overridden] of file.failed) {
+    for (let n = l0; n <= l1 && n <= lines.length; n++) {
+      const from = n === l0 ? c0 - 1 : leadingCarrier(lines[n - 1]);
+      const to = n === l1 ? c1 : lines[n - 1].length;
+      failedOn[n - 1].push({ from, to, kind: overridden ? "overridden" : "failed" });
+    }
+  }
 
   const out = [];
   const state = { comment: false };
@@ -726,6 +735,13 @@ function renderLines(file, f) {
       const cont = joined || /^\s*\+/.test(text);
       joined = hostLine(text, cls, cont, null);
     }
+    // what does not take effect at each character: a failure over an override
+    const fail = new Array(text.length).fill("");
+    for (const r of failedOn[i]) {
+      for (let c = r.from; c < r.to && c < text.length; c++) {
+        if (fail[c] !== "failed") fail[c] = r.kind;
+      }
+    }
     // the objects named at each character, the most narrowly named first
     const objs = new Array(text.length).fill(null);
     for (const s of spans[i].slice().sort((a, b) => a.len - b.len)) {
@@ -734,12 +750,23 @@ function renderLines(file, f) {
         if (!objs[c].includes(s.object)) objs[c].push(s.object);
       }
     }
-    out.push(lineElement(text, i + 1, cls, objs.map((o) => (o ? o.join(" ") : ""))));
+    out.push(lineElement(text, i + 1, cls, objs.map((o) => (o ? o.join(" ") : "")), fail));
   });
   return out;
 }
 
-function lineElement(text, n, cls, obj) {
+/** Where a later line of a record starts: after its comment marker and the blanks around it. */
+function leadingCarrier(text) {
+  const m = /^\s*(\/\/|\*)?\s*/.exec(text);
+  return m ? m[0].length : 0;
+}
+
+const FAIL_TITLE = {
+  failed: "Failed: this does not take effect (see Problems)",
+  overridden: "Overridden: another statement wins this conflict (7.5)",
+};
+
+function lineElement(text, n, cls, obj, fail) {
   const div = document.createElement("div");
   div.className = "ln";
   div.dataset.line = String(n);
@@ -751,14 +778,18 @@ function lineElement(text, n, cls, obj) {
   let i = 0;
   while (i < text.length) {
     let j = i + 1;
-    while (j < text.length && cls[j] === cls[i] && obj[j] === obj[i]) j++;
+    while (j < text.length && cls[j] === cls[i] && obj[j] === obj[i] && fail[j] === fail[i]) j++;
     const piece = text.slice(i, j);
-    if (!cls[i] && !obj[i]) {
+    if (!cls[i] && !obj[i] && !fail[i]) {
       code.append(piece);
     } else {
       const s = document.createElement("span");
       s.textContent = piece;
       if (cls[i]) s.className = `s-${cls[i]}`;
+      if (fail[i]) {
+        s.classList.add(`x-${fail[i]}`);
+        s.title = FAIL_TITLE[fail[i]];
+      }
       if (obj[i]) {
         s.classList.add("obj");
         s.dataset.obj = obj[i];
@@ -1243,6 +1274,14 @@ function setPane(name) {
   }
 }
 
+function setShowFailed(shown) {
+  $("show-failed").checked = shown;
+  source.classList.toggle("hide-failed", !shown);
+  save("show-failed", shown);
+}
+
+$("show-failed").addEventListener("change", () => setShowFailed($("show-failed").checked));
+
 function setProblems(shown) {
   $("problems-head").setAttribute("aria-expanded", String(shown));
   netlistPane.classList.toggle("problems-folded", !shown);
@@ -1258,7 +1297,7 @@ function sidebarWidthLimits() {
 // a hidden pane has no height yet: its size is taken as it is, and limited once it is shown
 function problemsHeightLimits() {
   if (netlistPane.clientHeight === 0) return [PROBLEMS_MIN, Infinity];
-  const fixed = $("problems-head").offsetHeight + $("file-tabs").offsetHeight;
+  const fixed = $("problems-head").offsetHeight + $("file-bar").offsetHeight;
   return [PROBLEMS_MIN, Math.max(PROBLEMS_MIN, netlistPane.clientHeight - fixed - SOURCE_MIN)];
 }
 
@@ -1378,6 +1417,7 @@ setProblemsHeight(load("problems-height", 180));
 setSidebar(load("sidebar-shown", true));
 setProblems(load("problems-shown", true));
 setPane(load("side-pane", "netlist"));
+setShowFailed(load("show-failed", true));
 setIndexHeight(load("index-height", 260));
 {
   const li = document.createElement("li");
