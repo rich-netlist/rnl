@@ -38,10 +38,10 @@ cargo tauri build
 | --- | --- |
 | `src/main.rs` | The Tauri application, and the commands to open a file, ask for a file and read the file named on the command line. Opening a file builds its Document with [`rnl-view`](../../crates/rnl-view/README.md) from the files on disk: one SVG per level with what on it can be clicked, the source files with the places of their records, the instances and nets of every level with the places that name them, and the diagnostics. |
 | `src/menu.rs` | The menu bar, built from the page's command table, and the command that sets its check marks. |
-| [`../viewer-ui/`](../viewer-ui/README.md) | The page, which the web viewer will share: plain HTML, CSS and ES modules with no build step. It reaches the app only through its desktop shell, `shells/desktop.js`. |
+| [`../viewer-ui/`](../viewer-ui/README.md) | The page, which the web viewer shares: plain HTML, CSS and ES modules with no build step. It reaches the app only through its desktop shell, `shells/desktop.js`. |
 | `tauri.conf.json`, `capabilities/` | The window, where the page is, the content security policy, and what the page may call. |
 | `icons/` | The application icon. |
 
 This directory is a Cargo workspace of its own, so the WebView dependencies stay out of the library crates' builds; [`desktop.yml`](../../.github/workflows/desktop.yml) builds it on Linux, Windows and macOS.
 
-The viewer calls the shared Rust core natively, through `rnl-view`, as [decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md) decides; the web viewer will call the same core through WebAssembly and share the page in [`apps/viewer-ui`](../viewer-ui/README.md).
+The viewer calls the shared Rust core natively, through `rnl-view`, as [decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md) decides; the [web viewer](../web/README.md) calls the same core through WebAssembly and shares the page in [`apps/viewer-ui`](../viewer-ui/README.md).

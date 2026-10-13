@@ -32,6 +32,7 @@ async function start() {
   const shell = await loadShell();
   await startCommands();
   if (!shell.nativeMenu) showMenuBar(true);
+  if (shell.onOpen) shell.onOpen((source) => openSource(source, false));
   openSource(await shell.initial(), false);
 }
 
