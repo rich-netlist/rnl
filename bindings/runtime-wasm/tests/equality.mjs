@@ -39,6 +39,7 @@ for (let k = 0; k < args.length; k++) {
   k++;
 }
 
+if (!existsSync(rnl) && existsSync(`${rnl}.exe`)) rnl = `${rnl}.exe`;
 if (!existsSync(rnl)) fail(`${rnl} is not there: build it with \`cargo build -p rnl-cli\`, or give --rnl`);
 if (!existsSync(join(dist, "rnl_runtime_wasm.wasm"))) fail(`${dist} has no core: run build.mjs, or give --dist`);
 const { loadCore } = await import(pathToFileURL(join(dist, "core.js")));
