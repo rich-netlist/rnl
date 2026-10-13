@@ -1,6 +1,6 @@
 // The side panel and its parts: the splitters within their limits and kept for the next start, the
 // side panel and the problems folded, the folded problems' header within reach, and the narrowest
-// side panel beside its splitter.
+// side panel beside its splitter, with its file tabs within reach.
 
 import { expect, test } from "../viewer.js";
 
@@ -173,4 +173,26 @@ test("at its narrowest the side panel stays beside its splitter", async ({ page,
   // and the splitter still drags
   await dragSplitter(page, viewer, "#vsplit", { x: 500 });
   expect(Math.abs((await size(page, "#sidebar", "width")) - 500)).toBeLessThanOrEqual(3);
+});
+
+test("at its narrowest the side panel keeps a tab of each file within reach", async ({ page, viewer }) => {
+  // The failed statements' box does not shrink, and at 220 pixels it takes the whole file bar: the
+  // file tabs get no width, and the box covers them (style.css, .file-bar).
+  test.fail(true, "the failed statements' box covers the file tabs");
+  /** Per file tab, whether a part of it is what a click there hits. */
+  const reached = () =>
+    page.locator("#file-tabs button").evaluateAll((tabs) =>
+      tabs.map((b) => {
+        const r = b.getBoundingClientRect();
+        for (let x = r.left + 1; x < r.right; x += 2) if (document.elementFromPoint(x, r.top + r.height / 2) === b) return true;
+        return false;
+      }),
+    );
+  await viewer.open("04-hierarchy");
+  expect(await reached()).toEqual([true, true]);
+  await dragSplitter(page, viewer, "#vsplit", { x: 0 });
+  expect(await size(page, "#sidebar", "width")).toBe(220);
+  expect(await reached()).toEqual([true, true]);
+  await page.locator("#file-tabs button", { hasText: "04-hierarchy-lib.inc" }).click({ timeout: 2000 });
+  await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");
 });

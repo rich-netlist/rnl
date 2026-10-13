@@ -57,7 +57,8 @@ It implements the Shell of [`shell.js`](../../apps/viewer-ui/shell.js). A source
 
 ## Known failures
 
-Two tests are marked as failing until the page is fixed; when it is, Playwright reports that they passed unexpectedly, and `test.fail` goes then.
+Three tests are marked as failing until the page is fixed; when it is, Playwright reports that they passed unexpectedly, and `test.fail` goes then.
 
-- An initial of the subcircuit index scrolls the list by the heading's `offsetTop`, which counts from the page's body, so every initial scrolls to the end of the list.
+- An initial of the subcircuit index scrolls the list by the heading's `offsetTop`, which counts from the page's body, so every initial scrolls to the end of the list. Taking the list's `offsetTop` off is not enough: the headings are sticky, and a heading stuck at the top of the scrolled list gives the `offsetTop` of where it sticks, so going back up to an initial does not scroll. The group's first row gives where the group starts.
+- At its narrowest, 220 pixels, the side panel's failed statements box, which does not shrink, takes the whole file bar, so the file tabs get no width and the box covers them: the other files cannot be shown.
 - In Firefox, a double click on a row of the tree does not fold it: the row's click draws the tree again, so the row that the second click pressed is out of the page when the `dblclick` comes, and Firefox sends none. Chromium and WebKit send it to that row, whose listener still folds the tree.

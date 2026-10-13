@@ -143,8 +143,11 @@ test.describe("with a subcircuit for each initial", () => {
   });
 
   test("an initial scrolls the index to its subcircuits", async ({ page, viewer }) => {
-    // The page scrolls the list by the heading's offsetTop, which counts from the page's body, not
-    // from the list, so every initial scrolls to the end of the list (hierarchy.js, renderIndex).
+    // The page scrolls the list by the heading's offsetTop (hierarchy.js, renderIndex). That counts
+    // from the page's body, not from the list, so every initial scrolls to the end of the list. Taking
+    // the list's own offsetTop off is not enough: the headings are sticky, and once the list has
+    // scrolled, a heading that sticks at its top gives the offsetTop of where it sticks, not of where
+    // its group starts, so going back up to an initial does not scroll. The group's first row gives it.
     test.fail(true, "an initial scrolls to the end of the index");
     const list = page.locator("#index");
     expect(await list.evaluate((l) => l.scrollHeight > 2 * l.clientHeight)).toBe(true);
