@@ -283,8 +283,12 @@ impl<'p> Interp<'p> {
                 SetKind::Select { .. } | SetKind::Gen { .. } => true,
                 SetKind::Union { source } => self.is_lazy(*source),
                 SetKind::Plain => {
+                    // a set none of whose members can be lazy is not lazy whatever its edits, so a
+                    // set that every level edits, such as $SUPPLY_NET_SET, does not go through them;
                     // the sources of the edits that are never lazy are not kept (`never_lazy`)
-                    if s.lazy_sources.iter().any(|o| self.is_lazy(*o)) {
+                    if s.items.iter().all(|(o, _)| self.never_lazy(*o))
+                        || s.lazy_sources.iter().any(|o| self.is_lazy(*o))
+                    {
                         return false;
                     }
                     s.items.iter().any(|(o, _)| self.is_lazy(*o))
