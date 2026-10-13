@@ -38,7 +38,7 @@ This is the central TODO list. A checked box means work present in this reposito
 
 One shared Rust core decides the drawing; the frontends are per platform ([decision 0006](decisions/0006-shared-core-per-platform-frontends.md)). In order:
 
-- [ ] Make style resolution linear in the number of objects. It grows quadratically today: a chain of 2,000 resistors takes 36 s.
+- [x] Make style resolution linear in the number of objects. A chain of 2,000 resistors takes 0.17 s to check instead of 36 s, and doubling the chain about doubles the time (0.78 s for 8,000).
 - [ ] Add `crates/rnl-view`, the core interface (a workspace in, a Document out). It takes over the desktop viewer's document builder and the parts of `rnl-cli` that read no files: dialect detection, the bundled standard packages, level status. The desktop viewer and the CLI use it.
 - [ ] Give the Document each level's primitives in serializable form, with SVG written from them; generate type definitions for frontends.
 - [ ] Ship fonts with the core and lay out text with their metrics; choose the font set, including Chinese, and its licence.
