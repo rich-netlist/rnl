@@ -34,7 +34,7 @@ Without it the build says so, and the drawing falls back on the fonts installed 
 | `--no-core` | Take the core as `bindings/runtime-wasm/build.mjs` last built it, without building it again. |
 | `--samples` | Copy the conformance corpus's [`cases`](../../tests/conformance/README.md) and `equivalence` files into `samples/`, for trying the viewer and for tests. |
 
-The site is 25 files and 1.36 MB, of which the core is 1.22 MB, 412 KB gzip-compressed; the web fonts add 232 files and 17.6 MB, of which a browser downloads only the slices a drawing uses, and the samples 0.70 MB.
+The site is 26 files and 1.36 MB, the licence of the fonts' metrics in `fonts/OFL.txt` among them, of which the core is 1.22 MB, 412 KB gzip-compressed; the web fonts add 232 files and 17.6 MB, of which a browser downloads only the slices a drawing uses, and the samples 0.70 MB.
 
 ## Serving
 

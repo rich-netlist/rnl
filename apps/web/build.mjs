@@ -1,6 +1,7 @@
 // Build the web viewer: a static site in apps/web/dist/, which git ignores, with the page of
-// apps/viewer-ui, its web fonts in fonts/ when python scripts/fonts.py web has written them, and the
-// core as WebAssembly with its JavaScript modules in core/:
+// apps/viewer-ui, its web fonts in fonts/ when python scripts/fonts.py web has written them, the
+// fonts' licence in fonts/OFL.txt in any case, and the core as WebAssembly with its JavaScript
+// modules in core/:
 //
 //   node apps/web/build.mjs [--no-core] [--samples]
 //
@@ -9,7 +10,7 @@
 // the viewer with ?url=samples/cases/04-hierarchy.sp and for tests.
 
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -49,6 +50,16 @@ cpSync(page, out, { recursive: true, filter: (from) => !leftOut.has(relative(pag
 const fonts = existsSync(join(out, "fonts", "fonts.css"));
 if (!fonts) {
   console.warn("no web fonts in apps/viewer-ui/fonts/, so texts fall back on sans-serif: write them with python scripts/fonts.py web");
+}
+// The core lays out texts with the fonts' metrics, which are under the fonts' licence (decision
+// 0007), so the site carries it, with their copyright as scripts/fonts.py writes it, even without
+// the fonts.
+const licence = join(out, "fonts", "OFL.txt");
+if (!existsSync(licence)) {
+  const copyright = "Copyright 2014-2021 Adobe (http://www.adobe.com/). Noto is a trademark of Google Inc.";
+  const ofl = readFileSync(join(root, "LICENSES", "OFL-1.1.txt"), "utf8").replace(/\r\n/g, "\n");
+  mkdirSync(dirname(licence), { recursive: true });
+  writeFileSync(licence, `${copyright}\n\n${ofl}`);
 }
 
 // The core, which the web shell imports from core/client.js, without the package.json for Node.

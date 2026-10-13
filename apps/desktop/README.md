@@ -20,7 +20,7 @@ cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-
 
 The menus and their keys come from the page's command table ([`commands.json`](../viewer-ui/README.md#the-command-table)). On Windows the page handles the shortcut keys and the menu only shows them, because the keys reach the WebView first; on macOS and Linux the menu handles them.
 
-The app embeds the page in [`apps/viewer-ui`](../viewer-ui/README.md) when it is built, with the drawing's web fonts in its `fonts/` when `python scripts/fonts.py web` has written them ([Fonts](../viewer-ui/README.md#fonts)); they add 17.3 MB. Without them the drawing falls back on the fonts installed on the computer.
+The app embeds the page in [`apps/viewer-ui`](../viewer-ui/README.md) when it is built, with the drawing's web fonts in its `fonts/` when `python scripts/fonts.py web` has written them ([Fonts](../viewer-ui/README.md#fonts)); they add 17.3 MB. Without them the drawing falls back on the fonts installed on the computer. The About box gives the fonts' copyright and licence.
 
 On Linux the build needs the WebKitGTK development packages that Tauri lists, for example `libwebkit2gtk-4.1-dev`, `libgtk-3-dev` and `librsvg2-dev` on Debian and Ubuntu. Windows needs the WebView2 runtime, which Windows 10 and 11 normally have.
 

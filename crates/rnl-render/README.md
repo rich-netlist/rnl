@@ -23,6 +23,6 @@ python scripts/fonts.py metrics           # write it again
 python scripts/fonts.py metrics --check   # fail when it is not what the pinned fonts give
 ```
 
-The file is licensed under the fonts' licence, the [SIL Open Font License 1.1](../../LICENSES/OFL-1.1.txt).
+The file is licensed under the fonts' licence, the [SIL Open Font License 1.1](../../LICENSES/OFL-1.1.txt), so the crate, which embeds it, declares `MIT AND OFL-1.1`.
 
 See the [roadmap](../../docs/roadmap.md) for planned work.
