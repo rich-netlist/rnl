@@ -1,6 +1,6 @@
 # rnl-view
 
-The core interface of [decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md): a workspace in, a Document out. The desktop viewer and `rnl view` call it natively; the web viewer will call it through WebAssembly.
+The core interface of [decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md): a workspace in, a Document out. The desktop viewer and `rnl view` call it natively; the [web viewer](../../apps/web/README.md) calls it through WebAssembly.
 
 ```rust
 pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Document, String>
