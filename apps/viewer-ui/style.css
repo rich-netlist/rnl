@@ -667,3 +667,77 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .menu-item[aria-checked="true"] .check::before { content: "\2713"; }
 .menu-item .keys { padding-left: 28px; color: var(--muted); font-size: 12px; }
 .menu-separator { height: 1px; margin: 4px 0; background: var(--line); }
+
+/* ------------------------------------------------------------------ dialogs */
+
+/* what a shell asks of the user (dialog.js): one of a list, a line of text, or a message */
+.dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  padding: 0;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+}
+.dialog[open] { display: flex; flex-direction: column; }
+.dialog::backdrop { background: rgba(0, 0, 0, 0.25); }
+.dialog-title { margin: 0; padding: 14px 16px 6px; font-size: 14px; font-weight: 600; }
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 4px 16px 8px;
+  overflow-wrap: anywhere;
+}
+.dialog-body p { margin: 0; }
+.dialog-body input, .dialog-list {
+  font: inherit;
+  color: inherit;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.dialog-body input { width: 100%; padding: 4px 8px; }
+.dialog-body input:focus, .dialog-list:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.dialog-list {
+  min-height: 66px;
+  max-height: 330px;
+  overflow: auto;
+  padding: 2px 0;
+}
+.dialog-option {
+  height: 22px;
+  padding: 0 10px;
+  font: 12.5px/22px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.dialog-option:hover { background: var(--hover); }
+.dialog-option[aria-selected="true"] { background: var(--hover); box-shadow: inset 3px 0 0 var(--accent); }
+.dialog-note { color: var(--muted); font-size: 12px; }
+.dialog-error { color: var(--error); font-size: 12px; }
+.dialog-name { font-weight: 600; }
+.dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 16px 14px; }
+.dialog-buttons button { min-width: 76px; padding: 3px 12px; border-color: var(--line); background: var(--tab); }
+.dialog-buttons button.default { color: var(--panel); background: var(--accent); border-color: var(--accent); }
+.dialog-buttons button.default:hover:not(:disabled) { background: var(--accent); filter: brightness(1.15); }
+.dialog-buttons button:disabled { opacity: 0.5; }
+@media (prefers-color-scheme: dark) {
+  .dialog-body input, .dialog-list { background: var(--tab); }
+}
+
+/* files dragged over the page, which opens them when they are dropped */
+body.dropping::after {
+  content: "";
+  position: fixed;
+  inset: 6px;
+  z-index: 20;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  pointer-events: none;
+}

@@ -24,7 +24,10 @@ export async function startCommands() {
   shell.onCommand(command);
 }
 
-/** Run a command by its id. Exit and About are the platform's own, so the page has nothing to do. */
+/**
+ * Run a command by its id. Exit and About are the platform's own: the page has nothing to do for
+ * Exit, and shows About through the shell, which has it when the page's menu bar offers it.
+ */
 export function command(id) {
   switch (id) {
     case "open": pickAndOpen("file"); break;
@@ -38,6 +41,7 @@ export function command(id) {
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "descend": descend(selected); break;
     case "ascend": ascend(); break;
+    case "about": if (shell.about) shell.about(); break;
     default: break;
   }
 }

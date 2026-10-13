@@ -5,6 +5,7 @@
 // the arrows move, Enter chooses, and the underlined letters choose too.
 
 import { command, isChecked, menus, shortcut } from "./commands.js";
+import { modal } from "./dialog.js";
 import { $ } from "./util.js";
 
 const bar = $("menubar");
@@ -211,7 +212,7 @@ function move(e) {
 document.addEventListener(
   "keydown",
   (e) => {
-    if (bar.hidden) return;
+    if (bar.hidden || modal()) return;
     if (e.key === "Alt") {
       altAlone = !e.ctrlKey && !e.shiftKey && !e.metaKey;
       return;
@@ -235,7 +236,7 @@ document.addEventListener(
 document.addEventListener(
   "keyup",
   (e) => {
-    if (e.key !== "Alt" || !altAlone || bar.hidden) return;
+    if (e.key !== "Alt" || !altAlone || bar.hidden || modal()) return;
     altAlone = false;
     if (at < 0) show(0, false, true);
     else leave();

@@ -21,6 +21,10 @@
  *   "toggle-netlist", in the platform's menu.
  * @property {(handler: (id: string) => void) => void} onCommand Call `handler` with the id of each command
  *   chosen in the platform's menu.
+ * @property {(handler: (source: Source) => void) => void} [onOpen] Call `handler` with each source opened
+ *   without `pick`, such as files dropped on the page. A shell that opens nothing so leaves it out.
+ * @property {() => void} [about] Show the platform's About box, for Help > About in the page's own menu
+ *   bar. A platform whose menu shows its own About box leaves it out.
  */
 
 /**

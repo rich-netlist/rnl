@@ -1,0 +1,233 @@
+// Dialogs in the page's style, for what a shell asks of the user: one of a list, such as the netlist
+// to open; a line of text, such as a URL; or a message, such as the About box. Each is modal and
+// returns a promise of the answer, null when it is cancelled. While one is shown, the page's keys and
+// its menu bar do nothing.
+
+const LIST_MAX = 500; // the items a list shows at most; the filter finds the others
+
+let shown = 0; // the dialogs shown
+let made = 0; // the dialogs made so far, for the ids of their titles
+
+/** Whether a dialog is shown. */
+export function modal() {
+  return shown > 0;
+}
+
+/**
+ * Ask for one of `items`, each `{ label, value }`, listed in the order given. With `filter`, a box
+ * above the list keeps the items whose label has its text, whatever the case. Enter or a double
+ * click chooses the marked item.
+ *
+ * @param {{ title: string, text?: string, items: { label: string, value: any }[], filter?: boolean,
+ *   action?: string }} options `action` labels the button that chooses, "Open" by default.
+ * @returns {Promise<any>} The value of the item chosen, or null when the dialog is cancelled.
+ */
+export function choose({ title, text, items, filter = false, action = "Open" }) {
+  const d = frame(title, text, action);
+  const box = filter ? textBox("search", "Filter by name") : null;
+  const list = document.createElement("div");
+  list.className = "dialog-list";
+  list.id = `${d.id}-list`;
+  list.tabIndex = 0;
+  list.setAttribute("role", "listbox");
+  list.setAttribute("aria-labelledby", d.id);
+  const note = document.createElement("p");
+  note.className = "dialog-note";
+  let matching = items; // the items the filter keeps
+  let at = 0; // the marked one among them, while there is one
+
+  function render() {
+    const q = box ? box.value.trim().toLowerCase() : "";
+    matching = q ? items.filter((x) => x.label.toLowerCase().includes(q)) : items;
+    list.replaceChildren(
+      ...matching.slice(0, LIST_MAX).map((x, k) => {
+        const option = document.createElement("div");
+        option.className = "dialog-option";
+        option.id = `${list.id}-${k}`;
+        option.setAttribute("role", "option");
+        option.textContent = x.label;
+        option.title = x.label;
+        option.addEventListener("click", () => mark(k));
+        option.addEventListener("dblclick", () => d.ok.click());
+        return option;
+      }),
+    );
+    const more = matching.length - LIST_MAX;
+    note.textContent = matching.length === 0 ? "Nothing matches." : more > 0 ? `${more} more; type to narrow the list.` : "";
+    note.hidden = !note.textContent;
+    d.ok.disabled = matching.length === 0;
+    mark(0);
+  }
+
+  function mark(k) {
+    const options = list.children;
+    if (options.length === 0) {
+      list.removeAttribute("aria-activedescendant");
+      return;
+    }
+    at = Math.max(0, Math.min(options.length - 1, k));
+    for (const o of options) o.setAttribute("aria-selected", "false");
+    options[at].setAttribute("aria-selected", "true");
+    list.setAttribute("aria-activedescendant", options[at].id);
+    options[at].scrollIntoView({ block: "nearest" });
+  }
+
+  /** Move the mark by a key, from the list or from the filter box; false for other keys. */
+  function move(e) {
+    const page = Math.max(1, Math.floor(list.clientHeight / 22));
+    const steps = { ArrowDown: 1, ArrowUp: -1, PageDown: page, PageUp: -page };
+    if (e.key in steps) mark(at + steps[e.key]);
+    else if (e.key === "Home" && e.target === list) mark(0);
+    else if (e.key === "End" && e.target === list) mark(list.children.length - 1);
+    else return false;
+    e.preventDefault();
+    return true;
+  }
+
+  list.addEventListener("keydown", move);
+  if (box) {
+    box.addEventListener("input", render);
+    box.addEventListener("keydown", move);
+  }
+  d.body.append(...(box ? [box] : []), list, note);
+  render();
+  return d.show(box || list, () => (matching[at] ? matching[at].value : undefined));
+}
+
+/**
+ * Ask for a line of text, such as a URL. `check` says what is wrong with a text, or null when it
+ * will do; the dialog stays until it does or is cancelled.
+ *
+ * @param {{ title: string, text?: string, value?: string, placeholder?: string, action?: string,
+ *   check?: (text: string) => string | null }} options `action` labels the button that answers,
+ *   "OK" by default.
+ * @returns {Promise<string | null>} The text, or null when the dialog is cancelled.
+ */
+export function ask({ title, text, value = "", placeholder = "", action = "OK", check = () => null }) {
+  const d = frame(title, text, action);
+  const box = textBox("text", placeholder);
+  box.value = value;
+  box.setAttribute("aria-labelledby", d.id);
+  const error = document.createElement("p");
+  error.className = "dialog-error";
+  error.hidden = true;
+  box.addEventListener("input", () => {
+    error.hidden = true;
+  });
+  d.body.append(box, error);
+  return d.show(box, () => {
+    const wrong = check(box.value);
+    if (wrong === null) return box.value;
+    error.textContent = wrong;
+    error.hidden = false;
+    box.focus();
+    return undefined;
+  });
+}
+
+/**
+ * Show a message until it is closed.
+ *
+ * @param {{ title: string, paragraphs: (string | Node)[] }} options Each paragraph a text, or a node
+ *   to show as it is.
+ * @returns {Promise<void>}
+ */
+export function inform({ title, paragraphs }) {
+  const d = frame(title, "", "Close", false);
+  for (const p of paragraphs) {
+    if (typeof p !== "string") {
+      d.body.append(p);
+      continue;
+    }
+    const el = document.createElement("p");
+    el.textContent = p;
+    d.body.append(el);
+  }
+  return d.show(d.ok, () => null).then(() => {});
+}
+
+/** A text box of a dialog. */
+function textBox(type, placeholder) {
+  const box = document.createElement("input");
+  box.type = type;
+  box.placeholder = placeholder;
+  box.spellcheck = false;
+  box.autocomplete = "off";
+  if (type === "search") box.setAttribute("aria-label", placeholder);
+  return box;
+}
+
+/**
+ * A modal dialog, not yet shown: its title, its text, the body that takes its parts, and its
+ * buttons: Cancel, if `cancel`, and the default one labelled `action`, which Enter presses.
+ * `show(focus, answer)` shows it with `focus` focused, and a text box's text selected. The default
+ * button closes it with what `answer()` gives, unless that is undefined; the promise it returns
+ * resolves with that, or with null when the dialog is cancelled by Escape or Cancel.
+ */
+function frame(title, text, action, cancel = true) {
+  const id = `dialog-${++made}`;
+  const el = document.createElement("dialog");
+  el.className = "dialog";
+  el.setAttribute("aria-labelledby", id);
+  const head = document.createElement("h2");
+  head.className = "dialog-title";
+  head.id = id;
+  head.textContent = title;
+  const body = document.createElement("div");
+  body.className = "dialog-body";
+  if (text) {
+    const p = document.createElement("p");
+    p.textContent = text;
+    body.append(p);
+  }
+  const buttons = document.createElement("div");
+  buttons.className = "dialog-buttons";
+  const ok = document.createElement("button");
+  ok.type = "button";
+  ok.className = "default";
+  ok.textContent = action;
+  if (cancel) {
+    const no = document.createElement("button");
+    no.type = "button";
+    no.textContent = "Cancel";
+    no.addEventListener("click", () => el.close());
+    buttons.append(no);
+  }
+  buttons.append(ok);
+  el.append(head, body, buttons);
+
+  let result = null;
+  function show(focus, answer) {
+    ok.addEventListener("click", () => {
+      const a = answer();
+      if (a === undefined) return;
+      result = a;
+      el.close();
+    });
+    // the page's keys wait; those the browser has too, F5, Ctrl+R and Ctrl+O, do nothing
+    el.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "F5" || ((e.ctrlKey || e.metaKey) && /^[ro]$/i.test(e.key))) e.preventDefault();
+      if (e.key === "Enter" && !e.isComposing && !(e.target instanceof HTMLButtonElement)) {
+        e.preventDefault();
+        if (!ok.disabled) ok.click();
+      }
+    });
+    const before = document.activeElement;
+    document.body.append(el);
+    shown += 1;
+    el.showModal();
+    focus.focus();
+    if (focus instanceof HTMLInputElement) focus.select();
+    return new Promise((resolve) => {
+      el.addEventListener("close", () => {
+        shown -= 1;
+        el.remove();
+        if (before instanceof HTMLElement && before.isConnected) before.focus();
+        resolve(result);
+      });
+    });
+  }
+
+  return { id, body, ok, show };
+}
