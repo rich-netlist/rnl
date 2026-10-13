@@ -14,7 +14,7 @@ Node 20 or later, and Rust with the `wasm32-unknown-unknown` target for the web 
 npm ci
 ```
 
-Before the tests Playwright builds the web viewer's site in `apps/web/dist` and serves it on the port `RNL_WEB_PORT` names, or a free one; the global setup builds the rnl command with Cargo and writes the fixtures into a temporary directory. The chromium project drives the installed Google Chrome, headless and with a profile of its own, so no Chromium is downloaded; `RNL_CHANNEL` names another of Playwright's channels instead, such as `chromium` for Playwright's own build. Firefox and WebKit need Playwright's builds, `npx playwright install firefox webkit` once. Two workers run at a time, each with a browser of its own.
+Before the tests Playwright builds the web viewer's site in `apps/web/dist` and serves it on the port `RNL_WEB_PORT` names, or a free one; the global setup builds the rnl command with Cargo and writes the fixtures into a temporary directory. A command line that names spec files, none of them `web.spec.js`, such as `npx playwright test specs/text.spec.js`, builds and serves no site, so the page's own tests need no WebAssembly target; `RNL_WEB=0` leaves the site out in any case, and the web viewer's tests skip, and `RNL_WEB=1` builds it in any case. The chromium project drives the installed Google Chrome, headless and with a profile of its own, so no Chromium is downloaded; `RNL_CHANNEL` names another of Playwright's channels instead, such as `chromium` for Playwright's own build. Firefox and WebKit need Playwright's builds, `npx playwright install firefox webkit` once. Two workers run at a time, each with a browser of its own.
 
 ```bash
 npx playwright test --project chromium
@@ -28,7 +28,7 @@ In CI, [`viewer.yml`](../../.github/workflows/viewer.yml) installs Rust with the
 
 | Path | Content |
 | --- | --- |
-| `playwright.config.js` | The three projects, the browser of each, and `RNL_CHANNEL`; the web viewer's server, which the tests find at `RNL_WEB_URL`. |
+| `playwright.config.js` | The three projects, the browser of each, and `RNL_CHANNEL`; the web viewer's server, when the run can include its tests, which find it at `RNL_WEB_URL`. |
 | `global-setup.js` | Builds the rnl command, writes the fixtures and starts the server; the tests find it at `RNL_VIEWER_URL`, and the rnl command at `RNL_BIN`. |
 | `fixtures.js` | The fixtures: `rnl view` of the corpus files `01-rc-lowpass.sp`, `04-hierarchy.sp`, `10-constraints-and-priority.sp`, `12-diagnostics.sp`, `17-line-styles.sp` and `inverter-chain.scs`; `04-hierarchy-changed`, the same netlist after it changed; `subcircuits`, a netlist with a subcircuit for each initial; and `continued` and `continued-spectre`, statements over several lines in each dialect. |
 | `server.js` | The test server, Node with no dependencies: `apps/viewer-ui` as it is, the fake shell as `shells/fake.js`, and the fixtures under `fixtures/`. Nothing of the tests goes into the page. |

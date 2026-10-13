@@ -6,7 +6,10 @@
 //
 // The web viewer's smoke tests (specs/web.spec.js) need its site: Playwright builds it with the
 // samples and serves it before the tests, on the port RNL_WEB_PORT names or a free one, and the
-// tests find it at RNL_WEB_URL.
+// tests find it at RNL_WEB_URL. A command line that names spec files, none of them web.spec.js,
+// such as `npx playwright test specs/text.spec.js`, builds and serves no site, as the page's own
+// tests need neither it nor the WebAssembly target. RNL_WEB=0 leaves the site out in any case, and
+// the web viewer's tests skip; RNL_WEB=1 builds it in any case.
 
 import net from "node:net";
 import { defineConfig, devices } from "@playwright/test";
@@ -29,9 +32,19 @@ function freePort() {
   });
 }
 
-// the workers load this file too, and inherit the port the runner chose
-process.env.RNL_WEB_PORT ||= String(await freePort());
-process.env.RNL_WEB_URL = `http://127.0.0.1:${process.env.RNL_WEB_PORT}`;
+/** Whether the command line names spec files, and none of them is the web viewer's. */
+function pageSpecsOnly() {
+  const specs = process.argv.filter((arg) => /\.spec\.js(:\d+)*$/.test(arg));
+  return specs.length > 0 && !specs.some((spec) => /web\.spec\.js/.test(spec));
+}
+
+// the workers load this file too, and inherit whether the runner builds the site, and its port
+process.env.RNL_WEB ??= pageSpecsOnly() ? "0" : "1";
+const web = process.env.RNL_WEB !== "0";
+if (web) {
+  process.env.RNL_WEB_PORT ||= String(await freePort());
+  process.env.RNL_WEB_URL = `http://127.0.0.1:${process.env.RNL_WEB_PORT}`;
+}
 
 export default defineConfig({
   testDir: "specs",
@@ -42,15 +55,17 @@ export default defineConfig({
   retries: 0,
   reporter: ci ? [["list"], ["html", { open: "never" }]] : "list",
   use: { trace: "retain-on-failure" },
-  webServer: {
-    command: `node apps/web/build.mjs --samples && node apps/web/serve.mjs --port ${process.env.RNL_WEB_PORT}`,
-    cwd: root,
-    url: `${process.env.RNL_WEB_URL}/about.json`,
-    // building the core from nothing takes minutes
-    timeout: 15 * 60 * 1000,
-    stdout: "ignore",
-    stderr: "pipe",
-  },
+  webServer: web
+    ? {
+        command: `node apps/web/build.mjs --samples && node apps/web/serve.mjs --port ${process.env.RNL_WEB_PORT}`,
+        cwd: root,
+        url: `${process.env.RNL_WEB_URL}/about.json`,
+        // building the core from nothing takes minutes
+        timeout: 15 * 60 * 1000,
+        stdout: "ignore",
+        stderr: "pipe",
+      }
+    : undefined,
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"], channel, viewport } },
     { name: "firefox", use: { ...devices["Desktop Firefox"], viewport } },

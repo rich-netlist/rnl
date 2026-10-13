@@ -11,6 +11,9 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { root } from "../fixtures.js";
 
+// Playwright builds and serves the site when the run can include these tests (playwright.config.js)
+test.skip(!process.env.RNL_WEB_URL, "the site is not built: RNL_WEB=0");
+
 /** The site that the web server serves. */
 const site = path.join(root, "apps", "web", "dist");
 
