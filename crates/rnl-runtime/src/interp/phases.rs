@@ -16,6 +16,15 @@ fn level(p: Priority) -> u8 {
     p as u8
 }
 
+/// The style facts of a scene by target, each list in the order of the facts (8.3).
+#[derive(Default)]
+struct StyleIndex {
+    /// Style parameters written on the object itself, with where they were written.
+    own: HashMap<ObjId, Vec<(Pos, StyleMap)>>,
+    /// The indexes of the SET-STYLE facts whose style is a style object.
+    styles: HashMap<ObjId, Vec<usize>>,
+}
+
 impl Interp<'_> {
     pub(crate) fn run_scene(&mut self, s: SceneId) {
         for ph in [3usize, 4] {
@@ -1456,30 +1465,43 @@ impl Interp<'_> {
     // ---- style queue (8.3, 9.3, 11.3)
 
     fn resolve_styles(&mut self, s: SceneId) {
-        let mut own: HashMap<ObjId, Vec<(Pos, StyleMap)>> = HashMap::new();
-        for f in &self.scenes[s].styles {
-            if let FactData::OwnStyle(m) = &f.data {
-                own.entry(f.target).or_default().push((f.pos.clone(), m.clone()));
+        // neither the facts nor the objects change in this pass, so the index and the entries kept
+        // in `done` stay valid until its end
+        let mut idx = StyleIndex::default();
+        for (k, f) in self.scenes[s].styles.iter().enumerate() {
+            match &f.data {
+                FactData::OwnStyle(m) => idx.own.entry(f.target).or_default().push((f.pos.clone(), m.clone())),
+                FactData::Style(sty) if matches!(self.o(*sty), ObjData::Style(_)) => {
+                    idx.styles.entry(f.target).or_default().push(k)
+                }
+                _ => {}
             }
         }
         let mut objs = self.drawables(s, false);
+        let mut listed: HashSet<ObjId> = objs.iter().copied().collect();
         for &t in &self.scenes[s].texts {
-            if matches!(self.o(t), ObjData::KeyText { .. }) && !objs.contains(&t) {
+            if matches!(self.o(t), ObjData::KeyText { .. }) && listed.insert(t) {
                 objs.push(t);
             }
         }
+        let mut done = HashMap::new();
         for o in objs {
-            let e = self.style_entries(s, o, &own);
+            let e = self.style_entries(s, o, &idx, &mut done).clone();
             self.scenes[s].style.insert(o, e);
         }
     }
 
-    fn style_entries(
+    /// The style entries of an object, computed once per object and kept in `done`.
+    fn style_entries<'a>(
         &mut self,
         s: SceneId,
         o: ObjId,
-        own: &HashMap<ObjId, Vec<(Pos, StyleMap)>>,
-    ) -> BTreeMap<String, (Lit, Pos)> {
+        idx: &StyleIndex,
+        done: &'a mut HashMap<ObjId, BTreeMap<String, (Lit, Pos)>>,
+    ) -> &'a BTreeMap<String, (Lit, Pos)> {
+        if done.contains_key(&o) {
+            return &done[&o];
+        }
         let mut direct: BTreeMap<String, (Lit, Pos)> = BTreeMap::new();
         let mut other: BTreeMap<String, (Lit, Pos)> = BTreeMap::new();
         fn put(d: &mut BTreeMap<String, (Lit, Pos)>, props: &StyleMap, p: &Pos) {
@@ -1493,7 +1515,7 @@ impl Interp<'_> {
                 }
             }
         }
-        if let Some(v) = own.get(&o) {
+        if let Some(v) = idx.own.get(&o) {
             for (p, props) in v {
                 put(&mut direct, props, p);
             }
@@ -1510,22 +1532,24 @@ impl Interp<'_> {
             }
             _ => {}
         }
-        let members = match self.o(o) {
-            ObjData::Bundle { members, .. } => members.clone(),
-            _ => Vec::new(),
-        };
-        let styles = self.scenes[s].styles.clone();
-        for (k, f) in styles.iter().enumerate() {
+        for &k in idx.styles.get(&o).into_iter().flatten() {
+            let f = &self.scenes[s].styles[k];
             let FactData::Style(sty) = f.data else { continue };
-            let ObjData::Style(props) = self.o(sty).clone() else { continue };
-            if f.target == o {
-                if f.direct {
-                    put(&mut direct, &props, &f.pos);
-                } else {
-                    put(&mut other, &props, &f.pos);
-                }
-            } else if members.contains(&f.target) {
-                self.member_draw_error(s, 's', k, f, f.target);
+            let ObjData::Style(props) = self.o(sty) else { continue };
+            if f.direct {
+                put(&mut direct, props, &f.pos);
+            } else {
+                put(&mut other, props, &f.pos);
+            }
+        }
+        // a style given to a member of a bundle fails, in the order of the facts (11.8)
+        if let ObjData::Bundle { members, .. } = self.o(o) {
+            let mut ks: Vec<usize> = members.iter().filter_map(|m| idx.styles.get(m)).flatten().copied().collect();
+            ks.sort_unstable();
+            ks.dedup();
+            for k in ks {
+                let f = self.scenes[s].styles[k].clone();
+                self.member_draw_error(s, 's', k, &f, f.target);
             }
         }
         // passed down: labels take the style of the object they are attached to (8.3)
@@ -1547,13 +1571,13 @@ impl Interp<'_> {
             _ => None,
         };
         if let Some(src) = src {
-            for (k, v) in self.style_entries(s, src, own) {
-                let replace = match other.get(&k) {
+            for (k, v) in self.style_entries(s, src, idx, done) {
+                let replace = match other.get(k) {
                     None => true,
                     Some(cur) => v.1 >= cur.1,
                 };
                 if replace {
-                    other.insert(k, v);
+                    other.insert(k.clone(), v.clone());
                 }
             }
         }
@@ -1561,7 +1585,7 @@ impl Interp<'_> {
         for (k, v) in direct {
             out.insert(k, v);
         }
-        out
+        done.entry(o).or_insert(out)
     }
 
     fn resolve_layers(&mut self, s: SceneId) {
