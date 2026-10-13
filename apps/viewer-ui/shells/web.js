@@ -252,7 +252,8 @@ async function openUrl() {
 }
 
 // The browser's file chooser, through an input kept in the page: one for files, one for a folder.
-// They have ids for the tests, which set their files (DOM.setFileInputFiles).
+// They have ids for the tests: files set on one while no chooser is shown, as a test sets them
+// (DOM.setFileInputFiles, or Playwright's setInputFiles), open as if they were chosen.
 
 const fileInput = input("file-input", false);
 const folderInput = input("folder-input", true);
@@ -269,7 +270,8 @@ function input(id, folder) {
   el.addEventListener("change", () => {
     const files = [...el.files];
     el.value = "";
-    chosen(files);
+    if (waiting) chosen(files);
+    else if (opened && !modal()) (folder ? openFolder : openFiles)(files).then((source) => source && opened(source));
   });
   el.addEventListener("cancel", () => chosen([]));
   document.body.append(el);
