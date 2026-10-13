@@ -1,6 +1,6 @@
 # Builds and tests the desktop viewer in apps/desktop, a Cargo workspace of its own so that its
 # WebView dependencies stay out of the library crates' builds, and checks the page in apps/viewer-ui
-# that it shows.
+# that it shows. On Windows a smoke test starts the app and drives it through WebView2's DevTools port.
 name: Desktop viewer
 
 on:
@@ -50,6 +50,14 @@ jobs:
         run: cargo clippy --manifest-path apps/desktop/Cargo.toml --all-targets -- -D warnings
       - name: Tests
         run: cargo test --manifest-path apps/desktop/Cargo.toml
+      - name: Install Node for the smoke test
+        if: runner.os == 'Windows'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Smoke test
+        if: runner.os == 'Windows'
+        run: node apps/desktop/tests/smoke.mjs
       - name: Check the page's scripts
         if: matrix.os == 'ubuntu-latest'
         run: find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
