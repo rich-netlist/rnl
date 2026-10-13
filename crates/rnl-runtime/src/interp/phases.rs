@@ -172,6 +172,13 @@ impl Interp<'_> {
             }
         }
         let appear = self.scenes[s].appear.clone();
+        // the SET-SYMBOL facts by target, each list in the order of `appear`
+        let mut by_target: HashMap<ObjId, Vec<usize>> = HashMap::new();
+        for (k, f) in appear.iter().enumerate() {
+            if let FactData::Symbol(_) = f.data {
+                by_target.entry(f.target).or_default().push(k);
+            }
+        }
         for o in objs {
             // each candidate with the index of its fact in `appear`; a block symbol has none
             let mut direct: Vec<(Pos, ObjId, Option<usize>)> = Vec::new();
@@ -195,18 +202,22 @@ impl Interp<'_> {
                     }
                 }
             }
-            for (k, f) in appear.iter().enumerate() {
+            for &k in by_target.get(&o).into_iter().flatten() {
+                let f = &appear[k];
                 let FactData::Symbol(sym) = f.data else { continue };
-                if f.target == o {
-                    self.scenes[s].symbol_weighed.insert(k);
-                    if f.direct {
-                        direct.push((f.pos.clone(), sym, Some(k)));
-                    } else {
-                        other.push((f.pos.clone(), sym, Some(k)));
-                    }
-                } else if members.contains(&f.target) {
-                    self.member_draw_error(s, 'a', k, f, f.target);
+                self.scenes[s].symbol_weighed.insert(k);
+                if f.direct {
+                    direct.push((f.pos.clone(), sym, Some(k)));
+                } else {
+                    other.push((f.pos.clone(), sym, Some(k)));
                 }
+            }
+            // a symbol given to a member of a bundle fails, in the order of the facts (11.8)
+            let mut ks: Vec<usize> = members.iter().filter_map(|m| by_target.get(m)).flatten().copied().collect();
+            ks.sort_unstable();
+            ks.dedup();
+            for k in ks {
+                self.member_draw_error(s, 'a', k, &appear[k], appear[k].target);
             }
             let pick = if !direct.is_empty() {
                 direct.into_iter().max_by(|a, b| a.0.cmp(&b.0))
@@ -345,7 +356,7 @@ impl Interp<'_> {
                         *sym_pos = lab.position;
                         *from_symbol = true;
                     }
-                    if !self.scenes[s].texts.contains(&kt) {
+                    if self.scenes[s].listed_keytexts.insert(kt) {
                         self.scenes[s].texts.push(kt);
                         let c = self.scenes[s].created.get(&owner).cloned().unwrap_or_else(|| pos(&[0]));
                         self.scenes[s].created.insert(kt, c);

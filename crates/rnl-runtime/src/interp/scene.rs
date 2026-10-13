@@ -70,6 +70,8 @@ pub struct Scene {
     pub usages: Vec<ObjId>,
     pub prims: Vec<ObjId>,
     pub texts: Vec<ObjId>,
+    /// The key texts already in `texts`.
+    pub listed_keytexts: HashSet<ObjId>,
     pub wires: Vec<ObjId>,
     pub bundles: Vec<ObjId>,
     pub constraints: Vec<ObjId>,
@@ -122,6 +124,7 @@ impl Scene {
             usages: Vec::new(),
             prims: Vec::new(),
             texts: Vec::new(),
+            listed_keytexts: HashSet::new(),
             wires: Vec::new(),
             bundles: Vec::new(),
             constraints: Vec::new(),
@@ -599,7 +602,7 @@ impl Interp<'_> {
                     }
                     let sc = &mut self.scenes[s];
                     sc.created.entry(kt).or_insert(at);
-                    if !sc.texts.contains(&kt) {
+                    if sc.listed_keytexts.insert(kt) {
                         sc.texts.push(kt);
                     }
                     return Ok(kt);
