@@ -291,6 +291,16 @@ fn a_package_checked_on_its_own_has_its_cycles() {
 
 #[test]
 fn a_long_chain_of_sets_is_no_cycle() {
+    // the members of a set and whether it is lazy (10.3) are found by going down the sets added
+    // to it, one call for each set of the chain: some 2 KB of stack each in a debug build, more
+    // than the 2 MiB of a test's thread hold on every platform, and 0.3 to 0.5 KB in a release build
+    let chain = std::thread::Builder::new().name("a_long_chain_of_sets_is_no_cycle".into()).stack_size(32 << 20);
+    if let Err(e) = chain.spawn(long_chain).unwrap().join() {
+        std::panic::resume_unwind(e);
+    }
+}
+
+fn long_chain() {
     // each set holds a selection and is added to the next, and also to a set made of the next
     let n = 1000;
     let mut s = String::new();
