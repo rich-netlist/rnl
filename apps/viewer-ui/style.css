@@ -20,6 +20,7 @@
   --select: #e8590c;
   --select-text: rgba(232, 89, 12, 0.22);
   --select-line: rgba(232, 89, 12, 0.08);
+  --out-of-scope: #ececee; /* the lines outside the subcircuit drawn */
   --select-fill: rgba(232, 89, 12, 0.07);
   /* the selection when it is a subcircuit instance, which can be opened */
   --sub: #c2255c;
@@ -63,6 +64,7 @@
     --hint: #74a7e8;
     --select-text: rgba(255, 140, 70, 0.3);
     --select-line: rgba(255, 140, 70, 0.1);
+    --out-of-scope: #1a1a1d;
     --sub-text: rgba(240, 101, 149, 0.28);
     --sub-line: rgba(240, 101, 149, 0.1);
     --flash: rgba(116, 167, 232, 0.28);
@@ -415,7 +417,8 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 .ln.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { from { background: var(--flash); } to { background: transparent; } }
 /* while a subcircuit is drawn, the text outside its definition (text.js, scopeSource) */
-.source.scoped .ln:not(.in-scope) { opacity: 0.45; }
+.source.scoped .ln:not(.in-scope) { background: var(--out-of-scope); }
+.source.scoped .ln:not(.in-scope) > * { opacity: 0.45; }
 
 .s-comment { color: var(--syn-comment); font-style: italic; }
 .s-marker { color: var(--syn-marker); }

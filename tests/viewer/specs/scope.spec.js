@@ -7,21 +7,28 @@
 
 import { expect, test } from "../viewer.js";
 
+/** Whether a line is dimmed: its text faded, on a grey background unlike the pane's. */
+const DIMMED = (ln) => {
+  const pane = getComputedStyle(document.getElementById("source")).backgroundColor;
+  return getComputedStyle(ln.querySelector(".code")).opacity !== "1" && getComputedStyle(ln).backgroundColor !== pane;
+};
+
 /** Per file, the dimmed lines as ranges [first, last]. */
 function dimmed(page) {
-  return page.evaluate(() =>
-    [...document.querySelectorAll("#source .file")].map((file) => {
+  return page.evaluate((test) => {
+    const isDimmed = new Function(`return (${test})`)();
+    return [...document.querySelectorAll("#source .file")].map((file) => {
       const ranges = [];
       for (const ln of file.querySelectorAll(".ln")) {
-        if (getComputedStyle(ln).opacity === "1") continue;
+        if (!isDimmed(ln)) continue;
         const n = Number(ln.dataset.line);
         const last = ranges[ranges.length - 1];
         if (last && last[1] === n - 1) last[1] = n;
         else ranges.push([n, n]);
       }
       return ranges;
-    }),
-  );
+    });
+  }, DIMMED.toString());
 }
 
 /** The file shown in the text, and its first line whose top is in view: the line at the top. */
@@ -58,7 +65,7 @@ test("while a subcircuit is drawn, the text outside its definition is dimmed", a
   await expect(page.locator("#source")).toHaveClass(/\bscoped\b/);
   expect(await dimmed(page)).toEqual([[[1, 6], [48, 78]], [[1, 19]]]);
   // the definition's lines are as at the top level
-  expect(await viewer.line(10).evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
+  expect(await viewer.line(10).evaluate((e) => getComputedStyle(e.querySelector(".code")).opacity)).toBe("1");
   // reading the file again keeps it so
   await viewer.build(() => page.keyboard.press("F5"));
   expect(await dimmed(page)).toEqual([[[1, 6], [48, 78]], [[1, 19]]]);
