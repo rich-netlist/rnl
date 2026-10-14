@@ -50,6 +50,7 @@ export function command(id) {
     case "descend": descend(selected); break;
     case "ascend": ascend(); break;
     case "about": about(); break;
+    case "desktop-viewer": toolsPage(); break;
     default: break;
   }
 }
@@ -64,6 +65,19 @@ function about() {
     const text = "Draws netlists with Rich Netlist (RNL) records. It only reads: it neither edits nor solves.";
     inform({ title: "About RNL Viewer", paragraphs: [text] });
   }
+}
+
+/** The project site's page of the tools, which offers the desktop viewer, in each of its languages. */
+const TOOLS = { zh: "https://rich-netlist.github.io/rnl/tools.html", en: "https://rich-netlist.github.io/rnl/en/tools.html" };
+
+/**
+ * Show the site's page of the tools through the shell (Help > Desktop Viewer, on the web): in
+ * English when the browser's languages put English before Chinese, else in Chinese, the site's
+ * first language.
+ */
+function toolsPage() {
+  const first = navigator.languages.find((language) => /^(en|zh)\b/i.test(language)) || "";
+  if (shell.browse) shell.browse(/^en/i.test(first) ? TOOLS.en : TOOLS.zh);
 }
 
 /** Set the state of a check-mark command, such as "toggle-netlist", in the menus that show it. */

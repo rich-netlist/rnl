@@ -26,6 +26,9 @@
  * @property {() => void} [about] Show the platform's About box, for Help > About in the page's own menu
  *   bar; without it the page shows a plain one. A platform whose menu shows its own About box leaves
  *   it out.
+ * @property {(url: string) => void} [browse] Show a web page outside the viewer: on the web, in a new
+ *   tab. Help > Desktop Viewer shows the project site's page of the tools with it; without it, the
+ *   command does nothing.
  */
 
 /**

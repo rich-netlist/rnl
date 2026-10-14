@@ -87,6 +87,7 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 | `onCommand(handler)` | Call `handler(id)` for each command chosen in the platform's menu. |
 | `onOpen(handler)` | Optional. Call `handler(source)` for each source opened without `pick`, such as files dropped on the page. |
 | `about()` | Optional. Show the platform's About box, for Help > About in the page's own menu bar; without it the page shows a plain one. A platform whose menu shows its own About box has none. |
+| `browse(url)` | Optional. Show a web page outside the viewer; the web shell opens it in a new tab, with no hold on the page (`noopener`). Help > Desktop Viewer shows the project site's page of the tools with it; without it, that command does nothing. |
 
 A Source is the shell's own object: the page keeps it to read it again and shows its `name`, and knows nothing else of it. On the desktop it is a path; on the web, files chosen or dropped, a folder or a URL, each with a way to read its entry, which gives the entry's path in the workspace, and its other files, and later a text being edited.
 
@@ -98,7 +99,7 @@ The web shell builds with the core as WebAssembly in a module Worker, one for th
 
 | Field | |
 | --- | --- |
-| `id` | What `command(id)` runs. `exit` and `about` are the platform's own: the desktop app quits, or shows its About box; the page runs `about` through the shell's `about()`, which the web shell has, or shows a plain About box when the shell has none and the page shows the menu bar. |
+| `id` | What `command(id)` runs. `exit` and `about` are the platform's own: the desktop app quits, or shows its About box; the page runs `about` through the shell's `about()`, which the web shell has, or shows a plain About box when the shell has none and the page shows the menu bar. `desktop-viewer`, which only the web offers, shows the project site's page of the tools, where the desktop viewer is downloaded, with the shell's `browse(url)`: [the English page](https://rich-netlist.github.io/rnl/en/tools.html) when the browser's languages put English before Chinese, else [the Chinese one](https://rich-netlist.github.io/rnl/tools.html). |
 | `label` | The text, with `&` before the underlined letter. |
 | `keys` | The keys that run it, written like `Ctrl+Shift+M`, `F5` or `Enter`; Ctrl stands for Cmd on macOS. The first is the native menu's accelerator. |
 | `shown` | How menus show the keys, when not as the first of them. |

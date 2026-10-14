@@ -57,7 +57,7 @@ Every form is built from the chapters of one commit and names its revision ([dec
 | [`scripts/`](scripts/README.md) | Maintenance scripts: the build of the standard's published forms, and the fonts shipped with the core. |
 | [`.github/workflows/`](.github/workflows/README.md) | CI workflows: the project site, the releases of the standard and of the desktop viewer, the Rust workspace, the viewers and their browser tests. |
 | [`docs/`](docs/README.md) | Toolchain architecture proposal, roadmap, and decision records. |
-| [`site/`](site/README.md) | The [project site](https://rich-netlist.github.io/rnl/en/): introduction page and language tour for circuit designers, in Chinese and English, built from one bilingual source by `site/build.py`. |
+| [`site/`](site/README.md) | The [project site](https://rich-netlist.github.io/rnl/en/): introduction page, language tour and the page of the tools for circuit designers, in Chinese and English, built from one bilingual source by `site/build.py`; [`pages.yml`](.github/workflows/pages.yml) adds the pages of the standard and the web viewer. |
 
 Start with the [documentation map](docs/README.md), the [toolchain architecture proposal](docs/rnl-toolchain-architecture.md) (in Chinese), and the [roadmap](docs/roadmap.md). Each component directory contains a short README describing its planned role.
 
@@ -74,7 +74,7 @@ See [`crates/rnl-cli`](crates/rnl-cli/README.md) for the other commands. To look
 cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-five-transistor-ota.sp
 ```
 
-Or in the web viewer: build its site with the samples and serve it, then open `http://127.0.0.1:8000/?url=samples/cases/03-five-transistor-ota.sp`. Both viewers draw texts in the shipped fonts once `python scripts/fonts.py web` has written them ([`scripts`](scripts/README.md)), and fall back on a system font without them.
+Or in the web viewer, which is on the site with the same samples: [rich-netlist.github.io/rnl/viewer/?url=samples/cases/03-five-transistor-ota.sp](https://rich-netlist.github.io/rnl/viewer/?url=samples/cases/03-five-transistor-ota.sp). To run it here, build its site with the samples and serve it, then open `http://127.0.0.1:8000/?url=samples/cases/03-five-transistor-ota.sp`. Both viewers draw texts in the shipped fonts once `python scripts/fonts.py web` has written them ([`scripts`](scripts/README.md)), and fall back on a system font without them.
 
 ```bash
 node apps/web/build.mjs --samples

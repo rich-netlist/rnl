@@ -1,4 +1,4 @@
-"""Build the introduction pages in every language from the one bilingual source in src/.
+"""Build the pages of the project site in every language from the one bilingual source in src/.
 
 In src/, every piece of text a reader sees is written once per language, side by side:
 
@@ -13,26 +13,39 @@ group per language and checks that
   elements marked lang="zh-CN", and in scripts the blocks between /*zh-CN*/ and /*/zh-CN*/ (RNL
   written with the Chinese alias package, for example).
 
-Output (site/dist/ by default, ignored by Git), for each page in PAGES:
-    index.html, language.html, assets/, *-standalone.html       Chinese, at the site root
-    en/index.html, en/language.html, en/assets/, en/*-standalone.html   English
-The standalone files have the styles and scripts inlined and link the other pages to the published
-site.
+The page of the tools links to the files of the desktop viewer's newest release. Its version comes
+from the newest tag viewer-vX.Y.Z of the repository (a tag with anything after the version, such as
+a release candidate's, does not count), or from --viewer-version. The parts of a page between
+<!--release--> and <!--/release--> are kept when there is a release, with {{viewer-version}} (such
+as 0.1.0) and {{viewer-tag}} (viewer-v0.1.0) filled in; the parts between <!--no-release--> and
+<!--/no-release--> are kept when there is none. The build checks that these blocks close and do not
+nest, and that the fields are only used in <!--release--> blocks.
 
-Usage, from the repository root (standard library only):
+Output (site/dist/ by default, ignored by Git), for each page in PAGES:
+    index.html, language.html, tools.html, assets/, *-standalone.html   Chinese, at the site root
+    en/index.html, en/language.html, en/tools.html, en/assets/, en/*-standalone.html   English
+The standalone files have the styles and scripts inlined and link the other pages to the published
+site. The pages of the standard (spec/0.2/) and the web viewer (viewer/), which the pages link to,
+are added by .github/workflows/pages.yml.
+
+Usage, from the repository root (standard library only, and git for the tags):
     python site/build.py              build into site/dist/
     python site/build.py --check      check the sources, write nothing
     python site/build.py --out DIR    build into DIR instead
     python site/build.py --zip FILE   also pack the built site into FILE
+    python site/build.py --viewer-version 0.1.0   link the files of this release of the desktop
+                                      viewer, whatever the tags say; "none" for no release yet
 """
 import argparse
 import re
 import shutil
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
 SRC = HERE / "src"
 DEFAULT_OUT = HERE / "dist"
 SITE_URL = "https://rich-netlist.github.io/rnl/"
@@ -45,6 +58,7 @@ CODES = [code for code, _ in LANGS]
 PAGES = {
     "index.html": "rnl-intro-standalone.html",
     "language.html": "rnl-language-standalone.html",
+    "tools.html": "rnl-tools-standalone.html",
 }
 
 LANG_TAG = re.compile(r"</?(?:%s)>" % "|".join(CODES))
@@ -58,6 +72,17 @@ ZH_BLOCK = re.compile(r"/\*zh-CN\*/.*?/\*/zh-CN\*/", re.S)
 STYLE_TAG = re.compile(r'<link rel="stylesheet" href="assets/([\w.-]+\.css)">')
 SCRIPT_TAG = re.compile(r'<script src="assets/([\w.-]+\.js)"></script>')
 NOTICE = "<!-- Built by site/build.py from site/src/. Edit the source, not this file. -->\n"
+
+# The desktop viewer's releases: a tag viewer-vX.Y.Z and a GitHub release of that name with the files
+# the page of the tools links to (.github/workflows/viewer-release.yml makes them).
+VIEWER_TAG = re.compile(r"viewer-v(\d+)\.(\d+)\.(\d+)")
+VERSION = re.compile(r"\d+\.\d+\.\d+")
+# The parts of a page kept with a release of the desktop viewer, or without one, and the fields
+# filled in from the release.
+RELEASE = re.compile(r"<!--(release|no-release)-->(.*?)<!--/\1-->", re.S)
+RELEASE_MARK = re.compile(r"<!--/?(?:no-)?release-->")
+FIELD = re.compile(r"\{\{(viewer-[a-z-]+)\}\}")
+FIELDS = ("viewer-version", "viewer-tag")
 
 
 class BuildError(Exception):
@@ -83,6 +108,48 @@ def check_groups(text, name):
             for n, tags in sorted(stray.items())]
 
 
+def check_release(text, name):
+    """Report the marks of release blocks that are not part of a block, blocks inside blocks, and
+    fields that are unknown or outside a <!--release--> block, where there is no release to give them."""
+    errors = []
+    for m in RELEASE.finditer(text):
+        inner = RELEASE_MARK.search(m.group(2))
+        if inner:
+            errors.append("%s:%d: %s inside a release block" % (name, line_of(text, m.start(2) + inner.start()), inner.group(0)))
+    outside = RELEASE.sub(blank, text)
+    for m in RELEASE_MARK.finditer(outside):
+        errors.append("%s:%d: %s is not part of a release block" % (name, line_of(outside, m.start()), m.group(0)))
+    for m in FIELD.finditer(text):
+        if m.group(1) not in FIELDS:
+            errors.append("%s:%d: {{%s}} is not a field; the fields are %s"
+                          % (name, line_of(text, m.start()), m.group(1), ", ".join("{{%s}}" % f for f in FIELDS)))
+    kept = RELEASE.sub(lambda m: blank(m) if m.group(1) == "release" else m.group(0), text)
+    for m in FIELD.finditer(kept):
+        errors.append("%s:%d: {{%s}} outside a <!--release--> block" % (name, line_of(kept, m.start()), m.group(1)))
+    return errors
+
+
+def release(text, version):
+    """Keep the release blocks that apply to `version`, None for no release, with the fields filled in."""
+    with_release = version is not None
+    text = RELEASE.sub(lambda m: m.group(2) if (m.group(1) == "release") == with_release else "", text)
+    if not with_release:
+        return text
+    values = {"viewer-version": version, "viewer-tag": "viewer-v" + version}
+    return FIELD.sub(lambda m: values[m.group(1)], text)
+
+
+def newest_viewer_release():
+    """The version of the desktop viewer's newest release, such as "0.1.0", from the tags of the
+    repository; None when it has no tag viewer-vX.Y.Z, or git cannot tell."""
+    try:
+        listed = subprocess.run(["git", "tag", "--list", "viewer-v*"], cwd=ROOT, capture_output=True, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    versions = [tuple(int(n) for n in m.groups()) for m in map(VIEWER_TAG.fullmatch, listed.stdout.split()) if m]
+    return "%d.%d.%d" % max(versions) if versions else None
+
+
 def localize(text, index):
     return GROUP.sub(lambda m: m.group(index + 1), text)
 
@@ -103,8 +170,9 @@ def sources():
     return files
 
 
-def build_language(files, index):
-    """Return {relative path: text} for one language, including the standalone pages."""
+def build_language(files, index, version):
+    """Return {relative path: text} for one language, including the standalone pages. Both kinds
+    of release block are checked for Chinese before the ones that do not apply are dropped."""
     code, prefix = LANGS[index]
     out = {path: localize(text, index) for path, text in files.items()}
     errors = []
@@ -113,6 +181,7 @@ def build_language(files, index):
             errors += check_leaks(text, "%s (%s)" % (path, code))
     if errors:
         raise BuildError("\n".join(errors))
+    out = {path: release(text, version) for path, text in out.items()}
     for page, single in PAGES.items():
         out[page] = out[page].replace("<!doctype html>\n", "<!doctype html>\n" + NOTICE, 1)
         out[single] = standalone(page, out, SITE_URL + prefix)
@@ -150,16 +219,18 @@ def standalone(page, out, page_url):
     return re.sub(r'(\shref=")([^"]*)"', absolute, html)
 
 
-def build():
+def build(version=None):
+    """Build every page in every language, with the files of the desktop viewer's release `version`,
+    or None for no release yet."""
     files = sources()
     errors = []
     for path, text in files.items():
-        errors += check_groups(text, "src/" + path)
+        errors += check_groups(text, "src/" + path) + check_release(text, "src/" + path)
     if errors:
         raise BuildError("\n".join(errors))
     result = {}
     for index, (code, prefix) in enumerate(LANGS):
-        for path, text in build_language(files, index).items():
+        for path, text in build_language(files, index, version).items():
             result[prefix + path] = text
     return result
 
@@ -183,13 +254,15 @@ GUIDE = """RNL introduction pages / RNL 介绍页
 
 rnl-intro/ is the complete site: open rnl-intro/index.html (Chinese) or rnl-intro/en/index.html
 (English), or upload the folder to any static host. .nojekyll makes GitHub Pages publish it as is.
-language.html next to each index.html is the language tour. The *-standalone.html files in each
-language folder are single files with everything inlined. Fonts load from Google Fonts; offline,
-system fonts are used and the pages still work.
+language.html next to each index.html is the language tour, and tools.html the page of the viewers;
+the web viewer itself and the pages of the standard are published with the site, not packed here.
+The *-standalone.html files in each language folder are single files with everything inlined.
+Fonts load from Google Fonts; offline, system fonts are used and the pages still work.
 
 rnl-intro/ 是完整站点：打开 rnl-intro/index.html（中文）或 rnl-intro/en/index.html（英文），
 或把整个目录上传到任意静态主机；.nojekyll 让 GitHub Pages 原样发布。每个 index.html 旁边的
-language.html 是语言导览。各语言目录里的 *-standalone.html 是内联了全部样式和脚本的单文件版。
+language.html 是语言导览，tools.html 是查看器的介绍页；网页版查看器本身和语言标准的网页随网站发布，
+不在这个包里。各语言目录里的 *-standalone.html 是内联了全部样式和脚本的单文件版。
 字体从 Google Fonts 加载，离线时退回系统字体，页面照常可用。
 """
 
@@ -203,15 +276,26 @@ def pack(result, zip_path):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Build the RNL introduction pages in every language.")
+    ap = argparse.ArgumentParser(description="Build the pages of the RNL site in every language.")
     ap.add_argument("--check", action="store_true", help="check the sources and write nothing")
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output directory (default: site/dist)")
     ap.add_argument("--zip", type=Path, help="also pack the built site into this zip file")
+    ap.add_argument("--viewer-version", metavar="VERSION",
+                    help="link the files of this release of the desktop viewer, such as 0.1.0, instead of the "
+                         "newest tag viewer-vX.Y.Z; none for no release yet")
     args = ap.parse_args()
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(errors="backslashreplace")
+    if args.viewer_version is None:
+        version = newest_viewer_release()
+    elif args.viewer_version == "none":
+        version = None
+    elif VERSION.fullmatch(args.viewer_version):
+        version = args.viewer_version
+    else:
+        ap.error("--viewer-version takes a version such as 0.1.0, or none")
     try:
-        result = build()
+        result = build(version)
     except BuildError as e:
         print(e, file=sys.stderr)
         print("build failed", file=sys.stderr)
@@ -226,6 +310,10 @@ def main():
     for code, prefix in LANGS:
         for page in PAGES:
             print("  %s: %s" % (code, out / prefix / page))
+    if version:
+        print("the page of the tools links to the desktop viewer %s (tag viewer-v%s)" % (version, version))
+    else:
+        print("the page of the tools says the desktop viewer's first release is coming (no tag viewer-vX.Y.Z)")
     if args.zip:
         pack(result, args.zip)
         print("packed %s" % args.zip.resolve())

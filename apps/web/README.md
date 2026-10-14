@@ -10,6 +10,7 @@ The web viewer: the page of the RNL viewers ([`apps/viewer-ui`](../viewer-ui/REA
 - **Help › About** names the version and the commit the site was built from. The browser tab is named after the document.
 - The bar above the drawing shows the hierarchy path to the level shown, a segment per subcircuit instance gone down into, each going back to its level, as in the [desktop viewer](../desktop/README.md).
 - **View › Grid** shows a light grey grid under the drawing, dots or lines at every unit of the scene, coarser when zoomed out, and the axes through the origin, as in the [desktop viewer](../desktop/README.md); G shows and hides it, and the settings are kept in the browser for the next visit. The status bar shows where the pointer is on the drawing, in units with y up.
+- **Help › Desktop Viewer** opens the project site's page of the tools in a new tab, where the desktop viewer is downloaded: [in English](https://rich-netlist.github.io/rnl/en/tools.html) when the browser's languages put English before Chinese, else [in Chinese](https://rich-netlist.github.io/rnl/tools.html).
 - Packages found by name (16.2) are only the bundled standard packages, as with `rnl` without `--package-dir`; a package file named by path is read like an include.
 
 Text is decoded as `rnl` decodes it, UTF-8 or else Latin-1, so a document is the one `rnl view` and the desktop viewer give for the same files, but for the paths that name them. Files opened from the computer are named in the workspace as `/NAME`, and a folder's as `/FOLDER/SUB/NAME`; a URL's files by their paths on the server that served the netlist, after any redirect, such as `/netlists/a/top.sp`, or `/top.sp` at its root, so that a URL that redirects opens as the one it redirects to. A netlist served at a directory's address is named after the directory, or after the server at its root, such as `/example.org`. The workspace has nothing above its root: an include such as `../x.inc` of a file opened from the computer is missing, not a file of that name opened with it.
@@ -48,6 +49,8 @@ serves `apps/web/dist/` at `http://127.0.0.1:8000/`, on this computer only; `--p
 
 ## Deploying
 
+The project site publishes it at <https://rich-netlist.github.io/rnl/viewer/>, with the samples, so that <https://rich-netlist.github.io/rnl/viewer/?url=samples/cases/04-hierarchy.sp> opens one. [`pages.yml`](../../.github/workflows/pages.yml) builds it with `--samples` whenever it, the page, the bindings, the crates, the standard library, the font script or the conformance corpus changes on `main`, and puts `dist/` at the site's `viewer/`, which the site's [page of the tools](https://rich-netlist.github.io/rnl/en/tools.html) links to ([`site`](../../site/README.md)).
+
 Any static host serves the site: copy `dist/` as it is, at the root or under a path. It needs no server code and no special headers, only the usual MIME types:
 
 - JavaScript (`.js`) as `text/javascript`: the page and the core's Worker are ES modules, which a browser runs only with a JavaScript type;
@@ -67,7 +70,7 @@ The page keeps the browser baseline of decision 0008: Chromium 109, the last Chr
 
 ## How it differs from the desktop viewer
 
-- **Its own menu bar.** The page shows the menu bar of the command table itself ([`menubar.js`](../viewer-ui/README.md#modules)); Alt or F10 moves to it. File has Open Folder and Open URL, and no Exit; F5 and Ctrl+R read the document again rather than reload the page.
+- **Its own menu bar.** The page shows the menu bar of the command table itself ([`menubar.js`](../viewer-ui/README.md#modules)); Alt or F10 moves to it. File has Open Folder and Open URL, and no Exit; Help has Desktop Viewer; F5 and Ctrl+R read the document again rather than reload the page.
 - **File access.** A browser lets the page read only what the user chooses or drops, so the files a netlist includes must be chosen with it, be in the folder opened, or be on the server of its URL. The desktop viewer reads any file by its path.
 - **Reload.** A file chosen with Open or Open Folder cannot be read again once it has changed; open it again, or drop it, which Reload reads anew.
 - **About** is a dialog in the page, and the document names the browser tab instead of the window.
@@ -78,7 +81,7 @@ The page keeps the browser baseline of decision 0008: Chromium 109, the last Chr
 | --- | --- |
 | `build.mjs` | Builds the core and assembles the site in `dist/`. |
 | `serve.mjs` | Serves `dist/` on this computer. |
-| [`../viewer-ui/shells/web.js`](../viewer-ui/README.md#the-shell) | The web shell: opening files, a folder, a URL or what is dropped; reading only the files a document needs, with `collect`; building in the core's Worker; the About box. |
+| [`../viewer-ui/shells/web.js`](../viewer-ui/README.md#the-shell) | The web shell: opening files, a folder, a URL or what is dropped; reading only the files a document needs, with `collect`; building in the core's Worker; the About box; a web page in a new tab. |
 | [`../viewer-ui/dialog.js`](../viewer-ui/README.md#modules) | The dialogs the web shell asks with: which netlist, which address, About. |
 | [`../../bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md) | The core as WebAssembly, and the modules that run it in a Worker and collect the files a document needs. |
 

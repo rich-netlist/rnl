@@ -438,4 +438,8 @@ export default {
     opened = handler;
   },
   about,
+  /** Show a web page in a new tab, with no hold on this one. */
+  browse(url) {
+    window.open(url, "_blank", "noopener");
+  },
 };

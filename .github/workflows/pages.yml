@@ -1,8 +1,10 @@
-# Builds the introduction pages in site/ and the pages of the language standard (scripts/spec/), and
-# publishes them to GitHub Pages: on a push to main, and after a revision of the standard is released, so
-# that its pages carry the new revision label.
-# Pull requests only run the build, which fails when a text is missing one of its languages, or when a
-# check of the standard fails (decision 0007).
+# Builds the project site and publishes it to GitHub Pages: the pages in site/ (the introduction, the
+# language tour and the page of the tools), the pages of the language standard (scripts/spec/), and the
+# web viewer with its samples (apps/web) under viewer/. It publishes on a push to main; after a revision
+# of the standard is released, so that its pages carry the new revision label; and after a release of
+# the desktop viewer, so that the page of the tools links to its files.
+# Pull requests only run the build, which fails when a text is missing one of its languages, when a
+# check of the standard fails (decision 0007), or when the web viewer does not build.
 # Requires Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
 name: Pages
 
@@ -14,6 +16,15 @@ on:
       - "spec/**"
       - "scripts/spec/**"
       - ".github/actions/install-spec-tools/**"
+      - "apps/web/**"
+      - "apps/viewer-ui/**"
+      - "bindings/**"
+      - "crates/**"
+      - "libraries/**"
+      - "scripts/fonts.py"
+      - "tests/conformance/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/pages.yml"
   pull_request:
     paths:
@@ -21,11 +32,21 @@ on:
       - "spec/**"
       - "scripts/spec/**"
       - ".github/actions/install-spec-tools/**"
+      - "apps/web/**"
+      - "apps/viewer-ui/**"
+      - "bindings/**"
+      - "crates/**"
+      - "libraries/**"
+      - "scripts/fonts.py"
+      - "tests/conformance/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/pages.yml"
-  # The release (spec-release.yml) runs on a tag, but only main may deploy to github-pages; this run
-  # builds main, whose history now holds the tag.
+  # The releases of the standard (spec-release.yml) and of the desktop viewer (viewer-release.yml) run
+  # on a tag, but only main may deploy to github-pages; this run builds main, and its checkout has the
+  # new tag.
   workflow_run:
-    workflows: ["Standard release"]
+    workflows: ["Standard release", "Viewer release"]
     types: [completed]
   workflow_dispatch:
 
@@ -34,6 +55,9 @@ permissions:
   pages: write
   id-token: write
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   build:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
@@ -41,10 +65,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0  # the tags give the revision label of the standard (decision 0007)
+          # the tags give the revision label of the standard (decision 0007), and the desktop viewer's
+          # newest release, whose files the page of the tools links to
+          fetch-depth: 0
 
-      # Writes site/dist/: the Chinese pages at the root and the English pages under en/.
-      # site/README.md, site/build.py and site/src/ stay out of the published site.
+      # Writes site/dist/: the Chinese pages at the root and the English pages under en/, the page of
+      # the tools with the files of the newest tag viewer-vX.Y.Z. site/README.md, site/build.py and
+      # site/src/ stay out of the published site.
       - name: Build the site
         run: python3 site/build.py
 
@@ -54,6 +81,48 @@ jobs:
       # site/dist/en/spec/0.2/ (English).
       - name: Build the pages of the standard
         run: python3 scripts/spec/build.py --site site/dist
+
+      # The web viewer, one copy for both languages: the core as WebAssembly, the page of
+      # apps/viewer-ui with its web fonts, and the conformance corpus as samples.
+      - name: Install Rust with the WebAssembly target
+        id: rust
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
+          echo "version=$(rustc --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+      # the crates the core depends on, and what was built of them for WebAssembly
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/wasm/
+            target/wasm32-unknown-unknown/
+          key: pages-wasm-${{ steps.rust.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: pages-wasm-${{ steps.rust.outputs.version }}-
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # Writing the web fonts from the pinned fonts takes scripts/fonts.py a minute or two, and what it
+      # writes changes only with the script, so it is kept between runs.
+      - id: fonts
+        uses: actions/cache@v6
+        with:
+          path: apps/viewer-ui/fonts/
+          key: web-fonts-${{ hashFiles('scripts/fonts.py') }}
+      - if: steps.fonts.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # downloads the pinned fonts and writes apps/viewer-ui/fonts/, the drawing's web fonts
+      - name: Write the web fonts
+        if: steps.fonts.outputs.cache-hit != 'true'
+        run: pip install fonttools brotli && python scripts/fonts.py web
+      # writes apps/web/dist/, and puts it at site/dist/viewer/, where the pages of both languages link
+      - name: Build the web viewer, with the samples
+        run: |
+          node apps/web/build.mjs --samples
+          cp -r apps/web/dist site/dist/viewer
 
       - if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
