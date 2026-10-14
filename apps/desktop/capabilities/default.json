@@ -1,7 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the viewer's page may call: the core APIs only; opening files goes through the app's own commands.",
+  "description": "What the viewer's page may call: the core APIs, and opening the repository's pages on GitHub in the default browser, for Help > Check for Updates; opening files goes through the app's own commands.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/rich-netlist/rnl/*" }]
+    }
+  ]
 }

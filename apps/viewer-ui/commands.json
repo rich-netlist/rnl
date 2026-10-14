@@ -43,6 +43,7 @@
       "label": "&Help",
       "items": [
         { "id": "desktop-viewer", "label": "&Desktop Viewer...", "platforms": ["web"] },
+        { "id": "check-updates", "label": "Check for &Updates...", "platforms": ["desktop"] },
         "-",
         { "id": "about", "label": "&About RNL Viewer" }
       ]

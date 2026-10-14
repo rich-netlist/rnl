@@ -26,9 +26,13 @@
  * @property {() => void} [about] Show the platform's About box, for Help > About in the page's own menu
  *   bar; without it the page shows a plain one. A platform whose menu shows its own About box leaves
  *   it out.
- * @property {(url: string) => void} [browse] Show a web page outside the viewer: on the web, in a new
- *   tab. Help > Desktop Viewer shows the project site's page of the tools with it; without it, the
- *   command does nothing.
+ * @property {(url: string) => void | Promise<void>} [browse] Show a web page outside the viewer: on the
+ *   web in a new tab, on the desktop in the default browser. Help > Desktop Viewer shows the project
+ *   site's page of the tools with it, and Help > Check for Updates a release's page; without it,
+ *   those commands do nothing.
+ * @property {() => Promise<string>} [version] The version of the app that runs, such as "0.1.0", for
+ *   Help > Check for Updates (updates.js), which only the desktop offers; without it, that command
+ *   does nothing.
  */
 
 /**

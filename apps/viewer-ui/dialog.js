@@ -1,7 +1,8 @@
 // Dialogs in the page's style, for what a shell asks of the user: one of a list, such as the netlist
-// to open; a line of text, such as a URL; several values at once, such as the grid's settings; or a
-// message, such as the About box. Each is modal and returns a promise of the answer, null when it is
-// cancelled. While one is shown, the page's keys and its menu bar do nothing.
+// to open; a line of text, such as a URL; several values at once, such as the grid's settings; a
+// message, such as the About box; or a message with a button that acts, such as one that opens a
+// release's page. Each is modal and returns a promise of the answer, null when it is cancelled.
+// While one is shown, the page's keys and its menu bar do nothing.
 
 const LIST_MAX = 500; // the items a list shows at most; the filter finds the others
 
@@ -154,16 +155,35 @@ export function form({ title, text, parts, answer, focus, action = "OK" }) {
  */
 export function inform({ title, paragraphs }) {
   const d = frame(title, "", "Close", false);
+  addParagraphs(d.body, paragraphs);
+  return d.show(d.ok, () => null).then(() => {});
+}
+
+/**
+ * Show a message with Cancel and a button that acts, labelled `action`, such as one that opens a
+ * page.
+ *
+ * @param {{ title: string, paragraphs: (string | Node)[], action: string }} options Each paragraph
+ *   a text, or a node to show as it is.
+ * @returns {Promise<boolean>} Whether the button that acts was pressed.
+ */
+export function offer({ title, paragraphs, action }) {
+  const d = frame(title, "", action);
+  addParagraphs(d.body, paragraphs);
+  return d.show(d.ok, () => true).then((acted) => acted === true);
+}
+
+/** Add paragraphs to a dialog's body: each a text, or a node to show as it is. */
+function addParagraphs(body, paragraphs) {
   for (const p of paragraphs) {
     if (typeof p !== "string") {
-      d.body.append(p);
+      body.append(p);
       continue;
     }
     const el = document.createElement("p");
     el.textContent = p;
-    d.body.append(el);
+    body.append(el);
   }
-  return d.show(d.ok, () => null).then(() => {});
 }
 
 /** A text box of a dialog. */
@@ -224,11 +244,13 @@ function frame(title, text, action, cancel = true) {
       result = a;
       el.close();
     });
-    // the page's keys wait; those the browser has too, F5, Ctrl+R and Ctrl+O, do nothing
+    // the page's keys wait; those the browser has too, F5, Ctrl+R and Ctrl+O, do nothing; Enter
+    // presses the default button, or the button or the link that has the focus
     el.addEventListener("keydown", (e) => {
       e.stopPropagation();
       if (e.key === "F5" || ((e.ctrlKey || e.metaKey) && /^[ro]$/i.test(e.key))) e.preventDefault();
-      if (e.key === "Enter" && !e.isComposing && !(e.target instanceof HTMLButtonElement)) {
+      const own = e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement;
+      if (e.key === "Enter" && !e.isComposing && !own) {
         e.preventDefault();
         if (!ok.disabled) ok.click();
       }

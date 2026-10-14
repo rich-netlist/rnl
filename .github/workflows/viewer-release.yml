@@ -1,0 +1,168 @@
+# Builds the desktop viewer of apps/desktop for Windows and releases it: the app as a single
+# executable, an NSIS installer for the current user and an MSI for the machine. The Tauri command
+# line that apps/desktop/package.json pins builds them on GitHub's Windows runner, whose MSVC
+# toolchain links the WebView2 loader into the executable. The workflow checks that the executable
+# imports no WebView2Loader.dll, smoke-tests it alone in a directory, and installs both installers,
+# smoke-tests the installed app and uninstalls it. A pushed tag viewer-v<version>, the app's version,
+# then makes the GitHub release "RNL Viewer <version>" with the notes of
+# apps/desktop/release-notes/<version>.md, not marked as the repository's latest release, which stays
+# the language standard's. Run by hand, it only builds and keeps the files as the run's artifact.
+name: Viewer release
+
+on:
+  push:
+    tags: ["viewer-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      # the version of tauri.conf.json, which the installers carry, must be the crate's, and a tag's
+      - name: The version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content apps/desktop/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $crate = (Select-String -Path apps/desktop/Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          if ($crate -ne $version) { throw "apps/desktop/Cargo.toml has version $crate, tauri.conf.json $version." }
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            if ($env:GITHUB_REF_NAME -ne "viewer-v$version") { throw "The tag $env:GITHUB_REF_NAME is not the app's version, $($version)." }
+            $notes = "apps/desktop/release-notes/$version.md"
+            if (-not (Test-Path $notes)) { throw "The release has no notes in $notes." }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$(([string]$version.Contains('-')).ToLower())" >> $env:GITHUB_OUTPUT
+          "RNL Viewer $version"
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # downloads the pinned fonts and writes apps/viewer-ui/fonts/, the drawing's web fonts, which
+      # the app embeds; fontTools and brotli are pinned, so that a release's fonts can be made again
+      - name: Write the web fonts
+        run: |
+          pip install fonttools==4.58.0 brotli==1.2.0
+          python scripts/fonts.py web
+      - name: Install the Tauri command line
+        working-directory: apps/desktop
+        run: npm ci
+      # cargo build --release with Tauri's custom-protocol feature, as for production, then the
+      # installers, for which the bundler downloads NSIS and WiX
+      - name: Build the app and its installers
+        working-directory: apps/desktop
+        run: npx tauri build
+
+      # dumpbin lists the imports; the Visual Studio installer's vswhere finds it
+      - name: The executable does not import WebView2Loader.dll
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $dumpbin = & $vswhere -latest -products * -find "VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
+          if (-not $dumpbin) { throw "There is no dumpbin." }
+          $imports = & $dumpbin /nologo /imports apps\desktop\target\release\rnl-viewer.exe
+          if ($LASTEXITCODE -ne 0) { throw "dumpbin failed." }
+          $dlls = @($imports | Where-Object { $_ -match '^\s+(\S+\.dll)$' } | ForEach-Object { $Matches[1] } | Sort-Object -Unique)
+          "rnl-viewer.exe imports $($dlls -join ', ')"
+          if ($dlls -notcontains "kernel32.dll") { throw "dumpbin listed no imports." }
+          if ($dlls -contains "WebView2Loader.dll") { throw "rnl-viewer.exe imports WebView2Loader.dll, so it is no single file." }
+
+      # names without spaces, and their SHA-256 sums
+      - name: The release's files
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $out = New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\assets"
+          $name = "RNL-Viewer-$env:VERSION-windows-x64"
+          $built = "apps\desktop\target\release"
+          Copy-Item "$built\bundle\nsis\RNL Viewer_$($env:VERSION)_x64-setup.exe" "$out\$name-setup.exe"
+          Copy-Item "$built\bundle\msi\RNL Viewer_$($env:VERSION)_x64_en-US.msi" "$out\$name.msi"
+          Copy-Item "$built\rnl-viewer.exe" "$out\$name.exe"
+          $sums = Get-ChildItem $out -File | Sort-Object Name | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          }
+          [IO.File]::WriteAllText("$out\SHA256SUMS.txt", ($sums -join "`n") + "`n")
+          Get-ChildItem $out | Format-Table Name, Length -AutoSize
+          Get-Content "$out\SHA256SUMS.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rnl-viewer-${{ steps.version.outputs.version }}-windows-x64
+          path: ${{ runner.temp }}/assets/
+          if-no-files-found: error
+          retention-days: 14
+
+      # each starts the app on tests/conformance/cases/04-hierarchy.sp and drives it through WebView2's
+      # DevTools port; alone in a directory, the executable shows that it needs no file beside it
+      - name: Smoke-test the single executable
+        timeout-minutes: 10
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/single"
+          cp "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.exe" "$RUNNER_TEMP/single/"
+          node apps/desktop/tests/smoke.mjs --exe "$RUNNER_TEMP/single/RNL-Viewer-$VERSION-windows-x64.exe"
+      - name: Install with the NSIS installer for the user, smoke-test the app and uninstall it
+        timeout-minutes: 10
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node apps/desktop/tests/installers.mjs --nsis "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64-setup.exe"
+      # the runner is an administrator, as the MSI's installation for the machine needs
+      - name: Install the MSI for the machine, smoke-test the app and uninstall it
+        timeout-minutes: 10
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node apps/desktop/tests/installers.mjs --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
+
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: rnl-viewer-${{ needs.build.outputs.version }}-windows-x64
+          path: assets
+      - name: Check the files against their sums
+        working-directory: assets
+        run: sha256sum --check SHA256SUMS.txt
+      # --latest=false: the repository's latest release stays the language standard's, so anything
+      # that looks for the newest viewer filters the releases by the tag's prefix, as Help > Check
+      # for Updates does
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+          PRERELEASE: ${{ needs.build.outputs.prerelease }}
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "viewer-v$VERSION" assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "RNL Viewer $VERSION" \
+            --notes-file "apps/desktop/release-notes/$VERSION.md" \
+            --latest=false \
+            --verify-tag \
+            "${flags[@]}"

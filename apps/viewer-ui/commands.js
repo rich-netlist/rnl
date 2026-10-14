@@ -12,6 +12,7 @@ import { clearSelection } from "./selection.js";
 import { shell } from "./shell.js";
 import { selected } from "./state.js";
 import { ascend, descend, opens } from "./subcircuits.js";
+import { checkForUpdates } from "./updates.js";
 import { $ } from "./util.js";
 
 let table = null; // commands.json, once loaded
@@ -49,6 +50,7 @@ export function command(id) {
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "descend": descend(selected); break;
     case "ascend": ascend(); break;
+    case "check-updates": checkForUpdates(); break;
     case "about": about(); break;
     case "desktop-viewer": toolsPage(); break;
     default: break;

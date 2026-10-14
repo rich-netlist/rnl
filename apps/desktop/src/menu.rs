@@ -249,6 +249,13 @@ mod tests {
         )
     }
 
+    /// The Help menu, alike on every platform: Check for Updates, which only the desktop offers and
+    /// which has no keys, then About.
+    fn help() -> (String, Vec<Shown>) {
+        let updates = item("check-updates", "Check for &Updates...", None);
+        ("&Help".to_string(), vec![updates, Shown::Separator, Shown::About("&About RNL Viewer".into())])
+    }
+
     /// The menu bar as it was written by hand before the table, on Windows, and the grid's submenu.
     #[test]
     fn windows_shows_the_keys_after_a_tab() {
@@ -278,7 +285,7 @@ mod tests {
                     check("toggle-problems", "&Problems\tCtrl+Shift+M", None),
                 ],
             ),
-            ("&Help".to_string(), vec![Shown::About("&About RNL Viewer".into())]),
+            help(),
         ];
         assert_eq!(menus, expected);
     }
@@ -313,7 +320,7 @@ mod tests {
                     check("toggle-problems", "&Problems", Some("CmdOrCtrl+Shift+M")),
                 ],
             ),
-            ("&Help".to_string(), vec![Shown::About("&About RNL Viewer".into())]),
+            help(),
         ];
         assert_eq!(menus, expected);
     }

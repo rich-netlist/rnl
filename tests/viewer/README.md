@@ -34,7 +34,7 @@ In CI, [`viewer.yml`](../../.github/workflows/viewer.yml) installs Rust with the
 | `server.js` | The test server, Node with no dependencies: `apps/viewer-ui` as it is, the fake shell as `shells/fake.js`, and the fixtures under `fixtures/`. Nothing of the tests goes into the page. |
 | `fake-shell.js` | The fake shell. |
 | `viewer.js` | What the tests share: opening the page, waiting for a build, the page's state, and where an object of the drawing is on the screen. |
-| `specs/` | The tests, one file per part of the page: opening, selection, subcircuits, the hierarchy path, the hierarchy view, the text pane, the view, the grid, the keys, reading again, the menu bar and its submenus, and the panels; and `web.spec.js`, the web viewer's smoke tests. The grid's tests read the pixels of its canvas where the scene's points are drawn. |
+| `specs/` | The tests, one file per part of the page: opening, selection, subcircuits, the hierarchy path, the hierarchy view, the text pane, the view, the grid, the keys, reading again, the menu bar and its submenus, the panels, and checking for updates, with GitHub's answer faked by `page.route`; and `web.spec.js`, the web viewer's smoke tests. The grid's tests read the pixels of its canvas where the scene's points are drawn. |
 
 ## The fake shell
 
@@ -44,13 +44,14 @@ It implements the Shell of [`shell.js`](../../apps/viewer-ui/shell.js). A source
 | --- | --- |
 | `open=NAME` | Open the fixture `NAME` at start. |
 | `fail-start=MESSAGE` | Reject the question of what to open at start with the plain message, as Tauri's invoke does. |
-| `platform=desktop` | Offer the desktop's commands with a native menu, so that the page shows no menu bar; otherwise the web's. |
+| `platform=desktop` | Offer the desktop's commands with a native menu, so that the page shows no menu bar, and what Help > Check for Updates needs (`updates`); otherwise the web's. |
+| `version=VERSION` | The version of the app that runs, for Help > Check for Updates; 0.1.0 by default. |
 
 `window.fakeShell` holds what the page asked and what the shell does next:
 
 | Member | |
 | --- | --- |
-| `calls` | The calls in order: `["initial"]`, `["pick", kind]`, `["build", name]`, `["setCheck", id, checked]`, `["browse", url]`. |
+| `calls` | The calls in order: `["initial"]`, `["pick", kind]`, `["build", name]`, `["setCheck", id, checked]`, `["browse", url]`, and on the desktop `["version"]`. |
 | `checks` | The check marks as a native menu would show them. |
 | `picks` | What the next picks choose, in order; nothing once it is empty. |
 | `fail` | A message the next build rejects with. |
