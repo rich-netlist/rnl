@@ -1,0 +1,69 @@
+# Tests the viewers' shared page in apps/viewer-ui in Chromium, Firefox and WebKit with Playwright,
+# against a fake shell that serves Documents the rnl command built natively, and smoke-tests the web
+# viewer of apps/web, its site built with the core as WebAssembly (tests/viewer).
+name: Viewer page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/viewer-ui/**"
+      - "apps/web/**"
+      - "bindings/**"
+      - "tests/viewer/**"
+      - "tests/conformance/**"
+      - "crates/**"
+      - "libraries/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/viewer.yml"
+  pull_request:
+    paths:
+      - "apps/viewer-ui/**"
+      - "apps/web/**"
+      - "bindings/**"
+      - "tests/viewer/**"
+      - "tests/conformance/**"
+      - "crates/**"
+      - "libraries/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/viewer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  page:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/viewer
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install Playwright
+        run: npm ci
+      - name: Install the browsers and what they need
+        run: npx playwright install --with-deps chromium firefox webkit
+      # the web server builds the web viewer's site and serves it; the global setup builds the rnl
+      # command and writes the fixtures
+      - name: Test the page and the web viewer in Chromium, Firefox and WebKit
+        run: npx playwright test
+      - name: Keep the report of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: viewer-page-report
+          path: |
+            tests/viewer/playwright-report/
+            tests/viewer/test-results/
+          retention-days: 14

@@ -1,0 +1,23 @@
+[package]
+name = "rnl-runtime-wasm"
+description = "The Rich Netlist (RNL) core for WebAssembly: a JSON request in, a Document out"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+name = "rnl_runtime_wasm"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# A request may ask the core to panic, for testing that the page still gets an answer.
+test-panic = []
+
+[dependencies]
+rnl-runtime.workspace = true
+rnl-view.workspace = true
+serde.workspace = true
+serde_json.workspace = true

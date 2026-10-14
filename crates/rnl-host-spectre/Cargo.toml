@@ -1,0 +1,13 @@
+[package]
+name = "rnl-host-spectre"
+description = "Spectre host adapter for Rich Netlist (RNL)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rnl-runtime.workspace = true
+rnl-host-spice.workspace = true

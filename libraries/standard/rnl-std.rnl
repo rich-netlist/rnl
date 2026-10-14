@@ -1,0 +1,337 @@
+/* The standard package rnl-std (spec-draft appendix B, 16.3, U3). Its content is a draft: it is
+   the Python prototype's package (rnl-dev tools/rnl-lang/stdlib, 2026-10-12) with the symbols
+   reviewed, an explicit box= on every symbol (9.2.3), and symbol rules for Spectre primitives and
+   model cards. Coordinates are y-up; one unit is one grid step, and pins sit on integer points. */
+@RNL(type="header") { @VERSION("0.2"); @PACKAGE(name="rnl-std", version="0.2")}
+
+/* ---------------------------------------------------------------- styles (9.3) */
+@RNL {
+  $base = @DEFINE-STYLE(linecolor="#1d1d1f", textcolor="#1d1d1f", fillcolor="#ffffff", linewidth=0, size=1) {};
+  $bus = @DEFINE-STYLE(linestyle="bold") {};
+  $signal = @DEFINE-STYLE(linecolor="#1f4fd8", linestyle="bold") {$base};
+  $note = @DEFINE-STYLE(textcolor="#555555", size=0.9) {};
+  $grey = @DEFINE-STYLE(linecolor="#9a9a9a", textcolor="#9a9a9a") {}
+}
+
+/* ---------------------------------------------------------------- symbols (9.2) */
+@RNL {
+  /* the arrow head drawn inside other symbols (9.2.7) */
+  $ARROW = @DEFINE(roles=[["p", "point"]]) {};
+  $ARROW_HEAD = @DEFINE-SYMBOL(box=[-0.35, -0.3, 0.35, 0.3]) { @LINE(fill="linecolor", linestyle="none") {(0.35, 0) (-0.35, 0.3) (-0.35, -0.3) (0.35, 0)}};
+
+  $RES = @DEFINE-SYMBOL(box=[-0.6, -3, 0.6, 3]) {
+    (0, 3) @PIN(terminal=1, direction="up");
+    (0, -3) @PIN(terminal=2, direction="down");
+    @LINE {(0, 3) (0, 2) (0.6, 1.667) (-0.6, 1) (0.6, 0.333) (-0.6, -0.333) (0.6, -1) (-0.6, -1.667) (0, -2) (0, -3)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.1, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.1, -0.95)
+  };
+  $CAP = @DEFINE-SYMBOL(box=[-1, -2, 1, 2]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    @LINE {(0, 2) (0, 0.3)};
+    @LINE {(0, -0.3) (0, -2)};
+    @LINE(linestyle="bold") {(-1, 0.3) (1, 0.3)};
+    @LINE(linestyle="bold") {(-1, -0.3) (1, -0.3)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.4, 0.35);
+    ? @TEXT("${value}", key="value") => @PLACE(1.4, -1.05)
+  };
+  $IND = @DEFINE-SYMBOL(box=[-0.5, -3, 0.5, 3]) {
+    (0, 3) @PIN(terminal=1, direction="up");
+    (0, -3) @PIN(terminal=2, direction="down");
+    @LINE {(0, 3) (0, 2)};
+    @LINE {(0, -2) (0, -3)};
+    @ARC {(0, 2) (0.5, 1.5) (0, 1)};
+    @ARC {(0, 1) (0.5, 0.5) (0, 0)};
+    @ARC {(0, 0) (0.5, -0.5) (0, -1)};
+    @ARC {(0, -1) (0.5, -1.5) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.1, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.1, -0.95)
+  };
+  %SOURCE_BODY = @DEFINE-SYMBOL {
+    (0, 3) @PIN(terminal=1, direction="up");
+    (0, -3) @PIN(terminal=2, direction="down");
+    @LINE {(0, 3) (0, 1.5)};
+    @LINE {(0, -1.5) (0, -3)};
+    (0, 0) @CIRCLE(radius=1.5);
+    ? @TEXT("${name}", key="name") => @PLACE(1.9, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.9, -0.95)
+  };
+  $VSRC = @DEFINE-SYMBOL(box=[-1.5, -3, 1.5, 3]) {
+    %SOURCE_BODY;
+    @LINE {(-0.4, 0.7) (0.4, 0.7)};
+    @LINE {(0, 0.3) (0, 1.1)};
+    @LINE {(-0.4, -0.7) (0.4, -0.7)}
+  };
+  $ISRC = @DEFINE-SYMBOL(box=[-1.5, -3, 1.5, 3]) {
+    %SOURCE_BODY;
+    @LINE(arrow="end") {(0, 0.9) (0, -0.9)}
+  };
+  $DIODE = @DEFINE-SYMBOL(box=[-0.7, -2, 0.7, 2]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    @LINE {(0, 2) (0, 0.5)};
+    @LINE {(0, -0.5) (0, -2)};
+    @LINE(fill="linecolor", linestyle="none") {(-0.7, 0.5) (0.7, 0.5) (0, -0.5) (-0.7, 0.5)};
+    @LINE {(-0.7, -0.5) (0.7, -0.5)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.1, 0.15)
+  };
+  %CTRL_BODY = @DEFINE-SYMBOL {
+    (0, 3) @PIN(terminal=1, direction="up");
+    (0, -3) @PIN(terminal=2, direction="down");
+    (-4, 1) @PIN(terminal=3, direction="left");
+    (-4, -1) @PIN(terminal=4, direction="left");
+    @LINE {(0, 3) (0, 1.5)};
+    @LINE {(0, -1.5) (0, -3)};
+    @LINE {(0, 1.5) (1.5, 0) (0, -1.5) (-1.5, 0) (0, 1.5)};
+    @LINE {(-4, 1) (-3, 1)};
+    @LINE {(-4, -1) (-3, -1)};
+    (-2.5, 1) @TEXT("+", halign="middle", valign="middle", size=0.8);
+    (-2.5, -1) @TEXT("−", halign="middle", valign="middle", size=0.8);
+    ? @TEXT("${name}", key="name") => @PLACE(1.9, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.9, -0.95)
+  };
+  $VCVS = @DEFINE-SYMBOL(box=[-4, -3, 1.5, 3]) {
+    %CTRL_BODY;
+    @LINE {(-0.4, 0.6) (0.4, 0.6)};
+    @LINE {(0, 0.2) (0, 1)};
+    @LINE {(-0.4, -0.6) (0.4, -0.6)}
+  };
+  $VCCS = @DEFINE-SYMBOL(box=[-4, -3, 1.5, 3]) {
+    %CTRL_BODY;
+    @LINE(arrow="end") {(0, 0.8) (0, -0.8)}
+  };
+
+  /* MOS: terminals d g s b = 1 2 3 4 (SPICE order). NMOS drain up, PMOS source up. */
+  %MOS_CHANNEL = @DEFINE-SYMBOL {
+    (-3, 0) @PIN(terminal=2, direction="left");
+    @LINE {(-3, 0) (-1.5, 0)};
+    @LINE {(-1.5, -1) (-1.5, 1)};
+    @LINE(linestyle="bold") {(-1, -1.2) (-1, 1.2)};
+    @LINE {(-1, 0.8) (0, 0.8) (0, 2)};
+    @LINE {(-1, -0.8) (0, -0.8) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
+    ? @TEXT("${model}", key="model") => @PLACE(0.5, -1.75)
+  };
+  %BULK = @DEFINE-SYMBOL {
+    (1, 0) @PIN(terminal=4, direction="right");
+    @LINE {(-1, 0) (1, 0)}
+  };
+  $NMOS = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
+    %MOS_CHANNEL;
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=3, direction="down");
+    $ARROW @ATTACH (-0.45, -0.8) => @SET-SYMBOL $ARROW_HEAD
+  };
+  $PMOS = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
+    %MOS_CHANNEL;
+    (0, -2) @PIN(terminal=1, direction="down");
+    (0, 2) @PIN(terminal=3, direction="up");
+    $ARROW @ATTACH (-0.55, 0.8) => @SET-SYMBOL $ARROW_HEAD => @ORIENT("R180")
+  };
+  $NMOS4 = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {$NMOS; %BULK};
+  $PMOS4 = @DEFINE-SYMBOL(box=[-3, -2, 1, 2]) {$PMOS; %BULK};
+
+  /* BJT: terminals c b e = 1 2 3. NPN collector up, PNP emitter up. */
+  %BJT_BASE = @DEFINE-SYMBOL {
+    (-3, 0) @PIN(terminal=2, direction="left");
+    @LINE {(-3, 0) (-1, 0)};
+    @LINE(linestyle="bold") {(-1, -1) (-1, 1)};
+    ? @TEXT("${name}", key="name") => @PLACE(0.5, 1.05);
+    ? @TEXT("${model}", key="model") => @PLACE(0.5, -1.75)
+  };
+  $NPN = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
+    %BJT_BASE;
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=3, direction="down");
+    @LINE {(-1, 0.5) (0, 1.1) (0, 2)};
+    @LINE {(0, -1.1) (0, -2)};
+    @LINE(arrow="end") {(-1, -0.5) (0, -1.1)}
+  };
+  $PNP = @DEFINE-SYMBOL(box=[-3, -2, 0, 2]) {
+    %BJT_BASE;
+    (0, -2) @PIN(terminal=1, direction="down");
+    (0, 2) @PIN(terminal=3, direction="up");
+    @LINE {(-1, -0.5) (0, -1.1) (0, -2)};
+    @LINE {(0, 1.1) (0, 2)};
+    @LINE(arrow="end") {(0, 1.1) (-1, 0.5)}
+  };
+
+  /* a generic op-amp: terminals in+ in- out = 1 2 3 */
+  $OPAMP = @DEFINE-SYMBOL(box=[-4, -2.5, 4, 2.5]) {
+    (-4, -1) @PIN(terminal=1, direction="left");
+    (-4, 1) @PIN(terminal=2, direction="left");
+    (4, 0) @PIN(terminal=3, direction="right");
+    @LINE {(-3, 2.5) (3, 0) (-3, -2.5) (-3, 2.5)};
+    @LINE {(-4, -1) (-3, -1)};
+    @LINE {(-4, 1) (-3, 1)};
+    @LINE {(3, 0) (4, 0)};
+    (-2.4, -1) @TEXT("+", halign="middle", valign="middle", size=0.9);
+    (-2.4, 1) @TEXT("−", halign="middle", valign="middle", size=0.9);
+    ? @TEXT("${name}", key="name") => @PLACE(0, 1.85)
+  };
+
+  /* virtual elements (12.5, 12.6, 13.2, 15.2). Their role is p (net is a standard subobject name, 9.4);
+     ${p} shows the net, or the net of the terminal when drawn on a pin (13.6, PR1). */
+  $GROUND = @DEFINE-SYMBOL(box=[-1, -1.5, 1, 0]) {
+    (0, 0) @PIN(terminal=1, direction="up");
+    @LINE {(0, 0) (0, -0.8)};
+    @LINE {(-1, -0.8) (1, -0.8)};
+    @LINE {(-0.6, -1.15) (0.6, -1.15)};
+    @LINE {(-0.2, -1.5) (0.2, -1.5)}
+  };
+  $SUPPLY_BAR = @DEFINE-SYMBOL(box=[-1, 0, 1, 0.8]) {
+    (0, 0) @PIN(terminal=1, direction="down");
+    @LINE {(0, 0) (0, 0.8)};
+    @LINE {(-1, 0.8) (1, 0.8)};
+    ? @TEXT("${p}", key="name", halign="middle", valign="bottom") => @PLACE(0, 1.1)
+  };
+  $PORT_TAG = @DEFINE-SYMBOL(box=[-3, -0.6, 0, 0.6]) {
+    (0, 0) @PIN(terminal=1, direction="right");
+    @LINE {(0, 0) (-0.7, 0.6) (-3, 0.6) (-3, -0.6) (-0.7, -0.6) (0, 0)};
+    ? @TEXT("${p}", key="name", halign="end", valign="middle") => @PLACE(-3.3, 0)
+  };
+  $NC_CROSS = @DEFINE-SYMBOL(box=[-0.5, -0.5, 0.5, 0.5]) {
+    @LINE {(-0.5, -0.5) (0.5, 0.5)};
+    @LINE {(-0.5, 0.5) (0.5, -0.5)}
+  };
+  $JUNCTION_DOT = @DEFINE-SYMBOL(box=[-0.25, -0.25, 0.25, 0.25]) {(0, 0) @CIRCLE(radius=0.25, fill="linecolor", linestyle="none")};
+  /* points right; ORIENT("R270") points down (15.2) */
+  $CURRENT_ARROW_SYM = @DEFINE-SYMBOL(box=[-0.6, 0.25, 0.6, 0.75]) { @LINE(arrow="end") {(-0.6, 0.5) (0.6, 0.5)}}
+}
+
+/* ---------------------------------------------------------------- definitions (9.4, 12, 14.6, 15.1) */
+@RNL {
+  /* virtual elements */
+  $GND = @DEFINE(roles=[["p", ["net", "terminal"]]]) {};
+  $SUPPLY = @DEFINE(roles=[["p", ["net", "terminal"]]]) {};
+  $IOPORT = @DEFINE(roles=[["p", ["net", "terminal"]]]) {};
+  $NC = @DEFINE(roles=[["t", "terminal"]]) {};
+  $JUNCTION = @DEFINE(roles=[["p", ["point", "terminal"]]]) {};
+  $CURRENT_ARROW = @DEFINE(roles=[["p", ["terminal", "point"]]]) {};
+
+  /* semantics: roles only (15.1) */
+  $DIFFPAIR = @DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"]]) {};
+  $DIFFPAIR_TAIL = @DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"], ["tail", "instance"]]) {};
+  $CURRENT_MIRROR = @DEFINE(roles=[["ref", "instance"], ["out", "instance"]]) {};
+  $INPUT_STAGE = @DEFINE(roles=[["pair", "usage"], ["tail", "instance"]]) {};
+  $MATCHED = @DEFINE(roles=["{members}"]) {};
+  $BRANCH = @DEFINE(roles=["{members}"]) {};
+  $CHAIN = @DEFINE(roles=["source", "{series}", "load"]) {};
+  $CASCADE = @DEFINE(roles=["first", "second", "feedback", "load"]) {};
+  $SUPPLY_HIGH = @DEFINE(roles=[["pin", "terminal"]]) {};
+  $SUPPLY_LOW = @DEFINE(roles=[["pin", "terminal"]]) {};
+
+  /* layout (14) */
+  $MIRROR_PAIR = @DEFINE(roles=["a", "b", "axis"]) {
+    {?a ?b} @ALIGN("y");
+    {?a ?axis ?b} @DISTRIBUTE("x");
+    ?a ?b @ORIENT-RELATION("MY")
+  };
+  $TAIL_CENTER = @DEFINE(roles=["a", "b", "t"]) {
+    %mid = (_, _);
+    {?a %mid ?b} @DISTRIBUTE("x");
+    {%mid ?t} @ALIGN("x")
+  };
+  $GND_STUB = @DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {
+    %g = $GND @ATTACH ?t::net;
+    ?t::net @WIRE {?t %g:p};
+    {?t %g:p} @ALIGN("x");
+    %g:p ?t @DISTANCE("bottom-to-top", min=?gap, max=?gap)
+  };
+  $SUPPLY_STUB = @DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {
+    %s = $SUPPLY @ATTACH ?t::net;
+    ?t::net @WIRE {?t %s:p};
+    {?t %s:p} @ALIGN("x");
+    ?t %s:p @DISTANCE("bottom-to-top", min=?gap, max=?gap)
+  };
+  $FLOW = @DEFINE(roles=["{path}"], parameters=[["direction", "left-to-right"]]) {
+    ?path @ORDER(?direction, priority="low")
+  }
+}
+
+/* ---------------------------------------------------------------- default rules (8.3, 10.5, 16.3) */
+@RNL {
+  /* style first, so every later rule and user statement overrides it */
+  # @SELECT-INSTANCE => @SET-STYLE $base;
+  # @SELECT-USAGE => @SET-STYLE $base;
+  # @SELECT-WIRE => @SET-STYLE $base;
+  # @SELECT-LABEL => @SET-STYLE $base;
+  # @SELECT-ANNOTATION => @SET-STYLE $base;
+  # @SELECT-WIRE(bus=true) => @SET-STYLE $bus;
+
+  /* symbols: broad (element letter, the first letter of the name) first, narrow (model type) later */
+  # @SELECT-INSTANCE(name="R*") => @SET-SYMBOL $RES;
+  # @SELECT-INSTANCE(name="C*") => @SET-SYMBOL $CAP;
+  # @SELECT-INSTANCE(name="L*") => @SET-SYMBOL $IND;
+  # @SELECT-INSTANCE(name="V*") => @SET-SYMBOL $VSRC;
+  # @SELECT-INSTANCE(name="I*") => @SET-SYMBOL $ISRC;
+  # @SELECT-INSTANCE(name="D*") => @SET-SYMBOL $DIODE;
+  # @SELECT-INSTANCE(name="E*") => @SET-SYMBOL $VCVS;
+  # @SELECT-INSTANCE(name="G*") => @SET-SYMBOL $VCCS;
+  # @SELECT-INSTANCE(name="M*") => @SET-SYMBOL $NMOS4;
+  # @SELECT-INSTANCE(name="Q*") => @SET-SYMBOL $NPN;
+
+  /* Spectre names carry no element letter: its primitives by master, model cards by type (6.12, 10.1) */
+  # @SELECT-INSTANCE(model="resistor") => @SET-SYMBOL $RES;
+  # @SELECT-INSTANCE(model="capacitor") => @SET-SYMBOL $CAP;
+  # @SELECT-INSTANCE(model="inductor") => @SET-SYMBOL $IND;
+  # @SELECT-INSTANCE(model="vsource") => @SET-SYMBOL $VSRC;
+  # @SELECT-INSTANCE(model="isource") => @SET-SYMBOL $ISRC;
+  # @SELECT-INSTANCE(model="diode") => @SET-SYMBOL $DIODE;
+  # @SELECT-INSTANCE(model="vcvs") => @SET-SYMBOL $VCVS;
+  # @SELECT-INSTANCE(model="vccs") => @SET-SYMBOL $VCCS;
+  # @SELECT-INSTANCE(type="d") => @SET-SYMBOL $DIODE;
+  # @SELECT-INSTANCE(type="nmos") => @SET-SYMBOL $NMOS4;
+  # @SELECT-INSTANCE(type="npn") => @SET-SYMBOL $NPN;
+
+  /* narrow: the model type picks the P variants */
+  # @SELECT-INSTANCE(type="pmos") => @SET-SYMBOL $PMOS4;
+  # @SELECT-INSTANCE(type="pnp") => @SET-SYMBOL $PNP;
+
+  # @SELECT-USAGE $GND => @SET-SYMBOL $GROUND;
+  # @SELECT-USAGE $SUPPLY => @SET-SYMBOL $SUPPLY_BAR;
+  # @SELECT-USAGE $IOPORT => @SET-SYMBOL $PORT_TAG;
+  # @SELECT-USAGE $NC => @SET-SYMBOL $NC_CROSS;
+  # @SELECT-USAGE $JUNCTION => @SET-SYMBOL $JUNCTION_DOT;
+  # @SELECT-USAGE $CURRENT_ARROW => @SET-SYMBOL $CURRENT_ARROW_SYM
+}
+
+@RNL {
+  /* sets the user edits with ADD-TO / REMOVE-FROM (10.5) */
+  $GROUND_NET_SET = # @SELECT-NET(name="0");
+  $SUPPLY_NET_SET = {};
+  $PORT_FILL_SET = # @SELECT-NET(port=true);
+
+  /* ground and supply for unwired pins: a stub with its own wire, gap below or above the pin
+     (10.5, PR3). The solver places it and writes it back as an explicit statement; its wire then
+     makes the terminal wired, so the fill does not come back (10.5 V8, PR2). A ground drawn right
+     on a pin (12.1 rule 5) is left to the user; through the usages only their terminal members are
+     selected (10.1, PR16), so such a pin is taken out of the fill. */
+  $GND_FILL_SET = $GROUND_NET_SET @SELECT-TERMINAL(wired=false);
+  # @SELECT-USAGE $NC => @SELECT-TERMINAL => @REMOVE-FROM $GND_FILL_SET;
+  # @SELECT-USAGE $GND => @SELECT-TERMINAL => @REMOVE-FROM $GND_FILL_SET;
+  $GND_STUB @ATTACH $GND_FILL_SET;
+
+  $SUPPLY_FILL_SET = $SUPPLY_NET_SET @SELECT-TERMINAL(wired=false);
+  # @SELECT-USAGE $NC => @SELECT-TERMINAL => @REMOVE-FROM $SUPPLY_FILL_SET;
+  # @SELECT-USAGE $SUPPLY => @SELECT-TERMINAL => @REMOVE-FROM $SUPPLY_FILL_SET;
+  $SUPPLY_STUB @ATTACH $SUPPLY_FILL_SET;
+
+  /* ports of a subcircuit: one tag per port net that has none yet */
+  # @SELECT-USAGE $IOPORT => @SELECT-NET => @REMOVE-FROM $PORT_FILL_SET;
+  $IOPORT @ATTACH $PORT_FILL_SET;
+
+  /* net-name labels for unwired pins: not applied by default; a document opts in with
+     $LABEL_TERM_SET @TEXT("${net}", key="netname") */
+  $LABEL_TERM_SET = # @SELECT-TERMINAL(wired=false);
+  $GROUND_NET_SET @SELECT-TERMINAL => @REMOVE-FROM $LABEL_TERM_SET;
+  $SUPPLY_NET_SET @SELECT-TERMINAL => @REMOVE-FROM $LABEL_TERM_SET;
+  # @SELECT-USAGE $NC => @SELECT-TERMINAL => @REMOVE-FROM $LABEL_TERM_SET;
+
+  /* nets to draw with wires, routed by the solver: not applied by default; a document or a style
+     package opts in with $WIRE_NET_SET @ROUTE (13.7, PR5) */
+  $WIRE_NET_SET = # @SELECT-NET;
+  $GROUND_NET_SET @REMOVE-FROM $WIRE_NET_SET;
+  $SUPPLY_NET_SET @REMOVE-FROM $WIRE_NET_SET
+}

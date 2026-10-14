@@ -1,0 +1,77 @@
+# Builds and tests the desktop viewer in apps/desktop, a Cargo workspace of its own so that its
+# WebView dependencies stay out of the library crates' builds, with the page in apps/viewer-ui and its
+# web fonts, which the app embeds, and checks the page's scripts. On Windows a smoke test starts the
+# app and drives it through WebView2's DevTools port.
+name: Desktop viewer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/desktop/**"
+      - "apps/viewer-ui/**"
+      - "crates/**"
+      - "libraries/**"
+      - "scripts/fonts.py"
+      - "tests/conformance/cases/04-hierarchy*"
+      - "rustfmt.toml"
+      - ".github/workflows/desktop.yml"
+  pull_request:
+    paths:
+      - "apps/desktop/**"
+      - "apps/viewer-ui/**"
+      - "crates/**"
+      - "libraries/**"
+      - "scripts/fonts.py"
+      - "tests/conformance/cases/04-hierarchy*"
+      - "rustfmt.toml"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the WebView build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy && rustup default stable
+      - name: Install Python for the web fonts
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # downloads the pinned fonts and writes apps/viewer-ui/fonts/, the drawing's web fonts
+      - name: Write the web fonts
+        run: pip install fonttools brotli && python scripts/fonts.py web
+      - name: Formatting
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo fmt --manifest-path apps/desktop/Cargo.toml --check
+      - name: Lints
+        run: cargo clippy --manifest-path apps/desktop/Cargo.toml --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --manifest-path apps/desktop/Cargo.toml
+      - name: Install Node for the smoke test
+        if: runner.os == 'Windows'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # it builds the app, starts it on tests/conformance/cases/04-hierarchy.sp and stops it
+      - name: Smoke test
+        if: runner.os == 'Windows'
+        timeout-minutes: 20
+        run: node apps/desktop/tests/smoke.mjs
+      - name: Check the page's scripts
+        if: matrix.os == 'ubuntu-latest'
+        run: find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check

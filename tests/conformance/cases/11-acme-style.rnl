@@ -1,0 +1,16 @@
+@RNL(type="header") {
+  @VERSION("0.2");
+  @PACKAGE(name="acme-style", version="1.3");
+  @DEVICE(name="X*", model="sky130_fd_pr__nfet_01v8", terminals=["d", "g", "s", "b"])
+}
+
+ACME house style for sky130 NMOS, a line of free text outside any record.
+@RNL {
+  $NMOS_ACME = @DEFINE-SYMBOL {
+    $NMOS;
+    (-1, 0) @CIRCLE(radius=2.6, linestyle="dashed")
+  };
+  # @SELECT-INSTANCE(model="sky130_fd_pr__nfet_01v8") => @SET-SYMBOL $NMOS_ACME;
+  $acme = @DEFINE-STYLE(linecolor="#6a1b9a", textcolor="#6a1b9a") {};
+  # @SELECT-INSTANCE => @SET-STYLE $acme
+}

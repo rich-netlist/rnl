@@ -4,8 +4,11 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Future tool output; no build is configured yet
+# Build and tool output
 target/
 node_modules/
 dist/
 coverage/
+
+# Web fonts written by scripts/fonts.py web
+apps/viewer-ui/fonts/

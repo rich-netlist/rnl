@@ -15,3 +15,5 @@ Decisions made before this log started, including those from the first architect
 | [0005](0005-github-organization.md) | The repository lives in the `rich-netlist` GitHub organization | accepted |
 | [0006](0006-language-versions-from-research-repository.md) | Language versions are worked out in a research repository and published here | accepted |
 | [0007](0007-publishing-the-standard.md) | The standard is published in several forms built from one Markdown source | accepted |
+| [0008](0008-shared-core-per-platform-frontends.md) | One shared Rust core decides the drawing; frontends are per platform | accepted |
+| [0009](0009-fonts-shipped-with-the-core.md) | The core ships Noto Sans SC and lays out text with its metrics | accepted |

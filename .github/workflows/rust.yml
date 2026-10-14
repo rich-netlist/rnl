@@ -1,0 +1,92 @@
+# Builds and tests the Rust workspace: formatting, lints and tests on three platforms; the core for
+# WebAssembly, whose Documents must be those of the native build (decision 0006); and checks that the
+# renderer's font metrics are those of the shipped fonts (decision 0007).
+name: Rust
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - "bindings/**"
+      - "libraries/**"
+      - "tests/**"
+      - "!tests/viewer/**"
+      - "scripts/fonts.py"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rustfmt.toml"
+      - ".github/workflows/rust.yml"
+  pull_request:
+    paths:
+      - "crates/**"
+      - "bindings/**"
+      - "libraries/**"
+      - "tests/**"
+      - "!tests/viewer/**"
+      - "scripts/fonts.py"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rustfmt.toml"
+      - ".github/workflows/rust.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy && rustup default stable
+      - name: Formatting
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo fmt --all --check
+      - name: Lints
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --workspace
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
+      # the core reads no files itself, so it builds for the browser as it is
+      - name: Build the core for WebAssembly
+        run: cargo build --target wasm32-unknown-unknown -p rnl-runtime -p rnl-render -p rnl-host-spice -p rnl-host-spectre -p rnl-view -p rnl-runtime-wasm
+      - name: Build the WebAssembly binding
+        run: node --version && node bindings/runtime-wasm/build.mjs
+      - name: Test the binding's JavaScript modules, with a module that panics on request
+        run: |
+          node bindings/runtime-wasm/build.mjs --features test-panic --out target/wasm-test
+          node bindings/runtime-wasm/tests/core.mjs target/wasm-test
+      - name: Build the CLI
+        run: cargo build -p rnl-cli
+      - name: Native and WebAssembly builds give identical Documents
+        run: |
+          node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl
+          node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl --view --primitives --request '{"primitives": true}'
+
+  fonts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install fontTools
+        run: pip install fonttools
+      # downloads the pinned fonts and fails when crates/rnl-render/fonts/ is not what they give
+      - name: The renderer's font metrics are those of the shipped fonts
+        run: python scripts/fonts.py metrics --check

@@ -1,0 +1,24 @@
+* RC low-pass filter
+*! 基本：标准包按元件字母配符号；地按 $GROUND_NET_SET 画在没接线的引脚上；导线的走法；汇合点，旁边的文字经角色取点的坐标 ${p::x}（13.6）；说明文字；写死的求解器块，地的 stub 是"求解器"写回的。
+V1 in 0 DC 0 AC 1
+R1 in out 1k
+C1 out 0 1n
+* @RNL(type="header") { @VERSION("0.2")}
+* @RNL {
+*   &in @WIRE(mode="vertical-horizontal") {#V1:1 #R1:1};
+*   %j = (12, 6);
+*   &out @WIRE(mode="horizontal-vertical") {#R1:2 %j #C1:1};
+*   %o = (17, 6);
+*   &out @WIRE {%j %o};
+*   $JUNCTION @ATTACH %j => @TEXT("(${p::x}, ${p::y})", dx=0.4, dy=-0.9, size=0.7);
+*   %o @TEXT("V_{out}", dx=0.4, dy=0.8);
+*   (6, 11) @TEXT("RC 低通：f_{c} = 1/(2\pi RC) ≈ 159 kHz", halign="middle")
+* }
+* @RNL(type="generated", priority="high") {
+*   #V1 @PLACE(0, 0);
+*   #R1 @PLACE(6, 6) => @ORIENT("R90");
+*   #C1 @PLACE(12, 3);
+*   %gs_V1_2 = $GND_STUB @ATTACH #V1:2; %gs_V1_2::g @PLACE(0, -5);
+*   %gs_C1_2 = $GND_STUB @ATTACH #C1:2; %gs_C1_2::g @PLACE(12, -1)
+* }
+.end

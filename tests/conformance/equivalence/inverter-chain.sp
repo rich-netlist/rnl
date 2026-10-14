@@ -1,0 +1,41 @@
+* Two inverters: a subcircuit with its block symbol, two instances, a record written from above
+* @RNL(type="header") { @VERSION("0.2")}
+.model nch nmos level=1
+.model pch pmos level=1
+.subckt inv a y vdd vss
+MP y a vdd vdd pch w=2u l=0.18u
+MN y a vss vss nch w=1u l=0.18u
+* @RNL {
+*   %inv_sym = @DEFINE-SYMBOL(box=[-3, -2, 3, 2]) {
+*     (-3, 0) @PIN(terminal="a", direction="left"); (3, 0) @PIN(terminal="y", direction="right");
+*     (0, 2) @PIN(terminal="vdd", direction="up"); (0, -2) @PIN(terminal="vss", direction="down");
+*     @LINE {(-1, 1) (1, 0) (-1, -1) (-1, 1)}; (1.25, 0) @CIRCLE(radius=0.25);
+*     @LINE {(-3, 0) (-1, 0)}; @LINE {(1.5, 0) (3, 0)}; @LINE {(0, 2) (0, 0.5)}; @LINE {(0, -2) (0, -0.5)};
+*     ? @TEXT("${name}", key="name") => @PLACE(-1, 1.4)
+*   };
+*   # @SET-SYMBOL %inv_sym;
+*   {#MP #MN} @ALIGN("x");
+*   #MN #MP @DISTANCE("bottom-to-top", min=6);
+*   &vdd @ADD-TO $SUPPLY_NET_SET; &vss @ADD-TO $GROUND_NET_SET;
+*   {&vdd &vss} @REMOVE-FROM $PORT_FILL_SET;
+*   &y @WIRE {#MP:d #MN:d}
+* }
+* @RNL(type="generated", priority="high") {
+*   #MP @PLACE(0, 4); #MN @PLACE(0, -4)
+* }
+.ends
+X1 in mid vdd 0 inv
+X2 mid out vdd 0 inv
+Vdd vdd 0 1.8
+* @RNL {
+*   &mid @WIRE {#X1:y #X2:a};
+*   &vdd @ADD-TO $SUPPLY_NET_SET;
+*   # @SELECT-INSTANCE(model="inv") => @TEXT("${model}", key="cell", dy=-3)
+* }
+* @RNL(scope="inv") {
+*   #MN @SET-STYLE $grey
+* }
+* @RNL(type="generated", priority="high") {
+*   #X1 @PLACE(0, 0); #X2 @PLACE(10, 0); #Vdd @PLACE(-8, 0)
+* }
+.end

@@ -1,0 +1,33 @@
+{
+  "menus": [
+    {
+      "label": "&File",
+      "items": [
+        { "id": "open", "label": "&Open...", "keys": ["Ctrl+O"] },
+        { "id": "open-folder", "label": "Open &Folder...", "platforms": ["web"] },
+        { "id": "open-url", "label": "Open &URL...", "platforms": ["web"] },
+        { "id": "reload", "label": "&Reload", "keys": ["F5", "Ctrl+R"] },
+        "-",
+        { "id": "exit", "label": "E&xit", "platforms": ["desktop"] }
+      ]
+    },
+    {
+      "label": "&View",
+      "items": [
+        { "id": "fit", "label": "&Fit to Window", "keys": ["F", "0"] },
+        { "id": "zoom-in", "label": "Zoom &In", "keys": ["Ctrl+=", "Ctrl++"], "shown": "Ctrl++" },
+        { "id": "zoom-out", "label": "Zoom &Out", "keys": ["Ctrl+-"] },
+        "-",
+        { "id": "descend", "label": "Open &Subcircuit", "keys": ["Enter"], "page": true },
+        { "id": "ascend", "label": "&Up to Parent Level", "keys": ["Backspace"], "page": true },
+        "-",
+        { "id": "toggle-netlist", "label": "&Netlist Panel", "keys": ["Ctrl+B"], "check": true },
+        { "id": "toggle-problems", "label": "&Problems", "keys": ["Ctrl+Shift+M"], "check": true }
+      ]
+    },
+    {
+      "label": "&Help",
+      "items": [{ "id": "about", "label": "&About RNL Viewer" }]
+    }
+  ]
+}
