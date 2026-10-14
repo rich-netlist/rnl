@@ -189,7 +189,8 @@ function leave() {
 /** Show the check marks of a list's entries as the commands have them. */
 function showChecks(el) {
   for (const b of entriesOf(el)) {
-    if (b.dataset.id && b.getAttribute("role") !== "menuitem") b.setAttribute("aria-checked", String(isChecked(b.dataset.id)));
+    if (!b.dataset.id || b.getAttribute("role") === "menuitem") continue;
+    b.setAttribute("aria-checked", String(isChecked(b.dataset.id)));
   }
 }
 

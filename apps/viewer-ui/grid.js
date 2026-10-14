@@ -19,7 +19,10 @@ const LINE = 1; // the width of a line and of an axis, in CSS pixels
 const MAX_SPACING = 1000; // units, the most a spacing of the user's may be
 const MAX_MAJOR = 100; // lines, the most a major line may be apart
 
-/** The settings: whether the grid is shown, as "dots" or "lines", its spacing ("auto" for 1 unit), its major lines and the axes. */
+/**
+ * The settings: whether the grid is shown, as "dots" or "lines", its spacing in units ("auto" for 1),
+ * every how many lines a major one comes, and whether the axes are shown.
+ */
 const settings = { shown: true, style: "dots", spacing: "auto", major: 5, axes: false };
 let shownView = null; // the view the grid was last drawn for, and the drawing's pixels per unit
 let drawn = null; // the step of the grid drawn and of its major lines, in units
@@ -65,7 +68,10 @@ export function gridCommand(id) {
   }
 }
 
-/** The settings, and the steps of the grid drawn, in units: `step`, and `majorStep` for lines; null when none is drawn. */
+/**
+ * The settings, and the steps of the grid drawn, in units: `step`, and `majorStep` for lines; null
+ * when none is drawn.
+ */
 export function gridState() {
   return { ...settings, step: drawn ? drawn.step : null, majorStep: drawn ? drawn.major : null };
 }
@@ -99,8 +105,8 @@ function paint() {
   const { view, scale } = shownView;
   if (!colours) {
     const style = getComputedStyle(grid);
-    const colour = (name) => style.getPropertyValue(name).trim();
-    colours = { dot: colour("--grid-dot"), line: colour("--grid-line"), major: colour("--grid-major"), axis: colour("--grid-axis") };
+    const colour = (name) => style.getPropertyValue(`--grid-${name}`).trim();
+    colours = { dot: colour("dot"), line: colour("line"), major: colour("major"), axis: colour("axis") };
   }
   // where a point of the scene is on the canvas, in device pixels, and the scene the canvas shows
   const px = (u) => (u * scale - view.x) * view.k * dpr;
@@ -111,12 +117,16 @@ function paint() {
   const line = Math.max(1, Math.round(LINE * dpr));
   const across = (p) => Math.round(p - line / 2);
 
-  if (settings.shown) {
+  if (settings.shown && Number.isFinite(unit) && unit > 0) {
     const base = settings.spacing === "auto" ? 1 : settings.spacing;
     let q = 1; // the step, in multiples of the spacing
     for (q of steps()) if (base * q * unit >= MIN_SPACING) break;
     const s = base * q;
-    const range = (a, b) => Array.from({ length: Math.max(0, Math.ceil(b / s) - Math.floor(a / s) + 1) }, (_, k) => Math.floor(a / s) + k);
+    // the steps from a to b, by their indexes, and one more on each side
+    const range = (a, b) => {
+      const first = Math.floor(a / s);
+      return Array.from({ length: Math.ceil(b / s) - first + 1 }, (_, k) => first + k);
+    };
     const [is, js] = [range(u0, u1), range(v0, v1)];
     if (settings.style === "dots") {
       const d = Math.max(1, Math.round(DOT * dpr));
@@ -129,7 +139,8 @@ function paint() {
       if (first !== undefined) for (const y of ys) if (y !== first) ctx.drawImage(grid, 0, first, W, d, 0, y, W, d);
       drawn = { step: s, major: null };
     } else {
-      // the major lines: every `major` lines, or the next step of the sequence that is a multiple of the step
+      // the major lines: every `major` lines, or else at the next step of the sequence that is a
+      // multiple of the step, in multiples of the spacing
       let Q = q;
       for (Q of steps()) if (Q >= settings.major * q && Q % q === 0) break;
       for (const major of [false, true]) {
@@ -197,8 +208,8 @@ function radios(legend, name, choices, value) {
 
 /** The Grid Settings dialog: the style, the spacing, the major lines and the axes. */
 async function askSettings() {
-  const now = settings.shown ? settings.style : "none";
-  const [styleSet, styles] = radios("Grid", "grid-style", [["none", "None"], ["dots", "Dots"], ["lines", "Lines"]], now);
+  const choices = [["none", "None"], ["dots", "Dots"], ["lines", "Lines"]];
+  const [styleSet, styles] = radios("Grid", "grid-style", choices, settings.shown ? settings.style : "none");
   const auto = settings.spacing === "auto";
   const [spacingSet, [autoSpacing, fixedSpacing]] = radios(
     "Spacing",
@@ -246,7 +257,9 @@ async function askSettings() {
     focus: styles.find((r) => r.checked),
     answer: () => {
       const spacing = autoSpacing.checked ? "auto" : Number(units.value);
-      if (!VALID.spacing(spacing)) return wrong(`The spacing is a number of units above 0 and at most ${MAX_SPACING}.`, units);
+      if (!VALID.spacing(spacing)) {
+        return wrong(`The spacing is a number of units above 0 and at most ${MAX_SPACING}.`, units);
+      }
       const every = Number(major.value);
       if (!VALID.major(every)) return wrong(`A major line comes every 2 to ${MAX_MAJOR} lines, a whole number.`, major);
       const style = styles.find((r) => r.checked).value;

@@ -60,7 +60,10 @@ window.viewer = {
   get level() {
     return current;
   },
-  /** The hierarchy path to it, from its root: per level, its index and the instance it was reached through, null for the root. */
+  /**
+   * The hierarchy path to it, from its root: per level, its index and the instance it was reached
+   * through, null for the root.
+   */
   get path() {
     return path.map((s) => ({ level: s.level, via: s.via }));
   },

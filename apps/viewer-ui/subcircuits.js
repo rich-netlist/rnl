@@ -127,8 +127,13 @@ export function namedPath() {
 export function restorePath(named, level) {
   const next = [];
   for (const s of named) {
-    const child = next.length === 0 ? null : doc.levels[next[next.length - 1].level].children.find((c) => c.instance === s.via);
-    const l = next.length === 0 ? doc.levels.findIndex((x) => x.title === s.title) : child && child.level !== null ? child.level : -1;
+    let l = -1;
+    if (next.length === 0) {
+      l = doc.levels.findIndex((x) => x.title === s.title);
+    } else {
+      const child = doc.levels[next[next.length - 1].level].children.find((c) => c.instance === s.via);
+      if (child && child.level !== null) l = child.level;
+    }
     if (l < 0 || doc.levels[l].title !== s.title) break;
     next.push({ level: l, via: s.via });
   }
