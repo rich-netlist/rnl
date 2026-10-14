@@ -12,6 +12,7 @@ import { $, save } from "./util.js";
 
 const holder = $("canvas");
 const grid = $("grid");
+const row = document.createElement("canvas"); // a row of dots, which paint() copies to every row
 
 const MIN_SPACING = 10; // CSS pixels between neighbouring dots or lines, at least
 const DOT = 2; // the side of a dot, in CSS pixels
@@ -132,11 +133,15 @@ function paint() {
       const d = Math.max(1, Math.round(DOT * dpr));
       const xs = is.map((i) => Math.round(px(i * s) - d / 2));
       const ys = js.map((j) => Math.round(py(j * s) - d / 2));
-      ctx.fillStyle = colours.dot;
-      // one row of dots, copied to the others
-      const first = ys.find((y) => y >= 0 && y + d <= H);
-      for (const y of first === undefined ? ys : [first]) for (const x of xs) ctx.fillRect(x, y, d, d);
-      if (first !== undefined) for (const y of ys) if (y !== first) ctx.drawImage(grid, 0, first, W, d, 0, y, W, d);
+      // one row of dots, on a canvas of its own, copied to every row: a canvas copied onto itself
+      // is copied whole first in WebKit, each time
+      if (row.width !== W) row.width = W;
+      if (row.height !== d) row.height = d;
+      const rc = row.getContext("2d");
+      rc.clearRect(0, 0, W, d);
+      rc.fillStyle = colours.dot;
+      for (const x of xs) rc.fillRect(x, 0, d, d);
+      for (const y of ys) ctx.drawImage(row, 0, y);
       drawn = { step: s, major: null };
     } else {
       // the major lines: every `major` lines, or else at the next step of the sequence that is a
