@@ -1,5 +1,7 @@
-# Builds the introduction pages in site/ and publishes them to GitHub Pages.
-# Pull requests only run the build, which fails when a text is missing one of its languages.
+# Builds the introduction pages in site/ and the pages of the language standard (scripts/spec/), and
+# publishes them to GitHub Pages.
+# Pull requests only run the build, which fails when a text is missing one of its languages, or when a
+# check of the standard fails (decision 0007).
 # Requires Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
 name: Pages
 
@@ -8,10 +10,16 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "spec/**"
+      - "scripts/spec/**"
+      - ".github/actions/install-spec-tools/**"
       - ".github/workflows/pages.yml"
   pull_request:
     paths:
       - "site/**"
+      - "spec/**"
+      - "scripts/spec/**"
+      - ".github/actions/install-spec-tools/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -25,11 +33,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # the tags give the revision label of the standard (decision 0007)
 
       # Writes site/dist/: the Chinese pages at the root and the English pages under en/.
       # site/README.md, site/build.py and site/src/ stay out of the published site.
       - name: Build the site
         run: python3 site/build.py
+
+      - uses: ./.github/actions/install-spec-tools
+
+      # Checks the standard, then writes its pages and downloads: site/dist/spec/0.2/ (Chinese) and
+      # site/dist/en/spec/0.2/ (English).
+      - name: Build the pages of the standard
+        run: python3 scripts/spec/build.py --site site/dist
 
       - if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6

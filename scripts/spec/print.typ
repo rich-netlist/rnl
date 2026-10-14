@@ -18,10 +18,11 @@
 #let mono = ($for(mono)$"$mono$", $endfor$)
 
 // RNL code, coloured by the filter rnl.lua: a list of lines, each a list of (class, text).
+// The colours of the project site (site/src/assets/intro.css, light palette).
 #let colors = (
-  k: rgb("#7c3aed"), i: rgb("#0f766e"), n: rgb("#b45309"), v: rgb("#1d4ed8"), d: rgb("#be185d"),
-  r: rgb("#4d7c0f"), s: rgb("#15803d"), o: rgb("#57606a"), t: rgb("#8a9199"), c: rgb("#8a9199"),
-  h: rgb("#57606a"), hi: rgb("#0f766e"),
+  k: rgb("#c2410c"), i: rgb("#1f4fd8"), n: rgb("#0f766e"), v: rgb("#7c3aed"), d: rgb("#ad1f78"),
+  r: rgb("#975a06"), pt: rgb("#15803d"), s: rgb("#8a5a00"), o: rgb("#435368"), t: rgb("#8792a3"),
+  c: rgb("#97a2b0"), h: rgb("#435368"), hi: rgb("#132033"),
 )
 #let rnlcode(label: none, lines) = block(
   fill: if label == none { luma(246) } else { rgb("#fef3f2") },

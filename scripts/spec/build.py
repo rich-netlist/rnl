@@ -54,14 +54,28 @@ FONTS = {  # preferences; only the families typst finds are passed on
     "sans": ["Segoe UI", "Noto Sans", "DejaVu Sans", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei"],
     "mono": ["DejaVu Sans Mono", "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Microsoft YaHei"],
 }
+SITE_URL = "https://rich-netlist.github.io/rnl/"  # the project site; the downloaded page links to it
+FONTS_CSS = ("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600"
+             "&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family={body}&display=swap")
 LANGS = {
     "en": {"suffix": "", "html_lang": "en", "other": "zh", "other_label": "中文", "contents": "Contents",
-           "zip_label": "Chapters (zip)", "files": "Files", "file": "File", "content": "Content",
+           "zip_label": "Markdown, chapters", "md_label": "Markdown", "sums_label": "SHA-256 checksums",
+           "intro": "Introduction", "tour": "Language tour", "spec": "Standard", "pages": "Pages",
+           "kicker": "Rich Netlist language standard", "theme_dark": "Switch to dark theme",
+           "theme_light": "Switch to light theme", "site_home": "en/",
+           "body_font": "IBM+Plex+Sans:wght@400;500;600;700",
+           "foot": "The text of the standard is licensed under CC-BY-4.0. The English text is normative.",
+           "files": "Files", "file": "File", "content": "Content",
            "label": "Version {v} · {state} ({date}, {commit})", "released": "revision {n}",
            "after": "revision {n} + later changes", "draft": "not released", "dirty": " + uncommitted changes",
            "site_dir": "en/spec/{v}", "site_other": "../../../spec/{v}/"},
-    "zh": {"suffix": ".zh", "html_lang": "zh-CN", "other": "en", "other_label": "English", "contents": "目录",
-           "zip_label": "分章包", "files": "文件", "file": "文件", "content": "内容",
+    "zh": {"suffix": ".zh", "html_lang": "zh-CN", "other": "en", "other_label": "EN", "contents": "目录",
+           "zip_label": "Markdown 分章包", "md_label": "Markdown 合订本", "sums_label": "SHA-256 校验值",
+           "intro": "介绍", "tour": "语言导览", "spec": "标准", "pages": "页面",
+           "kicker": "Rich Netlist 语言标准", "theme_dark": "切换到深色", "theme_light": "切换到浅色", "site_home": "",
+           "body_font": "Noto+Sans+SC:wght@400;500;700;900",
+           "foot": "标准文本按 CC-BY-4.0 许可发布。本文是中文译本，以英文版为准。",
+           "files": "文件", "file": "文件", "content": "内容",
            "label": "{v} 版 · {state}（{date}，{commit}）", "released": "修订 {n}",
            "after": "修订 {n} 之后的修改", "draft": "未发布", "dirty": " + 未提交的修改",
            "site_dir": "spec/{v}", "site_other": "../../en/spec/{v}/"},
@@ -225,23 +239,39 @@ def typst_fonts() -> dict:
 
 def common_args(lang: str, rev: dict) -> list[str]:
     return ["-f", READER, "--shift-heading-level-by=-1", "--lua-filter", str(HERE / "rnl.lua"),
-            "--syntax-highlighting=none", "--fail-if-warnings",
+            "--syntax-highlighting=none", "--fail-if-warnings", "--wrap=none",  # values go into scripts intact
             "-M", f"rnl-lang={lang}", "-M", f"typst-lang={lang}", "-M", f"revision-label={revision_label(lang, rev)}",
             "-M", f"revision={rev['commit']}", "-M", f"contents-title={LANGS[lang]['contents']}"]
 
 
-def build_html(src: Path, lang: str, rev: dict, dest: Path, other_href: str, work: Path) -> None:
+def size(p: Path) -> str:
+    if not p.exists():
+        return ""
+    n = p.stat().st_size
+    return f"{n / 1048576:.1f} MB" if n >= 1048576 else f"{max(1, n // 1024)} KB"
+
+
+def build_html(src: Path, lang: str, rev: dict, dest: Path, other_href: str, site_root: str, out: Path,
+               work: Path) -> None:
+    """The web page. Its downloads are the files of the same build, next to it; site_root is where the
+    links of the top bar lead: the site's pages for this language."""
     L, other = LANGS[lang], LANGS[lang]["other"]
     log = work / f"links-{lang}.tsv"
     log.unlink(missing_ok=True)
+    meta = {"html-lang": L["html_lang"], "pagetitle": f"RNL {VERSION} · {L['kicker']}",
+            "other-lang": LANGS[other]["html_lang"], "other-label": L["other_label"], "other-href": other_href,
+            "pdf-href": name(lang, ".pdf"), "md-href": name(lang, ".md"), "zip-href": name(lang, "-chapters.zip"),
+            "pdf-size": size(out / name(lang, ".pdf")), "md-size": size(out / name(lang, ".md")),
+            "zip-size": size(out / name(lang, "-chapters.zip")), "md-label": L["md_label"],
+            "zip-label": L["zip_label"], "sums-label": L["sums_label"], "site-root": site_root,
+            "intro-label": L["intro"], "tour-label": L["tour"], "spec-label": L["spec"], "pages-label": L["pages"],
+            "kicker": L["kicker"], "theme-label": L["theme_dark"], "theme-dark": L["theme_dark"],
+            "theme-light": L["theme_light"], "foot-note": L["foot"],
+            "font-href": FONTS_CSS.format(body=L["body_font"])}
+    args = [a for k, v in meta.items() for a in ("-M", f"{k}={v}")]
     run(["pandoc", str(src), *common_args(lang, rev), "-t", "html5", "--standalone",
-         "--template", str(HERE / "page.html"), "--toc", "--toc-depth=2", "--section-divs",
-         "-M", f"html-lang={L['html_lang']}", "-M", f"pagetitle=RNL {VERSION}",
-         "-M", f"other-lang={LANGS[other]['html_lang']}", "-M", f"other-label={L['other_label']}",
-         "-M", f"other-href={other_href}", "-M", f"pdf-href={name(lang, '.pdf')}",
-         "-M", f"md-href={name(lang, '.md')}", "-M", f"zip-href={name(lang, '-chapters.zip')}",
-         "-M", f"zip-label={L['zip_label']}", "-o", str(dest)], f"pandoc html ({lang})",
-        dict(os.environ, RNL_LINKS_LOG=str(log)))
+         "--template", str(HERE / "page.html"), "--toc", "--toc-depth=2", "--section-divs", *args,
+         "-o", str(dest)], f"pandoc html ({lang})", dict(os.environ, RNL_LINKS_LOG=str(log)))
 
 
 def build_pdf(src: Path, lang: str, rev: dict, out: Path, work: Path, fonts: dict) -> None:
@@ -331,19 +361,20 @@ def main(argv: list[str]) -> int:
     fonts = typst_fonts()
     try:
         for lang in LANGS:
+            L = LANGS[lang]
             shutil.copyfile(spec / name(lang, ".md"), out / name(lang, ".md"))
             src = pandoc_input(spec, lang, work)
-            build_html(src, lang, rev, out / name(lang, ".html"), name(LANGS[lang]["other"], ".html"), work)
+            build_zip(spec, lang, rev, out)
             if not args.no_pdf:
                 build_pdf(src, lang, rev, out, work, fonts)
-            build_zip(spec, lang, rev, out)
+            build_html(src, lang, rev, out / name(lang, ".html"), name(L["other"], ".html"),
+                       SITE_URL + L["site_home"], out, work)
             if args.site:
-                L = LANGS[lang]
                 d = args.site / L["site_dir"].format(v=VERSION)
                 d.mkdir(parents=True, exist_ok=True)
-                build_html(src, lang, rev, d / "index.html", L["site_other"].format(v=VERSION), work)
                 for ext in (".md", "-chapters.zip") + (() if args.no_pdf else (".pdf",)):
                     shutil.copyfile(out / name(lang, ext), d / name(lang, ext))
+                build_html(src, lang, rev, d / "index.html", L["site_other"].format(v=VERSION), "../../", out, work)
                 write_sums(d)
             print(f"built {lang}: {revision_label(lang, rev)}")
     except Failed as e:

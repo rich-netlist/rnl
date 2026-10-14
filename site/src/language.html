@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><zh>RNL 语言导览 · Rich Netlist</zh><en>RNL language tour · Rich Netlist</en></title>
-<meta name="description" content="<zh>Rich Netlist（RNL）语言草稿 0.2 的互动导览：标准例句与中文写法、定义与套用、标准包的默认行为、集合与选择、导线、文字、朝向、优先级和文件头。</zh>
-  <en>An interactive tour of Rich Netlist (RNL) language draft 0.2: standard sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en>">
+<meta name="description" content="<zh>Rich Netlist（RNL）语言标准 0.2 的互动导览：标准例句与中文写法、定义与套用、标准包的默认行为、集合与选择、导线、文字、朝向、优先级和文件头。</zh>
+  <en>An interactive tour of Rich Netlist (RNL) language standard 0.2: standard sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&<zh>family=Noto+Sans+SC:wght@400;500;700;900</zh><en>family=IBM+Plex+Sans:wght@400;500;600;700</en>&display=swap">
@@ -57,6 +57,7 @@
       <a href="#orientation"><zh>朝向</zh><en>Orientation</en></a>
       <a href="#priority"><zh>优先级</zh><en>Priority</en></a>
       <a href="#header"><zh>文件头</zh><en>Header</en></a>
+      <a class="toc-page" href="spec/0.2/"><zh>语言标准</zh><en>Standard</en><svg class="ico"><use href="#i-arrow"/></svg></a>
       <a class="toc-page" href="./"><svg class="ico"><use href="#i-back"/></svg><zh>介绍页</zh><en>Introduction</en></a>
     </nav>
     <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>打开目录</zh><en>Open the section list</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
@@ -74,8 +75,8 @@
     <p class="eyebrow"><span>RICH NETLIST · LANGUAGE 0.2</span><span class="chip chip-warn"><zh>草稿 · 2026-10-12</zh><en>Draft · 2026-10-12</en></span></p>
     <h1 id="tour-title" class="tour-h1"><zh>语言导览</zh><en>Language tour</en></h1>
     <p class="thesis"><zh>九个小节，每节讲一件事，都可以动手试。</zh><en>Nine sections, one idea each, all hands-on.</en></p>
-    <p class="lead"><zh>介绍页讲了 RNL 为什么存在、长什么样；这里讲语言草稿 0.2 里那些介绍页没有展开的规则。例子都在 RNL 原型里检查过，能读通；图是本页手工排的，求解器还没有正式版。</zh>
-      <en>The introduction covers why RNL exists and what it looks like; this tour covers the rules of language draft 0.2 that the introduction does not unpack. Every example has been checked in the RNL prototype and reads cleanly; the drawings are laid out by hand for this page, since there is no production solver yet.</en></p>
+    <p class="lead"><zh>介绍页讲了 RNL 为什么存在、长什么样；这里讲<a href="spec/0.2/">语言标准 0.2</a> 里那些介绍页没有展开的规则。例子都在 RNL 原型里检查过，能读通；图是本页手工排的，求解器还没有正式版。</zh>
+      <en>The introduction covers why RNL exists and what it looks like; this tour covers the rules of <a href="spec/0.2/">language standard 0.2</a> that the introduction does not unpack. Every example has been checked in the RNL prototype and reads cleanly; the drawings are laid out by hand for this page, since there is no production solver yet.</en></p>
     <ol class="tour-map">
       <li><a href="#sentences"><span class="n">T1</span><b><zh>句子</zh><en>Sentences</en></b><span><zh>记号、标准例句和中文写法</zh><en>Notation, standard sentences and Chinese</en></span></a></li>
       <li><a href="#definitions"><span class="n">T2</span><b><zh>定义</zh><en>Definitions</en></b><span><zh>AS 与 ATTACH，自己写一个定义</zh><en>AS and ATTACH; write your own</en></span></a></li>
@@ -538,14 +539,15 @@
   <div class="wrap foot-grid">
     <div>
       <span class="brand-mark">RNL</span>
-      <p><zh>Rich Netlist（RNL）语言导览。写法来自语言草稿 0.2（2026-10-12），尚未并入 spec/，名字和细节仍会调整；例子都在 RNL 原型里检查过。图中的坐标由本页手工排布，符号由本页自绘，引脚位置与标准包一致。</zh>
-        <en>Rich Netlist (RNL) language tour. The notation follows language draft 0.2 (2026-10-12), not yet merged into spec/, and names and details will still change; every example has been checked in the RNL prototype. The coordinates in the drawings were placed by hand and the symbols drawn for this page, with pins where the standard package puts them.</en></p>
+      <p><zh>Rich Netlist（RNL）语言导览。写法照语言标准 0.2；例子都在 RNL 原型里检查过。图中的坐标由本页手工排布，符号由本页自绘，引脚位置与标准包一致。</zh>
+        <en>Rich Netlist (RNL) language tour. The notation follows language standard 0.2; every example has been checked in the RNL prototype. The coordinates in the drawings were placed by hand and the symbols drawn for this page, with pins where the standard package puts them.</en></p>
     </div>
     <div>
       <h4><zh>另见</zh><en>See also</en></h4>
       <ul>
         <li><a href="./"><zh>介绍页</zh><en>Introduction</en></a><zh>：动机、工具链、设计原则和现状</zh><en>: motivation, toolchain, principles and status</en></li>
-        <li><zh>原则草案：</zh><en>Principles draft: </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md"><code>spec/rich-netlist.md</code></a></li>
+        <li><a href="spec/0.2/"><zh>语言标准 0.2</zh><en>Language standard 0.2</en></a><zh>：正式文本，另有 PDF 和 Markdown 下载</zh><en>: the formal text, also as PDF and Markdown downloads</en></li>
+        <li><zh>原则：</zh><en>Principles: </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md"><code>spec/rich-netlist.md</code></a></li>
         <li><zh>路线图：</zh><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a></li>
       </ul>
     </div>

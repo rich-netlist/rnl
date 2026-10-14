@@ -81,6 +81,7 @@
       <a href="#examples"><zh>例子</zh><en>Examples</en></a>
       <a href="#status"><zh>现状</zh><en>Status</en></a>
       <a class="toc-page" href="language.html"><zh>语言导览</zh><en>Language tour</en><svg class="ico"><use href="#i-arrow"/></svg></a>
+      <a class="toc-page" href="spec/0.2/"><zh>语言标准</zh><en>Standard</en><svg class="ico"><use href="#i-arrow"/></svg></a>
     </nav>
     <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>打开目录</zh><en>Open the section list</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
     <a class="lang-link" href="<zh>en/</zh><en>../</en>" hreflang="<zh>en</zh><en>zh-CN</en>" lang="<zh>en</zh><en>zh-CN</en>" aria-label="<zh>English version</zh><en>中文版</en>" data-lang-link><zh>EN</zh><en>中文</en></a>
@@ -111,8 +112,8 @@
         <div class="tb-main"><dt><zh>项目</zh><en>Project</en></dt><dd>Rich Netlist (RNL)</dd></div>
         <div><dt><zh>是什么</zh><en>What</en></dt><dd><zh>附着在网表上的元数据扩展</zh><en>A metadata extension attached to netlists</en></dd></div>
         <div><dt><zh>宿主</zh><en>Hosts</en></dt><dd><zh>SPICE、Spectre 等网表，写在注释里</zh><en>SPICE, Spectre and other netlists, inside comments</en></dd></div>
-        <div><dt><zh>阶段</zh><en>Stage</en></dt><dd><zh>原型；语言草稿 0.2 试写中</zh><en>Prototype; language draft 0.2 being tried out</en></dd></div>
-        <div><dt><zh>语言稿</zh><en>Language</en></dt><dd><span class="mono"><zh>0.2 草稿 · 2026-10-12</zh><en>Draft 0.2 · 2026-10-12</en></span></dd></div>
+        <div><dt><zh>阶段</zh><en>Stage</en></dt><dd><zh>原型；语言标准 0.2</zh><en>Prototype; language standard 0.2</en></dd></div>
+        <div><dt><zh>语言</zh><en>Language</en></dt><dd><span class="mono"><zh>0.2 · 2026-10-14</zh><en>0.2 · 2026-10-14</en></span></dd></div>
         <div><dt><zh>许可</zh><en>License</en></dt><dd><zh>代码 MIT · 规范 CC-BY-4.0 · 数据 CC0</zh><en>Code MIT · spec CC-BY-4.0 · data CC0</en></dd></div>
       </dl>
     </div>
@@ -184,8 +185,8 @@
       </li>
       <li>
         <span class="brief-k"><svg class="ico"><use href="#i-flask"/></svg><zh>现状</zh><en>Status</en></span>
-        <p><zh>原型阶段。语言草稿 0.2 已经成形，正在试写；已有布局求解和解释器原型，正式的运行库、求解器和查看器在规划中。</zh>
-          <en>Prototype stage. Language draft 0.2 has taken shape and is being tried out; there are prototypes of the layout solver and an interpreter, and the production runtime, solver and viewer are planned.</en></p>
+        <p><zh>原型阶段。语言已经整理成标准 0.2；已有布局求解和解释器原型，正式的运行库、求解器和查看器在规划中。</zh>
+          <en>Prototype stage. The language has been consolidated into standard 0.2; there are prototypes of the layout solver and an interpreter, and the production runtime, solver and viewer are planned.</en></p>
         <a href="#status"><zh>进度 →</zh><en>Progress →</en></a>
       </li>
     </ol>
@@ -891,8 +892,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
     <header class="sheet-head">
       <p class="sheet-no"><zh>07 · 语言</zh><en>07 · Language</en></p>
       <h2><zh>RNL 语言长什么样。</zh><en>What the RNL language looks like.</en></h2>
-      <p class="lead"><zh>以下写法来自语言草稿 0.2（2026-10-12）：46 个关键字；照标准例句写，语句读起来就是一句话，也可以用中文写。草稿还没有并入 spec/；解释器原型实现了全部关键字，名字和细节仍会调整。</zh>
-        <en>The notation below follows language draft 0.2 (2026-10-12): 46 keywords; written as standard sentences, statements read as prose, and they can be written in Chinese too. The draft is not yet merged into spec/; the interpreter prototype implements every keyword, and names and details will still change.</en></p>
+      <p class="lead"><zh>以下是<a href="spec/0.2/">语言标准 0.2</a> 的写法：46 个关键字；照标准例句写，语句读起来就是一句话，也可以用中文写。解释器原型实现了全部关键字。0.x 各版本之间不承诺兼容。</zh>
+        <en>The notation below is that of <a href="spec/0.2/">language standard 0.2</a>: 46 keywords; written as standard sentences, statements read as prose, and they can be written in Chinese too. The interpreter prototype implements every keyword. Versions 0.x promise no compatibility with each other.</en></p>
     </header>
 
     <h3 class="sub-h"><zh>一条语句的解剖</zh><en>Anatomy of a statement</en></h3>
@@ -1081,8 +1082,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
     <header class="sheet-head">
       <p class="sheet-no"><zh>09 · 现状</zh><en>09 · Status</en></p>
       <h2><zh>现在走到哪一步。</zh><en>Where things stand.</en></h2>
-      <p class="lead"><zh>原则已经定下，语言草稿 0.2 已经成形、正在试写，求解和解释都有能运行的原型；正式工具链还没开始实现。</zh>
-        <en>The principles are settled, language draft 0.2 has taken shape and is being tried out, and both solving and interpreting have working prototypes; the production toolchain has not been started.</en></p>
+      <p class="lead"><zh>原则已经定下，语言已经整理成标准 0.2，求解和解释都有能运行的原型；正式工具链还没开始实现。</zh>
+        <en>The principles are settled, the language has been consolidated into standard 0.2, and both solving and interpreting have working prototypes; the production toolchain has not been started.</en></p>
     </header>
     <div class="status-grid">
       <ol class="tl">
@@ -1108,11 +1109,11 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
           <en>All keyword and parameter names settled, such as PLACE, SET-SYMBOL and SELECT-INSTANCE; pipes and naming both use =&gt;, and points are written (x, y).</en></p></li>
         <li><time>2026-10-11</time><b><zh>第一轮试写</zh><en>First writing trial</en></b><p><zh>11 个模型写 6 道题，共 264 次；据此加了 ORIENT-RELATION、SELECT-WIRE 等关键字，放宽了自由文本的限制。</zh>
           <en>11 models wrote 6 tasks, 264 runs in all; as a result, keywords such as ORIENT-RELATION and SELECT-WIRE were added and the limits on free text were relaxed.</en></p></li>
-        <li class="now"><time>2026-10-12</time><b><zh>语言草稿 0.2：标准例句</zh><en>Language draft 0.2: standard sentences</en></b><p><zh>46 个关键字；语句读作事实，照标准例句写读起来就是一句话；中文代称包 rnl-zh；ATTACH 的定义写在前面，标准包的集合名带 _SET。</zh>
+        <li><time>2026-10-12</time><b><zh>语言草稿 0.2：标准例句</zh><en>Language draft 0.2: standard sentences</en></b><p><zh>46 个关键字；语句读作事实，照标准例句写读起来就是一句话；中文代称包 rnl-zh；ATTACH 的定义写在前面，标准包的集合名带 _SET。</zh>
           <en>46 keywords; statements read as facts, and written as standard sentences they read as prose; the Chinese alias package rnl-zh; ATTACH puts the definition first, and the standard package’s set names end in _SET.</en></p></li>
+        <li class="now"><time>2026-10-14</time><b><zh>语言标准 0.2</zh><en>Language standard 0.2</en></b><p><zh>草稿整理成<a href="spec/0.2/">正式标准</a>：英文为准，附中文版和标准词表；网页、PDF 和 Markdown 都从同一份源生成。</zh>
+          <en>The draft consolidated into a <a href="spec/0.2/">formal standard</a>: English normative, with a Chinese version and the standard word list; the web pages, PDFs and Markdown are all built from one source.</en></p></li>
         <li class="tl-sep"><zh>接下来</zh><en>Next</en></li>
-        <li class="next"><b><zh>第一份完整规范</zh><en>The first complete specification</en></b><p><zh>把语言草稿整理成正式规范，并入本仓库的 spec/。</zh>
-          <en>Turn the language draft into a proper specification and merge it into spec/ in this repository.</en></p></li>
         <li class="next"><b><zh>精确 RNL 阅读闭环</zh><en>Exact-RNL reading loop</en></b><p><zh>运行库、SPICE 与 Spectre 适配器、统一渲染器、查看器：不装求解器也能打开完整描述的文件。</zh>
           <en>Runtime, SPICE and Spectre adapters, shared renderer, viewer: open a fully described file without a solver.</en></p></li>
         <li class="next"><b><zh>求解闭环</zh><en>Solving loop</en></b><p><zh>求解器把结果写成 type="generated" 的记录，带输入的 hash，边算边刷新。</zh>
@@ -1159,8 +1160,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
         </details>
         <details>
           <summary><zh>现在能用吗？</zh><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>还不能当产品用。语言草稿 0.2 正在试写，已有布局求解和解释器原型；正式的运行库、求解器和查看器在规划中。</zh>
-            <en>Not as a product yet. Language draft 0.2 is being tried out, and there are layout-solver and interpreter prototypes; the production runtime, solver and viewer are planned.</en></p>
+          <p><zh>还不能当产品用。语言标准 0.2 已经发布，已有布局求解和解释器原型；正式的运行库、求解器和查看器在规划中。</zh>
+            <en>Not as a product yet. Language standard 0.2 is published, and there are layout-solver and interpreter prototypes; the production runtime, solver and viewer are planned.</en></p>
         </details>
       </div>
     </div>
@@ -1173,16 +1174,16 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
   <div class="wrap foot-grid">
     <div>
       <span class="brand-mark">RNL</span>
-      <p><zh>Rich Netlist（RNL）。本页用于介绍项目：语法来自语言草稿 0.2，仅作示意，不是已发布的格式；图中的坐标由本页手工排布，符号由本页自绘，引脚位置与标准包一致。</zh>
-        <en>Rich Netlist (RNL). This page introduces the project: the syntax follows language draft 0.2 and is illustrative, not a published format; the coordinates in the drawings were placed by hand and the symbols were drawn for this page, with pins where the standard package puts them.</en></p>
+      <p><zh>Rich Netlist（RNL）。本页用于介绍项目：写法照语言标准 0.2，仅作示意；图中的坐标由本页手工排布，符号由本页自绘，引脚位置与标准包一致。</zh>
+        <en>Rich Netlist (RNL). This page introduces the project: the notation follows language standard 0.2 and is illustrative here; the coordinates in the drawings were placed by hand and the symbols were drawn for this page, with pins where the standard package puts them.</en></p>
     </div>
     <div>
       <h4><zh>资料来源</zh><en>Sources</en></h4>
       <ul>
-        <li><zh>原则草案：</zh><en>Principles draft: </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md"><code>spec/rich-netlist.md</code></a></li>
-        <li><zh>早期语法草案（已被语言草稿 0.2 取代）：</zh><en>Early syntax draft (superseded by language draft 0.2): </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/RNL-Syntax-0.1-draft.2.md"><code>spec/RNL-Syntax-0.1-draft.2.md</code></a></li>
-        <li><zh>当前语言：0.2 草稿（2026-10-12），尚未并入 <code>spec/</code>；本站的<a href="language.html">语言导览</a>按它编写</zh>
-          <en>Current language: draft 0.2 (2026-10-12), not yet merged into <code>spec/</code>; this site’s <a href="language.html">language tour</a> follows it</en></li>
+        <li><zh>原则：</zh><en>Principles: </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md"><code>spec/rich-netlist.md</code></a></li>
+        <li><zh>早期语法草案（已被语言标准 0.2 取代，留在 Git 历史里）：</zh><en>Early syntax draft (superseded by language standard 0.2; kept in the Git history): </en><a href="https://github.com/rich-netlist/rnl/blob/1eefd27/spec/RNL-Syntax-0.1-draft.2.md"><code>spec/RNL-Syntax-0.1-draft.2.md</code></a></li>
+        <li><zh>当前语言：<a href="spec/0.2/">语言标准 0.2</a>（<code>spec/rnl-0.2.md</code>，另有 PDF 和 Markdown 下载）；本站的<a href="language.html">语言导览</a>按它编写</zh>
+          <en>Current language: <a href="spec/0.2/">language standard 0.2</a> (<code>spec/rnl-0.2.md</code>, also as PDF and Markdown downloads); this site’s <a href="language.html">language tour</a> follows it</en></li>
         <li><zh>工具链架构：</zh><en>Toolchain architecture: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/rnl-toolchain-architecture.md"><code>docs/rnl-toolchain-architecture.md</code></a></li>
         <li><zh>路线图：</zh><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a><zh>；布局求解原型和解释器原型在研究仓库中，尚未公开</zh><en>; the layout-solver and interpreter prototypes are in a research repository that is not public yet</en></li>
       </ul>

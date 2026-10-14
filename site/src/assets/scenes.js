@@ -3,7 +3,7 @@
  * The circuits come from examples used in the RNL language discussion (5T OTA, RC/RLC, the fill
  * example). Coordinates are RNL coordinates (x right, y up) and match the solver and editor records
  * shown in the files; they are placed by hand for this page, not computed by a solver. The RNL follows
- * the language draft 0.2 (2026-10-12) for illustration.
+ * language standard 0.2 for illustration.
  */
 (function (global) {
   'use strict';

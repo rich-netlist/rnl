@@ -1,6 +1,6 @@
 /* RNL language tour · interactions
  *
- * Every RNL statement shown here has been checked with the RNL prototype (language draft 0.2). The
+ * Every RNL statement shown here has been checked with the RNL prototype (language 0.2). The
  * drawings are laid out by hand in RNL coordinates (x right, y up), as on the introduction page.
  */
 (function () {
@@ -809,7 +809,7 @@
     show(false, '');
   }
 
-  /* A small renderer for the text markup of draft 0.2 (13.6), for the playground */
+  /* A small renderer for the text markup of standard 0.2 (13.6), for the playground */
   var GREEK = {
     alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ϵ', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', vartheta: 'ϑ',
     iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', varpi: 'ϖ', rho: 'ρ', varrho: 'ϱ', sigma: 'σ', varsigma: 'ς',

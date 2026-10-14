@@ -5,7 +5,7 @@ Two static pages, in Chinese and English, for circuit designers who have not wor
 - `index.html`, the introduction: what RNL is, the problem it addresses, the goal, before/after scenarios, the planned toolchain, the settled principles, the language at a glance, and a few examples.
 - `language.html`, the language tour: nine hands-on sections on the parts of the language the introduction does not unpack (standard sentences and Chinese, definitions, the standard package's defaults, sets and selections, wires, text, orientation, priority, the header record).
 
-**Status:** an explainer, not a specification. The RNL snippets follow language draft 0.2 (2026-10-12), which is not yet written into [`spec/`](../spec/README.md); the pages say so. The snippets have been checked with the RNL interpreter prototype, which lives in a research repository that is not public yet. Layouts in the drawings are placed by hand, not produced by a solver.
+**Status:** an explainer, not a specification. The RNL snippets follow language draft 0.2 (2026-10-12), which has since been consolidated into the language standard 0.2 in [`spec/`](../spec/README.md); the pages say so and link to it. The snippets have been checked with the RNL interpreter prototype, which lives in a research repository that is not public yet. Layouts in the drawings are placed by hand, not produced by a solver.
 
 ## One source, two languages
 
@@ -47,6 +47,7 @@ Then open `site/dist/index.html` (Chinese) or `site/dist/en/index.html` (English
 | --- | --- |
 | `index.html`, `language.html`, `assets/` | Chinese pages, at the site root |
 | `en/index.html`, `en/language.html`, `en/assets/` | English pages |
+| `spec/0.2/`, `en/spec/0.2/` | The language standard, one page per language with its PDF and Markdown downloads. Not written by `build.py`: [`pages.yml`](../.github/workflows/pages.yml) adds them with `python scripts/spec/build.py --site site/dist` ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). |
 | `rnl-intro-standalone.html`, `rnl-language-standalone.html`, and the same under `en/` | Single-file pages with the styles and scripts inlined; their links to the other pages and languages point to the published site |
 
 [`pages.yml`](../.github/workflows/pages.yml) publishes `site/dist/` to GitHub Pages whenever `site/` changes on `main`. The language switch keeps the reader on the same section.

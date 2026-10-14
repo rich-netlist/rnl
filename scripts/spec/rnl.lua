@@ -161,11 +161,13 @@ local REFCH = "[%w_<>%[%]:%*\128-\255]"
 local SIGIL = { ["#"] = "i", ["&"] = "n", ["%"] = "v", ["$"] = "d", ["?"] = "r" }
 
 -- Tokens of RNL text: a list of {class, text}. Classes: k keyword, i n v d r references
--- (# & % $ ?), s string, c comment, o operator, t free text, p inside brackets, "" white space.
+-- (# & % $ ?), s string, c comment, o operator, t free text, p parameters, pt a point,
+-- r also a role in brackets, "" white space.
 local function tokenize_rnl(s, out)
   local i, n = 1, #s
   local paren = 0
   local role = false
+  local pkind = "p"  -- what the brackets hold: parameters of a keyword, a role, or a point
   local function add(cls, text) table.insert(out, { cls, text }) end
   while i <= n do
     local c = s:sub(i, i)
@@ -215,13 +217,17 @@ local function tokenize_rnl(s, out)
       add("o", c)
     elseif c == "(" then
       j = i
+      if paren == 0 then
+        local last = out[#out]
+        if role then pkind = "r" elseif last and last[1] == "k" then pkind = "p" else pkind = "pt" end
+      end
       paren = paren + 1
-      add(role and "r" or "p", c)
+      add(pkind, c)
     elseif c == ")" then
       j = i
       paren = math.max(paren - 1, 0)
-      add(role and "r" or "p", c)
-      if paren == 0 then role = false end
+      add(pkind, c)
+      if paren == 0 then role = false; pkind = "p" end
     elseif c:match("%s") then
       j = i
       while j + 1 <= n and s:sub(j + 1, j + 1):match("%s") do j = j + 1 end
@@ -233,7 +239,7 @@ local function tokenize_rnl(s, out)
         if ch:match("[%s\"@#&%%%$%?;{}=()]") or s:sub(j + 1, j + 2) == "/*" then break end
         j = j + 1
       end
-      add(paren > 0 and (role and "r" or "p") or "t", s:sub(i, j))
+      add(paren > 0 and pkind or "t", s:sub(i, j))
     end
     i = j + 1
   end
