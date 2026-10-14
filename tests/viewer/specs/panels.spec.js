@@ -176,8 +176,8 @@ test("at its narrowest the side panel stays beside its splitter", async ({ page,
 });
 
 test("at its narrowest the side panel keeps a tab of each file within reach", async ({ page, viewer }) => {
-  // The failed statements' box does not shrink: as the file bar narrows, it leaves out its legend,
-  // then its caption, and keeps its checkbox (style.css, .failed-toggle).
+  // The failed statements' label gives way to the file tabs: when they need the room, it leaves out
+  // its legend, then its caption, and the checkbox stays (style.css, .failed-toggle).
   /** Per file tab, whether a part of it is what a click there hits. */
   const reached = () =>
     page.locator("#file-tabs button").evaluateAll((tabs) =>
@@ -195,7 +195,9 @@ test("at its narrowest the side panel keeps a tab of each file within reach", as
   await dragSplitter(page, viewer, "#vsplit", { x: 0 });
   expect(await size(page, "#sidebar", "width")).toBe(220);
   expect(await reached()).toEqual([true, true]);
-  expect(await page.locator(".failed-toggle .caption").evaluate((e) => e.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
+  // the caption has wrapped off the label's line, out of sight
+  const below = (e) => e.getBoundingClientRect().top >= e.parentElement.getBoundingClientRect().bottom;
+  expect(await page.locator(".failed-toggle .caption").evaluate(below)).toBe(true);
   await expect(checkbox).toBeVisible();
   await page.locator("#file-tabs button", { hasText: "04-hierarchy-lib.inc" }).click({ timeout: 2000 });
   await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");

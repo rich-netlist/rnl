@@ -23,11 +23,11 @@
     <div id="pane-netlist" class="pane netlist-pane" role="tabpanel">
       <div id="file-bar" class="file-bar">
         <nav id="file-tabs" class="tabs file-tabs" aria-label="Files"></nav>
-        <label class="failed-toggle" title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
-          <input id="show-failed" type="checkbox" checked>
+        <input id="show-failed" class="failed-check" type="checkbox" checked title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
+        <label for="show-failed" class="failed-toggle" title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
           <span class="caption">Failed statements</span>
-          <span class="swatch x-failed" aria-hidden="true"></span><span class="legend">error</span>
-          <span class="swatch x-overridden" aria-hidden="true"></span><span class="legend">overridden</span>
+          <span class="key"><span class="swatch x-failed" aria-hidden="true"></span><span class="legend">error</span></span>
+          <span class="key"><span class="swatch x-overridden" aria-hidden="true"></span><span class="legend">overridden</span></span>
         </label>
       </div>
       <div id="source" class="source" tabindex="-1"><p class="placeholder">No file is open.</p></div>

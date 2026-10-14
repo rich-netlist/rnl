@@ -232,54 +232,47 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 }
 
 .file-bar {
-  container-type: inline-size;
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
   overflow: hidden;
   padding: 3px 8px 3px 6px;
   border-bottom: 1px solid var(--line);
 }
-.file-tabs { flex: 1 1 auto; }
+/* the file tabs ask for the room they take up, unlike other tabs (.tabs) */
+.file-bar .file-tabs { flex: 1 1 auto; margin-right: 8px; }
 
+/* the failed statements' checkbox, and its label, which gives way to the file tabs when they need
+   the room, so that a tab of each file stays within reach: the label shrinks before them, and what
+   of it no longer fits on its line wraps out of sight, first its legend, then its caption; the
+   title still says what the checkbox marks, and the caption, out of sight, still names it */
+.failed-check { flex: none; margin: 0 2px 0 0; accent-color: var(--accent); cursor: pointer; }
 .failed-toggle {
   display: flex;
+  flex: 0 1000 auto;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
+  min-width: 0;
+  height: 1.4em;
+  overflow: hidden;
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
 }
-.failed-toggle input { margin: 0 2px 0 0; accent-color: var(--accent); }
+/* a line keeps its first item however narrow it is: this one takes no room, so the caption can go */
+.failed-toggle::before { content: ""; height: 1.4em; }
+.failed-toggle .caption { margin-left: 4px; }
+.failed-toggle .key { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
 .failed-toggle .swatch {
   width: 10px;
   height: 10px;
-  margin-left: 4px;
   border-radius: 2px;
   border: 1px solid var(--line);
 }
 .failed-toggle .swatch.x-failed { background: var(--failed-bg); }
 .failed-toggle .swatch.x-overridden { background: var(--overridden-bg); }
-/* the failed statements' box gives way to the file tabs as the bar narrows: first its legend, then
-   its caption, so that a tab of each file stays within reach; its title still says what it marks,
-   and the caption, out of sight, still names the checkbox */
-@container (max-width: 399px) {
-  .failed-toggle .swatch, .failed-toggle .legend { display: none; }
-}
-@container (max-width: 299px) {
-  .failed-toggle .caption {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-}
 
 .sub-head {
   display: flex;
