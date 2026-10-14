@@ -314,7 +314,7 @@ The rules of this standard follow these principles. Items 1–6 refine Principle
 3. **Contradictions.**
    - A description that cannot be understood (a syntax error, a name not found, a wrong kind and so on), or that contradicts itself, fails (Principles 2.4, 2.9; chapter 7).
    - Descriptions that can be understood but contradict each other are resolved where this standard gives a definite way, such as override by key (8.4), the appearance queues (8.3) and the resolution of geometric facts (8.5); a hint may be given.
-   - Where there is no definite way yet, the whole interpretation fails (7.6). Such cases are rare. A later version may define a way and make them tolerant; files that work now are not affected.
+   - Where there is no definite way yet, the whole interpretation fails (7.6). This version has no such case (7.5). A later version may define a way and make them tolerant; files that work now are not affected.
 4. **Each description sees the state before it takes effect.** A description reads the state as it was when its phase began; its own effect and the effects of other descriptions in the same phase are not included (8.2).
 5. **Objects and names.** Every statement with a keyword and every `{…}` makes a new object, made of a handle and facts. A reference makes no object. A name only refers to an object and is bound once in a level. Overriding applies to facts, not to names (5.1, 6.6).
 6. **No limits for the sake of readability.** A form that is hard to read but has a definite meaning is allowed; it is left to writers to restrain themselves. Only forms without a definite meaning are errors.
@@ -894,7 +894,7 @@ The objects written in a statement are matched to the slots of the signature as 
 - Additions and removals are applied in order of position (1.5 item 2). A set evaluated in a level holds only the members of that level (10.3).
 - `%a_set %b_set @UNION` makes a new set without duplicates, in the order of first occurrence; whether two members are the same is decided by handle.
 - To make a new set and leave the old ones as they are: the concatenation is `{%a_set %b_set}`; the union `%a_set %b_set @UNION`; the difference `%c_set = {%a_set}; %b_set @REMOVE-FROM %c_set`.
-- A cycle through a removal has no definite result, such as `%b_set = {%a_set}` written together with `%b_set @REMOVE-FROM %a_set`: a member of a_set would have to be removed if it is there, and kept if it is not. The interpretation fails (1.5 item 3).
+- A set depends on the sets written in the statement that makes it (inside its braces, in UNION, or as the scope of a selection) and on the sets that ADD-TO and REMOVE-FROM add to it or remove from it. Dependencies that form a cycle are an error, with or without a removal: taking the statements in order of position (8.5), the one whose dependency closes the cycle fails, and its diagnostic lists the whole cycle; the others take effect as usual. So `%a_set @ADD-TO %b_set; %b_set @ADD-TO %a_set` fails at the second statement, and `%b_set = {%a_set}; %b_set @REMOVE-FROM %a_set`, whose removal would have no definite result, fails at the removal.
 
 ### 5.3 Statements and signatures
 
@@ -1281,7 +1281,7 @@ XM2 out in vdd vdd sky130_fd_pr__pfet_01v8 w=2 l=0.15
 ### 7.5 Conflicts are not failures
 
 - Conflicts are handled after the whole level has been read, by the defined methods: override by key (8.4), the appearance queues (8.3) and the resolution of geometric facts (8.5).
-- A conflict for which no method has been defined yet makes the whole interpretation fail (1.5 item 3; 7.6). At present the only such case is a cycle of sets that involves removal (5.2.2).
+- A conflict for which no method has been defined yet makes the whole interpretation fail (1.5 item 3; 7.6). This version has no such case: a cycle of sets fails at the statement that closes it (5.2.2).
 
 ### 7.6 Diagnostics
 
@@ -1291,7 +1291,7 @@ XM2 out in vdd vdd sky130_fd_pr__pfet_01v8 w=2 l=0.15
   - **Error**: an item fails, whether the cause lies in the item itself, in another item, or upstream in something it depends on. Errors include the basic errors of Principles 2.4 (syntax errors, unknown words, a mismatched signature, a reference not found, a wrong kind, self-contradiction, an unsupported version), the further failures defined in this standard (such as ORIENT applied to a usage without a symbol, or a terminal without a pin in its symbol; 12.1, 9.2.4), and the failures that follow from them (7.2).
   - **Warning**: the item is valid and takes effect as usual, but may not be what the author meant, such as an empty set written out for a slot that takes single objects, as in `{} @PLACE(1, 2)` (5.2.1); an unnamed definition written directly as a member of a record, not nested in a statement (9.1); a role of a generation rule that cannot reach the levels below (10.5); an unknown field in a record head (2.8); a package version replaced by another (16.2); a wire connected to a terminal that is not on the net the wire names (13.1).
   - **Hint**: a common override, hiding or resolution that may also be a mistake, such as a lower level, or a package used in it, hiding a definition of an upper level or of the packages at the root (6.8); a package of a later USE-PACKAGE hiding one of an earlier USE-PACKAGE (16.2); a geometric fact discarded in conflict resolution (8.5); the latest version of a package used because none is written (16.2); a main file without a declared version, read with the tool's default version (16.1).
-- **The extent of a failure** is given where each failure is defined: a field (a known field of a record head written wrongly is treated as not written, 2.8); a statement (most cases); a record (unmatched brackets, a record cut off, a `scope` target not found; 7.4, 2.4, 2.6); a file (an unsupported version, 16.1); the whole interpretation (a conflict for which no method has been defined yet, 1.5 item 3: the interpretation stops and nothing is drawn; a later version could make such a case tolerant).
+- **The extent of a failure** is given where each failure is defined: a field (a known field of a record head written wrongly is treated as not written, 2.8); a statement (most cases); a record (unmatched brackets, a record cut off, a `scope` target not found; 7.4, 2.4, 2.6); a file (an unsupported version, 16.1); the whole interpretation (a conflict for which no method has been defined yet, 1.5 item 3: the interpretation stops and nothing is drawn; a later version could make such a case tolerant; this version has none).
 - **Requirements**:
   - Errors must be reported. Warnings and hints are those listed in this standard, and implementations should report them.
   - An implementation may add checks of its own, but only as warnings or hints; they must not make an item fail, or different implementations would draw different results.
@@ -3166,7 +3166,6 @@ This annex lists what this version of the standard leaves out and says may come 
 
 | Left for a later version | See |
 |---|---|
-| A tolerant handling of the conflicts for which the whole interpretation now fails | 1.5 item 3, 7.5 |
 | Carriers for further hosts, including block comments (such as `#com … #endcom` of Eldo), and the handling of a comment terminator of the host that this brings | 2.2, 2.5 |
 | Record IDs; tools find their records by `type`, `author` and the keys of statements | 2.8 |
 | Expressions | 3.7 |

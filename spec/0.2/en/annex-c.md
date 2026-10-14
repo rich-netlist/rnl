@@ -4,7 +4,6 @@ This annex lists what this version of the standard leaves out and says may come 
 
 | Left for a later version | See |
 |---|---|
-| A tolerant handling of the conflicts for which the whole interpretation now fails | 1.5 item 3, 7.5 |
 | Carriers for further hosts, including block comments (such as `#com … #endcom` of Eldo), and the handling of a comment terminator of the host that this brings | 2.2, 2.5 |
 | Record IDs; tools find their records by `type`, `author` and the keys of statements | 2.8 |
 | Expressions | 3.7 |
