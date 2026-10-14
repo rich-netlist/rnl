@@ -96,7 +96,7 @@ node apps/desktop/tests/installers.mjs --nsis SETUP [--dir DIR] [--no-smoke]
 node apps/desktop/tests/installers.mjs --msi PACKAGE [--no-smoke]
 ```
 
-The NSIS installer installs for you, into DIR or else a temporary directory; the test stops when RNL Viewer is installed for you already, to leave it be. The MSI installs for the computer and needs administrator rights, which GitHub's runners have; the release workflow tests both.
+The NSIS installer installs for you, into DIR or else a temporary directory, which the test gives in its long form: the uninstaller removes a shortcut only when its target, which Windows keeps long, reads as the installation directory was given, so an installation into a short path such as `C:\Users\RUNNER~1\...` leaves its shortcuts behind. The test stops when RNL Viewer is installed for you already, to leave it be. The MSI installs for the computer and needs administrator rights, which GitHub's runners have; the release workflow tests both.
 
 The app runs on the WebView2 Runtime, which Windows 10 and 11 come with and the installers install where it is missing. `node apps/desktop/tests/webview2.mjs` prints its version, and with `--install` installs it first with Microsoft's bootstrapper when there is none, as the workflows do on GitHub's Windows Server runners.
 

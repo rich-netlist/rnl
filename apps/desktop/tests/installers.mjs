@@ -144,7 +144,11 @@ async function installed(inspect, uninstall) {
 async function nsis(setup) {
   const shell = folders();
   check(registry(USER_ENTRY) === null, `${NAME} is installed for this user already: the test leaves it be.`);
-  const base = option("--dir") ? null : fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-nsis-"));
+  // the temporary directory's path in its long form: the uninstaller removes a shortcut only when its
+  // target, which Windows keeps long, is written as the installation directory was given, and TEMP
+  // may give it short, with RUNNER~1 for the user's directory on GitHub's runners
+  const temp = fs.realpathSync.native(os.tmpdir());
+  const base = option("--dir") ? null : fs.mkdtempSync(path.join(temp, "rnl-viewer-nsis-"));
   const dir = path.resolve(option("--dir") || path.join(base, NAME));
   check(!fs.existsSync(dir) || fs.readdirSync(dir).length === 0, `${dir} is not empty.`);
   const shortcuts = [path.join(shell.Programs, `${NAME}.lnk`), path.join(shell.Desktop, `${NAME}.lnk`)];
