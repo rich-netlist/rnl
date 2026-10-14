@@ -87,11 +87,14 @@ export function showFile(f) {
 // The file tabs scroll sideways with no scrollbar: the tab of the file shown is kept in view, and a
 // wheel turned over them scrolls them, as a sideways swipe does.
 
-/** Scroll the file tabs, when they must, so that `tab` is in view, or as much of it as fits. */
+/**
+ * Scroll the file tabs, when they must, so that `tab` is in view, or as much of it as fits. They
+ * scroll by whole pixels, rounded to bring the tab's edge in, as WebKit cuts a scroll to whole pixels.
+ */
 function tabInView(tab) {
   const [s, t] = [tabs.getBoundingClientRect(), tab.getBoundingClientRect()];
-  if (t.left < s.left) tabs.scrollLeft -= s.left - t.left;
-  else if (t.right > s.right) tabs.scrollLeft += Math.min(t.right - s.right, t.left - s.left);
+  if (t.left < s.left) tabs.scrollLeft -= Math.ceil(s.left - t.left);
+  else if (t.right > s.right) tabs.scrollLeft += Math.min(Math.ceil(t.right - s.right), Math.floor(t.left - s.left));
 }
 
 tabs.addEventListener(
