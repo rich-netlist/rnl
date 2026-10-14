@@ -62,6 +62,11 @@ export type Level = {
    */
   kind: string,
   /**
+   * A subcircuit's definition: file index, the first line of its header and the line of its end
+   * (`.ends`, `ends`), or the file's last line when it has none; None for a file level.
+   */
+  lines: [number, number, number] | null,
+  /**
    * The drawing as an SVG document, written from the primitives; absent unless
    * `BuildOptions::svg` asks for it, as it does by default.
    */

@@ -57,6 +57,9 @@ pub struct Level {
     pub title: String,
     /// "file" or "subckt".
     pub kind: &'static str,
+    /// A subcircuit's definition: file index, the first line of its header and the line of its end
+    /// (`.ends`, `ends`), or the file's last line when it has none; None for a file level.
+    pub lines: Option<[u32; 3]>,
     /// The drawing as an SVG document, written from the primitives; absent unless
     /// `BuildOptions::svg` asks for it, as it does by default.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -207,6 +210,15 @@ pub(crate) fn document(entry: &str, r: &Interpretation, missing: Vec<String>, op
     let mut levels: Vec<Level> = r.model.levels.iter().map(|lv| ix.level(lv, options)).collect();
     let drawn: HashMap<usize, usize> = r.model.levels.iter().enumerate().map(|(k, lv)| (lv.level, k)).collect();
     for (k, lv) in r.model.levels.iter().enumerate() {
+        let host = &r.doc.levels[lv.level];
+        if host.kind == LevelKind::Subckt && host.line > 0 {
+            if let Some(&f) = file_index.get(&host.file) {
+                // a subcircuit with no end has none (0), or the line after its file's last
+                let last = (files[f].text.lines().count() as u32).max(host.line);
+                let end = if host.end_line >= host.line { host.end_line.min(last) } else { last };
+                levels[k].lines = Some([f as u32, host.line, end]);
+            }
+        }
         levels[k].children = r.doc.levels[lv.level]
             .instances
             .iter()
@@ -440,6 +452,7 @@ impl<'a> Index<'a> {
             host: lv.level,
             title: lv.title.clone(),
             kind: lv.kind,
+            lines: None,
             svg: options.svg.then(|| rnl_render::svg_document(&prims, &render)),
             primitives: options.primitives.then(|| primitive::primitives(&prims)),
             scale: render.scale,

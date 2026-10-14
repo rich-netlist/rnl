@@ -497,13 +497,13 @@ R1 p q 1k
         // by default the SVG and no primitives, as the viewers have read the Document so far
         let default = BuildOptions::default();
         let l = level(default.svg, default.primitives);
-        assert_eq!(keys(&l), "host title kind svg scale empty status hits children");
+        assert_eq!(keys(&l), "host title kind lines svg scale empty status hits children");
         let l = level(true, true);
-        assert_eq!(keys(&l), "host title kind svg primitives scale empty status hits children");
+        assert_eq!(keys(&l), "host title kind lines svg primitives scale empty status hits children");
         assert_eq!(l["scale"], 14.0);
         assert!(l["primitives"].as_array().is_some_and(|p| p.len() > 2));
-        assert_eq!(keys(&level(false, true)), "host title kind primitives scale empty status hits children");
-        assert_eq!(keys(&level(false, false)), "host title kind scale empty status hits children");
+        assert_eq!(keys(&level(false, true)), "host title kind lines primitives scale empty status hits children");
+        assert_eq!(keys(&level(false, false)), "host title kind lines scale empty status hits children");
     }
 
     #[test]
@@ -512,5 +512,21 @@ R1 p q 1k
         let names: Vec<&str> = d.files.iter().map(|f| f.name.as_str()).collect();
         assert_eq!(names, ["04-hierarchy.sp", "04-hierarchy-lib.inc"]);
         assert!(d.missing.is_empty(), "{:?}", d.missing);
+        // a subcircuit's definition, from its header to its .ends, in the file that has it
+        let lines = |title: &str| d.levels.iter().find(|l| l.title == title).and_then(|l| l.lines);
+        assert_eq!((d.levels[0].kind, d.levels[0].lines), ("file", None));
+        assert_eq!(lines("amp"), Some([0, 7, 47]));
+        assert_eq!(lines("rdiv"), Some([1, 2, 19]));
+    }
+
+    #[test]
+    fn a_subcircuit_without_its_end_runs_to_the_end_of_its_file() {
+        let spice = MemoryProvider::new().with("a.sp", "* title\n.subckt x a b\nR1 a b 1k\n");
+        let d = build("a.sp", &spice, &BuildOptions::default()).unwrap();
+        assert_eq!(d.levels.iter().find(|l| l.title == "x").and_then(|l| l.lines), Some([0, 2, 3]));
+        // and one with its end, to its `ends`, after the title line that Spectre reads as a comment
+        let spectre = MemoryProvider::new().with("a.scs", "// title\nsubckt x (a b)\nR1 (a b) resistor r=1k\nends x\n");
+        let d = build("a.scs", &spectre, &BuildOptions::default()).unwrap();
+        assert_eq!(d.levels.iter().find(|l| l.title == "x").and_then(|l| l.lines), Some([0, 2, 4]));
     }
 }
