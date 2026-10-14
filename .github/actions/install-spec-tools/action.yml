@@ -1,0 +1,22 @@
+# Installs what scripts/spec/build.py needs besides Python: pinned pandoc and Typst, and the CJK fonts
+# for the Chinese PDF (decision 0007). Used by pages.yml and spec-release.yml.
+name: Install the tools of the standard's build
+description: pandoc, Typst and Noto CJK fonts, at pinned versions
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        PANDOC_VERSION: "3.8.3"
+        TYPST_VERSION: "0.15.1"
+      run: |
+        sudo apt-get update -q
+        curl -fsSL -o "$RUNNER_TEMP/pandoc.deb" \
+          "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb"
+        sudo apt-get install -y -q "$RUNNER_TEMP/pandoc.deb" fonts-noto-cjk
+        curl -fsSL "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz" \
+          | tar -xJ -C "$RUNNER_TEMP"
+        sudo install "$RUNNER_TEMP/typst-x86_64-unknown-linux-musl/typst" /usr/local/bin/typst
+        pandoc --version | head -n 1
+        typst --version

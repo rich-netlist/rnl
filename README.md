@@ -2,13 +2,13 @@
 
 RNL is a proposed way to attach circuit meaning and presentation information to native netlists. This independent repository is intended to grow into a portable RNL runtime, solver, viewer, editor, and standard symbol library.
 
-**Status:** This repository contains a directory skeleton and the RNL documents migrated from Analog Canvas. It has no parser, solver, renderer, application, build configuration, or released package. The language documents are drafts, not a published or frozen standard.
+**Status:** This repository holds the RNL language standard, version 0.2, with its principles and the project documents, and a directory skeleton for the toolchain. It has no parser, solver, renderer, application, or released package yet. Versions 0.x of the language make no promise of compatibility with each other.
 
 ## Repository map
 
 | Path | Intended responsibility |
 | --- | --- |
-| [`spec/`](spec/README.md) | RNL principles and syntax drafts; the only maintained location for language work. |
+| [`spec/`](spec/README.md) | The RNL language standard and its principles. Language versions are worked out in a research repository and published here ([decision 0006](docs/decisions/0006-language-versions-from-research-repository.md)). |
 | [`crates/`](crates/README.md) | Future Rust runtime, host adapters, shared renderer, solver, and CLI. |
 | [`bindings/`](bindings/README.md) | Separate runtime and solver WASM entry points. |
 | [`packages/`](packages/README.md) | TypeScript SDKs and framework independent viewer/editor cores. |
@@ -16,8 +16,8 @@ RNL is a proposed way to attach circuit meaning and presentation information to 
 | [`libraries/`](libraries/README.md) | External data libraries, starting with standard symbols. |
 | [`tests/`](tests/README.md) | Future conformance, roundtrip, and integration corpora. |
 | [`examples/`](examples/README.md) | Future example documents. |
-| [`scripts/`](scripts/README.md) | Future project maintenance scripts. |
-| [`.github/workflows/`](.github/workflows/README.md) | Future CI workflow location. |
+| [`scripts/`](scripts/README.md) | Project maintenance scripts, such as the build of the standard's published forms. |
+| [`.github/workflows/`](.github/workflows/README.md) | CI workflows: the project site and the releases of the standard. |
 | [`docs/`](docs/README.md) | Toolchain architecture proposal, roadmap, and decision records. |
 | [`site/`](site/README.md) | Static introduction page and language tour for circuit designers, in Chinese and English, built from one bilingual source by `site/build.py`. |
 

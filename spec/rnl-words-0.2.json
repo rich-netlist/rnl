@@ -1,0 +1,2441 @@
+{
+ "$schema": "rnl-words.schema.json",
+ "language": "RNL",
+ "version": "0.2",
+ "description": "Standard word list of RNL 0.2 (section 5.3 and Annex A of rnl-0.2.md).",
+ "record": {
+  "marker": "@RNL",
+  "section": "2.8",
+  "fields": [
+   {
+    "name": "type",
+    "type": "enum",
+    "values": [
+     "authored",
+     "generated",
+     "header"
+    ],
+    "default": "authored",
+    "affects_interpretation": true,
+    "since": "0.2"
+   },
+   {
+    "name": "scope",
+    "type": "string",
+    "affects_interpretation": true,
+    "since": "0.2"
+   },
+   {
+    "name": "priority",
+    "type": "enum",
+    "values": [
+     "disabled",
+     "low",
+     "normal",
+     "high"
+    ],
+    "default": "normal",
+    "affects_interpretation": true,
+    "since": "0.2"
+   },
+   {
+    "name": "author",
+    "type": "string",
+    "affects_interpretation": false,
+    "since": "0.2"
+   },
+   {
+    "name": "hash",
+    "type": "string",
+    "affects_interpretation": false,
+    "since": "0.2"
+   },
+   {
+    "name": "modified",
+    "type": "string",
+    "affects_interpretation": false,
+    "since": "0.2"
+   }
+  ]
+ },
+ "kinds": [
+  {
+   "name": "instance",
+   "since": "0.2"
+  },
+  {
+   "name": "terminal",
+   "since": "0.2"
+  },
+  {
+   "name": "net",
+   "since": "0.2"
+  },
+  {
+   "name": "point",
+   "since": "0.2"
+  },
+  {
+   "name": "wire",
+   "since": "0.2"
+  },
+  {
+   "name": "usage",
+   "since": "0.2"
+  },
+  {
+   "name": "bundle",
+   "since": "0.2"
+  },
+  {
+   "name": "text",
+   "since": "0.2"
+  },
+  {
+   "name": "annotation",
+   "since": "0.2"
+  },
+  {
+   "name": "label",
+   "since": "0.2"
+  }
+ ],
+ "pseudo_kinds": [
+  {
+   "name": "any",
+   "meaning": "any object"
+  },
+  {
+   "name": "level",
+   "meaning": "`#` alone: the level itself"
+  },
+  {
+   "name": "owner",
+   "meaning": "`?` alone in a symbol body: the object drawn with the symbol"
+  },
+  {
+   "name": "position",
+   "meaning": "the sub-object `::position` of an object (its origin)"
+  },
+  {
+   "name": "locatable",
+   "meaning": "an object with a position: instance, bundle, terminal with a pin, point, text, the centre of a graphic written with a centre, a usage drawn at a point of its own, or a set of them (14.1)"
+  },
+  {
+   "name": "orientable",
+   "meaning": "an object with an orientation: instance, bundle, usage with a symbol, or a set of them (14.9)"
+  },
+  {
+   "name": "constraint",
+   "meaning": "an object made by a constraint keyword"
+  },
+  {
+   "name": "set",
+   "meaning": "a set, written as a name"
+  }
+ ],
+ "takes": [
+  {
+   "name": "one",
+   "meaning": "a single object; given a set, the keyword is applied to each member (5.2.1), except that PRIORITY takes a set marked with GROUP as the group itself (14.8)"
+  },
+  {
+   "name": "set",
+   "meaning": "a set; loose objects written for the slot form one set (5.2.1)"
+  },
+  {
+   "name": "any",
+   "meaning": "one object, or a set taken as a whole"
+  },
+  {
+   "name": "shape",
+   "meaning": "a point, or a set of points (two forms of a graphic, 9.2.5)"
+  },
+  {
+   "name": "body",
+   "meaning": "statements in braces, enclosed (5.4)"
+  },
+  {
+   "name": "definition",
+   "meaning": "a definition: a `$` name, a `%` name bound to a definition, or an anonymous definition (5.6, 6.6)"
+  }
+ ],
+ "subobjects": [
+  {
+   "name": "position",
+   "since": "0.2"
+  },
+  {
+   "name": "net",
+   "since": "0.2"
+  }
+ ],
+ "attributes": [
+  {
+   "name": "name",
+   "since": "0.2"
+  },
+  {
+   "name": "value",
+   "since": "0.2"
+  },
+  {
+   "name": "model",
+   "since": "0.2"
+  },
+  {
+   "name": "type",
+   "since": "0.2"
+  },
+  {
+   "name": "net",
+   "since": "0.2"
+  },
+  {
+   "name": "x",
+   "since": "0.2"
+  },
+  {
+   "name": "y",
+   "since": "0.2"
+  }
+ ],
+ "truth_values": [
+  "true",
+  "false"
+ ],
+ "style_properties": [
+  {
+   "name": "linecolor",
+   "type": "color",
+   "since": "0.2"
+  },
+  {
+   "name": "linestyle",
+   "type": "enum",
+   "values": [
+    "solid",
+    "dashed",
+    "dotted",
+    "dash-dot",
+    "double",
+    "bold",
+    "none"
+   ],
+   "default": "solid",
+   "since": "0.2"
+  },
+  {
+   "name": "linewidth",
+   "type": "number",
+   "default": 0,
+   "since": "0.2"
+  },
+  {
+   "name": "cap",
+   "type": "enum",
+   "values": [
+    "butt",
+    "round",
+    "square"
+   ],
+   "since": "0.2"
+  },
+  {
+   "name": "join",
+   "type": "enum",
+   "values": [
+    "miter",
+    "round",
+    "bevel"
+   ],
+   "since": "0.2"
+  },
+  {
+   "name": "fillcolor",
+   "type": "color",
+   "since": "0.2"
+  },
+  {
+   "name": "textcolor",
+   "type": "color",
+   "since": "0.2"
+  },
+  {
+   "name": "size",
+   "type": "number",
+   "since": "0.2"
+  },
+  {
+   "name": "font",
+   "type": "string",
+   "since": "0.2"
+  },
+  {
+   "name": "bold",
+   "type": "bool",
+   "since": "0.2"
+  },
+  {
+   "name": "italic",
+   "type": "bool",
+   "since": "0.2"
+  },
+  {
+   "name": "arrowsize",
+   "type": "number",
+   "since": "0.2"
+  }
+ ],
+ "style_groups": {
+  "line": [
+   "linecolor",
+   "linestyle",
+   "linewidth",
+   "cap",
+   "join",
+   "fillcolor",
+   "arrowsize"
+  ],
+  "area": [
+   "linecolor",
+   "linestyle",
+   "linewidth",
+   "cap",
+   "join",
+   "fillcolor"
+  ],
+  "wire": [
+   "linecolor",
+   "linestyle",
+   "linewidth",
+   "cap",
+   "join"
+  ],
+  "text": [
+   "textcolor",
+   "size",
+   "font",
+   "bold",
+   "italic"
+  ]
+ },
+ "reserved": [],
+ "keywords": [
+  {
+   "keyword": "VERSION",
+   "since": "0.2",
+   "group": "Header records and packages",
+   "summary": "Declares the language version of the file.",
+   "section": "16.1",
+   "where": [
+    "header"
+   ],
+   "slots": [],
+   "params": [
+    {
+     "name": "version",
+     "type": "string",
+     "required": true,
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "version"
+   ],
+   "output": "none",
+   "form": "@VERSION(version)"
+  },
+  {
+   "keyword": "PACKAGE",
+   "since": "0.2",
+   "group": "Header records and packages",
+   "summary": "Declares the name and version of a package.",
+   "section": "2.7",
+   "where": [
+    "package-header"
+   ],
+   "slots": [],
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "version",
+     "type": "string",
+     "required": true,
+     "since": "0.2"
+    }
+   ],
+   "output": "none",
+   "form": "@PACKAGE(name=…, version=…)"
+  },
+  {
+   "keyword": "USE-PACKAGE",
+   "since": "0.2",
+   "group": "Header records and packages",
+   "summary": "Uses a package; with a body, an inline package. In the header record of a package file it references another package.",
+   "section": "16.2",
+   "where": [
+    "header",
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "body",
+     "takes": "body",
+     "mode": "enclose",
+     "optional": true
+    }
+   ],
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "version",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "path",
+     "type": "string",
+     "since": "0.2"
+    }
+   ],
+   "output": "none",
+   "form": "@USE-PACKAGE(name=…, version=…, path=…) {body} (optional)"
+  },
+  {
+   "keyword": "ALIAS",
+   "since": "0.2",
+   "group": "Header records and packages",
+   "summary": "Declares another spelling for a standard word or a `$` name; with `definition=`, for a role, parameter or local name of that definition.",
+   "section": "16.5",
+   "where": [
+    "header"
+   ],
+   "slots": [],
+   "params": [
+    {
+     "name": "alias",
+     "type": "string",
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "original",
+     "type": "string",
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "definition",
+     "type": "string",
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "alias",
+    "original"
+   ],
+   "output": "none",
+   "form": "@ALIAS(alias, original, definition=…)"
+  },
+  {
+   "keyword": "USE-ALIASES",
+   "since": "0.2",
+   "group": "Header records and packages",
+   "summary": "Loads an alias package.",
+   "section": "16.5",
+   "where": [
+    "header"
+   ],
+   "slots": [],
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "version",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "path",
+     "type": "string",
+     "since": "0.2"
+    }
+   ],
+   "output": "none",
+   "form": "@USE-ALIASES(name=…, version=…, path=…)"
+  },
+  {
+   "keyword": "DEVICE",
+   "since": "0.2",
+   "group": "Header records and packages",
+   "summary": "Names the terminals of the instances whose name and model match.",
+   "section": "6.12",
+   "where": [
+    "header"
+   ],
+   "slots": [],
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "terminals",
+     "type": "array",
+     "required": true,
+     "items": "terminal names (strings)",
+     "since": "0.2"
+    }
+   ],
+   "output": "none",
+   "form": "@DEVICE(name=…, model=…, terminals=…)"
+  },
+  {
+   "keyword": "DEFINE-SYMBOL",
+   "since": "0.2",
+   "group": "Definitions",
+   "summary": "Defines a symbol: graphics, pins and texts.",
+   "section": "9.2",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "body",
+     "takes": "body",
+     "mode": "enclose"
+    }
+   ],
+   "params": [
+    {
+     "name": "box",
+     "type": "array",
+     "items": "four numbers: x1, y1, x2, y2",
+     "since": "0.2"
+    }
+   ],
+   "output": "definition",
+   "output_kind": "symbol",
+   "form": "@DEFINE-SYMBOL(box=…) {body}",
+   "sentence": "$TRI = @DEFINE-SYMBOL {…}"
+  },
+  {
+   "keyword": "DEFINE-STYLE",
+   "since": "0.2",
+   "group": "Definitions",
+   "summary": "Defines a style from style properties, merging the styles in its braces.",
+   "section": "9.3",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "extends",
+     "takes": "body",
+     "mode": "enclose",
+     "kinds": [
+      "style"
+     ]
+    }
+   ],
+   "params": [],
+   "style": "all",
+   "output": "definition",
+   "output_kind": "style",
+   "form": "@DEFINE-STYLE(property=…, …) {extends}",
+   "sentence": "$orange = @DEFINE-STYLE(linecolor=\"#e07000\", textcolor=\"#e07000\") {}"
+  },
+  {
+   "keyword": "DEFINE",
+   "since": "0.2",
+   "group": "Definitions",
+   "summary": "Defines a general definition: a role list, a parameter list and a body.",
+   "section": "9.4",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "body",
+     "takes": "body",
+     "mode": "enclose"
+    }
+   ],
+   "params": [
+    {
+     "name": "roles",
+     "type": "array",
+     "required": true,
+     "items": "a role name, or [name, kind] where kind is a kind name or an array of kind names; \"{name}\" is a set role",
+     "since": "0.2"
+    },
+    {
+     "name": "parameters",
+     "type": "array",
+     "items": "a parameter name, or [name, default]",
+     "since": "0.2"
+    }
+   ],
+   "output": "definition",
+   "output_kind": "general",
+   "form": "@DEFINE(roles=…, parameters=…) {body}",
+   "sentence": "$PAIR = a definition, @DEFINE(roles=[\"a\", \"b\"], parameters=[[\"gap\", 2]]) {…}"
+  },
+  {
+   "keyword": "PIN",
+   "since": "0.2",
+   "group": "Symbol content and graphics",
+   "summary": "A pin: the point of a symbol where a terminal is drawn.",
+   "section": "9.2.4",
+   "where": [
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "position",
+     "takes": "one",
+     "kinds": [
+      "point"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "terminal",
+     "type": "terminal",
+     "required": true,
+     "items": "terminals; a non-empty array of them makes a bus pin (9.2.4)",
+     "since": "0.2"
+    },
+    {
+     "name": "label",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "direction",
+     "type": "enum",
+     "values": [
+      "right",
+      "up",
+      "left",
+      "down"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "output": "new",
+   "output_kind": "pin",
+   "form": "{position} @PIN",
+   "sentence": "at (-4, 0) there is a @PIN(terminal=\"in\", direction=\"left\")"
+  },
+  {
+   "keyword": "LINE",
+   "since": "0.2",
+   "group": "Symbol content and graphics",
+   "summary": "A line through two or more points.",
+   "section": "9.2.5",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "points",
+     "takes": "set",
+     "kinds": [
+      "point",
+      "terminal"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "arrow",
+     "type": "enum",
+     "values": [
+      "none",
+      "start",
+      "end",
+      "both"
+     ],
+     "default": "none",
+     "since": "0.2"
+    },
+    {
+     "name": "fill",
+     "type": "enum",
+     "values": [
+      "none",
+      "linecolor",
+      "fillcolor"
+     ],
+     "default": "none",
+     "since": "0.2"
+    }
+   ],
+   "style": "line",
+   "output": "new",
+   "output_kind": "annotation",
+   "form": "{points} @LINE",
+   "sentence": "a @LINE running through {(0, 0) (4, 0)}"
+  },
+  {
+   "keyword": "RECTANGLE",
+   "since": "0.2",
+   "group": "Symbol content and graphics",
+   "summary": "An axis-aligned rectangle, by its centre and size or by two corners.",
+   "section": "9.2.5",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "points",
+     "takes": "shape",
+     "kinds": [
+      "point",
+      "terminal"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "width",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "height",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "fill",
+     "type": "enum",
+     "values": [
+      "none",
+      "linecolor",
+      "fillcolor"
+     ],
+     "default": "none",
+     "since": "0.2"
+    }
+   ],
+   "style": "area",
+   "together": [
+    [
+     "width",
+     "height"
+    ]
+   ],
+   "shape_params": [
+    "width",
+    "height"
+   ],
+   "output": "new",
+   "output_kind": "annotation",
+   "form": "{points} @RECTANGLE",
+   "sentence": "centered at (0, 0), a @RECTANGLE(width=4, height=2)"
+  },
+  {
+   "keyword": "CIRCLE",
+   "since": "0.2",
+   "group": "Symbol content and graphics",
+   "summary": "A circle, by its centre and radius or by its centre and a point on it.",
+   "section": "9.2.5",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "points",
+     "takes": "shape",
+     "kinds": [
+      "point",
+      "terminal"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "radius",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "fill",
+     "type": "enum",
+     "values": [
+      "none",
+      "linecolor",
+      "fillcolor"
+     ],
+     "default": "none",
+     "since": "0.2"
+    }
+   ],
+   "style": "area",
+   "shape_params": [
+    "radius"
+   ],
+   "output": "new",
+   "output_kind": "annotation",
+   "form": "{points} @CIRCLE",
+   "sentence": "centered at (0, 0), a @CIRCLE(radius=1)"
+  },
+  {
+   "keyword": "ELLIPSE",
+   "since": "0.2",
+   "group": "Symbol content and graphics",
+   "summary": "An axis-aligned ellipse, by its centre and size or by two corners of its box.",
+   "section": "9.2.5",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "points",
+     "takes": "shape",
+     "kinds": [
+      "point",
+      "terminal"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "width",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "height",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "fill",
+     "type": "enum",
+     "values": [
+      "none",
+      "linecolor",
+      "fillcolor"
+     ],
+     "default": "none",
+     "since": "0.2"
+    }
+   ],
+   "style": "area",
+   "together": [
+    [
+     "width",
+     "height"
+    ]
+   ],
+   "shape_params": [
+    "width",
+    "height"
+   ],
+   "output": "new",
+   "output_kind": "annotation",
+   "form": "{points} @ELLIPSE",
+   "sentence": "centered at (0, 0), an @ELLIPSE(width=4, height=2)"
+  },
+  {
+   "keyword": "ARC",
+   "since": "0.2",
+   "group": "Symbol content and graphics",
+   "summary": "An arc from the first point through the second to the third.",
+   "section": "9.2.5",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "points",
+     "takes": "set",
+     "kinds": [
+      "point",
+      "terminal"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "arrow",
+     "type": "enum",
+     "values": [
+      "none",
+      "start",
+      "end",
+      "both"
+     ],
+     "default": "none",
+     "since": "0.2"
+    },
+    {
+     "name": "fill",
+     "type": "enum",
+     "values": [
+      "none",
+      "linecolor",
+      "fillcolor"
+     ],
+     "default": "none",
+     "since": "0.2"
+    }
+   ],
+   "style": "line",
+   "output": "new",
+   "output_kind": "annotation",
+   "form": "{points} @ARC",
+   "sentence": "an @ARC running through {(0, 2) (2, 0) (0, -2)}"
+  },
+  {
+   "keyword": "BEZIER",
+   "since": "0.2",
+   "group": "Symbol content and graphics",
+   "summary": "A cubic Bézier curve of 3n+1 points: the start point, then two control points and an end point for each segment.",
+   "section": "9.2.5",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "points",
+     "takes": "set",
+     "kinds": [
+      "point",
+      "terminal"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "arrow",
+     "type": "enum",
+     "values": [
+      "none",
+      "start",
+      "end",
+      "both"
+     ],
+     "default": "none",
+     "since": "0.2"
+    },
+    {
+     "name": "fill",
+     "type": "enum",
+     "values": [
+      "none",
+      "linecolor",
+      "fillcolor"
+     ],
+     "default": "none",
+     "since": "0.2"
+    }
+   ],
+   "style": "line",
+   "output": "new",
+   "output_kind": "annotation",
+   "form": "{points} @BEZIER",
+   "sentence": "a @BEZIER with control points {(0, 0) (1, 1) (2, 1) (3, 0)}"
+  },
+  {
+   "keyword": "TEXT",
+   "since": "0.2",
+   "group": "Symbol content and graphics",
+   "summary": "A text: attached to a point it is an annotation, attached to an object a label.",
+   "section": "13.3",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "attach",
+     "takes": "one",
+     "kinds": [
+      "point",
+      "instance",
+      "usage",
+      "bundle",
+      "terminal",
+      "wire",
+      "annotation",
+      "net",
+      "owner"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "text",
+     "type": "string",
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "key",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "dx",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "dy",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "halign",
+     "type": "enum",
+     "values": [
+      "start",
+      "middle",
+      "end"
+     ],
+     "default": "start",
+     "since": "0.2"
+    },
+    {
+     "name": "valign",
+     "type": "enum",
+     "values": [
+      "baseline",
+      "top",
+      "middle",
+      "bottom"
+     ],
+     "default": "baseline",
+     "since": "0.2"
+    },
+    {
+     "name": "rotate",
+     "type": "enum",
+     "values": [
+      0,
+      90,
+      180,
+      270
+     ],
+     "default": 0,
+     "since": "0.2"
+    }
+   ],
+   "style": "text",
+   "positional": [
+    "text"
+   ],
+   "output": "new",
+   "output_kind": "text",
+   "key_subobject": true,
+   "override": "key",
+   "key": "attached object and key, when key is given",
+   "form": "{attach} @TEXT(text)",
+   "sentence": "on #M1 there is a @TEXT(\"W/L = ${w}/${l}\", key=\"wl\", dy=-3)"
+  },
+  {
+   "keyword": "PLACE",
+   "since": "0.2",
+   "group": "Placement and appearance",
+   "summary": "Puts the origin of an object at a point; one axis is enough.",
+   "section": "11.1",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "target",
+     "takes": "one",
+     "kinds": [
+      "instance",
+      "usage",
+      "bundle",
+      "point",
+      "text",
+      "position"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "x",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "y",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "x",
+    "y"
+   ],
+   "at_least_one": [
+    "x",
+    "y"
+   ],
+   "output": "same",
+   "override": "geometry",
+   "key": "object and axis",
+   "form": "{target} @PLACE(x, y)",
+   "sentence": "#M1 is at @PLACE(10, 20)"
+  },
+  {
+   "keyword": "ORIENT",
+   "since": "0.2",
+   "group": "Placement and appearance",
+   "summary": "Gives an object one of the eight orientations.",
+   "section": "11.2",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "target",
+     "takes": "one",
+     "kinds": [
+      "instance",
+      "usage",
+      "bundle"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "code",
+     "type": "enum",
+     "values": [
+      "R0",
+      "R90",
+      "R180",
+      "R270",
+      "MX",
+      "MY",
+      "MXR90",
+      "MYR90"
+     ],
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "code"
+   ],
+   "output": "same",
+   "override": "geometry",
+   "key": "object",
+   "form": "{target} @ORIENT(code)",
+   "sentence": "#M2 @ORIENT(\"R90\")"
+  },
+  {
+   "keyword": "LAYER",
+   "since": "0.2",
+   "group": "Placement and appearance",
+   "summary": "Puts an object on the bottom, middle or top drawing layer.",
+   "section": "11.6",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "target",
+     "takes": "one",
+     "kinds": [
+      "instance",
+      "usage",
+      "bundle",
+      "wire",
+      "annotation",
+      "text"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "layer",
+     "type": "enum",
+     "values": [
+      "bottom",
+      "middle",
+      "top"
+     ],
+     "required": true,
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "layer"
+   ],
+   "output": "same",
+   "override": "key",
+   "key": "object",
+   "form": "{target} @LAYER(layer)",
+   "sentence": "#X is on @LAYER(\"bottom\")"
+  },
+  {
+   "keyword": "SET-SYMBOL",
+   "since": "0.2",
+   "group": "Placement and appearance",
+   "summary": "Gives an object a symbol; given to `#`, it is the block symbol of the subcircuit.",
+   "section": "11.3",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "target",
+     "takes": "one",
+     "kinds": [
+      "instance",
+      "usage",
+      "bundle",
+      "level"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "symbol",
+     "takes": "definition",
+     "kinds": [
+      "symbol"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [],
+   "output": "same",
+   "override": "queue",
+   "form": "{target} @SET-SYMBOL {symbol}",
+   "sentence": "#M1 @SET-SYMBOL to $NMOS"
+  },
+  {
+   "keyword": "SET-STYLE",
+   "since": "0.2",
+   "group": "Placement and appearance",
+   "summary": "Gives an object a style.",
+   "section": "11.3",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "target",
+     "takes": "one",
+     "kinds": [
+      "instance",
+      "usage",
+      "bundle",
+      "wire",
+      "annotation",
+      "text"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "style",
+     "takes": "definition",
+     "kinds": [
+      "style"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [],
+   "output": "same",
+   "override": "queue",
+   "form": "{target} @SET-STYLE {style}",
+   "sentence": "{#CC #RZ} @SET-STYLE to $orange"
+  },
+  {
+   "keyword": "SELECT-INSTANCE",
+   "since": "0.2",
+   "group": "Selections",
+   "summary": "Selects instances.",
+   "section": "10.1",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "scope",
+     "takes": "any",
+     "kinds": [
+      "level",
+      "any"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "type",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "role",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "recursive",
+     "type": "bool",
+     "default": true,
+     "since": "0.2"
+    }
+   ],
+   "output": "new",
+   "selects": "instance",
+   "output_kind": "set",
+   "form": "{scope} @SELECT-INSTANCE",
+   "sentence": "among the instances at each level in # and below, @SELECT-INSTANCE(model=\"nch\") => they @SET-SYMBOL to $NMOS"
+  },
+  {
+   "keyword": "SELECT-TERMINAL",
+   "since": "0.2",
+   "group": "Selections",
+   "summary": "Selects terminals that have a pin.",
+   "section": "10.1",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "scope",
+     "takes": "any",
+     "kinds": [
+      "level",
+      "any"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "type",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "terminal",
+     "type": "terminal",
+     "since": "0.2"
+    },
+    {
+     "name": "net",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "wired",
+     "type": "bool",
+     "since": "0.2"
+    },
+    {
+     "name": "current",
+     "type": "enum",
+     "values": [
+      "in",
+      "out",
+      "unspecified"
+     ],
+     "since": "0.2"
+    },
+    {
+     "name": "role",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "recursive",
+     "type": "bool",
+     "default": true,
+     "since": "0.2"
+    }
+   ],
+   "output": "new",
+   "selects": "terminal",
+   "output_kind": "set",
+   "form": "{scope} @SELECT-TERMINAL",
+   "sentence": "among the terminals at each level in # and below, @SELECT-TERMINAL(net=\"vss\", wired=false) => $GND_STUB is @ATTACH(gap=3) to them"
+  },
+  {
+   "keyword": "SELECT-NET",
+   "since": "0.2",
+   "group": "Selections",
+   "summary": "Selects nets.",
+   "section": "10.1",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "scope",
+     "takes": "any",
+     "kinds": [
+      "level",
+      "any"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "port",
+     "type": "bool",
+     "since": "0.2"
+    },
+    {
+     "name": "wired",
+     "type": "bool",
+     "since": "0.2"
+    },
+    {
+     "name": "global",
+     "type": "bool",
+     "since": "0.2"
+    },
+    {
+     "name": "role",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "recursive",
+     "type": "bool",
+     "default": true,
+     "since": "0.2"
+    }
+   ],
+   "output": "new",
+   "selects": "net",
+   "output_kind": "set",
+   "form": "{scope} @SELECT-NET",
+   "sentence": "among the nets at each level in # and below, @SELECT-NET(port=true) => $IOPORT is @ATTACH to them"
+  },
+  {
+   "keyword": "SELECT-WIRE",
+   "since": "0.2",
+   "group": "Selections",
+   "summary": "Selects wires.",
+   "section": "10.1",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "scope",
+     "takes": "any",
+     "kinds": [
+      "level",
+      "any"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "net",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "bus",
+     "type": "bool",
+     "since": "0.2"
+    },
+    {
+     "name": "role",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "recursive",
+     "type": "bool",
+     "default": true,
+     "since": "0.2"
+    }
+   ],
+   "output": "new",
+   "selects": "wire",
+   "output_kind": "set",
+   "form": "{scope} @SELECT-WIRE",
+   "sentence": "among the wires at each level in # and below, @SELECT-WIRE(bus=true) => they @SET-STYLE to $bus"
+  },
+  {
+   "keyword": "SELECT-LABEL",
+   "since": "0.2",
+   "group": "Selections",
+   "summary": "Selects labels.",
+   "section": "10.1",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "scope",
+     "takes": "any",
+     "kinds": [
+      "level",
+      "any"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "key",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "role",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "recursive",
+     "type": "bool",
+     "default": true,
+     "since": "0.2"
+    }
+   ],
+   "output": "new",
+   "selects": "label",
+   "output_kind": "set",
+   "form": "{scope} @SELECT-LABEL",
+   "sentence": "among the labels at each level in # and below, @SELECT-LABEL(key=\"wl\") => they @SET-STYLE to $grey"
+  },
+  {
+   "keyword": "SELECT-ANNOTATION",
+   "since": "0.2",
+   "group": "Selections",
+   "summary": "Selects annotations.",
+   "section": "10.1",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "scope",
+     "takes": "any",
+     "kinds": [
+      "level",
+      "any"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "role",
+     "type": "string",
+     "since": "0.2"
+    },
+    {
+     "name": "recursive",
+     "type": "bool",
+     "default": true,
+     "since": "0.2"
+    }
+   ],
+   "output": "new",
+   "selects": "annotation",
+   "output_kind": "set",
+   "form": "{scope} @SELECT-ANNOTATION",
+   "sentence": "among the annotations at each level in # and below, @SELECT-ANNOTATION => they @SET-STYLE to $base"
+  },
+  {
+   "keyword": "SELECT-USAGE",
+   "since": "0.2",
+   "group": "Selections",
+   "summary": "Selects usages of a general definition, looking inward from the scope.",
+   "section": "10.1",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "scope",
+     "takes": "any",
+     "kinds": [
+      "level",
+      "any"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "definition",
+     "takes": "definition",
+     "kinds": [
+      "general"
+     ],
+     "mode": "absorb",
+     "optional": true
+    }
+   ],
+   "params": [
+    {
+     "name": "recursive",
+     "type": "bool",
+     "default": true,
+     "since": "0.2"
+    }
+   ],
+   "output": "new",
+   "selects": "usage",
+   "output_kind": "set",
+   "form": "{scope} @SELECT-USAGE {definition} (optional)",
+   "sentence": "among the usages at each level in # and below, @SELECT-USAGE of $DIFFPAIR => they have @PRIORITY(\"disabled\")"
+  },
+  {
+   "keyword": "SELECT-ANCESTOR-USAGE",
+   "since": "0.2",
+   "group": "Selections",
+   "summary": "Selects the usages that have the objects of the scope as members, looking outward.",
+   "section": "10.1",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "scope",
+     "takes": "any",
+     "kinds": [
+      "any"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "definition",
+     "takes": "definition",
+     "kinds": [
+      "general"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "recursive",
+     "type": "bool",
+     "default": true,
+     "since": "0.2"
+    }
+   ],
+   "output": "new",
+   "selects": "usage",
+   "output_kind": "set",
+   "form": "{scope} @SELECT-ANCESTOR-USAGE {definition}",
+   "sentence": "among the usages containing #M1, @SELECT-ANCESTOR-USAGE of $DIFFPAIR => named %dp_set"
+  },
+  {
+   "keyword": "AS",
+   "since": "0.2",
+   "group": "Applying definitions",
+   "summary": "Applies a general definition, written last, to the objects that fill its roles.",
+   "section": "9.4",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "definition",
+     "takes": "definition",
+     "kinds": [
+      "general"
+     ],
+     "mode": "absorb",
+     "at": "last"
+    }
+   ],
+   "role_slots": true,
+   "params": [
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "definition_params": true,
+   "output": "new",
+   "output_kind": "usage",
+   "form": "{roles} @AS {definition}",
+   "sentence": "#M1(in_p) and #M2(in_n) are treated @AS $DIFFPAIR"
+  },
+  {
+   "keyword": "ATTACH",
+   "since": "0.2",
+   "group": "Applying definitions",
+   "summary": "Applies a general definition, written first, to the objects that fill its roles.",
+   "section": "9.4",
+   "where": [
+    "level",
+    "symbol"
+   ],
+   "slots": [
+    {
+     "name": "definition",
+     "takes": "definition",
+     "kinds": [
+      "general"
+     ],
+     "mode": "absorb",
+     "at": "first"
+    }
+   ],
+   "role_slots": true,
+   "params": [
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "definition_params": true,
+   "output": "new",
+   "output_kind": "usage",
+   "form": "{definition} @ATTACH {roles}",
+   "sentence": "$GND is @ATTACH to &vss"
+  },
+  {
+   "keyword": "WIRE",
+   "since": "0.2",
+   "group": "Wires",
+   "summary": "A wire of a net (or of several nets: a bus) through two or more terminals or points.",
+   "section": "13.1",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "net",
+     "takes": "any",
+     "kinds": [
+      "net"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "points",
+     "takes": "set",
+     "kinds": [
+      "terminal",
+      "point"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "mode",
+     "type": "enum",
+     "values": [
+      "auto",
+      "straight",
+      "horizontal-vertical",
+      "vertical-horizontal",
+      "manhattan",
+      "manhattan45"
+     ],
+     "default": "auto",
+     "since": "0.2"
+    }
+   ],
+   "style": "wire",
+   "output": "new",
+   "output_kind": "wire",
+   "form": "{net} {points} @WIRE",
+   "sentence": "net &n1 has a @WIRE connecting {#R1:2 %j #R2:1}"
+  },
+  {
+   "keyword": "ROUTE",
+   "since": "0.2",
+   "group": "Wires",
+   "summary": "Asks for the whole net to be drawn as wires; the solver chooses the branches.",
+   "section": "13.7",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "net",
+     "takes": "one",
+     "kinds": [
+      "net"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "mode",
+     "type": "enum",
+     "values": [
+      "auto",
+      "straight",
+      "horizontal-vertical",
+      "vertical-horizontal",
+      "manhattan",
+      "manhattan45"
+     ],
+     "default": "auto",
+     "since": "0.2"
+    }
+   ],
+   "style": "wire",
+   "output": "new",
+   "output_kind": "route",
+   "form": "{net} @ROUTE",
+   "sentence": "net &n1 is fully @ROUTE"
+  },
+  {
+   "keyword": "BUNDLE",
+   "since": "0.2",
+   "group": "Sets, groups and bundles",
+   "summary": "Draws several host instances as one object.",
+   "section": "11.8",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "members",
+     "takes": "set",
+     "kinds": [
+      "instance"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [],
+   "output": "new",
+   "output_kind": "bundle",
+   "form": "{members} @BUNDLE",
+   "sentence": "#XI<3:0> is drawn as a @BUNDLE => named %xi"
+  },
+  {
+   "keyword": "GROUP",
+   "since": "0.2",
+   "group": "Sets, groups and bundles",
+   "summary": "Marks a set as a group, which the solver keeps together.",
+   "section": "11.5",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "members",
+     "takes": "set",
+     "kinds": [
+      "any"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [],
+   "output": "same",
+   "form": "{members} @GROUP",
+   "sentence": "{#M1 #M2 #M5} as a @GROUP"
+  },
+  {
+   "keyword": "ADD-TO",
+   "since": "0.2",
+   "group": "Sets, groups and bundles",
+   "summary": "Adds objects to a named set.",
+   "section": "5.2.2",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "items",
+     "takes": "any",
+     "kinds": [
+      "any"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "target",
+     "takes": "any",
+     "kinds": [
+      "set"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [],
+   "output": "target",
+   "form": "{items} {target} @ADD-TO",
+   "sentence": "&vdd @ADD-TO $SUPPLY_NET_SET"
+  },
+  {
+   "keyword": "REMOVE-FROM",
+   "since": "0.2",
+   "group": "Sets, groups and bundles",
+   "summary": "Removes objects from a named set.",
+   "section": "5.2.2",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "items",
+     "takes": "any",
+     "kinds": [
+      "any"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "target",
+     "takes": "any",
+     "kinds": [
+      "set"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [],
+   "output": "target",
+   "form": "{items} {target} @REMOVE-FROM",
+   "sentence": "{&vdd &vss} @REMOVE-FROM $PORT_FILL_SET"
+  },
+  {
+   "keyword": "UNION",
+   "since": "0.2",
+   "group": "Sets, groups and bundles",
+   "summary": "The union of sets, without duplicates.",
+   "section": "5.2.2",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "sets",
+     "takes": "set",
+     "kinds": [
+      "any"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [],
+   "output": "new",
+   "output_kind": "set",
+   "form": "{sets} @UNION",
+   "sentence": "%u_set = %a_set and %b_set @UNION"
+  },
+  {
+   "keyword": "ALIGN",
+   "since": "0.2",
+   "group": "Constraints and priority",
+   "summary": "Constraint: the members have the same coordinate on the axis.",
+   "section": "14.2",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "members",
+     "takes": "set",
+     "kinds": [
+      "locatable"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "axis",
+     "type": "enum",
+     "values": [
+      "x",
+      "y"
+     ],
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "axis"
+   ],
+   "output": "new",
+   "output_kind": "constraint",
+   "override": "geometry",
+   "form": "{members} @ALIGN(axis)",
+   "sentence": "{#M1 #M2} @ALIGN(\"y\"), i.e., same y"
+  },
+  {
+   "keyword": "ORDER",
+   "since": "0.2",
+   "group": "Constraints and priority",
+   "summary": "Constraint: the members are in strict order in the direction.",
+   "section": "14.3",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "members",
+     "takes": "set",
+     "kinds": [
+      "locatable"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "direction",
+     "type": "enum",
+     "values": [
+      "left-to-right",
+      "right-to-left",
+      "bottom-to-top",
+      "top-to-bottom",
+      "x",
+      "y"
+     ],
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "direction"
+   ],
+   "output": "new",
+   "output_kind": "constraint",
+   "override": "geometry",
+   "form": "{members} @ORDER(direction)",
+   "sentence": "{#M1 #M2 #M3} are in @ORDER(\"left-to-right\")"
+  },
+  {
+   "keyword": "DISTRIBUTE",
+   "since": "0.2",
+   "group": "Constraints and priority",
+   "summary": "Constraint: the members are equally spaced along the axis.",
+   "section": "14.4",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "members",
+     "takes": "set",
+     "kinds": [
+      "locatable"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "axis",
+     "type": "enum",
+     "values": [
+      "x",
+      "y"
+     ],
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "axis"
+   ],
+   "output": "new",
+   "output_kind": "constraint",
+   "override": "geometry",
+   "form": "{members} @DISTRIBUTE(axis)",
+   "sentence": "the x of {#R1 #R2 #R3} @DISTRIBUTE(\"x\"), i.e., in equal steps"
+  },
+  {
+   "keyword": "DISTANCE",
+   "since": "0.2",
+   "group": "Constraints and priority",
+   "summary": "Constraint: the distance from the first object to the second in the direction.",
+   "section": "14.5",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "from",
+     "takes": "any",
+     "kinds": [
+      "locatable"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "to",
+     "takes": "any",
+     "kinds": [
+      "locatable"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "direction",
+     "type": "enum",
+     "values": [
+      "left-to-right",
+      "right-to-left",
+      "bottom-to-top",
+      "top-to-bottom",
+      "x",
+      "y"
+     ],
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "min",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "max",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "exact",
+     "type": "number",
+     "since": "0.2"
+    },
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "direction"
+   ],
+   "at_least_one": [
+    "min",
+    "max",
+    "exact"
+   ],
+   "exclusive": [
+    [
+     "exact",
+     "min"
+    ],
+    [
+     "exact",
+     "max"
+    ]
+   ],
+   "output": "new",
+   "output_kind": "constraint",
+   "override": "geometry",
+   "form": "{from} {to} @DISTANCE(direction)",
+   "sentence": "from #M1 to #M2, they have @DISTANCE(\"bottom-to-top\", min=4)"
+  },
+  {
+   "keyword": "ORIENT-RELATION",
+   "since": "0.2",
+   "group": "Constraints and priority",
+   "summary": "Constraint: the orientation of the second object is that of the first followed by the transform.",
+   "section": "14.9",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "from",
+     "takes": "any",
+     "kinds": [
+      "orientable"
+     ],
+     "mode": "absorb"
+    },
+    {
+     "name": "to",
+     "takes": "any",
+     "kinds": [
+      "orientable"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "relation",
+     "type": "enum",
+     "values": [
+      "R0",
+      "R90",
+      "R180",
+      "R270",
+      "MX",
+      "MY",
+      "MXR90",
+      "MYR90"
+     ],
+     "required": true,
+     "since": "0.2"
+    },
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "relation"
+   ],
+   "output": "new",
+   "output_kind": "constraint",
+   "override": "geometry",
+   "form": "{from} {to} @ORIENT-RELATION(relation)",
+   "sentence": "from #M1 to #M2, they have @ORIENT-RELATION(\"MY\"), i.e., flipped left-right"
+  },
+  {
+   "keyword": "PRIORITY",
+   "since": "0.2",
+   "group": "Constraints and priority",
+   "summary": "Changes the priority of a constraint or a usage, or turns a group on or off; a set with GROUP is taken as the group itself.",
+   "section": "14.8",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "target",
+     "takes": "one",
+     "kinds": [
+      "constraint",
+      "usage",
+      "set"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "priority",
+     "type": "enum",
+     "values": [
+      "disabled",
+      "low",
+      "normal",
+      "high"
+     ],
+     "required": true,
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "priority"
+   ],
+   "output": "same",
+   "override": "key",
+   "key": "object",
+   "form": "{target} @PRIORITY(priority)",
+   "sentence": "%c1 has @PRIORITY(\"disabled\")"
+  },
+  {
+   "keyword": "CURRENT",
+   "since": "0.2",
+   "group": "Electrical semantics",
+   "summary": "The direction of the current at a terminal.",
+   "section": "15.2",
+   "where": [
+    "level"
+   ],
+   "slots": [
+    {
+     "name": "terminal",
+     "takes": "one",
+     "kinds": [
+      "terminal"
+     ],
+     "mode": "absorb"
+    }
+   ],
+   "params": [
+    {
+     "name": "direction",
+     "type": "enum",
+     "values": [
+      "in",
+      "out",
+      "unspecified"
+     ],
+     "required": true,
+     "since": "0.2"
+    }
+   ],
+   "positional": [
+    "direction"
+   ],
+   "output": "same",
+   "override": "key",
+   "key": "terminal",
+   "form": "{terminal} @CURRENT(direction)",
+   "sentence": "#M5:1 has @CURRENT(\"in\")"
+  }
+ ]
+}

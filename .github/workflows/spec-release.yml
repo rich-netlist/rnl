@@ -1,0 +1,37 @@
+# Publishes a revision of the language standard (decision 0007). On a tag such as spec-0.2-r1 it checks
+# the standard and builds every form of it with scripts/spec/build.py, then creates the GitHub release
+# "RNL 0.2, revision 1" with those files and their SHA256SUMS. The message of the tag becomes the
+# release notes: list there what the revision changes.
+name: Standard release
+
+on:
+  push:
+    tags: ["spec-*-r*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # the tags give the revision label
+
+      - uses: ./.github/actions/install-spec-tools
+
+      - name: Build every form of the standard
+        run: python3 scripts/spec/build.py --out release
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#spec-}"
+          version="${version%-r*}"
+          revision="${TAG##*-r}"
+          git tag -l --format='%(contents)' "$TAG" > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" release/rnl-* release/SHA256SUMS \
+            --verify-tag --title "RNL ${version}, revision ${revision}" --notes-file "$RUNNER_TEMP/notes.md"

@@ -1,176 +1,178 @@
-# Rich Netlist（RNL）格式标准初稿：原则与边界
+# Rich Netlist (RNL): principles and boundaries
 
-状态：原则草案，供讨论；尚未定义可实现的正式语法或发布格式版本。
+Status: principles. The language that follows them is defined in the standard, [RNL 0.2](rnl-0.2.md); the principles are not tied to a language version.
 
-来源：迁自 Analog Canvas 仓库（`cascode-ai/analog-canvas`）`rich-netlist` 分支的 `docs/standards/rich-netlist.md`，提交 `641e9c21d36b86937d543c1698cc661eae61e007`（2026-09-19），于 2026-09-24 迁入；迁入时仅增加本段来源与下段许可说明，正文未改动。此后以本仓库为唯一维护位置。
+Language: this English text is the authoritative version. The Chinese version is [rich-netlist.zh.md](rich-netlist.zh.md); where the two differ, this English text prevails.
 
-许可：本文由版权所有者按 [CC-BY-4.0](../LICENSES/CC-BY-4.0.txt) 发布，仓库各部分的许可见[许可说明](../README.md#license)。Analog Canvas 中的冻结副本仍按该仓库的 AGPL-3.0 条款提供。
+Source: moved on 2026-09-24 from `docs/standards/rich-netlist.md` on the `rich-netlist` branch of the Analog Canvas repository (`cascode-ai/analog-canvas`), commit `641e9c21d36b86937d543c1698cc661eae61e007` (2026-09-19). Only this source note and the license note below were added when it was moved; the text was not changed. Since then, this repository has been the only place where it is maintained. The text was written in Chinese and translated into English in October 2026.
 
-## 1. 定位与总纲
+License: published by the copyright holder under [CC-BY-4.0](../LICENSES/CC-BY-4.0.txt); the licenses of the parts of this repository are described in the [license notes](../README.md#license). The frozen copy in Analog Canvas remains available under the AGPL-3.0 terms of that repository.
 
-Rich Netlist 是附着于原生电路网表的开放元数据扩展，以描述电路结构语义和设计意图为主，并允许补充原理图的视觉信息。
+## 1. Positioning and overview
 
-> 原生网表定义电路；Rich Netlist 描述如何理解和呈现这个电路。语义描述可以独立于几何存在，几何可以逐步细化，但两者都不能重新定义电路。
+Rich Netlist is an open metadata extension attached to a native circuit netlist. It mainly describes the structural meaning of a circuit and the design intent, and it may add visual information for the schematic.
 
-RNL 的定位是电路语义描述，不以精细绘图复现为目标，也不要求唯一的渲染结果。同一份描述可以由不同实现生成不同的布局与风格；精细视觉描述是可选的补充能力。
+> The native netlist defines the circuit; Rich Netlist describes how to understand and present that circuit. Semantic descriptions may exist without geometry, and geometry may be refined step by step, but neither may redefine the circuit.
 
-目标是同一份文件可由原有仿真器按原有方式读取，也可由理解 RNL 的工具读取并绘制原理图。扩展信息全部位于宿主语言的合法注释内；剥离注释不应成为仿真前置步骤。
+RNL is positioned as a description of circuit meaning. It does not aim to reproduce a drawing exactly and does not require a unique rendering. Different implementations may produce different layouts and styles from the same description; detailed visual description is an optional, supplementary capability.
 
-**RNL 是：**
+The goal is that the same file can be read by the existing simulator in the existing way, and also by tools that understand RNL, which draw the schematic from it. All extension information is placed in legal comments of the host language; stripping comments must not become a step required before simulation.
 
-- 附着于原生网表、通过合法注释承载信息的元数据扩展。
-- 描述电路结构语义、设计意图和原理图视觉信息的交换格式。
-- 允许纯语义、精确几何及混合粒度描述的声明式呈现规范。
+**RNL is:**
 
-**RNL 不是：**
+- a metadata extension attached to a native netlist, carrying its information in legal comments;
+- an exchange format for the structural meaning of circuits, design intent and the visual information of schematics;
+- a declarative presentation specification that allows purely semantic descriptions, exact geometry and descriptions of mixed granularity.
 
-- 统一不同电路网表语言或转换仿真器语法的标准。
-- 通过绘图描述创建器件、参数或连接的第二套电路定义。
-- 校验绘图所暗示的电气含义是否与原网表一致的规则集。
-- 规定唯一布局算法或唯一渲染结果的规范。
-- 保证编辑器“导出再导入”后图形不变的视觉存档格式。
+**RNL is not:**
 
-## 2. 设计原则
+- a standard that unifies different netlist languages or converts simulator syntax;
+- a second definition of the circuit that creates devices, parameters or connections through drawing descriptions;
+- a set of rules that checks whether the electrical meaning suggested by a drawing agrees with the original netlist;
+- a specification that prescribes a single layout algorithm or a single rendering;
+- a visual archive format that guarantees a drawing is unchanged after an editor exports and imports it again.
 
-用语约定：“应”“不应”“必须”“不能”表示规范要求；“建议”“鼓励”表示推荐做法，不作约束；“可以”“允许”表示许可。实现按职责分为解释器（读取网表和 RNL，得到自洽的描述集合，并给出诊断；只用来检查时也称 lint）、渲染器（据此绘制原理图）、生成器（产生 RNL 描述，包括人、LLM 和导出工具）和编辑器（读取、修改并写回 RNL）；“实现”是它们的统称。
+## 2. Design principles
 
-### 2.1 网表兼容性：安全嵌入注释，使用统一子标签
+Wording conventions: "must" and "must not" state requirements; "recommended" and "encouraged" state recommended practice and are not binding; "may" and "allowed" state permission. By their roles, implementations are divided into interpreters (they read the netlist and the RNL, obtain a consistent set of descriptions and give diagnostics; an interpreter used only for checking is also called lint), renderers (they draw the schematic from that set of descriptions), generators (they produce RNL descriptions; people, LLMs and export tools are all generators) and editors (they read, modify and write back RNL); "implementation" is the common name for all of them.
 
-1. **安全存在于原有注释中。** RNL 信息应嵌入原网表的合法注释，被原有仿真器视为普通注释，不影响仿真兼容性。目标覆盖主流电路网表格式，如 SPICE、Spectre、Eldo、HSPICE 等。
-2. **注释前缀可不同，子标签保持一致。** 不同网表格式可以采用各自的注释前缀，但注释内部识别 RNL 信息的子标签应统一为 `@RNL`。
-3. **仅修改 RNL 时保留原网表。** 应保留原网表正文及普通注释，不附带重写电路内容。
-4. **不绑定具体网表格式。** RNL 不规定也不统一宿主网表的语法；宿主对象的名称、大小写、可用字符集等一律遵循所在网表格式及仿真器自身的规则和限制。RNL 自己的名字由 RNL 规定。解释器等实现应明确其支持的网表格式；如何解析各种网表格式不属于本规范约束的内容。
+### 2.1 Netlist compatibility: embed safely in comments, use one sub-tag
 
-子标签定为 `@RNL`。据各仿真器和网表格式的文档调研，没有工具赋予注释中的 `@RNL` 特殊含义；有特殊含义的注释前缀（如 `*#`、`*.`、`*|`）都紧贴注释符，注释符后留一个空格即可避开。各网表格式的注释写法由语法规范规定，并需实测验证（第 4 节第 1 条）。
+1. **Live safely in the netlist's own comments.** RNL information must be embedded in legal comments of the original netlist so that the existing simulator treats it as ordinary comments and simulation compatibility is not affected. The aim is to cover the mainstream netlist formats, such as SPICE, Spectre, Eldo and HSPICE.
+2. **Comment prefixes may differ, the sub-tag stays the same.** Different netlist formats may use their own comment prefixes, but the sub-tag that identifies RNL inside a comment must be the same: `@RNL`.
+3. **Keep the original netlist when only RNL is modified.** The original netlist text and its ordinary comments must be kept, and circuit content must not be rewritten along the way.
+4. **Not bound to a particular netlist format.** RNL neither defines nor unifies the syntax of host netlists. The names of host objects, their case, the character sets available to them and so on all follow the rules and limits of the netlist format and of the simulator itself. RNL's own names are defined by RNL. Interpreters and other implementations must state which netlist formats they support; how each netlist format is parsed is outside this specification.
 
-### 2.2 语义唯一性与不校验原则：电气事实只由原网表定义
+The sub-tag is `@RNL`. A survey of the documentation of simulators and netlist formats found no tool that gives `@RNL` in a comment a special meaning. The comment prefixes with a special meaning (such as `*#`, `*.`, `*|`) all put a character directly after the comment character, so leaving one space after the comment character avoids them. How comments are written in each netlist format is defined by the syntax specification and needs to be verified by tests (section 4, item 1).
 
-RNL 不重复定义原网表的连接关系、器件类型、名称和参数；允许引用这些信息、解释结构语义，以及设置显示别名。绘图描述不产生或修改电气事实。
+### 2.2 One source of meaning, no checking: electrical facts are defined only by the original netlist
 
-**不校验原则：RNL 不负责校验绘图可能暗示的电气含义是否与原网表一致，也不因此判定绘图描述非法。** 例如：
+RNL does not duplicate the definition of the connections, device types, names or parameters of the original netlist. It may refer to this information, explain structural meaning and set display aliases. Drawing descriptions do not create or change electrical facts.
 
-- 两个器件的端口位置重叠，不代表端子之间有电气连接，也不使 RNL 描述非法。
-- 可以在两个没有电气连接的端子之间绘制连线；连线所关联的电气节点也可以不属于任何一端子。
-- 线条接触、交叉或重叠都只是几何信息，不能据此建立电气连接或修改原网表。
+**No-checking principle: RNL is not responsible for checking whether the electrical meaning that a drawing might suggest agrees with the original netlist, and does not declare a drawing description illegal for that reason.** For example:
 
-生成器和渲染器自行决定是否检查这些情况、是否提示 warning，以及如何呈现。此类检查与提示不属于格式规范的要求，目的是降低实现门槛并保留实现的选择权。语法、引用和单条描述内的基本语义检查仍属标准要求，校验边界见 2.4。
+- Overlapping pin positions of two devices do not mean that their terminals are electrically connected, and do not make the RNL description illegal.
+- A wire may be drawn between two terminals that are not electrically connected; the electrical node that the wire is associated with need not be the node of either terminal.
+- Lines that touch, cross or overlap carry only geometric information; they must not be taken as an electrical connection or used to change the original netlist.
 
-| 信息 | 权威边界 |
+Generators and renderers decide for themselves whether to check such cases, whether to give a warning and how to present them. Such checks and warnings are not requirements of the format specification; the purpose is to lower the barrier to implementation and to leave the choice to implementations. Checks of syntax, of references and of basic semantics within a single description are still required by the standard; see 2.4 for the boundary of checking.
+
+| Information | Boundary of authority |
 | --- | --- |
-| 器件身份、类型、参数、端子顺序、连接、子电路接口 | 由宿主网表定义，RNL 只引用 |
-| 显示别名、文字位置、符号外观、视觉路径 | 由 RNL 描述，不修改电气对象 |
-| “M1、M2 构成差分对” | 解释已有对象及其角色，不创建器件或连接 |
-| “显示 R1 的参数表达式” | 引用宿主值，不保存另一份权威参数 |
-| 虚元件（电源、地端子等仅为显示而存在的元件） | 由 RNL 定义和拥有，电气上不存在 |
-| note（自由文字、图形、边框等纯绘图对象） | 由 RNL 定义和拥有，没有任何电气语义 |
+| Device identity, type, parameters, terminal order, connections, subcircuit interface | Defined by the host netlist; RNL only refers to them |
+| Display aliases, text positions, symbol appearance, visual paths | Described by RNL; they do not change electrical objects |
+| "M1 and M2 form a differential pair" | Explains existing objects and their roles; creates no device or connection |
+| "Show the parameter expression of R1" | Refers to the host value; keeps no second authoritative copy of the parameter |
+| Virtual parts (supplies, grounds and other parts that exist only for display) | Defined and owned by RNL; do not exist electrically |
+| Note objects (free-form text, graphics, frames and other purely drawn objects) | Defined and owned by RNL; have no electrical meaning at all |
 
-RNL 不维护第二份“器件—端子—节点”连接表，也不能为画图向原网表加入实际不存在的元件、额外节点或零欧电阻；仅为显示而存在的对象用虚元件描述。视觉路径的网络关联、锚点的端子绑定与几何位置分别表达；它们不要求在绘图上电气一致，也不能覆盖原网表中的连接事实。
+RNL keeps no second "device–terminal–node" connection table, and it must not add parts that do not actually exist, extra nodes or zero-ohm resistors to the original netlist for the sake of the drawing; objects that exist only for display are described as virtual parts. The net associated with a visual path, the terminal that an anchor is bound to and the geometric position are expressed separately; they need not be electrically consistent on the drawing, and they must not override the connection facts of the original netlist.
 
-**虚元件。** RNL 可以描述虚元件：电气上不存在、仅为显示效果而存在的元件，例如电源、地端子。虚元件只存在于 RNL 描述中，不出现在原网表里；它和器件一样具有端子，可以与连线相接，也可以引用宿主对象（例如地端子关联某个网络），但只用于显示，不产生或修改电气事实，同样适用不校验原则。标准包定义一组虚元件，该集合不封闭，随标准包的版本扩展；用户也可以在标准包之外定义自己的虚元件，其生效范围见 2.5。
+**Virtual parts.** RNL may describe virtual parts: parts that do not exist electrically and exist only for display, such as supplies and grounds. A virtual part exists only in the RNL description and does not appear in the original netlist. Like a device it has terminals and may be connected to wires, and it may refer to host objects (for example, a ground associated with a net), but it is only for display, creates or changes no electrical facts, and the no-checking principle applies to it as well. The standard package defines a set of virtual parts; the set is not closed and grows with the versions of the standard package. Users may also define their own virtual parts outside the standard package; where they take effect is described in 2.5.
 
-**note。** 自由的文字说明、图形、边框等标注属于 note 对象。note 与虚元件不同：它是纯绘图对象，没有端子，不具有任何电气语义。
+**Note objects.** Free-form text, graphics, frames and other annotations are note objects. A note object differs from a virtual part: it is a purely drawn object, has no terminals and has no electrical meaning at all.
 
-### 2.3 可扩展性：克制但允许增量扩展
+### 2.3 Extensibility: restrained, but open to incremental extension
 
-- **只定义必要内容。** 不力图在早期版本定死所有语义和细节，但已定义内容的含义应明确。
-- **新增功能尽量兼容旧内容。** 后续通过扩展增加语义、符号、虚元件或布局能力，避免改变已有定义的含义。
-- **未知内容与错误统一处理。** 实现不认识的关键词或扩展内容与语法错误同等对待，按 2.9 处理：所在语句失效并报告为错误；保存时建议原样保留。例外是 RNL 记录入口处不认识的参数字段：只给出 warning 并忽略该字段，记录的其他部分照常处理，为以后的扩展留出位置。
-- **声明版本。** 实现应明确声明其支持的 RNL 版本；文件也应能声明其使用的 RNL 版本。
+- **Define only what is necessary.** Early versions do not try to settle every meaning and detail, but the meaning of what is defined must be clear.
+- **New features stay compatible with old content as far as possible.** Later versions add meanings, symbols, virtual parts or layout capabilities through extension and avoid changing the meaning of existing definitions.
+- **Unknown content is handled like errors.** Keywords or extension content that an implementation does not know are treated in the same way as syntax errors, as in 2.9: the statement that contains them fails and is reported as an error; keeping it unchanged when saving is recommended. The exception is an unknown parameter field in the head of an RNL record: only a warning is given and the field is ignored, and the rest of the record is processed as usual; this leaves room for later extensions.
+- **Declare versions.** Implementations must state which RNL versions they support; files must also be able to declare the RNL version they use.
 
-具体扩展与版本机制留待后续定义。
+Versions are defined in the standard (16.1); an extension mechanism is left to a later version (16.4).
 
-### 2.4 高层语义：明确描述拓扑、意图与视觉约束
+### 2.4 High-level meaning: describe topology, intent and visual constraints explicitly
 
-- **允许高层描述。** 可表达差分对、RC 滤波器、交叉耦合等拓扑，匹配、偏置等设计意图，以及对称、信号流向等视觉约束；不要求先填写器件坐标和走线。
-- **语义定义明确。** 每种语义应有明确的关键词和描述定义，说明其含义及所引用对象的角色，方便生成器和渲染器一致理解。具体词汇由标准包提供，不属于语言标准本身。
-- **允许嵌套描述。** 一条语义描述的结果可以被命名，并被其他描述引用，例如先声明差分对，再用它与尾电流源一起构成差分输入级。命名的语义对象引用的是本层次的网表对象，只属于所在层次。具体方案留待后续定义。
-- **基本校验是标准要求。** 语法错误、不认识的关键词、无效引用和单条描述内的基本语义冲突属于标准定义的基本错误，例如引用不存在的网表对象，或把网络填进要求器件的角色。每种语义的定义用它的角色声明和定义内容表达这些规则。实现应将基本错误报告为错误，出错语句按 2.9 失效。
-- **跨条冲突与网表一致性不强制校验。** 例如分别声明 A、B 构成差分对和 B、C 构成差分对，即使在具体拓扑中两条描述不能同时成立，RNL 也不要求检查这种跨条冲突。RNL 同样不要求验证语义描述是否符合实际网表的连接、类型或参数；实现可以自行提供这些检查和提示。
+- **High-level descriptions are allowed.** Topologies such as differential pairs, RC filters and cross-coupling, design intent such as matching and biasing, and visual constraints such as symmetry and signal flow may be expressed, without first writing device coordinates and wiring.
+- **Semantics are clearly defined.** Each kind of semantic description must have a clear keyword and a clear definition, saying what it means and what roles the referenced objects play, so that generators and renderers understand it the same way. The concrete vocabulary is provided by the standard package and is not part of the language standard itself.
+- **Nested descriptions are allowed.** The result of a semantic description may be named and referred to by other descriptions; for example, a differential pair is declared first and then used, together with the tail current source, to form a differential input stage. A named semantic object refers to netlist objects of its own level and belongs only to that level. How this is written is defined in the standard (9.4).
+- **Basic checking is required by the standard.** Syntax errors, unknown keywords, invalid references and basic semantic conflicts within a single description are basic errors defined by the standard, for example a reference to a netlist object that does not exist, or a net put into a role that requires a device. The definition of each kind of semantic description expresses these rules with its role declarations and its content. Implementations must report basic errors as errors, and the statement in error fails as in 2.9.
+- **Checking conflicts between descriptions and consistency with the netlist is not required.** For example, if A and B are declared a differential pair and B and C another, RNL does not require checking such a conflict between descriptions, even if the two cannot both hold in the actual topology. Nor does RNL require verifying that semantic descriptions agree with the actual connections, types or parameters of the netlist; implementations may provide such checks and warnings themselves.
 
-### 2.5 作用域：按位置确定，引用限于本层次，定义向下继承
+### 2.5 Scope: set by position, references limited to the level, definitions inherited downward
 
-RNL 描述应有明确的作用域，以支持 subcircuit，确定描述适用于哪个电路，以及其中的对象引用在哪个范围内解析。
+RNL descriptions must have a clear scope, to support subcircuits: it determines which circuit a description applies to and where the object references in it are resolved.
 
-- **作用域默认由声明位置确定，也可以指定。** 语句写在哪个 subcircuit 内，就属于该电路层次；写在文件里、不属于任何 subcircuit 的部分是该文件的文件层。主文件的文件层就是顶层电路；被包含（include）的文件，其文件层不构成电路，只承载定义和规则。文件层给出的定义对该文件定义的各个 subcircuit 和它包含的文件生效，不影响包含它的文件。语句也可以指定目标 subcircuit，目标只能是文字上位于声明位置之内的 subcircuit；subcircuit 内的语句不能指定。不指定时按声明位置确定。
-- **网表对象的引用限于作用域所在的电路层次。** 对器件、网络、端子等网表对象的引用只在语句作用域所在的层次内解析，不跨层次引用。例如，不同子电路都可以有名为 M1 的器件，各自的描述互不影响。
-- **RNL 的可复用定义向下继承，子层次可以覆盖。** RNL 自己定义的可复用对象（如自定义虚元件、符号及可能的样式定义）对其所在层次及以下各层都生效。子层次按文字的包含关系确定：文件的子层次是它定义的 subcircuit 和它包含的文件，与 subcircuit 在哪里被实例化无关，因此同一个 subcircuit 只有一种有效定义。定义应能限定自己的生效范围：仅限当前层次，或可继承到子层次；未限定时默认可继承。按条件选择对象的规则视同定义：写在某层次的规则默认在该层次和各子层次分别作用，每次只作用于那一层的对象，也可以限定只作用于当前层次。子层次可以重新定义同名对象以覆盖父层次的定义；覆盖只在该子层次及其以下生效，不影响父层次。层次优先于顺序：子层次的定义优先于父层次的同名定义，与语句出现的先后无关。同一层次内，一个名字只绑定一个定义：同名再定义属于错误，保留先前有效的定义；对同一对象的重复描述仍按 2.9 以后者为准。直接写给具体对象的描述（例如在某处摆放一个地端子）与其他描述一样，只属于所在层次，不向下继承。
-- **被包含的文件不影响包含它的文件。** 被包含的文件继承包含它的文件中的定义；它自己的定义和规则只作用于它定义的 subcircuit 和它再包含的文件。建议让所依赖的定义随 subcircuit 或其所在文件一起提供；引用外部元件时，描述不依赖外部的 RNL 定义。
-- **子电路的 block symbol 对父电路可见。** block symbol 是子电路接口的外观，随子电路定义，供实例化它的父电路使用，是定义只向下生效的例外。
+- **The scope is set by the place of declaration by default, and may also be specified.** A statement written inside a subcircuit belongs to that level of the circuit; the part of a file that belongs to no subcircuit is the file level of that file. The file level of the main file is the top-level circuit; the file level of an included file is not a circuit and carries only definitions and rules. Definitions given at a file level take effect for the subcircuits that the file defines and the files it includes, and do not affect the file that includes it. A statement may also specify a target subcircuit; the target must be a subcircuit that lies textually within the place of declaration, and statements inside a subcircuit must not specify one. Without a target, the scope follows the place of declaration.
+- **References to netlist objects are limited to the level of the scope.** References to devices, nets, terminals and other netlist objects are resolved only within the level of the statement's scope, never across levels. For example, different subcircuits can each have a device named M1, and their descriptions do not affect each other.
+- **RNL's reusable definitions are inherited downward, and lower levels may override them.** The reusable objects that RNL itself defines (such as user-defined virtual parts, symbols and possibly style definitions) take effect at their own level and every level below. The lower levels are determined by textual containment: the lower levels of a file are the subcircuits it defines and the files it includes, regardless of where a subcircuit is instantiated, so each subcircuit has only one effective set of definitions. A definition must be able to limit where it takes effect: the current level only, or inherited by the lower levels; without a limit, it is inherited by default. Rules that select objects by conditions are treated like definitions: a rule written at a level acts by default at that level and at each lower level separately, each time only on the objects of that level, and it may also be limited to the current level. A lower level may define an object with the same name again to override the definition of an upper level; the override takes effect only at that lower level and below and does not affect the upper level. Levels take precedence over order: the definition of a lower level wins over the definition with the same name at an upper level, regardless of the order of statements. Within one level a name is bound to only one definition: defining the same name again is an error and the earlier valid definition is kept; repeated descriptions of the same object still follow 2.9: the later one wins. Descriptions written directly for particular objects (for example, placing a ground somewhere) belong, like other descriptions, only to their own level and are not inherited downward.
+- **An included file does not affect the file that includes it.** An included file inherits the definitions of the file that includes it; its own definitions and rules act only on the subcircuits it defines and the files it includes in turn. It is recommended that the definitions a subcircuit depends on be provided together with the subcircuit or its file, and that a description that refers to external parts not depend on external RNL definitions.
+- **The block symbol of a subcircuit is visible to parent circuits.** A block symbol is the appearance of a subcircuit's interface; it is defined with the subcircuit and used by the parent circuits that instantiate it. It is the exception to definitions taking effect only downward.
 
-这样安排便于网表合并：定义可以安全地跟随 subcircuit 及其所在文件移动，子电路自带的定义不影响合入的父电路，也不被父电路的同名定义改写；包含别人的文件不会改动自己的内容，subcircuit 内的语句也无法影响其外部。
+This arrangement makes merging netlists easier: definitions can move safely with a subcircuit and its file, the definitions a subcircuit brings with it do not affect the parent circuit it is merged into and are not rewritten by definitions with the same name in the parent; including someone else's file does not change one's own content, and statements inside a subcircuit cannot affect anything outside it.
 
-具体作用域声明方式及继承规则的细节留待后续定义。视觉容器等功能可以作为后续扩展考虑，不属于本条原则。
+How scope is declared and how definitions are inherited are defined in the standard (2.6, 6.1, 6.8). Features such as visual containers may be considered as later extensions; they are not part of this principle.
 
-### 2.6 混合粒度：允许语义与几何混合描述
+### 2.6 Mixed granularity: semantic and geometric descriptions may be mixed
 
-RNL 允许高层语义与精确坐标、朝向、走线等几何信息同时存在。例如，描述差分对及对称意图，同时指定部分器件的位置或某段走线的路径。
+RNL allows high-level meaning to exist together with exact coordinates, orientations, wiring and other geometric information. For example, a differential pair and its symmetry intent may be described while the positions of some devices or the path of some wire are also specified.
 
-连线通常以端子为起止点，中间可以补充坐标、拐点等描述；这样的连线不依赖符号的具体图形，渲染器可按所用符号适配。RNL 也允许连线不与任何端子相连、直接以坐标为起止点，这不违反规范，只是不常见的做法。一条连线可以连接多个端子：写成共用点的几条连线，只有共用同一个点或端子才算接在一起；汇合圆点显式标出。
+A wire usually starts and ends at terminals, and coordinates, bends and so on may be added in between; such a wire does not depend on the actual graphics of the symbols, and renderers may adapt it to the symbols they use. RNL also allows a wire that connects to no terminal and starts and ends at coordinates; this does not violate the specification but is uncommon. A wire may connect several terminals: it is written as several wires that share points, and wires count as joined only when they share the same point or terminal; junction dots are marked explicitly.
 
-规范不强制要求这些描述彼此无冲突，也不强制检查它们之间的冲突。发现冲突时的默认取舍遵循 2.9；具体渲染及提示由实现决定。语法、引用及单条描述内的基本语义检查仍遵循 2.4。
+The specification does not require these descriptions to be free of conflicts, nor does it require checking the conflicts between them. When conflicts are found, the default resolution follows 2.9; the actual rendering and any hints are up to the implementation. Checks of syntax, of references and of basic semantics within a single description still follow 2.4.
 
-### 2.7 精细表达：允许按需定义视觉细节
+### 2.7 Detailed expression: visual detail may be defined where needed
 
-RNL 允许由渲染器决定默认符号与绘图风格，也允许作者按需精确定义器件符号、子电路 block symbol 等视觉细节，包括线条级图形描述或符号资源引用。精细描述是可选能力，不是所有输入必须提供的内容。
+RNL allows the renderer to decide the default symbols and drawing style, and also allows authors to define visual details precisely as needed, such as device symbols and the block symbols of subcircuits, including line-level graphic descriptions or references to symbol resources. Detailed description is an optional capability, not something every input must provide.
 
-依赖符号图形的精确坐标（例如直接落在引脚位置上的连线端点），只有在文件定义或引用了所用符号时，才能在不同渲染器之间保持一致；符号由渲染器决定时，建议与符号相关的位置优先以端子而不是绝对坐标表达（见 2.6）。
+Exact coordinates that depend on symbol graphics (for example, wire end points placed right on pin positions) stay consistent between renderers only when the file defines or refers to the symbols used. When the renderer decides the symbols, it is recommended that symbol-related positions be expressed preferably by terminals rather than by absolute coordinates (see 2.6).
 
-RNL 及其引用的符号资源都是纯数据：处理时不执行代码，也不隐式访问网络。
+RNL and the symbol resources it refers to are pure data: processing them executes no code and does not implicitly access the network.
 
-具体图形格式、端子锚点及资源引用机制留待后续定义。
+Graphics, pins and symbols are defined in the standard (9.2); symbol resources are provided as packages (16.2).
 
-### 2.8 人类与模型友好性：明确语法，允许可读辅助文字
+### 2.8 Friendly to people and models: clear syntax, readable helper text allowed
 
-- **核心语法明确。** 对象引用、关键词及参数使用明确标记和定义，便于第三方实现及 LLM 直接生成；鼓励一条语句表达一个声明，采用固定的核心结构。
-- **允许可读辅助文字。** 正式标记之外可插入英文、空格、数字及约定的标点，作为可选的行内说明，便于没有渲染器时阅读。鼓励 LLM 使用简单、固定的说明句式。
-- **辅助文字不参与机器解释。** 机器含义只由正式标记决定；否定、条件、角色及有语义作用的数值等必须通过正式语法表达，不能依靠普通文字改变含义。
-- **支持局部生成与修复。** 允许只补充部分电路的描述，减少不必要的标识和坐标；报告的错误应定位到具体语句、字段或引用，便于局部修复。
-- **生成可靠性以测试验证。** 比较有无辅助文字时的语法、引用及语义生成正确率，检查说明文字是否误导，并统计丢失分隔符的标记被当作辅助文字静默忽略的情况——标准不要求检出这类错误；不预先假定自然语言写法能提高准确率。
+- **The core syntax is clear.** Object references, keywords and parameters use clear markers and definitions, so that third parties can implement them easily and LLMs can generate them directly; one declaration per statement and a fixed core structure are encouraged.
+- **Readable helper text is allowed.** English words, spaces, digits and agreed punctuation may be inserted outside the formal markers as optional in-line explanations, for reading without a renderer. LLMs are encouraged to use simple, fixed explanatory sentence patterns.
+- **Helper text takes no part in machine interpretation.** The machine meaning is decided only by the formal markers; negation, conditions, roles, numbers with a semantic effect and the like must be expressed in the formal syntax; ordinary text must not be relied on to change the meaning.
+- **Partial generation and repair are supported.** Describing only part of a circuit is allowed, and unnecessary identifiers and coordinates are kept to a minimum; reported errors must point to the statement, field or reference concerned, to make local repair easy.
+- **The reliability of generation is verified by tests.** Compare the rates of correct syntax, references and meaning generated with and without helper text, check whether explanatory text misleads, and count markers that lost a delimiter and were silently ignored as helper text — the standard does not require such errors to be detected; it is not assumed in advance that natural-language wording improves accuracy.
 
-候选写法示例：`{}` 内引用网表对象，`$…$` 内为关键词，对象在前、关键词在后。以下两句的机器含义相同：
+In the standard, the following two statements have the same machine meaning:
 
 ```text
-{M1} {M2} $DIFFPAIR$
-{M1} and {M2} form a $DIFFPAIR$.
+#M1(in_p) #M2(in_n) @AS $DIFFPAIR
+#M1(in_p) and #M2(in_n) are treated @AS $DIFFPAIR
 ```
 
-这是语法方向示意，尚未确定最终分隔符、转义、允许的辅助字符及语句边界；例如普通文字中的 `not` 不会否定 `$DIFFPAIR$`。具体编码留待后续定义。
+The words between the tokens are free text, which does not change the meaning; a `not` in free text does not negate the statement (standard 3.3).
 
-### 2.9 处理顺序、容错与冲突解决：网表先行，出错忽略，冲突按优先级取舍
+### 2.9 Processing order, tolerance and conflict resolution: netlist first, errors ignored, conflicts resolved by precedence
 
-先解析宿主网表，再收齐全部 RNL 描述：忽略出错的语句，没有冲突的描述全部保留，互相冲突时按确定的优先级取舍，最终得到一个自洽的描述集合，再据此渲染。语句的出现顺序只用于在冲突时排定优先级，不影响引用的解析；语句所在的位置则决定其默认作用域（见 2.5）。
+The host netlist is parsed first, then all RNL descriptions are collected: statements in error are ignored, descriptions without conflicts are all kept, and conflicting ones are resolved by a definite precedence, which gives a consistent set of descriptions from which the drawing is rendered. The order in which statements appear is used only to decide precedence in a conflict and does not affect how references are resolved; the place where a statement is written decides its default scope (see 2.5).
 
-- **宿主网表先行。** 先解析完整的宿主网表，确定可被描述的对象，再处理 RNL。任何 RNL 描述都不能改动网表信息；对宿主对象的引用针对完整网表解析，不要求被引用对象的网表语句出现在 RNL 语句之前。
-- **RNL 内部定义不要求先后顺序。** RNL 自己定义的内容（如符号描述）可以先使用、后定义；这类依赖针对完整的 RNL 描述解析，定义的可见范围见 2.5。
-- **出错的语句失效并报错，其余照常处理。** 语法错误、不认识的关键词等基本错误（见 2.4）统一处理，不再细分类别：出错语句失效并报告为错误，解释和渲染继续处理其余描述。检查与解释是同一个过程，标准只规定一套诊断；实现应让用户能看到诊断，如何呈现由实现决定。
-- **错误局部处理。** 出错语句失效，不使其他语句自动失效，也不覆盖任何已有描述；依赖某条失效描述的语句随之失效，无论出现先后，同样报告为错误。例如，符号描述无法解析，依赖该符号描述的语句也失效。
-- **冲突按优先级取舍。** 位置、姿态和布局约束等几何描述各有一个唯一的优先级：先比描述给定的强度，强度相同时后出现的优先。按优先级从高到低逐条纳入，与已纳入的描述合在一起无解的就丢弃，结果唯一。例如先后两次指定同一器件的位置，强度相同时以后一次为准。丢弃的只是冲突的那部分信息：一个位置的两个坐标分别取舍，此前描述中未冲突的内容继续有效。其他可以覆盖的信息同样以后出现的为准。覆盖和丢弃是合法的处理，不属于错误，是否提示由实现决定；因此修改已有描述时，既可以就地改写，也可以在其后追加新的描述。按出现顺序排定先后只发生在同一电路层次内；不同层次之间按 2.5 的层次关系确定，不看出现顺序。
-- **保存时不因诊断改动内容。** 建议编辑器保存文件时不根据诊断删除、修复或改写语句，只给出 warning。这是对实现的建议，标准不作约束。
+- **The host netlist comes first.** The complete host netlist is parsed first to determine the objects that can be described, then RNL is processed. RNL descriptions must not change netlist information; references to host objects are resolved against the complete netlist, and the netlist statement of a referenced object need not appear before the RNL statement.
+- **RNL's own definitions need no particular order.** What RNL itself defines (such as symbol descriptions) may be used before it is defined; such dependencies are resolved against the complete RNL description, and where a definition is visible is described in 2.5.
+- **A statement in error fails and is reported; everything else is processed as usual.** Syntax errors, unknown keywords and other basic errors (see 2.4) are handled in one way, without being divided further into categories: the statement in error fails and is reported as an error, and interpretation and rendering go on with the remaining descriptions. Checking and interpreting are the same process, and the standard defines only one set of diagnostics; implementations must let users see the diagnostics, and how they are presented is up to the implementation.
+- **Errors are handled locally.** A statement in error fails; it does not automatically make other statements fail and does not override any existing description. Statements that depend on a failed description fail with it, whatever the order in which they appear, and are reported as errors too. For example, if a symbol description cannot be resolved, the statements that depend on that symbol description fail as well.
+- **Conflicts are resolved by precedence.** Geometric descriptions such as positions, orientations and layout constraints each have a unique precedence: the priority that the description gives is compared first, and with equal priority the one that appears later wins. They are taken in from the highest precedence to the lowest, one by one; a description that has no solution together with those already taken in is discarded, so the result is unique. For example, if the position of the same device is given twice with the same priority, the later one wins. Only the conflicting part of the information is discarded: the two coordinates of a position are resolved separately, and the parts of an earlier description that do not conflict stay valid. For other information that can be overridden, the later description likewise wins. Overriding and discarding are legitimate outcomes, not errors, and whether to give a hint is up to the implementation; so an existing description may be modified either by rewriting it in place or by appending a new description after it. Deciding precedence by order of appearance happens only within the same level of the circuit; between different levels the relation of levels in 2.5 decides, not the order of appearance.
+- **Saving does not change content because of diagnostics.** It is recommended that editors, when saving a file, not delete, repair or rewrite statements because of diagnostics, and only give a warning. This is a recommendation for implementations, not a constraint of the standard.
 
-这是基本的处理指导，允许实现采用更严格的策略，例如停止处理或拒绝整个 RNL 输入。上述处理方式不扩大强制校验范围：跨条高层语义冲突、语义及绘图与实际网表的一致性仍不要求检查，“自洽”以实现实际检查的范围为限。
+This is basic guidance for processing; implementations may adopt stricter strategies, such as stopping or rejecting the whole RNL input. This handling does not widen the range of required checks: conflicts between high-level meanings of different descriptions and the agreement of meaning and drawing with the actual netlist still need not be checked; "consistent" is limited to what the implementation actually checks.
 
-## 3. 对实现的建议
+## 3. Recommendations for implementations
 
-RNL 根本上是语义描述，不是保证“导出再导入后图形不变”的视觉存档。以下是对编辑器和渲染器的建议，标准不作约束：
+RNL is fundamentally a semantic description, not a visual archive that guarantees a drawing is unchanged after export and import. The following are recommendations for editors and renderers and are not binding:
 
-- **导出粒度可选。** 导出时可让用户选择精确的坐标级 RNL、简单的语义 RNL，或不带 RNL 的纯网表；这些都在规范允许的范围内。
-- **以合适的形式呈现语义结构。** 例如把差分对显示为一个组，而不是可以各自单独拖动的器件；用户拖动其中一个器件时给出提示，由用户选择解除该语义，还是保留语义并以坐标覆盖其摆放（见 2.9）。
-- **按语义形式写入时保留未被破坏的语义。** 没有被本次编辑破坏的语义信息全部保留。
-- **区分“仅修改 RNL”与“重新生成网表”。** 仅修改 RNL 时按 2.1 保留原网表；从编辑器自身的电路模型重新生成网表是另一种操作，同样在规范允许的范围内。
-- **没有任何描述的对象由渲染器处理。** 如何呈现由渲染器决定；合理的做法是把它们缩略成一个元件集合，或提供隐藏的选项。
-- 保存时对诊断的处理见 2.9。
+- **The granularity of export is a choice.** On export, users may be offered a choice of exact coordinate-level RNL, simple semantic RNL, or a plain netlist without RNL; all are within what the specification allows.
+- **Present semantic structure in a suitable form.** For example, show a differential pair as a group rather than as devices that can be dragged separately; when the user drags one of the devices, prompt the user to choose between removing the semantic description and keeping it while overriding the device's placement with coordinates (see 2.9).
+- **Keep the meaning that an edit did not break when writing in semantic form.** All semantic information not broken by the current edit is kept.
+- **Distinguish "modifying only RNL" from "regenerating the netlist".** When only RNL is modified, the original netlist is kept as in 2.1; regenerating the netlist from the editor's own circuit model is another operation, also within what the specification allows.
+- **Objects without any description are left to the renderer.** How they are presented is up to the renderer; a reasonable approach is to collapse them into a collection of parts, or to offer an option to hide them.
+- How diagnostics are handled when saving is described in 2.9.
 
-## 4. 后续工作
+## 4. Further work
 
-以下工作用于将已确定的原则落实为具体格式定义：
+The following work turns the settled principles into a concrete format definition:
 
-1. **注释兼容性验证。** 子标签已定为 `@RNL`（2.1），各网表格式的注释写法已做文档调研。实测验证各网表格式的安全注释前缀、位置、编码和长度限制，记录测试覆盖的工具版本及解析模式。
-2. **正式语法。** 定义对象、关键词和参数的标记，转义、辅助字符、语句边界与多行形式，以及版本声明和诊断定位方式。
-3. **作用域与引用。** 定义作用域路径的写法与构成、端子标识和跨文件引用方式，以及定义沿电路层次继承与覆盖的具体规则（包括限定定义生效范围的描述符、同一子电路被多个父电路实例化时有效定义如何确定，以及用路径指定的描述与目标层次自身描述之间的优先关系）；宿主对象名称的大小写等规则遵循宿主网表格式，不由 RNL 定义。
-4. **首批语义词汇与标准虚元件。** 确定关键词、描述定义、对象角色及单条描述的基本合法性规则，以及语义描述的命名与嵌套引用方式。首批语义词汇和标准虚元件属于标准包，不属于语言标准本身，在原型完成后边试验边建立。
-5. **可选几何与符号表达。** 定义坐标单位、旋转镜像、连线（端子起止点、拐点、纯坐标形式，以及多端子连接的表达，例如走线中间的虚结点或多元连线标签）、note 对象、图形格式、端子锚点和符号资源引用方式，以及用户自定义虚元件的定义方式。
-6. **版本与扩展机制。** 定义版本兼容规则、扩展标识及未知内容的读写保留方式。
-7. **顺序处理、覆盖与错误恢复。** 定义跨文件的处理顺序、分组描述的成立方式、冲突的判定与覆盖粒度（包括新描述与多条既有描述共同冲突时覆盖哪些），以及语句无法解析时如何恢复到下一条。
-8. **测试语料与评估。** 建立注释兼容性、基本校验、顺序覆盖与容错、读写保留的测试语料，并评估 LLM 生成及局部修复的正确率。
+1. **Verifying comment compatibility.** The sub-tag is settled as `@RNL` (2.1), and the documentation of how each netlist format writes comments has been surveyed. Verify by tests the safe comment prefixes, positions, encodings and length limits of each netlist format, recording the tool versions and parsing modes the tests cover.
+2. **Formal syntax.** Define the markers of objects, keywords and parameters; escapes, helper characters, statement boundaries and the multi-line form; and how versions are declared and diagnostics located.
+3. **Scope and references.** Define how scope paths are written and built, how terminals are identified and how references across files work, and the concrete rules by which definitions are inherited and overridden along the levels of the circuit (including descriptors that limit where a definition takes effect, how the effective set of definitions is determined when the same subcircuit is instantiated by several parents, and the precedence between descriptions targeted by a path and the target level's own descriptions); rules such as the case of host object names follow the host netlist format and are not defined by RNL.
+4. **The first semantic vocabulary and standard virtual parts.** Settle the keywords, the definitions, the object roles and the basic validity rules of single descriptions, and how semantic descriptions are named and referred to when nested. The first semantic vocabulary and the standard virtual parts belong to the standard package, not to the language standard itself, and will be built up through experiments after the prototype is complete.
+5. **Optional geometric and symbol expression.** Define coordinate units, rotation and mirroring, wires (terminal end points, bends, the pure-coordinate form, and how connections of several terminals are expressed, for example virtual nodes in the middle of a wire or multi-way wire labels), note objects, the graphic format, terminal anchors and how symbol resources are referred to, and how users define their own virtual parts.
+6. **Version and extension mechanisms.** Define the rules of version compatibility, extension identifiers, and how unknown content is kept when reading and writing.
+7. **Ordered processing, overriding and error recovery.** Define the processing order across files, how descriptions written as a group hold, how conflicts are determined and the granularity of overriding (including which descriptions are overridden when a new description conflicts with several existing ones together), and how to recover to the next statement when a statement cannot be parsed.
+8. **Test corpus and evaluation.** Build test corpora for comment compatibility, basic checking, ordered overriding and tolerance, and keeping content when reading and writing, and evaluate the correctness of LLM generation and local repair.
 
-这些问题解决前，不将对话中的示意语法当作解析器契约，也不将草案文档版本当作已发布的 RNL 格式版本。
+Version 0.2 of the standard settles items 2, 3, 5 and 7, and the part of item 6 about versions and keeping unknown content. Still open are item 1 (comments are surveyed in the documentation, but not yet verified by tests), item 4 (the content of the standard package), the extension mechanism of item 6, and item 8 (a conformance corpus).

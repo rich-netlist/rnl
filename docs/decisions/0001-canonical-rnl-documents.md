@@ -1,7 +1,7 @@
 # 0001. This repository is the canonical home of the RNL documents
 
 - Date: 2026-09-24
-- Status: accepted
+- Status: superseded by [0006](0006-language-versions-from-research-repository.md)
 
 ## Context
 
