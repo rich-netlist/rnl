@@ -692,6 +692,61 @@ mod tests {
         }
     }
 
+    /// Corpus case 18 writes characters the fonts do not map among characters they map: hangul,
+    /// emoji sequences, Arabic, Devanagari, Thai, combining marks and a zero width space. They are
+    /// in runs of their own, whole grapheme clusters, which the SVG draws centred on their widths
+    /// and not held to them.
+    #[test]
+    fn what_the_fonts_do_not_map_is_in_runs_of_its_own() {
+        let options = BuildOptions { primitives: true, ..BuildOptions::default() };
+        let d = crate::build(&crate::tests::corpus("cases/18-fallback-text.sp"), &Disk, &options).unwrap();
+        let level = &d.levels[0];
+        let (mut fallback, mut mapped) = (Vec::new(), 0);
+        for p in level.primitives.as_ref().unwrap() {
+            let Shape::Text(t) = &p.shape else { continue };
+            for r in &t.runs {
+                if r.fallback {
+                    fallback.push((r.text.as_str(), r.bold, r.italic, r.width / r.size));
+                } else {
+                    mapped += 1;
+                }
+            }
+        }
+        let svg = level.svg.as_deref().unwrap();
+        assert_eq!(svg.matches(" textLength=").count(), mapped);
+        assert_eq!(svg.matches(" text-anchor=\"middle\"").count(), fallback.len());
+        let (hangul, resistor, bolt, xhat) = ("\u{D55C}\u{AE00}", "\u{C800}\u{D56D}", "\u{26A1}", "x\u{302}");
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
+        let arabic = "\u{645}\u{642}\u{627}\u{648}\u{645}\u{629}";
+        let devanagari = "\u{92A}\u{94D}\u{930}\u{924}\u{93F}\u{930}\u{94B}\u{927}";
+        let thai = "\u{E15}\u{E31}\u{E27}\u{E15}\u{E49}\u{E32}\u{E19}\u{E17}\u{E32}\u{E19}";
+        for (text, bold, italic, em) in [
+            (hangul, false, false, 2.0),
+            (resistor, false, false, 2.0),
+            (bolt, false, false, 1.0),
+            // the selector of the emoji presentation takes the warning sign the fonts map with it
+            ("\u{26A0}\u{FE0F}", false, false, 1.0),
+            ("1\u{FE0F}\u{20E3}", false, false, 1.0),
+            (family, false, false, 1.0),
+            ("\u{1F44D}\u{1F3FD}", false, false, 1.0),
+            ("\u{1F1E8}\u{1F1F3}", false, false, 1.0),
+            ("\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}", false, false, 1.0),
+            (arabic, false, false, 6.0 * 0.55),
+            (devanagari, false, false, 4.0 - 0.45),
+            ("\u{915}\u{93F}", false, false, 1.0),
+            (thai, false, false, 8.0 * 0.55),
+            (xhat, false, false, 0.55),
+            ("v\u{20D7}", false, false, 0.55),
+            ("\u{200B}", false, false, 0.0),
+            (hangul, true, false, 2.0),
+            (bolt, true, false, 1.0),
+            (xhat, false, true, 0.55),
+        ] {
+            let found = fallback.iter().any(|f| f.0 == text && f.1 == bold && f.2 == italic && (f.3 - em).abs() < 1e-9);
+            assert!(found, "{text} {bold} {italic} {em}: {fallback:?}");
+        }
+    }
+
     #[test]
     fn the_owners_and_the_colours_are_as_the_types_say() {
         let options = BuildOptions { primitives: true, ..BuildOptions::default() };
