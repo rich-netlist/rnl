@@ -50,7 +50,7 @@ Then open `site/dist/index.html` (Chinese) or `site/dist/en/index.html` (English
 | `spec/0.2/`, `en/spec/0.2/` | The language standard, one page per language with its PDF and Markdown downloads. Not written by `build.py`: [`pages.yml`](../.github/workflows/pages.yml) adds them with `python scripts/spec/build.py --site site/dist` ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). |
 | `rnl-intro-standalone.html`, `rnl-language-standalone.html`, and the same under `en/` | Single-file pages with the styles and scripts inlined; their links to the other pages and languages point to the published site |
 
-[`pages.yml`](../.github/workflows/pages.yml) publishes `site/dist/` to GitHub Pages whenever `site/` changes on `main`. The language switch keeps the reader on the same section.
+[`pages.yml`](../.github/workflows/pages.yml) publishes `site/dist/` to GitHub Pages, at <https://rich-netlist.github.io/rnl/>, whenever `site/`, `spec/` or `scripts/spec/` changes on `main`, and after a revision of the standard is released. The language switch keeps the reader on the same section.
 
 ## Files
 

@@ -1,5 +1,6 @@
 # Builds the introduction pages in site/ and the pages of the language standard (scripts/spec/), and
-# publishes them to GitHub Pages.
+# publishes them to GitHub Pages: on a push to main, and after a revision of the standard is released, so
+# that its pages carry the new revision label.
 # Pull requests only run the build, which fails when a text is missing one of its languages, or when a
 # check of the standard fails (decision 0007).
 # Requires Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
@@ -21,6 +22,11 @@ on:
       - "scripts/spec/**"
       - ".github/actions/install-spec-tools/**"
       - ".github/workflows/pages.yml"
+  # The release (spec-release.yml) runs on a tag, but only main may deploy to github-pages; this run
+  # builds main, whose history now holds the tag.
+  workflow_run:
+    workflows: ["Standard release"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -30,6 +36,7 @@ permissions:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
