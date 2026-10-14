@@ -651,7 +651,7 @@ mod tests {
                 // the SVG written from them is the level's
                 let svg = rnl_render::svg_document(&read, &RenderOptions::default());
                 assert!(Some(svg) == level.svg, "{f}: {}", level.title);
-                assert_eq!(level.scale, Some(RenderOptions::default().scale));
+                assert_eq!(level.scale, RenderOptions::default().scale);
                 count += prims.len();
             }
         }

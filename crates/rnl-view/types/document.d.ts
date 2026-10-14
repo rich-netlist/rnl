@@ -72,10 +72,10 @@ export type Level = {
    */
   primitives?: Array<Primitive>,
   /**
-   * Pixels per scene unit in the SVG and the hits, given with the primitives: a point (x, y) of
-   * a primitive is at (x·scale, −y·scale) in them.
+   * Pixels per scene unit in the SVG and the hits: a point (x, y) of a primitive, or of the
+   * scene, is at (x·scale, −y·scale) in them.
    */
-  scale?: number,
+  scale: number,
   /**
    * Nothing on the level can be drawn: no object has a position yet.
    */

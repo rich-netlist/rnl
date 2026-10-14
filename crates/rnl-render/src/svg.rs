@@ -257,7 +257,7 @@ pub fn svg_document(prims: &[Primitive], o: &RenderOptions) -> String {
     );
     let _ = write!(
         s,
-        "\n<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{vw:.2}\" height=\"{vh:.2}\" fill=\"#ffffff\"/>",
+        "\n<rect class=\"backdrop\" x=\"{:.2}\" y=\"{:.2}\" width=\"{vw:.2}\" height=\"{vh:.2}\" fill=\"#ffffff\"/>",
         x0 * o.scale,
         -y1 * o.scale
     );

@@ -67,11 +67,9 @@ pub struct Level {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub primitives: Option<Vec<Primitive>>,
-    /// Pixels per scene unit in the SVG and the hits, given with the primitives: a point (x, y) of
-    /// a primitive is at (x·scale, −y·scale) in them.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(test, ts(optional))]
-    pub scale: Option<f64>,
+    /// Pixels per scene unit in the SVG and the hits: a point (x, y) of a primitive, or of the
+    /// scene, is at (x·scale, −y·scale) in them.
+    pub scale: f64,
     /// Nothing on the level can be drawn: no object has a position yet.
     pub empty: bool,
     /// What the level lacks without a solver; see [`crate::level_status`].
@@ -444,7 +442,7 @@ impl<'a> Index<'a> {
             kind: lv.kind,
             svg: options.svg.then(|| rnl_render::svg_document(&prims, &render)),
             primitives: options.primitives.then(|| primitive::primitives(&prims)),
-            scale: options.primitives.then_some(render.scale),
+            scale: render.scale,
             empty: prims.is_empty(),
             status: crate::level_status(lv),
             hits,
@@ -675,7 +673,7 @@ mod tests {
         let options = BuildOptions { primitives: true, ..BuildOptions::default() };
         let d = crate::build(&case("01-rc-lowpass.sp"), &Disk, &options).unwrap();
         let level = &d.levels[0];
-        let (prims, scale) = (level.primitives.as_ref().unwrap(), level.scale.unwrap());
+        let (prims, scale) = (level.primitives.as_ref().unwrap(), level.scale);
         let svg = level.svg.as_deref().unwrap();
         let mut wires = 0;
         for h in &level.hits {

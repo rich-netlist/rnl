@@ -17,16 +17,12 @@ const MAX_ZOOM = 50;
 const FIT_MARGIN = 24; // pixels around the drawing when it is fitted
 const CLICK_SLOP = 4; // pixels a press may move and still be a click
 const HIT_SLOP = 6; // pixels around a pin or a wire that still hit it
-// Pixels of the SVG and the hits per unit of the scene: the level's scale, which the Document gives
-// with the primitives, or else the renderer's, which the core draws the SVG at by default.
-const SVG_SCALE = 14;
-
 let svg = null; // the <svg> element of the level drawn
 let overlay = null; // the selection marks drawn over it
 let groups = new Map(); // data-id -> the SVG groups that draw it
 let extent = null; // the drawing's own viewBox: {x, y, w, h}
 export let view = null; // the view: top-left corner in drawing units, and pixels per unit (k)
-let scale = SVG_SCALE; // drawing units (SVG pixels) per unit of the scene, on the level drawn
+let scale = 1; // drawing units (SVG pixels) per unit of the scene: the level's scale, from the Document
 let size = { w: 0, h: 0 }; // the canvas size the view was last applied to
 let press = null; // a mouse press on the drawing: where, and whether it became a drag
 let pointer = null; // where the pointer is on the canvas, in its pixels, while it is over it
@@ -50,7 +46,7 @@ export function showLevel(i, keptView) {
   updatePath();
   badgeAt = null;
   positionBadge();
-  scale = lv.scale || SVG_SCALE;
+  scale = lv.scale;
   if (lv.empty) {
     view = null;
     paintGrid(null);

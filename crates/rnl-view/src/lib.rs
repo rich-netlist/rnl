@@ -49,7 +49,7 @@ pub struct BuildOptions {
     pub runtime: Options,
     /// Write each level's SVG ([`Level::svg`]); on by default.
     pub svg: bool,
-    /// Give each level's primitives and their scale ([`Level::primitives`]); off by default.
+    /// Give each level's primitives ([`Level::primitives`]); off by default.
     pub primitives: bool,
 }
 
@@ -497,13 +497,13 @@ R1 p q 1k
         // by default the SVG and no primitives, as the viewers have read the Document so far
         let default = BuildOptions::default();
         let l = level(default.svg, default.primitives);
-        assert_eq!(keys(&l), "host title kind svg empty status hits children");
+        assert_eq!(keys(&l), "host title kind svg scale empty status hits children");
         let l = level(true, true);
         assert_eq!(keys(&l), "host title kind svg primitives scale empty status hits children");
         assert_eq!(l["scale"], 14.0);
         assert!(l["primitives"].as_array().is_some_and(|p| p.len() > 2));
         assert_eq!(keys(&level(false, true)), "host title kind primitives scale empty status hits children");
-        assert_eq!(keys(&level(false, false)), "host title kind empty status hits children");
+        assert_eq!(keys(&level(false, false)), "host title kind scale empty status hits children");
     }
 
     #[test]

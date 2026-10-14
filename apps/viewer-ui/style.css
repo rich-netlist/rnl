@@ -342,10 +342,10 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
   height: 100%;
   display: block;
 }
-/* the grid is under the drawing and takes no clicks; the white backdrop that the SVG writer puts
-   first under the drawing is left out, so that the grid shows through, as the canvas is white */
+/* the grid is under the drawing and takes no clicks; the white backdrop the SVG writer puts
+   under the drawing is left out, so that the grid shows through, as the canvas is white */
 .canvas > .grid { pointer-events: none; }
-.canvas > svg > rect:first-child { display: none; }
+.canvas > svg > rect.backdrop { display: none; }
 
 /* a selected symbol, wire or ground: its lines and texts in the selection colour, but for the
    strokes over a shape's first, such as the colour between the lines of a double line */
