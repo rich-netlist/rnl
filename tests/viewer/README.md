@@ -34,7 +34,7 @@ In CI, [`viewer.yml`](../../.github/workflows/viewer.yml) installs Rust with the
 | `server.js` | The test server, Node with no dependencies: `apps/viewer-ui` as it is, the fake shell as `shells/fake.js`, and the fixtures under `fixtures/`. Nothing of the tests goes into the page. |
 | `fake-shell.js` | The fake shell. |
 | `viewer.js` | What the tests share: opening the page, waiting for a build, the page's state, and where an object of the drawing is on the screen. |
-| `specs/` | The tests, one file per part of the page: opening, selection, subcircuits, the hierarchy view, the text pane, the view, the keys, reading again, the menu bar, and the panels; and `web.spec.js`, the web viewer's smoke tests. |
+| `specs/` | The tests, one file per part of the page: opening, selection, subcircuits, the hierarchy view, the text pane, the view, the grid, the keys, reading again, the menu bar and its submenus, and the panels; and `web.spec.js`, the web viewer's smoke tests. The grid's tests read the pixels of its canvas where the scene's points are drawn. |
 
 ## The fake shell
 

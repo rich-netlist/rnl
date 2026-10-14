@@ -73,6 +73,7 @@
       </button>
     </div>
     <div id="canvas" class="canvas" tabindex="-1">
+      <canvas id="grid" class="grid" aria-hidden="true"></canvas>
       <p id="empty" class="empty">Open a SPICE or Spectre netlist with File &#x203A; Open (Ctrl+O).<br>Drag to move the view, scroll to zoom, click a symbol or a wire to find it in the netlist.</p>
       <button id="enter-badge" class="enter-badge" type="button" hidden title="Open the subcircuit (Enter, or double-click)" aria-label="Open the subcircuit">
         <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 5.5 10 10M10 6.5V10H6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -83,6 +84,7 @@
 <footer class="statusbar">
   <span id="selection" class="selection"></span>
   <span id="status" class="status"></span>
+  <span id="pointer" class="pointer" title="Where the pointer is on the drawing, in units with y up"></span>
   <span id="zoom" class="zoom"></span>
 </footer>
 <script type="module" src="main.js"></script>

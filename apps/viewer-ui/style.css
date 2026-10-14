@@ -11,6 +11,11 @@
   --warning: #b26a00;
   --hint: #2f6db5;
   --canvas: #ffffff;
+  /* the grid under the drawing (grid.js), light grey on the canvas, which is white in both schemes */
+  --grid-dot: #b4b4bc;
+  --grid-line: #ececf0;
+  --grid-major: #d9d9df;
+  --grid-axis: #a4a4b0;
   /* the selection, on the drawing and in the text */
   --select: #e8590c;
   --select-text: rgba(232, 89, 12, 0.22);
@@ -293,13 +298,17 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 }
 .canvas.over-object { cursor: pointer; }
 .canvas.dragging { cursor: grabbing; }
-.canvas > svg {
+.canvas > svg, .canvas > .grid {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
 }
+/* the grid is under the drawing and takes no clicks; the white backdrop that the SVG writer puts
+   first under the drawing is left out, so that the grid shows through, as the canvas is white */
+.canvas > .grid { pointer-events: none; }
+.canvas > svg > rect:first-child { display: none; }
 
 /* a selected symbol, wire or ground: its lines and texts in the selection colour, but for the
    strokes over a shape's first, such as the colour between the lines of a double line */
@@ -478,7 +487,7 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .statusbar .selection { color: var(--fg); flex-shrink: 0; }
 .statusbar .selection b { color: var(--select); font-weight: 600; }
 .statusbar .status { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
-.statusbar .zoom { font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.statusbar .pointer, .statusbar .zoom { font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* ------------------------------------------------------------------ hierarchy */
 
@@ -756,6 +765,14 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .dialog-option:hover { background: var(--hover); }
 .dialog-option[aria-selected="true"] { background: var(--hover); box-shadow: inset 3px 0 0 var(--accent); }
 .dialog-note { color: var(--muted); font-size: 12px; }
+/* a form of several values, such as the grid's settings */
+.dialog-form { display: flex; flex-direction: column; gap: 10px; }
+.dialog-form fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.dialog-form legend { padding: 0; margin-bottom: 4px; font-weight: 600; }
+.dialog-choice, .dialog-line { display: flex; align-items: center; gap: 6px; min-height: 24px; }
+.dialog-body .dialog-choice input { width: auto; margin: 0; padding: 0; accent-color: var(--accent); }
+.dialog-body .dialog-form input[type="number"] { width: 6em; padding: 2px 6px; }
+.dialog-body .dialog-form input:disabled { opacity: 0.5; }
 .dialog-error { color: var(--error); font-size: 12px; }
 .dialog-name { font-weight: 600; }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 16px 14px; }

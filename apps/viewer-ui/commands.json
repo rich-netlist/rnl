@@ -17,6 +17,20 @@
         { "id": "fit", "label": "&Fit to Window", "keys": ["F", "0"] },
         { "id": "zoom-in", "label": "Zoom &In", "keys": ["Ctrl+=", "Ctrl++"], "shown": "Ctrl++" },
         { "id": "zoom-out", "label": "Zoom &Out", "keys": ["Ctrl+-"] },
+        {
+          "label": "&Grid",
+          "items": [
+            { "id": "toggle-grid", "label": "Show &Grid", "keys": ["G"], "check": true, "page": true },
+            "-",
+            { "id": "grid-none", "label": "&None", "check": true, "radio": true },
+            { "id": "grid-dots", "label": "&Dots", "check": true, "radio": true },
+            { "id": "grid-lines", "label": "&Lines", "check": true, "radio": true },
+            "-",
+            { "id": "grid-axes", "label": "&Axes", "check": true },
+            "-",
+            { "id": "grid-settings", "label": "Grid &Settings..." }
+          ]
+        },
         "-",
         { "id": "descend", "label": "Open &Subcircuit", "keys": ["Enter"], "page": true },
         { "id": "ascend", "label": "&Up to Parent Level", "keys": ["Backspace"], "page": true },

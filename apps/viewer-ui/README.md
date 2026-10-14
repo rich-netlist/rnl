@@ -21,7 +21,8 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `shells/web.js` | The web shell: files, a folder, a URL or what is dropped, read as the core asks for them, and built by the core in a Worker. |
 | `state.js` | What the page shows: the Document, the level drawn, the selection, and the hierarchy path that led to the level. Modules read these bindings and change them through setters. |
 | `open.js` | Opening a source through the shell; reading it again keeps the level, the view and the selection. |
-| `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; what a click hits, from the boxes, pins and wires the Document gives; the selection marks and the open badge. |
+| `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; what a click hits, from the boxes, pins and wires the Document gives; the selection marks and the open badge; where the pointer is in the scene, in the status bar. |
+| `grid.js` | The grid under the drawing, a view aid of the page on a canvas of its own (see [The grid](#the-grid)), and its settings dialog. |
 | `selection.js` | Selecting an instance or a net. |
 | `subcircuits.js` | Going down into a subcircuit instance and back up, each level with the view it had. |
 | `text.js` | The text pane: the tabs and the lines of each file, the statements that do not take effect, the places of the selection, revealing a line, and clicks in the text. |
@@ -31,12 +32,20 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `panels.js` | The side panel's views, what is folded, and the splitters. The layout is kept in `localStorage` under `sidebar-shown`, `sidebar-width`, `side-pane`, `problems-shown`, `problems-height`, `index-height` and `show-failed`. |
 | `commands.js` | Running a command by its id, and the keys. |
 | `menubar.js` | The page's own menu bar. |
-| `dialog.js` | Dialogs in the page's style for what a shell asks: one of a list, with a filter; a line of text; a message. They are modal: the page's keys and its menu bar wait while one is shown. |
-| `util.js` | Small helpers for building the page. |
+| `dialog.js` | Dialogs in the page's style for what a shell or the page asks: one of a list, with a filter; a line of text; several values in a form, such as the grid's settings; a message. They are modal: the page's keys and its menu bar wait while one is shown. |
+| `util.js` | Small helpers for building the page, and for keeping values in `localStorage`, read and written so that a page without it starts from its defaults. |
 | `commands.json` | The command table. |
 | `fonts/` | The drawing's web fonts, which [`scripts/fonts.py`](../../scripts/README.md) writes and git ignores (see [Fonts](#fonts)). |
 
 The modules import each other in cycles. At its top level a module only looks up its elements, keeps its own state and adds listeners; it calls nothing of another module there, so no imported binding is read before its module has run.
+
+## The grid
+
+The drawing can show a light grey grid under it, at the integer points of the scene, the usual places of pins: the language's coordinates have x to the right and y up, a unit has no size of its own, and the origin no meaning of its own. View › Grid shows it as dots or lines, or not at all (G shows and hides it), and the axes through the origin, x = 0 and y = 0, a little darker; its dialog, Grid Settings, also sets the spacing, Auto (1 unit) or a number of units, and how often a line is a major one. Where the points would come closer than 10 pixels, the grid takes 2, 5, 10, 20, 50 ... times the spacing instead; with lines, every fifth line is a little darker, or, where that would not be a step of the sequence, the line at the next step of it (every 50 units with a step of 5). The dots and lines are the same size on the screen at every zoom.
+
+The grid is drawn on a canvas under the drawing's SVG, from the view and the level's scale, the pixels of the SVG per unit: `Level.scale` when the Document gives it, as it does with the primitives, or else the renderer's, 14, at which the core draws the SVG by default. It is not part of the drawing: it takes no clicks, and changes neither fitting, nor the selection, nor the SVG, of which the page only leaves out the white backdrop that the SVG writer puts first, as the canvas is white already. The settings are kept in `localStorage` under `grid-shown`, `grid-style` (`"dots"` or `"lines"`), `grid-spacing` (`"auto"` or a number of units), `grid-major` and `grid-axes`; a value that will not do leaves the default: dots at every unit, and no axes.
+
+The status bar shows where the pointer is on the drawing, in units with y up, to the digit that is worth 1 to 10 pixels at the zoom.
 
 ## Fonts
 
@@ -83,7 +92,7 @@ The web shell builds with the core as WebAssembly in a module Worker, one for th
 | `shown` | How menus show the keys, when not as the first of them. |
 | `check` | Whether it has a check mark. |
 | `radio` | Whether, with `check`, it is one of a group of which the page checks one: the page's menu bar shows a dot, a native menu a check mark. |
-| `page` | Whether the page always handles its key, as for Enter and Backspace: no menu accelerator would take the key from a text box. |
+| `page` | Whether the page always handles its key, as for Enter, Backspace and G: no menu accelerator would take the key from a text box. |
 | `platforms` | The platforms that offer it; all when not given. |
 
 The desktop app builds its native menu from the table ([`src/menu.rs`](../desktop/src/menu.rs)), its submenus too: on Windows the page handles the keys and the menu shows them after a tab; elsewhere the menu's accelerators handle them. A native menu toggles a check item when it is chosen, so the page sets the marks of a command's group again after running it, whether or not they changed. In the page's own menu bar, pointing at a submenu's entry opens the submenu beside it; from the keyboard, ArrowRight, Enter or the entry's letter opens it, and ArrowLeft or Escape closes it. The page runs keys by the same table. A key with Ctrl compares Shift only for a letter, since typing `+` may need Shift; a key without Ctrl that types or deletes does not count while Ctrl or Alt is held. In a text box only Ctrl keys and function keys count. Enter only opens a selected subcircuit instance, Escape clears the selection, and F5 and Ctrl+R, whatever else is held, read the document again instead of reloading the page.
@@ -98,4 +107,6 @@ Module scope hides the page's state from tests and the console, so `window.viewe
 | `level` | The level drawn, an index into `doc.levels`. |
 | `selected` | The selected object, an index into `doc.objects`, or null. |
 | `command(id)` | Run a command, as its menu item does. |
+| `checked(id)` | Whether a check-mark command, such as `toggle-netlist`, is checked. |
+| `grid` | The grid's settings, `shown`, `style`, `spacing`, `major` and `axes`, and the steps it is drawn at in units, `step` and, for lines, `majorStep`; null when it is not drawn. |
 | `menuBar(shown)` | Show or hide the page's own menu bar, whatever the shell says. |

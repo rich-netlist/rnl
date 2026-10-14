@@ -230,7 +230,26 @@ mod tests {
         serde_json::from_str(COMMANDS).expect("commands.json is a command table")
     }
 
-    /// The menu bar as it was written by hand before the table, on Windows.
+    /// View › Grid: the grid shown or not, by G, which the page always handles; its style, one of
+    /// three; the axes; and the dialog of its settings.
+    fn grid(show: &str) -> Shown {
+        Shown::Submenu(
+            "&Grid".into(),
+            vec![
+                check("toggle-grid", show, None),
+                Shown::Separator,
+                check("grid-none", "&None", None),
+                check("grid-dots", "&Dots", None),
+                check("grid-lines", "&Lines", None),
+                Shown::Separator,
+                check("grid-axes", "&Axes", None),
+                Shown::Separator,
+                item("grid-settings", "Grid &Settings...", None),
+            ],
+        )
+    }
+
+    /// The menu bar as it was written by hand before the table, on Windows, and the grid's submenu.
     #[test]
     fn windows_shows_the_keys_after_a_tab() {
         let menus = plan(&table(), true);
@@ -250,6 +269,7 @@ mod tests {
                     item("fit", "&Fit to Window\tF", None),
                     item("zoom-in", "Zoom &In\tCtrl++", None),
                     item("zoom-out", "Zoom &Out\tCtrl+-", None),
+                    grid("Show &Grid\tG"),
                     Shown::Separator,
                     item("descend", "Open &Subcircuit\tEnter", None),
                     item("ascend", "&Up to Parent Level\tBackspace", None),
@@ -263,7 +283,8 @@ mod tests {
         assert_eq!(menus, expected);
     }
 
-    /// The menu bar as it was written by hand before the table, on macOS and Linux.
+    /// The menu bar as it was written by hand before the table, on macOS and Linux, and the grid's
+    /// submenu.
     #[test]
     fn elsewhere_the_menu_has_the_accelerators() {
         let menus = plan(&table(), false);
@@ -283,6 +304,7 @@ mod tests {
                     item("fit", "&Fit to Window", Some("F")),
                     item("zoom-in", "Zoom &In", Some("CmdOrCtrl+=")),
                     item("zoom-out", "Zoom &Out", Some("CmdOrCtrl+-")),
+                    grid("Show &Grid"),
                     Shown::Separator,
                     item("descend", "Open &Subcircuit", None),
                     item("ascend", "&Up to Parent Level", None),

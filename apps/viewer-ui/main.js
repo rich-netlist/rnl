@@ -3,15 +3,16 @@
 // diagnostics and the subcircuit hierarchy, and follows a selected instance or net between the
 // drawing and the text. Each part is a module of its own (README.md); this one starts the page.
 
-import { command, startCommands } from "./commands.js";
+import { command, isChecked, startCommands } from "./commands.js";
+import { gridState, setGrid } from "./grid.js";
 import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
 import {
-  load, setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
+  setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
 } from "./panels.js";
 import { loadShell } from "./shell.js";
 import { current, doc, selected } from "./state.js";
-import { $ } from "./util.js";
+import { $, load } from "./util.js";
 
 setSidebarWidth(load("sidebar-width", 420));
 setProblemsHeight(load("problems-height", 180));
@@ -20,6 +21,14 @@ setProblems(load("problems-shown", true));
 setPane(load("side-pane", "netlist"));
 setShowFailed(load("show-failed", true));
 setIndexHeight(load("index-height", 260));
+// the grid: dots at the integer points, and no axes, since the origin means nothing in particular
+setGrid({
+  shown: load("grid-shown", true),
+  style: load("grid-style", "dots"),
+  spacing: load("grid-spacing", "auto"),
+  major: load("grid-major", 5),
+  axes: load("grid-axes", false),
+});
 {
   const li = document.createElement("li");
   li.className = "nothing";
@@ -57,6 +66,12 @@ window.viewer = {
   },
   /** Run a command by its id, as its menu item does. */
   command,
+  /** Whether a check-mark command, such as "toggle-netlist", is checked. */
+  checked: isChecked,
+  /** The grid's settings, and the steps it is drawn at, in units (grid.js). */
+  get grid() {
+    return gridState();
+  },
   /** Show or hide the page's own menu bar, whatever the shell says. */
   menuBar: showMenuBar,
 };

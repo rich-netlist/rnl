@@ -5,6 +5,7 @@
 
 import { inform } from "./dialog.js";
 import { fit, zoomCenter } from "./drawing.js";
+import { gridCommand } from "./grid.js";
 import { pickAndOpen, reload } from "./open.js";
 import { setProblems, setSidebar } from "./panels.js";
 import { clearSelection } from "./selection.js";
@@ -38,6 +39,12 @@ export function command(id) {
     case "fit": fit(); break;
     case "zoom-in": zoomCenter(1.25); break;
     case "zoom-out": zoomCenter(0.8); break;
+    case "toggle-grid":
+    case "grid-none":
+    case "grid-dots":
+    case "grid-lines":
+    case "grid-axes":
+    case "grid-settings": gridCommand(id); break;
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "descend": descend(selected); break;
