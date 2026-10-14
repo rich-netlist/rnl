@@ -59,7 +59,7 @@ M5 tail vbias vss  vss nch W=4u L=1u
 | [`scripts/`](scripts/README.md) | 项目维护脚本：生成标准的各种发布形式，以及随核心附带的字体。 |
 | [`.github/workflows/`](.github/workflows/README.md) | CI 工作流：项目网站、标准和桌面版查看器的发布、Rust 工作区、查看器及其浏览器测试。 |
 | [`docs/`](docs/README.md) | 工具链架构提案、路线图和决定记录。 |
-| [`site/`](site/README.md) | [项目网站](https://rich-netlist.github.io/rnl/)：写给电路设计者的介绍页和语言导览，中英文两版由 `site/build.py` 从同一份双语源生成。 |
+| [`site/`](site/README.md) | [项目网站](https://rich-netlist.github.io/rnl/)：写给电路设计者的介绍页、语言导览和工具页，中英文两版由 `site/build.py` 从同一份双语源生成；[`pages.yml`](.github/workflows/pages.yml) 再加上语言标准的网页和网页版查看器。 |
 
 建议从[文档地图](docs/README.md)、[工具链架构提案](docs/rnl-toolchain-architecture.md)（中文）和[路线图](docs/roadmap.md)读起。每个组件目录里都有一份简短的 README，说明它计划承担的职责。
 
@@ -76,7 +76,7 @@ cargo run --release -p rnl-cli -- render tests/conformance/cases/03-five-transis
 cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-five-transistor-ota.sp
 ```
 
-或者用网页版：先连同示例构建站点并在本机提供，再打开 `http://127.0.0.1:8000/?url=samples/cases/03-five-transistor-ota.sp`。用 `python scripts/fonts.py web` 生成字体后（[`scripts`](scripts/README.md)），两个查看器都用随附的字体显示文字；没有字体时退回系统字体。
+或者用网页版，网站上就有，带着同样的示例：[rich-netlist.github.io/rnl/viewer/?url=samples/cases/03-five-transistor-ota.sp](https://rich-netlist.github.io/rnl/viewer/?url=samples/cases/03-five-transistor-ota.sp)。要在本机运行，先连同示例构建站点并在本机提供，再打开 `http://127.0.0.1:8000/?url=samples/cases/03-five-transistor-ota.sp`。用 `python scripts/fonts.py web` 生成字体后（[`scripts`](scripts/README.md)），两个查看器都用随附的字体显示文字；没有字体时退回系统字体。
 
 ```bash
 node apps/web/build.mjs --samples
