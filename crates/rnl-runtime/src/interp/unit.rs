@@ -1,4 +1,4 @@
-//! Units of RNL text: host levels and packages (spec-draft 2.7, 2.8, 6.1, 16.1–16.5).
+//! Units of RNL text: host levels and packages (standard 2.7, 2.8, 6.1, 16.1–16.5).
 //!
 //! A unit has its own name table. Reading a unit parses its records, reads the header record
 //! (version, aliases, terminal names, root packages) and collects the members of the others.

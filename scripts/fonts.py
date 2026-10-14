@@ -1,4 +1,4 @@
-"""The fonts shipped with the core (decision 0007): Noto Sans SC Regular and Bold, the Simplified
+"""The fonts shipped with the core (decision 0009): Noto Sans SC Regular and Bold, the Simplified
 Chinese subset of Noto Sans CJK, under the SIL Open Font License 1.1.
 
 The fonts are not in the repository. `fetch` downloads them from the noto-cjk repository at a pinned
@@ -191,7 +191,7 @@ def web(out):
     out.mkdir(parents=True, exist_ok=True)
     css = [
         "/* %s, Regular and Bold, split by Unicode ranges: written by scripts/fonts.py from the\n"
-        "   fonts of noto-cjk %s, whose metrics the core lays out text with (decision 0007).\n"
+        "   fonts of noto-cjk %s, whose metrics the core lays out text with (decision 0009).\n"
         "   %s\n   Licensed under the SIL Open Font License 1.1: see OFL.txt. */\n" % (FAMILY, TAG, COPYRIGHT)
     ]
     sizes = {}

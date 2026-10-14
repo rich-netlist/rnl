@@ -1,4 +1,4 @@
-//! Parser for one record (spec-draft chapters 3 and 4).
+//! Parser for one record (standard chapters 3 and 4).
 //!
 //! The parser is scannerless: free text (3.3) and comments (3.4) are skipped between formal
 //! tokens. A syntax error makes the current member fail (7.4); the parser resumes at the next `;`

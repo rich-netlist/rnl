@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 # the code under MIT, and the metrics of the fonts it lays out text with, fonts/noto-sans-sc.metrics,
-# under the fonts' licence (decision 0007)
+# under the fonts' licence (decision 0009)
 license = "MIT AND OFL-1.1"
 repository.workspace = true
 publish.workspace = true

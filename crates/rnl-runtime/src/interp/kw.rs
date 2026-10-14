@@ -1,4 +1,4 @@
-//! The keywords (spec-draft chapters 9–15): what each statement creates or adds.
+//! The keywords (standard chapters 9–15): what each statement creates or adds.
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};

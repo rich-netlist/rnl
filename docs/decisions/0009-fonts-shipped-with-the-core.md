@@ -1,4 +1,4 @@
-# 0007. The core ships Noto Sans SC and lays out text with its metrics
+# 0009. The core ships Noto Sans SC and lays out text with its metrics
 
 - Date: 2026-10-14
 - Status: accepted
@@ -6,7 +6,7 @@
 
 ## Context
 
-[Decision 0006](0006-shared-core-per-platform-frontends.md) makes fonts part of the core's drawing contract: the core lays out text with the metrics of fonts shipped with it, and a frontend only rasterizes the primitives with those fonts. It left the font set and its licence to be chosen. Until now the renderer estimated widths per class of character, and the SVG placed texts with `text-anchor`, baselines estimated from the size and the browser's sub- and superscripts, in the font the style names or the platform's sans-serif. A text's width and place differed between platforms, and from the box the core gave it.
+[Decision 0008](0008-shared-core-per-platform-frontends.md) makes fonts part of the core's drawing contract: the core lays out text with the metrics of fonts shipped with it, and a frontend only rasterizes the primitives with those fonts. It left the font set and its licence to be chosen. Until now the renderer estimated widths per class of character, and the SVG placed texts with `text-anchor`, baselines estimated from the size and the browser's sub- and superscripts, in the font the style names or the platform's sans-serif. A text's width and place differed between platforms, and from the box the core gave it.
 
 Drawings carry Latin, Greek and the symbols of the markup (13.6), and Chinese: the language has Chinese aliases (`rnl-zh`) and the corpus draws Chinese labels. The fonts must cover Simplified Chinese, be free to ship with the desktop app and the web site, and be small enough for a browser to load what a drawing uses.
 
@@ -28,7 +28,7 @@ Facts that bear on the choice:
 
 ## Consequences
 
-- Texts are placed alike on every platform and in every frontend, up to rasterization, as decision 0006 requires, and a text's bounding box is exact rather than estimated, but over the runs the fonts do not map. The corpus's SVGs change only in their texts and in the frames that the texts' boxes change; the models and the conformance corpus's expected files do not change, and native and WebAssembly Documents stay identical.
+- Texts are placed alike on every platform and in every frontend, up to rasterization, as decision 0008 requires, and a text's bounding box is exact rather than estimated, but over the runs the fonts do not map. The corpus's SVGs change only in their texts and in the frames that the texts' boxes change; the models and the conformance corpus's expected files do not change, and native and WebAssembly Documents stay identical.
 - Lines are 1.448 times the size apart instead of 1.15, and texts aligned at the top sit lower than before, below the room the fonts keep above capitals.
 - The desktop app grows by the web fonts, 17.3 MB, and the web site carries them; a drawing in Latin loads the 45 KB Latin slice, one with a few Chinese labels a few hundred KB. `fonts.css` is 229 KB, 69 KB gzip-compressed, because the common hanzi are listed one by one. The slices follow GB 2312, not frequency of use; slices by frequency would load less for a Chinese page.
 - Building the viewers with their fonts needs Python with fontTools and brotli, and downloads 17 MB from GitHub.

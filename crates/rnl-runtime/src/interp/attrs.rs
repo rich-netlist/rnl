@@ -1,4 +1,4 @@
-//! Attribute references `${a::b::c}` (spec-draft 13.6): what a text shows of the object it is
+//! Attribute references `${a::b::c}` (standard 13.6): what a text shows of the object it is
 //! attached to.
 
 use crate::geom::fmt_num;

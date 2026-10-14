@@ -1,4 +1,4 @@
-//! The host circuit as host adapters hand it to the runtime (spec-draft 2.1, 2.6, 6.1, 6.3).
+//! The host circuit as host adapters hand it to the runtime (standard 2.1, 2.6, 6.1, 6.3).
 //!
 //! The model is dialect-neutral: adapters for SPICE, Spectre or another host fill it in, and the
 //! runtime never parses netlist syntax itself. Levels follow the text: the main file level is the

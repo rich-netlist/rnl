@@ -1,4 +1,4 @@
-//! The core for WebAssembly (decision 0006): [`rnl_view::build`] behind a small C-style interface
+//! The core for WebAssembly (decision 0008): [`rnl_view::build`] behind a small C-style interface
 //! over linear memory, a JSON request in and a JSON response out. It needs no generated glue: the
 //! module imports nothing, and a page or a Worker calls its exports as `js/core.js` does.
 //!

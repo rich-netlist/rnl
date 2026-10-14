@@ -62,7 +62,7 @@ pub struct Level {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub svg: Option<String>,
-    /// The drawing as primitives in drawing order (decision 0006); absent unless
+    /// The drawing as primitives in drawing order (decision 0008); absent unless
     /// `BuildOptions::primitives` asks for them.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]

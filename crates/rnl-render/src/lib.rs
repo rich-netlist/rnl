@@ -5,13 +5,13 @@
 //! The renderer draws what the model says and nothing more. Its defaults (colours, line width,
 //! the pin names) are this implementation's own choices (principle 2.7, 9.3), and so is how it
 //! draws a line style: it resolves each into strokes, which every output draws as they are. It lays
-//! out texts with the metrics of the fonts shipped with the core (decision 0007), in runs at their
+//! out texts with the metrics of the fonts shipped with the core (decision 0009), in runs at their
 //! places and bars as strokes, which every output draws as they are in those fonts; what the fonts
 //! do not map, in runs of its own at estimated widths, which an output draws in a font of the
 //! system's, centred on them.
 //!
 //! Sines, cosines and arc tangents come from `libm`, a math library in Rust, so that native and
-//! WebAssembly builds compute the same bits (decision 0006).
+//! WebAssembly builds compute the same bits (decision 0008).
 
 mod line;
 mod svg;

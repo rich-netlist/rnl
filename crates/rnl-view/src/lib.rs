@@ -1,4 +1,4 @@
-//! The core interface of decision 0006: a workspace in, a Document out. A frontend names the file
+//! The core interface of decision 0008: a workspace in, a Document out. A frontend names the file
 //! to open and gives its own file access; the core reads what the document needs through it, with
 //! the standard packages bundled here, and returns what a viewer shows.
 //!

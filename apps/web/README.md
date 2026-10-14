@@ -1,6 +1,6 @@
 # web
 
-The web viewer: the page of the RNL viewers ([`apps/viewer-ui`](../viewer-ui/README.md)) in a browser, with the shared core built as WebAssembly and run in a module Worker ([`bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md)), as [decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md) decides. It is a static site with no server code: files opened from the computer are read in the page and sent nowhere. Like the desktop viewer ([`apps/desktop`](../desktop/README.md)) it only reads, and it shows the same panels: the drawing, the netlist text, the problems and the hierarchy, with the selection followed between the drawing and the text.
+The web viewer: the page of the RNL viewers ([`apps/viewer-ui`](../viewer-ui/README.md)) in a browser, with the shared core built as WebAssembly and run in a module Worker ([`bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md)), as [decision 0008](../../docs/decisions/0008-shared-core-per-platform-frontends.md) decides. It is a static site with no server code: files opened from the computer are read in the page and sent nowhere. Like the desktop viewer ([`apps/desktop`](../desktop/README.md)) it only reads, and it shows the same panels: the drawing, the netlist text, the problems and the hierarchy, with the selection followed between the drawing and the text.
 
 - **File › Open** (Ctrl+O) opens one or several files. With several, the one that is not mostly included (`.inc`, `.lib`, `.rnl`) is opened, whatever its name; when more than one could be the netlist, the page asks which. The files a netlist includes are found among the files chosen with it, by their relative paths.
 - **File › Open Folder** opens a folder: the page lists its files, the netlists first (`.sp`, `.scs` and the like), then the files they may include, then the others, with a filter, and opens the one picked. Includes are found in the folder, and only the files the document needs are read.
@@ -20,7 +20,7 @@ node apps/web/build.mjs
 
 builds the core with [`bindings/runtime-wasm/build.mjs`](../../bindings/runtime-wasm/README.md#building) and puts the site into `apps/web/dist/`, which git ignores: the page from `apps/viewer-ui` without its README, its `package.json` and the desktop shell; the binding's modules and the WebAssembly module in `core/`; and `about.json`, the version of the workspace and the commit for the About box. It needs Rust with the `wasm32-unknown-unknown` target and Node 18 or later, and no npm packages.
 
-The page's `fonts/`, the drawing's web fonts ([decision 0007](../../docs/decisions/0007-fonts-shipped-with-the-core.md)), comes with it when it is there. Write it first, with Python 3, fontTools and brotli:
+The page's `fonts/`, the drawing's web fonts ([decision 0009](../../docs/decisions/0009-fonts-shipped-with-the-core.md)), comes with it when it is there. Write it first, with Python 3, fontTools and brotli:
 
 ```bash
 pip install fonttools brotli
@@ -57,7 +57,7 @@ The core's module Worker must come from the page's own origin, so `core/` stays 
 
 ## Browsers
 
-The page keeps the browser baseline of decision 0006: Chromium 109, the last Chrome and Edge on Windows 7 and 8.1, and Safari 16; and Firefox from 114, the first with module Workers. It uses no newer feature, such as JSON import attributes, CSS nesting or `Array.prototype.toSorted`; it reads files through `<input type="file">`, a folder through its `webkitdirectory`, and dropped folders through `webkitGetAsEntry`, which all three have, and not through `showOpenFilePicker`, which only Chromium has. Its smoke tests pass in headless Chrome 155, and in Playwright's Firefox 155 and WebKit 26.6 ([Testing](#testing)).
+The page keeps the browser baseline of decision 0008: Chromium 109, the last Chrome and Edge on Windows 7 and 8.1, and Safari 16; and Firefox from 114, the first with module Workers. It uses no newer feature, such as JSON import attributes, CSS nesting or `Array.prototype.toSorted`; it reads files through `<input type="file">`, a folder through its `webkitdirectory`, and dropped folders through `webkitGetAsEntry`, which all three have, and not through `showOpenFilePicker`, which only Chromium has. Its smoke tests pass in headless Chrome 155, and in Playwright's Firefox 155 and WebKit 26.6 ([Testing](#testing)).
 
 ## Testing
 

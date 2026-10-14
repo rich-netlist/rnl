@@ -1,6 +1,6 @@
 //! The SVG backend: primitives in scene units (y up) to an SVG document (y down). It writes the
 //! strokes as the renderer resolved them and decides nothing about how a line looks, and the runs
-//! of a text where the renderer laid them out, in the shipped fonts (decision 0007).
+//! of a text where the renderer laid them out, in the shipped fonts (decision 0009).
 
 use std::fmt::Write;
 

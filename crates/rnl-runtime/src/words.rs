@@ -1,4 +1,4 @@
-//! The standard word list (spec-draft 5.3, Z1): every keyword's signature, the record header
+//! The standard word list (standard 5.3, Z1): every keyword's signature, the record header
 //! fields, kind names, sub-object names, attribute names and style properties.
 //!
 //! It is a data file released with each language version. Checking, the reference documents and

@@ -1,4 +1,4 @@
-//! Text laid out with the metrics of the fonts shipped with the core (decision 0007): Noto Sans SC,
+//! Text laid out with the metrics of the fonts shipped with the core (decision 0009): Noto Sans SC,
 //! Regular and Bold. `fonts/noto-sans-sc.metrics`, which `scripts/fonts.py metrics` writes from the
 //! fonts, holds what the layout needs of them: the units per em, the ascender, descender and line
 //! gap, the top of the em box, and the advance of every character they map.

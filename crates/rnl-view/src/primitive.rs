@@ -1,4 +1,4 @@
-//! A level's drawing as primitives (decision 0006): the shapes and texts a frontend draws, in
+//! A level's drawing as primitives (decision 0008): the shapes and texts a frontend draws, in
 //! serializable types of the view's own. They are converted from the renderer's (architecture
 //! 4.3), which stay free to change; the field names are the contract with the frontends.
 //!
@@ -8,7 +8,7 @@
 //! The renderer resolves each line style into strokes, which the SVG writes as they are: a
 //! frontend that strokes with a colour, a width, dashes, a cap and a join draws the lines as the
 //! SVG does. It lays out each text with the metrics of the fonts shipped with the core (decision
-//! 0007), and gives its runs at their places and its bars as strokes, which the SVG writes as they
+//! 0009), and gives its runs at their places and its bars as strokes, which the SVG writes as they
 //! are in those fonts: a frontend that draws them in the same fonts draws the texts as the SVG
 //! does. A test holds the SVG writer to what the types say.
 
@@ -158,7 +158,7 @@ pub enum Join {
 }
 
 /// A text (9.2.5, 13.6) as the core laid it out, with the metrics of the fonts shipped with it,
-/// Noto Sans SC Regular and Bold (decision 0007). A frontend draws its `runs` and its `bars` and
+/// Noto Sans SC Regular and Bold (decision 0009). A frontend draws its `runs` and its `bars` and
 /// nothing else, so it needs no alignment, baseline or measuring of its own; the other fields say
 /// what the text is and how it was placed. Its glyphs read upright whatever turns it, or from
 /// bottom to top when it is vertical.

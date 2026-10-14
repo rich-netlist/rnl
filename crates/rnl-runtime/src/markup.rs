@@ -1,4 +1,4 @@
-//! Text markup (spec-draft 13.6): a subset of LaTeX text mode, and `${…}` attribute references.
+//! Text markup (standard 13.6): a subset of LaTeX text mode, and `${…}` attribute references.
 
 /// Marks text taken from an attribute: shown as written, never read as markup.
 pub const LITERAL: char = '\u{0}';

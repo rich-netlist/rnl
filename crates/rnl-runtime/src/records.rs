@@ -1,4 +1,4 @@
-//! Cutting records out of carrier lines (spec-draft 2.3–2.5, 2.7).
+//! Cutting records out of carrier lines (standard 2.3–2.5, 2.7).
 //!
 //! A host adapter decides which lines are carriers and strips the comment marker and the space
 //! after it; what is left of a run of consecutive carrier lines is handed here. This part is the

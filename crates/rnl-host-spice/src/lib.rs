@@ -1,4 +1,4 @@
-//! SPICE host adapter (spec-draft 2.1–2.7, 6.1, 6.3, 6.12).
+//! SPICE host adapter (standard 2.1–2.7, 6.1, 6.3, 6.12).
 //!
 //! Reads a SPICE netlist and the files it includes into the runtime's dialect-neutral host model:
 //! levels (the main file level, included file levels, `.lib` sections, subcircuits), instances,

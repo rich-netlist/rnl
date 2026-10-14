@@ -1,4 +1,4 @@
-//! Evaluating members, segments and objects (spec-draft chapters 5 and 6).
+//! Evaluating members, segments and objects (standard chapters 5 and 6).
 //!
 //! Names are resolved lazily: a reference evaluates the member that binds the name, once per
 //! drawing level. A failed statement yields a failed object (7.2); what depends on it fails too.

@@ -1,6 +1,6 @@
 # crates
 
-The Rust workspace ([`../Cargo.toml`](../Cargo.toml)). The crates implement the RNL language draft 0.2 without a solver: they read a netlist and its records, report diagnostics, build the effective model, and draw what has coordinates. The draft is not yet in [`spec/`](../spec/README.md); section numbers in code comments and diagnostics refer to it.
+The Rust workspace ([`../Cargo.toml`](../Cargo.toml)). The crates implement the RNL language standard 0.2 ([`spec/`](../spec/README.md)) without a solver: they read a netlist and its records, report diagnostics, build the effective model, and draw what has coordinates. They were written against the draft the standard was consolidated from; section numbers in code comments and diagnostics are the standard's.
 
 | Crate | Responsibility |
 | --- | --- |

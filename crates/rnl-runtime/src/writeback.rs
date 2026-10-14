@@ -1,4 +1,4 @@
-//! Writing RNL back into host files (spec-draft 2.2, 16.4, 17).
+//! Writing RNL back into host files (standard 2.2, 16.4, 17).
 //!
 //! A tool changes only its own records: a solver replaces the `type="generated"` records of the
 //! level it solved, an editor appends its records after them. Everything else in the file, host

@@ -20,7 +20,7 @@ SPDX-FileCopyrightText = "2026 many-question"
 SPDX-License-Identifier = "CC0-1.0"
 
 # The metrics of the fonts shipped with the core, Noto Sans SC, written from them by
-# scripts/fonts.py (decision 0007).
+# scripts/fonts.py (decision 0009).
 [[annotations]]
 path = "crates/rnl-render/fonts/noto-sans-sc.metrics"
 SPDX-FileCopyrightText = "2014-2021 Adobe (http://www.adobe.com/)"

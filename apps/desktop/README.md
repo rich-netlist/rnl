@@ -57,4 +57,4 @@ The app runs with a WebView2 profile of its own in a temporary directory, so the
 
 This directory is a Cargo workspace of its own, so the WebView dependencies stay out of the library crates' builds; [`desktop.yml`](../../.github/workflows/desktop.yml) builds it on Linux, Windows and macOS.
 
-The viewer calls the shared Rust core natively, through `rnl-view`, as [decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md) decides; the [web viewer](../web/README.md) calls the same core through WebAssembly and shares the page in [`apps/viewer-ui`](../viewer-ui/README.md).
+The viewer calls the shared Rust core natively, through `rnl-view`, as [decision 0008](../../docs/decisions/0008-shared-core-per-platform-frontends.md) decides; the [web viewer](../web/README.md) calls the same core through WebAssembly and shares the page in [`apps/viewer-ui`](../viewer-ui/README.md).

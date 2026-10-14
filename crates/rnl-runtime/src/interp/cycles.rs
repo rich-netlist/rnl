@@ -1,4 +1,4 @@
-//! Cycles of sets (spec-draft 5.2.2).
+//! Cycles of sets (standard 5.2.2).
 //!
 //! A set depends on the sets written in the statement that makes it (inside its braces, in UNION,
 //! or as the scope of a selection) and on the sets that ADD-TO and REMOVE-FROM add to it or remove

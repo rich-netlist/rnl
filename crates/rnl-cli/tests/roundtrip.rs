@@ -1,4 +1,4 @@
-//! Reading, changing and writing back (spec-draft 16.4, 17): host text stays as it is, and what a
+//! Reading, changing and writing back (standard 16.4, 17): host text stays as it is, and what a
 //! tool writes reads back as it meant.
 
 use std::path::{Path, PathBuf};

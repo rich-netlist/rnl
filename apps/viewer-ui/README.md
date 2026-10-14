@@ -1,8 +1,8 @@
 # viewer-ui
 
-The page of the RNL viewers: the drawing, the netlist text, the problems and the subcircuit hierarchy, with a selected instance or net followed between the drawing and the text. The desktop viewer ([`apps/desktop`](../desktop/README.md)) and the web viewer ([`apps/web`](../web/README.md)) show it ([decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md)). The page shows a Document that its shell builds; it never reads files itself.
+The page of the RNL viewers: the drawing, the netlist text, the problems and the subcircuit hierarchy, with a selected instance or net followed between the drawing and the text. The desktop viewer ([`apps/desktop`](../desktop/README.md)) and the web viewer ([`apps/web`](../web/README.md)) show it ([decision 0008](../../docs/decisions/0008-shared-core-per-platform-frontends.md)). The page shows a Document that its shell builds; it never reads files itself.
 
-It is plain HTML, CSS and ES modules, with no dependencies and no build step. It keeps to the browser baseline of decision 0006, Chromium 109 and Safari 16, so newer features such as JSON import attributes, CSS nesting or `Array.prototype.toSorted` are not used. `package.json` only makes Node read the scripts as modules, so that they can be checked:
+It is plain HTML, CSS and ES modules, with no dependencies and no build step. It keeps to the browser baseline of decision 0008, Chromium 109 and Safari 16, so newer features such as JSON import attributes, CSS nesting or `Array.prototype.toSorted` are not used. `package.json` only makes Node read the scripts as modules, so that they can be checked:
 
 ```bash
 find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
@@ -40,7 +40,7 @@ The modules import each other in cycles. At its top level a module only looks up
 
 ## Fonts
 
-The core lays out the drawing's texts with the metrics of Noto Sans SC Regular and Bold ([decision 0007](../../docs/decisions/0007-fonts-shipped-with-the-core.md)), and the SVG names that family first. `fonts/` holds the two faces as web fonts for the page: WOFF2 files split by Unicode ranges, so that a browser downloads only the slices a drawing uses (Latin with the symbols of the markup, the other symbols, the CJK punctuation, the 3755 common hanzi of GB 2312 in slices of 50, its 3008 others in slices of 250, and the rest in slices of 1000 code points); `fonts.css`, which `index.html` links, with their `@font-face` rules; and `OFL.txt`, their licence. Write them with Python 3, [fontTools](https://github.com/fonttools/fonttools) and brotli:
+The core lays out the drawing's texts with the metrics of Noto Sans SC Regular and Bold ([decision 0009](../../docs/decisions/0009-fonts-shipped-with-the-core.md)), and the SVG names that family first. `fonts/` holds the two faces as web fonts for the page: WOFF2 files split by Unicode ranges, so that a browser downloads only the slices a drawing uses (Latin with the symbols of the markup, the other symbols, the CJK punctuation, the 3755 common hanzi of GB 2312 in slices of 50, its 3008 others in slices of 250, and the rest in slices of 1000 code points); `fonts.css`, which `index.html` links, with their `@font-face` rules; and `OFL.txt`, their licence. Write them with Python 3, [fontTools](https://github.com/fonttools/fonttools) and brotli:
 
 ```bash
 pip install fonttools brotli

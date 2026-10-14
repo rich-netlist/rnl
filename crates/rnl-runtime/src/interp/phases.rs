@@ -1,4 +1,4 @@
-//! The phases after creation (spec-draft 8.2–8.5): symbol queue (4, 6), generation (5), geometry
+//! The phases after creation (standard 8.2–8.5): symbol queue (4, 6), generation (5), geometry
 //! (7), style queue (8). There is no solver here: positions come from PLACE and the coordinates of
 //! points; constraints are checked against them, and the ones that lose in the order of 8.5 are
 //! reported.

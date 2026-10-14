@@ -1,5 +1,5 @@
-/* The standard package rnl-std (spec-draft appendix B, 16.3, U3). Its content is a draft: it is
-   the Python prototype's package (rnl-dev tools/rnl-lang/stdlib, 2026-10-12) with the symbols
+/* The standard package rnl-std (standard appendix B, 16.3, U3). Its content is a draft: it is
+   the package of the Python prototype in the research repository (2026-10-12) with the symbols
    reviewed, an explicit box= on every symbol (9.2.3), and symbol rules for Spectre primitives and
    model cards. Coordinates are y-up; one unit is one grid step, and pins sit on integer points. */
 @RNL(type="header") { @VERSION("0.2"); @PACKAGE(name="rnl-std", version="0.2")}

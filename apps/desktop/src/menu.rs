@@ -162,7 +162,7 @@ pub fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 }
 
 /// The About box. Its copyright, which every platform shows, is the notice of the fonts the drawing
-/// is in, which the app embeds with the page (decision 0007, OFL 2).
+/// is in, which the app embeds with the page (decision 0009, OFL 2).
 fn about() -> AboutMetadata<'static> {
     AboutMetadata {
         name: Some("RNL Viewer".into()),

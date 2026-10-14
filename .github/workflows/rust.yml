@@ -1,6 +1,6 @@
 # Builds and tests the Rust workspace: formatting, lints and tests on three platforms; the core for
-# WebAssembly, whose Documents must be those of the native build (decision 0006); and checks that the
-# renderer's font metrics are those of the shipped fonts (decision 0007).
+# WebAssembly, whose Documents must be those of the native build (decision 0008); and checks that the
+# renderer's font metrics are those of the shipped fonts (decision 0009).
 name: Rust
 
 on:

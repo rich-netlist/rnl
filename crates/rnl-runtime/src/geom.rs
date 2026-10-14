@@ -1,7 +1,7 @@
-//! Orientation codes and the routing of wires (spec-draft 11.2, 11.7, 13.1).
+//! Orientation codes and the routing of wires (standard 11.2, 11.7, 13.1).
 //!
 //! Sines, cosines and arc tangents come from `libm`, a math library in Rust, so that native and
-//! WebAssembly builds compute the same bits (decision 0006).
+//! WebAssembly builds compute the same bits (decision 0008).
 
 /// A point in scene or symbol coordinates: x to the right, y up (11.7).
 pub type Pt = (f64, f64);

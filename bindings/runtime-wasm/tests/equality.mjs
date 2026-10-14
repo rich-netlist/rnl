@@ -1,4 +1,4 @@
-// Native and WebAssembly builds give identical Documents (decision 0006). For every file of the
+// Native and WebAssembly builds give identical Documents (decision 0008). For every file of the
 // conformance corpus and the standard packages, the Document that `rnl view` prints and the one the
 // WebAssembly core builds must be deep-equal, numbers compared exactly. Both get the same entry, an
 // absolute path; natively `rnl view` reads the disk, and in WebAssembly client.js's collect gives

@@ -1,6 +1,6 @@
 # standard
 
-The standard packages of the RNL language draft 0.2. Both are drafts: the content of the standard package is still open in the language draft, and names may change with it.
+The standard packages of RNL 0.2. Both are drafts: the language standard leaves the content of the standard package open, and names may change with it.
 
 | File | Package | Content |
 | --- | --- | --- |

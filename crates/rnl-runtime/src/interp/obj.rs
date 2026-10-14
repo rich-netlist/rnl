@@ -1,4 +1,4 @@
-//! Run-time objects (spec-draft 5.1, 5.2, 6.5): handles and what they carry.
+//! Run-time objects (standard 5.1, 5.2, 6.5): handles and what they carry.
 //!
 //! Every statement with a keyword and every `{…}` makes a new object; references only fetch
 //! existing handles. Objects live in one arena and are referred to by [`ObjId`]. Host objects

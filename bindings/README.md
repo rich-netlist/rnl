@@ -1,6 +1,6 @@
 # bindings
 
-Entry points to the shared core for platforms that do not call Rust natively ([decision 0006](../docs/decisions/0006-shared-core-per-platform-frontends.md)). The runtime and the solver stay separate.
+Entry points to the shared core for platforms that do not call Rust natively ([decision 0008](../docs/decisions/0008-shared-core-per-platform-frontends.md)). The runtime and the solver stay separate.
 
 | Binding | |
 | --- | --- |

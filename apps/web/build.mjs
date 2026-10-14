@@ -52,7 +52,7 @@ if (!fonts) {
   console.warn("no web fonts in apps/viewer-ui/fonts/, so texts fall back on sans-serif: write them with python scripts/fonts.py web");
 }
 // The core lays out texts with the fonts' metrics, which are under the fonts' licence (decision
-// 0007), so the site carries it, with their copyright as scripts/fonts.py writes it, even without
+// 0009), so the site carries it, with their copyright as scripts/fonts.py writes it, even without
 // the fonts.
 const licence = join(out, "fonts", "OFL.txt");
 if (!existsSync(licence)) {

@@ -1,4 +1,4 @@
-//! Diagnostics (spec-draft 7.6): three levels, a location, and an optional upstream cause.
+//! Diagnostics (standard 7.6): three levels, a location, and an optional upstream cause.
 //!
 //! Checking and interpreting are one process, so the same list serves a linter and a viewer.
 //! An error means an item failed; a warning flags something legal that is probably not what the

@@ -1,4 +1,4 @@
-//! One drawing level: its objects and facts, sets and selections (spec-draft 5.2, 8.2, 10).
+//! One drawing level: its objects and facts, sets and selections (standard 5.2, 8.2, 10).
 //!
 //! Phase 3 happens while statements are evaluated; the later phases are in `phases.rs`.
 

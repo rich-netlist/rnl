@@ -67,7 +67,7 @@ export type Level = {
    */
   svg?: string,
   /**
-   * The drawing as primitives in drawing order (decision 0006); absent unless
+   * The drawing as primitives in drawing order (decision 0008); absent unless
    * `BuildOptions::primitives` asks for them.
    */
   primitives?: Array<Primitive>,
@@ -359,7 +359,7 @@ export type Join = "miter" | "round" | "bevel";
 
 /**
  * A text (9.2.5, 13.6) as the core laid it out, with the metrics of the fonts shipped with it,
- * Noto Sans SC Regular and Bold (decision 0007). A frontend draws its `runs` and its `bars` and
+ * Noto Sans SC Regular and Bold (decision 0009). A frontend draws its `runs` and its `bars` and
  * nothing else, so it needs no alignment, baseline or measuring of its own; the other fields say
  * what the text is and how it was placed. Its glyphs read upright whatever turns it, or from
  * bottom to top when it is vertical.

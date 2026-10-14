@@ -1,6 +1,6 @@
 {
   "language_version": "0.2",
-  "note": "Prototype standard word list (spec-draft 5.3, Z1), with the names settled in round D (2026-10-10), the trial decisions TR1-TR4, TR3 continued and TR11 (2026-10-11), and the decisions of 2026-10-12: positional parameters first (D9 revised), ORDER and DISTANCE take one direction, ALIGN, DISTRIBUTE and TEXT take their first parameter by position, DEFINE only by name, ALIAS definition=, USE-ALIASES (D16, D17).",
+  "note": "The standard word list as the runtime reads it (5.3): the words, signatures and parameters of standard 0.2, taken from the draft it was consolidated from (2026-10-12). The published list, in another layout, is spec/rnl-words-0.2.json.",
   "header_fields": {
     "type": {"values": ["authored", "generated", "header"], "affects": true},
     "scope": {"type": "string", "affects": true},

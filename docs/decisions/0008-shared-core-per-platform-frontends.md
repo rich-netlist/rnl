@@ -1,4 +1,4 @@
-# 0006. One shared Rust core decides the drawing; frontends are per platform
+# 0008. One shared Rust core decides the drawing; frontends are per platform
 
 - Date: 2026-10-13
 - Status: accepted

@@ -1,6 +1,6 @@
 # runtime-wasm
 
-The shared core as WebAssembly ([decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md)): [`rnl_view::build`](../../crates/rnl-view/README.md), a workspace in and a Document out, behind a small C-style interface over linear memory, with a JSON request in and a JSON response out. The module imports nothing and needs no generated glue, so building it takes only Cargo. JavaScript modules load it, run it in a Worker and collect the files a document needs; the [web viewer](../../apps/web/README.md) uses them.
+The shared core as WebAssembly ([decision 0008](../../docs/decisions/0008-shared-core-per-platform-frontends.md)): [`rnl_view::build`](../../crates/rnl-view/README.md), a workspace in and a Document out, behind a small C-style interface over linear memory, with a JSON request in and a JSON response out. The module imports nothing and needs no generated glue, so building it takes only Cargo. JavaScript modules load it, run it in a Worker and collect the files a document needs; the [web viewer](../../apps/web/README.md) uses them.
 
 ## Building
 
@@ -70,7 +70,7 @@ The request, the answer and the panic message are buffers owned by the module, i
 
 ## JavaScript modules
 
-ES modules in [`js/`](js/), with no dependencies. They keep to the browser baseline of decision 0006, Chromium 109 and Safari 16, and run in module Workers and in Node 18 or later.
+ES modules in [`js/`](js/), with no dependencies. They keep to the browser baseline of decision 0008, Chromium 109 and Safari 16, and run in module Workers and in Node 18 or later.
 
 | Module | |
 | --- | --- |

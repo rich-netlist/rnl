@@ -1,4 +1,4 @@
-//! Spectre host adapter (spec-draft 2.1–2.6, 6.3, 6.11, 6.12).
+//! Spectre host adapter (standard 2.1–2.6, 6.3, 6.11, 6.12).
 //!
 //! Reads a Spectre netlist into the runtime's dialect-neutral host model. It covers the
 //! structural subset: instances (with or without parentheses), nets, `subckt` and `inline subckt`

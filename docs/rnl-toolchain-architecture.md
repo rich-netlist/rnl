@@ -2,7 +2,7 @@
 
 状态：架构提案，记录需求与推荐方案；尚未实施，不是已冻结的语言规范或性能承诺。
 
-日期：2026-09-23。修订：2026-09-23，吸收首轮审阅讨论的结论，主要涉及 solver 输出契约与所有权（第 3.3、5 章）、runtime 形态与运行模式（第 4、6 章）、宿主适配器（第 4.1 节）、统一渲染器（第 4.3 节）、solver 确定性与依赖政策（第 4.2 节）、字体（第 7 章）和落地顺序（第 11 章）。修订：2026-09-24，迁入独立仓库后记录已决定的 npm 作用域（第 9.1 节）和许可证（第 12 章）。修订：2026-10-13，[决定 0006](decisions/0006-shared-core-per-platform-frontends.md) 修改了第 6.1、6.3 节和第 7 章，并补充了第 8 章的目录：共享的 Rust 核心决定图形（定位好的图元和随核心发布的字体），桌面原生调用核心，各平台的前端可以不同；下文这几处的原文保留，以决定为准。
+日期：2026-09-23。修订：2026-09-23，吸收首轮审阅讨论的结论，主要涉及 solver 输出契约与所有权（第 3.3、5 章）、runtime 形态与运行模式（第 4、6 章）、宿主适配器（第 4.1 节）、统一渲染器（第 4.3 节）、solver 确定性与依赖政策（第 4.2 节）、字体（第 7 章）和落地顺序（第 11 章）。修订：2026-09-24，迁入独立仓库后记录已决定的 npm 作用域（第 9.1 节）和许可证（第 12 章）。修订：2026-10-13，[决定 0008](decisions/0008-shared-core-per-platform-frontends.md) 修改了第 6.1、6.3 节和第 7 章，并补充了第 8 章的目录：共享的 Rust 核心决定图形（定位好的图元和随核心发布的字体），桌面原生调用核心，各平台的前端可以不同；下文这几处的原文保留，以决定为准。
 
 来源：迁自 Analog Canvas 仓库（`cascode-ai/analog-canvas`）`rich-netlist` 分支的 `docs/standards/rnl-toolchain-architecture.md`，提交 `168ce69afc988b4e6a57816664fabdafb5d948ee`（2026-09-23），于 2026-09-24 迁入。迁入时除增加本段外，只修改了与文档位置有关的表述：删去"暂存于 Analog Canvas、待明确归属"的说明，更新两份语言草案的链接，并把第 8 章、第 12 章中指代 Analog Canvas 的"本仓库"改为明确名称；方案内容未改动。此后以本仓库为唯一维护位置。
 
@@ -274,7 +274,7 @@ Tauri WebView：同一套 TypeScript viewer/editor + 同一 WASM runtime 与渲�
 Rust 后台线程中的原生 solver；文件读写、文件关联、拖入、更新由 Tauri 提供
 ```
 
-> 已由[决定 0006](decisions/0006-shared-core-per-platform-frontends.md) 修改：桌面原生调用共享核心，不在 WebView 里运行 WASM；桌面和 Web 的前端可以共用界面代码，但不要求相同。
+> 已由[决定 0008](decisions/0008-shared-core-per-platform-frontends.md) 修改：桌面原生调用共享核心，不在 WebView 里运行 WASM；桌面和 Web 的前端可以共用界面代码，但不要求相同。
 
 桌面与 Web 的前端代码路径完全相同，Tauri 只接入两个缝：文件 I/O 和 solver 传输。原生 solver 满足需求 4 的执行效率。若 WebView 侧的 WASM 启用多线程，自定义协议同样需要跨源隔离头。
 
@@ -296,7 +296,7 @@ viewer 理解通用路径、变换、端子、文字等能力，但不携带器�
 
 接近 PDF 的分享体验需要接收方能取得全部必要资源。可以设计可打包依赖的文档分发形式，但容器格式、清单和相对路径规则尚未确定；不因出现类型名称而自动联网。
 
-> 已由[决定 0006](decisions/0006-shared-core-per-platform-frontends.md) 修改：字体随核心发布，渲染器按其度量排定文字位置，前端只负责绘制，跨平台的文字位置一致；具体字体与许可待定。
+> 已由[决定 0008](decisions/0008-shared-core-per-platform-frontends.md) 修改：字体随核心发布，渲染器按其度量排定文字位置，前端只负责绘制，跨平台的文字位置一致；具体字体与许可待定。
 
 字体由 viewer 环境提供并可配置。标签在 viewer 中可以改字体、改大小或隐藏，solver 不依赖实际文字度量，标签压线不是正确性问题。本方案不建立字体嵌入、缺失回退或 solver 与 viewer 共用的度量契约，也不承诺跨平台文字外观一致。
 
@@ -337,7 +337,7 @@ rnl/
 └─ examples/
 ```
 
-> 已由[决定 0006](decisions/0006-shared-core-per-platform-frontends.md) 补充：`crates/` 下还有 `rnl-view/`，即核心接口：输入工作区（各文件的文本），输出 Document；桌面、CLI 和 Web 前端都通过它取得要显示的内容。
+> 已由[决定 0008](decisions/0008-shared-core-per-platform-frontends.md) 补充：`crates/` 下还有 `rnl-view/`，即核心接口：输入工作区（各文件的文本），输出 Document；桌面、CLI 和 Web 前端都通过它取得要显示的内容。
 
 Rust 使用 Cargo workspace，TypeScript 使用 pnpm workspace。两套工具共存，各自管理依赖与构建，由根级脚本和 CI 协调；初期无需引入更重的统一构建系统。
 

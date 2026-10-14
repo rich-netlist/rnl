@@ -1,4 +1,4 @@
-//! The interpreter (spec-draft chapters 5–16): reads the records of a host document and its
+//! The interpreter (standard chapters 5–16): reads the records of a host document and its
 //! packages, resolves names, evaluates every statement into objects and facts, and lets each
 //! drawing level take effect phase by phase (8.2).
 //!

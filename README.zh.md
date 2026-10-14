@@ -4,9 +4,9 @@
 
 RNL 写在电路网表的注释里，描述电路怎样画成原理图、各部分是什么意思；电路本身只由网表定义。本仓库存放这门语言的标准，今后会逐步加入可移植的 RNL 运行时、求解器、查看器、编辑器和标准符号库。
 
-**网站：[rich-netlist.github.io/rnl](https://rich-netlist.github.io/rnl/)**，有[写给电路设计者的介绍](https://rich-netlist.github.io/rnl/)、[语言导览](https://rich-netlist.github.io/rnl/language.html)和[语言标准 0.2](https://rich-netlist.github.io/rnl/spec/0.2/)，每页都有英文版。
+**网站：[rich-netlist.github.io/rnl](https://rich-netlist.github.io/rnl/)**，有[写给电路设计者的介绍](https://rich-netlist.github.io/rnl/)、[语言导览](https://rich-netlist.github.io/rnl/language.html)、[语言标准 0.2](https://rich-netlist.github.io/rnl/spec/0.2/)和[查看器](https://rich-netlist.github.io/rnl/tools.html)：一个[在浏览器里用](https://rich-netlist.github.io/rnl/viewer/)，一个供 Windows 下载。每页都有英文版。
 
-**状态：** 本仓库存放 RNL 语言标准 0.2 版及其原则、项目文档，以及工具链的目录骨架。还没有解析器、求解器、渲染器、应用程序，也没有发布任何软件包。语言的 0.x 各版本之间不承诺兼容。
+**状态：** 本仓库存放 RNL 语言标准 0.2 版及其原则、项目文档，以及第一版 RNL 工具链（0.1 版，不含求解器）。工具链读取带 RNL 记录的 SPICE 和 Spectre 网表，报告诊断，生成有效模型，画出有坐标的部分，并能把记录写回网表；附带 `rnl` 命令，以及标准包和符号的草稿。原理图由一个共享核心决定（[决定 0008](docs/decisions/0008-shared-core-per-platform-frontends.md)）：它用随附的字体排字（[决定 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)），原生运行和编译成 WebAssembly 运行得到的结果完全相同（[`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)）。两个查看器共用一个页面（[`apps/viewer-ui`](apps/viewer-ui/README.md)）：Windows 桌面版（[`apps/desktop`](apps/desktop/README.md)）和网页版（[`apps/web`](apps/web/README.md)）；它们打开网表，画出各层，显示网表文本、诊断和层次结构，并在原理图和文本之间跟随选中的实例或网络。还没有求解器和编辑器。语言的 0.x 各版本之间不承诺兼容。
 
 本文是 [README.md](README.md) 的中文版，两者不一致时以英文版为准。仓库里的文档大多只有英文；有中文的是语言标准、原则、工具链架构提案和网站。
 
@@ -49,23 +49,46 @@ M5 tail vbias vss  vss nch W=4u L=1u
 | 路径 | 计划中的职责 |
 | --- | --- |
 | [`spec/`](spec/README.md) | RNL 语言标准及其原则。 |
-| [`crates/`](crates/README.md) | 将来的 Rust 运行时、宿主适配器、共享渲染器、求解器和命令行工具。 |
-| [`bindings/`](bindings/README.md) | 运行时和求解器各自的 WASM 入口。 |
+| [`crates/`](crates/README.md) | Rust 运行时、SPICE 和 Spectre 宿主适配器、共享渲染器、给查看器的核心接口和命令行工具；求解器是将来的工作。 |
+| [`bindings/`](bindings/README.md) | 编译成 WebAssembly 的核心，以及在 Worker 里运行它的 JavaScript 模块；求解器单独的绑定是将来的工作。 |
 | [`packages/`](packages/README.md) | TypeScript SDK，以及不依赖框架的查看器、编辑器核心。 |
-| [`apps/`](apps/README.md) | Web 应用和桌面外壳。 |
-| [`libraries/`](libraries/README.md) | 外部数据库，先从标准符号开始。 |
-| [`tests/`](tests/README.md) | 将来的一致性、往返和集成测试语料。 |
+| [`apps/`](apps/README.md) | 桌面版和网页版查看器，以及两者共用的页面。 |
+| [`libraries/`](libraries/README.md) | 外部数据库：标准包及其符号，以及中文代称包。 |
+| [`tests/`](tests/README.md) | 一致性测试语料，以及查看器的浏览器测试；往返和集成测试语料是将来的工作。 |
 | [`examples/`](examples/README.md) | 将来的示例文档。 |
-| [`scripts/`](scripts/README.md) | 项目维护脚本，例如生成标准各种发布形式的构建脚本。 |
-| [`.github/workflows/`](.github/workflows/README.md) | CI 工作流：项目网站和标准的发布。 |
+| [`scripts/`](scripts/README.md) | 项目维护脚本：生成标准的各种发布形式，以及随核心附带的字体。 |
+| [`.github/workflows/`](.github/workflows/README.md) | CI 工作流：项目网站、标准和桌面版查看器的发布、Rust 工作区、查看器及其浏览器测试。 |
 | [`docs/`](docs/README.md) | 工具链架构提案、路线图和决定记录。 |
 | [`site/`](site/README.md) | [项目网站](https://rich-netlist.github.io/rnl/)：写给电路设计者的介绍页和语言导览，中英文两版由 `site/build.py` 从同一份双语源生成。 |
 
 建议从[文档地图](docs/README.md)、[工具链架构提案](docs/rnl-toolchain-architecture.md)（中文）和[路线图](docs/roadmap.md)读起。每个组件目录里都有一份简短的 README，说明它计划承担的职责。
 
+## 试用
+
+```bash
+cargo run --release -p rnl-cli -- check tests/conformance/cases/03-five-transistor-ota.sp
+cargo run --release -p rnl-cli -- render tests/conformance/cases/03-five-transistor-ota.sp -o target/svg
+```
+
+其他命令见 [`crates/rnl-cli`](crates/rnl-cli/README.md)。也可以在桌面版查看器里打开网表：
+
+```bash
+cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-five-transistor-ota.sp
+```
+
+或者用网页版：先连同示例构建站点并在本机提供，再打开 `http://127.0.0.1:8000/?url=samples/cases/03-five-transistor-ota.sp`。用 `python scripts/fonts.py web` 生成字体后（[`scripts`](scripts/README.md)），两个查看器都用随附的字体显示文字；没有字体时退回系统字体。
+
+```bash
+node apps/web/build.mjs --samples
+```
+
+```bash
+node apps/web/serve.mjs
+```
+
 ## 下一步
 
-确定第一版工具链支持标准 0.2 的哪些部分，整理一致性和往返测试语料，并在开始实现时建立真正的 Cargo 和 pnpm 工作区。[路线图](docs/roadmap.md)跟踪这些工作，不会把未完成的写成已完成。
+对照已发布的标准 0.2 正文核对工具链，记下它支持的范围；补充往返测试语料；让查看器能编辑 RNL 文本并重新绘制；定义求解器的输入和输出。[路线图](docs/roadmap.md)跟踪这些工作，不会把未完成的写成已完成。
 
 ## 许可证
 
@@ -74,6 +97,7 @@ M5 tail vbias vss  vss nch W=4u L=1u
 | 其余一切，包括代码、配置和顶层文件 | 下面没有列出的全部路径 | [MIT](LICENSE) |
 | 规范文本和项目文档 | `spec/`、`docs/` | [CC-BY-4.0](LICENSES/CC-BY-4.0.txt) |
 | 数据：标准库、测试语料和示例 | `libraries/`、`tests/`、`examples/` | [CC0-1.0](LICENSES/CC0-1.0.txt) |
+| 随核心附带的字体 Noto Sans SC 的度量数据，版权 2014-2021 Adobe（[决定 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)） | `crates/rnl-render/fonts/noto-sans-sc.metrics` | [OFL-1.1](LICENSES/OFL-1.1.txt) |
 
 [`REUSE.toml`](REUSE.toml) 记录了这一对应关系，由 `reuse lint` 检查。从 Analog Canvas 迁来的文档由其版权人以 CC-BY-4.0 在这里发布；Analog Canvas 里冻结的副本仍按该仓库的 AGPL-3.0 许可。见[决定 0002](docs/decisions/0002-licenses.md)。
 
