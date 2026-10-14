@@ -405,7 +405,7 @@
         '<zh>只改 RNL 时，网表正文和普通注释原样保留</zh><en>When only RNL changes, the netlist body and ordinary comments are kept as is</en>'
       ],
       form: '<zh>rnl-host-spice、rnl-host-spectre（Rust）</zh><en>rnl-host-spice, rnl-host-spectre (Rust)</en>',
-      st: ['chip chip-warn', '<zh>规划中</zh><en>Planned</en>']
+      st: ['chip chip-ok', '<zh>0.1 已有</zh><en>In 0.1</en>']
     },
     runtime: {
       nm: '<zh>运行库</zh><en>Runtime</en>', sub: 'Runtime',
@@ -417,7 +417,7 @@
         '<zh>保留原文格式写回文件</zh><en>Writes back to the file, preserving the original formatting</en>'
       ],
       form: '<zh>rnl-runtime（Rust，可编译到 WASM）；npm 包 @rich-netlist/runtime</zh><en>rnl-runtime (Rust, compiles to WASM); npm package @rich-netlist/runtime</en>',
-      st: ['chip chip-warn', '<zh>规划中 · 解释器原型 rnl-lang</zh><en>Planned · interpreter prototype rnl-lang</en>']
+      st: ['chip chip-ok', '<zh>0.1 已有 · 不含求解</zh><en>In 0.1 · without solving</en>']
     },
     solver: {
       nm: '<zh>求解器</zh><en>Solver</en>', sub: 'Solver',
@@ -440,7 +440,7 @@
         '<zh>查看器和命令行画出来完全一致</zh><en>The viewer and the CLI draw exactly the same picture</en>'
       ],
       form: '<zh>rnl-render（Rust，与运行库同属共享核心）</zh><en>rnl-render (Rust, part of the shared core with the runtime)</en>',
-      st: ['chip chip-warn', '<zh>规划中</zh><en>Planned</en>']
+      st: ['chip chip-ok', '<zh>0.1 已有</zh><en>In 0.1</en>']
     },
     viewer: {
       nm: '<zh>查看器</zh><en>Viewer</en>', sub: 'Viewer',
@@ -451,8 +451,8 @@
         '<zh>文件里已有完整几何时，不需要求解器</zh><en>No solver needed when the file already has full geometry</en>',
         '<zh>不自带元件库，符号来自标准包和 RNL 库</zh><en>No built-in component library; symbols come from the standard package and RNL libraries</en>'
       ],
-      form: '<zh>@rich-netlist/viewer（TypeScript，不依赖 UI 框架）</zh><en>@rich-netlist/viewer (TypeScript, no UI framework dependency)</en>',
-      st: ['chip chip-warn', '<zh>规划中 · RNL Lab 实验</zh><en>Planned · RNL Lab experiment</en>']
+      form: '<zh>apps/web、apps/desktop，共用页面 apps/viewer-ui</zh><en>apps/web and apps/desktop, sharing the page apps/viewer-ui</en>',
+      st: ['chip chip-ok', '<zh>0.1 已有 · 网页版和桌面版，只读</zh><en>In 0.1 · web and desktop, read-only</en>']
     },
     editor: {
       nm: '<zh>编辑器</zh><en>Editor</en>', sub: 'Editor',
@@ -475,7 +475,7 @@
         '<zh>把旧版本语法迁移到新版本</zh><en>Migrates old syntax versions to new ones</en>'
       ],
       form: '<zh>rnl-cli（Rust，各平台预编译）</zh><en>rnl-cli (Rust, prebuilt for each platform)</en>',
-      st: ['chip chip-warn', '<zh>规划中</zh><en>Planned</en>']
+      st: ['chip chip-ok', '<zh>0.1 已有 · 检查和出图，不含求解</zh><en>In 0.1 · checks and renders, without solving</en>']
     },
     stdlib: {
       nm: '<zh>标准库</zh><en>Standard library</en>', sub: 'Standard library',
@@ -486,7 +486,7 @@
         '<zh>和引擎分开发布、分开编版本号；文件里写的同名定义盖过它</zh><en>Released and versioned separately from the engines; a definition of the same name in a file overrides it</en>'
       ],
       form: '<zh>@rich-netlist/stdlib（纯数据包）</zh><en>@rich-netlist/stdlib (data-only package)</en>',
-      st: ['chip chip-warn', '<zh>规划中 · 原型标准包和 rnl-zh</zh><en>Planned · prototype standard package and rnl-zh</en>']
+      st: ['chip chip-warn', '<zh>0.1 带草稿 · 内容未定</zh><en>Drafts in 0.1 · content not settled</en>']
     }
   };
 
