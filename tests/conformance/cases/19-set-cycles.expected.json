@@ -2,9 +2,9 @@
   "failed": false,
   "levels": [
     {
-      "title": "18-set-cycles.sp",
+      "title": "19-set-cycles.sp",
       "kind": "file",
-      "file": "18-set-cycles.sp",
+      "file": "19-set-cycles.sp",
       "symbols": [
         {
           "name": "$RES",
@@ -683,7 +683,7 @@
     {
       "title": "cell",
       "kind": "subckt",
-      "file": "18-set-cycles.sp",
+      "file": "19-set-cycles.sp",
       "symbols": [
         {
           "name": "$RES",
@@ -866,31 +866,31 @@
   "diagnostics": [
     {
       "severity": "error",
-      "file": "18-set-cycles.sp",
+      "file": "19-set-cycles.sp",
       "line": 23,
       "col": 5
     },
     {
       "severity": "error",
-      "file": "18-set-cycles.sp",
+      "file": "19-set-cycles.sp",
       "line": 28,
       "col": 5
     },
     {
       "severity": "hint",
-      "file": "18-set-cycles.sp",
+      "file": "19-set-cycles.sp",
       "line": 1,
       "col": 0
     },
     {
       "severity": "error",
-      "file": "18-set-cycles.sp",
+      "file": "19-set-cycles.sp",
       "line": 12,
       "col": 10
     },
     {
       "severity": "hint",
-      "file": "18-set-cycles.sp",
+      "file": "19-set-cycles.sp",
       "line": 10,
       "col": 0
     }
