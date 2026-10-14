@@ -73,7 +73,7 @@ The web shell builds with the core as WebAssembly in a module Worker, one for th
 
 ## The command table
 
-`commands.json` lists the menus, each with its `label` and `items`. An item is `"-"`, a separator, shown only between two items, or a command:
+`commands.json` lists the menus, each with its `label` and `items`. An item is `"-"`, a separator, shown only between two items; a submenu, `{ "label", "items" }` as a menu has, at any depth, shown only with an item the platform offers; or a command:
 
 | Field | |
 | --- | --- |
@@ -82,10 +82,11 @@ The web shell builds with the core as WebAssembly in a module Worker, one for th
 | `keys` | The keys that run it, written like `Ctrl+Shift+M`, `F5` or `Enter`; Ctrl stands for Cmd on macOS. The first is the native menu's accelerator. |
 | `shown` | How menus show the keys, when not as the first of them. |
 | `check` | Whether it has a check mark. |
+| `radio` | Whether, with `check`, it is one of a group of which the page checks one: the page's menu bar shows a dot, a native menu a check mark. |
 | `page` | Whether the page always handles its key, as for Enter and Backspace: no menu accelerator would take the key from a text box. |
 | `platforms` | The platforms that offer it; all when not given. |
 
-The desktop app builds its native menu from the table ([`src/menu.rs`](../desktop/src/menu.rs)): on Windows the page handles the keys and the menu shows them after a tab; elsewhere the menu's accelerators handle them. The page runs keys by the same table. A key with Ctrl compares Shift only for a letter, since typing `+` may need Shift; a key without Ctrl that types or deletes does not count while Ctrl or Alt is held. In a text box only Ctrl keys and function keys count. Enter only opens a selected subcircuit instance, Escape clears the selection, and F5 and Ctrl+R, whatever else is held, read the document again instead of reloading the page.
+The desktop app builds its native menu from the table ([`src/menu.rs`](../desktop/src/menu.rs)), its submenus too: on Windows the page handles the keys and the menu shows them after a tab; elsewhere the menu's accelerators handle them. A native menu toggles a check item when it is chosen, so the page sets the marks of a command's group again after running it, whether or not they changed. In the page's own menu bar, pointing at a submenu's entry opens the submenu beside it; from the keyboard, ArrowRight, Enter or the entry's letter opens it, and ArrowLeft or Escape closes it. The page runs keys by the same table. A key with Ctrl compares Shift only for a letter, since typing `+` may need Shift; a key without Ctrl that types or deletes does not count while Ctrl or Alt is held. In a text box only Ctrl keys and function keys count. Enter only opens a selected subcircuit instance, Escape clears the selection, and F5 and Ctrl+R, whatever else is held, read the document again instead of reloading the page.
 
 ## Debug handle
 

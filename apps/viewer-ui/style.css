@@ -668,7 +668,21 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
   border-radius: 6px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
-.menu-list[hidden] { display: none; }
+.menu-list[hidden], .submenu[hidden] { display: none; }
+/* a submenu beside its entry, its first entry level with it, or on its left where there is no room */
+.menu-sub { position: relative; }
+.submenu {
+  position: absolute;
+  top: -5px;
+  left: calc(100% - 2px);
+  min-width: 180px;
+  padding: 4px 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.submenu.left { left: auto; right: calc(100% - 2px); }
 .menu-item {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) auto;
@@ -683,7 +697,11 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .menu-item.active { background: var(--hover); }
 .menu-item .check { text-align: center; color: var(--accent); }
 .menu-item[aria-checked="true"] .check::before { content: "\2713"; }
+/* one of a group, of which one is checked */
+.menu-item[role="menuitemradio"][aria-checked="true"] .check::before { content: "\2022"; }
 .menu-item .keys { padding-left: 28px; color: var(--muted); font-size: 12px; }
+.menu-item.opens .keys::after { content: "\203A"; font-size: 15px; line-height: 1; }
+.menu-item.opens[aria-expanded="true"] { background: var(--hover); }
 .menu-separator { height: 1px; margin: 4px 0; background: var(--line); }
 
 /* ------------------------------------------------------------------ dialogs */

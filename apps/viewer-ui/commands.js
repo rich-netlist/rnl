@@ -1,7 +1,7 @@
 // The commands and the keys that run them. Both come from the command table, commands.json, which
-// the desktop viewer also builds its native menu from: the menus, their items, and per item its id,
-// its label, its keys and the platforms that offer it. A command runs by its id, whether it comes
-// from the platform's menu, the HTML menu bar or a key.
+// the desktop viewer also builds its native menu from: the menus, their items and submenus, and per
+// item its id, its label, its keys and the platforms that offer it. A command runs by its id,
+// whether it comes from the platform's menu, the HTML menu bar or a key.
 
 import { inform } from "./dialog.js";
 import { fit, zoomCenter } from "./drawing.js";
@@ -75,24 +75,39 @@ function offered(item) {
   return !item.platforms || item.platforms.includes(shell.platform);
 }
 
-/** The menus with the items this platform offers, and a separator ("-") only between two items. */
+/**
+ * The entries of a menu or a submenu that this platform shows: the items it offers, the submenus
+ * that have any, each as { label, items }, and a separator ("-") only between two entries.
+ */
+function entries(items) {
+  const shown = [];
+  let gap = false;
+  for (const item of items) {
+    if (item === "-") {
+      gap = shown.length > 0;
+      continue;
+    }
+    const entry = item.items ? { label: item.label, items: entries(item.items) } : item;
+    if (entry.items ? entry.items.length === 0 : !offered(item)) continue;
+    if (gap) shown.push("-");
+    shown.push(entry);
+    gap = false;
+  }
+  return shown;
+}
+
+/** The menus with the entries this platform shows, and no menu left without any. */
 export function menus() {
-  return table.menus
-    .map((m) => {
-      const items = [];
-      let gap = false;
-      for (const item of m.items) {
-        if (item === "-") {
-          gap = items.length > 0;
-        } else if (offered(item)) {
-          if (gap) items.push("-");
-          items.push(item);
-          gap = false;
-        }
-      }
-      return { label: m.label, items };
-    })
-    .filter((m) => m.items.length > 0);
+  return table.menus.map((m) => ({ label: m.label, items: entries(m.items) })).filter((m) => m.items.length > 0);
+}
+
+/** The commands among a menu's items, those of its submenus too. */
+function* commandsIn(items) {
+  for (const item of items) {
+    if (item === "-") continue;
+    if (item.items) yield* commandsIn(item.items);
+    else yield item;
+  }
 }
 
 /** How a menu shows an item's keys: its `shown` text, or else its first key. */
@@ -119,8 +134,8 @@ function matches(e, spec) {
 function keyCommand(e, typing) {
   if (!table) return null;
   for (const m of table.menus) {
-    for (const item of m.items) {
-      if (item === "-" || !offered(item)) continue;
+    for (const item of commandsIn(m.items)) {
+      if (!offered(item)) continue;
       for (const spec of item.keys || []) {
         if (typing && !/^(Ctrl\+|F\d+$)/.test(spec)) continue;
         if (matches(e, spec)) return item.id;
