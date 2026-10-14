@@ -1,11 +1,13 @@
 // The drawing: one level at a time, as the SVG the core drew. The view moves by changing the SVG's
 // viewBox; a click selects what it hits, found from the boxes, pins and wires of the level; the
-// selection is marked over the drawing, and a selected subcircuit instance gets the open badge.
+// selection is marked over the drawing, and a selected subcircuit instance gets the open badge. The
+// grid under it follows the view, and the status bar shows where the pointer is in the scene.
 
-import { current, doc, selected, setCurrent, setTreeActive, treeActive } from "./state.js";
+import { current, doc, selected, setCurrent, setPath } from "./state.js";
+import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { clearSelection, select } from "./selection.js";
-import { descend, opens, updateUp } from "./subcircuits.js";
+import { descend, opens, updatePath } from "./subcircuits.js";
 import { $, clamp, svgElement } from "./util.js";
 
 const canvas = $("canvas");
@@ -15,22 +17,28 @@ const MAX_ZOOM = 50;
 const FIT_MARGIN = 24; // pixels around the drawing when it is fitted
 const CLICK_SLOP = 4; // pixels a press may move and still be a click
 const HIT_SLOP = 6; // pixels around a pin or a wire that still hit it
+// Pixels of the SVG and the hits per unit of the scene: the level's scale, which the Document gives
+// with the primitives, or else the renderer's, which the core draws the SVG at by default.
+const SVG_SCALE = 14;
 
 let svg = null; // the <svg> element of the level drawn
 let overlay = null; // the selection marks drawn over it
 let groups = new Map(); // data-id -> the SVG groups that draw it
 let extent = null; // the drawing's own viewBox: {x, y, w, h}
 export let view = null; // the view: top-left corner in drawing units, and pixels per unit (k)
+let scale = SVG_SCALE; // drawing units (SVG pixels) per unit of the scene, on the level drawn
 let size = { w: 0, h: 0 }; // the canvas size the view was last applied to
 let press = null; // a mouse press on the drawing: where, and whether it became a drag
+let pointer = null; // where the pointer is on the canvas, in its pixels, while it is over it
 let badgeAt = null; // the drawing point of the open badge: a selected subcircuit's box corner
 
-/** Draw level `i`. `treePath` is the hierarchy row that asked for it, if one did. */
-export function showLevel(i, keptView, treePath) {
+/**
+ * Draw level `i`, with a view kept for it or else fitted. The hierarchy path that leads to it is set
+ * already (subcircuits.js); the bar above the drawing shows it.
+ */
+export function showLevel(i, keptView) {
   setCurrent(i);
   const lv = doc.levels[i];
-  setTreeActive(treePath !== undefined ? treePath : treeActive);
-  $("level-name").textContent = lv.title;
   $("level-kind").textContent = i === 0 ? "top level" : lv.kind === "subckt" ? "subcircuit" : "file level";
   $("status").textContent = lv.status ? `Not drawn without a solver: ${lv.status}` : "";
   $("status").title = $("status").textContent;
@@ -39,11 +47,14 @@ export function showLevel(i, keptView, treePath) {
   overlay = null;
   groups = new Map();
   updateHierarchy();
-  updateUp();
+  updatePath();
   badgeAt = null;
   positionBadge();
+  scale = lv.scale || SVG_SCALE;
   if (lv.empty) {
     view = null;
+    paintGrid(null);
+    showPointer();
     $("zoom").textContent = "";
     $("empty").textContent = "Nothing on this level has a position yet, so nothing is drawn.";
     $("empty").hidden = false;
@@ -86,11 +97,13 @@ export function clearDrawing(message) {
   view = null;
   $("empty").textContent = message;
   $("empty").hidden = false;
-  $("level-name").textContent = "";
+  setPath([]);
+  updatePath();
   $("level-kind").textContent = "";
-  $("up").hidden = true;
   badgeAt = null;
   positionBadge();
+  paintGrid(null);
+  showPointer();
   $("status").textContent = "";
   $("zoom").textContent = "";
   $("selection").textContent = "";
@@ -106,6 +119,26 @@ function apply() {
   svg.setAttribute("viewBox", `${view.x} ${view.y} ${size.w / view.k} ${size.h / view.k}`);
   $("zoom").textContent = `${Math.round(view.k * 100)}%`;
   positionBadge();
+  paintGrid(view, scale);
+  showPointer();
+}
+
+/**
+ * Show where the pointer is in the scene, x and y with y up, to the digits the zoom tells apart: the
+ * last is worth 1 to 10 pixels. Nothing while the pointer is off the drawing.
+ */
+function showPointer() {
+  const el = $("pointer");
+  if (!pointer || !view) {
+    el.textContent = "";
+    return;
+  }
+  const digits = clamp(Math.ceil(Math.log10(view.k * scale)) - 1, 0, 3);
+  // no "-0.0" for a point a little below 0
+  const fixed = (v) => (Number(v.toFixed(digits)) || 0).toFixed(digits);
+  const x = (view.x + pointer.x / view.k) / scale;
+  const y = -(view.y + pointer.y / view.k) / scale;
+  el.textContent = `x ${fixed(x)}, y ${fixed(y)}`;
 }
 
 export function fit() {
@@ -158,6 +191,8 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 
 canvas.addEventListener("pointermove", (e) => {
+  pointer = canvasPoint(e);
+  showPointer();
   if (!press || e.pointerId !== press.id) {
     if (!press && view) canvas.classList.toggle("over-object", hitAt(canvasPoint(e)) !== null);
     return;
@@ -185,6 +220,10 @@ function endPress(e, cancelled) {
 }
 canvas.addEventListener("pointerup", (e) => endPress(e, false));
 canvas.addEventListener("pointercancel", (e) => endPress(e, true));
+canvas.addEventListener("pointerleave", () => {
+  pointer = null;
+  showPointer();
+});
 // no autoscroll on the middle button, no page menu on the drawing
 canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());

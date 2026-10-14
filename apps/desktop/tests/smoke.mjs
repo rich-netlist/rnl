@@ -1,10 +1,11 @@
 // A smoke test of the desktop viewer, on Windows: build the app, start it on a netlist of the
 // corpus, and drive its page through WebView2's DevTools port. The drawing is shown, the window is
 // named after the file, a click selects an instance, Enter opens its subcircuit and Backspace comes
-// back, and the native menu has the items of the command table, runs them, and follows the page's
-// check marks. The app runs with a WebView2 profile of its own in a temporary directory, so that the
-// user's layout stays as it was, and is stopped by its process ID. The test fails at once when the
-// app exits, and a step fails when the page stops answering. Node 22 or later, with no dependencies.
+// back, and the native menu has the items of the command table, those of its submenus too, runs
+// them, and follows the page's check marks. The app runs with a WebView2 profile of its own in a
+// temporary directory, so that the user's layout stays as it was, and is stopped by its process ID.
+// The test fails at once when the app exits, and a step fails when the page stops answering. Node
+// 22 or later, with no dependencies.
 //
 //   node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build]
 //
@@ -224,57 +225,102 @@ function windowTitle(pid) {
   return powershell(`(Get-Process -Id ${pid}).MainWindowTitle`);
 }
 
-/** The native menu bar of the app's main window: per menu its text, and its items' texts, check marks and separators. */
+/**
+ * The native menu bar of the app's main window: per menu its text, and its items' texts, check marks
+ * and separators, a submenu's with its own items. A submenu's entry has its flags in the low byte of
+ * its state, and the number of its items in the high byte.
+ */
 function nativeMenu(pid) {
   return JSON.parse(
     powershell(`${WIN32}
+function Read-Menu([IntPtr]$menu) {
+  $items = @()
+  for ($j = 0; $j -lt [Win32Menu]::GetMenuItemCount($menu); $j++) {
+    $text = New-Object System.Text.StringBuilder 256
+    [void][Win32Menu]::GetMenuString($menu, $j, $text, 256, 0x400)
+    $state = [Win32Menu]::GetMenuState($menu, $j, 0x400)
+    $sub = [Win32Menu]::GetSubMenu($menu, $j)
+    if ($sub -ne [IntPtr]::Zero) { $state = $state -band 0xFF }
+    $item = [ordered]@{ text = $text.ToString(); separator = (($state -band 0x800) -ne 0); checked = (($state -band 0x8) -ne 0) }
+    if ($sub -ne [IntPtr]::Zero) { $item.items = Read-Menu $sub }
+    $items += [pscustomobject]$item
+  }
+  return ,$items
+}
 $bar = [Win32Menu]::GetMenu((Get-Process -Id ${pid}).MainWindowHandle)
 $menus = @()
 for ($i = 0; $i -lt [Win32Menu]::GetMenuItemCount($bar); $i++) {
   $text = New-Object System.Text.StringBuilder 256
   [void][Win32Menu]::GetMenuString($bar, $i, $text, 256, 0x400)
-  $sub = [Win32Menu]::GetSubMenu($bar, $i)
-  $items = @()
-  for ($j = 0; $j -lt [Win32Menu]::GetMenuItemCount($sub); $j++) {
-    $item = New-Object System.Text.StringBuilder 256
-    [void][Win32Menu]::GetMenuString($sub, $j, $item, 256, 0x400)
-    $state = [Win32Menu]::GetMenuState($sub, $j, 0x400)
-    $items += [pscustomobject]@{ text = $item.ToString(); separator = (($state -band 0x800) -ne 0); checked = (($state -band 0x8) -ne 0) }
-  }
-  $menus += [pscustomobject]@{ text = $text.ToString(); items = $items }
+  $menus += [pscustomobject]@{ text = $text.ToString(); items = (Read-Menu ([Win32Menu]::GetSubMenu($bar, $i))) }
 }
-ConvertTo-Json -InputObject $menus -Depth 4 -Compress`),
+ConvertTo-Json -InputObject $menus -Depth 10 -Compress`),
   );
 }
 
-/** Choose a native menu item, as a click on it does: post its id to the window as WM_COMMAND. */
-function chooseItem(pid, menu, item) {
+/**
+ * Choose a native menu item, as a click on it does: post its id to the window as WM_COMMAND. `at` is
+ * where it is: the menu's index, the indexes of the submenus' entries down to it, and its own.
+ */
+function chooseItem(pid, at) {
   powershell(`${WIN32}
 $h = (Get-Process -Id ${pid}).MainWindowHandle
-$id = [Win32Menu]::GetMenuItemID([Win32Menu]::GetSubMenu([Win32Menu]::GetMenu($h), ${menu}), ${item})
+$menu = [Win32Menu]::GetMenu($h)
+foreach ($k in @(${at.slice(0, -1).join(", ")})) { $menu = [Win32Menu]::GetSubMenu($menu, $k) }
+$id = [Win32Menu]::GetMenuItemID($menu, ${at[at.length - 1]})
 [void][Win32Menu]::PostMessage($h, 0x0111, [IntPtr]$id, [IntPtr]::Zero)`);
 }
 
-/** The native menus the command table gives the desktop on Windows, the keys shown after a tab. */
-function tableMenus() {
-  const menus = [];
-  for (const m of table.menus) {
-    const items = [];
+/** The commands of the table, those in its submenus too. */
+const commands = (items) => items.flatMap((item) => (item === "-" ? [] : item.items ? commands(item.items) : [item]));
+
+/**
+ * The native menus the command table gives the desktop on Windows, the keys shown after a tab, and
+ * the check marks the page has set: `marks` by command id.
+ */
+function tableMenus(marks) {
+  const entries = (items) => {
+    const shown = [];
     let gap = false;
-    for (const item of m.items) {
+    for (const item of items) {
       if (item === "-") {
-        gap = items.length > 0;
+        gap = shown.length > 0;
         continue;
       }
-      if (item.platforms && !item.platforms.includes("desktop")) continue;
-      if (gap) items.push({ text: "", separator: true, checked: false });
+      let next;
+      if (item.items) {
+        const inner = entries(item.items);
+        if (inner.length === 0) continue;
+        next = { text: item.label, separator: false, checked: false, items: inner };
+      } else {
+        if (item.platforms && !item.platforms.includes("desktop")) continue;
+        const keys = item.shown || (item.keys ? item.keys[0] : null);
+        next = { text: keys ? `${item.label}\t${keys}` : item.label, separator: false, checked: !!item.check && marks[item.id] };
+      }
+      if (gap) shown.push({ text: "", separator: true, checked: false });
       gap = false;
-      const keys = item.shown || (item.keys ? item.keys[0] : null);
-      items.push({ text: keys ? `${item.label}\t${keys}` : item.label, separator: false, checked: !!item.check });
+      shown.push(next);
     }
-    if (items.length > 0) menus.push({ text: m.label, items });
+    return shown;
+  };
+  return table.menus.map((m) => ({ text: m.label, items: entries(m.items) })).filter((m) => m.items.length > 0);
+}
+
+/** Where a command is in the native menus, as chooseItem takes it; and its item there. */
+function find(menus, id) {
+  const label = commands(table.menus.flatMap((m) => m.items)).find((c) => c.id === id).label;
+  const search = (items, at) => {
+    for (let k = 0; k < items.length; k++) {
+      const found = items[k].items ? search(items[k].items, [...at, k]) : items[k].text.split("\t")[0] === label && [...at, k];
+      if (found) return found;
+    }
+    return null;
+  };
+  for (let m = 0; m < menus.length; m++) {
+    const at = search(menus[m].items, [m]);
+    if (at) return { at, item: at.slice(1).reduce((entry, k) => entry.items[k], menus[m]) };
   }
-  return menus;
+  throw new Error(`The native menu has no item for ${id}.`);
 }
 
 /** Drive the app's page through the DevTools port and check what it shows; `session` keeps the connection. */
@@ -306,25 +352,36 @@ async function drive(app, port, profile, t0, session) {
   console.log("selected X2, opened amp and came back");
 
   // the native menu: the command table's items, with the page's check marks
-  const want = tableMenus();
+  const ids = commands(table.menus.flatMap((m) => m.items)).filter((c) => c.check).map((c) => c.id);
+  const marks = await page.evaluate(`Object.fromEntries(${JSON.stringify(ids)}.map((id) => [id, window.viewer.checked(id)]))`);
+  same(marks["grid-dots"] && !marks["grid-lines"], true, "the grid's marks at start");
+  const want = tableMenus(marks);
   same(nativeMenu(app.pid), want, "the native menu");
   // a key in the page clears a check mark, and an item chosen in the menu reaches the page
-  const view = want.findIndex((m) => m.text === "&View");
-  const item = (id) => {
-    const label = table.menus.flatMap((m) => m.items).find((i) => i.id === id).label;
-    return want[view].items.findIndex((i) => i.text.split("\t")[0] === label);
-  };
-  const checked = (id) => nativeMenu(app.pid)[view].items[item(id)].checked;
+  const at = (id) => find(want, id).at;
+  const checked = (id) => find(nativeMenu(app.pid), id).item.checked;
   await press(page, "b", "KeyB", 66, 2);
   await until("the side panel to be hidden", async () => !(await shown(page)).sidebar, 10_000);
   await until("Netlist Panel's check mark to clear", () => !checked("toggle-netlist"), 10_000);
-  chooseItem(app.pid, view, item("toggle-netlist"));
+  chooseItem(app.pid, at("toggle-netlist"));
   await until("the side panel to be shown", async () => (await shown(page)).sidebar, 10_000);
   await until("Netlist Panel's check mark", () => checked("toggle-netlist"), 10_000);
   const zoom = (await shown(page)).zoom;
-  chooseItem(app.pid, view, item("zoom-in"));
+  chooseItem(app.pid, at("zoom-in"));
   await until("View > Zoom In", async () => (await shown(page)).zoom !== zoom, 10_000);
-  console.log("the native menu has the command table's items and follows the page");
+  // an item of a submenu reaches the page too, and the page sets the marks of its group
+  const grid = () => page.evaluate("window.viewer.grid");
+  chooseItem(app.pid, at("grid-lines"));
+  await until("View > Grid > Lines", async () => (await grid()).style === "lines", 10_000);
+  await until("the marks of Lines and Dots", () => checked("grid-lines") && !checked("grid-dots"), 10_000);
+  // Lines chosen again stays checked, though the native menu clears the mark of the item chosen;
+  // Axes chosen after it tells when both have reached the page
+  chooseItem(app.pid, at("grid-lines"));
+  chooseItem(app.pid, at("grid-axes"));
+  await until("View > Grid > Axes", async () => (await grid()).axes, 10_000);
+  await until("the marks of Lines and Axes", () => checked("grid-lines") && checked("grid-axes"), 10_000);
+  same((await grid()).style, "lines", "the grid's style");
+  console.log("the native menu has the command table's items, its submenus too, and follows the page");
 
   same(page.errors, [], "the page's errors");
 }

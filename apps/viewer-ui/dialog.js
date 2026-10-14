@@ -1,7 +1,7 @@
 // Dialogs in the page's style, for what a shell asks of the user: one of a list, such as the netlist
-// to open; a line of text, such as a URL; or a message, such as the About box. Each is modal and
-// returns a promise of the answer, null when it is cancelled. While one is shown, the page's keys and
-// its menu bar do nothing.
+// to open; a line of text, such as a URL; several values at once, such as the grid's settings; or a
+// message, such as the About box. Each is modal and returns a promise of the answer, null when it is
+// cancelled. While one is shown, the page's keys and its menu bar do nothing.
 
 const LIST_MAX = 500; // the items a list shows at most; the filter finds the others
 
@@ -123,6 +123,26 @@ export function ask({ title, text, value = "", placeholder = "", action = "OK", 
     box.focus();
     return undefined;
   });
+}
+
+/**
+ * Ask for several values at once, such as settings, in the fields of a form that the caller builds
+ * and reads. `answer` reads them when the default button is pressed: it gives the answer, or
+ * undefined to keep the dialog, as when a value will not do and it says so. Enter in a field presses
+ * the default button.
+ *
+ * @param {{ title: string, text?: string, parts: Node[], answer: () => any, focus?: HTMLElement,
+ *   action?: string }} options `parts` are shown in order; `focus` has the focus at first, the
+ *   default button when not given, which `action` labels, "OK" by default.
+ * @returns {Promise<any>} What `answer` gave, or null when the dialog is cancelled.
+ */
+export function form({ title, text, parts, answer, focus, action = "OK" }) {
+  const d = frame(title, text, action);
+  const fields = document.createElement("div");
+  fields.className = "dialog-form";
+  fields.append(...parts);
+  d.body.append(fields);
+  return d.show(focus || d.ok, answer);
 }
 
 /**

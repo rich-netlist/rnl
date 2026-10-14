@@ -18,3 +18,22 @@ export function svgElement(name, attrs) {
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
   return el;
 }
+
+/** A value kept in localStorage for the next start, or `fallback` when there is none to read. */
+export function load(key, fallback) {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : JSON.parse(v);
+  } catch {
+    return fallback;
+  }
+}
+
+/** Keep a value in localStorage for the next start. */
+export function save(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // the next start has the default
+  }
+}

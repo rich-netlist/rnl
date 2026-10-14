@@ -1,10 +1,12 @@
 // The hierarchy view: the subcircuit instances as a tree under the top level, and every
-// subcircuit by name under its initial, with a search box. Picking a row opens its level.
+// subcircuit by name under its initial, with a search box. Picking a row opens its level: a row of
+// the tree by the way to it from the top level, a subcircuit of the index as the root of the path.
 
-import { current, doc, expanded, setTreeActive, treeActive, viewCache } from "./state.js";
-import { showLevel } from "./drawing.js";
-import { rememberView } from "./subcircuits.js";
+import { current, doc, expanded } from "./state.js";
+import { enterRoot, enterRow, pathRow } from "./subcircuits.js";
 import { $, span } from "./util.js";
+
+let active = null; // the tree row of the level shown: its path's, or else the first that reaches it
 
 export function renderHierarchy() {
   renderTree();
@@ -65,7 +67,7 @@ function treeRow({ level, path, depth, child, branches, open, cycle }) {
   }
   row.dataset.level = String(level);
   if (level === current) row.classList.add("current");
-  if (path === treeActive) row.classList.add("active");
+  if (path === active) row.classList.add("active");
   row.addEventListener("click", () => openLevel(level, path));
   row.addEventListener("dblclick", () => { if (branches) toggleBranch(path); });
   return row;
@@ -181,35 +183,26 @@ function indexRow(level, q, count) {
 }
 
 /**
- * Open a level from the hierarchy: from a tree row (`path`) or from the index (null). The row of the
- * level shown that is marked already changes nothing, and the tree is not drawn again, so that the
- * second click of a double click presses the row the first did: Firefox sends no dblclick to a row
- * that is out of the page.
+ * Open a level from the hierarchy: from a tree row (`path`), by the way to it from the top level, or
+ * from the index (null), as the root of the path (subcircuits.js). A pick of the path shown already
+ * changes nothing, and the tree is not drawn again, so that the second click of a double click
+ * presses the row the first did: Firefox sends no dblclick to a row that is out of the page.
  */
 export function openLevel(level, path) {
   if (!doc) return;
-  if (level !== current) {
-    rememberView();
-    const p = path !== null ? path : pathTo(level);
-    showLevel(level, p !== null ? viewCache.get(p) || null : null, path);
-  } else if (path === null || path !== treeActive) {
-    setTreeActive(path);
-    updateHierarchy();
-  }
+  if (path !== null) enterRow(path);
+  else enterRoot(level);
 }
 
-/** Mark the level shown in the tree and the index, and bring it into view in both. */
+/**
+ * Mark the level shown in the tree and the index, and bring it into view in both. The tree marks the
+ * row of the path when the path starts at the top level, and else the first row that reaches it.
+ */
 export function updateHierarchy() {
   if (!doc) return;
-  if (treeActive !== null) {
-    const parts = treeActive.split("/").map(Number);
-    let l = 0;
-    for (const k of parts.slice(1)) l = doc.levels[l] && doc.levels[l].children[k] ? doc.levels[l].children[k].level : null;
-    if (l !== current) setTreeActive(null);
-  }
-  if (treeActive === null) setTreeActive(pathTo(current));
-  if (treeActive) {
-    const parts = treeActive.split("/");
+  active = pathRow() || pathTo(current);
+  if (active) {
+    const parts = active.split("/");
     for (let k = 1; k < parts.length; k++) expanded.add(parts.slice(0, k).join("/"));
   }
   renderHierarchy();

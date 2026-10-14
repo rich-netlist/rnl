@@ -4,7 +4,7 @@
 import { setCheck } from "./commands.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { revealPending } from "./text.js";
-import { $, clamp } from "./util.js";
+import { $, clamp, load, save } from "./util.js";
 
 const app = $("app");
 const source = $("source");
@@ -18,23 +18,6 @@ const PROBLEMS_MIN = 60;
 const SOURCE_MIN = 120;
 const INDEX_MIN = 120;
 const TREE_MIN = 100;
-
-export function load(key, fallback) {
-  try {
-    const v = localStorage.getItem(key);
-    return v === null ? fallback : JSON.parse(v);
-  } catch {
-    return fallback;
-  }
-}
-
-function save(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // the layout just starts from its defaults next time
-  }
-}
 
 export function setSidebar(shown) {
   app.classList.toggle("sidebar-hidden", !shown);

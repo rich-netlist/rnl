@@ -1,15 +1,15 @@
 // Opening a document: the shell reads a source and builds its Document, and the page shows it.
-// Reading the same source again keeps the level, the view, the selection and the text's scroll.
+// Reading the same source again keeps the level, the hierarchy path to it while its instances are
+// still there, the view, the selection and the text's scroll.
 
 import { shell } from "./shell.js";
-import {
-  current, doc, expanded, selected, setDoc, setExpanded, setSelected, setTreeActive, setViewCache, treeActive, viewCache,
-} from "./state.js";
+import { current, doc, expanded, selected, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
 import { clearDrawing, showLevel, view } from "./drawing.js";
 import { renderHierarchy } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
 import { markDiagnostics, renderDiagnostics } from "./problems.js";
 import { select } from "./selection.js";
+import { namedPath, restorePath } from "./subcircuits.js";
 import { clearSource, fileShown, fileViews, renderFiles, showFile } from "./text.js";
 import { $ } from "./util.js";
 
@@ -60,7 +60,7 @@ function snapshot() {
     file: doc.files[fileShown] ? doc.files[fileShown].path : null,
     selected: sel && { kind: sel.kind, name: sel.name, level: sel.level },
     expanded,
-    treeActive,
+    path: namedPath(),
     viewCache,
   };
 }
@@ -68,7 +68,6 @@ function snapshot() {
 function showDocument(before) {
   setSelected(null);
   setExpanded(before ? before.expanded : new Set(["0"]));
-  setTreeActive(before ? before.treeActive : null);
   setViewCache(before ? before.viewCache : new Map());
   renderFiles();
   const diags = doc.diagnostics.slice();
@@ -92,6 +91,8 @@ function showDocument(before) {
     return;
   }
   const level = before ? doc.levels.findIndex((l) => l.title === before.level) : -1;
+  // the path by the names of its levels and instances, or else one that starts at the level
+  restorePath(before ? before.path : [], level >= 0 ? level : 0);
   showLevel(level >= 0 ? level : 0, level >= 0 ? before.view : null);
 
   if (before && before.selected) {

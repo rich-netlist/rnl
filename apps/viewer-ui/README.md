@@ -19,11 +19,12 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `shell.js` | The shell interface, and choosing the shell. |
 | `shells/desktop.js` | The desktop shell, the only module that uses `window.__TAURI__`. |
 | `shells/web.js` | The web shell: files, a folder, a URL or what is dropped, read as the core asks for them, and built by the core in a Worker. |
-| `state.js` | What the page shows: the Document, the level drawn, the selection, and the hierarchy path that led to the level. Modules read these bindings and change them through setters. |
-| `open.js` | Opening a source through the shell; reading it again keeps the level, the view and the selection. |
-| `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; what a click hits, from the boxes, pins and wires the Document gives; the selection marks and the open badge. |
+| `state.js` | What the page shows: the Document, the level drawn, the selection, the hierarchy path to the level and the views kept by path. Modules read these bindings and change them through setters. |
+| `open.js` | Opening a source through the shell; reading it again keeps the level, the hierarchy path while its instances are there, the view and the selection. |
+| `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; what a click hits, from the boxes, pins and wires the Document gives; the selection marks and the open badge; where the pointer is in the scene, in the status bar. |
+| `grid.js` | The grid under the drawing, a view aid of the page on a canvas of its own (see [The grid](#the-grid)), and its settings dialog. |
 | `selection.js` | Selecting an instance or a net. |
-| `subcircuits.js` | Going down into a subcircuit instance and back up, each level with the view it had. |
+| `subcircuits.js` | The hierarchy path of the level shown and the bar above the drawing that shows it (see [The hierarchy path](#the-hierarchy-path)): going down into a subcircuit instance and back along the path, each level with the view it had on it. |
 | `text.js` | The text pane: the tabs and the lines of each file, the statements that do not take effect, the places of the selection, revealing a line, and clicks in the text. |
 | `syntax.js` | Highlighting the host statements and the RNL records. |
 | `problems.js` | The problems list and the coloured line numbers. |
@@ -31,12 +32,32 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `panels.js` | The side panel's views, what is folded, and the splitters. The layout is kept in `localStorage` under `sidebar-shown`, `sidebar-width`, `side-pane`, `problems-shown`, `problems-height`, `index-height` and `show-failed`. |
 | `commands.js` | Running a command by its id, and the keys. |
 | `menubar.js` | The page's own menu bar. |
-| `dialog.js` | Dialogs in the page's style for what a shell asks: one of a list, with a filter; a line of text; a message. They are modal: the page's keys and its menu bar wait while one is shown. |
-| `util.js` | Small helpers for building the page. |
+| `dialog.js` | Dialogs in the page's style for what a shell or the page asks: one of a list, with a filter; a line of text; several values in a form, such as the grid's settings; a message. They are modal: the page's keys and its menu bar wait while one is shown. |
+| `util.js` | Small helpers for building the page, and for keeping values in `localStorage`, read and written so that a page without it starts from its defaults. |
 | `commands.json` | The command table. |
 | `fonts/` | The drawing's web fonts, which [`scripts/fonts.py`](../../scripts/README.md) writes and git ignores (see [Fonts](#fonts)). |
 
 The modules import each other in cycles. At its top level a module only looks up its elements, keeps its own state and adds listeners; it calls nothing of another module there, so no imported binding is read before its module has run.
+
+## The hierarchy path
+
+The bar above the drawing shows the path of the level shown, from its root down to it, a segment per level: the root's names its level, the top level's title or a subcircuit's name, and every other names its subcircuit with, smaller and dimmer beside it, the instance it was reached through. The path is a list of levels, each with the name of its instance in the level before it (`state.js`):
+
+- Going down into a subcircuit instance, by Enter, a double click, the open badge or View › Open Subcircuit, adds the instance to the path.
+- A subcircuit picked in the index is the root of a path of its own, with no way up from it; a row of the tree gives the path from the top level down to its instance; a level reached otherwise, such as by an object of it selected in the text, cuts the path back to it when it is on it, and is the root of a new path when not.
+- A click on a segment but the last goes back to its level, cutting the path there; the up button and Backspace go back one level, and at the root there is no up button and Backspace does nothing. The level comes back with the view it had when it was left and the instance it was left through selected.
+- Reading the document again keeps the path when its levels and instances are still there by their names; otherwise the level shown is the root.
+- The views kept are by path, the root's title and the instances on it, so a subcircuit reached two ways keeps a view for each.
+
+The tree marks the row of the path when the path starts at the top level, and else the first row that reaches the level; the index marks the level shown. Where the bar is narrow, the level's kind gives way first, then the levels after the root, from the root's side, behind an ellipsis whose list goes back to them, then the root; the level shown always stays, its name cut short only when nothing else is left to give way.
+
+## The grid
+
+The drawing can show a light grey grid under it, at the integer points of the scene, the usual places of pins: the language's coordinates have x to the right and y up, a unit has no size of its own, and the origin no meaning of its own. View › Grid shows it as dots or lines, or not at all (G shows and hides it), and the axes through the origin, x = 0 and y = 0, a little darker; its dialog, Grid Settings, also sets the spacing, Auto (1 unit) or a number of units, and how often a line is a major one. Where the points would come closer than 10 pixels, the grid takes 2, 5, 10, 20, 50 ... times the spacing instead; with lines, every fifth line is a little darker, or, where that would not be a step of the sequence, the line at the next step of it (every 50 units with a step of 5). The dots and lines are the same size on the screen at every zoom.
+
+The grid is drawn on a canvas under the drawing's SVG, from the view and the level's scale, the pixels of the SVG per unit: `Level.scale` when the Document gives it, as it does with the primitives, or else the renderer's, 14, at which the core draws the SVG by default. It is not part of the drawing: it takes no clicks, and changes neither fitting, nor the selection, nor the SVG, of which the page only leaves out the white backdrop that the SVG writer puts first, as the canvas is white already. The settings are kept in `localStorage` under `grid-shown`, `grid-style` (`"dots"` or `"lines"`), `grid-spacing` (`"auto"` or a number of units), `grid-major` and `grid-axes`; a value that will not do leaves the default: dots at every unit, and no axes.
+
+The status bar shows where the pointer is on the drawing, in units with y up, to the digit that is worth 1 to 10 pixels at the zoom.
 
 ## Fonts
 
@@ -73,7 +94,7 @@ The web shell builds with the core as WebAssembly in a module Worker, one for th
 
 ## The command table
 
-`commands.json` lists the menus, each with its `label` and `items`. An item is `"-"`, a separator, shown only between two items, or a command:
+`commands.json` lists the menus, each with its `label` and `items`. An item is `"-"`, a separator, shown only between two items; a submenu, `{ "label", "items" }` as a menu has, at any depth, shown only with an item the platform offers; or a command:
 
 | Field | |
 | --- | --- |
@@ -82,10 +103,11 @@ The web shell builds with the core as WebAssembly in a module Worker, one for th
 | `keys` | The keys that run it, written like `Ctrl+Shift+M`, `F5` or `Enter`; Ctrl stands for Cmd on macOS. The first is the native menu's accelerator. |
 | `shown` | How menus show the keys, when not as the first of them. |
 | `check` | Whether it has a check mark. |
-| `page` | Whether the page always handles its key, as for Enter and Backspace: no menu accelerator would take the key from a text box. |
+| `radio` | Whether, with `check`, it is one of a group of which the page checks one: the page's menu bar shows a dot, a native menu a check mark. |
+| `page` | Whether the page always handles its key, as for Enter, Backspace and G: no menu accelerator would take the key from a text box. |
 | `platforms` | The platforms that offer it; all when not given. |
 
-The desktop app builds its native menu from the table ([`src/menu.rs`](../desktop/src/menu.rs)): on Windows the page handles the keys and the menu shows them after a tab; elsewhere the menu's accelerators handle them. The page runs keys by the same table. A key with Ctrl compares Shift only for a letter, since typing `+` may need Shift; a key without Ctrl that types or deletes does not count while Ctrl or Alt is held. In a text box only Ctrl keys and function keys count. Enter only opens a selected subcircuit instance, Escape clears the selection, and F5 and Ctrl+R, whatever else is held, read the document again instead of reloading the page.
+The desktop app builds its native menu from the table ([`src/menu.rs`](../desktop/src/menu.rs)), its submenus too: on Windows the page handles the keys and the menu shows them after a tab; elsewhere the menu's accelerators handle them. A native menu toggles a check item when it is chosen, so the page sets the marks of a command's group again after running it, whether or not they changed. In the page's own menu bar, pointing at a submenu's entry opens the submenu beside it; from the keyboard, ArrowRight, Enter or the entry's letter opens it, and ArrowLeft or Escape closes it. The page runs keys by the same table. A key with Ctrl compares Shift only for a letter, since typing `+` may need Shift; a key without Ctrl that types or deletes does not count while Ctrl or Alt is held. In a text box only Ctrl keys and function keys count. Enter only opens a selected subcircuit instance, Escape clears the selection, and F5 and Ctrl+R, whatever else is held, read the document again instead of reloading the page.
 
 ## Debug handle
 
@@ -95,6 +117,9 @@ Module scope hides the page's state from tests and the console, so `window.viewe
 | --- | --- |
 | `doc` | The Document shown, or null. |
 | `level` | The level drawn, an index into `doc.levels`. |
+| `path` | The hierarchy path to it from its root: per level, `{ level, via }`, its index and the name of the instance it was reached through, null for the root. |
 | `selected` | The selected object, an index into `doc.objects`, or null. |
 | `command(id)` | Run a command, as its menu item does. |
+| `checked(id)` | Whether a check-mark command, such as `toggle-netlist`, is checked. |
+| `grid` | The grid's settings, `shown`, `style`, `spacing`, `major` and `axes`, and the steps it is drawn at in units, `step` and, for lines, `majorStep`; null when it is not drawn. |
 | `menuBar(shown)` | Show or hide the page's own menu bar, whatever the shell says. |

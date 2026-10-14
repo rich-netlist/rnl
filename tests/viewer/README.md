@@ -30,11 +30,11 @@ In CI, [`viewer.yml`](../../.github/workflows/viewer.yml) installs Rust with the
 | --- | --- |
 | `playwright.config.js` | The three projects, the browser of each, and `RNL_CHANNEL`; the web viewer's server, when the run can include its tests, which find it at `RNL_WEB_URL`. |
 | `global-setup.js` | Builds the rnl command, writes the fixtures and starts the server; the tests find it at `RNL_VIEWER_URL`, and the rnl command at `RNL_BIN`. |
-| `fixtures.js` | The fixtures: `rnl view` of the corpus files `01-rc-lowpass.sp`, `04-hierarchy.sp`, `10-constraints-and-priority.sp`, `12-diagnostics.sp`, `17-line-styles.sp` and `inverter-chain.scs`; `04-hierarchy-changed`, the same netlist after it changed; `subcircuits`, a netlist with a subcircuit for each initial; and `continued` and `continued-spectre`, statements over several lines in each dialect. |
+| `fixtures.js` | The fixtures: `rnl view` of the corpus files `01-rc-lowpass.sp`, `04-hierarchy.sp`, `10-constraints-and-priority.sp`, `12-diagnostics.sp`, `17-line-styles.sp` and `inverter-chain.scs`; `04-hierarchy-changed`, the same netlist after it changed; `subcircuits`, a netlist with a subcircuit for each initial; `nested`, subcircuits nested four deep, and `nested-changed`, the same netlist after an instance on the way down was renamed; and `continued` and `continued-spectre`, statements over several lines in each dialect. |
 | `server.js` | The test server, Node with no dependencies: `apps/viewer-ui` as it is, the fake shell as `shells/fake.js`, and the fixtures under `fixtures/`. Nothing of the tests goes into the page. |
 | `fake-shell.js` | The fake shell. |
 | `viewer.js` | What the tests share: opening the page, waiting for a build, the page's state, and where an object of the drawing is on the screen. |
-| `specs/` | The tests, one file per part of the page: opening, selection, subcircuits, the hierarchy view, the text pane, the view, the keys, reading again, the menu bar, and the panels; and `web.spec.js`, the web viewer's smoke tests. |
+| `specs/` | The tests, one file per part of the page: opening, selection, subcircuits, the hierarchy path, the hierarchy view, the text pane, the view, the grid, the keys, reading again, the menu bar and its submenus, and the panels; and `web.spec.js`, the web viewer's smoke tests. The grid's tests read the pixels of its canvas where the scene's points are drawn. |
 
 ## The fake shell
 

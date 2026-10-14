@@ -65,14 +65,16 @@
   <main class="drawing">
     <div class="level-bar">
       <button id="show-sidebar" class="icon" type="button" title="Show the side panel (Ctrl+B)" aria-label="Show the side panel">&#x203A;</button>
-      <span id="level-name" class="level-name"></span>
+      <nav id="level-path" class="level-path" aria-label="Hierarchy path"><span id="level-name" class="level-name"></span></nav>
       <span id="level-kind" class="level-kind"></span>
       <button id="up" class="up-button" type="button" hidden title="Up to the parent level (Backspace)">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 2.5 6.5 6 10M2.5 6.5H10a3.5 3.5 0 0 1 3.5 3.5V13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span id="up-name"></span>
       </button>
+      <div id="path-menu" class="path-menu" role="menu" aria-label="The levels in between" hidden></div>
     </div>
     <div id="canvas" class="canvas" tabindex="-1">
+      <canvas id="grid" class="grid" aria-hidden="true"></canvas>
       <p id="empty" class="empty">Open a SPICE or Spectre netlist with File &#x203A; Open (Ctrl+O).<br>Drag to move the view, scroll to zoom, click a symbol or a wire to find it in the netlist.</p>
       <button id="enter-badge" class="enter-badge" type="button" hidden title="Open the subcircuit (Enter, or double-click)" aria-label="Open the subcircuit">
         <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 5.5 10 10M10 6.5V10H6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -83,6 +85,7 @@
 <footer class="statusbar">
   <span id="selection" class="selection"></span>
   <span id="status" class="status"></span>
+  <span id="pointer" class="pointer" title="Where the pointer is on the drawing, in units with y up"></span>
   <span id="zoom" class="zoom"></span>
 </footer>
 <script type="module" src="main.js"></script>

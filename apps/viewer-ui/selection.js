@@ -1,8 +1,8 @@
 // The selection: an instance or a net, followed between the drawing and the text.
 
 import { current, doc, selected, setSelected } from "./state.js";
-import { paintDrawingSelection, showLevel } from "./drawing.js";
-import { opens } from "./subcircuits.js";
+import { paintDrawingSelection } from "./drawing.js";
+import { goTo, opens } from "./subcircuits.js";
 import { paintSourceSelection } from "./text.js";
 import { $ } from "./util.js";
 
@@ -14,10 +14,11 @@ export function select(o, from) {
   if (!doc || o === undefined || o === null || !doc.objects[o]) return;
   setSelected(o);
   const obj = doc.objects[o];
-  // a name picked in the text is shown on the level that has it
+  // a name picked in the text is shown on the level that has it, the path cut back to the level or
+  // starting there
   if (from === "source" && (!doc.levels[current] || doc.levels[current].host !== obj.level)) {
     const k = doc.levels.findIndex((l) => l.host === obj.level);
-    if (k >= 0) showLevel(k, null, null);
+    if (k >= 0) goTo(k);
   }
   markSubcircuit(opens(o) !== null);
   paintDrawingSelection();
