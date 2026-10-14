@@ -61,6 +61,16 @@ msiexec /i RNL-Viewer-0.1.0-windows-x64.msi /qn
 msiexec /x RNL-Viewer-0.1.0-windows-x64.msi /qn
 ```
 
+## Releasing
+
+[`viewer-release.yml`](../../.github/workflows/viewer-release.yml) builds and releases the viewer for Windows on GitHub's runner. To release version X.Y.Z:
+
+1. Set the version in `Cargo.toml` and `tauri.conf.json` here and in `[workspace.package]` of the root `Cargo.toml`, which the web viewer's About box shows, and update both lock files (`cargo update --workspace`, here with `--manifest-path apps/desktop/Cargo.toml`). The tests here fail while the three differ.
+2. Write the release's notes in `release-notes/X.Y.Z.md`.
+3. Push the tag `viewer-vX.Y.Z` of the commit to GitHub.
+
+The workflow stops when the tag is not the app's version or the notes are missing. It builds with the MSVC toolchain, checks with `dumpbin` that the executable imports no `WebView2Loader.dll`, smoke-tests the executable alone in a directory, installs each installer silently, smoke-tests the installed app and uninstalls it. Then it makes the GitHub release *RNL Viewer X.Y.Z* with the notes and four files: `RNL-Viewer-X.Y.Z-windows-x64-setup.exe`, `RNL-Viewer-X.Y.Z-windows-x64.msi`, `RNL-Viewer-X.Y.Z-windows-x64.exe`, the single executable, and `SHA256SUMS.txt`. The release is not marked as the repository's latest, which stays the language standard's release, so the viewer's releases are told apart by their tags. A version with a prerelease part, such as `0.2.0-rc.1`, makes a prerelease, which Check for Updates passes over. Run by hand, from the Actions tab, the workflow only builds and checks, and keeps the four files as the run's artifact.
+
 ## Checking for updates
 
 **Help › Check for Updates**, which only the desktop offers, looks for a newer release when it is chosen, never by itself. The page ([`updates.js`](../viewer-ui/updates.js)) asks GitHub's API for the repository's 30 newest releases, `https://api.github.com/repos/rich-netlist/rnl/releases?per_page=30`. Of those tagged `viewer-v` and a version, neither drafts nor prereleases, it takes the one with the highest version and compares it with the app's by Semantic Versioning. A newer one is offered with a button that opens its release page in the default browser; otherwise the dialog says that this is the latest version, or why the latest could not be looked up, with a link to the releases. GitHub answers 60 requests an hour from one address without an account.
@@ -84,7 +94,7 @@ node apps/desktop/tests/installers.mjs --nsis SETUP [--dir DIR] [--no-smoke]
 node apps/desktop/tests/installers.mjs --msi PACKAGE [--no-smoke]
 ```
 
-The NSIS installer installs for you, into DIR or else a temporary directory; the test stops when RNL Viewer is installed for you already, to leave it be. The MSI installs for the computer and needs administrator rights, which GitHub's runners have.
+The NSIS installer installs for you, into DIR or else a temporary directory; the test stops when RNL Viewer is installed for you already, to leave it be. The MSI installs for the computer and needs administrator rights, which GitHub's runners have; the release workflow tests both.
 
 ## Structure
 
@@ -99,8 +109,9 @@ The NSIS installer installs for you, into DIR or else a temporary directory; the
 | `package.json`, `package-lock.json` | The Tauri command line, pinned, which builds the installers. |
 | `LICENSE.txt` | The licence that the installers show and install. |
 | `nsis-hooks.nsh` | What the NSIS installer does besides Tauri's: its uninstaller leaves nothing in the registry. |
+| `release-notes/` | The notes of each release, by version, which the release workflow publishes. |
 | `icons/` | The application icon. |
 
-This directory is a Cargo workspace of its own, so the WebView dependencies stay out of the library crates' builds; [`desktop.yml`](../../.github/workflows/desktop.yml) builds it on Linux, Windows and macOS.
+This directory is a Cargo workspace of its own, so the WebView dependencies stay out of the library crates' builds; [`desktop.yml`](../../.github/workflows/desktop.yml) builds it on Linux, Windows and macOS, and [`viewer-release.yml`](../../.github/workflows/viewer-release.yml) releases it for Windows.
 
 The viewer calls the shared Rust core natively, through `rnl-view`, as [decision 0006](../../docs/decisions/0006-shared-core-per-platform-frontends.md) decides; the [web viewer](../web/README.md) calls the same core through WebAssembly and shares the page in [`apps/viewer-ui`](../viewer-ui/README.md).
