@@ -6,9 +6,16 @@
 //! A run is as wide as the sum of its characters' advances, with no kerning, ligatures or other
 //! shaping, so a frontend that draws each run from its start in the same face draws the text as it
 //! is laid out. The font the style names (9.3) is a hint that the layout does not follow.
+//!
+//! What the fonts do not map, a frontend draws in a font of the system's, whose advances the core
+//! cannot know. Such characters make runs of their own, with their marks, joiners and selectors
+//! (`split`), and each such run is as wide as an estimate by the classes of its grapheme clusters
+//! (`estimate`), which a frontend centres the run on.
 
 use rnl_runtime::geom::Pt;
 use rnl_runtime::markup::{Run, RunStyle};
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
 
 use crate::{Stroke, TextBar, TextPrim, TextRun};
 
@@ -47,6 +54,11 @@ const LEAST_BAR: f64 = 0.8;
 /// An italic run, which has no face of its own, leans: a point of a glyph moves forward along the
 /// baseline by this much of its height above it (about 14°, as browsers slant a face).
 pub const SLANT: f64 = 0.25;
+/// A grapheme cluster the fonts do not map is taken to be as wide as a character of its class, by
+/// the columns Unicode's East Asian Width (UAX #11) gives it: none, as a combining mark or a zero
+/// width space alone, 0; one, a narrow character, `NARROW` em; two or more, a wide or full-width
+/// character, such as a hangul syllable or an emoji with its selectors, modifiers and joiners, 1 em.
+const NARROW: f64 = 0.55;
 
 fn u16_at(k: usize) -> u16 {
     u16::from_le_bytes([METRICS[k], METRICS[k + 1]])
@@ -67,6 +79,63 @@ fn runs_at() -> usize {
 
 fn run_len() -> usize {
     6 + 2 * faces()
+}
+
+/// Where the run that holds a character starts, when the fonts map it.
+fn find(c: char) -> Option<usize> {
+    let (at, len) = (runs_at(), run_len());
+    let first = |k: usize| u32_at(at + len * k);
+    let cp = u32::from(c);
+    // the runs that start at or before the character
+    let (mut lo, mut hi) = (0, u32_at(at - 4) as usize);
+    while lo < hi {
+        let mid = (lo + hi) / 2;
+        if first(mid) <= cp {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    let k = lo.checked_sub(1)?;
+    (cp - first(k) < u32::from(u16_at(at + len * k + 4))).then_some(at + len * k)
+}
+
+/// Whether the fonts map a character; their faces map the same ones.
+fn maps(c: char) -> bool {
+    find(c).is_some()
+}
+
+/// A text in parts where the fonts' cover changes, each with whether the fonts do not map it. The
+/// parts are whole grapheme clusters (UAX #29), the characters a reader takes as one, so that a
+/// character keeps its combining marks, joiners and selectors: a cluster is in the fonts when they
+/// map all its characters. An empty text is one empty part.
+fn split(text: &str) -> Vec<(&str, bool)> {
+    let mut parts = Vec::new();
+    let (mut start, mut last) = (0, false);
+    for (at, cluster) in text.grapheme_indices(true) {
+        let fallback = !cluster.chars().all(maps);
+        if fallback != last && at > start {
+            parts.push((&text[start..at], last));
+            start = at;
+        }
+        last = fallback;
+    }
+    parts.push((&text[start..], last));
+    parts
+}
+
+/// The width in em of grapheme clusters the fonts do not map, which a frontend draws in a font of
+/// the system's: each as wide as a character of its class (`NARROW`). The columns are those the
+/// unicode-width crate gives a string, in which an emoji sequence, with its joiners, modifiers or a
+/// selector of the emoji presentation, is as wide as one emoji.
+fn estimate(s: &str) -> f64 {
+    s.graphemes(true)
+        .map(|cluster| match cluster.width() {
+            0 => 0.0,
+            1 => NARROW,
+            _ => 1.0,
+        })
+        .sum()
 }
 
 /// A face of the shipped family.
@@ -124,39 +193,30 @@ impl Face {
         (top - 1.0, top)
     }
 
-    /// The advance of a character, in units. A character the fonts do not map has that of their
-    /// .notdef glyph, the box they draw for it, 1 em.
-    fn units(self, c: char) -> i64 {
-        let (at, len) = (runs_at(), run_len());
-        let first = |k: usize| u32_at(at + len * k);
-        let cp = u32::from(c);
-        // the runs that start at or before the character
-        let (mut lo, mut hi) = (0, u32_at(at - 4) as usize);
-        while lo < hi {
-            let mid = (lo + hi) / 2;
-            if first(mid) <= cp {
-                lo = mid + 1;
-            } else {
-                hi = mid;
-            }
-        }
-        if lo > 0 {
-            let k = lo - 1;
-            if cp - first(k) < u32::from(u16_at(at + len * k + 4)) {
-                return i64::from(u16_at(at + len * k + 6 + 2 * self.0));
-            }
-        }
-        self.metric(5)
+    /// The advance of a character the fonts map, in units.
+    fn units(self, c: char) -> Option<i64> {
+        find(c).map(|run| i64::from(u16_at(run + 6 + 2 * self.0)))
     }
 
-    /// The advance of a character, in em.
-    pub fn advance(self, c: char) -> f64 {
-        self.em(self.units(c))
+    /// The advance of a character in em, or none when the fonts do not map it.
+    pub fn advance(self, c: char) -> Option<f64> {
+        self.units(c).map(|units| self.em(units))
     }
 
-    /// The width of a string in em: the sum of its characters' advances.
+    /// The width in em of a part of a text (`split`): the sum of its characters' advances, or the
+    /// estimate of its clusters when the fonts do not map them.
+    fn part_width(self, part: &str, fallback: bool) -> f64 {
+        if fallback {
+            estimate(part)
+        } else {
+            self.em(part.chars().filter_map(|c| self.units(c)).sum())
+        }
+    }
+
+    /// The width of a string in em as it is laid out: the sum of its characters' advances, where the
+    /// fonts map them, and of the estimates of the other grapheme clusters.
     pub fn width(self, s: &str) -> f64 {
-        self.em(s.chars().map(|c| self.units(c)).sum())
+        split(s).into_iter().map(|(part, fallback)| self.part_width(part, fallback)).sum()
     }
 }
 
@@ -179,6 +239,8 @@ struct Piece {
     width: f64,
     bold: bool,
     italic: bool,
+    /// Not mapped by the fonts, and as wide as estimated.
+    fallback: bool,
 }
 
 /// A bar in the text's frame, from `u0` to `u1` at `v`, `width` wide.
@@ -225,13 +287,19 @@ impl Lay {
         (BAR * size).max(self.least)
     }
 
+    /// The parts of the text of a run (`split`) in `face` and of size `size`, each with whether the
+    /// fonts do not map it and its width.
+    fn parts(face: Face, text: &str, size: f64) -> impl Iterator<Item = (&str, bool, f64)> {
+        split(text).into_iter().map(move |(part, fallback)| (part, fallback, face.part_width(part, fallback) * size))
+    }
+
     /// The width of runs whose levels count from `base`, where the size is `s`.
     fn width(&self, runs: &[Run], base: i32, s: f64) -> f64 {
         runs.iter()
             .map(|r| match r {
                 Run::Text { text, style } => {
                     let (size, _) = script(i32::from(style.level) - base, s);
-                    self.face(style.bold).width(text) * size
+                    Self::parts(self.face(style.bold), text, size).map(|(_, _, width)| width).sum::<f64>()
                 }
                 Run::Frac { num, den, style } => {
                     let (size, _) = script(i32::from(style.level) - base, s);
@@ -301,14 +369,17 @@ impl Lay {
                 Run::Text { text, style } => {
                     let (size, shift) = script(i32::from(style.level) - base, s);
                     let face = self.face(style.bold);
-                    let width = face.width(text) * size;
+                    let (bold, italic) = (self.bold || style.bold, self.italic || style.italic);
+                    let start = u;
+                    for (part, fallback, width) in Self::parts(face, text, size) {
+                        let text = part.to_string();
+                        self.pieces.push(Piece { text, u, v: v + shift, size, width, bold, italic, fallback });
+                        u += width;
+                    }
                     if style.overline {
                         let at = v + shift + Self::overline(face, size);
-                        self.bars.push(Bar { u0: u, u1: u + width, v: at, width: self.bar(size) });
+                        self.bars.push(Bar { u0: start, u1: u, v: at, width: self.bar(size) });
                     }
-                    let (bold, italic) = (self.bold || style.bold, self.italic || style.italic);
-                    self.pieces.push(Piece { text: text.clone(), u, v: v + shift, size, width, bold, italic });
-                    u += width;
                 }
                 Run::Frac { num, den, style } => {
                     let (size, shift) = script(i32::from(style.level) - base, s);
@@ -403,6 +474,7 @@ pub fn lay_out(t: &mut TextPrim, scale: f64) -> [f64; 4] {
             width: p.width,
             bold: p.bold,
             italic: p.italic,
+            fallback: p.fallback,
         })
         .collect();
     t.bars = lay
@@ -446,17 +518,64 @@ mod tests {
         for face in [Face::REGULAR, Face::BOLD] {
             assert_eq!((face.metric(0), face.ascender(), face.descender()), (1000, 1.16, -0.288));
             assert_eq!((face.line_height(), face.em_box()), (1.448, (-0.12, 0.88)));
-            // an ideograph, the last character the fonts map, and characters they do not map
-            let wide = ['中', '\u{3106C}', '\u{1F}', '\t', '\u{10FFFF}'];
-            assert_eq!(wide.map(|c| face.advance(c)), [1.0; 5]);
+            // an ideograph and the last character the fonts map; characters they do not map, for
+            // which they have a .notdef glyph 1 em wide
+            assert_eq!(['中', '\u{3106C}'].map(|c| face.advance(c)), [Some(1.0); 2]);
+            assert_eq!(['\u{1F}', '\t', '\u{10FFFF}', '\u{D55C}'].map(|c| face.advance(c)), [None; 4]);
+            assert_eq!(face.metric(5), 1000);
             // a combining mark
-            assert_eq!(face.advance('\u{301}'), 0.0);
+            assert_eq!(face.advance('\u{301}'), Some(0.0));
         }
         let (r, b) = (Face::REGULAR, Face::BOLD);
         // the first character the fonts map, letters and the minus sign
-        assert_eq!([' ', 'a', 'M', '−'].map(|c| r.advance(c)), [0.224, 0.563, 0.812, 0.555]);
-        assert_eq!([' ', 'a', 'M', '−'].map(|c| b.advance(c)), [0.227, 0.591, 0.853, 0.59]);
+        assert_eq!([' ', 'a', 'M', '−'].map(|c| r.advance(c)), [0.224, 0.563, 0.812, 0.555].map(Some));
+        assert_eq!([' ', 'a', 'M', '−'].map(|c| b.advance(c)), [0.227, 0.591, 0.853, 0.59].map(Some));
         assert_eq!((r.width("VDD"), b.width("VDD"), r.width("")), (1.951, 2.047, 0.0));
+    }
+
+    #[test]
+    fn what_the_fonts_do_not_map_is_split_off_and_estimated() {
+        let one = |s: &str, fallback: bool| assert_eq!(split(s), [(s, fallback)], "{s}");
+        // Latin, Greek and hanzi, with the combining marks the fonts map, are the fonts'
+        for s in ["VDD", "10 k\u{3A9}", "\u{7535}\u{963B} R1", "x\u{301}", "\u{26A0}", ""] {
+            one(s, false);
+        }
+        // hangul syllables and emoji are wide, 1 em
+        let (hangul, resistor) = ("\u{D55C}\u{AE00}", "\u{C800}\u{D56D}");
+        let text = format!("[{hangul} {resistor}]");
+        assert_eq!(split(&text), [("[", false), (hangul, true), (" ", false), (resistor, true), ("]", false)]);
+        close(&[estimate(hangul), estimate("\u{1F600}"), estimate("\u{26A1}")], &[2.0, 1.0, 1.0]);
+        // an emoji sequence is one cluster, as wide as one emoji: with joiners, a skin tone, the
+        // selector of the emoji presentation, which takes the warning sign the fonts map with it,
+        // a keycap, and a flag
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
+        for s in [family, "\u{1F44D}\u{1F3FD}", "\u{26A0}\u{FE0F}", "1\u{FE0F}\u{20E3}", "\u{1F1E8}\u{1F1F3}"] {
+            one(s, true);
+            close(&[estimate(s)], &[1.0]);
+        }
+        // a combining mark the fonts do not map takes its letter along, a narrow cluster; alone, a
+        // mark or a zero width space has no width
+        assert_eq!(split("ax\u{302}b"), [("a", false), ("x\u{302}", true), ("b", false)]);
+        close(&[estimate("x\u{302}"), estimate("\u{20D7}"), estimate("\u{200B}")], &[0.55, 0.0, 0.0]);
+        // Arabic letter by letter, narrow, joined or not
+        let arabic = "\u{645}\u{642}\u{627}\u{648}\u{645}\u{629}";
+        one(arabic, true);
+        close(&[estimate(arabic), estimate("\u{644}\u{627}")], &[6.0 * 0.55, 2.0 * 0.55]);
+        // Devanagari by clusters: a consonant alone narrow, and with a vowel sign or in a conjunct
+        // a cluster of two columns or more, 1 em
+        let (ka, ki, ksha) = ("\u{915}", "\u{915}\u{93F}", "\u{915}\u{94D}\u{937}");
+        let hindi = "\u{939}\u{93F}\u{928}\u{94D}\u{926}\u{940}";
+        close(&[estimate(ka), estimate(ki), estimate(ksha), estimate(hindi)], &[0.55, 1.0, 1.0, 2.0]);
+        // a Latin letter the fonts do not map, narrow
+        close(&[estimate("\u{1E9E}")], &[0.55]);
+        // a run of both: the fonts' advances, and the estimates
+        let (mapped, unmapped) = ("R = 10 k\u{3A9} ", format!("{family}\u{26A1}"));
+        let text = format!("{mapped}{unmapped}");
+        assert_eq!(split(&text), [(mapped, false), (unmapped.as_str(), true)]);
+        for face in [Face::REGULAR, Face::BOLD] {
+            let units: i64 = mapped.chars().map(|c| face.units(c).unwrap()).sum();
+            close(&[face.width(mapped), face.width(&text)], &[face.em(units), face.em(units) + 2.0]);
+        }
     }
 
     fn text(lines: &str, halign: &str, valign: &str, vertical: bool) -> (TextPrim, [f64; 4]) {
@@ -550,6 +669,35 @@ mod tests {
         close(&[t.runs[0].width, t.runs[1].width], &[b, i]);
         close(&[t.bars[0].a.0, t.bars[0].a.1, t.bars[0].b.0, t.bars[0].b.1], &[10.0 + b, 21.88, 10.0 + b + i, 21.88]);
         close(&[bbox[0], bbox[2]], &[10.0, 10.0 + b + i + 0.25 * 2.32]);
+    }
+
+    #[test]
+    fn runs_the_fonts_do_not_map_are_laid_out_with_the_others() {
+        let r = Face::REGULAR;
+        // a run for each part, each from where the one before ends, in the faces of the markup: a
+        // bold run of hangul as wide as a regular one, and one overline over an italic run of a
+        // letter with a mark the fonts do not map and a letter they do
+        let (t, bbox) = text("V\\textbf{\u{D55C}\u{AE00}}\\textit{\\overline{x\u{302}y}}", "start", "baseline", false);
+        let runs: Vec<(&str, bool, bool, bool)> =
+            t.runs.iter().map(|r| (r.text.as_str(), r.bold, r.italic, r.fallback)).collect();
+        let want = [
+            ("V", false, false, false),
+            ("\u{D55C}\u{AE00}", true, false, true),
+            ("x\u{302}", false, true, true),
+            ("y", false, true, false),
+        ];
+        assert_eq!(runs, want);
+        let widths = [r.width("V") * 2.0, 4.0, 1.1, r.width("y") * 2.0];
+        close(&t.runs.iter().map(|r| r.width).collect::<Vec<_>>(), &widths);
+        let starts: Vec<f64> = widths.iter().scan(10.0, |u, w| Some(std::mem::replace(u, *u + w))).collect();
+        close(&t.runs.iter().map(|r| r.at.0).collect::<Vec<_>>(), &starts);
+        let end = starts[3] + widths[3];
+        close(&[t.bars[0].a.0, t.bars[0].b.0], &[starts[2], end]);
+        close(&bbox, &[10.0, 20.0 - 0.576, end + 0.25 * 2.32, 20.0 + 2.32]);
+        // aligned by the estimates, and turned with the text
+        let (t, _) = text("\u{D55C}", "middle", "baseline", true);
+        assert!(t.runs[0].fallback);
+        close(&[t.runs[0].at.0, t.runs[0].at.1, t.runs[0].width], &[10.0, 19.0, 2.0]);
     }
 
     #[test]

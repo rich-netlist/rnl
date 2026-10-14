@@ -47,7 +47,7 @@ pip install fonttools brotli
 python scripts/fonts.py web
 ```
 
-It downloads the pinned fonts into `target/fonts/` first. The page works without `fonts/`: the drawing then takes the family under the names it is installed by (Noto Sans CJK SC, Source Han Sans SC), or else sans-serif, each run still where the core placed it and as wide. The desktop app embeds `fonts/` with the page, and the web viewer's build copies it into the site.
+It downloads the pinned fonts into `target/fonts/` first. The page works without `fonts/`: the drawing then takes the family under the names it is installed by (Noto Sans CJK SC, Source Han Sans SC), or else sans-serif, each run still where the core placed it and as wide. What the fonts do not map, such as hangul or emoji, is drawn in a font of the system's either way, centred on the width the core estimated for it. The desktop app embeds `fonts/` with the page, and the web viewer's build copies it into the site.
 
 The slices of both faces are 17.3 MB in all; the Latin slice of the regular face is 45 KB, and `fonts.css` is 229 KB, 69 KB gzip-compressed. A drawing with a few Chinese labels downloads a few hundred KB: corpus case 15, with 9 hanzi on its drawing, 205 KB in 11 slices (Latin, CJK punctuation and 9 of hanzi); case 14, with 23, 379 KB in 23 slices.
 

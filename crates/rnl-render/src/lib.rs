@@ -6,7 +6,9 @@
 //! the pin names) are this implementation's own choices (principle 2.7, 9.3), and so is how it
 //! draws a line style: it resolves each into strokes, which every output draws as they are. It lays
 //! out texts with the metrics of the fonts shipped with the core (decision 0007), in runs at their
-//! places and bars as strokes, which every output draws as they are in those fonts.
+//! places and bars as strokes, which every output draws as they are in those fonts; what the fonts
+//! do not map, in runs of its own at estimated widths, which an output draws in a font of the
+//! system's, centred on them.
 //!
 //! Sines, cosines and arc tangents come from `libm`, a math library in Rust, so that native and
 //! WebAssembly builds compute the same bits (decision 0006).
@@ -141,12 +143,16 @@ pub struct TextRun {
     pub at: Pt,
     /// The em in scene units.
     pub size: f64,
-    /// The sum of its characters' advances, in scene units.
+    /// The sum of its characters' advances, in scene units; when `fallback`, an estimate.
     pub width: f64,
     /// In the bold face.
     pub bold: bool,
     /// Leaning by `SLANT`, with the upright advances.
     pub italic: bool,
+    /// Grapheme clusters the shipped fonts do not map, drawn in a font of the system's, which the
+    /// layout does not know: `width` is estimated by the clusters' classes, and the run is drawn
+    /// centred on it as wide as the system's font makes it.
+    pub fallback: bool,
 }
 
 /// A straight line of a laid-out text, a fraction's bar or an overline, from `a` to `b`.

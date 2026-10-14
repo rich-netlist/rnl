@@ -32,7 +32,8 @@ pub struct Primitive {
     /// Its place within the layer, compared element by element (11.6).
     pub order: Vec<f64>,
     /// x0, y0, x1, y1: what it covers, in scene units; for a text, each run from its face's
-    /// ascender to its descender, leaning with it when italic, and the bars.
+    /// ascender to its descender, leaning with it when italic, and the bars. A run the fonts do not
+    /// map covers its estimated width, which its glyphs in the system's font may pass.
     pub bbox: [f64; 4],
     #[serde(flatten)]
     pub shape: Shape,
@@ -193,7 +194,8 @@ pub struct Text {
 /// ligatures, spacing of punctuation or other shaping, so that the run is `width` long; in CSS,
 /// `font-kerning: none`, `font-variant-ligatures: none`, `text-spacing-trim: space-all` and
 /// `text-autospace: no-autospace`. Its spaces are drawn as they are, those at its ends too; in
-/// SVG, with `xml:space="preserve"` on its own `text` element.
+/// SVG, with `xml:space="preserve"` on its own `text` element. A run of characters the fonts do not
+/// map is drawn otherwise (`fallback`).
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[cfg_attr(test, derive(serde::Deserialize, ts_rs::TS))]
 pub struct TextRun {
@@ -202,14 +204,28 @@ pub struct TextRun {
     pub at: [f64; 2],
     /// The font size, the em, in scene units.
     pub size: f64,
-    /// The sum of its characters' advances in its face, in scene units. A character the fonts do
-    /// not map is 1 em wide, as the box they draw for it.
+    /// The sum of its characters' advances in its face, in scene units; for a `fallback` run, an
+    /// estimate.
     pub width: f64,
     /// In Noto Sans SC Bold, else Regular.
     pub bold: bool,
     /// Leaning, since the fonts have no italic face: a point of a glyph moves forward along the
     /// baseline by 0.25 times its height above it, about 14°. Its advances are the upright face's.
     pub italic: bool,
+    /// Present, and true, when the fonts do not map the run: it holds whole grapheme clusters
+    /// (UAX #29), each a character with its combining marks, joiners and selectors, and each with a
+    /// character the fonts do not map. It is drawn in a font of the system's, in SVG the browser's
+    /// choice after the shipped family, bold, leaning and turned as the others, but not stretched
+    /// or squeezed: as wide as that font makes it, with the middle of its advance at the middle of
+    /// `width`, so that what the estimate misses falls to both sides alike; in SVG,
+    /// `text-anchor="middle"` there, and no `textLength`. The core cannot know that font, so `width`
+    /// is an estimate, each cluster as wide as a character of its class by the columns that East
+    /// Asian Width (UAX #11) gives it, as the unicode-width crate counts them for a string: none, as
+    /// a combining mark or a zero width space alone, 0; one, a narrow character, 0.55 of the size;
+    /// two or more, a wide or full-width character such as a hangul syllable, or an emoji with its
+    /// selectors, modifiers and joiners, the size.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fallback: bool,
 }
 
 /// A straight line of a text, the bar of a fraction or the line over an overlined run (13.6),
@@ -386,7 +402,15 @@ fn text(t: &rnl_render::TextPrim) -> Text {
 }
 
 fn text_run(r: &rnl_render::TextRun) -> TextRun {
-    TextRun { text: r.text.clone(), at: pt(r.at), size: r.size, width: r.width, bold: r.bold, italic: r.italic }
+    TextRun {
+        text: r.text.clone(),
+        at: pt(r.at),
+        size: r.size,
+        width: r.width,
+        bold: r.bold,
+        italic: r.italic,
+        fallback: r.fallback,
+    }
 }
 
 fn run(r: &markup::Run) -> Run {
@@ -511,8 +535,15 @@ mod tests {
     }
 
     fn back_run(r: &TextRun) -> rnl_render::TextRun {
-        let at = (r.at[0], r.at[1]);
-        rnl_render::TextRun { text: r.text.clone(), at, size: r.size, width: r.width, bold: r.bold, italic: r.italic }
+        rnl_render::TextRun {
+            text: r.text.clone(),
+            at: (r.at[0], r.at[1]),
+            size: r.size,
+            width: r.width,
+            bold: r.bold,
+            italic: r.italic,
+            fallback: r.fallback,
+        }
     }
 
     fn markup_run(r: &Run) -> markup::Run {
@@ -658,6 +689,61 @@ mod tests {
         // in a symbol by its own style and by the instance's, and on a wire
         for drawn in [("rect", "item-0"), ("path", "item-1"), ("path", "wire-0")] {
             assert!(doubles.contains(&drawn), "{drawn:?}: {doubles:?}");
+        }
+    }
+
+    /// Corpus case 18 writes characters the fonts do not map among characters they map: hangul,
+    /// emoji sequences, Arabic, Devanagari, Thai, combining marks and a zero width space. They are
+    /// in runs of their own, whole grapheme clusters, which the SVG draws centred on their widths
+    /// and not held to them.
+    #[test]
+    fn what_the_fonts_do_not_map_is_in_runs_of_its_own() {
+        let options = BuildOptions { primitives: true, ..BuildOptions::default() };
+        let d = crate::build(&crate::tests::corpus("cases/18-fallback-text.sp"), &Disk, &options).unwrap();
+        let level = &d.levels[0];
+        let (mut fallback, mut mapped) = (Vec::new(), 0);
+        for p in level.primitives.as_ref().unwrap() {
+            let Shape::Text(t) = &p.shape else { continue };
+            for r in &t.runs {
+                if r.fallback {
+                    fallback.push((r.text.as_str(), r.bold, r.italic, r.width / r.size));
+                } else {
+                    mapped += 1;
+                }
+            }
+        }
+        let svg = level.svg.as_deref().unwrap();
+        assert_eq!(svg.matches(" textLength=").count(), mapped);
+        assert_eq!(svg.matches(" text-anchor=\"middle\"").count(), fallback.len());
+        let (hangul, resistor, bolt, xhat) = ("\u{D55C}\u{AE00}", "\u{C800}\u{D56D}", "\u{26A1}", "x\u{302}");
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
+        let arabic = "\u{645}\u{642}\u{627}\u{648}\u{645}\u{629}";
+        let devanagari = "\u{92A}\u{94D}\u{930}\u{924}\u{93F}\u{930}\u{94B}\u{927}";
+        let thai = "\u{E15}\u{E31}\u{E27}\u{E15}\u{E49}\u{E32}\u{E19}\u{E17}\u{E32}\u{E19}";
+        for (text, bold, italic, em) in [
+            (hangul, false, false, 2.0),
+            (resistor, false, false, 2.0),
+            (bolt, false, false, 1.0),
+            // the selector of the emoji presentation takes the warning sign the fonts map with it
+            ("\u{26A0}\u{FE0F}", false, false, 1.0),
+            ("1\u{FE0F}\u{20E3}", false, false, 1.0),
+            (family, false, false, 1.0),
+            ("\u{1F44D}\u{1F3FD}", false, false, 1.0),
+            ("\u{1F1E8}\u{1F1F3}", false, false, 1.0),
+            ("\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}", false, false, 1.0),
+            (arabic, false, false, 6.0 * 0.55),
+            (devanagari, false, false, 4.0 - 0.45),
+            ("\u{915}\u{93F}", false, false, 1.0),
+            (thai, false, false, 8.0 * 0.55),
+            (xhat, false, false, 0.55),
+            ("v\u{20D7}", false, false, 0.55),
+            ("\u{200B}", false, false, 0.0),
+            (hangul, true, false, 2.0),
+            (bolt, true, false, 1.0),
+            (xhat, false, true, 0.55),
+        ] {
+            let found = fallback.iter().any(|f| f.0 == text && f.1 == bold && f.2 == italic && (f.3 - em).abs() < 1e-9);
+            assert!(found, "{text} {bold} {italic} {em}: {fallback:?}");
         }
     }
 
@@ -842,6 +928,7 @@ mod tests {
             width: 0.3,
             bold,
             italic,
+            fallback: false,
         };
         let bar = Bar {
             points: [[1.0, 2.0], [1.5, 2.0]],
@@ -884,6 +971,23 @@ mod tests {
                 vec![run("V", true, true)],
                 true,
                 format!("{head} font-weight=\"bold\" transform=\"{turn} {lean}\"{tail}V</text>"),
+            ),
+        ] {
+            let drawn = text(runs, Vec::new(), vertical);
+            assert!(drawn.contains(&format!("\n{want}\n")), "{want}: {drawn}");
+        }
+        // a run the fonts do not map in the family after theirs, with no textLength and the middle
+        // of its glyphs at the middle of its width; turned and leaning as the others, about the
+        // start of its baseline
+        let fallback = |bold: bool, italic: bool| TextRun { fallback: true, ..run("\u{D55C}", bold, italic) };
+        let centred = "<text x=\"16.10\" y=\"-28.00\" font-size=\"7.00\"";
+        let anchored = " text-anchor=\"middle\" fill=\"#102030\" xml:space=\"preserve\">\u{D55C}</text>";
+        for (runs, vertical, want) in [
+            (vec![fallback(false, false)], false, format!("{centred}{anchored}")),
+            (
+                vec![fallback(true, true)],
+                true,
+                format!("{centred} font-weight=\"bold\" transform=\"{turn} {lean}\"{anchored}"),
             ),
         ] {
             let drawn = text(runs, Vec::new(), vertical);
@@ -963,7 +1067,20 @@ mod tests {
         // at least 0.8 pixels wide
         let t = laid("\\frac{a}{b}", "baseline", 0.5);
         assert!(close(t.bars[0].stroke.width, 0.8 / o.scale), "{t:?}");
-        // a character the fonts do not map is 1 em wide
-        assert!(close(laid("\u{10FFFF}", "baseline", 2.0).runs[0].width, 2.0));
+        // the grapheme clusters the fonts do not map in runs of their own, each cluster as wide as
+        // a character of its class: a zero width space alone 0, hangul syllables and an emoji with
+        // a skin tone the size, and a letter with a mark the fonts do not map 0.55 of it
+        let t = laid("\u{200B}R\u{D55C}\u{AE00}x\u{302}\u{1F44D}\u{1F3FD}", "baseline", 2.0);
+        let runs: Vec<(&str, bool)> = t.runs.iter().map(|r| (r.text.as_str(), r.fallback)).collect();
+        let want = [("\u{200B}", true), ("R", false), ("\u{D55C}\u{AE00}x\u{302}\u{1F44D}\u{1F3FD}", true)];
+        assert_eq!(runs, want);
+        let r = 2.0 * regular.width("R");
+        let places: Vec<[f64; 2]> = t.runs.iter().map(|run| [run.at[0], run.width]).collect();
+        let want = [[0.0, 0.0], [0.0, r], [r, 2.0 * (1.0 + 1.0 + 0.55 + 1.0)]];
+        assert!(places.iter().zip(want).all(|(a, b)| close(a[0], b[0]) && close(a[1], b[1])), "{places:?}");
+        // only a run the fonts do not map says so
+        let json = serde_json::to_value(&t.runs).unwrap();
+        let flags: Vec<Option<bool>> = json.as_array().unwrap().iter().map(|r| r["fallback"].as_bool()).collect();
+        assert_eq!(flags, [Some(true), None, Some(true)]);
     }
 }

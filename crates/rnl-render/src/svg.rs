@@ -187,6 +187,11 @@ impl W {
     /// vertical, and leaning when italic; the bars as lines. Each element keeps its spaces with an
     /// xml:space of its own: Chrome and WebKit collapse the spaces of a `text` element, those at
     /// its ends included, whatever its ancestors say.
+    ///
+    /// A run the fonts do not map is drawn in a font of the system's, the browser's choice after the
+    /// shipped family, at the middle of its width with text-anchor and with no textLength: its
+    /// glyphs are as wide as that font makes them, not stretched or squeezed to the estimate, and
+    /// whatever the estimate misses falls to both sides alike.
     fn text(&self, t: &TextPrim) -> String {
         let mut out = String::new();
         for r in &t.runs {
@@ -199,13 +204,18 @@ impl W {
                 // a point h above the baseline moves forward by SLANT·h
                 turn.push(format!("matrix(1 0 {:.2} 1 {:.2} 0)", -SLANT, SLANT * y));
             }
+            // along the baseline before turning, so the transform is the same either way
+            let (x, fit) = if r.fallback {
+                (x + r.width * self.s / 2.0, " text-anchor=\"middle\"".to_string())
+            } else {
+                (x, format!(" textLength=\"{:.2}\" lengthAdjust=\"spacingAndGlyphs\"", r.width * self.s))
+            };
             let _ = write!(
                 out,
-                "<text x=\"{x:.2}\" y=\"{y:.2}\" font-size=\"{:.2}\"{}{} textLength=\"{:.2}\" lengthAdjust=\"spacingAndGlyphs\" fill=\"{}\" xml:space=\"preserve\">{}</text>",
+                "<text x=\"{x:.2}\" y=\"{y:.2}\" font-size=\"{:.2}\"{}{}{fit} fill=\"{}\" xml:space=\"preserve\">{}</text>",
                 r.size * self.s,
                 if r.bold { " font-weight=\"bold\"" } else { "" },
                 if turn.is_empty() { String::new() } else { format!(" transform=\"{}\"", turn.join(" ")) },
-                r.width * self.s,
                 esc(&t.color),
                 esc(&r.text)
             );

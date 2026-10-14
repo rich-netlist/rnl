@@ -250,7 +250,8 @@ export type Primitive = {
   order: Array<number>,
   /**
    * x0, y0, x1, y1: what it covers, in scene units; for a text, each run from its face's
-   * ascender to its descender, leaning with it when italic, and the bars.
+   * ascender to its descender, leaning with it when italic, and the bars. A run the fonts do not
+   * map covers its estimated width, which its glyphs in the system's font may pass.
    */
   bbox: [number, number, number, number],
 } & Shape;
@@ -410,7 +411,8 @@ export type Text = {
  * ligatures, spacing of punctuation or other shaping, so that the run is `width` long; in CSS,
  * `font-kerning: none`, `font-variant-ligatures: none`, `text-spacing-trim: space-all` and
  * `text-autospace: no-autospace`. Its spaces are drawn as they are, those at its ends too; in
- * SVG, with `xml:space="preserve"` on its own `text` element.
+ * SVG, with `xml:space="preserve"` on its own `text` element. A run of characters the fonts do not
+ * map is drawn otherwise (`fallback`).
  */
 export type TextRun = {
   text: string,
@@ -423,8 +425,8 @@ export type TextRun = {
    */
   size: number,
   /**
-   * The sum of its characters' advances in its face, in scene units. A character the fonts do
-   * not map is 1 em wide, as the box they draw for it.
+   * The sum of its characters' advances in its face, in scene units; for a `fallback` run, an
+   * estimate.
    */
   width: number,
   /**
@@ -436,6 +438,21 @@ export type TextRun = {
    * baseline by 0.25 times its height above it, about 14°. Its advances are the upright face's.
    */
   italic: boolean,
+  /**
+   * Present, and true, when the fonts do not map the run: it holds whole grapheme clusters
+   * (UAX #29), each a character with its combining marks, joiners and selectors, and each with a
+   * character the fonts do not map. It is drawn in a font of the system's, in SVG the browser's
+   * choice after the shipped family, bold, leaning and turned as the others, but not stretched
+   * or squeezed: as wide as that font makes it, with the middle of its advance at the middle of
+   * `width`, so that what the estimate misses falls to both sides alike; in SVG,
+   * `text-anchor="middle"` there, and no `textLength`. The core cannot know that font, so `width`
+   * is an estimate, each cluster as wide as a character of its class by the columns that East
+   * Asian Width (UAX #11) gives it, as the unicode-width crate counts them for a string: none, as
+   * a combining mark or a zero width space alone, 0; one, a narrow character, 0.55 of the size;
+   * two or more, a wide or full-width character such as a hangul syllable, or an emoji with its
+   * selectors, modifiers and joiners, the size.
+   */
+  fallback?: boolean,
 };
 
 /**
