@@ -63,3 +63,28 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("the viewer window could not be started");
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::Value;
+
+    fn config() -> Value {
+        serde_json::from_str(include_str!("../tauri.conf.json")).expect("tauri.conf.json is JSON")
+    }
+
+    /// The version in `[workspace.package]` of a Cargo manifest.
+    fn workspace_version(manifest: &str) -> Option<&str> {
+        let section = manifest.split("\n[").find(|s| s.starts_with("workspace.package]"))?;
+        let line = section.lines().find(|l| l.trim_start().starts_with("version"))?;
+        line.split('"').nth(1)
+    }
+
+    /// The app has one version: the one Tauri reports and the installers carry, the crate's, which
+    /// the About box shows, and the toolkit's, which the web viewer's About box shows.
+    #[test]
+    fn one_version() {
+        let version = env!("CARGO_PKG_VERSION");
+        assert_eq!(config()["version"], version, "tauri.conf.json");
+        assert_eq!(workspace_version(include_str!("../../../Cargo.toml")), Some(version), "the workspace's Cargo.toml");
+    }
+}
