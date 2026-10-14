@@ -1,7 +1,9 @@
 // Opening a document: the shell reads a source and builds its Document, and the page shows it.
 // Reading the same source again keeps the level, the hierarchy path to it while its instances are
-// still there, the view, the selection and the text's scroll.
+// still there, the view, the selection and the text's scroll. File > Load from Clipboard opens the
+// clipboard's text, once the user has seen it, as a source that holds its text.
 
+import { form, inform, modal } from "./dialog.js";
 import { shell } from "./shell.js";
 import { current, doc, expanded, selected, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
 import { clearDrawing, showLevel, view } from "./drawing.js";
@@ -47,6 +49,104 @@ export async function pickAndOpen(kind) {
 
 export function reload() {
   if (lastSource) openSource(lastSource, true);
+}
+
+/** What a text from the clipboard can be read as, by the extension of the file it is opened as. */
+const KINDS = [
+  ["sp", "SPICE netlist"],
+  ["scs", "Spectre netlist"],
+  ["rnl", "RNL package, checked on its own"],
+];
+const PREVIEW_LINES = 200; // the lines of the clipboard's text that its preview shows at most
+
+/**
+ * What a text most likely is, as the extension of the file to open it as: "rnl" for a package,
+ * whose records stand on lines of their own; "scs" for a Spectre netlist, which says so, has a
+ * subcircuit with no dot before `subckt` or has records in `//` comments; else "sp", SPICE.
+ */
+export function guessKind(text) {
+  if (/^[ \t]*@RNL\b/m.test(text)) return "rnl";
+  if (/^[ \t]*(simulator[ \t]+lang[ \t]*=[ \t]*spectre\b|(inline[ \t]+)?subckt[ \t]|\/\/[ \t]*@RNL\b)/m.test(text)) {
+    return "scs";
+  }
+  return "sp";
+}
+
+/**
+ * File > Load from Clipboard: read the clipboard's text, show it and what it will be read as, and
+ * when the user says so, open it in place of the document shown, alone: a file it includes is
+ * missing. Reload builds the same text again.
+ */
+export async function loadClipboard() {
+  if (loading || modal()) return;
+  const title = "Load from Clipboard";
+  let text;
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error("the browser does not let the page read it");
+    text = await navigator.clipboard.readText();
+  } catch (e) {
+    const why = (e instanceof Error && e.message ? e.message : String(e)).replace(/\.$/, "");
+    const again = "Allow the page to read the clipboard if the browser asks, and choose Load from Clipboard again.";
+    await inform({ title, paragraphs: [`The clipboard could not be read: ${why}.`, again] });
+    return;
+  }
+  if (!text.trim()) {
+    await inform({ title, paragraphs: ["The clipboard holds no text to load."] });
+    return;
+  }
+  const kind = await preview(title, text);
+  if (kind) await openSource({ name: `clipboard.${kind}`, text }, false);
+}
+
+/** Show the clipboard's text before it is loaded, and ask what to read it as; null when cancelled. */
+function preview(title, text) {
+  const lines = text.split(/\r?\n/);
+  if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+  const warning = document.createElement("p");
+  warning.className = "dialog-warning";
+  warning.textContent =
+    "This text from the clipboard will be opened in place of the document shown. Check that it is the netlist you mean to load.";
+  const box = document.createElement("pre");
+  box.className = "clip-preview";
+  box.tabIndex = 0;
+  box.setAttribute("aria-label", "The clipboard's text");
+  box.textContent = lines.slice(0, PREVIEW_LINES).join("\n");
+  const size = document.createElement("p");
+  size.className = "dialog-note";
+  const more = lines.length > PREVIEW_LINES ? `; the first ${PREVIEW_LINES} are shown` : "";
+  size.textContent = `${count(lines.length, "line")}, ${count(text.length, "character")}${more}.`;
+  const set = document.createElement("fieldset");
+  const legend = document.createElement("legend");
+  legend.textContent = "Read it as";
+  set.append(legend);
+  const guess = guessKind(text);
+  const inputs = KINDS.map(([ext, label]) => {
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "clipboard-kind";
+    input.value = ext;
+    input.checked = ext === guess;
+    const choice = document.createElement("label");
+    choice.className = "dialog-choice";
+    choice.append(input, `${label} (.${ext})`);
+    set.append(choice);
+    return input;
+  });
+  const alone = document.createElement("p");
+  alone.className = "dialog-note";
+  alone.textContent = "It is read alone, as clipboard.sp, .scs or .rnl: files that it includes are missing.";
+  return form({
+    title,
+    parts: [warning, box, size, set, alone],
+    answer: () => inputs.find((i) => i.checked).value,
+    action: "Load",
+    wide: true,
+  });
+}
+
+/** A number of things, such as "1 line" or "12 lines". */
+function count(n, thing) {
+  return `${n} ${thing}${n === 1 ? "" : "s"}`;
 }
 
 /** What to keep when the same source is read again. */

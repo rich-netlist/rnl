@@ -13,7 +13,11 @@ export default {
   nativeMenu: true,
   initial: () => invoke("initial_file").then(file),
   pick: (kind) => (kind === "file" ? invoke("pick_file").then(file) : Promise.resolve(null)),
-  build: (source) => invoke("open_document", { path: source.path }),
+  // a file by its path, or a text held by the source, such as the clipboard's
+  build: (source) =>
+    source.text === undefined
+      ? invoke("open_document", { path: source.path })
+      : invoke("open_text", { name: source.name, text: source.text }),
   setCheck(id, checked) {
     invoke("set_view_check", { id, checked }).catch(() => {});
   },

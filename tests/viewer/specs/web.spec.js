@@ -396,3 +396,20 @@ test("Help > Desktop Viewer opens the site's page of the tools in a new tab", as
   await tab.close();
   await expect(page.locator("#level-name")).toHaveText("01-rc-lowpass.sp");
 });
+
+test("File > Load from Clipboard opens the text alone, as rnl view reads it in a file of its own", async ({ page }) => {
+  const text = fs.readFileSync(path.join(root, "tests", "conformance", "cases", "04-hierarchy.sp"), "utf8");
+  await start(page);
+  // the test gives the page the clipboard's text, as a browser would once it lets the page read it
+  await page.evaluate((t) => {
+    navigator.clipboard.readText = async () => t;
+  }, text);
+  const doc = await opened(page, async () => {
+    await page.locator("#menubar .menu-title", { hasText: "File" }).click();
+    await page.locator('#menubar .menu-item[data-id="load-clipboard"]').click();
+    await page.locator("dialog.dialog").getByRole("button", { name: "Load" }).click();
+  });
+  expect([doc.name, doc.files.length, doc.missing]).toEqual(["clipboard.sp", 1, ["/04-hierarchy-lib.inc"]]);
+  sameAsRnl(doc, path.join(folder({ "clipboard.sp": text }), "clipboard.sp"));
+  await showsDocument(page, doc);
+});

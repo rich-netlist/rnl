@@ -37,10 +37,14 @@
 
 /**
  * Something a shell can open. The page keeps it to read it again (File > Reload) and shows its
- * name; anything else in it is the shell's own: a path, files held in memory, a URL, a text.
+ * name; anything else in it is the shell's own: a path, files held in memory, a URL. A source
+ * with `text`, as File > Load from Clipboard makes it, holds its text itself: every shell builds
+ * that text as the file `name`, such as "clipboard.sp", whose extension says how it is read, with
+ * no other file beside it.
  *
  * @typedef {object} Source
  * @property {string} name How the page names it, such as a file's path.
+ * @property {string} [text] The text itself, for a source that holds it.
  */
 
 /** @type {Shell | null} the shell chosen at start */

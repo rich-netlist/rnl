@@ -11,7 +11,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use rnl_cli::FsProvider;
-use rnl_view::{BuildOptions, Document};
+use rnl_view::{BuildOptions, Document, MemoryProvider};
 use tauri::{Emitter, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
@@ -45,6 +45,20 @@ async fn open_document(window: WebviewWindow, path: String) -> Result<Document, 
     let doc = tauri::async_runtime::spawn_blocking(move || {
         let path = std::path::absolute(&path).map_err(|e| format!("{path}: {e}"))?;
         rnl_view::build(&path.to_string_lossy(), &FsProvider::new(&[]), &BuildOptions::default())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    let _ = window.set_title(&format!("{} - RNL Viewer", doc.name));
+    Ok(doc)
+}
+
+/// Draw a netlist held in memory, such as one from the clipboard, as the file `name`, whose
+/// extension says how it is read, alone in a workspace of its own: what it includes is missing.
+#[tauri::command]
+async fn open_text(window: WebviewWindow, name: String, text: String) -> Result<Document, String> {
+    let doc = tauri::async_runtime::spawn_blocking(move || {
+        let entry = format!("/{name}");
+        rnl_view::build(&entry, &MemoryProvider::new().with(&entry, &text), &BuildOptions::default())
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -89,7 +103,13 @@ fn main() {
                 let _ = app.emit_to("main", "menu", id);
             }
         })
-        .invoke_handler(tauri::generate_handler![open_document, pick_file, initial_file, menu::set_view_check])
+        .invoke_handler(tauri::generate_handler![
+            open_document,
+            open_text,
+            pick_file,
+            initial_file,
+            menu::set_view_check
+        ])
         .run(context)
         .expect("the viewer window could not be started");
 }

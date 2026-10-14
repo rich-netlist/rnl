@@ -133,12 +133,14 @@ export function ask({ title, text, value = "", placeholder = "", action = "OK", 
  * the default button.
  *
  * @param {{ title: string, text?: string, parts: Node[], answer: () => any, focus?: HTMLElement,
- *   action?: string }} options `parts` are shown in order; `focus` has the focus at first, the
- *   default button when not given, which `action` labels, "OK" by default.
+ *   action?: string, wide?: boolean }} options `parts` are shown in order; `focus` has the focus at
+ *   first, the default button when not given, which `action` labels, "OK" by default; `wide` makes
+ *   the dialog wider, for a text to read.
  * @returns {Promise<any>} What `answer` gave, or null when the dialog is cancelled.
  */
-export function form({ title, text, parts, answer, focus, action = "OK" }) {
+export function form({ title, text, parts, answer, focus, action = "OK", wide = false }) {
   const d = frame(title, text, action);
+  if (wide) d.body.parentElement.classList.add("wide");
   const fields = document.createElement("div");
   fields.className = "dialog-form";
   fields.append(...parts);

@@ -21,8 +21,9 @@ let handler = null; // the page's handler of the commands chosen in the platform
 /** What the page asked of the shell, and what it should do next. */
 const fake = {
   /**
-   * The calls, in order: ["initial"], ["pick", kind], ["build", name], ["setCheck", id, checked],
-   * ["browse", url], and on the desktop ["version"].
+   * The calls, in order: ["initial"], ["pick", kind], ["build", name], or ["build", name, text] for
+   * a source that holds its text, ["setCheck", id, checked], ["browse", url], and on the desktop
+   * ["version"].
    */
   calls: [],
   /** The check marks as the platform's menu shows them, by command id. */
@@ -31,7 +32,10 @@ const fake = {
   picks: [],
   /** A message the next build rejects with, as a shell does when it cannot read the source. */
   fail: null,
-  /** A fixture that the next build returns instead of its source's, as if the file had changed. */
+  /**
+   * A fixture that the next build returns instead of its source's, as if the file had changed; the
+   * one a source that holds its text builds, which has none of its own.
+   */
   next: null,
   /** Choose a command in the platform's menu. */
   menu(id) {
@@ -61,7 +65,7 @@ export default {
     return source(fake.picks.shift());
   },
   async build(src) {
-    fake.calls.push(["build", src.name]);
+    fake.calls.push(src.text === undefined ? ["build", src.name] : ["build", src.name, src.text]);
     const [fail, name] = [fake.fail, fake.next || src.fixture];
     fake.fail = null;
     fake.next = null;

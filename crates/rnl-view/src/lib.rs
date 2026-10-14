@@ -14,13 +14,15 @@ use std::cell::RefCell;
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::{file_name, HostDocument};
 use rnl_runtime::model::LevelView;
-use rnl_runtime::source::{MemoryProvider, Provider};
+use rnl_runtime::source::Provider;
 use rnl_runtime::{Interpretation, Options};
 
 pub use document::{Child, Diagnostic, Document, Hit, Level, Object, SourceFile, Span};
 pub use primitive::{
     Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
 };
+/// Texts held in memory, for a frontend that builds one, such as a netlist from the clipboard.
+pub use rnl_runtime::source::MemoryProvider;
 
 /// The standard packages bundled with the core (16.2, 16.3).
 const BUNDLED: [(&str, &str); 2] = [

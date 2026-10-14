@@ -6,7 +6,7 @@
 import { inform } from "./dialog.js";
 import { fit, zoomCenter } from "./drawing.js";
 import { gridCommand } from "./grid.js";
-import { pickAndOpen, reload } from "./open.js";
+import { loadClipboard, pickAndOpen, reload } from "./open.js";
 import { setProblems, setSidebar } from "./panels.js";
 import { clearSelection } from "./selection.js";
 import { shell } from "./shell.js";
@@ -36,6 +36,7 @@ export function command(id) {
     case "open": pickAndOpen("file"); break;
     case "open-folder": pickAndOpen("folder"); break;
     case "open-url": pickAndOpen("url"); break;
+    case "load-clipboard": loadClipboard(); break;
     case "reload": reload(); break;
     case "fit": fit(); break;
     case "zoom-in": zoomCenter(1.25); break;

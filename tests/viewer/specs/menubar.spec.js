@@ -58,7 +58,11 @@ test.describe("on the web", () => {
     for (const m of menus) await expect(list(page, m.title).locator(".menu-item, .menu-separator")).toHaveText(m.items);
     // File has the web's own items, and not the desktop's Exit nor the separator above it
     expect(menus.slice(0, 2)).toEqual([
-      { title: "File", letter: "F", items: ["Open...Ctrl+O", "Open Folder...", "Open URL...", "ReloadF5"] },
+      {
+        title: "File",
+        letter: "F",
+        items: ["Open...Ctrl+O", "Open Folder...", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5"],
+      },
       {
         title: "View",
         letter: "V",

@@ -3,10 +3,11 @@
 // opens in its WebView. The drawing is shown, the window is named after the file, a click selects
 // an instance, Enter opens its subcircuit and Backspace comes back, the native menu has the items
 // of the command table, those of its submenus too, runs them, and follows the page's check marks,
-// and Help > Check for Updates asks GitHub for the releases, answered by the test, and offers a
-// newer one. The app runs with a WebView2 profile of its own in a temporary directory, so that the
-// user's layout stays as it was, and is stopped by its process ID. The test fails at once when the
-// app exits, and a step fails when the page stops answering. Node 22 or later, with no dependencies.
+// Help > Check for Updates asks GitHub for the releases, answered by the test, and offers a newer
+// one, and File > Load from Clipboard draws the text the test gives the page as the clipboard's. The
+// app runs with a WebView2 profile of its own in a temporary directory, so that the user's layout
+// stays as it was, and is stopped by its process ID. The test fails at once when the app exits, and
+// a step fails when the page stops answering. Node 22 or later, with no dependencies.
 //
 //   node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build | --exe PATH]
 //
@@ -422,6 +423,28 @@ async function drive(app, port, profile, t0, session) {
   await until("the dialog to close", async () => !(await page.evaluate(`!!document.querySelector("dialog.dialog")`)), 10_000);
   await page.send("Fetch.disable");
   console.log(`Help > Check for Updates offered the newer release GitHub was made to list, against ${version}`);
+
+  // File > Load from Clipboard: the page reads the clipboard, whose text the test gives in the page,
+  // shows it, and on Load the app draws it natively as clipboard.sp, alone, its include missing
+  const text = fs.readFileSync(netlist, "utf8");
+  await page.evaluate(`navigator.clipboard.readText = async () => ${JSON.stringify(text)}`);
+  chooseItem(app.pid, at("load-clipboard"));
+  const preview = await until("the clipboard's text in its preview", () =>
+    page.evaluate(`(() => {
+      const box = document.querySelector("dialog.dialog .clip-preview");
+      return box && box.textContent;
+    })()`),
+  );
+  same(preview, text.replace(/\r?\n$/, "").replace(/\r\n/g, "\n"), "the clipboard's text in its preview");
+  await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Load").click()`);
+  await until("the clipboard's netlist", async () => {
+    const s = await shown(page);
+    return s.level === "clipboard.sp" && s.drawn && !s.busy;
+  });
+  await until("the window's title", () => windowTitle(app.pid) === "clipboard.sp - RNL Viewer", 10_000);
+  const pasted = await page.evaluate(`({ files: window.viewer.doc.files.length, missing: window.viewer.doc.missing })`);
+  same(pasted, { files: 1, missing: ["/04-hierarchy-lib.inc"] }, "the clipboard's netlist, alone");
+  console.log("File > Load from Clipboard drew the netlist that the clipboard held, alone");
 
   same(page.errors, [], "the page's errors");
 }

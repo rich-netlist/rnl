@@ -265,6 +265,7 @@ mod tests {
                 "&File".to_string(),
                 vec![
                     item("open", "&Open...\tCtrl+O", None),
+                    item("load-clipboard", "Load from &Clipboard...\tCtrl+Shift+V", None),
                     item("reload", "&Reload\tF5", None),
                     Shown::Separator,
                     item("exit", "E&xit", None),
@@ -300,6 +301,7 @@ mod tests {
                 "&File".to_string(),
                 vec![
                     item("open", "&Open...", Some("CmdOrCtrl+O")),
+                    item("load-clipboard", "Load from &Clipboard...", Some("CmdOrCtrl+Shift+V")),
                     item("reload", "&Reload", Some("F5")),
                     Shown::Separator,
                     item("exit", "E&xit", None),

@@ -19,7 +19,8 @@ let opened = null; // the page's handler for sources opened without asking, such
 let lastUrl = ""; // the URL opened last, which Open URL offers again
 
 /**
- * A source of this shell: files chosen or dropped, a folder, or a URL; later a text being edited.
+ * A source of this shell: files chosen or dropped, a folder, or a URL. The page's sources that hold
+ * their text (shell.js) need none of this.
  *
  * @typedef {object} WebSource
  * @property {string} name How the page names it: the entry's file name, its path in a folder, or the URL.
@@ -418,14 +419,19 @@ export default {
     if (kind === "url") return openUrl();
     return Promise.resolve(null);
   },
-  /** Read the files the document needs, as SVG for the page to draw, and name the browser tab. */
+  /**
+   * Read the files the document needs, as SVG for the page to draw, and name the browser tab. A
+   * source that holds its text, such as the clipboard's, is the only file of its workspace.
+   */
   async build(source) {
     const again = built.has(source);
     built.add(source);
     try {
-      const entry = await source.open(again);
+      const held = source.text !== undefined;
+      const entry = held ? { path: `/${source.name}`, text: source.text } : await source.open(again);
       const request = { entry: entry.path, files: { [entry.path]: entry.text }, svg: true, primitives: false };
-      const { document: doc } = await collect(core, request, (path) => source.read(path, again));
+      const read = held ? async () => null : (path) => source.read(path, again);
+      const { document: doc } = await collect(core, request, read);
       document.title = `${doc.name} - RNL Viewer`;
       return doc;
     } catch (e) {
