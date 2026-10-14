@@ -102,8 +102,8 @@
     <header class="sheet-head">
       <p class="sheet-no"><zh>01 · 查看器</zh><en>01 · Viewers</en></p>
       <h2><zh>打开网表，看到原理图，<span class="mk">只读不改。</span></zh><en>Open a netlist, see the schematic. <span class="mk">Read-only.</span></en></h2>
-      <p class="lead"><zh>查看器打开一份带 RNL 记录的 SPICE 或 Spectre 网表，连同它 include 的文件，画出电路的每一层，旁边是网表文本、问题列表和层次结构。</zh>
-        <en>A viewer opens a SPICE or Spectre netlist with RNL records, with the files it includes, draws each level of the circuit, and shows the netlist text, the problems and the hierarchy beside it.</en></p>
+      <p class="lead"><zh>查看器打开一份带 RNL 记录的 SPICE 或 Spectre 网表，连同它 include 的文件，画出电路的每一层，旁边是网表文本、问题列表和层次结构。剪贴板里的网表文本也能直接打开：File › Load from Clipboard 先显示要打开的内容，确认后再打开。</zh>
+        <en>A viewer opens a SPICE or Spectre netlist with RNL records, with the files it includes, draws each level of the circuit, and shows the netlist text, the problems and the hierarchy beside it. A netlist’s text in the clipboard opens too: File › Load from Clipboard shows the text first, and opens it when you confirm.</en></p>
     </header>
 
     <div class="facts tools-facts">
@@ -114,8 +114,8 @@
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-netlist"/></svg><zh>网表文本</zh><en>The netlist text</en></h3>
-        <p><zh>网表和它 include 的文件分标签页显示，RNL 记录和网表语句都有高亮；没有生效的语句带底色。</zh>
-          <en>The netlist and the files it includes, in tabs, with the RNL records and the netlist’s statements highlighted; statements that do not take effect have a soft background.</en></p>
+        <p><zh>网表和它 include 的文件分标签页显示，RNL 记录和网表语句都有高亮；没有生效的语句带底色。画子电路时，它的定义之外的文本变暗；进入子电路，文本就滚到它的定义开头。</zh>
+          <en>The netlist and the files it includes, in tabs, with the RNL records and the netlist’s statements highlighted; statements that do not take effect have a soft background. While a subcircuit is drawn, the text outside its definition is dimmed, and entering it brings the start of its definition into view.</en></p>
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-warn"/></svg><zh>问题列表</zh><en>Problems</en></h3>
