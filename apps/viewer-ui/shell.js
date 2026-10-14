@@ -26,6 +26,17 @@
  * @property {() => void} [about] Show the platform's About box, for Help > About in the page's own menu
  *   bar; without it the page shows a plain one. A platform whose menu shows its own About box leaves
  *   it out.
+ * @property {Updates} [updates] What Help > Check for Updates needs of the platform (updates.js), on
+ *   the desktop, the platform that offers the command. A shell without it leaves the command undone.
+ */
+
+/**
+ * What Help > Check for Updates asks of the platform. The page itself asks GitHub for the releases.
+ *
+ * @typedef {object} Updates
+ * @property {() => Promise<string>} version The version of the app that runs, such as "0.1.0".
+ * @property {(url: string) => Promise<void>} open Open a page of the repository on GitHub, such as a
+ *   release's, in the default browser.
  */
 
 /**

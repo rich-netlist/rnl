@@ -52,6 +52,8 @@ fn initial_file() -> Option<String> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // opens a release's page for Help > Check for Updates; the capability limits it to the repository's
+        .plugin(tauri_plugin_opener::init())
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "exit" => app.exit(0),
@@ -86,5 +88,32 @@ mod tests {
         let version = env!("CARGO_PKG_VERSION");
         assert_eq!(config()["version"], version, "tauri.conf.json");
         assert_eq!(workspace_version(include_str!("../../../Cargo.toml")), Some(version), "the workspace's Cargo.toml");
+    }
+
+    /// Help > Check for Updates: the page may ask GitHub's API for the releases, and may open the
+    /// repository's pages on GitHub in the default browser, but no other address.
+    #[test]
+    fn the_update_check_reaches_github_and_opens_only_the_repository() {
+        let config = config();
+        let csp = config["app"]["security"]["csp"].as_str().unwrap_or_default();
+        let connect = csp.split(';').map(str::trim).find(|d| d.starts_with("connect-src ")).unwrap_or_default();
+        assert!(connect.split_whitespace().any(|s| s == "https://api.github.com"), "{csp}");
+
+        let capability: Value =
+            serde_json::from_str(include_str!("../capabilities/default.json")).expect("the capability is JSON");
+        let opener: Vec<&Value> = capability["permissions"]
+            .as_array()
+            .expect("the capability's permissions")
+            .iter()
+            .filter(|p| p.as_str().or(p["identifier"].as_str()).is_some_and(|id| id.starts_with("opener:")))
+            .collect();
+        let scope = "https://github.com/rich-netlist/rnl/*";
+        let allowed = serde_json::json!({ "identifier": "opener:allow-open-url", "allow": [{ "url": scope }] });
+        assert_eq!(opener, [&allowed]);
+
+        // the addresses the page asks for and opens
+        let page = include_str!("../../viewer-ui/updates.js");
+        assert!(page.contains("\"https://api.github.com/repos/rich-netlist/rnl/releases?"));
+        assert!(page.contains(&format!("\"{}releases\"", scope.trim_end_matches('*'))));
     }
 }

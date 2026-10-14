@@ -31,7 +31,8 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `panels.js` | The side panel's views, what is folded, and the splitters. The layout is kept in `localStorage` under `sidebar-shown`, `sidebar-width`, `side-pane`, `problems-shown`, `problems-height`, `index-height` and `show-failed`. |
 | `commands.js` | Running a command by its id, and the keys. |
 | `menubar.js` | The page's own menu bar. |
-| `dialog.js` | Dialogs in the page's style for what a shell asks: one of a list, with a filter; a line of text; a message. They are modal: the page's keys and its menu bar wait while one is shown. |
+| `dialog.js` | Dialogs in the page's style for what a shell asks: one of a list, with a filter; a line of text; a message; a message with a button that acts. They are modal: the page's keys and its menu bar wait while one is shown. |
+| `updates.js` | Help > Check for Updates: the newest release of the viewer on GitHub against the version that runs, compared by Semantic Versioning, in a dialog. |
 | `util.js` | Small helpers for building the page. |
 | `commands.json` | The command table. |
 | `fonts/` | The drawing's web fonts, which [`scripts/fonts.py`](../../scripts/README.md) writes and git ignores (see [Fonts](#fonts)). |
@@ -66,6 +67,7 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 | `onCommand(handler)` | Call `handler(id)` for each command chosen in the platform's menu. |
 | `onOpen(handler)` | Optional. Call `handler(source)` for each source opened without `pick`, such as files dropped on the page. |
 | `about()` | Optional. Show the platform's About box, for Help > About in the page's own menu bar; without it the page shows a plain one. A platform whose menu shows its own About box has none. |
+| `updates` | Optional. What Help > Check for Updates, the command `check-updates` that the table offers on the desktop only, needs of the platform: `version()`, the version of the app that runs, which the desktop shell has from Tauri, and `open(url)`, which opens a page of the repository on GitHub, such as a release's, in the default browser, through Tauri's opener plugin. The page asks GitHub's API for the releases itself (`updates.js`), as the desktop app's content security policy allows, and only when the command runs. |
 
 A Source is the shell's own object: the page keeps it to read it again and shows its `name`, and knows nothing else of it. On the desktop it is a path; on the web, files chosen or dropped, a folder or a URL, each with a way to read its entry, which gives the entry's path in the workspace, and its other files, and later a text being edited.
 

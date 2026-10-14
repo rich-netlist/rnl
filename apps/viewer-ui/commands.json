@@ -27,7 +27,11 @@
     },
     {
       "label": "&Help",
-      "items": [{ "id": "about", "label": "&About RNL Viewer" }]
+      "items": [
+        { "id": "check-updates", "label": "Check for &Updates...", "platforms": ["desktop"] },
+        "-",
+        { "id": "about", "label": "&About RNL Viewer" }
+      ]
     }
   ]
 }

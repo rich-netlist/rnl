@@ -20,4 +20,10 @@ export default {
   onCommand(handler) {
     tauri.event.listen("menu", (e) => handler(e.payload));
   },
+  updates: {
+    // the version Tauri has from tauri.conf.json, which the installers carry too
+    version: () => tauri.app.getVersion(),
+    // the opener plugin, which the app's capability lets open the repository's pages on GitHub only
+    open: (url) => invoke("plugin:opener|open_url", { url }),
+  },
 };

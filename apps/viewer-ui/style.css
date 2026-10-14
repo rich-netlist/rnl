@@ -92,7 +92,7 @@ body {
   overflow: hidden;
 }
 
-body.busy, body.busy * { cursor: progress !important; }
+body.busy, body.busy *, body.checking, body.checking * { cursor: progress !important; }
 body.resizing-x, body.resizing-x * { cursor: col-resize !important; user-select: none; }
 body.resizing-y, body.resizing-y * { cursor: row-resize !important; user-select: none; }
 
@@ -740,6 +740,7 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .dialog-note { color: var(--muted); font-size: 12px; }
 .dialog-error { color: var(--error); font-size: 12px; }
 .dialog-name { font-weight: 600; }
+.dialog-body a { color: var(--accent); }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 16px 14px; }
 .dialog-buttons button { min-width: 76px; padding: 3px 12px; border-color: var(--line); background: var(--tab); }
 .dialog-buttons button.default { color: var(--panel); background: var(--accent); border-color: var(--accent); }

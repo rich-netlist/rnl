@@ -9,6 +9,7 @@ RNL Viewer, a small desktop application that opens a netlist and draws it. It on
 - **A selected subcircuit instance can be opened.** It is marked in its own colour, with an open badge on the corner of its box. Clicking the badge, double-clicking the instance (on the drawing or in its statement), pressing Enter, or View › Open Subcircuit shows the subcircuit's drawing. While a subcircuit is shown, the button on the right of the bar above the drawing, Backspace, or View › Up to Parent Level goes back up along the hierarchy path that led there, with the instance selected and the view as it was left.
 - **Statements that do not take effect have a soft background** in the text: rose for those that failed with an error, cream for those overridden in a conflict (7.5): dropped in the order of 8.5, or a symbol that loses to later statements on every object. Only the failing part of a pipe is marked. The *Failed statements* box above the text turns the marking off and on. Statements in styles that later ones override property by property are not marked.
 - The status bar shows the selection, what the shown level lacks without a solver (objects without a position, and constraints that need a solver or could not be checked), and the zoom.
+- **Help › Check for Updates** looks on GitHub for a newer release of the viewer when it is chosen, never by itself ([Checking for updates](#checking-for-updates)).
 
 ## Running
 
@@ -34,9 +35,15 @@ cargo install tauri-cli --version "^2" --locked
 cargo tauri build
 ```
 
+## Checking for updates
+
+**Help › Check for Updates**, which only the desktop offers, looks for a newer release when it is chosen, never by itself. The page ([`updates.js`](../viewer-ui/updates.js)) asks GitHub's API for the repository's 30 newest releases, `https://api.github.com/repos/rich-netlist/rnl/releases?per_page=30`. Of those tagged `viewer-v` and a version, neither drafts nor prereleases, it takes the one with the highest version and compares it with the app's by Semantic Versioning. A newer one is offered with a button that opens its release page in the default browser; otherwise the dialog says that this is the latest version, or why the latest could not be looked up, with a link to the releases. GitHub answers 60 requests an hour from one address without an account.
+
+The app's content security policy (`tauri.conf.json`) lets the page reach `https://api.github.com`, and no other address outside the app; its capability (`capabilities/default.json`) lets the page open only the repository's pages, `https://github.com/rich-netlist/rnl/*`, through Tauri's opener plugin; the app's version comes from Tauri, which has it from `tauri.conf.json`. The desktop shell gives the page the version and opens the pages ([The shell](../viewer-ui/README.md#the-shell)).
+
 ## Testing
 
-`cargo test --manifest-path apps/desktop/Cargo.toml` tests the menu built from the command table. On Windows a smoke test builds the app, starts it on a netlist of the corpus and drives its page through WebView2's DevTools port: the drawing is shown, the window is named after the file, a click selects an instance, Enter opens its subcircuit and Backspace comes back, and the native menu has the table's items, runs them and follows the page's check marks. It needs Node 22 or later and nothing else:
+`cargo test --manifest-path apps/desktop/Cargo.toml` tests the menu built from the command table, and the configuration: that the app has one version, and that the page may reach GitHub's API but open only the repository's pages. On Windows a smoke test builds the app, starts it on a netlist of the corpus and drives its page through WebView2's DevTools port: the drawing is shown, the window is named after the file, a click selects an instance, Enter opens its subcircuit and Backspace comes back, and the native menu has the table's items, runs them and follows the page's check marks. Help › Check for Updates, chosen in the native menu, offers a newer release, which the test makes GitHub's API list by answering the page's request itself. It needs Node 22 or later and nothing else:
 
 ```bash
 node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build]

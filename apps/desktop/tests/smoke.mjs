@@ -1,8 +1,9 @@
 // A smoke test of the desktop viewer, on Windows: build the app, start it on a netlist of the
 // corpus, and drive its page through WebView2's DevTools port. The drawing is shown, the window is
 // named after the file, a click selects an instance, Enter opens its subcircuit and Backspace comes
-// back, and the native menu has the items of the command table, runs them, and follows the page's
-// check marks. The app runs with a WebView2 profile of its own in a temporary directory, so that the
+// back, the native menu has the items of the command table, runs them, and follows the page's check
+// marks, and Help > Check for Updates asks GitHub for the releases, answered by the test, and offers
+// a newer one. The app runs with a WebView2 profile of its own in a temporary directory, so that the
 // user's layout stays as it was, and is stopped by its process ID. The test fails at once when the
 // app exits, and a step fails when the page stops answering. Node 22 or later, with no dependencies.
 //
@@ -23,6 +24,8 @@ const netlist = path.join(root, "tests", "conformance", "cases", "04-hierarchy.s
 const TOP = "04-hierarchy.sp";
 /** The command table, which the native menu is built from. */
 const table = JSON.parse(fs.readFileSync(path.join(root, "apps", "viewer-ui", "commands.json"), "utf8"));
+/** The app's version, which Tauri reports. */
+const version = JSON.parse(fs.readFileSync(path.join(root, "apps", "desktop", "tauri.conf.json"), "utf8")).version;
 const TIMEOUT = 60_000; // the first start of WebView2 on a fresh machine can be slow
 
 if (process.platform !== "win32") {
@@ -87,9 +90,9 @@ function appPath() {
 }
 
 /**
- * Connect to the page's DevTools target; resolves to send(), evaluate() and the page's errors. A
- * call rejects when it has no answer within TIMEOUT, and every call rejects, with a final error,
- * once the connection is gone.
+ * Connect to the page's DevTools target; resolves to send(), evaluate(), on(), which handles an
+ * event, and the page's errors. A call rejects when it has no answer within TIMEOUT, and every call
+ * rejects, with a final error, once the connection is gone.
  */
 async function connect(port) {
   const target = await until("the page's DevTools target", async () => {
@@ -103,6 +106,7 @@ async function connect(port) {
   });
   let id = 0;
   const pending = new Map(); // the calls waiting for their answers, by id
+  const handlers = new Map(); // the handlers of events, by method
   const errors = [];
   let gone = null; // the error of every call once the connection is gone
   const lose = (why) => {
@@ -125,6 +129,8 @@ async function connect(port) {
       errors.push(x.exception ? x.exception.description : x.text);
     } else if (d.method === "Runtime.consoleAPICalled" && d.params.type === "error") {
       errors.push(d.params.args.map((a) => a.value ?? a.description).join(" "));
+    } else if (handlers.has(d.method)) {
+      handlers.get(d.method)(d.params);
     }
   });
   const send = (method, params = {}) =>
@@ -148,7 +154,8 @@ async function connect(port) {
     return r.result.value;
   };
   await send("Runtime.enable");
-  return { ws, send, evaluate, errors };
+  const on = (method, handler) => handlers.set(method, handler);
+  return { ws, send, evaluate, on, errors };
 }
 
 /** Click a page point, in CSS pixels, with the left button. */
@@ -325,6 +332,37 @@ async function drive(app, port, profile, t0, session) {
   chooseItem(app.pid, view, item("zoom-in"));
   await until("View > Zoom In", async () => (await shown(page)).zoom !== zoom, 10_000);
   console.log("the native menu has the command table's items and follows the page");
+
+  // Help > Check for Updates: the app's version, from Tauri; the page asks GitHub's API, which the
+  // content security policy lets it reach, for the releases, answered here with a newer one, and
+  // offers it; Cancel closes the dialog, which opens no browser
+  same(await page.evaluate("window.__TAURI__.app.getVersion()"), version, "the app's version");
+  page.on("Fetch.requestPaused", ({ requestId }) => {
+    const releases = [{ tag_name: "viewer-v99.0.0", draft: false, prerelease: false }];
+    const headers = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" };
+    page
+      .send("Fetch.fulfillRequest", {
+        requestId,
+        responseCode: 200,
+        responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
+        body: Buffer.from(JSON.stringify(releases)).toString("base64"),
+      })
+      .catch(() => {});
+  });
+  await page.send("Fetch.enable", { patterns: [{ urlPattern: "https://api.github.com/*" }] });
+  const help = want.findIndex((m) => m.text === "&Help");
+  chooseItem(app.pid, help, want[help].items.findIndex((i) => i.text === "Check for &Updates..."));
+  const said = await until("the dialog of Check for Updates", () =>
+    page.evaluate(`(() => {
+      const p = document.querySelector("dialog.dialog .dialog-body p");
+      return p && p.textContent;
+    })()`),
+  );
+  same(said, "RNL Viewer 99.0.0 is available.", "what Check for Updates found");
+  await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Cancel").click()`);
+  await until("the dialog to close", async () => !(await page.evaluate(`!!document.querySelector("dialog.dialog")`)), 10_000);
+  await page.send("Fetch.disable");
+  console.log(`Help > Check for Updates offered the newer release GitHub was made to list, against ${version}`);
 
   same(page.errors, [], "the page's errors");
 }

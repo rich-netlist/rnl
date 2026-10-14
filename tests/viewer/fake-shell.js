@@ -6,7 +6,9 @@
 // The URL sets it up: `open=NAME` opens the fixture NAME at start; `fail-start=MESSAGE` rejects the
 // question of what to open at start with that plain message, as Tauri's invoke rejects; and
 // `platform=desktop` offers the desktop's commands with the menu shown natively, as the desktop
-// shell does; otherwise it offers the web's commands and the page shows its own menu bar.
+// shell does, and what Help > Check for Updates needs, the version that runs being the one
+// `version=VERSION` gives, 0.1.0 by default; otherwise it offers the web's commands and the page
+// shows its own menu bar.
 
 const params = new URLSearchParams(location.search);
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";
@@ -18,7 +20,10 @@ let handler = null; // the page's handler of the commands chosen in the platform
 
 /** What the page asked of the shell, and what it should do next. */
 const fake = {
-  /** The calls, in order: ["initial"], ["pick", kind], ["build", name] and ["setCheck", id, checked]. */
+  /**
+   * The calls, in order: ["initial"], ["pick", kind], ["build", name], ["setCheck", id, checked], and
+   * on the desktop ["version"] and ["open", url].
+   */
   calls: [],
   /** The check marks as the platform's menu shows them, by command id. */
   checks: {},
@@ -35,10 +40,22 @@ const fake = {
 };
 window.fakeShell = fake;
 
+/** What Help > Check for Updates asks of the desktop: the version that runs, and opening a page. */
+const updates = {
+  async version() {
+    fake.calls.push(["version"]);
+    return params.get("version") || "0.1.0";
+  },
+  async open(url) {
+    fake.calls.push(["open", url]);
+  },
+};
+
 /** @type {import("../../apps/viewer-ui/shell.js").Shell} */
 export default {
   platform,
   nativeMenu: platform === "desktop",
+  ...(platform === "desktop" ? { updates } : {}),
   async initial() {
     fake.calls.push(["initial"]);
     if (params.has("fail-start")) throw params.get("fail-start");
