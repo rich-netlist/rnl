@@ -1,12 +1,12 @@
 // A smoke test of the desktop viewer, on Windows: build the app, start it on a netlist of the
-// corpus, and drive its page through WebView2's DevTools port. The drawing is shown, the window is
-// named after the file, a click selects an instance, Enter opens its subcircuit and Backspace comes
-// back, the native menu has the items of the command table, those of its submenus too, runs them,
-// and follows the page's check marks, and Help > Check for Updates asks GitHub for the releases,
-// answered by the test, and offers a newer one. The app runs with a WebView2 profile of its own in
-// a temporary directory, so that the user's layout stays as it was, and is stopped by its process
-// ID. The test fails at once when the app exits, and a step fails when the page stops answering.
-// Node 22 or later, with no dependencies.
+// corpus, and drive its page through the DevTools port that the app's --remote-debugging-port=PORT
+// opens in its WebView. The drawing is shown, the window is named after the file, a click selects
+// an instance, Enter opens its subcircuit and Backspace comes back, the native menu has the items
+// of the command table, those of its submenus too, runs them, and follows the page's check marks,
+// and Help > Check for Updates asks GitHub for the releases, answered by the test, and offers a
+// newer one. The app runs with a WebView2 profile of its own in a temporary directory, so that the
+// user's layout stays as it was, and is stopped by its process ID. The test fails at once when the
+// app exits, and a step fails when the page stops answering. Node 22 or later, with no dependencies.
 //
 //   node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build | --exe PATH]
 //
@@ -465,13 +465,11 @@ async function main() {
   const port = Number(option("--port")) || (await freePort());
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-smoke-"));
   const t0 = Date.now();
-  const app = spawn(exe, [netlist], {
+  // the app gives the port to WebView2 itself: WebView2 ignores WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
+  // where the app runs elevated, as on GitHub's runners, but takes the profile from the environment
+  const app = spawn(exe, [`--remote-debugging-port=${port}`, netlist], {
     cwd: root,
-    env: {
-      ...process.env,
-      WEBVIEW2_USER_DATA_FOLDER: profile,
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
-    },
+    env: { ...process.env, WEBVIEW2_USER_DATA_FOLDER: profile },
     stdio: ["ignore", "inherit", "inherit"],
   });
   let end = null; // how the app ended, or why it did not start

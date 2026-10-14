@@ -7,12 +7,34 @@
 
 mod menu;
 
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use rnl_cli::FsProvider;
 use rnl_view::{BuildOptions, Document};
 use tauri::{Emitter, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
+
+/// The switch that opens the WebView's DevTools port on 127.0.0.1, as in Chromium and Electron:
+/// `--remote-debugging-port=PORT`, through which the smoke test drives the page. The app gives it to
+/// WebView2 itself, which takes it from the app also where the app runs elevated, as on GitHub's
+/// runners, and ignores WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS there.
+const DEVTOOLS_SWITCH: &str = "--remote-debugging-port=";
+
+/// What wry gives WebView2 when the app gives it nothing, which arguments of the app's own must
+/// repeat: no mini menu, PDF menu nor SmartScreen, and media that may play by itself.
+const WEBVIEW_ARGS: &str =
+    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required";
+
+/// The port of the DevTools switch among the command line's arguments, if any.
+fn devtools_port(args: impl IntoIterator<Item = OsString>) -> Option<u16> {
+    args.into_iter().find_map(|a| a.to_str()?.strip_prefix(DEVTOOLS_SWITCH)?.parse().ok())
+}
+
+/// The file among the command line's arguments: the first that is not the DevTools switch.
+fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
+    args.into_iter().find(|a| !a.to_string_lossy().starts_with(DEVTOOLS_SWITCH))
+}
 
 /// The extensions offered first in the open dialog.
 const NETLISTS: [&str; 10] = ["sp", "spi", "spice", "cir", "ckt", "net", "inc", "lib", "scs", "rnl"];
@@ -44,12 +66,18 @@ async fn pick_file(window: WebviewWindow) -> Option<String> {
 /// The file named on the command line, if any.
 #[tauri::command]
 fn initial_file() -> Option<String> {
-    let arg = std::env::args_os().nth(1)?;
+    let arg = file_argument(std::env::args_os().skip(1))?;
     let path = std::path::absolute(PathBuf::from(arg)).ok()?;
     Some(path.to_string_lossy().into_owned())
 }
 
 fn main() {
+    let mut context = tauri::generate_context!();
+    if let Some(port) = devtools_port(std::env::args_os().skip(1)) {
+        for window in &mut context.config_mut().app.windows {
+            window.additional_browser_args = Some(format!("{WEBVIEW_ARGS} {DEVTOOLS_SWITCH}{port}"));
+        }
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         // opens a release's page for Help > Check for Updates; the capability limits it to the repository's
@@ -62,16 +90,33 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![open_document, pick_file, initial_file, menu::set_view_check])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("the viewer window could not be started");
 }
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsString;
+
     use serde_json::Value;
+
+    use super::{devtools_port, file_argument};
 
     fn config() -> Value {
         serde_json::from_str(include_str!("../tauri.conf.json")).expect("tauri.conf.json is JSON")
+    }
+
+    /// The DevTools switch opens the port, and the file is the other argument, before or after it.
+    #[test]
+    fn the_devtools_switch_is_not_the_file() {
+        let args = |a: &[&str]| a.iter().map(OsString::from).collect::<Vec<_>>();
+        assert_eq!(devtools_port(args(&["--remote-debugging-port=9222", "a.sp"])), Some(9222));
+        assert_eq!(file_argument(args(&["--remote-debugging-port=9222", "a.sp"])), Some("a.sp".into()));
+        assert_eq!(file_argument(args(&["a.sp", "--remote-debugging-port=9222"])), Some("a.sp".into()));
+        assert_eq!(devtools_port(args(&["a.sp"])), None);
+        assert_eq!(file_argument(args(&["a.sp"])), Some("a.sp".into()));
+        assert_eq!(devtools_port(args(&["--remote-debugging-port=a.sp"])), None);
+        assert_eq!(file_argument(args(&["--remote-debugging-port=9222"])), None);
     }
 
     /// The version in `[workspace.package]` of a Cargo manifest.

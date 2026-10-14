@@ -1,7 +1,7 @@
 # Builds and tests the desktop viewer in apps/desktop, a Cargo workspace of its own so that its
 # WebView dependencies stay out of the library crates' builds, with the page in apps/viewer-ui and its
 # web fonts, which the app embeds, and checks the page's scripts. On Windows a smoke test starts the
-# app and drives it through WebView2's DevTools port.
+# app and drives it through its WebView's DevTools port.
 name: Desktop viewer
 
 on:
