@@ -111,6 +111,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Windows 10 and 11 come with the runtime that the app runs on, the runner's Windows Server need not
+      - name: Install the WebView2 Runtime if there is none
+        timeout-minutes: 10
+        run: node apps/desktop/tests/webview2.mjs --install
       # each starts the app on tests/conformance/cases/04-hierarchy.sp and drives it through WebView2's
       # DevTools port; alone in a directory, the executable shows that it needs no file beside it
       - name: Smoke-test the single executable

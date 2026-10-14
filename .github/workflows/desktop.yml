@@ -67,6 +67,11 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
+      # Windows 10 and 11 come with the runtime that the app runs on, the runner's Windows Server need not
+      - name: Install the WebView2 Runtime if there is none
+        if: runner.os == 'Windows'
+        timeout-minutes: 10
+        run: node apps/desktop/tests/webview2.mjs --install
       # it builds the app, starts it on tests/conformance/cases/04-hierarchy.sp and stops it
       - name: Smoke test
         if: runner.os == 'Windows'

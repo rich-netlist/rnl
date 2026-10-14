@@ -20,6 +20,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runtimeVersion } from "./webview2.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const manifest = path.join(root, "apps", "desktop", "Cargo.toml");
@@ -425,6 +426,34 @@ async function drive(app, port, profile, t0, session) {
   same(page.errors, [], "the page's errors");
 }
 
+/**
+ * What there is of the app's WebView, for when its DevTools port does not answer: whether the app's
+ * window answers, the WebView2 browser processes that the app started, with their arguments, and
+ * what is in the profile.
+ */
+function webViewState(pid, profile) {
+  const lines = [];
+  try {
+    lines.push(
+      powershell(`$app = Get-Process -Id ${pid}
+"the app's window: '$($app.MainWindowTitle)', responding: $($app.Responding)"
+$all = @(Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'")
+"msedgewebview2.exe processes: $($all.Count)"
+$all | Where-Object { $_.ParentProcessId -eq ${pid} } | ForEach-Object { "the app's: $($_.CommandLine)" }`),
+    );
+  } catch (e) {
+    lines.push(`The app's processes could not be listed: ${e.message}`);
+  }
+  let files = [];
+  try {
+    files = fs.readdirSync(profile, { recursive: true });
+  } catch {
+    // it is gone, or was never made
+  }
+  lines.push(`the profile ${profile}: ${files.length} entries${files.length ? `, such as ${files.slice(0, 12).join(", ")}` : ""}`);
+  return lines.join("\n");
+}
+
 async function main() {
   const given = option("--exe");
   if (!given && !process.argv.includes("--no-build")) {
@@ -432,7 +461,7 @@ async function main() {
   }
   const exe = given ? path.resolve(given) : appPath();
   check(fs.existsSync(exe), `There is no ${exe} to start${given ? "" : ": build the app, or leave out --no-build"}.`);
-  console.log(`starting ${exe}`);
+  console.log(`starting ${exe}, on the WebView2 Runtime ${runtimeVersion() || "that the registry does not name"}`);
   const port = Number(option("--port")) || (await freePort());
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-smoke-"));
   const t0 = Date.now();
@@ -464,6 +493,10 @@ async function main() {
   const session = { page: null };
   try {
     await Promise.race([drive(app, port, profile, t0, session), early]);
+  } catch (e) {
+    // with no page to drive, say what there is of the WebView, while the app runs
+    if (!session.page && app.exitCode === null && app.signalCode === null) console.error(webViewState(app.pid, profile));
+    throw e;
   } finally {
     if (session.page) session.page.ws.close();
     // stop the app and its WebView by the app's own process ID while it is still the app's: Node

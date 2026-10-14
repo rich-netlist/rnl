@@ -87,7 +87,7 @@ The app's content security policy (`tauri.conf.json`) lets the page reach `https
 node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build | --exe PATH]
 ```
 
-The app runs with a WebView2 profile of its own in a temporary directory, so the layout kept in your profile is left as it was, and is stopped by its process ID. The test fails at once when the app ends early, and a step fails when the page stops answering. `--exe` starts the app at PATH instead of building one, such as `target/release/rnl-viewer.exe` or an installed app. The page itself is tested in three browsers against a fake shell in [`tests/viewer`](../../tests/viewer/README.md).
+The app runs with a WebView2 profile of its own in a temporary directory, so the layout kept in your profile is left as it was, and is stopped by its process ID. The test fails at once when the app ends early, and a step fails when the page stops answering; when the WebView's DevTools port does not answer, it says what there is of the WebView: its processes, with their arguments, and its profile. `--exe` starts the app at PATH instead of building one, such as `target/release/rnl-viewer.exe` or an installed app. The page itself is tested in three browsers against a fake shell in [`tests/viewer`](../../tests/viewer/README.md).
 
 The installers' test installs an installer silently, checks its files, its shortcuts and its entry among the installed apps, smoke-tests the installed app, uninstalls it silently and checks that nothing of it is left:
 
@@ -98,6 +98,8 @@ node apps/desktop/tests/installers.mjs --msi PACKAGE [--no-smoke]
 
 The NSIS installer installs for you, into DIR or else a temporary directory; the test stops when RNL Viewer is installed for you already, to leave it be. The MSI installs for the computer and needs administrator rights, which GitHub's runners have; the release workflow tests both.
 
+The app runs on the WebView2 Runtime, which Windows 10 and 11 come with and the installers install where it is missing. `node apps/desktop/tests/webview2.mjs` prints its version, and with `--install` installs it first with Microsoft's bootstrapper when there is none, as the workflows do on GitHub's Windows Server runners.
+
 ## Structure
 
 | Path | Content |
@@ -107,6 +109,7 @@ The NSIS installer installs for you, into DIR or else a temporary directory; the
 | [`../viewer-ui/`](../viewer-ui/README.md) | The page, which the web viewer shares: plain HTML, CSS and ES modules with no build step. It reaches the app only through its desktop shell, `shells/desktop.js`. |
 | `tests/smoke.mjs` | The smoke test, for Windows. |
 | `tests/installers.mjs` | The installers' test, for Windows. |
+| `tests/webview2.mjs` | The WebView2 Runtime's version, and its installation where it is missing. |
 | `tauri.conf.json`, `capabilities/` | The window, where the page is, the content security policy, what the page may call, and the installers' settings. |
 | `package.json`, `package-lock.json` | The Tauri command line, pinned, which builds the installers. |
 | `LICENSE.txt` | The licence that the installers show and install. |
