@@ -147,7 +147,8 @@ test("the web offers no Check for Updates, and asks GitHub nothing", async ({ pa
   await viewer.open("04-hierarchy");
   await viewer.menuTitle("Help").click();
   const help = page.locator("#menubar .menu", { has: page.locator(".menu-title", { hasText: "Help" }) });
-  await expect(help.locator(".menu-item, .menu-separator")).toHaveText(["About RNL Viewer"]);
+  await expect(help.locator(".menu-item", { hasText: "Check for Updates" })).toHaveCount(0);
+  await expect(help.locator(".menu-item", { hasText: "About RNL Viewer" })).toHaveCount(1);
   await page.keyboard.press("Escape");
   await page.evaluate(() => window.viewer.command("check-updates"));
   await expect(page.locator("dialog.dialog")).toHaveCount(0);

@@ -409,8 +409,7 @@ async function drive(app, port, profile, t0, session) {
       .catch(() => {});
   });
   await page.send("Fetch.enable", { patterns: [{ urlPattern: "https://api.github.com/*" }] });
-  const help = want.findIndex((m) => m.text === "&Help");
-  chooseItem(app.pid, help, want[help].items.findIndex((i) => i.text === "Check for &Updates..."));
+  chooseItem(app.pid, at("check-updates"));
   const said = await until("the dialog of Check for Updates", () =>
     page.evaluate(`(() => {
       const p = document.querySelector("dialog.dialog .dialog-body p");
