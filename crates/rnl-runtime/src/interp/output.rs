@@ -33,7 +33,8 @@ impl Interp<'_> {
         for s in 0..self.scenes.len() {
             levels.push(self.level_view(s));
         }
-        Model { levels, failed: self.failed_doc.clone() }
+        // this version of the language has no conflict that makes the whole interpretation fail (7.5)
+        Model { levels, failed: None }
     }
 
     fn style_of(&self, s: SceneId, o: ObjId) -> Style {

@@ -71,7 +71,7 @@ pub struct Diag {
 }
 
 /// Collects diagnostics; the same message at the same place is kept once.
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Sink {
     items: Vec<Diag>,
     /// Each diagnostic kept, by what makes it the same, with its index in `items`.

@@ -155,6 +155,7 @@ impl Interp<'_> {
             "UNION" => {
                 let mapped = self.map_args(kw, &args, seg, ctx, sig_positions(kw))?;
                 let src = mapped["sets"].obj;
+                self.check_closing(ctx, seg.start)?;
                 let lazy = self.is_lazy(src);
                 if lazy {
                     let key = ("union", ptr_seg(seg), self.frame_key(ctx), 0usize);
@@ -165,6 +166,7 @@ impl Interp<'_> {
                         kind: SetKind::Union { source: src },
                         ..SetData::plain(Vec::new(), false)
                     })));
+                    self.note_made(u, ctx, seg.start);
                     self.node_memo.insert(key, u);
                     return Ok((u, true));
                 }
@@ -172,6 +174,7 @@ impl Interp<'_> {
                     kind: SetKind::Union { source: src },
                     ..SetData::plain(Vec::new(), false)
                 })));
+                self.note_made(u, ctx, seg.start);
                 Ok((u, false))
             }
             k if k.starts_with("SELECT-") => self.kw_select(kw, &args, seg, ctx),
@@ -1666,7 +1669,8 @@ impl Interp<'_> {
             }
             self.set_mut(target.obj).lazy_sources.pop();
         }
-        let m = SetMod { pos: ctx.pos.clone(), add, source: items, ctx: Rc::new(ctx.clone()) };
+        let m = SetMod { pos: ctx.pos.clone(), add, source: items, ctx: Rc::new(ctx.clone()), off: seg.start };
+        self.check_edit(target.obj, &m, ctx)?;
         let (lazy, for_good) = (!self.stays_not_lazy(items), self.lazy_for_good(items));
         self.set_mut(target.obj).add_mod(m, lazy, for_good);
         Ok((target.obj, self.is_lazy(target.obj)))
@@ -1707,9 +1711,11 @@ impl Interp<'_> {
         {
             self.warn(ctx, "role= means something only when the scope is a usage (K3.12)", call.start);
         }
+        // a rule even where it fails for closing a cycle of sets (5.2.2), which it may not do below
+        self.rules.insert(ctx.member_key.clone());
+        self.check_closing(ctx, seg.start)?;
         let key = ("sel", ptr_seg(seg), self.frame_key(ctx), if scope == LEVEL { 0 } else { scope.0 as usize + 1 });
         if let Some(&s) = self.node_memo.get(&key) {
-            self.rules.insert(ctx.member_key.clone());
             return Ok((s, true));
         }
         let params: BTreeMap<String, Lit> = p.into_iter().collect();
@@ -1727,8 +1733,8 @@ impl Interp<'_> {
             ..SetData::plain(Vec::new(), false)
         };
         let s = self.new_obj(ObjData::Set(Box::new(sd)));
+        self.note_made(s, ctx, seg.start);
         self.node_memo.insert(key, s);
-        self.rules.insert(ctx.member_key.clone());
         Ok((s, true))
     }
 

@@ -7,6 +7,7 @@
 
 pub mod attrs;
 pub mod ctx;
+pub mod cycles;
 pub mod eval;
 pub mod kw;
 pub mod obj;
@@ -105,7 +106,17 @@ pub struct Interp<'p> {
     pub(crate) block_symbols: HashMap<String, BTreeMap<MemberKey, (Pos, ObjId)>>,
     pub(crate) scenes: Vec<Scene>,
     pub(crate) symbol_order: HashMap<SceneId, Vec<ObjId>>,
-    pub(crate) failed_doc: Option<String>,
+    /// Where each set made of other sets is made (5.2.2).
+    pub(crate) made_at: HashMap<ObjId, cycles::MadeAt>,
+    /// Per scene (`None`: before any), the latest made source of the edits there that make a set
+    /// depend on one made after it (5.2.2). Objects are numbered in the order they are made.
+    pub(crate) later_sources: HashMap<Option<SceneId>, ObjId>,
+    /// The statements that an earlier run found to close a cycle of sets, with their diagnostics:
+    /// they fail from the start (5.2.2).
+    pub(crate) closing: HashMap<cycles::StmtKey, String>,
+    /// A statement found to close a cycle of sets after a statement placed before it was
+    /// evaluated: the run stops, and the interpretation is run again with it in `closing`.
+    pub(crate) restart: Option<(cycles::StmtKey, String)>,
     pub(crate) std_enabled: bool,
     pub(crate) std_cache: Option<Option<UnitId>>,
     pub(crate) scoped_memo: HashMap<(UnitId, ObjId), Vec<(String, String)>>,
@@ -153,7 +164,10 @@ impl<'p> Interp<'p> {
             block_symbols: HashMap::new(),
             scenes: Vec::new(),
             symbol_order: HashMap::new(),
-            failed_doc: None,
+            made_at: HashMap::new(),
+            later_sources: HashMap::new(),
+            closing: HashMap::new(),
+            restart: None,
             std_enabled: options.std,
             std_cache: None,
             scoped_memo: HashMap::new(),
@@ -246,10 +260,28 @@ impl<'p> Interp<'p> {
         self.check_package_shadowing();
         self.prescan_blocks();
         for lv in 0..self.doc.levels.len() {
+            if self.restart.is_some() {
+                return;
+            }
             if self.doc.levels[lv].circuit {
                 self.build_scene(lv);
             }
         }
+    }
+
+    /// Run, and run again from the start as long as a run finds a statement that closes a cycle of
+    /// sets after a statement placed before it was evaluated (5.2.2): each run has the statements
+    /// found so far fail from the start. `again` makes a new interpreter from the one that stopped.
+    fn run_settled(mut self, again: impl Fn(Interp<'p>) -> Interp<'p>) -> Interpretation {
+        self.run();
+        while let Some((key, msg)) = self.restart.take() {
+            let mut closing = std::mem::take(&mut self.closing);
+            closing.insert(key, msg);
+            self = again(self);
+            self.closing = closing;
+            self.run();
+        }
+        self.finish()
     }
 
     /// Evaluate the statements of a unit without a circuit once: definitions, rules, errors.
@@ -317,6 +349,9 @@ impl<'p> Interp<'p> {
             }
         }
         for w in work {
+            if self.restart.is_some() {
+                return;
+            }
             if w.scope_in {
                 self.eval_scope_in(w.u, &w.m, w.pos.unwrap(), s);
                 continue;
@@ -336,6 +371,9 @@ impl<'p> Interp<'p> {
                     loc,
                 );
             }
+        }
+        if self.restart.is_some() {
+            return;
         }
         // a name bound twice in the same level (6.6)
         for b in self.units[unit].dups.clone() {
@@ -574,14 +612,11 @@ impl<'p> Interp<'p> {
 /// Interpret a host document: the effective model and the diagnostics. `sink` holds what the
 /// host adapter reported, if anything.
 pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, sink: Sink) -> Interpretation {
-    let mut it = Interp::new(doc, provider, options, sink);
-    it.run();
-    it.finish()
+    let host = sink.clone();
+    Interp::new(doc, provider, options, sink).run_settled(|it| Interp::new(it.doc, provider, options, host.clone()))
 }
 
 /// Check a package file on its own (2.7).
 pub fn check_package(path: &str, provider: &dyn Provider, options: &Options) -> Interpretation {
-    let mut it = Interp::new_package(path, provider, options);
-    it.run();
-    it.finish()
+    Interp::new_package(path, provider, options).run_settled(|_| Interp::new_package(path, provider, options))
 }

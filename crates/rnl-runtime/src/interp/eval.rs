@@ -290,8 +290,21 @@ impl<'p> Interp<'p> {
                     // a set that stays not lazy, such as $SUPPLY_NET_SET, which has no members, does
                     // not go through the edits that every level makes; nor does any set go through
                     // those whose sources stay not lazy, which are not kept (`add_mod`)
-                    if s.not_lazy || s.lazy_sources.iter().any(|o| self.is_lazy(*o)) {
+                    if s.not_lazy {
                         return false;
+                    }
+                    if !s.lazy_sources.is_empty() {
+                        // the sources of the edits of every level, and of the rules classified
+                        // before any level, are kept together, so they can lead back here although
+                        // no level has a cycle of sets (5.2.2); here the set is taken as not lazy
+                        if s.lazy_busy.replace(true) {
+                            return false;
+                        }
+                        let edited = s.lazy_sources.iter().any(|o| self.is_lazy(*o));
+                        s.lazy_busy.set(false);
+                        if edited {
+                            return false;
+                        }
                     }
                     s.items.iter().any(|(o, _)| self.is_lazy(*o))
                 }
@@ -904,11 +917,13 @@ impl<'p> Interp<'p> {
             lazy = lazy || self.is_lazy(obj);
             items.push((obj, false));
         }
+        self.check_closing(ctx, e.start)?;
         let mut sd = SetData::plain(items, true);
         if ctx.scene.is_some() && ctx.frame.is_none() {
             sd.writer = Some(ctx.unit);
         }
         let s = self.new_obj(ObjData::Set(Box::new(sd)));
+        self.note_made(s, ctx, e.start);
         Ok((s, lazy))
     }
 
@@ -1513,7 +1528,9 @@ impl<'p> Interp<'p> {
             } else {
                 let items: Vec<(ObjId, bool)> = objs.iter().map(|a| (a.obj, !a.explicit)).collect();
                 let sel = objs.iter().any(|a| a.sel);
+                self.check_closing(ctx, seg.start)?;
                 let s = self.new_obj(ObjData::Set(Box::new(SetData::plain(items, false))));
+                self.note_made(s, ctx, seg.start);
                 mapped.insert(
                     p.name.clone(),
                     ArgV { obj: s, role: None, role_quoted: false, sel, off: objs[0].off, explicit: false },
