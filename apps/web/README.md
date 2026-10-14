@@ -8,6 +8,7 @@ The web viewer: the page of the RNL viewers ([`apps/viewer-ui`](../viewer-ui/REA
 - Files or a folder dropped on the page open as with Open and Open Folder.
 - **File › Reload** (F5, Ctrl+R) reads the document again, not the page, keeping the level, the view and the selection. A URL is fetched again past the browser's cache. Files are read again from what the browser holds of them: a dropped file as it is now, but a file chosen with Open or Open Folder only as it was when it was chosen; once it has changed, Reload says to open it again.
 - **Help › About** names the version and the commit the site was built from. The browser tab is named after the document.
+- **Help › Desktop Viewer** opens the project site's page of the tools in a new tab, where the desktop viewer is downloaded: [in English](https://rich-netlist.github.io/rnl/en/tools.html) when the browser's languages put English before Chinese, else [in Chinese](https://rich-netlist.github.io/rnl/tools.html).
 - Packages found by name (16.2) are only the bundled standard packages, as with `rnl` without `--package-dir`; a package file named by path is read like an include.
 
 Text is decoded as `rnl` decodes it, UTF-8 or else Latin-1, so a document is the one `rnl view` and the desktop viewer give for the same files, but for the paths that name them. Files opened from the computer are named in the workspace as `/NAME`, and a folder's as `/FOLDER/SUB/NAME`; a URL's files by their paths on the server that served the netlist, after any redirect, such as `/netlists/a/top.sp`, or `/top.sp` at its root, so that a URL that redirects opens as the one it redirects to. A netlist served at a directory's address is named after the directory, or after the server at its root, such as `/example.org`. The workspace has nothing above its root: an include such as `../x.inc` of a file opened from the computer is missing, not a file of that name opened with it.
@@ -65,7 +66,7 @@ The page keeps the browser baseline of decision 0008: Chromium 109, the last Chr
 
 ## How it differs from the desktop viewer
 
-- **Its own menu bar.** The page shows the menu bar of the command table itself ([`menubar.js`](../viewer-ui/README.md#modules)); Alt or F10 moves to it. File has Open Folder and Open URL, and no Exit; F5 and Ctrl+R read the document again rather than reload the page.
+- **Its own menu bar.** The page shows the menu bar of the command table itself ([`menubar.js`](../viewer-ui/README.md#modules)); Alt or F10 moves to it. File has Open Folder and Open URL, and no Exit; Help has Desktop Viewer; F5 and Ctrl+R read the document again rather than reload the page.
 - **File access.** A browser lets the page read only what the user chooses or drops, so the files a netlist includes must be chosen with it, be in the folder opened, or be on the server of its URL. The desktop viewer reads any file by its path.
 - **Reload.** A file chosen with Open or Open Folder cannot be read again once it has changed; open it again, or drop it, which Reload reads anew.
 - **About** is a dialog in the page, and the document names the browser tab instead of the window.
@@ -76,7 +77,7 @@ The page keeps the browser baseline of decision 0008: Chromium 109, the last Chr
 | --- | --- |
 | `build.mjs` | Builds the core and assembles the site in `dist/`. |
 | `serve.mjs` | Serves `dist/` on this computer. |
-| [`../viewer-ui/shells/web.js`](../viewer-ui/README.md#the-shell) | The web shell: opening files, a folder, a URL or what is dropped; reading only the files a document needs, with `collect`; building in the core's Worker; the About box. |
+| [`../viewer-ui/shells/web.js`](../viewer-ui/README.md#the-shell) | The web shell: opening files, a folder, a URL or what is dropped; reading only the files a document needs, with `collect`; building in the core's Worker; the About box; a web page in a new tab. |
 | [`../viewer-ui/dialog.js`](../viewer-ui/README.md#modules) | The dialogs the web shell asks with: which netlist, which address, About. |
 | [`../../bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md) | The core as WebAssembly, and the modules that run it in a Worker and collect the files a document needs. |
 

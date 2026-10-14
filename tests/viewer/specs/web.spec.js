@@ -377,3 +377,22 @@ test("Help > About names the version and the commit the site was built from", as
   await expect(dialog).toHaveCount(0);
   await expect(page.locator("#level-name")).toHaveText("01-rc-lowpass.sp");
 });
+
+test("Help > Desktop Viewer opens the site's page of the tools in a new tab", async ({ context, page }) => {
+  // the tab is given a page of the test's own instead of the site's
+  await context.route("https://rich-netlist.github.io/**", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<!doctype html><title>RNL tools</title>" }),
+  );
+  await start(page, "?url=samples/cases/01-rc-lowpass.sp");
+  await shown(page);
+  await page.locator("#menubar .menu-title", { hasText: "Help" }).click();
+  const [tab] = await Promise.all([
+    context.waitForEvent("page"),
+    page.locator('#menubar .menu-item[data-id="desktop-viewer"]').click(),
+  ]);
+  // Playwright's browsers prefer en-US, so the English page
+  await expect(tab).toHaveURL("https://rich-netlist.github.io/rnl/en/tools.html");
+  expect(await tab.evaluate(() => window.opener)).toBe(null);
+  await tab.close();
+  await expect(page.locator("#level-name")).toHaveText("01-rc-lowpass.sp");
+});

@@ -18,7 +18,10 @@ let handler = null; // the page's handler of the commands chosen in the platform
 
 /** What the page asked of the shell, and what it should do next. */
 const fake = {
-  /** The calls, in order: ["initial"], ["pick", kind], ["build", name] and ["setCheck", id, checked]. */
+  /**
+   * The calls, in order: ["initial"], ["pick", kind], ["build", name], ["setCheck", id, checked]
+   * and ["browse", url].
+   */
   calls: [],
   /** The check marks as the platform's menu shows them, by command id. */
   checks: {},
@@ -65,5 +68,8 @@ export default {
   },
   onCommand(h) {
     handler = h;
+  },
+  browse(url) {
+    fake.calls.push(["browse", url]);
   },
 };

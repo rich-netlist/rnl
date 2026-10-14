@@ -27,7 +27,11 @@
     },
     {
       "label": "&Help",
-      "items": [{ "id": "about", "label": "&About RNL Viewer" }]
+      "items": [
+        { "id": "desktop-viewer", "label": "&Desktop Viewer...", "platforms": ["web"] },
+        "-",
+        { "id": "about", "label": "&About RNL Viewer" }
+      ]
     }
   ]
 }
