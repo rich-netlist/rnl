@@ -7,9 +7,11 @@
 // user's layout stays as it was, and is stopped by its process ID. The test fails at once when the
 // app exits, and a step fails when the page stops answering. Node 22 or later, with no dependencies.
 //
-//   node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build]
+//   node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build | --exe PATH]
 //
-// PORT is the DevTools port, any free one by default; --no-build starts the app as it was built.
+// PORT is the DevTools port, any free one by default; --no-build starts the app as it was built;
+// --exe starts the app at PATH instead, such as a release build or an installed app, and builds
+// nothing.
 
 import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
@@ -368,11 +370,13 @@ async function drive(app, port, profile, t0, session) {
 }
 
 async function main() {
-  if (!process.argv.includes("--no-build")) {
+  const given = option("--exe");
+  if (!given && !process.argv.includes("--no-build")) {
     execFileSync("cargo", ["build", "--manifest-path", manifest], { cwd: root, stdio: "inherit" });
   }
-  const exe = appPath();
-  check(fs.existsSync(exe), `There is no ${exe} to start: build the app, or leave out --no-build.`);
+  const exe = given ? path.resolve(given) : appPath();
+  check(fs.existsSync(exe), `There is no ${exe} to start${given ? "" : ": build the app, or leave out --no-build"}.`);
+  console.log(`starting ${exe}`);
   const port = Number(option("--port")) || (await freePort());
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-smoke-"));
   const t0 = Date.now();

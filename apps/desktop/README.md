@@ -25,14 +25,40 @@ The app embeds the page in [`apps/viewer-ui`](../viewer-ui/README.md) when it is
 
 On Linux the build needs the WebKitGTK development packages that Tauri lists, for example `libwebkit2gtk-4.1-dev`, `libgtk-3-dev` and `librsvg2-dev` on Debian and Ubuntu. Windows needs the WebView2 runtime, which Windows 10 and 11 normally have.
 
-To build an installer, install the Tauri command line once and build in this directory:
+## Building
+
+The app is a single executable with the page and its fonts embedded, `rnl-viewer.exe` on Windows; write the fonts first. From the repository root:
 
 ```bash
-cargo install tauri-cli --version "^2" --locked
+python scripts/fonts.py web
+cargo build --release --manifest-path apps/desktop/Cargo.toml
 ```
 
+`apps/desktop/target/release/rnl-viewer.exe` needs no other file of the build but the WebView2 loader. Rust's MSVC toolchain, which GitHub's Windows runners have, links the loader into the executable, so that it runs as a single file. The GNU toolchain (`x86_64-pc-windows-gnu`), on a computer without Visual Studio, makes it import `WebView2Loader.dll`, which the build puts next to it and which must stay there. Either way the app needs the WebView2 runtime.
+
+The installers come from the Tauri command line, which [`package.json`](package.json) pins at 2.12.1, with the sums of its files in `package-lock.json`. In this directory:
+
 ```bash
-cargo tauri build
+npm ci
+npx tauri build
+```
+
+It builds the executable as above, with Tauri's `custom-protocol` feature as for production, and then the installers that the bundle settings of `tauri.conf.json` ask for, in `target/release/bundle/`; the first time, it downloads NSIS and WiX into `%LOCALAPPDATA%\tauri`. `npx tauri build --no-bundle` builds only the executable, and `--bundles nsis` or `--bundles msi` one of the installers.
+
+- `nsis/RNL Viewer_VERSION_x64-setup.exe`, about 20 MB, installs for the current user without administrator rights, into `%LOCALAPPDATA%\RNL Viewer`, in English or Simplified Chinese as Windows is set. It adds shortcuts in the Start menu and on the desktop, and an entry among the installed apps, which uninstalls it. Tauri's uninstaller would keep in the registry where the app was installed, unless its *Delete the application data* box is checked, which a silent uninstall cannot do; [`nsis-hooks.nsh`](nsis-hooks.nsh) removes that too, except when an update runs the uninstaller.
+- `msi/RNL Viewer_VERSION_x64_en-US.msi`, about 22 MB, installs for all users of the computer, into Program Files, and needs administrator rights. It is in English only, as one MSI is built per language. Its upgrade code is fixed in `tauri.conf.json`, so that a later version replaces this one even if the product is renamed.
+
+Both show the licence in [`LICENSE.txt`](LICENSE.txt) and install it next to the app: the MIT License, and the copyright notice and the SIL Open Font License 1.1 of the fonts the app embeds ([Fonts](../viewer-ui/README.md#fonts)). It is written in ASCII, a line per paragraph for the installers' windows to wrap, since the MSI's licence dialog reads it as Windows-1252. When the WebView2 runtime is missing, both download Microsoft's bootstrapper, which installs it: Windows 10 and 11 normally have the runtime, and embedding the bootstrapper instead would add 1.8 MB to every installer to save a download, while the bootstrapper downloads the runtime anyway. The installers and the executable are not signed, so Windows SmartScreen may warn before they run. Built with the GNU toolchain, both installers carry `WebView2Loader.dll` next to the app.
+
+## Installing
+
+The installers also install and uninstall silently, for scripts and for deployment. The NSIS installer takes the directory last, after `/D=`, unquoted even with spaces:
+
+```bat
+RNL-Viewer-0.1.0-windows-x64-setup.exe /S /D=C:\Tools\RNL Viewer
+"%LOCALAPPDATA%\RNL Viewer\uninstall.exe" /S
+msiexec /i RNL-Viewer-0.1.0-windows-x64.msi /qn
+msiexec /x RNL-Viewer-0.1.0-windows-x64.msi /qn
 ```
 
 ## Checking for updates
@@ -43,13 +69,22 @@ The app's content security policy (`tauri.conf.json`) lets the page reach `https
 
 ## Testing
 
-`cargo test --manifest-path apps/desktop/Cargo.toml` tests the menu built from the command table, and the configuration: that the app has one version, and that the page may reach GitHub's API but open only the repository's pages. On Windows a smoke test builds the app, starts it on a netlist of the corpus and drives its page through WebView2's DevTools port: the drawing is shown, the window is named after the file, a click selects an instance, Enter opens its subcircuit and Backspace comes back, and the native menu has the table's items, runs them and follows the page's check marks. Help › Check for Updates, chosen in the native menu, offers a newer release, which the test makes GitHub's API list by answering the page's request itself. It needs Node 22 or later and nothing else:
+`cargo test --manifest-path apps/desktop/Cargo.toml` tests the menu built from the command table, and the configuration: that the app has one version, that `LICENSE.txt` has both licences word for word, and that the page may reach GitHub's API but open only the repository's pages. On Windows a smoke test builds the app, starts it on a netlist of the corpus and drives its page through WebView2's DevTools port: the drawing is shown, the window is named after the file, a click selects an instance, Enter opens its subcircuit and Backspace comes back, and the native menu has the table's items, runs them and follows the page's check marks. Help › Check for Updates, chosen in the native menu, offers a newer release, which the test makes GitHub's API list by answering the page's request itself. It needs Node 22 or later and nothing else:
 
 ```bash
-node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build]
+node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build | --exe PATH]
 ```
 
-The app runs with a WebView2 profile of its own in a temporary directory, so the layout kept in your profile is left as it was, and is stopped by its process ID. The test fails at once when the app ends early, and a step fails when the page stops answering. The page itself is tested in three browsers against a fake shell in [`tests/viewer`](../../tests/viewer/README.md).
+The app runs with a WebView2 profile of its own in a temporary directory, so the layout kept in your profile is left as it was, and is stopped by its process ID. The test fails at once when the app ends early, and a step fails when the page stops answering. `--exe` starts the app at PATH instead of building one, such as `target/release/rnl-viewer.exe` or an installed app. The page itself is tested in three browsers against a fake shell in [`tests/viewer`](../../tests/viewer/README.md).
+
+The installers' test installs an installer silently, checks its files, its shortcuts and its entry among the installed apps, smoke-tests the installed app, uninstalls it silently and checks that nothing of it is left:
+
+```bash
+node apps/desktop/tests/installers.mjs --nsis SETUP [--dir DIR] [--no-smoke]
+node apps/desktop/tests/installers.mjs --msi PACKAGE [--no-smoke]
+```
+
+The NSIS installer installs for you, into DIR or else a temporary directory; the test stops when RNL Viewer is installed for you already, to leave it be. The MSI installs for the computer and needs administrator rights, which GitHub's runners have.
 
 ## Structure
 
@@ -59,7 +94,11 @@ The app runs with a WebView2 profile of its own in a temporary directory, so the
 | `src/menu.rs` | The menu bar, built from the page's command table, and the command that sets its check marks. |
 | [`../viewer-ui/`](../viewer-ui/README.md) | The page, which the web viewer shares: plain HTML, CSS and ES modules with no build step. It reaches the app only through its desktop shell, `shells/desktop.js`. |
 | `tests/smoke.mjs` | The smoke test, for Windows. |
-| `tauri.conf.json`, `capabilities/` | The window, where the page is, the content security policy, and what the page may call. |
+| `tests/installers.mjs` | The installers' test, for Windows. |
+| `tauri.conf.json`, `capabilities/` | The window, where the page is, the content security policy, what the page may call, and the installers' settings. |
+| `package.json`, `package-lock.json` | The Tauri command line, pinned, which builds the installers. |
+| `LICENSE.txt` | The licence that the installers show and install. |
+| `nsis-hooks.nsh` | What the NSIS installer does besides Tauri's: its uninstaller leaves nothing in the registry. |
 | `icons/` | The application icon. |
 
 This directory is a Cargo workspace of its own, so the WebView dependencies stay out of the library crates' builds; [`desktop.yml`](../../.github/workflows/desktop.yml) builds it on Linux, Windows and macOS.

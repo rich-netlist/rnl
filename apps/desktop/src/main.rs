@@ -90,6 +90,22 @@ mod tests {
         assert_eq!(workspace_version(include_str!("../../../Cargo.toml")), Some(version), "the workspace's Cargo.toml");
     }
 
+    /// The licence that the installers show and install next to the app: the repository's MIT
+    /// License, and the fonts' copyright notice with the SIL Open Font License, word for word, with a
+    /// line per paragraph for the installers' windows to wrap, and the dashes in ASCII, since the
+    /// MSI's licence dialog reads the text as Windows-1252.
+    #[test]
+    fn the_installers_licence_has_both_licences() {
+        let words = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+        let text = include_str!("../LICENSE.txt");
+        assert_eq!(config()["bundle"]["licenseFile"], "LICENSE.txt");
+        assert!(text.is_ascii());
+        assert!(words(text).contains(&words(include_str!("../../../LICENSE"))));
+        let dash = char::from_u32(0x2014).unwrap();
+        assert!(words(text).contains(&words(&include_str!("../../../LICENSES/OFL-1.1.txt").replace(dash, "--"))));
+        assert!(text.contains("Copyright 2014-2021 Adobe (http://www.adobe.com/)"));
+    }
+
     /// Help > Check for Updates: the page may ask GitHub's API for the releases, and may open the
     /// repository's pages on GitHub in the default browser, but no other address.
     #[test]
