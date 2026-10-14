@@ -4,11 +4,13 @@
 // instance it was left through selected. Picking a subcircuit in the index makes it the root, picking
 // an instance in the tree gives the way to it from the top level, and reaching a level otherwise cuts
 // the path back to it, or starts it there. The views kept are by path, so a subcircuit reached two
-// ways keeps a view for each.
+// ways keeps a view for each. Entering a subcircuit brings the start of its definition to the top of
+// the text; going back up shows the statement of the instance it was left through.
 
 import { current, doc, path, setPath, viewCache } from "./state.js";
 import { showLevel, view } from "./drawing.js";
 import { clearSelection, select } from "./selection.js";
+import { revealDefinition } from "./text.js";
 import { $, span } from "./util.js";
 
 const bar = $("level-path");
@@ -68,6 +70,7 @@ export function descend(o) {
   const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
   clearSelection();
   enter(at < 0 ? [{ level, via: null }] : [...cutTo(at), { level, via: obj.name }]);
+  revealDefinition(level);
 }
 
 /** Go back along the path to its level at `depth`. */
@@ -95,12 +98,16 @@ export function enterRow(row) {
     next.push({ level: child.level, via: child.instance });
   }
   // the path shown already changes nothing, so that the tree is not drawn again (openLevel)
-  if (!same(next, path)) enter(next);
+  if (same(next, path)) return;
+  enter(next);
+  revealDefinition(next[next.length - 1].level);
 }
 
 /** Show a level as the root of the path, as the subcircuit index does. */
 export function enterRoot(level) {
-  if (!same([{ level, via: null }], path)) enter([{ level, via: null }]);
+  if (same([{ level, via: null }], path)) return;
+  enter([{ level, via: null }]);
+  revealDefinition(level);
 }
 
 /** The tree row of the path shown when it starts at the top level, as "0/1/0"; otherwise null. */

@@ -1,6 +1,7 @@
 // The text pane: the netlist and the files it includes, highlighted, with the statements that do
 // not take effect marked, and the places of the selected object. Clicking a name or a statement in
-// the text selects its object; double-clicking a subcircuit instance opens it.
+// the text selects its object; double-clicking a subcircuit instance opens it. While a subcircuit
+// is drawn, the text outside its definition is dimmed.
 
 import { doc, selected } from "./state.js";
 import { clearSelection, select } from "./selection.js";
@@ -12,11 +13,13 @@ const app = $("app");
 const source = $("source");
 const netlistPane = $("pane-netlist");
 const tabs = $("file-tabs");
+const TOP_GAP = 4; // pixels above a line brought to the top of the text pane
 
 export let fileShown = 0; // the file in the text pane
 export let fileViews = []; // per file: { el, lines: [line elements], scroll }
 let lineOwners = []; // per file: line number -> the instance whose statement it is
 let pendingReveal = null; // a line to bring into view once the text pane is shown
+let scope = null; // the definition of the subcircuit drawn: { f, from, to }, its file and lines
 
 /** Mark the selected object's places in the text; with `reveal`, scroll to where it is named. */
 export function paintSourceSelection(reveal) {
@@ -36,6 +39,8 @@ export function paintSourceSelection(reveal) {
 }
 
 export function clearSource(message) {
+  scope = null;
+  source.classList.remove("scoped");
   fileViews = [];
   lineOwners = [];
   tabs.replaceChildren();
@@ -48,6 +53,8 @@ export function clearSource(message) {
 
 export function renderFiles() {
   source.replaceChildren();
+  scope = null;
+  source.classList.remove("scoped");
   fileViews = [];
   lineOwners = doc.files.map(() => new Map());
   doc.objects.forEach((o, k) => {
@@ -113,20 +120,21 @@ function sourceShown() {
 }
 
 /**
- * Show a line of a file in the middle of the text pane; with `flash`, blink it. While the text
- * pane is hidden, the line waits until it is shown again.
+ * Show a line of a file in the middle of the text pane, or with `atTop` at its top; with `flash`,
+ * blink it. While the text pane is hidden, the line, and its file, wait until it is shown again: a
+ * hidden pane has no scroll to keep for the file it leaves.
  */
-export function revealLine(f, line, flash) {
+export function revealLine(f, line, flash, atTop = false) {
   if (f === null || f === undefined || !fileViews[f] || !line) return;
-  showFile(f);
   if (!sourceShown()) {
-    pendingReveal = { f, line, flash };
+    pendingReveal = { f, line, flash, atTop };
     return;
   }
   pendingReveal = null;
+  showFile(f);
   const el = fileViews[f].lines[line - 1];
   if (!el) return;
-  const top = el.offsetTop - source.clientHeight / 2 + el.offsetHeight / 2;
+  const top = atTop ? el.offsetTop - TOP_GAP : el.offsetTop - source.clientHeight / 2 + el.offsetHeight / 2;
   source.scrollTop = Math.max(0, top);
   if (flash) {
     el.classList.remove("flash");
@@ -137,9 +145,32 @@ export function revealLine(f, line, flash) {
 
 export function revealPending() {
   if (pendingReveal && sourceShown()) {
-    const { f, line, flash } = pendingReveal;
-    revealLine(f, line, flash);
+    const { f, line, flash, atTop } = pendingReveal;
+    revealLine(f, line, flash, atTop);
   }
+}
+
+/**
+ * Dim the text outside the definition of the subcircuit that level `i` draws, from its header to its
+ * end; at a file level, or with none, nothing is dimmed.
+ */
+export function scopeSource(i) {
+  const lines = doc && doc.levels[i] ? doc.levels[i].lines : null;
+  const mark = (on) => {
+    const view = scope && fileViews[scope.f];
+    if (!view) return;
+    for (let n = scope.from; n <= scope.to; n++) view.lines[n - 1]?.classList.toggle("in-scope", on);
+  };
+  mark(false);
+  scope = lines ? { f: lines[0], from: lines[1], to: lines[2] } : null;
+  mark(true);
+  source.classList.toggle("scoped", scope !== null);
+}
+
+/** Bring the start of the definition of the subcircuit that level `i` draws to the top of the text. */
+export function revealDefinition(i) {
+  const lines = doc && doc.levels[i] ? doc.levels[i].lines : null;
+  if (lines) revealLine(lines[0], lines[1], false, true);
 }
 
 source.addEventListener("click", (e) => {
