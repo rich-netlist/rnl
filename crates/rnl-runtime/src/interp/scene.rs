@@ -852,13 +852,8 @@ impl Interp<'_> {
             return v.clone();
         }
         if self.scenes[s].busy.contains(&key) {
-            if self.set(obj).removes {
-                let msg =
-                    "a cycle of sets with removals has no definite result; the whole interpretation fails (5.2.2)";
-                self.failed_doc = Some(msg.to_string());
-                let loc = ctx.and_then(|c| self.rec_loc(c.rec, 0));
-                self.sink.error(msg, loc);
-            }
+            // the statement that would close a cycle of sets in a level fails (5.2.2), so a set
+            // never comes back to itself; this only guards against it
             return Vec::new();
         }
         self.scenes[s].busy.insert(key);
@@ -866,7 +861,7 @@ impl Interp<'_> {
         // other scenes are not looked at
         let mods: Vec<(bool, ObjId, Rc<Ctx>)> = {
             let sd = self.set(obj);
-            let mut ks = sd.mods_by_scene.get(&s).cloned().unwrap_or_default();
+            let mut ks = sd.mods_by_scene.get(&Some(s)).cloned().unwrap_or_default();
             ks.sort_by(|a, b| sd.mods[*a].pos.cmp(&sd.mods[*b].pos));
             ks.into_iter().map(|k| (sd.mods[k].add, sd.mods[k].source, sd.mods[k].ctx.clone())).collect()
         };

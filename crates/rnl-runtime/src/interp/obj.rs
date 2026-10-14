@@ -4,6 +4,7 @@
 //! existing handles. Objects live in one arena and are referred to by [`ObjId`]. Host objects
 //! (the level, instances, nets, terminals) are unique per drawing level.
 
+use std::cell::Cell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
@@ -417,6 +418,8 @@ pub struct SetMod {
     pub add: bool,
     pub source: ObjId,
     pub ctx: Rc<Ctx>,
+    /// Where the statement is written in its record.
+    pub off: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -448,17 +451,18 @@ pub struct SetData {
     /// A written `{…}` stays a member inside another set.
     pub explicit: bool,
     pub mods: Vec<SetMod>,
-    /// The indexes in `mods` of the edits made in each scene, in order; `add_mod` keeps it.
-    pub mods_by_scene: HashMap<SceneId, Vec<usize>>,
+    /// The indexes in `mods` of the edits made in each scene, in order, and under `None` those read
+    /// before any scene, when the statements without a circuit are classified; `add_mod` keeps it.
+    pub mods_by_scene: HashMap<Option<SceneId>, Vec<usize>>,
     /// The sources in `mods` that are lazy or can become so (10.3), in order, while the set itself
     /// can be lazy; `add_mod` keeps it, and ADD-TO and REMOVE-FROM let go of the last ones once they
     /// stay not lazy.
     pub lazy_sources: Vec<ObjId>,
+    /// Whether `is_lazy` is going through `lazy_sources`.
+    pub lazy_busy: Cell<bool>,
     /// A plain set that is not lazy now and never will be (10.3): none of its members can be lazy
     /// (`new_obj` sets it), or the source of one of `mods` is lazy for good (`add_mod` sets it).
     pub not_lazy: bool,
-    /// Whether one of `mods` is a REMOVE-FROM; `add_mod` keeps it.
-    pub removes: bool,
     /// The host level unit that wrote it.
     pub writer: Option<UnitId>,
     pub kind: SetKind,
@@ -472,8 +476,8 @@ impl SetData {
             mods: Vec::new(),
             mods_by_scene: HashMap::new(),
             lazy_sources: Vec::new(),
+            lazy_busy: Cell::new(false),
             not_lazy: false,
-            removes: false,
             writer: None,
             kind: SetKind::Plain,
         }
@@ -482,17 +486,27 @@ impl SetData {
     /// Add an ADD-TO or REMOVE-FROM (5.2.2), given whether its source is lazy or can become so, and
     /// whether it is lazy for good, such as a selection.
     pub fn add_mod(&mut self, m: SetMod, lazy: bool, lazy_for_good: bool) {
-        if let Some(s) = m.ctx.scene {
-            self.mods_by_scene.entry(s).or_default().push(self.mods.len());
-        }
+        self.mods_by_scene.entry(m.ctx.scene).or_default().push(self.mods.len());
         if lazy_for_good && matches!(self.kind, SetKind::Plain) {
             self.not_lazy = true;
             self.lazy_sources = Vec::new();
         } else if lazy && !self.not_lazy {
             self.lazy_sources.push(m.source);
         }
-        self.removes |= !m.add;
         self.mods.push(m);
+    }
+
+    /// The objects written in the statement that makes it, among which are the sets it depends on
+    /// (5.2.2): its members, the sets of a UNION, the scope of a selection. A generated set is made
+    /// of usages and depends on no set.
+    pub fn made_of(&self) -> impl Iterator<Item = ObjId> + '_ {
+        let (items, other) = match &self.kind {
+            SetKind::Plain => (&self.items[..], None),
+            SetKind::Union { source } => (&[][..], Some(*source)),
+            SetKind::Select { scope, .. } => (&[][..], Some(*scope)),
+            SetKind::Gen { .. } => (&[][..], None),
+        };
+        items.iter().map(|(o, _)| *o).chain(other)
     }
 }
 

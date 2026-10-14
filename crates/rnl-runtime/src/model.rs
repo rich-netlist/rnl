@@ -176,7 +176,8 @@ pub struct LevelView {
 #[derive(Clone, Debug, Default)]
 pub struct Model {
     pub levels: Vec<LevelView>,
-    /// Set when the whole interpretation failed (1.5 rule 3, 7.6).
+    /// Set when the whole interpretation failed (1.5 rule 3, 7.6). Draft 0.2 has no case of it
+    /// (7.5), so it is never set.
     pub failed: Option<String>,
 }
 
