@@ -106,8 +106,11 @@ test("the search narrows the index; Enter opens the first match and Escape empti
   await search.press("Enter");
   await expect(page.locator("#level-name")).toHaveText("rdiv");
 
+  // a subcircuit opened from the index is the root of its path: no way up from it
+  await expect(page.locator("#up")).toBeHidden();
   // Escape empties the box, and leaves the rest as it is
-  await page.locator("#up").click();
+  await page.locator("#index .index-row.top").click();
+  await viewer.click("X3");
   await viewer.selected(`instance X3 in ${TOP}`);
   await search.fill("a");
   await search.press("Escape");

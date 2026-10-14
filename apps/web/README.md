@@ -8,6 +8,7 @@ The web viewer: the page of the RNL viewers ([`apps/viewer-ui`](../viewer-ui/REA
 - Files or a folder dropped on the page open as with Open and Open Folder.
 - **File › Reload** (F5, Ctrl+R) reads the document again, not the page, keeping the level, the view and the selection. A URL is fetched again past the browser's cache. Files are read again from what the browser holds of them: a dropped file as it is now, but a file chosen with Open or Open Folder only as it was when it was chosen; once it has changed, Reload says to open it again.
 - **Help › About** names the version and the commit the site was built from. The browser tab is named after the document.
+- The bar above the drawing shows the hierarchy path to the level shown, a segment per subcircuit instance gone down into, each going back to its level, as in the [desktop viewer](../desktop/README.md).
 - **View › Grid** shows a light grey grid under the drawing, dots or lines at every unit of the scene, coarser when zoomed out, and the axes through the origin, as in the [desktop viewer](../desktop/README.md); G shows and hides it, and the settings are kept in the browser for the next visit. The status bar shows where the pointer is on the drawing, in units with y up.
 - Packages found by name (16.2) are only the bundled standard packages, as with `rnl` without `--package-dir`; a package file named by path is read like an include.
 

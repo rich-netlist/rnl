@@ -11,7 +11,7 @@ import {
   setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
 } from "./panels.js";
 import { loadShell } from "./shell.js";
-import { current, doc, selected } from "./state.js";
+import { current, doc, path, selected } from "./state.js";
 import { $, load } from "./util.js";
 
 setSidebarWidth(load("sidebar-width", 420));
@@ -59,6 +59,10 @@ window.viewer = {
   /** The level drawn, an index into doc.levels. */
   get level() {
     return current;
+  },
+  /** The hierarchy path to it, from its root: per level, its index and the instance it was reached through, null for the root. */
+  get path() {
+    return path.map((s) => ({ level: s.level, via: s.via }));
   },
   /** The selected object, an index into doc.objects, or null. */
   get selected() {

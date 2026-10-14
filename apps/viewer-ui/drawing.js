@@ -3,11 +3,11 @@
 // selection is marked over the drawing, and a selected subcircuit instance gets the open badge. The
 // grid under it follows the view, and the status bar shows where the pointer is in the scene.
 
-import { current, doc, selected, setCurrent, setTreeActive, treeActive } from "./state.js";
+import { current, doc, selected, setCurrent, setPath } from "./state.js";
 import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { clearSelection, select } from "./selection.js";
-import { descend, opens, updateUp } from "./subcircuits.js";
+import { descend, opens, updatePath } from "./subcircuits.js";
 import { $, clamp, svgElement } from "./util.js";
 
 const canvas = $("canvas");
@@ -32,12 +32,13 @@ let press = null; // a mouse press on the drawing: where, and whether it became 
 let pointer = null; // where the pointer is on the canvas, in its pixels, while it is over it
 let badgeAt = null; // the drawing point of the open badge: a selected subcircuit's box corner
 
-/** Draw level `i`. `treePath` is the hierarchy row that asked for it, if one did. */
-export function showLevel(i, keptView, treePath) {
+/**
+ * Draw level `i`, with a view kept for it or else fitted. The hierarchy path that leads to it is set
+ * already (subcircuits.js); the bar above the drawing shows it.
+ */
+export function showLevel(i, keptView) {
   setCurrent(i);
   const lv = doc.levels[i];
-  setTreeActive(treePath !== undefined ? treePath : treeActive);
-  $("level-name").textContent = lv.title;
   $("level-kind").textContent = i === 0 ? "top level" : lv.kind === "subckt" ? "subcircuit" : "file level";
   $("status").textContent = lv.status ? `Not drawn without a solver: ${lv.status}` : "";
   $("status").title = $("status").textContent;
@@ -46,7 +47,7 @@ export function showLevel(i, keptView, treePath) {
   overlay = null;
   groups = new Map();
   updateHierarchy();
-  updateUp();
+  updatePath();
   badgeAt = null;
   positionBadge();
   scale = lv.scale || SVG_SCALE;
@@ -96,9 +97,9 @@ export function clearDrawing(message) {
   view = null;
   $("empty").textContent = message;
   $("empty").hidden = false;
-  $("level-name").textContent = "";
+  setPath([]);
+  updatePath();
   $("level-kind").textContent = "";
-  $("up").hidden = true;
   badgeAt = null;
   positionBadge();
   paintGrid(null);

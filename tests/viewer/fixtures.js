@@ -1,7 +1,7 @@
 // The Documents the fake shell serves: `rnl view` of a few files of the conformance corpus, built
 // natively before the tests run; a changed copy of one of them, for reading a file again; a netlist
-// with many subcircuits, for the subcircuit index; and statements over several lines in both
-// dialects, which the corpus has none of.
+// with many subcircuits, for the subcircuit index; subcircuits nested four deep, for the hierarchy
+// path; and statements over several lines in both dialects, which the corpus has none of.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -26,6 +26,25 @@ export const SUBCIRCUITS = [
   "adder", "buffer", "clock", "driver", "encoder", "filter", "gate", "hold", "inverter", "jitter", "keeper", "latch",
   "mixer", "mux", "nand", "oscillator", "pump", "quantizer", "regulator", "sampler", "timer", "unity", "vco", "window",
   "xor", "yield", "zero", "2stage",
+];
+
+/**
+ * Subcircuits nested four deep, every level drawn: the top level has XK1, a bank, whose XB1 and XB2
+ * are blocks, whose XC1 is a cell, whose XL1 and XL2 are leaves; and XC9, a cell at the top level too.
+ */
+export const NESTED = [
+  "* subcircuits nested four deep, and one of them at the top level too",
+  ".subckt leaf p q", "R1 p q 1k", ".ends",
+  ".subckt cell p q", "XL1 p m leaf", "XL2 m q leaf", ".ends",
+  ".subckt block p q", "XC1 p q cell", "R2 p q 1k", ".ends",
+  ".subckt bank p q", "XB1 p m block", "XB2 m q block", ".ends",
+  "XK1 a 0 bank", "XC9 a 0 cell", "R9 a 0 1k",
+  "* @RNL {", "*   #XK1 @PLACE(0, 0); #XC9 @PLACE(8, 0); #R9 @PLACE(16, 0)", "* }",
+  '* @RNL(scope="bank") {', "*   #XB1 @PLACE(0, 0); #XB2 @PLACE(8, 0)", "* }",
+  '* @RNL(scope="block") {', "*   #XC1 @PLACE(0, 0); #R2 @PLACE(8, 0)", "* }",
+  '* @RNL(scope="cell") {', "*   #XL1 @PLACE(0, 0); #XL2 @PLACE(8, 0)", "* }",
+  '* @RNL(scope="leaf") {', "*   #R1 @PLACE(0, 0)", "* }",
+  ".end",
 ];
 
 /** The statements over several lines: a SPICE netlist with `+` lines, and a Spectre one with `\`. */
@@ -82,7 +101,8 @@ function view(rnl, file, cwd) {
  * Write the fixtures into `dir`, each as NAME.json: those of FILES; "04-hierarchy-changed", the
  * Document of 04-hierarchy.sp after a comment line was added below its title and Vin's value
  * changed, so that every statement below the title moved down a line, with the same file names;
- * "subcircuits", a netlist that instantiates each of SUBCIRCUITS once at the top level; and
+ * "subcircuits", a netlist that instantiates each of SUBCIRCUITS once at the top level; "nested",
+ * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3; and
  * "continued" and "continued-spectre", the netlists of CONTINUED.
  */
 export function writeFixtures(rnl, dir) {
@@ -106,6 +126,12 @@ export function writeFixtures(rnl, dir) {
   lines.push(".end", "");
   fs.writeFileSync(path.join(dir, "subcircuits.sp"), lines.join("\n"));
   fs.writeFileSync(path.join(dir, "subcircuits.json"), view(rnl, "subcircuits.sp", dir));
+
+  const nested = NESTED.concat("").join("\n");
+  fs.writeFileSync(path.join(dir, "nested.sp"), nested);
+  fs.writeFileSync(path.join(dir, "nested.json"), view(rnl, "nested.sp", dir));
+  fs.writeFileSync(path.join(changed, "nested.sp"), nested.replace(/XB2/g, "XB3"));
+  fs.writeFileSync(path.join(dir, "nested-changed.json"), view(rnl, "nested.sp", changed));
 
   for (const [file, text] of Object.entries(CONTINUED)) {
     fs.writeFileSync(path.join(dir, file), text.concat("").join("\n"));

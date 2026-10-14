@@ -65,12 +65,13 @@
   <main class="drawing">
     <div class="level-bar">
       <button id="show-sidebar" class="icon" type="button" title="Show the side panel (Ctrl+B)" aria-label="Show the side panel">&#x203A;</button>
-      <span id="level-name" class="level-name"></span>
+      <nav id="level-path" class="level-path" aria-label="Hierarchy path"><span id="level-name" class="level-name"></span></nav>
       <span id="level-kind" class="level-kind"></span>
       <button id="up" class="up-button" type="button" hidden title="Up to the parent level (Backspace)">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 2.5 6.5 6 10M2.5 6.5H10a3.5 3.5 0 0 1 3.5 3.5V13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span id="up-name"></span>
       </button>
+      <div id="path-menu" class="path-menu" role="menu" aria-label="The levels in between" hidden></div>
     </div>
     <div id="canvas" class="canvas" tabindex="-1">
       <canvas id="grid" class="grid" aria-hidden="true"></canvas>

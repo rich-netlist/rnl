@@ -19,12 +19,12 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `shell.js` | The shell interface, and choosing the shell. |
 | `shells/desktop.js` | The desktop shell, the only module that uses `window.__TAURI__`. |
 | `shells/web.js` | The web shell: files, a folder, a URL or what is dropped, read as the core asks for them, and built by the core in a Worker. |
-| `state.js` | What the page shows: the Document, the level drawn, the selection, and the hierarchy path that led to the level. Modules read these bindings and change them through setters. |
-| `open.js` | Opening a source through the shell; reading it again keeps the level, the view and the selection. |
+| `state.js` | What the page shows: the Document, the level drawn, the selection, the hierarchy path to the level and the views kept by path. Modules read these bindings and change them through setters. |
+| `open.js` | Opening a source through the shell; reading it again keeps the level, the hierarchy path while its instances are there, the view and the selection. |
 | `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; what a click hits, from the boxes, pins and wires the Document gives; the selection marks and the open badge; where the pointer is in the scene, in the status bar. |
 | `grid.js` | The grid under the drawing, a view aid of the page on a canvas of its own (see [The grid](#the-grid)), and its settings dialog. |
 | `selection.js` | Selecting an instance or a net. |
-| `subcircuits.js` | Going down into a subcircuit instance and back up, each level with the view it had. |
+| `subcircuits.js` | The hierarchy path of the level shown and the bar above the drawing that shows it (see [The hierarchy path](#the-hierarchy-path)): going down into a subcircuit instance and back along the path, each level with the view it had on it. |
 | `text.js` | The text pane: the tabs and the lines of each file, the statements that do not take effect, the places of the selection, revealing a line, and clicks in the text. |
 | `syntax.js` | Highlighting the host statements and the RNL records. |
 | `problems.js` | The problems list and the coloured line numbers. |
@@ -38,6 +38,18 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `fonts/` | The drawing's web fonts, which [`scripts/fonts.py`](../../scripts/README.md) writes and git ignores (see [Fonts](#fonts)). |
 
 The modules import each other in cycles. At its top level a module only looks up its elements, keeps its own state and adds listeners; it calls nothing of another module there, so no imported binding is read before its module has run.
+
+## The hierarchy path
+
+The bar above the drawing shows the path of the level shown, from its root down to it, a segment per level: the root's names its level, the top level's title or a subcircuit's name, and every other names its subcircuit with, smaller and dimmer beside it, the instance it was reached through. The path is a list of levels, each with the name of its instance in the level before it (`state.js`):
+
+- Going down into a subcircuit instance, by Enter, a double click, the open badge or View › Open Subcircuit, adds the instance to the path.
+- A subcircuit picked in the index is the root of a path of its own, with no way up from it; a row of the tree gives the path from the top level down to its instance; a level reached otherwise, such as by an object of it selected in the text, cuts the path back to it when it is on it, and is the root of a new path when not.
+- A click on a segment but the last goes back to its level, cutting the path there; the up button and Backspace go back one level, and at the root there is no up button and Backspace does nothing. The level comes back with the view it had when it was left and the instance it was left through selected.
+- Reading the document again keeps the path when its levels and instances are still there by their names; otherwise the level shown is the root.
+- The views kept are by path, the root's title and the instances on it, so a subcircuit reached two ways keeps a view for each.
+
+The tree marks the row of the path when the path starts at the top level, and else the first row that reaches the level; the index marks the level shown. Where the bar is narrow, the level's kind gives way first, then the levels after the root, from the root's side, behind an ellipsis whose list goes back to them, then the root; the level shown always stays, its name cut short only when nothing else is left to give way.
 
 ## The grid
 
@@ -105,6 +117,7 @@ Module scope hides the page's state from tests and the console, so `window.viewe
 | --- | --- |
 | `doc` | The Document shown, or null. |
 | `level` | The level drawn, an index into `doc.levels`. |
+| `path` | The hierarchy path to it from its root: per level, `{ level, via }`, its index and the name of the instance it was reached through, null for the root. |
 | `selected` | The selected object, an index into `doc.objects`, or null. |
 | `command(id)` | Run a command, as its menu item does. |
 | `checked(id)` | Whether a check-mark command, such as `toggle-netlist`, is checked. |
