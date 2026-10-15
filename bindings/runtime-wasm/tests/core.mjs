@@ -201,6 +201,26 @@ test("a write gives the netlist written and its Document", () => {
   assert.ok("written" in core.respond(rcWrite([placeR1])));
 });
 
+test("parts ask for a snapshot, through the core and through the Worker", async () => {
+  const request = { ...untitled, parts: { drawing: false, host: true, model: true } };
+  const s = core.snapshot(request);
+  assert.equal(s.schema, "rnl-snapshot/1");
+  assert.equal(s.drawing, undefined);
+  assert.deepEqual(s.levels[0].host.instances.map((i) => i.id), ["#R1", "#C1"]);
+  const instances = s.levels[0].model.objects.filter((o) => o.kind === "instance");
+  assert.deepEqual(instances.map((o) => [o.id, o.at.value]), [["#R1", [0, 0]], ["#C1", [4, 0]]]);
+  // the standard package's ground stubs for the unwired pins on 0, by where its rule is written
+  assert.ok(s.levels[0].model.objects.some((o) => o.definition === "$GND_STUB" && o.id.startsWith("@")));
+  assert.throws(() => core.build(request), /the request is not a build without parts/);
+  assert.throws(() => core.snapshot(untitled), /the request is not a build with parts/);
+  const worker = startCore();
+  try {
+    assert.deepEqual(await worker.snapshot(request), s);
+  } finally {
+    worker.terminate();
+  }
+});
+
 test("the Worker writes, and gives every request the packages its build brings", async () => {
   const plain = startCore();
   try {

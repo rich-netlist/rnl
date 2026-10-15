@@ -27,14 +27,286 @@ fn flat(p: &Pos) -> Vec<f64> {
         .collect()
 }
 
+/// The unit vector of an exit direction in degrees, for the four directions pins have.
+fn dir_vector(d: u16) -> Option<(f64, f64)> {
+    match d {
+        0 => Some((1.0, 0.0)),
+        90 => Some((0.0, 1.0)),
+        180 => Some((-1.0, 0.0)),
+        270 => Some((0.0, -1.0)),
+        _ => None,
+    }
+}
+
+/// An exit direction turned with an object's orientation.
+fn turned(d: Option<u16>, o: Orient) -> Option<u16> {
+    let (x, y) = o.apply(dir_vector(d?)?);
+    match (x.round() as i32, y.round() as i32) {
+        (1, 0) => Some(0),
+        (0, 1) => Some(90),
+        (-1, 0) => Some(180),
+        (0, -1) => Some(270),
+        _ => None,
+    }
+}
+
 impl Interp<'_> {
     pub(crate) fn build_model(&mut self) -> Model {
         let mut levels = Vec::new();
         for s in 0..self.scenes.len() {
             levels.push(self.level_view(s));
         }
+        let language = self.units[self.level_unit[0]].version.clone();
+        let mut packages: Vec<(String, String)> = Vec::new();
+        for s in 0..self.scenes.len() {
+            let lv = self.scenes[s].level;
+            for e in self.effective_packages(lv) {
+                let u = &self.units[e.unit];
+                let p = (u.pkg_name.clone(), u.pkg_version.clone());
+                if !packages.contains(&p) {
+                    packages.push(p);
+                }
+            }
+        }
         // this version of the language has no conflict that makes the whole interpretation fail (7.5)
-        Model { levels, failed: None }
+        Model { levels, failed: None, language, packages }
+    }
+
+    // ---- ids for the editor interface (rnl-dev notes/rnl-editor-interface, 3.2)
+
+    /// Where the statement that made an object is, `@file:line:col`, for the objects that keep it.
+    fn site_id(&self, o: ObjId) -> Option<String> {
+        let (site, off) = match self.o(o) {
+            ObjData::Usage(u) => (&u.site, u.off),
+            ObjData::Wire { site, off, .. } | ObjData::Text { site, off, .. } | ObjData::KeyText { site, off, .. } => {
+                (site, *off)
+            }
+            ObjData::Bundle { site, .. } => (site, 0),
+            ObjData::Constraint(c) => (&c.site, c.off),
+            _ => return None,
+        };
+        let loc = self.rec_loc(site.as_ref()?.rec, off)?;
+        Some(format!("@{}:{}:{}", loc.file, loc.line, loc.col))
+    }
+
+    /// Is the object's `%` name one the level's records bind to it? Not so for a name bound in the
+    /// body of a definition, which each expansion binds anew.
+    fn level_named(&self, s: SceneId, o: ObjId) -> bool {
+        let name = &self.objs[o.0 as usize].name;
+        if name.is_empty() {
+            return false;
+        }
+        let u = self.level_unit[self.scenes[s].level];
+        let Some(b) = self.units[u].names.get(&('%', name.clone())) else { return false };
+        let key = b.key();
+        [Some(s), None].into_iter().any(|sc| {
+            let k = (key.clone(), sc);
+            matches!(self.memo.get(&k), Some(super::Memo::Val(v)) if *v == o)
+                || self
+                    .bound_memo
+                    .get(&k)
+                    .is_some_and(|bound| bound.iter().any(|((p, n), v)| *p == '%' && n == name && *v == o))
+        })
+    }
+
+    /// An object's id before the level's other objects are known: its name in the level, or
+    /// where it was made.
+    fn base_id(&self, s: SceneId, o: ObjId) -> String {
+        match self.o(o) {
+            ObjData::Inst { .. } => format!("#{}", quoted(&self.inst_name(o))),
+            ObjData::Net { display, .. } => format!("&{}", quoted(display)),
+            ObjData::LevelObj { .. } => "#".into(),
+            _ if self.level_named(s, o) => format!("%{}", quoted(&self.objs[o.0 as usize].name)),
+            _ => self.site_id(o).unwrap_or_else(|| format!("@{}", o.0)),
+        }
+    }
+
+    /// A symbol's name as a reference writes it: `$NMOS`, or `%amp` for one named in a level.
+    fn symbol_name(&self, sym: ObjId) -> String {
+        let name = &self.objs[sym.0 as usize].name;
+        if name.is_empty() || name.starts_with('$') {
+            self.label(sym)
+        } else {
+            format!("%{}", quoted(name))
+        }
+    }
+
+    /// Ids unique among `objs`. A name that several have, as each expansion of a definition makes
+    /// its own, is not the level's: those go by where they were made. Several made by one
+    /// statement are numbered after it, `#1`, `#2`, in order.
+    fn unique_ids(&self, s: SceneId, objs: &[ObjId], taken: &HashMap<ObjId, String>) -> HashMap<ObjId, String> {
+        let mut ids: Vec<String> = objs.iter().map(|o| self.base_id(s, *o)).collect();
+        let count = |ids: &[String]| {
+            let mut n: HashMap<String, usize> = taken.values().map(|v| (v.clone(), 1)).collect();
+            for i in ids {
+                *n.entry(i.clone()).or_default() += 1;
+            }
+            n
+        };
+        let n = count(&ids);
+        for (k, o) in objs.iter().enumerate() {
+            if ids[k].starts_with('%') && n[&ids[k]] > 1 {
+                ids[k] = self.site_id(*o).unwrap_or_else(|| format!("@{}", o.0));
+            }
+        }
+        let n = count(&ids);
+        let mut seen: HashMap<String, usize> = HashMap::new();
+        for id in ids.iter_mut() {
+            if n[id.as_str()] > 1 {
+                let k = seen.entry(id.clone()).or_default();
+                *k += 1;
+                *id = format!("{id}#{k}");
+            }
+        }
+        objs.iter().copied().zip(ids).collect()
+    }
+
+    /// The id of an object in a level whose objects have `ids`: theirs, or for a net, a terminal
+    /// or a point, as a reference writes it.
+    fn ref_id(&self, s: SceneId, o: ObjId, ids: &HashMap<ObjId, String>) -> String {
+        if let Some(id) = ids.get(&o) {
+            return id.clone();
+        }
+        match self.o(o) {
+            // an instance's terminals by number, as the netlist orders its nodes; a port by name
+            ObjData::Term { owner, index, name } => {
+                let base = self.ref_id(s, *owner, ids);
+                match name {
+                    Some(n) if !matches!(self.o(*owner), ObjData::Inst { .. } | ObjData::Bundle { .. }) => {
+                        format!("{base}:{}", quoted(n))
+                    }
+                    _ => format!("{base}:{index}"),
+                }
+            }
+            ObjData::KeyText { attach, key, .. } => format!("{}::{key}", self.ref_id(s, *attach, ids)),
+            _ => self.base_id(s, o),
+        }
+    }
+
+    /// Where a symbol is defined: the unit whose binding made it.
+    fn symbol_origin(&self, sym: ObjId) -> SymbolOrigin {
+        if self.symbol(sym).default {
+            return SymbolOrigin::None;
+        }
+        let mut found: Option<usize> = None;
+        for ((key, _), m) in &self.memo {
+            if let (super::Memo::Val(v), MemberKey::M { unit, .. }) = (m, key) {
+                if *v == sym {
+                    // the same symbol may be memoised per scene; any of them names the unit
+                    found = Some(found.map_or(*unit, |u: usize| u.min(*unit)));
+                }
+            }
+        }
+        match found.map(|u| &self.units[u]) {
+            Some(u) if u.kind == super::unit::UnitKind::Package => SymbolOrigin::Package(u.pkg_name.clone()),
+            Some(u) => u.level.map(SymbolOrigin::Level).unwrap_or_default(),
+            None => SymbolOrigin::None,
+        }
+    }
+
+    /// A vertex of a wire as the statement gives it.
+    fn vertex(&mut self, s: SceneId, v: ObjId, ids: &HashMap<ObjId, String>) -> Option<Vertex> {
+        match self.o(v).clone() {
+            ObjData::Term { owner, index, name } if matches!(self.o(owner), ObjData::Usage(_)) => Some(Vertex::Usage {
+                usage: self.ref_id(s, owner, ids),
+                role: name.unwrap_or_else(|| index.to_string()),
+            }),
+            ObjData::Term { .. } => Some(Vertex::Terminal(self.ref_id(s, v, ids))),
+            ObjData::Point { .. } if ids.contains_key(&v) => Some(Vertex::Point(ids[&v].clone())),
+            _ => self.point_of(s, v).map(Vertex::At),
+        }
+    }
+
+    /// What a role of a usage is attached to.
+    fn attached(&mut self, s: SceneId, o: ObjId, ids: &HashMap<ObjId, String>) -> Attach {
+        match self.o(o) {
+            ObjData::Point { .. } if !ids.contains_key(&o) => match self.point_of(s, o) {
+                Some(p) => Attach::At(p),
+                None => Attach::Object(self.label(o)),
+            },
+            _ => Attach::Object(self.ref_id(s, o, ids)),
+        }
+    }
+
+    /// The instances, bundles and usages of a scene, drawn or not, and its named points.
+    fn objects_of(
+        &mut self,
+        s: SceneId,
+        objs: &[ObjId],
+        points: &[ObjId],
+        ids: &HashMap<ObjId, String>,
+    ) -> (Vec<ObjectInfo>, Vec<PointInfo>) {
+        let mut out = Vec::new();
+        for &o in objs {
+            let (kind, host) = match self.o(o).clone() {
+                ObjData::Inst { .. } => ("instance", vec![ids[&o].clone()]),
+                ObjData::Bundle { members, .. } => {
+                    ("bundle", members.iter().map(|m| self.ref_id(s, *m, ids)).collect())
+                }
+                _ => ("usage", Vec::new()),
+            };
+            let (definition, attach) = match self.o(o).clone() {
+                ObjData::Usage(u) => {
+                    let roles = u.roles.iter().map(|(name, r)| (name.clone(), self.attached(s, *r, ids))).collect();
+                    (Some(self.label(u.definition)), roles)
+                }
+                _ => (None, Vec::new()),
+            };
+            let sym = self.scenes[s].symbol.get(&o).copied();
+            let symbol = sym.map(|sym| SymbolInfo {
+                name: self.symbol_name(sym),
+                origin: self.symbol_origin(sym),
+                default: self.symbol(sym).default,
+            });
+            let at = self.xy(s, o);
+            let orient = self.orientation(s, o);
+            let mut pins = Vec::new();
+            if let (Some(sym), Some(at)) = (sym, at) {
+                let sd = self.symbol(sym).clone();
+                pins = sd
+                    .pins
+                    .iter()
+                    .map(|p| {
+                        let d = orient.apply(p.pos);
+                        PinPlace {
+                            terminals: Vec::new(),
+                            at: (at.0 + d.0, at.1 + d.1),
+                            dir: turned(p.dir, orient),
+                            nets: Vec::new(),
+                        }
+                    })
+                    .collect();
+                for t in self.terms_of(s, o) {
+                    let Some(k) = self.pin_for(s, o, t) else { continue };
+                    let ObjData::Term { owner, index, name } = self.o(t).clone() else { continue };
+                    let term = match self.o(owner) {
+                        ObjData::Usage(_) => name.unwrap_or_else(|| index.to_string()),
+                        _ => format!("{}:{index}", self.ref_id(s, owner, ids)),
+                    };
+                    if !pins[k].terminals.contains(&term) {
+                        pins[k].terminals.push(term);
+                    }
+                    for n in self.term_nets(s, t) {
+                        let net = self.ref_id(s, n, ids);
+                        if !pins[k].nets.contains(&net) {
+                            pins[k].nets.push(net);
+                        }
+                    }
+                }
+            }
+            out.push(ObjectInfo { id: ids[&o].clone(), kind, host, definition, attach, symbol, at, orient, pins });
+        }
+        let junction_at: Vec<ObjId> = self.scenes[s]
+            .usages
+            .iter()
+            .filter(|a| self.label(self.usage(**a).definition) == "$JUNCTION")
+            .flat_map(|a| self.usage(*a).roles.iter().map(|(_, r)| *r).collect::<Vec<_>>())
+            .collect();
+        let points = points
+            .iter()
+            .map(|p| PointInfo { id: ids[p].clone(), at: self.xy(s, *p), junction: junction_at.contains(p) })
+            .collect();
+        (out, points)
     }
 
     fn style_of(&self, s: SceneId, o: ObjId) -> Style {
@@ -42,6 +314,20 @@ impl Interp<'_> {
             .style
             .get(&o)
             .map(|m| m.iter().map(|(k, (v, _))| (k.clone(), v.clone())).collect())
+            .unwrap_or_default()
+    }
+
+    /// The style properties the document's own records give an object: those that won from a
+    /// package, such as the standard package's defaults, left out. A package at the root is
+    /// placed first (0); one used in a level carries the tag `pkg` (`position_of`).
+    fn own_style_of(&self, s: SceneId, o: ObjId) -> Style {
+        let from_package = |p: &Pos| matches!(p.first(), Some(PosElem::Int(0))) || p.contains(&PosElem::Tag("pkg"));
+        self.scenes[s]
+            .style
+            .get(&o)
+            .map(|m| {
+                m.iter().filter(|(_, (_, p))| !from_package(p)).map(|(k, (v, _))| (k.clone(), v.clone())).collect()
+            })
             .unwrap_or_default()
     }
 
@@ -100,6 +386,7 @@ impl Interp<'_> {
             bbox,
             box_written: sd.bbox.is_some(),
             default: sd.default,
+            origin: self.symbol_origin(sym),
         });
 
         let prims = sd
@@ -241,6 +528,27 @@ impl Interp<'_> {
         let mut symbols: Vec<SymbolView> = Vec::new();
         let mut items = Vec::new();
         let last_symbol = self.last_symbol_pos(s);
+
+        // the objects of the editor interface, drawn or not, with ids unique in the level
+        let mut objs: Vec<ObjId> = self.inst_like(s).into_iter().filter(|o| !self.bundle_empty(*o)).collect();
+        objs.extend(self.scenes[s].usages.iter().copied().filter(|a| !self.usage(*a).in_symbol));
+        let named_points: Vec<ObjId> =
+            self.scenes[s].points.iter().copied().filter(|p| !self.objs[p.0 as usize].name.is_empty()).collect();
+        let wire_objs: Vec<ObjId> = self.scenes[s].wires.iter().copied().filter(|w| !self.is_obj_failed(*w)).collect();
+        let all: Vec<ObjId> = objs.iter().chain(&named_points).chain(&wire_objs).copied().collect();
+        let mut ids = self.unique_ids(s, &all, &HashMap::new());
+        // points whose name the level does not give them alone are left out
+        let named_points: Vec<ObjId> = named_points.into_iter().filter(|p| ids[p].starts_with('%')).collect();
+        let plain_texts: Vec<ObjId> =
+            self.scenes[s].texts.iter().copied().filter(|t| !matches!(self.o(*t), ObjData::KeyText { .. })).collect();
+        let text_ids = self.unique_ids(s, &plain_texts, &ids);
+        ids.extend(text_ids);
+        let (objects, points) = self.objects_of(s, &objs, &named_points, &ids);
+        let mut terminal_names = vec![Vec::new(); level.instances.len()];
+        for i in self.scenes[s].insts.clone() {
+            let ObjData::Inst { idx, .. } = *self.o(i) else { continue };
+            terminal_names[idx] = self.owner_terms(s, i).into_iter().map(|(_, n)| n).collect();
+        }
         let mut drawn: Vec<ObjId> = self.inst_like(s).into_iter().filter(|o| !self.bundle_empty(*o)).collect();
         for &a in &self.scenes[s].usages {
             let u = self.usage(a);
@@ -299,13 +607,17 @@ impl Interp<'_> {
                 continue;
             }
             let Some(points) = self.wire_points(s, w) else { continue };
-            let ObjData::Wire { nets, mode, .. } = self.o(w).clone() else { continue };
+            let ObjData::Wire { nets, mode, points: vertices, .. } = self.o(w).clone() else { continue };
+            let via = vertices.iter().filter_map(|v| self.vertex(s, *v, &ids)).collect();
             wires.push(WireView {
                 id: self.label(w),
+                object_id: self.ref_id(s, w, &ids),
                 nets: nets.iter().map(|n| self.net_display(*n)).collect(),
                 points,
+                via,
                 mode,
                 style: self.style_of(s, w),
+                own_style: self.own_style_of(s, w),
                 layer: self.layer_of(s, w),
                 order: self.key_of(s, w, &last_symbol),
             });
@@ -365,8 +677,17 @@ impl Interp<'_> {
             if drawable_att && layer == Layer::Middle {
                 layer = self.layer_of(s, att);
             }
+            let (key, attach) = match self.o(t) {
+                ObjData::KeyText { key, .. } => (Some(key.clone()), Some(self.ref_id(s, att, &ids))),
+                _ if matches!(self.o(att), ObjData::Point { .. } | ObjData::LevelObj { .. }) => (None, None),
+                _ => (None, Some(self.ref_id(s, att, &ids))),
+            };
             texts.push(TextView {
                 id: self.label(t),
+                object_id: self.ref_id(s, t, &ids),
+                attach,
+                key,
+                markup: text.as_str().to_string(),
                 anchor,
                 lines: markup::parse(&expanded),
                 halign: it.halign.clone().unwrap_or_else(|| "start".into()),
@@ -374,6 +695,7 @@ impl Interp<'_> {
                 rotate: it.rotate.unwrap_or(0.0),
                 orient,
                 style: self.style_of(s, t),
+                own_style: self.own_style_of(s, t),
                 layer,
                 order: self.key_of(s, t, &last_symbol),
             });
@@ -404,6 +726,9 @@ impl Interp<'_> {
             flylines,
             constraints,
             unplaced: self.scenes[s].unplaced.clone(),
+            objects,
+            points,
+            terminal_names,
         }
     }
 }

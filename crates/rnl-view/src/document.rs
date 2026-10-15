@@ -160,7 +160,7 @@ pub struct Span {
     pub kind: &'static str,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Diagnostic {
     /// "error", "warning" or "hint".

@@ -413,7 +413,7 @@ fn text_run(r: &rnl_render::TextRun) -> TextRun {
     }
 }
 
-fn run(r: &markup::Run) -> Run {
+pub(crate) fn run(r: &markup::Run) -> Run {
     match r {
         markup::Run::Text { text, style } => Run::Text { text: text.clone(), style: run_style(style) },
         markup::Run::Frac { num, den, style } => Run::Frac {

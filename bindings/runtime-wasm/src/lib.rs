@@ -28,7 +28,7 @@ use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
 use rnl_runtime::source::{normalize, MemoryProvider};
 use rnl_runtime::Options;
-use rnl_view::{BuildOptions, Document};
+use rnl_view::{BuildOptions, Document, Parts, Snapshot};
 use serde::{Deserialize, Serialize};
 
 /// What to build: the workspace and how. Fields the core does not know are ignored, so that a
@@ -54,6 +54,9 @@ pub struct Request {
     /// Give each level's primitives; false when not given.
     #[serde(default)]
     pub primitives: bool,
+    /// The parts of the editor interface's snapshot to give: with them, the answer is a
+    /// [`rnl_view::Snapshot`] instead of a Document.
+    pub parts: Option<PartsRequest>,
     /// Panic with this message, to test that the caller still gets an answer.
     #[cfg(feature = "test-panic")]
     pub panic: Option<String>,
@@ -65,6 +68,18 @@ pub struct Request {
 
 fn yes() -> bool {
     true
+}
+
+/// The parts of a snapshot ([`rnl_view::Parts`]): the Document unless `drawing` is false, and
+/// each level's host circuit and model when asked for.
+#[derive(Deserialize, Debug)]
+pub struct PartsRequest {
+    #[serde(default = "yes")]
+    pub drawing: bool,
+    #[serde(default)]
+    pub host: bool,
+    #[serde(default)]
+    pub model: bool,
 }
 
 /// What to write: an edit transaction's ops into its netlist ([`rnl_edit::write`]), and the
@@ -94,12 +109,15 @@ pub struct Written {
     pub document: Document,
 }
 
-/// The answer to a request: `{"document": ...}`, `{"written": ...}` or `{"error": "..."}`.
+/// The answer to a request: `{"document": ...}`, `{"snapshot": ...}`, `{"written": ...}` or
+/// `{"error": "..."}`.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Response {
     /// The Document of the entry.
     Document(Box<Document>),
+    /// The snapshot of the entry, when the request asks for `parts`.
+    Snapshot(Box<Snapshot>),
     /// The netlist a [`WriteRequest`] wrote, and its Document.
     Written(Box<Written>),
     /// Why there is none: the request is neither a [`Request`] nor a [`WriteRequest`], the entry
@@ -144,6 +162,13 @@ pub fn respond(request: &[u8]) -> Response {
         svg: request.svg,
         primitives: request.primitives,
     };
+    if let Some(p) = request.parts {
+        let parts = Parts { drawing: p.drawing, host: p.host, model: p.model };
+        return match rnl_view::snapshot(&request.entry, &files, &options, parts) {
+            Ok(s) => Response::Snapshot(Box::new(s)),
+            Err(e) => Response::Error(e),
+        };
+    }
     match rnl_view::build(&request.entry, &files, &options) {
         Ok(d) => Response::Document(Box::new(d)),
         Err(e) => Response::Error(e),
@@ -458,6 +483,30 @@ R1 a 0 1k
                 .contains("// @RNL(author=\"test\") {\n//   #r1 @PLACE(0, 0)\n// }\n"),
             "{v}"
         );
+    }
+
+    #[test]
+    fn parts_ask_for_a_snapshot() {
+        let files = json!({ "/w/a.sp": NETLIST });
+        let v = answer(
+            json!({ "entry": "/w/a.sp", "files": files, "parts": { "drawing": false, "host": true, "model": true } }),
+        );
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys, ["snapshot"]);
+        let s = &v["snapshot"];
+        assert_eq!(s["schema"], "rnl-snapshot/1");
+        assert!(s.get("drawing").is_none());
+        let level = &s["levels"][0];
+        assert_eq!(level["host"]["instances"][0]["id"], "#R1");
+        assert_eq!(level["model"]["objects"][1]["at"]["value"], json!([4.0, 0.0]));
+        // the snapshot is the one rnl-view gives, and its drawing the Document of a build
+        let provider = MemoryProvider::new().with("/w/a.sp", NETLIST);
+        let parts = Parts { drawing: true, host: false, model: true };
+        let native = rnl_view::snapshot("/w/a.sp", &provider, &BuildOptions::default(), parts).unwrap();
+        let v = answer(json!({ "entry": "/w/a.sp", "files": files, "parts": { "model": true } }));
+        assert_eq!(v["snapshot"], serde_json::to_value(native).unwrap());
+        let built = answer(json!({ "entry": "/w/a.sp", "files": files }));
+        assert_eq!(v["snapshot"]["drawing"], built["document"]);
     }
 
     #[test]

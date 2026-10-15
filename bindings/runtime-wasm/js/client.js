@@ -11,6 +11,8 @@ import { requestText } from "./core.js";
  * @property {(request: import("./core.js").Request) => Promise<object>} build Build the Document of a
  *   request; rejects with an Error with the core's message when there is none. The request is sent
  *   as the JSON text `requestText` makes of it, so it is read as loadCore's build reads it.
+ * @property {(request: import("./core.js").Request) => Promise<object>} snapshot Build the snapshot of
+ *   a request with `parts`, the editor interface's view of the document (snapshot.d.ts).
  * @property {(request: import("./core.js").WriteRequest) => Promise<{ text: string, document: object }>}
  *   write Write the ops of a request into its netlist, and build what was written: the netlist
  *   written and its Document, whose diagnostics say how it reads. Rejects with the core's message
@@ -76,6 +78,7 @@ export function startCore(options = {}) {
 
   return {
     build: (request) => send(request, "document"),
+    snapshot: (request) => send(request, "snapshot"),
     write: (request) => send(request, "written"),
     terminate() {
       stop(new Error("The core was stopped."));

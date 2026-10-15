@@ -44,8 +44,8 @@ const wasm = join(metadata.target_directory, "wasm32-unknown-unknown", "wasm", "
 mkdirSync(out, { recursive: true });
 copyFileSync(wasm, join(out, "rnl_runtime_wasm.wasm"));
 for (const name of readdirSync(join(here, "js"))) copyFileSync(join(here, "js", name), join(out, name));
-// the Document's declarations, which core.d.ts and client.d.ts refer to
-copyFileSync(join(here, "..", "..", "crates", "rnl-view", "types", "document.d.ts"), join(out, "document.d.ts"));
+// the declarations of the Document and of the snapshot, which core.d.ts and client.d.ts refer to
+for (const name of ["document.d.ts", "snapshot.d.ts"]) copyFileSync(join(here, "..", "..", "crates", "rnl-view", "types", name), join(out, name));
 const lines = (...l) => l.join("\n") + "\n";
 if (Object.keys(manifest).length) {
   const pkg = JSON.parse(readFileSync(join(here, "js", "package.json"), "utf8"));

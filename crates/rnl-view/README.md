@@ -20,6 +20,25 @@ The crate also has what the `rnl` command needs that reads no files: dialect det
 
 The crate does no file I/O, so it builds for `wasm32-unknown-unknown`.
 
+## Snapshots
+
+```rust
+pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts: Parts) -> Result<Snapshot, String>
+```
+
+gives the editor interface's view of a document (`notes/rnl-editor-interface/spec-draft.md` in rnl-dev, section 3), from the same interpretation as its Document, for a converter or an editor that reads the document by objects rather than draws it. This first part has what Analog Canvas's import needs:
+
+- the language version, the packages in effect by name and version, the files, the diagnostics, and the Document as `drawing` unless `parts.drawing` is false;
+- for each drawing level, by its id (`subckt:NAME`, or `file:PATH` for the file level), when `parts` ask:
+  - `host`, the host circuit: the ports, the instances with their masters and terminals (number, name and net), and the nets, each net written as on the first line that names it;
+  - `model`, what the RNL makes of it: the instances, bundles and usages, drawn or not, with their symbols, positions, orientations and pins where they are drawn; the named points and whether a junction is drawn at them; the wires with their vertices as written and as routed; the texts with their markup, lines, anchors and alignment.
+- Objects go by ids that a transaction can write back: `#M1`, `&vout`, `&"vdd!"`, `%gnd1` for a name the level binds, and `@file:line:col` for an object without one, where the statement that made it is, with `#n` after it when the statement made several. A name bound in a definition's body, which each expansion binds anew, does not count. An instance's terminals are written by number, `#M1:1`; a usage's pins by role.
+- A symbol is named by an id unique among the level's symbols: its name, or its name and where it is defined after `@` when two share it, as a subcircuit's symbol (9.2.6) and one of the file's may.
+- The `style` of a wire or a text holds what the document's own records give, not the standard package's defaults, so that a converter reads back what it wrote. A text with nothing to show, such as a label emptied by `rnl-std-no-labels`, is left out.
+- Each value is a slot with a `source`, which stays null until the snapshot's `sources` come; `revision` comes with them.
+
+`rnl snapshot FILE` prints it, with the host circuit and the model by default.
+
 ## Drawings
 
 A level's drawing comes in the outputs the frontend asks for. A level has an `svg` field only when the SVG was asked for, and a `primitives` field only when the primitives were; its `scale` is always there.
@@ -30,7 +49,7 @@ A level's drawing comes in the outputs the frontend asks for. A level has an `sv
 
 ## Type definitions
 
-[`types/document.d.ts`](types/document.d.ts) declares the Document and everything in it in TypeScript, for frontends and their checks; the page in [`apps/viewer-ui`](../../apps/viewer-ui/README.md) refers to it. It is generated from the Rust types by [ts-rs](https://crates.io/crates/ts-rs), which the types derive in the tests only, and laid out by the test to be read. The test fails when the file is not what the types give; after a change to them that is meant, write it with:
+[`types/document.d.ts`](types/document.d.ts) declares the Document and everything in it in TypeScript, for frontends and their checks; the page in [`apps/viewer-ui`](../../apps/viewer-ui/README.md) refers to it. [`types/snapshot.d.ts`](types/snapshot.d.ts) declares the snapshot. They are generated from the Rust types by [ts-rs](https://crates.io/crates/ts-rs), which the types derive in the tests only, and laid out by the test to be read. The test fails when the file is not what the types give; after a change to them that is meant, write it with:
 
 ```bash
 RNL_BLESS=1 cargo test -p rnl-view types

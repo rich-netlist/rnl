@@ -3,8 +3,9 @@
 // copies next to this file.
 
 import type { Document } from "./document.js";
+import type { Snapshot } from "./snapshot.js";
 
-export type { Document };
+export type { Document, Snapshot };
 
 /** What to build: the workspace and how. Fields the core does not know are ignored. */
 export interface Request {
@@ -22,6 +23,11 @@ export interface Request {
   svg?: boolean;
   /** Give each level's primitives; false when not given. */
   primitives?: boolean;
+  /**
+   * The parts of the editor interface's snapshot to give: with them, the answer is a Snapshot,
+   * with the Document as its `drawing` unless `drawing` is false.
+   */
+  parts?: { drawing?: boolean; host?: boolean; model?: boolean };
 }
 
 export type Point = [number, number];
@@ -109,10 +115,14 @@ export interface Written {
 export interface Core {
   /** Build the Document of a request; throws an Error with the core's message when there is none. */
   build(request: Request | string): Document;
+  /** Build the snapshot of a request with `parts`, as build builds the Document. */
+  snapshot(request: Request | string): Snapshot;
   /** Write the ops into the netlist and build it; throws an Error when an op cannot be written. */
   write(request: WriteRequest | string): Written;
   /** The core's answer as it gives it; throws only when the core stops. */
-  respond(request: Request | WriteRequest | string): { document: Document } | { written: Written } | { error: string };
+  respond(
+    request: Request | WriteRequest | string,
+  ): { document: Document } | { snapshot: Snapshot } | { written: Written } | { error: string };
 }
 
 /** Load the core: the module by URL, as a response, as bytes, or compiled. */

@@ -6,6 +6,7 @@
 
 mod document;
 mod primitive;
+mod snapshot;
 #[cfg(test)]
 mod types;
 
@@ -23,6 +24,10 @@ pub use primitive::{
 };
 /// Texts held in memory, for a frontend that builds one, such as a netlist from the clipboard.
 pub use rnl_runtime::source::MemoryProvider;
+pub use snapshot::{
+    FileRef, HostInstance, HostLevel, HostNet, HostTerminal, LevelModel, LevelSnapshot, ObjectView, PackageUse, Parts,
+    PinView, PointView, Slot, Snapshot, SymbolRef, TextView, Vertex, WireView, SCHEMA,
+};
 
 /// The standard packages bundled with the core (16.2, 16.3).
 const BUNDLED: [(&str, &str); 2] = [
@@ -75,6 +80,22 @@ pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Resul
     }
     let r = interpret_in(entry, options.dialect.as_deref(), &ws, &options.runtime)?;
     Ok(document::document(entry, &r, ws.missing.into_inner(), options))
+}
+
+/// The snapshot of `entry` for the editor interface, with the parts `parts` asks for, from the
+/// same interpretation as its Document; the Document in it is built as `options` ask. Fails as
+/// [`build`] does.
+pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts: Parts) -> Result<Snapshot, String> {
+    let ws = Workspace::new(files);
+    if ws.read(&slashed(entry)).is_none() {
+        return Err(format!("cannot read {entry}"));
+    }
+    let r = interpret_in(entry, options.dialect.as_deref(), &ws, &options.runtime)?;
+    // without the drawing, the Document is built only for its files, levels and diagnostics
+    let draw =
+        if parts.drawing { options.clone() } else { BuildOptions { svg: false, primitives: false, ..options.clone() } };
+    let document = document::document(entry, &r, ws.missing.into_inner(), &draw);
+    Ok(snapshot::snapshot(&r, document, parts))
 }
 
 /// Is the entry Spectre? By `dialect`, by the `.scs` extension, or a `simulator lang=spectre`

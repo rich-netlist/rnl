@@ -13,6 +13,7 @@ const USAGE: &str = "usage:
   rnl render FILE -o DIR [options]  write one SVG per drawing level
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
+  rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
@@ -24,6 +25,8 @@ options:
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
+snapshot options:
+  --parts LIST        the parts to give, of drawing, host and model; host,model by default
 write:
   REQUEST.json is {\"dialect\", \"netlist\", \"author\", \"ops\"}, the ops as the editor interface
   draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out";
@@ -38,6 +41,7 @@ struct Args {
     svg: bool,
     primitives: bool,
     author: Option<String>,
+    parts: Option<String>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -53,6 +57,7 @@ fn parse_args() -> Result<Args, String> {
     let mut dialect = None;
     let (mut svg, mut primitives) = (true, false);
     let mut author = None;
+    let mut parts = None;
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
@@ -62,12 +67,13 @@ fn parse_args() -> Result<Args, String> {
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--author" => author = Some(it.next().ok_or("--author needs a name")?),
+            "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
     }
     let file = file.ok_or(USAGE)?;
-    Ok(Args { command, file, out, package_dirs, std, dialect, svg, primitives, author })
+    Ok(Args { command, file, out, package_dirs, std, dialect, svg, primitives, author, parts })
 }
 
 fn main() -> ExitCode {
@@ -122,6 +128,27 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
+        "snapshot" => {
+            let list = args.parts.as_deref().unwrap_or("host,model");
+            let mut parts = rnl_view::Parts { drawing: false, host: false, model: false };
+            for p in list.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+                match p {
+                    "drawing" => parts.drawing = true,
+                    "host" => parts.host = true,
+                    "model" => parts.model = true,
+                    _ => return Err(format!("--parts: unknown part {p}; the parts are drawing, host and model")),
+                }
+            }
+            let options = BuildOptions {
+                dialect: args.dialect.clone(),
+                runtime: Options { std: args.std },
+                svg: args.svg,
+                primitives: args.primitives,
+            };
+            let snapshot = rnl_view::snapshot(&args.file.to_string_lossy(), &provider, &options, parts)?;
+            println!("{}", serde_json::to_string_pretty(&snapshot).unwrap());
             Ok(ExitCode::SUCCESS)
         }
         "render" => {
