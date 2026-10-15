@@ -1025,47 +1025,50 @@ impl Interp<'_> {
             | ObjData::Bundle { .. } => self.point_of(s, att),
             _ => None,
         };
-        let sym_pos = self.text_sym_pos(t);
+        // Each axis on its own (13.3): an absolute position (PLACE) or an offset (dx, dy), whichever was
+        // written later, whatever the priority; failing both, the position the symbol gives a label it
+        // defines, turned with the owner; failing that, the axis is free.
+        let mut xy = self.scenes[s].pos.get(&t).copied().unwrap_or([None, None]);
         if let Some(b) = base {
-            if (items.dx.is_some() || items.dy.is_some()) && sym_pos.is_none() {
-                // one axis is either an absolute position (PLACE) or an offset (dx, dy): whichever was written
-                // later replaces the other, whatever the priority (13.3)
-                let cur = self.scenes[s].pos.get(&t).copied().unwrap_or([None, None]);
-                let mut xy = cur;
-                for (k, axis, item) in [(0usize, 'x', items.dx), (1, 'y', items.dy)] {
-                    let Some(d) = item else { continue };
-                    let sc = &self.scenes[s];
-                    let ats: Vec<Pos> = sc
-                        .at_by_target
-                        .get(&t)
-                        .into_iter()
-                        .flatten()
-                        .map(|&j| &sc.at[j])
-                        .filter(|f| {
-                            matches!(f.data, FactData::Coord(a, _) if a == axis)
-                                && self.fact_priority(s, f) != Priority::Disabled
-                        })
-                        .map(|f| f.pos.clone())
-                        .collect();
-                    let off = self.offset_pos(s, t, k == 0);
-                    if ats.is_empty() || off > *ats.iter().max().unwrap() {
-                        xy[k] = Some(if k == 0 { b.0 } else { b.1 } + d);
-                    }
+            for (k, axis, item) in [(0usize, 'x', items.dx), (1, 'y', items.dy)] {
+                let Some(d) = item else { continue };
+                let sc = &self.scenes[s];
+                let ats: Vec<Pos> = sc
+                    .at_by_target
+                    .get(&t)
+                    .into_iter()
+                    .flatten()
+                    .map(|&j| &sc.at[j])
+                    .filter(|f| {
+                        matches!(f.data, FactData::Coord(a, _) if a == axis)
+                            && self.fact_priority(s, f) != Priority::Disabled
+                    })
+                    .map(|f| f.pos.clone())
+                    .collect();
+                let off = self.offset_pos(s, t, k == 0);
+                if ats.is_empty() || off > *ats.iter().max().unwrap() {
+                    xy[k] = Some(if k == 0 { b.0 } else { b.1 } + d);
                 }
-                if let [Some(x), Some(y)] = xy {
-                    return Some((x, y));
+            }
+            if let Some(sp) = self.text_sym_pos(t) {
+                if matches!(self.o(att), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. }) {
+                    let d = self.orientation(s, att).apply(sp);
+                    xy = [xy[0].or(Some(b.0 + d.0)), xy[1].or(Some(b.1 + d.1))];
                 }
             }
         }
-        if let Some(p) = self.xy(s, t) {
-            return Some(p);
+        if let [Some(x), Some(y)] = xy {
+            return Some((x, y));
         }
-        if let (Some(sp), Some(b)) = (sym_pos, base) {
-            if matches!(self.o(att), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. }) {
-                let d = self.orientation(s, att).apply(sp);
-                return Some((b.0 + d.0, b.1 + d.1));
-            }
-        }
+        // a free axis: where this implementation puts the text, on the axes the scene leaves free
+        let free = self.text_default_place(s, att, base)?;
+        Some((xy[0].unwrap_or(free.0), xy[1].unwrap_or(free.1)))
+    }
+
+    /// Where this implementation puts a text whose position the scene and the symbol leave free:
+    /// on the point it is attached to, beside the object, on the first wire of the net, or above the
+    /// middle of the wire (13.3).
+    fn text_default_place(&mut self, s: SceneId, att: ObjId, base: Option<Pt>) -> Option<Pt> {
         if matches!(self.o(att), ObjData::Point { .. } | ObjData::Pos { .. }) {
             return base;
         }

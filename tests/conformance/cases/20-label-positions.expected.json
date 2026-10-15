@@ -1,0 +1,578 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "20-label-positions.sp",
+      "kind": "file",
+      "file": "20-label-positions.sp",
+      "symbols": [
+        {
+          "name": "$TAG",
+          "box": [
+            -2.0,
+            -0.5,
+            2.0,
+            0.5
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -2.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                2.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R2",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R3",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            20.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R4",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            -10.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R5",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            10.0,
+            -10.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R6",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            20.0,
+            -10.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#R2::name",
+          "anchor": [
+            13.0,
+            1.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "R2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R3::name",
+          "anchor": [
+            25.0,
+            2.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "R3",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R4::value",
+          "anchor": [
+            1.0,
+            -13.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "4k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R6::name",
+          "anchor": [
+            19.0,
+            -8.5
+          ],
+          "lines": [
+            [
+              {
+                "text": "R6",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R6::note",
+          "anchor": [
+            19.0,
+            -11.5
+          ],
+          "lines": [
+            [
+              {
+                "text": "note",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R1::name",
+          "anchor": [
+            -3.0,
+            1.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "R1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R1::value",
+          "anchor": [
+            1.0,
+            -1.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R2::value",
+          "anchor": [
+            11.0,
+            1.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "2k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R3::value",
+          "anchor": [
+            21.0,
+            -1.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "3k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R4::name",
+          "anchor": [
+            1.0,
+            -9.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "R4",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R5::name",
+          "anchor": [
+            11.0,
+            -9.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "R5",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R5::value",
+          "anchor": [
+            11.0,
+            -11.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "5k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R6::value",
+          "anchor": [
+            21.0,
+            -11.0
+          ],
+          "lines": [
+            [
+              {
+                "text": "6k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": []
+}
