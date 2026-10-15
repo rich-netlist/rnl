@@ -599,7 +599,7 @@ impl Interp<'_> {
         // `numbering` is a field of the draft 0.3 only (2.8, 5.9)
         let draft: &[crate::words::HeaderField] =
             if self.follows_0_3(u) { crate::words::draft_header_fields() } else { &[] };
-        let mut numbering_at = None;
+        let (mut numbering_at, mut scope_at) = (None, None);
         for n in &params.named {
             let loc = self.recs[rec].loc(n.off);
             let fields = || words().header_fields.iter().chain(draft);
@@ -637,7 +637,10 @@ impl Interp<'_> {
             match n.name.as_str() {
                 "type" => h.type_ = v.clone(),
                 "priority" => h.priority = Priority::parse(v),
-                "scope" => h.scope = Some(v.clone()),
+                "scope" => {
+                    h.scope = Some(v.clone());
+                    scope_at = Some(loc);
+                }
                 "numbering" => {
                     if v.chars().count() != 16 || !v.chars().all(|c| c.is_ascii_hexdigit()) {
                         self.diag_in(
@@ -654,13 +657,27 @@ impl Interp<'_> {
                 _ => {}
             }
         }
-        if let (Some(loc), true) = (numbering_at, h.type_ != "generated") {
+        // the RNL of a subcircuit covers only itself: scope written inside one is an error, and the
+        // record is read as one of the subcircuit's own (2.6, 2.8)
+        if let (Some(loc), Some(LevelKind::Subckt)) = (scope_at, self.unit_level_kind(u)) {
             self.diag_in(
                 Severity::Error,
-                "record header field numbering is written only with type=\"generated\", in the record of the solver; treated as not written (2.8, 5.9)",
+                "scope= is not written in a record inside a subcircuit, whose RNL covers only itself; treated as not written, so the record is the subcircuit's own (2.6, 2.8)",
                 Some(loc),
                 &pkg,
             );
+            h.scope = None;
+        }
+        // numbering is written only in the record of the solver, which is in the level's own text
+        let wrong = if h.type_ != "generated" {
+            Some("record header field numbering is written only with type=\"generated\", in the record of the solver; treated as not written (2.8, 5.9)")
+        } else if h.scope.is_some() {
+            Some("record header field numbering is not written in a record with scope=: the record of the solver is in the level's own text; treated as not written (2.6, 2.8, 5.9)")
+        } else {
+            None
+        };
+        if let (Some(loc), Some(msg)) = (numbering_at, wrong) {
+            self.diag_in(Severity::Error, msg, Some(loc), &pkg);
             h.numbering = None;
         }
         if self.units[u].kind == UnitKind::Package && (h.scope.is_some() || h.type_ == "generated") {

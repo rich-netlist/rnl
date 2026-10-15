@@ -196,3 +196,54 @@ fn a_rule_in_a_scope_record_reaches_the_levels_below_the_target() {
     assert_eq!(symbol(&r, "leaf", "#M1"), "$NMOS");
     assert_eq!(symbol(&r, "other", "#M3"), "$NMOS4");
 }
+
+#[test]
+fn scope_written_inside_a_subcircuit_is_an_error_and_not_written() {
+    // the RNL of a subcircuit covers only itself (2.6): one error, on the field, and the record is
+    // read as ota's own, so its statements take effect there (2.8)
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt ota a b\nR1 a b 1k\n\
+                * @RNL(scope=\"x\") { #R1 @PLACE(1, 2) }\n.ends ota\nX1 n1 n2 ota\n.end\n";
+    let r = interpret(&MemoryProvider::new().with("t.sp", text), &Options::solver());
+    let e = errors(&r);
+    assert_eq!(e.len(), 1, "{e:?}");
+    assert_eq!(e[0].0, 5, "{e:?}");
+    let field = r.diagnostics().into_iter().find(|d| d.severity == Severity::Error).unwrap().loc.clone().unwrap();
+    assert_eq!(field.col, text.lines().nth(4).unwrap().find("scope").unwrap() as u32 + 1);
+    assert!(e[0].1.contains("treated as not written"), "{e:?}");
+    let p = ota(&r);
+    assert_eq!(fixed_at(&p.objects[named(p, "#R1").0].position), Some((1.0, 2.0)));
+}
+
+#[test]
+fn scope_at_a_file_level_whose_target_is_not_found_fails_the_whole_record() {
+    // the statements have no level to be resolved in, and all fail (2.6), as before
+    let text = netlist("", "#R1 @PLACE(1, 2)").replace("scope=\"ota\"", "scope=\"nosuch\"");
+    let r = interpret(&MemoryProvider::new().with("t.sp", &text), &Options::solver());
+    let e = errors(&r);
+    assert_eq!(e.len(), 1, "{e:?}");
+    assert_eq!(e[0].0, 7, "{e:?}");
+    assert!(e[0].1.contains("finds no subcircuit below this level"), "{e:?}");
+    // the whole record, from `@RNL` to its closing brace
+    let line = text.lines().nth(6).unwrap();
+    let whole = |f: &rnl_runtime::model::FailedSpan| {
+        (f.start.line, f.start.col, f.end.line, f.end.col) == (7, 3, 7, line.chars().count() as u32)
+    };
+    assert!(r.failed.iter().any(whole), "{:?}", r.failed);
+    let p = ota(&r);
+    assert_eq!(fixed_at(&p.objects[named(p, "#R1").0].position), None);
+}
+
+#[test]
+fn numbering_in_a_record_with_scope_is_not_written() {
+    // a field of the draft 0.3 for the record of the solver, which is in the level's own text
+    // (2.6, 2.8): an error, and the field is treated as not written; the record still applies to ota
+    let text = netlist("", "#R1 @PLACE(1, 2)")
+        .replace("\"0.2\"", "\"0.3\"")
+        .replace("@RNL(scope=\"ota\")", "@RNL(type=\"generated\", scope=\"ota\", numbering=\"0123456789abcdef\")");
+    let r = interpret(&MemoryProvider::new().with("t.sp", &text), &Options { draft: true, ..Options::default() });
+    let e = errors(&r);
+    assert_eq!(e.len(), 1, "{e:?}");
+    assert!(e[0].1.contains("numbering is not written in a record with scope="), "{e:?}");
+    let ota = r.model.levels.iter().find(|l| l.title == "ota").unwrap();
+    assert!(ota.unplaced.iter().all(|u| u != "#R1"), "{:?}", ota.unplaced);
+}
