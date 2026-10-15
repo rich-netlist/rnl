@@ -403,9 +403,12 @@ impl Interp<'_> {
     /// for `chain[i]` and n, the length of the chain, for `own`. It is written at 0 outside every
     /// usage of the chain, and at j + 1 in the body of `chain[j]`, or of a usage in its expansion
     /// that is not in the chain, outside `chain[j + 1]`. Written at a depth lower than its
-    /// target's, it comes from outside; otherwise it is the target's own. A usage's own statements,
-    /// else its `priority=`, are its own priority, written at the usage's depth; the own statements
-    /// on `own` are written at n, inside every usage.
+    /// target's, it comes from outside; otherwise it is the target's own. Only a statement that
+    /// names its target, through `::`, comes from outside (14.8): one that a selection reaches
+    /// (`Fact::direct` false) is an ordinary statement on its target, one of the target's own,
+    /// wherever it is written. A usage's own statements, else its `priority=`, are its own
+    /// priority, written at the usage's depth; the own statements on `own` are written at n,
+    /// inside every usage.
     ///
     /// The priority of a usage goes down: from the outermost inward, a usage governs when its own
     /// priority, or a statement from outside on it, is written no deeper than a bound, which then
@@ -429,7 +432,7 @@ impl Interp<'_> {
             let mut latest: Option<(&Pos, Priority)> = None;
             for g in self.scenes[s].prioritys.iter().filter(|g| g.target == target) {
                 let FactData::Priority(value) = g.data else { continue };
-                let at = self.written_depth(g, chain);
+                let at = if g.direct { self.written_depth(g, chain) } else { t };
                 if at < t {
                     said.push(Said { rank: (t, true, true, Some(&g.pos)), at, value });
                 } else if latest.is_none_or(|(q, _)| *q <= g.pos) {

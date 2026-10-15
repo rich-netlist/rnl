@@ -1587,7 +1587,13 @@ impl Interp<'_> {
             }
             return Ok((a.obj, a.sel));
         }
-        self.apply_op(s, &op, a.obj, ctx.pos.clone(), !a.sel && !ctx.selected, ctx)?;
+        // what a generation expands counts as reached through a selection (8.3), but a PRIORITY
+        // there that names its object, such as `%in::row` in a body, still comes from outside
+        // when written outside the object's usage (14.8): for it, only how the object is reached
+        // counts, as for a set above
+        let priority = matches!(op, TargetOp::Priority { .. });
+        let direct = !a.sel && (priority || !ctx.selected);
+        self.apply_op(s, &op, a.obj, ctx.pos.clone(), direct, ctx)?;
         Ok((a.obj, a.sel))
     }
 
@@ -1608,7 +1614,8 @@ impl Interp<'_> {
         let mut objs = Vec::new();
         for a in args {
             let now = (self.is_set(a.obj) && !self.is_lazy(a.obj)).then(|| self.flatten(s, a.obj, 3, Some(ctx)));
-            objs.push((a.obj, !lazy && !a.sel, now));
+            // named, or reached through a selection (14.8), object by object
+            objs.push((a.obj, !a.sel, now));
         }
         let TargetOp::Priority { off, .. } = op else { unreachable!("PRIORITY") };
         let (tag, c) = (if lazy { "g" } else { "e" }, Rc::new(ctx.clone()));

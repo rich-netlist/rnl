@@ -3,7 +3,8 @@
 //! definition reaches the local from outside the inner usage only: it beats the inner usage's
 //! priority and is still subject to the priority of the enclosing usage. One written from outside
 //! directly on a local usage makes that usage the outermost one with a priority for what it
-//! expands to, over the usages around it. Of the statements that are not subject to another
+//! expands to, over the usages around it; one that a selection reaches is an ordinary statement
+//! on its target, under the usages around it. Of the statements that are not subject to another
 //! priority, the one on the innermost object wins, and on one object the later. Constraints and
 //! groups follow the same order. Before, a statement written in an enclosing body counted as
 //! written outside every usage, and then the outermost usage with a priority decided, even over
@@ -286,4 +287,35 @@ fn a_statement_in_an_enclosing_body_stays_under_the_enclosing_usage_against_one_
         "#,
     ));
     assert_eq!(kept(&p), (vec![("%o1", Priority::High), ("%o2", Priority::Low)], vec!["%o1", "%o2"]));
+}
+
+#[test]
+fn a_priority_that_a_selection_reaches_is_one_of_its_targets_own() {
+    // the selection reaches %in, which it does not name through `::`: an ordinary PRIORITY on it
+    // (14.8), so the priority of %o1 beats it; without one, %in is disabled
+    let p = solve(&format!(
+        "{}{}",
+        nested(""),
+        r#"
+        %o1 = #R1(a) #R2(b) @AS(priority="normal") $OUTER;
+        %o2 = #R3(a) #R4(b) @AS $OUTER;
+        # @SELECT-USAGE $PAIR => @PRIORITY("disabled")
+        "#,
+    ));
+    let normal = Priority::Normal;
+    let (facts, groups) = given(&p);
+    assert_eq!(facts, [("%o1", "%c", normal), ("%o1", "%col", normal), ("%o1", "%row", normal), ("%o2", "%c", normal)]);
+    assert_eq!(groups, ["%o1"]);
+
+    // a statement through `::` in the body of a usage that a rule makes still names its object:
+    // it beats the priority of %in, as in a usage applied by hand
+    let p = solve(&format!(
+        "{}{}",
+        definitions("(priority=\"disabled\")", "%in::row @PRIORITY(\"low\")"),
+        r#"
+        %o1 = #R1(a) #R2(b) @AS $OUTER;
+        # @SELECT-INSTANCE(name="R3") => #R4 @AS $OUTER
+        "#,
+    ));
+    assert_eq!(kept(&p), (vec![("%o1", Priority::Low), ("a usage of $OUTER", Priority::Low)], vec![]));
 }
