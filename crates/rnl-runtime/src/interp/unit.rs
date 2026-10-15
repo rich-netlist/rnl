@@ -476,6 +476,13 @@ impl Interp<'_> {
                 }
             }
             if let Some(target) = &header.scope {
+                // a syntax error fails its member, as in the target's own records, and is reported
+                // at its place in this file (7.4); the other members go to the target
+                for m in ast_body.members.iter().filter(|m| m.error.is_some()) {
+                    let loc = self.recs[rec].loc(m.error_pos);
+                    self.diag_in(Severity::Error, m.error.clone().unwrap(), Some(loc), &pkg);
+                    self.note_failed(Some(rec), m.start, m.end, false);
+                }
                 let a = self.asts[rec].clone().unwrap();
                 let key = self.doc.key(target);
                 let unit = &mut self.units[u];

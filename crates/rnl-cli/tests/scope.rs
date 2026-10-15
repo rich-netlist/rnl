@@ -135,3 +135,22 @@ fn the_solver_writes_such_a_point_back_by_its_name() {
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert_eq!(fixed_at(named(ota(&r), "%q").1), Some((3.0, 4.0)));
 }
+
+#[test]
+fn a_syntax_error_in_a_scope_record_fails_its_member() {
+    // reported once, at its place in the file that writes the record, as the same member is in
+    // the subcircuit's own record (7.4); the other members take effect
+    let files = MemoryProvider::new().with("t.sp", &netlist("", "#R1 @PLACE(1 2); %q = (_, _); %q @PLACE(1, 2)"));
+    let r = interpret(&files, &Options::solver());
+    let e = errors(&r);
+    assert_eq!(e.len(), 1, "{e:?}");
+    assert_eq!(e[0].0, 7, "{e:?}");
+    assert!(r.failed.iter().any(|f| f.start.line == 7 && !f.conflict), "{:?}", r.failed);
+    let p = ota(&r);
+    assert_eq!(fixed_at(named(p, "%q").1), Some((1.0, 2.0)));
+    assert_eq!(fixed_at(&p.objects[named(p, "#R1").0].position), None);
+
+    let own = MemoryProvider::new().with("t.sp", &netlist("#R1 @PLACE(1 2)", ""));
+    let r = interpret(&own, &Options::solver());
+    assert_eq!(errors(&r).iter().map(|(_, m)| m).collect::<Vec<_>>(), [&e[0].1]);
+}
