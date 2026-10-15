@@ -217,6 +217,30 @@ fn a_matching_check_applies_the_numbers() {
 }
 
 #[test]
+fn an_authored_record_after_the_record_of_the_solver_is_numbered_before_it() {
+    // an editor appends its records after the record of the solver: what they make is numbered
+    // with the authored records, before the record's own objects, and is read before its numbers
+    let editor = "* @RNL(author=\"rnl-editor test\") { #M1 @PLACE(x=11); (7, 7) @TEXT(\"note\") }\n";
+    let solver =
+        "* @RNL(type=\"generated\", numbering=\"0000000000000000\") { %#7 @PLACE(8, 8); $JUNCTION @ATTACH %#3 }\n";
+    let first = read(&amp(&format!("{solver}{editor}")), &draft());
+    let lv = level_index(&first, "amp");
+    let n = first.numbering.iter().find(|n| n.level == lv).unwrap();
+    assert_eq!(n.authored[..5], AMP_LINES);
+    assert_eq!(n.authored[5..], ["( 7 , 7 ) @TEXT ( \"note\" )", "( 7 , 7 ) @TEXT ( \"note\" )"]);
+    assert_eq!(n.records[0].lines[7], "$JUNCTION @ATTACH %#3");
+    let check = level_check(&first, lv).unwrap().to_string();
+    let text = amp(&format!("{}{editor}", solver.replace("0000000000000000", &check)));
+    let r = read(&text, &Options { problems: true, ..draft() });
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    assert!(diagnostics(&r, Severity::Hint).iter().all(|(_, m)| !m.contains("out of date")));
+    // %#7 is the editor's text, %#8 the junction of the record of the solver
+    let p = problem(&r, "amp");
+    assert_eq!(at(p, &number(7, "")), Some((8.0, 8.0)));
+    assert!(p.usages.iter().any(|u| u.definition == "$JUNCTION" && u.reference == number(8, "")));
+}
+
+#[test]
 fn a_wrong_check_leaves_out_the_statements_with_numbers() {
     let r = read(&amp(&amp_solver("0123456789abcdef")), &Options { problems: true, ..draft() });
     // no error, one hint at the record, and no statement noted as failed
