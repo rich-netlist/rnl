@@ -47,7 +47,8 @@ pub fn bundled() -> MemoryProvider {
 pub struct BuildOptions {
     /// "spice" or "spectre", instead of guessing from the entry.
     pub dialect: Option<String>,
-    /// The runtime's options, such as using the standard package at the root (16.3).
+    /// The runtime's options, such as using the standard package at the root (16.3), or reading
+    /// the levels without their generated records, as a solver does (2.8).
     pub runtime: Options,
     /// Write each level's SVG ([`Level::svg`]); on by default.
     pub svg: bool,
