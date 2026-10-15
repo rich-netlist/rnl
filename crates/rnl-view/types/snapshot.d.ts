@@ -23,6 +23,12 @@ export type Snapshot = {
    */
   language: string,
   /**
+   * The fingerprint of what it is made from (3.7), 32 hexadecimal digits: the texts of the host
+   * files and of the packages read, and the build's options. The same for the same texts and
+   * options, whatever their line endings; new after any change to a text, a space included.
+   */
+  revision: string,
+  /**
    * "spice" or "spectre".
    */
   dialect: string,

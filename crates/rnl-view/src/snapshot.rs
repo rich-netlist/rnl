@@ -20,6 +20,7 @@ use serde_json::{Map, Value};
 
 use crate::document::{Diagnostic, Document};
 use crate::primitive::{self, Run};
+use crate::sha256::{hex, Sha256};
 
 /// The version of the snapshot's shape.
 pub const SCHEMA: &str = "rnl-snapshot/1";
@@ -52,6 +53,10 @@ pub struct Snapshot {
     pub runtime: String,
     /// The language version the main file declares, or the one a file without it is read as (16.1).
     pub language: String,
+    /// The fingerprint of what it is made from (3.7), 32 hexadecimal digits: the texts of the host
+    /// files and of the packages read, and the build's options. The same for the same texts and
+    /// options, whatever their line endings; new after any change to a text, a space included.
+    pub revision: String,
     /// "spice" or "spectre".
     pub dialect: String,
     /// The packages in effect, by name and version, the standard package first.
@@ -407,7 +412,7 @@ fn level_id(doc: &HostDocument, lv: usize) -> String {
 }
 
 /// The snapshot of an interpretation, with its Document.
-pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts) -> Snapshot {
+pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, std: bool) -> Snapshot {
     let files: Vec<FileRef> =
         document.files.iter().map(|f| FileRef { path: f.path.clone(), name: f.name.clone() }).collect();
     let file_index: HashMap<&str, usize> =
@@ -436,6 +441,7 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts) -> 
         schema: SCHEMA.into(),
         runtime: env!("CARGO_PKG_VERSION").into(),
         language,
+        revision: revision(r, std),
         dialect: r.doc.dialect.name.clone(),
         packages: r
             .model
@@ -449,6 +455,26 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts) -> 
         failed: r.model.failed.clone(),
         drawing: parts.drawing.then_some(document),
     }
+}
+
+/// The fingerprint of what a snapshot is made from (3.7): every file read, the host files and the
+/// packages, by name and text with its line endings made "\n"; the dialect; whether the standard
+/// package is used at the root. Each part has its length before it, so that no two inputs give the
+/// same bytes.
+fn revision(r: &Interpretation, std: bool) -> String {
+    let mut files: Vec<(&str, String)> =
+        r.sources.iter().map(|(name, text)| (name.as_str(), text.replace("\r\n", "\n").replace('\r', "\n"))).collect();
+    files.sort();
+    files.dedup();
+    let mut h = Sha256::new();
+    h.field(b"rnl-revision/1");
+    h.field(r.doc.dialect.name.as_bytes());
+    h.field(if std { &b"std"[..] } else { &b"no-std"[..] });
+    for (name, text) in &files {
+        h.field(name.as_bytes());
+        h.field(text.as_bytes());
+    }
+    hex(&h.finish()[..16])
 }
 
 /// The nets of a host level by key, each with the first way it is written: the ports, then the
@@ -877,6 +903,26 @@ R2 a vdd! 2k
                    "style": {"linecolor": "#00ff00"}, "layer": "middle"})
         );
         assert_eq!(top["shapes"], json!([]));
+    }
+
+    #[test]
+    fn the_revision_follows_the_texts_and_the_options() {
+        let rev = |text: &str, options: &BuildOptions| {
+            let files = MemoryProvider::new().with("/w/t.sp", text);
+            crate::snapshot("/w/t.sp", &files, options, Parts::default()).unwrap().revision
+        };
+        let options = BuildOptions::default();
+        let r = rev(NETLIST, &options);
+        assert_eq!(r.len(), 32, "{r}");
+        assert!(r.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()), "{r}");
+        assert_eq!(rev(NETLIST, &options), r);
+        // the line endings do not count; a space does, and so do the options
+        assert_eq!(rev(&NETLIST.replace('\n', "\r\n"), &options), r);
+        assert_ne!(rev(&NETLIST.replace("R1 in out 1k", "R1 in out  1k"), &options), r);
+        let no_std = BuildOptions { runtime: rnl_runtime::Options { std: false }, ..BuildOptions::default() };
+        assert_ne!(rev(NETLIST, &no_std), r);
+        let spectre = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
+        assert_ne!(rev(NETLIST, &spectre), r);
     }
 
     #[test]

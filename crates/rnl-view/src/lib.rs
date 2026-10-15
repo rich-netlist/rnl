@@ -6,6 +6,7 @@
 
 mod document;
 mod primitive;
+mod sha256;
 mod snapshot;
 #[cfg(test)]
 mod types;
@@ -145,7 +146,7 @@ pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts
     let draw =
         if parts.drawing { options.clone() } else { BuildOptions { svg: false, primitives: false, ..options.clone() } };
     let document = document::document(entry, &r, ws.missing.into_inner(), &draw);
-    Ok(snapshot::snapshot(&r, document, parts))
+    Ok(snapshot::snapshot(&r, document, parts, options.runtime.std))
 }
 
 /// Is the entry Spectre? By `dialect`, by the `.scs` extension, or a `simulator lang=spectre`
