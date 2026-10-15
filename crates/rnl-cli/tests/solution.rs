@@ -425,3 +425,31 @@ fn the_writer_says_what_it_does_not_write_and_what_a_solver_should_not_do() {
         ]
     );
 }
+
+#[test]
+fn a_record_that_uses_no_number_has_no_numbering() {
+    // in a file of the draft, a solution that reaches only named objects writes no number, and its
+    // record needs no numbering (5.9)
+    let text = "* named\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\nC1 a b 1p\n.end\n";
+    let files = MemoryProvider::new().with("t.sp", text);
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options { draft: true, ..Options::solver() }).unwrap();
+    let p = problem(&r, "t.sp");
+    let place = |label: &str, at: Pt| Placement {
+        object: p.objects.iter().position(|o| o.label == label).unwrap(),
+        at: Some(at),
+        orient: Some(Orient::R0),
+    };
+    let solution =
+        Solution { placements: vec![place("#R1", (0.0, 0.0)), place("#C1", (10.0, 0.0))], ..Solution::default() };
+    let written = write_record(p, &solution, "rnl-solver test", &sig1(p, OPTIONS));
+    assert!(written.unsolved.is_empty() && !written.record.contains("%#"), "{}", written.record);
+    let record = rnl_view::finish_record(&r.doc, &files, &draft(), p, &written.record);
+    assert_eq!(record, written.record);
+    assert!(!record.contains("numbering"));
+    // read back with the switch: placed, with no error and no hint that it is out of date
+    let back = read(&replace_generated(&r.doc, p.level, text, &record), &Options { problems: true, ..draft() });
+    assert!(diagnostics(&back, Severity::Error).is_empty(), "{:?}", diagnostics(&back, Severity::Error));
+    assert_eq!(out_of_date(&back), 0);
+    let r1 = problem(&back, "t.sp").objects.iter().find(|o| o.label == "#R1").unwrap();
+    assert_eq!(fixed_at(&r1.position), Some((0.0, 0.0)));
+}

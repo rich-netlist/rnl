@@ -6,7 +6,7 @@
 //! the wires it routed for ROUTE. [`write_record`] turns it into the one record the solver writes
 //! at the end of the level's own text, `@RNL(type="generated", priority="high", author="…",
 //! hash="…") {…}`, in standard form. In a level of a file of the draft 0.3, [`finish_record`] then
-//! puts `numbering`, the check of its numbers, in its head (5.9).
+//! puts `numbering`, the check of its numbers, in its head when it uses a number (5.9).
 //! [`crate::writeback::replace_generated`] puts the record in place of the level's previous one.
 //!
 //! - **The interface is RNL** (the draft's 14.8): a [`Solution`] holds only what a record of the
@@ -45,6 +45,7 @@ use crate::interp::unit::DRAFT_VERSION;
 use crate::numbering::level_check;
 use crate::problem::*;
 use crate::source::Provider;
+use crate::syntax::{parse_record_with, uses_number};
 use crate::writeback::record_type;
 use crate::Options;
 
@@ -393,8 +394,8 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
 ///   two points (13.1), or through the centre of a set; a coordinate that is NaN or infinite
 ///   (3.7); an index that is not in the problem or the solution.
 ///
-/// In a level of the draft 0.3 the record is not finished: [`finish_record`] gives it the check of
-/// its numbers.
+/// In a level of the draft 0.3 the record is not finished: when it uses a number,
+/// [`finish_record`] gives it the check of its numbers.
 pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &str) -> Written {
     let mut refs =
         Refs { p, names: generated_names(p), draft: p.version == DRAFT_VERSION, offsets: vec![None; p.usages.len()] };
@@ -606,8 +607,9 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
 }
 
 /// The record of the solver of a level, finished: `record` is what [`write_record`] gives for the
-/// problem `p`. In a level of a file of the draft 0.3, the record with `numbering` in its head, the
-/// check of its numbers (5.9); in a level of 0.2, the record as it is.
+/// problem `p`. When it uses a number, in a level of a file of the draft 0.3, the record with
+/// `numbering` in its head, the check of its numbers (5.9); otherwise the record as it is: a
+/// record that uses no number needs no `numbering` (5.9), and a level of 0.2 has no numbers.
 ///
 /// The check covers the objects of the authored records of the level and the record's own: the
 /// coordinates in its wires, the bodies of the usages it writes out, its junctions. So the document
@@ -623,7 +625,9 @@ pub fn finish_record(
     p: &LevelProblem,
     record: &str,
 ) -> String {
-    if p.version != DRAFT_VERSION {
+    let ast = parse_record_with(record, true);
+    let uses_numbers = ast.body.as_ref().is_some_and(|b| b.members.iter().any(|m| uses_number(m)));
+    if p.version != DRAFT_VERSION || !uses_numbers {
         return record.to_string();
     }
     let mut doc = doc.clone();

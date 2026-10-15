@@ -63,7 +63,9 @@ pub struct Fact {
 /// list of points and the mode that replace the wire's, read as a new WIRE's are, with where the
 /// statement is written. It has a key, the wire: of several, the one written last by position
 /// takes effect, and among those at one position (the segments of a pipe) the one read last
-/// (5.8, 8.4).
+/// (5.8, 8.4). One that fails once the symbols are known, such as one that lists a terminal
+/// without a pin, takes no effect: the wire keeps the list and the mode of the latest rewrite
+/// that holds, or those it was made with.
 #[derive(Clone, Debug)]
 pub struct Rewrite {
     pub pos: Pos,
@@ -75,6 +77,8 @@ pub struct Rewrite {
     pub generated: bool,
     pub site: Rc<Ctx>,
     pub off: usize,
+    /// Why it fails, found in the geometry phase (9.2.4, 11.8, 12.1): the error it gives.
+    pub fault: Option<String>,
 }
 
 /// What a wire is drawn by (13.1): its points and its mode, with the statement that gives them,
@@ -748,7 +752,8 @@ impl Interp<'_> {
         let sc = &mut self.scenes[s];
         let seq = sc.rewrite_count;
         sc.rewrite_count += 1;
-        let r = Rewrite { pos: ctx.pos.clone(), seq, points, mode, generated: ctx.frame_generated(), site, off };
+        let generated = ctx.frame_generated();
+        let r = Rewrite { pos: ctx.pos.clone(), seq, points, mode, generated, site, off, fault: None };
         sc.rewrites.entry(w).or_default().push(r);
         if !style.is_empty() {
             sc.styles.push(Fact {
@@ -765,13 +770,21 @@ impl Interp<'_> {
     }
 
     /// What a wire of scene `s` is drawn by (13.1): its points and its mode as the rewrite that
-    /// takes effect gives them (the draft 0.3), otherwise as the WIRE that made it.
+    /// takes effect gives them (the draft 0.3), otherwise as the WIRE that made it. That is the
+    /// latest rewrite by key that holds: one found to fail in the geometry phase takes no effect,
+    /// and the wire keeps its earlier list and mode (5.8).
     pub(crate) fn wire_shape(&self, s: SceneId, w: ObjId) -> Option<WireShape> {
+        self.wire_shape_of(s, w, true)
+    }
+
+    /// The same, with the rewrites that fail in the geometry phase or without them. The explicit
+    /// wires are fixed in step 3 (8.2), before any rewrite is found to fail: what selections read
+    /// of them, such as `wired=`, is the latest rewrite whether it holds or not.
+    pub(crate) fn wire_shape_of(&self, s: SceneId, w: ObjId, holding: bool) -> Option<WireShape> {
         let ObjData::Wire { points, mode, generated, site, off, .. } = self.o(w) else { return None };
-        let last = self.scenes[s]
-            .rewrites
-            .get(&w)
-            .and_then(|rs| rs.iter().max_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq))));
+        let last = self.scenes[s].rewrites.get(&w).and_then(|rs| {
+            rs.iter().filter(|r| !holding || r.fault.is_none()).max_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq)))
+        });
         Some(match last {
             Some(r) => WireShape {
                 points: r.points.clone(),
@@ -1605,14 +1618,15 @@ impl Interp<'_> {
     }
 
     /// The terminals that explicit wires touch, by owner: what `wired` looks among (10.2). A
-    /// rewritten wire touches the points of its rewrite (the draft 0.3, 13.1).
+    /// rewritten wire touches the points of its latest rewrite (the draft 0.3, 13.1), as fixed in
+    /// step 3, before the geometry phase finds whether it holds (8.2).
     pub(crate) fn wire_ends(&self, s: SceneId) -> HashMap<ObjId, Vec<ObjId>> {
         let mut ends: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
         for &w in &self.scenes[s].wires {
             if !matches!(self.o(w), ObjData::Wire { generated: false, .. }) {
                 continue;
             }
-            let Some(shape) = self.wire_shape(s, w) else { continue };
+            let Some(shape) = self.wire_shape_of(s, w, false) else { continue };
             for q in shape.points {
                 if let ObjData::Term { owner, .. } = self.o(q) {
                     ends.entry(*owner).or_default().push(q);

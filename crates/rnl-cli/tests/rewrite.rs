@@ -1,9 +1,10 @@
 //! WIRE given a wire rewrites it (the draft 0.3, 13.1), in a file that declares 0.3 read with
 //! `Options::draft`: the statement is read as a new WIRE, its list of points and its mode replace
 //! those of the wire, the net stays, its style parameters are direct style of the wire, and of
-//! several rewrites the one written last takes effect (5.8, 8.4). The model, the Document and the
-//! solver's view draw and give the wire as rewritten. A file of 0.2 reads a wire in the net slot as
-//! of the wrong kind, as before.
+//! several rewrites the one written last takes effect (5.8, 8.4). A rewrite that fails, also only
+//! once the symbols are known, is an error, and the wire keeps its earlier list and mode. The
+//! model, the Document and the solver's view draw and give the wire as rewritten. A file of 0.2
+//! reads a wire in the net slot as of the wrong kind, as before.
 
 use std::path::Path;
 
@@ -153,6 +154,63 @@ fn a_rewritten_wire_reaches_the_terminals_of_its_rewrite() {
     assert!(r.model.levels[0].unplaced.is_empty(), "{:?}", r.model.levels[0].unplaced);
     let w = diagnostics(&r, Severity::Warning);
     assert_eq!(w, [(6, "the wire is marked on net a, but the terminal #C1:n it reaches is on 0 (13.1)".to_string())]);
+}
+
+/// The netlist with R2 as well, drawn with a symbol that has no pin, so that a wire that lists one
+/// of its terminals fails (9.2.4); the records come after the one that gives R2 its symbol, line 7.
+fn pinless(records: &str) -> String {
+    let symbol = record("$BOX = @DEFINE-SYMBOL { @RECTANGLE {(0, 0) (2, 2)} }; #R2 @SET-SYMBOL $BOX");
+    netlist("0.3", &(symbol + records)).replace("C1 a 0 1p\n", "C1 a 0 1p\nR2 a 0 1k\n")
+}
+
+#[test]
+fn a_rewrite_that_fails_once_the_symbols_are_known_takes_no_effect() {
+    let (a, c) = pins();
+    let as_made = drawn(&read(&netlist("0.3", ""), &draft())).points.clone();
+    let hv = "%w @WIRE(mode=\"horizontal-vertical\") {#R1:1 (4, 4) #C1:1}";
+    let to_r2 = "%w @WIRE(mode=\"straight\") {#R1:1 (6, 6) #R2:1}";
+    let fails = "#R2:p has no pin in its symbol: this rewrite of %w fails and takes no effect; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with (9.2.4, 5.8, 13.1)";
+    let errors = |r: &Interpretation| {
+        let mut e = diagnostics(r, Severity::Error);
+        e.sort();
+        e
+    };
+    // a later rewrite that fails is an error, and the wire keeps the earlier rewrite (5.8)
+    let text = pinless(&(record(hv) + &record(to_r2)));
+    let r = read(&text, &draft());
+    assert_eq!(errors(&r), [(9, fails.to_string())]);
+    let w = drawn(&r);
+    assert_eq!((w.mode.as_str(), &w.points), ("horizontal-vertical", &horizontal_vertical(a, (4.0, 4.0), c)));
+    // the rewrite is text that takes no effect, and a solver reads the wire as the earlier rewrite
+    assert!(r.failed.iter().any(|f| f.start.line == 9 && !f.conflict), "{:?}", r.failed);
+    let r = read(&text, &Options { draft: true, ..Options::solver() });
+    assert_eq!(r.problems[0].wires.iter().find(|w| w.label == "%w").unwrap().mode, "horizontal-vertical");
+
+    // a first rewrite that fails leaves the list and the mode the wire was made with
+    let r = read(&pinless(&record(to_r2)), &draft());
+    assert_eq!(errors(&r), [(8, fails.to_string())]);
+    assert_eq!((drawn(&r).mode.as_str(), &drawn(&r).points), ("auto", &as_made));
+
+    // of several, the latest that holds; each that fails is an error, also before one that holds
+    let r = read(&pinless(&(record(hv) + &record(to_r2) + &record("%w @WIRE {#R2:1 #C1:1}"))), &draft());
+    assert_eq!(errors(&r).iter().map(|(line, _)| *line).collect::<Vec<_>>(), [9, 10]);
+    assert_eq!(drawn(&r).mode, "horizontal-vertical");
+    let r = read(&pinless(&(record(to_r2) + &record(hv))), &draft());
+    assert_eq!(errors(&r), [(8, fails.to_string())]);
+    assert_eq!(drawn(&r).mode, "horizontal-vertical");
+
+    // the wire fails as a whole only when the list it was made with fails as well
+    let made = "%v = &a @WIRE {#R1:1 #R2:1}";
+    let r = read(&pinless(&(record(made) + &record("%v @WIRE {#R2:1 #C1:1}"))), &draft());
+    let e = errors(&r);
+    assert_eq!(e.len(), 2, "{e:?}");
+    assert_eq!(e[0], (8, "#R2:p has no pin in its symbol: the wire fails (9.2.4)".to_string()));
+    assert!(e[1].0 == 9 && e[1].1.contains("this rewrite of %v fails and takes no effect"), "{e:?}");
+    assert!(r.model.levels[0].wires.iter().all(|w| w.id != "%v"));
+    // and a wire made to a terminal without a pin is drawn by a rewrite that holds
+    let r = read(&pinless(&(record(made) + &record("%v @WIRE {#R1:1 #C1:1}"))), &draft());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert!(r.model.levels[0].wires.iter().any(|w| w.id == "%v" && w.points == [a, c]));
 }
 
 #[test]

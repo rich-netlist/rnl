@@ -16,6 +16,36 @@ fn level(p: Priority) -> u8 {
     p as u8
 }
 
+/// Why a wire cannot reach a terminal of its list (9.2.4, 11.8, 12.1), by the label of the usage,
+/// the terminal or the instance at fault.
+enum Fault {
+    NoSymbol(String),
+    NoPin(String),
+    InBundle(String),
+}
+
+impl Fault {
+    /// The error of a wire whose list fails so: the wire fails.
+    fn for_wire(&self) -> String {
+        match self {
+            Fault::NoSymbol(l) => format!("{l} has no symbol: a wire to its terminal fails (12.1)"),
+            Fault::NoPin(l) => format!("{l} has no pin in its symbol: the wire fails (9.2.4)"),
+            Fault::InBundle(l) => format!("{l} is in a bundle; wires go to the terminals of the bundle (11.8)"),
+        }
+    }
+
+    /// The error of a rewrite of `wire` whose list fails so (the draft 0.3, 13.1): it takes no
+    /// effect, and the wire does not fail.
+    fn for_rewrite(&self, wire: &str) -> String {
+        let (cause, section) = match self {
+            Fault::NoSymbol(l) => (format!("{l} has no symbol"), "12.1"),
+            Fault::NoPin(l) => (format!("{l} has no pin in its symbol"), "9.2.4"),
+            Fault::InBundle(l) => (format!("{l} is in a bundle, and wires go to the terminals of the bundle"), "11.8"),
+        };
+        format!("{cause}: this rewrite of {wire} fails and takes no effect; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with ({section}, 5.8, 13.1)")
+    }
+}
+
 /// A priority said of a fact by a PRIORITY statement or a usage's own priority (14.8).
 struct Said<'a> {
     /// What ranks it: the depth of its target, from outside, a statement rather than a
@@ -613,8 +643,11 @@ impl Interp<'_> {
         }
         // 4. check constraints against the positions (no solver)
         self.check_constraints(s);
-        // 5. failures that need symbols: wires to pinless terminals, labels on symbol-less usages;
-        // a rewritten wire by the points of its rewrite, reported there (the draft 0.3, 13.1)
+        // 5. failures that need symbols: wires to pinless terminals, labels on symbol-less usages.
+        // A rewrite of the draft 0.3 that fails so is an error and takes no effect: the wire keeps
+        // the list and mode of the latest rewrite that holds, or those it was made with, and is
+        // warned about and checked by them, there (5.8, 13.1)
+        self.check_rewrites(s);
         for w in self.scenes[s].wires.clone() {
             let ObjData::Wire { nets, .. } = self.o(w).clone() else { continue };
             let Some(WireShape { points, generated, site, off, .. }) = self.wire_shape(s, w) else { continue };
@@ -644,21 +677,20 @@ impl Interp<'_> {
             }
         }
         for w in self.scenes[s].wires.clone() {
+            let mut rewrites = self.scenes[s].rewrites.get(&w).cloned().unwrap_or_default();
+            rewrites.sort_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq)));
+            for r in &rewrites {
+                if let Some(msg) = &r.fault {
+                    self.diag_site(Severity::Error, &Some(r.site.clone()), r.off, msg.clone());
+                }
+            }
+            if rewrites.iter().any(|r| r.fault.is_none()) {
+                continue; // drawn by a rewrite that holds
+            }
             let Some(WireShape { points, site, off, .. }) = self.wire_shape(s, w) else { continue };
             for q in &points {
-                let ObjData::Term { owner, .. } = self.o(*q).clone() else { continue };
-                if !self.term_drawable(s, *q, &site, off, "wire") {
-                    self.set_failed(w);
-                    break;
-                }
-                if self.bundle_field(owner).is_some() {
-                    let l = self.label(owner);
-                    self.diag_site(
-                        Severity::Error,
-                        &site,
-                        off,
-                        format!("{l} is in a bundle; wires go to the terminals of the bundle (11.8)"),
-                    );
+                if let Some(fault) = self.term_fault(s, *q) {
+                    self.diag_site(Severity::Error, &site, off, fault.for_wire());
                     self.set_failed(w);
                     break;
                 }
@@ -930,36 +962,39 @@ impl Interp<'_> {
         }
     }
 
-    fn term_drawable(
-        &mut self,
-        s: SceneId,
-        t: ObjId,
-        site: &Option<std::rc::Rc<super::ctx::Ctx>>,
-        off: usize,
-        what: &str,
-    ) -> bool {
-        let ObjData::Term { owner, .. } = self.o(t).clone() else { return true };
+    /// Why a wire cannot reach a point of its list, once the symbols are known: a terminal of a
+    /// usage without a symbol (12.1), a terminal without a pin (9.2.4), or a terminal of an
+    /// instance in a bundle (11.8). None for a terminal it reaches, and for a point.
+    fn term_fault(&mut self, s: SceneId, t: ObjId) -> Option<Fault> {
+        let ObjData::Term { owner, .. } = self.o(t).clone() else { return None };
         if matches!(self.o(owner), ObjData::Usage(_)) && !self.scenes[s].symbol.contains_key(&owner) {
-            let l = self.label(owner);
-            self.diag_site(
-                Severity::Error,
-                site,
-                off,
-                format!("{l} has no symbol: a {what} to its terminal fails (12.1)"),
-            );
-            return false;
+            return Some(Fault::NoSymbol(self.label(owner)));
         }
         if !self.has_pin(s, t) {
-            let l = self.label(t);
-            self.diag_site(
-                Severity::Error,
-                site,
-                off,
-                format!("{l} has no pin in its symbol: the {what} fails (9.2.4)"),
-            );
-            return false;
+            return Some(Fault::NoPin(self.label(t)));
         }
-        true
+        if self.bundle_field(owner).is_some() {
+            return Some(Fault::InBundle(self.label(owner)));
+        }
+        None
+    }
+
+    /// Find which rewrites of the wires of scene `s` fail (the draft 0.3, 13.1): those whose list
+    /// has a point that a wire cannot reach. Such a rewrite takes no effect (`wire_shape`);
+    /// its error is given with the other failures of the wire.
+    fn check_rewrites(&mut self, s: SceneId) {
+        let mut wires: Vec<ObjId> = self.scenes[s].rewrites.keys().copied().collect();
+        wires.sort();
+        for w in wires {
+            let wire = self.label(w);
+            for k in 0..self.scenes[s].rewrites[&w].len() {
+                let points = self.scenes[s].rewrites[&w][k].points.clone();
+                let fault = points.iter().find_map(|q| self.term_fault(s, *q)).map(|f| f.for_rewrite(&wire));
+                if let Some(r) = self.scenes[s].rewrites.get_mut(&w) {
+                    r[k].fault = fault;
+                }
+            }
+        }
     }
 
     // positions of things
