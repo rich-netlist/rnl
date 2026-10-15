@@ -3,12 +3,15 @@
 Builds every published form of the RNL standard from the chapters in [`spec/`](../../spec/README.md), and checks that they agree ([decision 0007](../../docs/decisions/0007-publishing-the-standard.md)).
 
 ```bash
-python scripts/spec/build.py                 # check, then build into scripts/spec/dist/
+python scripts/spec/build.py                 # check, then build every version into scripts/spec/dist/
 python scripts/spec/build.py --check         # the checks only
+python scripts/spec/build.py --version 0.2   # only this version, as the release of a tag spec-0.2-rN does
 python scripts/spec/build.py --site site/dist   # also add the web pages and their downloads to the built site
 python scripts/spec/build.py --no-pdf        # skip the PDFs
 python scripts/spec/build.py --stamp         # after bringing the Chinese in line with the English
 ```
+
+Every version in `spec/` is built: the folders named `major.minor`, such as `0.2/`, that hold `en/` and `zh/`. Decision 0007 keeps the earlier versions published when a new one is added.
 
 Needs Python 3.10 or later (standard library only), [pandoc](https://pandoc.org/) 3.x and [Typst](https://typst.app/) 0.13 or later on PATH, and git. The CI workflows install pinned versions.
 
@@ -16,15 +19,16 @@ Needs Python 3.10 or later (standard library only), [pandoc](https://pandoc.org/
 
 | Path in `spec/` | Content |
 | --- | --- |
-| `0.2/en/`, `0.2/zh/` | `front.md`, `ch01.md` to `ch17.md`, `annex-a.md` to `annex-c.md`: the source, the only text that is edited |
+| `0.2/en/`, `0.2/zh/` | `front.md`, the chapters `ch01.md`, `ch02.md`, … and the annexes `annex-a.md`, `annex-b.md`, …: the source, the only text that is edited. The parts of a version are the files there, chapters by number, then annexes by letter; both languages have the same parts |
 | `rnl-0.2.md`, `rnl-0.2.zh.md` | the combined texts, assembled from the chapters and committed |
-| `rnl-words-0.2.json`, `rnl-words.schema.json` | the word list and its schema |
+| `rnl-words-0.2.json` | the word list of the version |
+| `rnl-words.schema.json` | the schema of the word lists, shared by all versions; a new version may add optional properties to it, so that it still describes the lists of the earlier ones |
 
 The chapters come from the research repository where the language is worked out ([decision 0006](../../docs/decisions/0006-language-versions-from-research-repository.md)).
 
 ## Output
 
-For English and Chinese (`rnl-0.2…` and `rnl-0.2.zh…`), all from the same chapters and with the same revision label:
+For each version, in English and Chinese (`rnl-0.2…` and `rnl-0.2.zh…`), all from the same chapters and with the same revision label:
 
 | File | Form |
 | --- | --- |
@@ -34,9 +38,9 @@ For English and Chinese (`rnl-0.2…` and `rnl-0.2.zh…`), all from the same ch
 | `rnl-0.2.pdf` | the PDF: title page, contents with page numbers, the same anchors, links and colours |
 | `SHA256SUMS` | hashes of all of the above |
 
-With `--site DIR`, the Chinese page goes to `DIR/spec/0.2/index.html` and the English one to `DIR/en/spec/0.2/index.html`, following the site's layout, each with its downloads and `SHA256SUMS`.
+With `--site DIR`, the Chinese page of each version goes to `DIR/spec/0.2/index.html` and the English one to `DIR/en/spec/0.2/index.html`, following the site's layout, each with its downloads and `SHA256SUMS`. `DIR/spec/index.html` and `DIR/en/spec/index.html` lead to the newest version and keep the section of the address, so `spec/#9.4` opens 9.4 of the newest version; the top bar of the site links there. When there are several versions, each page lists them under its revision label, with links.
 
-The revision label comes from git: "revision 2" at the tag `spec-0.2-r2`, "revision 2 + later changes" after it, "not released" before the first tag; always with the commit date and short hash, and a note when `spec/` or this folder has uncommitted changes.
+Each version has its own revision label, from git: "revision 2" at the tag `spec-0.2-r2`, "revision 2 + later changes" once the chapters or the word list of 0.2 have changed since that tag, "not released" before its first tag; with the date and short hash of the tagged commit, or of the last commit that changed those files, and a note when they have uncommitted changes. Commits that change other files, such as the toolkit or another version, leave the label as it is.
 
 ## How the forms are kept in step
 
@@ -66,4 +70,4 @@ The revision label comes from git: "revision 2" at the tag `spec-0.2-r2`, "revis
 | `page.html` | the web page template |
 | `print.typ` | the PDF template |
 
-`dist/` is ignored by git; `dist/work/` keeps the pandoc input, the Typst source, and `links-en.tsv`, `links-zh.tsv`: every reference that was linked, for review.
+`dist/` is ignored by git; `dist/work/` keeps the pandoc input, the Typst source, and `links-0.2-en.tsv`, `links-0.2-zh.tsv` and so on: every reference that was linked, for review.

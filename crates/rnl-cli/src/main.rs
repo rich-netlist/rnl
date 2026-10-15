@@ -15,6 +15,7 @@ const USAGE: &str = "usage:
   rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
+  rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
 options:
@@ -30,7 +31,10 @@ view options:
 problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)
-  --previous          give each level what its type=\"generated\" record decided, as hints";
+  --previous          give each level what its type=\"generated\" record decided, as hints
+write:
+  REQUEST.json is {\"dialect\", \"netlist\", \"author\", \"ops\"}, the ops as the editor interface
+  draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out";
 
 struct Args {
     command: String,
@@ -47,6 +51,7 @@ struct Args {
     level: Option<String>,
     solver_options: String,
     previous: bool,
+    author: Option<String>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -66,6 +71,7 @@ fn parse_args() -> Result<Args, String> {
     let mut level = None;
     let mut previous = false;
     let mut solver_options = format!("tolerance={}", rnl_runtime::geom::fmt_num(rnl_runtime::geom::TOL));
+    let mut author = None;
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
@@ -80,6 +86,7 @@ fn parse_args() -> Result<Args, String> {
             "--previous" => previous = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
             "--solver-options" => solver_options = it.next().ok_or("--solver-options needs a text")?,
+            "--author" => author = Some(it.next().ok_or("--author needs a name")?),
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
@@ -100,6 +107,7 @@ fn parse_args() -> Result<Args, String> {
         level,
         solver_options,
         previous,
+        author,
     })
 }
 
@@ -218,6 +226,25 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             let text = doc.source(&main).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
             let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);
             std::fs::write(&out, stripped).map_err(|e| e.to_string())?;
+            Ok(ExitCode::SUCCESS)
+        }
+        "write" => {
+            let out = args.out.clone().ok_or("write needs -o OUT")?;
+            let text =
+                std::fs::read_to_string(&args.file).map_err(|e| format!("cannot read {}: {e}", args.file.display()))?;
+            let mut request: serde_json::Value =
+                serde_json::from_str(&text).map_err(|e| format!("{}: {e}", args.file.display()))?;
+            let fields = request.as_object_mut().ok_or("the request is not a JSON object")?;
+            if let Some(d) = &args.dialect {
+                fields.insert("dialect".into(), d.clone().into());
+            }
+            if let Some(a) = &args.author {
+                fields.insert("author".into(), a.clone().into());
+            }
+            fields.entry("dialect").or_insert_with(|| "spice".into());
+            let request: rnl_edit::WriteRequest =
+                serde_json::from_value(request).map_err(|e| format!("the request is not valid: {e}"))?;
+            std::fs::write(&out, rnl_edit::write(&request)?).map_err(|e| e.to_string())?;
             Ok(ExitCode::SUCCESS)
         }
         _ => Err(format!("unknown command {}\n{USAGE}", args.command)),

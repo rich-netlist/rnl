@@ -192,6 +192,7 @@ local function tokenize_rnl(s, out)
       add("k", s:sub(i, j))
     elseif SIGIL[c] then
       j = i
+      if c == "%" and s:sub(j + 1, j + 1) == "#" then j = j + 1 end  -- a number, such as %#3 (5.9 of 0.3)
       if s:sub(j + 1, j + 1) == '"' then
         local e = s:find('"', j + 2, true)
         j = e or n

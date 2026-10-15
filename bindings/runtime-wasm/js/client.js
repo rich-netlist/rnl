@@ -11,7 +11,11 @@ import { requestText } from "./core.js";
  * @property {(request: import("./core.js").Request) => Promise<object>} build Build the Document of a
  *   request; rejects with an Error with the core's message when there is none. The request is sent
  *   as the JSON text `requestText` makes of it, so it is read as loadCore's build reads it.
- * @property {() => void} terminate Stop the Worker; builds still waiting, and later ones, reject.
+ * @property {(request: import("./core.js").WriteRequest) => Promise<{ text: string, document: object }>}
+ *   write Write the ops of a request into its netlist, and build what was written: the netlist
+ *   written and its Document, whose diagnostics say how it reads. Rejects with the core's message
+ *   when an op cannot be written.
+ * @property {() => void} terminate Stop the Worker; calls still waiting, and later ones, reject.
  */
 
 /**
@@ -22,8 +26,7 @@ import { requestText } from "./core.js";
  * @returns {CoreWorker}
  */
 export function startCore(options = {}) {
-  const url = new URL(options.worker ?? "./worker.js", import.meta.url);
-  const waiting = new Map(); // by request id: the promise's resolve and reject
+  const waiting = new Map(); // by request id: the part of the answer wanted, the promise's resolve and reject
   let next = 0;
   let stopped = null; // why the Worker no longer answers
 
@@ -33,42 +36,47 @@ export function startCore(options = {}) {
     waiting.clear();
   }
 
-  function receive({ id, document, error }) {
-    const promise = waiting.get(id);
+  function receive(reply) {
+    const promise = waiting.get(reply.id);
     if (!promise) return;
-    waiting.delete(id);
-    if (error !== undefined) promise.reject(new Error(error));
-    else promise.resolve(document);
+    waiting.delete(reply.id);
+    if (reply.error !== undefined) promise.reject(new Error(reply.error));
+    else if (!(promise.part in reply)) promise.reject(new Error(`The core answered with no ${promise.part}.`));
+    else promise.resolve(reply[promise.part]);
   }
 
-  const worker = spawn(url, receive, stop);
+  const worker = spawn(options.worker, receive, stop);
   worker.catch(stop);
 
+  /** Send a request, and promise the part of the answer wanted. */
+  function send(request, part) {
+    if (stopped) return Promise.reject(stopped);
+    let text;
+    try {
+      text = requestText(request);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+    const id = next++;
+    return new Promise((resolve, reject) => {
+      waiting.set(id, { part, resolve, reject });
+      worker.then(
+        (w) => {
+          try {
+            w.postMessage({ id, request: text });
+          } catch (e) {
+            waiting.delete(id);
+            reject(e);
+          }
+        },
+        () => {},
+      );
+    });
+  }
+
   return {
-    build(request) {
-      if (stopped) return Promise.reject(stopped);
-      let text;
-      try {
-        text = requestText(request);
-      } catch (e) {
-        return Promise.reject(e);
-      }
-      const id = next++;
-      return new Promise((resolve, reject) => {
-        waiting.set(id, { resolve, reject });
-        worker.then(
-          (w) => {
-            try {
-              w.postMessage({ id, request: text });
-            } catch (e) {
-              waiting.delete(id);
-              reject(e);
-            }
-          },
-          () => {},
-        );
-      });
-    },
+    build: (request) => send(request, "document"),
+    write: (request) => send(request, "written"),
     terminate() {
       stop(new Error("The core was stopped."));
       worker.then((w) => w.terminate(), () => {});
@@ -76,17 +84,24 @@ export function startCore(options = {}) {
   };
 }
 
-/** A module Worker: the browser's, or a Node worker thread, with the same messages. */
-async function spawn(url, receive, stop) {
+/**
+ * A module Worker: the browser's, or a Node worker thread, with the same messages. Without `where`,
+ * worker.js next to this module, by a URL written out in full, as bundlers such as Vite need to find
+ * the Worker and bundle it.
+ */
+async function spawn(where, receive, stop) {
   const failed = (message) => stop(new Error(`The core's Worker failed: ${message}`));
   if (typeof Worker === "function") {
-    const worker = new Worker(url, { type: "module" });
+    const worker =
+      where === undefined
+        ? new Worker(new URL("./worker.js", import.meta.url), { type: "module" })
+        : new Worker(new URL(where, import.meta.url), { type: "module" });
     worker.addEventListener("message", (e) => receive(e.data));
-    worker.addEventListener("error", (e) => failed(e.message || `${url} could not be loaded`));
+    worker.addEventListener("error", (e) => failed(e.message || `${where ?? "worker.js"} could not be loaded`));
     return worker;
   }
   const { Worker: NodeWorker } = await import("node:worker_threads");
-  const worker = new NodeWorker(url);
+  const worker = new NodeWorker(new URL(where ?? "./worker.js", import.meta.url));
   worker.on("message", receive);
   worker.on("error", (e) => failed(e.message));
   worker.on("exit", (code) => failed(`it exited with code ${code}`));

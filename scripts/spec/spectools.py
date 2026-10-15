@@ -8,10 +8,19 @@ import json
 import re
 from collections import Counter
 
-PARTS = [f"ch{n:02d}.md" for n in range(1, 18)] + ["annex-a.md", "annex-b.md", "annex-c.md"]
-# The parts compared section by section: Annex A is generated in both languages, and Annex B of the
-# Chinese version has a column of Chinese sentences.
-COMPARED = [p for p in PARTS if p not in ("annex-a.md", "annex-b.md")]
+def parts(names: list[str]) -> list[str]:
+    """The parts of one version, in order, from the names of its files: the chapters ch01.md, ch02.md, …
+    by number, then the annexes annex-a.md, annex-b.md, … by letter. front.md is not a part."""
+    chapters = sorted((n for n in names if re.fullmatch(r"ch\d+\.md", n)), key=lambda n: int(n[2:-3]))
+    return chapters + sorted(n for n in names if re.fullmatch(r"annex-[a-z]\.md", n))
+
+
+def compared(parts: list[str]) -> list[str]:
+    """The parts compared section by section: Annex A is generated in both languages, and Annex B of the
+    Chinese version has a column of Chinese sentences."""
+    return [p for p in parts if p not in ("annex-a.md", "annex-b.md")]
+
+
 # Words of the discussion drafts that the Chinese version does not use (zh-guide.md).
 OLD_WORDS = ["虚元件", "姿态", "注册点", "合画", "强度", "原型", "草稿", "（用户", "D 轮", "rnl-dev"]
 
@@ -256,6 +265,8 @@ def md_result(e, lang="en") -> str:
             out = "符号里的一个图元；写在场景里时是新的标注（13.4）"
         if e.get("key_subobject"):
             out += "；写了 `key` 时是附着对象的子对象"
+        if e.get("rewrites"):
+            out += f"；收到{WORD_ZH.get(e['rewrites'], e['rewrites'])}时改写它，按键覆盖（键：这个对象）"
         if e.get("override"):
             ov = {"key": "按键覆盖", "geometry": "几何事实", "queue": "外观队列"}[e["override"]]
             if e.get("key"):
@@ -270,6 +281,8 @@ def md_result(e, lang="en") -> str:
         out = "a graphic of the symbol; in the scene, a new annotation (13.4)"
     if e.get("key_subobject"):
         out += "; with `key`, a sub-object of the attached object"
+    if e.get("rewrites"):
+        out += f"; given a {e['rewrites']}, rewrites it, overriding by key (key: that {e['rewrites']})"
     if e.get("override"):
         ov = {"key": "overrides by key", "geometry": "geometric fact", "queue": "appearance queue"}[e["override"]]
         if e.get("key"):
@@ -297,7 +310,7 @@ def annex_a(words, lang="en") -> str:
     zh = lang == "zh"
     if zh:
         L = ["## 附录 A 关键字签名（规范性）", "",
-             "本附录由标准词表 `rnl-words-0.2.json` 生成（5.3）；两者不一致时是勘误。它列出每个关键字收什么、给什么；"
+             f"本附录由标准词表 `rnl-words-{words['version']}.json` 生成（5.3）；两者不一致时是勘误。它列出每个关键字收什么、给什么；"
              "含义见最后一栏所指的节。", "",
              "- **对象槽位**按标准写法的次序列出，带槽位名（可以写成角色，5.3）和收什么：" + "；".join(
                  f"*{t['name']}*：{TAKES_ZH[t['name']]}" for t in words["takes"]) + "。吸收的输入是严格的，封装的输入是容错的（5.4、7.3）。",
@@ -313,7 +326,7 @@ def annex_a(words, lang="en") -> str:
              "| 字段 | 取值 | 默认值 | 影响解释 |", "|---|---|---|---|"]
     else:
         L = ["## Annex A Keyword signatures (normative)", "",
-             "This annex is generated from the word list `rnl-words-0.2.json` (5.3); where the two differ, it is an "
+             f"This annex is generated from the word list `rnl-words-{words['version']}.json` (5.3); where the two differ, it is an "
              "erratum. It lists what each keyword takes and gives; what it means is in the section named in the last column.", "",
              "- **Slots** are listed in the standard order, with their names (which can be written as roles, 5.3) and what "
              "they take: " + "; ".join(f"*{t['name']}*: {t['meaning']}" for t in words["takes"]) + ". Absorbed input is strict; enclosed input is tolerant (5.4, 7.3).",

@@ -127,6 +127,8 @@ main { min-width: 0; padding: 36px clamp(20px, 4vw, 56px) 96px; max-width: 900px
 .kicker::after { content: ""; width: 40px; height: 1px; background: var(--markup-line); }
 html[lang="zh-CN"] main h1.title { font-weight: 900; letter-spacing: .02em; }
 .rev { margin: 0; font: 13px/1.6 var(--f-mono); color: var(--ink-3); }
+.versions { margin: 2px 0 0; font: 13px/1.6 var(--f-mono); color: var(--ink-3); }
+.versions b { color: var(--ink-2); font-weight: 600; }
 .downloads { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .dl {
   display: inline-flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 8px;
@@ -189,7 +191,7 @@ th { background: var(--panel-2); font-weight: 600; }
   .lang-link { margin-left: auto; }
 }
 @media print {
-  .topbar, #toc, .downloads { display: none; }
+  .topbar, #toc, .downloads, .versions { display: none; }
   .layout { display: block; }
   body { background: none; }
 }
@@ -227,6 +229,9 @@ $table-of-contents$
   <div class="kicker">$kicker$</div>
   <h1 class="title">$title$</h1>
   <p class="rev">$revision-label$</p>
+$if(versions-html)$
+  <p class="versions">$versions-html$</p>
+$endif$
   <div class="downloads">
     <a class="dl" href="$pdf-href$" download><svg class="ico"><use href="#i-file"/></svg><b>PDF</b><small>$pdf-size$</small></a>
     <a class="dl" href="$md-href$" download><svg class="ico"><use href="#i-file"/></svg><b>$md-label$</b><small>$md-size$</small></a>
