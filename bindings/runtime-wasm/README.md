@@ -24,6 +24,14 @@ node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --packages DIR 
 
 `--packages DIR` brings the `.rnl` files of DIR with the build: `packages.js` holds them under `/rnl-bundled/packages`, and the Worker gives them to every request, after the request's own files and package directories. A newer `rnl-std` among them is the standard package at the root (16.3). `--name` and `--version` go into the `package.json`, whose `exports` name `client.js` as the package and `core.js` as `./core`.
 
+A frontend built with Vite needs three settings for it, as Analog Canvas found:
+
+- `worker: { format: "es" }`: the Worker is a module with a top-level `await`, which Vite's default format for Workers, `"iife"`, cannot bundle.
+- `optimizeDeps: { exclude: [the package's name] }`: the dev server's pre-bundling moves the modules, and `new URL("./worker.js", import.meta.url)` then names a file that is not there.
+- `server.fs.allow` with the package's real directory, when it is linked from outside the frontend's workspace, as `link:` does: the dev server otherwise refuses to serve `worker.js` ("outside of Vite serving allow list"). A package installed into `node_modules` does not need it.
+
+Vite may say that `node:worker_threads` and `node:fs/promises` were left out for the browser: the modules import them only when they run in Node.
+
 The `wasm` profile is the release profile with `opt-level = "s"`, LTO, one codegen unit and no symbols; the CLI keeps the release profile. A document takes milliseconds either way, so the profile favours size; `opt-level = "z"` would save another 63 KB compressed, but builds take a third longer. Measured with Rust 1.97 and Node 24 on Windows 11, building each of the 24 files of the conformance corpus once from memory:
 
 | Settings | Size (bytes) | gzip, level 9 | The 24 files |
