@@ -322,6 +322,11 @@ export type TextView = {
    */
   markup: Slot<string>,
   /**
+   * The document's records write it, or a part of it; false for a label its symbol alone gives,
+   * such as the formula of a block.
+   */
+  written: boolean,
+  /**
    * What it shows, as the Document's texts give it.
    */
   lines: Array<Array<Run>>,

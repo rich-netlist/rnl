@@ -285,6 +285,9 @@ pub struct TextView {
     pub key: Option<String>,
     /// The text as written, before `${…}` is read (13.6).
     pub markup: Slot<String>,
+    /// The document's records write it, or a part of it; false for a label its symbol alone gives,
+    /// such as the formula of a block.
+    pub written: bool,
     /// What it shows, as the Document's texts give it.
     pub lines: Vec<Vec<Run>>,
     pub anchor: [f64; 2],
@@ -531,6 +534,7 @@ fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
             attach: t.attach.clone(),
             key: t.key.clone(),
             markup: Slot::of(Some(t.markup.clone())),
+            written: t.written,
             lines: t.lines.iter().map(|l| l.iter().map(primitive::run).collect()).collect(),
             anchor: xy(t.anchor),
             halign: t.halign.clone(),
@@ -560,7 +564,8 @@ mod tests {
 *     (-2, 0) @PIN(terminal="in", label="in", direction="left");
 *     (2, 0) @PIN(terminal="out", direction="right");
 *     (0, -2) @PIN(terminal="VSS", direction="down");
-*     @RECTANGLE {(-1.5, -1.5) (1.5, 1.5)}
+*     @RECTANGLE {(-1.5, -1.5) (1.5, 1.5)};
+*     ? @TEXT("${name}", key="name") => @PLACE(0, 2.5)
 *   };
 *   # @SET-SYMBOL %amp
 * }
@@ -658,6 +663,10 @@ R2 a vdd! 2k
         );
         // only what the document gives, not the standard package's defaults
         assert_eq!(name["style"], json!({"textcolor": "#ff0000"}));
+        assert_eq!(name["written"], true);
+        // a label the symbol alone gives is there, but not written by the document
+        let x1 = texts.iter().find(|t| t["id"] == "#X1::name").unwrap();
+        assert_eq!((&x1["written"], &x1["lines"][0][0]["text"]), (&json!(false), &json!("X1")));
         // a label emptied is not there; an annotation goes by where it is written
         assert!(texts.iter().all(|t| t["id"] != "#R2::value"), "{texts:?}");
         let note = texts.iter().find(|t| t["lines"][0][0]["text"] == "note").unwrap();

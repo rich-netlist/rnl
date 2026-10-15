@@ -27,6 +27,12 @@ fn flat(p: &Pos) -> Vec<f64> {
         .collect()
 }
 
+/// Is a fact's position that of a package's statement? A package at the root is placed first (0);
+/// one used in a level carries the tag `pkg` (`position_of`).
+fn from_package(p: &Pos) -> bool {
+    matches!(p.first(), Some(PosElem::Int(0))) || p.contains(&PosElem::Tag("pkg"))
+}
+
 /// The unit vector of an exit direction in degrees, for the four directions pins have.
 fn dir_vector(d: u16) -> Option<(f64, f64)> {
     match d {
@@ -321,7 +327,6 @@ impl Interp<'_> {
     /// package, such as the standard package's defaults, left out. A package at the root is
     /// placed first (0); one used in a level carries the tag `pkg` (`position_of`).
     fn own_style_of(&self, s: SceneId, o: ObjId) -> Style {
-        let from_package = |p: &Pos| matches!(p.first(), Some(PosElem::Int(0))) || p.contains(&PosElem::Tag("pkg"));
         self.scenes[s]
             .style
             .get(&o)
@@ -682,12 +687,22 @@ impl Interp<'_> {
                 _ if matches!(self.o(att), ObjData::Point { .. } | ObjData::LevelObj { .. }) => (None, None),
                 _ => (None, Some(self.ref_id(s, att, &ids))),
             };
+            // a label the symbol gives has its layer (at -1) and a package's until the document
+            // writes one of its own
+            let written = match self.o(t) {
+                ObjData::KeyText { layers, .. } => {
+                    layers.iter().any(|(p, _, _)| !from_package(p) && p.first() != Some(&PosElem::Int(-1)))
+                }
+                ObjData::Text { from_symbol, .. } => !from_symbol,
+                _ => true,
+            };
             texts.push(TextView {
                 id: self.label(t),
                 object_id: self.ref_id(s, t, &ids),
                 attach,
                 key,
                 markup: text.as_str().to_string(),
+                written,
                 anchor,
                 lines: markup::parse(&expanded),
                 halign: it.halign.clone().unwrap_or_else(|| "start".into()),

@@ -184,6 +184,8 @@ pub struct TextView {
     pub key: Option<String>,
     /// The text as written, before `${…}` is read (13.6).
     pub markup: String,
+    /// The document's records write it, or a part of it; false for a label its symbol alone gives.
+    pub written: bool,
     pub anchor: Pt,
     pub lines: Vec<Line>,
     pub halign: String,
