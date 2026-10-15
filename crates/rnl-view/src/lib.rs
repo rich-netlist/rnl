@@ -418,7 +418,7 @@ R1 p q 1k
     #[test]
     fn the_standard_package_can_be_left_out() {
         let files = MemoryProvider::new().with("a.sp", NETLIST);
-        let options = BuildOptions { runtime: Options { std: false }, ..BuildOptions::default() };
+        let options = BuildOptions { runtime: Options { std: false, ..Options::default() }, ..BuildOptions::default() };
         let without = build("a.sp", &files, &options).unwrap();
         let with = build("a.sp", &files, &BuildOptions::default()).unwrap();
         assert_ne!(without.diagnostics.len(), with.diagnostics.len());

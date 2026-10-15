@@ -19,6 +19,7 @@ FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
 options:
   --package-dir DIR   look for packages in DIR as well (16.2); repeatable
   --no-std            do not use the standard package at the root (16.3)
+  --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      spice or spectre, instead of guessing from the file
 view options:
   --primitives        give each level's primitives, in scene units with y up
@@ -30,6 +31,7 @@ struct Args {
     out: Option<PathBuf>,
     package_dirs: Vec<PathBuf>,
     std: bool,
+    generated: bool,
     dialect: Option<String>,
     svg: bool,
     primitives: bool,
@@ -45,6 +47,7 @@ fn parse_args() -> Result<Args, String> {
     let mut out = None;
     let mut package_dirs = Vec::new();
     let mut std = true;
+    let mut generated = true;
     let mut dialect = None;
     let (mut svg, mut primitives) = (true, false);
     while let Some(a) = it.next() {
@@ -52,6 +55,7 @@ fn parse_args() -> Result<Args, String> {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
             "--package-dir" => package_dirs.push(PathBuf::from(it.next().ok_or("--package-dir needs a directory")?)),
             "--no-std" => std = false,
+            "--no-generated" => generated = false,
             "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
@@ -60,7 +64,7 @@ fn parse_args() -> Result<Args, String> {
         }
     }
     let file = file.ok_or(USAGE)?;
-    Ok(Args { command, file, out, package_dirs, std, dialect, svg, primitives })
+    Ok(Args { command, file, out, package_dirs, std, generated, dialect, svg, primitives })
 }
 
 fn main() -> ExitCode {
@@ -80,8 +84,13 @@ fn main() -> ExitCode {
     }
 }
 
+/// The runtime's options the command line gives.
+fn options(args: &Args) -> Options {
+    Options { std: args.std, generated: args.generated, ..Options::default() }
+}
+
 fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, String> {
-    rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), provider, &Options { std: args.std })
+    rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), provider, &options(args))
 }
 
 fn run(args: &Args) -> Result<ExitCode, String> {
@@ -109,7 +118,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         "view" => {
             let options = BuildOptions {
                 dialect: args.dialect.clone(),
-                runtime: Options { std: args.std },
+                runtime: options(args),
                 svg: args.svg,
                 primitives: args.primitives,
             };

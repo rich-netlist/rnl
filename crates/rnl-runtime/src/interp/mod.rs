@@ -45,11 +45,18 @@ pub(crate) type RuleMembers = ((usize, usize), Rc<Vec<unit::UnitMember>>);
 pub struct Options {
     /// Use the standard package implicitly at the root (16.3).
     pub std: bool,
+    /// Read the records with `type="generated"`, the solver's results. A solver interprets a level
+    /// without them (2.8, 14.8): every file of the document is read as if they were not written.
+    pub generated: bool,
+    /// Two coordinates closer than this are equal when constraints are checked against the
+    /// written coordinates and conflicting coordinates are found (11.7). The standard leaves the
+    /// tolerance to the tool; a viewer that does not solve uses [`crate::geom::TOL`].
+    pub tolerance: f64,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { std: true }
+        Options { std: true, generated: true, tolerance: crate::geom::TOL }
     }
 }
 
@@ -118,6 +125,10 @@ pub struct Interp<'p> {
     /// evaluated: the run stops, and the interpretation is run again with it in `closing`.
     pub(crate) restart: Option<(cycles::StmtKey, String)>,
     pub(crate) std_enabled: bool,
+    /// Read the records with `type="generated"` (`Options::generated`).
+    pub(crate) read_generated: bool,
+    /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
+    pub(crate) tol: f64,
     pub(crate) std_cache: Option<Option<UnitId>>,
     pub(crate) scoped_memo: HashMap<(UnitId, ObjId), Vec<(String, String)>>,
     pub(crate) body_errors: HashMap<usize, DiagId>,
@@ -169,6 +180,8 @@ impl<'p> Interp<'p> {
             closing: HashMap::new(),
             restart: None,
             std_enabled: options.std,
+            read_generated: options.generated,
+            tol: options.tolerance,
             std_cache: None,
             scoped_memo: HashMap::new(),
             body_errors: HashMap::new(),

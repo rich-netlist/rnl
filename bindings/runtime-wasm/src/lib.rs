@@ -98,7 +98,7 @@ pub fn respond(request: &[u8]) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: request.dialect,
-        runtime: Options { std: request.std },
+        runtime: Options { std: request.std, ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
     };

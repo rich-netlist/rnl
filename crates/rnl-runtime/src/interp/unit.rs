@@ -314,6 +314,11 @@ pub fn scan_package_decl(text: &str) -> Option<(String, String)> {
     Some((field("name")?, field("version")?))
 }
 
+/// A record whose head writes `type="generated"`: the solver's result (2.8).
+pub fn is_generated_record(ast: &RecordAst) -> bool {
+    ast.header.as_ref().and_then(|h| h.get("type")).is_some_and(|v| *v == Value::Str("generated".into()))
+}
+
 /// An alias package: a package file whose header has only VERSION, PACKAGE and ALIAS, and no other
 /// record (16.5).
 pub fn is_alias_package(u: &Unit) -> bool {
@@ -383,6 +388,10 @@ impl Interp<'_> {
         let pkg = self.units[u].pkg().to_string();
         for (index, rec) in self.unit_records(u).into_iter().enumerate() {
             let ast = self.parse(rec);
+            if !self.read_generated && self.units[u].kind == UnitKind::Level && is_generated_record(&ast) {
+                // a solver does not read the solver's records, nor what they would report (2.8, 14.8)
+                continue;
+            }
             for note in &ast.notes {
                 if let Some(kw) = &note.kw {
                     let k = self.kw(kw, u);

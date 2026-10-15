@@ -46,7 +46,12 @@ fn interpret_nets() -> Interpretation {
     }
     main.records = scan_run(&package_lines(RECORDS), "nets.sp", &mut sink);
     let dialect = Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec!["gnd".into()] };
-    interpret(HostDocument::new(main, dialect), &MemoryProvider::new(), &Options { std: false }, sink)
+    interpret(
+        HostDocument::new(main, dialect),
+        &MemoryProvider::new(),
+        &Options { std: false, ..Options::default() },
+        sink,
+    )
 }
 
 fn text_of(lines: &[Vec<Run>]) -> String {

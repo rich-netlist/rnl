@@ -93,7 +93,7 @@ fn interpret_with(
         let id = doc.add_level(lv, Some(0));
         doc.subckts.insert(doc.key(name), id);
     }
-    Outcome::of(&interpret(doc, provider, &Options { std: false }, sink))
+    Outcome::of(&interpret(doc, provider, &Options { std: false, ..Options::default() }, sink))
 }
 
 fn interpret_main(statements: &str) -> Outcome {
@@ -282,7 +282,11 @@ fn an_edit_generated_at_an_earlier_place_comes_before_a_later_statement() {
 #[test]
 fn a_package_checked_on_its_own_has_its_cycles() {
     let text = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"cyc\", version=\"1.0\") }\n@RNL {\n  $A = {# @SELECT-NET(name=\"a\")};\n  $B = {};\n  $A @ADD-TO $B;\n  $B @REMOVE-FROM $A\n}\n";
-    let r = check_package("cyc.rnl", &MemoryProvider::new().with("cyc.rnl", text), &Options { std: false });
+    let r = check_package(
+        "cyc.rnl",
+        &MemoryProvider::new().with("cyc.rnl", text),
+        &Options { std: false, ..Options::default() },
+    );
     let errors: Vec<String> =
         r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
     assert_eq!(errors.len(), 1, "{errors:?}");

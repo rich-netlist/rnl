@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::diag::{Loc, Severity};
-use crate::geom::{fmt_num, route, Orient, Pt, TOL};
+use crate::geom::{fmt_num, route, Orient, Pt};
 
 use super::obj::*;
 use super::scene::{Fact, FactData};
@@ -470,6 +470,7 @@ impl Interp<'_> {
             }
         }
         // 2. coordinates: per object and axis the fact with the highest priority (8.5)
+        let tol = self.tol;
         let mut best: HashMap<(ObjId, char), (Priority, Pos, usize)> = HashMap::new();
         let mut best_order: Vec<(ObjId, char)> = Vec::new();
         for k in live_at {
@@ -488,11 +489,11 @@ impl Interp<'_> {
                 Some(cur) => {
                     let FactData::Coord(_, cv) = at[cur.2].data else { continue };
                     if (level(p), &f.pos) > (level(cur.0), &cur.1) {
-                        if (cv - v).abs() > TOL {
+                        if (cv - v).abs() > tol {
                             self.drop_fact(s, &at[cur.2], f);
                         }
                         best.insert(key, (p, f.pos.clone(), k));
-                    } else if (cv - v).abs() > TOL {
+                    } else if (cv - v).abs() > tol {
                         self.drop_fact(s, f, &at[cur.2]);
                     }
                 }
@@ -1433,6 +1434,7 @@ impl Interp<'_> {
 
     fn satisfied(&mut self, s: SceneId, c: ObjId, members: &[ObjId]) -> Option<bool> {
         let ObjData::Constraint(cd) = self.o(c).clone() else { return Some(true) };
+        let tol = self.tol;
         if cd.kind == ConstraintKind::OrientRelation {
             // each side shares one orientation; `to` is `from` turned by the relation in the drawing's frame (14.9)
             let mut sides = Vec::new();
@@ -1470,8 +1472,8 @@ impl Interp<'_> {
                 Some("decreasing") => ra.0 - rb.1,
                 _ => (rb.0 - ra.1).max(ra.0 - rb.1),
             };
-            let lo_ok = cd.params.min.is_none_or(|lo| d >= lo - TOL);
-            let hi_ok = cd.params.max.is_none_or(|hi| d <= hi + TOL);
+            let lo_ok = cd.params.min.is_none_or(|lo| d >= lo - tol);
+            let hi_ok = cd.params.max.is_none_or(|hi| d <= hi + tol);
             return Some(lo_ok && hi_ok);
         }
         let mut vals = Vec::new();
@@ -1479,13 +1481,13 @@ impl Interp<'_> {
             vals.push(self.coord_of(s, m, axis)?);
         }
         match cd.kind {
-            ConstraintKind::Align => Some(vals.len() < 2 || vals.iter().all(|v| (v - vals[0]).abs() <= TOL)),
+            ConstraintKind::Align => Some(vals.len() < 2 || vals.iter().all(|v| (v - vals[0]).abs() <= tol)),
             ConstraintKind::Order => {
                 if vals.len() < 2 {
                     return Some(true);
                 }
-                let inc = vals.windows(2).all(|w| w[1] - w[0] >= 1.0 - TOL);
-                let dec = vals.windows(2).all(|w| w[0] - w[1] >= 1.0 - TOL);
+                let inc = vals.windows(2).all(|w| w[1] - w[0] >= 1.0 - tol);
+                let dec = vals.windows(2).all(|w| w[0] - w[1] >= 1.0 - tol);
                 Some(match cd.params.sense {
                     Some("increasing") => inc,
                     Some("decreasing") => dec,
@@ -1497,7 +1499,7 @@ impl Interp<'_> {
                     return Some(true);
                 }
                 let d0 = vals[1] - vals[0];
-                Some(vals.windows(2).all(|w| ((w[1] - w[0]) - d0).abs() <= TOL))
+                Some(vals.windows(2).all(|w| ((w[1] - w[0]) - d0).abs() <= tol))
             }
             _ => Some(true),
         }
