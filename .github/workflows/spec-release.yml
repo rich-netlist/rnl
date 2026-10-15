@@ -1,7 +1,8 @@
 # Publishes a revision of the language standard (decision 0007). On a tag such as spec-0.2-r1 it checks
-# the standard and builds every form of it with scripts/spec/build.py, then creates the GitHub release
-# "RNL 0.2, revision 1" with those files and their SHA256SUMS. The message of the tag becomes the
-# release notes: list there what the revision changes.
+# version 0.2 of the standard and builds every form of it with scripts/spec/build.py --version 0.2, then
+# creates the GitHub release "RNL 0.2, revision 1" with those files and their SHA256SUMS; the other
+# versions in spec/ are left out. The message of the tag becomes the release notes: list there what the
+# revision changes.
 name: Standard release
 
 on:
@@ -21,8 +22,12 @@ jobs:
 
       - uses: ./.github/actions/install-spec-tools
 
-      - name: Build every form of the standard
-        run: python3 scripts/spec/build.py --out release
+      - name: Build every form of the version of the tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#spec-}"
+          python3 scripts/spec/build.py --version "${version%-r*}" --out release
 
       - name: Create the release
         env:
