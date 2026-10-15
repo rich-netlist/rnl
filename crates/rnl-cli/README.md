@@ -28,6 +28,6 @@ Without a solver, `render` draws only what has coordinates. `check` says what is
 
 `problem` prints the `LevelProblem` of each level that [`rnl-runtime`](../rnl-runtime/README.md#for-a-solver) gives a solver: the objects with their slots and references, the symbols, the geometric facts in the order of 8.5, the wires, ROUTEs, groups and usages, and the level's `sig1` hash. It is for looking at what a solver will get; `--no-generated` shows how the other commands see a level before it is solved.
 
-The crate's integration tests run the [conformance corpus](../../tests/conformance/README.md) and the writeback round trips, check the problems given to a solver over the corpus and the [solver cases](../../tests/integration/README.md), write a hand-made solution back and read it again, and build the Document over the disk as the desktop viewer does: by absolute paths, with the files read by `FsProvider`.
+The crate's integration tests run the [conformance corpus](../../tests/conformance/README.md) and the writeback round trips, check the problems given to a solver over the corpus and the [solver cases](../../tests/integration/README.md) and how PRIORITY turns groups off, write a hand-made solution back and read it again, and build the Document over the disk as the desktop viewer does: by absolute paths, with the files read by `FsProvider`.
 
 See the [roadmap](../../docs/roadmap.md) for planned work.

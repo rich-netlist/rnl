@@ -126,6 +126,11 @@ impl Scene {
         self.at.push(f);
     }
 
+    /// Whether GROUP marks the set in this level (11.5); complete once generation is done (10.5).
+    pub(crate) fn grouped(&self, set: ObjId) -> bool {
+        self.groups.iter().any(|(_, g, _)| *g == set)
+    }
+
     fn new(level: LevelId, levelobj: ObjId) -> Scene {
         Scene {
             level,

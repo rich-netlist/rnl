@@ -1517,7 +1517,12 @@ impl Interp<'_> {
             let lazy = a.obj;
             let op2 = op.clone();
             let task: Task = Rc::new(move |it: &mut Interp, s: SceneId, ph: usize| {
-                let members = it.flatten(s, lazy, ph, Some(&c));
+                // PRIORITY runs at the geometry phase, when every GROUP of the level is in
+                let members = if matches!(op2, TargetOp::Priority { .. }) && it.scenes[s].grouped(lazy) {
+                    vec![lazy]
+                } else {
+                    it.flatten(s, lazy, ph, Some(&c))
+                };
                 for (k, m) in members.into_iter().enumerate() {
                     let _ = it.apply_op(s, &op2, m, pos_plus(&c.pos, "g", k as i64), false, &c);
                 }
@@ -1551,6 +1556,28 @@ impl Interp<'_> {
             let sd = self.set(a.obj);
             if members.is_empty() && sd.explicit && sd.items.is_empty() {
                 self.warn(ctx, "an empty set written directly: nothing happens (5.2.1)", a.off);
+            }
+            if let TargetOp::Priority { off, .. } = op {
+                // PRIORITY takes a set with GROUP as the group itself, any other set member by
+                // member (5.2.1, 14.8). GROUP may be written after this statement, or in a body
+                // that generation expands (10.5), so which it is is known only at the geometry
+                // phase, the first that reads priorities (8.2); the members are those of now.
+                let (set, direct, c) = (a.obj, !a.sel, Rc::new(ctx.clone()));
+                let task: Task = Rc::new(move |it: &mut Interp, s: SceneId, _| {
+                    let targets = if it.scenes[s].grouped(set) { vec![set] } else { members.clone() };
+                    for (k, m) in targets.into_iter().enumerate() {
+                        if it.apply_op(s, &op, m, pos_plus(&c.pos, "e", k as i64), direct, &c).is_err() {
+                            it.note_failed_at(c.rec, off, false);
+                            break;
+                        }
+                    }
+                });
+                if self.scenes[s].phase >= phase {
+                    task(self, s, phase);
+                } else {
+                    self.scenes[s].tasks[phase].push((ctx.pos.clone(), task));
+                }
+                return Ok((a.obj, a.sel));
             }
             for (k, m) in members.into_iter().enumerate() {
                 self.apply_op(s, &op, m, pos_plus(&ctx.pos, "e", k as i64), !a.sel, ctx)?;
