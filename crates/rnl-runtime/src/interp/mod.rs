@@ -22,14 +22,14 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::diag::{DiagId, Sink};
-use crate::host::{HostDocument, Level, LevelKind, Record};
+use crate::host::{HostDocument, Level, LevelId, LevelKind, Record};
 use crate::model::{FailedSpan, HostRef, Model};
 use crate::numbering::LevelNumbering;
 use crate::source::Provider;
 use crate::syntax::RecordAst;
 
 use eval::{Bound, Stop, R};
-use numbers::{Birth, NumberRun};
+use numbers::{AuthoredCount, Birth, Counted, LevelNumbers, NumberRun};
 use obj::*;
 use scene::Scene;
 use unit::{Header, Unit, UnitKind};
@@ -101,6 +101,15 @@ pub struct Interpretation {
     pub numbering: Vec<LevelNumbering>,
     /// The records of the solver to read again, differently (5.9).
     pub(crate) recheck: NumberRun,
+    /// In a reading without the records of the solver that counts for another, the objects of the
+    /// authored records of each level (5.9).
+    pub(crate) counted: HashMap<LevelId, AuthoredCount>,
+    /// The records' own objects of the records of the solver, when a reading after this one needs
+    /// them: a number was used before the member that makes its object, or this reading resolved
+    /// such numbers with the counts of the one before (5.9).
+    pub(crate) own: HashMap<RecId, Vec<Counted>>,
+    /// A number was used before the member that makes its object, while that member was read.
+    pub(crate) forward: bool,
 }
 
 impl Interpretation {
@@ -189,7 +198,20 @@ pub struct Interp<'p> {
     /// births and of names they were computed with.
     #[allow(clippy::type_complexity)]
     pub(crate) numbered_memo: HashMap<(SceneId, Option<RecId>, Option<usize>), ((usize, usize), Rc<Vec<ObjId>>)>,
-    /// The records of the solver this run reads differently (5.9).
+    /// The numbered objects of each scene, with the number of births and of names they were
+    /// computed with.
+    pub(crate) level_numbers_memo: HashMap<SceneId, ((usize, usize), Rc<LevelNumbers>)>,
+    /// The births by the member of a record whose evaluation made them, in each scene.
+    pub(crate) births_by_root: HashMap<(SceneId, MemberKey), Vec<usize>>,
+    /// How many objects one token made for one member of a set so far, by scene, usage whose body
+    /// it is in, record, token and member.
+    #[allow(clippy::type_complexity)]
+    pub(crate) each_seen: HashMap<(SceneId, Option<ObjId>, Option<RecId>, usize, ObjId), usize>,
+    /// How each object was made, as another reading compares it (5.9).
+    pub(crate) identities: HashMap<ObjId, Rc<str>>,
+    /// A number was used before the member that makes its object, while that member was read.
+    pub(crate) forward: bool,
+    /// What this run takes from the readings before it (5.9).
     pub(crate) numbers: NumberRun,
 }
 
@@ -257,6 +279,11 @@ impl<'p> Interp<'p> {
             evals: Vec::new(),
             next_eval: 0,
             numbered_memo: HashMap::new(),
+            level_numbers_memo: HashMap::new(),
+            births_by_root: HashMap::new(),
+            each_seen: HashMap::new(),
+            identities: HashMap::new(),
+            forward: false,
             numbers,
         };
         for _ in 0..3 {
@@ -638,13 +665,22 @@ impl<'p> Interp<'p> {
         let model = self.build_model();
         let problems =
             if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Vec::new() };
-        // the numbers and their checks, read with the draft only (5.9)
-        let numbering: Vec<LevelNumbering> = if self.draft && self.package_main.is_none() {
+        // the numbers and their checks, read with the draft only (5.9); a reading that counts the
+        // objects of the authored records for another gives those alone
+        let counting = self.numbers.count;
+        let counted: HashMap<LevelId, AuthoredCount> = if counting {
+            (0..self.scenes.len()).map(|s| (self.scenes[s].level, self.counted_authored(s))).collect()
+        } else {
+            HashMap::new()
+        };
+        let numbering: Vec<LevelNumbering> = if self.draft && !counting && self.package_main.is_none() {
             (0..self.scenes.len()).map(|s| self.level_numbering(s)).collect()
         } else {
             Vec::new()
         };
         let recheck = self.number_recheck(&numbering);
+        let own = if self.forward || self.numbers.own.is_some() { self.counted_own() } else { HashMap::new() };
+        let forward = self.forward;
         let checking = self.package_main.map(|p| self.units[p].pkg_name.clone()).unwrap_or_default();
         let mut sources = self.doc.sources.clone();
         sources.extend(self.pkg_sources.clone());
@@ -658,35 +694,79 @@ impl<'p> Interp<'p> {
             problems,
             numbering,
             recheck,
+            counted,
+            own,
+            forward,
             doc: self.doc,
         }
+    }
+
+    /// Does this reading count the objects of the authored records for another (5.9)?
+    fn counts_first(&self) -> bool {
+        self.numbers.authored.is_none() && self.needs_count()
     }
 }
 
 /// Interpret a host document: the effective model and the diagnostics. `sink` holds what the
 /// host adapter reported, if anything.
 ///
-/// In a file of the draft 0.3, a record of the solver whose numbers fail or are out of date is
-/// known only once every level is read (5.9): the document is then read again, with that record's
-/// numbers errors (it has no `numbering`) or its statements that use a number left out (its
-/// `numbering` does not match). The checks given are those of the first reading, where every
-/// number is read: the text as written.
+/// The numbers of the draft 0.3 take more than one reading of the document (5.9), only when a file
+/// of the draft is read with its records of the solver:
+///
+/// - the objects of the authored records are counted as the level reads without its records of
+///   the solver, so that reading comes first (`NumberRun::authored`);
+/// - a number used before the member that makes its object, while that member is being read, is
+///   resolved by reading again with the record's own objects that the reading counted, until they
+///   stay the same (`NumberRun::own`);
+/// - a record of the solver whose numbers fail or are out of date is known only once every level is
+///   read: the document is then read again, with that record's numbers errors (it has no
+///   `numbering`) or its statements that use a number left out (its `numbering` does not match).
+///   The checks given are those of the reading before, where every number is read: the text as
+///   written.
 pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, sink: Sink) -> Interpretation {
     let host = sink.clone();
-    let run = |doc: HostDocument, sink: Sink, numbers: NumberRun| -> Interpretation {
-        let again = numbers.clone();
-        Interp::new_run(doc, provider, options, sink, numbers)
-            .run_settled(|it| Interp::new_run(it.doc, provider, options, host.clone(), again.clone()))
-    };
-    let mut out = run(doc, sink, NumberRun::default());
+    let mut run = NumberRun::default();
+    let mut out = read(doc, provider, options, sink, &host, &mut run);
+    for _ in 0..3 {
+        let same = run.own.as_ref().is_some_and(|own| **own == out.own);
+        if !out.forward && (run.own.is_none() || same) {
+            break;
+        }
+        run.own = Some(Rc::new(std::mem::take(&mut out.own)));
+        out = read(out.doc, provider, options, host.clone(), &host, &mut run);
+    }
     if !out.recheck.is_empty() {
         let recheck = std::mem::take(&mut out.recheck);
         let numbering = std::mem::take(&mut out.numbering);
-        out = run(out.doc, host.clone(), recheck);
+        let mut again = NumberRun { refuse: recheck.refuse, stale: recheck.stale, ..run };
+        out = read(out.doc, provider, options, host.clone(), &host, &mut again);
         out.numbering = numbering;
         out.recheck = NumberRun::default();
     }
     out
+}
+
+/// One reading of a document; first the reading without the records of the solver that counts the
+/// objects of the authored records, when this one needs it and `run` does not have it yet (5.9).
+fn read(
+    doc: HostDocument,
+    provider: &dyn Provider,
+    options: &Options,
+    sink: Sink,
+    host: &Sink,
+    run: &mut NumberRun,
+) -> Interpretation {
+    let mut it = Interp::new_run(doc, provider, options, sink, run.clone());
+    if it.counts_first() {
+        let without = Options { generated: false, problems: false, ..options.clone() };
+        let counting = NumberRun { count: true, ..NumberRun::default() };
+        let first = Interp::new_run(it.doc.clone(), provider, &without, host.clone(), counting.clone())
+            .run_settled(|x| Interp::new_run(x.doc, provider, &without, host.clone(), counting.clone()));
+        run.authored = Some(Rc::new(first.counted));
+        it.numbers.authored = run.authored.clone();
+    }
+    let again = run.clone();
+    it.run_settled(|x| Interp::new_run(x.doc, provider, options, host.clone(), again.clone()))
 }
 
 /// Check a package file on its own (2.7).

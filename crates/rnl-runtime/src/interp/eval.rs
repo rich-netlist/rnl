@@ -703,7 +703,11 @@ impl<'p> Interp<'p> {
             }
             for b in m.binds.iter().filter(|b| b.after == k) {
                 bound.push(((b.prefix, b.name.clone()), val));
-                self.note_named(val);
+                // a name of a member of a record or of a definition body, which other members can
+                // use; one bound inside a `{…}` holds only there (6.7) and is no name for 5.9
+                if ctx.nested.is_none() {
+                    self.note_named(val);
+                }
                 if val != NOTHING && val != LEVEL && val != OWNER {
                     let nameable = matches!(
                         self.o(val),

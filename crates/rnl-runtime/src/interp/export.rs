@@ -346,7 +346,7 @@ impl Interp<'_> {
         }
 
         let version = self.version_of(Some(self.level_unit[lv]));
-        let authored_numbers = self.numbered(s, None, None).len();
+        let authored_numbers = self.level_numbers(s).authored.len();
         LevelProblem {
             level: lv,
             title: level.title(),

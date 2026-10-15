@@ -569,3 +569,126 @@ fn numbers_are_given_only_with_the_draft() {
     let r = read(&amp("").replace("@VERSION(\"0.3\")", "@VERSION(\"0.2\")"), &draft());
     assert_eq!(authored(&r, "amp"), AMP_LINES);
 }
+
+#[test]
+fn a_name_bound_only_inside_a_set_does_not_count() {
+    // %p and %t hold only in their `{…}` (6.7): the record of the solver cannot use them, so the
+    // point and the text have numbers, and the member of a TEXT given one is written by it
+    let text =
+        netlist("0.3", &record("", "{%p = (1, 2); %p @TEXT(\"p\") => %t} @ALIGN(\"x\"); @TEXT(\"q\") {%q = (3, 3)}"));
+    let r = read(&text, &draft());
+    let set = "{ %p = ( 1 , 2 ) ; %p @TEXT ( \"p\" ) => %t } @ALIGN ( \"x\" )";
+    let q = "@TEXT ( \"q\" ) { %q = ( 3 , 3 ) }";
+    assert_eq!(authored(&r, "t.sp"), [set, set, &format!("{q}\t%#4"), q]);
+    let r = read(&text, &Options { draft: true, ..Options::solver() });
+    let p = problem(&r, "t.sp");
+    assert_eq!(
+        numbered(p).iter().map(|(n, l)| (*n, l.as_str())).collect::<Vec<_>>(),
+        [(1, "%p"), (2, "a text"), (3, "a text"), (4, "%q")]
+    );
+}
+
+#[test]
+fn a_number_may_be_used_before_the_member_that_makes_its_object() {
+    // the junction is on the point (12, 2) that the rewritten wire after it writes, the record's
+    // own object 7, after its own junction, 6 (6.7, 5.9)
+    let solver = |numbering: &str| {
+        format!(
+            "* @RNL(type=\"generated\", priority=\"high\", numbering=\"{numbering}\") {{\n\
+             *   $JUNCTION @ATTACH %#7;\n\
+             *   %#2 @WIRE(mode=\"straight\") {{#M1:1 (12, 2) %#3 (12, 6) #R1:2}};\n\
+             *   #M1 @PLACE(10, 0); #R1 @PLACE(10, 8); %#3 @PLACE(12, 4)\n* }}\n"
+        )
+    };
+    let first = read(&amp(&solver("0000000000000000")), &draft());
+    let lv = level_index(&first, "amp");
+    let n = first.numbering.iter().find(|n| n.level == lv).unwrap();
+    let wire = "%#2 @WIRE ( mode = \"straight\" ) { #M1:1 ( 12 , 2 ) %#3 ( 12 , 6 ) #R1:2 }";
+    assert_eq!(n.records[0].lines[5..], ["$JUNCTION @ATTACH %#7", wire, wire]);
+    let check = level_check(&first, lv).unwrap().to_string();
+
+    // read back with its check: the junction is drawn on that point, with no error and no hint
+    let r = read(&amp(&solver(&check)), &Options { problems: true, ..draft() });
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    assert!(diagnostics(&r, Severity::Hint).iter().all(|(_, m)| !m.contains("out of date")));
+    assert_eq!(level_check(&r, lv), Some(check.as_str()));
+    let p = problem(&r, "amp");
+    let bend = p.objects.iter().position(|o| o.label == "(12, 2)").unwrap();
+    assert_eq!(p.objects[bend].reference, number(7, ""));
+    let dot = p.objects.iter().find(|o| o.reference == number(6, "")).unwrap();
+    assert_eq!(dot.label, "a usage of $JUNCTION");
+    assert_eq!(dot.position, Position::At(rnl_runtime::problem::PointRef::Origin(bend)));
+    // and the wire is drawn through it
+    let drawn = &r.model.levels.iter().find(|l| l.title == "amp").unwrap().wires;
+    assert!(drawn.iter().any(|w| w.mode == "straight" && w.points.contains(&(12.0, 2.0))));
+}
+
+#[test]
+fn the_authored_objects_keep_the_numbers_they_have_without_the_record_of_the_solver() {
+    // the record of the solver adds R2 to the set that an editor's TEXT written after it labels:
+    // read with that record, the TEXT labels R2 too, but that text gets no number, and the others
+    // keep those they have as the level reads without it, as a solver reads it (5.9)
+    let text = |numbering: &str| {
+        netlist(
+            "0.3",
+            &(record("", "%s_set = {#R1}; (5, 5) @TEXT(\"first\")")
+                + &record(
+                    &format!("(type=\"generated\", priority=\"high\", numbering=\"{numbering}\")"),
+                    "#R2 @ADD-TO %s_set; %#2 @PLACE(1, 1); %#3 @PLACE(2, 2); %#5 @PLACE(3, 3)",
+                )
+                + &record("(author=\"rnl-editor test\")", "%s_set @TEXT(\"${name}\"); (6, 6) @TEXT(\"last\")")),
+        )
+    };
+    let lines = [
+        "( 5 , 5 ) @TEXT ( \"first\" )",
+        "( 5 , 5 ) @TEXT ( \"first\" )",
+        "%s_set @TEXT ( \"${name}\" )\t#R1",
+        "( 6 , 6 ) @TEXT ( \"last\" )",
+        "( 6 , 6 ) @TEXT ( \"last\" )",
+    ];
+    let first = read(&text("0000000000000000"), &draft());
+    assert_eq!(authored(&first, "t.sp"), lines);
+    let check = level_check(&first, 0).unwrap().to_string();
+    assert_eq!(check, rnl_runtime::numbering::check(&lines.map(String::from)));
+
+    let r = read(&text(&check), &Options { problems: true, ..draft() });
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    assert!(diagnostics(&r, Severity::Hint).iter().all(|(_, m)| !m.contains("out of date")));
+    let p = problem(&r, "t.sp");
+    assert_eq!(p.objects.iter().filter(|o| o.text.as_ref().is_some_and(|t| t.key.is_none())).count(), 4);
+    assert_eq!(at(p, &number(2, "")), Some((1.0, 1.0)));
+    assert_eq!(at(p, &number(3, "")), Some((2.0, 2.0)));
+    assert_eq!(at(p, &number(5, "")), Some((3.0, 3.0)));
+    // the label of R1 is number 3, that of R2 has none
+    let label_of = |name: &str| {
+        p.objects
+            .iter()
+            .find(|o| {
+                o.text.as_ref().is_some_and(|t| {
+                    t.key.is_none()
+                        && matches!(&t.attach, rnl_runtime::problem::Filler::Object(k) if p.objects[*k].label == name)
+                })
+            })
+            .unwrap()
+            .reference
+            .clone()
+    };
+    assert_eq!(label_of("#R1"), number(3, ""));
+    assert_eq!(label_of("#R2"), Reference::Anonymous);
+    assert_eq!(p.authored_numbers, 5);
+}
+
+#[test]
+fn a_record_of_the_solver_that_uses_no_number_needs_no_numbering() {
+    // a numbering that does not match changes nothing in a record without a number: no hint (5.9)
+    let text = netlist("0.3", &record("(type=\"generated\", numbering=\"0123456789abcdef\")", "#R1 @PLACE(1, 2)"));
+    let r = read(&text, &Options { problems: true, ..draft() });
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    assert!(diagnostics(&r, Severity::Hint).iter().all(|(_, m)| !m.contains("out of date")));
+    assert_eq!(at(problem(&r, "t.sp"), &Reference::Name("#R1".into())), Some((1.0, 2.0)));
+    // nor without numbering
+    let text = netlist("0.3", &record("(type=\"generated\")", "#R1 @PLACE(1, 2)"));
+    let r = read(&text, &draft());
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    assert!(diagnostics(&r, Severity::Hint).iter().all(|(_, m)| !m.contains("out of date")));
+}
