@@ -53,6 +53,10 @@ pub struct Request {
     /// Give each level's primitives; false when not given.
     #[serde(default)]
     pub primitives: bool,
+    /// For development only: read the files that declare the draft 0.3 as well; false when not
+    /// given.
+    #[serde(default)]
+    pub draft: bool,
     /// Panic with this message, to test that the caller still gets an answer.
     #[cfg(feature = "test-panic")]
     pub panic: Option<String>,
@@ -98,7 +102,7 @@ pub fn respond(request: &[u8]) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: request.dialect,
-        runtime: Options { std: request.std, ..Options::default() },
+        runtime: Options { std: request.std, draft: request.draft, ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
     };

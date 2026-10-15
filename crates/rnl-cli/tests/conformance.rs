@@ -27,8 +27,12 @@ fn files(dir: &Path, exts: &[&str]) -> Vec<PathBuf> {
 }
 
 fn run(path: &Path) -> Value {
+    run_with(path, &Options::default())
+}
+
+fn run_with(path: &Path, options: &Options) -> Value {
     let provider = FsProvider::new(&[]);
-    let r = interpret_file(path, None, &provider, &Options::default()).unwrap();
+    let r = interpret_file(path, None, &provider, options).unwrap();
     dump::conformance(&r)
 }
 
@@ -55,6 +59,17 @@ fn cases_match_their_expected_models() {
         }
     }
     assert!(failed.is_empty(), "the effective model differs from the expected one: {failed:?}");
+}
+
+#[test]
+fn the_draft_switch_changes_nothing_in_a_file_of_0_2() {
+    // the rules the draft 0.3 changes apply only to the files that declare it
+    let draft = Options { draft: true, ..Options::default() };
+    for dir in ["cases", "equivalence"] {
+        for f in files(&corpus().join(dir), &["sp", "scs"]) {
+            assert_eq!(run_with(&f, &draft), run(&f), "{}", f.display());
+        }
+    }
 }
 
 /// Remove what names the file: the dialects' files differ only in that.

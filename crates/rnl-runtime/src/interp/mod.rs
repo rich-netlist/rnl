@@ -55,11 +55,15 @@ pub struct Options {
     /// written coordinates and conflicting coordinates are found (11.7). The standard leaves the
     /// tolerance to the tool; a viewer that does not solve uses [`crate::geom::TOL`].
     pub tolerance: f64,
+    /// For development only: read the files that declare the draft 0.3 as well
+    /// ([`unit::DRAFT_VERSION`]). The rules the draft changes apply only to those files, so a file
+    /// of 0.2 reads the same with this on or off.
+    pub draft: bool,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { std: true, generated: true, problems: false, tolerance: crate::geom::TOL }
+        Options { std: true, generated: true, problems: false, tolerance: crate::geom::TOL, draft: false }
     }
 }
 
@@ -108,6 +112,8 @@ pub struct Interp<'p> {
     pub(crate) level_scene: Vec<Option<SceneId>>,
     pub(crate) unit_recs: Vec<Vec<RecId>>,
     pub(crate) recs: Vec<Record>,
+    /// The unit whose text each record is in.
+    pub(crate) rec_unit: Vec<UnitId>,
     pub(crate) asts: Vec<Option<Rc<RecordAst>>>,
     /// The characters of each record's text, collected when an offset into it is first read.
     pub(crate) rec_chars: Vec<Option<Rc<[char]>>>,
@@ -146,6 +152,8 @@ pub struct Interp<'p> {
     pub(crate) want_problems: bool,
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
+    /// Read the files that declare the draft 0.3 (`Options::draft`).
+    pub(crate) draft: bool,
     pub(crate) std_cache: Option<Option<UnitId>>,
     pub(crate) scoped_memo: HashMap<(UnitId, ObjId), Vec<(String, String)>>,
     pub(crate) body_errors: HashMap<usize, DiagId>,
@@ -174,6 +182,7 @@ impl<'p> Interp<'p> {
             level_scene: vec![None; nlevels],
             unit_recs: Vec::new(),
             recs: Vec::new(),
+            rec_unit: Vec::new(),
             asts: Vec::new(),
             rec_chars: Vec::new(),
             pkg_levels: Vec::new(),
@@ -200,6 +209,7 @@ impl<'p> Interp<'p> {
             read_generated: options.generated,
             want_problems: options.problems,
             tol: options.tolerance,
+            draft: options.draft,
             std_cache: None,
             scoped_memo: HashMap::new(),
             body_errors: HashMap::new(),
@@ -224,10 +234,11 @@ impl<'p> Interp<'p> {
         for lv in 0..it.doc.levels.len() {
             let mut u = Unit::new(UnitKind::Level, &it.doc.levels[lv].title());
             u.level = Some(lv);
-            it.level_unit[lv] = it.units.len();
+            let unit = it.units.len();
+            it.level_unit[lv] = unit;
             it.units.push(u);
             let recs = it.doc.levels[lv].records.clone();
-            let ids: Vec<RecId> = recs.into_iter().map(|r| it.add_record(r)).collect();
+            let ids: Vec<RecId> = recs.into_iter().map(|r| it.add_record(r, unit)).collect();
             it.unit_recs.push(ids);
         }
         for lv in 0..it.doc.levels.len() {

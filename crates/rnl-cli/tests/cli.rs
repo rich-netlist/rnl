@@ -66,6 +66,33 @@ fn view_gives_the_primitives_and_the_svg_as_asked() {
 }
 
 #[test]
+fn draft_reads_the_files_that_declare_the_draft_0_3() {
+    let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("draft-0.3.sp");
+    let text = "* a file of the draft 0.3\nR1 a b 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n* @RNL { #R1 @PLACE(3, 4)}\n.end\n";
+    std::fs::write(&f, text).unwrap();
+    let f = f.to_string_lossy();
+    // without the switch, 0.3 is an unsupported version, and no RNL of the file is read (16.1)
+    let (code, out) = rnl(&["check", &f]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("unsupported version 0.3"), "{out}");
+    let (code, out) = rnl(&["check", &f, "--draft"]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.lines().any(|l| l.starts_with("0 errors")), "{out}");
+    // the solver's view reads it too
+    let places = |args: &[&str]| -> usize {
+        let (code, out) = rnl(args);
+        assert_eq!(code, 0, "{out}");
+        let p: serde_json::Value = serde_json::from_str(&out).unwrap();
+        p["levels"][0]["facts"].as_array().unwrap().iter().filter(|f| f["kind"] == "PLACE-x").count()
+    };
+    assert_eq!(places(&["problem", &f]), 0);
+    assert_eq!(places(&["problem", &f, "--draft"]), 1);
+    // the switch is in the help, for development only
+    let help = Command::new(env!("CARGO_BIN_EXE_rnl")).arg("--help").output().unwrap();
+    assert!(String::from_utf8_lossy(&help.stderr).contains("--draft             for development only"));
+}
+
+#[test]
 fn strip_generated_reads_the_bundled_packages_too() {
     let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("strip-generated-rnl-std.rnl");
     let (code, _) = rnl(&["strip-generated", "<bundled>/rnl-std.rnl", "-o", &out.to_string_lossy()]);

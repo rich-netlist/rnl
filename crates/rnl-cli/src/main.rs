@@ -22,6 +22,7 @@ options:
   --no-std            do not use the standard package at the root (16.3)
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      spice or spectre, instead of guessing from the file
+  --draft             for development only: read the files that declare the draft 0.3 as well
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -37,6 +38,7 @@ struct Args {
     std: bool,
     generated: bool,
     dialect: Option<String>,
+    draft: bool,
     svg: bool,
     primitives: bool,
     level: Option<String>,
@@ -55,6 +57,7 @@ fn parse_args() -> Result<Args, String> {
     let mut std = true;
     let mut generated = true;
     let mut dialect = None;
+    let mut draft = false;
     let (mut svg, mut primitives) = (true, false);
     let mut level = None;
     let mut solver_options = format!("tolerance={}", rnl_runtime::geom::fmt_num(rnl_runtime::geom::TOL));
@@ -65,6 +68,7 @@ fn parse_args() -> Result<Args, String> {
             "--no-std" => std = false,
             "--no-generated" => generated = false,
             "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
+            "--draft" => draft = true,
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
@@ -74,7 +78,20 @@ fn parse_args() -> Result<Args, String> {
         }
     }
     let file = file.ok_or(USAGE)?;
-    Ok(Args { command, file, out, package_dirs, std, generated, dialect, svg, primitives, level, solver_options })
+    Ok(Args {
+        command,
+        file,
+        out,
+        package_dirs,
+        std,
+        generated,
+        dialect,
+        draft,
+        svg,
+        primitives,
+        level,
+        solver_options,
+    })
 }
 
 fn main() -> ExitCode {
@@ -96,7 +113,7 @@ fn main() -> ExitCode {
 
 /// The runtime's options the command line gives.
 fn options(args: &Args) -> Options {
-    Options { std: args.std, generated: args.generated, ..Options::default() }
+    Options { std: args.std, generated: args.generated, draft: args.draft, ..Options::default() }
 }
 
 fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, String> {
@@ -126,7 +143,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         "problem" => {
-            let options = Options { std: args.std, ..Options::solver() };
+            let options = Options { std: args.std, draft: args.draft, ..Options::solver() };
             let r = rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), &provider, &options)?;
             let levels: Vec<_> = r
                 .problems

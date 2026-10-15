@@ -16,6 +16,7 @@ options:
   --no-std            do not use the standard package at the root (16.3)
   --no-generated      read the netlist without its type="generated" records, as a solver does (2.8)
   --dialect NAME      spice or spectre, instead of guessing from the file
+  --draft             for development only: read the files that declare the draft 0.3 as well
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -25,6 +26,8 @@ problem options (the levels are read without their type="generated" records):
 ```
 
 Without a solver, `render` draws only what has coordinates. `check` says what is missing: after the diagnostics it prints, for each drawing level, how many objects have no position and how many constraints hold, need a solver to move something, or could not be checked. `view` prints the Document of [`rnl-view`](../rnl-view/README.md), what the desktop viewer shows, for tools and for comparing builds; with `--primitives` each level has its primitives as well, and with `--no-svg` no SVG. The standard packages in [`libraries/standard`](../../libraries/standard/README.md) are built into the command through `rnl-view`; this crate adds the files and package directories on disk (`FsProvider`).
+
+`--draft` is for development only: the commands that interpret a file also read the files that declare the draft 0.3 of the language, which are otherwise of an unsupported version. The rules the draft changes apply only to those files, so a file of 0.2 reads the same with or without it.
 
 `problem` prints the `LevelProblem` of each level that [`rnl-runtime`](../rnl-runtime/README.md#for-a-solver) gives a solver: the objects with their slots and references, the symbols, the geometric facts in the order of 8.5, the wires, ROUTEs, groups and usages, and the level's `sig1` hash. It is for looking at what a solver will get; `--no-generated` shows how the other commands see a level before it is solved.
 

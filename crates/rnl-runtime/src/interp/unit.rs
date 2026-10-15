@@ -17,6 +17,8 @@ use super::obj::{Lit, MemberKey, Priority, RecId, UnitId};
 use super::Interp;
 
 pub const SUPPORTED_VERSION: &str = "0.2";
+/// The draft read as well when `Options::draft` is set, for development only.
+pub const DRAFT_VERSION: &str = "0.3";
 const HEADER_KW: [&str; 5] = ["VERSION", "PACKAGE", "ALIAS", "DEVICE", "USE-ALIASES"];
 
 /// The fields of a record header that affect interpretation (2.8).
@@ -358,8 +360,10 @@ impl Interp<'_> {
         a
     }
 
-    pub(crate) fn add_record(&mut self, r: crate::host::Record) -> RecId {
+    /// Add a record written in the text of unit `u`.
+    pub(crate) fn add_record(&mut self, r: crate::host::Record, u: UnitId) -> RecId {
         self.recs.push(r);
+        self.rec_unit.push(u);
         self.asts.push(None);
         self.rec_chars.push(None);
         self.recs.len() - 1
@@ -659,10 +663,16 @@ impl Interp<'_> {
                         continue;
                     };
                     self.units[u].version = v.clone();
-                    if version_key(v).0 < 0 || v != SUPPORTED_VERSION {
+                    let read = v == SUPPORTED_VERSION || (self.draft && v == DRAFT_VERSION);
+                    if version_key(v).0 < 0 || !read {
+                        let reads = if self.draft {
+                            format!("{SUPPORTED_VERSION}, and the draft {DRAFT_VERSION}")
+                        } else {
+                            SUPPORTED_VERSION.to_string()
+                        };
                         self.diag_in(
                             Severity::Error,
-                            format!("unsupported version {v}: no RNL of this file is interpreted (16.1; this implementation reads {SUPPORTED_VERSION})"),
+                            format!("unsupported version {v}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
                             Some(loc),
                             &pkg,
                         );
@@ -1133,6 +1143,20 @@ impl Interp<'_> {
         }
     }
 
+    /// Does a unit follow the draft 0.3? Only when the draft is read (`Options::draft`) and the
+    /// file the unit's text is in declares it: every rule the draft changes applies only there, so
+    /// a file of 0.2 reads the same with the switch on or off.
+    pub fn follows_0_3(&self, u: UnitId) -> bool {
+        self.draft && self.version_of(Some(u)) == DRAFT_VERSION
+    }
+
+    /// Does the text a statement is written in follow the draft 0.3? That is the file of its
+    /// record: for a record written into a subcircuit with scope=, the file that writes it (2.6);
+    /// for a statement of a definition body, the file of the definition (6.9).
+    pub fn statement_follows_0_3(&self, ctx: &super::ctx::Ctx) -> bool {
+        self.follows_0_3(ctx.rec.map_or(ctx.unit, |r| self.rec_unit[r]))
+    }
+
     fn use_decl(&mut self, u: UnitId, rec: Option<RecId>, k: usize, seg: &syntax::Segment, in_header: bool) {
         let call = seg.call.as_ref().unwrap();
         let loc = self.rec_loc(rec, call.start).unwrap();
@@ -1305,7 +1329,7 @@ impl Interp<'_> {
         u.pkg_level = Some(pl);
         let id = self.units.len();
         self.units.push(u);
-        let rec_ids: Vec<RecId> = recs.into_iter().map(|r| self.add_record(r)).collect();
+        let rec_ids: Vec<RecId> = recs.into_iter().map(|r| self.add_record(r, id)).collect();
         self.unit_recs.push(rec_ids);
         self.read_unit(id);
         if self.units[id].header_record.is_none() || self.units[id].pkg_name.is_empty() {
