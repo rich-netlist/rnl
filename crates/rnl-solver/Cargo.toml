@@ -14,3 +14,7 @@ num-bigint.workspace = true
 num-integer.workspace = true
 num-rational.workspace = true
 num-traits.workspace = true
+
+[dev-dependencies]
+# reads the netlists of the tests, with the bundled packages
+rnl-view.workspace = true

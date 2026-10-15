@@ -24,9 +24,9 @@
 //! - coordinates by a lexicographic LP, routing of the ROUTEs, layered scoring (`coords`, `route`,
 //!   `score`, `driver`).
 //!
-//! **Status: stage S1.** The crate, its options and its exact arithmetic are in place. [`solve`]
-//! does not resolve, place or route anything yet: it gives an empty solution and says so in the
-//! report's notes.
+//! **Status: stage S2.** [`resolve`] resolves the facts of a level as 8.5 says, exactly, and gives
+//! a witness, a placement that satisfies every fact kept. [`solve`] places every object where the
+//! witness puts it, with no search, rounding or routing yet, and says so in the report's notes.
 //!
 //! The crate does no file I/O and takes no time or randomness, so it builds for
 //! `wasm32-unknown-unknown` and the same input and options give the same result on every platform.
@@ -46,6 +46,7 @@ mod simplex;
 mod structure;
 
 pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, OBJECTIVES};
+pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;
 pub use rnl_runtime::solution::Solution;
 
@@ -80,9 +81,10 @@ pub struct SolveReport {
 pub struct Discarded {
     /// Its index in [`LevelProblem::facts`].
     pub fact: usize,
-    /// The facts kept before it that it conflicts with, by index: a minimal set, so that without
-    /// any one of them it would fit. Of several such sets, the one with the facts that rank
-    /// first.
+    /// The facts kept before it that it conflicts with, by index, sorted: a minimal set, so that
+    /// without any one of them it would fit. It is found from the facts that explain the conflict
+    /// by leaving out those of the latest rank first, so of several such sets it leans towards
+    /// the facts that rank first. Empty when the fact cannot hold even alone.
     pub conflicts_with: Vec<usize>,
     /// The budget for deciding it ran out ([`Budget::resolve_nodes`]): it is discarded without
     /// a proof that it conflicts, and `conflicts_with` is what the search had found by then. The
@@ -106,7 +108,17 @@ pub struct Work {
 /// Solves one drawing level: resolves its facts (8.5), places and orients its objects, and
 /// routes its ROUTEs (13.7).
 ///
-/// Stage S1: gives an empty solution, with a note that says so.
+/// Stage S2: places every object with a position of its own where the witness of the resolution
+/// puts it, and orients every object that has an orientation as the witness does; a note says
+/// that nothing is searched, rounded or routed yet.
 pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
     driver::solve(problem, options)
+}
+
+/// Resolves the facts of one drawing level (8.5): takes them in the order of
+/// [`LevelProblem::facts`], keeps each that fits with those kept before it and discards the others,
+/// each with a minimal set of facts it conflicts with, and gives a witness, a placement that
+/// satisfies every fact kept ([`Resolved`]).
+pub fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
+    resolve::resolve(problem, options)
 }

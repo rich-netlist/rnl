@@ -39,7 +39,7 @@
 //! [`Simplex::check`] and [`Simplex::minimize`] stop with [`Failure::Budget`] instead of going on,
 //! the solver's budget by amount of work (plan 5.9).
 
-// Used by `resolve` and `coords` from stage S2 on.
+// Used by `resolve`; what only the coordinate LP uses (minimisation) waits for stage S3.
 #![cfg_attr(not(test), allow(dead_code))]
 
 use std::collections::BTreeMap;

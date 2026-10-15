@@ -1,0 +1,811 @@
+//! Tests of the resolution of 8.5: the examples of the development plan (5.3), each checked for
+//! what is kept and discarded, for conflict sets that are minimal, and for a witness that
+//! satisfies every fact kept by a check written from the standard (14.1–14.5, 14.9), apart from
+//! the encoding of the model.
+
+use num_traits::One;
+use rnl_runtime::geom::Orient;
+use rnl_runtime::interp::obj::Priority;
+use rnl_runtime::model::PinView;
+use rnl_runtime::problem::*;
+
+use super::*;
+use crate::rational::{frac, int};
+
+// ---------------------------------------------------------------------------- building problems
+
+/// A MOS-like symbol: the gate at (−3, 0), the drain at (0, 2), the source at (0, −2).
+fn symbol() -> ProblemSymbol {
+    let pin = |x: f64, y: f64, dir: u16, t: &str| PinView {
+        pos: (x, y),
+        label: None,
+        dir: Some(dir),
+        terminals: vec![t.to_string()],
+    };
+    ProblemSymbol {
+        name: "$NMOS".to_string(),
+        bbox: [-3.0, -2.0, 0.0, 2.0],
+        box_written: true,
+        default: false,
+        pins: vec![pin(-3.0, 0.0, 180, "g"), pin(0.0, 2.0, 90, "d"), pin(0.0, -2.0, 270, "s")],
+    }
+}
+
+/// An instance of the symbol, free.
+pub(crate) fn instance() -> ProblemObject {
+    ProblemObject {
+        kind: ObjectKind::Instance,
+        label: "#M".to_string(),
+        reference: Reference::Name("#M".to_string()),
+        generated: false,
+        symbol: Some(0),
+        position: Position::Own { x: Slot::Free, y: Slot::Free },
+        orient: Some(OrientSlot::Free),
+        usage: None,
+        text: None,
+    }
+}
+
+/// A free point.
+pub(crate) fn point() -> ProblemObject {
+    ProblemObject {
+        kind: ObjectKind::Point,
+        label: "%p".to_string(),
+        reference: Reference::Name("%p".to_string()),
+        generated: false,
+        symbol: None,
+        position: Position::Own { x: Slot::Free, y: Slot::Free },
+        orient: None,
+        usage: None,
+        text: None,
+    }
+}
+
+/// A fact of normal priority.
+pub(crate) fn fact(kind: FactKind) -> ProblemFact {
+    ProblemFact {
+        label: kind.name().to_string(),
+        kind,
+        priority: Priority::Normal,
+        reference: None,
+        source: None,
+        chain: Vec::new(),
+    }
+}
+
+/// A level with these objects and these facts, in the order of 8.5.
+pub(crate) fn problem_of(objects: Vec<ProblemObject>, facts: Vec<ProblemFact>) -> LevelProblem {
+    LevelProblem {
+        level: 0,
+        title: "t.sp".to_string(),
+        kind: "file",
+        name: String::new(),
+        version: "0.2".to_string(),
+        authored_numbers: 0,
+        file: "t.sp".to_string(),
+        line: 1,
+        end_line: 1,
+        packages: Vec::new(),
+        names: Vec::new(),
+        objects,
+        symbols: vec![symbol()],
+        facts,
+        wires: Vec::new(),
+        routes: Vec::new(),
+        groups: Vec::new(),
+        usages: Vec::new(),
+    }
+}
+
+fn o(k: usize) -> PointRef {
+    PointRef::Origin(k)
+}
+
+fn pin(k: usize, j: usize) -> PointRef {
+    PointRef::Pin { object: k, pin: j, terminal: ["g", "d", "s"][j].to_string() }
+}
+
+fn place(at: PointRef, axis: Axis, value: f64) -> ProblemFact {
+    fact(FactKind::Place { at, axis, value })
+}
+
+fn align(axis: Axis, members: Vec<PointRef>) -> ProblemFact {
+    fact(FactKind::Align { axis, members })
+}
+
+fn distance(sense: Sense, min: Option<f64>, max: Option<f64>, from: Vec<PointRef>, to: Vec<PointRef>) -> ProblemFact {
+    fact(FactKind::Distance { axis: Axis::X, sense, min, max, from, to })
+}
+
+fn distribute(members: Vec<PointRef>) -> ProblemFact {
+    fact(FactKind::Distribute { axis: Axis::X, members })
+}
+
+fn orient(object: usize, code: Orient) -> ProblemFact {
+    fact(FactKind::Orient { object, code })
+}
+
+fn points(n: usize) -> Vec<ProblemObject> {
+    (0..n).map(|_| point()).collect()
+}
+
+fn discarded(fact: usize, conflicts_with: Vec<usize>) -> Discarded {
+    Discarded { fact, conflicts_with, undecided: false }
+}
+
+// ---------------------------------------------------------------------------- checking results
+
+/// Whether a placement satisfies a fact, from the standard: points as 14.1 counts them, constant
+/// bounds within the tolerance, equalities exact.
+pub(crate) fn semantic_holds(problem: &LevelProblem, kind: &FactKind, g: &Geometry, tol: &Q) -> bool {
+    let v = |r: &PointRef, axis: usize| point_value(problem, g, r, axis, 0).expect("a point of the problem");
+    let near = |a: Q, b: f64| {
+        let d = a - from_f64(b).unwrap();
+        d <= *tol && -d <= *tol
+    };
+    let axis_of = |a: &Axis| crate::model::ax(*a);
+    match kind {
+        FactKind::Place { at, axis, value } => near(v(at, axis_of(axis)), *value),
+        FactKind::PointCoordinate { point, axis, value } => near(v(&o(*point), axis_of(axis)), *value),
+        FactKind::Offset { text, from, axis, value } => {
+            let a = axis_of(axis);
+            near(v(&o(*text), a) - v(from, a), *value)
+        }
+        FactKind::Orient { object, code } => g.orient[*object] == *code,
+        FactKind::OrientRelation { relation, from, to } => relation_holds(&g.orient, *relation, from, to),
+        FactKind::Align { axis, members } => {
+            let vals: Vec<Q> = members.iter().map(|m| v(m, axis_of(axis))).collect();
+            vals.windows(2).all(|w| w[0] == w[1])
+        }
+        FactKind::Order { axis, sense, members } => {
+            let vals: Vec<Q> = members.iter().map(|m| v(m, axis_of(axis))).collect();
+            let step = Q::one() - tol;
+            let inc = vals.windows(2).all(|w| &w[1] - &w[0] >= step);
+            let dec = vals.windows(2).all(|w| &w[0] - &w[1] >= step);
+            match sense {
+                Sense::Increasing => inc,
+                Sense::Decreasing => dec,
+                Sense::Either => inc || dec,
+            }
+        }
+        FactKind::Distribute { axis, members } => {
+            let vals: Vec<Q> = members.iter().map(|m| v(m, axis_of(axis))).collect();
+            vals.windows(3).all(|w| &w[2] - &w[1] == &w[1] - &w[0])
+        }
+        FactKind::Distance { axis, sense, min, max, from, to } => {
+            let a = axis_of(axis);
+            let extent = |ms: &[PointRef]| {
+                let vals: Vec<Q> = ms.iter().map(|m| v(m, a)).collect();
+                vals.iter().min().cloned().zip(vals.iter().max().cloned())
+            };
+            let (Some((a_lo, a_hi)), Some((b_lo, b_hi))) = (extent(from), extent(to)) else { return true };
+            let (g0, g1) = (&b_lo - &a_hi, &a_lo - &b_hi);
+            let d = match sense {
+                Sense::Increasing => g0,
+                Sense::Decreasing => g1,
+                Sense::Either => g0.max(g1),
+            };
+            min.is_none_or(|m| d >= from_f64(m).unwrap() - tol) && max.is_none_or(|m| d <= from_f64(m).unwrap() + tol)
+        }
+    }
+}
+
+/// Resolves a problem and checks what every resolution must give: the witness satisfies every
+/// fact kept, the model's own test agrees with the standard's on every fact, each conflict set is
+/// made of facts kept before its fact, conflicts with it and is minimal, and a second run gives
+/// the same.
+fn check(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
+    let r = resolve(problem, options);
+    let tol = r.model.tol.clone();
+    let g = &r.witness.geometry;
+    let mut all: Vec<usize> = r.kept.clone();
+    all.extend(r.discarded.iter().map(|d| d.fact));
+    all.sort_unstable();
+    assert_eq!(all, (0..problem.facts.len()).collect::<Vec<_>>());
+    for &f in &r.kept {
+        assert!(
+            semantic_holds(problem, &problem.facts[f].kind, g, &tol),
+            "fact {f} kept but violated: {:?}",
+            problem.facts[f]
+        );
+    }
+    // the model's test of a unit is the standard's, on every fact
+    let mut probe = Resolver::new(&r.model, problem.objects.len(), options.budget);
+    probe.geometry = g.clone();
+    for (f, pf) in problem.facts.iter().enumerate() {
+        assert_eq!(probe.holds(f), semantic_holds(problem, &pf.kind, g, &tol), "fact {f}: {:?}", pf.kind);
+    }
+    for d in r.discarded.iter().filter(|d| !d.undecided) {
+        assert!(d.conflicts_with.iter().all(|c| *c < d.fact && r.kept.contains(c)), "{d:?}");
+        let fits = |set: &[usize]| {
+            let mut s = Resolver::new(&r.model, problem.objects.len(), options.budget);
+            assert!(set.iter().all(|&c| s.add(c) == Outcome::Kept));
+            s.add(d.fact) == Outcome::Kept
+        };
+        assert!(!fits(&d.conflicts_with), "{d:?} does not conflict");
+        for c in &d.conflicts_with {
+            let rest: Vec<usize> = d.conflicts_with.iter().copied().filter(|x| x != c).collect();
+            assert!(fits(&rest), "{d:?} is not minimal: {c} is not needed");
+        }
+    }
+    assert_eq!(r, resolve(problem, options), "not deterministic");
+    r
+}
+
+fn x_of(r: &Resolved, k: usize) -> Q {
+    r.witness.geometry.origin[k][0].clone()
+}
+
+// ---------------------------------------------------------------------------- the plan's examples
+
+#[test]
+fn the_example_of_the_brainstorm_message() {
+    // written 1 high A.y = 0; 2 ALIGN y {A B}; 3 B.y = 3; 4 low ALIGN x {A B}; 5 DISTANCE x |B − A| ≥ 2
+    // resolved in the order 1, 5, 3, 2, 4
+    let mut facts = vec![
+        place(o(0), Axis::Y, 0.0),
+        distance(Sense::Either, Some(2.0), None, vec![o(0)], vec![o(1)]),
+        place(o(1), Axis::Y, 3.0),
+        align(Axis::Y, vec![o(0), o(1)]),
+        align(Axis::X, vec![o(0), o(1)]),
+    ];
+    facts[0].priority = Priority::High;
+    facts[4].priority = Priority::Low;
+    let p = problem_of(points(2), facts);
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.kept, vec![0, 1, 2]);
+    assert_eq!(r.discarded, vec![discarded(3, vec![0, 2]), discarded(4, vec![1])]);
+}
+
+#[test]
+fn inequalities_in_a_cycle() {
+    let p = problem_of(
+        points(3),
+        vec![
+            distance(Sense::Increasing, Some(10.0), None, vec![o(0)], vec![o(1)]),
+            distance(Sense::Increasing, Some(10.0), None, vec![o(1)], vec![o(2)]),
+            distance(Sense::Increasing, None, Some(15.0), vec![o(0)], vec![o(2)]),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.discarded, vec![discarded(2, vec![0, 1])]);
+}
+
+#[test]
+fn an_equality_of_three_variables() {
+    let p = problem_of(
+        points(3),
+        vec![
+            distribute(vec![o(0), o(1), o(2)]),
+            distance(Sense::Increasing, Some(10.0), Some(10.0), vec![o(0)], vec![o(1)]),
+            distance(Sense::Increasing, Some(15.0), Some(15.0), vec![o(1)], vec![o(2)]),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.discarded, vec![discarded(2, vec![0, 1])]);
+}
+
+#[test]
+fn an_equality_with_inequalities() {
+    let p = problem_of(
+        points(3),
+        vec![
+            distribute(vec![o(0), o(1), o(2)]),
+            distance(Sense::Increasing, Some(30.0), None, vec![o(0)], vec![o(2)]),
+            distance(Sense::Increasing, None, Some(10.0), vec![o(0)], vec![o(1)]),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.discarded, vec![discarded(2, vec![0, 1])]);
+}
+
+#[test]
+fn two_orients_of_one_object() {
+    let p = problem_of(vec![instance()], vec![orient(0, Orient::R0), orient(0, Orient::MY)]);
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.discarded, vec![discarded(1, vec![0])]);
+    assert_eq!(r.orientation(0), Some(Orient::R0));
+}
+
+#[test]
+fn a_relation_and_two_orients() {
+    let p = problem_of(
+        vec![instance(), instance()],
+        vec![
+            fact(FactKind::OrientRelation { relation: Orient::MY, from: vec![0], to: vec![1] }),
+            orient(0, Orient::R0),
+            orient(1, Orient::R0),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.discarded, vec![discarded(2, vec![0, 1])]);
+    assert_eq!((r.orientation(0), r.orientation(1)), (Some(Orient::R0), Some(Orient::MY)));
+}
+
+#[test]
+fn an_orientation_matters_once_two_points_of_one_object_are_reached() {
+    // M's gate to x = 3 and its source to y = 2 reach one point of M on each axis: any orientation
+    // will do. Placing its origin at (0, 0) then reaches two on each axis: the gate must be 3 to the
+    // right and the source 2 up, which only R180 gives.
+    let p = problem_of(
+        vec![instance(), point(), point()],
+        vec![
+            fact(FactKind::PointCoordinate { point: 1, axis: Axis::X, value: 3.0 }),
+            fact(FactKind::PointCoordinate { point: 2, axis: Axis::Y, value: 2.0 }),
+            align(Axis::X, vec![pin(0, 0), o(1)]),
+            align(Axis::Y, vec![pin(0, 2), o(2)]),
+            place(o(0), Axis::X, 0.0),
+            place(o(0), Axis::Y, 0.0),
+            orient(0, Orient::MY),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.kept, vec![0, 1, 2, 3, 4, 5]);
+    assert_eq!(r.orientation(0), Some(Orient::R180));
+    assert_eq!(r.point(&p, &pin(0, 0)), Some((3.0, 0.0)));
+    assert_eq!(r.point(&p, &pin(0, 2)), Some((0.0, 2.0)));
+    // MY puts the gate right but the source down: it conflicts with what holds the source's y
+    assert_eq!(r.discarded, vec![discarded(6, vec![1, 3, 5])]);
+}
+
+#[test]
+fn a_fact_against_a_kept_bound_that_a_held_orientation_tightened() {
+    // the gate at least 1 above the origin: the orientation turns the gate up, 3 above (R270 or
+    // MYR90), and the link holds the row of gate − origin at 3. A DISTRIBUTE that puts the gate at
+    // the origin's height then conflicts with the DISTANCE, not with the orientation.
+    let p = problem_of(
+        vec![instance(), point()],
+        vec![
+            fact(FactKind::Distance {
+                axis: Axis::Y,
+                sense: Sense::Decreasing,
+                min: Some(1.0),
+                max: Some(1.0),
+                from: vec![o(1), pin(0, 0)],
+                to: vec![o(0)],
+            }),
+            fact(FactKind::Distribute { axis: Axis::Y, members: vec![o(0), pin(0, 0), pin(0, 0)] }),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.discarded, vec![discarded(1, vec![0])]);
+    assert!([Some(Orient::R270), Some(Orient::MYR90)].contains(&r.orientation(0)));
+}
+
+#[test]
+fn a_fixed_orientation_decides_the_pins() {
+    // with ORIENT first, the class has one value, and the pins follow it
+    let p = problem_of(
+        vec![instance()],
+        vec![
+            orient(0, Orient::MY),
+            place(o(0), Axis::X, 1.0),
+            place(pin(0, 0), Axis::X, 4.0),
+            place(pin(0, 0), Axis::X, -2.0),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.kept, vec![0, 1, 2]);
+    assert_eq!(r.discarded, vec![discarded(3, vec![2])]);
+}
+
+#[test]
+fn an_order_given_only_an_axis_turns_round_when_it_must() {
+    let p = problem_of(
+        points(2),
+        vec![
+            fact(FactKind::Order { axis: Axis::X, sense: Sense::Either, members: vec![o(0), o(1)] }),
+            place(o(0), Axis::X, 5.0),
+            place(o(1), Axis::X, 0.0),
+            fact(FactKind::Order { axis: Axis::X, sense: Sense::Increasing, members: vec![o(0), o(1)] }),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.kept, vec![0, 1, 2]);
+    assert_eq!((x_of(&r, 0), x_of(&r, 1)), (int(5), int(0)));
+    assert_eq!(r.discarded, vec![discarded(3, vec![1, 2])]);
+}
+
+#[test]
+fn distances_between_sets() {
+    // gap = min(C, D) − max(A, B) within [2, 3]
+    let p = problem_of(
+        points(4),
+        vec![
+            distance(Sense::Increasing, Some(2.0), Some(3.0), vec![o(0), o(1)], vec![o(2), o(3)]),
+            place(o(0), Axis::X, 0.0),
+            place(o(1), Axis::X, 4.0),
+            place(o(2), Axis::X, 10.0),
+            place(o(3), Axis::X, 8.0),
+            place(o(3), Axis::X, 6.5),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.discarded, vec![discarded(4, vec![0, 1, 2, 3])]);
+    assert_eq!(x_of(&r, 3), frac(13, 2));
+}
+
+#[test]
+fn distances_either_way_between_sets() {
+    // {A B} and {C D} apart by at least 2, either way; then C between A and B
+    let p = problem_of(
+        points(4),
+        vec![
+            distance(Sense::Either, Some(2.0), Some(4.0), vec![o(0), o(1)], vec![o(2), o(3)]),
+            place(o(0), Axis::X, 10.0),
+            place(o(1), Axis::X, 12.0),
+            place(o(3), Axis::X, 7.0),
+            place(o(2), Axis::X, 11.0),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.kept, vec![0, 1, 2, 3]);
+    // C at 11 is within a unit of A and of B: either with the DISTANCE is a minimal conflict
+    assert_eq!(r.discarded.len(), 1);
+    assert_eq!(r.discarded[0].fact, 4);
+    assert!([vec![0, 1], vec![0, 2]].contains(&r.discarded[0].conflicts_with), "{:?}", r.discarded);
+}
+
+#[test]
+fn the_centre_of_a_set_of_three() {
+    let p = problem_of(
+        points(4),
+        vec![
+            place(o(0), Axis::X, 0.0),
+            place(o(1), Axis::X, 10.0),
+            place(o(2), Axis::X, 4.0),
+            align(Axis::X, vec![PointRef::Centre(vec![o(0), o(1), o(2)]), o(3)]),
+            place(o(3), Axis::X, 7.0),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    // D at 7 would need A, B or C elsewhere: C beyond 10 would move the highest point
+    assert_eq!(r.discarded, vec![discarded(4, vec![0, 1, 2, 3])]);
+    assert_eq!(x_of(&r, 3), int(5));
+}
+
+#[test]
+fn a_centre_whose_extremes_must_change() {
+    // the centre of {A B C} at 6 with A at 0: the highest point must be at 12, which C, free, can be
+    let p = problem_of(
+        points(3),
+        vec![
+            place(o(0), Axis::X, 0.0),
+            place(o(1), Axis::X, 3.0),
+            place(PointRef::Centre(vec![o(0), o(1), o(2)]), Axis::X, 6.0),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.kept, vec![0, 1, 2]);
+    assert_eq!(x_of(&r, 2), int(12));
+}
+
+#[test]
+fn a_fact_that_cannot_hold_alone_conflicts_with_nothing() {
+    let p = problem_of(
+        points(2),
+        vec![
+            fact(FactKind::Order { axis: Axis::X, sense: Sense::Either, members: vec![o(0), o(0)] }),
+            distance(Sense::Either, Some(1.0), None, vec![o(1)], vec![o(1)]),
+            align(Axis::X, vec![o(1)]),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.kept, vec![2]);
+    assert_eq!(r.discarded, vec![discarded(0, vec![]), discarded(1, vec![])]);
+}
+
+#[test]
+fn the_tolerance_widens_constants_only() {
+    // A at 0, B at 1.0000005: ORDER needs 1, which the tolerance of 1e-6 grants; an ALIGN of A
+    // and B against PLACEs 5e-7 apart is no closer than exact
+    let p = problem_of(
+        points(4),
+        vec![
+            place(o(0), Axis::X, 0.0),
+            place(o(1), Axis::X, 0.9999995),
+            fact(FactKind::Order { axis: Axis::X, sense: Sense::Increasing, members: vec![o(0), o(1)] }),
+            place(o(2), Axis::X, 0.0),
+            place(o(3), Axis::X, 0.0000005),
+            align(Axis::X, vec![o(2), o(3)]),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.kept, vec![0, 1, 2, 3, 4, 5]);
+    // with no tolerance, both conflict
+    let r = check(&p, &SolverOptions { tolerance: 0.0, ..SolverOptions::default() });
+    assert_eq!(r.discarded, vec![discarded(2, vec![0, 1]), discarded(5, vec![3, 4])]);
+}
+
+#[test]
+fn the_witness_keeps_the_constants_as_written() {
+    // the tolerance decides conflicts; the witness sits on the values written where it can
+    let p = problem_of(
+        points(2),
+        vec![
+            place(o(0), Axis::X, 4.0),
+            distance(Sense::Increasing, Some(2.0), None, vec![o(0)], vec![o(1)]),
+            place(o(1), Axis::Y, -1.5),
+        ],
+    );
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.position(0), Some((4.0, 0.0)));
+    assert_eq!(r.position(1), Some((6.0, -1.5)));
+}
+
+#[test]
+fn a_search_out_of_budget_leaves_its_fact_undecided() {
+    let p = problem_of(
+        points(2),
+        vec![
+            fact(FactKind::Order { axis: Axis::X, sense: Sense::Either, members: vec![o(0), o(1)] }),
+            place(o(0), Axis::X, 5.0),
+            place(o(1), Axis::X, 0.0),
+        ],
+    );
+    let mut options = SolverOptions::default();
+    options.budget.resolve_nodes = 1;
+    let r = resolve(&p, &options);
+    assert_eq!(r.kept, vec![0, 1]);
+    assert_eq!(r.discarded.len(), 1);
+    assert!(r.discarded[0].undecided);
+    assert_eq!(r.discarded[0].fact, 2);
+    assert!(r.notes[0].contains("undecided"));
+    // the witness still satisfies what is kept
+    let tol = r.model.tol.clone();
+    assert!(r.kept.iter().all(|&f| semantic_holds(&p, &p.facts[f].kind, &r.witness.geometry, &tol)));
+}
+
+/// Instances chained gate to origin on x, the first origin at 0, the last at 1: each link adds
+/// −3, 0 or 3, so no orientations reach 1.
+fn chain(n: usize) -> LevelProblem {
+    let objects: Vec<ProblemObject> = (0..n).map(|_| instance()).collect();
+    let mut facts = Vec::new();
+    for k in 0..n - 1 {
+        facts.push(align(Axis::X, vec![pin(k, 0), o(k + 1)]));
+    }
+    facts.push(place(o(0), Axis::X, 0.0));
+    facts.push(place(o(n - 1), Axis::X, 1.0));
+    problem_of(objects, facts)
+}
+
+#[test]
+fn orientations_that_give_the_same_constants_are_tried_once() {
+    // four classes matter, three values each (the gate's x is −3, 0 or 3): 81 combinations at most
+    let p = chain(5);
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.discarded, vec![discarded(5, vec![0, 1, 2, 3, 4])]);
+    let main = resolve(&p, &SolverOptions::default());
+    assert!(main.work.resolve_nodes < 2000, "{} nodes", main.work.resolve_nodes);
+}
+
+#[test]
+fn a_search_that_grows_too_large_stops_at_its_budget() {
+    // nine classes: 3^9 combinations, beyond the default budget of nodes
+    let p = chain(10);
+    let r = resolve(&p, &SolverOptions::default());
+    assert_eq!(r.kept, (0..10).collect::<Vec<_>>());
+    assert_eq!(r.discarded.len(), 1);
+    assert_eq!((r.discarded[0].fact, r.discarded[0].undecided), (10, true));
+    assert!(r.discarded[0].conflicts_with.contains(&9));
+    let budget = SolverOptions::default().budget.resolve_nodes;
+    // the search of the last fact, and the facts before it taken in once more for the witness
+    assert!(r.work.resolve_nodes <= budget + 40, "{} nodes", r.work.resolve_nodes);
+}
+
+// ---------------------------------------------------------------------------- against brute force
+
+/// A fixed xorshift sequence, so every run tests the same problems.
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 7;
+        self.0 ^= self.0 << 17;
+        self.0
+    }
+
+    fn below(&mut self, n: usize) -> usize {
+        (self.next() % n as u64) as usize
+    }
+}
+
+/// Whether some units have a solution together, decided apart from the search: every
+/// orientation of every object tried, every pin linked to its origin whatever reaches it, every
+/// value of every choice and of the extremes of every centre a unit constrains tried, each
+/// combination checked by a simplex of its own. None when there are too many combinations.
+fn brute_feasible(model: &Model, problem: &LevelProblem, units: &[usize]) -> Option<bool> {
+    let oriented: Vec<usize> = (0..problem.objects.len()).filter(|&k| model.oriented[k]).collect();
+    // the literals: the bounds of each value
+    let mut lits: Vec<Vec<Vec<Bound>>> = Vec::new();
+    for &u in units {
+        for c in &model.units[u].choices {
+            lits.push(c.values.clone());
+        }
+    }
+    for axis in 0..2 {
+        let mut centres: Vec<usize> = units.iter().flat_map(|&u| model.units[u].centres[axis].clone()).collect();
+        centres.sort_unstable();
+        centres.dedup();
+        for c in centres {
+            for high in [false, true] {
+                let n = model.centres[c].members.len();
+                lits.push((0..n).map(|j| vec![model.centre_extreme(c, axis, high, j)]).collect());
+            }
+        }
+    }
+    let combos: usize = lits.iter().map(|l| l.len()).product::<usize>() * 8usize.pow(oriented.len() as u32);
+    if combos > 1 << 16 {
+        return None;
+    }
+    for code in 0..8usize.pow(oriented.len() as u32) {
+        let mut g = vec![Orient::R0; problem.objects.len()];
+        for (i, &k) in oriented.iter().enumerate() {
+            g[k] = from_index(((code >> (3 * i)) & 7) as u8);
+        }
+        let orientations_hold = units.iter().all(|&u| match &model.units[u].orient {
+            OrientEffect::None => true,
+            OrientEffect::Fix { object, code } => g[*object] == *code,
+            OrientEffect::Relate { relation, from, to } => relation_holds(&g, *relation, from, to),
+        });
+        if !orientations_hold {
+            continue;
+        }
+        let mut pick = vec![0usize; lits.len()];
+        loop {
+            let mut sx: [Simplex<usize>; 2] = [Simplex::new(), Simplex::new()];
+            for s in &mut sx {
+                for _ in 0..model.vars.len() {
+                    s.new_var();
+                }
+            }
+            let mut ok = true;
+            let mut put = |b: &Bound, sx: &mut [Simplex<usize>; 2]| {
+                let s = &mut sx[b.axis];
+                if let Some(lo) = &b.lo {
+                    ok &= s.assert(&b.expr, Rel::Ge, lo, 0).is_ok();
+                }
+                if let Some(hi) = &b.hi {
+                    ok &= s.assert(&b.expr, Rel::Le, hi, 0).is_ok();
+                }
+            };
+            for c in 0..model.centres.len() {
+                for axis in 0..2 {
+                    for b in model.centre_definition(c, axis) {
+                        put(&b, &mut sx);
+                    }
+                }
+            }
+            for (p, info) in &model.points {
+                if let (Some(k), Some(local)) = (info.object, &info.local) {
+                    if let Some(origin) = model.origin_point[k] {
+                        if model.oriented[k] && origin != *p {
+                            for axis in 0..2 {
+                                let c = turned(g[k], local, axis);
+                                let e = LinExpr::diff(info.var, model.var(origin));
+                                put(&Bound { axis, expr: e, lo: Some(c.clone()), hi: Some(c) }, &mut sx);
+                            }
+                        }
+                    }
+                }
+            }
+            for &u in units {
+                for b in &model.units[u].fixed {
+                    put(b, &mut sx);
+                }
+            }
+            for (l, &v) in lits.iter().zip(&pick) {
+                for b in &l[v] {
+                    put(b, &mut sx);
+                }
+            }
+            if ok && sx[0].check().is_ok() && sx[1].check().is_ok() {
+                return Some(true);
+            }
+            // the next combination
+            let mut i = 0;
+            while i < pick.len() {
+                pick[i] += 1;
+                if pick[i] < lits[i].len() {
+                    break;
+                }
+                pick[i] = 0;
+                i += 1;
+            }
+            if i == pick.len() {
+                break;
+            }
+        }
+    }
+    Some(false)
+}
+
+/// A random problem: three points and one or two instances, eight facts of every kind.
+fn random_problem(rng: &mut Rng) -> LevelProblem {
+    let instances = 1 + rng.below(2);
+    let mut objects = points(3);
+    objects.extend((0..instances).map(|_| instance()));
+    let refs = |rng: &mut Rng, centres: bool| -> PointRef {
+        match rng.below(if centres { 7 } else { 6 }) {
+            0..=2 => o(rng.below(3)),
+            3 => o(3 + rng.below(instances)),
+            4 | 5 => pin(3 + rng.below(instances), rng.below(3)),
+            _ => PointRef::Centre((0..2 + rng.below(2)).map(|_| o(rng.below(3))).collect()),
+        }
+    };
+    let senses = [Sense::Increasing, Sense::Decreasing, Sense::Either];
+    let mut facts = Vec::new();
+    for _ in 0..8 {
+        let axis = if rng.below(2) == 0 { Axis::X } else { Axis::Y };
+        let kind = match rng.below(9) {
+            0 | 1 => FactKind::Place { at: refs(rng, true), axis, value: rng.below(9) as f64 - 4.0 },
+            2 => FactKind::Align { axis, members: vec![refs(rng, true), refs(rng, true)] },
+            3 => FactKind::Order {
+                axis,
+                sense: senses[rng.below(3)],
+                members: (0..2 + rng.below(2)).map(|_| refs(rng, true)).collect(),
+            },
+            4 => FactKind::Distribute { axis, members: (0..3).map(|_| refs(rng, false)).collect() },
+            5 | 6 => {
+                let min = (rng.below(3) > 0).then(|| rng.below(4) as f64);
+                let max = if min.is_none() || rng.below(2) == 0 {
+                    Some(min.unwrap_or(0.0) + rng.below(4) as f64)
+                } else {
+                    None
+                };
+                FactKind::Distance {
+                    axis,
+                    sense: senses[rng.below(3)],
+                    min,
+                    max,
+                    from: (0..1 + rng.below(2)).map(|_| refs(rng, false)).collect(),
+                    to: (0..1 + rng.below(2)).map(|_| refs(rng, false)).collect(),
+                }
+            }
+            7 => FactKind::Orient { object: 3 + rng.below(instances), code: Orient::ALL[rng.below(8)] },
+            _ if instances == 2 => {
+                FactKind::OrientRelation { relation: Orient::ALL[rng.below(8)], from: vec![3], to: vec![4] }
+            }
+            _ => FactKind::Place { at: refs(rng, false), axis, value: rng.below(9) as f64 - 4.0 },
+        };
+        facts.push(fact(kind));
+    }
+    problem_of(objects, facts)
+}
+
+#[test]
+fn the_resolution_agrees_with_brute_force() {
+    let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
+    let options = SolverOptions::default();
+    let mut discards = 0;
+    let mut skipped = 0;
+    for case in 0..150 {
+        let p = random_problem(&mut rng);
+        let r = check(&p, &options);
+        let mut kept: Vec<usize> = Vec::new();
+        let mut decided = true;
+        for f in 0..p.facts.len() {
+            let mut with = kept.clone();
+            with.push(f);
+            match brute_feasible(&r.model, &p, &with) {
+                Some(true) => kept = with,
+                Some(false) => {}
+                None => {
+                    decided = false;
+                    break;
+                }
+            }
+        }
+        if !decided {
+            // too many combinations to try them all: the problem is left out
+            skipped += 1;
+            continue;
+        }
+        assert_eq!(r.kept, kept, "case {case}: {:#?}", p.facts.iter().map(|f| &f.kind).collect::<Vec<_>>());
+        discards += r.discarded.len();
+    }
+    // the problems conflict often enough to test the discards too, and few are left out
+    assert!(discards > 150, "{discards}");
+    assert!(skipped < 10, "{skipped}");
+}

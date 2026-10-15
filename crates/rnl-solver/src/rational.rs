@@ -10,7 +10,7 @@
 //! - [`to_f64`] rounds to the nearest `f64`, ties to even, so a number that came in goes back as
 //!   the same `f64`, and one the solver computed reads back as the value it chose.
 
-// Used by `simplex` now, and by `model`, `resolve` and `coords` from stage S2 on.
+// Used by `simplex`, `model` and `resolve`; what only the coordinates use waits for stage S3.
 #![cfg_attr(not(test), allow(dead_code))]
 
 use num_bigint::{BigInt, BigUint, Sign};
