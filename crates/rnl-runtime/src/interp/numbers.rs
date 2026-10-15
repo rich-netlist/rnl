@@ -205,6 +205,37 @@ impl Interp<'_> {
         list
     }
 
+    /// The objects without a name in the bodies of the usages that rules make in scene `s`, by
+    /// usage (5.9, 10.5). Such objects are not numbered; once the record of the solver writes their
+    /// usage out as an explicit statement, they are made again as the record's own objects,
+    /// numbered right after the usage, in the order of the body, depth first: each list is in that
+    /// order. Reached through a name (a local name, or one of a usage in the body), an object is
+    /// not in it.
+    pub(crate) fn generated_bodies(&self, s: SceneId) -> HashMap<ObjId, Vec<ObjId>> {
+        let mut keyed: HashMap<ObjId, Vec<(Vec<u64>, ObjId)>> = HashMap::new();
+        for (i, b) in self.births.iter().enumerate() {
+            if b.scene != s || self.named.contains(&b.obj) {
+                continue;
+            }
+            // the usage a rule made that the body it is in belongs to: the outermost generated one
+            let mut at = b.parent;
+            while let Some(u) = at {
+                if self.rule_made(u) {
+                    keyed.entry(u).or_default().push((self.birth_key(i), b.obj));
+                    break;
+                }
+                at = self.usage(u).parent;
+            }
+        }
+        keyed
+            .into_iter()
+            .map(|(u, mut list)| {
+                list.sort();
+                (u, list.into_iter().map(|(_, o)| o).collect())
+            })
+            .collect()
+    }
+
     /// The numbers of the objects of scene `s` for its problem (5.9): those of the authored records,
     /// and after them, for each record of the solver read, the record's own objects.
     pub(crate) fn problem_numbers(&mut self, s: SceneId) -> HashMap<ObjId, usize> {

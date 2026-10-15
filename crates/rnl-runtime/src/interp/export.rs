@@ -103,6 +103,15 @@ impl Interp<'_> {
         for (o, number) in numbers {
             ix.refs.entry(o).or_insert(Reference::Number { number, path: Vec::new() });
         }
+        // the objects without a name of a usage a rule makes, by their place among the objects
+        // that the statement writing the usage out makes (5.9, 10.5)
+        let bodies = self.generated_bodies(s);
+        for &a in &usages {
+            for (k, o) in bodies.get(&a).into_iter().flatten().enumerate() {
+                let r = Reference::GeneratedNumber { usage: ix.usages[&a], index: k + 1, path: Vec::new() };
+                ix.refs.entry(*o).or_insert(r);
+            }
+        }
         for &a in &usages {
             let u = self.usage(a).clone();
             let r = match ix.refs.get(&a) {
@@ -306,14 +315,21 @@ impl Interp<'_> {
         for &a in &usages {
             let u = self.usage(a).clone();
             let mut roles = Vec::new();
+            // the points written as coordinates in the roles of a usage that a rule makes are
+            // objects of the statement that writes it out, numbered after those of its body (5.9)
+            let mut role_points = 0;
             for (role, filler) in &u.roles {
                 let members = if self.is_set(*filler) { self.flatten(s, *filler, 7, None) } else { vec![*filler] };
+                let written = self.written_filler(s, &ix, *filler);
+                role_points += written.as_ref().map_or(0, |(_, n)| *n);
                 roles.push(RoleFill {
                     role: role.clone(),
                     members: members.iter().map(|m| self.filler(s, &ix, *m)).collect(),
-                    written: self.written_filler(s, &ix, *filler),
+                    written: written.map(|(w, _)| w),
                 });
             }
+            let written_numbers =
+                if self.rule_made(a) { bodies.get(&a).map_or(0, |b| b.len()) + role_points } else { 0 };
             entries.push(UsageEntry {
                 definition: self.label(u.definition),
                 label: self.label(a),
@@ -325,16 +341,19 @@ impl Interp<'_> {
                 priority: u.priority,
                 parent: u.parent.and_then(|p| ix.usages.get(&p).copied()),
                 object: ix.objects.get(&a).copied(),
+                written_numbers,
             });
         }
 
         let version = self.version_of(Some(self.level_unit[lv]));
+        let authored_numbers = self.numbered(s, None, None).len();
         LevelProblem {
             level: lv,
             title: level.title(),
             kind: if level.kind == LevelKind::Subckt { "subckt" } else { "file" },
             name: level.name.clone(),
             version,
+            authored_numbers,
             file: level.file.clone(),
             line: level.line,
             end_line: level.end_line,
@@ -374,7 +393,7 @@ impl Interp<'_> {
 
     /// A usage made by a generation rule itself (10.5), not in the expansion of another
     /// generated usage.
-    fn rule_made(&self, a: ObjId) -> bool {
+    pub(crate) fn rule_made(&self, a: ObjId) -> bool {
         let u = self.usage(a);
         u.generated && u.parent.is_none_or(|p| !self.usage(p).generated)
     }
@@ -418,22 +437,24 @@ impl Interp<'_> {
     }
 
     /// How the level's text writes what fills a role: a name or handle, a point with both
-    /// coordinates written, or a set of them in `{…}`. None when a part cannot be referred to
-    /// by a name the level writes.
-    fn written_filler(&mut self, s: SceneId, ix: &Index, o: ObjId) -> Option<String> {
+    /// coordinates written, or a set of them in `{…}`, with how many points it writes as
+    /// coordinates. None when a part cannot be referred to by a name the level writes.
+    fn written_filler(&mut self, s: SceneId, ix: &Index, o: ObjId) -> Option<(String, usize)> {
         if let ObjData::Set(_) = self.o(o) {
             let items = self.items_of(s, o, 7, None);
-            let mut out = Vec::new();
+            let (mut out, mut points) = (Vec::new(), 0);
             for m in items {
-                out.push(self.written_filler(s, ix, m)?);
+                let (w, n) = self.written_filler(s, ix, m)?;
+                out.push(w);
+                points += n;
             }
-            return Some(format!("{{{}}}", out.join(" ")));
+            return Some((format!("{{{}}}", out.join(" ")), points));
         }
         match self.reference_of(s, ix, o) {
-            Reference::Name(n) => Some(n),
+            Reference::Name(n) => Some((n, 0)),
             _ => match self.o(o) {
                 ObjData::Point { x: Some(x), y: Some(y), .. } => {
-                    Some(format!("({}, {})", crate::geom::fmt_num(*x), crate::geom::fmt_num(*y)))
+                    Some((format!("({}, {})", crate::geom::fmt_num(*x), crate::geom::fmt_num(*y)), 1))
                 }
                 _ => None,
             },

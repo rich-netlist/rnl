@@ -480,14 +480,34 @@ fn what_rules_make_and_what_names_reach_is_not_numbered() {
     assert!(p.objects.iter().any(|o| o.reference == Reference::Name("%w::k".into())));
     assert_eq!(numbered(p).len(), 2);
     // the grounds that the standard package adds are generated, and their wires too: those are
-    // reached through the usage written out, the wires not at all
+    // reached through the usage written out, the wires, which have no name in its body, by the
+    // number they take among the objects of the record that writes it out, the first there
     let text = netlist("0.3", &record("", "(9, 9) @TEXT(\"x\")"));
     let r = read(&text, &Options { draft: true, ..Options::solver() });
     let p = problem(&r, "t.sp");
     assert!(p.wires.iter().any(|w| w.generated));
-    assert!(p.wires.iter().filter(|w| w.generated).all(|w| w.reference == Reference::Anonymous));
+    for w in p.wires.iter().filter(|w| w.generated) {
+        let Reference::GeneratedNumber { usage, index: 1, path } = &w.reference else { panic!("{:?}", w.reference) };
+        assert!(path.is_empty());
+        assert_eq!((p.usages[*usage].definition.as_str(), p.usages[*usage].written_numbers), ("$GND_STUB", 1));
+    }
+    assert_eq!(p.authored_numbers, 2);
     assert!(p.usages.iter().filter(|u| u.rule_made).all(|u| matches!(u.reference, Reference::Generated { .. })));
     assert_eq!(numbered(p).len(), 2);
+    // as `rnl problem` prints them, and in a file of 0.2 not at all
+    let json = rnl_cli::problem::level(p, "tolerance=0.000001");
+    let stub = json["wires"].as_array().unwrap().iter().find(|w| w["generated"] == true).unwrap();
+    let usage = stub["reference"]["generated_by"].as_u64().unwrap() as usize;
+    assert_eq!(stub["reference"], serde_json::json!({"generated_by": usage, "number": 1, "path": ""}));
+    assert_eq!(
+        (json["authored_numbers"].as_u64(), json["usages"][usage]["written_numbers"].as_u64()),
+        (Some(2), Some(1))
+    );
+    let r = read(&text.replace("\"0.3\"", "\"0.2\""), &Options { draft: true, ..Options::solver() });
+    let json = rnl_cli::problem::level(problem(&r, "t.sp"), "tolerance=0.000001");
+    let stub = json["wires"].as_array().unwrap().iter().find(|w| w["generated"] == true).unwrap();
+    assert_eq!(stub["reference"], serde_json::Value::Null);
+    assert!(json.get("authored_numbers").is_none() && json["usages"][usage].get("written_numbers").is_none());
 }
 
 #[test]

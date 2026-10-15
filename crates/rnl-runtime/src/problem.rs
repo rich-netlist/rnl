@@ -164,6 +164,16 @@ pub enum Reference {
     /// are computed for every version, but only the record of the solver of a file of the draft
     /// writes them ([`LevelProblem::version`]).
     Number { number: usize, path: Vec<String> },
+    /// Without a name in the body of a usage that a rule makes, `usage` in
+    /// [`LevelProblem::usages`], and reached through no name of it (5.9, 10.5), such as the wire of
+    /// a `$GND_STUB` of the standard package. Once the record of the solver writes that usage out
+    /// as an explicit statement ([`Reference::Generated`]), the object is one of the record's own,
+    /// and the record refers to it by number: the objects that the statement writing the usage out
+    /// makes are numbered right after those of the statements before it, the first of them after
+    /// the objects of the authored records ([`LevelProblem::authored_numbers`]), and `index`, from
+    /// 1, is this one's place among them ([`UsageEntry::written_numbers`]); then `path`. Computed
+    /// for every version, written only by the record of the solver of a file of the draft.
+    GeneratedNumber { usage: usize, index: usize, path: Vec<String> },
     /// Not at all: an object reached only through one that has no reference, such as a local
     /// object of a usage named only inside a `{…}`, or an object that no statement of the level
     /// makes, such as a text without a key of a symbol (5.7, 13.3).
@@ -185,6 +195,11 @@ impl Reference {
                 let mut path = path.clone();
                 path.push(suffix.to_string());
                 Reference::Number { number: *number, path }
+            }
+            Reference::GeneratedNumber { usage, index, path } => {
+                let mut path = path.clone();
+                path.push(suffix.to_string());
+                Reference::GeneratedNumber { usage: *usage, index: *index, path }
             }
             Reference::Anonymous => Reference::Anonymous,
         }
@@ -387,6 +402,11 @@ pub struct UsageEntry {
     pub parent: Option<usize>,
     /// The object it is drawn as, for a virtual part.
     pub object: Option<usize>,
+    /// For a usage that a rule makes: how many objects without a name the statement that writes
+    /// it out makes, numbered among the record's own objects (5.9): those of its body, which are
+    /// [`Reference::GeneratedNumber`] with `index` 1 and on, then the points that its roles are
+    /// written with as coordinates. 0 for the other usages.
+    pub written_numbers: usize,
 }
 
 /// What a solver needs of one drawing level.
@@ -401,6 +421,9 @@ pub struct LevelProblem {
     /// The language version the level's file declares (16.1), "0.2" when it declares none. Only
     /// the record of the solver of a file of the draft 0.3 writes numbers ([`Reference::Number`]).
     pub version: String,
+    /// How many objects the authored records of the level number (5.9): the record of the solver
+    /// numbers its own objects from the next number on ([`Reference::GeneratedNumber`]).
+    pub authored_numbers: usize,
     pub file: String,
     pub line: u32,
     /// The line before which a record added to the end of the level goes (17).
@@ -488,9 +511,10 @@ pub fn options_digest(options: &str) -> String {
 /// written (files, lines and columns, the index of the level) is left out, so white space and
 /// comments do not change it; the order of the facts, which is what the positions decide, is in
 /// it. Numbers are written by [`fmt_num`], so the digest is the same on every platform. The
-/// numbers of the objects without a name ([`Reference::Number`]) are left out, the object counting
-/// as one without a reference: they follow from the text, which the check of the record of the
-/// solver covers (the draft 0.3, 5.9), and so the digest is the same in every version.
+/// numbers of the objects without a name ([`Reference::Number`], [`Reference::GeneratedNumber`],
+/// [`LevelProblem::authored_numbers`], [`UsageEntry::written_numbers`]) are left out, the object
+/// counting as one without a reference: they follow from the text, which the check of the record
+/// of the solver covers (the draft 0.3, 5.9), and so the digest is the same in every version.
 pub fn sig1(p: &LevelProblem, solver_options: &str) -> String {
     format!("{SIG1}:{}.{}", input_digest(p), options_digest(solver_options))
 }
@@ -644,7 +668,7 @@ pub fn canonical(p: &LevelProblem) -> String {
         c.word(f.priority.as_str());
         c.str(&f.label);
         match &f.reference {
-            Some(Reference::Number { .. }) | None => c.word("-"),
+            Some(Reference::Number { .. } | Reference::GeneratedNumber { .. }) | None => c.word("-"),
             Some(r) => c.reference(r),
         }
         c.indexes(&f.chain);
@@ -833,7 +857,9 @@ impl Canon {
                 }
             }
             // numbers are left out of the hash (`sig1`)
-            Reference::Number { .. } | Reference::Anonymous => self.word("anonymous"),
+            Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous => {
+                self.word("anonymous")
+            }
         }
     }
 
@@ -897,6 +923,7 @@ mod tests {
             kind: "file",
             name: "t.sp".into(),
             version: "0.2".into(),
+            authored_numbers: 0,
             file: "t.sp".into(),
             line: 1,
             end_line: 3,

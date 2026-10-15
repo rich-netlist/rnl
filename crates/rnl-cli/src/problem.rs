@@ -42,7 +42,10 @@ fn reference(r: &Reference, numbers: bool) -> Value {
         Reference::Name(n) => json!(n),
         Reference::Generated { usage, path } => json!({"generated_by": usage, "path": path.concat()}),
         Reference::Number { number, path } if numbers => json!({"number": number, "path": path.concat()}),
-        Reference::Number { .. } | Reference::Anonymous => Value::Null,
+        Reference::GeneratedNumber { usage, index, path } if numbers => {
+            json!({"generated_by": usage, "number": index, "path": path.concat()})
+        }
+        Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous => Value::Null,
     }
 }
 
@@ -112,7 +115,7 @@ fn fact(f: &ProblemFact, numbers: bool) -> Value {
     m.insert("priority".into(), json!(f.priority.as_str()));
     m.insert("label".into(), json!(f.label));
     match &f.reference {
-        Some(Reference::Number { .. }) if !numbers => {}
+        Some(Reference::Number { .. } | Reference::GeneratedNumber { .. }) if !numbers => {}
         Some(r) => {
             m.insert("reference".into(), reference(r, numbers));
         }
@@ -130,10 +133,12 @@ fn fact(f: &ProblemFact, numbers: bool) -> Value {
 }
 
 /// One level's problem, with its `sig1` hash for the solver options given. The references are
-/// numbers, `{"number": 3, "path": "::mid"}`, only in a level of a file of the draft 0.3.
+/// numbers, `{"number": 3, "path": "::mid"}` and `{"generated_by": 2, "number": 1, "path": ""}`,
+/// only in a level of a file of the draft 0.3, which alone has `authored_numbers` and the
+/// `written_numbers` of each usage as well.
 pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
     let numbers = p.version == DRAFT_VERSION;
-    json!({
+    let mut v = json!({
         "level": p.level,
         "title": p.title,
         "kind": p.kind,
@@ -191,19 +196,29 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             "pins": points(&r.pins), "wires": r.wires,
         })).collect::<Vec<_>>(),
         "groups": p.groups.iter().map(|g| json!({"label": g.label, "members": g.members})).collect::<Vec<_>>(),
-        "usages": p.usages.iter().map(|u| json!({
-            "definition": u.definition,
-            "label": u.label,
-            "reference": reference(&u.reference, numbers),
-            "generated": u.generated,
-            "rule_made": u.rule_made,
-            "roles": u.roles.iter().map(|r| json!({
-                "role": r.role, "members": r.members.iter().map(filler).collect::<Vec<_>>(), "written": r.written,
-            })).collect::<Vec<_>>(),
-            "params": u.params.iter().map(|(k, v)| (k.clone(), lit(v))).collect::<serde_json::Map<_, _>>(),
-            "priority": u.priority.map(|p| p.as_str()),
-            "parent": u.parent,
-            "object": u.object,
-        })).collect::<Vec<_>>(),
-    })
+        "usages": p.usages.iter().map(|u| {
+            let mut entry = json!({
+                "definition": u.definition,
+                "label": u.label,
+                "reference": reference(&u.reference, numbers),
+                "generated": u.generated,
+                "rule_made": u.rule_made,
+                "roles": u.roles.iter().map(|r| json!({
+                    "role": r.role, "members": r.members.iter().map(filler).collect::<Vec<_>>(), "written": r.written,
+                })).collect::<Vec<_>>(),
+                "params": u.params.iter().map(|(k, v)| (k.clone(), lit(v))).collect::<serde_json::Map<_, _>>(),
+                "priority": u.priority.map(|p| p.as_str()),
+                "parent": u.parent,
+                "object": u.object,
+            });
+            if numbers {
+                entry.as_object_mut().unwrap().insert("written_numbers".into(), json!(u.written_numbers));
+            }
+            entry
+        }).collect::<Vec<_>>(),
+    });
+    if numbers {
+        v.as_object_mut().unwrap().insert("authored_numbers".into(), json!(p.authored_numbers));
+    }
+    v
 }

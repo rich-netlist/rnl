@@ -131,7 +131,7 @@ fn written(r: &Reference, names: &[Option<String>]) -> Option<String> {
             Some(format!("%{}{}", written_name(base), path.concat()))
         }
         // not written yet: only the record of the solver of a file of the draft 0.3 may (5.9)
-        Reference::Number { .. } | Reference::Anonymous => None,
+        Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous => None,
     }
 }
 
