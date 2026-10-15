@@ -90,6 +90,13 @@ export type Level = {
    */
   status: string | null,
   /**
+   * Whether to solve the level (decision 0008): "fixed", nothing for a solver to decide;
+   * "unsolved", something to decide and no record of the solver; "solved", a record of the
+   * solver that is up to date; "stale", one whose input or numbering is out of date. Absent
+   * unless `BuildOptions::status` asks for it; see `rnl_runtime::previous::solve_status`.
+   */
+  solve?: string,
+  /**
    * What can be clicked on the drawing, in SVG pixels.
    */
   hits: Array<Hit>,

@@ -57,6 +57,10 @@ pub struct Request {
     /// given.
     #[serde(default)]
     pub draft: bool,
+    /// Give each level its solve status, what a frontend decides from whether to solve it
+    /// (decision 0008); false when not given.
+    #[serde(default)]
+    pub status: bool,
     /// Panic with this message, to test that the caller still gets an answer.
     #[cfg(feature = "test-panic")]
     pub panic: Option<String>,
@@ -105,6 +109,7 @@ pub fn respond(request: &[u8]) -> Response {
         runtime: Options { std: request.std, draft: request.draft, ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
+        status: request.status,
     };
     match rnl_view::build(&request.entry, &files, &options) {
         Ok(d) => Response::Document(Box::new(d)),
@@ -298,6 +303,13 @@ C1 a 0 1p
         let without = answer(json!({ "entry": "a.sp", "files": files, "std": false }));
         let count = |v: &Value| v["document"]["diagnostics"].as_array().unwrap().len();
         assert_ne!(count(&with), count(&without));
+        // the solve status only when asked for
+        assert!(with["document"]["levels"][0].get("solve").is_none());
+        let status = answer(json!({ "entry": "a.sp", "files": files, "status": true }));
+        assert_eq!(status["document"]["levels"][0]["solve"], "unsolved");
+        let native = BuildOptions { status: true, ..BuildOptions::default() };
+        let native = rnl_view::build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &native).unwrap();
+        assert_eq!(status["document"], serde_json::to_value(native).unwrap());
     }
 
     #[test]

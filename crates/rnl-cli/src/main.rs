@@ -26,6 +26,7 @@ options:
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
+  --status            give each level its solve status: fixed, unsolved, solved or stale
 problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)
@@ -42,6 +43,7 @@ struct Args {
     draft: bool,
     svg: bool,
     primitives: bool,
+    status: bool,
     level: Option<String>,
     solver_options: String,
     previous: bool,
@@ -60,7 +62,7 @@ fn parse_args() -> Result<Args, String> {
     let mut generated = true;
     let mut dialect = None;
     let mut draft = false;
-    let (mut svg, mut primitives) = (true, false);
+    let (mut svg, mut primitives, mut status) = (true, false, false);
     let mut level = None;
     let mut previous = false;
     let mut solver_options = format!("tolerance={}", rnl_runtime::geom::fmt_num(rnl_runtime::geom::TOL));
@@ -74,6 +76,7 @@ fn parse_args() -> Result<Args, String> {
             "--draft" => draft = true,
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
+            "--status" => status = true,
             "--previous" => previous = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
             "--solver-options" => solver_options = it.next().ok_or("--solver-options needs a text")?,
@@ -93,6 +96,7 @@ fn parse_args() -> Result<Args, String> {
         draft,
         svg,
         primitives,
+        status,
         level,
         solver_options,
         previous,
@@ -182,6 +186,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 runtime: options(args),
                 svg: args.svg,
                 primitives: args.primitives,
+                status: args.status,
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&doc).unwrap());

@@ -1,7 +1,8 @@
 //! The previous result of the solver as hints for a warm start, mapped onto the problem a solver
-//! reads (the draft 0.3, 2.8, 5.9, 14.8, 17). A hand-made solution is written back as the record of
-//! the solver, and the file read again: the hints are what the record holds, by name, by number,
-//! and through the usages that rules make, with whether the record is up to date.
+//! reads, and the solve status of each level that a viewer asks for (the draft 0.3, 2.8, 5.9,
+//! 14.8, 17; decision 0008). A hand-made solution is written back as the record of the solver, and
+//! the file read again: the hints are what the record holds, by name, by number, and through the
+//! usages that rules make, and the status says whether the record is up to date.
 
 use std::path::Path;
 use std::process::Command;
@@ -13,7 +14,7 @@ use rnl_runtime::solution::*;
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::writeback::replace_generated;
 use rnl_runtime::Options;
-use rnl_view::read_previous;
+use rnl_view::{build, read_previous, BuildOptions};
 use serde_json::Value;
 
 const OPTIONS: &str = "tolerance=0.000001";
@@ -176,6 +177,18 @@ impl Solved {
     }
 }
 
+/// The solve status of each level of a text, by title, as a viewer asks for it.
+fn statuses(text: &str) -> Vec<(String, Option<&'static str>)> {
+    let options = BuildOptions { runtime: draft(), svg: false, status: true, ..BuildOptions::default() };
+    let d = build("t.sp", &MemoryProvider::new().with("t.sp", text), &options).unwrap();
+    d.levels.iter().map(|l| (l.title.clone(), l.solve)).collect()
+}
+
+fn status(text: &str, title: &str) -> &'static str {
+    let all = statuses(text);
+    all.iter().find(|(t, _)| t == title).and_then(|(_, s)| *s).unwrap_or_else(|| panic!("{all:?}"))
+}
+
 #[test]
 fn the_hints_of_a_level_of_the_draft_map_by_name_and_by_number() {
     let s = solved(&amp("0.3"), "amp");
@@ -289,6 +302,8 @@ fn a_change_to_the_authored_text_is_another_input_and_keeps_the_hints() {
     assert_ne!(sig1(&p, OPTIONS), sig1(&s.p, OPTIONS));
     assert_eq!(previous.placements, s.placements());
     assert_eq!(previous.wire_routes, s.routes());
+    assert_eq!(status(&s.text, "amp"), "solved");
+    assert_eq!(status(&changed, "amp"), "stale");
 }
 
 #[test]
@@ -307,6 +322,76 @@ fn a_numbering_out_of_date_drops_the_hints_by_number() {
     assert_eq!(previous.placements, named);
     let routes: Vec<usize> = previous.wire_routes.iter().map(|r| r.wire).collect();
     assert_eq!(routes, [p.wires.iter().position(|w| w.label == "%w").unwrap()]);
+    assert_eq!(status(&tampered, "amp"), "stale");
+}
+
+#[test]
+fn each_level_has_its_solve_status_when_asked() {
+    let one = |records: &str| {
+        format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\nR1 a b 1k\nR2 b c 1k\n{records}.end\n")
+    };
+    // nothing to decide: every slot fixed, no "auto" wire, no ROUTE, no constraint needing a solver
+    let authored = "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) => @ORIENT(\"R0\") }\n";
+    let fixed = one(authored);
+    assert_eq!(statuses(&fixed), [("t.sp".to_string(), Some("fixed"))]);
+    // a free orientation, an "auto" wire, a ROUTE, a constraint that comes before the coordinates
+    for open in [
+        "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) }\n",
+        "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) => @ORIENT(\"R0\"); &b @WIRE {#R1:2 #R2:1} }\n",
+        "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) => @ORIENT(\"R0\"); &b @ROUTE }\n",
+        "* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 3) => @ORIENT(\"R0\");\n\
+         *   #R1 #R2 @ALIGN(\"y\", priority=\"high\") }\n",
+    ] {
+        assert_eq!(statuses(&one(open)), [("t.sp".to_string(), Some("unsolved"))], "{open}");
+    }
+    // with a record of the solver, as one writes it with nothing to decide: solved, and stale once
+    // R2 moves
+    let r = rnl_view::interpret("t.sp", None, &MemoryProvider::new().with("t.sp", &fixed), &Options::solver());
+    let hash = sig1(&r.unwrap().problems[0], OPTIONS);
+    let recorded = one(&format!("{authored}* @RNL(type=\"generated\", priority=\"high\", hash=\"{hash}\") {{}}\n"));
+    assert_eq!(statuses(&recorded), [("t.sp".to_string(), Some("solved"))]);
+    let moved = recorded.replace("#R2 @PLACE(10, 0)", "#R2 @PLACE(12, 0)");
+    assert_eq!(statuses(&moved), [("t.sp".to_string(), Some("stale"))]);
+    // a hash of another algorithm is not compared (17)
+    assert_eq!(statuses(&moved.replace(&hash, "sig2:0")), [("t.sp".to_string(), Some("solved"))]);
+
+    // a level of the draft, before and after it is solved, and the level of the file around it
+    let text = amp("0.3");
+    assert_eq!(statuses(&text), [("t.sp".to_string(), Some("fixed")), ("amp".to_string(), Some("unsolved"))]);
+    let s = solved(&text, "amp");
+    assert_eq!(statuses(&s.text), [("t.sp".to_string(), Some("fixed")), ("amp".to_string(), Some("solved"))]);
+    // a record that uses no number needs no numbering: a wrong one leaves it solved (5.9)
+    let named = solved_with(&stubs("0.3"), "t.sp", |p| {
+        let at = |label: &str| p.objects.iter().position(|o| o.label == label).unwrap();
+        let place = |k: usize| Placement { object: k, at: Some((k as f64 * 10.0, 0.0)), orient: Some(Orient::R0) };
+        Solution { placements: vec![place(at("#V1")), place(at("#R1"))], ..Solution::default() }
+    });
+    assert!(!named.text.contains("%#") && !named.text.contains("numbering"));
+    let wrong = named.text.replace("hash=", "numbering=\"0000000000000000\", hash=");
+    assert_eq!(status(&wrong, "t.sp"), "solved");
+
+    // not asked for, the levels have no status
+    let d = build("t.sp", &MemoryProvider::new().with("t.sp", &s.text), &BuildOptions::default()).unwrap();
+    assert!(d.levels.iter().all(|l| l.solve.is_none()));
+}
+
+#[test]
+fn asking_for_the_status_changes_nothing_else_in_the_document() {
+    let s = solved(&amp("0.3"), "amp");
+    for text in [amp("0.2"), s.text.clone(), fixed_text()] {
+        let files = MemoryProvider::new().with("t.sp", &text);
+        let plain = build("t.sp", &files, &BuildOptions { runtime: draft(), ..BuildOptions::default() }).unwrap();
+        let options = BuildOptions { runtime: draft(), status: true, ..BuildOptions::default() };
+        let mut with = serde_json::to_value(build("t.sp", &files, &options).unwrap()).unwrap();
+        for level in with["levels"].as_array_mut().unwrap() {
+            assert!(level.as_object_mut().unwrap().remove("solve").is_some());
+        }
+        assert_eq!(with, serde_json::to_value(plain).unwrap());
+    }
+}
+
+fn fixed_text() -> String {
+    "* t\nR1 a b 1k\n* @RNL { #R1 @PLACE(0, 0) => @ORIENT(\"R0\") }\n.end\n".to_string()
 }
 
 /// `rnl` on a text written to a file.
@@ -336,4 +421,14 @@ fn the_command_gives_the_hints_when_asked() {
     // a level without a record of the solver has none
     let v = rnl("previous-amp.sp", &s.text, &["problem", "--draft", "--previous", "--level", "previous-amp.sp"]);
     assert_eq!(v["levels"][0]["previous"], Value::Null);
+}
+
+#[test]
+fn the_command_gives_the_status_when_asked() {
+    let s = solved(&amp("0.3"), "amp");
+    let v = rnl("status-amp.sp", &s.text, &["view", "--draft", "--no-svg", "--status"]);
+    let solve: Vec<&Value> = v["levels"].as_array().unwrap().iter().map(|l| &l["solve"]).collect();
+    assert_eq!(solve, ["fixed", "solved"]);
+    let v = rnl("status-amp.sp", &s.text, &["view", "--draft", "--no-svg"]);
+    assert!(v["levels"].as_array().unwrap().iter().all(|l| l.get("solve").is_none()));
 }

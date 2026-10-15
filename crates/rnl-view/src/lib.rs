@@ -10,13 +10,15 @@ mod primitive;
 mod types;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::{file_name, HostDocument};
 use rnl_runtime::model::LevelView;
-use rnl_runtime::previous::Previous;
+use rnl_runtime::previous::{solve_status, Previous, SolveStatus};
 use rnl_runtime::problem::LevelProblem;
 use rnl_runtime::source::Provider;
+use rnl_runtime::writeback::record_type;
 use rnl_runtime::{Interpretation, Options};
 
 pub use document::{Child, Diagnostic, Document, Hit, Level, Object, SourceFile, Span};
@@ -56,11 +58,15 @@ pub struct BuildOptions {
     pub svg: bool,
     /// Give each level's primitives ([`Level::primitives`]); off by default.
     pub primitives: bool,
+    /// Give each level its solve status ([`Level::solve`]), what a frontend decides from whether
+    /// to solve it (decision 0008); off by default. It takes the problems of the levels read
+    /// without their records of the solver, so a document that has such records is read once more.
+    pub status: bool,
 }
 
 impl Default for BuildOptions {
     fn default() -> BuildOptions {
-        BuildOptions { dialect: None, runtime: Options::default(), svg: true, primitives: false }
+        BuildOptions { dialect: None, runtime: Options::default(), svg: true, primitives: false, status: false }
     }
 }
 
@@ -76,8 +82,48 @@ pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Resul
     if ws.read(&slashed(entry)).is_none() {
         return Err(format!("cannot read {entry}"));
     }
-    let r = interpret_in(entry, options.dialect.as_deref(), &ws, &options.runtime)?;
-    Ok(document::document(entry, &r, ws.missing.into_inner(), options))
+    let dialect = options.dialect.as_deref();
+    // the solve status takes the problems; built in this reading too, they change nothing else
+    let runtime = Options { problems: options.runtime.problems || options.status, ..options.runtime.clone() };
+    let r = interpret_in(entry, dialect, &ws, &runtime)?;
+    let solve = if options.status { solve_statuses(entry, dialect, &ws, &runtime, &r)? } else { HashMap::new() };
+    let mut d = document::document(entry, &r, ws.missing.into_inner(), options);
+    for level in &mut d.levels {
+        level.solve = solve.get(&level.host).map(|s| s.as_str());
+    }
+    Ok(d)
+}
+
+/// The solve status of each drawing level of `r`, by host level ([`solve_status`]): its problem
+/// and model read without the records of the solver, against its record of the solver read with
+/// them. `r` was read with `runtime`, problems included; so a document without records of the
+/// solver, which reads the same with them and without, is not read again.
+fn solve_statuses(
+    entry: &str,
+    dialect: Option<&str>,
+    ws: &Workspace,
+    runtime: &Options,
+    r: &Interpretation,
+) -> Result<HashMap<usize, SolveStatus>, String> {
+    let records = r.doc.levels.iter().any(|l| l.records.iter().any(|rec| record_type(rec) == "generated"));
+    let other;
+    let (with, without) = if !records {
+        (r, r)
+    } else if runtime.generated {
+        other = interpret_in(entry, dialect, ws, &Options { generated: false, ..runtime.clone() })?;
+        (r, &other)
+    } else {
+        other = interpret_in(entry, dialect, ws, &Options { generated: true, problems: false, ..runtime.clone() })?;
+        (&other, r)
+    };
+    let views: HashMap<usize, &LevelView> = without.model.levels.iter().map(|lv| (lv.level, lv)).collect();
+    let mut out = HashMap::new();
+    for p in &without.problems {
+        if let Some(view) = views.get(&p.level) {
+            out.insert(p.level, solve_status(p, view, with));
+        }
+    }
+    Ok(out)
 }
 
 /// Is the entry Spectre? By `dialect`, by the `.scs` extension, or a `simulator lang=spectre`
@@ -545,6 +591,12 @@ R1 p q 1k
         assert!(l["primitives"].as_array().is_some_and(|p| p.len() > 2));
         assert_eq!(keys(&level(false, true)), "host title kind lines primitives scale empty status hits children");
         assert_eq!(keys(&level(false, false)), "host title kind lines scale empty status hits children");
+        // the solve status when asked for: the resistor and the capacitor are placed, not turned
+        let options = BuildOptions { svg: false, status: true, ..BuildOptions::default() };
+        let d = serde_json::to_value(build("a.sp", &files, &options).unwrap()).unwrap();
+        let l = d["levels"][0].as_object().unwrap();
+        assert_eq!(keys(l), "host title kind lines scale empty status solve hits children");
+        assert_eq!(l["solve"], "unsolved");
     }
 
     #[test]

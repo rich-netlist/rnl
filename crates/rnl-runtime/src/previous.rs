@@ -1,5 +1,5 @@
-//! The previous result of the solver of a level, as hints for a warm start (the draft 0.3, 2.8,
-//! 5.9, 14.8, 17).
+//! The previous result of the solver of a level, as hints for a warm start, and the status that a
+//! front end decides from whether to solve (the draft 0.3, 2.8, 5.9, 14.8, 17; decision 0008).
 //!
 //! A solver reads a level without its records of the solver (2.8): they do not constrain the next
 //! result, and how else the solver uses them is up to it. [`Previous`] gives it the decisions of
@@ -17,13 +17,18 @@
 //! without a name in its body ([`Reference::GeneratedNumber`]), their place among the objects of
 //! that body. What maps to nothing is left out, and so is what the record does not hold: a
 //! statement that uses a number when the record's `numbering` is out of date takes no effect.
+//!
+//! [`solve_status`] is what a front end decides from (decision 0008): a level with nothing for a
+//! solver to decide ([`is_fixed`]), one with something and no record of the solver, one whose
+//! record is up to date, and one whose record is stale.
 
 use std::collections::HashMap;
 
 use crate::diag::Sink;
 use crate::geom::{Orient, Pt};
 use crate::host::{HostDocument, Record};
-use crate::problem::{same_input, written_name, LevelProblem, Reference};
+use crate::model::LevelView;
+use crate::problem::{same_input, written_name, LevelProblem, OrientSlot, Position, Reference, Slot};
 use crate::solution::{generated_names, Placement};
 use crate::source::Provider;
 use crate::writeback::{field, record_type};
@@ -71,6 +76,78 @@ pub struct PreviousWire {
     pub nets: Vec<String>,
     /// Its points in the scene, as the record's WIRE draws them in the level read with the record.
     pub points: Vec<Pt>,
+}
+
+/// What a front end decides from whether to solve a level (decision 0008).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SolveStatus {
+    /// Nothing for a solver to decide ([`is_fixed`]), and no record of the solver.
+    Fixed,
+    /// Something for a solver to decide, and no record of the solver.
+    Unsolved,
+    /// A record of the solver that is up to date: the input digest of its `hash` is that of the
+    /// level now, or it has no `sig1` hash to compare (17), and its numbers hold when it uses
+    /// numbers (5.9).
+    Solved,
+    /// A record of the solver whose `hash` is of another input, or whose `numbering` is missing or
+    /// out of date while it uses numbers.
+    Stale,
+}
+
+impl SolveStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SolveStatus::Fixed => "fixed",
+            SolveStatus::Unsolved => "unsolved",
+            SolveStatus::Solved => "solved",
+            SolveStatus::Stale => "stale",
+        }
+    }
+}
+
+/// Is there nothing for a solver to decide in a level? `p` is the level's problem and `view` its
+/// model, both of the reading without the records of the solver ([`crate::Options::solver`]).
+/// Nothing, when:
+///
+/// - no object of the problem that can be referred to has a free coordinate or a free orientation
+///   ([`Slot::Free`], [`OrientSlot::Free`]). One that cannot ([`Reference::Anonymous`]), such as a
+///   text without a key that a rule makes, is not the solver's to decide (14.8): the viewer places
+///   it (13.3);
+/// - no wire that can be referred to is `"auto"`, whose route is the solver's (13.1);
+/// - no ROUTE asks for wires (13.7);
+/// - no constraint has the status `needs-solver`: it comes before coordinates that it involves in
+///   the order of 8.5, so that a solver moves them.
+pub fn is_fixed(p: &LevelProblem, view: &LevelView) -> bool {
+    let open = |o: &crate::problem::ProblemObject| {
+        let free_position = matches!(&o.position, Position::Own { x, y } if *x == Slot::Free || *y == Slot::Free);
+        o.reference != Reference::Anonymous && (free_position || o.orient == Some(OrientSlot::Free))
+    };
+    !p.objects.iter().any(open)
+        && !p.wires.iter().any(|w| w.mode == "auto" && w.reference != Reference::Anonymous)
+        && p.routes.is_empty()
+        && !view.constraints.iter().any(|c| c.status == "needs-solver")
+}
+
+/// The solve status of a level. `p` and `view` are its problem and its model in the reading
+/// without the records of the solver; `with` is the same document read with them, and with
+/// [`crate::Options::draft`] for a file of the draft, so that it has the check of their numbers.
+/// The record of the solver of a level is its last record with `type="generated"` in the level's
+/// own text, without `scope=` (2.8, 5.9). A level that has one is solved or stale, whatever it
+/// leaves to decide: a stale record of a level that now has nothing to decide still holds what it
+/// decided, and solving again replaces it.
+pub fn solve_status(p: &LevelProblem, view: &LevelView, with: &Interpretation) -> SolveStatus {
+    match solver_record(&with.doc, p.level) {
+        Some(rec) => {
+            let other_input = field(rec, "hash").and_then(|h| same_input(&h, p)) == Some(false);
+            if other_input || numbers_hold(with, p.level, rec) == Some(false) {
+                SolveStatus::Stale
+            } else {
+                SolveStatus::Solved
+            }
+        }
+        None if is_fixed(p, view) => SolveStatus::Fixed,
+        None => SolveStatus::Unsolved,
+    }
 }
 
 /// The previous result of the level of `p`, the problem a solver reads, from `with`: the same
