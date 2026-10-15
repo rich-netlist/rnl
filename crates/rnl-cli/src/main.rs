@@ -28,7 +28,8 @@ view options:
   --no-svg            leave out each level's SVG
 problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
-  --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)";
+  --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)
+  --previous          give each level what its type=\"generated\" record decided, as hints";
 
 struct Args {
     command: String,
@@ -43,6 +44,7 @@ struct Args {
     primitives: bool,
     level: Option<String>,
     solver_options: String,
+    previous: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -60,6 +62,7 @@ fn parse_args() -> Result<Args, String> {
     let mut draft = false;
     let (mut svg, mut primitives) = (true, false);
     let mut level = None;
+    let mut previous = false;
     let mut solver_options = format!("tolerance={}", rnl_runtime::geom::fmt_num(rnl_runtime::geom::TOL));
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -71,6 +74,7 @@ fn parse_args() -> Result<Args, String> {
             "--draft" => draft = true,
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
+            "--previous" => previous = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
             "--solver-options" => solver_options = it.next().ok_or("--solver-options needs a text")?,
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
@@ -91,6 +95,7 @@ fn parse_args() -> Result<Args, String> {
         primitives,
         level,
         solver_options,
+        previous,
     })
 }
 
@@ -144,12 +149,24 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         }
         "problem" => {
             let options = Options { std: args.std, draft: args.draft, ..Options::solver() };
-            let r = rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), &provider, &options)?;
+            let (r, previous) = if args.previous {
+                rnl_view::read_previous(&args.file.to_string_lossy(), args.dialect.as_deref(), &provider, &options)?
+            } else {
+                (rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), &provider, &options)?, Vec::new())
+            };
             let levels: Vec<_> = r
                 .problems
                 .iter()
-                .filter(|p| args.level.as_ref().is_none_or(|t| *t == p.title))
-                .map(|p| rnl_cli::problem::level(p, &args.solver_options))
+                .enumerate()
+                .filter(|(_, p)| args.level.as_ref().is_none_or(|t| *t == p.title))
+                .map(|(k, p)| {
+                    let mut level = rnl_cli::problem::level(p, &args.solver_options);
+                    if args.previous {
+                        let hints = rnl_cli::problem::previous(previous.get(k).and_then(Option::as_ref));
+                        level.as_object_mut().unwrap().insert("previous".into(), hints);
+                    }
+                    level
+                })
                 .collect();
             if levels.is_empty() {
                 if let Some(t) = &args.level {

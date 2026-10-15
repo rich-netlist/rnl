@@ -14,6 +14,7 @@ use std::cell::RefCell;
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::{file_name, HostDocument};
 use rnl_runtime::model::LevelView;
+use rnl_runtime::previous::Previous;
 use rnl_runtime::problem::LevelProblem;
 use rnl_runtime::source::Provider;
 use rnl_runtime::{Interpretation, Options};
@@ -126,6 +127,26 @@ pub fn interpret(
     options: &Options,
 ) -> Result<Interpretation, String> {
     interpret_in(entry, dialect, &Workspace::new(files), options)
+}
+
+/// Both readings of an entry that a solver makes, with the bundled packages under `files`
+/// ([`rnl_runtime::previous::read_previous`]): the interpretation without the records of the
+/// solver, with the problems, and the previous result of each level, from the reading with them,
+/// in the order of the problems. `options` are those of both readings; `generated` and `problems`
+/// are set here. A package file (`.rnl`) has no problems.
+pub fn read_previous(
+    entry: &str,
+    dialect: Option<&str>,
+    files: &dyn Provider,
+    options: &Options,
+) -> Result<(Interpretation, Vec<Option<Previous>>), String> {
+    let ws = Workspace::new(files);
+    if extension(entry).is_some_and(|e| e.eq_ignore_ascii_case("rnl")) {
+        return Ok((rnl_runtime::check_package(&slashed(entry), &ws, options), Vec::new()));
+    }
+    let mut sink = Sink::new();
+    let doc = read_host_in(entry, dialect, &ws, &mut sink)?;
+    Ok(rnl_runtime::previous::read_previous(doc, &ws, options, sink))
 }
 
 /// [`interpret`] in a workspace, which has the bundled packages already.

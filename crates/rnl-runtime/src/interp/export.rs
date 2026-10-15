@@ -2,11 +2,14 @@
 //! is dropped.
 
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
-use crate::geom::Orient;
+use crate::geom::{Orient, Pt};
 use crate::host::LevelKind;
+use crate::previous::{Given, Key, RecordResult};
 use crate::problem::*;
 
+use super::ctx::Ctx;
 use super::obj::*;
 use super::scene::{FactData, WireShape};
 use super::Interp;
@@ -29,19 +32,27 @@ struct Ranked {
 }
 
 impl Interp<'_> {
-    pub(crate) fn build_problems(&mut self) -> Vec<LevelProblem> {
+    /// The problem of each drawing level and, read with the records of the solver, what the last of
+    /// each level gives ([`crate::previous`]).
+    pub(crate) fn build_problems(&mut self) -> (Vec<LevelProblem>, Vec<RecordResult>) {
         // building reads the scenes and reports nothing: what it would add to the diagnostics, the
         // references found and the dead text is dropped
         let sink = self.sink.clone();
         let (nrefs, nfailed) = (self.refs.len(), self.failed_spans.len());
-        let out = (0..self.scenes.len()).map(|s| self.level_problem(s)).collect();
+        let mut problems = Vec::new();
+        let mut results = Vec::new();
+        for s in 0..self.scenes.len() {
+            let (p, result) = self.level_problem(s);
+            problems.push(p);
+            results.extend(result);
+        }
         self.sink = sink;
         self.refs.truncate(nrefs);
         self.failed_spans.truncate(nfailed);
-        out
+        (problems, results)
     }
 
-    fn level_problem(&mut self, s: SceneId) -> LevelProblem {
+    fn level_problem(&mut self, s: SceneId) -> (LevelProblem, Option<RecordResult>) {
         let lv = self.scenes[s].level;
         let level = self.doc.levels[lv].clone();
         let packages = self
@@ -100,6 +111,7 @@ impl Interp<'_> {
         }
         let mut numbers: Vec<(ObjId, usize)> = self.problem_numbers(s).into_iter().collect();
         numbers.sort();
+        let by_number: HashMap<usize, ObjId> = numbers.iter().map(|&(o, n)| (n, o)).collect();
         for (o, number) in numbers {
             ix.refs.entry(o).or_insert(Reference::Number { number, path: Vec::new() });
         }
@@ -347,7 +359,14 @@ impl Interp<'_> {
 
         let version = self.version_of(Some(self.level_unit[lv]));
         let authored_numbers = self.level_numbers(s).authored.len();
-        LevelProblem {
+        let result = if self.read_generated {
+            let refs: Vec<(ObjId, Reference)> =
+                objs.iter().zip(&objects).map(|((o, _), po)| (*o, po.reference.clone())).collect();
+            self.record_result(s, &ix, &refs, &wires, &by_number, authored_numbers)
+        } else {
+            None
+        };
+        let problem = LevelProblem {
             level: lv,
             title: level.title(),
             kind: if level.kind == LevelKind::Subckt { "subckt" } else { "file" },
@@ -366,7 +385,117 @@ impl Interp<'_> {
             routes,
             groups,
             usages: entries,
+        };
+        (problem, result)
+    }
+
+    /// What the last record of the solver of scene `s` gives, read with it: the coordinates and
+    /// orientations of its PLACE and ORIENT statements, the routes of the wires it rewrites and the
+    /// wires it writes itself, with their points as drawn (the draft 0.3, 13.1, 14.8). The objects
+    /// and wires are given by the keys that a problem built without the record finds them by:
+    /// their names, the numbers of the authored records, and the places of the objects without a
+    /// name in the bodies of the usages that the record writes out (5.9, 10.5). `objects` are the
+    /// level's objects with their references, `wires` its wires, `by_number` the numbered objects.
+    fn record_result(
+        &mut self,
+        s: SceneId,
+        ix: &Index,
+        objects: &[(ObjId, Reference)],
+        wires: &[ObjId],
+        by_number: &HashMap<usize, ObjId>,
+        authored: usize,
+    ) -> Option<RecordResult> {
+        let g = *self.solver_records(s).last()?;
+        // the objects without a name in the bodies of the usages it writes out, by the usage's name
+        let mut bodies: HashMap<ObjId, (String, usize)> = HashMap::new();
+        for (u, list) in self.written_bodies(s, g) {
+            let Some(Reference::Name(name)) = ix.refs.get(&u) else { continue };
+            for (k, o) in list.into_iter().enumerate() {
+                bodies.insert(o, (name.clone(), k + 1));
+            }
         }
+        let key = |r: &Reference| match r {
+            Reference::Name(n) => Some(Key::Name(n.clone())),
+            Reference::Number { number, path } => match by_number.get(number).and_then(|o| bodies.get(o)) {
+                Some((usage, k)) => Some(Key::Body(usage.clone(), *k, path.concat())),
+                None if *number <= authored => Some(Key::Number(*number, path.concat())),
+                None => None,
+            },
+            _ => None,
+        };
+        // a statement of the record itself, not of the body of a usage it makes
+        let of_record = |ctx: Option<&Rc<Ctx>>| ctx.is_some_and(|c| c.rec == Some(g) && c.frame_usage().is_none());
+
+        // the coordinates and orientations it gives, the latest of each
+        let sc = &self.scenes[s];
+        let mut coords: HashMap<(ObjId, char), (Pos, f64)> = HashMap::new();
+        for &k in &sc.at_live {
+            let f = &sc.at[k];
+            let FactData::Coord(axis, value) = f.data else { continue };
+            if f.chain.is_empty() && of_record(f.ctx.as_ref()) {
+                let e = coords.entry((f.target, axis)).or_insert((f.pos.clone(), value));
+                if f.pos >= e.0 {
+                    *e = (f.pos.clone(), value);
+                }
+            }
+        }
+        let mut orients: HashMap<ObjId, (Pos, Orient)> = HashMap::new();
+        for &k in &sc.orient_live {
+            let f = &sc.orient[k];
+            let FactData::Orient(code) = f.data else { continue };
+            if f.chain.is_empty() && of_record(f.ctx.as_ref()) {
+                let e = orients.entry(f.target).or_insert((f.pos.clone(), code));
+                if f.pos >= e.0 {
+                    *e = (f.pos.clone(), code);
+                }
+            }
+        }
+        let mut placed = Vec::new();
+        for (o, r) in objects {
+            let x = coords.get(&(*o, 'x')).map(|e| e.1);
+            let y = coords.get(&(*o, 'y')).map(|e| e.1);
+            let orient = orients.get(o).map(|e| e.1);
+            if x.is_none() && y.is_none() && orient.is_none() {
+                continue;
+            }
+            if let Some(key) = key(r) {
+                placed.push(Given { key, x, y, orient });
+            }
+        }
+
+        // the wires it writes itself, and the routes of those it rewrites (13.1)
+        let mut routes = Vec::new();
+        let mut written = Vec::new();
+        for &w in wires {
+            let ObjData::Wire { nets, points, mode, generated, site, .. } = self.o(w).clone() else { continue };
+            if !generated && of_record(site.as_ref()) {
+                let nets = nets.iter().map(|n| self.net_display(*n)).collect();
+                if let Some(path) = self.drawn_path(s, &points, &mode) {
+                    written.push((nets, path));
+                }
+                continue;
+            }
+            let rewrite = self.scenes[s].rewrites.get(&w).and_then(|rs| {
+                rs.iter()
+                    .filter(|r| r.fault.is_none() && !r.generated && of_record(Some(&r.site)))
+                    .max_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq)))
+                    .map(|r| (r.points.clone(), r.mode.clone()))
+            });
+            let (Some((points, mode)), Some(k)) = (rewrite, ix.refs.get(&w).and_then(key)) else { continue };
+            if let Some(path) = self.drawn_path(s, &points, &mode) {
+                routes.push((k, path));
+            }
+        }
+        Some(RecordResult { level: self.scenes[s].level, placed, routes, wires: written })
+    }
+
+    /// A list of points of a wire as drawn with its mode (13.1); none when a point has no position.
+    fn drawn_path(&mut self, s: SceneId, points: &[ObjId], mode: &str) -> Option<Vec<Pt>> {
+        let mut pts = Vec::new();
+        for &q in points {
+            pts.push(self.point_of(s, q)?);
+        }
+        Some(crate::geom::route(&pts, mode))
     }
 
     /// The `%` names the level binds, those of the records written into it with scope= among them
