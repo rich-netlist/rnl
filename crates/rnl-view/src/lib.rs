@@ -14,6 +14,7 @@ use std::cell::RefCell;
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::{file_name, HostDocument};
 use rnl_runtime::model::LevelView;
+use rnl_runtime::problem::LevelProblem;
 use rnl_runtime::source::Provider;
 use rnl_runtime::{Interpretation, Options};
 
@@ -140,6 +141,22 @@ fn interpret_in(
     let mut sink = Sink::new();
     let doc = read_host_in(entry, dialect, ws, &mut sink)?;
     Ok(rnl_runtime::interpret(doc, ws, options, sink))
+}
+
+/// The record of the solver of a level, finished, with the bundled packages under `files` as
+/// [`interpret`] reads them: [`rnl_runtime::solution::finish_record`]. `record` is what
+/// [`rnl_runtime::solution::write_record`] gives for `problem`; `doc` is the host document the
+/// problem was read from ([`Interpretation::doc`]), and `files` and `options` are what it was read
+/// with. In a level of a file of the draft 0.3, the record gets `numbering`, the check of its
+/// numbers (5.9), from the document read again with it; otherwise it stays as it is.
+pub fn finish_record(
+    doc: &HostDocument,
+    files: &dyn Provider,
+    options: &Options,
+    problem: &LevelProblem,
+    record: &str,
+) -> String {
+    rnl_runtime::solution::finish_record(doc, &Workspace::new(files), options, problem, record)
 }
 
 /// What a drawing level still lacks without a solver: objects without a position, and the

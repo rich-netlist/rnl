@@ -329,14 +329,24 @@ fn a_solution_written_back_reads_back() {
             place(object(p, "#R1"), 6.0, 6.0, Some(Orient::R90)),
             place(generated_local(p, "#V1:n", "::g"), 0.0, -5.0, None),
             place(generated_local(p, "#C1:n", "::g"), 12.0, -1.0, None),
-            // the junction has no position of its own, and no name to write its orientation with
+            // the junction has no position of its own, and in a file of 0.2 no name to write its
+            // orientation with
             place(object(p, "a usage of $JUNCTION"), 1.0, 1.0, Some(Orient::R90)),
         ],
         ..Solution::default()
     };
     let hash = sig1(p, OPTIONS);
     let written = write_record(p, &solution, "rnl-solver test", &hash);
-    assert_eq!(written.skipped, ["a usage of $JUNCTION: it cannot be referred to (5.7)"]);
+    // neither is left out silently (the draft 0.3, 14.8)
+    let unsolved: Vec<String> = written.unsolved.iter().map(|u| u.to_string()).collect();
+    assert_eq!(
+        unsolved,
+        [
+            "the position of a usage of $JUNCTION: it is drawn at the point of its main object and has no position of its own (12.1)",
+            "the orientation of a usage of $JUNCTION: it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its number (5.9)",
+        ]
+    );
+    assert!(written.notes.is_empty());
     assert_eq!(
         written.record,
         format!(
@@ -412,9 +422,10 @@ fn a_routed_net_written_back_reads_back() {
             RoutedWire { route: route("out"), points: vec![WirePoint::Anchor(rn), WirePoint::Branch(0)] },
             RoutedWire { route: route("out"), points: vec![WirePoint::Branch(0), WirePoint::Anchor(cp)] },
         ],
+        ..Solution::default()
     };
     let written = write_record(p, &solution, "rnl-solver test", &sig1(p, OPTIONS));
-    assert!(written.skipped.is_empty(), "{:?}", written.skipped);
+    assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
     assert!(written.record.contains("&in @WIRE(mode=\"straight\") {#VIN:p (0, 6) #R1:p}"), "{}", written.record);
     assert!(written.record.contains("%rt1 = (12, 6)") && written.record.contains("$JUNCTION @ATTACH %rt1"));
     let (_, r) = write_back(&f, p, &written);

@@ -127,7 +127,7 @@ fn the_solver_writes_such_a_point_back_by_its_name() {
         ..Solution::default()
     };
     let written = write_record(p, &solution, "rnl-solver test", &sig1(p, "tolerance=0.000001"));
-    assert!(written.skipped.is_empty(), "{:?}", written.skipped);
+    assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
     assert!(written.record.contains("%q @PLACE(3, 4)"), "{}", written.record);
     let doc = read_host(Path::new("t.sp"), None, &files, &mut Sink::new()).unwrap();
     let solved = MemoryProvider::new().with("t.sp", &replace_generated(&doc, p.level, &text, &written.record));

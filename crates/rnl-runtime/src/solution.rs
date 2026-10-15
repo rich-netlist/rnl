@@ -1,26 +1,52 @@
-//! A solver's result written back as RNL (standard 10.5, 13.3, 13.7, 14.8, 17).
+//! A solver's result written back as RNL (standard 10.5, 13.3, 13.7, 14.8, 17; the draft 0.3,
+//! 5.9, 13.1, 14.8).
 //!
-//! A solver gives its result for one level as a [`Solution`]: the position and orientation of
-//! the objects of its [`LevelProblem`], and the wires it routed for ROUTE. [`write_record`] turns
-//! it into the one record the solver writes at the end of the level's own text,
-//! `@RNL(type="generated", priority="high", author="…", hash="…") {…}`, in standard form;
-//! [`crate::writeback::replace_generated`] puts it in place of the previous one.
+//! A solver gives its result for one level as a [`Solution`]: the position and orientation of the
+//! objects of its [`LevelProblem`], the routes it chose for the `"auto"` wires written in RNL, and
+//! the wires it routed for ROUTE. [`write_record`] turns it into the one record the solver writes
+//! at the end of the level's own text, `@RNL(type="generated", priority="high", author="…",
+//! hash="…") {…}`, in standard form. In a level of a file of the draft 0.3, [`finish_record`] then
+//! puts `numbering`, the check of its numbers, in its head (5.9).
+//! [`crate::writeback::replace_generated`] puts the record in place of the level's previous one.
 //!
+//! - **The interface is RNL** (the draft's 14.8): a [`Solution`] holds only what a record of the
+//!   solver can hold, positions (PLACE), orientations (ORIENT), paths through the points of the
+//!   problem and coordinates (WIRE), branch points (named points) and junctions (`$JUNCTION`), so
+//!   any solution that a solver passes to another tool can be saved as one record.
+//! - **Every decision is written back** (the draft's 14.8): by name or key for the objects that
+//!   have one, by number for the others, with WIRE given the wire for the route of a wire, through
+//!   explicit statements for what rules make. What the record of the level cannot hold is listed
+//!   in [`Written::unsolved`] with the reason, never left out silently. Such a decision is not a
+//!   result: the object stays free, as if the level were not solved, and a viewer that does not
+//!   solve shows it so.
+//! - **Numbers and rewritten wires** are written only in a level of a file of the draft 0.3
+//!   ([`LevelProblem::version`]), which needs [`crate::Options::draft`] until 0.3 is released: a
+//!   tool of 0.2 would read them as names it cannot find and as a net slot given the wrong kind. In
+//!   a level of 0.2, the decisions on objects without a name and the routes of wires are unsolved.
 //! - Objects made by rules have no handle of their own (5.7, 10.5): their generating usage is
 //!   written out first as an explicit statement with a name [`generated_names`] gives, and the
 //!   objects are reached through it, as in `%gnd_stub_M1_s = $GND_STUB @ATTACH(…) #M1:s;
-//!   %gnd_stub_M1_s::g @PLACE(0, -4)`. The explicit usage then takes the place of the generated
-//!   one when the file is read again.
-//! - A routed wire is a WIRE with `mode="straight"` and the style of its ROUTE, through its bends;
-//!   the points where wires branch are named points, with `$JUNCTION` where the solver wants a
-//!   dot (13.2, 13.7).
-//! - Numbers are written by [`fmt_num`], which reads back as the same value (11.7).
-//! - What cannot be referred to, such as a free point `(_, _)` with no name or a text without a
-//!   key or a name, is left out and reported (5.7, 13.3).
+//!   %gnd_stub_M1_s::g @PLACE(0, -4)`, or, without a name in its body, by the number they take
+//!   among the record's own objects ([`Reference::GeneratedNumber`]). The explicit usage then
+//!   takes the place of the generated one when the file is read again.
+//! - The route of a wire is WIRE given the wire, with `mode="straight"`, through the wire's own
+//!   points and the bends between them (the draft's 13.1). A wire routed for a ROUTE is a new WIRE
+//!   with `mode="straight"` and the style of its ROUTE; the points where wires branch are named
+//!   points, with `$JUNCTION` where the solver wants a dot (13.2, 13.7).
+//! - Coordinates are written by [`fmt_num`], which reads back as the same value (11.7).
 
+use std::fmt;
+
+use crate::diag::Sink;
 use crate::geom::{fmt_num, Orient, Pt};
+use crate::host::{HostDocument, Record, Seg};
 use crate::interp::obj::Priority;
+use crate::interp::unit::DRAFT_VERSION;
+use crate::numbering::level_check;
 use crate::problem::*;
+use crate::source::Provider;
+use crate::writeback::record_type;
+use crate::Options;
 
 /// Where the solver puts one object of the problem.
 #[derive(Clone, Debug, PartialEq)]
@@ -30,7 +56,7 @@ pub struct Placement {
     /// Its position; none for a virtual part drawn at the point of its main object, which has no
     /// position of its own (12.1), or when only the orientation is given.
     pub at: Option<Pt>,
-    /// Its orientation, for the objects that have one.
+    /// Its orientation, for the objects that have one: not points and texts (11.2).
     pub orient: Option<Orient>,
 }
 
@@ -42,18 +68,19 @@ pub struct Branch {
     pub junction: bool,
 }
 
-/// A point a routed wire passes.
+/// A point a wire of the solution passes.
 #[derive(Clone, Debug, PartialEq)]
 pub enum WirePoint {
-    /// A pin, or a point object of the problem.
+    /// A pin, or the origin of an object of the problem: a point itself, any other object by its
+    /// `::position` (6.5).
     Anchor(PointRef),
     /// A branch point of the solution, by its index in [`Solution::branches`].
     Branch(usize),
-    /// A bend.
+    /// A bend, written as coordinates: a point object of the record's own (5.9).
     Bend(Pt),
 }
 
-/// A wire routed for a ROUTE.
+/// A wire routed for a ROUTE (13.7): a new wire.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RoutedWire {
     /// The ROUTE, by its index in [`LevelProblem::routes`]: the net and the style.
@@ -61,23 +88,99 @@ pub struct RoutedWire {
     pub points: Vec<WirePoint>,
 }
 
-/// A solver's result for one level.
+/// The route the solver chose for an `"auto"` wire written in RNL (the draft 0.3, 13.1): written
+/// back as WIRE given the wire, which rewrites it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WireRoute {
+    /// The wire, by its index in [`LevelProblem::wires`].
+    pub wire: usize,
+    /// The path from one end to the other. The solver should keep the points of the wire
+    /// ([`ProblemWire::anchors`]) in order and add only bends between them: it decides the
+    /// geometry, and the connections stay as their author wrote them. The writer notes a path that
+    /// does not ([`Written::notes`]), and writes it all the same.
+    pub points: Vec<WirePoint>,
+}
+
+/// A solver's result for one level. It holds only what a record of the solver can hold (the draft
+/// 0.3, 14.8), so that it can always be saved as one: what the record of a particular level cannot
+/// hold, such as an object without a name in a file of 0.2, the writer lists as unsolved.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Solution {
     pub placements: Vec<Placement>,
     pub branches: Vec<Branch>,
+    /// The wires routed for ROUTE (13.7).
     pub wires: Vec<RoutedWire>,
+    /// The routes of the `"auto"` wires written in RNL (the draft 0.3, 13.1).
+    pub wire_routes: Vec<WireRoute>,
+}
+
+/// One decision of a [`Solution`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Decision {
+    /// The position of an object, by its index in [`LevelProblem::objects`].
+    Position { object: usize },
+    /// The orientation of an object, by its index in [`LevelProblem::objects`].
+    Orientation { object: usize },
+    /// The route of a wire, by its index in [`LevelProblem::wires`].
+    WireRoute { wire: usize },
+    /// A wire routed for a ROUTE, by its index in [`Solution::wires`].
+    RoutedWire { index: usize },
+    /// A branch point, by its index in [`Solution::branches`].
+    Branch { index: usize },
+}
+
+/// A decision that the record of the level cannot hold. It is not a result (the draft 0.3, 14.8):
+/// the object stays free, as if the level were not solved.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Unsolved {
+    pub decision: Decision,
+    /// The object, the wire, the ROUTE or the branch point, as diagnostics show it.
+    pub label: String,
+    /// Why the record cannot hold it, with the section of the standard.
+    pub reason: String,
+}
+
+impl fmt::Display for Unsolved {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let what = match self.decision {
+            Decision::Position { .. } => "the position of ",
+            Decision::Orientation { .. } => "the orientation of ",
+            Decision::WireRoute { .. } => "the route of ",
+            Decision::RoutedWire { .. } | Decision::Branch { .. } => "",
+        };
+        write!(f, "{what}{}: {}", self.label, self.reason)
+    }
 }
 
 /// A record written from a solution.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Written {
     /// The whole record, from `@RNL` to the closing brace, lines joined by `\n` without the
-    /// comment marker of the host: what [`crate::writeback::replace_generated`] takes.
+    /// comment marker of the host, and without `numbering`: what [`finish_record`] takes, and then
+    /// [`crate::writeback::replace_generated`].
     pub record: String,
-    /// What was left out, and why: placements and wires whose objects cannot be referred to.
-    pub skipped: Vec<String>,
+    /// Every decision of the solution that the record does not hold, with the reason. Every other
+    /// decision is in the record.
+    pub unsolved: Vec<Unsolved>,
+    /// What is written although the standard says that a solver should not do it, such as a route
+    /// that does not keep the points of its wire (13.1).
+    pub notes: Vec<String>,
 }
+
+const NOT_IN_PROBLEM: &str = "it is not in the problem";
+const AT_POINT: &str = "it is drawn at the point of its main object and has no position of its own (12.1)";
+const NO_ORIENTATION: &str = "it has no orientation (11.2)";
+const ANONYMOUS: &str = "it cannot be referred to (5.7)";
+const RULE_TEXT: &str = "a text without a key that a rule makes cannot be referred to: the solver does not decide its position, the viewer places it (13.3, 14.8)";
+const NO_NUMBERS: &str =
+    "it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its number (5.9)";
+const NOT_WRITTEN_OUT: &str = "the usage made by a rule that it belongs to cannot be written out (10.5)";
+const NO_REWRITE: &str =
+    "a file of 0.2 cannot rewrite a wire; the draft 0.3 writes its route with WIRE given the wire (13.1)";
+const OLD_RECORD: &str =
+    "it is an object of a record of the solver, which this record replaces: a solver reads the level without them (2.8)";
+const TWO_POINTS: &str = "a wire has at least two points (13.1)";
+const NOT_A_NUMBER: &str = "a coordinate is not a number of RNL, which has no NaN and no Infinity (3.7)";
 
 /// A name for RNL made of any text: ASCII letters, digits and `_`, without runs of `_`.
 fn slug(text: &str) -> String {
@@ -122,50 +225,135 @@ pub fn generated_names(p: &LevelProblem) -> Vec<Option<String>> {
     out
 }
 
-/// How the level's text writes a reference, given the names of the usages written out.
-fn written(r: &Reference, names: &[Option<String>]) -> Option<String> {
-    match r {
-        Reference::Name(n) => Some(n.clone()),
-        Reference::Generated { usage, path } => {
-            let base = names.get(*usage)?.as_ref()?;
-            Some(format!("%{}{}", written_name(base), path.concat()))
-        }
-        // not written yet: only the record of the solver of a file of the draft 0.3 may (5.9)
-        Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous => None,
+/// Coordinates as RNL writes them, or why it cannot.
+fn coords((x, y): Pt) -> Result<String, String> {
+    if x.is_finite() && y.is_finite() {
+        Ok(format!("({}, {})", fmt_num(x), fmt_num(y)))
+    } else {
+        Err(NOT_A_NUMBER.into())
     }
 }
 
-/// The usage made by a rule that a reference goes through, if any.
-fn root_of(r: &Reference) -> Option<usize> {
-    match r {
-        Reference::Generated { usage, .. } => Some(*usage),
-        _ => None,
-    }
+/// A piece of a statement: a reference, written once the usages that the record writes out are
+/// known, or text.
+enum Piece {
+    Ref(Reference),
+    Text(String),
 }
 
-/// How a routed wire writes one of its points, and the usage written out it goes through.
-fn wire_point(
-    p: &LevelProblem,
-    names: &[Option<String>],
-    q: &WirePoint,
-    branch: &[String],
-) -> Option<(String, Option<usize>)> {
-    match q {
-        WirePoint::Anchor(PointRef::Pin { object, terminal, .. }) => {
-            let r = &p.objects.get(*object)?.reference;
-            Some((format!("{}:{}", written(r, names)?, written_name(terminal)), root_of(r)))
-        }
-        WirePoint::Anchor(PointRef::Origin(k)) => {
-            let o = p.objects.get(*k)?;
-            if o.kind != ObjectKind::Point {
-                return None;
+/// How the record of the solver of a level refers to objects.
+struct Refs<'a> {
+    p: &'a LevelProblem,
+    /// The names of the usages made by rules, written out ([`generated_names`]).
+    names: Vec<Option<String>>,
+    /// The level's file declares the draft 0.3: numbers and rewrites can be written.
+    draft: bool,
+    /// For each usage written out: the number before those of the objects its statement makes.
+    offsets: Vec<Option<usize>>,
+}
+
+impl Refs<'_> {
+    /// Whether the record can write a reference, and the usage made by a rule that it goes
+    /// through, which is then written out.
+    fn reach(&self, r: &Reference) -> Result<Option<usize>, &'static str> {
+        match r {
+            Reference::Name(_) => Ok(None),
+            Reference::Number { .. } | Reference::GeneratedNumber { .. } if !self.draft => Err(NO_NUMBERS),
+            // in a problem read with the records of the solver, their own objects come after the
+            // authored ones: this record replaces them, and its numbers would name others (5.9)
+            Reference::Number { number, .. } if *number > self.p.authored_numbers => Err(OLD_RECORD),
+            Reference::Number { .. } => Ok(None),
+            Reference::Generated { usage, .. } | Reference::GeneratedNumber { usage, .. } => {
+                match self.names.get(*usage) {
+                    Some(Some(_)) => Ok(Some(*usage)),
+                    _ => Err(NOT_WRITTEN_OUT),
+                }
             }
-            Some((written(&o.reference, names)?, root_of(&o.reference)))
+            Reference::Anonymous => Err(ANONYMOUS),
         }
-        WirePoint::Anchor(PointRef::Centre(_)) => None,
-        WirePoint::Branch(i) => Some((format!("%{}", branch.get(*i)?), None)),
-        WirePoint::Bend((x, y)) => Some((format!("({}, {})", fmt_num(*x), fmt_num(*y)), None)),
     }
+
+    /// How the record writes a reference it can reach, once [`Refs::offsets`] are known.
+    fn text(&self, r: &Reference) -> String {
+        match r {
+            Reference::Name(n) => n.clone(),
+            Reference::Generated { usage, path } => {
+                format!("%{}{}", written_name(self.names[*usage].as_deref().unwrap_or_default()), path.concat())
+            }
+            Reference::Number { number, path } => format!("%#{number}{}", path.concat()),
+            Reference::GeneratedNumber { usage, index, path } => {
+                format!("%#{}{}", self.offsets[*usage].unwrap_or_default() + index, path.concat())
+            }
+            Reference::Anonymous => String::new(),
+        }
+    }
+
+    fn piece(&self, q: &Piece) -> String {
+        match q {
+            Piece::Ref(r) => self.text(r),
+            Piece::Text(t) => t.clone(),
+        }
+    }
+
+    /// The points of a wire of the solution as the record writes them, with the usages made by
+    /// rules they go through; or why the wire cannot be written.
+    fn wire(&self, points: &[WirePoint], branches: &[Option<String>]) -> Result<(Vec<Piece>, Vec<usize>), String> {
+        if points.len() < 2 {
+            return Err(TWO_POINTS.into());
+        }
+        let mut pieces = Vec::new();
+        let mut roots = Vec::new();
+        for q in points {
+            let (piece, label) = match q {
+                WirePoint::Anchor(PointRef::Pin { object, terminal, .. }) => {
+                    let o = self.p.objects.get(*object).ok_or("a point of it is not in the problem")?;
+                    let r = o.reference.then(&format!(":{}", written_name(terminal)));
+                    (Piece::Ref(r), format!("{}:{terminal}", o.label))
+                }
+                WirePoint::Anchor(PointRef::Origin(k)) => {
+                    let o = self.p.objects.get(*k).ok_or("a point of it is not in the problem")?;
+                    let r = match o.kind {
+                        ObjectKind::Point => o.reference.clone(),
+                        _ => o.reference.then("::position"),
+                    };
+                    (Piece::Ref(r), o.label.clone())
+                }
+                WirePoint::Anchor(PointRef::Centre(_)) => {
+                    return Err("a point of it is the centre of a set, which this writer does not write (6.5)".into())
+                }
+                WirePoint::Branch(i) => match branches.get(*i) {
+                    Some(Some(name)) => (Piece::Text(format!("%{name}")), String::new()),
+                    Some(None) => return Err(format!("its branch point {i}: {NOT_A_NUMBER}")),
+                    None => return Err(format!("its branch point {i} is not in the solution")),
+                },
+                WirePoint::Bend(at) => {
+                    (Piece::Text(coords(*at).map_err(|why| format!("a bend of it: {why}"))?), String::new())
+                }
+            };
+            if let Piece::Ref(r) = &piece {
+                roots.extend(self.reach(r).map_err(|why| format!("its point {label}: {why}"))?);
+            }
+            pieces.push(piece);
+        }
+        Ok((pieces, roots))
+    }
+}
+
+/// Does a route keep the points of its wire in order, with bends only between them (13.1)?
+fn keeps_points(wire: &ProblemWire, points: &[WirePoint]) -> bool {
+    let bend = |q: Option<&WirePoint>| matches!(q, Some(WirePoint::Bend(_)) | None);
+    if bend(points.first()) || bend(points.last()) {
+        return false;
+    }
+    let kept: Vec<Option<&PointRef>> = points
+        .iter()
+        .filter_map(|q| match q {
+            WirePoint::Bend(_) => None,
+            WirePoint::Anchor(r) => Some(Some(r)),
+            WirePoint::Branch(_) => Some(None),
+        })
+        .collect();
+    kept.len() == wire.anchors.len() && kept.iter().zip(&wire.anchors).all(|(a, b)| *a == Some(b))
 }
 
 /// The statement that writes out a usage made by a rule (10.5): its definition, its roles in
@@ -185,107 +373,221 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
 }
 
 /// The solver's record for a level (14.8, 17): the usages made by rules that the result reaches,
-/// written out; the branch points of routed wires; the positions and orientations; the wires;
-/// the junctions. `author` and `hash` go in the record head, the hash being what [`sig1`] gives
-/// for the problem and the solver's options.
+/// written out; the branch points of routed wires; the positions and orientations; the wires
+/// routed for ROUTE; the routes of the wires written in RNL; the junctions. `p` is the problem the
+/// solver read, without the records of the solver ([`crate::Options::solver`]). `author` and
+/// `hash` go in the record head, the hash being what [`sig1`] gives for the problem and the
+/// solver's options.
+///
+/// Every decision of the solution is in the record, or in [`Written::unsolved`] with the reason
+/// the record cannot hold it:
+///
+/// - in a level of a file of 0.2: the position or orientation of an object without a name, and
+///   the route of a wire (the draft 0.3 writes them, by number and with WIRE given the wire);
+/// - in every version: the position of a text without a key that a rule makes, which nothing can
+///   refer to, so the solver does not decide it (13.3; the draft 0.3, 14.8); an object reached
+///   only through a usage that a rule makes and that cannot be written out (10.5), or through
+///   nothing (5.7); in a problem read with the records of the solver, an object that one of them
+///   makes, which this record replaces; a position given to an object drawn at the point of its
+///   main object (12.1), an orientation given to a point or a text (11.2); a wire with fewer than
+///   two points (13.1), or through the centre of a set; a coordinate that is NaN or infinite
+///   (3.7); an index that is not in the problem or the solution.
+///
+/// In a level of the draft 0.3 the record is not finished: [`finish_record`] gives it the check of
+/// its numbers.
 pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &str) -> Written {
-    let names = generated_names(p);
-    let mut skipped = Vec::new();
+    let mut refs =
+        Refs { p, names: generated_names(p), draft: p.version == DRAFT_VERSION, offsets: vec![None; p.usages.len()] };
+    let mut unsolved = Vec::new();
+    let mut notes = Vec::new();
     let mut needed = vec![false; p.usages.len()];
-    let mut placements: Vec<(usize, String)> = Vec::new();
-    let mut sorted: Vec<&Placement> = solution.placements.iter().collect();
-    sorted.sort_by_key(|pl| pl.object);
-    for pl in sorted {
-        let Some(o) = p.objects.get(pl.object) else {
-            skipped.push(format!("object {}: not in the problem", pl.object));
-            continue;
-        };
-        let Some(r) = written(&o.reference, &names) else {
-            let why = match o.reference {
-                Reference::Generated { .. } => "the usage made by a rule that it belongs to cannot be written out",
-                _ => "it cannot be referred to (5.7)",
-            };
-            skipped.push(format!("{}: {why}", o.label));
-            continue;
-        };
-        let at = match (&o.position, pl.at) {
-            (Position::At(_), _) | (_, None) => None,
-            (_, Some(xy)) => Some(xy),
-        };
-        let orient = if o.orient.is_some() { pl.orient } else { None };
-        let mut parts = Vec::new();
-        if let Some((x, y)) = at {
-            parts.push(format!("@PLACE({}, {})", fmt_num(x), fmt_num(y)));
-        }
-        if let Some(code) = orient {
-            parts.push(format!("@ORIENT(\"{}\")", code.as_str()));
-        }
-        if parts.is_empty() {
-            continue;
-        }
-        if let Some(u) = root_of(&o.reference) {
-            needed[u] = true;
-        }
-        placements.push((pl.object, format!("{r} {}", parts.join(" => "))));
-    }
+    let mut lost = |decision: Decision, label: &str, reason: &str| {
+        unsolved.push(Unsolved { decision, label: label.to_string(), reason: reason.to_string() })
+    };
 
-    let mut taken: Vec<String> = p.names.iter().chain(names.iter().flatten()).cloned().collect();
-    let mut branch_names = Vec::new();
-    for _ in &solution.branches {
-        let mut n = branch_names.len() + 1;
+    // the branch points, named so as not to clash with the level's names
+    let mut taken: Vec<String> = p.names.iter().chain(refs.names.iter().flatten()).cloned().collect();
+    let mut branch_names: Vec<Option<String>> = Vec::new();
+    for (index, b) in solution.branches.iter().enumerate() {
+        if coords(b.at).is_err() {
+            lost(Decision::Branch { index }, &format!("branch point {index}"), NOT_A_NUMBER);
+            branch_names.push(None);
+            continue;
+        }
+        let mut n = 1;
         while taken.contains(&format!("rt{n}")) {
             n += 1;
         }
         taken.push(format!("rt{n}"));
-        branch_names.push(format!("rt{n}"));
+        branch_names.push(Some(format!("rt{n}")));
     }
 
-    let mut wires = Vec::new();
-    'wire: for w in &solution.wires {
-        let Some(route) = p.routes.get(w.route) else {
-            skipped.push(format!("route {}: not in the problem", w.route));
+    // positions and orientations
+    let mut placements: Vec<(Reference, Option<Pt>, Option<Orient>)> = Vec::new();
+    let mut sorted: Vec<&Placement> = solution.placements.iter().collect();
+    sorted.sort_by_key(|pl| pl.object);
+    for pl in sorted {
+        let (position, orientation) =
+            (Decision::Position { object: pl.object }, Decision::Orientation { object: pl.object });
+        let Some(o) = p.objects.get(pl.object) else {
+            let label = format!("object {}", pl.object);
+            if pl.at.is_some() {
+                lost(position, &label, NOT_IN_PROBLEM);
+            }
+            if pl.orient.is_some() {
+                lost(orientation, &label, NOT_IN_PROBLEM);
+            }
             continue;
         };
-        let mut pts = Vec::new();
-        let mut roots = Vec::new();
-        for q in &w.points {
-            match wire_point(p, &names, q, &branch_names) {
-                Some((text, root)) => {
-                    pts.push(text);
-                    roots.extend(root);
+        let mut at = pl.at;
+        if let Some(xy) = at {
+            let why = match o.position {
+                Position::At(_) => Some(AT_POINT),
+                _ if coords(xy).is_err() => Some(NOT_A_NUMBER),
+                _ => None,
+            };
+            if let Some(why) = why {
+                lost(position, &o.label, why);
+                at = None;
+            }
+        }
+        let mut orient = pl.orient;
+        if orient.is_some() && o.orient.is_none() {
+            lost(orientation, &o.label, NO_ORIENTATION);
+            orient = None;
+        }
+        if at.is_none() && orient.is_none() {
+            continue;
+        }
+        match refs.reach(&o.reference) {
+            Ok(root) => {
+                if let Some(u) = root {
+                    needed[u] = true;
                 }
-                None => {
-                    skipped.push(format!(
-                        "a wire of the ROUTE of &{}: a point of it cannot be referred to (5.7)",
-                        route.net
-                    ));
-                    continue 'wire;
+                placements.push((o.reference.clone(), at, orient));
+            }
+            Err(why) => {
+                let keyless = o.text.as_ref().is_some_and(|t| t.key.is_none());
+                let why = if why == ANONYMOUS && o.generated && keyless { RULE_TEXT } else { why };
+                if at.is_some() {
+                    lost(position, &o.label, why);
+                }
+                if orient.is_some() {
+                    lost(orientation, &o.label, why);
                 }
             }
         }
-        for u in roots {
+    }
+
+    // the wires routed for ROUTE: new wires
+    let mut routed: Vec<(&RouteIntent, Vec<Piece>)> = Vec::new();
+    for (index, rw) in solution.wires.iter().enumerate() {
+        let decision = Decision::RoutedWire { index };
+        let Some(route) = p.routes.get(rw.route) else {
+            lost(decision, &format!("a wire of ROUTE {}", rw.route), NOT_IN_PROBLEM);
+            continue;
+        };
+        let label = format!("a wire of the ROUTE of &{}", written_name(&route.net));
+        match refs.wire(&rw.points, &branch_names) {
+            Ok((pieces, roots)) => {
+                for u in roots {
+                    needed[u] = true;
+                }
+                routed.push((route, pieces));
+            }
+            Err(why) => lost(decision, &label, &why),
+        }
+    }
+
+    // the routes of the wires written in RNL: WIRE given the wire (the draft 0.3, 13.1)
+    let mut rewrites: Vec<(Reference, Vec<Piece>)> = Vec::new();
+    let mut sorted: Vec<&WireRoute> = solution.wire_routes.iter().collect();
+    sorted.sort_by_key(|r| r.wire);
+    for wr in sorted {
+        let decision = Decision::WireRoute { wire: wr.wire };
+        let Some(wire) = p.wires.get(wr.wire) else {
+            lost(decision, &format!("wire {}", wr.wire), NOT_IN_PROBLEM);
+            continue;
+        };
+        if !refs.draft {
+            lost(decision, &wire.label, NO_REWRITE);
+            continue;
+        }
+        let root = match refs.reach(&wire.reference) {
+            Ok(root) => root,
+            Err(why) => {
+                lost(decision, &wire.label, why);
+                continue;
+            }
+        };
+        let (pieces, roots) = match refs.wire(&wr.points, &branch_names) {
+            Ok(found) => found,
+            Err(why) => {
+                lost(decision, &wire.label, &why);
+                continue;
+            }
+        };
+        for u in root.into_iter().chain(roots) {
             needed[u] = true;
         }
-        let mut params = vec!["mode=\"straight\"".to_string()];
-        params.extend(route.style.iter().map(|(k, v)| format!("{}={}", k, written_lit(v))));
-        wires.push(format!("&{} @WIRE({}) {{{}}}", written_name(&route.net), params.join(", "), pts.join(" ")));
+        if wire.mode != "auto" {
+            notes.push(format!(
+                "the route of {}: the wire is not \"auto\" but {}, so its route was not the solver's to choose (13.1); written as given",
+                wire.label,
+                written_string(&wire.mode)
+            ));
+        }
+        if !keeps_points(wire, &wr.points) {
+            notes.push(format!(
+                "the route of {} does not keep the points of the wire in order with bends only between them, as a solver should (13.1); written as given",
+                wire.label
+            ));
+        }
+        rewrites.push((wire.reference.clone(), pieces));
+    }
+
+    // the usages written out first, in order: the objects that each makes are numbered after those
+    // of the authored records and of the usages before it (5.9)
+    let mut next = p.authored_numbers;
+    for (k, u) in p.usages.iter().enumerate() {
+        if needed[k] && refs.names[k].is_some() {
+            refs.offsets[k] = Some(next);
+            next += u.written_numbers;
+        }
     }
 
     let mut statements = Vec::new();
     for (k, u) in p.usages.iter().enumerate() {
-        if needed[k] {
-            if let Some(name) = &names[k] {
-                statements.push(usage_statement(u, name));
-            }
+        if let (true, Some(name)) = (needed[k], &refs.names[k]) {
+            statements.push(usage_statement(u, name));
         }
     }
     for (b, name) in solution.branches.iter().zip(&branch_names) {
-        statements.push(format!("%{name} = ({}, {})", fmt_num(b.at.0), fmt_num(b.at.1)));
+        if let (Some(name), Ok(xy)) = (name, coords(b.at)) {
+            statements.push(format!("%{name} = {xy}"));
+        }
     }
-    statements.extend(placements.into_iter().map(|(_, s)| s));
-    statements.extend(wires);
+    for (r, at, orient) in &placements {
+        let mut parts = Vec::new();
+        if let Some((x, y)) = at {
+            parts.push(format!("@PLACE({}, {})", fmt_num(*x), fmt_num(*y)));
+        }
+        if let Some(code) = orient {
+            parts.push(format!("@ORIENT(\"{}\")", code.as_str()));
+        }
+        statements.push(format!("{} {}", refs.text(r), parts.join(" => ")));
+    }
+    let list = |pieces: &[Piece]| pieces.iter().map(|q| refs.piece(q)).collect::<Vec<_>>().join(" ");
+    for (route, pieces) in &routed {
+        let mut params = vec!["mode=\"straight\"".to_string()];
+        params.extend(route.style.iter().map(|(k, v)| format!("{}={}", k, written_lit(v))));
+        statements.push(format!("&{} @WIRE({}) {{{}}}", written_name(&route.net), params.join(", "), list(pieces)));
+    }
+    for (r, pieces) in &rewrites {
+        statements.push(format!("{} @WIRE(mode=\"straight\") {{{}}}", refs.text(r), list(pieces)));
+    }
     for (b, name) in solution.branches.iter().zip(&branch_names) {
-        if b.junction {
+        if let (true, Some(name)) = (b.junction, name) {
             statements.push(format!("$JUNCTION @ATTACH %{name}"));
         }
     }
@@ -300,7 +602,80 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     } else {
         format!("{head} {{\n  {}\n}}", statements.join(";\n  "))
     };
-    Written { record, skipped }
+    Written { record, unsolved, notes }
+}
+
+/// The record of the solver of a level, finished: `record` is what [`write_record`] gives for the
+/// problem `p`. In a level of a file of the draft 0.3, the record with `numbering` in its head, the
+/// check of its numbers (5.9); in a level of 0.2, the record as it is.
+///
+/// The check covers the objects of the authored records of the level and the record's own: the
+/// coordinates in its wires, the bodies of the usages it writes out, its junctions. So the document
+/// is read again with the record in place of the level's records of the solver, with
+/// [`crate::Options::draft`], and the check is [`level_check`] of the level, the check of the text
+/// as written. `doc` is the host document that the problem was read from, such as
+/// [`crate::Interpretation::doc`]; `files` and `options` are what it was read with, packages
+/// included (`rnl_view::finish_record` adds the bundled ones).
+pub fn finish_record(
+    doc: &HostDocument,
+    files: &dyn Provider,
+    options: &Options,
+    p: &LevelProblem,
+    record: &str,
+) -> String {
+    if p.version != DRAFT_VERSION {
+        return record.to_string();
+    }
+    let mut doc = doc.clone();
+    let Some(level) = doc.levels.get_mut(p.level) else { return record.to_string() };
+    let file = level.file.clone();
+    level.records.retain(|r| r.file != file || record_type(r) != "generated");
+    level.records.push(placed(record, &file, level.end_line.max(1)));
+    let options = Options { draft: true, generated: true, problems: false, ..options.clone() };
+    let read = crate::interpret(doc, files, &options, Sink::new());
+    match level_check(&read, p.level) {
+        Some(check) => with_numbering(record, check),
+        None => record.to_string(),
+    }
+}
+
+/// A record as a host adapter would cut it out of the lines from `line` of `file` on.
+fn placed(text: &str, file: &str, line: u32) -> Record {
+    let mut segs = Vec::new();
+    let mut off = 0;
+    for (k, l) in text.split('\n').enumerate() {
+        segs.push(Seg { off, file: file.to_string(), line: line + k as u32, col: 0 });
+        off += l.chars().count() + 1;
+    }
+    let last = line + segs.len().saturating_sub(1) as u32;
+    Record { text: text.to_string(), segs, lines: (line, last), file: file.to_string() }
+}
+
+/// A record with `numbering="…"` added at the end of its head (2.8, 5.9).
+fn with_numbering(record: &str, check: &str) -> String {
+    let field = format!("numbering={}", written_string(check));
+    let chars: Vec<char> = record.chars().collect();
+    let head = "@RNL(".chars().count();
+    if !record.starts_with("@RNL(") {
+        let rest = record.strip_prefix("@RNL").unwrap_or(record);
+        return format!("@RNL({field}){rest}");
+    }
+    // the bracket that closes the head, outside strings, where `""` is a quote (3.7)
+    let mut k = head;
+    let mut in_string = false;
+    while k < chars.len() {
+        match chars[k] {
+            '"' if in_string && chars.get(k + 1) == Some(&'"') => k += 1,
+            '"' => in_string = !in_string,
+            ')' if !in_string => break,
+            _ => {}
+        }
+        k += 1;
+    }
+    let before: String = chars[..k].iter().collect();
+    let after: String = chars[k..].iter().collect();
+    let sep = if before.trim_end().ends_with('(') { "" } else { ", " };
+    format!("{}{sep}{field}{after}", before.trim_end())
 }
 
 #[cfg(test)]
@@ -313,5 +688,23 @@ mod tests {
         assert_eq!(slug("&\"D<3>\""), "D_3");
         assert_eq!(slug("gnd_stub"), "gnd_stub");
         assert_eq!(slug("{#M1 #M2}"), "M1_M2");
+    }
+
+    #[test]
+    fn numbering_goes_at_the_end_of_the_head() {
+        let check = "0123456789abcdef";
+        assert_eq!(
+            with_numbering("@RNL(type=\"generated\", author=\"a (b) \"\"c)\"\"\") {}", check),
+            "@RNL(type=\"generated\", author=\"a (b) \"\"c)\"\"\", numbering=\"0123456789abcdef\") {}"
+        );
+        assert_eq!(with_numbering("@RNL() {\n  #R1\n}", check), "@RNL(numbering=\"0123456789abcdef\") {\n  #R1\n}");
+        assert_eq!(with_numbering("@RNL {}", check), "@RNL(numbering=\"0123456789abcdef\") {}");
+    }
+
+    #[test]
+    fn a_record_placed_maps_its_lines() {
+        let r = placed("@RNL {\n  #R1 @PLACE(1, 2)\n}", "t.sp", 7);
+        assert_eq!(r.lines, (7, 9));
+        assert_eq!((r.loc(9).line, r.loc(9).col), (8, 3));
     }
 }
