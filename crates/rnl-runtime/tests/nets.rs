@@ -1,5 +1,6 @@
-//! How nets are drawn without a solver: a label on a net sits on one of the net's wires (13.3),
-//! and a ROUTE draws flylines between the pins its net's wires do not join yet (13.7).
+//! How nets are drawn without a solver: a label on a net sits on one of the net's wires, or on one
+//! of its pins when no wire of it is drawn (13.3), and a ROUTE draws flylines between the pins its
+//! net's wires do not join yet (13.7).
 
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::{Dialect, HostDocument, Instance, Level, LevelKind};
@@ -73,8 +74,8 @@ fn a_label_on_a_net_sits_on_its_first_drawn_wire() {
     let lv = &r.model.levels[0];
     let anchors: Vec<(String, (f64, f64))> = lv.texts.iter().map(|t| (text_of(&t.lines), t.anchor)).collect();
     // not on the wire of c, nor on the wire of b whose point is free: at #R1:2, where the next one starts;
-    // a has no wire, so its label is not drawn
-    assert_eq!(anchors, [("on b".to_string(), (1.0, 0.0))]);
+    // a has no wire, so its label goes on its pin #R1:1, R1 being turned R90
+    assert_eq!(anchors, [("on b".to_string(), (1.0, 0.0)), ("on a".to_string(), (-1.0, 0.0))]);
 }
 
 #[test]

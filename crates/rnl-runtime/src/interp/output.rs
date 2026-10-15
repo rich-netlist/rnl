@@ -356,7 +356,8 @@ impl Interp<'_> {
             if self.is_obj_failed(t) {
                 continue;
             }
-            let Some(anchor) = self.text_anchor(s, t) else { continue };
+            // a text whose attached object is drawn is drawn too (13.3; the draft 0.3, section 9)
+            let Some(anchor) = self.text_drawn_at(s, t) else { continue };
             let it = self.text_items(t);
             let Some(text) = it.text.clone() else { continue };
             let att = self.text_attach(t);

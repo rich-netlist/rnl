@@ -1,6 +1,7 @@
 //! What a viewer that does not solve draws of a level not solved yet, or whose numbers are out of
 //! date (the draft 0.3, section 9; 13.1, 13.3, 5.9): a wire some of whose points have no position
-//! is drawn in its runs of points that have one, with flylines over the gaps, and not dropped.
+//! is drawn in its runs of points that have one, with flylines over the gaps, and not dropped; a
+//! text without a position whose attached object is drawn is drawn beside it.
 
 use std::path::Path;
 
@@ -122,4 +123,69 @@ fn a_stale_numbering_leaves_the_free_point_free_and_the_wire_drawn_in_part() {
         |name: &str| lv.texts.iter().find(|t| t.id == "a text" && rnl_runtime::markup::plain(&t.lines[0]) == name);
     assert_eq!(label("M1").map(|t| t.anchor), Some((1.2, 1.2)));
     assert_eq!(label("R1").map(|t| t.anchor), Some((11.2, 1.2)));
+}
+
+/// The texts of a level by what they show.
+fn text_at(lv: &LevelView, shown: &str) -> Option<Pt> {
+    lv.texts.iter().find(|t| rnl_runtime::markup::plain(&t.lines[0]) == shown).map(|t| t.anchor)
+}
+
+#[test]
+fn a_text_on_a_wire_drawn_in_part_is_drawn_above_it() {
+    let (m1, r1) = pins();
+    // the wire is drawn up to (2, 5) and from (8, 5), with a flyline between: its label goes above
+    // the middle of that drawing, here the flyline; a PLACE on one axis keeps its value
+    let records = "%w = &out @WIRE {#M1:1 (2, 5) (_, _) (8, 5) #R1:2}; %w @TEXT(\"w\");                    %w @TEXT(\"x7\") => @PLACE(x=7); %t = %w @TEXT(\"t\"); {%t #R1} @ALIGN(\"x\")";
+    let r = read(&netlist("0.2", &record(records)), &Options::default());
+    let lv = level(&r, "t.sp");
+    assert_eq!(text_at(&lv, "w"), Some((5.0, 5.6)));
+    assert_eq!(text_at(&lv, "x7"), Some((7.0, 5.6)));
+    // the place is the viewer's only: a constraint on the text still has nothing to check
+    assert_eq!(lv.constraints[0].status, "unsolved");
+    // a wire drawn only as a flyline: above its middle
+    let r =
+        read(&netlist("0.2", &record("%w = &out @WIRE {#M1:1 (_, _) #R1:2}; %w @TEXT(\"w\")")), &Options::default());
+    assert_eq!(text_at(&level(&r, "t.sp"), "w"), Some(((m1.0 + r1.0) / 2.0, (m1.1 + r1.1) / 2.0 + 0.6)));
+    // a wire with one point placed is not drawn, and neither is its label
+    let r = read(&netlist("0.2", &record("%w = &out @WIRE {#M1:1 (_, _)}; %w @TEXT(\"w\")")), &Options::default());
+    assert_eq!(text_at(&level(&r, "t.sp"), "w"), None);
+}
+
+#[test]
+fn a_text_on_a_net_goes_next_to_what_is_drawn_of_it() {
+    let (m1, r1) = pins();
+    // no wire of out has all its points placed: the label goes at the start of the first that is
+    // drawn at all, here as a flyline from M1:1
+    let r =
+        read(&netlist("0.2", &record("&out @WIRE {#M1:1 (_, _) #R1:2}; &out @TEXT(\"${name}\")")), &Options::default());
+    assert_eq!(text_at(&level(&r, "t.sp"), "out"), Some(m1));
+    // a net without a wire drawn: next to the first of its pins that is drawn (13.3)
+    let r = read(&netlist("0.2", &record("&out @TEXT(\"${name}\")")), &Options::default());
+    assert_eq!(text_at(&level(&r, "t.sp"), "out"), Some(m1));
+    let r = read(&netlist("0.2", &record("&out @WIRE {(_, _) #R1:2}; &out @TEXT(\"${name}\")")), &Options::default());
+    assert_eq!(text_at(&level(&r, "t.sp"), "out"), Some(m1));
+    // a wire drawn whole comes first, as before
+    let r = read(&netlist("0.2", &record("&out @WIRE {#R1:2 (12, 6)}; &out @TEXT(\"${name}\")")), &Options::default());
+    assert_eq!(text_at(&level(&r, "t.sp"), "out"), Some(r1));
+    // a net none of whose terminals is drawn: no label
+    let text = netlist("0.2", &record("&x @TEXT(\"${name}\")")).replace(
+        "R1 vdd out 10k
+",
+        "R1 vdd out 10k
+R2 x 0 1k
+",
+    );
+    assert_eq!(text_at(&level(&read(&text, &Options::default()), "t.sp"), "x"), None);
+}
+
+#[test]
+fn a_text_on_a_graphic_is_drawn_beside_it() {
+    // a label on a graphic in the scene is drawn beside its first point, as one on an object beside
+    // its origin (13.3, 13.4); on a graphic that is not drawn, as one point has no position, it is not
+    let records = "%r = @RECTANGLE {(20, 20) (24, 22)}; %r @TEXT(\"box\");                    %s = @LINE {(30, 30) (_, _)}; %s @TEXT(\"line\")";
+    let r = read(&netlist("0.2", &record(records)), &Options::default());
+    let lv = level(&r, "t.sp");
+    assert_eq!(text_at(&lv, "box"), Some((21.2, 21.2)));
+    assert_eq!(text_at(&lv, "line"), None);
+    assert_eq!(lv.shapes.len(), 1);
 }
