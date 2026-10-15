@@ -251,7 +251,8 @@ fn what_it_writes_interprets_without_errors() {
     ]);
     let out = write(&request("spice", net, ops)).unwrap();
     let files = MemoryProvider::new().with(entry("spice"), &out);
-    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: true }).unwrap();
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: true, ..Options::default() })
+        .unwrap();
     let loud: Vec<String> =
         r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
     assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));

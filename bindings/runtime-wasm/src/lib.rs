@@ -92,6 +92,10 @@ pub struct WriteRequest {
     pub svg: bool,
     #[serde(default)]
     pub primitives: bool,
+    #[serde(default)]
+    pub draft: bool,
+    #[serde(default)]
+    pub status: bool,
 }
 
 /// What a write answers: the netlist with the ops written into it, and its Document, whose
@@ -172,9 +176,10 @@ fn write(request: WriteRequest) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: Some(request.write.dialect),
-        runtime: Options { std: request.std },
+        runtime: Options { std: request.std, draft: request.draft, ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
+        status: request.status,
     };
     match rnl_view::build(entry, &files, &options) {
         Ok(document) => Response::Written(Box::new(Written { text, document })),
