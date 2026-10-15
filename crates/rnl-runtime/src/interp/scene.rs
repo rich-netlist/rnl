@@ -481,6 +481,10 @@ impl Interp<'_> {
         if self.units[u].kind == UnitKind::Level {
             let ul = self.units[u].level;
             if ul == Some(lv) {
+                // a record written above with scope= comes after the level's own text (2.6)
+                if let Some(&place) = rec.and_then(|r| self.units[u].scope_places.get(&r)) {
+                    return pos(&[4, place, tail[0], tail[1]]);
+                }
                 return pos(&[3, 0, tail[0], tail[1]]);
             }
             let anc = self.doc.ancestors(lv);

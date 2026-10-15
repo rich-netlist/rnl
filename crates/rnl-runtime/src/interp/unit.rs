@@ -149,6 +149,11 @@ pub struct Unit {
     pub scope_records: Vec<(RecId, Rc<RecordAst>, Rc<Header>)>,
     /// The indexes in `scope_records` by the key of the subcircuit named in scope=, in order.
     pub scope_index: HashMap<String, Vec<usize>>,
+    /// In a subcircuit's unit, the members of the records written above with scope= it, in the
+    /// order they take effect after its own text (2.6). The names they bind are its own (6.7).
+    pub scope_members: Vec<UnitMember>,
+    /// Where each of those records takes effect: the outer ones later (2.6).
+    pub scope_places: HashMap<RecId, i64>,
     pub classified: bool,
     /// An embedded package reads with the aliases of the file it is written in (16.5).
     pub alias_from: Option<UnitId>,
@@ -184,6 +189,8 @@ impl Unit {
             ok: true,
             scope_records: Vec::new(),
             scope_index: HashMap::new(),
+            scope_members: Vec::new(),
+            scope_places: HashMap::new(),
             classified: false,
             alias_from: None,
             embedded: false,
@@ -1483,6 +1490,41 @@ impl Interp<'_> {
     }
 
     // ------------------------------------------------------------------ names (6.6)
+
+    /// The records written above a subcircuit with scope= commit their statements to it, and the
+    /// names they bind are published there, in one name space with its own (2.6, 6.7, as the
+    /// draft 0.3 makes clear in its 7.4). They come after its own text, the nearest level's
+    /// first, as they take effect; a name bound again is the 6.6 error of the subcircuit's level,
+    /// and the earlier binding is kept. Called once every level is read.
+    pub(crate) fn publish_scope_names(&mut self) {
+        for lv in 0..self.doc.levels.len() {
+            let level = &self.doc.levels[lv];
+            if level.kind != LevelKind::Subckt {
+                continue;
+            }
+            let key = self.doc.key(&level.name);
+            let unit = self.level_unit[lv];
+            let above = self.doc.ancestors(lv);
+            for (depth, a) in above.iter().enumerate() {
+                let au = self.level_unit[*a];
+                let Some(ks) = self.units[au].scope_index.get(&key).cloned() else { continue };
+                let place = -((above.len() - depth) as i64);
+                for i in ks {
+                    let (rec, ast, header) = self.units[au].scope_records[i].clone();
+                    self.units[unit].scope_places.insert(rec, place);
+                    for (k, m) in ast.body.as_ref().unwrap().members.iter().enumerate() {
+                        if m.error.is_some() {
+                            continue;
+                        }
+                        let member =
+                            UnitMember { rec: Some(rec), k, embedded: false, m: m.clone(), header: header.clone() };
+                        self.units[unit].scope_members.push(member);
+                        self.declare(unit, Some(rec), k, false, m, &header);
+                    }
+                }
+            }
+        }
+    }
 
     pub(crate) fn declare(
         &mut self,

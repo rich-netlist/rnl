@@ -642,7 +642,7 @@ impl<'p> Interp<'p> {
             selected: false,
             defining: None,
             def_unit: None,
-            scope_in: false,
+            scope_in: rec.is_some_and(|r| self.units[u].scope_places.contains_key(&r)),
         };
         let (r, bound) = self.eval_member(m, &ctx);
         self.in_progress.remove(&skey);

@@ -245,6 +245,7 @@ impl<'p> Interp<'p> {
             let u = it.level_unit[lv];
             it.read_unit(u);
         }
+        it.publish_scope_names();
         it
     }
 
@@ -347,13 +348,11 @@ impl<'p> Interp<'p> {
         struct Work {
             u: UnitId,
             m: unit::UnitMember,
-            pos: Option<Pos>,
-            scope_in: bool,
         }
         let mut work: Vec<Work> = Vec::new();
         for e in self.effective_packages(lv) {
             for m in self.rule_members(e.unit).iter() {
-                work.push(Work { u: e.unit, m: m.clone(), pos: None, scope_in: false });
+                work.push(Work { u: e.unit, m: m.clone() });
             }
         }
         let mut anc = self.doc.ancestors(lv);
@@ -364,39 +363,16 @@ impl<'p> Interp<'p> {
             }
             let au = self.level_unit[*a];
             for m in self.rule_members(au).iter() {
-                work.push(Work { u: au, m: m.clone(), pos: None, scope_in: false });
+                work.push(Work { u: au, m: m.clone() });
             }
         }
-        for m in self.units[unit].members.clone() {
-            work.push(Work { u: unit, m, pos: None, scope_in: false });
-        }
-        // records written above with scope= this subcircuit (2.6)
-        let anc_up = self.doc.ancestors(lv);
-        let lvl = &self.doc.levels[lv];
-        let key = if lvl.kind == LevelKind::Subckt { Some(self.doc.key(&lvl.name)) } else { None };
-        for (depth, a) in anc_up.iter().enumerate() {
-            let au = self.level_unit[*a];
-            let Some(ks) = key.as_ref().and_then(|k| self.units[au].scope_index.get(k)) else { continue };
-            for i in ks.clone() {
-                let (rec, ast, header) = self.units[au].scope_records[i].clone();
-                for (k, m) in ast.body.as_ref().unwrap().members.iter().enumerate() {
-                    if m.error.is_some() {
-                        continue;
-                    }
-                    let p = pos(&[4, -((anc_up.len() - depth) as i64), rec as i64, k as i64]);
-                    let um =
-                        unit::UnitMember { rec: Some(rec), k, embedded: false, m: m.clone(), header: header.clone() };
-                    work.push(Work { u: unit, m: um, pos: Some(p), scope_in: true });
-                }
-            }
-        }
+        // its own text, then the records written above with scope= this subcircuit (2.6), whose
+        // members are its own as well, evaluated in its unit
+        let own = self.units[unit].members.iter().chain(&self.units[unit].scope_members);
+        work.extend(own.map(|m| Work { u: unit, m: m.clone() }));
         for w in work {
             if self.restart.is_some() {
                 return;
-            }
-            if w.scope_in {
-                self.eval_scope_in(w.u, &w.m, w.pos.unwrap(), s);
-                continue;
             }
             let r =
                 self.eval_member_at(w.u, w.m.rec, w.m.k, w.m.embedded, &w.m.m, Some(s), w.m.header.clone(), None, "");
@@ -471,31 +447,6 @@ impl<'p> Interp<'p> {
         let scope: Vec<&crate::syntax::Arg> =
             seg.args.iter().filter(|a| !matches!(&a.obj, crate::syntax::ObjExpr::Ref(r) if r.prefix == '$')).collect();
         !scope.is_empty() && scope.iter().all(|a| matches!(&a.obj, crate::syntax::ObjExpr::Ref(r) if (r.prefix == '#' || r.prefix == '&') && r.name.is_some()))
-    }
-
-    fn eval_scope_in(&mut self, u: UnitId, m: &unit::UnitMember, p: Pos, s: SceneId) {
-        let key = (MemberKey::Scope { rec: m.rec.unwrap_or(0), k: m.k }, Some(s));
-        if self.memo.contains_key(&key) {
-            return;
-        }
-        let c = ctx::Ctx {
-            scene: Some(s),
-            unit: u,
-            rec: m.rec,
-            header: m.header.clone(),
-            pos: p,
-            frame: None,
-            origin: Rc::from(""),
-            nested: None,
-            member_key: key.0.clone(),
-            selected: false,
-            defining: None,
-            def_unit: None,
-            scope_in: true,
-        };
-        if let (Ok(v), _) = self.eval_member(&m.m, &c) {
-            self.memo.insert(key, Memo::Val(v));
-        }
     }
 
     fn check_scopes(&mut self) {

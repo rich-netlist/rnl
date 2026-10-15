@@ -340,8 +340,9 @@ impl Interp<'_> {
         }
     }
 
-    /// The `%` names the level binds, with their objects in this scene, in the order they are
-    /// declared; a name bound twice keeps its first binding (6.6).
+    /// The `%` names the level binds, those of the records written into it with scope= among them
+    /// (2.6, 6.7), with their objects in this scene, in the order they are declared; a name bound
+    /// twice keeps its first binding (6.6).
     fn level_names(&self, s: SceneId) -> Vec<(String, ObjId)> {
         let u = self.level_unit[self.scenes[s].level];
         let mut out = Vec::new();

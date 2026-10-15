@@ -610,12 +610,12 @@ pub struct Obj {
     pub name: String,
 }
 
-/// A member key for memoisation: a top-level member of a unit's records, or of a scope record.
+/// A member key for memoisation: a top-level member of a unit's records, among them those of the
+/// records written into a subcircuit with scope=, which are members of its unit (2.6).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MemberKey {
     None,
     M { unit: UnitId, rec: RecId, k: usize, embedded: bool },
-    Scope { rec: RecId, k: usize },
 }
 
 /// The members found to be rules, evaluated again in every level below (10.3), with how many
