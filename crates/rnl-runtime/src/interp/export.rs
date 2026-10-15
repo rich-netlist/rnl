@@ -92,10 +92,16 @@ impl Interp<'_> {
             }
         }
 
-        // what each object is referred to by (5.7, 10.5, 13.3)
+        // what each object is referred to by: a name, else a number (5.7, 10.5, 13.3; the draft
+        // 0.3, 5.9); through `::` the local objects of a usage that has either
         let names = self.level_names(s);
         for (name, o) in &names {
             ix.refs.entry(*o).or_insert_with(|| Reference::Name(format!("%{}", written_name(name))));
+        }
+        let mut numbers: Vec<(ObjId, usize)> = self.problem_numbers(s).into_iter().collect();
+        numbers.sort();
+        for (o, number) in numbers {
+            ix.refs.entry(o).or_insert(Reference::Number { number, path: Vec::new() });
         }
         for &a in &usages {
             let u = self.usage(a).clone();
@@ -320,11 +326,13 @@ impl Interp<'_> {
             });
         }
 
+        let version = self.version_of(Some(self.level_unit[lv]));
         LevelProblem {
             level: lv,
             title: level.title(),
             kind: if level.kind == LevelKind::Subckt { "subckt" } else { "file" },
             name: level.name.clone(),
+            version,
             file: level.file.clone(),
             line: level.line,
             end_line: level.end_line,
@@ -343,7 +351,7 @@ impl Interp<'_> {
     /// The `%` names the level binds, those of the records written into it with scope= among them
     /// (2.6, 6.7), with their objects in this scene, in the order they are declared; a name bound
     /// twice keeps its first binding (6.6).
-    fn level_names(&self, s: SceneId) -> Vec<(String, ObjId)> {
+    pub(crate) fn level_names(&self, s: SceneId) -> Vec<(String, ObjId)> {
         let u = self.level_unit[self.scenes[s].level];
         let mut out = Vec::new();
         for key in &self.units[u].name_order {
@@ -371,7 +379,7 @@ impl Interp<'_> {
 
     /// Made by a rule (10.5): a generated usage, wire or text, or any object made in a generation,
     /// whose position carries the mark of the generation rule.
-    fn made_by_rule(&self, s: SceneId, o: ObjId) -> bool {
+    pub(crate) fn made_by_rule(&self, s: SceneId, o: ObjId) -> bool {
         self.is_generated(o) || self.scenes[s].created.get(&o).is_some_and(|p| p.contains(&PosElem::Tag("g")))
     }
 

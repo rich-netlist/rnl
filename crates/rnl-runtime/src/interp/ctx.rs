@@ -84,6 +84,15 @@ pub type NestedRef = Rc<RefCell<HashMap<(char, String), Nested>>>;
 /// it means the outer definition of that name (6.9). (prefix, name) -> (member that binds it, unit).
 pub type Defining = HashMap<(char, String), (MemberRef, UnitId)>;
 
+/// A statement of a record, or of a definition body, by its record and its characters: what the
+/// objects it makes are numbered by (the draft 0.3, 5.9).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct StmtSpan {
+    pub rec: Option<RecId>,
+    pub start: usize,
+    pub end: usize,
+}
+
 #[derive(Clone, Debug)]
 pub struct Ctx {
     /// The drawing level; None for packages and included file levels (no circuit).
@@ -104,6 +113,9 @@ pub struct Ctx {
     pub def_unit: Option<UnitId>,
     /// A record written above with `scope=` this subcircuit (2.6).
     pub scope_in: bool,
+    /// The statement being evaluated: the member of the record, or in a definition body the member
+    /// of the body (the draft 0.3, 5.9).
+    pub stmt: Option<StmtSpan>,
 }
 
 impl Ctx {

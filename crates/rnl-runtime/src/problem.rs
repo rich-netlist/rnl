@@ -156,8 +156,17 @@ pub enum Reference {
     /// with a name, and the object is that name followed by `path`, such as `["::g"]`. An empty
     /// path is the usage itself.
     Generated { usage: usize, path: Vec<String> },
-    /// Not at all: an anonymous object, such as the free point `(_, _)` written in a wire, a text
-    /// without a key or a name, or a local object of an anonymous usage (5.7, 13.3).
+    /// By its number, `%#3` (the draft 0.3, 5.9): an object without a name that no name reaches
+    /// through `::`, such as the free point `(_, _)` written in a wire, a text without a key or a
+    /// name, or a usage without a name; then `path`, such as `["::mid"]` for a local object of such
+    /// a usage, `[":p"]` for one of its terminals. The numbers are those of the level read without
+    /// the records of the solver, followed by the objects of each record of the solver read. They
+    /// are computed for every version, but only the record of the solver of a file of the draft
+    /// writes them ([`LevelProblem::version`]).
+    Number { number: usize, path: Vec<String> },
+    /// Not at all: an object reached only through one that has no reference, such as a local
+    /// object of a usage named only inside a `{…}`, or an object that no statement of the level
+    /// makes, such as a text without a key of a symbol (5.7, 13.3).
     Anonymous,
 }
 
@@ -171,6 +180,11 @@ impl Reference {
                 let mut path = path.clone();
                 path.push(suffix.to_string());
                 Reference::Generated { usage: *usage, path }
+            }
+            Reference::Number { number, path } => {
+                let mut path = path.clone();
+                path.push(suffix.to_string());
+                Reference::Number { number: *number, path }
             }
             Reference::Anonymous => Reference::Anonymous,
         }
@@ -384,6 +398,9 @@ pub struct LevelProblem {
     /// "file" or "subckt".
     pub kind: &'static str,
     pub name: String,
+    /// The language version the level's file declares (16.1), "0.2" when it declares none. Only
+    /// the record of the solver of a file of the draft 0.3 writes numbers ([`Reference::Number`]).
+    pub version: String,
     pub file: String,
     pub line: u32,
     /// The line before which a record added to the end of the level goes (17).
@@ -470,7 +487,10 @@ pub fn options_digest(options: &str) -> String {
 /// `type="generated"`, and the metadata fields of record heads never reach it. Where things are
 /// written (files, lines and columns, the index of the level) is left out, so white space and
 /// comments do not change it; the order of the facts, which is what the positions decide, is in
-/// it. Numbers are written by [`fmt_num`], so the digest is the same on every platform.
+/// it. Numbers are written by [`fmt_num`], so the digest is the same on every platform. The
+/// numbers of the objects without a name ([`Reference::Number`]) are left out, the object counting
+/// as one without a reference: they follow from the text, which the check of the record of the
+/// solver covers (the draft 0.3, 5.9), and so the digest is the same in every version.
 pub fn sig1(p: &LevelProblem, solver_options: &str) -> String {
     format!("{SIG1}:{}.{}", input_digest(p), options_digest(solver_options))
 }
@@ -624,8 +644,8 @@ pub fn canonical(p: &LevelProblem) -> String {
         c.word(f.priority.as_str());
         c.str(&f.label);
         match &f.reference {
+            Some(Reference::Number { .. }) | None => c.word("-"),
             Some(r) => c.reference(r),
-            None => c.word("-"),
         }
         c.indexes(&f.chain);
     }
@@ -812,7 +832,8 @@ impl Canon {
                     self.str(s);
                 }
             }
-            Reference::Anonymous => self.word("anonymous"),
+            // numbers are left out of the hash (`sig1`)
+            Reference::Number { .. } | Reference::Anonymous => self.word("anonymous"),
         }
     }
 
@@ -875,6 +896,7 @@ mod tests {
             title: "t.sp".into(),
             kind: "file",
             name: "t.sp".into(),
+            version: "0.2".into(),
             file: "t.sp".into(),
             line: 1,
             end_line: 3,

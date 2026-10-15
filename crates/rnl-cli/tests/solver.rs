@@ -136,10 +136,13 @@ fn the_problem_holds_what_a_solver_places() {
     assert_eq!(p.facts[fx].kind, FactKind::PointCoordinate { point: j, axis: Axis::X, value: 12.0 });
     assert_eq!(p.facts[fy].kind, FactKind::PointCoordinate { point: j, axis: Axis::Y, value: 6.0 });
 
-    // the junction is drawn on %j: no position of its own, and no name to write its orientation with
+    // the junction is drawn on %j: no position of its own, and no name to write its orientation
+    // with, only its number after the three wires, which a file of 0.2 cannot write (the draft 0.3,
+    // 5.9)
     let dot = object(p, "a usage of $JUNCTION");
     assert_eq!(p.objects[dot].position, Position::At(PointRef::Origin(j)));
-    assert_eq!(p.objects[dot].reference, Reference::Anonymous);
+    assert_eq!(p.objects[dot].reference, Reference::Number { number: 4, path: Vec::new() });
+    assert_eq!(p.version, "0.2");
     assert_eq!(p.usages[p.objects[dot].usage.unwrap()].definition, "$JUNCTION");
 
     // the grounds that the fill of the standard package makes: generated, reached through their stubs
@@ -228,9 +231,10 @@ fn facts_are_in_the_order_of_8_5() {
         Position::Own { x: Slot::Fixed { value: 0.0, fact: 1 }, y: Slot::Fixed { value: 0.0, fact: 0 } }
     );
     assert!(matches!(p.objects[m2].position, Position::Own { x: Slot::Free, y: Slot::Fixed { value: 3.0, .. } }));
-    // the free axis point of the mirror pairs is named; the middle point of the tail is not
+    // the free axis point of the mirror pairs is named; the middle point of the tail is reached
+    // only through the number of its usage, the third without a name (the draft 0.3, 5.9)
     assert_eq!(p.objects[object(p, "%ax")].reference, Reference::Name("%ax".into()));
-    assert_eq!(p.objects[object(p, "%mid")].reference, Reference::Anonymous);
+    assert_eq!(p.objects[object(p, "%mid")].reference, Reference::Number { number: 3, path: vec!["::mid".into()] });
 }
 
 #[test]
@@ -557,4 +561,29 @@ fn the_brainstorm_cases_give_whole_problems() {
         panic!("{:?}", vin.position)
     };
     assert_eq!((fact, p.facts[fact].priority), (0, Priority::High));
+}
+
+#[test]
+fn the_draft_switch_changes_no_problem_of_a_file_of_0_2() {
+    // the numbers of the objects without a name are computed in every version, but only a file of
+    // the draft 0.3 writes them (5.9): `rnl problem` gives a file of 0.2 the same with the switch
+    let fs = FsProvider::new(&[]);
+    let mut files = Vec::new();
+    for dir in [case(""), solver_case("")] {
+        for e in std::fs::read_dir(dir).unwrap() {
+            let f = e.unwrap().path();
+            if f.extension().is_some_and(|x| x == "sp" || x == "scs") {
+                files.push(f);
+            }
+        }
+    }
+    files.sort();
+    assert!(files.len() > 20);
+    for f in files {
+        let json = |options: &Options| -> Vec<serde_json::Value> {
+            let r = interpret_file(&f, None, &fs, options).unwrap();
+            r.problems.iter().map(|p| rnl_cli::problem::level(p, OPTIONS)).collect()
+        };
+        assert_eq!(json(&Options { draft: true, ..Options::solver() }), json(&Options::solver()), "{}", f.display());
+    }
 }

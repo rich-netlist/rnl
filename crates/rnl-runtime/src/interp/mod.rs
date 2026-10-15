@@ -11,6 +11,7 @@ pub mod cycles;
 pub mod eval;
 mod export;
 pub mod kw;
+mod numbers;
 pub mod obj;
 mod output;
 pub mod phases;
@@ -23,13 +24,15 @@ use std::rc::Rc;
 use crate::diag::{DiagId, Sink};
 use crate::host::{HostDocument, Level, LevelKind, Record};
 use crate::model::{FailedSpan, HostRef, Model};
+use crate::numbering::LevelNumbering;
 use crate::source::Provider;
 use crate::syntax::RecordAst;
 
 use eval::{Bound, Stop, R};
+use numbers::Birth;
 use obj::*;
 use scene::Scene;
-use unit::{Unit, UnitKind};
+use unit::{Header, Unit, UnitKind};
 
 /// The memoised value of a member in a scene.
 #[derive(Clone, Debug)]
@@ -93,6 +96,9 @@ pub struct Interpretation {
     /// [`Options::problems`] is set. Built without the generated records ([`Options::solver`]),
     /// it is the solver's input (2.8, 17).
     pub problems: Vec<crate::problem::LevelProblem>,
+    /// The numbers of the objects without a name of each drawing level, with their checks (the
+    /// draft 0.3, 5.9); empty unless [`Options::draft`] is set. See [`crate::numbering`].
+    pub numbering: Vec<LevelNumbering>,
 }
 
 impl Interpretation {
@@ -167,6 +173,20 @@ pub struct Interp<'p> {
     /// The statements found not to take effect so far, each once.
     pub(crate) failed_spans: Vec<FailedSpan>,
     pub(crate) failed_seen: HashSet<FailedSpan>,
+    /// The header of each record read, other than the header record (2.8).
+    pub(crate) rec_header: HashMap<RecId, Rc<Header>>,
+    /// The objects that may be numbered, as they were made, and each one's index there (5.9).
+    pub(crate) births: Vec<Birth>,
+    pub(crate) birth_of: HashMap<ObjId, usize>,
+    /// The objects that the member making them binds to a name: not numbered (5.9).
+    pub(crate) named: HashSet<ObjId>,
+    /// The evaluations of members under way, innermost last, and the last one begun.
+    pub(crate) evals: Vec<u64>,
+    pub(crate) next_eval: u64,
+    /// The numbered objects by (scene, record of the solver, before its member), with the number of
+    /// births and of names they were computed with.
+    #[allow(clippy::type_complexity)]
+    pub(crate) numbered_memo: HashMap<(SceneId, Option<RecId>, Option<usize>), ((usize, usize), Rc<Vec<ObjId>>)>,
 }
 
 impl<'p> Interp<'p> {
@@ -220,6 +240,13 @@ impl<'p> Interp<'p> {
             failed_seen: HashSet::new(),
             package_main: None,
             checking_path: None,
+            rec_header: HashMap::new(),
+            births: Vec::new(),
+            birth_of: HashMap::new(),
+            named: HashSet::new(),
+            evals: Vec::new(),
+            next_eval: 0,
+            numbered_memo: HashMap::new(),
         };
         for _ in 0..3 {
             it.objs.push(Obj { data: ObjData::Marker, name: String::new() }); // LEVEL, OWNER, NOTHING
@@ -589,6 +616,12 @@ impl<'p> Interp<'p> {
         let model = self.build_model();
         let problems =
             if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Vec::new() };
+        // the numbers and their checks, read with the draft only (5.9)
+        let numbering: Vec<LevelNumbering> = if self.draft && self.package_main.is_none() {
+            (0..self.scenes.len()).map(|s| self.level_numbering(s)).collect()
+        } else {
+            Vec::new()
+        };
         let checking = self.package_main.map(|p| self.units[p].pkg_name.clone()).unwrap_or_default();
         let mut sources = self.doc.sources.clone();
         sources.extend(self.pkg_sources.clone());
@@ -600,6 +633,7 @@ impl<'p> Interp<'p> {
             refs: std::mem::take(&mut self.refs),
             failed: std::mem::take(&mut self.failed_spans),
             problems,
+            numbering,
             doc: self.doc,
         }
     }

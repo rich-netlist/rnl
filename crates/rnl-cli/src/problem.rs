@@ -3,6 +3,7 @@
 use serde_json::{json, Value};
 
 use rnl_runtime::interp::obj::Lit;
+use rnl_runtime::interp::unit::DRAFT_VERSION;
 use rnl_runtime::markup::plain;
 use rnl_runtime::problem::*;
 
@@ -34,11 +35,14 @@ fn slot(s: &Slot) -> Value {
     }
 }
 
-fn reference(r: &Reference) -> Value {
+/// A reference; a number only in a level of a file of the draft 0.3, where the record of the
+/// solver writes it (5.9), and otherwise none, as for an object without a reference.
+fn reference(r: &Reference, numbers: bool) -> Value {
     match r {
         Reference::Name(n) => json!(n),
         Reference::Generated { usage, path } => json!({"generated_by": usage, "path": path.concat()}),
-        Reference::Anonymous => Value::Null,
+        Reference::Number { number, path } if numbers => json!({"number": number, "path": path.concat()}),
+        Reference::Number { .. } | Reference::Anonymous => Value::Null,
     }
 }
 
@@ -61,7 +65,7 @@ fn position(p: &Position) -> Value {
     }
 }
 
-fn fact(f: &ProblemFact) -> Value {
+fn fact(f: &ProblemFact, numbers: bool) -> Value {
     let mut v = json!({"kind": f.kind.name()});
     let m = v.as_object_mut().unwrap();
     match &f.kind {
@@ -107,8 +111,12 @@ fn fact(f: &ProblemFact) -> Value {
     }
     m.insert("priority".into(), json!(f.priority.as_str()));
     m.insert("label".into(), json!(f.label));
-    if let Some(r) = &f.reference {
-        m.insert("reference".into(), reference(r));
+    match &f.reference {
+        Some(Reference::Number { .. }) if !numbers => {}
+        Some(r) => {
+            m.insert("reference".into(), reference(r, numbers));
+        }
+        None => {}
     }
     m.insert(
         "source".into(),
@@ -121,8 +129,10 @@ fn fact(f: &ProblemFact) -> Value {
     v
 }
 
-/// One level's problem, with its `sig1` hash for the solver options given.
+/// One level's problem, with its `sig1` hash for the solver options given. The references are
+/// numbers, `{"number": 3, "path": "::mid"}`, only in a level of a file of the draft 0.3.
 pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
+    let numbers = p.version == DRAFT_VERSION;
     json!({
         "level": p.level,
         "title": p.title,
@@ -139,7 +149,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
                 "id": k,
                 "kind": o.kind.as_str(),
                 "label": o.label,
-                "reference": reference(&o.reference),
+                "reference": reference(&o.reference, numbers),
                 "generated": o.generated,
                 "symbol": o.symbol,
                 "position": position(&o.position),
@@ -170,9 +180,9 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             "default": s.default,
             "pins": s.pins.iter().map(|q| json!({"pos": [q.pos.0, q.pos.1], "dir": q.dir, "terminals": q.terminals, "label": q.label})).collect::<Vec<_>>(),
         })).collect::<Vec<_>>(),
-        "facts": p.facts.iter().map(fact).collect::<Vec<_>>(),
+        "facts": p.facts.iter().map(|f| fact(f, numbers)).collect::<Vec<_>>(),
         "wires": p.wires.iter().map(|w| json!({
-            "label": w.label, "reference": reference(&w.reference), "nets": w.nets, "bus": w.bus,
+            "label": w.label, "reference": reference(&w.reference, numbers), "nets": w.nets, "bus": w.bus,
             "anchors": points(&w.anchors), "mode": w.mode, "generated": w.generated,
         })).collect::<Vec<_>>(),
         "routes": p.routes.iter().map(|r| json!({
@@ -184,7 +194,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
         "usages": p.usages.iter().map(|u| json!({
             "definition": u.definition,
             "label": u.label,
-            "reference": reference(&u.reference),
+            "reference": reference(&u.reference, numbers),
             "generated": u.generated,
             "rule_made": u.rule_made,
             "roles": u.roles.iter().map(|r| json!({

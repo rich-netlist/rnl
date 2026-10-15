@@ -422,6 +422,7 @@ impl Interp<'_> {
                 continue;
             }
             let header = Rc::new(self.read_header_fields(&ast, rec, u));
+            self.rec_header.insert(rec, header.clone());
             if header.type_ == "header" {
                 if !is_file_level || index != 0 || self.units[u].header_record.is_some() {
                     let loc = self.recs[rec].loc(0);
