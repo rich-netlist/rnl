@@ -16,6 +16,16 @@ fn level(p: Priority) -> u8 {
     p as u8
 }
 
+/// A priority said of a fact by a PRIORITY statement or a usage's own priority (14.8).
+struct Said<'a> {
+    /// What ranks it: the depth of its target, from outside, a statement rather than a
+    /// parameter, and where it is written.
+    rank: (usize, bool, bool, Option<&'a Pos>),
+    /// The depth it is written at.
+    at: usize,
+    value: Priority,
+}
+
 /// The style facts of a scene by target, each list in the order of the facts (8.3).
 #[derive(Default)]
 struct StyleIndex {
@@ -384,14 +394,27 @@ impl Interp<'_> {
 
     // ---- priorities (14.8)
 
-    /// From low to high: header default < own parameter < PRIORITY statements < the priority of the
-    /// enclosing usages (outermost that has one) < PRIORITY written on the local from outside. A
-    /// statement written in the body of an enclosing usage reaches the local from outside the
-    /// usages within that one only: it beats their priorities and gives way to those of the usage
-    /// it is written in and of the usages around that one. So, from the outermost level inward:
-    /// the statements written outside every usage of the chain; then for each usage, its priority,
-    /// or else the statements written in its body and outside the next usage; the last of these
-    /// are the statements written inside, then the own parameter.
+    /// The effective priority of a fact (14.8, in the order the draft 0.3 makes clear in its 7.3,
+    /// which holds in every version). `priority` is the fact's own parameter or its record head's
+    /// default, `chain` the usages whose expansion made it, outermost first, and `own` its own
+    /// object, a constraint or a set with GROUP, when PRIORITY can name it.
+    ///
+    /// A PRIORITY statement on `own` or on a usage of the chain has two depths. Its target's is i
+    /// for `chain[i]` and n, the length of the chain, for `own`. It is written at 0 outside every
+    /// usage of the chain, and at j + 1 in the body of `chain[j]`, or of a usage in its expansion
+    /// that is not in the chain, outside `chain[j + 1]`. Written at a depth lower than its
+    /// target's, it comes from outside; otherwise it is the target's own. A usage's own statements,
+    /// else its `priority=`, are its own priority, written at the usage's depth; the own statements
+    /// on `own` are written at n, inside every usage.
+    ///
+    /// The priority of a usage goes down: from the outermost inward, a usage governs when its own
+    /// priority, or a statement from outside on it, is written no deeper than a bound, which then
+    /// comes down to the usage's depth; whatever is written deeper than the bound is blocked. So a
+    /// statement in the body of an enclosing definition stays under the enclosing usage, and one
+    /// from outside on a local usage makes it the outermost usage with a priority for its
+    /// expansion. Of what is not blocked, the innermost target wins; on one target, a statement
+    /// from outside beats the target's own, a statement beats a parameter, and the later beats the
+    /// earlier. When nothing is left, the fact's own parameter decides, else it is "normal".
     pub(crate) fn eff_priority(
         &self,
         s: SceneId,
@@ -399,54 +422,56 @@ impl Interp<'_> {
         chain: &[ObjId],
         own: Option<ObjId>,
     ) -> Priority {
-        let said = match own {
-            Some(own) => self.priority_statements(s, own, chain),
-            None => vec![None; chain.len() + 1],
-        };
-        if let Some(p) = said[0] {
-            return p;
-        }
-        for (k, &u) in chain.iter().enumerate() {
-            // the priority of the usage is its PRIORITY statements by the same order, or else its
-            // own parameter; the usages around it have none, as none of them has decided
-            let on_u = self.priority_statements(s, u, &chain[..k]);
-            if let Some(p) = on_u.into_iter().flatten().next().or(self.usage(u).priority) {
-                return p;
+        let n = chain.len();
+        let mut said: Vec<Said> = Vec::new();
+        for (t, target) in chain.iter().copied().chain(own).enumerate() {
+            // the target's own statement written last
+            let mut latest: Option<(&Pos, Priority)> = None;
+            for g in self.scenes[s].prioritys.iter().filter(|g| g.target == target) {
+                let FactData::Priority(value) = g.data else { continue };
+                let at = self.written_depth(g, chain);
+                if at < t {
+                    said.push(Said { rank: (t, true, true, Some(&g.pos)), at, value });
+                } else if latest.is_none_or(|(q, _)| *q <= g.pos) {
+                    latest = Some((&g.pos, value));
+                }
             }
-            if let Some(p) = said[k + 1] {
-                return p;
+            match latest {
+                Some((q, value)) => said.push(Said { rank: (t, false, true, Some(q)), at: t, value }),
+                None if t < n => {
+                    if let Some(value) = self.usage(target).priority {
+                        said.push(Said { rank: (t, false, false, None), at: t, value });
+                    }
+                }
+                None => {}
             }
         }
-        priority.unwrap_or(Priority::Normal)
+        let mut bound = n;
+        for j in 0..n {
+            if said.iter().any(|x| x.rank.0 == j && x.at <= bound) {
+                bound = bound.min(j);
+            }
+        }
+        said.iter()
+            .filter(|x| x.at <= bound)
+            .max_by(|a, b| a.rank.cmp(&b.rank))
+            .map(|x| x.value)
+            .or(priority)
+            .unwrap_or(Priority::Normal)
     }
 
-    /// The PRIORITY statements on `own`, the later of each level of `chain` (14.8): at 0 those
-    /// written outside every usage of the chain, at k + 1 those written in the body of `chain[k]`,
-    /// or of a usage in its expansion, and outside `chain[k + 1]`. The last level holds the
-    /// statements written inside, in the body that made `own`.
-    fn priority_statements(&self, s: SceneId, own: ObjId, chain: &[ObjId]) -> Vec<Option<Priority>> {
-        let mut latest: Vec<Option<&Fact>> = vec![None; chain.len() + 1];
-        for g in self.scenes[s].prioritys.iter().filter(|g| g.target == own) {
-            let mut level = 0;
-            let mut at = g.ctx.as_ref().and_then(|c| c.frame_usage());
-            while let Some(u) = at {
-                if let Some(k) = chain.iter().position(|c| *c == u) {
-                    level = k + 1;
-                    break;
-                }
-                at = self.usage(u).parent;
+    /// The depth a PRIORITY statement is written at, for a fact made through `chain` (14.8): 0
+    /// outside every usage of the chain, j + 1 in the body of `chain[j]`, or of a usage in its
+    /// expansion that is not in the chain, outside `chain[j + 1]`.
+    fn written_depth(&self, g: &Fact, chain: &[ObjId]) -> usize {
+        let mut at = g.ctx.as_ref().and_then(|c| c.frame_usage());
+        while let Some(u) = at {
+            if let Some(j) = chain.iter().position(|c| *c == u) {
+                return j + 1;
             }
-            if latest[level].is_none_or(|h| h.pos <= g.pos) {
-                latest[level] = Some(g);
-            }
+            at = self.usage(u).parent;
         }
-        latest
-            .into_iter()
-            .map(|g| match g?.data {
-                FactData::Priority(p) => Some(p),
-                _ => None,
-            })
-            .collect()
+        0
     }
 
     pub(crate) fn fact_priority(&self, s: SceneId, f: &Fact) -> Priority {
