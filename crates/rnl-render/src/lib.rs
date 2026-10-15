@@ -543,7 +543,9 @@ impl Out {
             }
             self.shape(owner, p.shape, &gpts, &params, &st, layer, key);
         }
-        // pin names: shown by this viewer just inside the pin (9.2.4 leaves it to the viewer)
+        // pin names: shown by this viewer just inside the pin, past the pin's lead when a line of
+        // the symbol runs from the pin inwards, so that a block's names are inside its body (9.2.4
+        // leaves it to the viewer)
         for (k, pin) in sym.pins.iter().enumerate() {
             let (Some(label), Some(dir)) = (&pin.label, pin.dir) else { continue };
             let inward = match dir {
@@ -552,7 +554,26 @@ impl Out {
                 180 => (1.0, 0.0),
                 _ => (0.0, 1.0),
             };
-            let at = (pin.pos.0 + 0.45 * inward.0, pin.pos.1 + 0.45 * inward.1);
+            let lead = sym
+                .prims
+                .iter()
+                .filter(|p| p.shape == Shape::Line && p.points.len() == 2)
+                .filter_map(|p| {
+                    let near = |q: Pt| (q.0 - pin.pos.0).abs() < 1e-9 && (q.1 - pin.pos.1).abs() < 1e-9;
+                    let other = if near(p.points[0]) {
+                        p.points[1]
+                    } else if near(p.points[1]) {
+                        p.points[0]
+                    } else {
+                        return None;
+                    };
+                    let d = (other.0 - pin.pos.0, other.1 - pin.pos.1);
+                    let along = d.0 * inward.0 + d.1 * inward.1;
+                    let across = d.0 * inward.1 - d.1 * inward.0;
+                    (along > 1e-9 && across.abs() < 1e-9).then_some(along)
+                })
+                .fold(0.0, f64::max);
+            let at = (pin.pos.0 + (lead + 0.45) * inward.0, pin.pos.1 + (lead + 0.45) * inward.1);
             let halign = if inward == (-1.0, 0.0) {
                 "end"
             } else if inward == (1.0, 0.0) {

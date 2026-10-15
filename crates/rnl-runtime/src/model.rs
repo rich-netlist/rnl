@@ -262,6 +262,8 @@ pub struct ObjectInfo {
     pub orient: Orient,
     /// The symbol's pins where they are drawn, when it has a symbol and a position.
     pub pins: Vec<PinPlace>,
+    /// Its symbol, by index in `LevelView::symbols`, when it is drawn.
+    pub symbol_view: Option<usize>,
 }
 
 /// What a role of a usage is attached to: an object, by its id, or a point.

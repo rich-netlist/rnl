@@ -184,6 +184,58 @@ pub struct SymbolRef {
     pub level: Option<String>,
     /// The viewer's own stand-in box (9.2.6).
     pub default: bool,
+    /// For a symbol the document defines, such as a block's (9.2.6), what it is made of, in its
+    /// own coordinates; for a package's symbol, null: its name says it.
+    pub definition: Option<SymbolDefinition>,
+}
+
+/// A symbol's box, pins and graphics, in its own coordinates, y up.
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct SymbolDefinition {
+    /// x1, y1, x2, y2: the box the symbol writes, or the extent of its graphics.
+    #[serde(rename = "box")]
+    pub bbox: [f64; 4],
+    /// The symbol writes its box.
+    pub box_written: bool,
+    pub pins: Vec<SymbolPin>,
+    /// Its graphics, texts left out, in the order written.
+    pub prims: Vec<SymbolPrim>,
+}
+
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct SymbolPin {
+    /// The terminals at the pin, by number or name as the symbol writes them.
+    pub terminals: Vec<String>,
+    pub at: [f64; 2],
+    /// The exit direction in degrees: 0 right, 90 up, 180 left, 270 down.
+    pub dir: Option<u16>,
+    /// The pin's name for display (9.2.4): as written, and as lines of runs.
+    pub label: Option<PinLabel>,
+}
+
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct PinLabel {
+    pub markup: String,
+    pub lines: Vec<Vec<Run>>,
+}
+
+/// A graphic of a symbol (9.2.5).
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct SymbolPrim {
+    /// "line", "rectangle", "circle", "ellipse", "arc" or "bezier".
+    pub shape: String,
+    /// The centre of a rectangle, circle or ellipse with its size, else its points.
+    pub points: Vec<[f64; 2]>,
+    /// Its parameters: width, height, radius, fill, arrow.
+    #[cfg_attr(test, ts(type = "Record<string, string | number>"))]
+    pub params: Map<String, Value>,
+    /// The style properties it writes.
+    #[cfg_attr(test, ts(type = "Record<string, string | number | boolean>"))]
+    pub style: Map<String, Value>,
 }
 
 /// A value and the statement it comes from (`source`, a key of `sources`; null for now).
@@ -454,9 +506,62 @@ fn symbol_refs(doc: &HostDocument, lv: &LevelView) -> Vec<(SymbolInfo, SymbolRef
                 (_, Some(l), true) => format!("{}@{l}", s.name),
                 _ => format!("{}@default", s.name),
             };
-            (s.clone(), SymbolRef { id, name: s.name.clone(), package, level, default: s.default })
+            // what a symbol the document defines is made of, from an object drawn with it
+            let definition = (package.is_none() && !s.default)
+                .then(|| lv.objects.iter().find(|o| o.symbol.as_ref() == Some(s)).and_then(|o| o.symbol_view))
+                .flatten()
+                .map(|k| definition(&lv.symbols[k]));
+            (s.clone(), SymbolRef { id, name: s.name.clone(), package, level, default: s.default, definition })
         })
         .collect()
+}
+
+fn definition(sv: &rnl_runtime::model::SymbolView) -> SymbolDefinition {
+    SymbolDefinition {
+        bbox: sv.bbox,
+        box_written: sv.box_written,
+        pins: sv
+            .pins
+            .iter()
+            .map(|p| SymbolPin {
+                terminals: p.terminals.clone(),
+                at: xy(p.pos),
+                dir: p.dir,
+                label: p.label.as_ref().map(|m| PinLabel {
+                    markup: m.clone(),
+                    lines: rnl_runtime::markup::parse(m)
+                        .iter()
+                        .map(|l| l.iter().map(primitive::run).collect())
+                        .collect(),
+                }),
+            })
+            .collect(),
+        prims: sv
+            .prims
+            .iter()
+            .filter(|p| p.shape != rnl_runtime::interp::obj::Shape::Text)
+            .map(|p| {
+                let mut params = Map::new();
+                let pp = &p.params;
+                for (k, v) in [("width", pp.width), ("height", pp.height), ("radius", pp.radius)] {
+                    if let Some(v) = v {
+                        params.insert(k.into(), serde_json::json!(v));
+                    }
+                }
+                for (k, v) in [("fill", &pp.fill), ("arrow", &pp.arrow)] {
+                    if let Some(v) = v {
+                        params.insert(k.into(), Value::String(v.clone()));
+                    }
+                }
+                SymbolPrim {
+                    shape: p.shape.as_str().to_lowercase(),
+                    points: p.points.iter().map(|q| xy(*q)).collect(),
+                    params,
+                    style: style(&p.style),
+                }
+            })
+            .collect(),
+    }
 }
 
 fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
@@ -628,6 +733,22 @@ R2 a vdd! 2k
         let symbol = |id: &str| symbols.iter().find(|x| x["id"] == id).cloned();
         assert_eq!(symbol("%amp@subckt:amp").unwrap()["level"], "subckt:amp");
         assert_eq!(symbol(&format!("%amp@file:{file}")).unwrap()["package"], Value::Null);
+        // a symbol the document defines comes with what it is made of: box, pins with their
+        // names, graphics; a package's does not
+        let block = symbol("%amp@subckt:amp").unwrap();
+        let def = &block["definition"];
+        assert_eq!((&def["box"], &def["box_written"]), (&json!([-2.0, -2.0, 2.0, 2.0]), &json!(true)));
+        assert_eq!(
+            def["pins"][0],
+            json!({"terminals": ["in"], "at": [-2.0, 0.0], "dir": 180,
+                   "label": {"markup": "in", "lines": [[{"kind": "text", "text": "in", "style": {"level": 0, "bold": false, "italic": false, "overline": false}}]]}})
+        );
+        assert_eq!(def["pins"][1]["label"], Value::Null);
+        assert_eq!(
+            def["prims"],
+            json!([{"shape": "rectangle", "points": [[-1.5, -1.5], [1.5, 1.5]], "params": {}, "style": {}}])
+        );
+        assert!(symbols.iter().filter(|x| x["package"] != Value::Null).all(|x| x["definition"].is_null()));
         let objects = model["objects"].as_array().unwrap();
         let object = |id: &str| objects.iter().find(|o| o["id"] == id).cloned().unwrap_or(Value::Null);
         assert_eq!(object("#X1")["symbol"]["value"], "%amp@subckt:amp");

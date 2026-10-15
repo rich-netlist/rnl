@@ -8,9 +8,9 @@ use ts_rs::{Config, TS};
 
 use crate::{
     Bar, Cap, Child, Color, Diagnostic, Document, FileRef, HAlign, Hit, HostInstance, HostLevel, HostNet, HostTerminal,
-    Join, Layer, Level, LevelModel, LevelSnapshot, Object, ObjectView, PackageUse, PinView, PointView, Primitive, Run,
-    RunStyle, Segment, Shape, Slot, Snapshot, SourceFile, Span, Stroke, SymbolRef, Text, TextRun, TextView, Unit,
-    VAlign, Vertex, WireView,
+    Join, Layer, Level, LevelModel, LevelSnapshot, Object, ObjectView, PackageUse, PinLabel, PinView, PointView,
+    Primitive, Run, RunStyle, Segment, Shape, Slot, Snapshot, SourceFile, Span, Stroke, SymbolDefinition, SymbolPin,
+    SymbolPrim, SymbolRef, Text, TextRun, TextView, Unit, VAlign, Vertex, WireView,
 };
 
 const SNAPSHOT_HEADER: &str = "\
@@ -39,6 +39,10 @@ fn snapshot_all() -> Vec<(String, String)> {
         one::<HostNet>(&cfg),
         one::<LevelModel>(&cfg),
         one::<SymbolRef>(&cfg),
+        one::<SymbolDefinition>(&cfg),
+        one::<SymbolPin>(&cfg),
+        one::<PinLabel>(&cfg),
+        one::<SymbolPrim>(&cfg),
         one::<Slot<String>>(&cfg),
         one::<ObjectView>(&cfg),
         one::<PinView>(&cfg),

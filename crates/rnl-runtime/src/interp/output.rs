@@ -300,7 +300,18 @@ impl Interp<'_> {
                     }
                 }
             }
-            out.push(ObjectInfo { id: ids[&o].clone(), kind, host, definition, attach, symbol, at, orient, pins });
+            out.push(ObjectInfo {
+                id: ids[&o].clone(),
+                kind,
+                host,
+                definition,
+                attach,
+                symbol,
+                at,
+                orient,
+                pins,
+                symbol_view: None,
+            });
         }
         let junction_at: Vec<ObjId> = self.scenes[s]
             .usages
@@ -605,6 +616,11 @@ impl Interp<'_> {
                 host,
                 pin_nets,
             });
+        }
+        // the symbols of the drawn objects, as the items have them
+        let mut objects = objects;
+        for (info, &o) in objects.iter_mut().zip(&objs) {
+            info.symbol_view = self.scenes[s].symbol.get(&o).and_then(|sym| table.get(sym).copied());
         }
         let mut wires = Vec::new();
         for w in self.scenes[s].wires.clone() {

@@ -26,7 +26,8 @@ pub use primitive::{
 pub use rnl_runtime::source::MemoryProvider;
 pub use snapshot::{
     FileRef, HostInstance, HostLevel, HostNet, HostTerminal, LevelModel, LevelSnapshot, ObjectView, PackageUse, Parts,
-    PinView, PointView, Slot, Snapshot, SymbolRef, TextView, Vertex, WireView, SCHEMA,
+    PinLabel, PinView, PointView, Slot, Snapshot, SymbolDefinition, SymbolPin, SymbolPrim, SymbolRef, TextView, Vertex,
+    WireView, SCHEMA,
 };
 
 /// The standard packages bundled with the core (16.2, 16.3).
@@ -282,6 +283,39 @@ C1 a 0 1p
         assert!(d.levels[0].svg.as_ref().is_some_and(|s| s.starts_with("<svg")) && !d.levels[0].empty);
         assert_eq!(d.levels[0].hits.iter().filter(|h| h.kind == "box").count(), 2);
         assert!(d.missing.is_empty(), "{:?}", d.missing);
+    }
+
+    #[test]
+    fn a_pin_name_is_shown_past_the_pins_lead() {
+        // a block as an editor draws it: pins one unit outside its body, a lead from each to it
+        let netlist = "* block
+X1 a b blk
+* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL {
+*   $blk = @DEFINE-SYMBOL(box=[-3, -2, 3, 2]) {
+*     (-3, 0) @PIN(terminal=1, label=\"IN\", direction=\"left\");
+*     (3, 0) @PIN(terminal=2, label=\"OUT\", direction=\"right\");
+*     (0, 0) @RECTANGLE(width=4, height=4);
+*     @LINE {(-3, 0) (-2, 0)}
+*   };
+*   #X1 @SET-SYMBOL $blk => @PLACE(10, 0)
+* }
+.end
+";
+        let files = MemoryProvider::new().with("/w/b.sp", netlist);
+        let options = BuildOptions { svg: false, primitives: true, ..BuildOptions::default() };
+        let d = serde_json::to_value(build("/w/b.sp", &files, &options).unwrap()).unwrap();
+        let anchor = |name: &str| {
+            let prims = d["levels"][0]["primitives"].as_array().unwrap();
+            let text = prims.iter().find(|p| p["kind"] == "text" && p["lines"][0][0]["text"] == name).unwrap();
+            (text["anchor"][0].as_f64().unwrap(), text["anchor"][1].as_f64().unwrap())
+        };
+        // IN: past its lead, 0.45 inside the body
+        let (x, y) = anchor("IN");
+        assert!((x - 8.45).abs() < 1e-9 && y.abs() < 1e-9, "{x} {y}");
+        // OUT has no lead: 0.45 inside the pin
+        let (x, y) = anchor("OUT");
+        assert!((x - 12.55).abs() < 1e-9 && y.abs() < 1e-9, "{x} {y}");
     }
 
     #[test]

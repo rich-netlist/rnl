@@ -201,6 +201,70 @@ export type SymbolRef = {
    * The viewer's own stand-in box (9.2.6).
    */
   default: boolean,
+  /**
+   * For a symbol the document defines, such as a block's (9.2.6), what it is made of, in its
+   * own coordinates; for a package's symbol, null: its name says it.
+   */
+  definition: SymbolDefinition | null,
+};
+
+/**
+ * A symbol's box, pins and graphics, in its own coordinates, y up.
+ */
+export type SymbolDefinition = {
+  /**
+   * x1, y1, x2, y2: the box the symbol writes, or the extent of its graphics.
+   */
+  box: [number, number, number, number],
+  /**
+   * The symbol writes its box.
+   */
+  box_written: boolean,
+  pins: Array<SymbolPin>,
+  /**
+   * Its graphics, texts left out, in the order written.
+   */
+  prims: Array<SymbolPrim>,
+};
+
+export type SymbolPin = {
+  /**
+   * The terminals at the pin, by number or name as the symbol writes them.
+   */
+  terminals: Array<string>,
+  at: [number, number],
+  /**
+   * The exit direction in degrees: 0 right, 90 up, 180 left, 270 down.
+   */
+  dir: number | null,
+  /**
+   * The pin's name for display (9.2.4): as written, and as lines of runs.
+   */
+  label: PinLabel | null,
+};
+
+export type PinLabel = { markup: string, lines: Array<Array<Run>> };
+
+/**
+ * A graphic of a symbol (9.2.5).
+ */
+export type SymbolPrim = {
+  /**
+   * "line", "rectangle", "circle", "ellipse", "arc" or "bezier".
+   */
+  shape: string,
+  /**
+   * The centre of a rectangle, circle or ellipse with its size, else its points.
+   */
+  points: Array<[number, number]>,
+  /**
+   * Its parameters: width, height, radius, fill, arrow.
+   */
+  params: Record<string, string | number>,
+  /**
+   * The style properties it writes.
+   */
+  style: Record<string, string | number | boolean>,
 };
 
 /**
