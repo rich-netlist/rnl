@@ -135,7 +135,7 @@ pub struct Ref {
     pub id: NodeId,
     /// `#`, `&`, `%`, `$` or `?`.
     pub prefix: char,
-    /// None: a bare `#` (this level) or a bare `?` (the symbol's owner).
+    /// None: a bare `#` (this level) or a bare `?` (the symbol's owner), or a number.
     pub name: Option<String>,
     pub quoted: bool,
     pub sub: Option<Sub>,
@@ -144,6 +144,9 @@ pub struct Ref {
     pub end: Off,
     /// The spelling as written when a `$` alias was read as its original (16.5).
     pub written: Option<String>,
+    /// `%#` and a number, such as `%#3`: an object without a name, which the record of the solver
+    /// refers to by its number (the draft 0.3, 5.9). Read only in a file of the draft.
+    pub number: Option<u64>,
 }
 
 impl Ref {
@@ -152,6 +155,9 @@ impl Ref {
         s.push(self.prefix);
         if let Some(n) = &self.name {
             s.push_str(n);
+        }
+        if let Some(k) = self.number {
+            s.push_str(&format!("#{k}"));
         }
         if self.sub.is_some() {
             s.push_str("<…>");
@@ -328,11 +334,14 @@ struct Parser {
     i: usize,
     notes: Vec<Note>,
     next_id: NodeId,
+    /// Read `%#` and a number as a reference, as a file of the draft 0.3 does (5.9); otherwise `%#`
+    /// is a lexical error, as in 0.2.
+    numbers: bool,
 }
 
 impl Parser {
-    fn new(text: &str) -> Parser {
-        Parser { t: text.chars().collect(), i: 0, notes: Vec::new(), next_id: 0 }
+    fn new(text: &str, numbers: bool) -> Parser {
+        Parser { t: text.chars().collect(), i: 0, notes: Vec::new(), next_id: 0, numbers }
     }
 
     fn id(&mut self) -> NodeId {
@@ -818,12 +827,14 @@ impl Parser {
         let mut name = None;
         let mut quoted = false;
         let mut sub = None;
+        let mut number = None;
         match self.peek() {
             Some('"') => {
                 name = Some(self.string()?);
                 quoted = true;
             }
             Some(c) if is_ascii_word(c) => name = self.ascii_name(),
+            Some('#') if prefix == '%' && self.numbers => number = Some(self.object_number()?),
             _ if prefix == '#' || prefix == '?' => {}
             _ => return self.err(format!("write a name after `{prefix}`")),
         }
@@ -887,7 +898,28 @@ impl Parser {
         if expansions > 1 {
             return self.err_at("only one subscript in a reference may expand to a group (6.11)", start);
         }
-        Ok(Ref { id, prefix, name, quoted, sub, path, start, end: self.i, written: None })
+        Ok(Ref { id, prefix, name, quoted, sub, path, start, end: self.i, written: None, number })
+    }
+
+    /// The number of `%#3`, at the `#` (the draft 0.3, 5.9): digits, which take no subscript and
+    /// no letters after them.
+    fn object_number(&mut self) -> PResult<u64> {
+        self.i += 1;
+        let j0 = self.i;
+        while self.i < self.n() && self.t[self.i].is_ascii_digit() {
+            self.i += 1;
+        }
+        if self.i == j0 || matches!(self.peek(), Some(c) if is_word_char(c)) {
+            return self.err("write the number of an object after `%#`, in digits only, such as %#3 (5.9)");
+        }
+        if self.peek_in("<[") {
+            return self.err("a number takes no subscript (6.11); a point is written `(x, y)`");
+        }
+        let digits: String = self.t[j0..self.i].iter().collect();
+        match digits.parse() {
+            Ok(k) => Ok(k),
+            Err(_) => self.err_at("this number is larger than this implementation can hold (3.7)", j0),
+        }
     }
 
     fn number_u64(&mut self) -> Option<u64> {
@@ -1290,7 +1322,26 @@ fn check_member(m: &Member) -> PResult<()> {
 
 /// Parse one record; `text` starts with `@RNL` and ends with the matching `}`.
 pub fn parse_record(text: &str) -> RecordAst {
-    Parser::new(text).record()
+    parse_record_with(text, false)
+}
+
+/// Parse one record, with `numbers` reading `%#` and a number as a reference, as a file of the
+/// draft 0.3 does (5.9); without, `%#` is a lexical error, as in 0.2.
+pub fn parse_record_with(text: &str, numbers: bool) -> RecordAst {
+    Parser::new(text, numbers).record()
+}
+
+/// Does a member use a number, such as `%#3`, anywhere in it, definition bodies included (the
+/// draft 0.3, 5.9)?
+pub fn uses_number(m: &Member) -> bool {
+    fn obj(o: &ObjExpr) -> bool {
+        match o {
+            ObjExpr::Ref(r) => r.number.is_some(),
+            ObjExpr::Point(_) => false,
+            ObjExpr::Set(s) => s.members.iter().any(|m| uses_number(m)),
+        }
+    }
+    m.segments.iter().any(|sg| sg.args.iter().any(|a| obj(&a.obj)))
 }
 
 /// The formal tokens of the characters `start..end` of a record (3.2), each as written, without
@@ -1616,6 +1667,26 @@ mod tests {
     fn unclosed_record_body() {
         let r = parse_record("@RNL {#M1 @PLACE(1, 2)");
         assert!(r.error.is_some());
+    }
+
+    #[test]
+    fn numbers_are_read_only_when_asked() {
+        let text = "@RNL {%#3 @PLACE(1, 2); %#5:p %#5::mid @ALIGN(\"x\"); %#2a; %# @PLACE(1, 2); #M1}";
+        // as in 0.2, `%#` is a lexical error: the member fails, the others are read
+        let b = body(text);
+        assert!(b.members[0].error.as_ref().unwrap().contains("write a name after `%`"));
+        assert!(b.members[4].error.is_none());
+        let r = parse_record_with(text, true);
+        let b = r.body.unwrap();
+        let ObjExpr::Ref(r0) = &b.members[0].segments[0].args[0].obj else { panic!() };
+        assert_eq!((r0.prefix, r0.number, r0.name.as_ref()), ('%', Some(3), None));
+        assert_eq!(r0.text(), "%#3");
+        let ObjExpr::Ref(r1) = &b.members[1].segments[0].args[1].obj else { panic!() };
+        assert_eq!((r1.number, r1.path[0].sep, r1.path[0].name.as_str()), (Some(5), Sep::Sub, "mid"));
+        assert!(uses_number(&b.members[1]) && !uses_number(&b.members[4]));
+        // digits only, and some of them
+        assert!(b.members[2].error.as_ref().unwrap().contains("digits only"));
+        assert!(b.members[3].error.as_ref().unwrap().contains("digits only"));
     }
 
     #[test]

@@ -27,11 +27,14 @@ pub struct Header {
     pub type_: String,
     pub priority: Option<Priority>,
     pub scope: Option<String>,
+    /// The check of the numbers that the record of the solver uses, as written: a field of the
+    /// draft 0.3, only with `type="generated"` (5.9).
+    pub numbering: Option<String>,
 }
 
 impl Default for Header {
     fn default() -> Header {
-        Header { type_: "authored".into(), priority: None, scope: None }
+        Header { type_: "authored".into(), priority: None, scope: None, numbering: None }
     }
 }
 
@@ -357,12 +360,14 @@ impl Interp<'_> {
         self.sink.add(sev, msg, loc, Extra { in_package: pkg.to_string(), ..Extra::default() })
     }
 
-    /// Parse a record once.
+    /// Parse a record once. In a file of the draft 0.3, `%#3` is a number (5.9); in 0.2 it stays a
+    /// lexical error.
     pub(crate) fn parse(&mut self, rec: RecId) -> Rc<RecordAst> {
         if let Some(a) = &self.asts[rec] {
             return a.clone();
         }
-        let a = Rc::new(syntax::parse_record(&self.recs[rec].text));
+        let numbers = self.follows_0_3(self.rec_unit[rec]);
+        let a = Rc::new(syntax::parse_record_with(&self.recs[rec].text, numbers));
         self.asts[rec] = Some(a.clone());
         a
     }
@@ -423,6 +428,18 @@ impl Interp<'_> {
             }
             let header = Rc::new(self.read_header_fields(&ast, rec, u));
             self.rec_header.insert(rec, header.clone());
+            // the record of the solver whose numbering does not match the level: its statements
+            // that use a number are left out, as if they were not written, with one hint (5.9)
+            let stale = self.numbers.stale.contains(&rec);
+            if stale {
+                let off = ast
+                    .header
+                    .as_ref()
+                    .and_then(|h| h.named.iter().find(|n| n.name == "numbering"))
+                    .map_or(0, |n| n.off);
+                let loc = self.recs[rec].loc(off);
+                self.diag_in(Severity::Hint, super::numbers::STALE_HINT, Some(loc), &pkg);
+            }
             if header.type_ == "header" {
                 if !is_file_level || index != 0 || self.units[u].header_record.is_some() {
                     let loc = self.recs[rec].loc(0);
@@ -471,6 +488,9 @@ impl Interp<'_> {
                     let loc = self.recs[rec].loc(m.error_pos);
                     self.diag_in(Severity::Error, err.clone(), Some(loc), &pkg);
                     self.note_failed(Some(rec), m.start, m.end, false);
+                    continue;
+                }
+                if stale && syntax::uses_number(m) {
                     continue;
                 }
                 self.units[u].members.push(UnitMember {
@@ -569,10 +589,15 @@ impl Interp<'_> {
                 &pkg,
             );
         }
+        // `numbering` is a field of the draft 0.3 only (2.8, 5.9)
+        let draft: &[crate::words::HeaderField] =
+            if self.follows_0_3(u) { crate::words::draft_header_fields() } else { &[] };
+        let mut numbering_at = None;
         for n in &params.named {
             let loc = self.recs[rec].loc(n.off);
-            let Some(spec) = words().header_field(&n.name) else {
-                let close = closest(&n.name, words().header_fields.iter().map(|f| f.name.as_str()));
+            let fields = || words().header_fields.iter().chain(draft);
+            let Some(spec) = fields().find(|f| f.name == n.name) else {
+                let close = closest(&n.name, fields().map(|f| f.name.as_str()));
                 let hint = close.map(|c| format!(", did you mean {c}?")).unwrap_or_default();
                 self.diag_in(
                     Severity::Warning,
@@ -606,8 +631,30 @@ impl Interp<'_> {
                 "type" => h.type_ = v.clone(),
                 "priority" => h.priority = Priority::parse(v),
                 "scope" => h.scope = Some(v.clone()),
+                "numbering" => {
+                    if v.chars().count() != 16 || !v.chars().all(|c| c.is_ascii_hexdigit()) {
+                        self.diag_in(
+                            Severity::Error,
+                            format!("record header field numbering holds a check of 16 hexadecimal digits (5.9), not {v:?}; treated as not written (2.8)"),
+                            Some(loc),
+                            &pkg,
+                        );
+                        continue;
+                    }
+                    h.numbering = Some(v.clone());
+                    numbering_at = Some(loc);
+                }
                 _ => {}
             }
+        }
+        if let (Some(loc), true) = (numbering_at, h.type_ != "generated") {
+            self.diag_in(
+                Severity::Error,
+                "record header field numbering is written only with type=\"generated\", in the record of the solver; treated as not written (2.8, 5.9)",
+                Some(loc),
+                &pkg,
+            );
+            h.numbering = None;
         }
         if self.units[u].kind == UnitKind::Package && (h.scope.is_some() || h.type_ == "generated") {
             let loc = self.recs[rec].loc(0);

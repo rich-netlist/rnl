@@ -368,6 +368,14 @@ fn keyword(name: &str, spec: &Value) -> Result<KeywordSig, String> {
     })
 }
 
+/// The fields of the record head that the draft 0.3 adds (2.8), read only in a file that declares
+/// it: `numbering`, the check of the numbers of the record of the solver, which affects the
+/// interpretation (5.9). In a file of 0.2 it is an unknown field.
+pub fn draft_header_fields() -> &'static [HeaderField] {
+    static F: OnceLock<Vec<HeaderField>> = OnceLock::new();
+    F.get_or_init(|| vec![HeaderField { name: "numbering".into(), values: None, affects: true }])
+}
+
 /// The word list of the language version this runtime supports.
 pub fn words() -> &'static Words {
     static W: OnceLock<Words> = OnceLock::new();

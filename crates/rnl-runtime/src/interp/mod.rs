@@ -29,7 +29,7 @@ use crate::source::Provider;
 use crate::syntax::RecordAst;
 
 use eval::{Bound, Stop, R};
-use numbers::Birth;
+use numbers::{Birth, NumberRun};
 use obj::*;
 use scene::Scene;
 use unit::{Header, Unit, UnitKind};
@@ -99,6 +99,8 @@ pub struct Interpretation {
     /// The numbers of the objects without a name of each drawing level, with their checks (the
     /// draft 0.3, 5.9); empty unless [`Options::draft`] is set. See [`crate::numbering`].
     pub numbering: Vec<LevelNumbering>,
+    /// The records of the solver to read again, differently (5.9).
+    pub(crate) recheck: NumberRun,
 }
 
 impl Interpretation {
@@ -187,10 +189,18 @@ pub struct Interp<'p> {
     /// births and of names they were computed with.
     #[allow(clippy::type_complexity)]
     pub(crate) numbered_memo: HashMap<(SceneId, Option<RecId>, Option<usize>), ((usize, usize), Rc<Vec<ObjId>>)>,
+    /// The records of the solver this run reads differently (5.9).
+    pub(crate) numbers: NumberRun,
 }
 
 impl<'p> Interp<'p> {
-    fn blank(doc: HostDocument, provider: &'p dyn Provider, options: &Options, sink: Sink) -> Interp<'p> {
+    fn blank(
+        doc: HostDocument,
+        provider: &'p dyn Provider,
+        options: &Options,
+        sink: Sink,
+        numbers: NumberRun,
+    ) -> Interp<'p> {
         let nlevels = doc.levels.len();
         let mut it = Interp {
             doc,
@@ -247,6 +257,7 @@ impl<'p> Interp<'p> {
             evals: Vec::new(),
             next_eval: 0,
             numbered_memo: HashMap::new(),
+            numbers,
         };
         for _ in 0..3 {
             it.objs.push(Obj { data: ObjData::Marker, name: String::new() }); // LEVEL, OWNER, NOTHING
@@ -257,7 +268,18 @@ impl<'p> Interp<'p> {
     /// Prepare the interpretation of a host document: read every level's records and headers.
     /// `sink` may already hold the host adapter's diagnostics.
     pub fn new(doc: HostDocument, provider: &'p dyn Provider, options: &Options, sink: Sink) -> Interp<'p> {
-        let mut it = Interp::blank(doc, provider, options, sink);
+        Interp::new_run(doc, provider, options, sink, NumberRun::default())
+    }
+
+    /// The same, with the records of the solver that this run reads differently (5.9).
+    fn new_run(
+        doc: HostDocument,
+        provider: &'p dyn Provider,
+        options: &Options,
+        sink: Sink,
+        numbers: NumberRun,
+    ) -> Interp<'p> {
+        let mut it = Interp::blank(doc, provider, options, sink, numbers);
         for lv in 0..it.doc.levels.len() {
             let mut u = Unit::new(UnitKind::Level, &it.doc.levels[lv].title());
             u.level = Some(lv);
@@ -284,7 +306,7 @@ impl<'p> Interp<'p> {
             main,
             crate::host::Dialect { name: "none".into(), case_sensitive: false, ground_aliases: Vec::new() },
         );
-        let mut it = Interp::blank(doc, provider, options, Sink::new());
+        let mut it = Interp::blank(doc, provider, options, Sink::new(), NumberRun::default());
         let mut u = Unit::new(UnitKind::Level, &name);
         u.level = Some(0);
         u.ok = false;
@@ -622,6 +644,7 @@ impl<'p> Interp<'p> {
         } else {
             Vec::new()
         };
+        let recheck = self.number_recheck(&numbering);
         let checking = self.package_main.map(|p| self.units[p].pkg_name.clone()).unwrap_or_default();
         let mut sources = self.doc.sources.clone();
         sources.extend(self.pkg_sources.clone());
@@ -634,6 +657,7 @@ impl<'p> Interp<'p> {
             failed: std::mem::take(&mut self.failed_spans),
             problems,
             numbering,
+            recheck,
             doc: self.doc,
         }
     }
@@ -641,9 +665,28 @@ impl<'p> Interp<'p> {
 
 /// Interpret a host document: the effective model and the diagnostics. `sink` holds what the
 /// host adapter reported, if anything.
+///
+/// In a file of the draft 0.3, a record of the solver whose numbers fail or are out of date is
+/// known only once every level is read (5.9): the document is then read again, with that record's
+/// numbers errors (it has no `numbering`) or its statements that use a number left out (its
+/// `numbering` does not match). The checks given are those of the first reading, where every
+/// number is read: the text as written.
 pub fn interpret(doc: HostDocument, provider: &dyn Provider, options: &Options, sink: Sink) -> Interpretation {
     let host = sink.clone();
-    Interp::new(doc, provider, options, sink).run_settled(|it| Interp::new(it.doc, provider, options, host.clone()))
+    let run = |doc: HostDocument, sink: Sink, numbers: NumberRun| -> Interpretation {
+        let again = numbers.clone();
+        Interp::new_run(doc, provider, options, sink, numbers)
+            .run_settled(|it| Interp::new_run(it.doc, provider, options, host.clone(), again.clone()))
+    };
+    let mut out = run(doc, sink, NumberRun::default());
+    if !out.recheck.is_empty() {
+        let recheck = std::mem::take(&mut out.recheck);
+        let numbering = std::mem::take(&mut out.numbering);
+        out = run(out.doc, host.clone(), recheck);
+        out.numbering = numbering;
+        out.recheck = NumberRun::default();
+    }
+    out
 }
 
 /// Check a package file on its own (2.7).

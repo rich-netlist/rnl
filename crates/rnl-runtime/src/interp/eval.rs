@@ -966,6 +966,8 @@ impl<'p> Interp<'p> {
             sel = ctx.frame.as_ref().is_some_and(|f| f.borrow().selected);
         } else if e.prefix == '#' || e.prefix == '&' {
             obj = self.resolve_host(e, ctx)?;
+        } else if let Some(n) = e.number {
+            obj = self.resolve_number(n, e, ctx)?;
         } else {
             let name = e.name.clone().unwrap_or_default();
             let found = self.lookup(e.prefix, &name, ctx);

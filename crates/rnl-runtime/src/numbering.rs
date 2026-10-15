@@ -47,13 +47,18 @@ pub struct RecordNumbering {
     pub lines: Vec<String>,
     /// The check of the lines, which its `numbering` holds when it is up to date.
     pub check: String,
+    /// The `numbering` written in its head.
+    pub written: Option<String>,
+    /// Whether it writes any number.
+    pub uses_numbers: bool,
 }
 
 /// The check that the record of the solver of a level holds, as the level reads in an
 /// interpretation made with [`crate::Options::draft`]: of the lines of its last record of the
 /// solver, the authored records' objects and the record's own, or of the authored records' alone
-/// when it has none. None for a level that is not drawn, or an interpretation made without the
-/// draft.
+/// when it has none. When a record's `numbering` does not match, its statements that use a number
+/// take no effect, but the check is still of the text as written, with every number read. None for
+/// a level that is not drawn, or an interpretation made without the draft.
 pub fn level_check(i: &Interpretation, level: usize) -> Option<&str> {
     let n = i.numbering.iter().find(|n| n.level == level)?;
     Some(n.records.last().map_or(&n.check, |r| &r.check))

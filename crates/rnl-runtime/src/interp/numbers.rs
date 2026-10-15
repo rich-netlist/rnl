@@ -19,20 +19,33 @@
 //! local name in a body), and what rules make (10.5). What `::` reaches from another object, such
 //! as a local object or a text with a key, is never noted. Numbers start at 1.
 //!
-//! The numbers are computed for every version, for the solver's view of a level, and with the
-//! draft for the check of the record of the solver: one line for each number
-//! ([`Interp::number_lines`]).
+//! The numbers are computed for every version, for the solver's view of a level; they are read,
+//! as `%#3`, only in a file of the draft. The check of a record of the solver is made of one line
+//! for each number ([`Interp::number_lines`]).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::numbering::{check, LevelNumbering, RecordNumbering};
 use crate::problem::written_name;
-use crate::syntax::statement_tokens;
+use crate::syntax::{statement_tokens, uses_number, Ref};
 
 use super::ctx::{Ctx, StmtSpan};
+use super::eval::{Stop, R};
 use super::obj::*;
+use super::unit::{UnitKind, UnitMember};
 use super::Interp;
+
+/// The hint of a record of the solver whose numbering is out of date (5.9).
+pub(crate) const STALE_HINT: &str = "this record of the solver is out of date for the objects without a name: its numbering is not the check of the level, so its statements that use a number take no effect; solve the level again (5.9)";
+
+/// The error of a number written in a definition body (5.9).
+pub(crate) fn in_body_message(r: &Ref) -> String {
+    format!(
+        "{}: a number is written only in the statements of the record of the solver, not in a definition body (5.9)",
+        r.text()
+    )
+}
 
 /// An object of a kind that may be numbered, as it was made.
 #[derive(Clone, Debug)]
@@ -53,6 +66,22 @@ pub(crate) struct Birth {
     pub each: Option<(usize, ObjId)>,
     /// The evaluation of a member that made it (`Interp::evals`).
     pub eval: u64,
+}
+
+/// The records of the solver that a run of the interpreter reads differently (5.9).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct NumberRun {
+    /// Without `numbering`: their numbers are errors (2.8).
+    pub refuse: HashSet<RecId>,
+    /// Their `numbering` is not the check of the level: their statements that use a number are
+    /// left out, and the record gives one hint.
+    pub stale: HashSet<RecId>,
+}
+
+impl NumberRun {
+    pub fn is_empty(&self) -> bool {
+        self.refuse.is_empty() && self.stale.is_empty()
+    }
 }
 
 /// The records whose statements make the numbered objects of a level.
@@ -190,6 +219,65 @@ impl Interp<'_> {
         out
     }
 
+    /// `%#n` in a statement (5.9). Only the record of the solver, with `type="generated"` in the
+    /// level's own text, of a file of the draft, writes numbers; its `numbering` decides afterwards
+    /// whether they take effect (`NumberRun`). A number is the object of that place among the
+    /// objects of the authored records and those that the statements of the record before this one
+    /// make: those are read first, as the level reads them.
+    pub(crate) fn resolve_number(&mut self, n: u64, e: &Ref, ctx: &Ctx) -> R<ObjId> {
+        if ctx.frame.is_some() {
+            let d = match self.body_errors.get(&super::eval::ptr(e)).copied() {
+                Some(d) => d,
+                None => self.err(ctx, in_body_message(e), e.start),
+            };
+            return Err(Stop::Fail(Some(d)));
+        }
+        let solver = ctx.rec.filter(|&r| {
+            !ctx.scope_in
+                && ctx.header.type_ == "generated"
+                && self.rec_unit[r] == ctx.unit
+                && self.units[ctx.unit].kind == UnitKind::Level
+                && !self.numbers.refuse.contains(&r)
+        });
+        let (Some(g), Some(s), MemberKey::M { k: current, .. }) = (solver, ctx.scene, ctx.member_key.clone()) else {
+            let msg = format!("{}: a number is written only in the record of the solver, with type=\"generated\" and the field numbering, in the level's own text (2.6, 2.8, 5.9)", e.text());
+            return self.fail(ctx, msg, e.start);
+        };
+        self.read_before_number(s, ctx.unit, g, current);
+        let list = self.numbered(s, Some(g), Some(current));
+        match usize::try_from(n).ok().filter(|&k| k >= 1 && k <= list.len()) {
+            Some(k) => Ok(list[k - 1]),
+            None => {
+                let msg = format!("{}: no object without a name has this number; the authored records of the level and the statements of this record before this one number {} (5.9)", e.text(), list.len());
+                self.fail(ctx, msg, e.start)
+            }
+        }
+    }
+
+    /// Read what a number in the member `current` of the record of the solver `g` counts: the
+    /// members of the authored records of the level, and those of the record before it. Each is
+    /// read once, as the level reads it; one being read now is left.
+    fn read_before_number(&mut self, s: SceneId, u: UnitId, g: RecId, current: usize) {
+        let recs = self.level_records(s);
+        let members: Vec<UnitMember> = self.units[u]
+            .members
+            .iter()
+            .chain(&self.units[u].scope_members)
+            .filter(|m| m.rec.is_some_and(|r| recs.authored.contains_key(&r) || (r == g && m.k < current)))
+            .cloned()
+            .collect();
+        for m in members {
+            if self.restart.is_some() {
+                return;
+            }
+            let key = (m.key(u), Some(s));
+            if self.memo.contains_key(&key) || self.in_progress.contains(&key) {
+                continue;
+            }
+            let _ = self.eval_member_at(u, m.rec, m.k, m.embedded, &m.m, Some(s), m.header.clone(), None, "");
+        }
+    }
+
     /// The numbers of a drawn level and their checks (5.9), for `Interpretation::numbering`.
     pub(crate) fn level_numbering(&mut self, s: SceneId) -> LevelNumbering {
         let authored = self.numbered(s, None, None);
@@ -199,9 +287,45 @@ impl Interp<'_> {
             let list = self.numbered(s, Some(g), None);
             let lines = self.number_lines(s, &list);
             let at = self.recs[g].loc(0);
-            records.push(RecordNumbering { file: at.file, line: at.line, check: check(&lines), lines });
+            let written = self.rec_header.get(&g).and_then(|h| h.numbering.clone());
+            let ast = self.parse(g);
+            let uses_numbers = ast.body.as_ref().is_some_and(|b| b.members.iter().any(|m| uses_number(m)));
+            records.push(RecordNumbering {
+                file: at.file,
+                line: at.line,
+                check: check(&lines),
+                lines,
+                written,
+                uses_numbers,
+            });
         }
         LevelNumbering { level: self.scenes[s].level, check: check(&lines), authored: lines, records }
+    }
+
+    /// The records of the solver that a second run reads differently (5.9): in a file of the draft,
+    /// one that uses numbers without `numbering`, and one whose `numbering` is not its check. The
+    /// check is compared as hexadecimal digits, in either case.
+    pub(crate) fn number_recheck(&mut self, numbering: &[LevelNumbering]) -> NumberRun {
+        let mut out = NumberRun::default();
+        for lvn in numbering {
+            let Some(s) = self.level_scene[lvn.level] else { continue };
+            let solver = self.level_records(s).solver;
+            for (g, r) in solver.into_iter().zip(&lvn.records) {
+                if !self.follows_0_3(self.rec_unit[g]) {
+                    continue;
+                }
+                match &r.written {
+                    None if r.uses_numbers => {
+                        out.refuse.insert(g);
+                    }
+                    Some(w) if !w.eq_ignore_ascii_case(&r.check) => {
+                        out.stale.insert(g);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        out
     }
 
     /// One line for each object of a list in the order of their numbers (5.9): the tokens of the

@@ -511,6 +511,12 @@ impl Interp<'_> {
             for r in refs {
                 match r {
                     crate::syntax::RefOrHole::Ref(r) => {
+                        if r.number.is_some() {
+                            // reported once here, and each expansion leaves the statement out (5.9)
+                            let diag = self.err(ctx, super::numbers::in_body_message(r), r.start);
+                            self.body_errors.insert(super::eval::ptr(r), diag);
+                            self.note_failed_at(ctx.rec, r.start, false);
+                        }
                         if r.prefix == '#' || r.prefix == '&' {
                             self.err(ctx, "the body of an ordinary definition cannot reference host objects; they come in through roles (6.9)", r.start);
                             self.note_failed_at(ctx.rec, r.start, false);
