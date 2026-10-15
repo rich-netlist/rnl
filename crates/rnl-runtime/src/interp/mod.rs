@@ -9,6 +9,7 @@ pub mod attrs;
 pub mod ctx;
 pub mod cycles;
 pub mod eval;
+mod export;
 pub mod kw;
 pub mod obj;
 mod output;
@@ -48,6 +49,8 @@ pub struct Options {
     /// Read the records with `type="generated"`, the solver's results. A solver interprets a level
     /// without them (2.8, 14.8): every file of the document is read as if they were not written.
     pub generated: bool,
+    /// Build the solver's view of each drawing level, [`Interpretation::problems`].
+    pub problems: bool,
     /// Two coordinates closer than this are equal when constraints are checked against the
     /// written coordinates and conflicting coordinates are found (11.7). The standard leaves the
     /// tolerance to the tool; a viewer that does not solve uses [`crate::geom::TOL`].
@@ -56,7 +59,15 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Options {
-        Options { std: true, generated: true, tolerance: crate::geom::TOL }
+        Options { std: true, generated: true, problems: false, tolerance: crate::geom::TOL }
+    }
+}
+
+impl Options {
+    /// What a solver reads (2.8, 14.8, 17): the levels without the records with
+    /// `type="generated"`, and the problem of each.
+    pub fn solver() -> Options {
+        Options { generated: false, problems: true, ..Options::default() }
     }
 }
 
@@ -74,6 +85,10 @@ pub struct Interpretation {
     pub refs: Vec<HostRef>,
     /// The statements, or parts of them, that do not take effect: failed or dropped in a conflict.
     pub failed: Vec<FailedSpan>,
+    /// What a solver needs of each drawing level, in the order of `model.levels`; empty unless
+    /// [`Options::problems`] is set. Built without the generated records ([`Options::solver`]),
+    /// it is the solver's input (2.8, 17).
+    pub problems: Vec<crate::problem::LevelProblem>,
 }
 
 impl Interpretation {
@@ -127,6 +142,8 @@ pub struct Interp<'p> {
     pub(crate) std_enabled: bool,
     /// Read the records with `type="generated"` (`Options::generated`).
     pub(crate) read_generated: bool,
+    /// Build the problems (`Options::problems`).
+    pub(crate) want_problems: bool,
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
     pub(crate) std_cache: Option<Option<UnitId>>,
@@ -181,6 +198,7 @@ impl<'p> Interp<'p> {
             restart: None,
             std_enabled: options.std,
             read_generated: options.generated,
+            want_problems: options.problems,
             tol: options.tolerance,
             std_cache: None,
             scoped_memo: HashMap::new(),
@@ -607,6 +625,8 @@ impl<'p> Interp<'p> {
     /// Build the output.
     pub fn finish(mut self) -> Interpretation {
         let model = self.build_model();
+        let problems =
+            if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Vec::new() };
         let checking = self.package_main.map(|p| self.units[p].pkg_name.clone()).unwrap_or_default();
         let mut sources = self.doc.sources.clone();
         sources.extend(self.pkg_sources.clone());
@@ -617,6 +637,7 @@ impl<'p> Interp<'p> {
             sources,
             refs: std::mem::take(&mut self.refs),
             failed: std::mem::take(&mut self.failed_spans),
+            problems,
             doc: self.doc,
         }
     }

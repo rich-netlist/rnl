@@ -147,7 +147,8 @@ impl Interp<'_> {
                     }
                     return self.scene_only(ctx, seg.start);
                 };
-                self.scenes[s].groups.push((ctx.pos.clone(), obj));
+                let chain = self.apply_chain(ctx);
+                self.scenes[s].groups.push((ctx.pos.clone(), obj, chain));
                 Ok((obj, self.is_lazy(obj)))
             }
             "ADD-TO" => self.kw_mod(kw, &args, seg, ctx, true),

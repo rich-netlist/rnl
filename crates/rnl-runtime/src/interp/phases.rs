@@ -447,7 +447,7 @@ impl Interp<'_> {
         true
     }
 
-    fn fact_priority(&self, s: SceneId, f: &Fact) -> Priority {
+    pub(crate) fn fact_priority(&self, s: SceneId, f: &Fact) -> Priority {
         self.eff_priority(s, f.priority, &f.chain, None)
     }
 
@@ -469,6 +469,8 @@ impl Interp<'_> {
                 live_or.push(k);
             }
         }
+        self.scenes[s].at_live = live_at.clone();
+        self.scenes[s].orient_live = live_or.clone();
         // 2. coordinates: per object and axis the fact with the highest priority (8.5)
         let tol = self.tol;
         let mut best: HashMap<(ObjId, char), (Priority, Pos, usize)> = HashMap::new();
@@ -993,7 +995,7 @@ impl Interp<'_> {
     }
 
     /// Where the text's `dx` or `dy` was last written (13.3).
-    fn offset_pos(&self, s: SceneId, t: ObjId, dx: bool) -> Pos {
+    pub(crate) fn offset_pos(&self, s: SceneId, t: ObjId, dx: bool) -> Pos {
         let mut p = self.scenes[s].created.get(&t).cloned().unwrap_or_else(|| pos(&[0]));
         if let ObjData::KeyText { layers, .. } = self.o(t) {
             let mut ls: Vec<&(Pos, TextItems, StyleMap)> = layers.iter().collect();
@@ -1359,7 +1361,7 @@ impl Interp<'_> {
         }
     }
 
-    fn leaves(&mut self, s: SceneId, members: &[ObjId]) -> Vec<ObjId> {
+    pub(crate) fn leaves(&mut self, s: SceneId, members: &[ObjId]) -> Vec<ObjId> {
         let mut out = Vec::new();
         for &m in members {
             if self.is_set(m) {

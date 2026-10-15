@@ -51,7 +51,7 @@ pub struct SymbolPrim {
     pub rotate: Option<f64>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PinView {
     pub pos: Pt,
     pub label: Option<String>,

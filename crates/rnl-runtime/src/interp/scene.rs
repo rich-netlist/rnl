@@ -88,7 +88,9 @@ pub struct Scene {
     pub layers: Vec<Fact>,
     pub prioritys: Vec<Fact>,
     pub currents: Vec<(Pos, ObjId, String)>,
-    pub groups: Vec<(Pos, ObjId)>,
+    /// The sets given GROUP (11.5), each with where it is written and the usages whose expansion
+    /// wrote it, outermost first (14.8).
+    pub groups: Vec<(Pos, ObjId, Vec<ObjId>)>,
     pub tasks: Vec<Vec<(Pos, Task)>>,
     pub created: HashMap<ObjId, Pos>,
     pub items_cache: HashMap<(ObjId, usize), Vec<ObjId>>,
@@ -107,6 +109,10 @@ pub struct Scene {
     /// The fact kept per (object, axis) and per object's orientation: (priority, position, index).
     pub at_best: HashMap<(ObjId, char), (Priority, Pos, usize)>,
     pub ori_best: HashMap<ObjId, (Priority, Pos, usize)>,
+    /// The indexes in `at` and `orient` of the facts whose objects PLACE and ORIENT take, as the
+    /// geometry phase finds them (7.1, 12.1, 11.8).
+    pub at_live: Vec<usize>,
+    pub orient_live: Vec<usize>,
     pub devices: Option<Vec<DeviceDecl>>,
     pub busy: HashSet<(ObjId, usize)>,
     pub hinted: HashSet<ObjId>,
@@ -166,6 +172,8 @@ impl Scene {
             symbol_won: HashSet::new(),
             at_best: HashMap::new(),
             ori_best: HashMap::new(),
+            at_live: Vec::new(),
+            orient_live: Vec::new(),
             devices: None,
             busy: HashSet::new(),
             hinted: HashSet::new(),
