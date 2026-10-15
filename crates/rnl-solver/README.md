@@ -8,7 +8,7 @@ let hash = rnl_runtime::problem::sig1(problem, &options.canonical());
 let written = rnl_runtime::solution::write_record(problem, &solved.solution, rnl_solver::AUTHOR, &hash);
 ```
 
-**Status: stage S2 of solver v1.** The crate, its options, its exact arithmetic and the resolution of 8.5 are in place: `resolve` keeps or discards each fact, exactly, with minimal conflict sets, and gives a witness, a placement that satisfies every fact kept. `solve` places every object where the witness puts it: nothing is searched, rounded to the grid or routed yet, and the report's notes say so. The stages that follow are structure, search and coordinates (S3), routing, scoring and the driver (S4), the `rnl solve` command (S5) and the end-to-end demonstration (S6).
+**Status: stage S3 of solver v1.** The crate, its options, its exact arithmetic, the resolution of 8.5, the structure of a level, the search and the coordinates are in place: `resolve` keeps or discards each fact, exactly, with minimal conflict sets; `solve` then searches candidates structure first, places each by a lexicographic LP rounded to the grid, every fact kept holding exactly, and takes the best by the layered objectives in force. Nothing is routed yet, and the report's notes say so: the routing objectives measure straight connections. The stages that follow are routing, scoring and the driver (S4), the `rnl solve` command (S5) and the end-to-end demonstration (S6).
 
 ## Interface
 
@@ -53,6 +53,33 @@ The tests compare the simplex with complete deciders on systems made by a fixed 
 - **Budget**: a search stops after `resolve_nodes` nodes; its fact is then discarded and reported `undecided`, with a note. Deciding the facts is NP-hard in general (the side of `"x"` DISTANCEs alone can encode graph colouring), so a level can need it; the standard does not say yet what a solver does then.
 - **The witness** satisfies every fact kept. It is taken from the facts kept resolved once more without the tolerance when they hold so, so that a PLACE at 4 puts its object at 4.
 
+## Objectives
+
+Each objective has a row in a table (`objectives`): its default scope, within groups (11.5) or over the level, the inputs it needs, whether it has a structural side, and how it is measured. Every value is an exact rational.
+
+| Objective | Measures (smaller is better) | Structural side | Needs |
+| --- | --- | --- | --- |
+| `current_direction` | MOS and BJT whose source (emitter) is not on the side of the ground | rows by current depth; sources towards the ground; a two-terminal element with an end on a supply or the ground hung towards it, one between two signals laid across | a supply and a ground symbol |
+| `ground_direction` | ground symbols whose pin is not above their body | grounds hang below their pins | a ground symbol |
+| `signal_flow` | pairs of an input port right of an output port | inputs left, outputs right | a port whose kind can be told |
+| `component_alignment` | distinct x plus distinct y of the components, per group | connected elements in one column; barycentre order | |
+| `distribution` | the prototype's gap kinds of the components' coordinates, per group | rows evenly spaced | |
+| `symmetry` | mirror pairs not symmetric | mirrored orientations, the first of a pair on the left | |
+| `turns` | bends; without wires, an L for each connection not along an axis and a turn at each pin a connection does not leave along | | something drawn as wires |
+| `crossings` | crossings of wires of different nets | barycentre order | something drawn as wires |
+| `wire_length` | the length of the wires; without wires, of a minimum spanning tree of each net | barycentre order | something drawn as wires |
+| `area`, `aspect` | the envelope's area; the distance of its width over height from 16/9 | | |
+
+`terminal_wire_alignment`, `labels` and `bend_alignment` are not computed by this version. An objective configured but inert in a level, one this version does not compute or one whose inputs the level lacks, is treated as off, and `inert_objectives` says why in one sentence. An objective that is off makes no candidate, ranks none and breaks no tie; ties go to the canonical code of the candidates.
+
+## Structure, search and coordinates
+
+- **Structure** (`structure`): what each object is (an element of the rows, a supply, ground or port symbol, a point, a text; the device, from the symbol: NMOS, PMOS, NPN, PNP with the pins in SPICE's order); the nets as far as the problem shows them (ROUTEs, wires, usages attached to nets) and what is drawn as wires; supply and ground from the usages of `$SUPPLY_STUB`, `$GND_STUB`, `$SUPPLY` and `$GND`; the current depth by breadth-first search from a supply terminal through the pins the current runs through; the tree of groups, nested by containment, two overlapping groups split in three with the shared part in the middle; the orientation classes no ORIENT fixes; the rows the elements start in (by current depth, or by the heights the facts give, an ALIGN on y joining rows); the left-to-right precedences of the facts on x, the members of a set at its centre; the sources of candidates the configured objectives call for. The problem carries no netlist of its own, so a net neither routed nor wired is known only through the usages on it.
+- **Candidates** (`search`): the orientation of every free class, the rows and the order in them, the groups kept apart as blocks, and the relations that follow: neighbours in a row on one line (by the pins that connect them when one leaves sideways, otherwise by their origins) and apart by their boxes and the texts their symbols place, neighbouring rows apart, blocks apart, ports beside the pins they connect to, and, from the objectives, columns and even rows. Each relation is a unit of the solver's own, taken in by the resolution after every fact kept and dropped when it does not fit; no fact is ever dropped for one.
+- **P0** is the baseline: rows by depth, the order of the netlist, every free orientation R0, ports beside what they connect to, stubs where their facts put them.
+- **The beam search** goes up the tree of groups: the children's variants combined, the order of the items by barycentres until it settles and then neighbours swapped, each class turned so that most of its pins leave towards what they connect to, among the orientations its sources allow; variants ranked by the layered estimates on a sketch of the level, the best of each order kept first, then checked by the resolution with the node's relations; `beam` variants kept. The root's variants, P0, and with even rows in force a twin of each, are placed, and the one with the fewest overlapping symbols, then the best layered score, then the smallest canonical code is taken.
+- **Coordinates** (`coords`): the orientations taken in first and read back, then the relations made for them; on each axis every pin and text linked to its origin, then a lexicographic LP: the half perimeter of each net drawn as wires, the envelope of the components, the distance to where the resolution put each origin. Each optimum is kept for the next layer by fixing the variables its row holds at a bound (their reduced costs are not 0), which adds no row. The constants of the relations are on the grid; origins still off it are put on it in the order of the objects where the facts allow, and the layers solved again. Two symbols that still overlap get a relation with four sides to choose from, ranked after the facts and before the structure; those no side separates overlap because the facts make them, and a note says so.
+
 ## Modules
 
 | Module | Content | Stage |
@@ -63,15 +90,17 @@ The tests compare the simplex with complete deciders on systems made by a fixed 
 | `model` | Variables per axis, points as linear forms, each fact as rows and bounds (14.1–14.5) | S2 |
 | `orient` | Orientation classes: a union-find labelled with the eight orientations (11.2, 14.9) | S2 |
 | `resolve` | The resolution of 8.5: literals, search, minimal conflict sets, a witness | S2 |
-| `objectives` | The table of objectives: scope, inputs, structural side, estimate, score | S3 |
-| `structure` | The tree of groups (11.5), what is left to decide, the connection graph, the sources of candidates | S3 |
-| `search` | Candidates and the beam search | S3 |
-| `coords` | The lexicographic LP of a candidate's coordinates, rounding to the grid (11.7) | S3 |
+| `objectives` | The table of objectives: scope, inputs, structural side, estimate, score; the layers in force and the inert ones | S3 |
+| `structure` | Objects, devices, nets, supply and ground, current depth, the tree of groups (11.5), what is left to decide, rows and precedences, the sources of candidates | S3 |
+| `search` | Candidates, their relations, P0 and the beam search | S3 |
+| `coords` | Taking a candidate in, the lexicographic LP of its coordinates, rounding to the grid (11.7), putting overlapping symbols apart | S3 |
 | `route` | Rectilinear routing of the ROUTEs, branch points and junctions (13.2, 13.7) | S4 |
 | `score` | The layered score | S4 |
-| `driver` | The flow of a solve, the budget, the report | S1 stub, S2 placeholder, S4 |
+| `driver` | The flow of a solve, the budget, the report | S1 stub, S2 placeholder, S3, S4 |
 
 The public interface is `solve` and `resolve` and what they take and give: the options (`SolverOptions`, `Objectives`, `Layer`, `Budget`), the names of the objectives and the default order of the layers (`OBJECTIVES`, `DEFAULT_LAYERS`), the report types (`Solved`, `SolveReport`, `Discarded`, `Work`), the resolution (`Resolved`), the `AUTHOR` the solver writes in its record, and, re-exported from the runtime, `LevelProblem` and `Solution`. The modules are private.
+
+The tests of the search and the coordinates (`driver`) read every level of T1–T6 and of the conformance corpus from the files and solve it: every fact kept holds where the objects are, checked exactly on the rationals before they become `f64`; two instances overlap only when no side can put them apart with the facts kept; a solve is the same twice; every object with a position of its own is placed and every orientation given. T3 is drawn as the development plan pictures it: the mirror on top with the gates facing each other, the pair in the middle, M5 under the midpoint, the supplies above, the ground below, the ports beside the gates and the drain they connect to. T6, without a supply, reports the current direction inert. With other options (no objective, no grid, a beam of one, no budget for candidates) the facts still hold.
 
 The tests of `resolve` include the examples of the development plan, an orientation that matters only once two points of an object are reached, a randomized check that the explanations of the orientation classes are minimal, and, in `tests/resolve.rs`, every level of the cases written for the solver (`tests/integration/solver`) and of the conformance corpus, read from the files: every fact kept holds at the witness as a viewer checks it, every conflict set conflicts and is minimal, and T4 resolves as its reference says.
 

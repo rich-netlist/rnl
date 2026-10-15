@@ -12,7 +12,7 @@
 //! `x_pin − x_origin = c(orientation)`, only once the orientation matters (plan 5.1): when facts
 //! reach two points of one object on one axis, the origin counted as one. With one point reached,
 //! the origin, which nothing else holds, takes up any constant, and the orientation cannot make a
-//! fact fail. The links are the resolution's to assert ([`crate::resolve`]), with the orientation
+//! fact fail. The links are the resolution's to assert ([`crate::resolve`](mod@crate::resolve)), with the orientation
 //! as a literal.
 //!
 //! **Facts.** Each fact of the problem is one unit of 8.5 ([`Unit`]): bounds that hold whatever
@@ -128,19 +128,19 @@ pub(crate) struct Bound {
 }
 
 impl Bound {
-    fn at_least(axis: usize, expr: LinExpr, lo: Q) -> Bound {
+    pub(crate) fn at_least(axis: usize, expr: LinExpr, lo: Q) -> Bound {
         Bound { axis, expr, lo: Some(lo), hi: None }
     }
 
-    fn at_most(axis: usize, expr: LinExpr, hi: Q) -> Bound {
+    pub(crate) fn at_most(axis: usize, expr: LinExpr, hi: Q) -> Bound {
         Bound { axis, expr, lo: None, hi: Some(hi) }
     }
 
-    fn within(axis: usize, expr: LinExpr, lo: Q, hi: Q) -> Bound {
+    pub(crate) fn within(axis: usize, expr: LinExpr, lo: Q, hi: Q) -> Bound {
         Bound { axis, expr, lo: Some(lo), hi: Some(hi) }
     }
 
-    fn equal(axis: usize, expr: LinExpr, v: Q) -> Bound {
+    pub(crate) fn equal(axis: usize, expr: LinExpr, v: Q) -> Bound {
         Bound { axis, expr, lo: Some(v.clone()), hi: Some(v) }
     }
 
@@ -187,6 +187,10 @@ pub(crate) enum ChoiceKind {
     /// Which pair `(a, b)`, `a` of `from` and `b` of `to`, keeps a gap within the upper bound: one
     /// value per pair, in this order.
     Pair { axis: usize, gap: u8, pairs: Vec<(PointId, PointId)> },
+    /// The alternatives of a relation of the solver's own, ranked after every fact (8.5), such as
+    /// the sides on which two symbols that overlap may be put apart (`crate::coords`): in the
+    /// order the solver prefers them, the first tried first.
+    Ranked,
 }
 
 /// What a unit says of orientations (11.2, 14.9).
@@ -306,7 +310,9 @@ impl Model {
         self.points[&p].var
     }
 
-    fn new_var(&mut self, kind: VarKind) -> Var {
+    /// A new variable, on both axes: the separators of the solver's own relations are made so
+    /// (`crate::search`).
+    pub(crate) fn new_var(&mut self, kind: VarKind) -> Var {
         self.vars.push(kind);
         self.vars.len() - 1
     }

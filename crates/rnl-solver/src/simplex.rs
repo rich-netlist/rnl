@@ -584,6 +584,31 @@ impl<T: Clone + Ord> Simplex<T> {
         }
     }
 
+    /// Keeps the optimum that [`Simplex::minimize`] just found for `objective`, for the next
+    /// layer of a lexicographic LP, without adding a row: every nonbasic variable of the
+    /// objective's row is fixed at its value, with the tag `tag`. At an optimum those are the
+    /// variables with a reduced cost other than 0, each at the bound that blocks it, so the
+    /// solutions left are exactly the optimal ones: the objective is its optimum plus the sum of
+    /// those variables' moves times their reduced costs, each move a cost. A bound `objective ≤
+    /// optimum` would say the same with a row over all its variables, which every later pivot
+    /// would have to rewrite.
+    pub(crate) fn keep_optimum(&mut self, objective: &LinExpr, tag: T) -> Result<(), Failure<T>> {
+        let Some((_, lead)) = objective.terms.first() else { return Ok(()) };
+        let lead = lead.clone();
+        let form =
+            LinExpr { terms: objective.terms.iter().map(|(v, a)| (*v, a / &lead)).collect(), constant: Q::zero() };
+        let s = self.add_row(&form);
+        let fixed: Vec<Var> = match self.vars[s].row {
+            Some(r) => self.rows[r].terms.iter().map(|(v, _)| *v).collect(),
+            None => vec![s],
+        };
+        for v in fixed {
+            let value = self.vars[v].value.clone();
+            self.assert_bounds(v, Some(value.clone()), Some(value), tag.clone())?;
+        }
+        Ok(())
+    }
+
     fn out_of_budget(&self) -> bool {
         self.pivot_limit.is_some_and(|limit| self.pivots >= limit)
     }

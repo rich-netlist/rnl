@@ -94,7 +94,8 @@ pub(crate) struct Geometry {
 const MAX_DEPTH: usize = 16;
 
 impl Geometry {
-    fn new(n: usize) -> Geometry {
+    /// Every object at the origin with R0.
+    pub(crate) fn new(n: usize) -> Geometry {
         Geometry { origin: vec![[Q::zero(), Q::zero()]; n], orient: vec![Orient::R0; n] }
     }
 
@@ -311,6 +312,20 @@ impl<'a> Resolver<'a> {
             base,
             nodes: 0,
         }
+    }
+
+    /// Starts from a placement other than every object at the origin with R0: the witness of an
+    /// earlier resolution, so that the facts it kept are taken in again without a check (step 1
+    /// of the module). Only before the first unit is taken in.
+    pub(crate) fn seed(&mut self, geometry: Geometry) {
+        debug_assert!(self.kept.is_empty() && geometry.orient.len() == self.geometry.orient.len());
+        self.geometry = geometry;
+    }
+
+    /// The simplex of an axis, with the bounds of the units kept and of the literals held: the
+    /// coordinates of a candidate are optimised over it (`crate::coords`).
+    pub(crate) fn simplex_mut(&mut self, axis: usize) -> &mut Simplex<Tag> {
+        &mut self.sx[axis]
     }
 
     /// The pivots of both simplexes.
@@ -743,6 +758,8 @@ impl<'a> Resolver<'a> {
                 // gap 0 = min(to) − max(from), gap 1 = min(from) − max(to)
                 usize::from(&a.0 - &b.1 > &b.0 - &a.1)
             }
+            // the solver's own alternatives: the one it prefers
+            ChoiceKind::Ranked => 0,
             ChoiceKind::Pair { axis, gap, pairs } => {
                 // the pair with the smallest gap
                 let gap_of = |(a, b): &(PointId, PointId)| {
@@ -1127,6 +1144,9 @@ pub struct Resolved {
     pub notes: Vec<String>,
     pub(crate) model: Model,
     pub(crate) witness: Witness,
+    /// Whether the facts kept hold together with their constants as written, the tolerance not
+    /// needed: the witness is then taken from them so, and the coordinates are sought so.
+    pub(crate) as_written: bool,
 }
 
 impl Resolved {
@@ -1234,7 +1254,7 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolv
     let values = [0, 1].map(|axis| (0..model.vars.len()).map(|v| geometry.var_value(&model, v, axis)).collect());
     drop(r);
     drop(e);
-    Resolved { kept, discarded, work, notes, witness: Witness { geometry, values, classes }, model }
+    Resolved { kept, discarded, work, notes, witness: Witness { geometry, values, classes }, model, as_written }
 }
 
 /// The deletion filter (step 3 of the module): a minimal subset of `set` that `f` conflicts with,

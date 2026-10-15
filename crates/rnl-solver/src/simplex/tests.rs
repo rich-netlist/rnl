@@ -896,3 +896,46 @@ fn wire_length_rows_made_after_the_facts_take_about_one_pivot_each() {
         assert_eq!(optimum, early.minimize(&sum(&early_ts)));
     }
 }
+
+#[test]
+fn keeping_an_optimum_by_its_variables_equals_bounding_the_objective() {
+    // two layers on one tableau: the second optimum is the same whether the first is kept by
+    // fixing the variables its row holds at a bound, or by a bound on the objective
+    let mut rng = Rng(0x5eed_0004);
+    let mut layered = 0;
+    for _ in 0..600 {
+        let n = 2 + rng.below(3) as usize;
+        let m = 2 + rng.below(6) as usize;
+        let cs: Vec<Constraint> = (0..m).map(|_| random_linear(&mut rng, n)).collect();
+        let objectives: [Vec<i64>; 2] =
+            [(0..n).map(|_| rng.int(-2, 2)).collect(), (0..n).map(|_| rng.int(-2, 2)).collect()];
+        let form = |vars: &[Var], o: &[i64]| {
+            LinExpr::from_terms(o.iter().enumerate().map(|(i, &c)| (vars[i], int(c))), int(0))
+        };
+        let (mut a, va, results) = resolve(&cs, n);
+        let (mut b, vb, _) = resolve(&cs, n);
+        let kept: Vec<&Constraint> = cs.iter().zip(&results).filter(|(_, r)| r.is_ok()).map(|(c, _)| c).collect();
+        let (f1a, f1b) = (form(&va, &objectives[0]), form(&vb, &objectives[0]));
+        let (Ok(o1), Ok(o1b)) = (a.minimize(&f1a), b.minimize(&f1b)) else { continue };
+        assert_eq!(o1, o1b);
+        a.keep_optimum(&f1a, 100).unwrap();
+        b.assert(&f1b, Rel::Le, &o1b, 100).unwrap();
+        let (f2a, f2b) = (form(&va, &objectives[1]), form(&vb, &objectives[1]));
+        match (a.minimize(&f2a), b.minimize(&f2b)) {
+            (Ok(x), Ok(y)) => {
+                assert_eq!(x, y, "{objectives:?} over {kept:?}");
+                // and the first optimum still holds, with every constraint kept
+                assert_eq!(a.eval(&f1a), o1);
+                for c in &kept {
+                    assert!(c.holds(|j| a.value(va[j]).clone()));
+                }
+                layered += 1;
+            }
+            (Err(Failure::Unbounded), Err(Failure::Unbounded)) => {}
+            (x, y) => panic!("{x:?} against {y:?} for {objectives:?} over {kept:?}"),
+        }
+        a.assert_invariants();
+    }
+    // the others are empty or unbounded at the first layer
+    assert!(layered > 150, "{layered}");
+}

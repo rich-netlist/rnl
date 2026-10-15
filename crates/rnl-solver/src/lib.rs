@@ -24,9 +24,11 @@
 //! - coordinates by a lexicographic LP, routing of the ROUTEs, layered scoring (`coords`, `route`,
 //!   `score`, `driver`).
 //!
-//! **Status: stage S2.** [`resolve`] resolves the facts of a level as 8.5 says, exactly, and gives
-//! a witness, a placement that satisfies every fact kept. [`solve`] places every object where the
-//! witness puts it, with no search, rounding or routing yet, and says so in the report's notes.
+//! **Status: stage S3.** [`resolve()`] resolves the facts of a level as 8.5 says, exactly, and gives
+//! a witness, a placement that satisfies every fact kept. [`solve`] then analyses the structure of
+//! the level, searches candidates structure first (rows by current depth, orders, orientations),
+//! places each by a lexicographic LP rounded to the grid, keeping every fact kept, and takes the
+//! best by the layered objectives in force. Nothing is routed yet, and the report's notes say so.
 //!
 //! The crate does no file I/O and takes no time or randomness, so it builds for
 //! `wasm32-unknown-unknown` and the same input and options give the same result on every platform.
@@ -108,9 +110,10 @@ pub struct Work {
 /// Solves one drawing level: resolves its facts (8.5), places and orients its objects, and
 /// routes its ROUTEs (13.7).
 ///
-/// Stage S2: places every object with a position of its own where the witness of the resolution
-/// puts it, and orients every object that has an orientation as the witness does; a note says
-/// that nothing is searched, rounded or routed yet.
+/// Stage S3: places every object with a position of its own and orients every object that has
+/// an orientation, as the best candidate of the search says, every fact kept holding exactly; the
+/// objectives that are on but inert in the level are in the report; a note says that nothing is
+/// routed yet.
 pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
     driver::solve(problem, options)
 }
