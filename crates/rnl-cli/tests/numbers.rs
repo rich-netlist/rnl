@@ -163,7 +163,7 @@ fn the_example_of_the_draft_gives_its_lines() {
 #[test]
 fn the_records_of_the_solver_are_numbered_after_the_authored_ones() {
     // the rewritten wire of the example writes two points as coordinates: numbers 6 and 7 of the
-    // record (WIRE given a wire is not read yet, so the statement fails, but its points are made)
+    // record; WIRE given the wire makes no wire of its own (13.1)
     let rewrite = "* @RNL(type=\"generated\", numbering=\"0000000000000000\") {\n\
                    *   %#2 @WIRE(mode=\"straight\") {#M1:1 (12, 2) %#3 (12, 6) #R1:2}\n* }\n";
     let r = read(&amp(rewrite), &draft());

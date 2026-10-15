@@ -57,6 +57,35 @@ pub struct Fact {
     pub chain: Vec<ObjId>,
 }
 
+/// A WIRE given a wire in a statement of the draft 0.3, which rewrites the wire (its 13.1): the
+/// list of points and the mode that replace the wire's, read as a new WIRE's are, with where the
+/// statement is written. It has a key, the wire: of several, the one written last by position
+/// takes effect, and among those at one position (the segments of a pipe) the one read last
+/// (5.8, 8.4).
+#[derive(Clone, Debug)]
+pub struct Rewrite {
+    pub pos: Pos,
+    /// The order in which the rewrites of the scene were read.
+    pub seq: usize,
+    pub points: Vec<ObjId>,
+    pub mode: String,
+    /// Written in the body of a usage that a rule made (10.5).
+    pub generated: bool,
+    pub site: Rc<Ctx>,
+    pub off: usize,
+}
+
+/// What a wire is drawn by (13.1): its points and its mode, with the statement that gives them,
+/// the WIRE that made the wire or the rewrite that takes effect.
+#[derive(Clone, Debug)]
+pub struct WireShape {
+    pub points: Vec<ObjId>,
+    pub mode: String,
+    pub generated: bool,
+    pub site: Option<Rc<Ctx>>,
+    pub off: usize,
+}
+
 pub struct Scene {
     pub level: LevelId,
     pub levelobj: ObjId,
@@ -75,6 +104,9 @@ pub struct Scene {
     pub wires: Vec<ObjId>,
     /// The wires on each net, in the order of `wires`; `scene_add_wire` keeps it.
     pub wires_by_net: HashMap<ObjId, Vec<ObjId>>,
+    /// The rewrites of each wire, in the order they were read (the draft 0.3, 13.1).
+    pub rewrites: HashMap<ObjId, Vec<Rewrite>>,
+    pub rewrite_count: usize,
     pub bundles: Vec<ObjId>,
     pub constraints: Vec<ObjId>,
     pub routes: Vec<ObjId>,
@@ -148,6 +180,8 @@ impl Scene {
             listed_keytexts: HashSet::new(),
             wires: Vec::new(),
             wires_by_net: HashMap::new(),
+            rewrites: HashMap::new(),
+            rewrite_count: 0,
             bundles: Vec::new(),
             constraints: Vec::new(),
             routes: Vec::new(),
@@ -691,6 +725,67 @@ impl Interp<'_> {
                 chain: Vec::new(),
             });
         }
+    }
+
+    /// A WIRE given the wire `w` in a statement of the draft 0.3 (its 13.1): its list of points and
+    /// its mode are kept, to replace the wire's when this is the rewrite that takes effect; its
+    /// style parameters are direct style of the wire, as if a SET-STYLE were written for the wire
+    /// at the statement (8.3).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn scene_rewrite_wire(
+        &mut self,
+        s: SceneId,
+        w: ObjId,
+        points: Vec<ObjId>,
+        mode: String,
+        style: StyleMap,
+        ctx: &Ctx,
+        off: usize,
+    ) {
+        let site = Rc::new(ctx.clone());
+        let sc = &mut self.scenes[s];
+        let seq = sc.rewrite_count;
+        sc.rewrite_count += 1;
+        let r = Rewrite { pos: ctx.pos.clone(), seq, points, mode, generated: ctx.frame_generated(), site, off };
+        sc.rewrites.entry(w).or_default().push(r);
+        if !style.is_empty() {
+            sc.styles.push(Fact {
+                pos: ctx.pos.clone(),
+                target: w,
+                data: FactData::OwnStyle(style),
+                priority: None,
+                ctx: Some(Rc::new(ctx.clone())),
+                off: 0,
+                direct: true,
+                chain: Vec::new(),
+            });
+        }
+    }
+
+    /// What a wire of scene `s` is drawn by (13.1): its points and its mode as the rewrite that
+    /// takes effect gives them (the draft 0.3), otherwise as the WIRE that made it.
+    pub(crate) fn wire_shape(&self, s: SceneId, w: ObjId) -> Option<WireShape> {
+        let ObjData::Wire { points, mode, generated, site, off, .. } = self.o(w) else { return None };
+        let last = self.scenes[s]
+            .rewrites
+            .get(&w)
+            .and_then(|rs| rs.iter().max_by(|a, b| (&a.pos, a.seq).cmp(&(&b.pos, b.seq))));
+        Some(match last {
+            Some(r) => WireShape {
+                points: r.points.clone(),
+                mode: r.mode.clone(),
+                generated: r.generated,
+                site: Some(r.site.clone()),
+                off: r.off,
+            },
+            None => WireShape {
+                points: points.clone(),
+                mode: mode.clone(),
+                generated: *generated,
+                site: site.clone(),
+                off: *off,
+            },
+        })
     }
 
     pub(crate) fn scene_add_bundle(&mut self, s: SceneId, b: ObjId, at: Pos) {
@@ -1500,12 +1595,16 @@ impl Interp<'_> {
         self.tnets(s, t).contains(&net)
     }
 
-    /// The terminals that explicit wires touch, by owner: what `wired` looks among (10.2).
+    /// The terminals that explicit wires touch, by owner: what `wired` looks among (10.2). A
+    /// rewritten wire touches the points of its rewrite (the draft 0.3, 13.1).
     pub(crate) fn wire_ends(&self, s: SceneId) -> HashMap<ObjId, Vec<ObjId>> {
         let mut ends: HashMap<ObjId, Vec<ObjId>> = HashMap::new();
         for &w in &self.scenes[s].wires {
-            let ObjData::Wire { points, generated: false, .. } = self.o(w) else { continue };
-            for &q in points {
+            if !matches!(self.o(w), ObjData::Wire { generated: false, .. }) {
+                continue;
+            }
+            let Some(shape) = self.wire_shape(s, w) else { continue };
+            for q in shape.points {
                 if let ObjData::Term { owner, .. } = self.o(q) {
                     ends.entry(*owner).or_default().push(q);
                 }

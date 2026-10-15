@@ -9,7 +9,7 @@ use crate::diag::{Loc, Severity};
 use crate::geom::{fmt_num, route, Orient, Pt};
 
 use super::obj::*;
-use super::scene::{Fact, FactData};
+use super::scene::{Fact, FactData, WireShape};
 use super::Interp;
 
 fn level(p: Priority) -> u8 {
@@ -613,9 +613,11 @@ impl Interp<'_> {
         }
         // 4. check constraints against the positions (no solver)
         self.check_constraints(s);
-        // 5. failures that need symbols: wires to pinless terminals, labels on symbol-less usages
+        // 5. failures that need symbols: wires to pinless terminals, labels on symbol-less usages;
+        // a rewritten wire by the points of its rewrite, reported there (the draft 0.3, 13.1)
         for w in self.scenes[s].wires.clone() {
-            let ObjData::Wire { nets, points, generated, site, off, .. } = self.o(w).clone() else { continue };
+            let ObjData::Wire { nets, .. } = self.o(w).clone() else { continue };
+            let Some(WireShape { points, generated, site, off, .. }) = self.wire_shape(s, w) else { continue };
             if site.is_none() || generated {
                 continue;
             }
@@ -642,7 +644,7 @@ impl Interp<'_> {
             }
         }
         for w in self.scenes[s].wires.clone() {
-            let ObjData::Wire { points, site, off, .. } = self.o(w).clone() else { continue };
+            let Some(WireShape { points, site, off, .. }) = self.wire_shape(s, w) else { continue };
             for q in &points {
                 let ObjData::Term { owner, .. } = self.o(*q).clone() else { continue };
                 if !self.term_drawable(s, *q, &site, off, "wire") {
@@ -1212,8 +1214,10 @@ impl Interp<'_> {
         }
         let ws = self.scenes[s].wires_by_net.get(&net).cloned().unwrap_or_default();
         for w in ws {
-            let ObjData::Wire { points, failed: false, .. } = self.o(w) else { continue };
-            let points = points.clone();
+            if !matches!(self.o(w), ObjData::Wire { failed: false, .. }) {
+                continue;
+            }
+            let Some(WireShape { points, .. }) = self.wire_shape(s, w) else { continue };
             let mut keys = Vec::new();
             for q in points {
                 let k = match self.o(q).clone() {
@@ -1261,8 +1265,10 @@ impl Interp<'_> {
         out
     }
 
+    /// The vertices of a wire after its routing mode (13.1), as it is drawn: rewritten, by the
+    /// rewrite that takes effect (the draft 0.3). None while one of its points has no position.
     pub(crate) fn wire_points(&mut self, s: SceneId, w: ObjId) -> Option<Vec<Pt>> {
-        let ObjData::Wire { points, mode, .. } = self.o(w).clone() else { return None };
+        let WireShape { points, mode, .. } = self.wire_shape(s, w)?;
         let mut pts = Vec::new();
         for q in points {
             pts.push(self.point_of(s, q)?);

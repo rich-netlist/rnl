@@ -299,7 +299,9 @@ impl Interp<'_> {
                 continue;
             }
             let Some(points) = self.wire_points(s, w) else { continue };
-            let ObjData::Wire { nets, mode, .. } = self.o(w).clone() else { continue };
+            let ObjData::Wire { nets, .. } = self.o(w).clone() else { continue };
+            // a rewritten wire is drawn by its rewrite (the draft 0.3, 13.1)
+            let Some(mode) = self.wire_shape(s, w).map(|shape| shape.mode) else { continue };
             wires.push(WireView {
                 id: self.label(w),
                 nets: nets.iter().map(|n| self.net_display(*n)).collect(),

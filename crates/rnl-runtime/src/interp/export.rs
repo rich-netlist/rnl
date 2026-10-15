@@ -8,7 +8,7 @@ use crate::host::LevelKind;
 use crate::problem::*;
 
 use super::obj::*;
-use super::scene::FactData;
+use super::scene::{FactData, WireShape};
 use super::Interp;
 
 /// The indexes of a problem's lists by the interpreter's objects, and what the objects are
@@ -243,10 +243,12 @@ impl Interp<'_> {
             });
         }
 
-        // wires (13.1)
+        // wires (13.1), a rewritten one as its rewrite gives it (the draft 0.3): read without the
+        // records of the solver, as by a solver, the rewrites of the authored records
         let mut problem_wires = Vec::new();
         for &w in &wires {
-            let ObjData::Wire { nets, bus, points, mode, generated, .. } = self.o(w).clone() else { continue };
+            let ObjData::Wire { nets, bus, generated, .. } = self.o(w).clone() else { continue };
+            let Some(WireShape { points, mode, .. }) = self.wire_shape(s, w) else { continue };
             let anchors: Vec<PointRef> = points.iter().filter_map(|q| self.point_ref(s, &ix, *q)).collect();
             problem_wires.push(ProblemWire {
                 label: self.label(w),

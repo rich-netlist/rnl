@@ -1,0 +1,178 @@
+//! WIRE given a wire rewrites it (the draft 0.3, 13.1), in a file that declares 0.3 read with
+//! `Options::draft`: the statement is read as a new WIRE, its list of points and its mode replace
+//! those of the wire, the net stays, its style parameters are direct style of the wire, and of
+//! several rewrites the one written last takes effect (5.8, 8.4). The model, the Document and the
+//! solver's view draw and give the wire as rewritten. A file of 0.2 reads a wire in the net slot as
+//! of the wrong kind, as before.
+
+use std::path::Path;
+
+use rnl_cli::interpret_file;
+use rnl_runtime::diag::Severity;
+use rnl_runtime::geom::Pt;
+use rnl_runtime::interp::obj::Lit;
+use rnl_runtime::model::WireView;
+use rnl_runtime::problem::{ObjectKind, PointRef, Reference};
+use rnl_runtime::source::MemoryProvider;
+use rnl_runtime::{Interpretation, Options};
+use rnl_view::{BuildOptions, Segment, Shape};
+
+fn draft() -> Options {
+    Options { draft: true, ..Options::default() }
+}
+
+fn read(text: &str, options: &Options) -> Interpretation {
+    interpret_file(Path::new("t.sp"), None, &MemoryProvider::new().with("t.sp", text), options).unwrap()
+}
+
+/// A file of `version` where R1 and C1 are placed and the wire %w joins their first terminals,
+/// then `records`.
+fn netlist(version: &str, records: &str) -> String {
+    format!(
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\nR1 a b 1k\nC1 a 0 1p\n\
+         * @RNL {{ #R1 @PLACE(0, 0); #C1 @PLACE(10, 0); %w = &a @WIRE {{#R1:1 #C1:1}} }}\n{records}.end\n"
+    )
+}
+
+/// One authored record on one carrier line.
+fn record(body: &str) -> String {
+    format!("* @RNL {{ {body} }}\n")
+}
+
+fn diagnostics(r: &Interpretation, severity: Severity) -> Vec<(u32, String)> {
+    let found = r.diagnostics().into_iter().filter(|d| d.severity == severity);
+    found.map(|d| (d.loc.as_ref().map_or(0, |l| l.line), d.message.clone())).collect()
+}
+
+/// The wire %w as the model draws it.
+fn drawn(r: &Interpretation) -> &WireView {
+    r.model.levels[0].wires.iter().find(|w| w.id == "%w").unwrap_or_else(|| panic!("{:?}", r.model.levels[0].wires))
+}
+
+/// The pins that %w joins, R1:1 and C1:1, where the file places them.
+fn pins() -> (Pt, Pt) {
+    let w = drawn(&read(&netlist("0.3", ""), &draft())).points.clone();
+    (w[0], w[w.len() - 1])
+}
+
+/// The vertices of a wire from `a` through `via` to `b` with `"horizontal-vertical"` (13.1).
+fn horizontal_vertical(a: Pt, via: Pt, b: Pt) -> Vec<Pt> {
+    vec![a, (via.0, a.1), via, (b.0, via.1), b]
+}
+
+#[test]
+fn an_authored_record_rewrites_a_wire() {
+    let (a, c) = pins();
+    let text = netlist(
+        "0.3",
+        &record("%w @WIRE(mode=\"horizontal-vertical\", linestyle=\"bold\") {#R1:1 (4, 4) #C1:1} => @LAYER(\"top\")"),
+    );
+    let r = read(&text, &draft());
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    // one wire still, on its own net, drawn by the rewrite: its points and its mode
+    let wires = &r.model.levels[0].wires;
+    assert_eq!(wires.iter().filter(|w| w.nets == ["a"]).count(), 1);
+    let w = drawn(&r);
+    assert_eq!(w.mode, "horizontal-vertical");
+    assert_eq!(w.points, horizontal_vertical(a, (4.0, 4.0), c));
+    // the style parameter is direct style of the wire, and the handle passed on is the wire
+    assert_eq!(w.style.get("linestyle").and_then(Lit::str), Some("bold"));
+    assert_eq!(w.layer.as_str(), "top");
+
+    // a solver reads the wire as the authored record rewrites it: its mode, its points, the point
+    // written as coordinates being an object of the authored record, with a number
+    let r = read(&text, &Options { draft: true, ..Options::solver() });
+    let p = &r.problems[0];
+    let wire = p.wires.iter().find(|w| w.label == "%w").unwrap();
+    assert_eq!(wire.mode, "horizontal-vertical");
+    assert_eq!(wire.anchors.len(), 3);
+    let PointRef::Origin(k) = wire.anchors[1] else { panic!("{:?}", wire.anchors) };
+    assert_eq!((p.objects[k].kind, p.objects[k].label.as_str()), (ObjectKind::Point, "(4, 4)"));
+    assert_eq!(p.objects[k].reference, Reference::Number { number: 1, path: Vec::new() });
+    assert!(matches!(wire.anchors[0], PointRef::Pin { .. }) && matches!(wire.anchors[2], PointRef::Pin { .. }));
+
+    // in a file of 0.2 a wire in the net slot is of the wrong kind, with the switch or without
+    let text = netlist("0.2", &record("%w @WIRE(mode=\"horizontal-vertical\") {#R1:1 (4, 4) #C1:1}"));
+    for options in [Options::default(), draft()] {
+        let r = read(&text, &options);
+        let e = diagnostics(&r, Severity::Error);
+        assert_eq!(e, [(6, "the net position of a wire received %w, the wrong kind (13.1)".to_string())]);
+        assert_eq!(drawn(&r).mode, "auto");
+    }
+}
+
+#[test]
+fn the_rewrite_written_last_takes_effect() {
+    let (a, c) = pins();
+    let bold = "%w @WIRE(mode=\"straight\", linestyle=\"bold\") {#R1:1 (5, 5) #C1:1}";
+    let hv = "%w @WIRE(mode=\"horizontal-vertical\") {#R1:1 (4, 4) #C1:1}";
+    // by the position of the statements (8.4), whichever record is read first
+    let r = read(&netlist("0.3", &(record(bold) + &record(hv))), &draft());
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    assert_eq!(drawn(&r).points, horizontal_vertical(a, (4.0, 4.0), c));
+    // the style written with the earlier rewrite stays: it is direct style of the wire (8.3), not
+    // part of the rewrite that the later one replaces
+    assert!(drawn(&r).style.contains_key("linestyle"));
+    let r = read(&netlist("0.3", &(record(hv) + &record(bold))), &draft());
+    assert_eq!((drawn(&r).mode.as_str(), drawn(&r).points.clone()), ("straight", vec![a, (5.0, 5.0), c]));
+    // in one pipe, the later segment
+    let r = read(&netlist("0.3", &record(&format!("{bold} => @WIRE(mode=\"manhattan\") {{#R1:1 #C1:1}}"))), &draft());
+    assert_eq!(drawn(&r).mode, "manhattan");
+    // a later rewrite that fails leaves the earlier one (5.8): a wire has two points at least
+    let r = read(&netlist("0.3", &(record(hv) + &record("%w @WIRE {#R1:1}"))), &draft());
+    let e = diagnostics(&r, Severity::Error);
+    assert_eq!(e.len(), 1, "{e:?}");
+    assert!(e[0].1.contains("a wire has at least two points"), "{e:?}");
+    assert_eq!(drawn(&r).points, horizontal_vertical(a, (4.0, 4.0), c));
+}
+
+#[test]
+fn the_net_slot_takes_a_net_a_set_of_nets_or_one_wire() {
+    // a set that holds a wire is of the wrong kind
+    let r = read(&netlist("0.3", &record("{%w} @WIRE {#R1:1 #C1:1}")), &draft());
+    let e = diagnostics(&r, Severity::Error);
+    assert_eq!(e, [(6, "the net position of a wire received %w, the wrong kind (13.1)".to_string())]);
+    // a wire passed on by a pipe is rewritten as soon as it is made: one wire on the net b
+    let r =
+        read(&netlist("0.3", &record("&b @WIRE {#R1:2 (3, 3)} => @WIRE(mode=\"straight\") {#R1:2 (3, -3)}")), &draft());
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    let on_b: Vec<&WireView> = r.model.levels[0].wires.iter().filter(|w| w.nets == ["b"]).collect();
+    assert_eq!(on_b.len(), 1);
+    assert_eq!((on_b[0].mode.as_str(), on_b[0].points[1]), ("straight", (3.0, -3.0)));
+}
+
+#[test]
+fn a_rewritten_wire_reaches_the_terminals_of_its_rewrite() {
+    // C1:2 is on the net 0 without a wire, so the standard package draws a ground at it; rewritten
+    // to reach C1:2 as well, %w makes it wired, and the terminal off the net of the wire is warned
+    // about at the rewrite (10.2, 13.1)
+    let r = read(&netlist("0.3", ""), &draft());
+    assert_eq!(r.model.levels[0].unplaced, ["%g"]);
+    let r = read(&netlist("0.3", &record("%w @WIRE {#R1:1 #C1:1 #C1:2}")), &draft());
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    assert!(r.model.levels[0].unplaced.is_empty(), "{:?}", r.model.levels[0].unplaced);
+    let w = diagnostics(&r, Severity::Warning);
+    assert_eq!(w, [(6, "the wire is marked on net a, but the terminal #C1:n it reaches is on 0 (13.1)".to_string())]);
+}
+
+#[test]
+fn the_document_draws_the_rewrite() {
+    let (a, c) = pins();
+    let text = netlist("0.3", &record("%w @WIRE(mode=\"horizontal-vertical\") {#R1:1 (4, 4) #C1:1}"));
+    let files = MemoryProvider::new().with("/w/t.sp", &text);
+    let options = BuildOptions { runtime: draft(), primitives: true, ..BuildOptions::default() };
+    let d = rnl_view::build("/w/t.sp", &files, &options).unwrap();
+    let level = &d.levels[0];
+    let hit = level.hits.iter().find(|h| h.kind == "wire" && h.points.len() == 5).unwrap();
+    let id = hit.id.clone().unwrap();
+    let path = level.primitives.as_ref().unwrap().iter().find(|p| p.owner == id).unwrap();
+    let Shape::Path { segments, .. } = &path.shape else { panic!("{:?}", path.shape) };
+    let points: Vec<Pt> = segments
+        .iter()
+        .map(|s| match s {
+            Segment::Move { to } | Segment::Line { to } => (to[0], to[1]),
+            s => panic!("{s:?}"),
+        })
+        .collect();
+    assert_eq!(points, horizontal_vertical(a, (4.0, 4.0), c));
+}

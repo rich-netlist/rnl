@@ -1867,7 +1867,13 @@ impl Interp<'_> {
             }
             return self.scene_only(ctx, seg.start);
         };
-        let (nets, bus) = if self.is_set(nets_a.obj) {
+        // in the draft 0.3, given one wire in place of a net, WIRE makes no new wire: it rewrites
+        // that one (its 13.1). In 0.2 a wire there is of the wrong kind, as a set that holds one is
+        // in both
+        let rewrite = matches!(self.o(nets_a.obj), ObjData::Wire { .. }) && self.statement_follows_0_3(ctx);
+        let (nets, bus) = if rewrite {
+            (Vec::new(), false)
+        } else if self.is_set(nets_a.obj) {
             let nets = self.flatten(s, nets_a.obj, 3, Some(ctx));
             if nets.is_empty() {
                 return self.fail(
@@ -1919,6 +1925,12 @@ impl Interp<'_> {
         }
         let (style, rest) = split_style(&p);
         let mode = get(&rest, "mode").and_then(Lit::str).unwrap_or("auto").to_string();
+        if rewrite {
+            // read as a new WIRE: its list and its mode replace the wire's, whose net stays; the
+            // handle passed on is the wire's (5.3)
+            self.scene_rewrite_wire(s, nets_a.obj, pts, mode, style, ctx, seg.start);
+            return Ok((nets_a.obj, false));
+        }
         let w = self.new_obj(ObjData::Wire {
             nets,
             bus,
