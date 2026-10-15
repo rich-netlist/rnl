@@ -34,15 +34,15 @@ impl Fault {
         }
     }
 
-    /// The error of a rewrite of `wire` whose list fails so (the draft 0.3, 13.1): it takes no
-    /// effect, and the wire does not fail.
+    /// The error of a rewrite of `wire` whose list fails so (the draft 0.3, 13.1): it has no
+    /// effect, its style parameters included, and the wire does not fail.
     fn for_rewrite(&self, wire: &str) -> String {
         let (cause, section) = match self {
             Fault::NoSymbol(l) => (format!("{l} has no symbol"), "12.1"),
             Fault::NoPin(l) => (format!("{l} has no pin in its symbol"), "9.2.4"),
             Fault::InBundle(l) => (format!("{l} is in a bundle, and wires go to the terminals of the bundle"), "11.8"),
         };
-        format!("{cause}: this rewrite of {wire} fails and takes no effect; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with ({section}, 5.8, 13.1)")
+        format!("{cause}: this rewrite of {wire} fails and has no effect, its style parameters included; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with ({section}, 5.8, 13.1)")
     }
 }
 
@@ -644,9 +644,9 @@ impl Interp<'_> {
         // 4. check constraints against the positions (no solver)
         self.check_constraints(s);
         // 5. failures that need symbols: wires to pinless terminals, labels on symbol-less usages.
-        // A rewrite of the draft 0.3 that fails so is an error and takes no effect: the wire keeps
-        // the list and mode of the latest rewrite that holds, or those it was made with, and is
-        // warned about and checked by them, there (5.8, 13.1)
+        // A rewrite of the draft 0.3 that fails so is an error and has no effect, its style
+        // parameters included: the wire keeps the list and mode of the latest rewrite that holds,
+        // or those it was made with, and is warned about and checked by them, there (5.8, 13.1)
         self.check_rewrites(s);
         for w in self.scenes[s].wires.clone() {
             let ObjData::Wire { nets, .. } = self.o(w).clone() else { continue };
@@ -980,8 +980,10 @@ impl Interp<'_> {
     }
 
     /// Find which rewrites of the wires of scene `s` fail (the draft 0.3, 13.1): those whose list
-    /// has a point that a wire cannot reach. Such a rewrite takes no effect (`wire_shape`);
-    /// its error is given with the other failures of the wire.
+    /// has a point that a wire cannot reach. Such a rewrite has no effect: its list and its mode
+    /// do not replace the wire's (`wire_shape`), and its style parameters are taken back here, in
+    /// step 7, before the style queue of step 8 reads them (8.2). Its error is given with the other
+    /// failures of the wire.
     fn check_rewrites(&mut self, s: SceneId) {
         let mut wires: Vec<ObjId> = self.scenes[s].rewrites.keys().copied().collect();
         wires.sort();
@@ -990,8 +992,11 @@ impl Interp<'_> {
             for k in 0..self.scenes[s].rewrites[&w].len() {
                 let points = self.scenes[s].rewrites[&w][k].points.clone();
                 let fault = points.iter().find_map(|q| self.term_fault(s, *q)).map(|f| f.for_rewrite(&wire));
-                if let Some(r) = self.scenes[s].rewrites.get_mut(&w) {
-                    r[k].fault = fault;
+                let Some(r) = self.scenes[s].rewrites.get_mut(&w).map(|r| &mut r[k]) else { continue };
+                let style = r.style.filter(|_| fault.is_some());
+                r.fault = fault;
+                if let Some(f) = style.and_then(|j| self.scenes[s].styles.get_mut(j)) {
+                    f.data = FactData::OwnStyle(StyleMap::new());
                 }
             }
         }

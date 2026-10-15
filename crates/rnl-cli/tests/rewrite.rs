@@ -169,7 +169,7 @@ fn a_rewrite_that_fails_once_the_symbols_are_known_takes_no_effect() {
     let as_made = drawn(&read(&netlist("0.3", ""), &draft())).points.clone();
     let hv = "%w @WIRE(mode=\"horizontal-vertical\") {#R1:1 (4, 4) #C1:1}";
     let to_r2 = "%w @WIRE(mode=\"straight\") {#R1:1 (6, 6) #R2:1}";
-    let fails = "#R2:p has no pin in its symbol: this rewrite of %w fails and takes no effect; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with (9.2.4, 5.8, 13.1)";
+    let fails = "#R2:p has no pin in its symbol: this rewrite of %w fails and has no effect, its style parameters included; the wire keeps the list and mode of the latest rewrite that holds, or those it was made with (9.2.4, 5.8, 13.1)";
     let errors = |r: &Interpretation| {
         let mut e = diagnostics(r, Severity::Error);
         e.sort();
@@ -205,12 +205,37 @@ fn a_rewrite_that_fails_once_the_symbols_are_known_takes_no_effect() {
     let e = errors(&r);
     assert_eq!(e.len(), 2, "{e:?}");
     assert_eq!(e[0], (8, "#R2:p has no pin in its symbol: the wire fails (9.2.4)".to_string()));
-    assert!(e[1].0 == 9 && e[1].1.contains("this rewrite of %v fails and takes no effect"), "{e:?}");
+    assert!(e[1].0 == 9 && e[1].1.contains("this rewrite of %v fails and has no effect"), "{e:?}");
     assert!(r.model.levels[0].wires.iter().all(|w| w.id != "%v"));
     // and a wire made to a terminal without a pin is drawn by a rewrite that holds
     let r = read(&pinless(&(record(made) + &record("%v @WIRE {#R1:1 #C1:1}"))), &draft());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert!(r.model.levels[0].wires.iter().any(|w| w.id == "%v" && w.points == [a, c]));
+}
+
+#[test]
+fn a_rewrite_that_fails_gives_the_wire_no_style() {
+    // a rewrite that fails has no effect, its style parameters included (1.4.2, 13.1)
+    let hv = "%w @WIRE(mode=\"horizontal-vertical\") {#R1:1 (4, 4) #C1:1}";
+    let red = "linecolor=\"#ff0000\", linestyle=\"bold\"";
+    let colour = |r: &Interpretation| drawn(r).style.get("linecolor").and_then(Lit::str).map(String::from);
+    let before = read(&pinless(&record(hv)), &draft());
+    assert_ne!(colour(&before).as_deref(), Some("#ff0000"));
+    // a later rewrite that fails: the wire keeps the earlier rewrite and the style it had
+    let fails = format!("%w @WIRE(mode=\"straight\", {red}) {{#R1:1 (6, 6) #R2:1}}");
+    let r = read(&pinless(&(record(hv) + &record(&fails))), &draft());
+    assert_eq!(diagnostics(&r, Severity::Error).len(), 1);
+    assert_eq!(drawn(&r).mode, "horizontal-vertical");
+    assert_eq!(drawn(&r).style, drawn(&before).style);
+    // the first rewrite, failing, leaves the style the wire was made with
+    let made = read(&pinless(""), &draft());
+    let r = read(&pinless(&record(&fails)), &draft());
+    assert_eq!((drawn(&r).mode.as_str(), &drawn(&r).style), ("auto", &drawn(&made).style));
+    // the same style written with a rewrite that holds takes effect, also when a later rewrite fails
+    let holds = format!("%w @WIRE(mode=\"straight\", {red}) {{#R1:1 (6, 6) #C1:1}}");
+    let r = read(&pinless(&(record(&holds) + &record(&fails.replace(red, "linecolor=\"#00ff00\"")))), &draft());
+    assert_eq!((drawn(&r).mode.as_str(), colour(&r).as_deref()), ("straight", Some("#ff0000")));
+    assert_eq!(drawn(&r).style.get("linestyle").and_then(Lit::str), Some("bold"));
 }
 
 #[test]

@@ -64,8 +64,8 @@ pub struct Fact {
 /// statement is written. It has a key, the wire: of several, the one written last by position
 /// takes effect, and among those at one position (the segments of a pipe) the one read last
 /// (5.8, 8.4). One that fails once the symbols are known, such as one that lists a terminal
-/// without a pin, takes no effect: the wire keeps the list and the mode of the latest rewrite
-/// that holds, or those it was made with.
+/// without a pin, has no effect, its style parameters included: the wire keeps the list and the
+/// mode of the latest rewrite that holds, or those it was made with.
 #[derive(Clone, Debug)]
 pub struct Rewrite {
     pub pos: Pos,
@@ -79,6 +79,9 @@ pub struct Rewrite {
     pub off: usize,
     /// Why it fails, found in the geometry phase (9.2.4, 11.8, 12.1): the error it gives.
     pub fault: Option<String>,
+    /// Its style parameters, as the fact in `Scene::styles` that makes them direct style of the
+    /// wire (8.3), which a rewrite that fails takes back before the style queue (8.2).
+    pub style: Option<usize>,
 }
 
 /// What a wire is drawn by (13.1): its points and its mode, with the statement that gives them,
@@ -744,7 +747,7 @@ impl Interp<'_> {
     /// A WIRE given the wire `w` in a statement of the draft 0.3 (its 13.1): its list of points and
     /// its mode are kept, to replace the wire's when this is the rewrite that takes effect; its
     /// style parameters are direct style of the wire, as if a SET-STYLE were written for the wire
-    /// at the statement (8.3).
+    /// at the statement (8.3), unless the rewrite fails (`check_rewrites`).
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn scene_rewrite_wire(
         &mut self,
@@ -761,9 +764,7 @@ impl Interp<'_> {
         let seq = sc.rewrite_count;
         sc.rewrite_count += 1;
         let generated = ctx.frame_generated();
-        let r = Rewrite { pos: ctx.pos.clone(), seq, points, mode, generated, site, off, fault: None };
-        sc.rewrites.entry(w).or_default().push(r);
-        if !style.is_empty() {
+        let style = (!style.is_empty()).then(|| {
             sc.styles.push(Fact {
                 pos: ctx.pos.clone(),
                 target: w,
@@ -774,7 +775,10 @@ impl Interp<'_> {
                 direct: true,
                 chain: Vec::new(),
             });
-        }
+            sc.styles.len() - 1
+        });
+        let r = Rewrite { pos: ctx.pos.clone(), seq, points, mode, generated, site, off, fault: None, style };
+        sc.rewrites.entry(w).or_default().push(r);
     }
 
     /// What a wire of scene `s` is drawn by (13.1): its points and its mode as the rewrite that
