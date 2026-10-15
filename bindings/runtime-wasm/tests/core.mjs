@@ -11,8 +11,9 @@
 //   node bindings/runtime-wasm/tests/core.mjs target/wasm-test
 
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -178,6 +179,58 @@ test("the core runs in a Worker", async () => {
     worker.terminate();
   }
   await assert.rejects(worker.build(untitled), { message: "The core was stopped." });
+});
+
+const RC = "\n.subckt rc VSS\nR1 in VSS 1k\n.ends rc\n";
+const rcWrite = (ops) => ({ write: { dialect: "spice", netlist: RC, author: "test", ops }, svg: false });
+const placeR1 = { level: "subckt:rc", op: "set", object: "#R1", at: [2, 0] };
+
+test("a write gives the netlist written and its Document", () => {
+  const { text, document } = core.write(rcWrite([placeR1]));
+  assert.equal(
+    text,
+    '\n* @RNL(type="header") { @VERSION("0.2")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author="test") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n',
+  );
+  assert.equal(document.path, "/rnl-edit/netlist.sp");
+  assert.equal(document.files[0].text, text);
+  assert.deepEqual(document.diagnostics.filter((d) => d.severity === "error"), []);
+  // an op that cannot be written is the error; a build and a write each want their own answer
+  assert.throws(() => core.write(rcWrite([{ ...placeR1, level: "subckt:none" }])), { message: "op 0 (set): the netlist has no subcircuit none" });
+  assert.throws(() => core.build(rcWrite([placeR1])), /the request is not a build/);
+  assert.throws(() => core.write(untitled), /the request is not a write/);
+  assert.ok("written" in core.respond(rcWrite([placeR1])));
+});
+
+test("the Worker writes, and gives every request the packages its build brings", async () => {
+  const plain = startCore();
+  try {
+    assert.equal((await plain.write(rcWrite([placeR1]))).text, core.write(rcWrite([placeR1])).text);
+    await assert.rejects(plain.write(rcWrite([{ ...placeR1, op: "turn" }])), { message: 'op 0: unknown op "turn"' });
+  } finally {
+    plain.terminate();
+  }
+  // a copy of the build that brings one package
+  const to = await mkdtemp(join(tmpdir(), "rnl-core-"));
+  try {
+    for (const name of ["core.js", "worker.js", "rnl_runtime_wasm.wasm", "package.json"]) await copyFile(new URL(name, dist), join(to, name));
+    const acme = '@RNL(type="header") { @VERSION("0.2"); @PACKAGE(name="acme", version="1.0")}';
+    const files = JSON.stringify({ "/rnl-bundled/packages/acme.rnl": acme });
+    await writeFile(join(to, "packages.js"), `export const files = ${files};\nexport const packageDirs = ["/rnl-bundled/packages"];\n`);
+    const header = '* t\n* @RNL(type="header") { @VERSION("0.2"); @USE-PACKAGE(name="acme", version="1.0")}\nR1 a 0 1k\n';
+    const request = { entry: "/w/t.sp", files: { "/w/t.sp": header } };
+    const errors = (d) => d.diagnostics.filter((x) => x.severity === "error").map((x) => x.message);
+    assert.notDeepEqual(errors(core.build(request)), []);
+    const worker = startCore({ worker: pathToFileURL(join(to, "worker.js")) });
+    try {
+      assert.deepEqual(errors(await worker.build(request)), []);
+      const use = { level: "subckt:rc", op: "use-package", name: "acme", version: "1.0" };
+      assert.deepEqual(errors((await worker.write(rcWrite([use, placeR1]))).document), []);
+    } finally {
+      worker.terminate();
+    }
+  } finally {
+    await rm(to, { recursive: true, force: true });
+  }
 });
 
 test("decodeText reads bytes as rnl reads a file", () => {

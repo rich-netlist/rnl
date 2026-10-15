@@ -14,6 +14,7 @@ const USAGE: &str = "usage:
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
+  rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
 options:
@@ -22,7 +23,10 @@ options:
   --dialect NAME      spice or spectre, instead of guessing from the file
 view options:
   --primitives        give each level's primitives, in scene units with y up
-  --no-svg            leave out each level's SVG";
+  --no-svg            leave out each level's SVG
+write:
+  REQUEST.json is {\"dialect\", \"netlist\", \"author\", \"ops\"}, the ops as the editor interface
+  draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out";
 
 struct Args {
     command: String,
@@ -33,6 +37,7 @@ struct Args {
     dialect: Option<String>,
     svg: bool,
     primitives: bool,
+    author: Option<String>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -47,6 +52,7 @@ fn parse_args() -> Result<Args, String> {
     let mut std = true;
     let mut dialect = None;
     let (mut svg, mut primitives) = (true, false);
+    let mut author = None;
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
@@ -55,12 +61,13 @@ fn parse_args() -> Result<Args, String> {
             "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
+            "--author" => author = Some(it.next().ok_or("--author needs a name")?),
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
     }
     let file = file.ok_or(USAGE)?;
-    Ok(Args { command, file, out, package_dirs, std, dialect, svg, primitives })
+    Ok(Args { command, file, out, package_dirs, std, dialect, svg, primitives, author })
 }
 
 fn main() -> ExitCode {
@@ -143,6 +150,25 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             let text = doc.source(&main).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
             let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);
             std::fs::write(&out, stripped).map_err(|e| e.to_string())?;
+            Ok(ExitCode::SUCCESS)
+        }
+        "write" => {
+            let out = args.out.clone().ok_or("write needs -o OUT")?;
+            let text =
+                std::fs::read_to_string(&args.file).map_err(|e| format!("cannot read {}: {e}", args.file.display()))?;
+            let mut request: serde_json::Value =
+                serde_json::from_str(&text).map_err(|e| format!("{}: {e}", args.file.display()))?;
+            let fields = request.as_object_mut().ok_or("the request is not a JSON object")?;
+            if let Some(d) = &args.dialect {
+                fields.insert("dialect".into(), d.clone().into());
+            }
+            if let Some(a) = &args.author {
+                fields.insert("author".into(), a.clone().into());
+            }
+            fields.entry("dialect").or_insert_with(|| "spice".into());
+            let request: rnl_edit::WriteRequest =
+                serde_json::from_value(request).map_err(|e| format!("the request is not valid: {e}"))?;
+            std::fs::write(&out, rnl_edit::write(&request)?).map_err(|e| e.to_string())?;
             Ok(ExitCode::SUCCESS)
         }
         _ => Err(format!("unknown command {}\n{USAGE}", args.command)),

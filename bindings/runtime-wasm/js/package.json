@@ -1,5 +1,12 @@
 {
   "name": "rnl-runtime-wasm",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "types": "./client.d.ts",
+  "exports": {
+    ".": { "types": "./client.d.ts", "default": "./client.js" },
+    "./core": { "types": "./core.d.ts", "default": "./core.js" },
+    "./worker": "./worker.js",
+    "./package.json": "./package.json"
+  }
 }

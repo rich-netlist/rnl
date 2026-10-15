@@ -1,6 +1,6 @@
 [package]
 name = "rnl-runtime-wasm"
-description = "The Rich Netlist (RNL) core for WebAssembly: a JSON request in, a Document out"
+description = "The Rich Netlist (RNL) core for WebAssembly: a JSON request in, a Document or a written netlist out"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -19,5 +19,6 @@ test-panic = []
 [dependencies]
 rnl-runtime.workspace = true
 rnl-view.workspace = true
+rnl-edit.workspace = true
 serde.workspace = true
 serde_json.workspace = true

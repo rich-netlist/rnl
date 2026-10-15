@@ -8,6 +8,7 @@ rnl render FILE -o DIR [options]  write one SVG per drawing level
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
 rnl view FILE [options]           print the Document a viewer shows, as JSON
 rnl strip-generated FILE -o OUT   write FILE without its type="generated" records
+rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
 options:
@@ -17,7 +18,12 @@ options:
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
+write:
+  REQUEST.json is {"dialect", "netlist", "author", "ops"}, the ops as the editor interface
+  draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out
 ```
+
+`write` writes the ops into the netlist with [`rnl-edit`](../rnl-edit/README.md) and saves the result as OUT; `rnl check OUT` then says how it reads.
 
 Without a solver, `render` draws only what has coordinates. `check` says what is missing: after the diagnostics it prints, for each drawing level, how many objects have no position and how many constraints hold, need a solver to move something, or could not be checked. `view` prints the Document of [`rnl-view`](../rnl-view/README.md), what the desktop viewer shows, for tools and for comparing builds; with `--primitives` each level has its primitives as well, and with `--no-svg` no SVG. The standard packages in [`libraries/standard`](../../libraries/standard/README.md) are built into the command through `rnl-view`; this crate adds the files and package directories on disk (`FsProvider`).
 

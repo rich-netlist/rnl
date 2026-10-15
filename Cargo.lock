@@ -70,9 +70,20 @@ dependencies = [
 name = "rnl-cli"
 version = "0.1.0"
 dependencies = [
+ "rnl-edit",
  "rnl-render",
  "rnl-runtime",
  "rnl-view",
+ "serde_json",
+]
+
+[[package]]
+name = "rnl-edit"
+version = "0.1.0"
+dependencies = [
+ "rnl-runtime",
+ "rnl-view",
+ "serde",
  "serde_json",
 ]
 
@@ -114,6 +125,7 @@ dependencies = [
 name = "rnl-runtime-wasm"
 version = "0.1.0"
 dependencies = [
+ "rnl-edit",
  "rnl-runtime",
  "rnl-view",
  "serde",
