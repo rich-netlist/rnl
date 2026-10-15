@@ -520,9 +520,11 @@ impl Interp<'_> {
         let tail = [rec.map(|r| r as i64).unwrap_or(0), k.map(|k| k as i64).unwrap_or(0)];
         if self.units[u].kind == UnitKind::Level {
             let ul = self.units[u].level;
+            // a record written above with scope= comes after the level's own text (2.6), in the
+            // level and, for its rules, in the levels below it
+            let scope = rec.and_then(|r| self.units[u].scope_places.get(&r).copied());
             if ul == Some(lv) {
-                // a record written above with scope= comes after the level's own text (2.6)
-                if let Some(&place) = rec.and_then(|r| self.units[u].scope_places.get(&r)) {
+                if let Some(place) = scope {
                     return pos(&[4, place, tail[0], tail[1]]);
                 }
                 return pos(&[3, 0, tail[0], tail[1]]);
@@ -530,6 +532,12 @@ impl Interp<'_> {
             let anc = self.doc.ancestors(lv);
             if let Some(i) = anc.iter().position(|a| Some(*a) == ul) {
                 let depth = (anc.len() - i) as i64;
+                if let Some(place) = scope {
+                    let mut p = pos(&[2, depth]);
+                    p.push(PosElem::Tag("scope"));
+                    p.extend(pos(&[place, tail[0], tail[1]]));
+                    return p;
+                }
                 return pos(&[2, depth, tail[0], tail[1]]);
             }
             return pos(&[9, 0, tail[0], tail[1]]);

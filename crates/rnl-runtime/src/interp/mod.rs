@@ -498,8 +498,9 @@ impl<'p> Interp<'p> {
         self.run_scene(s);
     }
 
-    /// The members of a unit that are rules, in order. They are taken again only when the unit
-    /// has new members or new rules, so that a level does not go through every member above it.
+    /// The members of a unit that are rules, in order, those of the records written into it with
+    /// scope= after its own. They are taken again only when the unit has new members or new rules,
+    /// so that a level does not go through every member above it.
     fn rule_members(&mut self, u: UnitId) -> Rc<Vec<unit::UnitMember>> {
         let counts = (self.units[u].members.len(), self.rules.count(u));
         if let Some((c, ms)) = self.rule_members.get(&u) {
@@ -507,8 +508,11 @@ impl<'p> Interp<'p> {
                 return ms.clone();
             }
         }
-        let ms: Vec<unit::UnitMember> =
-            self.units[u].members.iter().filter(|m| self.rules.contains(&m.key(u))).cloned().collect();
+        // a subcircuit's own rules, then those of the records written into it with scope=, which
+        // act as if written there: in the levels below it too, after its own text (2.6, 10.4)
+        let unit = &self.units[u];
+        let all = unit.members.iter().chain(&unit.scope_members);
+        let ms: Vec<unit::UnitMember> = all.filter(|m| self.rules.contains(&m.key(u))).cloned().collect();
         let ms = Rc::new(ms);
         self.rule_members.insert(u, (counts, ms.clone()));
         ms

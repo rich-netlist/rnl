@@ -154,3 +154,45 @@ fn a_syntax_error_in_a_scope_record_fails_its_member() {
     let r = interpret(&own, &Options::solver());
     assert_eq!(errors(&r).iter().map(|(_, m)| m).collect::<Vec<_>>(), [&e[0].1]);
 }
+
+/// A main file with an NMOS in each level: mid defines leaf in its text and uses it, and uses
+/// other, defined beside it. `own` is mid's own record, `scope` a record written into mid.
+fn hierarchy(own: &str, scope: &str) -> String {
+    let own = if own.is_empty() { String::new() } else { format!("* @RNL {{ {own} }}\n") };
+    format!(
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n.model nch nmos level=1\n\
+         .subckt mid a b\n.subckt leaf x y\nM1 x y 0 0 nch\n.ends leaf\nXL a b leaf\nXO a b other\nM2 a b 0 0 nch\n\
+         {own}.ends mid\n.subckt other p q\nM3 p q 0 0 nch\n.ends other\n\
+         M4 n1 n2 0 0 nch\nX1 n1 n2 mid\n* @RNL(scope=\"mid\") {{ {scope} }}\n.end\n"
+    )
+}
+
+/// The symbol of an object in the problem of a level.
+fn symbol<'a>(r: &'a Interpretation, level: &str, label: &str) -> &'a str {
+    let p = r.problems.iter().find(|p| p.title == level).unwrap();
+    let o = p.objects.iter().find(|o| o.label == label).unwrap();
+    &p.symbols[o.symbol.unwrap()].name
+}
+
+#[test]
+fn a_rule_in_a_scope_record_reaches_the_levels_below_the_target() {
+    // as if written in mid: in mid, and in leaf, which mid contains in its text (6.1, 10.4); not
+    // in other, which mid only uses, nor in the main file above mid
+    let rule = "# @SELECT-INSTANCE(model=\"nch\") => @SET-SYMBOL $NMOS";
+    let files = MemoryProvider::new().with("t.sp", &hierarchy("", rule));
+    let r = interpret(&files, &Options::solver());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(symbol(&r, "mid", "#M2"), "$NMOS");
+    assert_eq!(symbol(&r, "leaf", "#M1"), "$NMOS");
+    assert_eq!(symbol(&r, "other", "#M3"), "$NMOS4");
+    assert_eq!(symbol(&r, "t.sp", "#M4"), "$NMOS4");
+
+    // after mid's own text, there and below: written later, it wins the symbol queue (2.6, 8.3)
+    let own = "# @SELECT-INSTANCE(model=\"nch\") => @SET-SYMBOL $PMOS";
+    let files = MemoryProvider::new().with("t.sp", &hierarchy(own, rule));
+    let r = interpret(&files, &Options::solver());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(symbol(&r, "mid", "#M2"), "$NMOS");
+    assert_eq!(symbol(&r, "leaf", "#M1"), "$NMOS");
+    assert_eq!(symbol(&r, "other", "#M3"), "$NMOS4");
+}
