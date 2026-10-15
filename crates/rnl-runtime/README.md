@@ -17,7 +17,7 @@ The language core of RNL 0.2, the language standard in [`spec/`](../../spec/READ
 | `writeback` | Removing, appending and replacing records in host text while keeping everything else byte for byte. |
 | `diag` | Diagnostics with level, place and cause. |
 
-`Options::draft`, for development only, reads the files that declare the draft 0.3 as well; the rules the draft changes apply only to those files, so a file of 0.2 reads the same with it on or off.
+`Options::draft`, for development only, reads the files that declare the draft 0.3 as well; the rules the draft changes apply only to those files, so a file of 0.2 reads the same with it on or off. So far one rule does: PRIORITY given several objects takes each as it is, so that a set with GROUP among them is the group itself (draft 7.2).
 
 Without a solver, constraints are checked against the written coordinates and get the status `ok`, `failed`, `needs-solver`, `unsolved`, `dropped` or `disabled`; nothing is placed by the runtime. Two coordinates within `Options::tolerance`, 1e-6 by default, count as equal (11.7).
 

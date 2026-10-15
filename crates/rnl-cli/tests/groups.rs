@@ -1,7 +1,10 @@
 //! PRIORITY on a set with GROUP (standard 5.2.1, 11.5, 14.8): it acts on the group itself, which
 //! has no priority, only on and off. A disabled group is withheld from the solver; the constraints
 //! written on the grouped set are not affected. Any other set is taken member by member. Before,
-//! every set was split into its members, so a group could not be turned off at all.
+//! every set was split into its members, so a group could not be turned off at all. Several
+//! objects given to one PRIORITY make one set whose referenced sets are spread (5.2.1); in a file
+//! of the draft 0.3 each is taken as it is instead, so one statement turns off several groups
+//! (draft 0.3, 7.2).
 
 use std::path::Path;
 
@@ -33,17 +36,23 @@ impl Outcome {
 
 /// R1 to R6 in a row, with `statements`, one per line, in a record of the main file.
 fn solve(statements: &str) -> Outcome {
+    solve_in("0.2", false, statements)
+}
+
+/// The same in a file that declares `version`, read with the draft 0.3 or without it.
+fn solve_in(version: &str, draft: bool, statements: &str) -> Outcome {
     let mut text = String::from("* groups\n");
     for k in 1..=6 {
         text += &format!("R{k} n{k} n{} 1k\n", k + 1);
     }
-    text += "* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n* @RNL {\n";
+    text += &format!("* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\n* @RNL {{\n");
     for line in statements.lines().filter(|l| !l.trim().is_empty()) {
         text += &format!("*   {}\n", line.trim());
     }
     text += "* }\n.end\n";
     let files = MemoryProvider::new().with("g.sp", &text);
-    let r = interpret_file(Path::new("g.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    let options = Options { std: false, draft, ..Options::solver() };
+    let r = interpret_file(Path::new("g.sp"), None, &files, &options).unwrap();
     let errors =
         r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
     Outcome { problem: r.problems.into_iter().next().unwrap(), errors }
@@ -177,4 +186,78 @@ fn a_group_follows_the_order_of_overriding() {
     );
     assert!(r.errors.is_empty(), "{:?}", r.errors);
     assert_eq!(r.groups(), [["#R3", "#R4"], ["#R5", "#R6"]]);
+}
+
+/// Two sets with GROUP given to one PRIORITY, and a third group that stays on.
+const TWO_GROUPS: &str = r#"
+    %a_set = {#R1 #R2} @GROUP;
+    %b_set = {#R3 #R4} @GROUP;
+    {#R5 #R6} @GROUP;
+    %a_set %b_set @PRIORITY("disabled")
+"#;
+
+#[test]
+fn in_0_3_several_objects_are_each_taken_as_they_are() {
+    // draft 0.3, 7.2: a set with GROUP among the objects is the group itself
+    let r = solve_in("0.3", true, TWO_GROUPS);
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.groups(), [["#R5", "#R6"]]);
+
+    // one with GROUP and one without, which is taken member by member as usual
+    let r = solve_in(
+        "0.3",
+        true,
+        r#"
+        %a_set = {#R1 #R2} @GROUP;
+        %c1 = {#R3 #R4} @ALIGN("y");
+        %c2 = {#R5 #R6} @ALIGN("y");
+        %c3 = {#R1 #R6} @ALIGN("x");
+        %b_set = {%c1 %c2};
+        %a_set %b_set @PRIORITY("disabled")
+        "#,
+    );
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(r.groups().is_empty());
+    assert_eq!(r.constraints(), [("%c3", Priority::Normal)]);
+
+    // a set of instances without GROUP fails at its first member, on its own
+    let r = solve_in("0.3", true, "%a_set = {#R1 #R2} @GROUP; %s = {#R3 #R4}; %a_set %s @PRIORITY(\"disabled\")");
+    assert_eq!(r.errors.len(), 1, "{:?}", r.errors);
+    assert!(r.errors[0].contains("PRIORITY takes constraints, usages and grouped sets only, not #R3 (14.8)"));
+    assert!(r.groups().is_empty());
+
+    // with a selection among them, at the geometry phase too
+    let r = solve_in(
+        "0.3",
+        true,
+        r#"
+        $PAIR = @DEFINE(roles=["a", "b"]) { %row = {?a ?b} @ALIGN("y") };
+        %u = #R3(a) #R4(b) @AS $PAIR;
+        %a_set = {#R1 #R2} @GROUP;
+        # @SELECT-USAGE $PAIR => %a_set @PRIORITY("disabled")
+        "#,
+    );
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(r.groups().is_empty());
+    assert!(r.constraints().is_empty());
+}
+
+#[test]
+fn in_0_2_several_objects_make_one_set_as_before() {
+    // the sets are spread into their members, and PRIORITY fails at the first instance
+    let r = solve(TWO_GROUPS);
+    assert_eq!(r.errors.len(), 1, "{:?}", r.errors);
+    assert!(r.errors[0].contains("PRIORITY takes constraints, usages and grouped sets only, not #R1 (14.8)"));
+    assert_eq!(r.groups(), [["#R1", "#R2"], ["#R3", "#R4"], ["#R5", "#R6"]]);
+    // the same with the draft read
+    let draft = solve_in("0.2", true, TWO_GROUPS);
+    assert_eq!((draft.errors, draft.problem), (r.errors, r.problem));
+}
+
+#[test]
+fn a_file_of_0_3_without_the_draft_is_of_an_unsupported_version() {
+    let r = solve_in("0.3", false, TWO_GROUPS);
+    assert_eq!(r.errors.len(), 1, "{:?}", r.errors);
+    assert!(r.errors[0].contains("unsupported version 0.3: no RNL of this file is interpreted"), "{:?}", r.errors);
+    assert!(r.groups().is_empty());
 }
