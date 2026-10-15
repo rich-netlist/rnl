@@ -385,7 +385,13 @@ impl Interp<'_> {
     // ---- priorities (14.8)
 
     /// From low to high: header default < own parameter < PRIORITY statements < the priority of the
-    /// enclosing usages (outermost that has one) < PRIORITY written on the local from outside.
+    /// enclosing usages (outermost that has one) < PRIORITY written on the local from outside. A
+    /// statement written in the body of an enclosing usage reaches the local from outside the
+    /// usages within that one only: it beats their priorities and gives way to those of the usage
+    /// it is written in and of the usages around that one. So, from the outermost level inward:
+    /// the statements written outside every usage of the chain; then for each usage, its priority,
+    /// or else the statements written in its body and outside the next usage; the last of these
+    /// are the statements written inside, then the own parameter.
     pub(crate) fn eff_priority(
         &self,
         s: SceneId,
@@ -393,58 +399,54 @@ impl Interp<'_> {
         chain: &[ObjId],
         own: Option<ObjId>,
     ) -> Priority {
-        let sc = &self.scenes[s];
-        let mut p = priority;
-        let mut inner: Vec<&Fact> = Vec::new();
-        let mut outer: Vec<&Fact> = Vec::new();
-        if let Some(own) = own {
-            for g in &sc.prioritys {
-                if g.target == own {
-                    if self.reaches_from_outside(g, chain) {
-                        outer.push(g);
-                    } else {
-                        inner.push(g);
-                    }
-                }
+        let said = match own {
+            Some(own) => self.priority_statements(s, own, chain),
+            None => vec![None; chain.len() + 1],
+        };
+        if let Some(p) = said[0] {
+            return p;
+        }
+        for (k, &u) in chain.iter().enumerate() {
+            // the priority of the usage is its PRIORITY statements by the same order, or else its
+            // own parameter; the usages around it have none, as none of them has decided
+            let on_u = self.priority_statements(s, u, &chain[..k]);
+            if let Some(p) = on_u.into_iter().flatten().next().or(self.usage(u).priority) {
+                return p;
+            }
+            if let Some(p) = said[k + 1] {
+                return p;
             }
         }
-        let best = |v: &[&Fact]| -> Option<Priority> {
-            v.iter().max_by(|a, b| a.pos.cmp(&b.pos)).and_then(|g| match g.data {
+        priority.unwrap_or(Priority::Normal)
+    }
+
+    /// The PRIORITY statements on `own`, the later of each level of `chain` (14.8): at 0 those
+    /// written outside every usage of the chain, at k + 1 those written in the body of `chain[k]`,
+    /// or of a usage in its expansion, and outside `chain[k + 1]`. The last level holds the
+    /// statements written inside, in the body that made `own`.
+    fn priority_statements(&self, s: SceneId, own: ObjId, chain: &[ObjId]) -> Vec<Option<Priority>> {
+        let mut latest: Vec<Option<&Fact>> = vec![None; chain.len() + 1];
+        for g in self.scenes[s].prioritys.iter().filter(|g| g.target == own) {
+            let mut level = 0;
+            let mut at = g.ctx.as_ref().and_then(|c| c.frame_usage());
+            while let Some(u) = at {
+                if let Some(k) = chain.iter().position(|c| *c == u) {
+                    level = k + 1;
+                    break;
+                }
+                at = self.usage(u).parent;
+            }
+            if latest[level].is_none_or(|h| h.pos <= g.pos) {
+                latest[level] = Some(g);
+            }
+        }
+        latest
+            .into_iter()
+            .map(|g| match g?.data {
                 FactData::Priority(p) => Some(p),
                 _ => None,
             })
-        };
-        if !inner.is_empty() {
-            p = best(&inner);
-        }
-        for &a in chain {
-            let mods: Vec<&Fact> = sc.prioritys.iter().filter(|g| g.target == a).collect();
-            if !mods.is_empty() {
-                p = best(&mods);
-                break;
-            }
-            if let Some(ap) = self.usage(a).priority {
-                p = Some(ap);
-                break;
-            }
-        }
-        if !outer.is_empty() {
-            p = best(&outer);
-        }
-        p.unwrap_or(Priority::Normal)
-    }
-
-    /// A PRIORITY reaches a definition's local from outside when it is not written in that usage's body.
-    fn reaches_from_outside(&self, g: &Fact, chain: &[ObjId]) -> bool {
-        let Some(last) = chain.last() else { return false };
-        let mut inside = g.ctx.as_ref().and_then(|c| c.frame_usage());
-        while let Some(u) = inside {
-            if u == *last {
-                return false;
-            }
-            inside = self.usage(u).parent;
-        }
-        true
+            .collect()
     }
 
     pub(crate) fn fact_priority(&self, s: SceneId, f: &Fact) -> Priority {
