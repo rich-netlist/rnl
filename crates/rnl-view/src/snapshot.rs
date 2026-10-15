@@ -618,7 +618,7 @@ fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
                     })
                     .collect()
             }),
-            symbol: Slot::of(o.symbol.as_ref().and_then(&symbol_id)),
+            symbol: Slot::of(o.symbol.as_ref().and_then(symbol_id)),
             at: Slot::of(o.at.map(xy)),
             orient: Slot::of(Some(o.orient.as_str().to_string())),
             pins: o
