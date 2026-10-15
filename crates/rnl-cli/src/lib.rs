@@ -3,6 +3,7 @@
 //! conformance tests use them too.
 
 pub mod dump;
+pub mod problem;
 pub mod provider;
 
 use std::path::Path;

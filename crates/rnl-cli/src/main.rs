@@ -13,6 +13,7 @@ const USAGE: &str = "usage:
   rnl render FILE -o DIR [options]  write one SVG per drawing level
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
+  rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
@@ -23,7 +24,10 @@ options:
   --dialect NAME      spice or spectre, instead of guessing from the file
 view options:
   --primitives        give each level's primitives, in scene units with y up
-  --no-svg            leave out each level's SVG";
+  --no-svg            leave out each level's SVG
+problem options (the levels are read without their type=\"generated\" records):
+  --level TITLE       only the level with this title: a subcircuit name, or the file name
+  --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)";
 
 struct Args {
     command: String,
@@ -35,6 +39,8 @@ struct Args {
     dialect: Option<String>,
     svg: bool,
     primitives: bool,
+    level: Option<String>,
+    solver_options: String,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -50,6 +56,8 @@ fn parse_args() -> Result<Args, String> {
     let mut generated = true;
     let mut dialect = None;
     let (mut svg, mut primitives) = (true, false);
+    let mut level = None;
+    let mut solver_options = format!("tolerance={}", rnl_runtime::geom::fmt_num(rnl_runtime::geom::TOL));
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
@@ -59,12 +67,14 @@ fn parse_args() -> Result<Args, String> {
             "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
+            "--level" => level = Some(it.next().ok_or("--level needs a title")?),
+            "--solver-options" => solver_options = it.next().ok_or("--solver-options needs a text")?,
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
     }
     let file = file.ok_or(USAGE)?;
-    Ok(Args { command, file, out, package_dirs, std, generated, dialect, svg, primitives })
+    Ok(Args { command, file, out, package_dirs, std, generated, dialect, svg, primitives, level, solver_options })
 }
 
 fn main() -> ExitCode {
@@ -113,6 +123,23 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         "dump" => {
             let r = interpret(args, &provider)?;
             println!("{}", serde_json::to_string_pretty(&dump::interpretation(&r)).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
+        "problem" => {
+            let options = Options { std: args.std, ..Options::solver() };
+            let r = rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), &provider, &options)?;
+            let levels: Vec<_> = r
+                .problems
+                .iter()
+                .filter(|p| args.level.as_ref().is_none_or(|t| *t == p.title))
+                .map(|p| rnl_cli::problem::level(p, &args.solver_options))
+                .collect();
+            if levels.is_empty() {
+                if let Some(t) = &args.level {
+                    return Err(format!("no drawing level is titled {t}"));
+                }
+            }
+            println!("{}", serde_json::to_string_pretty(&serde_json::json!({ "levels": levels })).unwrap());
             Ok(ExitCode::SUCCESS)
         }
         "view" => {
