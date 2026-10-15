@@ -293,26 +293,31 @@ impl Interp<'_> {
                 pin_nets,
             });
         }
+        // a wire some of whose points have no position yet is drawn in its runs of points that
+        // have one, each a WireView of the wire, with flylines over the gaps (the draft 0.3,
+        // section 9); a rewritten wire is drawn by its rewrite (13.1)
         let mut wires = Vec::new();
+        let mut flylines = Vec::new();
         for w in self.scenes[s].wires.clone() {
             if self.is_obj_failed(w) {
                 continue;
             }
-            let Some(points) = self.wire_points(s, w) else { continue };
             let ObjData::Wire { nets, .. } = self.o(w).clone() else { continue };
-            // a rewritten wire is drawn by its rewrite (the draft 0.3, 13.1)
             let Some(mode) = self.wire_shape(s, w).map(|shape| shape.mode) else { continue };
-            wires.push(WireView {
-                id: self.label(w),
-                nets: nets.iter().map(|n| self.net_display(*n)).collect(),
-                points,
-                mode,
-                style: self.style_of(s, w),
-                layer: self.layer_of(s, w),
-                order: self.key_of(s, w, &last_symbol),
-            });
+            let (runs, gaps) = self.wire_drawing(s, w);
+            flylines.extend(gaps);
+            for points in runs {
+                wires.push(WireView {
+                    id: self.label(w),
+                    nets: nets.iter().map(|n| self.net_display(*n)).collect(),
+                    points,
+                    mode: mode.clone(),
+                    style: self.style_of(s, w),
+                    layer: self.layer_of(s, w),
+                    order: self.key_of(s, w, &last_symbol),
+                });
+            }
         }
-        let mut flylines = Vec::new();
         let routes = self.scenes[s].routes.clone();
         if !routes.is_empty() {
             let terms = self.route_terms(s);

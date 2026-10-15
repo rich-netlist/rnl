@@ -1316,6 +1316,38 @@ impl Interp<'_> {
         Some(route(&pts, &mode))
     }
 
+    /// What a viewer that does not solve draws of a wire some of whose points have no position yet,
+    /// such as a free point `(_, _)` or the pin of an instance not placed (13.1; the draft 0.3,
+    /// section 9): the runs of consecutive points that have one, each of two or more drawn as the
+    /// wire after its mode, and a flyline from the end of each run to the start of the next, over
+    /// the points that have none. Each run is its points as written, and the mode is the wire's;
+    /// a wire whose points all have a position is one run.
+    pub(crate) fn wire_runs(&mut self, s: SceneId, w: ObjId) -> Option<(Vec<Vec<Pt>>, String)> {
+        let WireShape { points, mode, .. } = self.wire_shape(s, w)?;
+        let mut runs: Vec<Vec<Pt>> = Vec::new();
+        let mut gap = true;
+        for q in points {
+            match self.point_of(s, q) {
+                Some(xy) if gap => {
+                    runs.push(vec![xy]);
+                    gap = false;
+                }
+                Some(xy) => runs.last_mut().unwrap().push(xy),
+                None => gap = true,
+            }
+        }
+        Some((runs, mode))
+    }
+
+    /// A wire as a viewer that does not solve draws it ([`Interp::wire_runs`]): its runs of two
+    /// points or more after its mode, and its flylines.
+    pub(crate) fn wire_drawing(&mut self, s: SceneId, w: ObjId) -> (Vec<Vec<Pt>>, Vec<(Pt, Pt)>) {
+        let Some((runs, mode)) = self.wire_runs(s, w) else { return (Vec::new(), Vec::new()) };
+        let flylines = runs.windows(2).map(|pair| (pair[0][pair[0].len() - 1], pair[1][0])).collect();
+        let drawn = runs.iter().filter(|run| run.len() >= 2).map(|run| route(run, &mode)).collect();
+        (drawn, flylines)
+    }
+
     // ---- constraints (14)
 
     fn check_constraints(&mut self, s: SceneId) {
