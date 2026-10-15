@@ -15,16 +15,24 @@
 //!   `x_B − x_A ≥ m` the lower bound of the row `x_B − x_A` ([`Simplex::assert`]). A bound no
 //!   stronger than the one in place changes nothing, so the tag in place is the earlier one: the
 //!   explanations lean towards what came first.
-//! - **Check** ([`Simplex::check`]): brings every variable within its bounds by pivoting, with
-//!   Bland's rule (always the smallest variable that qualifies), which terminates. When a row
-//!   cannot be brought within its bounds, because every variable of it that could help is at a
-//!   bound, the bounds that hold it are the **explanation**: those bounds alone have no solution,
-//!   a Farkas certificate read off the row.
+//! - **Check** ([`Simplex::check`]): brings every variable within its bounds by pivoting. It fixes
+//!   the smallest basic variable out of its bounds, and moves the variable of its row whose pivot
+//!   costs least: one with no bound in the way first, then the one in the fewest rows. Rows added
+//!   after the rest, such as `t ≥ |xᵢ − xⱼ|` for the wire length of the coordinate LP, are then
+//!   fixed by one pivot each on their own `t`, where the smallest variable would be an old one
+//!   and each pivot would spread through the tableau. Once variables have left the basis again
+//!   [`BLAND_AFTER`] times within one check, it takes Bland's rule (always the smallest variable
+//!   that qualifies), which terminates. Either way the same input gives the same pivots. When a
+//!   row cannot be brought within its bounds, because every variable of it that could help is at
+//!   a bound, the bounds that hold it are the **explanation**: those bounds alone have no
+//!   solution, a Farkas certificate read off the row.
 //! - **Undo** ([`Simplex::checkpoint`], [`Simplex::backtrack`]): bounds are undone in the reverse
 //!   order, and the rows stay, bounding nothing. Undoing only loosens bounds, so the assignment
 //!   stays as valid as the tableau needs: no pivot is undone.
 //! - **Optimum** ([`Simplex::minimize`]): the primal simplex from the current solution over the
-//!   same tableau, Bland's rule again, for the layers of the lexicographic LP of the coordinates.
+//!   same tableau, with Bland's rule, for the layers of the lexicographic LP of the coordinates.
+//!   The objective is a row like any form, so its reduced costs are read off that row, which the
+//!   pivots keep up to date.
 //!
 //! Every number is a [`Q`]: no decision compares floating point, and the result is the same on
 //! every platform. The pivots are counted, and with a limit ([`Simplex::set_pivot_limit`])
@@ -41,7 +49,7 @@ use num_traits::{One, Signed, Zero};
 use crate::rational::Q;
 
 /// A variable of the tableau, by its index: structural and slack variables share the numbering,
-/// which is also the order of Bland's rule.
+/// which is also the order of Bland's rule and of the ties of [`Simplex::check`].
 pub(crate) type Var = usize;
 
 /// A linear form with a constant, `Σ aᵢ xᵢ + c`: the terms sorted by variable, none with a zero
@@ -219,9 +227,21 @@ pub(crate) struct Simplex<T> {
     /// The slack variable of each form a row was made for, so one form makes one row.
     forms: BTreeMap<Vec<(Var, Q)>, Var>,
     trail: Vec<Undo<T>>,
+    /// How many rows each variable occurs in, the basic variables of the rows not counted: what
+    /// a pivot on it costs, which [`Simplex::check`] weighs.
+    occurrences: Vec<u32>,
     pivots: u64,
     pivot_limit: Option<u64>,
+    /// [`Simplex::check`] chooses by Bland's rule once variables have left the basis again this
+    /// many times within one check ([`BLAND_AFTER`]).
+    bland_after: u64,
 }
+
+/// How many times variables may leave the basis again within one [`Simplex::check`] before it
+/// chooses by Bland's rule. Every pivot makes one variable leave the basis, so a check that has
+/// not finished after this many pivots more than there are variables chooses by Bland's rule,
+/// which terminates.
+pub(crate) const BLAND_AFTER: u64 = 1000;
 
 impl<T: Clone + Ord> Default for Simplex<T> {
     fn default() -> Self {
@@ -236,14 +256,17 @@ impl<T: Clone + Ord> Simplex<T> {
             rows: Vec::new(),
             forms: BTreeMap::new(),
             trail: Vec::new(),
+            occurrences: Vec::new(),
             pivots: 0,
             pivot_limit: None,
+            bland_after: BLAND_AFTER,
         }
     }
 
     /// A new structural variable, with no bound and the value 0.
     pub(crate) fn new_var(&mut self) -> Var {
         self.vars.push(VarState { value: Q::zero(), lower: None, upper: None, row: None });
+        self.occurrences.push(0);
         self.vars.len() - 1
     }
 
@@ -267,6 +290,13 @@ impl<T: Clone + Ord> Simplex<T> {
     /// `limit`; none for no limit.
     pub(crate) fn set_pivot_limit(&mut self, limit: Option<u64>) {
         self.pivot_limit = limit;
+    }
+
+    /// Let [`Simplex::check`] choose by Bland's rule once variables have left the basis again
+    /// `repeats` times within one check; 0 for Bland's rule throughout. For tests.
+    #[cfg(test)]
+    pub(crate) fn set_bland_after(&mut self, repeats: u64) {
+        self.bland_after = repeats;
     }
 
     /// The current value of a variable: after a successful [`Simplex::check`], a solution of
@@ -314,6 +344,8 @@ impl<T: Clone + Ord> Simplex<T> {
         let value = row.iter().fold(Q::zero(), |sum, (v, a)| sum + a * &self.vars[*v].value);
         let s = self.vars.len();
         self.vars.push(VarState { value, lower: None, upper: None, row: Some(self.rows.len()) });
+        self.occurrences.push(0);
+        count(&mut self.occurrences, &row, true);
         self.rows.push(Row { basic: s, terms: row });
         self.forms.insert(terms.clone(), s);
         s
@@ -416,8 +448,11 @@ impl<T: Clone + Ord> Simplex<T> {
 
     /// Brings every variable within its bounds, or explains why it cannot (see the module).
     pub(crate) fn check(&mut self) -> Result<(), Failure<T>> {
+        // the variables that have left the basis in this check, and how many times one left again
+        let mut left = vec![false; self.vars.len()];
+        let mut repeats: u64 = 0;
         loop {
-            // Bland: the smallest basic variable out of its bounds
+            // the smallest basic variable out of its bounds
             let mut pick: Option<(Var, bool)> = None;
             for row in &self.rows {
                 let s = &self.vars[row.basic];
@@ -428,19 +463,9 @@ impl<T: Clone + Ord> Simplex<T> {
             }
             let Some((xi, below)) = pick else { return Ok(()) };
             let r = self.vars[xi].row.expect("a basic variable has a row");
-            // Bland: the smallest nonbasic variable that moves it towards the bound; the terms
-            // are sorted, so the first that qualifies
-            let entering = self.rows[r].terms.iter().find(|(xj, a)| {
-                let s = &self.vars[*xj];
-                let up = if below { a.is_positive() } else { a.is_negative() };
-                if up {
-                    s.can_increase()
-                } else {
-                    s.can_decrease()
-                }
-            });
-            let Some((xj, _)) = entering else { return Err(Failure::Conflict(self.explain(r, below))) };
-            let xj = *xj;
+            let Some(xj) = self.entering(r, below, repeats >= self.bland_after) else {
+                return Err(Failure::Conflict(self.explain(r, below)));
+            };
             if self.out_of_budget() {
                 return Err(Failure::Budget);
             }
@@ -448,36 +473,81 @@ impl<T: Clone + Ord> Simplex<T> {
             let target = if below { &s.lower } else { &s.upper };
             let target = target.as_ref().expect("the violated bound").value.clone();
             self.pivot_and_update(xi, xj, target);
+            if std::mem::replace(&mut left[xi], true) {
+                repeats += 1;
+            }
         }
+    }
+
+    /// The nonbasic variable of row `r` that [`Simplex::check`] moves to bring the row's basic
+    /// variable up to its lower bound (`below`) or down to its upper bound: one that can move the
+    /// way that needs. By Bland's rule, the smallest. Otherwise the one whose pivot costs least:
+    /// one without a bound on the side it moves towards first, since it cannot overshoot when it
+    /// becomes basic, then the one in the fewest rows, since the pivot rewrites each of them, then
+    /// the smallest. A variable made after the rest and bounding one row, such as the `t` of
+    /// `t ≥ |xᵢ − xⱼ|`, so fixes its row in one pivot. None when no variable can move: the row
+    /// explains the conflict.
+    fn entering(&self, r: usize, below: bool, bland: bool) -> Option<Var> {
+        let mut best: Option<((bool, u32), Var)> = None;
+        for (xj, a) in &self.rows[r].terms {
+            let s = &self.vars[*xj];
+            let (can_move, bounded) = if below == a.is_positive() {
+                (s.can_increase(), s.upper.is_some())
+            } else {
+                (s.can_decrease(), s.lower.is_some())
+            };
+            if !can_move {
+                continue;
+            }
+            if bland {
+                return Some(*xj);
+            }
+            // the terms are sorted, so of equal keys the first is the smallest variable
+            let key = (bounded, self.occurrences[*xj]);
+            if best.as_ref().is_none_or(|(k, _)| key < *k) {
+                best = Some((key, *xj));
+            }
+        }
+        best.map(|(_, v)| v)
     }
 
     /// Minimises a form over the bounds, from the current solution: its optimum, the variables
     /// left at an optimal solution. [`Simplex::check`] runs first.
+    ///
+    /// The form, divided by its first coefficient as [`Simplex::assert`] divides it, is a row,
+    /// made the first time and kept as rows are: its row over the nonbasic variables gives the
+    /// reduced costs, and the pivots keep it up to date. A layer of the lexicographic LP that
+    /// bounds the form by its optimum then bounds that same row.
     pub(crate) fn minimize(&mut self, objective: &LinExpr) -> Result<Q, Failure<T>> {
         self.check()?;
+        let Some((_, lead)) = objective.terms.first() else { return Ok(objective.constant.clone()) };
+        let lead = lead.clone();
+        let form =
+            LinExpr { terms: objective.terms.iter().map(|(v, a)| (*v, a / &lead)).collect(), constant: Q::zero() };
+        // the objective is `lead · s` and a constant
+        let s = self.add_row(&form);
+        let flip = lead.is_negative();
         loop {
-            // the objective over the nonbasic variables: its reduced costs
-            let mut reduced: Vec<(Var, Q)> = Vec::new();
-            for (v, c) in &objective.terms {
-                match self.vars[*v].row {
-                    Some(r) => axpy(&mut reduced, &self.rows[r].terms, c),
-                    None => axpy(&mut reduced, &[(*v, Q::one())], c),
-                }
-            }
-            // Bland: the smallest variable whose move lowers the objective
-            let entering = reduced.iter().find(|(v, d)| {
-                let s = &self.vars[*v];
-                (d.is_negative() && s.can_increase()) || (d.is_positive() && s.can_decrease())
-            });
-            let Some((xk, d)) = entering else { return Ok(self.eval(objective)) };
-            let (xk, increase) = (*xk, d.is_negative());
+            // Bland: the smallest variable whose move lowers the objective; its reduced cost is
+            // `lead` times its coefficient in the row of `s`, or `lead` for `s` when nonbasic
+            let lowers = |v: Var, d: &Q| {
+                let x = &self.vars[v];
+                let negative = d.is_negative() != flip;
+                (negative && x.can_increase()) || (!negative && x.can_decrease())
+            };
+            let entering = match self.vars[s].row {
+                Some(r) => self.rows[r].terms.iter().find(|(v, d)| lowers(*v, d)).map(|(v, d)| (*v, d.is_negative())),
+                None => lowers(s, &Q::one()).then_some((s, false)),
+            };
+            let Some((xk, negative)) = entering else { return Ok(self.eval(objective)) };
+            let increase = negative != flip;
             // the ratio test: how far it can move before a variable reaches a bound; of equal
             // steps, the smallest variable (Bland), itself included
-            let s = &self.vars[xk];
+            let x = &self.vars[xk];
             let mut step: Option<(Q, Var)> = if increase {
-                s.upper.as_ref().map(|u| (&u.value - &s.value, xk))
+                x.upper.as_ref().map(|u| (&u.value - &x.value, xk))
             } else {
-                s.lower.as_ref().map(|l| (&s.value - &l.value, xk))
+                x.lower.as_ref().map(|l| (&x.value - &l.value, xk))
             };
             for row in &self.rows {
                 let Some(a) = coefficient(&row.terms, xk) else { continue };
@@ -567,15 +637,20 @@ impl<T: Clone + Ord> Simplex<T> {
             self.rows[r].terms.iter().filter(|(v, _)| *v != xj).map(|(v, c)| (*v, -(c * &inv))).collect();
         let at = def.partition_point(|(v, _)| *v < xi);
         def.insert(at, (xi, inv));
+        let occurrences = &mut self.occurrences;
         for (k, row) in self.rows.iter_mut().enumerate() {
             if k == r {
                 continue;
             }
             if let Ok(i) = row.terms.binary_search_by_key(&xj, |(v, _)| *v) {
+                count(occurrences, &row.terms, false);
                 let (_, c) = row.terms.remove(i);
                 axpy(&mut row.terms, &def, &c);
+                count(occurrences, &row.terms, true);
             }
         }
+        count(occurrences, &self.rows[r].terms, false);
+        count(occurrences, &def, true);
         self.rows[r] = Row { basic: xj, terms: def };
         self.vars[xi].row = None;
         self.vars[xj].row = Some(r);
@@ -600,6 +675,11 @@ impl<T: Clone + Ord> Simplex<T> {
                 assert!(!s.below() && !s.above());
             }
         }
+        let mut occurrences = vec![0; self.vars.len()];
+        for row in &self.rows {
+            count(&mut occurrences, &row.terms, true);
+        }
+        assert_eq!(occurrences, self.occurrences);
         for (form, s) in &self.forms {
             let sum = form.iter().fold(Q::zero(), |sum, (v, a)| sum + a * &self.vars[*v].value);
             assert_eq!(sum, self.vars[*s].value);
@@ -610,6 +690,17 @@ impl<T: Clone + Ord> Simplex<T> {
     #[cfg(test)]
     pub(crate) fn satisfied(&self) -> bool {
         self.vars.iter().all(|s| !s.below() && !s.above())
+    }
+}
+
+/// Counts the variables of a row's terms in `occurrences`, or with `add` false uncounts them.
+fn count(occurrences: &mut [u32], terms: &[(Var, Q)], add: bool) {
+    for (v, _) in terms {
+        if add {
+            occurrences[*v] += 1;
+        } else {
+            occurrences[*v] -= 1;
+        }
     }
 }
 

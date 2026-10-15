@@ -18,8 +18,9 @@
 //!
 //! - `objectives` lists the layers in order, separated by `,`; the objectives of a layer are
 //!   separated by `+`, each with `*` and its weight when the weight is not 1, and a layer with a
-//!   tolerance other than 0 ends with `~` and the tolerance: `area+wire_length*2~0.5`. `none` is
-//!   no objective at all.
+//!   tolerance other than 0 ends with `~` and the tolerance: `area+wire_length*2~0.5`. A layer is
+//!   a sum, so the order of its objectives means nothing: the text writes them sorted by name,
+//!   and `wire_length*2+area` reads as the same layer. `none` is no objective at all.
 //! - `grid` is a number, or `none` to leave free coordinates where the LP puts them.
 //! - `budget` lists `name:count` pairs separated by `,`; an override may give some of them.
 
@@ -62,7 +63,8 @@ pub const DEFAULT_LAYERS: [&str; 11] = [
 /// One layer of objectives: their weighted sum is one component of a candidate's score.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Layer {
-    /// The objectives, by name ([`OBJECTIVES`]), with their weights.
+    /// The objectives, by name ([`OBJECTIVES`]), with their weights. Their order means nothing:
+    /// [`SolverOptions::parse`] gives them sorted by name, and the canonical text writes them so.
     pub items: Vec<(String, u32)>,
     /// Two values of this layer that differ by no more than this count as equal, and the next
     /// layer decides; 0 by default. It also bounds how much of this layer's optimum the next
@@ -110,9 +112,11 @@ impl Objectives {
             return "none".to_string();
         }
         let layer = |l: &Layer| {
-            let items: Vec<String> = l
-                .items
-                .iter()
+            // a layer is a sum: its objectives by name, so that equal layers are written alike
+            let mut sorted: Vec<&(String, u32)> = l.items.iter().collect();
+            sorted.sort();
+            let items: Vec<String> = sorted
+                .into_iter()
                 .map(|(name, weight)| if *weight == 1 { name.clone() } else { format!("{name}*{weight}") })
                 .collect();
             let mut text = items.join("+");
@@ -150,6 +154,7 @@ impl Objectives {
                 };
                 parsed.push((name.to_string(), weight));
             }
+            parsed.sort();
             layers.push(Layer { items: parsed, tolerance });
         }
         let objectives = Objectives { layers };
@@ -196,7 +201,10 @@ impl Objectives {
 pub struct Budget {
     /// The nodes of the search for the literals of one fact, in the resolution of 8.5.
     pub resolve_nodes: u64,
-    /// The pivots of the simplex over the whole level.
+    /// The pivots of the simplex over the whole level. A pivot rewrites the rows it touches with
+    /// exact rationals, so its cost grows with the size of the tableau and of its numbers: the
+    /// count bounds the work, not the time, and the default of 1,000,000 is far more than a
+    /// level of a few hundred objects needs, a backstop rather than a limit on time.
     pub pivots: u64,
     /// The candidates the search makes over the whole level.
     pub candidates: u64,
@@ -419,6 +427,22 @@ mod tests {
         assert!(options.canonical().contains(";grid=0.5;objectives=none;"));
         assert_eq!(SolverOptions::parse(&options.canonical()), Ok(options));
         assert_eq!(SolverOptions::parse(DEFAULT), Ok(SolverOptions::default()));
+    }
+
+    #[test]
+    fn the_order_within_a_layer_means_nothing() {
+        let a = SolverOptions::parse("objectives=area+wire_length*2~0.5,turns").unwrap();
+        let b = SolverOptions::parse("objectives=wire_length*2+area~0.5,turns").unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a.canonical(), b.canonical());
+        assert!(a.canonical().contains(";objectives=area+wire_length*2~0.5,turns;"));
+        // options made in code with the items in another order are written alike too
+        let mut c = a.clone();
+        c.objectives.layers[0].items.reverse();
+        assert_eq!(c.canonical(), a.canonical());
+        // the order of the layers does mean something
+        let d = SolverOptions::parse("objectives=turns,area+wire_length*2~0.5").unwrap();
+        assert_ne!(d.canonical(), a.canonical());
     }
 
     #[test]

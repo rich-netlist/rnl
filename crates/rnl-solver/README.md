@@ -36,9 +36,9 @@ Every decision is taken with exact rationals (`num-rational` over `num-bigint`),
 
 - A number of the problem is read as its shortest decimal representation, the digits `fmt_num` writes, so `0.1` is 1/10. A result goes back as the nearest `f64`, ties to even, so a number that came in goes back unchanged.
 - The tolerance (11.7) is to widen only the constant bounds of the facts, `x = v` becoming `v − tol ≤ x ≤ v + tol`, from stage S2 on; equalities between variables, such as ALIGN and DISTRIBUTE, stay exact.
-- The simplex is incremental and bounded, after Dutertre and de Moura: each linear form is one row, made once; a fact is bounds on rows, each with the tag of the fact; Bland's rule chooses every pivot, so it terminates and the same input gives the same pivots. When the bounds have no solution, the tags of the bounds that hold the failing row are the explanation, a set of facts that conflict. Bounds are undone back to a checkpoint, and the same tableau minimises linear forms for the layers of the coordinate LP.
+- The simplex is incremental and bounded, after Dutertre and de Moura: each linear form is one row, made once; a fact is bounds on rows, each with the tag of the fact. A check moves the variable whose pivot costs least, one with no bound in its way first, then the one in the fewest rows, so a row added late, such as `t ≥ |xᵢ − xⱼ|` for the wire length, is fixed by one pivot on its own `t`; once variables have left the basis again 1000 times within one check it takes Bland's rule, which terminates. The same input gives the same pivots. When the bounds have no solution, the tags of the bounds that hold the failing row are the explanation, a set of facts that conflict. Bounds are undone back to a checkpoint, and the same tableau minimises linear forms for the layers of the coordinate LP, with Bland's rule, each objective a row whose reduced costs the pivots keep up to date.
 
-The tests compare the simplex with complete deciders on systems made by a fixed pseudo-random sequence: Bellman–Ford on difference constraints, Gaussian elimination on equalities of three variables, Fourier–Motzkin elimination on small systems of any linear constraints and on the optimum of linear objectives. Each explanation is checked to have no solution by itself, and a tableau whose bounds were asserted, undone and asserted again answers as one built afresh.
+The tests compare the simplex with complete deciders on systems made by a fixed pseudo-random sequence: Bellman–Ford on difference constraints, Gaussian elimination on equalities of three variables, Fourier–Motzkin elimination on small systems of any linear constraints and on the optimum of linear objectives. Each explanation is checked to have no solution by itself, whether a check pivots by cost or by Bland's rule, and a tableau whose bounds were asserted, undone and asserted again answers as one built afresh. One axis of a level of 150 objects, its facts taken in one by one and its wire-length rows made after them, checks in about one pivot per wire, as it does with those rows made first.
 
 ## Modules
 
@@ -58,7 +58,7 @@ The tests compare the simplex with complete deciders on systems made by a fixed 
 | `score` | The layered score | S4 |
 | `driver` | The flow of a solve, the budget, the report | S1 stub, S4 |
 
-Only `solve`, the options and the report types are public.
+The public interface is `solve` and what it takes and gives: the options (`SolverOptions`, `Objectives`, `Layer`, `Budget`), the names of the objectives and the default order of the layers (`OBJECTIVES`, `DEFAULT_LAYERS`), the report types (`Solved`, `SolveReport`, `Discarded`, `Work`), the `AUTHOR` the solver writes in its record, and, re-exported from the runtime, `LevelProblem` and `Solution`. The modules are private.
 
 The crate does no file I/O and takes no time or randomness, so it builds for `wasm32-unknown-unknown` and the same input and options give the same output on every platform. Its dependencies are pure Rust: the runtime and the `num` crates.
 

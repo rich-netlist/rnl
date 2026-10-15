@@ -92,7 +92,13 @@ type Outcomes = Vec<Result<(), Vec<usize>>>;
 /// those kept is kept, each that does not is undone. Gives the result of each, and checks the
 /// invariants and that the values solve what is kept after each step.
 fn resolve(cs: &[Constraint], n: usize) -> (Simplex<usize>, Vec<Var>, Outcomes) {
+    resolve_with(cs, n, BLAND_AFTER)
+}
+
+/// [`resolve`] with Bland's rule after `bland_after` repeats ([`Simplex::set_bland_after`]).
+fn resolve_with(cs: &[Constraint], n: usize, bland_after: u64) -> (Simplex<usize>, Vec<Var>, Outcomes) {
     let (mut sx, vars) = simplex(n);
+    sx.set_bland_after(bland_after);
     let mut kept: Vec<usize> = Vec::new();
     let mut results = Vec::new();
     for (i, c) in cs.iter().enumerate() {
@@ -307,6 +313,39 @@ fn the_optimum_of_an_absolute_value() {
     sx.assert(&LinExpr::var(y), Rel::Ge, &int(7), 4).unwrap();
     assert_eq!(sx.minimize(&LinExpr::var(t)), Ok(int(4)));
     assert_eq!((sx.value(x), sx.value(y)), (&int(3), &int(7)));
+}
+
+#[test]
+fn an_objective_is_the_row_of_its_form() {
+    let (mut sx, v) = simplex(2);
+    let (x, y) = (v[0], v[1]);
+    let sum = LinExpr::from_terms([(x, int(1)), (y, int(1))], int(0));
+    sx.assert(&LinExpr::var(x), Rel::Ge, &int(0), 1).unwrap();
+    sx.assert(&LinExpr::var(y), Rel::Ge, &int(0), 2).unwrap();
+    sx.assert(&sum, Rel::Ge, &int(3), 3).unwrap();
+    assert_eq!(sx.check(), Ok(()));
+    let s = sx.add_row(&sum);
+    assert_eq!(sx.row_count(), 1);
+    // the check made the row of x + y nonbasic at its bound: the objective is that variable
+    assert_eq!(*sx.value(s), int(3));
+    // 2 (x + y) + 1, and −(x + y), are the same row, whatever their factor and constant
+    let mut twice = sum.scaled(&int(2));
+    twice.add_constant(&int(1));
+    assert_eq!(sx.minimize(&twice), Ok(int(7)));
+    assert_eq!(sx.minimize(&sum.scaled(&int(-1))), Err(Failure::Unbounded));
+    assert_eq!(sx.row_count(), 1);
+    sx.assert(&LinExpr::var(x), Rel::Le, &int(5), 4).unwrap();
+    sx.assert(&LinExpr::var(y), Rel::Le, &int(4), 5).unwrap();
+    assert_eq!(sx.minimize(&sum.scaled(&int(-1))), Ok(int(-9)));
+    assert_eq!((sx.value(x), sx.value(y)), (&int(5), &int(4)));
+    // a layer bounds the form by its optimum, on the same row; the next layer works within it
+    sx.assert(&sum, Rel::Ge, &int(9), 6).unwrap();
+    assert_eq!(sx.minimize(&LinExpr::var(x)), Ok(int(5)));
+    assert_eq!(sx.minimize(&twice), Ok(int(19)));
+    // an objective without variables is its constant, and makes no row
+    assert_eq!(sx.minimize(&LinExpr::constant(int(-2))), Ok(int(-2)));
+    assert_eq!(sx.row_count(), 1);
+    sx.assert_invariants();
 }
 
 #[test]
@@ -743,5 +782,117 @@ fn the_same_input_gives_the_same_tableau() {
     assert_eq!(a.pivots(), b.pivots());
     for (x, y) in va.iter().zip(&vb) {
         assert_eq!(a.value(*x), b.value(*y));
+    }
+}
+
+#[test]
+fn blands_rule_throughout_or_from_midway_decides_alike() {
+    // what a check decides does not depend on how it pivots: the same constraints are kept, and
+    // every explanation has no solution, whether Bland's rule chooses from the start, after one
+    // or a few repeats, or only as the fallback
+    let mut rng = Rng(0x5eed_0006);
+    for round in 0..600 {
+        let n = 2 + rng.below(2) as usize;
+        let m = 1 + rng.below(10) as usize;
+        let difference = round % 2 == 0;
+        let cs: Vec<Constraint> = (0..m)
+            .map(|_| if difference { random_difference(&mut rng, n) } else { random_linear(&mut rng, n) })
+            .collect();
+        let (_, _, expected) = resolve(&cs, n);
+        let kept = |results: &Outcomes| results.iter().map(Result::is_ok).collect::<Vec<bool>>();
+        for bland_after in [0, 1, 3] {
+            let (_, _, results) = resolve_with(&cs, n, bland_after);
+            assert_eq!(kept(&results), kept(&expected), "Bland after {bland_after}: {cs:?}");
+            for tags in results.iter().filter_map(|r| r.as_ref().err()) {
+                let subset: Vec<&Constraint> = tags.iter().map(|&t| &cs[t]).collect();
+                let feasible =
+                    if difference { bellman_ford(&subset, n) } else { fourier_motzkin(&subset, n, &[], 0).is_some() };
+                assert!(!feasible, "Bland after {bland_after}: the explanation {tags:?} has a solution: {cs:?}");
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------------------ at scale
+
+/// One axis of a level as the coordinate LP of stage S3 builds it (plan 5.1, 5.6): per object an
+/// origin and a pin at a fixed offset; facts taken in one at a time as the resolution of 8.5 takes
+/// them (ORDER, ALIGN, DISTANCE, DISTRIBUTE, fixed coordinates), each that conflicts undone; then
+/// the wire-length rows, per connected pair of pins a new variable `t` with `t ≥ pᵢ − pⱼ` and
+/// `t ≥ pⱼ − pᵢ`, and one check. The `t`s are made after the rows of the facts, as the LP adds
+/// them, or with `t_first` before them. Gives the tableau, the `t`s, and the pivots of the last
+/// check.
+fn level_axis(seed: u64, objects: usize, t_first: bool) -> (Simplex<usize>, Vec<Var>, u64) {
+    let mut rng = Rng(seed);
+    let mut sx: Simplex<usize> = Simplex::new();
+    let mut ts: Vec<Var> = if t_first { (0..objects).map(|_| sx.new_var()).collect() } else { Vec::new() };
+    let origins: Vec<Var> = (0..objects).map(|_| sx.new_var()).collect();
+    let pins: Vec<Var> = (0..objects).map(|_| sx.new_var()).collect();
+    let mut tag = 0;
+    let mut take = |sx: &mut Simplex<usize>, e: LinExpr, rel: Rel, c: Q| {
+        tag += 1;
+        let cp = sx.checkpoint();
+        match sx.assert(&e, rel, &c, tag).and_then(|()| sx.check()) {
+            Ok(()) => {}
+            Err(Failure::Conflict(_)) => sx.backtrack(cp),
+            Err(e) => panic!("{e:?}"),
+        }
+    };
+    for k in 0..objects {
+        take(&mut sx, LinExpr::diff(pins[k], origins[k]), Rel::Eq, int(rng.int(-2, 2)));
+    }
+    let n = objects as u64;
+    for _ in 0..3 * objects {
+        let a = rng.below(n) as usize;
+        let b = (a + 1 + rng.below(n - 1) as usize) % objects;
+        let (a, b) = (a.min(b), a.max(b));
+        match rng.below(6) {
+            0 | 1 => take(&mut sx, LinExpr::diff(origins[b], origins[a]), Rel::Ge, int(1)),
+            2 => take(&mut sx, LinExpr::diff(pins[b], pins[a]), Rel::Eq, int(0)),
+            3 => take(&mut sx, LinExpr::diff(origins[b], origins[a]), Rel::Ge, int(rng.int(1, 10))),
+            4 if b + 1 < objects => {
+                let c = b + 1 + rng.below((objects - b - 1) as u64) as usize;
+                let e =
+                    LinExpr::from_terms([(origins[a], int(1)), (origins[b], int(-2)), (origins[c], int(1))], int(0));
+                take(&mut sx, e, Rel::Eq, int(0))
+            }
+            _ => take(&mut sx, LinExpr::var(origins[a]), Rel::Eq, int(4 * a as i64 + rng.int(0, 20))),
+        }
+    }
+    let before = sx.pivots();
+    for k in 0..objects {
+        let i = rng.below(n) as usize;
+        let j = (i + 1 + rng.below(n - 1) as usize) % objects;
+        let t = if t_first { ts[k] } else { sx.new_var() };
+        ts.push(t);
+        tag += 1;
+        let up = LinExpr::from_terms([(t, int(1)), (pins[i], int(-1)), (pins[j], int(1))], int(0));
+        let down = LinExpr::from_terms([(t, int(1)), (pins[i], int(1)), (pins[j], int(-1))], int(0));
+        sx.assert(&up, Rel::Ge, &int(0), tag).unwrap();
+        sx.assert(&down, Rel::Ge, &int(0), tag).unwrap();
+    }
+    ts.truncate(objects);
+    assert_eq!(sx.check(), Ok(()));
+    let pivots = sx.pivots() - before;
+    (sx, ts, pivots)
+}
+
+#[test]
+fn wire_length_rows_made_after_the_facts_take_about_one_pivot_each() {
+    // Bland's rule alone would move an old variable of each row, the smallest, and the pivots
+    // would spread: about 1000 to 1350 pivots for these 150 rows, and minutes of rationals
+    for seed in [0x7e57_0002, 0x7e57_0003] {
+        let (mut late, ts, pivots) = level_axis(seed, 150, false);
+        let wires = ts.len() as u64;
+        assert!(pivots <= wires + wires / 10, "seed {seed:x}: {pivots} pivots for {wires} wires");
+        assert!(late.satisfied());
+        late.assert_invariants();
+        // made before the facts or after them, the `t`s give the same optimum
+        let (mut early, early_ts, early_pivots) = level_axis(seed, 150, true);
+        assert!(early_pivots <= wires + wires / 10, "seed {seed:x}: {early_pivots} pivots for {wires} wires");
+        let sum = |ts: &[Var]| LinExpr::from_terms(ts.iter().map(|&t| (t, int(1))), int(0));
+        let optimum = late.minimize(&sum(&ts));
+        assert!(optimum.is_ok(), "{optimum:?}");
+        assert_eq!(optimum, early.minimize(&sum(&early_ts)));
     }
 }
