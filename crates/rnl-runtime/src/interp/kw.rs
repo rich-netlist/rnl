@@ -1313,10 +1313,19 @@ impl Interp<'_> {
                 points: pts,
                 params: params.clone(),
                 style: style.clone(),
+                site: Some(Rc::new(ctx.clone())),
+                off: seg.start,
             }));
         }
         let Some(s) = ctx.scene else { return self.scene_only(ctx, seg.start) };
-        let prim = self.new_obj(ObjData::Prim { shape, points: pts, params: params.clone(), style: style.clone() });
+        let prim = self.new_obj(ObjData::Prim {
+            shape,
+            points: pts,
+            params: params.clone(),
+            style: style.clone(),
+            site: Some(Rc::new(ctx.clone())),
+            off: seg.start,
+        });
         self.scene_add_prim(s, prim, ctx.pos.clone(), ctx);
         Ok(prim)
     }

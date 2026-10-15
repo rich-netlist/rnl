@@ -26,8 +26,8 @@ pub use primitive::{
 pub use rnl_runtime::source::MemoryProvider;
 pub use snapshot::{
     FileRef, HostInstance, HostLevel, HostNet, HostTerminal, LevelModel, LevelSnapshot, ObjectView, PackageUse, Parts,
-    PinLabel, PinView, PointView, Slot, Snapshot, SymbolDefinition, SymbolPin, SymbolPrim, SymbolRef, TextView, Vertex,
-    WireView, SCHEMA,
+    PinLabel, PinView, PointView, ShapeView, Slot, Snapshot, SymbolDefinition, SymbolPin, SymbolPrim, SymbolRef,
+    TextView, Vertex, WireView, SCHEMA,
 };
 
 /// The standard packages bundled with the core (16.2, 16.3).

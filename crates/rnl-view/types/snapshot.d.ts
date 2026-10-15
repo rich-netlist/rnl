@@ -158,9 +158,14 @@ export type HostNet = {
  */
 export type LevelModel = {
   /**
-   * The symbols the objects are drawn with.
+   * The symbols the objects are drawn with, and the level's own.
    */
   symbols: Array<SymbolRef>,
+  /**
+   * A subcircuit's own symbol, `#` (9.2.6), by its id in `symbols`: what its instances are drawn
+   * with when they are given no other. Null for a file level, and for a subcircuit without one.
+   */
+  symbol: Slot<string>,
   /**
    * The instances, bundles and usages, drawn or not.
    */
@@ -177,6 +182,10 @@ export type LevelModel = {
    * The texts with an anchor and something to show.
    */
   texts: Array<TextView>,
+  /**
+   * The graphics of the scene (13.4) that have their points, in the order written.
+   */
+  shapes: Array<ShapeView>,
 };
 
 /**
@@ -407,4 +416,35 @@ export type TextView = {
    * `italic`; a package's are left out.
    */
   style: Record<string, string | number | boolean>,
+};
+
+/**
+ * A graphic of the scene (13.4), as an `add-shape` op writes one.
+ */
+export type ShapeView = {
+  /**
+   * `%box1` when the level names it; else where the statement that made it is, as an object's.
+   */
+  id: string,
+  /**
+   * "line", "rectangle", "circle", "ellipse", "arc" or "bezier".
+   */
+  shape: string,
+  /**
+   * The centre of a rectangle, circle or ellipse with its size, else its points; a point given
+   * by a reference, such as `%j1`, where it is.
+   */
+  points: Array<[number, number]>,
+  /**
+   * Its parameters: width, height, radius, fill, arrow.
+   */
+  params: Record<string, string | number>,
+  /**
+   * The style properties the document's records give it; a package's are left out.
+   */
+  style: Record<string, string | number | boolean>,
+  /**
+   * "bottom", "middle" or "top".
+   */
+  layer: string,
 };

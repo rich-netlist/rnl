@@ -165,10 +165,15 @@ pub enum Vertex {
 /// A graphic written in the scene: an annotation (13.4).
 #[derive(Clone, Debug)]
 pub struct ShapeView {
+    /// Its id in the editor interface: `%box1` when the level names it, else where the statement
+    /// that made it is, as [`ObjectInfo::id`].
+    pub object_id: String,
     pub shape: Shape,
     pub points: Vec<Pt>,
     pub params: PrimParams,
     pub style: Style,
+    /// The properties of `style` the document's own records give, not a package.
+    pub own_style: Style,
     pub layer: Layer,
     pub order: Vec<f64>,
 }
@@ -237,6 +242,18 @@ pub struct LevelView {
     /// DEVICE, the subcircuit's ports or the adapter's defaults (6.4, 6.12); None where there is
     /// no name.
     pub terminal_names: Vec<Vec<Option<String>>>,
+    /// A subcircuit's own symbol, `# @SET-SYMBOL` (9.2.6).
+    pub block_symbol: Option<BlockSymbol>,
+}
+
+/// The symbol a subcircuit gives itself (9.2.6): what its instances are drawn with when they are
+/// given no other.
+#[derive(Clone, Debug)]
+pub struct BlockSymbol {
+    pub info: SymbolInfo,
+    /// What it is made of, without the symbols drawn in it (9.2.7). It is not among the level's
+    /// `symbols`, which are those of the level's own items.
+    pub view: SymbolView,
 }
 
 /// An instance, bundle or usage of a level, drawn or not: what the editor interface's snapshot

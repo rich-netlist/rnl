@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use rnl_runtime::geom::Pt;
 use rnl_runtime::host::{HostDocument, LevelKind};
-use rnl_runtime::interp::obj::Lit;
+use rnl_runtime::interp::obj::{Lit, PrimParams, Shape};
 use rnl_runtime::model::{self, quoted, Attach, LevelView, Style, SymbolInfo, SymbolOrigin};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
@@ -158,8 +158,11 @@ pub struct HostNet {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LevelModel {
-    /// The symbols the objects are drawn with.
+    /// The symbols the objects are drawn with, and the level's own.
     pub symbols: Vec<SymbolRef>,
+    /// A subcircuit's own symbol, `#` (9.2.6), by its id in `symbols`: what its instances are drawn
+    /// with when they are given no other. Null for a file level, and for a subcircuit without one.
+    pub symbol: Slot<String>,
     /// The instances, bundles and usages, drawn or not.
     pub objects: Vec<ObjectView>,
     /// The named points.
@@ -168,6 +171,8 @@ pub struct LevelModel {
     pub wires: Vec<WireView>,
     /// The texts with an anchor and something to show.
     pub texts: Vec<TextView>,
+    /// The graphics of the scene (13.4) that have their points, in the order written.
+    pub shapes: Vec<ShapeView>,
 }
 
 /// A symbol, by an id unique in the level's `symbols`: its name, or its name and where it is
@@ -297,6 +302,27 @@ pub struct PointView {
     pub at: Slot<[f64; 2]>,
     /// A junction dot is drawn at it.
     pub junction: bool,
+}
+
+/// A graphic of the scene (13.4), as an `add-shape` op writes one.
+#[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct ShapeView {
+    /// `%box1` when the level names it; else where the statement that made it is, as an object's.
+    pub id: String,
+    /// "line", "rectangle", "circle", "ellipse", "arc" or "bezier".
+    pub shape: String,
+    /// The centre of a rectangle, circle or ellipse with its size, else its points; a point given
+    /// by a reference, such as `%j1`, where it is.
+    pub points: Vec<[f64; 2]>,
+    /// Its parameters: width, height, radius, fill, arrow.
+    #[cfg_attr(test, ts(type = "Record<string, string | number>"))]
+    pub params: Map<String, Value>,
+    /// The style properties the document's records give it; a package's are left out.
+    #[cfg_attr(test, ts(type = "Record<string, string | number | boolean>"))]
+    pub style: Map<String, Value>,
+    /// "bottom", "middle" or "top".
+    pub layer: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -482,14 +508,12 @@ fn host(doc: &HostDocument, lv: &LevelView) -> HostLevel {
     }
 }
 
-/// The symbols of a level's objects with ids unique among them.
+/// The symbols of a level's objects, and the level's own, with ids unique among them.
 fn symbol_refs(doc: &HostDocument, lv: &LevelView) -> Vec<(SymbolInfo, SymbolRef)> {
     let mut seen: Vec<SymbolInfo> = Vec::new();
-    for o in &lv.objects {
-        if let Some(s) = &o.symbol {
-            if !seen.contains(s) {
-                seen.push(s.clone());
-            }
+    for s in lv.objects.iter().filter_map(|o| o.symbol.as_ref()).chain(lv.block_symbol.as_ref().map(|b| &b.info)) {
+        if !seen.contains(s) {
+            seen.push(s.clone());
         }
     }
     seen.iter()
@@ -506,11 +530,15 @@ fn symbol_refs(doc: &HostDocument, lv: &LevelView) -> Vec<(SymbolInfo, SymbolRef
                 (_, Some(l), true) => format!("{}@{l}", s.name),
                 _ => format!("{}@default", s.name),
             };
-            // what a symbol the document defines is made of, from an object drawn with it
-            let definition = (package.is_none() && !s.default)
-                .then(|| lv.objects.iter().find(|o| o.symbol.as_ref() == Some(s)).and_then(|o| o.symbol_view))
-                .flatten()
-                .map(|k| definition(&lv.symbols[k]));
+            // what a symbol the document defines is made of, from an object drawn with it, or from
+            // the level that gives it itself
+            let drawn = lv.objects.iter().find(|o| o.symbol.as_ref() == Some(s)).and_then(|o| o.symbol_view);
+            let view = match (drawn, &lv.block_symbol) {
+                (Some(k), _) => Some(&lv.symbols[k]),
+                (None, Some(b)) if &b.info == s => Some(&b.view),
+                _ => None,
+            };
+            let definition = view.filter(|_| package.is_none() && !s.default).map(definition);
             (s.clone(), SymbolRef { id, name: s.name.clone(), package, level, default: s.default, definition })
         })
         .collect()
@@ -539,29 +567,31 @@ fn definition(sv: &rnl_runtime::model::SymbolView) -> SymbolDefinition {
         prims: sv
             .prims
             .iter()
-            .filter(|p| p.shape != rnl_runtime::interp::obj::Shape::Text)
-            .map(|p| {
-                let mut params = Map::new();
-                let pp = &p.params;
-                for (k, v) in [("width", pp.width), ("height", pp.height), ("radius", pp.radius)] {
-                    if let Some(v) = v {
-                        params.insert(k.into(), serde_json::json!(v));
-                    }
-                }
-                for (k, v) in [("fill", &pp.fill), ("arrow", &pp.arrow)] {
-                    if let Some(v) = v {
-                        params.insert(k.into(), Value::String(v.clone()));
-                    }
-                }
-                SymbolPrim {
-                    shape: p.shape.as_str().to_lowercase(),
-                    points: p.points.iter().map(|q| xy(*q)).collect(),
-                    params,
-                    style: style(&p.style),
-                }
+            .filter(|p| p.shape != Shape::Text)
+            .map(|p| SymbolPrim {
+                shape: p.shape.as_str().to_lowercase(),
+                points: p.points.iter().map(|q| xy(*q)).collect(),
+                params: params(&p.params),
+                style: style(&p.style),
             })
             .collect(),
     }
+}
+
+/// The parameters a graphic gives (9.2.5).
+fn params(pp: &PrimParams) -> Map<String, Value> {
+    let mut params = Map::new();
+    for (k, v) in [("width", pp.width), ("height", pp.height), ("radius", pp.radius)] {
+        if let Some(v) = v {
+            params.insert(k.into(), serde_json::json!(v));
+        }
+    }
+    for (k, v) in [("fill", &pp.fill), ("arrow", &pp.arrow)] {
+        if let Some(v) = v {
+            params.insert(k.into(), Value::String(v.clone()));
+        }
+    }
+    params
 }
 
 fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
@@ -652,7 +682,21 @@ fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
             style: style(&t.own_style),
         })
         .collect();
-    LevelModel { symbols: symbols.into_iter().map(|(_, r)| r).collect(), objects, points, wires, texts }
+    let shapes = lv
+        .shapes
+        .iter()
+        .filter(|s| s.shape != Shape::Text)
+        .map(|s| ShapeView {
+            id: s.object_id.clone(),
+            shape: s.shape.as_str().to_lowercase(),
+            points: s.points.iter().map(|p| xy(*p)).collect(),
+            params: params(&s.params),
+            style: style(&s.own_style),
+            layer: s.layer.as_str().to_string(),
+        })
+        .collect();
+    let symbol = Slot::of(lv.block_symbol.as_ref().and_then(|b| symbol_id(&b.info)));
+    LevelModel { symbols: symbols.into_iter().map(|(_, r)| r).collect(), symbol, objects, points, wires, texts, shapes }
 }
 
 #[cfg(test)]
@@ -672,7 +716,10 @@ mod tests {
 *     @RECTANGLE {(-1.5, -1.5) (1.5, 1.5)};
 *     ? @TEXT("${name}", key="name") => @PLACE(0, 2.5)
 *   };
-*   # @SET-SYMBOL %amp
+*   # @SET-SYMBOL %amp;
+*   %p1 = (1, 1);
+*   (0, 3) @CIRCLE(radius=0.5, fill="fillcolor", fillcolor="#eef4ff") => @LAYER("bottom");
+*   @LINE(arrow="end", linecolor="#00ff00") {(0, 0) %p1} => %arrow1
 * }
 R1 in out 1k
 .ends amp
@@ -793,6 +840,41 @@ R2 a vdd! 2k
         let note = texts.iter().find(|t| t["lines"][0][0]["text"] == "note").unwrap();
         assert_eq!(note["attach"], Value::Null);
         assert!(note["id"].as_str().unwrap().starts_with(&format!("@{file}:")), "{note}");
+    }
+
+    #[test]
+    fn a_subcircuits_own_symbol_and_the_graphics_of_the_scene() {
+        let s = snap(Parts { drawing: false, host: false, model: true });
+        let file = s["files"][0]["path"].as_str().unwrap().to_string();
+        let (top, amp) = (&s["levels"][0]["model"], &s["levels"][1]["model"]);
+        // the subcircuit's own symbol with what it is made of, though nothing in the level is drawn
+        // with it
+        assert_eq!(amp["symbol"], json!({"value": "%amp", "source": null}));
+        let own = amp["symbols"].as_array().unwrap().iter().find(|x| x["id"] == "%amp").cloned().unwrap();
+        assert_eq!((&own["level"], &own["definition"]["box"]), (&json!("subckt:amp"), &json!([-2.0, -2.0, 2.0, 2.0])));
+        assert_eq!(own["definition"]["pins"].as_array().unwrap().len(), 3);
+        assert_eq!(top["symbol"]["value"], Value::Null);
+        // the graphics in the order written: their params, the style the document gives, the layer;
+        // a point given by a reference where it is
+        let shapes = amp["shapes"].as_array().unwrap();
+        assert_eq!(shapes.len(), 2, "{shapes:?}");
+        assert!(shapes[0]["id"].as_str().unwrap().starts_with(&format!("@{file}:")), "{shapes:?}");
+        assert_eq!(
+            (&shapes[0]["shape"], &shapes[0]["points"], &shapes[0]["params"], &shapes[0]["style"], &shapes[0]["layer"]),
+            (
+                &json!("circle"),
+                &json!([[0.0, 3.0]]),
+                &json!({"radius": 0.5, "fill": "fillcolor"}),
+                &json!({"fillcolor": "#eef4ff"}),
+                &json!("bottom")
+            )
+        );
+        assert_eq!(
+            shapes[1],
+            json!({"id": "%arrow1", "shape": "line", "points": [[0.0, 0.0], [1.0, 1.0]], "params": {"arrow": "end"},
+                   "style": {"linecolor": "#00ff00"}, "layer": "middle"})
+        );
+        assert_eq!(top["shapes"], json!([]));
     }
 
     #[test]

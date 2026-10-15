@@ -562,6 +562,8 @@ pub enum ObjData {
         points: Vec<ObjId>,
         params: PrimParams,
         style: StyleMap,
+        site: Option<Rc<Ctx>>,
+        off: usize,
     },
     Text {
         attach: ObjId,

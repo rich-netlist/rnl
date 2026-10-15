@@ -84,9 +84,10 @@ impl Interp<'_> {
     fn site_id(&self, o: ObjId) -> Option<String> {
         let (site, off) = match self.o(o) {
             ObjData::Usage(u) => (&u.site, u.off),
-            ObjData::Wire { site, off, .. } | ObjData::Text { site, off, .. } | ObjData::KeyText { site, off, .. } => {
-                (site, *off)
-            }
+            ObjData::Wire { site, off, .. }
+            | ObjData::Text { site, off, .. }
+            | ObjData::KeyText { site, off, .. }
+            | ObjData::Prim { site, off, .. } => (site, *off),
             ObjData::Bundle { site, .. } => (site, 0),
             ObjData::Constraint(c) => (&c.site, c.off),
             _ => return None,
@@ -559,6 +560,9 @@ impl Interp<'_> {
             self.scenes[s].texts.iter().copied().filter(|t| !matches!(self.o(*t), ObjData::KeyText { .. })).collect();
         let text_ids = self.unique_ids(s, &plain_texts, &ids);
         ids.extend(text_ids);
+        let prims = self.scenes[s].prims.clone();
+        let prim_ids = self.unique_ids(s, &prims, &ids);
+        ids.extend(prim_ids);
         let (objects, points) = self.objects_of(s, &objs, &named_points, &ids);
         let mut terminal_names = vec![Vec::new(); level.instances.len()];
         for i in self.scenes[s].insts.clone() {
@@ -652,7 +656,7 @@ impl Interp<'_> {
             }
         }
         let mut shapes = Vec::new();
-        for p in self.scenes[s].prims.clone() {
+        for p in prims {
             let ObjData::Prim { shape, points, params, .. } = self.o(p).clone() else { continue };
             let mut pts = Vec::new();
             let mut ok = true;
@@ -669,10 +673,12 @@ impl Interp<'_> {
                 continue;
             }
             shapes.push(ShapeView {
+                object_id: ids[&p].clone(),
                 shape,
                 points: pts,
                 params,
                 style: self.style_of(s, p),
+                own_style: self.own_style_of(s, p),
                 layer: self.layer_of(s, p),
                 order: self.key_of(s, p, &last_symbol),
             });
@@ -760,6 +766,31 @@ impl Interp<'_> {
             objects,
             points,
             terminal_names,
+            block_symbol: self.block_symbol_of(lv),
         }
+    }
+
+    /// The symbol a subcircuit gives itself with `# @SET-SYMBOL`, the later one when it is written
+    /// more than once (9.2.6, 8.3).
+    fn block_symbol_of(&mut self, lv: usize) -> Option<BlockSymbol> {
+        let level = &self.doc.levels[lv];
+        if level.kind != LevelKind::Subckt {
+            return None;
+        }
+        let key = self.doc.key(&level.name);
+        let sym = self.block_symbols.get(&key)?.values().max_by(|a, b| a.0.cmp(&b.0))?.1;
+        let mut views = Vec::new();
+        let k = self.symbol_view(sym, &mut HashMap::new(), &mut views);
+        let mut view = views.swap_remove(k);
+        // the symbols drawn in it go by their index in `views`, which is not kept
+        view.nested.clear();
+        Some(BlockSymbol {
+            info: SymbolInfo {
+                name: self.symbol_name(sym),
+                origin: self.symbol_origin(sym),
+                default: self.symbol(sym).default,
+            },
+            view,
+        })
     }
 }
