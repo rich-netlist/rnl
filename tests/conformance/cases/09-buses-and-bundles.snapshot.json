@@ -1,0 +1,3258 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.2",
+  "levels": [
+    {
+      "id": "file:09-buses-and-bundles.sp",
+      "kind": "file",
+      "name": "09-buses-and-bundles.sp",
+      "file": 0,
+      "line": 0,
+      "status": null,
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#XR",
+            "subckt": true,
+            "master": "reg4",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "D<3>",
+                "net": "&\"D<3>\""
+              },
+              {
+                "n": 2,
+                "name": "D<2>",
+                "net": "&\"D<2>\""
+              },
+              {
+                "n": 3,
+                "name": "D<1>",
+                "net": "&\"D<1>\""
+              },
+              {
+                "n": 4,
+                "name": "D<0>",
+                "net": "&\"D<0>\""
+              },
+              {
+                "n": 5,
+                "name": "clk",
+                "net": "&clk"
+              },
+              {
+                "n": 6,
+                "name": "Q<3>",
+                "net": "&\"Q<3>\""
+              },
+              {
+                "n": 7,
+                "name": "Q<2>",
+                "net": "&\"Q<2>\""
+              },
+              {
+                "n": 8,
+                "name": "Q<1>",
+                "net": "&\"Q<1>\""
+              },
+              {
+                "n": 9,
+                "name": "Q<0>",
+                "net": "&\"Q<0>\""
+              }
+            ]
+          },
+          {
+            "id": "#\"RL<3>\"",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&\"Q<3>\""
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#\"RL<2>\"",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&\"Q<2>\""
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#\"RL<1>\"",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&\"Q<1>\""
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#\"RL<0>\"",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&\"Q<0>\""
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#V1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&clk"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&\"D<3>\"",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&\"D<2>\"",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&\"D<1>\"",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&\"D<0>\"",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&clk",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&\"Q<3>\"",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&\"Q<2>\"",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&\"Q<1>\"",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&\"Q<0>\"",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "%blk",
+            "name": "%blk",
+            "package": null,
+            "level": "subckt:reg4",
+            "default": false,
+            "definition": {
+              "box": [
+                -4.0,
+                -3.0,
+                4.0,
+                3.0
+              ],
+              "box_written": false,
+              "pins": [
+                {
+                  "terminals": [
+                    "D<3>",
+                    "D<2>",
+                    "D<1>",
+                    "D<0>"
+                  ],
+                  "at": [
+                    -4.0,
+                    1.0
+                  ],
+                  "dir": 180,
+                  "label": {
+                    "markup": "D<3:0>",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "D<3:0>",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "terminals": [
+                    "clk"
+                  ],
+                  "at": [
+                    -4.0,
+                    -1.0
+                  ],
+                  "dir": 180,
+                  "label": {
+                    "markup": "clk",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "clk",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "terminals": [
+                    "Q<3>",
+                    "Q<2>",
+                    "Q<1>",
+                    "Q<0>"
+                  ],
+                  "at": [
+                    4.0,
+                    1.0
+                  ],
+                  "dir": 0,
+                  "label": {
+                    "markup": "Q<3:0>",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "Q<3:0>",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      -3.0,
+                      -3.0
+                    ],
+                    [
+                      3.0,
+                      3.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -4.0,
+                      1.0
+                    ],
+                    [
+                      -3.0,
+                      1.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {
+                    "linestyle": "bold"
+                  }
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -4.0,
+                      -1.0
+                    ],
+                    [
+                      -3.0,
+                      -1.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      3.0,
+                      1.0
+                    ],
+                    [
+                      4.0,
+                      1.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {
+                    "linestyle": "bold"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "$RES",
+            "name": "$RES",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$VSRC",
+            "name": "$VSRC",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$JUNCTION_DOT",
+            "name": "$JUNCTION_DOT",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND",
+            "name": "$GROUND",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#XR",
+            "kind": "instance",
+            "host": [
+              "#XR"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "%blk",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#XR:1",
+                  "#XR:2",
+                  "#XR:3",
+                  "#XR:4"
+                ],
+                "at": [
+                  -4.0,
+                  1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&\"D<3>\"",
+                  "&\"D<2>\"",
+                  "&\"D<1>\"",
+                  "&\"D<0>\""
+                ]
+              },
+              {
+                "terminals": [
+                  "#XR:5"
+                ],
+                "at": [
+                  -4.0,
+                  -1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&clk"
+                ]
+              },
+              {
+                "terminals": [
+                  "#XR:6",
+                  "#XR:7",
+                  "#XR:8",
+                  "#XR:9"
+                ],
+                "at": [
+                  4.0,
+                  1.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&\"Q<3>\"",
+                  "&\"Q<2>\"",
+                  "&\"Q<1>\"",
+                  "&\"Q<0>\""
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#\"RL<3>\"",
+            "kind": "instance",
+            "host": [
+              "#\"RL<3>\""
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#\"RL<3>\":1"
+                ],
+                "at": [
+                  10.0,
+                  0.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&\"Q<3>\""
+                ]
+              },
+              {
+                "terminals": [
+                  "#\"RL<3>\":2"
+                ],
+                "at": [
+                  10.0,
+                  -6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#\"RL<2>\"",
+            "kind": "instance",
+            "host": [
+              "#\"RL<2>\""
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                14.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#\"RL<2>\":1"
+                ],
+                "at": [
+                  14.0,
+                  0.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&\"Q<2>\""
+                ]
+              },
+              {
+                "terminals": [
+                  "#\"RL<2>\":2"
+                ],
+                "at": [
+                  14.0,
+                  -6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#\"RL<1>\"",
+            "kind": "instance",
+            "host": [
+              "#\"RL<1>\""
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                18.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#\"RL<1>\":1"
+                ],
+                "at": [
+                  18.0,
+                  0.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&\"Q<1>\""
+                ]
+              },
+              {
+                "terminals": [
+                  "#\"RL<1>\":2"
+                ],
+                "at": [
+                  18.0,
+                  -6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#\"RL<0>\"",
+            "kind": "instance",
+            "host": [
+              "#\"RL<0>\""
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                22.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#\"RL<0>\":1"
+                ],
+                "at": [
+                  22.0,
+                  0.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&\"Q<0>\""
+                ]
+              },
+              {
+                "terminals": [
+                  "#\"RL<0>\":2"
+                ],
+                "at": [
+                  22.0,
+                  -6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#V1",
+            "kind": "instance",
+            "host": [
+              "#V1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$VSRC",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -8.0,
+                -5.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#V1:1"
+                ],
+                "at": [
+                  -8.0,
+                  -2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&clk"
+                ]
+              },
+              {
+                "terminals": [
+                  "#V1:2"
+                ],
+                "at": [
+                  -8.0,
+                  -8.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:63:5#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%t3"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:63:5#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%t2"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                14.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:63:5#3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%t1"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                18.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%gs_RL3_2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#\"RL<3>\":2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                -8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  10.0,
+                  -8.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_RL2_2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#\"RL<2>\":2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                14.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                14.0,
+                -8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  14.0,
+                  -8.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_RL1_2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#\"RL<1>\":2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                18.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9#3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                18.0,
+                -8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  18.0,
+                  -8.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_RL0_2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#\"RL<0>\":2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                22.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9#4",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                22.0,
+                -8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  22.0,
+                  -8.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_V1_2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#V1:2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -8.0,
+                -8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9#5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -8.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -8.0,
+                  -10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [
+          {
+            "id": "%t3",
+            "at": {
+              "value": [
+                10.0,
+                1.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%t2",
+            "at": {
+              "value": [
+                14.0,
+                1.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%t1",
+            "at": {
+              "value": [
+                18.0,
+                1.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%t0",
+            "at": {
+              "value": [
+                22.0,
+                1.0
+              ],
+              "source": null
+            },
+            "junction": false
+          },
+          {
+            "id": "%dpt",
+            "at": {
+              "value": [
+                -8.0,
+                1.0
+              ],
+              "source": null
+            },
+            "junction": false
+          }
+        ],
+        "wires": [
+          {
+            "id": "%bus",
+            "nets": [
+              "&\"Q<3>\"",
+              "&\"Q<2>\"",
+              "&\"Q<1>\"",
+              "&\"Q<0>\""
+            ],
+            "via": [
+              {
+                "terminal": "#XR:6"
+              },
+              {
+                "point": "%t3"
+              },
+              {
+                "point": "%t2"
+              },
+              {
+                "point": "%t1"
+              },
+              {
+                "point": "%t0"
+              }
+            ],
+            "points": [
+              [
+                4.0,
+                1.0
+              ],
+              [
+                10.0,
+                1.0
+              ],
+              [
+                14.0,
+                1.0
+              ],
+              [
+                18.0,
+                1.0
+              ],
+              [
+                22.0,
+                1.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:59:5",
+            "nets": [
+              "&\"Q<3>\""
+            ],
+            "via": [
+              {
+                "point": "%t3"
+              },
+              {
+                "terminal": "#\"RL<3>\":1"
+              }
+            ],
+            "points": [
+              [
+                10.0,
+                1.0
+              ],
+              [
+                10.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:60:5",
+            "nets": [
+              "&\"Q<2>\""
+            ],
+            "via": [
+              {
+                "point": "%t2"
+              },
+              {
+                "terminal": "#\"RL<2>\":1"
+              }
+            ],
+            "points": [
+              [
+                14.0,
+                1.0
+              ],
+              [
+                14.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:61:5",
+            "nets": [
+              "&\"Q<1>\""
+            ],
+            "via": [
+              {
+                "point": "%t1"
+              },
+              {
+                "terminal": "#\"RL<1>\":1"
+              }
+            ],
+            "points": [
+              [
+                18.0,
+                1.0
+              ],
+              [
+                18.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:62:5",
+            "nets": [
+              "&\"Q<0>\""
+            ],
+            "via": [
+              {
+                "point": "%t0"
+              },
+              {
+                "terminal": "#\"RL<0>\":1"
+              }
+            ],
+            "points": [
+              [
+                22.0,
+                1.0
+              ],
+              [
+                22.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:68:5",
+            "nets": [
+              "&\"D<3>\"",
+              "&\"D<2>\"",
+              "&\"D<1>\"",
+              "&\"D<0>\""
+            ],
+            "via": [
+              {
+                "point": "%dpt"
+              },
+              {
+                "terminal": "#XR:4"
+              }
+            ],
+            "points": [
+              [
+                -8.0,
+                1.0
+              ],
+              [
+                -4.0,
+                1.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:70:5",
+            "nets": [
+              "&clk"
+            ],
+            "via": [
+              {
+                "terminal": "#V1:1"
+              },
+              {
+                "terminal": "#XR:5"
+              }
+            ],
+            "points": [
+              [
+                -8.0,
+                -2.0
+              ],
+              [
+                -8.0,
+                -1.0
+              ],
+              [
+                -4.0,
+                -1.0
+              ]
+            ],
+            "mode": "vertical-horizontal",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:238:5#1",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#\"RL<3>\":2"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9#1",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                10.0,
+                -6.0
+              ],
+              [
+                10.0,
+                -8.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:238:5#2",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#\"RL<2>\":2"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9#2",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                14.0,
+                -6.0
+              ],
+              [
+                14.0,
+                -8.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:238:5#3",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#\"RL<1>\":2"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9#3",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                18.0,
+                -6.0
+              ],
+              [
+                18.0,
+                -8.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:238:5#4",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#\"RL<0>\":2"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9#4",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                22.0,
+                -6.0
+              ],
+              [
+                22.0,
+                -8.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:238:5#5",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#V1:2"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9#5",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -8.0,
+                -8.0
+              ],
+              [
+                -8.0,
+                -10.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          }
+        ],
+        "texts": [
+          {
+            "id": "@09-buses-and-bundles.sp:58:5",
+            "attach": "%bus",
+            "key": null,
+            "markup": {
+              "value": "${net}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Q<3>,Q<2>,Q<1>,Q<0>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              12.0,
+              1.6
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.7,
+            "style": {
+              "size": 0.7
+            }
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:69:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "D<3:0>",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "D<3:0>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -8.3,
+              1.0
+            ],
+            "halign": "end",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#\"RL<0>\":1::even",
+            "attach": "#\"RL<0>\":1",
+            "key": "even",
+            "markup": {
+              "value": "${net}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Q<0>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              23.0,
+              -5.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.7,
+            "style": {
+              "size": 0.7
+            }
+          },
+          {
+            "id": "#\"RL<2>\":1::even",
+            "attach": "#\"RL<2>\":1",
+            "key": "even",
+            "markup": {
+              "value": "${net}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Q<2>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              15.0,
+              -5.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.7,
+            "style": {
+              "size": 0.7
+            }
+          },
+          {
+            "id": "#\"RL<1>\":1::even",
+            "attach": "#\"RL<1>\":1",
+            "key": "even",
+            "markup": {
+              "value": "${net}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Q<1>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              19.0,
+              -5.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.7,
+            "style": {
+              "size": 0.7
+            }
+          },
+          {
+            "id": "#XR::name",
+            "attach": "#XR",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "XR",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -3.0,
+              3.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#\"RL<3>\"::name",
+            "attach": "#\"RL<3>\"",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "RL<3>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              11.1,
+              -2.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#\"RL<3>\"::value",
+            "attach": "#\"RL<3>\"",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "10k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              11.1,
+              -3.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#\"RL<2>\"::name",
+            "attach": "#\"RL<2>\"",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "RL<2>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              15.1,
+              -2.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#\"RL<2>\"::value",
+            "attach": "#\"RL<2>\"",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "10k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              15.1,
+              -3.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#\"RL<1>\"::name",
+            "attach": "#\"RL<1>\"",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "RL<1>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              19.1,
+              -2.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#\"RL<1>\"::value",
+            "attach": "#\"RL<1>\"",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "10k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              19.1,
+              -3.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#\"RL<0>\"::name",
+            "attach": "#\"RL<0>\"",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "RL<0>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              23.1,
+              -2.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#\"RL<0>\"::value",
+            "attach": "#\"RL<0>\"",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "10k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              23.1,
+              -3.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#V1::name",
+            "attach": "#V1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "V1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.1,
+              -4.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#V1::value",
+            "attach": "#V1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "PULSE(0 1.8 0 1n 1n 5n 10n)",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.1,
+              -5.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": []
+      }
+    },
+    {
+      "id": "subckt:dff",
+      "kind": "subckt",
+      "name": "dff",
+      "file": 0,
+      "line": 4,
+      "status": null,
+      "host": {
+        "ports": [
+          "&d",
+          "&clk",
+          "&q"
+        ],
+        "instances": [],
+        "nets": [
+          {
+            "id": "&d",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&clk",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&q",
+            "global": false,
+            "port": true
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$PORT_TAG",
+            "name": "$PORT_TAG",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "@rnl-std.rnl:323:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&d"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -2.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -2.0,
+                  1.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&d"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&clk"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -2.0,
+                -1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -2.0,
+                  -1.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&clk"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&q"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                2.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  2.0,
+                  1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&q"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [],
+        "wires": [],
+        "texts": [
+          {
+            "id": "@rnl-std.rnl:323:3#1::name",
+            "attach": "@rnl-std.rnl:323:3#1",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "d",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -5.3,
+              1.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#2::name",
+            "attach": "@rnl-std.rnl:323:3#2",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "clk",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -5.3,
+              -1.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#3::name",
+            "attach": "@rnl-std.rnl:323:3#3",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "q",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              5.3,
+              1.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": []
+      }
+    },
+    {
+      "id": "subckt:reg4",
+      "kind": "subckt",
+      "name": "reg4",
+      "file": 0,
+      "line": 11,
+      "status": null,
+      "host": {
+        "ports": [
+          "&\"D<3>\"",
+          "&\"D<2>\"",
+          "&\"D<1>\"",
+          "&\"D<0>\"",
+          "&clk",
+          "&\"Q<3>\"",
+          "&\"Q<2>\"",
+          "&\"Q<1>\"",
+          "&\"Q<0>\""
+        ],
+        "instances": [
+          {
+            "id": "#\"XI0<3>\"",
+            "subckt": true,
+            "master": "dff",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&\"D<3>\""
+              },
+              {
+                "n": 2,
+                "name": "clk",
+                "net": "&clk"
+              },
+              {
+                "n": 3,
+                "name": "q",
+                "net": "&\"Q<3>\""
+              }
+            ]
+          },
+          {
+            "id": "#\"XI0<2>\"",
+            "subckt": true,
+            "master": "dff",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&\"D<2>\""
+              },
+              {
+                "n": 2,
+                "name": "clk",
+                "net": "&clk"
+              },
+              {
+                "n": 3,
+                "name": "q",
+                "net": "&\"Q<2>\""
+              }
+            ]
+          },
+          {
+            "id": "#\"XI0<1>\"",
+            "subckt": true,
+            "master": "dff",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&\"D<1>\""
+              },
+              {
+                "n": 2,
+                "name": "clk",
+                "net": "&clk"
+              },
+              {
+                "n": 3,
+                "name": "q",
+                "net": "&\"Q<1>\""
+              }
+            ]
+          },
+          {
+            "id": "#\"XI0<0>\"",
+            "subckt": true,
+            "master": "dff",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&\"D<0>\""
+              },
+              {
+                "n": 2,
+                "name": "clk",
+                "net": "&clk"
+              },
+              {
+                "n": 3,
+                "name": "q",
+                "net": "&\"Q<0>\""
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&\"D<3>\"",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&\"D<2>\"",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&\"D<1>\"",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&\"D<0>\"",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&clk",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&\"Q<3>\"",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&\"Q<2>\"",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&\"Q<1>\"",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&\"Q<0>\"",
+            "global": false,
+            "port": true
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$DFF",
+            "name": "$DFF",
+            "package": null,
+            "level": "subckt:reg4",
+            "default": false,
+            "definition": {
+              "box": [
+                -3.0,
+                -2.0,
+                3.0,
+                2.0
+              ],
+              "box_written": false,
+              "pins": [
+                {
+                  "terminals": [
+                    "d"
+                  ],
+                  "at": [
+                    -3.0,
+                    1.0
+                  ],
+                  "dir": 180,
+                  "label": {
+                    "markup": "D",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "D",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "terminals": [
+                    "clk"
+                  ],
+                  "at": [
+                    -3.0,
+                    -1.0
+                  ],
+                  "dir": 180,
+                  "label": {
+                    "markup": "C",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "C",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "terminals": [
+                    "q"
+                  ],
+                  "at": [
+                    3.0,
+                    1.0
+                  ],
+                  "dir": 0,
+                  "label": {
+                    "markup": "Q",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "Q",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      -2.0,
+                      -2.0
+                    ],
+                    [
+                      2.0,
+                      2.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -3.0,
+                      1.0
+                    ],
+                    [
+                      -2.0,
+                      1.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -3.0,
+                      -1.0
+                    ],
+                    [
+                      -2.0,
+                      -1.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      2.0,
+                      1.0
+                    ],
+                    [
+                      3.0,
+                      1.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                }
+              ]
+            }
+          },
+          {
+            "id": "$PORT_TAG",
+            "name": "$PORT_TAG",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "%blk",
+            "name": "%blk",
+            "package": null,
+            "level": "subckt:reg4",
+            "default": false,
+            "definition": {
+              "box": [
+                -4.0,
+                -3.0,
+                4.0,
+                3.0
+              ],
+              "box_written": false,
+              "pins": [
+                {
+                  "terminals": [
+                    "D<3>",
+                    "D<2>",
+                    "D<1>",
+                    "D<0>"
+                  ],
+                  "at": [
+                    -4.0,
+                    1.0
+                  ],
+                  "dir": 180,
+                  "label": {
+                    "markup": "D<3:0>",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "D<3:0>",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "terminals": [
+                    "clk"
+                  ],
+                  "at": [
+                    -4.0,
+                    -1.0
+                  ],
+                  "dir": 180,
+                  "label": {
+                    "markup": "clk",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "clk",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "terminals": [
+                    "Q<3>",
+                    "Q<2>",
+                    "Q<1>",
+                    "Q<0>"
+                  ],
+                  "at": [
+                    4.0,
+                    1.0
+                  ],
+                  "dir": 0,
+                  "label": {
+                    "markup": "Q<3:0>",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "Q<3:0>",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      -3.0,
+                      -3.0
+                    ],
+                    [
+                      3.0,
+                      3.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -4.0,
+                      1.0
+                    ],
+                    [
+                      -3.0,
+                      1.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {
+                    "linestyle": "bold"
+                  }
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -4.0,
+                      -1.0
+                    ],
+                    [
+                      -3.0,
+                      -1.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      3.0,
+                      1.0
+                    ],
+                    [
+                      4.0,
+                      1.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {
+                    "linestyle": "bold"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "symbol": {
+          "value": "%blk",
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "%st",
+            "kind": "bundle",
+            "host": [
+              "#\"XI0<3>\"",
+              "#\"XI0<2>\"",
+              "#\"XI0<1>\"",
+              "#\"XI0<0>\""
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$DFF",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "%st:1"
+                ],
+                "at": [
+                  -3.0,
+                  1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&\"D<3>\"",
+                  "&\"D<2>\"",
+                  "&\"D<1>\"",
+                  "&\"D<0>\""
+                ]
+              },
+              {
+                "terminals": [
+                  "%st:2"
+                ],
+                "at": [
+                  -3.0,
+                  -1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&clk"
+                ]
+              },
+              {
+                "terminals": [
+                  "%st:3"
+                ],
+                "at": [
+                  3.0,
+                  1.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&\"Q<3>\"",
+                  "&\"Q<2>\"",
+                  "&\"Q<1>\"",
+                  "&\"Q<0>\""
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std.rnl:323:3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&clk"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -3.0,
+                -1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -3.0,
+                  -1.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&clk"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [
+          {
+            "id": "%dp",
+            "at": {
+              "value": [
+                -7.0,
+                1.0
+              ],
+              "source": null
+            },
+            "junction": false
+          },
+          {
+            "id": "%qp",
+            "at": {
+              "value": [
+                7.0,
+                1.0
+              ],
+              "source": null
+            },
+            "junction": false
+          }
+        ],
+        "wires": [
+          {
+            "id": "%bd",
+            "nets": [
+              "&\"D<3>\"",
+              "&\"D<2>\"",
+              "&\"D<1>\"",
+              "&\"D<0>\""
+            ],
+            "via": [
+              {
+                "point": "%dp"
+              },
+              {
+                "terminal": "%st:1"
+              }
+            ],
+            "points": [
+              [
+                -7.0,
+                1.0
+              ],
+              [
+                -3.0,
+                1.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "%bq",
+            "nets": [
+              "&\"Q<3>\"",
+              "&\"Q<2>\"",
+              "&\"Q<1>\"",
+              "&\"Q<0>\""
+            ],
+            "via": [
+              {
+                "terminal": "%st:3"
+              },
+              {
+                "point": "%qp"
+              }
+            ],
+            "points": [
+              [
+                3.0,
+                1.0
+              ],
+              [
+                7.0,
+                1.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          }
+        ],
+        "texts": [
+          {
+            "id": "%st::name",
+            "attach": "%st",
+            "key": "name",
+            "markup": {
+              "value": "XI0<3:0>",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "XI0<3:0>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -2.0,
+              2.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%st::model",
+            "attach": "%st",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "dff",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -2.0,
+              -2.8
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:40:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "D<3:0>",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "D<3:0>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -7.3,
+              1.0
+            ],
+            "halign": "end",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@09-buses-and-bundles.sp:41:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "Q<3:0>",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Q<3:0>",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              7.3,
+              1.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:323:3::name",
+            "attach": "@rnl-std.rnl:323:3",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "clk",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.3,
+              -1.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std",
+      "version": "0.2"
+    }
+  ],
+  "files": [
+    {
+      "path": "09-buses-and-bundles.sp",
+      "name": "09-buses-and-bundles.sp"
+    }
+  ]
+}
