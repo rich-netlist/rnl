@@ -131,10 +131,14 @@ impl Interp<'_> {
                 let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
                 let pr = Priority::parse(get(&p, "priority").and_then(Lit::str).unwrap_or("normal"))
                     .unwrap_or(Priority::Normal);
-                let op = TargetOp::Priority { priority: pr, off: seg.call.as_ref().unwrap().start };
-                if args.len() > 1 && args.iter().all(|a| a.role.is_none()) && self.statement_follows_0_3(ctx) {
-                    return self.priority_each(kw, &args, seg, ctx, op);
-                }
+                // several objects make one set in which they are spread (5.2.1), so a set with GROUP
+                // among them is not taken as the group: the error on its members says so
+                let spread = if args.len() > 1 {
+                    args.iter().map(|a| a.obj).filter(|o| self.is_set(*o)).collect()
+                } else {
+                    Vec::new()
+                };
+                let op = TargetOp::Priority { priority: pr, off: seg.call.as_ref().unwrap().start, spread };
                 self.target_each(kw, &args, seg, ctx, 7, op, "target")
             }
             "GROUP" => {
@@ -1616,61 +1620,6 @@ impl Interp<'_> {
         let direct = !a.sel && (priority || !ctx.selected);
         self.apply_op(s, &op, a.obj, ctx.pos.clone(), direct, ctx)?;
         Ok((a.obj, a.sel))
-    }
-
-    /// PRIORITY given several objects for its one slot in a statement of the draft 0.3 (its 7.2):
-    /// each is taken as it is, as if it were the only object, so a set with GROUP among them is the
-    /// group itself and any other set is taken member by member. In 0.2 the objects make one set in
-    /// which referenced sets are spread (5.2.1), so a group among them is split into its members;
-    /// that set is the handle passed on in both. As for one set, which sets have GROUP is known at
-    /// the geometry phase, and the members are those of now (`target_each_mapped`).
-    fn priority_each(&mut self, kw: &str, args: &[ArgV], seg: &Segment, ctx: &Ctx, op: TargetOp) -> R<(ObjId, bool)> {
-        let mapped = self.map_args(kw, args, seg, ctx, sig_positions(kw))?;
-        let all = mapped["target"].clone();
-        let Some(s) = ctx.scene else {
-            // a rule, taken in each level, or nowhere to act
-            return self.target_each_mapped(kw, mapped, seg, ctx, 7, op, "target");
-        };
-        let lazy = self.is_lazy(all.obj);
-        let mut objs = Vec::new();
-        for a in args {
-            let now = (self.is_set(a.obj) && !self.is_lazy(a.obj)).then(|| self.flatten(s, a.obj, 3, Some(ctx)));
-            // named, or reached through a selection (14.8), object by object
-            objs.push((a.obj, !a.sel, now));
-        }
-        let TargetOp::Priority { off, .. } = op else { unreachable!("PRIORITY") };
-        let (tag, c) = (if lazy { "g" } else { "e" }, Rc::new(ctx.clone()));
-        let task: Task = Rc::new(move |it: &mut Interp, s: SceneId, ph: usize| {
-            let mut k = 0;
-            for (obj, direct, now) in &objs {
-                let targets = if it.scenes[s].grouped(*obj) {
-                    vec![*obj]
-                } else if let Some(members) = now {
-                    members.clone()
-                } else if it.is_set(*obj) {
-                    it.flatten(s, *obj, ph, Some(&c))
-                } else {
-                    vec![*obj]
-                };
-                // each object on its own: a member of the wrong kind stops only its object
-                for m in targets {
-                    let at = pos_plus(&c.pos, tag, k);
-                    k += 1;
-                    if it.apply_op(s, &op, m, at, *direct, &c).is_err() {
-                        it.note_failed_at(c.rec, off, false);
-                        break;
-                    }
-                }
-            }
-        });
-        if lazy {
-            self.defer(ctx, 7, task)?;
-        } else if self.scenes[s].phase >= 7 {
-            task(self, s, 7);
-        } else {
-            self.scenes[s].tasks[7].push((ctx.pos.clone(), task));
-        }
-        Ok((all.obj, all.sel))
     }
 
     pub(crate) fn is_generated(&self, id: ObjId) -> bool {

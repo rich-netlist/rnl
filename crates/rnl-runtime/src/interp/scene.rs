@@ -18,7 +18,9 @@ use super::Interp;
 /// A statement whose input is a selection, run at its phase (8.2, 10.4).
 pub type Task = Rc<dyn Fn(&mut Interp, SceneId, usize)>;
 
-/// What a statement adds to each object of its single-object position.
+/// What a statement adds to each object of its single-object position. The `spread` of PRIORITY
+/// holds the sets among several objects written for the slot, which are spread into their members
+/// like any other set (5.2.1), a set with GROUP too.
 #[derive(Clone, Debug)]
 pub enum TargetOp {
     Place { x: Option<f64>, y: Option<f64>, priority: Option<Priority>, off: usize },
@@ -27,7 +29,7 @@ pub enum TargetOp {
     Symbol { symbol: ObjId, off: usize },
     Style { style: ObjId, off: usize },
     Current { direction: String, off: usize },
-    Priority { priority: Priority, off: usize },
+    Priority { priority: Priority, off: usize, spread: Vec<ObjId> },
     Route { mode: String, style: StyleMap, off: usize },
 }
 
@@ -902,12 +904,19 @@ impl Interp<'_> {
                 }
                 self.scenes[s].currents.push((at, obj, direction.clone()));
             }
-            TargetOp::Priority { priority, off } => {
+            TargetOp::Priority { priority, off, spread } => {
                 if !matches!(self.o(obj), ObjData::Constraint(_) | ObjData::Usage(_) | ObjData::Set(_)) {
                     let l = self.label(obj);
+                    // a group among several objects is spread too: it is taken as the group only
+                    // when it is written alone
+                    let hint = if spread.iter().any(|g| self.scenes[s].grouped(*g)) {
+                        "; several objects are spread into their members, so write one PRIORITY for each group (5.2.1)"
+                    } else {
+                        ""
+                    };
                     return self.fail(
                         ctx,
-                        format!("PRIORITY takes constraints, usages and grouped sets only, not {l} (14.8)"),
+                        format!("PRIORITY takes constraints, usages and grouped sets only, not {l} (14.8){hint}"),
                         *off,
                     );
                 }
