@@ -64,7 +64,7 @@ jobs:
         run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
       # the core reads no files itself, so it builds for the browser as it is
       - name: Build the core for WebAssembly
-        run: cargo build --target wasm32-unknown-unknown -p rnl-runtime -p rnl-render -p rnl-host-spice -p rnl-host-spectre -p rnl-view -p rnl-runtime-wasm
+        run: cargo build --target wasm32-unknown-unknown -p rnl-runtime -p rnl-render -p rnl-host-spice -p rnl-host-spectre -p rnl-view -p rnl-solver -p rnl-runtime-wasm
       - name: Build the WebAssembly binding
         run: node --version && node bindings/runtime-wasm/build.mjs
       - name: Test the binding's JavaScript modules, with a module that panics on request

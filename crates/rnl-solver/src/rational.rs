@@ -1,0 +1,292 @@
+//! Exact rational numbers for every decision of the solver (standard 8.5, 11.7).
+//!
+//! The resolution of 8.5 and the coordinate LPs compare numbers, so they compute with [`Q`], a
+//! fraction of two big integers: no decision depends on how floating point rounds, and native
+//! and WebAssembly builds decide alike. Numbers come from the problem as `f64` and go back to the
+//! record as `f64`, written by `fmt_num` (11.7, chapter 17):
+//!
+//! - [`from_f64`] reads a number as its shortest decimal representation, the digits `fmt_num`
+//!   writes and RNL reads, so `0.1` is 1/10 and not the binary fraction nearest to it;
+//! - [`to_f64`] rounds to the nearest `f64`, ties to even, so a number that came in goes back as
+//!   the same `f64`, and one the solver computed reads back as the value it chose.
+
+// Used by `simplex` now, and by `model`, `resolve` and `coords` from stage S2 on.
+#![cfg_attr(not(test), allow(dead_code))]
+
+use num_bigint::{BigInt, BigUint, Sign};
+use num_integer::Integer;
+use num_rational::Ratio;
+use num_traits::{ToPrimitive, Zero};
+use rnl_runtime::geom::fmt_num;
+
+/// An exact rational number. The denominator is positive and the fraction is in lowest terms.
+pub(crate) type Q = Ratio<BigInt>;
+
+/// The integer `n`.
+pub(crate) fn int(n: i64) -> Q {
+    Q::from_integer(BigInt::from(n))
+}
+
+/// The fraction `n / d`, reduced; `d` must not be 0.
+pub(crate) fn frac(n: i64, d: i64) -> Q {
+    Q::new(BigInt::from(n), BigInt::from(d))
+}
+
+/// A number of the problem as its shortest decimal representation, the one `fmt_num` writes:
+/// `0.1` is exactly 1/10. None for NaN and the infinities, which RNL cannot write (3.7).
+pub(crate) fn from_f64(v: f64) -> Option<Q> {
+    if !v.is_finite() {
+        return None;
+    }
+    // `Display` writes the shortest digits that read back as `v`, never with an exponent.
+    parse_decimal(&format!("{v}"))
+}
+
+/// A decimal number as written: an optional sign, digits with an optional `.` and fraction
+/// digits (at least one digit in all), and an optional exponent `e` or `E` with an optional sign.
+/// None for anything else, and for exponents beyond ±4096, which no number of RNL needs.
+pub(crate) fn parse_decimal(s: &str) -> Option<Q> {
+    let (negative, rest) = match s.as_bytes().first()? {
+        b'-' => (true, &s[1..]),
+        b'+' => (false, &s[1..]),
+        _ => (false, s),
+    };
+    let (mantissa, exponent) = match rest.find(['e', 'E']) {
+        Some(i) => (&rest[..i], Some(&rest[i + 1..])),
+        None => (rest, None),
+    };
+    let (whole, fraction) = match mantissa.find('.') {
+        Some(i) => (&mantissa[..i], &mantissa[i + 1..]),
+        None => (mantissa, ""),
+    };
+    let digits = |t: &str| t.bytes().all(|b| b.is_ascii_digit());
+    if whole.len() + fraction.len() == 0 || !digits(whole) || !digits(fraction) {
+        return None;
+    }
+    let mut exp: i64 = 0;
+    if let Some(e) = exponent {
+        let (sign, body) = match e.as_bytes().first()? {
+            b'-' => (-1, &e[1..]),
+            b'+' => (1, &e[1..]),
+            _ => (1, e),
+        };
+        if body.is_empty() || body.len() > 4 || !digits(body) {
+            return None;
+        }
+        exp = sign * body.parse::<i64>().ok()?;
+        if exp.abs() > 4096 {
+            return None;
+        }
+    }
+    let all: String = [whole, fraction].concat();
+    let mut n: BigInt = all.parse().ok()?;
+    if negative {
+        n = -n;
+    }
+    exp -= fraction.len() as i64;
+    let ten = BigInt::from(10);
+    let scale = num_traits::pow(ten, exp.unsigned_abs() as usize);
+    Some(if exp >= 0 { Q::from_integer(n * scale) } else { Q::new(n, scale) })
+}
+
+/// The `f64` nearest to `q`, ties to even, as IEEE 754 rounds; infinite beyond the largest
+/// `f64`. A number [`from_f64`] made comes back as the same `f64` (−0 as 0).
+pub(crate) fn to_f64(q: &Q) -> f64 {
+    let (n, d) = (q.numer(), q.denom());
+    if n.is_zero() {
+        return 0.0;
+    }
+    let negative = n.sign() == Sign::Minus;
+    let (n, d): (&BigUint, &BigUint) = (n.magnitude(), d.magnitude());
+    // e = floor(log2(n / d)): n / d lies in (2^(e0 - 1), 2^(e0 + 1)) with e0 the difference of the
+    // bit lengths, and is at least 2^e0 exactly when n * 2^-e0 >= d.
+    let e0 = n.bits() as i64 - d.bits() as i64;
+    let e = if shl(n, (-e0).max(0)) >= shl(d, e0.max(0)) { e0 } else { e0 - 1 };
+    let magnitude = if e > 1023 {
+        f64::INFINITY
+    } else {
+        // the bits of precision at this exponent: 53, fewer for subnormal numbers
+        let p = if e >= -1022 { 53 } else { 1075 + e };
+        // m = n / d in units of the last place, 2^(e - p + 1), rounded half to even
+        let s = p - 1 - e;
+        let (num, den) = if s >= 0 { (shl(n, s), d.clone()) } else { (n.clone(), shl(d, -s)) };
+        let (mut m, r) = num.div_rem(&den);
+        let twice: BigUint = r << 1u32;
+        if twice > den || (twice == den && m.is_odd()) {
+            m += 1u32;
+        }
+        // m <= 2^53, exact as an f64; the product is exact or overflows to infinity
+        let m = m.to_u64().map_or(f64::INFINITY, |m| m as f64);
+        m * pow2(e - p + 1)
+    };
+    if negative {
+        -magnitude
+    } else {
+        magnitude
+    }
+}
+
+/// `q` as RNL writes it: rounded to the nearest `f64`, then by `fmt_num` (11.7).
+pub(crate) fn fmt(q: &Q) -> String {
+    fmt_num(to_f64(q))
+}
+
+fn shl(n: &BigUint, by: i64) -> BigUint {
+    n << (by as u64)
+}
+
+/// 2^k for k from −1074 to 1023, the powers of two that are `f64`.
+fn pow2(k: i64) -> f64 {
+    debug_assert!((-1074..=1023).contains(&k));
+    if k >= -1022 {
+        f64::from_bits(((k + 1023) as u64) << 52)
+    } else {
+        f64::from_bits(1u64 << (k + 1074))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A fixed xorshift sequence, so the tests are the same on every run.
+    struct Rng(u64);
+
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+    }
+
+    #[test]
+    fn numbers_are_read_as_their_shortest_decimals() {
+        assert_eq!(from_f64(0.1), Some(frac(1, 10)));
+        assert_eq!(from_f64(-2.5), Some(frac(-5, 2)));
+        assert_eq!(from_f64(1e-6), Some(frac(1, 1_000_000)));
+        assert_eq!(from_f64(3.0), Some(int(3)));
+        assert_eq!(from_f64(-0.0), Some(int(0)));
+        assert_eq!(from_f64(0.3), Some(frac(3, 10)));
+        let big = from_f64(1e300).unwrap();
+        assert_eq!(big, Q::from_integer(num_traits::pow(BigInt::from(10), 300)));
+        assert_eq!(from_f64(f64::NAN), None);
+        assert_eq!(from_f64(f64::INFINITY), None);
+        assert_eq!(from_f64(f64::NEG_INFINITY), None);
+    }
+
+    #[test]
+    fn decimals_parse_in_every_written_form() {
+        assert_eq!(parse_decimal("12"), Some(int(12)));
+        assert_eq!(parse_decimal("-12.50"), Some(frac(-25, 2)));
+        assert_eq!(parse_decimal("+.5"), Some(frac(1, 2)));
+        assert_eq!(parse_decimal("5."), Some(int(5)));
+        assert_eq!(parse_decimal("1e3"), Some(int(1000)));
+        assert_eq!(parse_decimal("2.5E-2"), Some(frac(1, 40)));
+        assert_eq!(parse_decimal("0.000001"), Some(frac(1, 1_000_000)));
+        for bad in ["", "-", ".", "1.2.3", "1e", "e5", "1e+", "0x10", "1 ", " 1", "1e99999", "nan", "inf", "1_0"] {
+            assert_eq!(parse_decimal(bad), None, "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn every_f64_comes_back_as_itself() {
+        let special = [
+            0.1,
+            1.0 / 3.0,
+            2.0 / 3.0,
+            -7.25,
+            1e-310,
+            5e-324,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE / 3.0,
+            f64::MAX,
+            -f64::MAX,
+            f64::EPSILON,
+            123_456_789.123_456_79,
+            9007199254740993.0,
+            1e22,
+            1e23,
+        ];
+        for v in special {
+            assert_eq!(to_f64(&from_f64(v).unwrap()).to_bits(), v.to_bits(), "{v:e}");
+        }
+        let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
+        let mut seen = 0;
+        while seen < 3000 {
+            let v = f64::from_bits(rng.next());
+            if !v.is_finite() {
+                continue;
+            }
+            seen += 1;
+            let back = to_f64(&from_f64(v).unwrap());
+            assert_eq!(back.to_bits(), if v == 0.0 { 0.0f64.to_bits() } else { v.to_bits() }, "{v:e}");
+        }
+    }
+
+    #[test]
+    fn fractions_round_to_nearest_like_ieee_division() {
+        // n / d with both exact in f64: the division is correctly rounded, an oracle for to_f64
+        let mut rng = Rng(0x2545_f491_4f6c_dd1d);
+        for _ in 0..3000 {
+            let n = (rng.next() >> (11 + rng.next() % 50)) as i64;
+            let d = ((rng.next() >> (11 + rng.next() % 50)) as i64).max(1);
+            let n = if rng.next() % 2 == 0 { n } else { -n };
+            assert_eq!(to_f64(&frac(n, d)).to_bits(), (n as f64 / d as f64).to_bits(), "{n}/{d}");
+        }
+    }
+
+    #[test]
+    fn long_decimals_round_like_the_standard_library() {
+        // `str::parse::<f64>` rounds correctly, another oracle, with many digits and exponents
+        let mut rng = Rng(0x1234_5678_9abc_def1);
+        for _ in 0..2000 {
+            let digits: String = (0..1 + rng.next() % 40).map(|_| char::from(b'0' + (rng.next() % 10) as u8)).collect();
+            let point = (rng.next() % (digits.len() as u64 + 1)) as usize;
+            let exp = (rng.next() % 700) as i64 - 350;
+            let s = format!("{}.{}e{}", &digits[..point], &digits[point..], exp);
+            let expected: f64 = s.parse().unwrap();
+            assert_eq!(to_f64(&parse_decimal(&s).unwrap()).to_bits(), expected.to_bits(), "{s}");
+        }
+    }
+
+    #[test]
+    fn ties_go_to_even_and_extremes_saturate() {
+        let one = BigInt::from(1);
+        let two53 = BigInt::from(1u64 << 53);
+        // 1 + 2^-53 is halfway between 1 and the next f64: to 1, whose last bit is even
+        assert_eq!(to_f64(&Q::new(&two53 + &one, two53.clone())), 1.0);
+        // 1 + 3 * 2^-53 is halfway between 1 + 2^-52 (odd) and 1 + 2^-51 (even)
+        assert_eq!(to_f64(&Q::new(&two53 + BigInt::from(3), two53.clone())), 1.0 + 2f64.powi(-51));
+        // just above halfway rounds up
+        let two54 = BigInt::from(1u64 << 54);
+        assert_eq!(to_f64(&Q::new(&two54 + BigInt::from(3), two54.clone())), 1.0 + 2f64.powi(-52));
+        // beyond the largest f64, and below half the smallest subnormal
+        let huge = Q::from_integer(num_traits::pow(BigInt::from(2), 1024));
+        assert_eq!(to_f64(&huge), f64::INFINITY);
+        assert_eq!(to_f64(&-huge), f64::NEG_INFINITY);
+        let tiny = Q::new(one.clone(), num_traits::pow(BigInt::from(2), 1076));
+        assert_eq!(to_f64(&tiny), 0.0);
+        // exactly half the smallest subnormal goes to the even 0, a little more to 2^-1074
+        let half = Q::new(one.clone(), num_traits::pow(BigInt::from(2), 1075));
+        assert_eq!(to_f64(&half), 0.0);
+        let more = Q::new(BigInt::from(3), num_traits::pow(BigInt::from(2), 1076));
+        assert_eq!(to_f64(&more), 5e-324);
+        // the largest f64, (2^53 − 1) 2^971 exactly, plus less than half an ulp stays the largest;
+        // plus half an ulp is a tie, and its even neighbour 2^1024 is beyond every f64
+        let max = Q::from_integer((num_traits::pow(BigInt::from(2), 53) - 1) << 971u32);
+        assert_eq!(to_f64(&max), f64::MAX);
+        let half_ulp = Q::from_integer(num_traits::pow(BigInt::from(2), 970));
+        assert_eq!(to_f64(&(&max + &half_ulp - int(1))), f64::MAX);
+        assert_eq!(to_f64(&(&max + &half_ulp)), f64::INFINITY);
+    }
+
+    #[test]
+    fn written_as_rnl_writes_numbers() {
+        assert_eq!(fmt(&frac(1, 10)), "0.1");
+        assert_eq!(fmt(&int(-4)), "-4");
+        assert_eq!(fmt(&frac(5, 2)), "2.5");
+        assert_eq!(fmt(&frac(1, 3)), "0.3333333333333333");
+    }
+}

@@ -1,0 +1,747 @@
+//! Tests of the simplex: small cases written by hand, then systems made by a fixed pseudo-random
+//! sequence and compared with complete deciders: Bellman–Ford for difference constraints,
+//! Gaussian elimination for equalities, Fourier–Motzkin elimination for small systems of any
+//! linear constraints and for the optimum of a linear objective.
+
+use num_traits::{Signed, Zero};
+
+use super::*;
+use crate::rational::{frac, int};
+
+/// A fixed xorshift sequence, so every run tests the same systems.
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 7;
+        self.0 ^= self.0 << 17;
+        self.0
+    }
+
+    fn below(&mut self, n: u64) -> u64 {
+        self.next() % n
+    }
+
+    /// An integer from `lo` to `hi`, both included.
+    fn int(&mut self, lo: i64, hi: i64) -> i64 {
+        lo + self.below((hi - lo + 1) as u64) as i64
+    }
+}
+
+/// One constraint of a test: `Σ a x rel c`, the variables by their index among the test's.
+#[derive(Clone, Debug)]
+struct Constraint {
+    terms: Vec<(usize, i64)>,
+    rel: Rel,
+    c: Q,
+}
+
+impl Constraint {
+    fn expr(&self, vars: &[Var]) -> LinExpr {
+        LinExpr::from_terms(self.terms.iter().map(|&(i, a)| (vars[i], int(a))), Q::zero())
+    }
+
+    fn holds(&self, value: impl Fn(usize) -> Q) -> bool {
+        let lhs = self.terms.iter().fold(Q::zero(), |s, &(i, a)| s + int(a) * value(i));
+        match self.rel {
+            Rel::Le => lhs <= self.c,
+            Rel::Ge => lhs >= self.c,
+            Rel::Eq => lhs == self.c,
+        }
+    }
+
+    /// As `Σ a x ≤ b` rows: one, or two for an equality.
+    fn as_le(&self) -> Vec<(Vec<Q>, Q)> {
+        let n = self.terms.iter().map(|&(i, _)| i + 1).max().unwrap_or(0);
+        let mut row = vec![Q::zero(); n];
+        for &(i, a) in &self.terms {
+            row[i] += int(a);
+        }
+        let neg = |r: &Vec<Q>| r.iter().map(|a| -a).collect::<Vec<Q>>();
+        match self.rel {
+            Rel::Le => vec![(row, self.c.clone())],
+            Rel::Ge => vec![(neg(&row), -self.c.clone())],
+            Rel::Eq => vec![(neg(&row), -self.c.clone()), (row, self.c.clone())],
+        }
+    }
+}
+
+fn simplex(n: usize) -> (Simplex<usize>, Vec<Var>) {
+    let mut sx = Simplex::new();
+    let vars = (0..n).map(|_| sx.new_var()).collect();
+    (sx, vars)
+}
+
+fn le(terms: &[(usize, i64)], c: i64) -> Constraint {
+    Constraint { terms: terms.to_vec(), rel: Rel::Le, c: int(c) }
+}
+
+fn ge(terms: &[(usize, i64)], c: i64) -> Constraint {
+    Constraint { terms: terms.to_vec(), rel: Rel::Ge, c: int(c) }
+}
+
+fn eq(terms: &[(usize, i64)], c: i64) -> Constraint {
+    Constraint { terms: terms.to_vec(), rel: Rel::Eq, c: int(c) }
+}
+
+/// What became of each constraint: kept, or discarded with the explanation of the conflict.
+type Outcomes = Vec<Result<(), Vec<usize>>>;
+
+/// Takes the constraints in one at a time as the resolution of 8.5 does: each that fits with
+/// those kept is kept, each that does not is undone. Gives the result of each, and checks the
+/// invariants and that the values solve what is kept after each step.
+fn resolve(cs: &[Constraint], n: usize) -> (Simplex<usize>, Vec<Var>, Outcomes) {
+    let (mut sx, vars) = simplex(n);
+    let mut kept: Vec<usize> = Vec::new();
+    let mut results = Vec::new();
+    for (i, c) in cs.iter().enumerate() {
+        let cp = sx.checkpoint();
+        let r = sx.assert(&c.expr(&vars), c.rel, &c.c, i).and_then(|()| sx.check());
+        sx.assert_invariants();
+        match r {
+            Ok(()) => {
+                kept.push(i);
+                for &k in &kept {
+                    assert!(cs[k].holds(|j| sx.value(vars[j]).clone()), "constraint {k} fails after {i}");
+                }
+                results.push(Ok(()));
+            }
+            Err(Failure::Conflict(tags)) => {
+                assert!(tags.contains(&i), "the explanation {tags:?} of {i} leaves it out");
+                assert!(tags.iter().all(|t| *t == i || kept.contains(t)), "{tags:?} is not among {kept:?} and {i}");
+                sx.backtrack(cp);
+                assert_eq!(sx.check(), Ok(()), "what was kept before {i} has a solution");
+                sx.assert_invariants();
+                results.push(Err(tags));
+            }
+            Err(e) => panic!("{e:?}"),
+        }
+    }
+    (sx, vars, results)
+}
+
+// ------------------------------------------------------------------------------ by hand
+
+#[test]
+fn linear_forms_merge_sort_and_cancel() {
+    let e = LinExpr::from_terms([(3, int(2)), (1, int(1)), (3, int(-2)), (0, frac(1, 2)), (1, int(1))], int(4));
+    assert_eq!(e.terms(), &[(0, frac(1, 2)), (1, int(2))]);
+    assert_eq!(e.constant_part(), &int(4));
+    assert!(!e.is_constant());
+    let mut f = LinExpr::diff(1, 0);
+    f.add_scaled(&e, &int(-2));
+    // (x1 − x0) − 2 (x0 / 2 + 2 x1 + 4) = −2 x0 − 3 x1 − 8
+    assert_eq!(f.terms(), &[(0, int(-2)), (1, int(-3))]);
+    assert_eq!(f.constant_part(), &int(-8));
+    assert_eq!(f.eval(|v| int(v as i64 + 1)), int(-2 - 6 - 8));
+    f.add_scaled(&f.clone(), &int(-1));
+    assert!(f.is_constant() && f.constant_part().is_zero());
+    assert_eq!(LinExpr::term(5, int(0)), LinExpr::default());
+    let (mut sx, v) = simplex(2);
+    assert_eq!(sx.var_count(), 2);
+    sx.add_row(&LinExpr::from_terms([(v[0], int(1)), (v[1], int(1))], int(0)));
+    assert_eq!((sx.var_count(), sx.row_count()), (3, 1));
+}
+
+#[test]
+fn opposite_bounds_conflict_at_once_and_change_nothing() {
+    let (mut sx, v) = simplex(1);
+    assert_eq!(sx.assert(&LinExpr::var(v[0]), Rel::Ge, &int(1), 7), Ok(()));
+    assert_eq!(sx.assert(&LinExpr::var(v[0]), Rel::Le, &int(0), 3), Err(Failure::Conflict(vec![3, 7])));
+    assert!(sx.upper(v[0]).is_none());
+    assert_eq!(sx.check(), Ok(()));
+    assert_eq!(*sx.value(v[0]), int(1));
+    // both sides of one assertion conflict with each other alone
+    assert_eq!(sx.assert_bounds(v[0], Some(int(5)), Some(int(4)), 9), Err(Failure::Conflict(vec![9])));
+}
+
+#[test]
+fn a_cycle_of_distances_is_explained_by_all_of_it() {
+    // DISTANCE(x, A→B, min 10), DISTANCE(x, B→C, min 10), DISTANCE(x, A→C, max 15)
+    let (a, b, c) = (0, 1, 2);
+    let cs = [ge(&[(b, 1), (a, -1)], 10), ge(&[(c, 1), (b, -1)], 10), le(&[(c, 1), (a, -1)], 15)];
+    let (_, _, results) = resolve(&cs, 3);
+    assert_eq!(results, vec![Ok(()), Ok(()), Err(vec![0, 1, 2])]);
+}
+
+#[test]
+fn three_variable_equalities_are_exact() {
+    // DISTRIBUTE(x: A, B, C), DISTANCE(x, A→B, exact 10), DISTANCE(x, B→C, exact 15)
+    let (a, b, c) = (0, 1, 2);
+    let cs = [eq(&[(a, 1), (b, -2), (c, 1)], 0), eq(&[(b, 1), (a, -1)], 10), eq(&[(c, 1), (b, -1)], 15)];
+    let (_, _, results) = resolve(&cs, 3);
+    assert_eq!(results, vec![Ok(()), Ok(()), Err(vec![0, 1, 2])]);
+    // and with exact 10 twice, C is 10 beyond B
+    let cs = [eq(&[(a, 1), (b, -2), (c, 1)], 0), eq(&[(b, 1), (a, -1)], 10), eq(&[(a, 1)], 3)];
+    let (sx, v, results) = resolve(&cs, 3);
+    assert!(results.iter().all(Result::is_ok));
+    assert_eq!((sx.value(v[0]), sx.value(v[1]), sx.value(v[2])), (&int(3), &int(13), &int(23)));
+}
+
+#[test]
+fn distribute_with_distances_conflicts() {
+    // DISTRIBUTE(x: A, B, C), DISTANCE(x, A→C, min 30), DISTANCE(x, A→B, max 10)
+    let (a, b, c) = (0, 1, 2);
+    let cs = [eq(&[(a, 1), (b, -2), (c, 1)], 0), ge(&[(c, 1), (a, -1)], 30), le(&[(b, 1), (a, -1)], 10)];
+    let (_, _, results) = resolve(&cs, 3);
+    assert_eq!(results, vec![Ok(()), Ok(()), Err(vec![0, 1, 2])]);
+}
+
+#[test]
+fn a_conflict_leaves_out_what_it_does_not_need() {
+    let (a, b, c) = (0, 1, 2);
+    // the bound on C is no part of the conflict of the others
+    let cs = [ge(&[(c, 1)], 100), ge(&[(b, 1), (a, -1)], 5), le(&[(b, 1), (a, -1)], 4)];
+    let (_, _, results) = resolve(&cs, 3);
+    assert_eq!(results[2], Err(vec![1, 2]));
+}
+
+#[test]
+fn fractions_stay_exact() {
+    // 3 x = 1 and y = x: y is 1/3, not a float near it
+    let (x, y) = (0, 1);
+    let cs = [eq(&[(x, 3)], 1), eq(&[(y, 1), (x, -1)], 0)];
+    let (sx, v, results) = resolve(&cs, 2);
+    assert!(results.iter().all(Result::is_ok));
+    assert_eq!(*sx.value(v[1]), frac(1, 3));
+}
+
+#[test]
+fn undo_puts_the_earlier_bounds_back() {
+    let (mut sx, v) = simplex(2);
+    let d = LinExpr::diff(v[1], v[0]);
+    sx.assert(&d, Rel::Ge, &int(5), 1).unwrap();
+    assert_eq!(sx.check(), Ok(()));
+    let cp = sx.checkpoint();
+    sx.assert(&d.scaled(&int(-1)), Rel::Ge, &int(0), 2).unwrap_err();
+    sx.assert(&LinExpr::var(v[0]), Rel::Ge, &int(10), 3).unwrap();
+    sx.assert(&LinExpr::var(v[1]), Rel::Le, &int(12), 4).unwrap();
+    assert_eq!(sx.check(), Err(Failure::Conflict(vec![1, 3, 4])));
+    sx.backtrack(cp);
+    assert!(sx.lower(v[0]).is_none() && sx.upper(v[1]).is_none());
+    assert_eq!(sx.check(), Ok(()));
+    sx.assert(&LinExpr::var(v[1]), Rel::Le, &int(12), 5).unwrap();
+    assert_eq!(sx.check(), Ok(()));
+    assert!(sx.value(v[1]) - sx.value(v[0]) >= int(5));
+    sx.assert_invariants();
+}
+
+#[test]
+fn a_stronger_bound_replaces_and_an_equal_one_keeps_the_first_tag() {
+    let (mut sx, v) = simplex(1);
+    let x = LinExpr::var(v[0]);
+    sx.assert(&x, Rel::Le, &int(5), 1).unwrap();
+    let cp = sx.checkpoint();
+    sx.assert(&x, Rel::Le, &int(5), 2).unwrap();
+    assert_eq!(sx.upper(v[0]), Some((&int(5), &1)));
+    sx.assert(&x, Rel::Le, &int(7), 3).unwrap();
+    assert_eq!(sx.upper(v[0]), Some((&int(5), &1)));
+    sx.assert(&x, Rel::Le, &int(3), 4).unwrap();
+    assert_eq!(sx.upper(v[0]), Some((&int(3), &4)));
+    sx.backtrack(cp);
+    assert_eq!(sx.upper(v[0]), Some((&int(5), &1)));
+}
+
+#[test]
+fn one_form_is_one_row_whatever_its_factor() {
+    let (mut sx, v) = simplex(2);
+    let d = LinExpr::diff(v[1], v[0]);
+    let s = sx.add_row(&d);
+    assert_eq!(sx.add_row(&d), s);
+    assert_eq!(sx.add_row(&LinExpr::var(v[0])), v[0]);
+    assert_eq!(sx.row_count(), 1);
+    // assert divides by the first coefficient, so 2 (b − a) ≥ 4, −(b − a) ≥ −3 and
+    // b − a + 1 ≤ 3 all bound one row, a − b: −3 ≤ a − b ≤ −2, then −2 ≤ a − b
+    sx.assert(&d.scaled(&int(2)), Rel::Ge, &int(4), 1).unwrap();
+    sx.assert(&d.scaled(&int(-1)), Rel::Ge, &int(-3), 2).unwrap();
+    let mut shifted = d.clone();
+    shifted.add_constant(&int(1));
+    sx.assert(&shifted, Rel::Le, &int(3), 3).unwrap();
+    assert_eq!(sx.row_count(), 2);
+    let r = sx.add_row(&LinExpr::diff(v[0], v[1]));
+    assert_eq!(sx.upper(r), Some((&int(-2), &1)));
+    assert_eq!(sx.lower(r), Some((&int(-2), &3)));
+    assert_eq!(sx.check(), Ok(()));
+    assert_eq!(sx.eval(&d), int(2));
+    assert_eq!(*sx.value(s), int(2));
+}
+
+#[test]
+fn a_form_without_variables_holds_or_conflicts_alone() {
+    let (mut sx, _) = simplex(0);
+    assert_eq!(sx.assert(&LinExpr::constant(int(3)), Rel::Le, &int(5), 1), Ok(()));
+    assert_eq!(sx.assert(&LinExpr::constant(int(3)), Rel::Ge, &int(5), 2), Err(Failure::Conflict(vec![2])));
+    assert_eq!(sx.assert(&LinExpr::constant(int(3)), Rel::Eq, &int(3), 3), Ok(()));
+}
+
+#[test]
+fn the_optimum_of_a_form() {
+    let (mut sx, v) = simplex(2);
+    let (x, y) = (v[0], v[1]);
+    sx.assert(&LinExpr::var(x), Rel::Ge, &int(1), 1).unwrap();
+    sx.assert(&LinExpr::diff(y, x), Rel::Ge, &int(2), 2).unwrap();
+    assert_eq!(sx.minimize(&LinExpr::var(y)), Ok(int(3)));
+    assert_eq!(*sx.value(y), int(3));
+    let sum = LinExpr::from_terms([(x, int(1)), (y, int(1))], int(10));
+    assert_eq!(sx.minimize(&sum), Ok(int(14)));
+    assert_eq!(sx.minimize(&LinExpr::term(y, int(-1))), Err(Failure::Unbounded));
+    sx.assert(&LinExpr::var(y), Rel::Le, &int(10), 3).unwrap();
+    assert_eq!(sx.minimize(&LinExpr::term(y, int(-1))), Ok(int(-10)));
+    assert_eq!(*sx.value(y), int(10));
+    // fixing the optimum keeps it for the next layer: x is then as large as it can be
+    sx.assert(&LinExpr::var(y), Rel::Eq, &int(10), 4).unwrap();
+    assert_eq!(sx.minimize(&LinExpr::term(x, int(-1))), Ok(int(-8)));
+    sx.assert_invariants();
+    assert!(sx.satisfied());
+}
+
+#[test]
+fn the_optimum_of_an_absolute_value() {
+    // |x − y| through t ≥ x − y and t ≥ y − x, with x = 3 and y ≥ 7: 4
+    let (mut sx, v) = simplex(3);
+    let (x, y, t) = (v[0], v[1], v[2]);
+    sx.assert(&LinExpr::from_terms([(t, int(1)), (x, int(-1)), (y, int(1))], int(0)), Rel::Ge, &int(0), 1).unwrap();
+    sx.assert(&LinExpr::from_terms([(t, int(1)), (x, int(1)), (y, int(-1))], int(0)), Rel::Ge, &int(0), 2).unwrap();
+    sx.assert(&LinExpr::var(x), Rel::Eq, &int(3), 3).unwrap();
+    sx.assert(&LinExpr::var(y), Rel::Ge, &int(7), 4).unwrap();
+    assert_eq!(sx.minimize(&LinExpr::var(t)), Ok(int(4)));
+    assert_eq!((sx.value(x), sx.value(y)), (&int(3), &int(7)));
+}
+
+#[test]
+fn an_infeasible_minimum_is_a_conflict() {
+    // b − a ≥ 1, c − b ≥ 1, a − c ≥ 1: three rows, no solution
+    let (mut sx, v) = simplex(3);
+    sx.assert(&LinExpr::diff(v[1], v[0]), Rel::Ge, &int(1), 1).unwrap();
+    sx.assert(&LinExpr::diff(v[2], v[1]), Rel::Ge, &int(1), 2).unwrap();
+    sx.assert(&LinExpr::diff(v[0], v[2]), Rel::Ge, &int(1), 3).unwrap();
+    assert_eq!(sx.minimize(&LinExpr::var(v[0])), Err(Failure::Conflict(vec![1, 2, 3])));
+}
+
+#[test]
+fn the_budget_stops_the_pivots() {
+    let cs = [ge(&[(1, 1), (0, -1)], 10), ge(&[(2, 1), (1, -1)], 10), le(&[(2, 1), (0, -1)], 25), eq(&[(0, 1)], 5)];
+    let (mut sx, v) = simplex(3);
+    sx.set_pivot_limit(Some(0));
+    for (i, c) in cs.iter().enumerate() {
+        sx.assert(&c.expr(&v), c.rel, &c.c, i).unwrap();
+    }
+    assert_eq!(sx.check(), Err(Failure::Budget));
+    sx.set_pivot_limit(None);
+    assert_eq!(sx.check(), Ok(()));
+    let used = sx.pivots();
+    assert!(used > 0);
+    sx.set_pivot_limit(Some(used));
+    assert_eq!(sx.minimize(&LinExpr::term(v[2], int(-1))), Err(Failure::Budget));
+    sx.set_pivot_limit(None);
+    assert_eq!(sx.minimize(&LinExpr::term(v[2], int(-1))), Ok(int(-30)));
+}
+
+// ------------------------------------------------------------------------------ deciders
+
+/// Whether difference constraints, `x_j − x_i rel c` or `x_i rel c`, have a solution: no
+/// negative cycle in their graph (Bellman–Ford). Variable `n` is the zero the bounds are
+/// differences from.
+fn bellman_ford(cs: &[&Constraint], n: usize) -> bool {
+    let mut edges: Vec<(usize, usize, Q)> = Vec::new();
+    for c in cs {
+        // to − from rel c
+        let (to, from) = match c.terms.as_slice() {
+            [(i, 1)] => (*i, n),
+            [(i, -1)] => (n, *i),
+            [(j, 1), (i, -1)] | [(i, -1), (j, 1)] => (*j, *i),
+            other => panic!("not a difference: {other:?}"),
+        };
+        if matches!(c.rel, Rel::Le | Rel::Eq) {
+            edges.push((from, to, c.c.clone()));
+        }
+        if matches!(c.rel, Rel::Ge | Rel::Eq) {
+            edges.push((to, from, -c.c.clone()));
+        }
+    }
+    let mut dist = vec![Q::zero(); n + 1];
+    for _ in 0..=n + 1 {
+        let mut changed = false;
+        for (u, v, w) in &edges {
+            let d = &dist[*u] + w;
+            if d < dist[*v] {
+                dist[*v] = d;
+                changed = true;
+            }
+        }
+        if !changed {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether equalities have a solution (Gaussian elimination over Q).
+fn gauss(cs: &[&Constraint], n: usize) -> bool {
+    let mut rows: Vec<Vec<Q>> = cs
+        .iter()
+        .map(|c| {
+            assert_eq!(c.rel, Rel::Eq);
+            let mut row = vec![Q::zero(); n + 1];
+            for &(i, a) in &c.terms {
+                row[i] += int(a);
+            }
+            row[n] = c.c.clone();
+            row
+        })
+        .collect();
+    let mut rank = 0;
+    for col in 0..n {
+        let Some(p) = (rank..rows.len()).find(|&r| !rows[r][col].is_zero()) else { continue };
+        rows.swap(rank, p);
+        let pivot = rows[rank].clone();
+        for (r, row) in rows.iter_mut().enumerate() {
+            if r != rank && !row[col].is_zero() {
+                let f = &row[col] / &pivot[col];
+                for k in col..=n {
+                    let d = &f * &pivot[k];
+                    row[k] -= d;
+                }
+            }
+        }
+        rank += 1;
+    }
+    rows[rank..].iter().all(|row| row[n].is_zero())
+}
+
+/// Rows `Σ a x ≤ b` over `n` variables, then Fourier–Motzkin elimination of variables `from..n`
+/// (all when `from` is 0): the rows left over the first `from` variables, or none when the
+/// system has no solution.
+fn fourier_motzkin(cs: &[&Constraint], n: usize, extra: &[(Vec<Q>, Q)], keep: usize) -> Option<Vec<(Vec<Q>, Q)>> {
+    let pad = |mut a: Vec<Q>| {
+        a.resize(n, Q::zero());
+        a
+    };
+    let mut rows: Vec<(Vec<Q>, Q)> =
+        cs.iter().flat_map(|c| c.as_le()).map(|(a, b)| (pad(a), b)).chain(extra.iter().cloned()).collect();
+    for k in (keep..n).rev() {
+        let (mut pos, mut neg, mut rest) = (Vec::new(), Vec::new(), Vec::new());
+        for (a, b) in rows {
+            if a[k].is_positive() {
+                pos.push((a, b));
+            } else if a[k].is_negative() {
+                neg.push((a, b));
+            } else {
+                rest.push((a, b));
+            }
+        }
+        for (p, pb) in &pos {
+            for (q, qb) in &neg {
+                // p / p_k + q / |q_k| has no x_k
+                let (fp, fq) = (p[k].recip(), -q[k].recip());
+                let a: Vec<Q> = p.iter().zip(q).map(|(x, y)| x * &fp + y * &fq).collect();
+                rest.push((a, pb * &fp + qb * &fq));
+            }
+        }
+        // normalise and drop repeats and rows without variables that hold
+        let mut seen: BTreeMap<Vec<Q>, Q> = BTreeMap::new();
+        for (a, b) in rest {
+            let scale = a.iter().find(|x| !x.is_zero()).map(|x| x.abs());
+            match scale {
+                None if b.is_negative() => return None,
+                None => {}
+                Some(s) => {
+                    let a: Vec<Q> = a.iter().map(|x| x / &s).collect();
+                    let b = b / &s;
+                    let e = seen.entry(a).or_insert(b.clone());
+                    if b < *e {
+                        *e = b;
+                    }
+                }
+            }
+        }
+        rows = seen.into_iter().collect();
+    }
+    if rows.iter().any(|(a, b)| a.iter().all(Zero::is_zero) && b.is_negative()) {
+        return None;
+    }
+    Some(rows)
+}
+
+/// The minimum of `Σ cᵢ xᵢ` over the constraints by Fourier–Motzkin: z = objective, every x
+/// eliminated, the largest lower bound left on z. Err(()) when infeasible, Ok(None) when
+/// unbounded.
+fn fm_minimum(cs: &[&Constraint], n: usize, objective: &[i64]) -> Result<Option<Q>, ()> {
+    // variables: z, then x_0 … x_{n-1}; the constraints shifted by one
+    let shifted: Vec<Constraint> = cs
+        .iter()
+        .map(|c| Constraint { terms: c.terms.iter().map(|&(i, a)| (i + 1, a)).collect(), rel: c.rel, c: c.c.clone() })
+        .collect();
+    let refs: Vec<&Constraint> = shifted.iter().collect();
+    let mut row: Vec<Q> = vec![int(1)];
+    row.extend(objective.iter().map(|&c| int(-c)));
+    let neg: Vec<Q> = row.iter().map(|x| -x).collect();
+    let rows = fourier_motzkin(&refs, n + 1, &[(row, Q::zero()), (neg, Q::zero())], 1).ok_or(())?;
+    // a z ≤ b with a < 0 is z ≥ b / a
+    Ok(rows.iter().filter(|(a, _)| a[0].is_negative()).map(|(a, b)| b / &a[0]).max())
+}
+
+// ------------------------------------------------------------------------------ against them
+
+/// A random difference constraint over `n` variables, constants from −10 to 10, a few halves.
+fn random_difference(rng: &mut Rng, n: usize) -> Constraint {
+    let i = rng.below(n as u64) as usize;
+    let j = (i + 1 + rng.below(n as u64 - 1) as usize) % n;
+    let terms =
+        if rng.below(4) == 0 { vec![(i, if rng.below(2) == 0 { 1 } else { -1 })] } else { vec![(j, 1), (i, -1)] };
+    let rel = [Rel::Le, Rel::Ge, Rel::Eq, Rel::Ge][rng.below(4) as usize];
+    let c = if rng.below(5) == 0 { frac(rng.int(-20, 20), 2) } else { int(rng.int(-10, 10)) };
+    Constraint { terms, rel, c }
+}
+
+#[test]
+fn difference_constraints_agree_with_bellman_ford() {
+    let mut rng = Rng(0x5eed_0001);
+    let (mut kept_total, mut discarded_total) = (0, 0);
+    for _ in 0..1000 {
+        let n = 2 + rng.below(6) as usize;
+        let m = 1 + rng.below(18) as usize;
+        let cs: Vec<Constraint> = (0..m).map(|_| random_difference(&mut rng, n)).collect();
+        let (_, _, results) = resolve(&cs, n);
+        let mut kept: Vec<&Constraint> = Vec::new();
+        for (i, r) in results.iter().enumerate() {
+            let mut with = kept.clone();
+            with.push(&cs[i]);
+            let feasible = bellman_ford(&with, n);
+            match r {
+                Ok(()) => {
+                    assert!(feasible, "kept {i} of {cs:?}");
+                    kept.push(&cs[i]);
+                    kept_total += 1;
+                }
+                Err(tags) => {
+                    assert!(!feasible, "discarded {i} of {cs:?}");
+                    let subset: Vec<&Constraint> = tags.iter().map(|&t| &cs[t]).collect();
+                    assert!(!bellman_ford(&subset, n), "the explanation {tags:?} of {i} has a solution: {cs:?}");
+                    discarded_total += 1;
+                }
+            }
+        }
+    }
+    // the systems are neither all feasible nor all conflicting
+    assert!(kept_total > 2000 && discarded_total > 1000, "{kept_total} kept, {discarded_total} discarded");
+}
+
+/// A random equality of the kinds the facts make: a DISTRIBUTE step, a difference, a fixed
+/// coordinate, or any three variables with small coefficients.
+fn random_equality(rng: &mut Rng, n: usize) -> Constraint {
+    let kind = rng.below(4);
+    let mut pick = |k: usize| {
+        let mut vs: Vec<usize> = Vec::new();
+        while vs.len() < k {
+            let v = rng.below(n as u64) as usize;
+            if !vs.contains(&v) {
+                vs.push(v);
+            }
+        }
+        vs
+    };
+    let terms = match kind {
+        0 => {
+            let v = pick(3);
+            vec![(v[0], 1), (v[1], -2), (v[2], 1)]
+        }
+        1 => {
+            let v = pick(2);
+            vec![(v[0], 1), (v[1], -1)]
+        }
+        2 => vec![(pick(1)[0], 1)],
+        _ => {
+            let v = pick(3);
+            let mut coefficient = || {
+                let c = rng.int(-3, 2);
+                if c >= 0 {
+                    c + 1
+                } else {
+                    c
+                }
+            };
+            vec![(v[0], coefficient()), (v[1], coefficient()), (v[2], coefficient())]
+        }
+    };
+    let c = if rng.below(3) == 0 { int(0) } else { int(rng.int(-12, 12)) };
+    Constraint { terms, rel: Rel::Eq, c }
+}
+
+#[test]
+fn equalities_of_three_variables_agree_with_gaussian_elimination() {
+    let mut rng = Rng(0x5eed_0002);
+    let (mut kept_total, mut discarded_total) = (0, 0);
+    for _ in 0..800 {
+        let n = 3 + rng.below(4) as usize;
+        let m = 1 + rng.below(9) as usize;
+        let cs: Vec<Constraint> = (0..m).map(|_| random_equality(&mut rng, n)).collect();
+        let (_, _, results) = resolve(&cs, n);
+        let mut kept: Vec<&Constraint> = Vec::new();
+        for (i, r) in results.iter().enumerate() {
+            let mut with = kept.clone();
+            with.push(&cs[i]);
+            let feasible = gauss(&with, n);
+            match r {
+                Ok(()) => {
+                    assert!(feasible, "kept {i} of {cs:?}");
+                    kept.push(&cs[i]);
+                    kept_total += 1;
+                }
+                Err(tags) => {
+                    assert!(!feasible, "discarded {i} of {cs:?}");
+                    let subset: Vec<&Constraint> = tags.iter().map(|&t| &cs[t]).collect();
+                    assert!(!gauss(&subset, n), "the explanation {tags:?} of {i} has a solution: {cs:?}");
+                    discarded_total += 1;
+                }
+            }
+        }
+    }
+    assert!(kept_total > 1500 && discarded_total > 500, "{kept_total} kept, {discarded_total} discarded");
+}
+
+/// A random constraint over one to three of `n` variables, coefficients from −3 to 3.
+fn random_linear(rng: &mut Rng, n: usize) -> Constraint {
+    let k = 1 + rng.below(n.min(3) as u64) as usize;
+    let mut terms: Vec<(usize, i64)> = Vec::new();
+    while terms.len() < k {
+        let v = rng.below(n as u64) as usize;
+        let a = rng.int(-3, 3);
+        if a != 0 && terms.iter().all(|&(w, _)| w != v) {
+            terms.push((v, a));
+        }
+    }
+    let rel = [Rel::Le, Rel::Ge, Rel::Eq, Rel::Le, Rel::Ge][rng.below(5) as usize];
+    Constraint { terms, rel, c: int(rng.int(-8, 8)) }
+}
+
+#[test]
+fn linear_constraints_and_optima_agree_with_fourier_motzkin() {
+    let mut rng = Rng(0x5eed_0003);
+    let (mut kept_total, mut discarded_total, mut optima, mut unbounded) = (0, 0, 0, 0);
+    for _ in 0..800 {
+        let n = 2 + rng.below(2) as usize;
+        let m = 1 + rng.below(7) as usize;
+        let cs: Vec<Constraint> = (0..m).map(|_| random_linear(&mut rng, n)).collect();
+        let (mut sx, vars, results) = resolve(&cs, n);
+        let mut kept: Vec<&Constraint> = Vec::new();
+        for (i, r) in results.iter().enumerate() {
+            let mut with = kept.clone();
+            with.push(&cs[i]);
+            let feasible = fourier_motzkin(&with, n, &[], 0).is_some();
+            match r {
+                Ok(()) => {
+                    assert!(feasible, "kept {i} of {cs:?}");
+                    kept.push(&cs[i]);
+                    kept_total += 1;
+                }
+                Err(tags) => {
+                    assert!(!feasible, "discarded {i} of {cs:?}");
+                    let subset: Vec<&Constraint> = tags.iter().map(|&t| &cs[t]).collect();
+                    assert!(fourier_motzkin(&subset, n, &[], 0).is_none(), "the explanation {tags:?} has a solution");
+                    discarded_total += 1;
+                }
+            }
+        }
+        // the optimum of a few objectives over what was kept, one after the other on one tableau
+        for _ in 0..3 {
+            let objective: Vec<i64> = (0..n).map(|_| rng.int(-2, 2)).collect();
+            let form = LinExpr::from_terms(objective.iter().enumerate().map(|(i, &c)| (vars[i], int(c))), int(0));
+            let expected = fm_minimum(&kept, n, &objective).expect("what was kept has a solution");
+            match (sx.minimize(&form), expected) {
+                (Ok(v), Some(w)) => {
+                    assert_eq!(v, w, "{objective:?} over {kept:?}");
+                    assert_eq!(sx.eval(&form), v);
+                    for c in &kept {
+                        assert!(c.holds(|j| sx.value(vars[j]).clone()));
+                    }
+                    optima += 1;
+                }
+                (Err(Failure::Unbounded), None) => unbounded += 1,
+                (got, want) => panic!("{got:?} against {want:?} for {objective:?} over {kept:?}"),
+            }
+            sx.assert_invariants();
+        }
+    }
+    assert!(kept_total > 1000 && discarded_total > 300, "{kept_total} kept, {discarded_total} discarded");
+    assert!(optima > 800 && unbounded > 200, "{optima} optima, {unbounded} unbounded");
+}
+
+#[test]
+fn undoing_and_asserting_again_equals_building_afresh() {
+    let mut rng = Rng(0x5eed_0004);
+    for _ in 0..500 {
+        let n = 2 + rng.below(4) as usize;
+        let m = 2 + rng.below(10) as usize;
+        let cs: Vec<Constraint> = (0..m)
+            .map(|_| match rng.below(3) {
+                0 => random_difference(&mut rng, n),
+                1 => random_linear(&mut rng, n),
+                _ => random_equality(&mut rng, n.max(3)),
+            })
+            .map(|c| Constraint { terms: c.terms.into_iter().filter(|&(i, _)| i < n).collect(), ..c })
+            .filter(|c| !c.terms.is_empty())
+            .collect();
+        // one tableau, with junk asserted, checked and undone between the constraints
+        let (mut sx, vars) = simplex(n);
+        let mut kept: Vec<usize> = Vec::new();
+        for (i, c) in cs.iter().enumerate() {
+            if rng.below(2) == 0 {
+                let cp = sx.checkpoint();
+                for _ in 0..1 + rng.below(3) {
+                    let junk = random_linear(&mut rng, n);
+                    if sx.assert(&junk.expr(&vars), junk.rel, &junk.c, 1000).is_err() {
+                        break;
+                    }
+                }
+                let _ = sx.check();
+                if rng.below(2) == 0 {
+                    let _ = sx.minimize(&LinExpr::term(vars[0], int(rng.int(-1, 1))));
+                }
+                sx.backtrack(cp);
+            }
+            let cp = sx.checkpoint();
+            match sx.assert(&c.expr(&vars), c.rel, &c.c, i).and_then(|()| sx.check()) {
+                Ok(()) => kept.push(i),
+                Err(Failure::Conflict(_)) => sx.backtrack(cp),
+                Err(e) => panic!("{e:?}"),
+            }
+            sx.assert_invariants();
+        }
+        assert_eq!(sx.check(), Ok(()));
+        // the same constraints on a fresh tableau, without the junk, keep the same ones
+        let (fresh_sx, fresh_vars, results) = resolve(&cs, n);
+        let fresh_kept: Vec<usize> = (0..cs.len()).filter(|&i| results[i].is_ok()).collect();
+        assert_eq!(kept, fresh_kept, "{cs:?}");
+        // and give the same optima and the same answers to more constraints
+        let mut fresh = fresh_sx;
+        for _ in 0..3 {
+            let objective: Vec<(usize, i64)> = (0..n).map(|i| (i, rng.int(-2, 2))).collect();
+            let form = |vars: &[Var]| LinExpr::from_terms(objective.iter().map(|&(i, c)| (vars[i], int(c))), int(0));
+            assert_eq!(sx.minimize(&form(&vars)), fresh.minimize(&form(&fresh_vars)), "{cs:?}");
+            let more = random_linear(&mut rng, n);
+            let (a, b) = (sx.checkpoint(), fresh.checkpoint());
+            let ra = sx.assert(&more.expr(&vars), more.rel, &more.c, 999).and_then(|()| sx.check()).is_ok();
+            let rb = fresh.assert(&more.expr(&fresh_vars), more.rel, &more.c, 999).and_then(|()| fresh.check()).is_ok();
+            assert_eq!(ra, rb, "{more:?} after {cs:?}");
+            sx.backtrack(a);
+            fresh.backtrack(b);
+            assert_eq!(sx.check(), Ok(()));
+            assert_eq!(fresh.check(), Ok(()));
+        }
+    }
+}
+
+#[test]
+fn the_same_input_gives_the_same_tableau() {
+    let mut rng = Rng(0x5eed_0005);
+    let cs: Vec<Constraint> = (0..30).map(|_| random_linear(&mut rng, 5)).collect();
+    let (a, va, ra) = resolve(&cs, 5);
+    let (b, vb, rb) = resolve(&cs, 5);
+    assert_eq!(ra, rb);
+    assert_eq!(a.pivots(), b.pivots());
+    for (x, y) in va.iter().zip(&vb) {
+        assert_eq!(a.value(*x), b.value(*y));
+    }
+}

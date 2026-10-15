@@ -1,0 +1,112 @@
+//! The solver of Rich Netlist (RNL) descriptions (standard 8.5, 11, 13.7, 14, chapter 17).
+//!
+//! [`solve`] takes the problem of one drawing level, the [`LevelProblem`] that the runtime builds
+//! when it reads a document with `rnl_runtime::Options::solver()`, and gives a [`Solution`]: the
+//! positions and orientations of the objects and the wires of the ROUTEs. The runtime writes it
+//! back as the level's record of the solver:
+//!
+//! ```text
+//! let solved = rnl_solver::solve(problem, &options);
+//! let hash = rnl_runtime::problem::sig1(problem, &options.canonical());
+//! let written = rnl_runtime::solution::write_record(problem, &solved.solution, rnl_solver::AUTHOR, &hash);
+//! ```
+//!
+//! [`SolveReport`] says what became of each fact: 8.5 takes the facts in the order of
+//! [`LevelProblem::facts`] and keeps each that fits with those kept before it; a fact that does not
+//! is discarded, with the facts it conflicts with.
+//!
+//! The work is in stages (the development plan of solver v1):
+//!
+//! - resolution of 8.5 with exact rationals and an incremental simplex (`rational`, `simplex`,
+//!   `model`, `orient`, `resolve`);
+//! - structure-first search over the discrete decisions, configured by the layered objectives
+//!   (`objectives`, `structure`, `search`);
+//! - coordinates by a lexicographic LP, routing of the ROUTEs, layered scoring (`coords`, `route`,
+//!   `score`, `driver`).
+//!
+//! **Status: stage S1.** The crate, its options and its exact arithmetic are in place. [`solve`]
+//! does not resolve, place or route anything yet: it gives an empty solution and says so in the
+//! report's notes.
+//!
+//! The crate does no file I/O and takes no time or randomness, so it builds for
+//! `wasm32-unknown-unknown` and the same input and options give the same result on every platform.
+
+mod coords;
+mod driver;
+mod model;
+mod objectives;
+mod options;
+mod orient;
+mod rational;
+mod resolve;
+mod route;
+mod score;
+mod search;
+mod simplex;
+mod structure;
+
+pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, OBJECTIVES};
+pub use rnl_runtime::problem::LevelProblem;
+pub use rnl_runtime::solution::Solution;
+
+/// The `author` the solver writes in the head of its record (2.8, chapter 17).
+pub const AUTHOR: &str = "rnl-solver 0.1";
+
+/// What [`solve`] gives: the solution, and the report of how it was reached.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Solved {
+    pub solution: Solution,
+    pub report: SolveReport,
+}
+
+/// What became of the facts, and how much work it took.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SolveReport {
+    /// The facts kept, by their index in [`LevelProblem::facts`], in that order (8.5).
+    pub kept: Vec<usize>,
+    /// The facts discarded, in the order of [`LevelProblem::facts`] (8.5).
+    pub discarded: Vec<Discarded>,
+    /// The objectives that are on but have nothing to work with, such as the current direction
+    /// without a supply or ground symbol, or that this version does not compute: one sentence
+    /// each.
+    pub inert_objectives: Vec<String>,
+    pub work: Work,
+    /// Anything else worth saying, such as a budget that ran out.
+    pub notes: Vec<String>,
+}
+
+/// A fact the resolution of 8.5 discarded.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Discarded {
+    /// Its index in [`LevelProblem::facts`].
+    pub fact: usize,
+    /// The facts kept before it that it conflicts with, by index: a minimal set, so that without
+    /// any one of them it would fit. Of several such sets, the one with the facts that rank
+    /// first.
+    pub conflicts_with: Vec<usize>,
+    /// The budget for deciding it ran out ([`Budget::resolve_nodes`]): it is discarded without
+    /// a proof that it conflicts, and `conflicts_with` is what the search had found by then. The
+    /// standard does not say yet what a solver does then.
+    pub undecided: bool,
+}
+
+/// The work done, counted as the [`Budget`] counts it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Work {
+    /// The nodes of the searches of the resolution of 8.5.
+    pub resolve_nodes: u64,
+    /// The pivots of the simplex.
+    pub pivots: u64,
+    /// The candidates the search made.
+    pub candidates: u64,
+    /// The cells the router expanded.
+    pub astar_expansions: u64,
+}
+
+/// Solves one drawing level: resolves its facts (8.5), places and orients its objects, and
+/// routes its ROUTEs (13.7).
+///
+/// Stage S1: gives an empty solution, with a note that says so.
+pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
+    driver::solve(problem, options)
+}

@@ -10,7 +10,7 @@ The Rust workspace ([`../Cargo.toml`](../Cargo.toml)). The crates implement the 
 | [`rnl-render`](rnl-render/README.md) | Draws an effective model as basic primitives and SVG. |
 | [`rnl-view`](rnl-view/README.md) | The core interface for frontends: a workspace in, a Document out, with the standard packages bundled. Reads no files. |
 | [`rnl-cli`](rnl-cli/README.md) | The `rnl` command: check, render, dump, view, and strip generated records. Its `FsProvider` reads files for the desktop viewer too. |
-| [`rnl-solver`](rnl-solver/README.md) | Future solver; no crate yet. |
+| [`rnl-solver`](rnl-solver/README.md) | The solver, in progress: options and exact arithmetic (rationals, an incremental simplex); resolution, placement and routing to come. Reads no files. |
 
 ```bash
 cargo build --release -p rnl-cli
