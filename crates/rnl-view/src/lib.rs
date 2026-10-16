@@ -576,7 +576,8 @@ R1 p q 1k
 
     #[test]
     fn the_bundled_packages_are_by_version() {
-        // the series 0.2 with the Chinese aliases, and the series 0.3, each in its own directory
+        // the series 0.2 with the Chinese aliases, and the series 0.3, each in its own directory, and
+        // Analog Canvas's package in one of its own
         let names: Vec<&str> = BUNDLED.iter().map(|(path, _)| *path).collect();
         let series = |v: &str| names.iter().filter(|n| n.starts_with(&format!("{v}/"))).count();
         assert_eq!(
@@ -598,9 +599,11 @@ R1 p q 1k
         for name in ["rnl-std", "rnl-std-core", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre", "rnl-std-full"] {
             assert!(names.contains(&format!("0.3/{name}.rnl").as_str()), "{name}");
         }
-        assert_eq!(names.len(), 9 + 16);
+        assert_eq!(names.last(), Some(&"analog-canvas-extensions/analog-canvas-extensions.rnl"));
+        assert_eq!(names.len(), 9 + 16 + 1);
         let p = bundled();
-        assert_eq!(p.package_dirs, [format!("{BUNDLED_DIR}/0.2"), format!("{BUNDLED_DIR}/0.3")]);
+        let dirs = ["0.2", "0.3", "analog-canvas-extensions"].map(|d| format!("{BUNDLED_DIR}/{d}"));
+        assert_eq!(p.package_dirs, dirs);
         assert_eq!(p.package_files().len(), names.len());
     }
 
@@ -646,15 +649,15 @@ R1 p q 1k
         assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
         assert_eq!(r.model.levels[0].items.iter().filter(|i| !i.host.is_empty()).count(), 2);
         for (path, _) in BUNDLED {
-            // the hints of the packages of the series 0.3 are left to their authors, such as the
-            // pins of the gates with four inputs, which are not on integer points (9.2.4)
-            let series_0_3 = path.starts_with("0.3/");
+            // no diagnostic, but the hints of analog-canvas-extensions: the pins of its gates with
+            // four inputs, which Analog Canvas puts off the integer points (9.2.4)
+            let extensions = path.starts_with("analog-canvas-extensions/");
             let options = Options::default();
             let package = interpret(&format!("{BUNDLED_DIR}/{path}"), None, &MemoryProvider::new(), &options);
             let package = package.unwrap();
             let loud: Vec<_> = package.diagnostics().into_iter().filter(|d| d.severity != Severity::Hint).collect();
             assert!(loud.is_empty(), "{path}: {loud:?}");
-            assert!(series_0_3 || package.diagnostics().is_empty(), "{path}: {:?}", package.diagnostics());
+            assert!(extensions || package.diagnostics().is_empty(), "{path}: {:?}", package.diagnostics());
         }
     }
 
