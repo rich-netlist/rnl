@@ -32,10 +32,11 @@
 //!
 //! A fact that has no solution on its own contradicts itself and fails (the draft 0.3, 8.5; 7.6):
 //! the report of its level has an error for it, on a line that begins with `error:`, and the level
-//! is solved and written back without it, as if it were not written; `rnl solve` then exits with
-//! 1 ([`errors`]). The runtime fails those it sees from what is written alone, with an error of
-//! the netlist, and leaves them out of the problem (8.5, 9.5); the solver gets those that only the
-//! pins of a symbol and the orientations tie.
+//! is solved and written back without it, as if it were not written ([`errors`]). The runtime fails
+//! those it sees from what is written alone, with an error of the netlist, and leaves them out of
+//! the problem (8.5, 9.5); the solver gets those that only the pins of a symbol and the
+//! orientations tie. `rnl solve` exits with 1 when any error was reported, of the netlist as a
+//! solver reads it ([`SolveRun::errors`]) or of the solver, once the files are written.
 //!
 //! A level whose file, or a file above it, declares a language version that the reading does not
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
@@ -618,7 +619,8 @@ fn num(v: f64) -> String {
 }
 
 /// How many errors the solver reported over the levels of a run: the facts that contradict
-/// themselves and fail (the draft 0.3, 8.5; 7.6). `rnl solve` exits with 1 when there is one.
+/// themselves and fail (the draft 0.3, 8.5; 7.6). `rnl solve` exits with 1 when there is one, or
+/// an error of the netlist ([`SolveRun::errors`]).
 pub fn errors(run: &SolveRun) -> usize {
     run.levels.iter().map(|l| l.solved.report.errors.len()).sum()
 }

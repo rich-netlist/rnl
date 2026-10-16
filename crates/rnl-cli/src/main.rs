@@ -51,7 +51,10 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --report            print what became of every fact, not only of the facts discarded, and the hints
                       of the facts of priority low and of the statements only they lose (8.5)
   a fact that has no solution on its own contradicts itself and fails (8.5): solve prints an error line
-  for it, solves the level and writes it back without it, and exits with 1
+  for it, and solves the level and writes it back without it
+  solve exits with 1 when an error was reported, once the files are written: one of the netlist as a
+  solver reads it, whose number it gives on the standard error as rnl check --no-generated counts
+  them, or one of the solver
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
 write:
@@ -315,8 +318,10 @@ fn run(args: &Args) -> Result<ExitCode, String> {
 }
 
 /// `rnl solve`: solve, print what became of each level, write the files (plan 5.10). Exits with 1
-/// when the solver reports an error, a fact that contradicts itself (the draft 0.3, 8.5; 7.6), once
-/// the files are written.
+/// when any error was reported, once the files are written: an error of the netlist as a solver
+/// reads it, counted as `rnl check --no-generated` counts them (7.6), or an error of the solver, a
+/// fact that contradicts itself (the draft 0.3, 8.5; 7.6); with 2 when a file cannot be read or
+/// written.
 fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
     let target = match (&args.out, args.in_place) {
         (Some(_), true) => return Err("solve writes under -o DIR or --in-place, not both".into()),
@@ -366,10 +371,11 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
     if run.errors > 0 {
         eprintln!("{} errors in {} as a solver reads it; run `rnl check` to see them", run.errors, run.entry);
     }
-    // a fact that contradicts itself fails (8.5, 7.6): the levels are written all the same
+    // an error of the netlist, or a fact that contradicts itself (8.5, 7.6): the levels are written
+    // all the same
     match writing.error {
         Some(e) => Err(e),
-        None if rnl_cli::solve::errors(&run) > 0 => Ok(ExitCode::from(1)),
+        None if run.errors + rnl_cli::solve::errors(&run) > 0 => Ok(ExitCode::from(1)),
         None => Ok(ExitCode::SUCCESS),
     }
 }

@@ -803,11 +803,13 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
     let snapshot = std::fs::read(solver_dir().join("solved/T1-rc-lowpass.sp")).unwrap();
     assert!(std::fs::read(&copy).unwrap() == snapshot);
 
-    // a file whose RNL is not interpreted: said, and nothing written
+    // a file whose RNL is not interpreted: said, and nothing written; its version is an error of
+    // the netlist (16.1), so the command exits with 1
     let unsupported = path_str(&corpus("13-unsupported-version.sp"));
-    let (code, stdout, _) =
+    let (code, stdout, stderr) =
         rnl(&["solve", &unsupported, "-o", &path_str(&dir.join("none")), "--solver-options", "time_limit=none"]);
-    assert_eq!(code, 0, "{stdout}");
+    assert_eq!(code, 1, "{stdout}{stderr}");
+    assert!(stderr.contains(" errors in "), "{stderr}");
     assert!(stdout.contains("): not solved, and nothing is written for it: "), "{stdout}");
     assert!(!stdout.contains("\nwrote "), "{stdout}");
     assert!(!dir.join("none").exists());
@@ -1152,6 +1154,9 @@ fn a_free_text_goes_beside_what_it_is_attached_to() {
     check_read_back(&run, Path::new("/w/t.sp"), &Layered { layers: vec![&solved, &files] }, false, "texts");
 }
 
+// TODO: under RNL_BLESS=1 this test can read T1's snapshot before the test that blesses it has
+// written it again, as the tests run in parallel; a second plain run passes. Bless with
+// `--test-threads=1`.
 #[test]
 fn the_problem_command_hashes_the_options_as_solve_writes_them() {
     let f = path_str(&case("T1-rc-lowpass"));
@@ -1790,7 +1795,7 @@ fn a_fact_that_the_runtime_sees_contradict_itself_never_reaches_the_solver() {
     // what is written, two members at one place. The runtime fails each itself, with an error at
     // its statement, and leaves it out of the problem (8.5, 9.5): the solver fails nothing, and the
     // level is solved as without them; the command gives the errors of the netlist on the standard
-    // error and exits with 0
+    // error, writes the file and exits with 1, as for any error (7.6)
     let failing = "*   {{#R1 #R2} {#R1 #R2}} @ORDER(\"y\");\n*   {#R1 {#R1}} @ORDER(\"y\");\n";
     let files = MemoryProvider::new().with("/w/self.sp", &with_statements(failing));
     let run = solve(Path::new("/w/self.sp"), &files, &unlimited()).unwrap();
@@ -1813,10 +1818,31 @@ fn a_fact_that_the_runtime_sees_contradict_itself_never_reaches_the_solver() {
     let out = dir.join("out");
     let (code, stdout, stderr) =
         rnl(&["solve", &path_str(&file), "-o", &path_str(&out), "--solver-options", "time_limit=none"]);
-    assert_eq!(code, 0, "{stdout}{stderr}");
+    assert_eq!(code, 1, "{stdout}{stderr}");
     assert!(stderr.contains("2 errors in "), "{stderr}");
     assert!(!stdout.contains("error: "), "{stdout}");
+    assert!(stdout.ends_with(&format!("wrote {}\n", path_str(&out.join("self.sp")))), "{stdout}");
     assert!(out.join("self.sp").exists());
+}
+
+#[test]
+fn the_command_exits_with_1_on_the_errors_of_the_netlist() {
+    // the corpus cases written with errors (7.6) are solved and written all the same, and the
+    // command exits with 1, as `rnl check` does, with their number on the standard error
+    for name in ["12-diagnostics.sp", "16-ties.sp", "19-set-cycles.sp"] {
+        let f = corpus(name);
+        let errors = interpret_file(&f, None, &FsProvider::new(&[]), &Options::solver()).unwrap();
+        let errors = errors.diagnostics().iter().filter(|d| d.severity == Severity::Error).count();
+        assert!(errors > 0, "{name}");
+        let (code, _, _) = rnl(&["check", &path_str(&f), "--no-generated"]);
+        assert_eq!(code, 1, "{name}");
+        let out = scratch(&format!("errors-{name}"));
+        let (code, stdout, stderr) =
+            rnl(&["solve", &path_str(&f), "-o", &path_str(&out), "--solver-options", "time_limit=none"]);
+        assert_eq!(code, 1, "{name}: {stdout}{stderr}");
+        assert!(stderr.contains(&format!("{errors} errors in ")), "{name}: {stderr}");
+        assert!(stdout.contains(&format!("wrote {}", path_str(&out.join(name)))), "{name}: {stdout}");
+    }
 }
 
 #[test]
