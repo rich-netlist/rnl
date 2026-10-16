@@ -1333,6 +1333,43 @@ fn above_the_switch_to_spectre_an_included_file_gets_its_header_in_stars() {
 }
 
 #[test]
+fn a_header_in_slashes_moved_into_spice_mode_carries_every_record_of_its_file() {
+    // a main file that is not a .scs file and whose first statement is not `simulator
+    // lang=spectre`, with its header in `//` after a subcircuit: the record of the subcircuit
+    // would come before it, so it moves to line 2, where only `*` is a comment (2.2, 2.8). It
+    // moves before any level of the file is written, so that the record of the file level, solved
+    // first, is in `*` as well, as the next solve, which finds the header in `*`, writes it: the
+    // same text twice, and no line left holding a marker alone
+    let net = "* title\n.param rr=1k\nsimulator lang=spectre\nsubckt pair (a b)\nR1 (a m) resistor r=1k\n\
+               R2 (m b) resistor r=1k\nends pair\n// @RNL(type=\"header\") { }\nX1 (p q) pair\n";
+    let files = MemoryProvider::new().with("/w/top.net", net);
+    let entry = Path::new("/w/top.net");
+    let alone = |text: &str| text.lines().any(|l| l.trim() == "*" || l.trim() == "//");
+    let run = solve(entry, &files, &unlimited()).unwrap();
+    assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.net", "pair"]);
+    let text = &run.files[0].text;
+    let head = "* title\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.param rr=1k\nsimulator lang=spectre\n";
+    assert!(text.starts_with(head), "{text}");
+    assert_eq!(text.matches("\n* @RNL(type=\"generated\"").count(), 2, "{text}");
+    assert!(!text.contains("// @RNL") && !alone(text), "{text}");
+    let solved = MemoryProvider::new().with("/w/top.net", text);
+    let both = Layered { layers: vec![&solved, &files] };
+    check_read_back(&run, entry, &both, false, "top.net");
+    assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files);
+    // the file level solved alone keeps the header where it is, in `//`, and writes its record in
+    // `//`; the next solve of every level moves the header, and its record in `//` is replaced by
+    // one in `*`, leaving no `//` alone on its line
+    let one = SolveOptions { level: Some("top.net".into()), ..unlimited() };
+    let first = solve(entry, &files, &one).unwrap();
+    let text = &first.files[0].text;
+    assert!(text.contains("\nends pair\n// @RNL(type=\"header\") { @VERSION(\"0.2\") }\n"), "{text}");
+    assert!(text.contains("\n// @RNL(type=\"generated\""), "{text}");
+    let solved = MemoryProvider::new().with("/w/top.net", text);
+    let after = solve(entry, &Layered { layers: vec![&solved, &files] }, &unlimited()).unwrap();
+    assert_eq!(after.files, run.files, "{}", after.files[0].text);
+}
+
+#[test]
 fn a_file_read_only_through_a_library_section_gets_no_header_outside_it() {
     // a file read through `.lib file sec` or `include … section=` is read only inside the
     // section, and tools must not write outside it (2.2): it gets no header record there, the

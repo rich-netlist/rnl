@@ -13,7 +13,10 @@
 //! record, at the positions the reading gives; but a file read only through library sections,
 //! where what lies outside them is not read (2.2), gets no new header. The header record stays the
 //! first record of its file (2.8): one written after a subcircuit that gets its record moves where
-//! a new header goes, to line 2 (the draft 0.3, 16.3 and 2.2). A file may hold several levels, and
+//! a new header goes, to line 2 (the draft 0.3, 16.3 and 2.2), before any level of its file is
+//! written (`writeback::move_header_for`), so that every record written into the file follows the
+//! carrier it has there, `*` above the `simulator lang=spectre` of a file in `//`, as the next
+//! solve, which finds it there, writes them. A file may hold several levels, and
 //! writing one back moves the lines of those after it, so the document is read again before the
 //! next level, the texts written so far held in memory over the files.
 //!
@@ -59,7 +62,9 @@ use rnl_runtime::interp::unit::{DRAFT_VERSION, SUPPORTED_VERSION};
 use rnl_runtime::problem::{sig1, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
-use rnl_runtime::writeback::{generated_files, remove_generated_with_header, replace_generated_with_header};
+use rnl_runtime::writeback::{
+    generated_files, move_header_for, remove_generated_with_header, replace_generated_with_header,
+};
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Clock, Discarded, Solved, SolverOptions, Statement, AUTHOR};
 
@@ -276,9 +281,28 @@ pub fn solve_with_clock(
             return Err(format!("no drawing level is titled {t}"));
         }
     }
+    // a header that the record of a level would come before moves before any level of its file is
+    // written (2.8; the draft 0.3, 16.3 and 2.2), so that every record written into the file
+    // follows the carrier it has where it goes, as the next solve, which finds it there, writes them
+    let mut moved: Vec<String> = Vec::new();
+    for (level, title) in &targets {
+        let Some(p) = first.problems.iter().find(|p| p.level == *level && p.title == *title) else { continue };
+        let host = &first.doc.levels[*level];
+        let path = normalize(&host.path);
+        if moved.contains(&path) {
+            continue;
+        }
+        let text = text_of(&first, &Layered { layers: vec![&memory, &files] }, &host.file, &path)?;
+        let out = move_header_for(&first.doc, *level, &text, &p.version);
+        if out != text {
+            memory.insert(&path, &out);
+            moved.push(path);
+        }
+    }
     let mut levels = Vec::new();
     let mut solved_files: Vec<SolvedFile> = Vec::new();
-    let mut current = Some(first);
+    // the document read again when a header moved
+    let mut current = if moved.is_empty() { Some(first) } else { None };
     for (level, title) in targets {
         // the document as written so far: the lines of this level have moved if one before it in
         // its file was written back
@@ -301,21 +325,16 @@ pub fn solve_with_clock(
         let (record, texts) = {
             let both = Layered { layers: vec![&memory, &files] };
             let record = rnl_view::finish_record(&r.doc, &both, &runtime, p, &written.record);
-            // the text as the adapter read it, which the positions of its records refer to
-            let text_of = |file: &str, path: &str| match r.doc.source(file) {
-                Some(t) => Ok(t.to_string()),
-                None => both.read(path).ok_or_else(|| format!("cannot read {path}")),
-            };
             // the record and the header in one pass, at the positions of this reading: a header
             // below the end of a subcircuit written moves to line 2, to stay the first record (2.8)
-            let text = text_of(&host.file, &path)?;
+            let text = text_of(&r, &both, &host.file, &path)?;
             let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
             let mut texts = vec![(path.clone(), out)];
             // a record of the solver for this level written with scope= in another file (2.6)
             for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
                 let Some(lv) = r.doc.levels.iter().find(|l| l.file == other) else { continue };
                 let at = normalize(&lv.path);
-                let text = text_of(&other, &at)?;
+                let text = text_of(&r, &both, &other, &at)?;
                 let out = remove_generated_with_header(&r.doc, p.level, &other, &text, &version_of(&r, &other));
                 texts.push((at, out));
             }
@@ -334,6 +353,15 @@ pub fn solve_with_clock(
     let packages: Vec<String> = files.files.package_files().iter().map(|p| normalize(p)).collect();
     let read: Vec<String> = files.read.take().into_iter().filter(|p| !packages.contains(p)).collect();
     Ok(SolveRun { entry, levels, not_solved, files: solved_files, read, errors })
+}
+
+/// The text of a file as the reading `r` found it, which the positions of its records refer to; read
+/// from `files` when the reading kept none.
+fn text_of(r: &Interpretation, files: &dyn Provider, file: &str, path: &str) -> Result<String, String> {
+    match r.doc.source(file) {
+        Some(t) => Ok(t.to_string()),
+        None => files.read(path).ok_or_else(|| format!("cannot read {path}")),
+    }
 }
 
 /// The version a file of the document was read in (16.1): that of a level in it, else the tool's

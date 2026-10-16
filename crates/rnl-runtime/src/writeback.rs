@@ -12,7 +12,8 @@
 //! file, its header among them, are found where the reading found them, however many lines the
 //! other changes add or remove. A solver that writes a level back and gives its file its header
 //! makes both changes in one pass ([`replace_generated_with_header`],
-//! [`remove_generated_with_header`]).
+//! [`remove_generated_with_header`]); one that writes several levels of a file first moves the
+//! header that the record of one of them would come before ([`move_header_for`]).
 
 use crate::host::{HostDocument, LevelId, LevelKind, Record};
 use crate::syntax::{parse_record, Value};
@@ -57,7 +58,8 @@ impl Lines {
     }
 
     /// Remove the characters from (line, col) to (line, col) inclusive, 1-based; drop the lines
-    /// that are left holding nothing but a comment marker.
+    /// that are left holding nothing but a comment marker, `marker`, the file's carrier, or the
+    /// marker that carried the record on its line.
     fn remove(&mut self, start: (u32, u32), end: (u32, u32), marker: &str) {
         let (l0, c0) = (start.0 as usize - 1, start.1 as usize - 1);
         let (l1, c1) = (end.0 as usize - 1, end.1 as usize);
@@ -74,6 +76,12 @@ impl Lines {
         if holds_tokens(&tail) {
             tail = format!("@RNL {{}} {}", tail.trim_start());
         }
+        // the marker that carries the record on its line: the file's, or the other one of a file
+        // in Spectre's dialect, `*` above its `simulator lang=spectre` or `//` below it (2.2)
+        let marker = match head.trim() {
+            own @ ("*" | "//") if !marker.is_empty() => own,
+            _ => marker,
+        };
         // a record removed from the middle of a carrier line leaves one marker and one space
         let merged = if !marker.is_empty() && head.trim() == marker && !tail.trim().is_empty() {
             format!("{marker} {}", tail.trim_start())
@@ -83,7 +91,7 @@ impl Lines {
 
         let ending = Self::ending(&last_line).to_string();
         let rest = merged.trim();
-        let empty = rest.is_empty() || rest == marker || (marker.is_empty() && rest.is_empty());
+        let empty = rest.is_empty() || rest == marker;
         let replacement: Vec<String> = if empty { Vec::new() } else { vec![format!("{}{ending}", merged.trim_end())] };
         self.lines.splice(l0..=l1, replacement);
     }
@@ -375,20 +383,40 @@ pub fn replace_generated_with_header(
     version: &str,
 ) -> String {
     let file = &doc.levels[level].file;
-    let (mut edits, mut marker) = header_edits(doc, file, text, version);
-    let at = end_of(doc, level, &Lines::new(text));
-    // the record, at the end of the level, would come before the header
-    if let Some(header) = first_header(doc, file).filter(|h| span(h).0 .0 >= at) {
-        let to = top(doc, file, text, marker)
-            .or_else(|| subckt_start(doc, level).map(|line| Top { line, marker, bare: false }));
-        if let Some(to) = to {
-            // the version it gets where it is goes with it
-            edits = moved_header(header, version, to);
-            marker = to.marker;
-        }
-    }
+    let (mut edits, marker) =
+        header_move(doc, level, text, version).unwrap_or_else(|| header_edits(doc, file, text, version));
     edits.extend(replacement(doc, level, text, record, marker));
     apply(text, carrier(doc, file, text), edits)
+}
+
+/// The text of the level's file, `text`, with its header record moved where
+/// [`replace_generated_with_header`] moves it when the record of the solver written at the end of
+/// `level` would come before it, with its VERSION; the text as it is otherwise. A solver that
+/// writes several levels of a file moves the header so before it writes the first of them, and
+/// reads the file again: where it goes, the header may need a carrier other than the file's, `*`
+/// above the `simulator lang=spectre` of a file in `//` (2.2), and every record written into the
+/// file then follows that carrier, those of the levels written before the one that comes before
+/// the header as well, as the next solve, which finds the header there, writes them.
+pub fn move_header_for(doc: &HostDocument, level: LevelId, text: &str, version: &str) -> String {
+    match header_move(doc, level, text, version) {
+        Some((edits, _)) => apply(text, carrier(doc, &doc.levels[level].file, text), edits),
+        None => text.to_string(),
+    }
+}
+
+/// The changes that move the header record of the level's file when the record of the solver
+/// written at the end of `level` (17) would come before it, as [`replace_generated_with_header`]
+/// says, and the carrier it has where it goes, which records written with it follow (2.2); None
+/// when it stays where it is.
+fn header_move(doc: &HostDocument, level: LevelId, text: &str, version: &str) -> Option<(Vec<Edit>, &'static str)> {
+    let file = &doc.levels[level].file;
+    let at = end_of(doc, level, &Lines::new(text));
+    let header = first_header(doc, file).filter(|h| span(h).0 .0 >= at)?;
+    let marker = carrier(doc, file, text);
+    let to = top(doc, file, text, marker)
+        .or_else(|| subckt_start(doc, level).map(|line| Top { line, marker, bare: false }))?;
+    // the version it gets where it is goes with it
+    Some((moved_header(header, version, to), to.marker))
 }
 
 /// The first line of the outermost subcircuit, in the file of `level`, that holds `level` or is
@@ -634,7 +662,8 @@ mod tests {
     use crate::host::{Dialect, Level, LevelKind};
     use crate::records::{scan_run, CarrierLine};
 
-    /// A tiny SPICE reader for these tests: `*` carriers, `.subckt`/`.ends` levels.
+    /// A tiny SPICE reader for these tests: `*` carriers, `.subckt`/`.ends` levels; with `//`, a
+    /// Spectre reader, whose `*` lines carry as well.
     fn doc(text: &str, file: &str, marker: &str) -> HostDocument {
         let mut main = Level::new(LevelKind::File, file, file, file);
         main.circuit = true;
@@ -653,9 +682,10 @@ mod tests {
         for (k, l) in lines.iter().enumerate() {
             let no = k as u32 + 1;
             if k > 0 {
-                if let Some(rest) = l.strip_prefix(marker) {
+                let own = if marker == "//" && l.starts_with('*') { "*" } else { marker };
+                if let Some(rest) = l.strip_prefix(own) {
                     if rest.is_empty() || rest.starts_with(' ') {
-                        run.push(CarrierLine { line: no, content: rest.to_string(), col: marker.len() as i64 });
+                        run.push(CarrierLine { line: no, content: rest.to_string(), col: own.len() as i64 });
                         continue;
                     }
                 }
@@ -947,10 +977,40 @@ mod tests {
         let net = format!("* t\n.param rr=1k\nsimulator lang=spectre\n{body}");
         let d = doc(&net, "a.net", "//");
         let out = replace_generated_with_header(&d, 1, &net, record, "0.2");
-        let want = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.param rr=1k\nsimulator lang=spectre\n\
-                    subckt s (a b)\nR1 (a b) resistor r=1k\n* @RNL(type=\"generated\") {#R1 @PLACE(0, 0)}\nends s\n\
-                    X1 (a b) s\n";
+        let head = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.param rr=1k\nsimulator lang=spectre\n";
+        let want = format!(
+            "{head}subckt s (a b)\nR1 (a b) resistor r=1k\n* @RNL(type=\"generated\") {{#R1 @PLACE(0, 0)}}\nends s\n\
+             X1 (a b) s\n"
+        );
         assert_eq!(out, want);
+        // moved before the file level, which comes first, is written: the record of the file level
+        // then follows the header in `*` as well, as the next solve, which finds it there, writes it
+        let moved = move_header_for(&d, 1, &net, "0.2");
+        assert_eq!(moved, format!("{head}subckt s (a b)\nR1 (a b) resistor r=1k\nends s\nX1 (a b) s\n"));
+        assert_eq!(move_header_for(&d, 0, &net, "0.2"), net);
+        let d = doc(&moved, "a.net", "//");
+        assert_eq!(carrier(&d, "a.net", &moved), "*");
+        assert_eq!(move_header_for(&d, 1, &moved, "0.2"), moved);
+        let top = replace_generated_with_header(&d, 0, &moved, "@RNL(type=\"generated\") {}", "0.2");
+        let both = replace_generated_with_header(&doc(&top, "a.net", "//"), 1, &top, record, "0.2");
+        assert_eq!(both, format!("{want}* @RNL(type=\"generated\") {{}}\n"));
+    }
+
+    #[test]
+    fn a_record_removed_leaves_no_marker_of_its_own_alone() {
+        // a file in Spectre's dialect whose carrier is `*`, that of its header above its
+        // `simulator lang=spectre`, with records in `//` below it: each removed takes its line
+        // with it, or leaves one `//` and one space before what follows it on its line
+        let net = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.param rr=1k\nsimulator lang=spectre\n\
+                   // @RNL(type=\"generated\") {\n//   #R1 @PLACE(0, 0)\n// }\n\
+                   // @RNL(type=\"generated\") {#R1}   /* note */\nR1 (a b) resistor r=1k\n";
+        let d = doc(net, "a.net", "//");
+        assert_eq!(carrier(&d, "a.net", net), "*");
+        assert_eq!(
+            strip_generated(&d, "a.net", net),
+            "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.param rr=1k\nsimulator lang=spectre\n\
+             // /* note */\nR1 (a b) resistor r=1k\n"
+        );
     }
 
     #[test]
