@@ -14,7 +14,7 @@
 //! makes both changes in one pass ([`replace_generated_with_header`],
 //! [`remove_generated_with_header`]).
 
-use crate::host::{HostDocument, Level, LevelId, LevelKind, Record};
+use crate::host::{HostDocument, LevelId, LevelKind, Record};
 use crate::syntax::{parse_record, Value};
 
 /// The `type=` of a record's header: "authored" when not written.
@@ -354,11 +354,13 @@ pub fn replace_generated(doc: &HostDocument, level: LevelId, text: &str, record:
 
 /// [`replace_generated`], and the level's file given its header record and its version as
 /// [`with_header`] gives them, in one pass at the positions of the document's reading of `text`:
-/// what a solver writes into the file of a level it solved, which it saves (16.1). A header record
-/// below the level's end, such as one written after a subcircuit, gets its version where the
-/// reading found it, not inside the record put before it. The record follows the carrier of a
-/// header written in the same pass (2.2), so that the next solve, which finds that header, writes
-/// it the same.
+/// what a solver writes into the file of a level it solved, which it saves (16.1). The header
+/// record stays the first record of its file (2.8): one written after a subcircuit solved, which
+/// the record put at the end of the subcircuit would come before, moves to the line above the
+/// subcircuit, the outermost one in the file that holds the level, with its version, and is
+/// removed where the reading found it; no record comes before it there, as none came before it
+/// where it was. The record follows the carrier of a header written in the same pass (2.2), so
+/// that the next solve, which finds that header, writes it the same.
 pub fn replace_generated_with_header(
     doc: &HostDocument,
     level: LevelId,
@@ -368,8 +370,98 @@ pub fn replace_generated_with_header(
 ) -> String {
     let file = &doc.levels[level].file;
     let (mut edits, marker) = header_edits(doc, file, text, version);
+    let at = end_of(doc, level, &Lines::new(text));
+    if let (Some(header), Some(above)) = (first_header(doc, file), subckt_start(doc, level)) {
+        if span(header).0 .0 >= at {
+            // the version it gets where it is goes with it
+            edits = moved_header(header, version, marker, above);
+        }
+    }
     edits.extend(replacement(doc, level, text, record, marker));
     apply(text, carrier(doc, file, text), edits)
+}
+
+/// The first line of the outermost subcircuit, in the file of `level`, that holds `level` or is
+/// it: the record written at the end of `level` lies inside it. None for a file level.
+fn subckt_start(doc: &HostDocument, level: LevelId) -> Option<u32> {
+    let file = &doc.levels[level].file;
+    let mut start = None;
+    let mut at = Some(level);
+    while let Some(k) = at {
+        let lv = &doc.levels[k];
+        if lv.kind != LevelKind::Subckt || lv.file != *file {
+            break;
+        }
+        start = Some(lv.line);
+        at = lv.parent;
+    }
+    start.filter(|&line| line > 0)
+}
+
+/// The changes that move a header record to the line `above`, carried by `marker`, with VERSION
+/// when it has none: removed where the reading found it, and written whole there.
+fn moved_header(header: &Record, version: &str, marker: &str, above: u32) -> Vec<Edit> {
+    let mut text = header.text.clone();
+    if let Some((brace, s)) = version_insert(header, version) {
+        let at = text.char_indices().nth(brace + 1).map_or(text.len(), |(b, _)| b);
+        text.insert_str(at, &s);
+    }
+    let (a, b) = span(header);
+    vec![Edit::Remove(a, b), Edit::Lines(above, carried(&text, marker))]
+}
+
+/// Where VERSION goes into a header record that has none: after the `{` of its body, given as the
+/// offset of that `{` in its text, with what goes there. None when it has a VERSION, or no body.
+fn version_insert(header: &Record, version: &str) -> Option<(usize, String)> {
+    let ast = parse_record(&header.text);
+    let body = ast.body?;
+    let call = |m: &crate::syntax::Member| m.segments.first().and_then(|s| s.call.as_ref()).map(|c| c.kw.clone());
+    if body.members.iter().any(|m| call(m).as_deref() == Some("VERSION")) {
+        return None;
+    }
+    let sep = if body.members.is_empty() { "" } else { ";" };
+    Some((body.start, format!(" @VERSION({}){sep}", crate::problem::written_string(version))))
+}
+
+/// The records of a file as a reading of it takes them (2.8), each with its level: those of the
+/// file level that reads it, one that reads it whole before one that reads a section of it, and of
+/// the subcircuits written in it; a section of `.lib` that is read counts as a file. With that file
+/// level, None when no file level reads the file.
+fn file_records<'a>(doc: &'a HostDocument, file: &str) -> (Option<LevelId>, Vec<(LevelId, &'a Record)>) {
+    let mut levels: Vec<LevelId> = (0..doc.levels.len())
+        .filter(|&l| doc.levels[l].kind == LevelKind::File && doc.levels[l].file == file)
+        .collect();
+    levels.sort_by_key(|&l| doc.levels[l].section.is_some());
+    let Some(&top) = levels.first() else {
+        return (None, records_of(doc, file));
+    };
+    let in_top = |mut l: LevelId| loop {
+        let lv = &doc.levels[l];
+        if lv.kind == LevelKind::File {
+            return l == top;
+        }
+        match lv.parent {
+            Some(p) => l = p,
+            None => return false,
+        }
+    };
+    let records = (0..doc.levels.len())
+        .filter(|&l| doc.levels[l].file == file && in_top(l))
+        .flat_map(|l| doc.levels[l].records.iter().filter(|r| r.file == file).map(move |r| (l, r)))
+        .collect();
+    (Some(top), records)
+}
+
+/// The header record of a file, when it is the first record of the file as the reading takes it,
+/// written at its file level ([`file_records`], 2.8); a package file has a header by rule (16.2)
+/// and gives none.
+fn first_header<'a>(doc: &'a HostDocument, file: &str) -> Option<&'a Record> {
+    if file.to_lowercase().ends_with(".rnl") {
+        return None;
+    }
+    let (top, records) = file_records(doc, file);
+    let first = records.into_iter().min_by_key(|(_, r)| span(r).0);
+    first.filter(|(l, r)| top.is_none_or(|t| t == *l) && record_type(r) == "header").map(|(_, r)| r)
 }
 
 /// The changes of [`replace_generated`]: the removal of the level's records of the solver in its
@@ -388,10 +480,11 @@ fn replacement(doc: &HostDocument, level: LevelId, text: &str, record: &str, mar
 /// `file`, with `@RNL(type="header") { @VERSION("…")}` added as its first record when the file has
 /// no header record, or with VERSION added to its header record when that has none. `version` is
 /// the version the file was read in, so that it reads the same. A file whose header record has its
-/// version, one whose header record is not the first record of its file level (an error its author
+/// version, one whose header record is not the first record of the file (an error its author
 /// fixes), and a package file, which has a header by rule (16.2), come back as they are. The
-/// header record is the first record of the file level, as the reading takes it (2.8): the records
-/// of a subcircuit above it are read in the subcircuit.
+/// header record is the first record of the whole file, as the reading takes it (2.8): a record of
+/// a subcircuit written above it comes before it, and a section of `.lib` that is read counts as a
+/// file ([`file_records`]).
 ///
 /// The first line of a host file never carries RNL (2.2): it is the title of the main file, and
 /// in an included file a comment or a statement. The header goes on the line after a title or a
@@ -403,9 +496,10 @@ fn replacement(doc: &HostDocument, level: LevelId, text: &str, record: &str, mar
 /// `*`, which carries in both modes, and so does the bare marker.
 ///
 /// A file read only through library sections (`.lib file sec`, Spectre's `include "file"
-/// section=sec`, [`Level::section`]) is read inside them alone, and tools must not write outside
-/// them (2.2): it gets no new header record, and takes the version of the file that includes it
-/// (16.1). A header record that the reading found inside a section gets its version there.
+/// section=sec`, [`crate::host::Level::section`]) is read inside them alone, and tools must not
+/// write outside them (2.2): it gets no new header record, and takes the version of the file that
+/// includes it (16.1). A header record that the reading found inside a section gets its version
+/// there.
 ///
 /// `text` is the text whose positions the document gives, as the reading found it. To give a file
 /// its header together with the records a solver writes or removes, use
@@ -425,33 +519,20 @@ fn header_edits(doc: &HostDocument, file: &str, text: &str, version: &str) -> (V
     }
     let version_kw = format!("@VERSION({})", crate::problem::written_string(version));
     let all = records_of(doc, file);
-    // the file levels that read the file, one that reads it whole first
-    let mut levels: Vec<&Level> =
-        doc.levels.iter().filter(|lv| lv.kind == LevelKind::File && lv.file == file).collect();
-    levels.sort_by_key(|lv| lv.section.is_some());
-    let file_level: Vec<&Record> = match levels.first() {
-        Some(lv) => lv.records.iter().filter(|r| r.file == file).collect(),
-        None => all.iter().map(|(_, r)| *r).collect(),
-    };
-    match file_level.iter().min_by_key(|r| span(r).0) {
-        Some(first) if record_type(first) == "header" => {
-            let ast = parse_record(&first.text);
-            let Some(body) = ast.body else { return (Vec::new(), marker) };
-            let call =
-                |m: &crate::syntax::Member| m.segments.first().and_then(|s| s.call.as_ref()).map(|c| c.kw.clone());
-            if body.members.iter().any(|m| call(m).as_deref() == Some("VERSION")) {
-                return (Vec::new(), marker);
-            }
+    match first_header(doc, file) {
+        Some(first) => {
             // right after the `{` of the body
-            let at = first.loc(body.start);
-            let sep = if body.members.is_empty() { "" } else { ";" };
-            return (vec![Edit::Text(at.line, at.col as usize, format!(" {version_kw}{sep}"))], marker);
+            let edit = version_insert(first, version).map(|(brace, s)| {
+                let at = first.loc(brace);
+                Edit::Text(at.line, at.col as usize, s)
+            });
+            return (edit.into_iter().collect(), marker);
         }
-        _ if all.iter().any(|(_, r)| record_type(r) == "header") => return (Vec::new(), marker),
-        _ => {}
+        None if all.iter().any(|(_, r)| record_type(r) == "header") => return (Vec::new(), marker),
+        None => {}
     }
     // read only through library sections: line 2 lies outside each of them, and is not read (2.2)
-    if levels.first().is_some_and(|lv| lv.section.is_some()) {
+    if file_records(doc, file).0.is_some_and(|top| doc.levels[top].section.is_some()) {
         return (Vec::new(), marker);
     }
     let header = |m: &str| carried(&format!("@RNL(type=\"header\") {{ {version_kw}}}"), m);
@@ -542,6 +623,7 @@ mod tests {
             if low.starts_with(".subckt") || low.starts_with("subckt") {
                 let mut s = Level::new(LevelKind::Subckt, "s", file, file);
                 s.circuit = true;
+                s.line = no;
                 cur = d.add_level(s, Some(0));
             } else if low.starts_with(".ends") || low.starts_with("ends") {
                 d.levels[cur].end_line = no;
@@ -664,23 +746,40 @@ mod tests {
     }
 
     #[test]
-    fn the_header_gets_its_version_where_the_reading_found_it() {
-        // a header record after a subcircuit: the record of the subcircuit goes in above it, and
-        // VERSION into the header, not into that record (16.1, 17)
+    fn a_header_below_a_subcircuit_solved_moves_above_it() {
+        // a header record after a subcircuit: the record of the subcircuit goes in before its
+        // `.ends`, and would come before the header, which must be the first record of the file
+        // (2.8); so the header moves above the subcircuit, with its VERSION (16.1, 17)
         let net = "* t\n.subckt s a b\nR1 a b 1k\n.ends\n* @RNL(type=\"header\") { }\nX1 a b s\n.end\n";
         let d = doc(net, "a.sp", "*");
         let record = "@RNL(type=\"generated\") {\n  #R1 @PLACE(0, 0)\n}";
         let out = replace_generated_with_header(&d, 1, net, record, "0.2");
-        assert_eq!(
-            out,
-            "* t\n.subckt s a b\nR1 a b 1k\n* @RNL(type=\"generated\") {\n*   #R1 @PLACE(0, 0)\n* }\n.ends\n\
-             * @RNL(type=\"header\") { @VERSION(\"0.2\") }\nX1 a b s\n.end\n"
-        );
-        // a record of the subcircuit above it is read in the subcircuit: the header is still the
-        // first record of the file level (2.8), and the next level written finds it whole
+        let moved = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.subckt s a b\nR1 a b 1k\n\
+                     * @RNL(type=\"generated\") {\n*   #R1 @PLACE(0, 0)\n* }\n.ends\nX1 a b s\n.end\n";
+        assert_eq!(out, moved);
+        // the next level written finds it whole, and leaves it where it is
         assert_eq!(with_header(&doc(&out, "a.sp", "*"), "a.sp", &out, "0.2"), out);
         let bare = out.replace(" @VERSION(\"0.2\")", "");
         assert_eq!(with_header(&doc(&bare, "a.sp", "*"), "a.sp", &bare, "0.2"), out);
+        let again = replace_generated_with_header(&doc(&out, "a.sp", "*"), 1, &out, record, "0.2");
+        assert_eq!(again, out);
+        // the file level written first: its record goes at its end, below the header, which gets its
+        // version where it is; the subcircuit written next moves it
+        let top = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.2");
+        let kept = "* t\n.subckt s a b\nR1 a b 1k\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\nX1 a b s\n\
+                    * @RNL(type=\"generated\") {}\n.end\n";
+        assert_eq!(top, kept);
+        let both = replace_generated_with_header(&doc(&top, "a.sp", "*"), 1, &top, record, "0.2");
+        assert_eq!(both, moved.replace(".end\n", "* @RNL(type=\"generated\") {}\n.end\n"));
+        // a header after a record of a subcircuit is not the first record of the file: an error
+        // its author fixes, left as it is
+        let late = net.replace("R1 a b 1k\n", "R1 a b 1k\n* @RNL {#R1}\n");
+        assert_eq!(with_header(&doc(&late, "a.sp", "*"), "a.sp", &late, "0.2"), late);
+        let out = replace_generated_with_header(&doc(&late, "a.sp", "*"), 1, &late, record, "0.2");
+        assert_eq!(
+            out,
+            late.replace("* @RNL {#R1}\n", "* @RNL {#R1}\n* @RNL(type=\"generated\") {\n*   #R1 @PLACE(0, 0)\n* }\n")
+        );
         // without a header, at the end of a level on line 2: the header first, then the record
         let net = "* t\n.end\n";
         let out = replace_generated_with_header(&doc(net, "a.sp", "*"), 0, net, "@RNL(type=\"generated\") {}", "0.2");

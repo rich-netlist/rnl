@@ -1184,10 +1184,12 @@ fn read_solved(run: &SolveRun, files: &dyn Provider, entry: &Path) -> rnl_runtim
 }
 
 #[test]
-fn a_header_after_a_subcircuit_solved_gets_its_version_where_it_is() {
+fn a_header_after_a_subcircuit_solved_moves_above_it() {
     // a header record without VERSION after the subcircuit that is solved, in an included file and
     // in a main file solved a level at a time: the record of the subcircuit goes in before its
-    // `.ends`, above the header, and VERSION into the header, not into that record (16.1, 17)
+    // `.ends`, and would come before the header, which is the first record of its file (2.8); so
+    // the header moves above the subcircuit, and VERSION goes into it, not into that record (16.1,
+    // 17)
     let files = MemoryProvider::new()
         .with(
             "/w/top4.sp",
@@ -1197,8 +1199,9 @@ fn a_header_after_a_subcircuit_solved_gets_its_version_where_it_is() {
     let entry = Path::new("/w/top4.sp");
     let run = solve(entry, &files, &unlimited()).unwrap();
     let lib = &run.files.iter().find(|f| f.path == "/w/lib4.inc").unwrap().text;
-    assert!(lib.ends_with("* }\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n"), "{lib}");
-    assert_eq!(lib.matches("@VERSION").count(), 1, "{lib}");
+    let moved = "* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.subckt pair a b\n";
+    assert!(lib.starts_with(&format!("* lib\n{moved}")) && lib.ends_with("* }\n.ends\n"), "{lib}");
+    assert_eq!(lib.matches("type=\"header\"").count(), 1, "{lib}");
     let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
     let both = Layered { layers: vec![&solved, &files] };
     check_read_back(&run, entry, &both, false, "lib4.inc");
@@ -1207,18 +1210,23 @@ fn a_header_after_a_subcircuit_solved_gets_its_version_where_it_is() {
     let top = "* top\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") { }\nX1 p q pair\n.end\n";
     let files = MemoryProvider::new().with("/w/top.sp", top);
     let entry = Path::new("/w/top.sp");
-    for level in ["pair", "top.sp"] {
+    // the main file alone keeps the header below the subcircuit, its record going at the end
+    let below = "\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\nX1 p q pair\n";
+    for (level, header) in [("pair", format!("* top\n{moved}")), ("top.sp", below.to_string())] {
         let one = SolveOptions { level: Some(level.into()), ..unlimited() };
         let run = solve(entry, &files, &one).unwrap();
         let text = &run.files[0].text;
-        let header = "\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\nX1 p q pair\n";
-        assert!(text.contains(header) && text.matches("@VERSION").count() == 1, "{level}: {text}");
+        assert!(text.contains(&header) && text.matches("type=\"header\"").count() == 1, "{level}: {text}");
+        assert_eq!(text.matches("@VERSION").count(), 1, "{level}: {text}");
         let solved = MemoryProvider::new().with("/w/top.sp", text);
         let both = Layered { layers: vec![&solved, &files] };
         check_read_back(&run, entry, &both, false, level);
-        // the other level solved after it finds the header whole
+        // the other level solved after it finds the header whole, above the subcircuit at the end
         let all = solve(entry, &both, &unlimited()).unwrap();
-        assert_eq!(all.files[0].text.matches("@VERSION").count(), 1, "{level}: {}", all.files[0].text);
+        let text = &all.files[0].text;
+        assert!(text.starts_with(&format!("* top\n{moved}")), "{level}: {text}");
+        assert_eq!(text.matches("type=\"header\"").count(), 1, "{level}: {text}");
+        assert_eq!(text.matches("@VERSION").count(), 1, "{level}: {text}");
         let solved = MemoryProvider::new().with("/w/top.sp", &all.files[0].text);
         check_read_back(&all, entry, &Layered { layers: vec![&solved, &files] }, false, level);
     }
@@ -1256,8 +1264,8 @@ fn above_the_switch_to_spectre_an_included_file_gets_its_header_in_stars() {
     // a file that is not a .scs file and does not start with `simulator lang=spectre` is in SPICE
     // mode up to that statement, where only `*` is a comment (2.2): the header there, and the bare
     // marker before a statement, are written with `*`, and the record of the solver follows them;
-    // so is a header put before a record that the reading takes above the switch, so that it is
-    // the first record (2.8)
+    // so is a header put before a record that the reading takes above the switch, written with
+    // `*` there, so that it is the first record (2.8)
     let top = "// top\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spectre\ninclude \"div.inc\"\n\
                X1 (p 0) div\n";
     let body = "simulator lang=spectre\nsubckt div (p n)\nR1 (p m) resistor r=1k\nR2 (m n) resistor r=1k\nends div\n";
@@ -1265,7 +1273,7 @@ fn above_the_switch_to_spectre_an_included_file_gets_its_header_in_stars() {
     for (head, want) in [
         ("* lib\n.param rr=1k\n", format!("* lib\n{star}\n.param rr=1k\n")),
         ("simulator lang=spice\n.param rr=1k\n", format!("*\n{star}\nsimulator lang=spice\n.param rr=1k\n")),
-        ("// lib\n// @RNL { /* note */ }\n", format!("// lib\n{star}\n// @RNL {{ /* note */ }}\n")),
+        ("* lib\n* @RNL { /* note */ }\n", format!("* lib\n{star}\n* @RNL {{ /* note */ }}\n")),
     ] {
         let files = MemoryProvider::new().with("/w/top.scs", top).with("/w/div.inc", &format!("{head}{body}"));
         let entry = Path::new("/w/top.scs");
@@ -1673,12 +1681,14 @@ fn unranked(p: &LevelProblem, k: usize) -> String {
 fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
     // The drain and the gate of the NMOS, at (0, 2) and (−3, 0), at one height whatever its
     // orientation; an ORDER of the NMOS and the centre of its drain and its source, which is its
-    // origin whatever its orientation; an ORDER of one set written twice; an ORDER of a point and
-    // the centre of the set it is the only member of. The runtime gives them to the solver, and
-    // the solver finds that none has a solution on its own: each fails with an error (the draft
-    // 0.3, 8.5; 7.6), takes no part in the resolution, and the level is solved as without them.
+    // origin whatever its orientation; its drain and its source at least 5 apart on x, where they
+    // are 0 or 4 apart; its gate and its drain exactly 1 apart on y, where they are 2 or 3 apart.
+    // Only the pins of its symbol and its orientations tie these points, which the runtime does
+    // not look at (8.5, 9.5): it gives them to the solver, and the solver finds that none has a
+    // solution on its own: each fails with an error (the draft 0.3, 8.5; 7.6), takes no part in
+    // the resolution, and the level is solved as without them.
     let failing = "*   {#M1:d #M1:g} @ALIGN(\"y\");\n*   {#M1 {#M1:d #M1:s}} @ORDER(\"x\");\n\
-                   *   {{#R1 #R2} {#R1 #R2}} @ORDER(\"y\");\n*   {#R1 {#R1}} @ORDER(\"y\");\n";
+                   *   #M1:d #M1:s @DISTANCE(\"x\", min=5);\n*   #M1:g #M1:d @DISTANCE(\"y\", exact=1);\n";
     let files = MemoryProvider::new().with("/w/self.sp", &with_statements(failing));
     let run = solve(Path::new("/w/self.sp"), &files, &unlimited()).unwrap();
     assert_eq!(run.errors, 0, "the runtime does not fail them");
@@ -1689,8 +1699,8 @@ fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
     let mut failed = vec![
         fact("ALIGN y {#M1:d #M1:g}"),
         fact("ORDER x either {#M1 {#M1:d #M1:s}}"),
-        fact("ORDER y either {{#R1 #R2} {#R1 #R2}}"),
-        fact("ORDER y either {#R1 {#R1}}"),
+        fact("{#M1:d} {#M1:s}"),
+        fact("{#M1:g} {#M1:d}"),
     ];
     failed.sort_unstable();
     assert_eq!(r.failed, failed);
@@ -1722,9 +1732,7 @@ fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
     }
     // the rest is solved as without them, the lines left empty: the same facts kept and discarded,
     // with the same groups, and the same solution
-    let blank = "*
-"
-    .repeat(4);
+    let blank = "*\n".repeat(4);
     let none = MemoryProvider::new().with("/w/self.sp", &with_statements(&blank));
     let without = solve(Path::new("/w/self.sp"), &none, &unlimited()).unwrap();
     let other = &without.levels[0];
@@ -1765,6 +1773,41 @@ fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
         rnl(&["solve", &path_str(&file), "-o", &path_str(&out), "--solver-options", "time_limit=none"]);
     assert_eq!(code, 0, "{stdout}");
     assert!(!stdout.contains("error: "), "{stdout}");
+}
+
+#[test]
+fn a_fact_that_the_runtime_sees_contradict_itself_never_reaches_the_solver() {
+    // an ORDER of one set written twice, and an ORDER of a resistor and the set of it alone: from
+    // what is written, two members at one place. The runtime fails each itself, with an error at
+    // its statement, and leaves it out of the problem (8.5, 9.5): the solver fails nothing, and the
+    // level is solved as without them; the command gives the errors of the netlist on the standard
+    // error and exits with 0
+    let failing = "*   {{#R1 #R2} {#R1 #R2}} @ORDER(\"y\");\n*   {#R1 {#R1}} @ORDER(\"y\");\n";
+    let files = MemoryProvider::new().with("/w/self.sp", &with_statements(failing));
+    let run = solve(Path::new("/w/self.sp"), &files, &unlimited()).unwrap();
+    assert_eq!(run.errors, 2, "the runtime fails them");
+    let level = &run.levels[0];
+    let p = &level.problem;
+    let r = &level.solved.report;
+    assert!((0..p.facts.len()).all(|k| !describe_fact(p, k).contains("ORDER")), "{:#?}", p.facts);
+    assert!(r.failed.is_empty() && r.errors.is_empty(), "{r:?}");
+    let none = MemoryProvider::new().with("/w/self.sp", &with_statements(&"*\n".repeat(2)));
+    let without = solve(Path::new("/w/self.sp"), &none, &unlimited()).unwrap();
+    let other = &without.levels[0];
+    let described = |p: &LevelProblem| (0..p.facts.len()).map(|k| unranked(p, k)).collect::<Vec<_>>();
+    assert_eq!(described(p), described(&other.problem));
+    assert_eq!(level.solved.solution, other.solved.solution);
+
+    let dir = scratch("runtime-contradiction");
+    let file = dir.join("self.sp");
+    std::fs::write(&file, with_statements(failing)).unwrap();
+    let out = dir.join("out");
+    let (code, stdout, stderr) =
+        rnl(&["solve", &path_str(&file), "-o", &path_str(&out), "--solver-options", "time_limit=none"]);
+    assert_eq!(code, 0, "{stdout}{stderr}");
+    assert!(stderr.contains("2 errors in "), "{stderr}");
+    assert!(!stdout.contains("error: "), "{stdout}");
+    assert!(out.join("self.sp").exists());
 }
 
 #[test]

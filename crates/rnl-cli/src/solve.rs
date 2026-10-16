@@ -11,9 +11,11 @@
 //! (2.6) but which applies to the level all the same, is removed from that file. Every file written
 //! has its header record and its version (16.1), added when it has none, in the same pass as the
 //! record, at the positions the reading gives; but a file read only through library sections,
-//! where what lies outside them is not read (2.2), gets no new header. A file may hold several
-//! levels, and writing one back moves the lines of those after it, so the document is read again
-//! before the next level, the texts written so far held in memory over the files.
+//! where what lies outside them is not read (2.2), gets no new header. The header record stays the
+//! first record of its file (2.8): one written after a subcircuit that gets its record moves above
+//! that subcircuit. A file may hold several levels, and writing one back moves the lines of those
+//! after it, so the document is read again before the next level, the texts written so far held in
+//! memory over the files.
 //!
 //! The resolution of each level is limited in time by the solver's `time_limit` (the draft 0.3,
 //! 8.5), 5 seconds unless `--solver-options` says otherwise, measured on the wall clock
@@ -31,7 +33,9 @@
 //! A fact that has no solution on its own contradicts itself and fails (the draft 0.3, 8.5; 7.6):
 //! the report of its level has an error for it, on a line that begins with `error:`, and the level
 //! is solved and written back without it, as if it were not written; `rnl solve` then exits with
-//! 1 ([`errors`]).
+//! 1 ([`errors`]). The runtime fails those it sees from what is written alone, with an error of
+//! the netlist, and leaves them out of the problem (8.5, 9.5); the solver gets those that only the
+//! pins of a symbol and the orientations tie.
 //!
 //! A level whose file, or a file above it, declares a language version that the reading does not
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
@@ -296,7 +300,7 @@ pub fn solve_with_clock(
                 None => both.read(path).ok_or_else(|| format!("cannot read {path}")),
             };
             // the record and the header in one pass, at the positions of this reading: a header
-            // below the level's end keeps its place
+            // below the end of a subcircuit written moves above it, to stay the first record (2.8)
             let text = text_of(&host.file, &path)?;
             let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
             let mut texts = vec![(path.clone(), out)];
