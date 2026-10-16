@@ -32,7 +32,7 @@ pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts
 
 gives the editor interface's view of a document (`notes/rnl-editor-interface/spec-draft.md` in rnl-dev, section 3), from the same interpretation as its Document, for a converter or an editor that reads the document by objects rather than draws it. This first part has what Analog Canvas's import needs:
 
-- the language version, the packages in effect by name and version, the files, the diagnostics, and the Document as `drawing` unless `parts.drawing` is false;
+- the language version, the one the main file declares, or 0.3, the tool's default, when it declares none (16.1); the packages in effect by name and version, the files, the diagnostics, and the Document as `drawing` unless `parts.drawing` is false;
 - for each drawing level, by its id (`subckt:NAME`, or `file:PATH` for the file level), when `parts` ask:
   - `host`, the host circuit: the ports, the instances with their masters and terminals (number, name and net), and the nets, each net written as on the first line that names it;
   - `model`, what the RNL makes of it: the instances, bundles and usages, drawn or not, with their symbols, positions, orientations and pins where they are drawn; the named points and whether a junction is drawn at them; the wires with their vertices as written and as routed; the texts with their markup, lines, anchors and alignment; the graphics of the scene (13.4) as an `add-shape` op writes them, in the order written; and a subcircuit's own symbol, `#` (9.2.6), as `symbol`.
