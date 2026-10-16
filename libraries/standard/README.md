@@ -51,7 +51,7 @@ And outside `rnl-std`, for a file that names them in its header record:
 | --- | --- | --- |
 | [`rnl-std-functional`](0.3/rnl-std-functional.rnl) | | Behavioral models: op-amps, comparators, amplifiers, transconductors, ADC, DAC. |
 | [`rnl-std-rf`](0.3/rnl-std-rf.rnl) | | The center-tap inductor and the T-coil. |
-| [`rnl-std-logic`](0.3/rnl-std-logic.rnl) | | Gates, buffer, inverter, D flip-flops, and the drawing-only `$DELAY_CELL`. The pins of the gates with four inputs are not on integer points, as Analog Canvas spaces them; checked on its own, the package gives a hint for each. |
+| [`rnl-std-logic`](0.3/rnl-std-logic.rnl) | | Gates, buffer, inverter, D flip-flops, and the drawing-only `$DELAY_CELL`. The gates with four inputs have their inputs on integer points, the outer two reaching the input side drawn on to them. |
 | [`rnl-std-signal-flow`](0.3/rnl-std-signal-flow.rnl) | | Adder and multiplier, and the drawing-only `$INTEGRATOR`, `$DISCRETE_TIME_INTEGRATOR`, `$QUANTIZER` and `$UNIT_DELAY`. |
 | [`rnl-std-full`](0.3/rnl-std-full.rnl) | `rnl-std` and the four above | The fuller collection (16.3). Written in a header record beside the implicit `rnl-std`, it adds the four packages of fields, and nothing twice. |
 | [`rnl-std-no-labels`](0.3/rnl-std-no-labels.rnl) | | Optional, in no collection: it empties the default labels of the standard symbols (name, value, model), for a file that writes all its labels itself, such as one an editor writes. A label the file writes with the same key comes later and shows again (13.3). |

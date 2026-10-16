@@ -38,19 +38,22 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 1.85)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas and-gate-4 */
+  /* a b c d y (vp) (vn); from Analog Canvas and-gate-4, the inputs on integer points: the
+     outer two reach the input side drawn on to them */
   $AND_4INPUT = @DEFINE-SYMBOL(box=[-4.4, -2.4, 4.4, 2.4]) {
-    (-3, 1.2) @PIN(terminal=1, direction="left");
-    (-3, 0.4) @PIN(terminal=2, direction="left");
-    (-3, -0.4) @PIN(terminal=3, direction="left");
-    (-3, -1.2) @PIN(terminal=4, direction="left");
+    (-3, 2) @PIN(terminal=1, direction="left");
+    (-3, 1) @PIN(terminal=2, direction="left");
+    (-3, -1) @PIN(terminal=3, direction="left");
+    (-3, -2) @PIN(terminal=4, direction="left");
     (2, 0) @PIN(terminal=5, direction="right");
     @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
     @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
-    @LINE {(-3, 1.2) (-2, 1.2)};
-    @LINE {(-3, 0.4) (-2, 0.4)};
-    @LINE {(-3, -0.4) (-2, -0.4)};
-    @LINE {(-3, -1.2) (-2, -1.2)};
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-2, 1)};
+    @LINE {(-3, -1) (-2, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24) {(-2, 2) (-2, 1.5)};
+    @LINE(linewidth=0.24) {(-2, -1.5) (-2, -2)};
     @LINE {(1.5, 0) (2, 0)};
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 1.85)
   };
@@ -85,20 +88,23 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.85)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas nand-gate-4 */
+  /* a b c d y (vp) (vn); from Analog Canvas nand-gate-4, the inputs on integer points: the
+     outer two reach the input side drawn on to them */
   $NAND_4INPUT = @DEFINE-SYMBOL(box=[-4.4, -2.4, 4.4, 2.4]) {
-    (-3, 1.2) @PIN(terminal=1, direction="left");
-    (-3, 0.4) @PIN(terminal=2, direction="left");
-    (-3, -0.4) @PIN(terminal=3, direction="left");
-    (-3, -1.2) @PIN(terminal=4, direction="left");
+    (-3, 2) @PIN(terminal=1, direction="left");
+    (-3, 1) @PIN(terminal=2, direction="left");
+    (-3, -1) @PIN(terminal=3, direction="left");
+    (-3, -2) @PIN(terminal=4, direction="left");
     (3, 0) @PIN(terminal=5, direction="right");
     @LINE(linewidth=0.24) {(0, 1.5) (-2, 1.5) (-2, -1.5) (0, -1.5)};
     @ARC(linewidth=0.24) {(0, 1.5) (1.5, 0) (0, -1.5)};
     (2.05, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
-    @LINE {(-3, 1.2) (-2, 1.2)};
-    @LINE {(-3, 0.4) (-2, 0.4)};
-    @LINE {(-3, -0.4) (-2, -0.4)};
-    @LINE {(-3, -1.2) (-2, -1.2)};
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-2, 1)};
+    @LINE {(-3, -1) (-2, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24) {(-2, 2) (-2, 1.5)};
+    @LINE(linewidth=0.24) {(-2, -1.5) (-2, -2)};
     @LINE {(2.3875, 0) (3, 0)};
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 1.85)
   };
@@ -133,20 +139,23 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 2.15)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas or-gate-4 */
+  /* a b c d y (vp) (vn); from Analog Canvas or-gate-4, the inputs on integer points: the
+     outer two reach the input side drawn on to them */
   $OR_4INPUT = @DEFINE-SYMBOL(box=[-4.4, -2.4, 4.4, 2.4]) {
-    (-3, 1.2) @PIN(terminal=1, direction="left");
-    (-3, 0.4) @PIN(terminal=2, direction="left");
-    (-3, -0.4) @PIN(terminal=3, direction="left");
-    (-3, -1.2) @PIN(terminal=4, direction="left");
+    (-3, 2) @PIN(terminal=1, direction="left");
+    (-3, 1) @PIN(terminal=2, direction="left");
+    (-3, -1) @PIN(terminal=3, direction="left");
+    (-3, -2) @PIN(terminal=4, direction="left");
     (2, 0) @PIN(terminal=5, direction="right");
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
     @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
-    @LINE {(-3, 1.2) (-1.5586, 1.2)};
-    @LINE {(-3, 0.4) (-1.2824, 0.4)};
-    @LINE {(-3, -0.4) (-1.2824, -0.4)};
-    @LINE {(-3, -1.2) (-1.5586, -1.2)};
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24, cap="round") {(-2, 2) (-2, 1.78)};
+    @LINE(linewidth=0.24, cap="round") {(-2, -1.78) (-2, -2)};
     @LINE {(1.58, 0) (2, 0)};
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(-0.5, 2.15)
   };
@@ -183,21 +192,24 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas nor-gate-4 */
+  /* a b c d y (vp) (vn); from Analog Canvas nor-gate-4, the inputs on integer points: the
+     outer two reach the input side drawn on to them */
   $NOR_4INPUT = @DEFINE-SYMBOL(box=[-4.4, -2.4, 4.4, 2.4]) {
-    (-3, 1.2) @PIN(terminal=1, direction="left");
-    (-3, 0.4) @PIN(terminal=2, direction="left");
-    (-3, -0.4) @PIN(terminal=3, direction="left");
-    (-3, -1.2) @PIN(terminal=4, direction="left");
+    (-3, 2) @PIN(terminal=1, direction="left");
+    (-3, 1) @PIN(terminal=2, direction="left");
+    (-3, -1) @PIN(terminal=3, direction="left");
+    (-3, -2) @PIN(terminal=4, direction="left");
     (3, 0) @PIN(terminal=5, direction="right");
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-2, 1.78) (0.03, 1.18) (1.58, 0)};
     @ARC(linewidth=0.24, cap="round") {(-2, -1.78) (0.03, -1.18) (1.58, 0)};
     (2, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
-    @LINE {(-3, 1.2) (-1.5586, 1.2)};
-    @LINE {(-3, 0.4) (-1.2824, 0.4)};
-    @LINE {(-3, -0.4) (-1.2824, -0.4)};
-    @LINE {(-3, -1.2) (-1.5586, -1.2)};
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24, cap="round") {(-2, 2) (-2, 1.78)};
+    @LINE(linewidth=0.24, cap="round") {(-2, -1.78) (-2, -2)};
     @LINE {(2.3375, 0) (3, 0)};
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
@@ -234,21 +246,24 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas xor-gate-4 */
+  /* a b c d y (vp) (vn); from Analog Canvas xor-gate-4, the inputs on integer points: the
+     outer two reach the input side drawn on to them */
   $XOR_4INPUT = @DEFINE-SYMBOL(box=[-4.4, -2.4, 4.4, 2.4]) {
-    (-3, 1.2) @PIN(terminal=1, direction="left");
-    (-3, 0.4) @PIN(terminal=2, direction="left");
-    (-3, -0.4) @PIN(terminal=3, direction="left");
-    (-3, -1.2) @PIN(terminal=4, direction="left");
+    (-3, 2) @PIN(terminal=1, direction="left");
+    (-3, 1) @PIN(terminal=2, direction="left");
+    (-3, -1) @PIN(terminal=3, direction="left");
+    (-3, -2) @PIN(terminal=4, direction="left");
     (3, 0) @PIN(terminal=5, direction="right");
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
     @ARC(linewidth=0.24) {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
-    @LINE {(-3, 1.2) (-1.5586, 1.2)};
-    @LINE {(-3, 0.4) (-1.2824, 0.4)};
-    @LINE {(-3, -0.4) (-1.2824, -0.4)};
-    @LINE {(-3, -1.2) (-1.5586, -1.2)};
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24, cap="round") {(-2, 2) (-2, 1.78)};
+    @LINE(linewidth=0.24, cap="round") {(-2, -1.78) (-2, -2)};
     @LINE {(2.23, 0) (3, 0)};
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0, 2.15)
   };
@@ -287,22 +302,25 @@
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0.5, 2.15)
   };
 
-  /* a b c d y (vp) (vn); from Analog Canvas xnor-gate-4 */
+  /* a b c d y (vp) (vn); from Analog Canvas xnor-gate-4, the inputs on integer points: the
+     outer two reach the input side drawn on to them */
   $XNOR_4INPUT = @DEFINE-SYMBOL(box=[-4.4, -2.4, 4.4, 2.4]) {
-    (-3, 1.2) @PIN(terminal=1, direction="left");
-    (-3, 0.4) @PIN(terminal=2, direction="left");
-    (-3, -0.4) @PIN(terminal=3, direction="left");
-    (-3, -1.2) @PIN(terminal=4, direction="left");
+    (-3, 2) @PIN(terminal=1, direction="left");
+    (-3, 1) @PIN(terminal=2, direction="left");
+    (-3, -1) @PIN(terminal=3, direction="left");
+    (-3, -2) @PIN(terminal=4, direction="left");
     (4, 0) @PIN(terminal=5, direction="right");
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (-0.6, 0) (-1.35, -1.78)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, 1.78) (0.68, 1.18) (2.23, 0)};
     @ARC(linewidth=0.24, cap="round") {(-1.35, -1.78) (0.68, -1.18) (2.23, 0)};
     @ARC(linewidth=0.24) {(-2, 1.78) (-1.25, 0) (-2, -1.78)};
     (2.65, 0) @CIRCLE(radius=0.3375, linewidth=0.24);
-    @LINE {(-3, 1.2) (-1.5586, 1.2)};
-    @LINE {(-3, 0.4) (-1.2824, 0.4)};
-    @LINE {(-3, -0.4) (-1.2824, -0.4)};
-    @LINE {(-3, -1.2) (-1.5586, -1.2)};
+    @LINE {(-3, 2) (-2, 2)};
+    @LINE {(-3, 1) (-1.4599, 1)};
+    @LINE {(-3, -1) (-1.4599, -1)};
+    @LINE {(-3, -2) (-2, -2)};
+    @LINE(linewidth=0.24, cap="round") {(-2, 2) (-2, 1.78)};
+    @LINE(linewidth=0.24, cap="round") {(-2, -1.78) (-2, -2)};
     @LINE {(2.9875, 0) (4, 0)};
     ? @TEXT("${name}", key="name", halign="middle") => @PLACE(0.5, 2.15)
   };
