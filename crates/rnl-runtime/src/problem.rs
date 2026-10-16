@@ -439,8 +439,9 @@ pub struct LevelProblem {
     pub kind: &'static str,
     pub name: String,
     /// The language version the level's file is read in (16.1): what it declares; for an included
-    /// file that declares none, the version of the file that includes it; else "0.2". Only
-    /// the record of the solver of a file of the draft 0.3 writes numbers ([`Reference::Number`]).
+    /// file that declares none, the version of the file that includes it; else the toolkit's
+    /// default, "0.3". Only the record of the solver of a file of the draft 0.3 writes numbers
+    /// ([`Reference::Number`]).
     pub version: String,
     /// How many objects the authored records of the level number (5.9): the record of the solver
     /// numbers its own objects from the next number on ([`Reference::GeneratedNumber`]).
