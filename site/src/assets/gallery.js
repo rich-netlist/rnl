@@ -17,7 +17,8 @@
   var REPO = 'https://github.com/rich-netlist/rnl/blob/main/';
 
   /* What each package is for, in both languages; a package without a line here shows the comment
-     its file starts with. Names stay the same across versions of the series. */
+     its file starts with. A line holds for every version of the package, unless one is written for
+     its name and version, such as 'rnl-std-fill 0.3', where the versions differ. */
   var SUMMARY = {
     'rnl-std': '<zh>标准包。每份网表的根上默认就用它；它只引用别的包，自己没有内容。</zh><en>The standard package, used at the root of every netlist by default. It only references other packages and has no content of its own.</en>',
     'rnl-std-core': '<zh>最小的组合：样式、符号和配符号的规则，把网表画出来，别的什么都不加——不补地、电源和端口标签。</zh><en>The smallest collection: styles, symbols and the rules that give them, enough to draw the netlist and nothing more — no grounds, supplies or port tags filled in.</en>',
@@ -28,7 +29,8 @@
     'rnl-std-semiconductors': '<zh>二极管、MOS、BJT 和 JFET 的符号。</zh><en>The symbols of diodes, MOS transistors, BJTs and JFETs.</en>',
     'rnl-std-spice': '<zh>SPICE 网表的配符号规则：先按元件字母，再按模型类型。</zh><en>The symbol rules of SPICE netlists: by element letter first, then by model type.</en>',
     'rnl-std-spectre': '<zh>Spectre 网表的配符号规则：内置元件按 master，模型卡的实例按模型类型。</zh><en>The symbol rules of Spectre netlists: primitives by master, instances of model cards by model type.</en>',
-    'rnl-std-fill': '<zh>自动补全：给没连线的引脚补地或电源，给端口网络补端口标签；还有文件可以增删的集合。</zh><en>The automatic fill: a ground or supply for every unwired pin on such a net, a port tag for every port net; and the sets a file edits.</en>',
+    'rnl-std-fill': '<zh>自动补全：给没连线的引脚补地或电源，给每个端口网络补端口标签；还有文件可以增删的集合。</zh><en>The automatic fill: a ground or supply for every unwired pin on such a net, a port tag for every port net; and the sets a file edits.</en>',
+    'rnl-std-fill 0.3': '<zh>自动补全：给没连线的引脚补地或电源；给端口网络补端口标签，地和电源网络除外，那里已经有地和电源；不叫 0 的地网络（比如 vss）上的地，下面写上网络名。还有文件可以增删的集合。</zh><en>The automatic fill: a ground or supply for every unwired pin on such a net; a port tag for every port net but the ground and supply nets, which have their grounds and supplies already; and the grounds of a ground net other than 0, such as vss, drawn with the name of the net under them. And the sets a file edits.</en>',
     'rnl-std-semantics': '<zh>语义定义，比如差分对、电流镜：只有角色，什么都不画。</zh><en>Semantic definitions, such as a differential pair or a current mirror: roles only, nothing drawn.</en>',
     'rnl-std-layout': '<zh>布局定义：镜像对、居中的尾管、信号流的方向。</zh><en>Layout definitions: a mirrored pair, a tail centred under a pair, the direction of signal flow.</en>',
     'rnl-std-full': '<zh>rnl-std 再加上四个领域包：functional、rf、logic、signal-flow。</zh><en>rnl-std with the four domain packages: functional, rf, logic and signal-flow.</en>',
@@ -176,7 +178,7 @@
       (pkg.language !== pkg.version ? '<span class="chip chip-mute">' + fill('<zh>语言 {v}</zh><en>language {v}</en>', { v: esc(pkg.language) }) + '</span>' : '') +
       (group.series ? '' : '<span class="chip chip-warn"><zh>不属于标准系列</zh><en>not in the standard series</en></span>') +
       '</div>';
-    var sum = SUMMARY[pkg.name];
+    var sum = SUMMARY[pkg.name + ' ' + pkg.version] || SUMMARY[pkg.name];
     h += '<p class="gl-sum">' + (sum || esc(pkg.description.split('\n\n')[0])) + '</p>';
     h += '<dl class="gl-meta">';
     h += '<div><dt><zh>文件</zh><en>File</en></dt><dd><a href="' + REPO + esc(pkg.path) + '">' + esc(pkg.path) + '</a></dd></div>';
