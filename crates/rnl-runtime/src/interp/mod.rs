@@ -63,9 +63,9 @@ pub struct Options {
     /// written coordinates and conflicting coordinates are found (11.7). The standard leaves the
     /// tolerance to the tool; a viewer that does not solve uses [`crate::geom::TOL`].
     pub tolerance: f64,
-    /// No effect. Kept for compatibility, to be removed after the solver-v1 branch merges: the
-    /// files of 0.3, and a main file without a header record, are read in 0.3 without any switch
-    /// ([`unit::READ_VERSIONS`], [`unit::DEFAULT_VERSION`]).
+    /// No effect. Kept for compatibility, to be removed later: the files of 0.3, and a main file
+    /// without a header record, are read in 0.3 without any switch ([`unit::READ_VERSIONS`],
+    /// [`unit::DEFAULT_VERSION`]).
     pub draft: bool,
 }
 

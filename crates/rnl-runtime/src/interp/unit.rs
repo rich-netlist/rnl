@@ -23,11 +23,9 @@ pub const READ_VERSIONS: [&str; 2] = ["0.2", "0.3"];
 /// The version a main file, or a package file, without a header record is read in: the tool's
 /// default (16.1). An included file without one follows the file that includes it.
 pub const DEFAULT_VERSION: &str = "0.3";
-/// The tool's default version, [`DEFAULT_VERSION`]. Kept for compatibility, to be removed after
-/// the solver-v1 branch merges.
+/// The tool's default version, [`DEFAULT_VERSION`]. Kept for compatibility, to be removed later.
 pub const SUPPORTED_VERSION: &str = DEFAULT_VERSION;
-/// The version 0.3, which is read without any switch. Kept for compatibility, to be removed after
-/// the solver-v1 branch merges.
+/// The version 0.3, which is read without any switch. Kept for compatibility, to be removed later.
 pub const DRAFT_VERSION: &str = "0.3";
 const HEADER_KW: [&str; 5] = ["VERSION", "PACKAGE", "ALIAS", "DEVICE", "USE-ALIASES"];
 

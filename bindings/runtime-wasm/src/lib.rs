@@ -55,8 +55,7 @@ pub struct Request {
     #[serde(default)]
     pub primitives: bool,
     /// Accepted, with no effect, as [`rnl_runtime::Options::draft`] has none: the files of 0.3
-    /// are read without it. Kept for compatibility, to be removed after the solver-v1 branch
-    /// merges.
+    /// are read without it. Kept for compatibility, to be removed later.
     #[serde(default)]
     pub draft: bool,
     /// Give each level its solve status, what a frontend decides from whether to solve it

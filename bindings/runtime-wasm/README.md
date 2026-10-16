@@ -77,7 +77,7 @@ A call writes the request as UTF-8 JSON, calls `rnl_build`, and reads the answer
 | `std` | Whether the standard package is used at the root (16.3); true when not given. |
 | `svg` | Whether each level's SVG is written; true when not given. |
 | `primitives` | Whether each level's primitives are given; false when not given. |
-| `draft` | Accepted, with no effect: the files that declare 0.3, and a main file without a header record, are read in 0.3 without it (16.1). Kept for compatibility, to be removed after the solver-v1 branch merges. |
+| `draft` | Accepted, with no effect: the files that declare 0.3, and a main file without a header record, are read in 0.3 without it (16.1). Kept for compatibility, to be removed later. |
 | `status` | Whether each level gets its solve status, `solve`, what a frontend decides from whether to solve it ([`rnl-view`](../../crates/rnl-view/README.md)); false when not given. |
 | `parts` | `{"drawing", "host", "model"}`: the parts of the editor interface's snapshot to give ([`rnl-view`](../../crates/rnl-view/README.md#snapshots)), the Document unless `drawing` is false, each level's host circuit and model when they are true. With it, the answer is a snapshot. |
 

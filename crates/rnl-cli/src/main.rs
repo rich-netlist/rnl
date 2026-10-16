@@ -71,7 +71,7 @@ struct Args {
     generated: bool,
     dialect: Option<String>,
     /// `--draft`: accepted, with no effect, as [`Options::draft`] has none; kept for
-    /// compatibility, to be removed after the solver-v1 branch merges.
+    /// compatibility, to be removed later.
     draft: bool,
     svg: bool,
     primitives: bool,
