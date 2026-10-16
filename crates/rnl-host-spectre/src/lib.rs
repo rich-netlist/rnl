@@ -603,17 +603,11 @@ impl<'a> Reader<'a> {
             self.sink.error(format!("the include of {target} forms a cycle"), Some(Loc::line(fname, no)));
             return;
         }
-        let Some(text) = self.provider.read(&full) else {
+        if self.provider.read(&full).is_none() {
             self.sink.error(format!("the included file {target} cannot be found"), Some(Loc::line(fname, no)));
             return;
-        };
-        // an included file is in Spectre mode when it is a .scs file or starts with `simulator lang=spectre`
-        let spectre_file = full.to_lowercase().ends_with(".scs")
-            || text.lines().take(5).any(|l| {
-                let l = l.trim().to_lowercase();
-                l.starts_with("simulator") && l.contains("spectre")
-            });
-        let mode = if spectre_file { Mode::Spectre } else { Mode::Spice };
+        }
+        let mode = start_mode(&full);
         let _ = parent_mode; // the mode comes back after the include (S1 p89)
         let display = self.display(&full);
         let name = match section {
@@ -840,23 +834,28 @@ impl<'a> Reader<'a> {
     }
 }
 
+/// The language mode a file starts in (2.2): Spectre for a `.scs` file, SPICE for any other, up
+/// to its `simulator lang=spectre`. Each `simulator lang=` line switches the mode of the lines
+/// after it, wherever it stands.
+fn start_mode(path: &str) -> Mode {
+    if path.to_lowercase().ends_with(".scs") {
+        Mode::Spectre
+    } else {
+        Mode::Spice
+    }
+}
+
 /// Read a Spectre document whose main file is `path`.
 pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<HostDocument> {
     let path = normalize(path);
-    let text = provider.read(&path)?;
+    provider.read(&path)?;
     let main_dir = dirname(&path);
     let fname = file_name(&path).to_string();
     let mut main = Level::new(LevelKind::File, fname.clone(), fname, path.clone());
     main.circuit = true;
     main.case_sensitive = true;
     let doc = HostDocument::new(main, dialect());
-    // the main file is in Spectre mode when it is a .scs file or says so near the top (S1 p89)
-    let spectre_file = path.to_lowercase().ends_with(".scs")
-        || text.lines().take(5).any(|l| {
-            let l = l.trim().to_lowercase();
-            l.starts_with("simulator") && l.contains("spectre")
-        });
-    let mode = if spectre_file { Mode::Spectre } else { Mode::Spice };
+    let mode = start_mode(&path);
     let mut r = Reader {
         provider,
         sink,
@@ -929,6 +928,25 @@ mod tests {
         let said: Vec<(&str, Option<Loc>)> = sink.all().iter().map(|d| (d.message.as_str(), d.loc.clone())).collect();
         assert_eq!(said, [(PROTECTED, Some(Loc::line("a.scs", 5))), (PROTECTED_SPICE, Some(Loc::line("a.scs", 11)))]);
         assert_eq!(doc.protected, [("a.scs".to_string(), 2, 7), ("a.scs".to_string(), 9, 12)]);
+    }
+
+    #[test]
+    fn a_file_that_is_not_a_scs_file_is_in_spice_mode_up_to_its_switch() {
+        // also within its first lines: before `simulator lang=spectre`, `//` is no comment and
+        // carries no record; after it, it does (2.2). So for the main file and an included one
+        let net =
+            "title\n// @RNL {#R1 @PLACE(0, 0)}\nsimulator lang=spectre\ninclude \"x.inc\"\nR1 (a 0) resistor r=1k\n\
+                   // @RNL {#R1 @PLACE(1, 2)}\n";
+        let inc = "* x\n// @RNL {#R2 @PLACE(0, 0)}\nsimulator lang=spectre\nR2 (a 0) resistor r=1k\n// @RNL {#R2 @PLACE(3, 4)}\n";
+        let p = MemoryProvider::new().with("t.net", net).with("x.inc", inc);
+        let mut sink = Sink::new();
+        let doc = read("t.net", &p, &mut sink).unwrap();
+        let lines = |lv: usize| doc.levels[lv].records.iter().map(|r| r.lines.0).collect::<Vec<u32>>();
+        assert_eq!((lines(0), lines(1)), (vec![6], vec![5]));
+        // the lines with `//` in SPICE mode are statements of the host, which the adapter skips
+        let said: Vec<(String, u32)> =
+            sink.all().iter().filter_map(|d| d.loc.as_ref().map(|l| (l.file.clone(), l.line))).collect();
+        assert!(said.contains(&("t.net".into(), 2)) && said.contains(&("x.inc".into(), 2)), "{:?}", sink.all());
     }
 
     #[test]

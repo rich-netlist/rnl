@@ -28,26 +28,42 @@ pub const STD_NAME: &str = "rnl-std";
 pub const SPICE_RULES: &str = "rnl-std-spice";
 pub const SPECTRE_RULES: &str = "rnl-std-spectre";
 
-/// The dialect of one file of a netlist, "spice" or "spectre": the language mode in which the
-/// file's first line is read (2.2, 16.3). `netlist` is the dialect of the netlist, as the adapter
-/// that reads it names it ([`crate::host::Dialect::name`]), `path` and `text` are the file's.
-/// Every file of a SPICE netlist is in the SPICE dialect. In a Spectre netlist a `.scs` file, or
-/// one that says `simulator lang=spectre` at its top, within its first five lines as the Spectre
-/// adapter reads them (S1 p89), is in the Spectre dialect, and any other file in the SPICE
-/// dialect: a `simulator lang=` further down switches the mode of what follows it, not the
-/// dialect of the file. A netlist of another host keeps its own dialect.
+/// The dialect of one file of a netlist, "spice" or "spectre": the language mode in which its
+/// first statement of the host is read (2.2, 16.3), the first line that is not a comment, a blank
+/// line, the title of the main file or a `simulator lang=` line. `netlist` is the dialect of the
+/// netlist, as the adapter that reads it names it ([`crate::host::Dialect::name`]), `path` and
+/// `text` are the file's, and `main` says whether it is the main file. Every file of a SPICE
+/// netlist is in the SPICE dialect. In a Spectre netlist a file starts in the Spectre mode when it
+/// is a `.scs` file and in the SPICE mode otherwise, and a `simulator lang=` line switches the mode
+/// of what follows it, as the Spectre adapter reads them; one after the first statement does not
+/// change the dialect of the file, and writing a record, a comment, does not either. A file
+/// without a statement is in the mode it ends in. A netlist of another host keeps its own dialect.
 ///
 /// This is the rule of the draft 0.3 for dropping the rule package of the other dialect, and the
 /// one place that decides it.
-pub fn file_dialect<'a>(netlist: &'a str, path: &str, text: &str) -> &'a str {
+pub fn file_dialect<'a>(netlist: &'a str, path: &str, text: &str, main: bool) -> &'a str {
     if netlist != "spectre" {
         return netlist;
     }
-    let spectre = path.to_lowercase().ends_with(".scs")
-        || text.lines().take(5).any(|l| {
-            let l = l.trim().to_lowercase();
-            l.starts_with("simulator") && l.contains("spectre")
-        });
+    let mut spectre = path.to_lowercase().ends_with(".scs");
+    for (k, raw) in text.lines().enumerate() {
+        // the title of the main file; a comment line, `*` in both modes, `//` in Spectre's, and on
+        // the first line of an included file either, as the adapter reads them
+        let comment = raw.starts_with('*') || ((spectre || k == 0) && raw.starts_with("//"));
+        if (k == 0 && main) || comment || raw.trim().is_empty() {
+            continue;
+        }
+        let low = raw.trim().to_lowercase();
+        if low.split_whitespace().next() == Some("simulator") {
+            if !spectre && low.contains("spectre") {
+                spectre = true;
+            } else if spectre && low.contains("spice") && !low.contains("spectre") {
+                spectre = false;
+            }
+            continue;
+        }
+        break;
+    }
     if spectre {
         "spectre"
     } else {
@@ -269,7 +285,7 @@ impl Interp<'_> {
     pub(crate) fn level_dialect(&self, level: LevelId) -> &str {
         let lv = &self.doc.levels[level];
         let text = self.doc.source(&lv.file).unwrap_or("");
-        file_dialect(&self.doc.dialect.name, &lv.path, text)
+        file_dialect(&self.doc.dialect.name, &lv.path, text, level == 0)
     }
 
     /// The rule package of the other dialect that a level of a file of the draft 0.3 drops
@@ -814,24 +830,34 @@ mod tests {
     #[test]
     fn every_file_of_a_spice_netlist_is_in_the_spice_dialect() {
         for (path, text) in [("a.sp", "R1 a 0 1k\n"), ("lib.scs", ""), ("x.inc", "simulator lang=spectre\n")] {
-            assert_eq!(file_dialect("spice", path, text), "spice", "{path}");
+            assert_eq!(file_dialect("spice", path, text, false), "spice", "{path}");
         }
         // a netlist of another host keeps its own dialect
-        assert_eq!(file_dialect("none", "a.rnl", ""), "none");
+        assert_eq!(file_dialect("none", "a.rnl", "", false), "none");
     }
 
     #[test]
-    fn a_file_of_a_spectre_netlist_is_in_the_mode_of_its_first_line() {
+    fn a_file_of_a_spectre_netlist_is_in_the_mode_of_its_first_statement() {
         // by the name of the file, in any case
-        assert_eq!(file_dialect("spectre", "a.scs", "R1 a 0 1k\n"), "spectre");
-        assert_eq!(file_dialect("spectre", "lib/A.SCS", ""), "spectre");
-        // by `simulator lang=spectre` at its top, after a title or a comment too
-        assert_eq!(file_dialect("spectre", "a.inc", "simulator lang=spectre\nR1 (a 0) resistor\n"), "spectre");
-        assert_eq!(file_dialect("spectre", "a.sp", "* title\n  Simulator Lang = Spectre\n"), "spectre");
-        // any other file is in the SPICE dialect, and a switch further down changes only the mode
-        // of what follows it
-        assert_eq!(file_dialect("spectre", "a.sp", "R1 a 0 1k\n"), "spice");
-        assert_eq!(file_dialect("spectre", "a.inc", "* 1\n* 2\n* 3\n* 4\n* 5\nsimulator lang=spectre\n"), "spice");
-        assert_eq!(file_dialect("spectre", "a.scs.bak", "simulator lang=spice\n"), "spice");
+        assert_eq!(file_dialect("spectre", "a.scs", "R1 a 0 1k\n", false), "spectre");
+        assert_eq!(file_dialect("spectre", "lib/A.SCS", "", false), "spectre");
+        // by `simulator lang=` before the first statement, past the title, comments and blank lines
+        assert_eq!(file_dialect("spectre", "a.inc", "simulator lang=spectre\nR1 (a 0) resistor\n", false), "spectre");
+        assert_eq!(file_dialect("spectre", "a.sp", "* title\n  Simulator Lang = Spectre\n", true), "spectre");
+        let far = "* 1\n* 2\n* 3\n* 4\n* 5\n\nsimulator lang=spectre\nR1 (a 0) resistor\n";
+        assert_eq!(file_dialect("spectre", "a.inc", far, false), "spectre");
+        assert_eq!(file_dialect("spectre", "b.scs", "// lib\nsimulator lang=spice\nR1 a 0 1k\n", false), "spice");
+        // a header record written above the switch, a comment, does not change the dialect
+        let header = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nsimulator lang=spectre\nR1 (a 0) resistor\n";
+        assert_eq!(file_dialect("spectre", "t.net", header, true), "spectre");
+        // any other file is in the SPICE dialect, and a switch after the first statement changes only
+        // the mode of what follows it
+        assert_eq!(file_dialect("spectre", "a.sp", "R1 a 0 1k\n", false), "spice");
+        let after = "R1 a 0 1k\nsimulator lang=spectre\nR2 (a 0) resistor\n";
+        assert_eq!(file_dialect("spectre", "a.inc", after, false), "spice");
+        assert_eq!(file_dialect("spectre", "a.scs.bak", "simulator lang=spice\n", false), "spice");
+        // in the SPICE mode `//` is no comment (2.2): the line is the first statement
+        let slashes = "* t\n// a note\nsimulator lang=spectre\nR1 (a 0) resistor\n";
+        assert_eq!(file_dialect("spectre", "t.net", slashes, true), "spice");
     }
 }
