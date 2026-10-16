@@ -36,10 +36,11 @@ use crate::search::{search, Candidate, RelKind};
 use crate::structure::{analyse, Structure};
 use crate::{SolveReport, Solved, SolverOptions, Unrouted};
 
-/// The note of a solve at this stage.
-pub(crate) const STAGE_NOTE: &str = "rnl-solver is at stage S4 of solver v1: the facts are resolved (8.5), the \
-     candidates of the structure-first search placed by the lexicographic LP and rounded to the grid, the best of them \
-     by the estimate routed (13.7), and the best by the layered objectives on their wires taken";
+/// The note of every solve: how this solver solves a level.
+pub(crate) const METHOD_NOTE: &str =
+    "the facts are resolved (8.5), the candidates of the structure-first search placed \
+     by the lexicographic LP and rounded to the grid, the best of them by the estimate routed (13.7), and the best by \
+     the layered objectives on their wires taken";
 
 /// A solve with its exact result, for the tests.
 #[derive(Clone, Debug)]
@@ -77,7 +78,7 @@ struct Placing {
 
 /// Solves a level, and gives the exact result with it.
 pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (Solved, Exact) {
-    let mut notes = vec![STAGE_NOTE.to_string()];
+    let mut notes = vec![METHOD_NOTE.to_string()];
     if let Err(e) = options.validate() {
         notes.push(format!("the options are not valid: {e}"));
     }

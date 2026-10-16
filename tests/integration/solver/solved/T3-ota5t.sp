@@ -29,14 +29,14 @@ M5 tail vbias vss vss nch W=4u L=1u
 *   %ax = (_, _);
 *   #M1(a) #M2(b) %ax(axis) @AS $MIRROR_PAIR;
 *   #M3(a) #M4(b) %ax(axis) @AS $MIRROR_PAIR;
-*   #M1(a) #M2(b) #M5(t) @AS $TAIL_CENTER;
+*   %tc = #M1(a) #M2(b) #M5(t) @AS $TAIL_CENTER;
 *   #M5 {#M1 #M2} @DISTANCE("bottom-to-top", min=2);
 *   {#M1 #M2} {#M3 #M4} @DISTANCE("bottom-to-top", min=2);
 *   &vdd @ADD-TO $SUPPLY_NET_SET;
 *   &vss @ADD-TO $GROUND_NET_SET;
 *   $WIRE_NET_SET @ROUTE
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:516667502c9c73b6.e17f1522b2b059c0") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:5faf5c7cc1a9f072.e17f1522b2b059c0") {
 *   %gnd_stub_M5_s = $GND_STUB @ATTACH(gap=2, priority="normal") #M5:s;
 *   %supply_stub_M3_s = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #M3:s;
 *   %supply_stub_M4_s = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #M4:s;
@@ -65,6 +65,7 @@ M5 tail vbias vss vss nch W=4u L=1u
 *   %ioport_vss @PLACE(-9, -9) => @ORIENT("R0");
 *   %ioport_vbias @PLACE(-9, -7) => @ORIENT("R0");
 *   %ax @PLACE(-4, 0);
+*   %tc::mid @PLACE(-4, 0);
 *   &inp @WIRE(mode="straight") {%ioport_inp:p #M1:g};
 *   &inn @WIRE(mode="straight") {#M2:g %ioport_inn:p};
 *   &out @WIRE(mode="straight") {#M2:d %rt1};

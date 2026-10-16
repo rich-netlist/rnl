@@ -33,7 +33,8 @@ problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)
 solve options (the levels are read without their type=\"generated\" records; -o or --in-place is needed):
-  -o DIR              write the files solved under DIR, named as they are relative to FILE's directory
+  -o DIR              write the files solved under DIR, named as they are relative to FILE's directory,
+                      with a copy of the other files they read from there, such as includes
   --in-place          write them over the files read instead
   --level TITLE       only the level with this title
   --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam
@@ -250,21 +251,35 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
     // nothing is written when a file has no place to go
     rnl_cli::solve::destinations(&run, &target)?;
     println!("solver options: {}", options.solver.canonical());
-    if run.levels.is_empty() {
+    if run.levels.is_empty() && run.not_solved.is_empty() {
         println!("{} has no drawing level to solve", run.entry);
     }
-    for level in &run.levels {
-        for line in rnl_cli::solve::report(level, args.report) {
-            println!("{line}");
-        }
+    for line in rnl_cli::solve::lines(&run, args.report) {
+        println!("{line}");
     }
-    for path in rnl_cli::solve::write(&run, &target)? {
-        println!("wrote {}", rnl_cli::path_str(&path));
+    let writing = rnl_cli::solve::write(&run, &target);
+    for path in &writing.written {
+        println!("wrote {}", rnl_cli::path_str(path));
+    }
+    for path in &writing.copied {
+        println!("copied {}", rnl_cli::path_str(path));
+    }
+    if let Target::Dir(dir) = &target {
+        for path in &writing.outside {
+            eprintln!(
+                "warning: {} reads {path}, which is outside its directory and is not copied under {}",
+                run.entry,
+                rnl_cli::path_str(dir)
+            );
+        }
     }
     if run.errors > 0 {
         eprintln!("{} errors in {} as a solver reads it; run `rnl check` to see them", run.errors, run.entry);
     }
-    Ok(ExitCode::SUCCESS)
+    match writing.error {
+        Some(e) => Err(e),
+        None => Ok(ExitCode::SUCCESS),
+    }
 }
 
 fn sanitize(s: &str) -> String {

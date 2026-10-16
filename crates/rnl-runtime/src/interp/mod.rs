@@ -99,6 +99,13 @@ pub struct Interpretation {
     /// The numbers of the objects without a name of each drawing level, with their checks (the
     /// draft 0.3, 5.9); empty unless [`Options::draft`] is set. See [`crate::numbering`].
     pub numbering: Vec<LevelNumbering>,
+    /// For each level of the host document, by its index in [`HostDocument::levels`]: `None`
+    /// when its RNL is interpreted, otherwise the file level on the way up from it, itself
+    /// included, that declares a language version this reading does not interpret, with that
+    /// version. No RNL of that file is interpreted, nor of the levels in it, and the file is kept
+    /// as it is when saved (16.1): a tool writes no record into such a level. Empty when a package
+    /// file is checked on its own (2.7).
+    pub unsupported: Vec<Option<(LevelId, String)>>,
     /// The records of the solver to read again, differently (5.9).
     pub(crate) recheck: NumberRun,
     /// In a reading without the records of the solver that counts for another, the objects of the
@@ -688,6 +695,11 @@ impl<'p> Interp<'p> {
         let checking = self.package_main.map(|p| self.units[p].pkg_name.clone()).unwrap_or_default();
         let mut sources = self.doc.sources.clone();
         sources.extend(self.pkg_sources.clone());
+        let unsupported = if self.package_main.is_some() {
+            Vec::new()
+        } else {
+            (0..self.doc.levels.len()).map(|lv| self.unsupported_file(lv)).collect()
+        };
         Interpretation {
             model,
             sink: std::mem::take(&mut self.sink),
@@ -697,6 +709,7 @@ impl<'p> Interp<'p> {
             failed: std::mem::take(&mut self.failed_spans),
             problems,
             numbering,
+            unsupported,
             recheck,
             counted,
             own,

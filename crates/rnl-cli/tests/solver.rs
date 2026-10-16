@@ -231,9 +231,18 @@ fn facts_are_in_the_order_of_8_5() {
         Position::Own { x: Slot::Fixed { value: 0.0, fact: 1 }, y: Slot::Fixed { value: 0.0, fact: 0 } }
     );
     assert!(matches!(p.objects[m2].position, Position::Own { x: Slot::Free, y: Slot::Fixed { value: 3.0, .. } }));
-    // the free axis point of the mirror pairs is named; the middle point of the tail is reached
-    // only through the number of its usage, the third without a name (the draft 0.3, 5.9)
+    // the free axis point of the mirror pairs is named, and so is the middle point of the tail,
+    // through the name of its usage
     assert_eq!(p.objects[object(p, "%ax")].reference, Reference::Name("%ax".into()));
+    assert_eq!(p.objects[object(p, "%mid")].reference, Reference::Name("%tc::mid".into()));
+    // without that name it is reached only through the number of its usage, the third without a
+    // name (the draft 0.3, 5.9)
+    let f = solver_case("T4-miller-conflicts.sp");
+    let fs = FsProvider::new(&[]);
+    let text = fs.read(&path_str(&f)).unwrap().replace("%tc = #M1(a)", "#M1(a)");
+    let unnamed = MemoryProvider::new().with(&path_str(&f), &text);
+    let ps = problems(&f, &Layered { layers: vec![&unnamed, &fs] });
+    let p = &ps[0];
     assert_eq!(p.objects[object(p, "%mid")].reference, Reference::Number { number: 3, path: vec!["::mid".into()] });
 }
 

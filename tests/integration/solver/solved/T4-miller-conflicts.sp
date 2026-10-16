@@ -21,7 +21,7 @@ CL out 0 2p
 *   %ax = (_, _);
 *   #M1(a) #M2(b) %ax(axis) @AS $MIRROR_PAIR;
 *   #M3(a) #M4(b) %ax(axis) @AS $MIRROR_PAIR;
-*   #M1(a) #M2(b) #M5(t) @AS $TAIL_CENTER;
+*   %tc = #M1(a) #M2(b) #M5(t) @AS $TAIL_CENTER;
 *   %stage1 = {#M1 #M2 #M3 #M4 #M5} @GROUP;
 *   %stage2 = {#M6 #M7 #CC} @GROUP;
 *   %stage1 %stage2 @DISTANCE("left-to-right", min=3);
@@ -39,7 +39,7 @@ CL out 0 2p
 *   #M6 #M7 @DISTANCE("x", min=2);
 *   #VIP #VIN @DISTANCE("bottom-to-top", exact=6)
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:8933f64ecae67109.e17f1522b2b059c0") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:2e2eb6c29c369899.e17f1522b2b059c0") {
 *   %gnd_stub_M5_s = $GND_STUB @ATTACH(gap=2, priority="normal") #M5:s;
 *   %gnd_stub_M7_s = $GND_STUB @ATTACH(gap=2, priority="normal") #M7:s;
 *   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VDD:n;
@@ -84,6 +84,7 @@ CL out 0 2p
 *   %supply_stub_M6_s::s @PLACE(18, 17) => @ORIENT("R0");
 *   %supply_stub_VDD_p::s @PLACE(-8, 20) => @ORIENT("R0");
 *   %ax @PLACE(4, 0);
+*   %tc::mid @PLACE(4, 0);
 *   &x @WIRE(mode="straight") {#M3:g %rt1};
 *   &x @WIRE(mode="straight") {%rt1 #M4:g};
 *   &x @WIRE(mode="straight") {#M3:d %rt2};

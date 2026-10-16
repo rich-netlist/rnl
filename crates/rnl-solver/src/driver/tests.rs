@@ -12,7 +12,7 @@ fn an_empty_level_gives_an_empty_solution_and_says_what_is_done() {
     let p = problem_of(Vec::new(), Vec::new());
     let solved = crate::solve(&p, &SolverOptions::default());
     assert_eq!(solved.solution, Solution::default());
-    assert_eq!(solved.report.notes[0], STAGE_NOTE);
+    assert_eq!(solved.report.notes[0], METHOD_NOTE);
     assert!(solved.report.kept.is_empty() && solved.report.discarded.is_empty());
     assert_eq!(solved, crate::solve(&p, &SolverOptions::default()));
 }

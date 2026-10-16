@@ -141,7 +141,7 @@ Solver v1 leaves these out; the interfaces have room for them.
 - **Polish** (5.8 of the synthesis): no one-step neighbourhood search improves the candidate taken.
 - **Labels**: no placement of labels or texts beyond what their facts and symbols say; `labels`, `terminal_wire_alignment` and `bend_alignment` are inert (see [Objectives](#objectives)).
 - **WebAssembly**: the crate builds for `wasm32-unknown-unknown`, but there is no binding (`bindings/solver-wasm`), no check that native and WebAssembly builds give the same solutions, and the viewer does not solve on demand.
-- **What a file of 0.2 cannot hold**: the record of a file of 0.2 cannot refer to an object without a name, such as the middle point of a `$TAIL_CENTER` written without a name in T3 and T4. The solver decides it all the same; `Written::unsolved` lists it, it stays without a position, and the constraints that reach it cannot be checked. The draft 0.3 writes it by number (5.9).
+- **What a file of 0.2 cannot hold**: the record of a file of 0.2 cannot refer to an object without a name, such as the middle point of a `$TAIL_CENTER` written without a name. The solver decides it all the same; `Written::unsolved` lists it, it stays without a position, and the constraints that reach it cannot be checked. The draft 0.3 writes it by number (5.9). T3 and T4 name their `$TAIL_CENTER` (`%tc`), so that their records of 0.2 place its middle point as `%tc::mid`.
 - **A fact the budget leaves undecided** is discarded and reported `undecided`; the standard does not say yet what a solver does then.
 
 See the [roadmap](../../docs/roadmap.md) for planned work.
