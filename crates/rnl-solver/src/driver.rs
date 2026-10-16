@@ -256,10 +256,12 @@ pub(crate) fn solve_exact_with(
     let report = SolveReport {
         kept: resolved.kept.clone(),
         discarded: resolved.discarded.clone(),
+        failed: resolved.failed.clone(),
         statements: resolved.statements.clone(),
         inert_objectives: structure.active.inert.clone(),
         unrouted,
         work,
+        errors: resolved.errors.clone(),
         warnings: resolved.warnings.clone(),
         notes,
     };

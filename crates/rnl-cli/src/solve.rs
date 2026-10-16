@@ -28,6 +28,11 @@
 //! (the draft 0.3, 8.5); the hints of a fact of priority low, and of the statements that only such
 //! facts lose, only with `--report` ([`report`]), as 7.6 allows them to be left out.
 //!
+//! A fact that has no solution on its own contradicts itself and fails (the draft 0.3, 8.5; 7.6):
+//! the report of its level has an error for it, on a line that begins with `error:`, and the level
+//! is solved and written back without it, as if it were not written; `rnl solve` then exits with
+//! 1 ([`errors`]).
+//!
 //! A level whose file, or a file above it, declares a language version that the reading does not
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
 //! (16.1), so nothing is written into it.
@@ -550,9 +555,12 @@ fn fact_what(p: &LevelProblem, k: usize) -> String {
 /// A statement as the hints of 8.5 name it (the draft 0.3, 8.5; 7.6): where it is written, such
 /// as `T4-miller-conflicts.sp:37`; for one in the body of a definition, the usage written in the
 /// level that it was expanded from, the first of its chain, with how the level writes its roles,
-/// and the line of the definition, such as `the usage of $MIRROR_PAIR with #M1(a) #M2(b) %ax(axis)
-/// (rnl-std.rnl:227 of its definition)`; for the coordinates of a point, which have no statement of
-/// their own, the point.
+/// a role that cannot be referred to left out, and the line of the definition, such as `the usage
+/// of $MIRROR_PAIR with #M1(a) #M2(b) %ax(axis) (rnl-std.rnl:227 of its definition)`. When the
+/// statement is in the body of a definition used inside another, the line is of the innermost,
+/// and every definition of the chain is named, outermost first, as for a fact: `%o1, the usage of
+/// $OUTER with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)`. For the coordinates of a
+/// point, which have no statement of their own, the point.
 fn statement_name(p: &LevelProblem, s: &Statement) -> String {
     if let Some(k) = s.point {
         return format!("the coordinates of {}", point(p, &PointRef::Origin(k)));
@@ -564,11 +572,15 @@ fn statement_name(p: &LevelProblem, s: &Statement) -> String {
         _ => format!("the usage of {}", u.definition),
     };
     let roles: Vec<String> =
-        u.roles.iter().map(|r| format!("{}({})", r.written.as_deref().unwrap_or("?"), r.role)).collect();
+        u.roles.iter().filter_map(|r| r.written.as_ref().map(|w| format!("{w}({})", r.role))).collect();
     if !roles.is_empty() {
         name.push_str(&format!(" with {}", roles.join(" ")));
     }
-    format!("{name} ({place} of its definition)")
+    let defs: Vec<&str> = s.chain.iter().filter_map(|u| p.usages.get(*u)).map(|u| u.definition.as_str()).collect();
+    match defs.as_slice() {
+        [_, .., inner] => format!("{name} ({place} of {inner}, from {})", defs.join(" in ")),
+        _ => format!("{name} ({place} of its definition)"),
+    }
 }
 
 /// Some ranks as a list: `[3]`, `[0] and [4]`, `[0], [2] and [3]`, or with another last word.
@@ -585,9 +597,7 @@ fn ranks(ks: &[usize], last: &str) -> String {
 /// kept before it that it conflicts with, such as `it conflicts with [3]; or with [0] and [4]`,
 /// and that the list is not complete when the time limit cut it.
 fn conflicts(d: &Discarded) -> String {
-    let mut why = if d.groups == [Vec::<usize>::new()] {
-        "it cannot hold even alone".to_string()
-    } else if d.groups.is_empty() {
+    let mut why = if d.groups.is_empty() {
         "no group of facts it conflicts with was found within the time limit of the solver".to_string()
     } else {
         let groups: Vec<String> = d.groups.iter().map(|g| ranks(g, "and")).collect();
@@ -601,6 +611,12 @@ fn conflicts(d: &Discarded) -> String {
 
 fn num(v: f64) -> String {
     rnl_runtime::geom::fmt_num(v)
+}
+
+/// How many errors the solver reported over the levels of a run: the facts that contradict
+/// themselves and fail (the draft 0.3, 8.5; 7.6). `rnl solve` exits with 1 when there is one.
+pub fn errors(run: &SolveRun) -> usize {
+    run.levels.iter().map(|l| l.solved.report.errors.len()).sum()
 }
 
 /// What the command prints of the levels of a run, in the order of the document's levels: each
@@ -629,18 +645,22 @@ pub fn not_solved(n: &NotSolved) -> String {
     )
 }
 
-/// What the command prints of one level: its title; the facts kept and discarded, every fact with
-/// `all`, otherwise the discarded ones, each with its hint (the draft 0.3, 8.5): every minimal
-/// group of facts it conflicts with, and whether the list is complete; the hints by statement,
-/// each statement whose facts took part in discarding with the facts discarded because of it; the
-/// hints of a fact of priority low, and of the statements that only such facts lose, only with
-/// `all` (7.6); the warnings of the solver, each on a line of its own (7.6), what the record cannot
-/// hold, the ROUTEs left in parts, the inert objectives, the notes, the work and the time.
+/// What the command prints of one level: its title, with how many facts are kept, discarded and,
+/// when there are any, failed; the facts kept and discarded, every fact with `all`, a fact that
+/// fails among them, otherwise the discarded ones, each with its hint (the draft 0.3, 8.5): every
+/// minimal group of facts it conflicts with, and whether the list is complete; the hints by
+/// statement, each statement whose facts took part in discarding with the facts discarded because
+/// of it; the hints of a fact of priority low, and of the statements that only such facts lose,
+/// only with `all` (7.6); the errors of the solver, the facts that contradict themselves, each on
+/// a line of its own beginning with `error:`, and its warnings, each beginning with `warning:`
+/// (7.6); what the record cannot hold, the ROUTEs left in parts, the inert objectives, the notes,
+/// the work and the time.
 pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     let p = &level.problem;
     let r = &level.solved.report;
+    let failed = if r.failed.is_empty() { String::new() } else { format!(", {} failed", r.failed.len()) };
     let mut out = vec![format!(
-        "level {} ({} in {}): {} kept, {} discarded of {}",
+        "level {} ({} in {}): {} kept, {} discarded{failed} of {}",
         p.title,
         p.kind,
         file_name(&level.path),
@@ -675,6 +695,8 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
         for k in 0..p.facts.len() {
             if r.kept.contains(&k) {
                 out.push(format!("    kept {}", describe_fact(p, k)));
+            } else if r.failed.contains(&k) {
+                out.push(format!("    failed {}: it contradicts itself (8.5, 7.6)", describe_fact(p, k)));
             } else {
                 discarded(&mut out, k, "    ");
             }
@@ -720,6 +742,7 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
         "statements whose facts took part in discarding (8.5)"
     };
     section(&mut out, head, statements);
+    out.extend(r.errors.iter().map(|e| format!("  error: {e}")));
     out.extend(r.warnings.iter().map(|w| format!("  warning: {w}")));
     section(&mut out, "unsolved", level.written.unsolved.iter().map(|u| u.to_string()).collect());
     section(
@@ -773,6 +796,34 @@ mod tests {
         assert_eq!(name_in("../x.inc", ""), None);
         assert_eq!(name_in("/x.inc", ""), None);
         assert_eq!(name_in("D:/x.inc", ""), None);
+    }
+
+    #[test]
+    fn a_statement_is_named_by_its_usage_and_every_definition_it_is_in() {
+        // %row is written in $PAIR, which $OUTER uses as %in, which the level uses as %o1: the line
+        // is of $PAIR, and both definitions are named, as for a fact (the draft 0.3, 8.5; 7.6)
+        let text = "* nested\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n* @RNL {\n\
+                    *   $PAIR = @DEFINE(roles=[\"a\", \"b\"]) { %row = {?a ?b} @ALIGN(\"y\") };\n\
+                    *   $OUTER = @DEFINE(roles=[\"a\", \"b\"]) { %in = ?a(a) ?b(b) @AS $PAIR };\n\
+                    *   %o1 = #R1(a) #R2(b) @AS $OUTER\n* }\n.end\n";
+        let files = MemoryProvider::new().with("/w/p.sp", text);
+        let options = Options { std: false, ..Options::solver() };
+        let r = crate::interpret_file(Path::new("/w/p.sp"), None, &files, &options).unwrap();
+        let p = &r.problems[0];
+        let f = p.facts.iter().position(|f| f.label == "%row").unwrap();
+        let s = Statement::of(p, f);
+        assert_eq!(s.chain.len(), 2, "{s:?}");
+        let named = "%o1, the usage of $OUTER with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
+        assert_eq!(statement_name(p, &s), named);
+        assert!(describe_fact(p, f).ends_with("(normal, p.sp:6, from $OUTER in $PAIR)"), "{}", describe_fact(p, f));
+        // a role that cannot be referred to is left out, not shown as `?`
+        let mut q = p.clone();
+        q.usages[s.chain[0]].roles[0].written = None;
+        let named = "%o1, the usage of $OUTER with #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
+        assert_eq!(statement_name(&q, &s), named);
+        // a statement in the body of a definition the level uses itself
+        let one = Statement { chain: s.chain[..1].to_vec(), ..s.clone() };
+        assert_eq!(statement_name(p, &one), "%o1, the usage of $OUTER with #R1(a) #R2(b) (p.sp:6 of its definition)");
     }
 
     #[test]

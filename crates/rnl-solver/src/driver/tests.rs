@@ -586,6 +586,10 @@ fn check_capped(
     assert_eq!(solved.report.warnings, e.resolved.warnings, "{what}");
     let undecided = solved.report.discarded.iter().filter(|d| d.undecided).count();
     assert_eq!(solved.report.warnings.len(), undecided, "{what}: {:?}", solved.report.warnings);
+    // a fact that contradicts itself, and only such a fact, fails with its error (the draft 0.3,
+    // 8.5; 7.6)
+    assert_eq!((&solved.report.failed, &solved.report.errors), (&e.resolved.failed, &e.resolved.errors), "{what}");
+    assert_eq!(solved.report.errors.len(), solved.report.failed.len(), "{what}: {:?}", solved.report.errors);
     // every fact kept holds where the objects are, exactly, before they become f64
     let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
     for &f in &solved.report.kept {

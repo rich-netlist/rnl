@@ -3,7 +3,7 @@
 //! (`tests/conformance/cases`). Each level is read as a solver reads it (`Options::solver()`, the
 //! records of the solver left out, 2.8) and resolved; then:
 //!
-//! - every fact is kept or discarded, once;
+//! - every fact is kept or discarded, once: none contradicts itself (the draft 0.3, 8.5);
 //! - every fact kept holds where the witness puts the objects, checked as a viewer checks a
 //!   constraint (14.1–14.5, 14.9), in `f64` with the tolerance (11.7);
 //! - each fact discarded has all its minimal conflict groups (the draft 0.3, 8.5), and each group
@@ -139,6 +139,8 @@ fn check_level(file: &str, p: &LevelProblem) -> Resolved {
     let mut all: Vec<usize> = r.kept.iter().copied().chain(r.discarded.iter().map(|d| d.fact)).collect();
     all.sort_unstable();
     assert_eq!(all, (0..p.facts.len()).collect::<Vec<_>>(), "{what}");
+    // no fact of the cases contradicts itself (the draft 0.3, 8.5)
+    assert!(r.failed.is_empty() && r.errors.is_empty(), "{what}: {:?}", r.errors);
     // the witness is exact; converting it to f64 may cross the edge of the tolerance by rounding
     let tol = options.tolerance + 1e-9;
     for &f in &r.kept {

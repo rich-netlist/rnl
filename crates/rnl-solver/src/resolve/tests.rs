@@ -283,6 +283,7 @@ fn check(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
     let g = &r.witness.geometry;
     let mut all: Vec<usize> = r.kept.clone();
     all.extend(r.discarded.iter().map(|d| d.fact));
+    all.extend(&r.failed);
     all.sort_unstable();
     assert_eq!(all, (0..problem.facts.len()).collect::<Vec<_>>());
     for &f in &r.kept {
@@ -296,7 +297,20 @@ fn check(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
     let mut probe = Resolver::new(&r.model, problem.objects.len(), Limits::Caps(CAPS));
     probe.geometry = g.clone();
     for (f, pf) in problem.facts.iter().enumerate() {
+        if r.failed.contains(&f) {
+            // left out of the model: no witness satisfies it
+            assert!(r.model.left_out.contains(&f) && !semantic_holds(problem, &pf.kind, g, &tol), "fact {f}");
+            continue;
+        }
         assert_eq!(probe.holds(f), semantic_holds(problem, &pf.kind, g, &tol), "fact {f}: {:?}", pf.kind);
+    }
+    // each fact that fails has its error (7.6), in order, and fails alone again
+    assert_eq!(r.errors.len(), r.failed.len(), "{:?}", r.errors);
+    for (e, &f) in r.errors.iter().zip(&r.failed) {
+        assert!(e.starts_with(&format!("the fact [{f}] {} ", problem.facts[f].label)), "{e}");
+        assert!(e.ends_with(" contradicts itself and fails (8.5, 7.6)"), "{e}");
+        let alone = LevelProblem { facts: vec![problem.facts[f].clone()], ..problem.clone() };
+        assert_eq!(resolve(&alone, options).failed, [0], "fact {f}");
     }
     let n = problem.objects.len();
     for d in r.discarded.iter().filter(|d| !d.undecided) {
@@ -616,8 +630,10 @@ fn a_centre_whose_extremes_must_change() {
 }
 
 #[test]
-fn a_fact_that_cannot_hold_alone_conflicts_with_nothing() {
-    let p = problem_of(
+fn facts_that_contradict_themselves_fail_and_take_no_part() {
+    // an ORDER of one point twice, a DISTANCE from a point to itself with min=1 (9.5): no solution
+    // on their own, so they fail (the draft 0.3, 8.5; 7.6), and are neither kept nor discarded
+    let mut p = problem_of(
         points(2),
         vec![
             fact(FactKind::Order { axis: Axis::X, sense: Sense::Either, members: vec![o(0), o(0)] }),
@@ -625,9 +641,151 @@ fn a_fact_that_cannot_hold_alone_conflicts_with_nothing() {
             align(Axis::X, vec![o(1)]),
         ],
     );
+    p.facts[1].source = Some(rnl_runtime::diag::Loc::new("cases/t.sp", 7, 3));
     let r = check(&p, &SolverOptions::without_time_limit());
-    assert_eq!(r.kept, vec![2]);
-    assert_eq!(r.discarded, vec![discarded(0, vec![]), discarded(1, vec![])]);
+    assert_eq!((r.kept.as_slice(), r.discarded.as_slice(), r.failed.as_slice()), (&[2][..], &[][..], &[0, 1][..]));
+    let label = &p.facts[0].label;
+    assert_eq!(
+        r.errors,
+        [
+            format!("the fact [0] {label} contradicts itself and fails (8.5, 7.6)"),
+            "the fact [1] DISTANCE (t.sp:7) contradicts itself and fails (8.5, 7.6)".to_string()
+        ]
+    );
+    assert!(r.warnings.is_empty() && r.statements.is_empty());
+}
+
+/// The facts of `p` without the fact `f`.
+fn without(p: &LevelProblem, f: usize) -> LevelProblem {
+    let mut q = p.clone();
+    q.facts.remove(f);
+    q
+}
+
+#[test]
+fn two_pins_of_one_object_that_no_orientation_aligns() {
+    // {#M1:d #M1:g} @ALIGN("y") on the NMOS: the drain at (0, 2) and the gate at (−3, 0), whose y
+    // differ by 2, −2, 3 or −3 whatever the orientation: no solution on its own, it fails. The
+    // drain and the source, (0, 2) and (0, −2), share a y once turned a quarter
+    let p = problem_of(
+        vec![instance()],
+        vec![align(Axis::Y, vec![pin(0, 1), pin(0, 0)]), align(Axis::Y, vec![pin(0, 1), pin(0, 2)])],
+    );
+    let r = check(&p, &SolverOptions::without_time_limit());
+    assert_eq!((r.failed.as_slice(), r.kept.as_slice()), (&[0][..], &[1][..]));
+    assert!([Orient::R90, Orient::R270, Orient::MXR90, Orient::MYR90].contains(&r.orientation(0).unwrap()));
+    // alone, and without its one solution of ALIGN: the same
+    let q = without(&p, 1);
+    assert_eq!(check(&q, &SolverOptions::without_time_limit()).failed, [0]);
+    // an orientation fixed first changes nothing: the check is of the fact on its own
+    let mut p = p;
+    p.facts.insert(0, orient(0, Orient::R90));
+    let r = check(&p, &SolverOptions::without_time_limit());
+    assert_eq!((r.failed.as_slice(), r.kept.as_slice()), (&[1][..], &[0, 2][..]));
+}
+
+#[test]
+fn an_order_whose_members_are_at_one_place_through_the_centres_of_sets() {
+    let c = PointRef::Centre;
+    let order = |members: Vec<PointRef>| fact(FactKind::Order { axis: Axis::X, sense: Sense::Either, members });
+    let p = problem_of(
+        vec![point(), point(), instance()],
+        vec![
+            // the same set written twice: one centre
+            order(vec![c(vec![o(0), o(1)]), c(vec![o(1), o(0)])]),
+            // a point and the centre of the set it is the only member of
+            order(vec![o(0), c(vec![c(vec![o(0)])])]),
+            // the instance and the centre of its drain and its source, (0, 2) and (0, −2): at its
+            // origin whatever its orientation
+            order(vec![o(2), c(vec![pin(2, 1), pin(2, 2)])]),
+            // the centre of its drain and its gate is 1 or 1.5 off its origin: an ORDER holds
+            order(vec![o(2), c(vec![pin(2, 1), pin(2, 0)])]),
+        ],
+    );
+    let r = check(&p, &SolverOptions::without_time_limit());
+    assert_eq!((r.failed.as_slice(), r.kept.as_slice()), (&[0, 1, 2][..], &[3][..]));
+}
+
+#[test]
+fn the_rest_is_resolved_as_without_the_facts_that_fail() {
+    // the example of the brainstorm, with a fact that fails among its facts: it reaches two pins
+    // of an instance that a later fact reaches too, so that the model without it has other
+    // variables; the rest of the resolution is that of the problem without it, the indices of the
+    // facts after it one higher
+    let at = |line: u32| Some(rnl_runtime::diag::Loc::new("cases/t.sp", line, 3));
+    let mut facts = vec![
+        place(o(0), Axis::Y, 0.0),
+        distance(Sense::Either, Some(2.0), None, vec![o(0)], vec![o(1)]),
+        align(Axis::Y, vec![pin(2, 1), pin(2, 0)]),
+        place(o(1), Axis::Y, 3.0),
+        align(Axis::Y, vec![o(0), o(1)]),
+        place(pin(2, 1), Axis::Y, 1.5),
+        align(Axis::X, vec![o(0), o(1)]),
+        align(Axis::Y, vec![pin(2, 2), o(1)]),
+    ];
+    for (k, f) in facts.iter_mut().enumerate() {
+        f.source = at(10 + k as u32);
+    }
+    facts[0].priority = Priority::High;
+    facts[6].priority = Priority::Low;
+    let p = problem_of(vec![point(), point(), instance()], facts);
+    let r = check(&p, &SolverOptions::without_time_limit());
+    assert_eq!(r.failed, [2]);
+    let q = without(&p, 2);
+    let s = check(&q, &SolverOptions::without_time_limit());
+    let up = |f: usize| if f < 2 { f } else { f + 1 };
+    let ups = |fs: &[usize]| fs.iter().map(|&f| up(f)).collect::<Vec<_>>();
+    assert_eq!(r.kept, ups(&s.kept));
+    let moved: Vec<Discarded> = s
+        .discarded
+        .iter()
+        .map(|d| Discarded { fact: up(d.fact), groups: d.groups.iter().map(|g| ups(g)).collect(), ..d.clone() })
+        .collect();
+    assert_eq!(r.discarded, moved);
+    assert!(!r.discarded.is_empty() && r.discarded.iter().all(|d| !d.in_groups().contains(&2)));
+    let hints: BTreeMap<Statement, StatementHint> = s
+        .statements
+        .iter()
+        .map(|(k, h)| (k.clone(), StatementHint { facts: ups(&h.facts), discarded: ups(&h.discarded) }))
+        .collect();
+    assert_eq!(r.statements, hints);
+    assert!(!r.statements.contains_key(&Statement::of(&p, 2)));
+    assert_eq!((&r.witness, r.as_written), (&s.witness, s.as_written));
+    assert_eq!(r.placing.exact, s.placing.exact.iter().map(|&f| up(f)).collect());
+    assert_eq!(r.warnings, s.warnings);
+    assert_eq!(r.errors.len(), 1);
+    // the orientation of the instance is the one of the problem without it
+    assert_eq!(r.orientation(2), s.orientation(2));
+}
+
+#[test]
+fn a_fact_whose_own_check_runs_out_of_time_is_undecided_not_failed() {
+    // the check of a fact on its own is checking (the draft 0.3, 8.5): with the time out before it
+    // finishes, the fact is discarded undecided, with its warning, and does not fail
+    let p = problem_of(
+        vec![instance(), point()],
+        vec![place(o(1), Axis::X, 4.0), align(Axis::Y, vec![pin(0, 1), pin(0, 0)]), place(o(1), Axis::Y, 2.0)],
+    );
+    let (whole, reads) = check_timed(&p, 1e9);
+    assert_eq!((whole.failed.as_slice(), whole.kept.as_slice()), (&[1][..], &[0, 2][..]));
+    let mut cut = false;
+    for limit in 0..=reads {
+        let (r, _) = check_timed(&p, limit as f64);
+        // never kept: it fails, or is undecided
+        assert!(!r.kept.contains(&1), "{limit} s");
+        let undecided = r.discarded.iter().any(|d| d.fact == 1 && d.undecided);
+        assert_ne!(undecided, r.failed == [1], "{limit} s: {r:?}");
+        if undecided {
+            cut = true;
+            assert!(r.errors.is_empty(), "{limit} s");
+            assert!(r.warnings.iter().any(|w| w.starts_with("the fact [1] ")), "{limit} s: {:?}", r.warnings);
+        }
+    }
+    assert!(cut, "no limit cuts the check of the ALIGN on its own");
+    // with no time at all, every fact that needs a check is undecided: none fails
+    let (r, _) = check_timed(&p, 0.0);
+    let undecided: Vec<usize> = r.discarded.iter().filter(|d| d.undecided).map(|d| d.fact).collect();
+    assert_eq!((undecided.as_slice(), r.failed.as_slice()), (&[0, 1, 2][..], &[][..]));
 }
 
 #[test]
@@ -737,6 +895,7 @@ fn check_timed(problem: &LevelProblem, seconds: f64) -> (Resolved, u64) {
     let r = super::resolve(problem, &within(seconds), &clock);
     let mut all: Vec<usize> = r.kept.clone();
     all.extend(r.discarded.iter().map(|d| d.fact));
+    all.extend(&r.failed);
     all.sort_unstable();
     assert_eq!(all, (0..problem.facts.len()).collect::<Vec<_>>());
     let tol = r.model.tol.clone();
@@ -745,6 +904,7 @@ fn check_timed(problem: &LevelProblem, seconds: f64) -> (Resolved, u64) {
     }
     let undecided: Vec<&Discarded> = r.discarded.iter().filter(|d| d.undecided).collect();
     assert_eq!(r.warnings.len(), undecided.len(), "{seconds} s: {:?}", r.warnings);
+    assert_eq!(r.errors.len(), r.failed.len(), "{seconds} s: {:?}", r.errors);
     for (w, d) in r.warnings.iter().zip(&undecided) {
         let end = format!(" was not decided within the time limit of {} s and is discarded (8.5)", fmt_num(seconds));
         assert!(w.starts_with(&format!("the fact [{}] {} ", d.fact, problem.facts[d.fact].label)), "{w}");
@@ -795,8 +955,8 @@ fn with_no_time_at_all_only_what_the_witness_satisfies_is_kept() {
         ]
     );
     assert_eq!(r.work.resolve_nodes, 0);
-    // the witness is the resolution's, within the tolerance: nothing more was resolved
-    assert!(!r.as_written && r.placing.tol == r.model.tol);
+    // the witness is taken as written all the same, which is not timed: the facts kept hold so
+    assert!(r.as_written && r.placing.tol.is_zero());
     assert!(r.notes.is_empty(), "{:?}", r.notes);
     // without a limit every fact is decided, and the same on a clock that never advances
     let all = resolve(&p, &SolverOptions::without_time_limit());
@@ -835,6 +995,26 @@ fn a_check_out_of_time_leaves_its_fact_undecided() {
 }
 
 #[test]
+fn with_a_fact_left_undecided_the_witness_is_still_taken_as_written() {
+    // A at 5.5, decided; then B at 10, whose check the limit cuts: the witness is taken as written
+    // all the same, which is not timed, so A is at 5.5 and not a tolerance below, where the simplex
+    // stopped, and the record writes the constant of the file (17)
+    let p = problem_of(points(2), vec![place(o(0), Axis::X, 5.5), place(o(1), Axis::X, 10.0)]);
+    let (_, reads) = check_timed(&p, 1e9);
+    let mut cut = false;
+    for limit in 0..=reads {
+        let (r, _) = check_timed(&p, limit as f64);
+        if r.kept == [0] && r.discarded.iter().any(|d| d.fact == 1 && d.undecided) {
+            cut = true;
+            assert!(r.as_written, "{limit} s");
+            assert_eq!(x_of(&r, 0), frac(11, 2), "{limit} s");
+            assert_eq!(r.position(0), Some((5.5, 0.0)), "{limit} s");
+        }
+    }
+    assert!(cut, "no limit decides A and leaves B undecided");
+}
+
+#[test]
 fn a_search_that_grows_too_large_stops_at_its_time_limit() {
     // nine classes: 3^9 combinations, a search too long for 2000 readings; then a point, whose y
     // at 0 the witness satisfies and whose x at 7 needs a check
@@ -847,8 +1027,11 @@ fn a_search_that_grows_too_large_stops_at_its_time_limit() {
     let undecided: Vec<usize> = r.discarded.iter().filter(|d| d.undecided).map(|d| d.fact).collect();
     assert_eq!(undecided, vec![10, 12]);
     assert_eq!(r.warnings.len(), 2);
-    // a reading at each node and every few pivots: the search stops within the limit's readings
-    assert!(r.work.resolve_nodes <= 2000 && reads == 2002, "{} nodes, {reads} readings", r.work.resolve_nodes);
+    // a reading at each node and every few pivots: the checks, each fact on its own first, stop
+    // within the limit's readings; the witness taken as written after them, which is not timed,
+    // adds a node or so for each fact kept
+    assert!(r.as_written, "the facts kept hold as written");
+    assert!(r.work.resolve_nodes <= 2000 + 20 && reads == 2002, "{} nodes, {reads} readings", r.work.resolve_nodes);
 }
 
 #[test]
@@ -988,6 +1171,139 @@ fn a_limit_that_cuts_the_enumeration_gives_the_groups_found_and_says_so() {
     // cut before the first group, after it, and after the second
     assert!(cut.contains(&0) && cut.contains(&1) && cut.contains(&2), "{cut:?}");
     assert_eq!(check_timed(&p, reads as f64).0, unlimited);
+}
+
+/// `k` independent conflicts: for each of `k` points, a DISTANCE that puts A exactly 5 to its
+/// left and a PLACE of it at 0, then A at 0. Each pair is a minimal conflict group of A's PLACE,
+/// and the largest sets of the pairs that fit with it, one fact of each pair left out, are 2^k.
+fn independent_pairs(k: usize) -> LevelProblem {
+    let mut facts = Vec::new();
+    for i in 1..=k {
+        facts.push(distance(Sense::Increasing, Some(5.0), Some(5.0), vec![o(0)], vec![o(i)]));
+        facts.push(place(o(i), Axis::X, 0.0));
+    }
+    facts.push(place(o(0), Axis::X, 0.0));
+    problem_of(points(k + 1), facts)
+}
+
+#[test]
+fn the_map_of_the_enumeration_propagates_its_clauses() {
+    // The map of MARCO for 8 independent groups of two, each seed answered as a resolution would:
+    // a seed that holds a pair whole holds a group, the others fit. Every seed is a largest subset
+    // that holds no group found and is no subset of a set found to fit; the map gives the 2^8 sets
+    // that fit and the 8 groups, then none. Unit propagation over its two kinds of clauses, a
+    // group of which a seed leaves one out and a set found to fit outside which it holds one, and
+    // a search that goes on from the last seed keep the work small: a search from the start of
+    // each seed that tries each position in and out, and finds a clause broken only once every
+    // position of it has a value, made a million nodes.
+    let k = 8;
+    let mut map = Map::new(2 * k, vec![0, 1]);
+    let (mut groups, mut fits) = (1, 0);
+    loop {
+        let seed = match map.seed(Limits::Caps(CAPS)) {
+            Seed::Found(seed) => seed,
+            Seed::None => break,
+            Seed::Stopped => panic!("no time limit"),
+        };
+        assert!(map.groups.iter().all(|g| !g.iter().all(|i| seed.contains(i))), "{seed:?}");
+        assert!(map.fits.iter().all(|s| s.iter().any(|i| seed.contains(i))), "{seed:?}");
+        match (0..k).find(|i| seed.contains(&(2 * i)) && seed.contains(&(2 * i + 1))) {
+            Some(i) => {
+                map.add_group(vec![2 * i, 2 * i + 1]);
+                groups += 1;
+            }
+            None => {
+                // as large as can be: one of each pair
+                assert_eq!(seed.len(), k, "{seed:?}");
+                map.add_fit((0..2 * k).filter(|j| !seed.contains(j)).collect());
+                fits += 1;
+            }
+        }
+    }
+    assert_eq!((groups, fits), (k, 1 << k));
+    // about 3400 nodes; a search from the start of each seed without propagation made a million
+    assert!(map.nodes <= 20_000, "{} nodes", map.nodes);
+}
+
+#[test]
+fn the_map_gives_the_first_subset_not_explored_as_a_search_from_the_start_would() {
+    // Random maps against brute force: hidden minimal groups over a few positions answer each seed
+    // as a resolution would, the first hidden group that the seed holds whole being found, and the
+    // seed is checked against the first subset in the order of the search (positions in before
+    // out, the first position first) that holds no group found and is no subset of a set found to
+    // fit, grown as the map grows it: the propagation and the search going on from the last seed
+    // change the work, not the seeds.
+    let mut state: u64 = 0x2545_f491_4f6c_dd1d;
+    let mut next = move |n: u64| {
+        state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+        (state >> 33) % n
+    };
+    let reference = |map: &Map| -> Option<Vec<usize>> {
+        let n = map.size;
+        let first = (0..1u32 << n).rev().find(|mask| {
+            let has = |i: usize| mask >> (n - 1 - i) & 1 == 1;
+            map.groups.iter().all(|g| !g.iter().all(|&i| has(i))) && map.fits.iter().all(|s| s.iter().any(|&i| has(i)))
+        })?;
+        let mut seed: Vec<bool> = (0..n).map(|i| first >> (n - 1 - i) & 1 == 1).collect();
+        for i in 0..n {
+            if !seed[i] {
+                seed[i] = true;
+                if map.groups.iter().any(|g| g.contains(&i) && g.iter().all(|&j| seed[j])) {
+                    seed[i] = false;
+                }
+            }
+        }
+        Some((0..n).filter(|&i| seed[i]).collect())
+    };
+    let mut maps = 0;
+    for _ in 0..300 {
+        let n = 2 + next(9) as usize;
+        let mut hidden: Vec<Vec<usize>> = Vec::new();
+        for _ in 0..1 + next(4) {
+            let mut g: Vec<usize> = (0..n).filter(|_| next(3) == 0).collect();
+            if g.is_empty() {
+                g.push(next(n as u64) as usize);
+            }
+            // minimal: none holds another
+            if hidden.iter().all(|h| !h.iter().all(|i| g.contains(i)) && !g.iter().all(|i| h.contains(i))) {
+                hidden.push(g);
+            }
+        }
+        let mut map = Map::new(n, hidden[0].clone());
+        let mut found = 1;
+        loop {
+            let want = reference(&map);
+            let seed = match map.seed(Limits::Caps(CAPS)) {
+                Seed::Found(seed) => Some(seed),
+                Seed::None => None,
+                Seed::Stopped => panic!("no time limit"),
+            };
+            assert_eq!(seed, want, "{hidden:?}: {:?} / {:?}", map.groups, map.fits);
+            let Some(seed) = seed else { break };
+            match hidden.iter().find(|h| h.iter().all(|i| seed.contains(i))) {
+                Some(h) => {
+                    map.add_group(h.clone());
+                    found += 1;
+                }
+                None => map.add_fit((0..n).filter(|i| !seed.contains(i)).collect()),
+            }
+        }
+        assert_eq!(found, hidden.len(), "{hidden:?}");
+        maps += 1;
+    }
+    assert_eq!(maps, 300);
+}
+
+#[test]
+fn independent_conflicts_have_all_their_groups() {
+    // the resolution itself: the 8 groups, each a pair, found among the 2^8 largest sets that fit
+    let k = 8;
+    let p = independent_pairs(k);
+    let r = resolve(&p, &SolverOptions::without_time_limit());
+    let groups: Vec<Vec<usize>> = (0..k).map(|i| vec![2 * i, 2 * i + 1]).collect();
+    assert_eq!(r.discarded, vec![discarded_with(2 * k, groups)]);
+    // the nodes of the seeds are counted with those of the resolutions
+    assert!(r.work.resolve_nodes <= 20_000, "{} nodes", r.work.resolve_nodes);
 }
 
 #[test]
@@ -1224,13 +1540,24 @@ fn the_resolution_agrees_with_brute_force() {
     let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
     let options = SolverOptions::without_time_limit();
     let mut discards = 0;
+    let mut failed = 0;
     let mut skipped = 0;
     for case in 0..150 {
         let p = random_problem(&mut rng);
         let r = check(&p, &options);
+        // a fact fails when it has no solution on its own, on the model of every fact (the draft
+        // 0.3, 8.5); the others are taken in on the model without those that fail
+        let whole = Model::new(&p, r.model.tol.clone());
         let mut kept: Vec<usize> = Vec::new();
         let mut decided = true;
         for f in 0..p.facts.len() {
+            if let Some(alone) = brute_feasible(&whole, &p, &[f]) {
+                assert_eq!(alone, !r.failed.contains(&f), "case {case}: fact {f} on its own");
+            }
+            if r.failed.contains(&f) {
+                failed += 1;
+                continue;
+            }
             let mut with = kept.clone();
             with.push(f);
             match brute_feasible(&r.model, &p, &with) {
@@ -1250,7 +1577,8 @@ fn the_resolution_agrees_with_brute_force() {
         assert_eq!(r.kept, kept, "case {case}: {:#?}", p.facts.iter().map(|f| &f.kind).collect::<Vec<_>>());
         discards += r.discarded.len();
     }
-    // the problems conflict often enough to test the discards too, and few are left out
-    assert!(discards > 150, "{discards}");
+    // the problems conflict often enough to test the discards too, some facts fail, and few are
+    // left out
+    assert!(discards > 150 && failed > 0, "{discards} discarded, {failed} failed");
     assert!(skipped < 10, "{skipped}");
 }

@@ -367,6 +367,8 @@ fn every_case_solved_and_written_back_reads_back_whole() {
         for level in &run.levels {
             let report = &level.solved.report;
             assert_eq!(report.kept.len() + report.discarded.len(), level.problem.facts.len(), "{name}");
+            // no fact contradicts itself (the draft 0.3, 8.5)
+            assert!(report.failed.is_empty() && report.errors.is_empty(), "{name}: {:?}", report.errors);
             assert!(report.unrouted.is_empty(), "{name}: {:?}", report.unrouted);
             // the record holds every decision: every object is placed and every constraint read
             // back (plan 5.11)
@@ -877,6 +879,10 @@ fn every_corpus_case_solved_reads_back_as_its_authors_wrote_it() {
             continue;
         }
         solved += 1;
+        for level in &run.levels {
+            let report = &level.solved.report;
+            assert!(report.failed.is_empty() && report.errors.is_empty(), "{name}: {:?}", report.errors);
+        }
         let dir = scratch(&format!("corpus-{name}"));
         let writing = write(&run, &Target::Dir(dir.clone()));
         assert_eq!(writing.error, None, "{name}");
@@ -1621,13 +1627,15 @@ fn every_minimal_group_is_named_and_a_limit_that_cuts_them_says_the_list_is_not_
 
 #[test]
 fn a_case_whose_resolution_runs_out_of_time_keeps_what_it_decided() {
-    // T4 with 20 readings of the clock: the facts decided by then are those of 8.5 as far as they
-    // go, each later fact that needs a check is undecided, and every fact kept holds
+    // T4 with 35 readings of the clock, of which the checks of its facts on their own take about
+    // 25 (the draft 0.3, 8.5): the facts decided by then are those of 8.5 as far as they go, two
+    // of them discarded, each later fact that needs a check is undecided, and every fact kept holds
     let fs = FsProvider::new(&[]);
-    let run = solve_with_clock(&case("T4-miller-conflicts"), &fs, &within(20.0), &Ticks::default()).unwrap();
+    let run = solve_with_clock(&case("T4-miller-conflicts"), &fs, &within(35.0), &Ticks::default()).unwrap();
     let level = &run.levels[0];
     let r = &level.solved.report;
     assert!(!r.warnings.is_empty() && !r.kept.is_empty(), "{r:?}");
+    assert!(r.discarded.iter().any(|d| !d.undecided), "the time ran out before the order of 8.5: {r:?}");
     check_undecided(level, "T4");
     check_kept(&run, "T4");
     let first = r.discarded.iter().find(|d| d.undecided).unwrap().fact;
@@ -1638,8 +1646,163 @@ fn a_case_whose_resolution_runs_out_of_time_keeps_what_it_decided() {
     // before the first fact left undecided, what is kept is what 8.5 keeps
     let before = |kept: &[usize]| kept.iter().copied().filter(|&k| k < first).collect::<Vec<_>>();
     assert_eq!(before(&r.kept), before(&whole.kept));
-    let again = solve_with_clock(&case("T4-miller-conflicts"), &fs, &within(20.0), &Ticks::default()).unwrap();
+    let again = solve_with_clock(&case("T4-miller-conflicts"), &fs, &within(35.0), &Ticks::default()).unwrap();
     assert_eq!(again.files, run.files, "not the same on a fresh clock");
     let lines = lines(&run, false);
     assert!(lines.iter().any(|l| l.starts_with("  warning: the fact [")), "{lines:#?}");
+}
+
+/// A netlist whose RNL has, with `statements` in it, an NMOS, two resistors placed apart that an
+/// ALIGN y puts on one height, and the ground stubs of the standard package.
+fn with_statements(statements: &str) -> String {
+    format!(
+        "* facts that contradict themselves\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n\
+         .model nch nmos level=1\nM1 out in 0 0 nch W=4u L=1u\nR1 out a 1k\nR2 a 0 1k\n* @RNL {{\n\
+         *   # @SELECT-INSTANCE(model=\"nch\") => @SET-SYMBOL $NMOS;\n{statements}\
+         *   #R1 @PLACE(0, 0);\n*   #R2 @PLACE(0, 5);\n*   {{#R1 #R2}} @ALIGN(\"y\")\n* }}\n.end\n"
+    )
+}
+
+/// What a fact says and where, without its rank.
+fn unranked(p: &LevelProblem, k: usize) -> String {
+    let d = describe_fact(p, k);
+    d[d.find("] ").unwrap() + 2..].to_string()
+}
+
+#[test]
+fn a_fact_that_contradicts_itself_fails_and_the_level_is_solved_without_it() {
+    // The drain and the gate of the NMOS, at (0, 2) and (−3, 0), at one height whatever its
+    // orientation; an ORDER of the NMOS and the centre of its drain and its source, which is its
+    // origin whatever its orientation; an ORDER of one set written twice; an ORDER of a point and
+    // the centre of the set it is the only member of. The runtime gives them to the solver, and
+    // the solver finds that none has a solution on its own: each fails with an error (the draft
+    // 0.3, 8.5; 7.6), takes no part in the resolution, and the level is solved as without them.
+    let failing = "*   {#M1:d #M1:g} @ALIGN(\"y\");\n*   {#M1 {#M1:d #M1:s}} @ORDER(\"x\");\n\
+                   *   {{#R1 #R2} {#R1 #R2}} @ORDER(\"y\");\n*   {#R1 {#R1}} @ORDER(\"y\");\n";
+    let files = MemoryProvider::new().with("/w/self.sp", &with_statements(failing));
+    let run = solve(Path::new("/w/self.sp"), &files, &unlimited()).unwrap();
+    assert_eq!(run.errors, 0, "the runtime does not fail them");
+    let level = &run.levels[0];
+    let p = &level.problem;
+    let r = &level.solved.report;
+    let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
+    let mut failed = vec![
+        fact("ALIGN y {#M1:d #M1:g}"),
+        fact("ORDER x either {#M1 {#M1:d #M1:s}}"),
+        fact("ORDER y either {{#R1 #R2} {#R1 #R2}}"),
+        fact("ORDER y either {#R1 {#R1}}"),
+    ];
+    failed.sort_unstable();
+    assert_eq!(r.failed, failed);
+    // in no list but their own: not kept, not discarded, in no group and no hint by statement
+    assert!(failed.iter().all(|k| !r.kept.contains(k)), "{r:?}");
+    assert!(r.discarded.iter().all(|d| !failed.contains(&d.fact) && d.in_groups().iter().all(|k| !failed.contains(k))));
+    assert!(r.statements.values().all(|h| h.facts.iter().all(|k| !failed.contains(k))), "{:?}", r.statements);
+    assert_eq!(r.kept.len() + r.discarded.len() + r.failed.len(), p.facts.len());
+    // an error for each, on a line of its own
+    let lines = rnl_cli::solve::report(level, false);
+    assert_eq!(r.errors.len(), 4);
+    for (e, &k) in r.errors.iter().zip(&failed) {
+        let line = p.facts[k].source.as_ref().unwrap().line;
+        assert_eq!(
+            e,
+            &format!("the fact [{k}] {} (self.sp:{line}) contradicts itself and fails (8.5, 7.6)", p.facts[k].label)
+        );
+        assert!(lines.contains(&format!("  error: {e}")), "{e}\n{lines:#?}");
+    }
+    assert!(
+        lines[0].ends_with(&format!(" kept, {} discarded, 4 failed of 13 facts", r.discarded.len())),
+        "{}",
+        lines[0]
+    );
+    let all = rnl_cli::solve::report(level, true);
+    for &k in &failed {
+        let line = format!("    failed {}: it contradicts itself (8.5, 7.6)", describe_fact(p, k));
+        assert!(all.contains(&line), "{line}\n{all:#?}");
+    }
+    // the rest is solved as without them, the lines left empty: the same facts kept and discarded,
+    // with the same groups, and the same solution
+    let blank = "*
+"
+    .repeat(4);
+    let none = MemoryProvider::new().with("/w/self.sp", &with_statements(&blank));
+    let without = solve(Path::new("/w/self.sp"), &none, &unlimited()).unwrap();
+    let other = &without.levels[0];
+    let q = &other.problem;
+    let described = |p: &LevelProblem, ks: &[usize]| ks.iter().map(|&k| unranked(p, k)).collect::<Vec<_>>();
+    assert_eq!(described(p, &r.kept), described(q, &other.solved.report.kept));
+    let groups = |p: &LevelProblem, ds: &[rnl_solver::Discarded]| {
+        ds.iter()
+            .map(|d| (unranked(p, d.fact), d.groups.iter().map(|g| described(p, g)).collect::<Vec<_>>()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(groups(p, &r.discarded), groups(q, &other.solved.report.discarded));
+    assert!(!r.discarded.is_empty());
+    assert_eq!(level.solved.solution, other.solved.solution);
+    // the record is written all the same
+    assert!(run.files[0].text.contains(&level.hash), "{}", run.files[0].text);
+    // with no time at all, their checks on their own do not finish: undecided, not failed
+    let cut = solve_with_clock(Path::new("/w/self.sp"), &files, &within(0.0), &Ticks::default()).unwrap();
+    let r = &cut.levels[0].solved.report;
+    assert!(r.failed.is_empty() && r.errors.is_empty(), "{r:?}");
+    assert!(failed.iter().all(|k| r.discarded.iter().any(|d| d.fact == *k && d.undecided)), "{r:?}");
+    check_undecided(&cut.levels[0], "no time");
+
+    // the command prints the errors, writes the file and exits with 1
+    let dir = scratch("self-contradiction");
+    let file = dir.join("self.sp");
+    std::fs::write(&file, with_statements(failing)).unwrap();
+    let out = dir.join("out");
+    let (code, stdout, stderr) =
+        rnl(&["solve", &path_str(&file), "-o", &path_str(&out), "--solver-options", "time_limit=none"]);
+    assert_eq!(code, 1, "{stdout}{stderr}");
+    assert_eq!(stdout.matches("\n  error: the fact [").count(), 4, "{stdout}");
+    assert!(stdout.ends_with(&format!("wrote {}\n", path_str(&out.join("self.sp")))), "{stdout}");
+    assert!(out.join("self.sp").exists());
+    // and without them, 0
+    std::fs::write(&file, with_statements("")).unwrap();
+    let (code, stdout, _) =
+        rnl(&["solve", &path_str(&file), "-o", &path_str(&out), "--solver-options", "time_limit=none"]);
+    assert_eq!(code, 0, "{stdout}");
+    assert!(!stdout.contains("error: "), "{stdout}");
+}
+
+#[test]
+fn a_place_decided_before_the_time_ran_out_is_written_as_written() {
+    // #R1 at (5.5, 0) is decided; #R2 at x = 10, after it in the order of 8.5, is not, for want of
+    // time. The positions are still taken from the facts kept with their constants as written,
+    // which is not timed: the record writes 5.5, not a tolerance off it, every fact kept holds at
+    // 1e-6 where the solution puts the objects, and read back, no fact kept is dropped against
+    // the record (8.5, 17)
+    let body = "* decimal\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n\
+                * @RNL { #R2 @PLACE(x=10); #R1 @PLACE(5.5, 0) }\n.end\n";
+    let files = MemoryProvider::new().with("/w/t.sp", body);
+    let entry = Path::new("/w/t.sp");
+    let clock = Ticks::default();
+    solve_with_clock(entry, &files, &within(1e9), &clock).unwrap();
+    let mut cut = 0;
+    for limit in 0..=clock.reads() {
+        let run = solve_with_clock(entry, &files, &within(limit as f64), &Ticks::default()).unwrap();
+        let level = &run.levels[0];
+        let p = &level.problem;
+        let r = &level.solved.report;
+        let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
+        let (x1, x2) = (fact("the x of #R1 = 5.5"), fact("the x of #R2 = 10"));
+        if !(r.kept.contains(&x1) && r.discarded.iter().any(|d| d.fact == x2 && d.undecided)) {
+            continue;
+        }
+        cut += 1;
+        check_kept(&run, &format!("{limit} s"));
+        assert!(level.record.contains("#R1 @PLACE(5.5, 0)"), "{limit} s: {}", level.record);
+        let back = read_solved(&run, &files, entry);
+        let dropped = dropped(&back);
+        for &k in &r.kept {
+            let label = &p.facts[k].label;
+            assert!(
+                !dropped.iter().any(|m| m.starts_with(&format!("{label} conflicts with"))),
+                "{limit} s: {dropped:?}"
+            );
+        }
+    }
+    assert!(cut > 0, "no limit decides #R1 and leaves #R2 undecided");
 }

@@ -230,8 +230,8 @@ impl Default for Budget {
 /// their result does not depend on the machine, by caps that the implementation fixes ([`CAPS`]),
 /// backstops far above what a level of a few hundred objects needs. A search that reaches its cap
 /// drops its relation without a conflict, a simplex that reaches its cap stops and the LP leaves
-/// the candidate where its resolution put it, the witness is the resolution's when it cannot be
-/// taken as written, and the report says so.
+/// the candidate where its resolution put it, the witness is the resolution's, within the
+/// tolerance, when it cannot be taken as written; the report says so in a note each time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Caps {
     /// The nodes of the search for the literals of one relation.
@@ -307,15 +307,18 @@ pub struct SolverOptions {
     pub beam: usize,
     pub budget: Budget,
     /// How many seconds the resolution of a level may spend on checking, none for no limit (the
-    /// draft 0.3, 8.5): the checks of the facts and the search for all their minimal conflict
-    /// groups, nothing else, on the clock the caller gives (`crate::solve_with_clock`). When the
-    /// check of a fact does not finish within it, the fact is discarded undecided, with a warning
-    /// (7.6), and so is every later fact that needs a check; a later fact that the placement
-    /// reached by then already satisfies is kept. The result may then differ from that of 8.5,
-    /// and from one run to the next; without a limit, and whenever no check reaches it, it is that
-    /// of 8.5. When the groups are not all found within it, those found are given, each minimal,
-    /// and the hint says that its list is not complete (`crate::Discarded::complete`).
-    /// [`DEFAULT_TIME_LIMIT`] by default.
+    /// draft 0.3, 8.5): the checks of the facts, each on its own first and then in order, and the
+    /// search for all their minimal conflict groups, nothing else, on the clock the caller gives
+    /// (`crate::solve_with_clock`). When the check of a fact does not finish within it, the fact
+    /// is discarded undecided, with a warning (7.6), and so is every later fact that needs a
+    /// check; a later fact that the placement reached by then already satisfies is kept. A fact
+    /// whose check on its own does not finish is undecided too, not failed. The result may then
+    /// differ from that of 8.5, and from one run to the next; without a limit, and whenever no
+    /// check reaches it, it is that of 8.5. The placement is then taken from the facts kept with
+    /// their constants as written all the same, which is not timed, so that a fact kept before the
+    /// time ran out puts its objects where it says. When the groups are not all found within it,
+    /// those found are given, each minimal, and the hint says that its list is not complete
+    /// (`crate::Discarded::complete`). [`DEFAULT_TIME_LIMIT`] by default.
     pub time_limit: Option<f64>,
 }
 

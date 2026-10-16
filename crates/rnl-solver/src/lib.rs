@@ -11,11 +11,12 @@
 //! let written = rnl_runtime::solution::write_record(problem, &solved.solution, rnl_solver::AUTHOR, &hash);
 //! ```
 //!
-//! [`SolveReport`] says what became of each fact: 8.5 takes the facts in the order of
-//! [`LevelProblem::facts`] and keeps each that fits with those kept before it; a fact that does not
-//! is discarded, with every minimal group of facts kept before it that it conflicts with, and each
-//! statement whose facts are in such a group is told which facts were discarded because of it (the
-//! draft 0.3, 8.5).
+//! [`SolveReport`] says what became of each fact: 8.5 first checks each fact on its own, and a fact
+//! that has no solution on its own contradicts itself and fails, with an error (7.6); it takes the
+//! others in the order of [`LevelProblem::facts`] and keeps each that fits with those kept before
+//! it; a fact that does not is discarded, with every minimal group of facts kept before it that it
+//! conflicts with, and each statement whose facts are in such a group is told which facts were
+//! discarded because of it (the draft 0.3, 8.5).
 //!
 //! The work is in stages (the development plan of solver v1):
 //!
@@ -82,6 +83,12 @@ pub struct SolveReport {
     /// The facts discarded, in the order of [`LevelProblem::facts`] (8.5), each with every minimal
     /// conflict group it has (the draft 0.3, 8.5).
     pub discarded: Vec<Discarded>,
+    /// The facts that contradict themselves, by their index, in order (the draft 0.3, 8.5): each
+    /// has no solution on its own, whatever orientations the objects it reaches take and whatever
+    /// way it holds in, and fails (7.6). They take no part in the resolution: neither kept nor
+    /// discarded, in no group and in no hint by statement; the level is solved as if they were
+    /// not written, and the report has an error for each.
+    pub failed: Vec<usize>,
     /// The hints of 8.5 by statement (the draft 0.3, 8.5): each statement whose facts are in a
     /// minimal conflict group of a fact discarded, with those facts and the facts discarded because
     /// of them, so that the author sees which statements lost their effect through it. In the
@@ -96,6 +103,11 @@ pub struct SolveReport {
     /// lines for what is left. Not an error.
     pub unrouted: Vec<Unrouted>,
     pub work: Work,
+    /// The errors of the solve (7.6), one sentence each: a fact that contradicts itself and fails
+    /// (the draft 0.3, 8.5), one for each fact of `failed`, in order, naming it by its index, its
+    /// label, where its statement is written and the definitions it was expanded from, such as
+    /// `the fact [3] ALIGN (amp.sp:12) contradicts itself and fails (8.5, 7.6)`.
+    pub errors: Vec<String>,
     /// The warnings of the solve (7.6), one sentence each: a fact discarded because the check for
     /// it did not finish within the time limit (the draft 0.3, 8.5), one for each such fact, in
     /// the order of the facts.
@@ -112,9 +124,9 @@ pub struct Discarded {
     /// Its minimal conflict groups, which the hint of 8.5 names (the draft 0.3, 8.5): each a set
     /// of facts kept before it that has no solution together with it and from which no fact can
     /// be left out, by index. Each group is sorted by rank, and the groups are sorted too. Every
-    /// group here is minimal; there are all of them when `complete` says so. A fact that cannot
-    /// hold even alone has one group, the empty one. Empty when the fact is `undecided`, and when
-    /// the time limit ran out before a first group was made minimal.
+    /// group here is minimal; there are all of them when `complete` says so. Never empty but when
+    /// the fact is `undecided`, or the time limit ran out before a first group was made minimal: a
+    /// fact that cannot hold even alone is not discarded but fails ([`SolveReport::failed`]).
     pub groups: Vec<Vec<usize>>,
     /// Whether `groups` holds every minimal conflict group of the fact. False when the time limit
     /// ([`SolverOptions::time_limit`]) ran out before they were all found, so that the hint says
@@ -208,8 +220,9 @@ pub struct Unrouted {
 /// caps of the implementation in the solver's own uses of it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Work {
-    /// The nodes of the searches over the literals: those of the resolution of 8.5, and those of
-    /// the solver's own relations.
+    /// The nodes of the searches over the literals: those of the resolution of 8.5, the checks of
+    /// the facts on their own among them, and those of the solver's own relations; and the nodes
+    /// of the search for the seeds of the enumeration of the conflict groups.
     pub resolve_nodes: u64,
     /// The pivots of every simplex.
     pub pivots: u64,
@@ -264,7 +277,8 @@ pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: 
     driver::solve(problem, options, clock)
 }
 
-/// Resolves the facts of one drawing level (8.5): takes them in the order of
+/// Resolves the facts of one drawing level (8.5): checks each on its own first, a fact with no
+/// solution on its own failing (the draft 0.3, 8.5; 7.6); takes the others in the order of
 /// [`LevelProblem::facts`], keeps each that fits with those kept before it and discards the others,
 /// each with every minimal group of facts it conflicts with, says for each statement which facts
 /// were discarded because of it (the draft 0.3, 8.5), and gives a witness, a placement that
