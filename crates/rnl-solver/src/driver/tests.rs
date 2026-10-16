@@ -239,8 +239,9 @@ fn summary(p: &LevelProblem, solved: &Solved, e: &Exact) -> String {
 
 /// The wires of the ROUTEs (13.7, 13.2): each from a pin of its net, a point of a wire written on
 /// it or a branch point, to another, its bends between, as the exact paths have them; along the
-/// axes and through no symbol's box; every branch point the end of three wires or more, with a
-/// junction; every net one tree but those the report leaves in parts, in as many as it says.
+/// axes and through no symbol's box; every branch point the end of three wires or more, or of two
+/// on a pin or a point, one of them the wire of length 0 to it, with a junction; every net one
+/// tree but those the report leaves in parts, in as many as it says.
 fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
     use rnl_runtime::solution::WirePoint;
     let s = &e.structure;
@@ -253,7 +254,11 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
     let boxes: Vec<(usize, [Q; 4])> =
         s.components().filter_map(|k| Some((k, s.box_at(&e.placed.origins, &g.orient, k)?))).collect();
     let mut ends_at = vec![0usize; sol.branches.len()];
+    let mut on_anchor = vec![false; sol.branches.len()];
     for (w, path) in sol.wires.iter().zip(&r.paths) {
+        if let [WirePoint::Branch(b), WirePoint::Anchor(_)] = w.points.as_slice() {
+            on_anchor[*b] |= path.len() == 2 && path[0] == path[1];
+        }
         let what = format!("{what}: {w:?}");
         let net = &p.routes[w.route].net;
         assert_eq!(p.routes.iter().position(|x| x.net == *net), Some(w.route), "{what}: the first ROUTE of its net");
@@ -307,7 +312,44 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
         }
     }
     for (b, n) in ends_at.iter().enumerate() {
-        assert!(*n >= 3 && sol.branches[b].junction, "{what}: branch point {b} ends {n} wires");
+        assert!(
+            (*n >= 3 || (*n == 2 && on_anchor[b])) && sol.branches[b].junction,
+            "{what}: branch point {b} ends {n} wires"
+        );
+    }
+    // no T without a junction: a pin at which a wire routed ends ends no other wire of its net,
+    // routed or written, and a point ends fewer than three; the wire of length 0 from a branch
+    // point on it is the junction's
+    let mut ends: Vec<(&String, &PointRef, usize)> = Vec::new();
+    for (w, path) in sol.wires.iter().zip(&r.paths) {
+        if matches!(w.points[0], WirePoint::Branch(_)) && path.len() == 2 && path[0] == path[1] {
+            continue;
+        }
+        let net = &p.routes[w.route].net;
+        for q in [&w.points[0], &w.points[w.points.len() - 1]] {
+            if let WirePoint::Anchor(a) = q {
+                match ends.iter_mut().find(|(n, b, _)| *n == net && *b == a) {
+                    Some(e) => e.2 += 1,
+                    None => ends.push((net, a, 1)),
+                }
+            }
+        }
+    }
+    for (net, a, routed) in ends {
+        let mut wires: Vec<usize> = p.routes.iter().filter(|x| x.net == *net).flat_map(|x| x.wires.clone()).collect();
+        wires.sort_unstable();
+        wires.dedup();
+        let mut written = 0;
+        for k in wires {
+            let anchors = &p.wires[k].anchors;
+            for (i, b) in anchors.iter().enumerate() {
+                if b == a {
+                    written += if i == 0 || i == anchors.len() - 1 { 1 } else { 2 };
+                }
+            }
+        }
+        let lead = usize::from(matches!(a, PointRef::Pin { .. }));
+        assert!(lead + routed + written < 3, "{what}: {a:?} ends {routed} wires routed and {written} written");
     }
     for x in sol.branches.iter().map(|b| b.at) {
         assert!(x.0.is_finite() && x.1.is_finite(), "{what}");
@@ -1008,4 +1050,142 @@ fn groups_and_facts_drawn_at_random_are_solved() {
         }
     }
     assert!(unions > 20, "{unions}");
+}
+
+/// A netlist given as the body of a file of 0.2.
+fn netlist(body: &str) -> String {
+    format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n{body}.end\n")
+}
+
+/// Solves the one level of a netlist given as text with some options, checked as the cases of the
+/// files are, and asserts that every ROUTE is routed whole.
+fn routed_whole(body: &str, options: &str) -> (LevelProblem, Solved, Exact) {
+    let ps = problems_of(&netlist(body));
+    assert_eq!(ps.len(), 1, "{body}");
+    let p = ps.into_iter().next().unwrap();
+    let (solved, e) = check_with(body, &p, &SolverOptions::parse(options).unwrap());
+    assert!(
+        solved.report.unrouted.is_empty(),
+        "{body} / {options}: {:?}\n{}",
+        solved.report.unrouted,
+        summary(&p, &solved, &e)
+    );
+    (p, solved, e)
+}
+
+/// Rows without facts put pins of two nets face to face across the gap of 2 between neighbours,
+/// where both lead to one node: the net routed second leaves its pin along the edge of its
+/// symbol, and every net is one tree, with and without the objectives (review of S4).
+#[test]
+fn pins_of_two_nets_face_to_face_in_a_row_are_both_routed() {
+    for body in [
+        "R1 a b 1k\nR2 a b 1k\nR3 a c 1k\n* @RNL { {&a &b} @ROUTE }\n",
+        "R1 a b 1k\nR2 b c 1k\nR3 c a 1k\n* @RNL { #R1 #R2 @DISTANCE(\"left-to-right\", min=4, max=4); $WIRE_NET_SET @ROUTE }\n",
+        "R1 hub x 1k\nR2 hub x 1k\nR3 hub x 1k\nR4 hub x 1k\nR5 hub x 1k\nR6 hub x 1k\nR7 x b 1k\nR8 hub d 1k\n\
+         * @RNL { $WIRE_NET_SET @ROUTE }\n",
+        "R1 a b 1k\nR2 b c 1k\nR3 c d 1k\nR4 d e 1k\n* @RNL { %f = (_, _); &b @WIRE {#R1:2 %f}; $WIRE_NET_SET @ROUTE }\n",
+    ] {
+        for options in ["", "objectives=none"] {
+            let (p, solved, _) = routed_whole(body, options);
+            assert!(!solved.solution.wires.is_empty(), "{}", p.title);
+        }
+    }
+}
+
+/// A ROUTE on a supply and a ground net that carry the standard package's stubs (13.7: every net
+/// but the ground in the standard's own example): the stubs' wires are part of the trees, and each
+/// net is one tree, joined from pins whose own way their stub takes along the edges of their
+/// symbols; so too a ground drawn right on a pin (12.1) (review of S4).
+#[test]
+fn supply_and_ground_nets_with_stubs_are_routed() {
+    let circuit = "V1 vdd 0 1\nR1 vdd out 1k\nC1 out 0 1n\nR2 out 0 1k\n";
+    for (rnl, nets) in [
+        ("&vdd @ADD-TO $SUPPLY_NET_SET; # @SELECT-NET => @ROUTE", vec!["vdd", "0", "out"]),
+        ("$GND @ATTACH #C1:2; &0 @ROUTE", vec!["0"]),
+    ] {
+        let body = format!("{circuit}* @RNL {{ {rnl} }}\n");
+        let (p, solved, _) = routed_whole(&body, "");
+        for net in nets {
+            let wires = solved.solution.wires.iter().filter(|w| p.routes[w.route].net == net).count();
+            assert!(wires > 0, "{rnl}: &{net}");
+        }
+        // the stubs are there, and their wires are written on the nets routed
+        assert!(p.routes.iter().any(|r| !r.wires.is_empty()), "{rnl}");
+    }
+}
+
+/// A symbol placed far from the rest no longer makes the lattice too large (review of S4).
+#[test]
+fn symbols_placed_far_apart_are_routed() {
+    let (_, solved, _) = routed_whole(
+        "R1 a b 1k\nR2 a b 1k\n* @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(25000, 0); $WIRE_NET_SET @ROUTE }\n",
+        "",
+    );
+    assert_eq!(solved.solution.wires.len(), 2);
+}
+
+/// Two ROUTEs of one net with different styles: the wires take the first's, and the report says
+/// so; with the same style, nothing is noted. The counts of the notes are singular for one.
+#[test]
+fn routes_of_one_net_with_different_styles_are_noted() {
+    let note = "the ROUTEs of &b give different styles: its wires take the style of the first of them";
+    let (p, solved, _) =
+        routed_whole("R1 a b 1k\nR2 a b 1k\n* @RNL { &b @ROUTE(linestyle=\"dashed\"); &b @ROUTE }\n", "");
+    assert!(solved.report.notes.iter().any(|n| n == note), "{:?}", solved.report.notes);
+    assert!(solved.solution.wires.iter().all(|w| w.route == 0));
+    assert_eq!(p.routes.len(), 2);
+    assert!(
+        solved
+            .report
+            .notes
+            .iter()
+            .any(|n| n.starts_with("1 wire and 0 branch points routed for the ROUTEs of 1 net, ")),
+        "{:?}",
+        solved.report.notes
+    );
+    for rnl in ["&b @ROUTE(linestyle=\"dashed\"); &b @ROUTE(linestyle=\"dashed\")", "&b @ROUTE; &b @ROUTE"] {
+        let (_, solved, _) = routed_whole(&format!("R1 a b 1k\nR2 a b 1k\n* @RNL {{ {rnl} }}\n"), "");
+        assert!(!solved.report.notes.iter().any(|n| n.contains("give different styles")), "{rnl}");
+    }
+    assert_eq!(
+        (count(0, "net"), count(1, "net"), count(2, "branch point")),
+        ("0 nets".into(), "1 net".into(), "2 branch points".into())
+    );
+}
+
+/// T3: the two wires of &out that meet at M4's drain end at a branch point there with a junction,
+/// which a wire of length 0 joins to the drain (13.2; review of S4).
+#[test]
+fn t3_has_a_junction_where_two_wires_meet_at_a_drain() {
+    let ps = problems(&repo().join("tests/integration/solver/T3-ota5t.sp"));
+    let p = ps.iter().find(|p| p.title == "ota5t").unwrap();
+    let (solved, e) = check_level("T3", p);
+    let m4 = object(p, "#M4");
+    let drain = |q: &rnl_runtime::solution::WirePoint| matches!(q, rnl_runtime::solution::WirePoint::Anchor(PointRef::Pin { object, terminal, .. }) if *object == m4 && terminal == "d");
+    let at_drain: Vec<(usize, &rnl_runtime::solution::RoutedWire)> = solved
+        .solution
+        .wires
+        .iter()
+        .enumerate()
+        .filter(|(_, w)| p.routes[w.route].net == "out" && w.points.iter().any(drain))
+        .collect();
+    assert_eq!(at_drain.len(), 1, "{}", summary(p, &solved, &e));
+    let (i, w) = at_drain[0];
+    let path = &e.routing.paths[i];
+    assert_eq!(path[0], path[1], "of length 0: {w:?}");
+    let rnl_runtime::solution::WirePoint::Branch(b) = w.points[0] else { panic!("{w:?}") };
+    assert!(solved.solution.branches[b].junction);
+}
+
+/// Without objectives the candidates differ, and every ROUTE of T1–T6 is still routed whole (T4
+/// left two nets in parts before leads along the edges of symbols; review of S4).
+#[test]
+fn every_case_of_the_solver_is_routed_whole_without_objectives() {
+    let options = SolverOptions::parse("objectives=none").unwrap();
+    for f in netlists("tests/integration/solver", "T") {
+        for p in problems(&f) {
+            let (solved, _) = check_with(&f.to_string_lossy(), &p, &options);
+            assert!(solved.report.unrouted.is_empty(), "{}: {:?}", p.title, solved.report.unrouted);
+        }
+    }
 }

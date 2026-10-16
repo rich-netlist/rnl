@@ -30,7 +30,7 @@ use rnl_runtime::solution::{Placement, Solution};
 use crate::coords::{place, Cause, Placed};
 use crate::rational::{to_f64, Q};
 use crate::resolve::Resolved;
-use crate::route::{route, Failure, Routing};
+use crate::route::{route, style_notes, Failure, Routing};
 use crate::score::{drawn, layers, order, Entry};
 use crate::search::{search, Candidate, RelKind};
 use crate::structure::{analyse, Structure};
@@ -58,6 +58,16 @@ pub(crate) fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
     solve_exact(problem, options).0
 }
 
+/// A count and its noun, singular for one: `count(1, "wire")` is "1 wire", `count(2, "wire")` "2
+/// wires".
+pub(crate) fn count(n: usize, noun: &str) -> String {
+    if n == 1 {
+        format!("1 {noun}")
+    } else {
+        format!("{n} {noun}s")
+    }
+}
+
 /// A candidate placed, with how it ranks.
 struct Placing {
     candidate: Candidate,
@@ -72,11 +82,11 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
         notes.push(format!("the options are not valid: {e}"));
     }
     notes.push(format!(
-        "the level `{}` has {} objects, {} facts and {} ROUTEs",
+        "the level `{}` has {}, {} and {}",
         problem.title,
-        problem.objects.len(),
-        problem.facts.len(),
-        problem.routes.len()
+        count(problem.objects.len(), "object"),
+        count(problem.facts.len(), "fact"),
+        count(problem.routes.len(), "ROUTE")
     ));
     let resolved = crate::resolve::resolve(problem, options);
     notes.extend(resolved.notes.iter().cloned());
@@ -84,7 +94,7 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
     let structure = analyse(problem, &resolved, options, &mut work);
     notes.extend(structure.notes.iter().cloned());
     let candidates = search(problem, &structure, options, &mut work);
-    let count = candidates.len();
+    let placed_count = candidates.len();
     let mut all: Vec<Placing> = Vec::new();
     for c in candidates {
         let placed = place(problem, &structure, &c, options, &mut work);
@@ -112,7 +122,8 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
     let Placing { candidate, placed, .. } = all.swap_remove(taken);
     let score = entry.layers;
     notes.push(format!(
-        "{count} candidates placed and {} routed; the one taken comes from {}",
+        "{} placed and {} routed; the one taken comes from {}",
+        count(placed_count, "candidate"),
         entries.len(),
         if candidate.origin == "P0" { "P0, the order of the netlist" } else { "the beam search" }
     ));
@@ -151,14 +162,16 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
         notes.push(format!("{} and {} overlap: {why}", problem.objects[o.a].label, problem.objects[o.b].label));
     }
     if !problem.routes.is_empty() {
+        notes.extend(style_notes(problem));
         let mut nets: Vec<usize> = routing.wires.iter().map(|w| w.route).collect();
+        nets.sort_unstable();
         nets.dedup();
         notes.push(format!(
-            "{} wires and {} branch points routed for the ROUTEs of {} nets, {} cells expanded",
-            routing.wires.len(),
-            routing.branches.len(),
-            nets.len(),
-            routing.expansions
+            "{} and {} routed for the ROUTEs of {}, {} expanded",
+            count(routing.wires.len(), "wire"),
+            count(routing.branches.len(), "branch point"),
+            count(nets.len(), "net"),
+            count(usize::try_from(routing.expansions).unwrap_or(usize::MAX), "cell")
         ));
     }
     let mut unrouted = Vec::new();

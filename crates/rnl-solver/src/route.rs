@@ -5,35 +5,55 @@
 //! already written on it part of the tree (13.7). The router makes the rest of the tree for a
 //! placed candidate (`crate::coords`), net by net:
 //!
-//! - **The lattice.** Every integer coordinate over the extent of the level and a margin around
-//!   it, and the coordinates of every pin, of every point of a wire written and of every bend of
-//!   one, so that every pin is a node and neighbouring nodes are at most one unit apart. Lengths
-//!   are exact: the coordinates are rationals, scaled to integers by the least common multiple of
-//!   their denominators.
+//! - **The lattice.** The coordinates of every pin, of every point of a wire written and of every
+//!   bend of one, so that every pin is a node; and the integers over the extent of the level and a
+//!   margin around it that are within [`TRACKS`] of one of those or of an edge of a box, the
+//!   tracks the wires run on near the symbols. Where two such coordinates are farther apart, the
+//!   lattice goes from the last track of one window to the first of the next in one edge, so that
+//!   a symbol placed far away makes the lattice no larger than one placed near. Lengths are exact:
+//!   the coordinates are rationals, scaled to integers by the least common multiple of their
+//!   denominators.
 //! - **Obstacles.** The box of every placed symbol, turned with it (9.2.3, 11.2), widened by one
 //!   unit on every side: no wire runs closer to a symbol than that. A point the net joins reaches
 //!   the free lattice by a *lead*, a straight run from it in one of the four directions to the
 //!   first node clear of every widened box, through no symbol's box and past no other pin. A lead
-//!   that does not leave a pin the way its symbol says (9.2.4) costs a violated exit, and leaves
-//!   the box of its symbol at once rather than run along its edge. The lead a pin's own way is
-//!   kept for its net: no wire of another net runs through it, so that no wire walls a pin in.
+//!   that does not leave a pin the way its symbol says (9.2.4) costs a violated exit. The lead a
+//!   pin's own way is kept for its net: no wire of another net runs through it, so that no wire
+//!   walls a pin in; where the own ways of pins of two nets end at one node, neither keeps it,
+//!   and the net routed first may take it.
+//! - **Leads along the edge.** A lead other than the pin's own way that runs along the edge of the
+//!   pin's own symbol (the box is not drawn, the glyph inside it is) is a fallback for a pin whose
+//!   own way is taken or barred, such as by the wire of a supply stub written on it: it costs
+//!   [`ALONG_COST`] more, so that a pin with its own way open takes that, and a path runs through
+//!   it only straight, from or to its pin.
 //! - **Other wires.** A wire may cross another, straight through the crossing, which makes no
 //!   connection (13.1); it never runs along another or touches one at a bend or an end, which
 //!   would look like a connection that is not there (Principles 2.2). The wires written, drawn by
 //!   their mode (13.1, `"auto"` straight as a viewer that does not route draws it), and those
-//!   routed for the nets before are the other wires.
+//!   routed for the nets before are the other wires. A wire written on the net being routed is
+//!   one too: it is part of the tree by its points, which are where the net's new wires join it
+//!   (it has no point on a segment, 13.1), and a new wire neither runs along it nor touches it in
+//!   between.
 //! - **A net.** Its points, pins sorted by x and then y, and the points of its wires written,
 //!   which those wires join into parts. The two nearest parts are joined first, then each part
 //!   left, the nearest first, to the nearest point of the tree; any point of a wire routed for the
-//!   net may be where a new wire branches off. The cost of a path is its length, 2 for each bend,
-//!   4 for each crossing of another wire and 2 for each end that violates the exit of its pin.
+//!   net may be where a new wire branches off. A part none of whose points has an open lead is
+//!   walled in: it is reported without a search, which would only flood the lattice. A part that
+//!   found no path is tried again once the tree has grown. The cost of a path is its length, 2 for
+//!   each bend, 4 for each crossing of another wire, 2 for each end that violates the exit of its
+//!   pin and [`ALONG_COST`] for each end that takes a lead along the edge.
 //! - **What is written back** (13.7): each wire from a pin or a branch point to a pin or a branch
 //!   point, its bends between, `RoutedWire` with `Anchor`, `Bend` and `Branch` points; a wire that
 //!   meets the tree in the middle of a wire routed before splits that wire there, and the branch
-//!   point, where three wires meet, gets a junction (13.2).
+//!   point, where three wires meet, gets a junction (13.2). A pin at which a wire routed ends and
+//!   another too, routed or written, is a T with the pin's lead: the wires routed end at a branch
+//!   point on the pin instead, with a junction, and a wire of length 0 joins it to the pin (13.1);
+//!   so too a point where three wires end.
 //! - **What cannot be routed** is reported, never an error: a part with no path to the rest, or a
 //!   net whose budget of expansions ran out ([`crate::Budget::astar_expansions`]), is left as it
 //!   is, and a viewer draws flight lines for it. A net without ROUTE is not routed at all.
+//! - **Several ROUTEs of one net** are one net to route; its wires take the style of the first of
+//!   them, and the report notes the net when the others give another ([`style_notes`]).
 //!
 //! The nets are routed the smallest first, by the half perimeter of their points, so that short
 //! connections take the direct paths; the wires come out in the order of the ROUTEs. The search
@@ -64,6 +84,13 @@ pub(crate) const BEND_COST: i64 = 2;
 pub(crate) const CROSSING_COST: i64 = 4;
 /// The cost of an end that does not leave its pin the way the symbol says (9.2.4).
 pub(crate) const EXIT_COST: i64 = 2;
+/// The cost of a lead that runs along the edge of its own symbol, on top of the violated exit:
+/// high, so that only a pin walled in its own way takes one (see the module).
+pub(crate) const ALONG_COST: i64 = 8;
+/// How far from a coordinate that matters (an edge of a box, a pin, a point of a wire written) the
+/// lattice keeps every integer, the tracks wires run on near the symbols; between two such
+/// coordinates farther apart it goes straight from the last track of one to the first of the next.
+const TRACKS: i64 = 8;
 /// The most nodes a lattice may have, and the most along one axis.
 const MAX_NODES: usize = 1_000_000;
 const MAX_SIDE: i64 = 20_000;
@@ -220,14 +247,46 @@ struct Lattice {
 }
 
 impl Lattice {
-    /// The integers over `extent` widened by `pad`, and the coordinates `extra` on each axis.
-    fn new(extent: &[Q; 4], pad: i64, extra: [&BTreeSet<Q>; 2]) -> Result<Lattice, Failure> {
+    /// The coordinates `extra` on each axis, and the integers over `extent` widened by `pad` that are
+    /// within [`TRACKS`] of one of them or of one of `near`.
+    fn new(extent: &[Q; 4], pad: i64, extra: [&BTreeSet<Q>; 2], near: [&BTreeSet<Q>; 2]) -> Result<Lattice, Failure> {
         let mut axes: [Vec<Q>; 2] = [Vec::new(), Vec::new()];
         for axis in 0..2 {
             let lo = extent[axis].floor().to_integer() - BigInt::from(pad);
             let hi = extent[axis + 2].ceil().to_integer() + BigInt::from(pad);
-            let count = (&hi - &lo).to_i64().filter(|c| *c < MAX_SIDE).ok_or(Failure::Lattice)?;
-            let mut set: BTreeSet<Q> = (0..=count).map(|i| Q::from_integer(&lo + BigInt::from(i))).collect();
+            // the windows of tracks round the coordinates that matter, merged
+            let tracks = BigInt::from(TRACKS);
+            let mut windows: Vec<(BigInt, BigInt)> = extra[axis]
+                .iter()
+                .chain(near[axis])
+                .map(|v| {
+                    (
+                        (v.floor().to_integer() - &tracks).max(lo.clone()),
+                        (v.ceil().to_integer() + &tracks).min(hi.clone()),
+                    )
+                })
+                .filter(|(a, b)| a <= b)
+                .collect();
+            windows.sort();
+            let mut merged: Vec<(BigInt, BigInt)> = Vec::new();
+            for (a, b) in windows {
+                match merged.last_mut() {
+                    Some(last) if a <= &last.1 + 1 => last.1 = last.1.clone().max(b),
+                    _ => merged.push((a, b)),
+                }
+            }
+            let mut count = 0i64;
+            for (a, b) in &merged {
+                count += (b - a).to_i64().unwrap_or(MAX_SIDE) + 1;
+                if count >= MAX_SIDE {
+                    return Err(Failure::Lattice);
+                }
+            }
+            let mut set: BTreeSet<Q> = BTreeSet::new();
+            for (a, b) in &merged {
+                let span = (b - a).to_i64().unwrap_or(0);
+                set.extend((0..=span).map(|i| Q::from_integer(a + BigInt::from(i))));
+            }
             set.extend(extra[axis].iter().cloned());
             axes[axis] = set.into_iter().collect();
         }
@@ -355,6 +414,27 @@ struct Made {
     nodes: Vec<usize>,
 }
 
+/// A lead of an anchor (see the module).
+#[derive(Clone, Debug)]
+struct Lead {
+    /// Its direction from the anchor.
+    dir: usize,
+    /// Its nodes, from the one next to the anchor out.
+    nodes: Vec<usize>,
+    /// It runs along the edge of the anchor's own symbol, not the pin's own way: only a pin walled
+    /// in takes it, at [`ALONG_COST`].
+    along: bool,
+}
+
+/// The bit of the axis of a direction: 1 along x, 2 along y.
+fn axis_bit(d: usize) -> u8 {
+    if horizontal(d) {
+        1
+    } else {
+        2
+    }
+}
+
 /// The router of a layout: the lattice, what blocks it, and the scratch of the searches.
 struct Grid<'a> {
     layout: &'a Layout,
@@ -377,6 +457,14 @@ struct Grid<'a> {
     /// Nodes on a lead of the net being routed, by `net_stamp`.
     lead: Vec<u32>,
     net_stamp: u32,
+    /// The nodes inside a widened box on a lead along the edge of a symbol of the net being routed,
+    /// and on no other lead: a path runs through them only straight along the lead, by the axes
+    /// given ([`axis_bit`]), from or to its anchor.
+    corridors: BTreeMap<usize, u8>,
+    /// For each anchor node of the net being routed, the directions ([`STEP`], as bits) in which
+    /// it has a lead only along the edge of its symbol: a path that leaves or enters it that way
+    /// costs [`ALONG_COST`].
+    along_only: BTreeMap<usize, u8>,
     /// The net whose pin leaves through each node its own way ([`FREE`] for none, [`SHARED`] when
     /// pins of two nets would).
     kept: Vec<u32>,
@@ -413,6 +501,7 @@ impl<'a> Grid<'a> {
             })
         };
         let mut extra: [BTreeSet<Q>; 2] = [BTreeSet::new(), BTreeSet::new()];
+        let mut near: [BTreeSet<Q>; 2] = [BTreeSet::new(), BTreeSet::new()];
         let add = |p: &[Q; 2], extra: &mut [BTreeSet<Q>; 2]| {
             extra[0].insert(p[0].clone());
             extra[1].insert(p[1].clone());
@@ -420,6 +509,8 @@ impl<'a> Grid<'a> {
         for (_, b) in &layout.boxes {
             grow(&[b[0].clone(), b[1].clone()]);
             grow(&[b[2].clone(), b[3].clone()]);
+            add(&[b[0].clone(), b[1].clone()], &mut near);
+            add(&[b[2].clone(), b[3].clone()], &mut near);
         }
         for p in layout.pins.iter().chain(layout.written.iter().flatten()) {
             grow(p);
@@ -430,7 +521,7 @@ impl<'a> Grid<'a> {
             add(&a.at, &mut extra);
         }
         let Some(extent) = extent else { return Err(Failure::Lattice) };
-        let lat = Lattice::new(&extent, CLEARANCE + MARGIN, [&extra[0], &extra[1]])?;
+        let lat = Lattice::new(&extent, CLEARANCE + MARGIN, [&extra[0], &extra[1]], [&near[0], &near[1]])?;
         let n = lat.len();
         let mut g = Grid {
             layout,
@@ -444,6 +535,8 @@ impl<'a> Grid<'a> {
             exempt: Vec::new(),
             lead: vec![0; n],
             net_stamp: 0,
+            corridors: BTreeMap::new(),
+            along_only: BTreeMap::new(),
             kept: vec![FREE; n],
             kept_by: vec![Vec::new(); layout.nets.len()],
             net: FREE,
@@ -509,11 +602,11 @@ impl<'a> Grid<'a> {
             let anchors: BTreeSet<usize> = net.anchors.iter().filter_map(|a| g.lat.at(&a.at)).collect();
             for a in &net.anchors {
                 let Some(own) = a.exit.and_then(dir_of) else { continue };
-                for (d, lead) in g.leads(a, &anchors) {
-                    if d != own {
+                for lead in g.leads(a, &anchors) {
+                    if lead.dir != own {
                         continue;
                     }
-                    for n in lead {
+                    for n in lead.nodes {
                         let k = &mut g.kept[n];
                         *k = if *k == FREE || *k == i as u32 { i as u32 } else { SHARED };
                         g.kept_by[i].push(n);
@@ -657,10 +750,14 @@ impl<'a> Grid<'a> {
 
     /// Whether a search may pass through a node that is not one of its targets.
     fn passable(&self, n: usize) -> bool {
-        if self.has(n, FORBID) || (self.pin[n] && !self.has(n, SOURCE)) {
-            return false;
-        }
-        if self.blocked[n] && self.lead[n] != self.net_stamp && !self.has(n, SOURCE) {
+        !self.has(n, FORBID) && self.clear(n, self.has(n, SOURCE))
+    }
+
+    /// Whether a path of the net being routed may pass through a node, whatever the search; a
+    /// `source` may be a pin and inside a widened box.
+    fn clear(&self, n: usize, source: bool) -> bool {
+        if !source && (self.pin[n] || (self.blocked[n] && self.lead[n] != self.net_stamp && self.corridor(n).is_none()))
+        {
             return false;
         }
         let kept = self.kept[n];
@@ -671,11 +768,45 @@ impl<'a> Grid<'a> {
         o & STOP == 0 && (o & (H | V)) != (H | V)
     }
 
+    /// The axes a path may run through a node by, when it is a corridor ([`Grid::corridors`]).
+    fn corridor(&self, n: usize) -> Option<u8> {
+        if !self.blocked[n] || self.lead[n] == self.net_stamp {
+            return None;
+        }
+        self.corridors.get(&n).copied()
+    }
+
+    /// Whether leaving or entering an anchor node in a direction (from it) takes a lead only along
+    /// the edge of its symbol.
+    fn along(&self, n: usize, d: usize) -> bool {
+        self.along_only.get(&n).is_some_and(|m| m & (1 << d) != 0)
+    }
+
+    /// Whether a lead from the node `start` is open to the net being routed: no wire runs along
+    /// it, and every node on it may be passed, out to the free lattice or to another anchor of the
+    /// net in `anchors`.
+    fn lead_open(&self, start: usize, lead: &Lead, anchors: &BTreeSet<usize>) -> bool {
+        let mut n = start;
+        for &m in &lead.nodes {
+            if self.edge_flags(n, lead.dir) & TAKEN != 0 || self.through_symbol(n, lead.dir) {
+                return false;
+            }
+            if anchors.contains(&m) {
+                return true;
+            }
+            if !self.clear(m, false) {
+                return false;
+            }
+            n = m;
+        }
+        true
+    }
+
     /// The leads of an anchor (see the module): for each direction, the nodes from the anchor out
     /// to the first node clear of every widened box, or to another anchor of the net; none where
     /// the lattice ends first, a symbol's box is in the way or another pin. A lead other than the
-    /// pin's own direction leaves the box of its symbol at once: it does not run along its edge.
-    fn leads(&self, a: &AnchorIn, anchors: &BTreeSet<usize>) -> Vec<(usize, Vec<usize>)> {
+    /// pin's own direction that runs along the edge of its own symbol is marked [`Lead::along`].
+    fn leads(&self, a: &AnchorIn, anchors: &BTreeSet<usize>) -> Vec<Lead> {
         let Some(start) = self.lat.at(&a.at) else { return Vec::new() };
         let mut out = Vec::new();
         for d in 0..4 {
@@ -701,15 +832,17 @@ impl<'a> Grid<'a> {
             }
             let end = self.lat.point(last);
             let own_way = a.exit.and_then(dir_of) == Some(d);
+            let mut along = false;
             let through = self.layout.boxes.iter().any(|(k, b)| {
                 let own = a.owner == Some(*k);
                 if own && inside(b, &a.at) {
                     return false;
                 }
-                meets_inside(b, &a.at, &end) || (own && !own_way && runs_along(b, &a.at, &end))
+                along |= own && !own_way && runs_along(b, &a.at, &end);
+                meets_inside(b, &a.at, &end)
             });
             if !through {
-                out.push((d, nodes));
+                out.push(Lead { dir: d, nodes, along });
             }
         }
         out
@@ -777,10 +910,18 @@ impl<'a> Grid<'a> {
                 if edge & TAKEN != 0 || self.through_symbol(node, d) {
                     continue;
                 }
+                // through a corridor only straight along it
+                let bit = axis_bit(d);
+                if self.corridor(node).is_some_and(|a| a & bit == 0) || self.corridor(v).is_some_and(|a| a & bit == 0) {
+                    continue;
+                }
                 let mut cost = g + self.lat.edge_len(node, v);
                 if self.has(v, TARGET) {
                     if self.exit(v).is_some_and(|e| d != opposite(e)) {
                         cost += EXIT_COST * unit;
+                    }
+                    if self.along(v, opposite(d)) {
+                        cost += ALONG_COST * unit;
                     }
                 } else {
                     if !self.passable(v) {
@@ -800,6 +941,9 @@ impl<'a> Grid<'a> {
                 }
                 if din == NONE && self.exit(node).is_some_and(|e| d != e) {
                     cost += EXIT_COST * unit;
+                }
+                if din == NONE && self.along(node, d) {
+                    cost += ALONG_COST * unit;
                 }
                 let sv = v * 5 + d;
                 let (s, old, _) = self.best[sv];
@@ -861,22 +1005,56 @@ impl<'a> Grid<'a> {
         if parts.len() < 2 {
             return out;
         }
-        // the leads of every anchor of the net
+        // the leads of every anchor of the net: those clear of its symbol open the widened boxes
+        // they run through, those along its edge are corridors
         self.net_stamp += 1;
+        self.corridors.clear();
+        self.along_only.clear();
         let anchor_nodes: BTreeSet<usize> = order.iter().filter_map(|&a| nodes[a]).collect();
+        let mut leads: Vec<(usize, usize, Lead)> = Vec::new();
+        let mut clear_ways: BTreeMap<usize, u8> = BTreeMap::new();
         for &a in &order {
-            for (_, lead) in self.leads(&net.anchors[a], &anchor_nodes) {
-                for n in lead {
-                    self.lead[n] = self.net_stamp;
+            let Some(n) = nodes[a] else { continue };
+            for lead in self.leads(&net.anchors[a], &anchor_nodes) {
+                if !lead.along {
+                    for &m in &lead.nodes {
+                        self.lead[m] = self.net_stamp;
+                    }
+                    *clear_ways.entry(n).or_default() |= 1 << lead.dir;
                 }
+                leads.push((a, n, lead));
             }
         }
+        for (_, n, lead) in leads.iter().filter(|(_, _, l)| l.along) {
+            for &m in lead.nodes.iter().filter(|m| !anchor_nodes.contains(m)) {
+                *self.corridors.entry(m).or_default() |= axis_bit(lead.dir);
+            }
+            if clear_ways.get(n).is_none_or(|w| w & (1 << lead.dir) == 0) {
+                *self.along_only.entry(*n).or_default() |= 1 << lead.dir;
+            }
+        }
+        // a part none of whose anchors has a lead open, nor is where an anchor of another part is,
+        // is walled in: no path leaves or reaches it, so no search is made for it
+        let open: Vec<bool> = (0..net.anchors.len())
+            .map(|a| leads.iter().any(|(b, n, lead)| *b == a && self.lead_open(*n, lead, &anchor_nodes)))
+            .collect();
+        let walled: Vec<bool> = (0..parts.len())
+            .map(|p| {
+                !parts[p].iter().any(|&a| {
+                    open[a]
+                        || parts
+                            .iter()
+                            .enumerate()
+                            .any(|(q, other)| q != p && other.iter().any(|&b| nodes[b] == nodes[a]))
+                })
+            })
+            .collect();
         let exit = |a: usize| net.anchors[a].exit.and_then(dir_of);
         let mut tree: BTreeMap<usize, TreeNode> = BTreeMap::new();
         let mut made: Vec<Made> = Vec::new();
         let mut branches: Vec<usize> = Vec::new();
         let mut joined = vec![false; parts.len()];
-        let mut failed = vec![false; parts.len()];
+        let mut failed = walled.clone();
         let mut failure = None;
 
         // the two nearest parts first
@@ -888,8 +1066,8 @@ impl<'a> Grid<'a> {
                 .unwrap_or(i64::MAX)
         };
         let mut pairs: Vec<(i64, usize, usize)> = Vec::new();
-        for a in 0..parts.len() {
-            for b in a + 1..parts.len() {
+        for a in (0..parts.len()).filter(|&a| !walled[a]) {
+            for b in (a + 1..parts.len()).filter(|&b| !walled[b]) {
                 pairs.push((dist(&self.lat, &parts[a], &parts[b]), a, b));
             }
         }
@@ -935,6 +1113,9 @@ impl<'a> Grid<'a> {
                 Ok(path) => {
                     self.grow(&mut tree, &mut made, &mut branches, &parts[p], &nodes, path);
                     joined[p] = true;
+                    // the tree has grown: a part that found no path may find one to it now, its
+                    // way perhaps barred only by an anchor of the part just joined
+                    failed.clone_from(&walled);
                 }
                 Err(Failure::NoPath) => {
                     failed[p] = true;
@@ -949,6 +1130,7 @@ impl<'a> Grid<'a> {
         let tree_parts = joined.iter().filter(|j| **j).count();
         out.parts = if tree_parts > 0 { parts.len() - tree_parts + 1 } else { parts.len() };
         out.failure = (out.parts > 1).then(|| failure.unwrap_or(Failure::NoPath));
+        self.junctions_at_anchors(net, &nodes, &mut made, &mut branches);
         // the wires made, as vertices; then other wires to the nets after
         for m in &made {
             let vertices = self.vertices(&m.nodes);
@@ -957,6 +1139,52 @@ impl<'a> Grid<'a> {
         }
         out.branches = branches.iter().map(|&n| self.lat.point(n)).collect();
         out
+    }
+
+    /// Where a wire made ends at a pin at which another wire ends too, made or written, the wires
+    /// meet in a T with the lead of the pin: the wires made end at a branch point on the pin
+    /// instead, joined to it by a wire of length 0, and the branch point gets a junction (13.1,
+    /// 13.2). So too at a point where three wires end.
+    fn junctions_at_anchors(
+        &self,
+        net: &NetIn,
+        nodes: &[Option<usize>],
+        made: &mut Vec<Made>,
+        branches: &mut Vec<usize>,
+    ) {
+        let mut written = vec![0usize; net.anchors.len()];
+        for &(a, b) in &net.joined {
+            for x in [a, b] {
+                if let Some(e) = written.get_mut(x) {
+                    *e += 1;
+                }
+            }
+        }
+        let mut routed = vec![0usize; net.anchors.len()];
+        for m in made.iter() {
+            for e in [m.start, m.end] {
+                if let End::Anchor(a) = e {
+                    routed[a] += 1;
+                }
+            }
+        }
+        for (a, node) in nodes.iter().enumerate() {
+            let Some(n) = *node else { continue };
+            if routed[a] == 0 || usize::from(self.pin[n]) + written[a] + routed[a] < 3 {
+                continue;
+            }
+            let b = branches.len();
+            branches.push(n);
+            for m in made.iter_mut() {
+                if m.start == End::Anchor(a) {
+                    m.start = End::Branch(b);
+                }
+                if m.end == End::Anchor(a) {
+                    m.end = End::Branch(b);
+                }
+            }
+            made.push(Made { start: End::Branch(b), end: End::Anchor(a), nodes: vec![n] });
+        }
     }
 
     /// Searches from part `p` to the tree.
@@ -1246,6 +1474,31 @@ fn jobs(problem: &LevelProblem) -> Vec<Job> {
         }
     }
     jobs
+}
+
+/// A note for each net whose ROUTEs give different styles (13.7, 13.1): its wires take the style of
+/// the first of them, as [`crate::Unrouted::route`] and `RoutedWire::route` refer to it; the others'
+/// are not used, which the report says rather than leave it unsaid.
+pub(crate) fn style_notes(problem: &LevelProblem) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut noted: Vec<&str> = Vec::new();
+    let sorted = |i: usize| {
+        let mut style: Vec<_> = problem.routes[i].style.iter().collect();
+        style.sort_by(|a, b| a.0.cmp(&b.0));
+        style
+    };
+    for (i, r) in problem.routes.iter().enumerate() {
+        let Some(first) = problem.routes.iter().position(|x| x.net == r.net) else { continue };
+        if first == i || noted.contains(&r.net.as_str()) || sorted(first) == sorted(i) {
+            continue;
+        }
+        noted.push(&r.net);
+        out.push(format!(
+            "the ROUTEs of &{} give different styles: its wires take the style of the first of them",
+            r.net
+        ));
+    }
+    out
 }
 
 /// The point of a wire written that a routed wire may end at: a pin, or a point object (13.1).

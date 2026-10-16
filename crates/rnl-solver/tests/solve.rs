@@ -102,3 +102,59 @@ fn every_level_solved_and_written_back_is_drawn_with_its_wires() {
     }
     assert!(levels >= 9, "{levels}");
 }
+
+/// The netlists of the review of the routing (stage S4), as files: pins of two nets face to face in
+/// a row, a star of resistors, a supply and a ground net routed with their stubs, a ground drawn on
+/// a pin, symbols placed far apart. Each is solved with every ROUTE whole, written back and read
+/// again: no error, nothing unplaced, every net routed without a flight line, a straight wire for
+/// each wire routed, a dot for each branch point, the hash the same.
+#[test]
+fn the_netlists_of_the_review_are_routed_whole_and_read_back() {
+    let head = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n";
+    let circuit = "V1 vdd 0 1\nR1 vdd out 1k\nC1 out 0 1n\nR2 out 0 1k\n";
+    let star = "R1 hub x 1k\nR2 hub x 1k\nR3 hub x 1k\nR4 hub x 1k\nR5 hub x 1k\nR6 hub x 1k\nR7 x b 1k\nR8 hub d 1k\n";
+    let bodies = [
+        "R1 a b 1k\nR2 a b 1k\nR3 a c 1k\n* @RNL { # @SELECT-NET => @ROUTE }\n".to_string(),
+        format!("{star}* @RNL {{ # @SELECT-NET => @ROUTE }}\n"),
+        format!("{circuit}* @RNL {{ &vdd @ADD-TO $SUPPLY_NET_SET; # @SELECT-NET => @ROUTE }}\n"),
+        format!("{circuit}* @RNL {{ $GND @ATTACH #C1:2; # @SELECT-NET => @ROUTE }}\n"),
+        "R1 a b 1k\nR2 a b 1k\n* @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(25000, 0); # @SELECT-NET => @ROUTE }\n"
+            .to_string(),
+    ];
+    let options = SolverOptions::default();
+    for body in bodies {
+        let entry = "t.sp";
+        let text = format!("{head}{body}.end\n");
+        let files = MemoryProvider::new().with(entry, &text);
+        let ps = problems(entry, &files);
+        assert_eq!(ps.len(), 1, "{body}");
+        let p = &ps[0];
+        let solved = solve(p, &options);
+        assert!(solved.report.unrouted.is_empty(), "{body}: {:?}", solved.report.unrouted);
+        let hash = sig1(p, &options.canonical());
+        let written = write_record(p, &solved.solution, AUTHOR, &hash);
+        let lost: Vec<String> = written
+            .unsolved
+            .iter()
+            .filter(|u| matches!(u.decision, Decision::RoutedWire { .. } | Decision::Branch { .. }))
+            .map(|u| u.to_string())
+            .collect();
+        assert!(lost.is_empty(), "{body}: {lost:?}");
+        let doc = rnl_view::read_host(entry, None, &files, &mut Sink::new()).unwrap();
+        let record = rnl_view::finish_record(&doc, &files, &Options::solver(), p, &written.record);
+        let out = replace_generated(&doc, p.level, &text, &record);
+        let again = MemoryProvider::new().with(entry, &out);
+        let r = rnl_view::interpret(entry, None, &again, &Options::default()).unwrap();
+        let errors: Vec<_> = r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(errors.is_empty(), "{body}: {errors:?}\n{record}");
+        let lv = r.model.levels.iter().find(|l| l.level == p.level).unwrap();
+        assert!(lv.unplaced.is_empty(), "{body}: {:?}", lv.unplaced);
+        assert!(lv.flylines.is_empty(), "{body}: {:?}\n{record}", lv.flylines);
+        let straight = lv.wires.iter().filter(|w| w.mode == "straight").count();
+        assert_eq!(straight, solved.solution.wires.len(), "{body}");
+        let dots = lv.items.iter().filter(|i| i.kind == "usage" && lv.symbols[i.symbol].name == "$JUNCTION_DOT");
+        assert_eq!(dots.count(), solved.solution.branches.len(), "{body}");
+        let q = problems(entry, &again);
+        assert_eq!(same_input(&hash, &q[0]), Some(true), "{body}");
+    }
+}
