@@ -27,12 +27,30 @@ function names(page, kind) {
 }
 
 /**
+ * The symbols of the level shown that stand for a net, the supply and ground stubs and the ports:
+ * for each net, by its name, how many boxes stand for it.
+ */
+function symbols(page) {
+  return page.evaluate(() => {
+    const doc = window.viewer.doc;
+    const out = {};
+    for (const h of doc.levels[window.viewer.level].hits.filter((h) => h.kind === "box")) {
+      for (const o of h.objects.filter((o) => doc.objects[o].kind === "net")) {
+        out[doc.objects[o].name] = (out[doc.objects[o].name] ?? 0) + 1;
+      }
+    }
+    return out;
+  });
+}
+
+/**
  * Expect the level shown, with the title `title`, to be drawn as the solver placed it: nothing on
  * it lacks a position or a solver, every symbol and wire of its hits is in the SVG, the instances
- * `instances` and the nets `stubs` have symbols, the stubs and ports of a net standing for it, and
- * the nets `wired` have wires. Then save a screenshot of the page as `shot`; see screenshot().
+ * `instances` have symbols, the symbols that stand for a net are `nets`, so many for each net (each
+ * stub and each port is one box, so that a port does not pass for the stubs of its net), and the
+ * nets `wired` have wires. Then save a screenshot of the page as `shot`; see screenshot().
  */
-async function drawn(page, viewer, { title, instances, stubs, wired, shot }) {
+async function drawn(page, viewer, { title, instances, nets, wired, shot }) {
   await expect(page.locator("#level-name")).toHaveText(title);
   await expect(page.locator("#empty")).toBeHidden();
   await expect(page.locator("#canvas > svg")).toHaveCount(1);
@@ -40,7 +58,8 @@ async function drawn(page, viewer, { title, instances, stubs, wired, shot }) {
   expect(await page.evaluate(() => window.viewer.doc.levels[window.viewer.level].status)).toBeNull();
   const ids = await page.evaluate(() => window.viewer.doc.levels[window.viewer.level].hits.filter((h) => h.id).map((h) => h.id));
   for (const id of ids) await expect(page.locator(`#canvas > svg [data-id="${id}"]`).first()).toBeAttached();
-  expect(await names(page, "box")).toEqual(expect.arrayContaining([...instances, ...stubs]));
+  expect(await names(page, "box")).toEqual(expect.arrayContaining(instances));
+  expect(await symbols(page)).toEqual(nets);
   expect(await names(page, "wire")).toEqual(expect.arrayContaining(wired));
   // each symbol is on the screen, as the level is fitted
   for (const name of instances) await viewer.where(name);
@@ -54,7 +73,8 @@ test("T3, the five-transistor OTA in its testbench, is drawn as the solver place
   await drawn(page, viewer, {
     title: "T3-ota5t.sp",
     instances: ["XU1", "VDD", "VB", "VIP", "VIN", "CL"],
-    stubs: ["0", "vdd"],
+    // the ground stubs of XU1, VDD, VB, VIP, VIN and CL; the supply stubs of XU1 and VDD
+    nets: { 0: 6, vdd: 2 },
     wired: ["inp", "inn", "out", "vb"],
     shot: "solved-T3-top",
   });
@@ -66,7 +86,8 @@ test("T3, the five-transistor OTA in its testbench, is drawn as the solver place
   await drawn(page, viewer, {
     title: "ota5t",
     instances: ["M1", "M2", "M3", "M4", "M5"],
-    stubs: ["vdd", "vss", "inp", "inn", "out", "vbias"],
+    // the supply stubs of M3 and M4 and the ground stub of M5, besides a port for each net
+    nets: { vdd: 3, vss: 2, inp: 1, inn: 1, out: 1, vbias: 1 },
     wired: ["x", "tail", "out", "inp", "inn", "vbias"],
     shot: "solved-T3",
   });
@@ -84,7 +105,8 @@ test("T2, the common-source stage, is drawn as the solver placed and routed it",
   await drawn(page, viewer, {
     title: "T2-common-source.sp",
     instances: ["M1", "RD", "VDD", "VIN"],
-    stubs: ["0", "vdd"],
+    // the ground stubs of M1, VDD and VIN; the supply stubs of RD and VDD
+    nets: { 0: 3, vdd: 2 },
     wired: ["in", "out"],
     shot: "solved-T2",
   });
