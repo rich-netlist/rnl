@@ -150,16 +150,35 @@ fn cross(o: &[Q; 2], p: &[Q; 2], q: &[Q; 2]) -> Q {
     (&p[0] - &o[0]) * (&q[1] - &o[1]) - (&p[1] - &o[1]) * (&q[0] - &o[0])
 }
 
+/// The least and the greatest coordinate of two points on an axis.
+fn span<'a>(a: &'a [Q; 2], b: &'a [Q; 2], i: usize) -> (&'a Q, &'a Q) {
+    if a[i] <= b[i] {
+        (&a[i], &b[i])
+    } else {
+        (&b[i], &a[i])
+    }
+}
+
 /// Whether `p` is on the segment from `a` to `b`, its ends included.
 fn on_segment(p: &[Q; 2], a: &[Q; 2], b: &[Q; 2]) -> bool {
-    let within = |i: usize| a[i].clone().min(b[i].clone()) <= p[i] && p[i] <= a[i].clone().max(b[i].clone());
-    cross(a, b, p).is_zero() && within(0) && within(1)
+    let within = |i: usize| {
+        let (lo, hi) = span(a, b, i);
+        *lo <= p[i] && p[i] <= *hi
+    };
+    within(0) && within(1) && cross(a, b, p).is_zero()
 }
 
 /// Whether two segments touch, as a reader takes for a connection: an end of one is on the other.
 /// That covers two segments on one line that share a point or a stretch, and leaves out two that
-/// cross, meeting inside both.
+/// cross, meeting inside both. Segments whose boxes are apart are told at once.
 fn touch(a: &[Q; 2], b: &[Q; 2], c: &[Q; 2], d: &[Q; 2]) -> bool {
+    let apart = |i: usize| {
+        let ((lo1, hi1), (lo2, hi2)) = (span(a, b, i), span(c, d, i));
+        hi1 < lo2 || hi2 < lo1
+    };
+    if apart(0) || apart(1) {
+        return false;
+    }
     on_segment(c, a, b) || on_segment(d, a, b) || on_segment(a, c, d) || on_segment(b, c, d)
 }
 
@@ -167,6 +186,12 @@ fn touch(a: &[Q; 2], b: &[Q; 2], c: &[Q; 2], d: &[Q; 2]) -> bool {
 /// some length: the parameters along it at which it is strictly inside the box's range on each
 /// axis make an interval that is not empty.
 fn through(bx: &[Q; 4], a: &[Q; 2], b: &[Q; 2]) -> bool {
+    for i in 0..2 {
+        let (lo, hi) = span(a, b, i);
+        if *hi <= bx[i] || bx[i + 2] <= *lo {
+            return false;
+        }
+    }
     let (mut lo, mut hi) = (Q::zero(), Q::one());
     for axis in 0..2 {
         let (min, max) = (&bx[axis], &bx[axis + 2]);
