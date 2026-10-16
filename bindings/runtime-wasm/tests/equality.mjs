@@ -55,7 +55,7 @@ const { collect, decodeText } = await import(pathToFileURL(join(dist, "client.js
 const core = await loadCore(pathToFileURL(join(dist, "rnl_runtime_wasm.wasm")));
 
 const entries = [];
-for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "libraries/standard"]) {
+for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "tests/conformance/cases-0.3", "libraries/standard"]) {
   entries.push(...files(join(root, dir)).filter((path) => /\.(sp|scs|inc|rnl)$/.test(path)));
 }
 if (entries.length < 20) fail(`only ${entries.length} files found under ${root}`);
