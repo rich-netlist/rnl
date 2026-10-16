@@ -113,7 +113,11 @@ fn the_problem_holds_what_a_solver_places() {
     let ps = problems(&case("01-rc-lowpass.sp"), &FsProvider::new(&[]));
     let p = &ps[0];
     assert_eq!((p.title.as_str(), p.kind, p.level), ("01-rc-lowpass.sp", "file", 0));
-    assert_eq!(p.packages, [("rnl-std".to_string(), "0.2".to_string())]);
+    // the standard package and its sub-packages, as it brings them in (16.3)
+    let std = ["style", "symbols", "virtual", "core", "fill", "semantics", "layout"].map(|n| format!("rnl-std-{n}"));
+    let want: Vec<(String, String)> =
+        std.into_iter().chain(["rnl-std".to_string()]).map(|n| (n, "0.2".to_string())).collect();
+    assert_eq!(p.packages, want);
     assert_eq!(p.names, ["j", "o"]);
 
     // instances: free, with a symbol whose pins carry the terminals
@@ -156,7 +160,9 @@ fn the_problem_holds_what_a_solver_places() {
     // its constraints come from the definition body, with the stub in their chain
     let from_stub: Vec<&ProblemFact> = p.facts.iter().filter(|f| f.chain == [*usage]).collect();
     assert_eq!(from_stub.iter().map(|f| f.kind.name()).collect::<Vec<_>>(), ["DISTANCE", "ALIGN"]);
-    assert!(from_stub[0].source.as_ref().unwrap().file.ends_with("rnl-std.rnl"));
+    // written in the body of $GND_STUB, which is in the sub-package of the virtual elements (16.3)
+    let source = from_stub[0].source.as_ref().unwrap();
+    assert!(source.file.ends_with("rnl-std-virtual.rnl"), "{source:?}");
 
     // texts: by the symbol, or free with offsets from the point they are attached to
     let name = object(p, "#R1::name");
