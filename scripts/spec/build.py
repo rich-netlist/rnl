@@ -68,7 +68,8 @@ FONTS_CSS = ("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;50
 LANGS = {
     "en": {"suffix": "", "html_lang": "en", "other": "zh", "other_label": "中文", "contents": "Contents",
            "zip_label": "Markdown, chapters", "md_label": "Markdown", "sums_label": "SHA-256 checksums",
-           "intro": "Introduction", "tour": "Language tour", "spec": "Standard", "pages": "Pages",
+           "intro": "Introduction", "tour": "Language tour", "spec": "Standard", "packages": "Packages",
+           "pages": "Pages",
            "kicker": "Rich Netlist language standard", "theme_dark": "Switch to dark theme",
            "theme_light": "Switch to light theme", "site_home": "en/",
            "body_font": "IBM+Plex+Sans:wght@400;500;600;700",
@@ -84,7 +85,7 @@ LANGS = {
            "only": "Only what changed"},
     "zh": {"suffix": ".zh", "html_lang": "zh-CN", "other": "en", "other_label": "EN", "contents": "目录",
            "zip_label": "Markdown 分章包", "md_label": "Markdown 合订本", "sums_label": "SHA-256 校验值",
-           "intro": "介绍", "tour": "语言导览", "spec": "标准", "pages": "页面",
+           "intro": "介绍", "tour": "语言导览", "spec": "标准", "packages": "标准包", "pages": "页面",
            "kicker": "Rich Netlist 语言标准", "theme_dark": "切换到深色", "theme_light": "切换到浅色", "site_home": "",
            "body_font": "Noto+Sans+SC:wght@400;500;700;900",
            "foot": "标准文本按 CC-BY-4.0 许可发布。本文是中文译本，以英文版为准。",
@@ -337,7 +338,8 @@ def page_meta(lang: str, title: str, other_href: str, site_root: str) -> dict:
     return {"html-lang": L["html_lang"], "pagetitle": title,
             "other-lang": LANGS[other]["html_lang"], "other-label": L["other_label"], "other-href": other_href,
             "site-root": site_root, "intro-label": L["intro"], "tour-label": L["tour"], "spec-label": L["spec"],
-            "pages-label": L["pages"], "kicker": L["kicker"], "theme-label": L["theme_dark"],
+            "packages-label": L["packages"], "pages-label": L["pages"], "kicker": L["kicker"],
+            "theme-label": L["theme_dark"],
             "theme-dark": L["theme_dark"], "theme-light": L["theme_light"], "foot-note": L["foot"],
             "font-href": FONTS_CSS.format(body=L["body_font"])}
 
