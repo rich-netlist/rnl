@@ -14,13 +14,13 @@ use rnl_runtime::geom::Pt;
 use rnl_runtime::host::{HostDocument, LevelKind};
 use rnl_runtime::interp::obj::{Lit, PrimParams, Shape};
 use rnl_runtime::model::{self, quoted, Attach, LevelView, Style, SymbolInfo, SymbolOrigin};
-use rnl_runtime::Interpretation;
+use rnl_runtime::numbering::{hex, sha256};
+use rnl_runtime::{Interpretation, Options};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::document::{Diagnostic, Document};
 use crate::primitive::{self, Run};
-use crate::sha256::{hex, Sha256};
 
 /// The version of the snapshot's shape.
 pub const SCHEMA: &str = "rnl-snapshot/1";
@@ -412,7 +412,7 @@ fn level_id(doc: &HostDocument, lv: usize) -> String {
 }
 
 /// The snapshot of an interpretation, with its Document.
-pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, std: bool) -> Snapshot {
+pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, options: &Options) -> Snapshot {
     let files: Vec<FileRef> =
         document.files.iter().map(|f| FileRef { path: f.path.clone(), name: f.name.clone() }).collect();
     let file_index: HashMap<&str, usize> =
@@ -441,7 +441,7 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, std
         schema: SCHEMA.into(),
         runtime: env!("CARGO_PKG_VERSION").into(),
         language,
-        revision: revision(r, std),
+        revision: revision(r, options),
         dialect: r.doc.dialect.name.clone(),
         packages: r
             .model
@@ -458,23 +458,31 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, std
 }
 
 /// The fingerprint of what a snapshot is made from (3.7): every file read, the host files and the
-/// packages, by name and text with its line endings made "\n"; the dialect; whether the standard
-/// package is used at the root. Each part has its length before it, so that no two inputs give the
-/// same bytes.
-fn revision(r: &Interpretation, std: bool) -> String {
+/// packages, by name and text with its line endings made "\n"; the dialect; the options that change
+/// what the texts give: the standard package at the root, the generated records, the draft and the
+/// tolerance. Each part has its length before it, so that no two inputs give the same bytes.
+fn revision(r: &Interpretation, options: &Options) -> String {
     let mut files: Vec<(&str, String)> =
         r.sources.iter().map(|(name, text)| (name.as_str(), text.replace("\r\n", "\n").replace('\r', "\n"))).collect();
     files.sort();
     files.dedup();
-    let mut h = Sha256::new();
-    h.field(b"rnl-revision/1");
-    h.field(r.doc.dialect.name.as_bytes());
-    h.field(if std { &b"std"[..] } else { &b"no-std"[..] });
+    let reading = format!(
+        "std={} generated={} draft={} tolerance={}",
+        options.std, options.generated, options.draft, options.tolerance
+    );
+    let mut bytes = Vec::new();
+    let mut field = |part: &[u8]| {
+        bytes.extend_from_slice(&(part.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(part);
+    };
+    field(b"rnl-revision/1");
+    field(r.doc.dialect.name.as_bytes());
+    field(reading.as_bytes());
     for (name, text) in &files {
-        h.field(name.as_bytes());
-        h.field(text.as_bytes());
+        field(name.as_bytes());
+        field(text.as_bytes());
     }
-    hex(&h.finish()[..16])
+    hex(&sha256(&bytes)[..16])
 }
 
 /// The nets of a host level by key, each with the first way it is written: the ports, then the
@@ -919,8 +927,10 @@ R2 a vdd! 2k
         // the line endings do not count; a space does, and so do the options
         assert_eq!(rev(&NETLIST.replace('\n', "\r\n"), &options), r);
         assert_ne!(rev(&NETLIST.replace("R1 in out 1k", "R1 in out  1k"), &options), r);
-        let no_std = BuildOptions { runtime: rnl_runtime::Options { std: false }, ..BuildOptions::default() };
+        let no_std = BuildOptions { runtime: Options { std: false, ..Options::default() }, ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &no_std), r);
+        let draft = BuildOptions { runtime: Options { draft: true, ..Options::default() }, ..BuildOptions::default() };
+        assert_ne!(rev(NETLIST, &draft), r);
         let spectre = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &spectre), r);
     }
