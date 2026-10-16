@@ -6,6 +6,8 @@ Pandoc filter for the RNL standard, the same for the web page (html5) and the PD
   become links; "Principles 2.4" and "原则 2.4" refer to the principles and stay text;
 - code blocks marked rnl, spice or rnl-file are coloured by one tokenizer for both outputs;
   blocks marked error get the label of an error example;
+- on a page that compares two versions (specdiff.py), a code block with data-diff holds the lines of
+  both, each coloured as it reads in its own version and marked as kept, removed or added;
 - for Typst, the table of contents is put before chapter 1, after the front matter.
 
 Metadata read: rnl-lang ("en" or "zh"). Linked references are listed on stderr with --verbose-links.
@@ -324,7 +326,8 @@ local function typst_string(s)
   return '"' .. s:gsub("\\", "\\\\"):gsub('"', '\\"') .. '"'
 end
 
-local function render(lines, kind, is_error)
+-- marks: for a block compared with an earlier version, one character per line: "=" kept, "-" removed, "+" added
+local function render(lines, kind, is_error, marks)
   if is_typst then
     local L = {}
     for _, line in ipairs(lines) do
@@ -338,8 +341,11 @@ local function render(lines, kind, is_error)
     return pandoc.RawBlock("typst", "#rnlcode(label: " .. label .. ", (\n" .. table.concat(L, "\n") .. "\n))")
   end
   local H = {}
+  local MARK = { ["-"] = "d-del", ["+"] = "d-ins" }
   for n, line in ipairs(lines) do
     if n > 1 then table.insert(H, "\n") end
+    local mark = marks and MARK[marks:sub(n, n)]
+    if mark then table.insert(H, '<span class="' .. mark .. '">') end
     for _, t in ipairs(line) do
       if t[1] == "" then
         table.insert(H, html_escape(t[2]))
@@ -347,6 +353,7 @@ local function render(lines, kind, is_error)
         table.insert(H, '<span class="t-' .. t[1] .. '">' .. html_escape(t[2]) .. "</span>")
       end
     end
+    if mark then table.insert(H, "</span>") end
   end
   local pre = '<pre class="code ' .. kind .. '"><code>' .. table.concat(H) .. "</code></pre>"
   if is_error then
@@ -355,7 +362,47 @@ local function render(lines, kind, is_error)
   return pandoc.RawBlock("html", pre)
 end
 
+-- The lines of tokens of a code block's text, coloured when it is marked rnl, spice or rnl-file.
+local function code_lines(kind, text)
+  if kind == "rnl" then
+    if text:match("^%s*%*") or text:match("\n%s*%*") then return lines_of(tokenize_host(text, true)) end
+    local toks = {}
+    tokenize_rnl(text, toks)
+    return lines_of(toks)
+  elseif kind == "spice" or kind == "rnl-file" then
+    return lines_of(tokenize_host(text, false))
+  end
+  return lines_of({ { "", text } })
+end
+
+-- A block compared with an earlier version: the old lines and the new lines are each coloured as one
+-- text, so that a record over several lines reads as in its own version, and then interleaved again.
+local function diff_block(cb, marks)
+  local old, new = {}, {}
+  local n = 0
+  for line in (cb.text .. "\n"):gmatch("(.-)\n") do
+    n = n + 1
+    local m = marks:sub(n, n)
+    if m ~= "+" then table.insert(old, line) end
+    if m ~= "-" then table.insert(new, line) end
+  end
+  local kind = cb.classes[1]
+  local lo, ln = code_lines(kind, table.concat(old, "\n")), code_lines(kind, table.concat(new, "\n"))
+  local lines, i, j = {}, 1, 1
+  for k = 1, #marks do
+    local m = marks:sub(k, k)
+    if m == "-" then
+      table.insert(lines, lo[i]); i = i + 1
+    else
+      table.insert(lines, ln[j]); j = j + 1
+      if m == "=" then i = i + 1 end
+    end
+  end
+  return render(lines, kind or "text", cb.classes:includes("error"), marks)
+end
+
 local function code_block(cb)
+  if cb.attributes["data-diff"] then return diff_block(cb, cb.attributes["data-diff"]) end
   local kind = cb.classes[1]
   local is_error = cb.classes:includes("error")
   if kind == "rnl" then

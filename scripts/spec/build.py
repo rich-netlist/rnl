@@ -17,6 +17,8 @@ Output, for each version, in English and Chinese, all from the same chapters and
 label: the combined Markdown, the chapters as a zip, one web page, a PDF, and SHA256SUMS. With --site, the
 Chinese page of version V goes to DIR/spec/V/ and the English one to DIR/en/spec/V/, each with its
 downloads; DIR/spec/ and DIR/en/spec/ lead to the newest version, and each page links to the others.
+Next to the page of V go the pages that compare it with each earlier version W, compare-W.html, which
+mark what was added and what was removed (specdiff.py).
 
 Before building, it checks for each version that
   1. the Chinese chapters have the sections, list items, table rows and code of the English ones;
@@ -38,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
 import os
 import re
@@ -50,6 +53,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import specdiff  # noqa: E402
 import spectools  # noqa: E402
 
 READER = "commonmark_x-smart-tex_math_dollars-subscript-superscript-emoji-implicit_header_references"
@@ -72,7 +76,12 @@ LANGS = {
            "files": "Files", "file": "File", "content": "Content", "versions": "Versions: ",
            "label": "Version {v} · {state} ({date}, {commit})", "released": "revision {n}",
            "after": "revision {n} + later changes", "draft": "not released", "dirty": " + uncommitted changes",
-           "site_dir": "en/spec/{v}", "site_other": "../../../spec/{v}/"},
+           "site_dir": "en/spec/{v}", "site_other": "../../../spec/{v}/",
+           "compare": "compare with {w}", "compare_title": "RNL {v} compared with {w}",
+           "compared": "Compared with {label}:", "added": "added", "removed": "removed",
+           "list_changed": "Changed", "list_added": "Added", "list_removed": "Removed", "front": "beginning",
+           "annex": "Annex {a}", "changes": "Changes", "prev": "Previous change", "next": "Next change",
+           "only": "Only what changed"},
     "zh": {"suffix": ".zh", "html_lang": "zh-CN", "other": "en", "other_label": "EN", "contents": "目录",
            "zip_label": "Markdown 分章包", "md_label": "Markdown 合订本", "sums_label": "SHA-256 校验值",
            "intro": "介绍", "tour": "语言导览", "spec": "标准", "pages": "页面",
@@ -82,7 +91,12 @@ LANGS = {
            "files": "文件", "file": "文件", "content": "内容", "versions": "版本：",
            "label": "{v} 版 · {state}（{date}，{commit}）", "released": "修订 {n}",
            "after": "修订 {n} 之后的修改", "draft": "未发布", "dirty": " + 未提交的修改",
-           "site_dir": "spec/{v}", "site_other": "../../en/spec/{v}/"},
+           "site_dir": "spec/{v}", "site_other": "../../en/spec/{v}/",
+           "compare": "与 {w} 对比", "compare_title": "RNL {v} 与 {w} 对比",
+           "compared": "与 {label}对比：", "added": "新增", "removed": "删除",
+           "list_changed": "改动", "list_added": "新增", "list_removed": "删掉", "front": "开头",
+           "annex": "附录 {a}", "changes": "改动", "prev": "上一处改动", "next": "下一处改动",
+           "only": "只看改动"},
 }
 VERSION_DIR = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)")  # a version folder of spec/, such as 0.2 (16.1)
 STAMP = re.compile(r"^<!-- translated from en/(\S+) sha256:([0-9a-f]{12}) -->\n")
@@ -280,8 +294,11 @@ def typst_fonts() -> dict:
     return {k: [f for f in v if f.lower() in have] for k, v in FONTS.items()}
 
 
-def common_args(lang: str, v: str, rev: dict) -> list[str]:
-    return ["-f", READER, "--shift-heading-level-by=-1", "--lua-filter", str(HERE / "rnl.lua"),
+MARKDOWN = ("-f", READER, "--shift-heading-level-by=-1")  # how pandoc reads the chapters
+
+
+def common_args(lang: str, v: str, rev: dict, reader: tuple = MARKDOWN) -> list[str]:
+    return [*reader, "--lua-filter", str(HERE / "rnl.lua"),
             "--syntax-highlighting=none", "--fail-if-warnings", "--wrap=none",  # values go into scripts intact
             "-M", f"rnl-lang={lang}", "-M", f"typst-lang={lang}", "-M", f"revision-label={revision_label(lang, v, rev)}",
             "-M", f"revision={rev['commit']}", "-M", f"contents-title={LANGS[lang]['contents']}"]
@@ -294,37 +311,106 @@ def size(p: Path) -> str:
     return f"{n / 1048576:.1f} MB" if n >= 1048576 else f"{max(1, n // 1024)} KB"
 
 
-def version_links(lang: str, v: str, all_versions: list[str], href) -> str:
-    """The versions, newest first, for the head of the page of v; nothing while there is only one."""
+def earlier(all_versions: list[str], v: str) -> list[str]:
+    return all_versions[:all_versions.index(v)]
+
+
+def version_links(lang: str, v: str, all_versions: list[str], href, compare_href=None,
+                  comparing: str | None = None) -> str:
+    """The versions, newest first, for the head of the page of v, then the pages that compare v with each
+    earlier version, when compare_href is given; nothing while there is only one version. On the page that
+    compares v with the version comparing, that comparison is in bold instead of v."""
     if len(all_versions) < 2:
         return ""
-    items = [f"<b>{x}</b>" if x == v else f'<a href="{href(x)}">{x}</a>' for x in reversed(all_versions)]
-    return LANGS[lang]["versions"] + " · ".join(items)
+    L = LANGS[lang]
+    items = [f"<b>{x}</b>" if x == v and not comparing else f'<a href="{href(x)}">{x}</a>'
+             for x in reversed(all_versions)]
+    for w in reversed(earlier(all_versions, v)) if compare_href else []:
+        text = L["compare"].format(w=w)
+        items.append(f"<b>{text}</b>" if w == comparing else f'<a href="{compare_href(w)}">{text}</a>')
+    return L["versions"] + " · ".join(items)
+
+
+def page_meta(lang: str, title: str, other_href: str, site_root: str) -> dict:
+    """What every page has: its language and title, the top bar, the theme and the foot."""
+    L, other = LANGS[lang], LANGS[lang]["other"]
+    return {"html-lang": L["html_lang"], "pagetitle": title,
+            "other-lang": LANGS[other]["html_lang"], "other-label": L["other_label"], "other-href": other_href,
+            "site-root": site_root, "intro-label": L["intro"], "tour-label": L["tour"], "spec-label": L["spec"],
+            "pages-label": L["pages"], "kicker": L["kicker"], "theme-label": L["theme_dark"],
+            "theme-dark": L["theme_dark"], "theme-light": L["theme_light"], "foot-note": L["foot"],
+            "font-href": FONTS_CSS.format(body=L["body_font"])}
 
 
 def build_html(src: Path, lang: str, v: str, rev: dict, dest: Path, other_href: str, site_root: str,
                links: str, out: Path, work: Path) -> None:
     """The web page. Its downloads are the files of the same build, next to it; site_root is where the
     links of the top bar lead: the site's pages for this language. links is the line of versions."""
-    L, other = LANGS[lang], LANGS[lang]["other"]
+    L = LANGS[lang]
     log = work / f"links-{v}-{lang}.tsv"
     log.unlink(missing_ok=True)
-    meta = {"html-lang": L["html_lang"], "pagetitle": f"RNL {v} · {L['kicker']}",
-            "other-lang": LANGS[other]["html_lang"], "other-label": L["other_label"], "other-href": other_href,
+    meta = {**page_meta(lang, f"RNL {v} · {L['kicker']}", other_href, site_root),
             "pdf-href": name(v, lang, ".pdf"), "md-href": name(v, lang, ".md"),
             "zip-href": name(v, lang, "-chapters.zip"), "pdf-size": size(out / name(v, lang, ".pdf")),
             "md-size": size(out / name(v, lang, ".md")), "zip-size": size(out / name(v, lang, "-chapters.zip")),
-            "md-label": L["md_label"], "zip-label": L["zip_label"], "sums-label": L["sums_label"],
-            "site-root": site_root, "intro-label": L["intro"], "tour-label": L["tour"], "spec-label": L["spec"],
-            "pages-label": L["pages"], "kicker": L["kicker"], "theme-label": L["theme_dark"],
-            "theme-dark": L["theme_dark"], "theme-light": L["theme_light"], "foot-note": L["foot"],
-            "font-href": FONTS_CSS.format(body=L["body_font"])}
+            "md-label": L["md_label"], "zip-label": L["zip_label"], "sums-label": L["sums_label"]}
     args = [a for k, val in meta.items() for a in ("-M", f"{k}={val}")]
     if links:  # HTML, so a variable (not escaped) rather than metadata
         args += ["-V", f"versions-html={links}"]
     run(["pandoc", str(src), *common_args(lang, v, rev), "-t", "html5", "--standalone",
          "--template", str(HERE / "page.html"), "--toc", "--toc-depth=2", "--section-divs", *args,
          "-o", str(dest)], f"pandoc html ({v}, {lang})", dict(os.environ, RNL_LINKS_LOG=str(log)))
+
+
+def pandoc_json(spec: Path, v: str, lang: str, work: Path) -> dict:
+    """Version v as pandoc reads it, before the filter: what the pages that compare versions are made of."""
+    p = work / f"{v}-{lang}.json"
+    run(["pandoc", str(pandoc_input(spec, v, lang, work)), *MARKDOWN, "--fail-if-warnings", "-t", "json",
+         "-o", str(p)], f"pandoc json ({v}, {lang})")
+    return json.loads(read(p))
+
+
+def compare_head(lang: str, w: str, rev_w: dict, summary: dict) -> str:
+    """The head of the page that compares with version w: which revision of w, the key to the marks, and
+    links to the sections that changed, were added and were removed."""
+    L = LANGS[lang]
+    out = [f'<p class="compare-with">{html.escape(L["compared"].format(label=revision_label(lang, w, rev_w)))}'
+           f'<span class="diff-ins">{L["added"]}</span><span class="diff-del">{L["removed"]}</span></p>']
+    for what in ("changed", "added", "removed"):
+        refs = []
+        for k, title in summary[what]:
+            text = L["front"] if not k else k.lstrip("~") if k.startswith("~") else (
+                L["annex"].format(a=k) if re.fullmatch(r"[A-Z]", k) else k)
+            href = "#top" if not k else "" if k.startswith("~") else f"#{k}"
+            attrs = f' title="{html.escape(title)}"' if title else ""
+            refs.append(f'<a href="{href}"{attrs}>{html.escape(text)}</a>' if href else
+                        f"<span{attrs}>{html.escape(text)}</span>")
+        if refs:
+            out.append(f'<p class="compare-list"><b>{L["list_" + what]}</b>{" ".join(refs)}</p>')
+    return "".join(out)
+
+
+def build_compare(old: dict, new: dict, lang: str, v: str, w: str, revs: dict, dest: Path, other_href: str,
+                  site_root: str, links: str, work: Path) -> dict:
+    """The page that compares version v with the earlier version w, from both as pandoc reads them; returns
+    the sections that changed, were added and were removed. revs holds the revisions of both."""
+    merged, summary = specdiff.compare(old, new)
+    problems = specdiff.check(old, new, merged)
+    if problems:
+        raise Failed(f"comparing {v} with {w} ({lang}): " + "; ".join(problems))
+    src = work / f"{v}-{w}-{lang}.json"
+    src.write_text(json.dumps(merged, ensure_ascii=False), encoding="utf-8", newline="\n")
+    L = LANGS[lang]
+    meta = {**page_meta(lang, f"{L['compare_title'].format(v=v, w=w)} · {L['kicker']}", other_href, site_root),
+            "changes-label": L["changes"], "prev-label": L["prev"], "next-label": L["next"], "only-label": L["only"]}
+    args = [a for k, val in meta.items() for a in ("-M", f"{k}={val}")]
+    args += ["-V", f"compare-html={compare_head(lang, w, revs[w], summary)}"]
+    if links:
+        args += ["-V", f"versions-html={links}"]
+    run(["pandoc", str(src), *common_args(lang, v, revs[v], ("-f", "json")), "-t", "html5", "--standalone",
+         "--template", str(HERE / "page.html"), "--toc", "--toc-depth=2", "--section-divs", *args,
+         "-o", str(dest)], f"pandoc html ({v} compared with {w}, {lang})")
+    return summary
 
 
 def build_pdf(src: Path, lang: str, v: str, rev: dict, out: Path, work: Path, fonts: dict) -> None:
@@ -432,11 +518,18 @@ def main(argv: list[str]) -> int:
     out, work = args.out, args.out / "work"
     work.mkdir(parents=True, exist_ok=True)
     fonts = typst_fonts()
+    revs, docs = {}, {}  # the revisions of the versions, and the versions as pandoc reads them, once each
+
+    def doc(x: str, lang: str) -> dict:
+        if (x, lang) not in docs:
+            docs[x, lang] = pandoc_json(spec, x, lang, work)
+        return docs[x, lang]
+
     try:
         for v in chosen:
             for f in own_files(out, v):
                 f.unlink()
-            rev = revision(spec, v)
+            rev = revs[v] = revision(spec, v)
             for lang in LANGS:
                 L = LANGS[lang]
                 shutil.copyfile(spec / name(v, lang, ".md"), out / name(v, lang, ".md"))
@@ -444,7 +537,9 @@ def main(argv: list[str]) -> int:
                 build_zip(spec, lang, v, rev, out)
                 if not args.no_pdf:
                     build_pdf(src, lang, v, rev, out, work, fonts)
-                published = version_links(lang, v, all_versions, lambda x: SITE_URL + L["site_dir"].format(v=x) + "/")
+                on_site = SITE_URL + L["site_dir"].format(v=v) + "/"
+                published = version_links(lang, v, all_versions, lambda x: SITE_URL + L["site_dir"].format(v=x) + "/",
+                                          lambda w: on_site + f"compare-{w}.html")
                 build_html(src, lang, v, rev, out / name(v, lang, ".html"), name(v, L["other"], ".html"),
                            SITE_URL + L["site_home"], published, out, work)
                 if args.site:
@@ -453,7 +548,17 @@ def main(argv: list[str]) -> int:
                     for ext in (".md", "-chapters.zip") + (() if args.no_pdf else (".pdf",)):
                         shutil.copyfile(out / name(v, lang, ext), d / name(v, lang, ext))
                     build_html(src, lang, v, rev, d / "index.html", L["site_other"].format(v=v), "../../",
-                               version_links(lang, v, all_versions, lambda x: f"../{x}/"), out, work)
+                               version_links(lang, v, all_versions, lambda x: f"../{x}/",
+                                             lambda w: f"compare-{w}.html"), out, work)
+                    for w in earlier(all_versions, v):
+                        revs.setdefault(w, revision(spec, w))
+                        page = f"compare-{w}.html"
+                        links = version_links(lang, v, all_versions, lambda x: "./" if x == v else f"../{x}/",
+                                              lambda x: f"compare-{x}.html", comparing=w)
+                        found = build_compare(doc(w, lang), doc(v, lang), lang, v, w, revs, d / page,
+                                              L["site_other"].format(v=v) + page, "../../", links, work)
+                        print(f"built {v} compared with {w}, {lang}: " +
+                              ", ".join(f"{len(found[k])} sections {k}" for k in ("changed", "added", "removed")))
                     write_sums(d)
                 print(f"built {v} {lang}: {revision_label(lang, v, rev)}")
         if args.site:

@@ -40,6 +40,14 @@ For each version, in English and Chinese (`rnl-0.2…` and `rnl-0.2.zh…`), all
 
 With `--site DIR`, the Chinese page of each version goes to `DIR/spec/0.2/index.html` and the English one to `DIR/en/spec/0.2/index.html`, following the site's layout, each with its downloads and `SHA256SUMS`. `DIR/spec/index.html` and `DIR/en/spec/index.html` lead to the newest version and keep the section of the address, so `spec/#9.4` opens 9.4 of the newest version; the top bar of the site links there. When there are several versions, each page lists them under its revision label, with links.
 
+Next to the page of each version that has earlier ones, `--site` also writes a page that compares it with each of them, such as `DIR/spec/0.3/compare-0.2.html`, linked from the line of versions. It is the text of 0.3 in which what only 0.2 has is struck through on red and what only 0.3 has is on green, built by [`specdiff.py`](specdiff.py) from both versions as pandoc reads them:
+
+- sections are matched by their numbers; a section that only one version has is marked as a whole;
+- within a section, paragraphs, list items and table rows are matched in order, the most similar first; words are compared in English and characters in Chinese, and inline code counts as one word; text of which less than half is kept is shown removed and added as a whole;
+- code is compared line by line, and each line is coloured as it reads in its own version.
+
+The page has the contents, anchors and colours of the version's own page. Its head links the sections that changed, were added and were removed; the contents mark them; a bar at the bottom moves from one change to the next and can hide the sections that did not change. Before the page is written, the build takes both versions back out of the comparison and stops when either does not come back whole.
+
 Each version has its own revision label, from git: "revision 2" at the tag `spec-0.2-r2`, "revision 2 + later changes" once the chapters or the word list of 0.2 have changed since that tag, "not released" before its first tag; with the date and short hash of the tagged commit, or of the last commit that changed those files, and a note when they have uncommitted changes. Commits that change other files, such as the toolkit or another version, leave the label as it is.
 
 ## How the forms are kept in step
@@ -66,8 +74,9 @@ Each version has its own revision label, from git: "revision 2" at the tag `spec
 | --- | --- |
 | `build.py` | the checks and the build |
 | `spectools.py` | assembling the combined texts, comparing the languages, Annex A from the word list |
+| `specdiff.py` | comparing two versions, for the pages that show what changed |
 | `rnl.lua` | the pandoc filter: anchors, reference links, RNL code colours, the Typst table of contents |
 | `page.html` | the web page template |
 | `print.typ` | the PDF template |
 
-`dist/` is ignored by git; `dist/work/` keeps the pandoc input, the Typst source, and `links-0.2-en.tsv`, `links-0.2-zh.tsv` and so on: every reference that was linked, for review.
+`dist/` is ignored by git; `dist/work/` keeps the pandoc input, the Typst source, the comparisons as pandoc reads them (`0.3-0.2-en.json` and so on), and `links-0.2-en.tsv`, `links-0.2-zh.tsv` and so on: every reference that was linked, for review.

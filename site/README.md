@@ -74,7 +74,7 @@ python -m http.server --directory site/dist
 | --- | --- |
 | `index.html`, `language.html`, `tools.html`, `assets/` | Chinese pages, at the site root |
 | `en/index.html`, `en/language.html`, `en/tools.html`, `en/assets/` | English pages |
-| `spec/<version>/`, `en/spec/<version>/`, and `spec/`, `en/spec/` | The language standard: for each version in `spec/`, one page per language with its PDF and Markdown downloads; `spec/` and `en/spec/` lead to the newest version, which the top bar links to. Not written by `build.py`: [`pages.yml`](../.github/workflows/pages.yml) adds them with `python scripts/spec/build.py --site site/dist` ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). |
+| `spec/<version>/`, `en/spec/<version>/`, and `spec/`, `en/spec/` | The language standard: for each version in `spec/`, one page per language with its PDF and Markdown downloads, and next to it the pages that compare it with each earlier version, such as `compare-0.2.html`; `spec/` and `en/spec/` lead to the newest version, which the top bar links to. Not written by `build.py`: [`pages.yml`](../.github/workflows/pages.yml) adds them with `python scripts/spec/build.py --site site/dist` ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). |
 | `viewer/` | The web viewer with its samples, one copy for both languages, its interface in English. Not written by `build.py`: `pages.yml` builds it with `node apps/web/build.mjs --samples` and copies `apps/web/dist/` here. |
 | `rnl-intro-standalone.html`, `rnl-language-standalone.html`, `rnl-tools-standalone.html`, and the same under `en/` | Single-file pages with the styles and scripts inlined; their links to the other pages, the languages and the web viewer point to the published site |
 
