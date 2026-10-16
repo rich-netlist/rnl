@@ -24,8 +24,9 @@ struct Index {
     refs: HashMap<ObjId, Reference>,
 }
 
-/// A fact before it is put in the order of 8.5: priority, position, and what breaks a tie within
-/// one position (the kind of fact, then x before y), then the order the facts were collected in.
+/// A fact before it is put in the order of 8.5: priority, position in the order of resolution (of
+/// the segments of one pipe the later is later), and what breaks a tie within one position (the
+/// kind of fact, then x before y), then the order the facts were collected in.
 struct Ranked {
     key: (u8, Pos, u8, u8, usize),
     fact: ProblemFact,
@@ -748,7 +749,7 @@ impl Interp<'_> {
             let label = format!("the {axis} of {} = {}", self.label(f.target), crate::geom::fmt_num(value));
             let source = f.ctx.as_ref().and_then(|c| self.rec_loc(c.rec, f.off));
             ranked.push(Ranked {
-                key: (rank(p), f.pos.clone(), 0, (axis == 'y') as u8, ranked.len()),
+                key: (rank(p), f.order(), 0, (axis == 'y') as u8, ranked.len()),
                 fact: ProblemFact {
                     kind,
                     priority: p,
@@ -784,8 +785,15 @@ impl Interp<'_> {
                 }
                 let source = site.as_ref().and_then(|c| self.rec_loc(c.rec, self.text_off(*o)));
                 let label = format!("the d{axis} of {} = {}", self.label(*o), crate::geom::fmt_num(value));
+                // where the offset is written: in the statement that made the text, or in a later
+                // TEXT with the same key, whose segments are not known here
+                let at = self.offset_pos(s, *o, axis == 'x');
+                let order = match &site {
+                    Some(c) if at.starts_with(&c.pos) => order_pos(&at, &c.segments),
+                    _ => at,
+                };
                 ranked.push(Ranked {
-                    key: (rank(p), self.offset_pos(s, *o, axis == 'x'), 1, (axis == 'y') as u8, ranked.len()),
+                    key: (rank(p), order, 1, (axis == 'y') as u8, ranked.len()),
                     fact: ProblemFact {
                         kind: FactKind::Offset { text: ix.objects[o], from, axis: Axis::of(axis), value },
                         priority: p,
@@ -810,7 +818,7 @@ impl Interp<'_> {
             let Some(&object) = ix.objects.get(&f.target) else { continue };
             let source = f.ctx.as_ref().and_then(|c| self.rec_loc(c.rec, f.off));
             ranked.push(Ranked {
-                key: (rank(p), f.pos.clone(), 2, 0, ranked.len()),
+                key: (rank(p), f.order(), 2, 0, ranked.len()),
                 fact: ProblemFact {
                     kind: FactKind::Orient { object, code },
                     priority: p,
@@ -838,7 +846,10 @@ impl Interp<'_> {
                 Some(Reference::Anonymous) | None => None,
                 Some(r) => Some(r.clone()),
             };
-            let pos = self.scenes[s].created.get(&c).cloned().unwrap_or_default();
+            let mut pos = self.scenes[s].created.get(&c).cloned().unwrap_or_default();
+            if let Some(site) = &cd.site {
+                pos = order_pos(&pos, &site.segments);
+            }
             ranked.push(Ranked {
                 key: (rank(p), pos, 3, 0, ranked.len()),
                 fact: ProblemFact {

@@ -543,21 +543,20 @@ impl Interp<'_> {
             }
             let FactData::Coord(axis, v) = f.data else { continue };
             let key = (f.target, axis);
+            // in the order of resolution, of the segments of one pipe the later comes first (8.5)
+            let order = f.order();
             match best.get(&key).cloned() {
                 None => {
-                    best.insert(key, (p, f.pos.clone(), k));
+                    best.insert(key, (p, order, k));
                     best_order.push(key);
                 }
                 Some(cur) => {
                     let FactData::Coord(_, cv) = at[cur.2].data else { continue };
-                    // the facts of the segments of one pipe share their statement's position; the
-                    // later segment is written later and comes first (8.5), and its facts were
-                    // collected later
-                    if (level(p), &f.pos, k) > (level(cur.0), &cur.1, cur.2) {
+                    if (level(p), &order, k) > (level(cur.0), &cur.1, cur.2) {
                         if (cv - v).abs() > tol {
                             self.drop_fact(s, &at[cur.2], f);
                         }
-                        best.insert(key, (p, f.pos.clone(), k));
+                        best.insert(key, (p, order, k));
                     } else if (cv - v).abs() > tol {
                         self.drop_fact(s, f, &at[cur.2]);
                     }
@@ -596,18 +595,18 @@ impl Interp<'_> {
                 continue;
             }
             let FactData::Orient(code) = f.data else { continue };
+            let order = f.order();
             match ob.get(&f.target).cloned() {
                 None => {
-                    ob.insert(f.target, (p, f.pos.clone(), k));
+                    ob.insert(f.target, (p, order, k));
                 }
                 Some(cur) => {
                     let FactData::Orient(cc) = orient[cur.2].data else { continue };
-                    // as for coordinates: of the segments of one pipe, the later wins (8.5)
-                    if (level(p), &f.pos, k) > (level(cur.0), &cur.1, cur.2) {
+                    if (level(p), &order, k) > (level(cur.0), &cur.1, cur.2) {
                         if cc != code {
                             self.drop_fact(s, &orient[cur.2], f);
                         }
-                        ob.insert(f.target, (p, f.pos.clone(), k));
+                        ob.insert(f.target, (p, order, k));
                     } else if cc != code {
                         self.drop_fact(s, f, &orient[cur.2]);
                     }
@@ -1492,7 +1491,12 @@ impl Interp<'_> {
                 Some(false) => {}
             }
             // violated: compare its priority with the coordinates it involves (8.5)
-            let pr = (level(p), self.scenes[s].created[&c].clone());
+            let created = &self.scenes[s].created[&c];
+            let at = match &site {
+                Some(sc) => order_pos(created, &sc.segments),
+                None => created.clone(),
+            };
+            let pr = (level(p), at);
             let mut involved: Vec<Fact> = Vec::new();
             for m in &leaves {
                 if relation {
@@ -1512,7 +1516,7 @@ impl Interp<'_> {
                 }
             }
             let what = if relation { "orientations" } else { "coordinates" };
-            let weaker = involved.iter().any(|f| (level(self.fact_priority(s, f)), f.pos.clone()) < pr);
+            let weaker = involved.iter().any(|f| (level(self.fact_priority(s, f)), f.order()) < pr);
             let l = self.label(c);
             if !involved.is_empty() && !weaker {
                 self.constraint_mut(c).status = Some("dropped");

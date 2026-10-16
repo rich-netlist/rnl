@@ -644,6 +644,7 @@ impl<'p> Interp<'p> {
             def_unit: None,
             scope_in: rec.is_some_and(|r| self.units[u].scope_places.contains_key(&r)),
             stmt: Some(StmtSpan { rec, start: m.start, end: m.end }),
+            segments: Rc::new([]),
         };
         let (r, bound) = self.eval_member(m, &ctx);
         self.in_progress.remove(&skey);
@@ -678,7 +679,7 @@ impl<'p> Interp<'p> {
         let mut bound: Bound = Vec::new();
         for (k, seg) in m.segments.iter().enumerate() {
             let piped = if k > 0 { Some((val, sel)) } else { None };
-            match self.eval_segment(seg, ctx, piped, m) {
+            match self.eval_segment(seg, &ctx.in_segment(k), piped, m) {
                 Ok((v, s)) => {
                     val = v;
                     sel = s;
@@ -847,7 +848,7 @@ impl<'p> Interp<'p> {
         }
         let p = self.new_obj(ObjData::Point { x, y, local });
         if let (Some(s), false) = (ctx.scene, local) {
-            self.scene_add_point(s, p, ctx.pos.clone());
+            self.scene_add_point(s, p, ctx.pos.clone(), ctx);
             self.note_birth(s, p, ctx, e.start, None);
         }
         Ok(p)

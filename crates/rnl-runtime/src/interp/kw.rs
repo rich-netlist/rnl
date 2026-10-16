@@ -1138,6 +1138,7 @@ impl Interp<'_> {
             def_unit: Some(ctx.def_unit.unwrap_or(ctx.unit)),
             scope_in: false,
             stmt: ctx.stmt,
+            segments: ctx.segments.clone(),
         };
         for m in body.members.iter() {
             if let Some(err) = &m.error {

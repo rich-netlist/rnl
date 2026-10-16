@@ -238,6 +238,63 @@ fn facts_are_in_the_order_of_8_5() {
 }
 
 #[test]
+fn the_later_segment_of_a_pipe_comes_first() {
+    // the facts of the segments of one pipe follow the order of the text, the later segment first,
+    // before what a segment adds: its members, its nested statements, the axes of a PLACE (8.5, as
+    // the draft 0.3 makes it clear, in every version)
+    let text = "* pipes\nR1 a b 1k\nR2 c d 1k\nR3 e f 1k\nR4 g h 1k\n\
+        * @RNL(type=\"header\") { @VERSION(\"0.2\")}\n\
+        * @RNL {\n\
+        *   $TALL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1); (0, 10) @PIN(terminal=2) };\n\
+        *   {#R1 #R2 #R3 #R4} @SET-SYMBOL $TALL;\n\
+        *   #R1 @PLACE(0, 0) => @PLACE(5, 5);\n\
+        *   {#R4 @PLACE(40, 0)} => @PLACE(45, 5);\n\
+        *   #R2 @PLACE(20, 0) => @ORIENT(\"R90\");\n\
+        *   %row = {#R2:2 #R3} @ALIGN(\"y\");\n\
+        *   #R3 @PLACE(30, 10)\n\
+        * }\n.end\n";
+    let files = MemoryProvider::new().with("p.sp", text);
+    let r = interpret_file(Path::new("p.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error));
+    let p = &r.problems[0];
+    let labels: Vec<&str> = p.facts.iter().map(|f| f.label.as_str()).collect();
+    assert_eq!(
+        labels,
+        [
+            "the y of #R3 = 10",
+            "the x of #R3 = 30",
+            "%row",
+            "the orientation R90 of #R2",
+            "the y of #R2 = 0",
+            "the x of #R2 = 20",
+            "the y of #R4 = 5",
+            "the x of #R4 = 45",
+            "the y of #R4 = 0",
+            "the x of #R4 = 40",
+            "the y of #R1 = 5",
+            "the x of #R1 = 5",
+            "the y of #R1 = 0",
+            "the x of #R1 = 0",
+        ]
+    );
+    // pin 2 of R2 is 10 above its origin, and the row written later puts it at y = 10. Taken in
+    // after the row, the ORIENT of the later segment turns the pin 10 to the left, so the row holds
+    // R2 at y = 10 and the PLACE of the earlier segment loses its y = 0, keeping x = 20. Had the
+    // PLACE come first, "R0" would have kept it, and the ORIENT would have been dropped.
+    let FactKind::Align { members, .. } = &p.facts[2].kind else { panic!("{:?}", p.facts[2].kind) };
+    let r2 = object(p, "#R2");
+    let pin = |xy: Pt, orient: Orient| pin_at(p, &[(r2, xy, orient)], &members[0]);
+    assert_eq!(pin((20.0, 10.0), Orient::R90), (10.0, 10.0));
+    assert_eq!(pin((20.0, 0.0), Orient::R90).1, 0.0);
+    assert_eq!(pin((20.0, 0.0), Orient::R0).1, 10.0);
+    // a viewer keeps the same one of two coordinates of an object: R4 is where the later segment
+    // puts it, not the statement nested in the earlier one
+    let drawn = |id: &str| r.model.levels[0].items.iter().find(|i| i.id == id).map(|i| i.at).unwrap();
+    assert_eq!(drawn("#R1"), (5.0, 5.0));
+    assert_eq!(drawn("#R4"), (45.0, 5.0));
+}
+
+#[test]
 fn disabled_facts_are_left_out() {
     let ps = problems(&case("10-constraints-and-priority.sp"), &FsProvider::new(&[]));
     let p = &ps[0];
