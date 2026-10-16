@@ -28,7 +28,7 @@ fn draft() -> Options {
 /// without a key that a rule makes on C1.
 fn amp(version: &str) -> String {
     format!(
-        "* a round trip\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\n\
+        "* a round trip\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"){}}}\n\
          .subckt amp in out vdd vss\nM1 out in vss vss nch\nR1 vdd out 10k\nC1 out vss 1p\n\
          * @RNL {{\n\
          *   #M1 #R1 @ALIGN(\"x\");\n\
@@ -38,7 +38,8 @@ fn amp(version: &str) -> String {
          *   &vss @WIRE {{#M1:3 #C1:2}};\n\
          *   %w = &out @WIRE {{#R1:2 #C1:1}};\n\
          *   # @SELECT-INSTANCE(name=\"C*\") => @TEXT(\"${{value}}\")\n\
-         * }}\n.ends amp\n.end\n"
+         * }}\n.ends amp\n.end\n",
+        pin_02(version)
     )
 }
 
@@ -46,9 +47,21 @@ fn amp(version: &str) -> String {
 /// whose wire is "auto" and has no name in its body.
 fn stubs(version: &str) -> String {
     format!(
-        "* stubs\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\nV1 a 0 1\nR1 a 0 1k\n\
-         * @RNL {{ (9, 9) @TEXT(\"note\") }}\n.end\n"
+        "* stubs\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"){}}}\nV1 a 0 1\nR1 a 0 1k\n\
+         * @RNL {{ (9, 9) @TEXT(\"note\") }}\n.end\n",
+        pin_02(version)
     )
+}
+
+/// A file of 0.3 uses the standard series 0.3 (16.3), whose names differ: these tests write and
+/// look for those of the series 0.2, such as $GND and $GND_STUB, so a file of 0.3 pins that series
+/// in its header record.
+fn pin_02(version: &str) -> &'static str {
+    if version == "0.3" {
+        "; @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")"
+    } else {
+        ""
+    }
 }
 
 /// Where the solutions put the instances: M1 and R1 on one x, as the ALIGN of `amp` asks.

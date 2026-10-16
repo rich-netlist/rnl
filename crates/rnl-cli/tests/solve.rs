@@ -523,12 +523,15 @@ fn a_solve_is_the_same_twice_and_again_on_its_own_output() {
 fn in_a_file_of_the_draft_the_record_reaches_every_object() {
     // T3 and T4 declaring the draft 0.3, with their $TAIL_CENTER without a name: its middle point,
     // which a file of 0.2 could not refer to, is placed by its number, with the check of the
-    // numbers (5.9), so every constraint holds but those that 8.5 discarded
+    // numbers (5.9), so every constraint holds but those that 8.5 discarded. They write the names of
+    // the standard series 0.2, such as $DIFFPAIR, and pin it: a file of 0.3 uses the series 0.3
+    // otherwise (16.3)
     let fs = FsProvider::new(&[]);
+    let header = "@VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
     for name in ["T3-ota5t", "T4-miller-conflicts"] {
         let f = case(name);
         let text = fs.read(&path_str(&f)).unwrap();
-        let text = text.replace("@VERSION(\"0.2\")", "@VERSION(\"0.3\")").replace("%tc = #M1(a)", "#M1(a)");
+        let text = text.replace("@VERSION(\"0.2\")", header).replace("%tc = #M1(a)", "#M1(a)");
         let mem = MemoryProvider::new().with(&path_str(&f), &text);
         let both = Layered { layers: vec![&mem, &fs] };
         let run = solve(&f, &both, &SolveOptions { draft: true, ..unlimited() }).unwrap();
