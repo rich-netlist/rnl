@@ -239,14 +239,22 @@ pub(crate) struct Port {
 /// goes at that point, and a text attached to an object next to the object". At the point itself,
 /// or beside the coordinate point of the object, the origin of an instance, a usage drawn or a
 /// bundle, or the pin of a terminal, by the offset that a viewer that does not solve puts it at.
+/// A wire or a net has no coordinate point (13.3), and a text attached to one is anchored beside
+/// one of its points only for the axis that no fact kept reaches, when a fact kept reaches the
+/// other: with no fact kept reaching it, the solution leaves it free and the viewer places it
+/// (`crate::driver`).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Anchor {
-    /// The object it is attached to, or whose terminal.
+    /// The object it is attached to, or whose terminal; for a wire or a net, the object of the
+    /// point it is beside.
     pub object: usize,
     /// The pin of the terminal, in the object's symbol.
     pub pin: Option<usize>,
     /// From the point, along the axes of the scene.
     pub offset: [Q; 2],
+    /// What the text is attached to has a coordinate point (13.3), which the anchor is: a point,
+    /// an object or a terminal; not a wire or a net, whose anchor is only one of its points.
+    pub point: bool,
 }
 
 /// Where a viewer that does not solve puts a text attached to an object, from the object's
@@ -255,22 +263,51 @@ fn beside() -> [Q; 2] {
     [Q::new(6.into(), 5.into()), Q::new(6.into(), 5.into())]
 }
 
+/// The first of some points that is the origin of an object or a pin, as an anchor's object and
+/// pin.
+fn first_point(points: &[PointRef]) -> Option<(usize, Option<usize>)> {
+    points.iter().find_map(|r| match r {
+        PointRef::Origin(k) => Some((*k, None)),
+        PointRef::Pin { object, pin, .. } => Some((*object, Some(*pin))),
+        PointRef::Centre(_) => None,
+    })
+}
+
 /// The anchors of the texts with a position of their own ([`Structure::anchors`]): those attached
-/// to a point, an object with a coordinate point, or a terminal with a pin.
-fn anchors(problem: &LevelProblem) -> BTreeMap<usize, Anchor> {
+/// to a point, an object with a coordinate point, or a terminal with a pin; and those attached to
+/// a wire, beside its first point, or to a net, beside the first point of its first wire, else of
+/// its first ROUTE, else beside its first pin, as the viewer puts a net's label at the start of
+/// its first wire, else on one of its pins (13.3).
+fn anchors(problem: &LevelProblem, connections: &Connections) -> BTreeMap<usize, Anchor> {
     let mut out = BTreeMap::new();
     for (k, o) in problem.objects.iter().enumerate() {
         let (ObjectKind::Text, Position::Own { .. }, Some(t)) = (o.kind, &o.position, &o.text) else { continue };
         let anchor = match &t.attach {
             Filler::Object(j) => match problem.objects.get(*j).map(|a| a.kind) {
-                Some(ObjectKind::Point) => Anchor { object: *j, pin: None, offset: [Q::zero(), Q::zero()] },
+                Some(ObjectKind::Point) => {
+                    Anchor { object: *j, pin: None, offset: [Q::zero(), Q::zero()], point: true }
+                }
                 Some(ObjectKind::Instance | ObjectKind::Usage | ObjectKind::Bundle) => {
-                    Anchor { object: *j, pin: None, offset: beside() }
+                    Anchor { object: *j, pin: None, offset: beside(), point: true }
                 }
                 _ => continue,
             },
             Filler::Terminal { object, pin: Some(pin), .. } => {
-                Anchor { object: *object, pin: Some(*pin), offset: beside() }
+                Anchor { object: *object, pin: Some(*pin), offset: beside(), point: true }
+            }
+            Filler::Wire(w) => {
+                let Some((object, pin)) = problem.wires.get(*w).and_then(|w| first_point(&w.anchors)) else { continue };
+                Anchor { object, pin, offset: beside(), point: false }
+            }
+            Filler::Net(name) => {
+                let wire = problem.wires.iter().filter(|w| w.nets.contains(name)).find_map(|w| first_point(&w.anchors));
+                let route = || problem.routes.iter().filter(|r| r.net == *name).find_map(|r| first_point(&r.pins));
+                let pin = || {
+                    let net = connections.nets.iter().find(|n| n.name == *name)?;
+                    net.pins.first().map(|&(object, pin)| (object, Some(pin)))
+                };
+                let Some((object, pin)) = wire.or_else(route).or_else(pin) else { continue };
+                Anchor { object, pin, offset: beside(), point: false }
             }
             _ => continue,
         };
@@ -636,6 +673,7 @@ pub(crate) fn analyse(
             })
             .or_insert(b);
     }
+    let anchors = anchors(problem, &connections);
     let mut s = Structure {
         symbols,
         objects,
@@ -646,7 +684,7 @@ pub(crate) fn analyse(
         pairs,
         hanging,
         labels,
-        anchors: anchors(problem),
+        anchors,
         tree,
         scopes,
         open,

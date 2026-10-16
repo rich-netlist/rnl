@@ -19,7 +19,7 @@ use rnl_cli::{interpret_file, path_str, FsProvider};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::geom::{Orient, Pt};
 use rnl_runtime::problem::{
-    same_input, Axis, FactKind, LevelProblem, OrientSlot, PointRef, Position, Reference, Sense, Slot,
+    same_input, Axis, FactKind, Filler, LevelProblem, OrientSlot, PointRef, Position, Reference, Sense, Slot,
 };
 use rnl_runtime::solution::{Decision, Solution, Unsolved};
 use rnl_runtime::source::{normalize, Layered, MemoryProvider, Provider};
@@ -1200,6 +1200,117 @@ fn a_free_text_goes_beside_what_it_is_attached_to() {
     assert_eq!(at("%v"), at("%q"));
     let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
     check_read_back(&run, Path::new("/w/t.sp"), &Layered { layers: vec![&solved, &files] }, false, "texts");
+}
+
+/// How far a point is from the line drawn through some points.
+fn off_line(at: Pt, points: &[Pt]) -> f64 {
+    let along = |a: Pt, b: Pt| {
+        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+        let len = dx * dx + dy * dy;
+        let t = if len == 0.0 { 0.0 } else { (((at.0 - a.0) * dx + (at.1 - a.1) * dy) / len).clamp(0.0, 1.0) };
+        ((a.0 + t * dx - at.0).powi(2) + (a.1 + t * dy - at.1).powi(2)).sqrt()
+    };
+    points.windows(2).map(|w| along(w[0], w[1])).fold(f64::INFINITY, f64::min)
+}
+
+/// Where the level read back draws the texts attached to a wire, by the wire's points: each
+/// text's anchor with the points of the wire it is attached to.
+fn texts_on_wires(r: &rnl_runtime::Interpretation, level: usize) -> Vec<(String, Pt, Vec<Pt>)> {
+    let lv = r.model.levels.iter().find(|l| l.level == level).unwrap();
+    lv.texts
+        .iter()
+        .filter_map(|t| {
+            let w = lv.wires.iter().find(|w| Some(&w.id) == t.attach.as_ref())?;
+            Some((t.markup.clone(), t.anchor, w.points.clone()))
+        })
+        .collect()
+}
+
+#[test]
+fn a_label_on_a_bus_that_no_fact_reaches_reads_back_on_the_bus() {
+    // corpus 09: `%bus @TEXT("${net}")` is attached to a wire, which has no coordinate point
+    // (13.3), and no fact reaches it. The file is raised to 0.3, whose record could refer to the
+    // text by its number (5.9), but the solver has no point to put it at and leaves it free, as a
+    // file of 0.2 did: the record has no decision for it, and read back the viewer draws it above
+    // the middle of the bus, as it does unsolved, not at the origin inside XR's symbol
+    let fs = FsProvider::new(&[]);
+    let f = corpus("09-buses-and-bundles.sp");
+    let run = solve(&f, &fs, &unlimited()).unwrap();
+    assert_eq!(run.raised.len(), 1, "{:?}", run.raised);
+    let level = run.levels.iter().find(|l| l.problem.title == "09-buses-and-bundles.sp").unwrap();
+    let p = &level.problem;
+    let label = p.objects.iter().position(|o| o.text.as_ref().is_some_and(|t| matches!(t.attach, Filler::Wire(_))));
+    let label = label.unwrap();
+    let Reference::Number { number, .. } = &p.objects[label].reference else { panic!("{:?}", p.objects[label]) };
+    assert!(!level.record.contains(&format!("%#{number} @")), "{}", level.record);
+    assert!(level.solved.solution.placements.iter().all(|pl| pl.object != label));
+    assert!(!level.written.unsolved.iter().any(|u| u.decision == Decision::Position { object: label }));
+    let notes = &level.solved.report.notes;
+    assert!(notes.iter().any(|n| n.starts_with("1 text that no fact kept reaches is left free")), "{notes:#?}");
+    let back = read_solved(&run, &fs, &f);
+    let drawn = texts_on_wires(&back, p.level);
+    let [(markup, at, wire)] = drawn.as_slice() else { panic!("{drawn:?}") };
+    assert_eq!(markup, "${net}");
+    // above the middle of the bus: 0.6 above its middle segment (13.3)
+    assert!((off_line(*at, wire) - 0.6).abs() < 1e-9, "{at:?} {wire:?}");
+    let k = wire.len() / 2;
+    assert_eq!(*at, ((wire[k - 1].0 + wire[k].0) / 2.0, (wire[k - 1].1 + wire[k].1) / 2.0 + 0.6));
+    // unsolved, the viewer draws it so too
+    let unsolved = interpret_file(&f, None, &fs, &Options { generated: false, ..Options::default() }).unwrap();
+    let before = texts_on_wires(&unsolved, p.level);
+    let [(_, at, wire)] = before.as_slice() else { panic!("{before:?}") };
+    assert!((off_line(*at, wire) - 0.6).abs() < 1e-9, "{at:?} {wire:?}");
+}
+
+#[test]
+fn labels_on_a_wire_and_a_net_are_left_to_the_viewer_and_one_a_fact_reaches_is_written() {
+    // a text attached to a wire or to a net, which have no coordinate point (13.3), and that no
+    // fact reaches, has no decision in the record, which needs no number for it: the file stays
+    // 0.2, and read back the viewer draws the label of the wire above its middle and that of the
+    // net at the start of its wire. A label of the wire whose y an ALIGN gives is the solver's: the
+    // record writes it, its x beside the wire, not at the origin
+    let body = concat!(
+        "* labels\n",
+        "* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n",
+        "R1 a b 1k\n",
+        "R2 b c 1k\n",
+        "* @RNL {\n",
+        "*   %w = &b @WIRE {#R1:2 #R2:1};\n",
+        "*   %w @TEXT(\"on the wire\");\n",
+        "*   &b @TEXT(\"on the net\");\n",
+        "*   %l = %w @TEXT(\"aligned\");\n",
+        "*   {%l #R2} @ALIGN(\"y\");\n",
+        "*   #R1 @PLACE(10, 10)\n",
+        "* }\n",
+        ".end\n",
+    );
+    let files = MemoryProvider::new().with("/w/t.sp", body);
+    let run = solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap();
+    assert!(run.raised.is_empty(), "{:?}", run.raised);
+    let level = &run.levels[0];
+    assert!(level.written.unsolved.is_empty(), "{:?}", level.written.unsolved);
+    assert!(!level.record.contains("%#"), "{}", level.record);
+    let notes = &level.solved.report.notes;
+    assert!(notes.iter().any(|n| n.starts_with("2 texts that no fact kept reaches are left free")), "{notes:#?}");
+    let p = &level.problem;
+    let placed = Placed { p, s: &level.solved.solution };
+    let named = |n: &str| p.objects.iter().position(|o| o.reference == Reference::Name(n.into())).unwrap();
+    let (x, y) = placed.origin(named("%l"));
+    assert_eq!(y, placed.origin(named("#R2")).1);
+    let pin = placed.at(&p.wires[0].anchors[0]);
+    assert!((x - pin.0).abs() <= 1.5, "{x} beside {pin:?}");
+    let written = format!("%l @PLACE({}, {})", rnl_runtime::geom::fmt_num(x), rnl_runtime::geom::fmt_num(y));
+    assert!(level.record.contains(&written), "{}", level.record);
+    let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
+    let layered = Layered { layers: vec![&solved, &files] };
+    check_read_back(&run, Path::new("/w/t.sp"), &layered, false, "labels");
+    let back = interpret_file(Path::new("/w/t.sp"), None, &layered, &Options::default()).unwrap();
+    let drawn = texts_on_wires(&back, p.level);
+    let on_wire = drawn.iter().find(|(m, _, _)| m == "on the wire").unwrap();
+    assert!((off_line(on_wire.1, &on_wire.2) - 0.6).abs() < 1e-9, "{on_wire:?}");
+    let lv = &back.model.levels[0];
+    let on_net = lv.texts.iter().find(|t| t.markup == "on the net").unwrap();
+    assert_eq!(Some(on_net.anchor), lv.wires[0].points.first().copied(), "{:?}", lv.wires[0]);
 }
 
 // TODO: under RNL_BLESS=1 this test can read T1's snapshot before the test that blesses it has

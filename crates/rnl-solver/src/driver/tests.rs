@@ -626,15 +626,19 @@ fn check_capped(
             assert!(x.is_finite() && y.is_finite(), "{what}: {pl:?}");
         }
     }
-    // every object with a position of its own placed, those the file fixes too (plan 3.2), and
-    // every text that its symbol places on one axis only, where it is (13.3); and every
-    // orientation given
+    // every object with a position of its own placed, those the file fixes too (plan 3.2), but a
+    // text left to the viewer (13.3), and every text that its symbol places on one axis only,
+    // where it is (13.3); and every orientation given
     for (k, o) in p.objects.iter().enumerate() {
         let pl: Vec<&Placement> = solved.solution.placements.iter().filter(|pl| pl.object == k).collect();
         assert!(pl.len() <= 1, "{what}: {pl:?}");
         let at = pl.first().and_then(|pl| pl.at);
         let orient = pl.first().and_then(|pl| pl.orient);
-        let own = matches!(o.position, Position::Own { .. } | Position::InSymbol { replaced: Some(_), .. });
+        let own = match o.position {
+            Position::Own { .. } => !left_free(&e.structure, k),
+            Position::InSymbol { replaced: Some(_), .. } => true,
+            _ => false,
+        };
         assert_eq!(at.is_some(), own, "{what}: {} {pl:?}", o.label);
         if let (Some((x, y)), Position::InSymbol { .. }) = (at, &o.position) {
             let origin = &e.placed.origins[k];
@@ -1638,4 +1642,183 @@ R1 a b 1k
         }
         assert!(e.placed.dropped.is_empty(), "{what}: {:?}", e.placed.dropped);
     }
+}
+
+// --------------------------------------------------------------- texts that the solver leaves free
+
+use rnl_runtime::problem::{Filler, Reference};
+
+use crate::model::{ax, PointId};
+
+/// Whether the LP decides each object's coordinate on each axis, by object: false where it is
+/// left where the witness of the resolution happens to be. The LP's first two layers, the facts
+/// kept, the links of pins and texts to their objects, the wires and the anchors of texts all
+/// bound differences of coordinates only, so a set of objects that they join on an axis, and that
+/// has neither a symbol placed by its own position, which the search places, nor a fact kept that
+/// fixes a coordinate (a PLACE, or a coordinate of a point, 11.1), can move as one along it: only
+/// layer 3, the distance to where the resolution put it, holds it, and its coordinates there are
+/// where the witness happens to be, such as 0 for what nothing reaches. Such is a point `(_, _)`
+/// in no wire on an axis that no fact reaches; a text attached to a wire or a net that no fact
+/// reaches would be but for its anchor, and is left free ([`left_free`]).
+fn grounded(problem: &LevelProblem, s: &Structure) -> Vec<[bool; 2]> {
+    let n = problem.objects.len();
+    // the objects, then one node for what is held: a union-find on each axis
+    let mut parent: [Vec<usize>; 2] = [(0..=n).collect(), (0..=n).collect()];
+    fn root(parent: &mut [usize], mut k: usize) -> usize {
+        while parent[k] != k {
+            parent[k] = parent[parent[k]];
+            k = parent[k];
+        }
+        k
+    }
+    let mut join = |axis: usize, a: usize, b: usize| {
+        let (ra, rb) = (root(&mut parent[axis], a), root(&mut parent[axis], b));
+        if ra != rb {
+            parent[axis][ra.max(rb)] = ra.min(rb);
+        }
+    };
+    let held = n;
+    let object_of = |p: &PointId| match p {
+        PointId::Origin(k) | PointId::Pin(k, _) | PointId::Text(k) => Some(*k),
+        PointId::Centre(_) => None,
+    };
+    for (k, o) in problem.objects.iter().enumerate() {
+        if crate::coords::solid(s, k) {
+            join(0, k, held);
+            join(1, k, held);
+        }
+        match &o.position {
+            // drawn at the point of its main object (12.1)
+            Position::At(_) => {
+                if let Some(j) = s.model.origin_point[k].as_ref().and_then(object_of) {
+                    join(0, k, j);
+                    join(1, k, j);
+                }
+            }
+            // a point of its owner on the axes that its symbol gives (13.3)
+            Position::InSymbol { owner, .. } => {
+                for axis in [Axis::X, Axis::Y] {
+                    if o.position.from_symbol(axis) {
+                        join(ax(axis), k, *owner);
+                    }
+                }
+            }
+            Position::Own { .. } => {}
+        }
+    }
+    for &f in &s.kept {
+        let (Some(unit), Some(fact)) = (s.model.units.get(f), problem.facts.get(f)) else { continue };
+        let fixes = match &fact.kind {
+            FactKind::Place { axis, .. } | FactKind::PointCoordinate { axis, .. } => Some(ax(*axis)),
+            _ => None,
+        };
+        for axis in 0..2 {
+            let objects: Vec<usize> = unit.touched[axis].iter().filter_map(object_of).collect();
+            for w in objects.windows(2) {
+                join(axis, w[0], w[1]);
+            }
+            if let (Some(&first), true) = (objects.first(), fixes == Some(axis)) {
+                join(axis, first, held);
+            }
+        }
+    }
+    for d in &s.connections.drawn {
+        let objects: Vec<usize> = d.points.iter().filter_map(object_of).collect();
+        for w in objects.windows(2) {
+            join(0, w[0], w[1]);
+            join(1, w[0], w[1]);
+        }
+    }
+    for (k, a) in &s.anchors {
+        join(0, *k, a.object);
+        join(1, *k, a.object);
+    }
+    let ground = [root(&mut parent[0], held), root(&mut parent[1], held)];
+    (0..n).map(|k| [root(&mut parent[0], k) == ground[0], root(&mut parent[1], k) == ground[1]]).collect()
+}
+
+/// The texts of a level: on the wire `%w` and on the net `&b`, which no fact reaches, and `%l` on
+/// the wire, whose y an ALIGN with R2 gives.
+const TEXTS_ON_WIRES: &str = concat!(
+    "R1 a b 1k\n",
+    "R2 b c 1k\n",
+    "* @RNL {\n",
+    "*   %w = &b @WIRE {#R1:2 #R2:1};\n",
+    "*   %w @TEXT(\"on the wire\");\n",
+    "*   &b @TEXT(\"on the net\");\n",
+    "*   %l = %w @TEXT(\"aligned\");\n",
+    "*   {%l #R2} @ALIGN(\"y\")\n",
+    "* }\n",
+);
+
+/// A text attached to a wire or a net, which has no coordinate point (13.3), and that no fact
+/// reaches, is left free: the viewer places it next to what it is attached to, and the report
+/// says so. Placed, the LP would have left it where the witness of the resolution is, such as the
+/// origin. A text on the wire whose y a fact gives is placed, its x beside the wire's first point,
+/// not where the witness is.
+#[test]
+fn a_text_on_a_wire_or_a_net_that_no_fact_reaches_is_left_to_the_viewer() {
+    let (p, solved, e) = solve_text(&netlist(TEXTS_ON_WIRES));
+    let attached = |unnamed: fn(&Filler) -> bool| {
+        let found = p.objects.iter().position(|o| {
+            o.reference != Reference::Name("%l".into()) && o.text.as_ref().is_some_and(|t| unnamed(&t.attach))
+        });
+        found.unwrap()
+    };
+    let placed = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.at);
+    let on_wire = attached(|f| matches!(f, Filler::Wire(_)));
+    let on_net = attached(|f| matches!(f, Filler::Net(n) if n == "b"));
+    for k in [on_wire, on_net] {
+        assert!(left_free(&e.structure, k), "{}", p.objects[k].label);
+        assert_eq!(placed(k), None, "{}", p.objects[k].label);
+    }
+    assert!(
+        solved.report.notes.iter().any(|n| n.starts_with("2 texts that no fact kept reaches are left free")),
+        "{:#?}",
+        solved.report.notes
+    );
+    let l = p.objects.iter().position(|o| o.reference == Reference::Name("%l".into())).unwrap();
+    assert!(!left_free(&e.structure, l));
+    assert_eq!(grounded(&p, &e.structure)[l], [true, true]);
+    let (x, y) = placed(l).expect("the aligned text is placed");
+    assert_eq!(y, to_f64(&e.placed.origins[object(&p, "#R2")][1]));
+    // beside the first point of the wire, the pin of R1, on x
+    let PointRef::Pin { object: r1, pin, .. } = p.wires[0].anchors[0] else { panic!("{:?}", p.wires[0]) };
+    let at = e.structure.pin_offset(r1, pin, e.placed.geometry.orient[r1]).unwrap();
+    let pin_x = to_f64(&(&e.placed.origins[r1][0] + &at[0]));
+    assert!((x - pin_x).abs() <= 1.5, "{x} beside {pin_x}");
+}
+
+/// No text is placed where only the witness of the resolution puts it: in every case of the
+/// solver and of the corpus, every text the solution places is held on each axis by a fact kept,
+/// a symbol or what it is attached to ([`grounded`]). Only points `(_, _)` may be left so on an
+/// axis: the axes of `$MIRROR_PAIR` and the middle point of `$TAIL_CENTER` (T3, T4, corpus 03 and
+/// 15) and a point aligned on x only (corpus 10), on y. A point is the solver's to place (11.1)
+/// and is not drawn. The bus label of corpus 09, on a wire, is left free (13.3).
+#[test]
+fn no_text_is_placed_where_only_the_witness_puts_it() {
+    let mut files = netlists("tests/integration/solver", "T");
+    files.extend(netlists("tests/conformance/cases", ""));
+    let mut left = Vec::new();
+    for f in files {
+        let name = f.file_name().unwrap().to_string_lossy().to_string();
+        for p in problems(&f) {
+            let (solved, e) = solve_exact(&p, &SolverOptions::without_time_limit());
+            let g = grounded(&p, &e.structure);
+            for pl in solved.solution.placements.iter().filter(|pl| pl.at.is_some()) {
+                let o = &p.objects[pl.object];
+                let free: Vec<usize> = (0..2).filter(|&a| !g[pl.object][a]).collect();
+                assert!(
+                    free.is_empty() || o.kind == ObjectKind::Point,
+                    "{name} / {}: {} on {free:?}",
+                    p.title,
+                    o.label
+                );
+            }
+            for k in (0..p.objects.len()).filter(|&k| left_free(&e.structure, k)) {
+                left.push(format!("{name} / {}: {}", p.title, p.objects[k].label));
+            }
+        }
+    }
+    assert_eq!(left, ["09-buses-and-bundles.sp / 09-buses-and-bundles.sp: a text"]);
 }
