@@ -10,8 +10,14 @@
 //! ranked by the estimate of the objectives, the routing objectives measuring the straight
 //! connections of each net; the best `beam` of them are routed (`crate::route`) and scored on
 //! their wires (`crate::score`), and the best of those is the solution. Overlapping symbols rank
-//! first and then joins left undone, as the solver's own rules rank after every fact and before
-//! every objective (8.5, 11.7).
+//! first, then wires that mislead (wires of different nets that touch, a pin on a wire of another
+//! net, a wire through a symbol, 13.2) and then joins left undone, as the solver's own rules rank
+//! after every fact and before every objective (8.5, 11.7).
+//!
+//! **The solution** gives every object with a position of its own its position and every object
+//! with an orientation its orientation, but not a position that the file gives on both axes, each
+//! by a fact kept (PLACE, a point's coordinates) where the object is or by the offset of a text
+//! (13.3): that is the file's, not the solver's, and the record leaves it to the file.
 //!
 //! **Budget** (`crate::Budget`): the work is counted, never timed, so the result is the same on
 //! every machine. The resolution stops deciding a fact after `resolve_nodes` nodes and discards it
@@ -24,14 +30,14 @@
 use std::collections::BTreeMap;
 
 use rnl_runtime::geom::Orient;
-use rnl_runtime::problem::{LevelProblem, Position};
+use rnl_runtime::problem::{Axis, FactKind, LevelProblem, Position, Slot};
 use rnl_runtime::solution::{Placement, Solution};
 
 use crate::coords::{place, Cause, Placed};
-use crate::rational::{to_f64, Q};
+use crate::rational::{from_f64, to_f64, Q};
 use crate::resolve::Resolved;
 use crate::route::{route, style_notes, Failure, Routing};
-use crate::score::{drawn, layers, order, Entry};
+use crate::score::{drawn, layers, misleading, order, Entry};
 use crate::search::{search, Candidate, RelKind};
 use crate::structure::{analyse, Structure};
 use crate::{SolveReport, Solved, SolverOptions, Unrouted};
@@ -100,8 +106,14 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
     for c in candidates {
         let placed = place(problem, &structure, &c, options, &mut work);
         let estimate = layers(&structure, &placed.origins, &placed.geometry, None);
-        let entry =
-            Entry { overlaps: placed.overlaps.len(), joins_left: 0, layers: estimate, code: c.code(&structure) };
+        let written = drawn(problem, &structure, &placed.geometry, &Routing::default());
+        let entry = Entry {
+            overlaps: placed.overlaps.len(),
+            misleading: misleading(problem, &structure, &placed.origins, &placed.geometry, &written),
+            joins_left: 0,
+            layers: estimate,
+            code: c.code(&structure),
+        };
         all.push(Placing { candidate: c, placed, entry });
     }
     // the best `beam` by the estimate are routed and scored on their wires (plan 5.8)
@@ -114,7 +126,12 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
         let routing = route(problem, &structure, &p.placed.geometry, &p.placed.origins, options, &mut work);
         let wires = drawn(problem, &structure, &p.placed.geometry, &routing);
         let score = layers(&structure, &p.placed.origins, &p.placed.geometry, Some(&wires));
-        let entry = Entry { joins_left: routing.joins_left(), layers: score, ..p.entry.clone() };
+        let entry = Entry {
+            misleading: misleading(problem, &structure, &p.placed.origins, &p.placed.geometry, &wires),
+            joins_left: routing.joins_left(),
+            layers: score,
+            ..p.entry.clone()
+        };
         finals.push((i, routing, entry));
     }
     let entries: Vec<Entry> = finals.iter().map(|(_, _, e)| e.clone()).collect();
@@ -190,10 +207,32 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
             budget: l.failure == Failure::Budget,
         });
     }
+    let mut kept = vec![false; problem.facts.len()];
+    for &i in &resolved.kept {
+        kept[i] = true;
+    }
+    let by_offset = |k: usize, axis: Axis| {
+        problem.facts.iter().any(|f| matches!(f.kind, FactKind::Offset { text, axis: a, .. } if text == k && a == axis))
+    };
+    // an axis on which the file gives the position: a coordinate fact kept, where the object is
+    // (8.5), or an offset that places a text, which a record does not write over (13.3)
+    let the_files = |k: usize, axis: Axis, slot: &Slot| match slot {
+        Slot::Fixed { value, fact } => {
+            kept[*fact] && from_f64(*value).as_ref() == Some(&placed.geometry.origin[k][usize::from(axis == Axis::Y)])
+        }
+        Slot::Free => by_offset(k, axis),
+    };
     let mut placements = Vec::new();
     for (k, o) in problem.objects.iter().enumerate() {
         let orient: Option<Orient> = o.orient.is_some().then(|| placed.geometry.orient[k]);
-        match o.position {
+        match &o.position {
+            // a position the file gives on both axes is not a decision of the solver's, and only
+            // the orientation is given, if any (plan 3.2)
+            Position::Own { x, y } if the_files(k, Axis::X, x) && the_files(k, Axis::Y, y) => {
+                if orient.is_some() {
+                    placements.push(Placement { object: k, at: None, orient });
+                }
+            }
             Position::Own { .. } => {
                 let [x, y] = &placed.geometry.origin[k];
                 placements.push(Placement { object: k, at: Some((to_f64(x), to_f64(y))), orient })

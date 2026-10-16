@@ -88,10 +88,6 @@ impl Placed<'_> {
     }
 
     fn origin(&self, k: usize) -> Pt {
-        let slot = |s: &Slot| match s {
-            Slot::Fixed { value, .. } => *value,
-            Slot::Free => 0.0,
-        };
         match &self.p.objects[k].position {
             Position::At(r) => self.at(r),
             Position::InSymbol { owner, local, replaced } => {
@@ -110,7 +106,13 @@ impl Placed<'_> {
             }
             Position::Own { x, y } => {
                 let solved = self.s.placements.iter().find(|q| q.object == k).and_then(|q| q.at);
-                solved.unwrap_or((slot(x), slot(y)))
+                // without a position from the solver, where the file puts it: by its coordinate
+                // facts, or as a text by its offsets (13.3)
+                let own = |axis: Axis, s: &Slot| match s {
+                    Slot::Fixed { value, .. } => *value,
+                    Slot::Free => self.offset(k, axis).unwrap_or(0.0),
+                };
+                solved.unwrap_or((own(Axis::X, x), own(Axis::Y, y)))
             }
         }
     }
@@ -864,12 +866,14 @@ fn a_label_that_the_scene_places_on_one_axis_keeps_its_owner_where_it_is() {
     assert!(matches!(at("#R2::name"), Position::InSymbol { replaced: Some((Axis::X, Slot::Free)), .. }));
     assert!(matches!(at("#R5::name"), Position::InSymbol { replaced: None, .. }));
     assert!(matches!(at("#R6::name"), Position::Own { x: Slot::Free, y: Slot::Free }));
-    for line in
-        ["#R1 @PLACE(0, 0) => @ORIENT(\"R0\");", "#R3 @PLACE(20, 0) => @ORIENT(\"R0\");", "#R4::value @PLACE(x=1)"]
-    {
+    // the PLACEs of R1 and R3, and of #R3::name and #R4::value with the offsets on their other
+    // axes, are the file's, and the record leaves them to it
+    for line in ["#R1 @ORIENT(\"R0\");", "#R3 @ORIENT(\"R0\");"] {
         assert!(level.record.contains(line), "{}", level.record);
     }
-    assert!(!level.record.contains("#R6::name") && !level.record.contains("#R6::note"), "{}", level.record);
+    for text in ["#R1 @PLACE", "#R3 @PLACE", "#R3::name", "#R4::value", "#R6::name", "#R6::note"] {
+        assert!(!level.record.contains(text), "{}", level.record);
+    }
     let anchors = |r: &rnl_runtime::Interpretation| {
         let mut out: Vec<(String, Pt)> = r.model.levels[0].texts.iter().map(|t| (t.id.clone(), t.anchor)).collect();
         out.sort_by(|a, b| a.0.cmp(&b.0));

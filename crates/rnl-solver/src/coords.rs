@@ -187,7 +187,7 @@ fn apart_cause(
 
 /// The symbols placed by their own position: elements, supply, ground and port symbols, and other
 /// virtual parts with a position of their own.
-fn solid(s: &Structure, k: usize) -> bool {
+pub(crate) fn solid(s: &Structure, k: usize) -> bool {
     let o = &s.objects[k];
     o.own && o.symbol.is_some() && !matches!(o.role, Role::Point | Role::Text)
 }

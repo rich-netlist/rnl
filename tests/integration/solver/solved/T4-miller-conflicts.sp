@@ -59,7 +59,7 @@ CL out 0 2p
 *   %rt6 = (8, -17);
 *   %rt7 = (19, 6);
 *   %rt8 = (19, 5);
-*   #M1 @PLACE(0, 0) => @ORIENT("MY");
+*   #M1 @ORIENT("MY");
 *   #M2 @PLACE(8, 3) => @ORIENT("R0");
 *   #M3 @PLACE(0, 15) => @ORIENT("MY");
 *   #M4 @PLACE(8, 15) => @ORIENT("R0");

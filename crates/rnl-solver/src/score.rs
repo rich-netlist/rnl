@@ -7,16 +7,25 @@
 //! (13.1), drawn by their mode. Before routing, the routing objectives measure the straight
 //! connections of each net; that is the estimate the driver picks the candidates to route by.
 //!
-//! **The order of candidates** ([`order`]) has two counts ahead of the objectives, as the solver's
-//! own rules rank after every fact and before every objective (8.5, 11.7): first the pairs of
-//! symbols that overlap, then the joins that routing left undone, a ROUTE (13.7) being a request
-//! of the file and the objectives only preferences of the solver. Among candidates equal in both,
-//! the layers decide as `crate::objectives::Active::rank` does: layer by layer, the candidates
-//! within the layer's tolerance of its least value kept, the canonical code breaking what is left
-//! tied. An objective that is off has no layer, so it neither ranks nor breaks ties.
+//! **The order of candidates** ([`order`]) has three counts ahead of the objectives, as the
+//! solver's own rules rank after every fact and before every objective (8.5, 11.7): first the
+//! pairs of symbols that overlap; then the places where the wires mislead ([`misleading`]): lines
+//! that touch or overlap make no connection (13.2), so wires of different nets that do, a pin on a
+//! wire of another net, or a wire through a symbol read as what they are not; then the joins that
+//! routing left undone, a ROUTE (13.7) being a request of the file and the objectives only
+//! preferences of the solver. The wires routed avoid all of it by themselves; the count is there
+//! for the wires written (13.1), which the placement moves and their mode draws. Among candidates
+//! equal in the three, the layers decide as `crate::objectives::Active::rank` does: layer by
+//! layer, the candidates within the layer's tolerance of its least value kept, the canonical code
+//! breaking what is left tied. An objective that is off has no layer, so it neither ranks nor
+//! breaks ties.
 
+use std::collections::BTreeSet;
+
+use num_traits::{One, Zero};
 use rnl_runtime::problem::LevelProblem;
 
+use crate::coords::solid;
 use crate::objectives::{Active, Routed, View};
 use crate::rational::Q;
 use crate::resolve::Geometry;
@@ -28,6 +37,9 @@ use crate::structure::Structure;
 pub(crate) struct Entry {
     /// The pairs of symbols that overlap.
     pub overlaps: usize,
+    /// The places where the wires mislead ([`misleading`]); before routing, those of the wires
+    /// written.
+    pub misleading: usize,
     /// The joins routing left undone (`Routing::joins_left`); 0 before routing.
     pub joins_left: usize,
     /// The value of each layer of the objectives in force.
@@ -62,16 +74,128 @@ pub(crate) fn layers(s: &Structure, origins: &[[Q; 2]], g: &Geometry, routed: Op
     s.active.score(&view, routed)
 }
 
+/// The places where the wires of a candidate, drawn as they will be (`routed`: the wires routed and
+/// the wires written, by their mode), read as what they are not. Lines that touch, cross or
+/// overlap make no connection (13.2), and a reader takes wires that touch for connected, so each
+/// of these counts once:
+///
+/// - two segments of different nets on one line that share a stretch of it, or an end;
+/// - two segments of different nets, not on one line, that meet at an end or a bend of one of
+///   them (where they meet inside both, they cross: that is the objective `crossings`);
+/// - a pin on a segment of a net it is not on;
+/// - a segment through the inside of a symbol's box over some length, but one that ends at a pin
+///   of that symbol inside its box, which has no other way to the pin.
+///
+/// Nets are compared by name, a wire of a bus being on each of its nets: two wires are of
+/// different nets when they share none. A wire on no net is left out.
+pub(crate) fn misleading(
+    problem: &LevelProblem,
+    s: &Structure,
+    origins: &[[Q; 2]],
+    g: &Geometry,
+    routed: &Routed,
+) -> usize {
+    let drawn = &s.connections.drawn;
+    let first_written = drawn.len().saturating_sub(problem.wires.len());
+    // the nets of an entry of `drawn`: a ROUTE's, or a wire written's
+    let nets_of = |d: usize| -> BTreeSet<&str> {
+        match d.checked_sub(first_written).and_then(|w| problem.wires.get(w)) {
+            Some(w) => w.nets.iter().map(String::as_str).collect(),
+            None => drawn.get(d).map(|e| e.net.as_str()).into_iter().collect(),
+        }
+    };
+    let nets: Vec<BTreeSet<&str>> = routed.paths.iter().map(|(d, _)| nets_of(*d)).collect();
+    let segments: Vec<(usize, &[Q; 2], &[Q; 2])> = routed
+        .paths
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !nets[*i].is_empty())
+        .flat_map(|(i, (_, path))| path.windows(2).map(move |w| (i, &w[0], &w[1])))
+        .filter(|(_, a, b)| a != b)
+        .collect();
+    let mut count = 0;
+    for (n, (i, a, b)) in segments.iter().enumerate() {
+        for (j, c, d) in &segments[n + 1..] {
+            if nets[*i].is_disjoint(&nets[*j]) && touch(a, b, c, d) {
+                count += 1;
+            }
+        }
+    }
+    for (&(k, pin), on) in &s.connections.nets_of {
+        let names: BTreeSet<&str> =
+            on.iter().filter_map(|&i| s.connections.nets.get(i)).map(|net| net.name.as_str()).collect();
+        if names.is_empty() {
+            continue;
+        }
+        let Some(p) = s.pin_at(origins, &g.orient, k, pin) else { continue };
+        count += segments.iter().filter(|(i, a, b)| nets[*i].is_disjoint(&names) && on_segment(&p, a, b)).count();
+    }
+    for k in (0..s.objects.len()).filter(|&k| solid(s, k)) {
+        let Some(b) = s.box_at(origins, &g.orient, k) else { continue };
+        let inner: Vec<[Q; 2]> = s
+            .connections
+            .nets_of
+            .range((k, 0)..(k + 1, 0))
+            .filter_map(|(&(_, pin), _)| s.pin_at(origins, &g.orient, k, pin))
+            .filter(|p| b[0] < p[0] && p[0] < b[2] && b[1] < p[1] && p[1] < b[3])
+            .collect();
+        count +=
+            segments.iter().filter(|(_, p, q)| through(&b, p, q) && !inner.iter().any(|x| x == *p || x == *q)).count();
+    }
+    count
+}
+
+/// `(p - o) x (q - o)`: 0 when the three points are on one line.
+fn cross(o: &[Q; 2], p: &[Q; 2], q: &[Q; 2]) -> Q {
+    (&p[0] - &o[0]) * (&q[1] - &o[1]) - (&p[1] - &o[1]) * (&q[0] - &o[0])
+}
+
+/// Whether `p` is on the segment from `a` to `b`, its ends included.
+fn on_segment(p: &[Q; 2], a: &[Q; 2], b: &[Q; 2]) -> bool {
+    let within = |i: usize| a[i].clone().min(b[i].clone()) <= p[i] && p[i] <= a[i].clone().max(b[i].clone());
+    cross(a, b, p).is_zero() && within(0) && within(1)
+}
+
+/// Whether two segments touch, as a reader takes for a connection: an end of one is on the other.
+/// That covers two segments on one line that share a point or a stretch, and leaves out two that
+/// cross, meeting inside both.
+fn touch(a: &[Q; 2], b: &[Q; 2], c: &[Q; 2], d: &[Q; 2]) -> bool {
+    on_segment(c, a, b) || on_segment(d, a, b) || on_segment(a, c, d) || on_segment(b, c, d)
+}
+
+/// Whether the segment from `a` to `b` runs through the inside of a box, its edge left out, over
+/// some length: the parameters along it at which it is strictly inside the box's range on each
+/// axis make an interval that is not empty.
+fn through(bx: &[Q; 4], a: &[Q; 2], b: &[Q; 2]) -> bool {
+    let (mut lo, mut hi) = (Q::zero(), Q::one());
+    for axis in 0..2 {
+        let (min, max) = (&bx[axis], &bx[axis + 2]);
+        let d = &b[axis] - &a[axis];
+        if d.is_zero() {
+            if !(*min < a[axis] && a[axis] < *max) {
+                return false;
+            }
+            continue;
+        }
+        let (t0, t1) = ((min - &a[axis]) / &d, (max - &a[axis]) / &d);
+        let (t0, t1) = if t0 <= t1 { (t0, t1) } else { (t1, t0) };
+        lo = lo.max(t0);
+        hi = hi.min(t1);
+    }
+    lo < hi
+}
+
 /// The order of some candidates, best first (see the module): the fewest overlaps, then the fewest
-/// joins left undone, then the layers within their tolerances, then the code.
+/// places where the wires mislead, then the fewest joins left undone, then the layers within
+/// their tolerances, then the code.
 pub(crate) fn order(active: &Active, entries: &[Entry]) -> Vec<usize> {
-    let mut keys: Vec<(usize, usize)> = entries.iter().map(|e| (e.overlaps, e.joins_left)).collect();
+    let key = |e: &Entry| (e.overlaps, e.misleading, e.joins_left);
+    let mut keys: Vec<(usize, usize, usize)> = entries.iter().map(key).collect();
     keys.sort_unstable();
     keys.dedup();
     let mut out = Vec::with_capacity(entries.len());
-    for key in keys {
-        let members: Vec<usize> =
-            (0..entries.len()).filter(|&i| (entries[i].overlaps, entries[i].joins_left) == key).collect();
+    for k in keys {
+        let members: Vec<usize> = (0..entries.len()).filter(|&i| key(&entries[i]) == k).collect();
         let refs: Vec<(&[Q], &[u32])> =
             members.iter().map(|&i| (entries[i].layers.as_slice(), entries[i].code.as_slice())).collect();
         out.extend(active.rank(&refs).into_iter().map(|j| members[j]));
@@ -87,7 +211,13 @@ mod tests {
     use crate::{Layer, Objectives};
 
     fn entry(overlaps: usize, joins_left: usize, layers: &[i64], code: u32) -> Entry {
-        Entry { overlaps, joins_left, layers: layers.iter().map(|v| int(*v)).collect(), code: vec![code] }
+        Entry {
+            overlaps,
+            misleading: 0,
+            joins_left,
+            layers: layers.iter().map(|v| int(*v)).collect(),
+            code: vec![code],
+        }
     }
 
     #[test]
@@ -106,6 +236,54 @@ mod tests {
             entry(0, 1, &[0, 0], 6),
         ];
         assert_eq!(order(&active, &entries), vec![5, 4, 3, 2, 6, 1, 0]);
+    }
+
+    fn pt(x: i64, y: i64) -> [Q; 2] {
+        [int(x), int(y)]
+    }
+
+    #[test]
+    fn what_misleads_ranks_after_the_overlaps_and_before_the_joins_left() {
+        let active = Active::new(&Objectives { layers: vec![Layer::single("area")] }, &Inputs::default());
+        let mut entries = [entry(0, 0, &[5], 0), entry(0, 0, &[1], 1), entry(1, 0, &[0], 2), entry(0, 1, &[0], 3)];
+        entries[1].misleading = 2;
+        entries[0].misleading = 1;
+        // the overlaps first, then what misleads, then the joins left, then the layers
+        assert_eq!(order(&active, &entries), vec![3, 0, 1, 2]);
+    }
+
+    #[test]
+    fn segments_touch_at_an_end_or_along_a_line_and_not_where_they_cross() {
+        // along one line: a stretch shared, an end on the other, ends that meet, apart
+        assert!(touch(&pt(0, 0), &pt(4, 0), &pt(2, 0), &pt(6, 0)));
+        assert!(touch(&pt(0, 0), &pt(4, 0), &pt(4, 0), &pt(6, 0)));
+        assert!(!touch(&pt(0, 0), &pt(4, 0), &pt(5, 0), &pt(6, 0)));
+        // a T: the end of one inside the other; a bend on the other
+        assert!(touch(&pt(0, 0), &pt(4, 0), &pt(2, 0), &pt(2, 3)));
+        assert!(touch(&pt(0, 0), &pt(4, 0), &pt(2, -3), &pt(2, 0)));
+        // a crossing, inside both: the objective crossings, not a touch; parallel lines apart
+        assert!(!touch(&pt(0, 0), &pt(4, 0), &pt(2, -3), &pt(2, 3)));
+        assert!(!touch(&pt(0, 0), &pt(4, 0), &pt(0, 1), &pt(4, 1)));
+        // oblique: an end on it, and a crossing
+        assert!(touch(&pt(0, 0), &pt(4, 4), &pt(2, 2), &pt(5, 0)));
+        assert!(!touch(&pt(0, 0), &pt(4, 4), &pt(0, 4), &pt(4, 0)));
+        assert!(on_segment(&pt(2, 2), &pt(0, 0), &pt(4, 4)) && !on_segment(&pt(5, 5), &pt(0, 0), &pt(4, 4)));
+    }
+
+    #[test]
+    fn a_segment_runs_through_a_box_only_inside_it() {
+        let b = [int(0), int(0), int(4), int(2)];
+        // across, and along the middle; in from the edge to the inside
+        assert!(through(&b, &pt(-1, 1), &pt(5, 1)));
+        assert!(through(&b, &pt(2, -3), &pt(2, 1)));
+        // along an edge, up to an edge, past a corner, outside
+        assert!(!through(&b, &pt(-1, 2), &pt(5, 2)));
+        assert!(!through(&b, &pt(-3, 1), &pt(0, 1)));
+        assert!(!through(&b, &pt(-1, 1), &pt(1, -1)));
+        assert!(!through(&b, &pt(5, 0), &pt(5, 2)));
+        // oblique, through the inside and only touching a corner
+        assert!(through(&b, &pt(-1, -1), &pt(5, 3)));
+        assert!(!through(&b, &pt(3, 3), &pt(5, 1)));
     }
 
     /// Within a layer's tolerance the next layer decides, and an objective that is off breaks no

@@ -48,6 +48,52 @@ fn every_object_is_placed_where_the_facts_put_it() {
     assert!(solved.report.work.resolve_nodes > 0);
 }
 
+/// A position that the file gives on both axes, by facts kept, is the file's: the solution leaves
+/// it out, gives the orientation alone where there is one, and the record of a file of 0.2 then
+/// has nothing it cannot hold for a point without a name. A position whose fact is discarded is
+/// the solver's.
+#[test]
+fn a_position_the_file_gives_by_facts_kept_is_left_to_the_file() {
+    use rnl_runtime::problem::{ProblemObject, Reference, Slot};
+    let fixed = |value: f64, fact: usize| Slot::Fixed { value, fact };
+    let m = ProblemObject { position: Position::Own { x: fixed(-10.0, 1), y: fixed(2.0, 2) }, ..instance() };
+    let p0 = ProblemObject {
+        label: "(3, 4)".to_string(),
+        reference: Reference::Anonymous,
+        position: Position::Own { x: fixed(3.0, 3), y: fixed(4.0, 4) },
+        ..point()
+    };
+    let n = ProblemObject {
+        label: "#N".to_string(),
+        reference: Reference::Name("#N".to_string()),
+        position: Position::Own { x: fixed(9.0, 5), y: fixed(-10.0, 6) },
+        ..instance()
+    };
+    let p = problem_of(
+        vec![m, p0, n],
+        vec![
+            fact(FactKind::Align { axis: Axis::X, members: vec![PointRef::Origin(2), PointRef::Origin(1)] }),
+            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: -10.0 }),
+            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::Y, value: 2.0 }),
+            fact(FactKind::PointCoordinate { point: 1, axis: Axis::X, value: 3.0 }),
+            fact(FactKind::PointCoordinate { point: 1, axis: Axis::Y, value: 4.0 }),
+            fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::X, value: 9.0 }),
+            fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::Y, value: -10.0 }),
+        ],
+    );
+    let solved = crate::solve(&p, &SolverOptions::default());
+    assert_eq!(solved.report.kept, vec![0, 1, 2, 3, 4, 6]);
+    let placements = &solved.solution.placements;
+    assert_eq!(placements.len(), 2, "{placements:?}");
+    assert_eq!((placements[0].object, placements[0].at), (0, None));
+    assert!(placements[0].orient.is_some());
+    assert_eq!((placements[1].object, placements[1].at), (2, Some((3.0, -10.0))));
+    let written = rnl_runtime::solution::write_record(&p, &solved.solution, "t", "h");
+    assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
+    assert!(written.record.contains("#M @ORIENT(") && !written.record.contains("#M @PLACE"), "{}", written.record);
+    assert!(written.record.contains("#N @PLACE(3, -10)"), "{}", written.record);
+}
+
 #[test]
 fn a_text_that_an_offset_places_on_one_axis_follows_its_owner_there_only() {
     // the dx of #M::name replaces the x its symbol gives it (13.3): wherever M goes, the text is 3
@@ -75,11 +121,11 @@ fn a_text_that_an_offset_places_on_one_axis_follows_its_owner_there_only() {
 
 // ------------------------------------------------------------------------------------ the files
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use num_traits::{One, Signed, Zero};
-use rnl_runtime::problem::{LevelProblem, ObjectKind, Sense};
+use rnl_runtime::problem::{LevelProblem, ObjectKind, Sense, Slot};
 use rnl_runtime::source::Provider;
 
 use crate::rational::{from_f64, int};
@@ -494,11 +540,28 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> (Solved,
             assert!(x.is_finite() && y.is_finite(), "{what}: {pl:?}");
         }
     }
-    // every object with a position of its own placed, and every orientation given
-    let own = p.objects.iter().filter(|o| matches!(o.position, Position::Own { .. })).count();
-    assert_eq!(solved.solution.placements.iter().filter(|pl| pl.at.is_some()).count(), own, "{what}");
-    for pl in &solved.solution.placements {
-        assert_eq!(pl.orient.is_some(), p.objects[pl.object].orient.is_some(), "{what}: {pl:?}");
+    // every object with a position of its own placed, but one that the file places on both axes,
+    // by facts kept where it is or by offsets; and every orientation given
+    let kept: BTreeSet<usize> = solved.report.kept.iter().copied().collect();
+    let by_file = |k: usize, axis: Axis, slot: &Slot| match slot {
+        Slot::Fixed { value, fact } => {
+            kept.contains(fact)
+                && from_f64(*value).as_ref() == Some(&e.placed.geometry.origin[k][usize::from(axis == Axis::Y)])
+        }
+        Slot::Free => {
+            p.facts.iter().any(|f| matches!(f.kind, FactKind::Offset { text, axis: a, .. } if text == k && a == axis))
+        }
+    };
+    for (k, o) in p.objects.iter().enumerate() {
+        let pl: Vec<&Placement> = solved.solution.placements.iter().filter(|pl| pl.object == k).collect();
+        assert!(pl.len() <= 1, "{what}: {pl:?}");
+        let at = pl.first().and_then(|pl| pl.at);
+        let orient = pl.first().and_then(|pl| pl.orient);
+        if let Position::Own { x, y } = &o.position {
+            assert_eq!(at.is_none(), by_file(k, Axis::X, x) && by_file(k, Axis::Y, y), "{what}: {} {pl:?}", o.label);
+        }
+        let oriented = o.orient.is_some() && !matches!(o.position, Position::InSymbol { .. });
+        assert_eq!(orient.is_some(), oriented, "{what}: {} {pl:?}", o.label);
     }
     check_wires(p, &solved, &e, &what);
     (solved, e)
@@ -552,6 +615,30 @@ fn every_case_of_the_corpus_is_placed_keeping_every_fact_kept() {
         for p in problems(&f) {
             let (solved, e) = check_level(&f.to_string_lossy(), &p);
             eprintln!("{}", summary(&p, &solved, &e));
+        }
+    }
+}
+
+/// The wires written, which their mode draws between the points the placement moves (13.1), do
+/// not mislead where a candidate can avoid it (13.2; `crate::score::misleading`): in the RC
+/// low-pass filter of the corpus, `&in` and `&out` were drawn on one line through R1, over the
+/// pin of V1, when the order of candidates did not count it; now no wire touches one of another
+/// net, runs over a pin of another net or through a symbol. The same for the common-source stage,
+/// whose `&bias` ran through the symbols of Vdd and Vb, and for their equivalents.
+#[test]
+fn wires_written_do_not_touch_other_nets_or_run_through_symbols() {
+    for file in [
+        "tests/conformance/cases/01-rc-lowpass.sp",
+        "tests/conformance/cases/02-cs-amplifier.sp",
+        "tests/conformance/equivalence/rc-lowpass.sp",
+        "tests/conformance/equivalence/cs-amplifier.sp",
+    ] {
+        for p in problems(&repo().join(file)) {
+            let (solved, e) = check_level(file, &p);
+            let wires = crate::score::drawn(&p, &e.structure, &e.placed.geometry, &e.routing);
+            assert!(!wires.paths.is_empty(), "{file}");
+            let n = crate::score::misleading(&p, &e.structure, &e.placed.origins, &e.placed.geometry, &wires);
+            assert_eq!(n, 0, "{file}: {n} places where the wires mislead\n{}", summary(&p, &solved, &e));
         }
     }
 }
