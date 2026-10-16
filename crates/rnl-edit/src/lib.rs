@@ -81,6 +81,7 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
     // the header's packages, and each level's statements in the order of the ops
     let mut packages: Vec<String> = Vec::new();
     let mut levels: BTreeMap<LevelId, Vec<String>> = BTreeMap::new();
+    let mut first_op: BTreeMap<LevelId, usize> = BTreeMap::new();
     for (k, lop) in ops.iter().enumerate() {
         if let Op::UsePackage { name, version, path } = &lop.op {
             let p = form::use_package(name, version.as_deref(), path.as_deref());
@@ -92,6 +93,19 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
         let id = lop.level.as_deref().unwrap_or_default();
         let level = find_level(&doc, &file, id).map_err(|why| format!("op {k} ({}): {why}", lop.op.name()))?;
         levels.entry(level).or_default().extend(form::statements(&lop.op));
+        first_op.entry(level).or_insert(k);
+    }
+    // a record at the end of a level goes before its last line; in a region written to be
+    // encrypted it would be gone once the region is encrypted (2.2)
+    for (&level, &k) in &first_op {
+        let at = doc.levels[level].end_line;
+        if let Some((_, a, b)) = doc.protected.iter().find(|(f, a, b)| *f == file && *a < at && at <= *b) {
+            let (what, title) = (ops[k].op.name(), doc.levels[level].title());
+            return Err(format!(
+                "op {k} ({what}): {title} ends in a region written to be encrypted, lines {a} to {b}, where a record \
+                 is gone once the region is encrypted (2.2)"
+            ));
+        }
     }
 
     let marker = carrier(&doc, &file, &request.netlist);

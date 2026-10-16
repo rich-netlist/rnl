@@ -20,7 +20,7 @@ test("opening shows the drawing, the text and the problems", async ({ page, view
   await expect(page.locator("#file-tabs button").first()).toHaveAttribute("aria-selected", "true");
   const lines = await page.evaluate(() => window.viewer.doc.files[0].text.split(/\r?\n/).filter((l, i, a) => i < a.length - 1 || l).length);
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);
-  await expect(viewer.line(48)).toHaveText(/X1 a b vdd 0 amp/);
+  await expect(viewer.line(49)).toHaveText(/X1 a b vdd 0 amp/);
   await expect(page.locator("#counts")).toHaveText("none");
   await expect(page.locator("#diags")).toHaveText("No errors, warnings or hints.");
 

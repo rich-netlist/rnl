@@ -418,7 +418,8 @@ pub struct LevelProblem {
     /// "file" or "subckt".
     pub kind: &'static str,
     pub name: String,
-    /// The language version the level's file declares (16.1), "0.2" when it declares none. Only
+    /// The language version the level's file is read in (16.1): what it declares; for an included
+    /// file that declares none, the version of the file that includes it; else "0.2". Only
     /// the record of the solver of a file of the draft 0.3 writes numbers ([`Reference::Number`]).
     pub version: String,
     /// How many objects the authored records of the level number (5.9): the record of the solver

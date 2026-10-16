@@ -95,7 +95,7 @@ test("the badge on a selected subcircuit instance sits on its box and opens it",
 
 test("a double click on an instance's statement or name in the text opens its subcircuit", async ({ page, viewer }) => {
   // X3's statement, by its line number
-  await viewer.line(50).locator(".no").dblclick();
+  await viewer.line(51).locator(".no").dblclick();
   await expect(page.locator("#level-name")).toHaveText("rdiv");
   await page.keyboard.press("Backspace");
   await viewer.selected(`instance X3 in ${TOP}`);
@@ -109,7 +109,7 @@ test("a double click on an instance's statement or name in the text opens its su
 
   // a statement that opens nothing opens nothing
   await page.keyboard.press("Backspace");
-  await viewer.line(52).locator(".no").dblclick();
+  await viewer.line(53).locator(".no").dblclick();
   await viewer.selected(`instance Vin in ${TOP}`);
   await expect(page.locator("#level-name")).toHaveText(TOP);
 });

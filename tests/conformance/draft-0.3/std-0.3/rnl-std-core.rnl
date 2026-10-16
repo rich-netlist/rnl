@@ -1,0 +1,8 @@
+/* The stand-in of rnl-std-core 0.3: the symbols, then the rule packages of SPICE and of Spectre. */
+@RNL(type="header") {
+  @VERSION("0.3");
+  @PACKAGE(name="rnl-std-core", version="0.3");
+  @USE-PACKAGE(name="rnl-std-basic", version="0.3", path="rnl-std-basic.rnl");
+  @USE-PACKAGE(name="rnl-std-spice", version="0.3", path="rnl-std-spice.rnl");
+  @USE-PACKAGE(name="rnl-std-spectre", version="0.3", path="rnl-std-spectre.rnl")
+}

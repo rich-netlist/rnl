@@ -1,0 +1,977 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "01-terminal-names.sp",
+      "kind": "file",
+      "file": "01-terminal-names.sp",
+      "symbols": [
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -2.0,
+            3.0,
+            2.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                1.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "p1",
+              "dir": 180
+            },
+            {
+              "pos": [
+                -3.0,
+                -1.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "n1",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                1.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": "p2",
+              "dir": 0
+            },
+            {
+              "pos": [
+                3.0,
+                -1.0
+              ],
+              "terminals": [
+                "4"
+              ],
+              "label": "n2",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -2.0
+                ],
+                [
+                  2.0,
+                  2.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  1.0
+                ],
+                [
+                  -2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  -1.0
+                ],
+                [
+                  -2.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  -1.0
+                ],
+                [
+                  2.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -2.0,
+            3.0,
+            2.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                1.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "p1",
+              "dir": 180
+            },
+            {
+              "pos": [
+                -3.0,
+                -1.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "n1",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                1.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": "p2",
+              "dir": 0
+            },
+            {
+              "pos": [
+                3.0,
+                -1.0
+              ],
+              "terminals": [
+                "4"
+              ],
+              "label": "n2",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -2.0
+                ],
+                [
+                  2.0,
+                  2.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  1.0
+                ],
+                [
+                  -2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  -1.0
+                ],
+                [
+                  -2.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  -1.0
+                ],
+                [
+                  2.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -2.0,
+            3.0,
+            2.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                1.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "a",
+              "dir": 180
+            },
+            {
+              "pos": [
+                -3.0,
+                -1.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "b",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                1.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": "ref",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -2.0
+                ],
+                [
+                  2.0,
+                  2.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  1.0
+                ],
+                [
+                  -2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  -1.0
+                ],
+                [
+                  -2.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -2.0,
+            3.0,
+            2.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                1.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "d",
+              "dir": 180
+            },
+            {
+              "pos": [
+                -3.0,
+                -1.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "g",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                1.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": "s",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -2.0
+                ],
+                [
+                  2.0,
+                  2.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  1.0
+                ],
+                [
+                  -2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  -1.0
+                ],
+                [
+                  -2.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -2.0,
+            3.0,
+            2.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                1.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "drain",
+              "dir": 180
+            },
+            {
+              "pos": [
+                -3.0,
+                -1.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "gate",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                1.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": "source",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -2.0
+                ],
+                [
+                  2.0,
+                  2.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  1.0
+                ],
+                [
+                  -2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  -1.0
+                ],
+                [
+                  -2.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#T1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#O1",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#U1",
+          "kind": "instance",
+          "symbol": 2,
+          "at": [
+            20.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#Z1",
+          "kind": "instance",
+          "symbol": 3,
+          "at": [
+            30.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#Z2",
+          "kind": "instance",
+          "symbol": 4,
+          "at": [
+            40.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "b"
+          ],
+          "points": [
+            [
+              3.0,
+              1.0
+            ],
+            [
+              7.0,
+              1.0
+            ]
+          ],
+          "mode": "straight",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "c"
+          ],
+          "points": [
+            [
+              13.0,
+              1.0
+            ],
+            [
+              17.0,
+              1.0
+            ]
+          ],
+          "mode": "straight",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "d"
+          ],
+          "points": [
+            [
+              17.0,
+              -1.0
+            ],
+            [
+              27.0,
+              1.0
+            ],
+            [
+              37.0,
+              1.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "0"
+          ],
+          "points": [
+            [
+              -3.0,
+              -1.0
+            ],
+            [
+              3.0,
+              -1.0
+            ],
+            [
+              7.0,
+              -1.0
+            ],
+            [
+              13.0,
+              -1.0
+            ],
+            [
+              23.0,
+              1.0
+            ],
+            [
+              33.0,
+              1.0
+            ],
+            [
+              43.0,
+              1.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#T1::name",
+          "anchor": [
+            0.0,
+            2.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "T1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#O1::name",
+          "anchor": [
+            10.0,
+            2.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "O1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#U1::name",
+          "anchor": [
+            20.0,
+            2.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "U1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Z1::name",
+          "anchor": [
+            30.0,
+            2.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "Z1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Z2::name",
+          "anchor": [
+            40.0,
+            2.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "Z2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": []
+}

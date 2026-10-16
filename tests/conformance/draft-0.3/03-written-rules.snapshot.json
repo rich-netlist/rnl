@@ -1,0 +1,260 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.3",
+  "levels": [
+    {
+      "id": "file:03-written-rules.sp",
+      "kind": "file",
+      "name": "03-written-rules.sp",
+      "file": 0,
+      "line": 0,
+      "status": null,
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#R1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#X1",
+            "subckt": true,
+            "master": "resistor",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&a",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$RES",
+            "name": "$RES",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#R1",
+            "kind": "instance",
+            "host": [
+              "#R1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R1:1"
+                ],
+                "at": [
+                  0.0,
+                  3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R1:2"
+                ],
+                "at": [
+                  0.0,
+                  -3.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#X1",
+            "kind": "instance",
+            "host": [
+              "#X1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#X1:1"
+                ],
+                "at": [
+                  10.0,
+                  3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "terminals": [
+                  "#X1:2"
+                ],
+                "at": [
+                  10.0,
+                  -3.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [],
+        "wires": [],
+        "texts": [],
+        "shapes": []
+      }
+    },
+    {
+      "id": "subckt:resistor",
+      "kind": "subckt",
+      "name": "resistor",
+      "file": 0,
+      "line": 9,
+      "status": null,
+      "host": {
+        "ports": [
+          "&p",
+          "&n"
+        ],
+        "instances": [],
+        "nets": [
+          {
+            "id": "&p",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&n",
+            "global": false,
+            "port": true
+          }
+        ]
+      },
+      "model": {
+        "symbols": [],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [],
+        "points": [],
+        "wires": [],
+        "texts": [],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std-core",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-basic",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-spice",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-spectre",
+      "version": "0.3"
+    }
+  ],
+  "files": [
+    {
+      "path": "03-written-rules.sp",
+      "name": "03-written-rules.sp"
+    }
+  ]
+}
