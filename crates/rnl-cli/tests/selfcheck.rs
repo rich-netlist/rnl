@@ -31,14 +31,15 @@ fn line(k: usize) -> u32 {
     4 + k as u32
 }
 
-/// The options that read a file of `version`: the draft 0.3 with the switch.
-fn options(version: &str) -> Options {
-    Options { std: false, draft: version == "0.3", ..Options::default() }
-}
-
 fn read(version: &str, statements: &[&str]) -> Interpretation {
     let text = netlist(version, statements);
-    interpret_file(Path::new("t.sp"), None, &MemoryProvider::new().with("t.sp", &text), &options(version)).unwrap()
+    interpret_file(
+        Path::new("t.sp"),
+        None,
+        &MemoryProvider::new().with("t.sp", &text),
+        &Options { std: false, ..Options::default() },
+    )
+    .unwrap()
 }
 
 /// The errors, by their line and message.
@@ -215,7 +216,7 @@ fn a_fact_without_a_solution_is_not_given_to_a_solver() {
     for v in VERSIONS {
         let text = netlist(v, &[DP_LAYOUT, USE, "%o = {#R1 #R2 #R1} @ORDER(\"x\")"]);
         let files = MemoryProvider::new().with("t.sp", &text);
-        let solver = Options { std: false, draft: v == "0.3", ..Options::solver() };
+        let solver = Options { std: false, ..Options::solver() };
         let r = interpret_file(Path::new("t.sp"), None, &files, &solver).unwrap();
         let p: &LevelProblem = &r.problems[0];
         let labels: Vec<&str> = p.facts.iter().map(|f| f.label.as_str()).collect();

@@ -16,8 +16,18 @@ use crate::words::{words, ParamType};
 use super::obj::{Lit, MemberKey, Priority, RecId, UnitId};
 use super::Interp;
 
-pub const SUPPORTED_VERSION: &str = "0.2";
-/// The draft read as well when `Options::draft` is set, for development only.
+/// The versions of the language this implementation reads (16.1): 0.2, and 0.3, whose text is
+/// still a draft. Every rule that 0.3 changes applies only to the files of 0.3, so a file of 0.2
+/// reads as it did before 0.3 was read.
+pub const READ_VERSIONS: [&str; 2] = ["0.2", "0.3"];
+/// The version a main file, or a package file, without a header record is read in: the tool's
+/// default (16.1). An included file without one follows the file that includes it.
+pub const DEFAULT_VERSION: &str = "0.3";
+/// The tool's default version, [`DEFAULT_VERSION`]. Kept for compatibility, to be removed after
+/// the solver-v1 branch merges.
+pub const SUPPORTED_VERSION: &str = DEFAULT_VERSION;
+/// The version 0.3, which is read without any switch. Kept for compatibility, to be removed after
+/// the solver-v1 branch merges.
 pub const DRAFT_VERSION: &str = "0.3";
 const HEADER_KW: [&str; 5] = ["VERSION", "PACKAGE", "ALIAS", "DEVICE", "USE-ALIASES"];
 
@@ -562,7 +572,7 @@ impl Interp<'_> {
             // the header record may be left out; tools write it when they save the file (16.1, TR5)
             let file = self.doc.levels[0].file.clone();
             self.sink.hint(
-                format!("the main file has no header record: it is read in the tool's default version {SUPPORTED_VERSION}, and tools add the header when they write the file (16.1)"),
+                format!("the main file has no header record: it is read in the tool's default version {DEFAULT_VERSION}, and tools add the header when they write the file (16.1)"),
                 Some(Loc::line(file, 2)),
             );
         }
@@ -801,13 +811,8 @@ impl Interp<'_> {
                         continue;
                     };
                     self.units[u].version = v.clone();
-                    let read = v == SUPPORTED_VERSION || (self.draft && v == DRAFT_VERSION);
-                    if version_key(v).0 < 0 || !read {
-                        let reads = if self.draft {
-                            format!("{SUPPORTED_VERSION}, and the draft {DRAFT_VERSION}")
-                        } else {
-                            SUPPORTED_VERSION.to_string()
-                        };
+                    if version_key(v).0 < 0 || !READ_VERSIONS.contains(&v.as_str()) {
+                        let reads = READ_VERSIONS.join(" and ");
                         self.diag_in(
                             Severity::Error,
                             format!("unsupported version {v}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
@@ -1292,14 +1297,14 @@ impl Interp<'_> {
             let above = self.units[f].level.and_then(|l| self.doc.levels[l].parent);
             fu = above.and_then(|p| self.file_unit(self.level_unit[p]));
         }
-        SUPPORTED_VERSION.to_string()
+        DEFAULT_VERSION.to_string()
     }
 
-    /// Does a unit follow the draft 0.3? Only when the draft is read (`Options::draft`) and the
-    /// file the unit's text is in declares it: every rule the draft changes applies only there, so
-    /// a file of 0.2 reads the same with the switch on or off.
+    /// Does a unit follow 0.3? When the file the unit's text is in is read in 0.3
+    /// ([`Self::version_of`]): every rule that 0.3 changes applies only there, so a file of 0.2
+    /// reads as it did before 0.3 was read.
     pub fn follows_0_3(&self, u: UnitId) -> bool {
-        self.draft && self.version_of(Some(u)) == DRAFT_VERSION
+        self.version_of(Some(u)) == "0.3"
     }
 
     /// Does the text a statement is written in follow the draft 0.3? That is the file of its
@@ -1393,7 +1398,7 @@ impl Interp<'_> {
             if let Some(text) = self.provider.read(&f) {
                 if let Some((n, v)) = scan_package_decl(&text) {
                     // the language version it is written in, the tool's default when it declares none (16.1)
-                    let language = scan_language_decl(&text).unwrap_or_else(|| SUPPORTED_VERSION.to_string());
+                    let language = scan_language_decl(&text).unwrap_or_else(|| DEFAULT_VERSION.to_string());
                     self.pkg_languages.insert(f.clone(), language);
                     out.push((n, v, f));
                 }

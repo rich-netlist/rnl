@@ -638,9 +638,10 @@ fn the_brainstorm_cases_give_whole_problems() {
 }
 
 #[test]
-fn the_draft_switch_changes_no_problem_of_a_file_of_0_2() {
+fn rnl_problem_gives_a_file_of_0_2_no_numbers() {
     // the numbers of the objects without a name are computed in every version, but only a file of
-    // the draft 0.3 writes them (5.9): `rnl problem` gives a file of 0.2 the same with the switch
+    // the draft 0.3 writes them (5.9): `rnl problem` gives a file of 0.2 no number, and the draft
+    // switch, kept for compatibility, changes nothing
     let fs = FsProvider::new(&[]);
     let mut files = Vec::new();
     for dir in [case(""), solver_case("")] {
@@ -658,6 +659,20 @@ fn the_draft_switch_changes_no_problem_of_a_file_of_0_2() {
             let r = interpret_file(&f, None, &fs, options).unwrap();
             r.problems.iter().map(|p| rnl_cli::problem::level(p, OPTIONS)).collect()
         };
-        assert_eq!(json(&Options { draft: true, ..Options::solver() }), json(&Options::solver()), "{}", f.display());
+        let levels = json(&Options::solver());
+        for level in &levels {
+            assert!(level.get("authored_numbers").is_none(), "{}", f.display());
+            assert!(!has_key(level, "number"), "{}", f.display());
+        }
+        assert_eq!(json(&Options { draft: true, ..Options::solver() }), levels, "{}", f.display());
+    }
+}
+
+/// Whether an object in `v` has the key `key`.
+fn has_key(v: &serde_json::Value, key: &str) -> bool {
+    match v {
+        serde_json::Value::Object(m) => m.contains_key(key) || m.values().any(|x| has_key(x, key)),
+        serde_json::Value::Array(a) => a.iter().any(|x| has_key(x, key)),
+        _ => false,
     }
 }

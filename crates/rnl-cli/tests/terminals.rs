@@ -1,19 +1,18 @@
 //! The terminal names that the draft 0.3 gives T, O, U and Z by default (6.12), in files that
-//! declare 0.3 read with `Options::draft`: `p1 n1 p2 n2` for T and O, `a b ref` for U and `d g s`
-//! for Z, with the adapter's defaults of the SPICE family. They are the names of the instances
-//! written in such a file, in a SPICE netlist and in the SPICE mode of a Spectre one, and a
-//! DEVICE of the file still overrides them. An instance written in a file of 0.2 has none, with
-//! the switch or without, as before.
+//! declare 0.3: `p1 n1 p2 n2` for T and O, `a b ref` for U and `d g s` for Z, with the adapter's
+//! defaults of the SPICE family. They are the names of the instances written in such a file, in a
+//! SPICE netlist and in the SPICE mode of a Spectre one, and a DEVICE of the file still overrides
+//! them. An instance written in a file of 0.2 has none, as before.
 
 use std::path::Path;
 
-use rnl_cli::{dump, interpret_file};
+use rnl_cli::interpret_file;
 use rnl_runtime::diag::Severity;
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
-fn draft() -> Options {
-    Options { std: false, draft: true, ..Options::default() }
+fn options() -> Options {
+    Options { std: false, ..Options::default() }
 }
 
 fn read(main: &str, files: &MemoryProvider, options: &Options) -> Interpretation {
@@ -47,7 +46,7 @@ fn netlist(version: &str, header: &str, records: &str) -> String {
 fn t_o_u_and_z_have_terminal_names_in_a_file_of_0_3() {
     let wires = "* @RNL { &a @WIRE {#T1:p1 #O1:p1 #U1:a}; &b @WIRE {#T1:p2 #O1:p2 #U1:b}; &0 @WIRE {#T1:n2 #O1:n1 #U1:ref #Z1:s} }\n";
     let files = MemoryProvider::new().with("t.sp", &netlist("0.3", "", wires));
-    let r = read("t.sp", &files, &draft());
+    let r = read("t.sp", &files, &options());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     let tl = named(&["p1", "n1", "p2", "n2"]);
     assert_eq!(
@@ -64,7 +63,7 @@ fn t_o_u_and_z_have_terminal_names_in_a_file_of_0_3() {
 #[test]
 fn a_device_of_the_file_still_overrides_them() {
     let header = "; @DEVICE(name=\"Z*\", terminals=[\"drain\", \"gate\", \"source\"])";
-    let r = read("t.sp", &MemoryProvider::new().with("t.sp", &netlist("0.3", header, "")), &draft());
+    let r = read("t.sp", &MemoryProvider::new().with("t.sp", &netlist("0.3", header, "")), &options());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert_eq!(names(&r)[3], ("Z1".into(), named(&["drain", "gate", "source"])));
     assert_eq!(names(&r)[0].1, named(&["p1", "n1", "p2", "n2"]));
@@ -73,17 +72,15 @@ fn a_device_of_the_file_still_overrides_them() {
 #[test]
 fn a_file_of_0_2_has_no_names_for_them() {
     let files = MemoryProvider::new().with("t.sp", &netlist("0.2", "", ""));
-    let r = read("t.sp", &files, &draft());
+    let r = read("t.sp", &files, &options());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     for (inst, names) in names(&r) {
         assert!(names.iter().all(Option::is_none), "{inst}: {names:?}");
     }
-    // and reads as it did, with the switch or without; a name of 0.3 is not a terminal there
+    // and reads as it did: a name of 0.3 is not a terminal there
     let wire = "* @RNL { &a @WIRE {#T1:p1 #U1:a} }\n";
     let files = MemoryProvider::new().with("t.sp", &netlist("0.2", "", wire));
-    let without = read("t.sp", &files, &Options { std: false, ..Options::default() });
-    assert_eq!(dump::interpretation(&read("t.sp", &files, &draft())), dump::interpretation(&without));
-    assert!(!errors(&without).is_empty());
+    assert!(!errors(&read("t.sp", &files, &options())).is_empty());
 }
 
 #[test]
@@ -100,7 +97,7 @@ fn the_names_follow_the_file_the_instance_is_written_in() {
     let none = vec![None; 4];
     for (outer, inner, want) in [("0.3", "0.2", [tl.clone(), none.clone()]), ("0.2", "0.3", [none, tl])] {
         let files = MemoryProvider::new().with("t.sp", &main(outer)).with("part.inc", &part(inner));
-        let r = read("t.sp", &files, &draft());
+        let r = read("t.sp", &files, &options());
         assert!(errors(&r).is_empty(), "{:?}", errors(&r));
         let got: Vec<Vec<Option<String>>> = names(&r).into_iter().map(|(_, n)| n).collect();
         // T2 is read first, at the include
@@ -112,7 +109,7 @@ fn the_names_follow_the_file_the_instance_is_written_in() {
 fn the_spice_mode_of_a_spectre_netlist_has_them_too() {
     let net = "// t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR0 (a 0) resistor r=1k\n\
                simulator lang=spice\nT1 a 0 b 0 z0=50 td=1n\nsimulator lang=spectre\n";
-    let r = read("n.scs", &MemoryProvider::new().with("n.scs", net), &draft());
+    let r = read("n.scs", &MemoryProvider::new().with("n.scs", net), &options());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert_eq!(names(&r)[1], ("T1".into(), named(&["p1", "n1", "p2", "n2"])));
     // a Spectre primitive keeps the names of its master

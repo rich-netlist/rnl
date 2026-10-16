@@ -2,16 +2,19 @@
 //!
 //! - `cases/NAME.sp` (or `.scs`) with `NAME.expected.json`: the effective model and the places of
 //!   the diagnostics must match; and with `NAME.snapshot.json`, the editor interface's snapshot.
-//!   Run with `RNL_BLESS=1` to write the expected files after a change that is meant.
+//!   Run with `RNL_BLESS=1` to write the expected files after a change that is meant. These are
+//!   the corpus of 0.2: each case declares its version, so it keeps the standard series 0.2 (16.1,
+//!   16.3).
 //! - `equivalence/NAME.sp` and `NAME.scs`: the same circuit in SPICE and Spectre with the same RNL
-//!   gives the same effective model (architecture 4.1, 10.2).
-//! - `draft-0.3/NAME.sp` (or `.scs`): cases of the draft 0.3, read with the draft switch, with
-//!   expected files of their own as in `cases`. `RNL_BLESS_DRAFT=1` writes them, so that writing
-//!   them never touches the expected files of the corpus of 0.2.
+//!   gives the same effective model (architecture 4.1, 10.2). They declare 0.2 too.
+//! - `cases-0.3/NAME.sp` (or `.scs`): the cases of 0.3, read as every file is, with expected files
+//!   of their own as in `cases`. `RNL_BLESS_0_3=1` writes them, and `RNL_BLESS=1` does not: the
+//!   expected files of each corpus are written only when it is asked for.
 
 use std::path::{Path, PathBuf};
 
 use rnl_cli::{dump, interpret_file, FsProvider};
+use rnl_runtime::interp::unit::scan_language_decl;
 use rnl_runtime::Options;
 use serde_json::Value;
 
@@ -39,29 +42,13 @@ fn run_with(path: &Path, options: &Options) -> Value {
     dump::conformance(&r)
 }
 
-fn draft() -> Options {
-    Options { draft: true, ..Options::default() }
-}
-
-fn run_draft(path: &Path) -> Value {
-    run_with(path, &draft())
-}
-
 /// The editor interface's snapshot of a file, as `rnl snapshot` prints it, without what changes
 /// with the toolkit rather than with the case: the runtime's version, the revision, which follows
 /// the bundled packages' texts, and the diagnostics, which the expected file holds.
 fn snapshot(path: &Path) -> Value {
-    snapshot_with(path, &Options::default())
-}
-
-fn snapshot_draft(path: &Path) -> Value {
-    snapshot_with(path, &draft())
-}
-
-fn snapshot_with(path: &Path, options: &Options) -> Value {
     let provider = FsProvider::new(&[]);
     let parts = rnl_view::Parts { drawing: false, host: true, model: true };
-    let build = rnl_view::BuildOptions { runtime: options.clone(), ..rnl_view::BuildOptions::default() };
+    let build = rnl_view::BuildOptions::default();
     let s = rnl_view::snapshot(&path.to_string_lossy(), &provider, &build, parts).unwrap();
     let mut v = serde_json::to_value(s).unwrap();
     for k in ["runtime", "revision", "diagnostics"] {
@@ -75,11 +62,11 @@ fn check_cases(kind: &str, what: &str, output: fn(&Path) -> Value) {
     check_cases_in("cases", "RNL_BLESS", kind, what, output)
 }
 
-/// The cases of a directory of the corpus against their expected files, or with `bless` set in
+/// The cases of a directory of the corpus against their expected files, or with `variable` set in
 /// the environment written there.
-fn check_cases_in(dir: &str, bless: &str, kind: &str, what: &str, output: fn(&Path) -> Value) {
+fn check_cases_in(dir: &str, variable: &str, kind: &str, what: &str, output: fn(&Path) -> Value) {
     let dir = corpus().join(dir);
-    let bless = std::env::var(bless).is_ok();
+    let bless = std::env::var(variable).is_ok();
     let mut failed = Vec::new();
     for f in files(&dir, &["sp", "scs"]) {
         let got = output(&f);
@@ -90,7 +77,7 @@ fn check_cases_in(dir: &str, bless: &str, kind: &str, what: &str, output: fn(&Pa
             continue;
         }
         let want = std::fs::read_to_string(&expected)
-            .unwrap_or_else(|_| panic!("{} has no {kind} file; run with RNL_BLESS=1", f.display()));
+            .unwrap_or_else(|_| panic!("{} has no {kind} file; run with {variable}=1", f.display()));
         // compared as text: numbers are written in their shortest exact form, line endings may differ
         if want.replace("\r\n", "\n") != text {
             // the output as computed now, next to the expected one, to compare
@@ -113,20 +100,32 @@ fn cases_match_their_expected_snapshots() {
 }
 
 #[test]
-fn draft_cases_match_their_expected_models() {
-    check_cases_in("draft-0.3", "RNL_BLESS_DRAFT", "expected", "effective model of the draft 0.3", run_draft);
+fn cases_of_0_3_match_their_expected_models() {
+    check_cases_in("cases-0.3", "RNL_BLESS_0_3", "expected", "effective model of 0.3", run);
 }
 
 #[test]
-fn draft_cases_match_their_expected_snapshots() {
-    check_cases_in("draft-0.3", "RNL_BLESS_DRAFT", "snapshot", "snapshot of the draft 0.3", snapshot_draft);
+fn cases_of_0_3_match_their_expected_snapshots() {
+    check_cases_in("cases-0.3", "RNL_BLESS_0_3", "snapshot", "snapshot of 0.3", snapshot);
 }
 
 #[test]
-fn the_draft_switch_changes_nothing_in_a_file_of_0_2() {
-    // the rules the draft 0.3 changes apply only to the files that declare it
-    let draft = Options { draft: true, ..Options::default() };
+fn the_corpus_of_0_2_declares_its_version() {
+    // a main file without a header record is read in the tool's default version, 0.3 (16.1): each
+    // case of the corpus of 0.2 declares its version, so that it stays a corpus of 0.2
     for dir in ["cases", "equivalence"] {
+        for f in files(&corpus().join(dir), &["sp", "scs"]) {
+            let declared = scan_language_decl(&std::fs::read_to_string(&f).unwrap());
+            assert!(declared.as_ref().is_some_and(|v| v != "0.3"), "{}: {declared:?}", f.display());
+        }
+    }
+}
+
+#[test]
+fn the_draft_switch_changes_nothing() {
+    // kept for compatibility, it has no effect on either corpus
+    let draft = Options { draft: true, ..Options::default() };
+    for dir in ["cases", "equivalence", "cases-0.3"] {
         for f in files(&corpus().join(dir), &["sp", "scs"]) {
             assert_eq!(run_with(&f, &draft), run(&f), "{}", f.display());
         }
@@ -172,27 +171,26 @@ fn spice_and_spectre_give_the_same_model() {
 
 #[test]
 fn standard_packages_check_clean() {
-    // every version of the standard series, in a directory of its own; the series of the draft 0.3
-    // is written in the language 0.3, which the toolkit reads with the draft switch until it is
-    // released
+    // every version of the standard series, in a directory of its own, each written in the
+    // language of its version
     let lib = corpus().join("../../libraries/standard");
     let mut checked = 0;
     for dir in std::fs::read_dir(lib).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()) {
-        let draft_series = dir.file_name().is_some_and(|n| n == rnl_runtime::interp::unit::DRAFT_VERSION);
-        let options = if draft_series { draft() } else { Options::default() };
+        let series_0_3 = dir.file_name().is_some_and(|n| n == "0.3");
         for f in files(&dir, &["rnl"]) {
             let provider = FsProvider::new(&[]);
-            let r = interpret_file(&f, None, &provider, &options).unwrap();
+            let r = interpret_file(&f, None, &provider, &Options::default()).unwrap();
             let d = r.diagnostics();
             // the hints of a package checked on its own are its author's, such as the pins of the
-            // gates with four inputs, which are not on integer points (9.2.4)
+            // gates with four inputs of the series 0.3, which are not on integer points (9.2.4);
+            // the series 0.2 has none
             let loud: Vec<String> = d
                 .iter()
                 .filter(|d| d.severity != rnl_runtime::diag::Severity::Hint)
                 .map(|d| r.sink.render(d))
                 .collect();
             assert!(loud.is_empty(), "{}: {loud:?}", f.display());
-            if !draft_series {
+            if !series_0_3 {
                 assert!(d.is_empty(), "{}: {:?}", f.display(), d.iter().map(|d| r.sink.render(d)).collect::<Vec<_>>());
             }
             checked += 1;

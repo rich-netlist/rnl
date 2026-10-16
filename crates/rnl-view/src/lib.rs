@@ -645,15 +645,15 @@ R1 p q 1k
         assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
         assert_eq!(r.model.levels[0].items.iter().filter(|i| !i.host.is_empty()).count(), 2);
         for (path, _) in BUNDLED {
-            // the series 0.3 is written in the language 0.3, which is read with the draft switch
-            // until it is released; its packages' own hints are left to their authors
-            let draft = path.starts_with(&format!("{}/", rnl_runtime::interp::unit::DRAFT_VERSION));
-            let options = Options { draft, ..Options::default() };
+            // the hints of the packages of the series 0.3 are left to their authors, such as the
+            // pins of the gates with four inputs, which are not on integer points (9.2.4)
+            let series_0_3 = path.starts_with("0.3/");
+            let options = Options::default();
             let package = interpret(&format!("{BUNDLED_DIR}/{path}"), None, &MemoryProvider::new(), &options);
             let package = package.unwrap();
             let loud: Vec<_> = package.diagnostics().into_iter().filter(|d| d.severity != Severity::Hint).collect();
             assert!(loud.is_empty(), "{path}: {loud:?}");
-            assert!(draft || package.diagnostics().is_empty(), "{path}: {:?}", package.diagnostics());
+            assert!(series_0_3 || package.diagnostics().is_empty(), "{path}: {:?}", package.diagnostics());
         }
     }
 

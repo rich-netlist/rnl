@@ -109,7 +109,7 @@ fn a_stale_numbering_leaves_the_free_point_free_and_the_wire_drawn_in_part() {
     let text = format!(
         "* t\n* @RNL(type=\"header\") {{ {header}}}\nM1 out in vss vss nch\nR1 vdd out 10k\n* @RNL {{\n{authored}* }}\n{solver}.end\n"
     );
-    let r = read(&text, &Options { draft: true, ..Options::default() });
+    let r = read(&text, &Options::default());
     assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
     let hints =
         r.diagnostics().into_iter().filter(|d| d.message.contains("out of date for the objects without a name"));

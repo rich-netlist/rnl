@@ -16,14 +16,13 @@
 //! The check is the first 16 hexadecimal digits, in lower case, of the SHA-256 of these lines in
 //! UTF-8, each ended by a line feed ([`check`]). SHA-256 is implemented here, without a dependency.
 //!
-//! An interpretation made with [`crate::Options::draft`] gives the numbers of each drawn level in
+//! An interpretation gives the numbers of each drawn level in
 //! [`crate::Interpretation::numbering`], whatever its version: a writer that appends the record of
 //! the solver reads the level again and puts [`level_check`] in its head.
 
 use crate::Interpretation;
 
-/// The numbers of a drawing level as an interpretation made with [`crate::Options::draft`] reads
-/// them (5.9).
+/// The numbers of a drawing level as an interpretation reads them (5.9).
 #[derive(Clone, Debug, PartialEq)]
 pub struct LevelNumbering {
     /// The host level, its index in the host document's levels.
@@ -62,11 +61,11 @@ impl RecordNumbering {
 }
 
 /// The check that the record of the solver of a level holds, as the level reads in an
-/// interpretation made with [`crate::Options::draft`]: of the lines of its last record of the
-/// solver, the authored records' objects and the record's own, or of the authored records' alone
-/// when it has none. When a record's `numbering` does not match, its statements that use a number
-/// take no effect, but the check is still of the text as written, with every number read. None for
-/// a level that is not drawn, or an interpretation made without the draft.
+/// interpretation: of the lines of its last record of the solver, the authored records' objects
+/// and the record's own, or of the authored records' alone when it has none. When a record's
+/// `numbering` does not match, its statements that use a number take no effect, but the check is
+/// still of the text as written, with every number read. None for a level that is not drawn, or a
+/// package file checked on its own.
 pub fn level_check(i: &Interpretation, level: usize) -> Option<&str> {
     let n = i.numbering.iter().find(|n| n.level == level)?;
     Some(n.records.last().map_or(&n.check, |r| &r.check))

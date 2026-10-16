@@ -24,7 +24,7 @@ options:
   --no-std            do not use the standard package at the root (16.3)
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      spice or spectre, instead of guessing from the file
-  --draft             for development only: read the files that declare the draft 0.3 as well
+  --draft             no effect, kept for compatibility: the files of 0.3 are read without it
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -47,6 +47,8 @@ struct Args {
     std: bool,
     generated: bool,
     dialect: Option<String>,
+    /// `--draft`: accepted, with no effect, as [`Options::draft`] has none; kept for
+    /// compatibility, to be removed after the solver-v1 branch merges.
     draft: bool,
     svg: bool,
     primitives: bool,

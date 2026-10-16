@@ -240,7 +240,7 @@ fn numbering_in_a_record_with_scope_is_not_written() {
     let text = netlist("", "#R1 @PLACE(1, 2)")
         .replace("\"0.2\"", "\"0.3\"")
         .replace("@RNL(scope=\"ota\")", "@RNL(type=\"generated\", scope=\"ota\", numbering=\"0123456789abcdef\")");
-    let r = interpret(&MemoryProvider::new().with("t.sp", &text), &Options { draft: true, ..Options::default() });
+    let r = interpret(&MemoryProvider::new().with("t.sp", &text), &Options::default());
     let e = errors(&r);
     assert_eq!(e.len(), 1, "{e:?}");
     assert!(e[0].1.contains("numbering is not written in a record with scope="), "{e:?}");

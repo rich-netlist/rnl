@@ -1,8 +1,8 @@
 //! A solution written back as the record of the solver and read again (the draft 0.3, 5.9, 13.1,
-//! 14.8). In a level of a file of the draft read with `Options::draft`, every decision is in the
-//! record: the objects without a name by their numbers, the routes of wires as WIRE given the wire,
-//! with the check of the numbers in the head. In a level of 0.2 no number and no rewrite is
-//! written. Either way, the writer lists every decision it does not write, with the reason.
+//! 14.8). In a level of a file of the draft, every decision is in the record: the objects without
+//! a name by their numbers, the routes of wires as WIRE given the wire, with the check of the
+//! numbers in the head. In a level of 0.2 no number and no rewrite is written. Either way, the
+//! writer lists every decision it does not write, with the reason.
 
 use std::path::Path;
 use std::process::Command;
@@ -18,10 +18,6 @@ use rnl_runtime::writeback::replace_generated;
 use rnl_runtime::{Interpretation, Options};
 
 const OPTIONS: &str = "tolerance=0.000001";
-
-fn draft() -> Options {
-    Options { draft: true, ..Options::default() }
-}
 
 fn read(text: &str, options: &Options) -> Interpretation {
     interpret_file(Path::new("t.sp"), None, &MemoryProvider::new().with("t.sp", text), options).unwrap()
@@ -150,11 +146,11 @@ struct Solved {
 
 fn solved(text: &str, title: &str) -> Solved {
     let files = MemoryProvider::new().with("t.sp", text);
-    let r = interpret_file(Path::new("t.sp"), None, &files, &Options { draft: true, ..Options::solver() }).unwrap();
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options::solver()).unwrap();
     let p = problem(&r, title).clone();
     let solution = solve(&p);
     let written = write_record(&p, &solution, "rnl-solver test", &sig1(&p, OPTIONS));
-    let record = rnl_view::finish_record(&r.doc, &files, &draft(), &p, &written.record);
+    let record = rnl_view::finish_record(&r.doc, &files, &Options::default(), &p, &written.record);
     let text = replace_generated(&r.doc, p.level, text, &record);
     Solved { p, solution, written, record, text }
 }
@@ -184,12 +180,11 @@ fn fixed_at(position: &Position) -> Option<Pt> {
     }
 }
 
-/// `rnl check --draft` on a text: its exit code and the line of counts.
+/// `rnl check` on a text: its exit code and the line of counts.
 fn rnl_check(name: &str, text: &str) -> (bool, String) {
     let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
     std::fs::write(&f, text).unwrap();
-    let out =
-        Command::new(env!("CARGO_BIN_EXE_rnl")).args(["check", &f.to_string_lossy(), "--draft"]).output().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_rnl")).args(["check", &f.to_string_lossy()]).output().unwrap();
     let stdout = String::from_utf8(out.stdout).unwrap();
     (out.status.success(), stdout.lines().last().unwrap_or_default().to_string())
 }
@@ -225,7 +220,7 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
     let check = numbering(&s.record).unwrap();
 
     // read back with the switch: no error, and the check of the level is the record's
-    let r = read(&s.text, &Options { problems: true, ..draft() });
+    let r = read(&s.text, &Options { problems: true, ..Options::default() });
     assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
     assert_eq!(out_of_date(&r), 0);
     assert_eq!(level_check(&r, level_index(&r, "amp")), Some(check.as_str()));
@@ -276,7 +271,7 @@ fn changing_the_authored_text_puts_the_numbers_out_of_date() {
     let s = solved(&amp("0.3"), "amp");
     let swapped = s.text.replace("{#M1 #R1} @TEXT", "{#R1 #M1} @TEXT");
     assert_ne!(swapped, s.text);
-    let r = read(&swapped, &Options { problems: true, ..draft() });
+    let r = read(&swapped, &Options { problems: true, ..Options::default() });
     assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
     assert_eq!(out_of_date(&r), 1);
     let back = problem(&r, "amp");
@@ -371,7 +366,7 @@ fn the_wire_of_a_ground_that_a_rule_makes_is_routed_by_its_number() {
     ] {
         assert!(s.record.contains(written), "{written}\n{}", s.record);
     }
-    let r = read(&s.text, &Options { problems: true, ..draft() });
+    let r = read(&s.text, &Options { problems: true, ..Options::default() });
     assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
     assert_eq!(out_of_date(&r), 0);
     assert_eq!(level_check(&r, 0), numbering(&s.record).as_deref());
@@ -404,7 +399,7 @@ fn the_writer_says_what_it_does_not_write_and_what_a_solver_should_not_do() {
     let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\nC1 a 0 1p\n\
                 * @RNL { #R1 @PLACE(0, 0); #C1 @PLACE(10, 0); %w = &a @WIRE(mode=\"manhattan\") {#R1:1 #C1:1};\n\
                 * %v = &b @WIRE {#R1:2 (5, -5)} }\n.end\n";
-    let r = read(text, &Options { draft: true, ..Options::solver() });
+    let r = read(text, &Options::solver());
     let p = problem(&r, "t.sp");
     let wire = |label: &str| p.wires.iter().position(|w| w.label == label).unwrap();
     let (w, v) = (wire("%w"), wire("%v"));
@@ -447,7 +442,7 @@ fn a_record_that_uses_no_number_has_no_numbering() {
     // record needs no numbering (5.9)
     let text = "* named\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a b 1k\nC1 a b 1p\n.end\n";
     let files = MemoryProvider::new().with("t.sp", text);
-    let r = interpret_file(Path::new("t.sp"), None, &files, &Options { draft: true, ..Options::solver() }).unwrap();
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options::solver()).unwrap();
     let p = problem(&r, "t.sp");
     let place = |label: &str, at: Pt| Placement {
         object: p.objects.iter().position(|o| o.label == label).unwrap(),
@@ -458,11 +453,12 @@ fn a_record_that_uses_no_number_has_no_numbering() {
         Solution { placements: vec![place("#R1", (0.0, 0.0)), place("#C1", (10.0, 0.0))], ..Solution::default() };
     let written = write_record(p, &solution, "rnl-solver test", &sig1(p, OPTIONS));
     assert!(written.unsolved.is_empty() && !written.record.contains("%#"), "{}", written.record);
-    let record = rnl_view::finish_record(&r.doc, &files, &draft(), p, &written.record);
+    let record = rnl_view::finish_record(&r.doc, &files, &Options::default(), p, &written.record);
     assert_eq!(record, written.record);
     assert!(!record.contains("numbering"));
     // read back with the switch: placed, with no error and no hint that it is out of date
-    let back = read(&replace_generated(&r.doc, p.level, text, &record), &Options { problems: true, ..draft() });
+    let back =
+        read(&replace_generated(&r.doc, p.level, text, &record), &Options { problems: true, ..Options::default() });
     assert!(diagnostics(&back, Severity::Error).is_empty(), "{:?}", diagnostics(&back, Severity::Error));
     assert_eq!(out_of_date(&back), 0);
     let r1 = problem(&back, "t.sp").objects.iter().find(|o| o.label == "#R1").unwrap();

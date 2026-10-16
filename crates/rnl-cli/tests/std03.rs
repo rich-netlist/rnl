@@ -2,8 +2,8 @@
 //! standard package that a file uses implicitly (16.3 of the language 0.3): the newest version
 //! that the tool has of the standard series written in the language version of the file, so that
 //! a file of 0.2 keeps the series 0.2 and a file of 0.3 uses the series 0.3; a version pinned in
-//! the header record of the file, or of a file that includes it, comes first. The toolkit reads
-//! the language 0.3 with the draft switch until it is released.
+//! the header record of the file, or of a file that includes it, comes first. A main file without
+//! a header record is read in the tool's default version, 0.3 (16.1), and so uses the series 0.3.
 
 use std::path::{Path, PathBuf};
 
@@ -41,10 +41,6 @@ const SERIES_03: [&str; 10] = [
     "rnl-std",
 ];
 
-fn draft() -> Options {
-    Options { draft: true, ..Options::default() }
-}
-
 fn read(files: &MemoryProvider, entry: &str, options: &Options) -> Interpretation {
     interpret_file(Path::new(entry), None, files, options).unwrap()
 }
@@ -74,39 +70,34 @@ fn netlist(version: &str, header: &str, body: &str) -> String {
 
 #[test]
 fn a_file_of_0_2_keeps_the_series_0_2() {
-    // with the series 0.3 bundled beside it, a file of 0.2, with or without the draft switch
-    for options in [Options::default(), draft()] {
-        let files = MemoryProvider::new().with("t.sp", &netlist("0.2", "", ""));
-        let r = read(&files, "t.sp", &options);
-        assert!(errors(&r).is_empty(), "{:?}", errors(&r));
-        let at_root = root(level(&r, "t.sp"));
-        assert_eq!(names(&at_root), SERIES_02);
-        assert!(at_root.iter().all(|(_, v)| *v == "0.2"), "{at_root:?}");
-        // the series 0.3 is not even read
-        assert!(
-            !r.sources.iter().any(|(f, _)| f == "rnl-std-basic.rnl"),
-            "{:?}",
-            r.sources.iter().map(|s| &s.0).collect::<Vec<_>>()
-        );
-    }
-    // nor is a main file without a header record, read as 0.2 until 0.3 is released (16.1)
-    let files = MemoryProvider::new().with("t.sp", "* t\nR1 a 0 1k\n.end\n");
-    assert_eq!(names(&root(level(&read(&files, "t.sp", &draft()), "t.sp"))), SERIES_02);
+    // with the series 0.3 bundled beside it
+    let files = MemoryProvider::new().with("t.sp", &netlist("0.2", "", ""));
+    let r = read(&files, "t.sp", &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let at_root = root(level(&r, "t.sp"));
+    assert_eq!(names(&at_root), SERIES_02);
+    assert!(at_root.iter().all(|(_, v)| *v == "0.2"), "{at_root:?}");
+    // the series 0.3 is not even read
+    assert!(
+        !r.sources.iter().any(|(f, _)| f == "rnl-std-basic.rnl"),
+        "{:?}",
+        r.sources.iter().map(|s| &s.0).collect::<Vec<_>>()
+    );
 }
 
 #[test]
 fn a_file_of_0_3_uses_the_series_0_3() {
-    let files = MemoryProvider::new().with("t.sp", &netlist("0.3", "", ""));
-    let r = read(&files, "t.sp", &draft());
-    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
-    let at_root = root(level(&r, "t.sp"));
-    // a file of the SPICE dialect drops the rule package of Spectre (16.3)
-    let want: Vec<&str> = SERIES_03.iter().copied().filter(|n| *n != "rnl-std-spectre").collect();
-    assert_eq!(names(&at_root), want);
-    assert!(at_root.iter().all(|(_, v)| *v == "0.3"), "{at_root:?}");
-    // without the draft switch the file is not read at all, nor is a standard package used (16.1)
-    let r = read(&files, "t.sp", &Options::default());
-    assert!(root(level(&r, "t.sp")).is_empty());
+    // so does a main file without a header record, read in the tool's default version (16.1)
+    for text in [netlist("0.3", "", ""), "* t\nR1 a 0 1k\n.end\n".to_string()] {
+        let files = MemoryProvider::new().with("t.sp", &text);
+        let r = read(&files, "t.sp", &Options::default());
+        assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+        let at_root = root(level(&r, "t.sp"));
+        // a file of the SPICE dialect drops the rule package of Spectre (16.3)
+        let want: Vec<&str> = SERIES_03.iter().copied().filter(|n| *n != "rnl-std-spectre").collect();
+        assert_eq!(names(&at_root), want, "{text}");
+        assert!(at_root.iter().all(|(_, v)| *v == "0.3"), "{at_root:?}");
+    }
 }
 
 #[test]
@@ -114,7 +105,7 @@ fn a_pinned_version_comes_first() {
     // a file of 0.3 that pins the series 0.2: the series 0.2, in its own order
     let files =
         MemoryProvider::new().with("t.sp", &netlist("0.3", "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")", ""));
-    let r = read(&files, "t.sp", &draft());
+    let r = read(&files, "t.sp", &Options::default());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert_eq!(names(&root(level(&r, "t.sp"))), SERIES_02);
     // a file of 0.2 that pins the series 0.3, written in the language 0.3: the series 0.3 in its
@@ -122,7 +113,7 @@ fn a_pinned_version_comes_first() {
     // rule package
     let files =
         MemoryProvider::new().with("t.sp", &netlist("0.2", "@USE-PACKAGE(name=\"rnl-std\", version=\"0.3\")", ""));
-    let r = read(&files, "t.sp", &draft());
+    let r = read(&files, "t.sp", &Options::default());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     let at_root = root(level(&r, "t.sp"));
     assert_eq!(names(&at_root), SERIES_03);
@@ -140,13 +131,13 @@ fn a_file_that_includes_another_pins_its_series_too() {
     let files = MemoryProvider::new()
         .with("lib.sp", lib)
         .with("t.sp", &main("@USE-PACKAGE(name=\"rnl-std\", version=\"0.3\")"));
-    let r = read(&files, "t.sp", &draft());
+    let r = read(&files, "t.sp", &Options::default());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     let cell = root(level(&r, "cell"));
     assert!(cell.iter().all(|(_, v)| *v == "0.3") && names(&cell).contains(&"rnl-std-basic"), "{cell:?}");
     // unpinned, each file uses the series of its own language version
     let files = MemoryProvider::new().with("lib.sp", lib).with("t.sp", &main(""));
-    let r = read(&files, "t.sp", &draft());
+    let r = read(&files, "t.sp", &Options::default());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert_eq!(names(&root(level(&r, "cell"))), SERIES_02);
     assert!(names(&root(level(&r, "t.sp"))).contains(&"rnl-std-basic"));
@@ -162,7 +153,7 @@ fn a_package_directory_hides_the_bundled_series_of_the_same_version() {
     for version in ["0.2", "0.3"] {
         let mut files = MemoryProvider::new().with("pkgs/rnl-std.rnl", own).with("t.sp", &netlist(version, "", ""));
         files.package_dirs.push("pkgs".into());
-        let r = read(&files, "t.sp", &draft());
+        let r = read(&files, "t.sp", &Options::default());
         assert!(errors(&r).is_empty(), "{version}: {:?}", errors(&r));
         assert_eq!(root(level(&r, "t.sp")), [("rnl-std", "0.3")], "{version}");
         assert!(!r.sources.iter().any(|(f, _)| f == "rnl-std-basic.rnl"), "{version}");
@@ -171,23 +162,23 @@ fn a_package_directory_hides_the_bundled_series_of_the_same_version() {
 
 #[test]
 fn a_package_that_is_not_read_uses_no_series() {
-    // a package of 0.3 checked on its own without the draft switch is not read (16.1): its version
-    // is the one error, and the series 0.3, which would not be read either, is not used
-    let f = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/standard/0.3/rnl-std-basic.rnl");
-    let r = interpret_file(&f, None, &FsProvider::new(&[]), &Options::default()).unwrap();
+    // a package of a version that the toolkit does not read, checked on its own, is not read
+    // (16.1): its version is the one error, and no standard series is used
+    let package = "@RNL(type=\"header\") { @VERSION(\"0.4\"); @PACKAGE(name=\"p\", version=\"1.0\")}\n";
+    let r = read(&MemoryProvider::new().with("p.rnl", package), "p.rnl", &Options::default());
     let e = errors(&r);
-    assert!(e.len() == 1 && e[0].contains("unsupported version 0.3"), "{e:?}");
-    assert!(!r.sources.iter().any(|(f, _)| f == "rnl-std-core.rnl"));
+    assert!(e.len() == 1 && e[0].contains("unsupported version 0.4"), "{e:?}");
+    assert!(!r.sources.iter().any(|(f, _)| f.starts_with("rnl-std")), "{:?}", r.sources);
 }
 
-/// The draft cases of the corpus.
+/// The cases of 0.3 of the corpus.
 fn case(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/draft-0.3").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases-0.3").join(name)
 }
 
 /// The symbol each drawn instance of the top level is drawn with.
 fn symbols(path: &Path) -> Vec<(String, String)> {
-    let r = interpret_file(path, None, &FsProvider::new(&[]), &draft()).unwrap();
+    let r = interpret_file(path, None, &FsProvider::new(&[]), &Options::default()).unwrap();
     let errors = errors(&r);
     assert!(errors.is_empty(), "{}: {errors:?}", path.display());
     let lv = &r.model.levels[0];
@@ -279,7 +270,7 @@ fn every_package_of_the_series_names_what_it_uses_through_its_references() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/standard/0.3");
     let mut checked = 0;
     for f in std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path()) {
-        let options = Options { std: false, ..draft() };
+        let options = Options { std: false, ..Options::default() };
         let r = interpret_file(&f, None, &FsProvider::new(&[]), &options).unwrap();
         assert!(errors(&r).is_empty(), "{}: {:?}", f.display(), errors(&r));
         checked += 1;
@@ -295,7 +286,7 @@ fn the_fill_puts_no_port_tag_on_ground_and_supply_nets() {
                 R1 vdd out 10k\n* @RNL { &vdd @ADD-TO $SUPPLY_NET_SET; &vss @ADD-TO $GROUND_NET_SET }\n.ends\n\
                 X1 a b vdd 0 amp\nV1 vdd 0 1.8\n.model nch nmos\n.end\n";
     let files = MemoryProvider::new().with("t.sp", text);
-    let r = read(&files, "t.sp", &draft());
+    let r = read(&files, "t.sp", &Options::default());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     let amp = level(&r, "amp");
     let usages = |def: &str| -> Vec<(String, String)> {
@@ -319,7 +310,7 @@ fn the_fill_puts_no_port_tag_on_ground_and_supply_nets() {
         on_zero.clone().count() > 0 && on_zero.into_iter().all(|o| o.symbol.as_ref().unwrap().name == "$GROUND_SYMBOL")
     );
     // the stubs' distances have a least value and no greatest
-    let r = read(&files, "t.sp", &Options { draft: true, ..Options::solver() });
+    let r = read(&files, "t.sp", &Options::solver());
     let distances: Vec<(Option<f64>, Option<f64>)> = r
         .problems
         .iter()

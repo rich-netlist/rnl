@@ -54,8 +54,9 @@ pub struct Request {
     /// Give each level's primitives; false when not given.
     #[serde(default)]
     pub primitives: bool,
-    /// For development only: read the files that declare the draft 0.3 as well; false when not
-    /// given.
+    /// Accepted, with no effect, as [`rnl_runtime::Options::draft`] has none: the files of 0.3
+    /// are read without it. Kept for compatibility, to be removed after the solver-v1 branch
+    /// merges.
     #[serde(default)]
     pub draft: bool,
     /// Give each level its solve status, what a frontend decides from whether to solve it
@@ -405,6 +406,13 @@ C1 a 0 1p
         let native = BuildOptions { status: true, ..BuildOptions::default() };
         let native = rnl_view::build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &native).unwrap();
         assert_eq!(status["document"], serde_json::to_value(native).unwrap());
+        // `draft`, kept for compatibility, changes nothing: a file of 0.3 is read without it
+        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+        let files = json!({ "t.sp": text });
+        let plain = answer(json!({ "entry": "t.sp", "files": files }));
+        assert_eq!(answer(json!({ "entry": "t.sp", "files": files, "draft": true })), plain);
+        let diagnostics = plain["document"]["diagnostics"].as_array().unwrap();
+        assert!(diagnostics.iter().all(|d| d["severity"] != "error"), "{diagnostics:?}");
     }
 
     #[test]

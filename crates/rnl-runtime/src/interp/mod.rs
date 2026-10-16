@@ -63,9 +63,9 @@ pub struct Options {
     /// written coordinates and conflicting coordinates are found (11.7). The standard leaves the
     /// tolerance to the tool; a viewer that does not solve uses [`crate::geom::TOL`].
     pub tolerance: f64,
-    /// For development only: read the files that declare the draft 0.3 as well
-    /// ([`unit::DRAFT_VERSION`]). The rules the draft changes apply only to those files, so a file
-    /// of 0.2 reads the same with this on or off.
+    /// No effect. Kept for compatibility, to be removed after the solver-v1 branch merges: the
+    /// files of 0.3, and a main file without a header record, are read in 0.3 without any switch
+    /// ([`unit::READ_VERSIONS`], [`unit::DEFAULT_VERSION`]).
     pub draft: bool,
 }
 
@@ -101,8 +101,8 @@ pub struct Interpretation {
     /// [`Options::problems`] is set. Built without the generated records ([`Options::solver`]),
     /// it is the solver's input (2.8, 17).
     pub problems: Vec<crate::problem::LevelProblem>,
-    /// The numbers of the objects without a name of each drawing level, with their checks (the
-    /// draft 0.3, 5.9); empty unless [`Options::draft`] is set. See [`crate::numbering`].
+    /// The numbers of the objects without a name of each drawing level, with their checks, whatever
+    /// its version (5.9); empty for a package file checked on its own. See [`crate::numbering`].
     pub numbering: Vec<LevelNumbering>,
     /// The records of the solver to read again, differently (5.9).
     pub(crate) recheck: NumberRun,
@@ -179,8 +179,6 @@ pub struct Interp<'p> {
     pub(crate) want_problems: bool,
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
-    /// Read the files that declare the draft 0.3 (`Options::draft`).
-    pub(crate) draft: bool,
     /// The standard package used implicitly for the files of each language version (16.3).
     pub(crate) std_units: HashMap<String, Option<UnitId>>,
     /// The packages in effect on each chain of levels, and the number of units they were found
@@ -291,7 +289,6 @@ impl<'p> Interp<'p> {
             read_generated: options.generated,
             want_problems: options.problems,
             tol: options.tolerance,
-            draft: options.draft,
             std_units: HashMap::new(),
             effs: HashMap::new(),
             effs_units: 0,
@@ -747,15 +744,15 @@ impl<'p> Interp<'p> {
         let model = self.build_model();
         let (problems, results) =
             if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Default::default() };
-        // the numbers and their checks, read with the draft only (5.9); a reading that counts the
-        // objects of the authored records for another gives those alone
+        // the numbers and their checks (5.9); a reading that counts the objects of the authored
+        // records for another gives those alone
         let counting = self.numbers.count;
         let counted: HashMap<LevelId, AuthoredCount> = if counting {
             (0..self.scenes.len()).map(|s| (self.scenes[s].level, self.counted_authored(s))).collect()
         } else {
             HashMap::new()
         };
-        let numbering: Vec<LevelNumbering> = if self.draft && !counting && self.package_main.is_none() {
+        let numbering: Vec<LevelNumbering> = if !counting && self.package_main.is_none() {
             (0..self.scenes.len()).map(|s| self.level_numbering(s)).collect()
         } else {
             Vec::new()
@@ -793,8 +790,8 @@ impl<'p> Interp<'p> {
 /// Interpret a host document: the effective model and the diagnostics. `sink` holds what the
 /// host adapter reported, if anything.
 ///
-/// The numbers of the draft 0.3 take more than one reading of the document (5.9), only when a file
-/// of the draft is read with its records of the solver:
+/// The numbers of 0.3 take more than one reading of the document (5.9), only when a file of 0.3 is
+/// read with its records of the solver:
 ///
 /// - the objects of the authored records are counted as the level reads without its records of
 ///   the solver, so that reading comes first (`NumberRun::authored`);
