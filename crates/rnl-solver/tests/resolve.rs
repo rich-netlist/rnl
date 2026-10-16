@@ -265,6 +265,24 @@ fn the_groups_of_the_low_order_of_corpus_03_are_not_sought_by_default() {
     assert!(r.work.resolve_nodes < 10_000, "{}", summary(p, &r));
 }
 
+#[test]
+fn with_its_hints_asked_for_the_low_order_of_corpus_03_has_its_one_group_found_whole() {
+    // the enumeration of every minimal group on the one large case of the corpus, which `rnl solve
+    // --report` runs (hints_for_low): the low ORDER [46] conflicts with [16], [19], [23] and [26]
+    // alone, a list known complete after about 9 million nodes, and the facts kept are those kept
+    // without it, which gives that group first (the draft 0.3, 8.5)
+    let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
+    let p = &ps[0];
+    let r = resolve(p, &SolverOptions { hints_for_low: true, ..SolverOptions::without_time_limit() });
+    let low: Vec<&Discarded> = r.discarded.iter().filter(|d| p.facts[d.fact].priority == Priority::Low).collect();
+    assert_eq!(low.len(), 1, "{}", summary(p, &r));
+    assert_eq!((low[0].fact, &low[0].groups, low[0].complete), (46, &vec![vec![16, 19, 23, 26]], true));
+    let first = resolve(p, &SolverOptions::without_time_limit());
+    assert_eq!(r.kept, first.kept);
+    let d = first.discarded.iter().find(|d| d.fact == 46).unwrap();
+    assert_eq!((&d.groups, d.complete), (&low[0].groups, false));
+}
+
 fn object(p: &LevelProblem, label: &str) -> usize {
     p.objects.iter().position(|o| o.label == label).unwrap_or_else(|| panic!("no object {label}"))
 }
