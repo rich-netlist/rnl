@@ -105,6 +105,13 @@ impl Lines {
     }
 
     fn insert(&mut self, before_line: u32, new: &[String]) {
+        // a line not there yet, such as line 2 of an empty text, has empty lines before it
+        while self.lines.len() + 1 < before_line as usize {
+            if let Some(last) = self.lines.last_mut().filter(|l| !l.ends_with('\n')) {
+                last.push_str(self.eol);
+            }
+            self.lines.push(self.eol.to_string());
+        }
         let at = (before_line as usize).saturating_sub(1).min(self.lines.len());
         if at == self.lines.len() {
             if let Some(last) = self.lines.last_mut() {
@@ -616,14 +623,15 @@ fn replacement(doc: &HostDocument, level: LevelId, text: &str, record: &str, mar
 /// a subcircuit written above it comes before it, and a section of `.lib` that is read counts as a
 /// file ([`file_records`]).
 ///
-/// The first line of a host file never carries RNL (2.2): it is the title of the main file, and
-/// in an included file a comment or a statement. The header goes on the line after a title or a
-/// comment; before a statement, a comment line, the bare marker, is put first, so that the
-/// statement keeps its meaning on the third line. Spectre reads a file that is not a `.scs` file
-/// in SPICE mode until its `simulator lang=spectre`, and `//` is no comment there (2.2): a header
-/// carried by `//` goes after that statement, and after the lines that continue it, when no other
-/// statement and no record comes before it; otherwise it goes above the statement, written with
-/// `*`, which carries in both modes, and so does the bare marker.
+/// The first line of a host file never carries RNL (2.2): it is the title of the main file, and in
+/// an included file a comment or a statement. The header goes on the line after a title or a
+/// comment, and after the lines that continue it (`+` lines, or the line after one that ends with
+/// `\` in Spectre's dialect); before a statement, a comment line, the bare marker, is put first, so
+/// that the statement keeps its meaning on the third line. Spectre reads a file that is not a
+/// `.scs` file in SPICE mode until its `simulator lang=spectre`, and `//` is no comment there
+/// (2.2): a header carried by `//` goes after that statement, and after the lines that continue it,
+/// when no other statement and no record comes before it; otherwise it goes above the statement,
+/// written with `*`, which carries in both modes, and so does the bare marker.
 ///
 /// A file read only through library sections (`.lib file sec`, Spectre's `include "file"
 /// section=sec`, [`crate::host::Level::section`]) is read inside them alone, and tools must not
@@ -661,10 +669,41 @@ fn header_edits(doc: &HostDocument, file: &str, text: &str, version: &str) -> (V
         None if records_of(doc, file).iter().any(|(_, r)| record_type(r) == "header") => return (Vec::new(), marker),
         None => {}
     }
-    let Some(to) = top(doc, file, text, marker).and_then(|to| to.kept(doc, file)) else { return (Vec::new(), marker) };
     let version_kw = format!("@VERSION({})", crate::problem::written_string(version));
-    let header = carried(&format!("@RNL(type=\"header\") {{ {version_kw}}}"), to.marker);
-    (vec![to.edit(header)], to.marker)
+    match new_header(doc, file, text, marker, |_| format!("@RNL(type=\"header\") {{ {version_kw}}}")) {
+        Some((edit, marker)) => (vec![edit], marker),
+        None => (Vec::new(), marker),
+    }
+}
+
+/// The change that writes a new header record at the top of `file` ([`top`]), the record that
+/// `record` gives for the marker that carries it there, and that marker; None where none can be
+/// written, such as in a file read only through library sections.
+fn new_header(
+    doc: &HostDocument,
+    file: &str,
+    text: &str,
+    marker: &'static str,
+    record: impl FnOnce(&'static str) -> String,
+) -> Option<(Edit, &'static str)> {
+    let to = top(doc, file, text, marker).and_then(|to| to.kept(doc, file))?;
+    Some((to.edit(carried(&record(to.marker), to.marker)), to.marker))
+}
+
+/// A file that has no header record, given one that is not [`with_header`]'s, such as one with
+/// USE-PACKAGE (16.3): `record` gives the whole record for the comment marker that carries it, so
+/// that it can fit its lines to it, and it goes where [`with_header`] puts a new header, by the
+/// same rules. A file that has a header record, or where none can be written, comes back as it
+/// is, and so does a package file. `text` is the text whose positions the document gives.
+pub fn add_header(doc: &HostDocument, file: &str, text: &str, record: impl FnOnce(&'static str) -> String) -> String {
+    if file.to_lowercase().ends_with(".rnl") || records_of(doc, file).iter().any(|(_, r)| record_type(r) == "header") {
+        return text.to_string();
+    }
+    let marker = carrier(doc, file, text);
+    match new_header(doc, file, text, marker, record) {
+        Some((edit, _)) => apply(text, marker, vec![edit]),
+        None => text.to_string(),
+    }
 }
 
 /// Where a header record written at the top of a file goes: before the line `line`, 1-based,
@@ -696,8 +735,8 @@ impl Top {
 
 /// Where a file's header record goes at its top ([`with_header`]; the draft 0.3, 16.3 and 2.2),
 /// carried by `marker`, the file's carrier, unless said otherwise: line 2, after a title or a
-/// comment on the first line, which never carries RNL; the bare marker first before a statement on
-/// the first line of an included file. In a file that is not a `.scs` file, carried by `//`, whose
+/// comment on the first line, which never carries RNL, and after the lines that continue it; the
+/// bare marker first before a statement on the first line of an included file. In a file that is not a `.scs` file, carried by `//`, whose
 /// first statement is `simulator lang=spectre`, after that statement and the lines that continue
 /// it, when no record comes before it; otherwise above it, in SPICE mode, where only `*` is a
 /// comment (2.2), carried by `*`. None for a file read only through library sections: its line 2
@@ -722,8 +761,21 @@ fn top(doc: &HostDocument, file: &str, text: &str, marker: &'static str) -> Opti
     }
     let comment = |l: &str| l.starts_with('*') || (spectre && l.starts_with("//"));
     let first = lines.lines.first().map(|l| Lines::body(l));
-    let bare = !first.is_some_and(|l| main || l.trim().is_empty() || comment(l));
-    Some(Top { line: if bare { 1 } else { 2 }, marker, bare })
+    let bare = first.is_some_and(|l| !(main || l.trim().is_empty() || comment(l)));
+    if bare {
+        return Some(Top { line: 1, marker, bare });
+    }
+    // after the lines that continue line 1, such as a title: a `+` line, or in Spectre's dialect
+    // the line after one that ends with `\`; no comment goes between a line and its continuation
+    // (2.2)
+    let body = |line: usize| lines.lines.get(line - 1).map(|l| Lines::body(l));
+    let mut line = 2;
+    while body(line).is_some_and(|l| l.trim_start().starts_with('+'))
+        || (spectre && body(line - 1).is_some_and(|l| l.ends_with('\\')) && body(line).is_some())
+    {
+        line += 1;
+    }
+    Some(Top { line: line as u32, marker, bare })
 }
 
 /// The line, 1-based, after a file's `simulator lang=spectre` and the lines that continue it (a
@@ -1239,5 +1291,35 @@ mod tests {
         assert_eq!(out, net.replace("R2 a b 1k\n", &format!("R2 a b 1k\n* {record}\n")));
         let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.2");
         assert_eq!(out, format!("{net}* @RNL(type=\"generated\") {{}}\n"));
+    }
+
+    #[test]
+    fn a_header_record_of_its_own_goes_where_a_new_header_goes() {
+        // `add_header` writes the record that its caller makes for the marker that carries it, by
+        // the rules of `with_header`: after line 1 and the lines that continue it, a `+` line, or
+        // in Spectre's dialect the line after one that ends with `\` (2.2)
+        let record = |m: &'static str| format!("@RNL(type=\"header\") {{ @VERSION(\"0.3\"); @DEVICE(m={})}}", m.len());
+        let net = "title\n+ more of it\nR1 a 0 1k\n";
+        let d = doc(net, "a.sp", "*");
+        let head = "title\n+ more of it\n* @RNL(type=\"header\") { @VERSION(\"0.3\")";
+        assert_eq!(add_header(&d, "a.sp", net, record), format!("{head}; @DEVICE(m=1)}}\nR1 a 0 1k\n"));
+        assert_eq!(with_header(&d, "a.sp", net, "0.3"), format!("{head}}}\nR1 a 0 1k\n"));
+        let net = "t \\\nmore\nR1 (a b) resistor r=1k\n";
+        let d = doc(net, "a.scs", "//");
+        assert_eq!(
+            add_header(&d, "a.scs", net, record),
+            "t \\\nmore\n// @RNL(type=\"header\") { @VERSION(\"0.3\"); @DEVICE(m=2)}\nR1 (a b) resistor r=1k\n"
+        );
+        // an empty text keeps line 1, which is never read, empty
+        let d = doc("", "a.sp", "*");
+        assert_eq!(with_header(&d, "a.sp", "", "0.3"), "\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n");
+        assert_eq!(
+            add_header(&d, "a.sp", "", record),
+            "\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @DEVICE(m=1)}\n"
+        );
+        // a file that has a header record, and a package file, come back as they are
+        let with = "* t\n* @RNL(type=\"header\") {}\n.end\n";
+        assert_eq!(add_header(&doc(with, "a.sp", "*"), "a.sp", with, record), with);
+        assert_eq!(add_header(&d, "p.rnl", "@RNL {}\n", record), "@RNL {}\n");
     }
 }

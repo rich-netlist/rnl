@@ -311,6 +311,10 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 fields.insert("author".into(), a.clone().into());
             }
             fields.entry("dialect").or_insert_with(|| "spice".into());
+            // the netlist is saved as OUT, so it is read under that name unless the request names one
+            if let Some(name) = out.file_name().and_then(|n| n.to_str()) {
+                fields.entry("file").or_insert_with(|| name.into());
+            }
             let request: rnl_edit::WriteRequest =
                 serde_json::from_value(request).map_err(|e| format!("the request is not valid: {e}"))?;
             std::fs::write(&out, rnl_edit::write(&request)?).map_err(|e| e.to_string())?;

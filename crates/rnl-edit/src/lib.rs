@@ -4,14 +4,17 @@
 //! as a tool does that prints a netlist and its drawing together, such as Analog Canvas's
 //! export. It writes:
 //!
-//! - the header record after line 1, which is never read (2.2, 2.8): VERSION, then the packages
-//!   of the `use-package` ops, each name and version once;
+//! - the header record where a new header goes (`writeback::add_header`; 2.2, 2.8, 16.3): on line
+//!   2, after the title, which is never read, and after the lines that continue it; in a Spectre
+//!   netlist saved under a name that is not a `.scs` file, whose first statement is `simulator
+//!   lang=spectre`, after that statement with `//`, and otherwise above it with `*`. It holds
+//!   VERSION, then the packages of the `use-package` ops, each name and version once;
 //! - one record of the author's for each level the ops name, at the end of the level's own text
 //!   (17): before the `.ends` of a subcircuit, or the `.end` of the file, or at the end of the file;
 //!   before a region written to be encrypted (`.prot … .unprot`, `protect … unprotect`) that the
 //!   end lies in, where a record is gone once the region is encrypted (2.2), and a level whose own
 //!   text lies in one is refused;
-//! - in the comment carrier of the dialect, `*` or `//`, and `*` in a `simulator lang=spice` section
+//! - in the comment carrier of the header, `*` or `//`, and `*` in a `simulator lang=spice` section
 //!   of a Spectre netlist, where `//` is no comment (2.2);
 //! - the statements in the standard form (4.3), in the order of the ops, each line at most 132
 //!   characters long, broken only at spaces outside strings and brackets.
@@ -25,9 +28,10 @@ pub mod ops;
 use std::collections::BTreeMap;
 
 use rnl_runtime::diag::Sink;
+use rnl_runtime::host::file_name;
 use rnl_runtime::host::{HostDocument, LevelId, LevelKind};
 use rnl_runtime::source::MemoryProvider;
-use rnl_runtime::writeback::{append_record, carried, carrier, record_line};
+use rnl_runtime::writeback::{add_header, append_record, carrier_at, record_line};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -52,9 +56,27 @@ pub struct WriteRequest {
     /// refusal can say which.
     #[serde(default)]
     pub ops: Vec<Value>,
+    /// The name the netlist is saved under, such as `top.net`, when it is known; only its last
+    /// part counts. Its suffix tells the Spectre adapter the mode the file starts in (2.2): a
+    /// `.scs` file starts in the Spectre mode, any other file in the SPICE mode up to its
+    /// `simulator lang=spectre`, so the header and the records are written where that reading
+    /// keeps them. Without it, a Spectre netlist is read as a `.scs` file and a SPICE netlist as a
+    /// `.sp` file ([`entry`]).
+    #[serde(default)]
+    pub file: Option<String>,
 }
 
-/// The path the netlist is read under: its extension tells the adapters the dialect too.
+/// The path the netlist of a request is read under: in `/rnl-edit/`, by the name of its `file`,
+/// or [`entry`] when it names none.
+pub fn entry_of(request: &WriteRequest) -> String {
+    match request.file.as_deref().map(|f| file_name(&f.replace('\\', "/")).to_string()) {
+        Some(name) if !name.is_empty() => format!("/rnl-edit/{name}"),
+        _ => entry(&request.dialect).to_string(),
+    }
+}
+
+/// The path a netlist is read under when its request names no file: a `.scs` file for Spectre,
+/// a `.sp` file for SPICE.
 pub fn entry(dialect: &str) -> &'static str {
     if dialect == "spectre" {
         "/rnl-edit/netlist.scs"
@@ -72,10 +94,12 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
     }
     let ops: Vec<LevelOp> = request.ops.iter().enumerate().map(|(k, v)| ops::parse(k, v)).collect::<Result<_, _>>()?;
 
-    let path = entry(dialect);
-    let files = MemoryProvider::new().with(path, &request.netlist);
-    let mut sink = Sink::new();
-    let doc = rnl_view::read_host(path, Some(dialect), &files, &mut sink)?;
+    let path = entry_of(request);
+    let read = |text: &str| {
+        let files = MemoryProvider::new().with(&path, text);
+        rnl_view::read_host(&path, Some(dialect), &files, &mut Sink::new())
+    };
+    let doc = read(&request.netlist)?;
     // the netlist as the reader names it in its levels and records
     let file = doc.main().file.clone();
     if doc.levels.iter().any(|lv| lv.records.iter().any(|r| r.file == file)) {
@@ -102,28 +126,33 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
     // a record goes at the end of a level, or before a region written to be encrypted that the end
     // lies in, where it would be gone once the region is encrypted (2.2); a level whose own text
     // lies in such a region has no place for it
-    let mut at: BTreeMap<LevelId, u32> = BTreeMap::new();
     for (&level, &k) in &first_op {
-        let line = record_line(&doc, level, &request.netlist).map_err(|(a, b)| {
+        record_line(&doc, level, &request.netlist).map_err(|(a, b)| {
             let (what, title) = (ops[k].op.name(), doc.levels[level].title());
             format!(
                 "op {k} ({what}): {title} lies in a region written to be encrypted, lines {a} to {b}, where a record \
                  is gone once the region is encrypted (2.2)"
             )
         })?;
-        at.insert(level, line);
     }
 
-    let marker = carrier(&doc, &file, &request.netlist);
-    let mut text = request.netlist.clone();
+    // the header first, where a new header goes; then the netlist is read again, so that the
+    // records follow its carrier (2.2), at the places of the text that has it
+    let mut text = add_header(&doc, &file, &request.netlist, |marker| header(&packages, marker));
+    let doc = read(&text)?;
+    let mut at: BTreeMap<LevelId, u32> = BTreeMap::new();
+    for &level in levels.keys() {
+        let line = record_line(&doc, level, &text).map_err(|_| "the netlist reads otherwise with its header")?;
+        at.insert(level, line);
+    }
     // from the bottom up, so that the places of the levels above stay where the reader found them
     let mut order: Vec<LevelId> = levels.keys().copied().collect();
     order.sort_by_key(|lv| std::cmp::Reverse(at[lv]));
     for lv in order {
-        let record = record(&request.author, &levels[&lv], marker);
+        let record = record(&request.author, &levels[&lv], carrier_at(&doc, &file, &text, at[&lv]));
         text = append_record(&doc, lv, &text, &record);
     }
-    Ok(header_after_first_line(&text, &header(&packages, marker), marker, dialect == "spectre"))
+    Ok(text)
 }
 
 /// The level an op names: `subckt:NAME`, a subcircuit of the netlist, by the dialect's case rule;
@@ -177,37 +206,6 @@ fn header(packages: &[String], marker: &str) -> String {
     }
     out.push("}".into());
     out.join("\n")
-}
-
-/// Put the header record after line 1, and after the lines that continue it: SPICE's `+` lines, or
-/// the next line when a Spectre line ends with `\` (2.2).
-fn header_after_first_line(text: &str, header: &str, marker: &str, spectre: bool) -> String {
-    let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
-    let mut lines: Vec<String> = text.split_inclusive('\n').map(String::from).collect();
-    let body = |l: &str| l.trim_end_matches(['\n', '\r']).to_string();
-    if lines.is_empty() {
-        // line 1 stays the title, even when there is none
-        lines.push(eol.to_string());
-    }
-    let mut at = 1;
-    while at < lines.len() {
-        let continues =
-            if spectre { body(&lines[at - 1]).ends_with('\\') } else { body(&lines[at]).trim_start().starts_with('+') };
-        if !continues {
-            break;
-        }
-        at += 1;
-    }
-    if at == lines.len() {
-        if let Some(last) = lines.last_mut() {
-            if !last.ends_with('\n') {
-                last.push_str(eol);
-            }
-        }
-    }
-    let added: Vec<String> = carried(header, marker).into_iter().map(|l| format!("{l}{eol}")).collect();
-    lines.splice(at..at, added);
-    lines.concat()
 }
 
 #[cfg(test)]

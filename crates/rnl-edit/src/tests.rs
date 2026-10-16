@@ -12,6 +12,7 @@ fn request(dialect: &str, netlist: &str, ops: Value) -> WriteRequest {
         netlist: netlist.into(),
         author: "test".into(),
         ops: ops.as_array().unwrap().clone(),
+        file: None,
     }
 }
 
@@ -118,6 +119,45 @@ fn the_header_goes_after_what_continues_line_one() {
     assert_eq!(out, "simulator lang=spectre \\\n  insensitive=no\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 (a b) resistor r=1k\n");
     // an empty netlist still keeps line 1 for the title
     assert_eq!(write(&request("spice", "", json!([]))).unwrap(), "\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n");
+}
+
+#[test]
+fn a_netlist_saved_under_a_name_is_read_as_that_file() {
+    // a Spectre netlist that is not a .scs file is read in the SPICE mode up to its `simulator
+    // lang=spectre` (2.2): its header goes right after that statement when it is the first, with
+    // `//`, and otherwise above it with `*`; the records follow the header's marker (16.3)
+    let ops = json!([{"level": "file", "op": "set", "object": "#R1", "at": [0, 0]}]);
+    let saved = |netlist: &str, file: Option<&str>| {
+        write(&WriteRequest { file: file.map(String::from), ..request("spectre", netlist, ops.clone()) }).unwrap()
+    };
+    let header = "@RNL(type=\"header\") { @VERSION(\"0.3\")}";
+    let record = |m: &str| format!("{m} @RNL(author=\"test\") {{\n{m}   #R1 @PLACE(0, 0)\n{m} }}\n");
+    let first = "* title\nsimulator lang=spectre\nR1 (a 0) resistor r=1k\n";
+    assert_eq!(
+        saved(first, Some("top.net")),
+        format!("* title\nsimulator lang=spectre\n// {header}\nR1 (a 0) resistor r=1k\n{}", record("//"))
+    );
+    let later = "* title\n.param rr=1k\nsimulator lang=spectre\nR1 (a 0) resistor r=1k\n";
+    assert_eq!(
+        saved(later, Some("dir/top.net")),
+        format!("* title\n* {header}\n.param rr=1k\nsimulator lang=spectre\nR1 (a 0) resistor r=1k\n{}", record("*"))
+    );
+    // a .scs file, or a netlist without a name, as before: in the Spectre mode from its start
+    for file in [Some("top.scs"), None] {
+        assert_eq!(
+            saved(first, file),
+            format!("* title\n// {header}\nsimulator lang=spectre\nR1 (a 0) resistor r=1k\n{}", record("//"))
+        );
+    }
+    // read back under its name, each has its header and its record
+    for net in [first, later] {
+        let out = saved(net, Some("top.net"));
+        let files = MemoryProvider::new().with("/rnl-edit/top.net", &out);
+        let doc = rnl_view::read_host("/rnl-edit/top.net", Some("spectre"), &files, &mut Sink::new()).unwrap();
+        assert_eq!(doc.levels[0].records.len(), 2, "{out}");
+    }
+    let named = |file: &str| entry_of(&WriteRequest { file: Some(file.into()), ..request("spectre", "", json!([])) });
+    assert_eq!((named("C:\\work\\top.net"), named("")), ("/rnl-edit/top.net".into(), "/rnl-edit/netlist.scs".into()));
 }
 
 #[test]

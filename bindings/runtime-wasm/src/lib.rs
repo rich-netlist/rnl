@@ -194,10 +194,11 @@ fn write(request: WriteRequest) -> Response {
         Ok(t) => t,
         Err(e) => return Response::Error(e),
     };
-    let entry = rnl_edit::entry(&request.write.dialect);
+    // the netlist built under the name it was written under, so that it reads the same
+    let entry = rnl_edit::entry_of(&request.write);
     let mut files: BTreeMap<String, String> =
         request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
-    files.insert(normalize(entry), text.clone());
+    files.insert(normalize(&entry), text.clone());
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: Some(request.write.dialect),
@@ -206,7 +207,7 @@ fn write(request: WriteRequest) -> Response {
         primitives: request.primitives,
         status: request.status,
     };
-    match rnl_view::build(entry, &files, &options) {
+    match rnl_view::build(&entry, &files, &options) {
         Ok(document) => Response::Written(Box::new(Written { text, document })),
         Err(e) => Response::Error(e),
     }
@@ -511,6 +512,17 @@ R1 a 0 1k
                 .contains("// @RNL(author=\"test\") {\n//   #r1 @PLACE(0, 0)\n// }\n"),
             "{v}"
         );
+        // saved under a name that is not a .scs file: read so, in the SPICE mode up to its switch,
+        // with the header after it, and built under that name; a request without it is as above
+        let named = json!({ "dialect": "spectre", "netlist": "* t\nsimulator lang=spectre\nr1 (a 0) resistor r=1k\n",
+                            "author": "test", "file": "top.net", "ops": [] });
+        let v = answer(json!({ "write": named, "svg": false }));
+        assert_eq!(v["written"]["document"]["path"], "/rnl-edit/top.net");
+        assert_eq!(
+            v["written"]["text"],
+            "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nr1 (a 0) resistor r=1k\n"
+        );
+        assert_eq!(errors(&v["written"]["document"]), 0, "{v}");
     }
 
     #[test]

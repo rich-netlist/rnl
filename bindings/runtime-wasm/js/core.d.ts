@@ -130,6 +130,13 @@ export interface WriteRequest {
     /** The `author` of the records written. */
     author: string;
     ops: Op[];
+    /**
+     * The name the netlist is saved under, such as `top.net`, when it is known: a Spectre netlist
+     * that is not a `.scs` file is read in the SPICE mode up to its `simulator lang=spectre`, and its
+     * header and records go where that reading keeps them. Without it, a Spectre netlist is read as
+     * a `.scs` file.
+     */
+    file?: string;
   };
   /** Further files, such as packages; the netlist is the entry. */
   files?: Record<string, string>;
