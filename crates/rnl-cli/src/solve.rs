@@ -28,7 +28,9 @@
 //! The report of a level gives each fact discarded with every minimal group of facts it conflicts
 //! with, and each statement whose facts are in such a group with the facts discarded because of it
 //! (the draft 0.3, 8.5); the hints of a fact of priority low, and of the statements that only such
-//! facts lose, only with `--report` ([`report`]), as 7.6 allows them to be left out.
+//! facts lose, only with `--report` ([`report`]), as 7.6 allows them to be left out. Without it the
+//! solver does not seek the groups of such a fact beyond its first, which can cost far more than
+//! the rest of the resolution (`SolverOptions::hints_for_low`), and a note says so.
 //!
 //! A fact that has no solution on its own contradicts itself and fails (the draft 0.3, 8.5; 7.6):
 //! the report of its level has an error for it, on a line that begins with `error:`, and the level
@@ -110,6 +112,10 @@ pub struct SolvedLevel {
     pub path: String,
     /// The time the solver took for the level. Nothing written depends on it.
     pub time: Duration,
+    /// Whether the solver sought the hints of the facts of priority low discarded, every minimal
+    /// conflict group of each and its hints by statement (`SolverOptions::hints_for_low`), as
+    /// `--report` asks: [`report`] prints them only then.
+    pub hints_for_low: bool,
 }
 
 /// A level that is not solved, because the reading does not interpret its RNL (16.1).
@@ -322,7 +328,8 @@ pub fn solve_with_clock(
                 None => solved_files.push(SolvedFile { path: at, text: out }),
             }
         }
-        levels.push(SolvedLevel { problem: p.clone(), solved, written, record, hash, path, time });
+        let hints_for_low = options.solver.hints_for_low;
+        levels.push(SolvedLevel { problem: p.clone(), solved, written, record, hash, path, time, hints_for_low });
     }
     let packages: Vec<String> = files.files.package_files().iter().map(|p| normalize(p)).collect();
     let read: Vec<String> = files.read.take().into_iter().filter(|p| !packages.contains(p)).collect();
@@ -657,9 +664,9 @@ pub fn not_solved(n: &NotSolved) -> String {
 /// minimal group of facts it conflicts with, and whether the list is complete; the hints by
 /// statement, each statement whose facts took part in discarding with the facts discarded because
 /// of it; the hints of a fact of priority low, and of the statements that only such facts lose,
-/// only with `all` (7.6); the errors of the solver, the facts that contradict themselves, each on
-/// a line of its own beginning with `error:`, and its warnings, each beginning with `warning:`
-/// (7.6); what the record cannot hold, the ROUTEs left in parts, the inert objectives, the notes,
+/// only with `all`, when the solver sought them ([`SolvedLevel::hints_for_low`], 7.6); the errors
+/// of the solver, the facts that contradict themselves, each on a line of its own beginning with
+/// `error:`, and its warnings, each beginning with `warning:` (7.6); what the record cannot hold, the ROUTEs left in parts, the inert objectives, the notes,
 /// the work and the time.
 pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     let p = &level.problem;
@@ -676,8 +683,8 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     )];
     // Discarding a fact of priority low is expected, and its hints may be left out (the draft 0.3,
     // 8.5; 7.6): they are printed with `all` alone, the hint of the fact and those of the
-    // statements that only such facts lose.
-    let hinted = |f: usize| all || p.facts.get(f).is_none_or(|f| f.priority != Priority::Low);
+    // statements that only such facts lose, when the solver sought them.
+    let hinted = |f: usize| (all && level.hints_for_low) || p.facts.get(f).is_none_or(|f| f.priority != Priority::Low);
     // a fact discarded and its hint: every minimal group of facts kept before it that it conflicts
     // with, each fact of them described once below it, and whether the list is complete
     let discarded = |out: &mut Vec<String>, k: usize, indent: &str| {

@@ -6,16 +6,19 @@
 //! - every fact is kept or discarded, once: none contradicts itself (the draft 0.3, 8.5);
 //! - every fact kept holds where the witness puts the objects, checked as a viewer checks a
 //!   constraint (14.1–14.5, 14.9), in `f64` with the tolerance (11.7);
-//! - each fact discarded has all its minimal conflict groups (the draft 0.3, 8.5), and each group
-//!   is made of facts kept before its fact, conflicts with it, and is minimal: the level with only
-//!   those facts and the fact discarded discards it again, and without any one of them keeps them
-//!   all; the hints by statement are those of the groups;
+//! - each fact discarded has all its minimal conflict groups (the draft 0.3, 8.5), but a fact of
+//!   priority low, which has its first only unless its hints are asked for (8.5, 7.6), and each
+//!   group is made of facts kept before its fact, conflicts with it, and is minimal: the level with
+//!   only those facts and the fact discarded discards it again, and without any one of them keeps
+//!   them all; the hints by statement are those of the groups of the facts whose hints are given;
 //! - a second run gives the same, and the placement of `solve` has no NaN.
 //!
 //! T4 has a reference resolution (the brief of the solver brainstorm): exactly three facts are
 //! discarded, `{#M6 #M7} @ALIGN("x")`, the ALIGN y that the `$MIRROR_PAIR` of M1 and M2 expands
 //! to, and the low `{#VIP #VIN} @ALIGN("y")`, each with one minimal group, and the statements of
-//! those groups are those of lines 37 to 40 of the file.
+//! those groups are those of lines 37 to 40 of the file, line 40 only with the hints of the facts
+//! of priority low. Corpus 03 discards a low ORDER whose groups cost millions of nodes: by default
+//! they are not sought.
 //!
 //! The solver itself does no file I/O; these tests read the files with `std`.
 
@@ -26,7 +29,7 @@ use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::problem::*;
 use rnl_runtime::source::Provider;
 use rnl_runtime::Options;
-use rnl_solver::{resolve, solve, Resolved, SolverOptions, Statement};
+use rnl_solver::{resolve, solve, Discarded, Resolved, SolverOptions, Statement};
 
 /// Files from the disk, as the CLI reads them.
 struct Files;
@@ -133,7 +136,12 @@ fn with_facts(p: &LevelProblem, facts: &[usize]) -> LevelProblem {
 
 /// Resolves a level and checks everything the module says.
 fn check_level(file: &str, p: &LevelProblem) -> Resolved {
-    let options = SolverOptions::without_time_limit();
+    check_with(file, p, &SolverOptions::without_time_limit())
+}
+
+/// Resolves a level with some options and checks everything the module says.
+fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> Resolved {
+    let options = options.clone();
     let r = resolve(p, &options);
     let what = format!("{file} / {}", p.title);
     let mut all: Vec<usize> = r.kept.iter().copied().chain(r.discarded.iter().map(|d| d.fact)).collect();
@@ -146,8 +154,14 @@ fn check_level(file: &str, p: &LevelProblem) -> Resolved {
     for &f in &r.kept {
         assert!(holds(p, &r, &p.facts[f].kind, tol), "{what}: fact {f} kept but violated: {:?}", p.facts[f]);
     }
+    // a fact of priority low has its first group only, unless its hints are asked for (8.5, 7.6)
+    let hinted = |d: &Discarded| options.hints_for_low || p.facts[d.fact].priority != Priority::Low;
     for d in &r.discarded {
-        assert!(!d.undecided && d.complete && !d.groups.is_empty(), "{what}: {d:?}");
+        if hinted(d) {
+            assert!(!d.undecided && d.complete && !d.groups.is_empty(), "{what}: {d:?}");
+        } else {
+            assert!(!d.undecided && !d.complete && d.groups.len() == 1, "{what}: {d:?}");
+        }
         assert!(d.groups.windows(2).all(|w| w[0] < w[1]), "{what}: {d:?} not sorted");
         for group in &d.groups {
             assert!(group.windows(2).all(|w| w[0] < w[1]), "{what}: {d:?} not sorted");
@@ -162,6 +176,9 @@ fn check_level(file: &str, p: &LevelProblem) -> Resolved {
             }
         }
     }
+    // and a note says so
+    let noted = r.notes.iter().any(|n| n.contains(" are listed only with --report "));
+    assert_eq!(noted, r.discarded.iter().any(|d| !hinted(d)), "{what}: {:?}", r.notes);
     // the hints by statement: each statement of a fact in a group, with the facts discarded
     // because of it
     let mut named: Vec<(usize, usize)> = Vec::new();
@@ -176,8 +193,12 @@ fn check_level(file: &str, p: &LevelProblem) -> Resolved {
         }
     }
     named.sort_unstable();
-    let mut pairs: Vec<(usize, usize)> =
-        r.discarded.iter().flat_map(|d| d.in_groups().into_iter().map(move |k| (k, d.fact))).collect();
+    let mut pairs: Vec<(usize, usize)> = r
+        .discarded
+        .iter()
+        .filter(|d| hinted(d))
+        .flat_map(|d| d.in_groups().into_iter().map(move |k| (k, d.fact)))
+        .collect();
     pairs.sort_unstable();
     assert_eq!(named, pairs, "{what}: {:?}", r.statements);
     assert_eq!(r, resolve(p, &options), "{what}: not deterministic");
@@ -227,6 +248,21 @@ fn every_case_of_the_corpus_resolves() {
             eprintln!("{}", summary(&p, &r));
         }
     }
+}
+
+#[test]
+fn the_groups_of_the_low_order_of_corpus_03_are_not_sought_by_default() {
+    // corpus 03 discards the low ORDER of its $FLOW, whose one minimal conflict group took about 9
+    // million nodes of the search for seeds to be known as the only one. Its hints may be left out
+    // (the draft 0.3, 8.5; 7.6): by default it has that group, its first, and the resolution of the
+    // level costs a few hundred nodes, as before every group was sought
+    let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
+    let p = &ps[0];
+    let r = check_level("03", p);
+    let low: Vec<&Discarded> = r.discarded.iter().filter(|d| p.facts[d.fact].priority == Priority::Low).collect();
+    assert_eq!(low.len(), 1, "{}", summary(p, &r));
+    assert!(matches!(p.facts[low[0].fact].kind, FactKind::Order { .. }), "{:?}", p.facts[low[0].fact]);
+    assert!(r.work.resolve_nodes < 10_000, "{}", summary(p, &r));
 }
 
 fn object(p: &LevelProblem, label: &str) -> usize {
@@ -279,23 +315,43 @@ fn t4_resolves_as_the_reference_says() {
     });
     assert_eq!(groups(inputs), [vec![vip_vin]]);
     // the hints by statement name the statements of lines 37 to 40 of the file, each with the facts
-    // discarded because of it, as the table of the development report has them
-    let hints: Vec<(String, u32, Vec<usize>, Vec<usize>)> = r
-        .statements
-        .iter()
-        .map(|(s, h)| {
-            let file = s.file.rsplit('/').next().unwrap_or_default().to_string();
-            (file, s.line, h.facts.clone(), h.discarded.clone())
-        })
-        .collect();
+    // discarded because of it, as the table of the development report has them; line 40, which only
+    // the low fact loses, only with the hints of the facts of priority low (8.5, 7.6)
+    let hints = |r: &Resolved| -> Vec<(String, u32, Vec<usize>, Vec<usize>)> {
+        r.statements
+            .iter()
+            .map(|(s, h)| {
+                let file = s.file.rsplit('/').next().unwrap_or_default().to_string();
+                (file, s.line, h.facts.clone(), h.discarded.clone())
+            })
+            .collect()
+    };
     let at = |line: u32, fact: usize, discarded: usize| {
         ("T4-miller-conflicts.sp".to_string(), line, vec![fact], vec![discarded])
     };
+    assert_eq!(hints(&r), [at(37, m1_y, mirror), at(38, m2_y, mirror), at(39, distance_m6_m7, m6_m7)]);
+    assert!(r.statements.keys().all(|s| s.chain.is_empty() && s.point.is_none()), "{:?}", r.statements);
+    // by default the low fact has its first group, which is all it has, without knowing it, and a
+    // note says why; with its hints asked for, the list is known to be complete, and line 40 is
+    // named; nothing else changes
+    let low = r.discarded.iter().find(|d| d.fact == inputs).unwrap();
+    assert!(!low.complete, "{low:?}");
+    let note = format!("[{inputs}] has its first group only, and is in no hint by statement");
+    assert!(
+        r.notes.iter().any(|n| n.contains(" are listed only with --report ") && n.ends_with(&note)),
+        "{:?}",
+        r.notes
+    );
+    let all = check_with("T4", p, &SolverOptions { hints_for_low: true, ..SolverOptions::without_time_limit() });
+    assert!(all.discarded.iter().all(|d| d.complete), "{:?}", all.discarded);
+    let same = |r: &Resolved| r.discarded.iter().map(|d| (d.fact, d.groups.clone())).collect::<Vec<_>>();
+    assert_eq!(same(&all), same(&r));
     assert_eq!(
-        hints,
+        hints(&all),
         [at(37, m1_y, mirror), at(38, m2_y, mirror), at(39, distance_m6_m7, m6_m7), at(40, vip_vin, inputs)]
     );
-    assert!(r.statements.keys().all(|s| s.chain.is_empty() && s.point.is_none()), "{:?}", r.statements);
+    assert!(all.notes.is_empty(), "{:?}", all.notes);
+    assert_eq!((&all.kept, all.position(object(p, "#M2"))), (&r.kept, r.position(object(p, "#M2"))));
     // the rest is kept: the witness has M1 at the origin, M2 at y = 3, mirrored
     let (m1, m2) = (object(p, "#M1"), object(p, "#M2"));
     assert_eq!(r.position(m1), Some((0.0, 0.0)));

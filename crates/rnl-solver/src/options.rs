@@ -320,6 +320,16 @@ pub struct SolverOptions {
     /// those found are given, each minimal, and the hint says that its list is not complete
     /// (`crate::Discarded::complete`). [`DEFAULT_TIME_LIMIT`] by default.
     pub time_limit: Option<f64>,
+    /// Whether a fact of priority low that is discarded gets every minimal conflict group it has
+    /// and its place in the hints by statement (the draft 0.3, 8.5). Discarding such a fact is
+    /// expected, and its hints may be left out (8.5, 7.6); so, false by default, it gets only its
+    /// first group, which the deletion filter makes of the explanation of its conflict, with
+    /// `complete` false (`crate::Discarded::complete`), it is in no hint by statement, and a note
+    /// says that the groups of such facts are listed only with `rnl solve --report`, which sets
+    /// this. Enumerating every group of a low fact can cost far more than the rest of the
+    /// resolution. It changes no fact kept and no placement, only the report, so it is not in the
+    /// canonical text, and not in the hash (chapter 17), nor an option `--solver-options` reads.
+    pub hints_for_low: bool,
 }
 
 impl Default for SolverOptions {
@@ -331,6 +341,7 @@ impl Default for SolverOptions {
             beam: 4,
             budget: Budget::default(),
             time_limit: Some(DEFAULT_TIME_LIMIT),
+            hints_for_low: false,
         }
     }
 }
@@ -346,7 +357,8 @@ impl SolverOptions {
 
     /// The options as one string, every setting that changes the result, in a fixed order with
     /// numbers by `fmt_num`: what the options digest of `sig1` hashes (chapter 17). The time limit
-    /// is among them, as it may change which facts are kept (8.5).
+    /// is among them, as it may change which facts are kept (8.5); `hints_for_low`, which changes
+    /// only the report, is not.
     pub fn canonical(&self) -> String {
         let none = |v: Option<f64>| v.map_or_else(|| "none".to_string(), fmt_num);
         format!(
@@ -463,6 +475,12 @@ mod tests {
         assert_eq!(options.objectives.layer_of("turns"), Some(1));
         assert!(!options.objectives.is_on("signal_flow"));
         assert_eq!(options.validate(), Ok(()));
+        // the groups of the facts of priority low are not all sought by default; asking for them
+        // changes only the report, so not the canonical text, and no setting reads it (8.5, 7.6)
+        assert!(!options.hints_for_low);
+        let low = SolverOptions { hints_for_low: true, ..SolverOptions::default() };
+        assert_eq!(low.canonical(), DEFAULT);
+        assert!(SolverOptions::parse("hints_for_low=true").unwrap_err().contains("no option `hints_for_low`"));
     }
 
     #[test]
@@ -480,6 +498,7 @@ mod tests {
             beam: 7,
             budget: Budget { candidates: 7, astar_expansions: 8 },
             time_limit: None,
+            hints_for_low: false,
         };
         let text = options.canonical();
         assert_eq!(

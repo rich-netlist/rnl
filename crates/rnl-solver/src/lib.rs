@@ -81,7 +81,8 @@ pub struct SolveReport {
     /// The facts kept, by their index in [`LevelProblem::facts`], in that order (8.5).
     pub kept: Vec<usize>,
     /// The facts discarded, in the order of [`LevelProblem::facts`] (8.5), each with every minimal
-    /// conflict group it has (the draft 0.3, 8.5).
+    /// conflict group it has (the draft 0.3, 8.5); a fact of priority low with its first only,
+    /// unless [`SolverOptions::hints_for_low`] asks for its hints.
     pub discarded: Vec<Discarded>,
     /// The facts that contradict themselves, by their index, in order (the draft 0.3, 8.5): each
     /// has no solution on its own, whatever orientations the objects it reaches take and whatever
@@ -91,8 +92,9 @@ pub struct SolveReport {
     pub failed: Vec<usize>,
     /// The hints of 8.5 by statement (the draft 0.3, 8.5): each statement whose facts are in a
     /// minimal conflict group of a fact discarded, with those facts and the facts discarded because
-    /// of them, so that the author sees which statements lost their effect through it. In the
-    /// order of [`Statement`]: by where the statement is written, then by usage.
+    /// of them, so that the author sees which statements lost their effect through it; a fact of
+    /// priority low only when [`SolverOptions::hints_for_low`] asks for its hints. In the order of
+    /// [`Statement`]: by where the statement is written, then by usage.
     pub statements: BTreeMap<Statement, StatementHint>,
     /// The objectives that are on but have nothing to work with, such as the current direction
     /// without a supply or ground symbol, or that this version does not compute: one sentence
@@ -130,7 +132,10 @@ pub struct Discarded {
     pub groups: Vec<Vec<usize>>,
     /// Whether `groups` holds every minimal conflict group of the fact. False when the time limit
     /// ([`SolverOptions::time_limit`]) ran out before they were all found, so that the hint says
-    /// that its list is not complete (the draft 0.3, 8.5), and for a fact `undecided`.
+    /// that its list is not complete (the draft 0.3, 8.5); for a fact of priority low whose other
+    /// groups were not sought, as its hints may be left out (8.5, 7.6), unless
+    /// [`SolverOptions::hints_for_low`] asks for them, which a note of the report says; and for a
+    /// fact `undecided`.
     pub complete: bool,
     /// The check for it did not finish within the time limit ([`SolverOptions::time_limit`], the
     /// draft 0.3, 8.5): it is discarded without a proof that it conflicts, `groups` is empty, and

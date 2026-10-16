@@ -67,6 +67,10 @@
 //!    one fact of it. When no seed is left, the groups are all. The seeds come from one search
 //!    over the facts, each in or out, the facts that rank first taken in first, with unit
 //!    propagation over the two kinds of clauses, which goes on from each seed to the next ([`Map`]).
+//!    A fact of priority low, whose hints may be left out as discarding it is expected (8.5, 7.6),
+//!    keeps its first group only, `complete` false, and is in no hint by statement, unless
+//!    [`SolverOptions::hints_for_low`] asks for its hints; a note says so. Its groups can cost far
+//!    more than the rest of the resolution.
 //!
 //! The search is complete: a fact is discarded only when no values of the literals have a
 //! solution, so what is kept is the lexicographically greatest consistent subset in the order of
@@ -120,6 +124,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use num_traits::Zero;
 use rnl_runtime::geom::{fmt_num, Orient};
 use rnl_runtime::host::file_name;
+use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::problem::{FactKind, LevelProblem, PointRef, Position};
 
 use crate::model::{ax, turned, Bound, ChoiceKind, LitKey, Model, OrientEffect, PointId, VarKind};
@@ -1290,7 +1295,8 @@ pub struct Resolved {
     /// The facts kept, by their index in [`LevelProblem::facts`], in that order (8.5).
     pub kept: Vec<usize>,
     /// The facts discarded, in that order, each with its minimal conflict groups, all of them
-    /// unless the time limit ran out before they were found, or undecided ([`Discarded`]).
+    /// unless the time limit ran out before they were found, or the fact is of priority low and
+    /// its hints are not asked for ([`SolverOptions::hints_for_low`]), or undecided ([`Discarded`]).
     pub discarded: Vec<Discarded>,
     /// The facts that contradict themselves (the draft 0.3, 8.5), by their index, in that order:
     /// each has no solution on its own, whatever values the literals it opens take, and fails
@@ -1298,7 +1304,8 @@ pub struct Resolved {
     /// no hint by statement; the other facts are resolved as in the problem without them.
     pub failed: Vec<usize>,
     /// The hints of 8.5 by statement (the draft 0.3, 8.5): each statement whose facts are in a
-    /// group of `discarded`, with those facts and the facts discarded because of them.
+    /// group of `discarded`, with those facts and the facts discarded because of them; a fact of
+    /// priority low only when [`SolverOptions::hints_for_low`] asks for its hints.
     pub statements: BTreeMap<Statement, StatementHint>,
     pub work: Work,
     /// The errors (7.6): one for each fact of `failed`, in order, such as `the fact [3] ORDER
@@ -1307,8 +1314,9 @@ pub struct Resolved {
     /// The warnings (7.6): one for each fact discarded undecided because the time limit was out
     /// (the draft 0.3, 8.5), in the order of the facts.
     pub warnings: Vec<String>,
-    /// Anything else worth saying of the resolution, one sentence each. What the time limit left
-    /// undone is not here but in `warnings` and [`Discarded::complete`].
+    /// Anything else worth saying of the resolution, one sentence each, such as the facts of
+    /// priority low whose groups were not all sought ([`SolverOptions::hints_for_low`]). What the
+    /// time limit left undone is not here but in `warnings` and [`Discarded::complete`].
     pub notes: Vec<String>,
     pub(crate) model: Model,
     pub(crate) witness: Witness,
@@ -1385,8 +1393,9 @@ pub(crate) fn point_value(problem: &LevelProblem, g: &Geometry, r: &PointRef, ax
 /// Resolves the facts of a level (8.5), with the time limit of the options on `clock` (the draft
 /// 0.3, 8.5): each fact on its own first, then the facts that have a solution on their own in
 /// order, then a first minimal conflict group of each fact discarded, then the other groups of
-/// each, within the one limit; then, counted in work and not timed, the witness taken as written
-/// (see the module).
+/// each, but of a fact of priority low unless [`SolverOptions::hints_for_low`] asks for them,
+/// within the one limit; then, counted in work and not timed, the witness taken as written (see
+/// the module).
 pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Resolved {
     let tol = from_f64(options.tolerance)
         .filter(|t| *t >= Q::zero())
@@ -1448,7 +1457,10 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
         .collect();
     // The minimal conflict groups, still within the limit (the draft 0.3, 8.5): first one group
     // of each fact discarded, the deletion filter of its explanation, so that every fact has one
-    // before the time goes to the others; then the others of each, in the order of the facts.
+    // before the time goes to the others; then the others of each, in the order of the facts. A
+    // fact of priority low keeps its first only, and is in no hint by statement, unless its hints
+    // are asked for: they may be left out (8.5, 7.6), and its groups can be many.
+    let hinted = |f: usize| options.hints_for_low || problem.facts[f].priority != Priority::Low;
     let mut discarded: Vec<Discarded> = undecided
         .iter()
         .map(|&fact| Discarded { fact, groups: Vec::new(), complete: false, undecided: true })
@@ -1459,14 +1471,20 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
         let groups = if minimal { vec![group] } else { Vec::new() };
         found.push(Discarded { fact: f, groups, complete: false, undecided: false });
     }
+    let mut first_only = Vec::new();
     for d in &mut found {
         let Some(first) = d.groups.first().cloned() else { continue };
+        if !hinted(d.fact) {
+            first_only.push(d.fact);
+            continue;
+        }
         let before: Vec<usize> = kept.iter().copied().take_while(|&k| k < d.fact).collect();
         (d.groups, d.complete) = all_groups(&model, n, limits, d.fact, &before, first, &mut work);
     }
     discarded.extend(found);
     discarded.sort_by_key(|d| d.fact);
-    let statements = statement_hints(problem, &discarded);
+    let shown: Vec<Discarded> = discarded.iter().filter(|d| hinted(d.fact)).cloned().collect();
+    let statements = statement_hints(problem, &shown);
     // The tolerance decides conflicts (11.7); it need not move what the facts do not move. When
     // the facts kept hold with their constants as written, the witness is taken from them so: a
     // PLACE at 4 puts the object at 4, not at 4 less the tolerance, where a simplex stops.
@@ -1476,6 +1494,9 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     // within the caps of work, the witness of the resolution, which satisfies the facts kept
     // within the tolerance.
     let mut notes = Vec::new();
+    if !first_only.is_empty() {
+        notes.push(first_groups_only(&first_only));
+    }
     let placed = taken_as_written(problem, &model, &kept, &mut work);
     if placed.is_none() {
         notes.push(
@@ -1487,6 +1508,23 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     let (witness, as_written, placing) = placed.unwrap_or_else(|| (witness_of(&r, &model), false, model.clone()));
     drop(r);
     Resolved { kept, discarded, failed, statements, work, errors, warnings, notes, witness, model, as_written, placing }
+}
+
+/// The note on the facts of priority low discarded whose other groups were not sought
+/// ([`SolverOptions::hints_for_low`]), such as `… are listed only with --report (hints_for_low), as
+/// its hints may be left out (8.5, 7.6): [40] has its first group only, and is in no hint by
+/// statement`.
+fn first_groups_only(facts: &[usize]) -> String {
+    let names: Vec<String> = facts.iter().map(|f| format!("[{f}]")).collect();
+    let said = match names.split_last() {
+        Some((one, [])) => format!("{one} has its first group only, and is"),
+        Some((last, rest)) => format!("{} and {last} have their first group only, and are", rest.join(", ")),
+        None => String::new(),
+    };
+    format!(
+        "the minimal conflict groups of a fact of priority low discarded are listed only with --report \
+         (hints_for_low), as its hints may be left out (8.5, 7.6): {said} in no hint by statement"
+    )
 }
 
 /// The hints of 8.5 by statement (the draft 0.3, 8.5): for each statement whose facts are in a

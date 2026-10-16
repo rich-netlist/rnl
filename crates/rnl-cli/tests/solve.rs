@@ -439,8 +439,28 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     assert!(!lines.iter().any(|l| l == "  unsolved:"), "{lines:#?}");
     assert!(level.record.contains("%tc::mid @PLACE("), "{}", level.record);
     assert!(lines.iter().any(|l| l.starts_with("  work: ")) && lines.iter().any(|l| l.starts_with("  time: ")));
-    // with --report every fact, in the order of 8.5
+    // the solver gave the low fact its first group only, which a note says (8.5, 7.6), so that even
+    // the report of every fact leaves out its hints
+    let low = level.solved.report.discarded.iter().find(|d| d.fact == 40).unwrap();
+    assert_eq!((&low.groups, low.complete), (&vec![vec![2]], false));
+    let note = "    the minimal conflict groups of a fact of priority low discarded are listed only with --report \
+                (hints_for_low), as its hints may be left out (8.5, 7.6): [40] has its first group only, and is in \
+                no hint by statement";
+    assert!(lines.iter().any(|l| l == note), "{lines:#?}");
+    let every = rnl_cli::solve::report(level, true);
+    assert!(every.contains(&format!("  {}", discarded[2])), "{every:#?}");
+    // with --report the solver seeks them: every fact, in the order of 8.5, the same solution, and
+    // no note
+    let options = SolveOptions {
+        solver: SolverOptions { hints_for_low: true, ..SolverOptions::without_time_limit() },
+        ..unlimited()
+    };
+    let reported = solve(&case("T4-miller-conflicts"), &FsProvider::new(&[]), &options).unwrap();
+    assert_eq!(reported.files, run.files);
+    let level = &reported.levels[0];
+    assert!(level.solved.report.discarded.iter().all(|d| d.complete), "{:?}", level.solved.report.discarded);
     let all = rnl_cli::solve::report(level, true);
+    assert!(!all.iter().any(|l| l == note), "{all:#?}");
     assert_eq!(all.iter().filter(|l| l.starts_with("    kept [")).count(), 38);
     assert_eq!(all.iter().filter(|l| l.starts_with("    discarded [")).count(), 3);
     assert!(all.iter().any(|l| l == "    kept [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:37)"), "{all:#?}");
@@ -456,6 +476,13 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     );
     let head = all.iter().position(|l| l == "  statements whose facts took part in discarding (8.5):").unwrap();
     assert_eq!(all[head + 1..head + 5], statements, "{all:#?}");
+    // the command asks for them with --report
+    let t4 = path_str(&case("T4-miller-conflicts"));
+    let out = path_str(&scratch("t4-report"));
+    let (code, stdout, _) = rnl(&["solve", &t4, "-o", &out, "--report", "--solver-options", "time_limit=none"]);
+    assert_eq!(code, 0, "{stdout}");
+    assert!(stdout.contains(&format!("\n{}\n{}\n", all[at], all[at + 1])), "{stdout}");
+    assert!(!stdout.contains(" are listed only with --report "), "{stdout}");
 }
 
 #[test]

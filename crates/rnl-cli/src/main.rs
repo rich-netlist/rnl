@@ -49,7 +49,8 @@ solve options (the levels are read without their type=\"generated\" records; -o 
                       from one run to the next; when the conflict groups of a fact are not all found
                       within it, its hint says that the list is not complete
   --report            print what became of every fact, not only of the facts discarded, and the hints
-                      of the facts of priority low and of the statements only they lose (8.5)
+                      of the facts of priority low and of the statements only they lose (8.5), whose
+                      minimal conflict groups the solver then seeks all, not only the first
   a fact that has no solution on its own contradicts itself and fails (8.5): solve prints an error line
   for it, and solves the level and writes it back without it
   solve exits with 1 when an error was reported, once the files are written: one of the netlist as a
@@ -335,6 +336,8 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
     let solver = SolverOptions::default()
         .with_overrides(args.solver_options.as_deref().unwrap_or(""))
         .map_err(|e| format!("--solver-options: {e}"))?;
+    // the groups of the facts of priority low are sought only for their hints (8.5, 7.6)
+    let solver = SolverOptions { hints_for_low: args.report, ..solver };
     let options = SolveOptions {
         dialect: args.dialect.clone(),
         std: args.std,

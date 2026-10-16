@@ -313,18 +313,32 @@ fn check(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
         assert_eq!(resolve(&alone, options).failed, [0], "fact {f}");
     }
     let n = problem.objects.len();
+    // a fact of priority low has its first group only, unless its hints are asked for (8.5, 7.6)
+    let hinted = |f: usize| options.hints_for_low || problem.facts[f].priority != Priority::Low;
     for d in r.discarded.iter().filter(|d| !d.undecided) {
-        assert!(d.complete && !d.groups.is_empty(), "{d:?}");
+        if hinted(d.fact) {
+            assert!(d.complete && !d.groups.is_empty(), "{d:?}");
+        } else {
+            assert!(!d.complete && d.groups.len() == 1, "{d:?}");
+        }
         assert!(d.groups.windows(2).all(|w| w[0] < w[1]), "{d:?}: the groups are not sorted");
         for g in &d.groups {
             check_group(&r, n, d.fact, g, &format!("{d:?}"));
         }
         let before: Vec<usize> = r.kept.iter().copied().filter(|&k| k < d.fact).collect();
         if let Some(every) = every_group(&r.model, n, d.fact, &before) {
-            assert_eq!(d.groups, every, "{d:?}: not every group");
+            if hinted(d.fact) {
+                assert_eq!(d.groups, every, "{d:?}: not every group");
+            } else {
+                assert!(every.contains(&d.groups[0]), "{d:?}: {every:?}");
+            }
         }
     }
-    assert_eq!(r.statements, statement_hints(problem, &r.discarded));
+    let first_only: Vec<usize> =
+        r.discarded.iter().filter(|d| !d.undecided && !hinted(d.fact)).map(|d| d.fact).collect();
+    assert_eq!(r.notes.iter().any(|n| n.contains(" are listed only with --report ")), !first_only.is_empty());
+    let shown: Vec<Discarded> = r.discarded.iter().filter(|d| hinted(d.fact)).cloned().collect();
+    assert_eq!(r.statements, statement_hints(problem, &shown));
     for (s, hint) in &r.statements {
         for &k in &hint.facts {
             assert_eq!(&Statement::of(problem, k), s);
@@ -358,13 +372,60 @@ fn the_example_of_the_brainstorm_message() {
     facts[0].priority = Priority::High;
     facts[4].priority = Priority::Low;
     let p = problem_of(points(2), facts);
-    let r = check(&p, &SolverOptions::without_time_limit());
+    let hints = SolverOptions { hints_for_low: true, ..SolverOptions::without_time_limit() };
+    let r = check(&p, &hints);
     assert_eq!(r.kept, vec![0, 1, 2]);
     // fact 2 has exactly one minimal group, facts 1 and 3, and fact 4 exactly one, fact 5 (the
     // draft 0.3, 8.5)
     assert_eq!(r.discarded, vec![discarded(3, vec![0, 2]), discarded(4, vec![1])]);
     assert_eq!(r.discarded[0].groups, [[0, 2]]);
     assert_eq!(r.discarded[1].groups, [[1]]);
+    // without the hints of the facts of priority low, fact 4 has its first group, not known to
+    // be all it has (8.5, 7.6)
+    let s = check(&p, &SolverOptions::without_time_limit());
+    let first = Discarded { complete: false, ..discarded(4, vec![1]) };
+    assert_eq!(s.discarded, vec![discarded(3, vec![0, 2]), first]);
+    assert_eq!((&s.kept, &s.witness), (&r.kept, &r.witness));
+}
+
+#[test]
+fn the_groups_of_a_low_fact_are_all_sought_only_when_its_hints_are_asked_for() {
+    // three points apart on x and a low ALIGN x of them all: each pair of the PLACEs is a minimal
+    // group of the ALIGN. Its hints may be left out (the draft 0.3, 8.5; 7.6): by default it has
+    // the first group, which the deletion filter gives, `complete` false, no hint by statement,
+    // and a note says that the groups of such facts are listed only with --report; with
+    // `hints_for_low`, every group and the hints, and no note. Nothing else changes
+    let at = |line: u32| Some(rnl_runtime::diag::Loc::new("cases/t.sp", line, 3));
+    let mut p = three_apart();
+    for (k, f) in p.facts.iter_mut().enumerate() {
+        f.source = at(10 + k as u32);
+    }
+    p.facts[3].priority = Priority::Low;
+    let first = check(&p, &SolverOptions::without_time_limit());
+    let d = &first.discarded[0];
+    assert_eq!((first.discarded.len(), d.fact, d.groups.len(), d.complete, d.undecided), (1, 3, 1, false, false));
+    assert!(first.statements.is_empty(), "{:?}", first.statements);
+    let note = "the minimal conflict groups of a fact of priority low discarded are listed only with --report \
+                (hints_for_low), as its hints may be left out (8.5, 7.6): [3] has its first group only, and is in \
+                no hint by statement";
+    assert_eq!(first.notes, [note]);
+    let all = check(&p, &SolverOptions { hints_for_low: true, ..SolverOptions::without_time_limit() });
+    assert_eq!(all.discarded, vec![discarded_with(3, vec![vec![0, 1], vec![0, 2], vec![1, 2]])]);
+    assert!(all.discarded[0].groups.contains(&d.groups[0]), "{d:?}");
+    assert_eq!(all.statements.len(), 3, "{:?}", all.statements);
+    assert!(all.notes.is_empty(), "{:?}", all.notes);
+    assert_eq!((&first.kept, &first.witness, &first.placing), (&all.kept, &all.witness, &all.placing));
+    assert!(first.work.resolve_nodes + first.work.pivots < all.work.resolve_nodes + all.work.pivots);
+    // a normal fact has every group either way
+    p.facts[3].priority = Priority::Normal;
+    let normal = check(&p, &SolverOptions::without_time_limit());
+    assert_eq!(normal.discarded, all.discarded);
+    assert_eq!(normal.statements, all.statements);
+    // two low facts are named together
+    assert_eq!(
+        first_groups_only(&[3, 7]),
+        note.replace("[3] has its first group only, and is", "[3] and [7] have their first group only, and are")
+    );
 }
 
 #[test]
