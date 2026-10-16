@@ -550,7 +550,10 @@ impl Interp<'_> {
                 }
                 Some(cur) => {
                     let FactData::Coord(_, cv) = at[cur.2].data else { continue };
-                    if (level(p), &f.pos) > (level(cur.0), &cur.1) {
+                    // the facts of the segments of one pipe share their statement's position; the
+                    // later segment is written later and comes first (8.5), and its facts were
+                    // collected later
+                    if (level(p), &f.pos, k) > (level(cur.0), &cur.1, cur.2) {
                         if (cv - v).abs() > tol {
                             self.drop_fact(s, &at[cur.2], f);
                         }
@@ -599,7 +602,8 @@ impl Interp<'_> {
                 }
                 Some(cur) => {
                     let FactData::Orient(cc) = orient[cur.2].data else { continue };
-                    if (level(p), &f.pos) > (level(cur.0), &cur.1) {
+                    // as for coordinates: of the segments of one pipe, the later wins (8.5)
+                    if (level(p), &f.pos, k) > (level(cur.0), &cur.1, cur.2) {
                         if cc != code {
                             self.drop_fact(s, &orient[cur.2], f);
                         }

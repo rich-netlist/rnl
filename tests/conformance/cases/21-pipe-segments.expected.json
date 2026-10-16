@@ -1,0 +1,459 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "21-pipe-segments.sp",
+      "kind": "file",
+      "file": "21-pipe-segments.sp",
+      "symbols": [
+        {
+          "name": "$RES",
+          "box": [
+            -0.6,
+            -3.0,
+            0.6,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  3.0
+                ],
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.6,
+                  1.667
+                ],
+                [
+                  -0.6,
+                  1.0
+                ],
+                [
+                  0.6,
+                  0.333
+                ],
+                [
+                  -0.6,
+                  -0.333
+                ],
+                [
+                  0.6,
+                  -1.0
+                ],
+                [
+                  -0.6,
+                  -1.667
+                ],
+                [
+                  0.0,
+                  -2.0
+                ],
+                [
+                  0.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            5.0,
+            5.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R2",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R3",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            25.0,
+            3.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R4",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            -10.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#R1::name",
+          "anchor": [
+            6.1,
+            5.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "R1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R1::value",
+          "anchor": [
+            6.1,
+            4.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R2::name",
+          "anchor": [
+            9.75,
+            1.1
+          ],
+          "lines": [
+            [
+              {
+                "text": "R2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R2::value",
+          "anchor": [
+            10.95,
+            1.1
+          ],
+          "lines": [
+            [
+              {
+                "text": "2k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R90",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R3::name",
+          "anchor": [
+            26.1,
+            3.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "R3",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R3::value",
+          "anchor": [
+            26.1,
+            2.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "3k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R4::name",
+          "anchor": [
+            1.1,
+            -9.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "R4",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R4::value",
+          "anchor": [
+            1.1,
+            -10.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "4k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "21-pipe-segments.sp",
+      "line": 11,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "file": "21-pipe-segments.sp",
+      "line": 11,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "file": "21-pipe-segments.sp",
+      "line": 13,
+      "col": 5
+    },
+    {
+      "severity": "hint",
+      "file": "21-pipe-segments.sp",
+      "line": 14,
+      "col": 44
+    },
+    {
+      "severity": "hint",
+      "file": "21-pipe-segments.sp",
+      "line": 14,
+      "col": 44
+    },
+    {
+      "severity": "hint",
+      "file": "21-pipe-segments.sp",
+      "line": 12,
+      "col": 26
+    }
+  ]
+}
