@@ -119,6 +119,28 @@ test("a segment goes back to its level with its view and the instance left selec
   await viewer.selected(`instance XK1 in ${TOP}`);
 });
 
+test("the up button that hides at the root leaves the focus on the drawing, so that Enter goes back down at once", async ({ page, viewer }) => {
+  // WebKit moves the focus off a hidden element only some milliseconds later, and on Linux a click
+  // gives a button the focus: an Enter in between went to the hidden button, which the page leaves
+  // Enter to, and did nothing. Pressed and followed by Enter in one go, as a keyboard can:
+  await down(page, viewer, "XK1");
+  await page.locator("#up").focus();
+  const after = await page.evaluate(() => {
+    document.getElementById("up").click();
+    const focused = document.activeElement;
+    focused.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    return { focused: focused.id, path: window.viewer.path.length };
+  });
+  expect(after).toEqual({ focused: "canvas", path: 2 });
+  await expect(page.locator("#level-name")).toHaveText("bank");
+  // and from the keyboard alone
+  await page.locator("#up").focus();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#level-name")).toHaveText("bank");
+  expect(await segments(page)).toEqual([TOP, "bank XK1"]);
+});
+
 test("a subcircuit picked in the index is the root, with no up button; going down from it extends the path", async ({ page, viewer }) => {
   await page.locator("#tab-hierarchy").click();
   await page.locator("#index .index-row", { hasText: "block" }).click();

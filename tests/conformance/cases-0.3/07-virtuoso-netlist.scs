@@ -1,0 +1,18 @@
+// A netlist as Virtuoso writes it: the instances of subcircuits are named I0, I1 and so on
+*! Virtuoso 导出的 Spectre 网表，子电路的实例叫 I0、I1（16.3）：0.3 版的文件不用 SPICE 的规则包，它们按子电路画成方框，不画成电流源；真正的电流源 I2 按 master isource 画。
+*! 头段记录写在 simulator lang=spectre 之后，用 // 写（16.3）。子电路 inv 里的 M0、M1 按模型类型画成 P、N 型 MOS。
+simulator lang=spectre
+// @RNL(type="header") { @VERSION("0.3")}
+global 0 vdd!
+subckt inv in out
+    M0 (out in vdd! vdd!) pmos4 w=2u l=180n
+    M1 (out in 0 0) nmos4 w=1u l=180n
+// @RNL { #M0 @PLACE(0, 4); #M1 @PLACE(0, -4) }
+ends inv
+I0 (a b) inv
+I1 (b c) inv
+I2 (vdd! a) isource dc=10u
+V0 (vdd! 0) vsource dc=1.8
+model pmos4 bsim4 type=p
+model nmos4 bsim4 type=n
+// @RNL { #I0 @PLACE(0, 0); #I1 @PLACE(10, 0); #I2 @PLACE(-6, 4); #V0 @PLACE(-12, 0) }

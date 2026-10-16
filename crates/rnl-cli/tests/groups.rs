@@ -36,11 +36,11 @@ impl Outcome {
 
 /// R1 to R6 in a row, with `statements`, one per line, in a record of the main file.
 fn solve(statements: &str) -> Outcome {
-    solve_in("0.2", false, statements)
+    solve_in("0.2", statements)
 }
 
-/// The same in a file that declares `version`, read with the draft 0.3 or without it.
-fn solve_in(version: &str, draft: bool, statements: &str) -> Outcome {
+/// The same in a file that declares `version`.
+fn solve_in(version: &str, statements: &str) -> Outcome {
     let mut text = String::from("* groups\n");
     for k in 1..=6 {
         text += &format!("R{k} n{k} n{} 1k\n", k + 1);
@@ -51,7 +51,7 @@ fn solve_in(version: &str, draft: bool, statements: &str) -> Outcome {
     }
     text += "* }\n.end\n";
     let files = MemoryProvider::new().with("g.sp", &text);
-    let options = Options { std: false, draft, ..Options::solver() };
+    let options = Options { std: false, ..Options::solver() };
     let r = interpret_file(Path::new("g.sp"), None, &files, &options).unwrap();
     let errors =
         r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
@@ -200,16 +200,16 @@ const TWO_GROUPS: &str = r#"
 const ONE_FOR_EACH: &str =
     "several objects are spread into their members, so write one PRIORITY for each group (5.2.1)";
 
-/// A file of 0.2, the same read with the draft, and a file of the draft 0.3, which reads PRIORITY
-/// as 0.2 does: its 7.2, which took each of several objects as it is, is withdrawn.
-const READINGS: [(&str, bool); 3] = [("0.2", false), ("0.2", true), ("0.3", true)];
+/// A file of 0.2, and a file of the draft 0.3, which reads PRIORITY as 0.2 does: its 7.2, which took
+/// each of several objects as it is, is withdrawn.
+const VERSIONS: [&str; 2] = ["0.2", "0.3"];
 
 #[test]
 fn several_objects_are_spread_into_their_members_a_group_too() {
-    for (version, draft) in READINGS {
+    for version in VERSIONS {
         // the loose objects are put together as in {…} (5.2.1): PRIORITY receives the members and
         // fails at the first; every group stays on
-        let r = solve_in(version, draft, TWO_GROUPS);
+        let r = solve_in(version, TWO_GROUPS);
         assert_eq!(r.errors.len(), 1, "{version}: {:?}", r.errors);
         assert!(r.errors[0].contains("PRIORITY takes constraints, usages and grouped sets only, not #R1 (14.8)"));
         assert!(r.errors[0].contains(ONE_FOR_EACH), "{version}: {:?}", r.errors);
@@ -218,7 +218,6 @@ fn several_objects_are_spread_into_their_members_a_group_too() {
         // a group and a set of constraints: the constraints after the group are not reached
         let r = solve_in(
             version,
-            draft,
             r#"
             %a_set = {#R1 #R2} @GROUP;
             %c1 = {#R3 #R4} @ALIGN("y");
@@ -236,7 +235,6 @@ fn several_objects_are_spread_into_their_members_a_group_too() {
         // member of the group fails
         let r = solve_in(
             version,
-            draft,
             r#"
             $PAIR = @DEFINE(roles=["a", "b"]) { %row = {?a ?b} @ALIGN("y") };
             %u = #R3(a) #R4(b) @AS $PAIR;
@@ -260,8 +258,8 @@ fn one_priority_for_each_group_turns_both_off() {
         %a_set @PRIORITY("disabled");
         %b_set @PRIORITY("disabled")
     "#;
-    for (version, draft) in READINGS {
-        let r = solve_in(version, draft, statements);
+    for version in VERSIONS {
+        let r = solve_in(version, statements);
         assert!(r.errors.is_empty(), "{version}: {:?}", r.errors);
         assert_eq!(r.groups(), [["#R5", "#R6"]]);
     }
@@ -277,9 +275,9 @@ fn without_a_group_among_the_objects_the_error_says_nothing_of_groups() {
 }
 
 #[test]
-fn a_file_of_0_3_without_the_draft_is_of_an_unsupported_version() {
-    let r = solve_in("0.3", false, TWO_GROUPS);
+fn a_file_of_a_version_not_read_is_of_an_unsupported_version() {
+    let r = solve_in("0.4", TWO_GROUPS);
     assert_eq!(r.errors.len(), 1, "{:?}", r.errors);
-    assert!(r.errors[0].contains("unsupported version 0.3: no RNL of this file is interpreted"), "{:?}", r.errors);
+    assert!(r.errors[0].contains("unsupported version 0.4: no RNL of this file is interpreted"), "{:?}", r.errors);
     assert!(r.groups().is_empty());
 }

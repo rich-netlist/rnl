@@ -731,7 +731,8 @@ impl Interp<'_> {
                 if let Some(k) = &key {
                     let kt = self.scene_keytext(s, att, k);
                     if let ObjData::KeyText { layers, site: ks, generated: g, .. } = self.om(kt) {
-                        layers.push((at.clone(), items, style));
+                        // its place in the order of writing, where a later segment is later (5.5)
+                        layers.push((order_pos(&at, &ctx.segments), items, style));
                         *ks = site;
                         *g = generated;
                     }

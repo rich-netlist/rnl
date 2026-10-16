@@ -135,8 +135,8 @@ pub fn is_fixed(p: &LevelProblem, view: &LevelView) -> bool {
 }
 
 /// The solve status of a level. `p` and `view` are its problem and its model in the reading
-/// without the records of the solver; `with` is the same document read with them, and with
-/// [`crate::Options::draft`] for a file of the draft, so that it has the check of their numbers.
+/// without the records of the solver; `with` is the same document read with them, which has the
+/// check of their numbers.
 /// The record of the solver of a level is its last record with `type="generated"` in the level's
 /// own text, without `scope=` (2.8, 5.9). A level that has one is solved or stale, whatever it
 /// leaves to decide: a stale record of a level that now has nothing to decide still holds what it
@@ -158,9 +158,9 @@ pub fn solve_status(p: &LevelProblem, view: &LevelView, with: &Interpretation) -
 
 /// The previous result of the level of `p`, the problem a solver reads, from `with`: the same
 /// document read with the records of the solver and with [`crate::Options::problems`], such as the
-/// reading a viewer shows with the problems built as well, and with [`crate::Options::draft`] for
-/// a file of the draft. None when the level has no record of the solver. Read without `problems`,
-/// `with` gives the hash and whether the numbers hold, but no decision.
+/// reading a viewer shows with the problems built as well. None when the level has no record of
+/// the solver. Read without `problems`, `with` gives the hash and whether the numbers hold, but no
+/// decision.
 pub fn previous(p: &LevelProblem, with: &Interpretation) -> Option<Previous> {
     let rec = solver_record(&with.doc, p.level)?;
     let hash = field(rec, "hash");
@@ -209,7 +209,7 @@ pub fn previous(p: &LevelProblem, with: &Interpretation) -> Option<Previous> {
 /// Both readings of a host document that a solver makes (2.8): without the records of the
 /// solver, whose [`Interpretation::problems`] it solves, and with them, which gives the previous
 /// result of each level ([`previous`]), in the order of the problems. `options` are those of both
-/// readings, such as `std` and `draft`; `generated` and `problems` are set here. `sink` holds what
+/// readings, such as `std`; `generated` and `problems` are set here. `sink` holds what
 /// the host adapter reported, if anything. A document without records of the solver is read once.
 pub fn read_previous(
     doc: HostDocument,
@@ -238,7 +238,7 @@ fn solver_record(doc: &HostDocument, level: usize) -> Option<&Record> {
 }
 
 /// Whether the numbers of a record of the solver hold, as `with` read them; None when it uses no
-/// number, or when `with` was read without the draft, which reads no number.
+/// number, as a record of a file of 0.2 never does.
 fn numbers_hold(with: &Interpretation, level: usize, rec: &Record) -> Option<bool> {
     let at = rec.loc(0);
     let numbering = with.numbering.iter().find(|n| n.level == level)?;

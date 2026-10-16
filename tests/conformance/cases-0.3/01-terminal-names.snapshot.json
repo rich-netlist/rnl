@@ -175,11 +175,27 @@
       "model": {
         "symbols": [
           {
-            "id": "%\"(viewer default)\"",
-            "name": "%\"(viewer default)\"",
-            "package": null,
+            "id": "$TRANSMISSION_LINE",
+            "name": "$TRANSMISSION_LINE",
+            "package": "rnl-std-basic",
             "level": null,
-            "default": true,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$RC_LINE",
+            "name": "$RC_LINE",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NJFET",
+            "name": "$NJFET",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
             "definition": null
           }
         ],
@@ -197,7 +213,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "$TRANSMISSION_LINE",
               "source": null
             },
             "at": {
@@ -217,8 +233,8 @@
                   "#T1:1"
                 ],
                 "at": [
-                  -3.0,
-                  1.0
+                  -4.0,
+                  0.0
                 ],
                 "dir": 180,
                 "nets": [
@@ -230,10 +246,10 @@
                   "#T1:2"
                 ],
                 "at": [
-                  -3.0,
-                  -1.0
+                  -2.0,
+                  -2.0
                 ],
-                "dir": 180,
+                "dir": 270,
                 "nets": [
                   "&0"
                 ]
@@ -243,8 +259,8 @@
                   "#T1:3"
                 ],
                 "at": [
-                  3.0,
-                  1.0
+                  4.0,
+                  0.0
                 ],
                 "dir": 0,
                 "nets": [
@@ -256,10 +272,10 @@
                   "#T1:4"
                 ],
                 "at": [
-                  3.0,
-                  -1.0
+                  2.0,
+                  -2.0
                 ],
-                "dir": 0,
+                "dir": 270,
                 "nets": [
                   "&0"
                 ]
@@ -275,7 +291,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "$TRANSMISSION_LINE",
               "source": null
             },
             "at": {
@@ -295,8 +311,8 @@
                   "#O1:1"
                 ],
                 "at": [
-                  7.0,
-                  1.0
+                  6.0,
+                  0.0
                 ],
                 "dir": 180,
                 "nets": [
@@ -308,10 +324,10 @@
                   "#O1:2"
                 ],
                 "at": [
-                  7.0,
-                  -1.0
+                  8.0,
+                  -2.0
                 ],
-                "dir": 180,
+                "dir": 270,
                 "nets": [
                   "&0"
                 ]
@@ -321,8 +337,8 @@
                   "#O1:3"
                 ],
                 "at": [
-                  13.0,
-                  1.0
+                  14.0,
+                  0.0
                 ],
                 "dir": 0,
                 "nets": [
@@ -334,10 +350,10 @@
                   "#O1:4"
                 ],
                 "at": [
-                  13.0,
-                  -1.0
+                  12.0,
+                  -2.0
                 ],
-                "dir": 0,
+                "dir": 270,
                 "nets": [
                   "&0"
                 ]
@@ -353,7 +369,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "$RC_LINE",
               "source": null
             },
             "at": {
@@ -373,8 +389,8 @@
                   "#U1:1"
                 ],
                 "at": [
-                  17.0,
-                  1.0
+                  16.0,
+                  0.0
                 ],
                 "dir": 180,
                 "nets": [
@@ -386,10 +402,10 @@
                   "#U1:2"
                 ],
                 "at": [
-                  17.0,
-                  -1.0
+                  24.0,
+                  0.0
                 ],
-                "dir": 180,
+                "dir": 0,
                 "nets": [
                   "&d"
                 ]
@@ -399,10 +415,10 @@
                   "#U1:3"
                 ],
                 "at": [
-                  23.0,
-                  1.0
+                  20.0,
+                  -2.0
                 ],
-                "dir": 0,
+                "dir": 270,
                 "nets": [
                   "&0"
                 ]
@@ -418,7 +434,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "$NJFET",
               "source": null
             },
             "at": {
@@ -438,10 +454,10 @@
                   "#Z1:1"
                 ],
                 "at": [
-                  27.0,
-                  1.0
+                  30.0,
+                  2.0
                 ],
-                "dir": 180,
+                "dir": 90,
                 "nets": [
                   "&d"
                 ]
@@ -452,7 +468,7 @@
                 ],
                 "at": [
                   27.0,
-                  -1.0
+                  0.0
                 ],
                 "dir": 180,
                 "nets": [
@@ -464,10 +480,10 @@
                   "#Z1:3"
                 ],
                 "at": [
-                  33.0,
-                  1.0
+                  30.0,
+                  -2.0
                 ],
-                "dir": 0,
+                "dir": 270,
                 "nets": [
                   "&0"
                 ]
@@ -483,7 +499,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "%\"(viewer default)\"",
+              "value": "$NJFET",
               "source": null
             },
             "at": {
@@ -503,10 +519,10 @@
                   "#Z2:1"
                 ],
                 "at": [
-                  37.0,
-                  1.0
+                  40.0,
+                  2.0
                 ],
-                "dir": 180,
+                "dir": 90,
                 "nets": [
                   "&d"
                 ]
@@ -517,7 +533,7 @@
                 ],
                 "at": [
                   37.0,
-                  -1.0
+                  0.0
                 ],
                 "dir": 180,
                 "nets": [
@@ -529,10 +545,10 @@
                   "#Z2:3"
                 ],
                 "at": [
-                  43.0,
-                  1.0
+                  40.0,
+                  -2.0
                 ],
-                "dir": 0,
+                "dir": 270,
                 "nets": [
                   "&0"
                 ]
@@ -557,12 +573,12 @@
             ],
             "points": [
               [
-                3.0,
-                1.0
+                4.0,
+                0.0
               ],
               [
-                7.0,
-                1.0
+                6.0,
+                0.0
               ]
             ],
             "mode": "straight",
@@ -583,12 +599,12 @@
             ],
             "points": [
               [
-                13.0,
-                1.0
+                14.0,
+                0.0
               ],
               [
-                17.0,
-                1.0
+                16.0,
+                0.0
               ]
             ],
             "mode": "straight",
@@ -612,16 +628,16 @@
             ],
             "points": [
               [
-                17.0,
-                -1.0
+                24.0,
+                0.0
               ],
               [
-                27.0,
-                1.0
+                30.0,
+                2.0
               ],
               [
-                37.0,
-                1.0
+                40.0,
+                2.0
               ]
             ],
             "mode": "auto",
@@ -657,32 +673,32 @@
             ],
             "points": [
               [
-                -3.0,
-                -1.0
+                -2.0,
+                -2.0
               ],
               [
-                3.0,
-                -1.0
+                2.0,
+                -2.0
               ],
               [
-                7.0,
-                -1.0
+                8.0,
+                -2.0
               ],
               [
-                13.0,
-                -1.0
+                12.0,
+                -2.0
               ],
               [
-                23.0,
-                1.0
+                20.0,
+                -2.0
               ],
               [
-                33.0,
-                1.0
+                30.0,
+                -2.0
               ],
               [
-                43.0,
-                1.0
+                40.0,
+                -2.0
               ]
             ],
             "mode": "auto",
@@ -715,10 +731,10 @@
             ],
             "anchor": [
               0.0,
-              2.3
+              1.15
             ],
             "halign": "middle",
-            "valign": "bottom",
+            "valign": "baseline",
             "rotate": 0.0,
             "size": 1.0,
             "style": {}
@@ -748,10 +764,10 @@
             ],
             "anchor": [
               10.0,
-              2.3
+              1.15
             ],
             "halign": "middle",
-            "valign": "bottom",
+            "valign": "baseline",
             "rotate": 0.0,
             "size": 1.0,
             "style": {}
@@ -781,10 +797,10 @@
             ],
             "anchor": [
               20.0,
-              2.3
+              0.75
             ],
             "halign": "middle",
-            "valign": "bottom",
+            "valign": "baseline",
             "rotate": 0.0,
             "size": 1.0,
             "style": {}
@@ -813,11 +829,44 @@
               ]
             ],
             "anchor": [
-              30.0,
-              2.3
+              30.5,
+              1.05
             ],
-            "halign": "middle",
-            "valign": "bottom",
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Z1::model",
+            "attach": "#Z1",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "mesf",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              30.5,
+              -1.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
             "rotate": 0.0,
             "size": 1.0,
             "style": {}
@@ -846,11 +895,44 @@
               ]
             ],
             "anchor": [
-              40.0,
-              2.3
+              40.5,
+              1.05
             ],
-            "halign": "middle",
-            "valign": "bottom",
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Z2::model",
+            "attach": "#Z2",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "mesf",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.5,
+              -1.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
             "rotate": 0.0,
             "size": 1.0,
             "style": {}
@@ -864,35 +946,39 @@
   "packages": [
     {
       "name": "rnl-std-style",
-      "version": "0.2"
+      "version": "0.3"
     },
     {
-      "name": "rnl-std-symbols",
-      "version": "0.2"
+      "name": "rnl-std-basic",
+      "version": "0.3"
     },
     {
-      "name": "rnl-std-virtual",
-      "version": "0.2"
+      "name": "rnl-std-semiconductors",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-spice",
+      "version": "0.3"
     },
     {
       "name": "rnl-std-core",
-      "version": "0.2"
+      "version": "0.3"
     },
     {
       "name": "rnl-std-fill",
-      "version": "0.2"
+      "version": "0.3"
     },
     {
       "name": "rnl-std-semantics",
-      "version": "0.2"
+      "version": "0.3"
     },
     {
       "name": "rnl-std-layout",
-      "version": "0.2"
+      "version": "0.3"
     },
     {
       "name": "rnl-std",
-      "version": "0.2"
+      "version": "0.3"
     }
   ],
   "files": [

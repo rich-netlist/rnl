@@ -54,8 +54,8 @@ pub struct Request {
     /// Give each level's primitives; false when not given.
     #[serde(default)]
     pub primitives: bool,
-    /// For development only: read the files that declare the draft 0.3 as well; false when not
-    /// given.
+    /// Accepted, with no effect, as [`rnl_runtime::Options::draft`] has none: the files of 0.3
+    /// are read without it. Kept for compatibility, to be removed later.
     #[serde(default)]
     pub draft: bool,
     /// Give each level its solve status, what a frontend decides from whether to solve it
@@ -194,10 +194,11 @@ fn write(request: WriteRequest) -> Response {
         Ok(t) => t,
         Err(e) => return Response::Error(e),
     };
-    let entry = rnl_edit::entry(&request.write.dialect);
+    // the netlist built under the name it was written under, so that it reads the same
+    let entry = rnl_edit::entry_of(&request.write);
     let mut files: BTreeMap<String, String> =
         request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
-    files.insert(normalize(entry), text.clone());
+    files.insert(normalize(&entry), text.clone());
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: Some(request.write.dialect),
@@ -206,7 +207,7 @@ fn write(request: WriteRequest) -> Response {
         primitives: request.primitives,
         status: request.status,
     };
-    match rnl_view::build(entry, &files, &options) {
+    match rnl_view::build(&entry, &files, &options) {
         Ok(document) => Response::Written(Box::new(Written { text, document })),
         Err(e) => Response::Error(e),
     }
@@ -405,6 +406,13 @@ C1 a 0 1p
         let native = BuildOptions { status: true, ..BuildOptions::default() };
         let native = rnl_view::build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &native).unwrap();
         assert_eq!(status["document"], serde_json::to_value(native).unwrap());
+        // `draft`, kept for compatibility, changes nothing: a file of 0.3 is read without it
+        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+        let files = json!({ "t.sp": text });
+        let plain = answer(json!({ "entry": "t.sp", "files": files }));
+        assert_eq!(answer(json!({ "entry": "t.sp", "files": files, "draft": true })), plain);
+        let diagnostics = plain["document"]["diagnostics"].as_array().unwrap();
+        assert!(diagnostics.iter().all(|d| d["severity"] != "error"), "{diagnostics:?}");
     }
 
     #[test]
@@ -478,7 +486,7 @@ R1 a 0 1k
         let text = v["written"]["text"].as_str().unwrap();
         assert_eq!(
             text,
-            "\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author=\"test\") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n"
+            "\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author=\"test\") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n"
         );
         let d = &v["written"]["document"];
         assert_eq!(
@@ -504,6 +512,17 @@ R1 a 0 1k
                 .contains("// @RNL(author=\"test\") {\n//   #r1 @PLACE(0, 0)\n// }\n"),
             "{v}"
         );
+        // saved under a name that is not a .scs file: read so, in the SPICE mode up to its switch,
+        // with the header after it, and built under that name; a request without it is as above
+        let named = json!({ "dialect": "spectre", "netlist": "* t\nsimulator lang=spectre\nr1 (a 0) resistor r=1k\n",
+                            "author": "test", "file": "top.net", "ops": [] });
+        let v = answer(json!({ "write": named, "svg": false }));
+        assert_eq!(v["written"]["document"]["path"], "/rnl-edit/top.net");
+        assert_eq!(
+            v["written"]["text"],
+            "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nr1 (a 0) resistor r=1k\n"
+        );
+        assert_eq!(errors(&v["written"]["document"]), 0, "{v}");
     }
 
     #[test]

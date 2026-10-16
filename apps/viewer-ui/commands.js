@@ -179,8 +179,10 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     return;
   } else id = keyCommand(e, typing);
-  // Enter opens a selected subcircuit instance, and presses a button that has the focus
-  if (id === "descend" && (e.target instanceof HTMLButtonElement || opens(selected) === null)) return;
+  // Enter opens a selected subcircuit instance, and presses a button that has the focus; a button
+  // hidden with the focus still on it, until the browser moves the focus, is pressed by nothing
+  const button = e.target instanceof HTMLButtonElement && e.target.getClientRects().length > 0;
+  if (id === "descend" && (button || opens(selected) === null)) return;
   if (id) {
     e.preventDefault();
     command(id);

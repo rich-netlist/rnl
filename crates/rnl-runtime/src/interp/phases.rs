@@ -1084,9 +1084,10 @@ impl Interp<'_> {
         Some(((x0 + x1) / 2.0, (y0 + y1) / 2.0))
     }
 
-    /// Where the text's `dx` or `dy` was last written (13.3).
+    /// Where the text's `dx` or `dy` was last written (13.3), as a place in the order of writing, where
+    /// a later segment of a pipe is later (5.5).
     pub(crate) fn offset_pos(&self, s: SceneId, t: ObjId, dx: bool) -> Pos {
-        let mut p = self.scenes[s].created.get(&t).cloned().unwrap_or_else(|| pos(&[0]));
+        let mut p = self.scenes[s].created_order.get(&t).cloned().unwrap_or_else(|| pos(&[0]));
         if let ObjData::KeyText { layers, .. } = self.o(t) {
             let mut ls: Vec<&(Pos, TextItems, StyleMap)> = layers.iter().collect();
             ls.sort_by(|a, b| a.0.cmp(&b.0));
@@ -1136,7 +1137,7 @@ impl Interp<'_> {
                         matches!(f.data, FactData::Coord(a, _) if a == axis)
                             && self.fact_priority(s, f) != Priority::Disabled
                     })
-                    .map(|f| f.pos.clone())
+                    .map(|f| f.order())
                     .collect();
                 let off = self.offset_pos(s, t, k == 0);
                 if ats.is_empty() || off > *ats.iter().max().unwrap() {

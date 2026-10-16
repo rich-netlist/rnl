@@ -159,7 +159,6 @@ function draw(pkg, symbols) {
     files: { ...workspace, [entry]: netlist },
     package_dirs: packageDirs,
     dialect: "spice",
-    draft: true,
     primitives: true,
     parts: { drawing: true, model: true },
   });

@@ -20,6 +20,13 @@
 //! writing one back moves the lines of those after it, so the document is read again before the
 //! next level, the texts written so far held in memory over the files.
 //!
+//! A record in a region written to be encrypted (`.prot … .unprot`, `protect … unprotect`) is
+//! gone once the region is encrypted (2.2): the record of a level whose end lies in one goes before
+//! the region (`writeback::record_line`), and a level whose own text lies in one, such as a
+//! subcircuit of an encrypted library, is solved but not written, with a note that says so. In a
+//! `simulator lang=spice` section of a Spectre file, where `//` is no comment, a record is carried
+//! by `*` (2.2).
+//!
 //! The resolution of each level is limited in time by the solver's `time_limit` (the draft 0.3,
 //! 8.5), 5 seconds unless `--solver-options` says otherwise, measured on the wall clock
 //! ([`WallClock`]): a fact whose check does not finish within it is discarded undecided, and the
@@ -47,6 +54,15 @@
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
 //! (16.1), so nothing is written into it.
 //!
+//! A file of 0.2 whose record of the solver needs what only 0.3 writes, the numbers of the objects
+//! without a name (5.9) and the routes of wires (13.1), is raised to 0.3 (16.1), and its levels
+//! are solved again as they read in 0.3 ([`solve_with_clock`], [`VersionRaise`]). Its header
+//! record then says `@VERSION("0.3")`, followed by `@USE-PACKAGE(name="rnl-std", version="0.2")`
+//! unless the file, or a file that includes it, pins a version of the standard package, so that
+//! it keeps the standard series 0.2 it was read with (16.3). A name in it spelled like a word that
+//! 0.3 adds, `numbering`, would change its meaning, so such a file stays at 0.2, with a warning
+//! for each such name, and its record lists what it cannot hold as unsolved.
+//!
 //! [`solve`] does the work without writing a file; [`write`] puts the texts where `-o DIR` or
 //! `--in-place` says, with the other files the document reads copied under `DIR`; [`lines`] is
 //! what the command prints of the levels.
@@ -58,12 +74,13 @@ use std::time::{Duration, Instant};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::host::file_name;
 use rnl_runtime::interp::obj::Priority;
-use rnl_runtime::interp::unit::{DRAFT_VERSION, SUPPORTED_VERSION};
+use rnl_runtime::interp::unit::SUPPORTED_VERSION;
 use rnl_runtime::problem::{sig1, FactKind, LevelProblem, PointRef, Reference};
-use rnl_runtime::solution::{write_record, Written};
+use rnl_runtime::solution::{write_record, Unsolved, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{
-    generated_files, move_header_for, remove_generated_with_header, replace_generated_with_header,
+    generated_files, move_header_for, pins_std, raise_version, record_line, remove_generated_with_header,
+    replace_generated_with_header, spelled_like_new_words, PIN_STD_0_2,
 };
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Clock, Discarded, Solved, SolverOptions, Statement, AUTHOR};
@@ -77,7 +94,7 @@ pub struct SolveOptions {
     pub dialect: Option<String>,
     /// Use the standard package implicitly at the root (16.3).
     pub std: bool,
-    /// For development only: read the files that declare the draft 0.3 as well.
+    /// No effect, kept for compatibility: the files of 0.3 are read without a switch.
     pub draft: bool,
     /// Only the level with this title: a subcircuit name, or the file name.
     pub level: Option<String>,
@@ -106,10 +123,11 @@ pub struct SolvedLevel {
     pub problem: LevelProblem,
     pub solved: Solved,
     /// The record as [`write_record`] gives it, with what it cannot hold (`unsolved`) and what it
-    /// holds although a solver should not do it (`notes`).
+    /// holds although a solver should not do it (`notes`); and, among the notes, why it is not
+    /// written into the file when the level lies in a region written to be encrypted (2.2).
     pub written: Written,
     /// The record written into the file: [`Written::record`] finished by
-    /// `rnl_view::finish_record`.
+    /// `rnl_view::finish_record`; for a level not written, the record it would have.
     pub record: String,
     /// The `hash` of the record head (17).
     pub hash: String,
@@ -160,8 +178,30 @@ pub struct SolveRun {
     /// solved, the files it includes, the package files named by `path=` (16.2). Not the packages
     /// of the package directories, which a file reaches by name, nor the bundled ones.
     pub read: Vec<String>,
-    /// The errors of the document read as a solver reads it, before anything was written back.
+    /// The errors of the document read as a solver reads it, before anything was written back
+    /// but the files raised to 0.3 ([`SolveRun::raised`]).
     pub errors: usize,
+    /// The files of 0.2 whose records of the solver need 0.3 (16.1): raised, or kept at 0.2.
+    pub raised: Vec<VersionRaise>,
+}
+
+/// A file of 0.2 whose records of the solver need what only 0.3 writes: numbers for the objects
+/// without a name (5.9) and the routes of wires (13.1), which a record of 0.2 lists as unsolved
+/// ([`Unsolved::needs_0_3`]). `rnl solve` raises it to 0.3 (16.1), and solves its levels again
+/// as they read in 0.3.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VersionRaise {
+    /// The path of the file, `/`-separated.
+    pub path: String,
+    /// Whether it is raised to 0.3; when not, it stays at 0.2 and [`VersionRaise::why`] says why.
+    pub raised: bool,
+    /// Whether its header record got `@USE-PACKAGE(name="rnl-std", version="0.2")`, which keeps
+    /// the standard series 0.2 it was read with (16.3): it does, unless it, or a file that includes
+    /// it, pins a version of the standard package already.
+    pub pinned: bool,
+    /// Why it is not raised: each name in it spelled like a word that 0.3 adds, whose meaning the
+    /// raise would change (16.1, 16.5), or that its header record cannot be changed so.
+    pub why: Vec<String>,
 }
 
 /// Where [`write`] puts the files solved.
@@ -234,17 +274,72 @@ pub fn solve(file: &Path, files: &dyn Provider, options: &SolveOptions) -> Resul
 
 /// [`solve`], with the time limit of the resolution of each level measured on `clock` (the draft
 /// 0.3, 8.5): the limit of a level runs from the reading when its resolution begins.
+///
+/// A file of 0.2 whose record of the solver needs what only 0.3 writes, numbers and the routes of
+/// wires ([`Unsolved::needs_0_3`]), is raised to 0.3 (16.1): when no name in it is spelled like a
+/// word that 0.3 adds ([`spelled_like_new_words`]), its header record says 0.3, with
+/// `@USE-PACKAGE(name="rnl-std", version="0.2")` unless it or a file that includes it pins a
+/// version of the standard package, so that it keeps the series 0.2 it was read with (16.3). The
+/// levels are then solved again from the start, as they read with the files raised; a file whose
+/// name stands in the way stays at 0.2, and its record lists what it cannot hold as unsolved.
 pub fn solve_with_clock(
     file: &Path,
     files: &dyn Provider,
     options: &SolveOptions,
     clock: &dyn Clock,
 ) -> Result<SolveRun, String> {
+    let (run, wants) = pass(file, files, options, clock, &[])?;
+    if wants.is_empty() {
+        return Ok(run);
+    }
+    // the files as they were read, raised
+    let entry = path_str(file);
+    let original = rnl_view::interpret(&entry, options.dialect.as_deref(), files, &options.runtime())?;
+    let mut raised = Vec::new();
+    let mut texts: Vec<(String, String)> = Vec::new();
+    for (path, file) in wants {
+        let clashes = spelled_like_new_words(&original.doc, &file);
+        let pin = !pins_std(&original.doc, &file);
+        let text = text_of(&original, files, &file, &path)?;
+        let out = if clashes.is_empty() { raise_version(&original.doc, &file, &text, pin) } else { None };
+        let why = match &out {
+            Some(_) => Vec::new(),
+            None if clashes.is_empty() => vec!["its header record cannot say 0.3 so".to_string()],
+            None => clashes
+                .into_iter()
+                .map(|c| format!("{c}, has the spelling of a word that 0.3 adds (2.8), and would mean something else"))
+                .collect(),
+        };
+        raised.push(VersionRaise { path: path.clone(), raised: out.is_some(), pinned: out.is_some() && pin, why });
+        texts.extend(out.map(|t| (path, t)));
+    }
+    // the files read are those of the first pass: the second reads the files raised from memory
+    let read = run.read.clone();
+    let mut run = if texts.is_empty() { run } else { pass(file, files, options, clock, &texts)?.0 };
+    run.read = read;
+    run.raised = raised;
+    Ok(run)
+}
+
+/// One pass of [`solve_with_clock`] over the levels, with the texts of the files `raised` over
+/// the files: the run, and the files of 0.2, path and name in the document, whose records need
+/// 0.3; those only in the first pass, when nothing is raised.
+fn pass(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    clock: &dyn Clock,
+    raised: &[(String, String)],
+) -> Result<(SolveRun, Vec<(String, String)>), String> {
     let entry = path_str(file);
     let runtime = options.runtime();
     let canonical = options.solver.canonical();
     let files = Noting { files, read: RefCell::new(Vec::new()) };
     let mut memory = MemoryProvider::new();
+    for (path, text) in raised {
+        memory.insert(path, text);
+    }
+    let mut wants: Vec<(String, String)> = Vec::new();
     let read = |memory: &MemoryProvider| -> Result<Interpretation, String> {
         let both = Layered { layers: vec![memory, &files] };
         rnl_view::interpret(&entry, options.dialect.as_deref(), &both, &runtime)
@@ -256,14 +351,11 @@ pub fn solve_with_clock(
     for p in first.problems.iter().filter(|p| options.level.as_ref().is_none_or(|t| *t == p.title)) {
         match first.unsupported.get(p.level).cloned().flatten() {
             Some((at, version)) => {
-                let mut reason = format!(
+                let reason = format!(
                     "{} declares the version {version}, which this reading does not interpret: none of its RNL is \
                      read, and it is kept as it is (16.1)",
                     file_name(&first.doc.levels[at].path)
                 );
-                if version == DRAFT_VERSION && !options.draft {
-                    reason.push_str(&format!("; --draft reads the draft {DRAFT_VERSION} as well"));
-                }
                 let path = normalize(&first.doc.levels[p.level].path);
                 not_solved.push(NotSolved {
                     title: p.title.clone(),
@@ -319,24 +411,44 @@ pub fn solve_with_clock(
         let solved = rnl_solver::solve_with_clock(p, &options.solver, clock);
         let time = start.elapsed();
         let hash = sig1(p, &canonical);
-        let written = write_record(p, &solved.solution, AUTHOR, &hash);
+        let mut written = write_record(p, &solved.solution, AUTHOR, &hash);
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);
+        // a file of 0.2 whose record needs what only 0.3 writes (16.1)
+        let want = (path.clone(), host.file.clone());
+        let needs = p.version == "0.2" && written.unsolved.iter().any(Unsolved::needs_0_3);
+        if raised.is_empty() && needs && !wants.contains(&want) {
+            wants.push(want);
+        }
         let (record, texts) = {
             let both = Layered { layers: vec![&memory, &files] };
             let record = rnl_view::finish_record(&r.doc, &both, &runtime, p, &written.record);
-            // the record and the header in one pass, at the positions of this reading: a header
-            // below the end of a subcircuit written moves to line 2, to stay the first record (2.8)
             let text = text_of(&r, &both, &host.file, &path)?;
-            let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
-            let mut texts = vec![(path.clone(), out)];
-            // a record of the solver for this level written with scope= in another file (2.6)
-            for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
-                let Some(lv) = r.doc.levels.iter().find(|l| l.file == other) else { continue };
-                let at = normalize(&lv.path);
-                let text = text_of(&r, &both, &other, &at)?;
-                let out = remove_generated_with_header(&r.doc, p.level, &other, &text, &version_of(&r, &other));
-                texts.push((at, out));
+            let mut texts = Vec::new();
+            match record_line(&r.doc, p.level, &text) {
+                // a level whose own text lies in a region written to be encrypted has no place for a
+                // record that is not gone once the region is encrypted (2.2): nothing is written for it
+                Err((a, b)) => written.notes.push(format!(
+                    "the record is not written: {} lies in a region written to be encrypted, lines {a} to {b} of {}, \
+                     where a record is gone once the region is encrypted (2.2)",
+                    p.title,
+                    file_name(&host.file)
+                )),
+                Ok(_) => {
+                    // the record and the header in one pass, at the positions of this reading: a
+                    // header below the end of a subcircuit written moves to line 2, to stay the first
+                    // record (2.8)
+                    let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
+                    texts.push((path.clone(), out));
+                    // a record of the solver for this level written with scope= in another file (2.6)
+                    for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
+                        let Some(lv) = r.doc.levels.iter().find(|l| l.file == other) else { continue };
+                        let at = normalize(&lv.path);
+                        let text = text_of(&r, &both, &other, &at)?;
+                        let out = remove_generated_with_header(&r.doc, p.level, &other, &text, &version_of(&r, &other));
+                        texts.push((at, out));
+                    }
+                }
             }
             (record, texts)
         };
@@ -352,7 +464,7 @@ pub fn solve_with_clock(
     }
     let packages: Vec<String> = files.files.package_files().iter().map(|p| normalize(p)).collect();
     let read: Vec<String> = files.read.take().into_iter().filter(|p| !packages.contains(p)).collect();
-    Ok(SolveRun { entry, levels, not_solved, files: solved_files, read, errors })
+    Ok((SolveRun { entry, levels, not_solved, files: solved_files, read, errors, raised: Vec::new() }, wants))
 }
 
 /// The text of a file as the reading `r` found it, which the positions of its records refer to; read
@@ -594,12 +706,13 @@ fn fact_what(p: &LevelProblem, k: usize) -> String {
 
 /// A statement as the hints of 8.5 name it (the draft 0.3, 8.5; 7.6): where it is written, such
 /// as `T4-miller-conflicts.sp:37`; for one in the body of a definition, the usage written in the
-/// level that it was expanded from, the first of its chain, with how the level writes its roles,
-/// a role that cannot be referred to left out, and the line of the definition, such as `the usage
-/// of $MIRROR_PAIR with #M1(a) #M2(b) %ax(axis) (rnl-std-layout.rnl:10 of its definition)`. When the
+/// level that it was expanded from, the first of its chain, where it is written, with how the
+/// level writes its roles, a role that cannot be referred to left out, and the line of the
+/// definition, such as `the usage of $MIRROR_PAIR at T4-miller-conflicts.sp:22 with #M1(a) #M2(b) %ax(axis)
+/// (rnl-std-layout.rnl:10 of its definition)`. When the
 /// statement is in the body of a definition used inside another, the line is of the innermost,
 /// and every definition of the chain is named, outermost first, as for a fact: `%o1, the usage of
-/// $OUTER with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)`. For the coordinates of a
+/// $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)`. For the coordinates of a
 /// point, which have no statement of their own, the point.
 fn statement_name(p: &LevelProblem, s: &Statement) -> String {
     if let Some(k) = s.point {
@@ -611,6 +724,9 @@ fn statement_name(p: &LevelProblem, s: &Statement) -> String {
         Reference::Name(n) => format!("{n}, the usage of {}", u.definition),
         _ => format!("the usage of {}", u.definition),
     };
+    if let Some(at) = &u.source {
+        name.push_str(&format!(" at {}:{}", file_name(&at.file), at.line));
+    }
     let roles: Vec<String> =
         u.roles.iter().filter_map(|r| r.written.as_ref().map(|w| format!("{w}({})", r.role))).collect();
     if !roles.is_empty() {
@@ -663,7 +779,7 @@ pub fn errors(run: &SolveRun) -> usize {
 /// What the command prints of the levels of a run, in the order of the document's levels: each
 /// level solved as [`report`] gives it, each level not solved in one line.
 pub fn lines(run: &SolveRun, all: bool) -> Vec<String> {
-    let mut out = Vec::new();
+    let mut out: Vec<String> = run.raised.iter().map(raised).collect();
     for k in 0..=run.levels.len() {
         for n in run.not_solved.iter().filter(|n| n.before == k) {
             out.push(not_solved(n));
@@ -673,6 +789,25 @@ pub fn lines(run: &SolveRun, all: bool) -> Vec<String> {
         }
     }
     out
+}
+
+/// The line of a file of 0.2 whose records of the solver need 0.3: raised, or kept at 0.2 with a
+/// warning (16.1).
+pub fn raised(v: &VersionRaise) -> String {
+    let name = file_name(&v.path);
+    if v.raised {
+        let series = if v.pinned {
+            format!("its header record keeps the standard series 0.2 it was read with: {PIN_STD_0_2} (16.3)")
+        } else {
+            "the version of the standard package that it pins stays (16.3)".to_string()
+        };
+        format!(
+            "{name}: raised from 0.2 to 0.3 for what its records of the solver write that only 0.3 has, the numbers of \
+             the objects without a name (5.9) and the routes of wires (13.1) (16.1); {series}"
+        )
+    } else {
+        format!("warning: {name} stays at 0.2, so what only 0.3 can write is unsolved (16.1): {}", v.why.join("; "))
+    }
 }
 
 /// The line of a level that is not solved.
@@ -860,17 +995,20 @@ mod tests {
         let f = p.facts.iter().position(|f| f.label == "%row").unwrap();
         let s = Statement::of(p, f);
         assert_eq!(s.chain.len(), 2, "{s:?}");
-        let named = "%o1, the usage of $OUTER with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
+        let named = "%o1, the usage of $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
         assert_eq!(statement_name(p, &s), named);
         assert!(describe_fact(p, f).ends_with("(normal, p.sp:6, from $OUTER in $PAIR)"), "{}", describe_fact(p, f));
         // a role that cannot be referred to is left out, not shown as `?`
         let mut q = p.clone();
         q.usages[s.chain[0]].roles[0].written = None;
-        let named = "%o1, the usage of $OUTER with #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
+        let named = "%o1, the usage of $OUTER at p.sp:8 with #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
         assert_eq!(statement_name(&q, &s), named);
         // a statement in the body of a definition the level uses itself
         let one = Statement { chain: s.chain[..1].to_vec(), ..s.clone() };
-        assert_eq!(statement_name(p, &one), "%o1, the usage of $OUTER with #R1(a) #R2(b) (p.sp:6 of its definition)");
+        assert_eq!(
+            statement_name(p, &one),
+            "%o1, the usage of $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of its definition)"
+        );
     }
 
     #[test]

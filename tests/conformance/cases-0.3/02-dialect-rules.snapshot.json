@@ -9,7 +9,7 @@
       "name": "02-dialect-rules.scs",
       "file": 0,
       "line": 0,
-      "status": null,
+      "status": "2 without a position; constraints: 4 unsolved",
       "host": {
         "ports": [],
         "instances": [
@@ -72,8 +72,16 @@
             "definition": null
           },
           {
-            "id": "$RES",
-            "name": "$RES",
+            "id": "$RESISTOR",
+            "name": "$RESISTOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND_SYMBOL",
+            "name": "$GROUND_SYMBOL",
             "package": "rnl-std-basic",
             "level": null,
             "default": false,
@@ -146,7 +154,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "$RES",
+              "value": "$RESISTOR",
               "source": null
             },
             "at": {
@@ -167,7 +175,7 @@
                 ],
                 "at": [
                   10.0,
-                  3.0
+                  2.0
                 ],
                 "dir": 90,
                 "nets": [
@@ -180,7 +188,7 @@
                 ],
                 "at": [
                   10.0,
-                  -3.0
+                  -2.0
                 ],
                 "dir": 270,
                 "nets": [
@@ -188,6 +196,100 @@
                 ]
               }
             ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:28:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND_STUB",
+            "attach": {
+              "t": "#I0:2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                3.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-basic.rnl:457:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-fill.rnl:28:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND_STUB",
+            "attach": {
+              "t": "#R0:2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                -2.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-basic.rnl:457:9#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
           }
         ],
         "points": [],
@@ -223,7 +325,73 @@
             "halign": "middle",
             "valign": "bottom",
             "rotate": 0.0,
-            "size": null,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R0::name",
+            "attach": "#R0",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R0",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.95,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R0::value",
+            "attach": "#R0",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.95,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
             "style": {}
           }
         ],
@@ -235,8 +403,8 @@
       "kind": "subckt",
       "name": "cell",
       "file": 0,
-      "line": 11,
-      "status": null,
+      "line": 8,
+      "status": "2 without a position",
       "host": {
         "ports": [
           "&p",
@@ -257,12 +425,66 @@
         ]
       },
       "model": {
-        "symbols": [],
+        "symbols": [
+          {
+            "id": "$IO_PORT_SYMBOL",
+            "name": "$IO_PORT_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
         "symbol": {
           "value": null,
           "source": null
         },
-        "objects": [],
+        "objects": [
+          {
+            "id": "@rnl-std-fill.rnl:40:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&p"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-fill.rnl:40:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&n"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          }
+        ],
         "points": [],
         "wires": [],
         "texts": [],
@@ -275,7 +497,7 @@
       "name": "spsub",
       "file": 1,
       "line": 3,
-      "status": null,
+      "status": "2 without a position",
       "host": {
         "ports": [
           "&a",
@@ -333,16 +555,24 @@
       "model": {
         "symbols": [
           {
-            "id": "$ISRC",
-            "name": "$ISRC",
+            "id": "$CURRENT_SOURCE",
+            "name": "$CURRENT_SOURCE",
             "package": "rnl-std-basic",
             "level": null,
             "default": false,
             "definition": null
           },
           {
-            "id": "$RES",
-            "name": "$RES",
+            "id": "$RESISTOR",
+            "name": "$RESISTOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$IO_PORT_SYMBOL",
+            "name": "$IO_PORT_SYMBOL",
             "package": "rnl-std-basic",
             "level": null,
             "default": false,
@@ -363,7 +593,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "$ISRC",
+              "value": "$CURRENT_SOURCE",
               "source": null
             },
             "at": {
@@ -384,7 +614,7 @@
                 ],
                 "at": [
                   0.0,
-                  3.0
+                  2.0
                 ],
                 "dir": 90,
                 "nets": [
@@ -397,7 +627,7 @@
                 ],
                 "at": [
                   0.0,
-                  -3.0
+                  -2.0
                 ],
                 "dir": 270,
                 "nets": [
@@ -415,7 +645,7 @@
             "definition": null,
             "attach": null,
             "symbol": {
-              "value": "$RES",
+              "value": "$RESISTOR",
               "source": null
             },
             "at": {
@@ -436,7 +666,7 @@
                 ],
                 "at": [
                   10.0,
-                  3.0
+                  2.0
                 ],
                 "dir": 90,
                 "nets": [
@@ -449,7 +679,7 @@
                 ],
                 "at": [
                   10.0,
-                  -3.0
+                  -2.0
                 ],
                 "dir": 270,
                 "nets": [
@@ -457,11 +687,188 @@
                 ]
               }
             ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:40:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&a"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-fill.rnl:40:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&b"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
           }
         ],
         "points": [],
         "wires": [],
-        "texts": [],
+        "texts": [
+          {
+            "id": "#I1::name",
+            "attach": "#I1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "I1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.5,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#I1::value",
+            "attach": "#I1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1m",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.5,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::name",
+            "attach": "#R1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.95,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::value",
+            "attach": "#R1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.95,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
         "shapes": []
       }
     },
@@ -470,8 +877,8 @@
       "kind": "subckt",
       "name": "mid",
       "file": 0,
-      "line": 17,
-      "status": null,
+      "line": 14,
+      "status": "2 without a position",
       "host": {
         "ports": [
           "&a",
@@ -517,6 +924,14 @@
             "package": null,
             "level": null,
             "default": true,
+            "definition": null
+          },
+          {
+            "id": "$IO_PORT_SYMBOL",
+            "name": "$IO_PORT_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
             "definition": null
           }
         ],
@@ -576,6 +991,50 @@
                 ]
               }
             ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:40:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&a"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-fill.rnl:40:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IO_PORT",
+            "attach": {
+              "p": "&b"
+            },
+            "symbol": {
+              "value": "$IO_PORT_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
           }
         ],
         "points": [],
@@ -611,7 +1070,7 @@
             "halign": "middle",
             "valign": "bottom",
             "rotate": 0.0,
-            "size": null,
+            "size": 1.0,
             "style": {}
           }
         ],
@@ -622,11 +1081,7 @@
   "dialect": "spectre",
   "packages": [
     {
-      "name": "rnl-std-core",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std",
+      "name": "rnl-std-style",
       "version": "0.3"
     },
     {
@@ -634,7 +1089,31 @@
       "version": "0.3"
     },
     {
+      "name": "rnl-std-semiconductors",
+      "version": "0.3"
+    },
+    {
       "name": "rnl-std-spectre",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-core",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-layout",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std",
       "version": "0.3"
     },
     {

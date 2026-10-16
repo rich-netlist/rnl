@@ -27,6 +27,6 @@ Do not copy material that cannot be licensed this way. This includes code or tex
 
 When you add files or change licensing, run [`reuse lint`](https://reuse.software/) from the repository root; it must report the project as compliant. Keep relative Markdown links working.
 
-When you change the Rust crates, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test --workspace` must pass. When a change is meant to alter the results of the [conformance corpus](tests/conformance/README.md), write its expected files again with `RNL_BLESS=1` and review the difference.
+When you change the Rust crates, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test --workspace` must pass. When a change is meant to alter the results of the [conformance corpus](tests/conformance/README.md), write its expected files again with `RNL_BLESS=1`, or `RNL_BLESS_0_3=1` for the cases of 0.3, and review the difference.
 
 When you change the pages of the site, edit `site/src/` and write every text in both languages, as described in [`site/README.md`](site/README.md); `python site/build.py --check` must pass.

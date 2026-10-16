@@ -423,6 +423,10 @@ pub struct UsageEntry {
     /// [`Reference::GeneratedNumber`] with `index` 1 and on, then the points that its roles are
     /// written with as coordinates. 0 for the other usages.
     pub written_numbers: usize,
+    /// Where it is written: its AS or ATTACH, or the generation rule that makes it (10.5), such as
+    /// a statement in the body of a definition for a usage made there. Like every place, it is left
+    /// out of the input digest ([`sig1`]).
+    pub source: Option<Loc>,
 }
 
 /// What a solver needs of one drawing level.
@@ -435,8 +439,9 @@ pub struct LevelProblem {
     pub kind: &'static str,
     pub name: String,
     /// The language version the level's file is read in (16.1): what it declares; for an included
-    /// file that declares none, the version of the file that includes it; else "0.2". Only
-    /// the record of the solver of a file of the draft 0.3 writes numbers ([`Reference::Number`]).
+    /// file that declares none, the version of the file that includes it; else the toolkit's
+    /// default, "0.3". Only the record of the solver of a file of the draft 0.3 writes numbers
+    /// ([`Reference::Number`]).
     pub version: String,
     /// How many objects the authored records of the level number (5.9): the record of the solver
     /// numbers its own objects from the next number on ([`Reference::GeneratedNumber`]).

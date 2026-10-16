@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use rnl_runtime::geom::Pt;
 use rnl_runtime::host::{HostDocument, LevelKind};
 use rnl_runtime::interp::obj::{Lit, PrimParams, Shape};
+use rnl_runtime::interp::unit::DEFAULT_VERSION;
 use rnl_runtime::model::{self, quoted, Attach, LevelView, Style, SymbolInfo, SymbolOrigin};
 use rnl_runtime::numbering::{hex, sha256};
 use rnl_runtime::{Interpretation, Options};
@@ -437,7 +438,7 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, opt
             }
         })
         .collect();
-    let language = if r.model.language.is_empty() { "0.2".to_string() } else { r.model.language.clone() };
+    let language = if r.model.language.is_empty() { DEFAULT_VERSION.to_string() } else { r.model.language.clone() };
     Snapshot {
         schema: SCHEMA.into(),
         runtime: env!("CARGO_PKG_VERSION").into(),
@@ -460,17 +461,17 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, opt
 
 /// The fingerprint of what a snapshot is made from (3.7): every file read, the host files and the
 /// packages, by name and text with its line endings made "\n"; the dialect; the options that change
-/// what the texts give: the standard package at the root, the generated records, the draft and the
-/// tolerance. Each part has its length before it, so that no two inputs give the same bytes.
+/// what the texts give: the standard package at the root, the generated records and the tolerance.
+/// Each part has its length before it, so that no two inputs give the same bytes. The draft switch,
+/// which has no effect, is written as off, as the revisions made before it lost its effect have
+/// it, so that the same texts keep their revisions.
 fn revision(r: &Interpretation, options: &Options) -> String {
     let mut files: Vec<(&str, String)> =
         r.sources.iter().map(|(name, text)| (name.as_str(), text.replace("\r\n", "\n").replace('\r', "\n"))).collect();
     files.sort();
     files.dedup();
-    let reading = format!(
-        "std={} generated={} draft={} tolerance={}",
-        options.std, options.generated, options.draft, options.tolerance
-    );
+    let reading =
+        format!("std={} generated={} draft=false tolerance={}", options.std, options.generated, options.tolerance);
     let mut bytes = Vec::new();
     let mut field = |part: &[u8]| {
         bytes.extend_from_slice(&(part.len() as u64).to_le_bytes());
@@ -937,8 +938,9 @@ R2 a vdd! 2k
         assert_ne!(rev(&NETLIST.replace("R1 in out 1k", "R1 in out  1k"), &options), r);
         let no_std = BuildOptions { runtime: Options { std: false, ..Options::default() }, ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &no_std), r);
+        // the draft switch has no effect, and so does not change the revision
         let draft = BuildOptions { runtime: Options { draft: true, ..Options::default() }, ..BuildOptions::default() };
-        assert_ne!(rev(NETLIST, &draft), r);
+        assert_eq!(rev(NETLIST, &draft), r);
         let spectre = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &spectre), r);
     }

@@ -19,16 +19,12 @@ use serde_json::Value;
 
 const OPTIONS: &str = "tolerance=0.000001";
 
-fn draft() -> Options {
-    Options { draft: true, ..Options::default() }
-}
-
 /// The example of the draft's 5.9 with a capacitor: an unnamed usage, a free point in a wire, a
 /// label on each of two instances, an "auto" wire between two pins, a named wire, and a text
 /// without a key that a rule makes on C1.
 fn amp(version: &str) -> String {
     format!(
-        "* a round trip\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\n\
+        "* a round trip\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"){}}}\n\
          .subckt amp in out vdd vss\nM1 out in vss vss nch\nR1 vdd out 10k\nC1 out vss 1p\n\
          * @RNL {{\n\
          *   #M1 #R1 @ALIGN(\"x\");\n\
@@ -38,7 +34,8 @@ fn amp(version: &str) -> String {
          *   &vss @WIRE {{#M1:3 #C1:2}};\n\
          *   %w = &out @WIRE {{#R1:2 #C1:1}};\n\
          *   # @SELECT-INSTANCE(name=\"C*\") => @TEXT(\"${{value}}\")\n\
-         * }}\n.ends amp\n.end\n"
+         * }}\n.ends amp\n.end\n",
+        pin_02(version)
     )
 }
 
@@ -46,9 +43,21 @@ fn amp(version: &str) -> String {
 /// whose wire is "auto" and has no name in its body.
 fn stubs(version: &str) -> String {
     format!(
-        "* stubs\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\nV1 a 0 1\nR1 a 0 1k\n\
-         * @RNL {{ (9, 9) @TEXT(\"note\") }}\n.end\n"
+        "* stubs\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"){}}}\nV1 a 0 1\nR1 a 0 1k\n\
+         * @RNL {{ (9, 9) @TEXT(\"note\") }}\n.end\n",
+        pin_02(version)
     )
+}
+
+/// A file of 0.3 uses the standard series 0.3 (16.3), whose names differ: these tests write and
+/// look for those of the series 0.2, such as $GND and $GND_STUB, so a file of 0.3 pins that series
+/// in its header record.
+fn pin_02(version: &str) -> &'static str {
+    if version == "0.3" {
+        "; @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")"
+    } else {
+        ""
+    }
 }
 
 /// Where the solutions put the instances: M1 and R1 on one x, as the ALIGN of `amp` asks.
@@ -128,11 +137,11 @@ struct Solved {
 
 fn solved_with(text: &str, title: &str, solver: impl Fn(&LevelProblem) -> Solution) -> Solved {
     let files = MemoryProvider::new().with("t.sp", text);
-    let r = rnl_view::interpret("t.sp", None, &files, &Options { draft: true, ..Options::solver() }).unwrap();
+    let r = rnl_view::interpret("t.sp", None, &files, &Options::solver()).unwrap();
     let p = r.problems.iter().find(|p| p.title == title).unwrap().clone();
     let solution = solver(&p);
     let written = write_record(&p, &solution, "rnl-solver test", &sig1(&p, OPTIONS));
-    let record = rnl_view::finish_record(&r.doc, &files, &draft(), &p, &written.record);
+    let record = rnl_view::finish_record(&r.doc, &files, &Options::default(), &p, &written.record);
     let text = replace_generated(&r.doc, p.level, text, &record);
     Solved { p, solution, written, text }
 }
@@ -145,7 +154,7 @@ fn solved(text: &str, title: &str) -> Solved {
 /// and its previous result.
 fn hints(text: &str, title: &str) -> (LevelProblem, Option<Previous>) {
     let files = MemoryProvider::new().with("t.sp", text);
-    let (r, previous) = read_previous("t.sp", None, &files, &draft()).unwrap();
+    let (r, previous) = read_previous("t.sp", None, &files, &Options::default()).unwrap();
     assert_eq!(r.problems.len(), previous.len());
     let k = r.problems.iter().position(|p| p.title == title).unwrap();
     (r.problems[k].clone(), previous[k].clone())
@@ -179,7 +188,7 @@ impl Solved {
 
 /// The solve status of each level of a text, by title, as a viewer asks for it.
 fn statuses(text: &str) -> Vec<(String, Option<&'static str>)> {
-    let options = BuildOptions { runtime: draft(), svg: false, status: true, ..BuildOptions::default() };
+    let options = BuildOptions { svg: false, status: true, ..BuildOptions::default() };
     let d = build("t.sp", &MemoryProvider::new().with("t.sp", text), &options).unwrap();
     d.levels.iter().map(|l| (l.title.clone(), l.solve)).collect()
 }
@@ -406,8 +415,8 @@ fn asking_for_the_status_changes_nothing_else_in_the_document() {
     let s = solved(&amp("0.3"), "amp");
     for text in [amp("0.2"), s.text.clone(), fixed_text()] {
         let files = MemoryProvider::new().with("t.sp", &text);
-        let plain = build("t.sp", &files, &BuildOptions { runtime: draft(), ..BuildOptions::default() }).unwrap();
-        let options = BuildOptions { runtime: draft(), status: true, ..BuildOptions::default() };
+        let plain = build("t.sp", &files, &BuildOptions::default()).unwrap();
+        let options = BuildOptions { status: true, ..BuildOptions::default() };
         let mut with = serde_json::to_value(build("t.sp", &files, &options).unwrap()).unwrap();
         for level in with["levels"].as_array_mut().unwrap() {
             assert!(level.as_object_mut().unwrap().remove("solve").is_some());
@@ -434,7 +443,7 @@ fn the_command_gives_the_hints_when_asked() {
     let s = solved(&amp("0.3"), "amp");
     let (_, previous) = hints(&s.text, "amp");
     let previous = previous.unwrap();
-    let v = rnl("previous-amp.sp", &s.text, &["problem", "--draft", "--previous", "--level", "amp"]);
+    let v = rnl("previous-amp.sp", &s.text, &["problem", "--previous", "--level", "amp"]);
     let hints = &v["levels"][0]["previous"];
     assert_eq!(hints["same_input"], true);
     assert_eq!(hints["numbering"], true);
@@ -442,19 +451,19 @@ fn the_command_gives_the_hints_when_asked() {
     assert_eq!(hints["placements"][0]["object"], previous.placements[0].object);
     assert_eq!(hints["wire_routes"].as_array().unwrap().len(), 3);
     // without the flag, as before
-    let v = rnl("previous-amp.sp", &s.text, &["problem", "--draft"]);
+    let v = rnl("previous-amp.sp", &s.text, &["problem"]);
     assert!(v["levels"].as_array().unwrap().iter().all(|l| l.get("previous").is_none()));
     // a level without a record of the solver has none
-    let v = rnl("previous-amp.sp", &s.text, &["problem", "--draft", "--previous", "--level", "previous-amp.sp"]);
+    let v = rnl("previous-amp.sp", &s.text, &["problem", "--previous", "--level", "previous-amp.sp"]);
     assert_eq!(v["levels"][0]["previous"], Value::Null);
 }
 
 #[test]
 fn the_command_gives_the_status_when_asked() {
     let s = solved(&amp("0.3"), "amp");
-    let v = rnl("status-amp.sp", &s.text, &["view", "--draft", "--no-svg", "--status"]);
+    let v = rnl("status-amp.sp", &s.text, &["view", "--no-svg", "--status"]);
     let solve: Vec<&Value> = v["levels"].as_array().unwrap().iter().map(|l| &l["solve"]).collect();
     assert_eq!(solve, ["fixed", "solved"]);
-    let v = rnl("status-amp.sp", &s.text, &["view", "--draft", "--no-svg"]);
+    let v = rnl("status-amp.sp", &s.text, &["view", "--no-svg"]);
     assert!(v["levels"].as_array().unwrap().iter().all(|l| l.get("solve").is_none()));
 }

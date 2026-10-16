@@ -1,0 +1,9 @@
+// A standard series without rule packages drops nothing
+*! 头段记录钉住工具自带的标准包 0.2，钉的版本优先于按语言版本隐式用的 0.3（16.3）：0.2 系列没有方言的规则包，0.3 版的文件也就什么都不去掉；I0 照 0.2 的规则按名字画成电流源。
+simulator lang=spectre
+// @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="rnl-std", version="0.2")}
+subckt cell (p n)
+ends cell
+I0 (a 0) cell
+R0 (a 0) resistor r=1k
+// @RNL { #I0 @PLACE(0, 0); #R0 @PLACE(10, 0) }

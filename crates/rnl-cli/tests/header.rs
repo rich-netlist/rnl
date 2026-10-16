@@ -32,7 +32,7 @@ fn said(r: &Interpretation, severity: Severity) -> Vec<(String, u32, String)> {
 const HEADER: &str = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
 const AFTER: &str =
     "a header record is the first record of a file, and a record comes before this one (2.8); this one is ignored";
-const NO_HEADER: &str = "the main file has no header record: it is read in the tool's default version 0.2, and tools add the header when they write the file (16.1)";
+const NO_HEADER: &str = "the main file has no header record: it is read in the tool's default version 0.3, and tools add the header when they write the file (16.1)";
 
 #[test]
 fn a_record_in_a_subcircuit_above_it_comes_first() {
@@ -77,15 +77,26 @@ fn only_the_first_record_of_the_file_level_and_only_one() {
 
 #[test]
 fn an_included_file_without_a_version_takes_the_includers() {
-    // the main file declares the draft 0.3; the included file declares none, and its subcircuit is
-    // read in 0.3 too, while a file that declares 0.2 stays 0.2 (16.1)
-    let main = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.include \"a.inc\"\n.include \"b.inc\"\nX1 n cell\nX2 n other\n.end\n";
+    // the main file declares 0.3, 0.2 or nothing, which is the tool's default 0.3; the included
+    // file declares none, and its subcircuit is read in the main file's version, while a file that
+    // declares 0.2 stays 0.2 (16.1)
     let a = "* a\n.subckt cell p\nR1 p 0 1k\n.ends\n";
     let b = "* b\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt other p\nR1 p 0 1k\n.ends\n";
-    let files = MemoryProvider::new().with("t.sp", main).with("a.inc", a).with("b.inc", b);
-    let r = read(&files, &Options { draft: true, ..Options::solver() });
-    let version = |title: &str| r.problems.iter().find(|p| p.title == title).unwrap().version.clone();
-    assert_eq!((version("t.sp"), version("cell"), version("other")), ("0.3".into(), "0.3".into(), "0.2".into()));
+    let body = ".include \"a.inc\"\n.include \"b.inc\"\nX1 n cell\nX2 n other\n.end\n";
+    for (header, version) in [("@VERSION(\"0.3\")", "0.3"), ("@VERSION(\"0.2\")", "0.2"), ("", "0.3")] {
+        let main = match header {
+            "" => format!("* t\n{body}"),
+            _ => format!("* t\n* @RNL(type=\"header\") {{ {header}}}\n{body}"),
+        };
+        let files = MemoryProvider::new().with("t.sp", &main).with("a.inc", a).with("b.inc", b);
+        let r = read(&files, &Options::solver());
+        let read_in = |title: &str| r.problems.iter().find(|p| p.title == title).unwrap().version.clone();
+        assert_eq!(
+            (read_in("t.sp"), read_in("cell"), read_in("other")),
+            (version.into(), version.into(), "0.2".into()),
+            "{main}"
+        );
+    }
 }
 
 #[test]

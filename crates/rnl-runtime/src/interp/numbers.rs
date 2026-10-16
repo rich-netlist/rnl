@@ -213,11 +213,10 @@ impl Interp<'_> {
     }
 
     /// Does this reading count the objects of the authored records as a reading without the
-    /// records of the solver does (5.9)? With the draft, when it reads a record of the solver of a
-    /// file of the draft; then that reading comes first. A file of 0.2 never needs it.
+    /// records of the solver does (5.9)? When it reads a record of the solver of a file of 0.3;
+    /// then that reading comes first. A file of 0.2 never needs it.
     pub(crate) fn needs_count(&self) -> bool {
-        self.draft
-            && self.read_generated
+        self.read_generated
             && self.rec_header.iter().any(|(&rec, h)| {
                 let u = self.rec_unit[rec];
                 h.type_ == "generated"

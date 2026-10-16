@@ -20,9 +20,10 @@
 //!   result: the object stays free, as if the level were not solved, and a viewer that does not
 //!   solve shows it so.
 //! - **Numbers and rewritten wires** are written only in a level of a file of the draft 0.3
-//!   ([`LevelProblem::version`]), which needs [`crate::Options::draft`] until 0.3 is released: a
-//!   tool of 0.2 would read them as names it cannot find and as a net slot given the wrong kind. In
-//!   a level of 0.2, the decisions on objects without a name and the routes of wires are unsolved.
+//!   ([`LevelProblem::version`]): a tool of 0.2 would read them as names it cannot find and as a
+//!   net slot given the wrong kind. In a level of 0.2, the decisions on objects without a name and
+//!   the routes of wires are unsolved ([`Unsolved::needs_0_3`]); `rnl solve` raises such a file to
+//!   0.3 when no name in it is spelled like a word that 0.3 adds (16.1).
 //! - Objects made by rules have no handle of their own (5.7, 10.5): their generating usage is
 //!   written out first as an explicit statement with a name [`generated_names`] gives, and the
 //!   objects are reached through it, as in `%gnd_stub_M1_s = $GND_STUB @ATTACH(…) #M1:s;
@@ -152,6 +153,15 @@ pub struct Unsolved {
     pub reason: String,
 }
 
+impl Unsolved {
+    /// Whether a record of a file of 0.3 holds it, where one of 0.2 cannot: the decision on an
+    /// object without a name, which 0.3 refers to by its number (5.9), or the route of a wire, which
+    /// 0.3 writes with WIRE given the wire (13.1). A tool raises such a file to 0.3 (16.1).
+    pub fn needs_0_3(&self) -> bool {
+        self.reason == NO_NUMBERS || self.reason == NO_REWRITE
+    }
+}
+
 impl fmt::Display for Unsolved {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let what = match self.decision {
@@ -175,7 +185,9 @@ pub struct Written {
     /// decision is in the record.
     pub unsolved: Vec<Unsolved>,
     /// What is written although the standard says that a solver should not do it, such as a route
-    /// that does not keep the points of its wire (13.1).
+    /// that does not keep the points of its wire (13.1). A tool that writes the record into its
+    /// file adds why it does not, when it does not, such as `rnl solve` for a level in a region
+    /// written to be encrypted (2.2).
     pub notes: Vec<String>,
 }
 
@@ -759,8 +771,8 @@ fn fixed_at(o: &ProblemObject, axis: Axis, v: f64) -> bool {
 ///
 /// The check covers the objects of the authored records of the level and the record's own: the
 /// coordinates in its wires, the bodies of the usages it writes out, its junctions. So the document
-/// is read again with the record in place of the level's records of the solver, with
-/// [`crate::Options::draft`], and the check is [`level_check`] of the level, the check of the text
+/// is read again with the record in place of the level's records of the solver, and the check is
+/// [`level_check`] of the level, the check of the text
 /// as written. `doc` is the host document that the problem was read from, such as
 /// [`crate::Interpretation::doc`]; `files` and `options` are what it was read with, packages
 /// included (`rnl_view::finish_record` adds the bundled ones).
@@ -781,7 +793,7 @@ pub fn finish_record(
     let file = level.file.clone();
     level.records.retain(|r| r.file != file || record_type(r) != "generated");
     level.records.push(placed(record, &file, level.end_line.max(1)));
-    let options = Options { draft: true, generated: true, problems: false, ..options.clone() };
+    let options = Options { generated: true, problems: false, ..options.clone() };
     let read = crate::interpret(doc, files, &options, Sink::new());
     match level_check(&read, p.level) {
         Some(check) => with_numbering(record, check),

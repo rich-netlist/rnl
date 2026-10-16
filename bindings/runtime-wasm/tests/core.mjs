@@ -189,7 +189,7 @@ test("a write gives the netlist written and its Document", () => {
   const { text, document } = core.write(rcWrite([placeR1]));
   assert.equal(
     text,
-    '\n* @RNL(type="header") { @VERSION("0.2")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author="test") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n',
+    '\n* @RNL(type="header") { @VERSION("0.3")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author="test") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n',
   );
   assert.equal(document.path, "/rnl-edit/netlist.sp");
   assert.equal(document.files[0].text, text);

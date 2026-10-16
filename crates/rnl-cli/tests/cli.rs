@@ -66,16 +66,14 @@ fn view_gives_the_primitives_and_the_svg_as_asked() {
 }
 
 #[test]
-fn draft_reads_the_files_that_declare_the_draft_0_3() {
-    let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("draft-0.3.sp");
-    let text = "* a file of the draft 0.3\nR1 a b 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n* @RNL { #R1 @PLACE(3, 4)}\n.end\n";
+fn files_of_0_3_are_read_and_draft_changes_nothing() {
+    let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("version-0.3.sp");
+    let text =
+        "* a file of 0.3\nR1 a b 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n* @RNL { #R1 @PLACE(3, 4)}\n.end\n";
     std::fs::write(&f, text).unwrap();
     let f = f.to_string_lossy();
-    // without the switch, 0.3 is an unsupported version, and no RNL of the file is read (16.1)
+    // 0.3 is read without any switch (16.1)
     let (code, out) = rnl(&["check", &f]);
-    assert_eq!(code, 1, "{out}");
-    assert!(out.contains("unsupported version 0.3"), "{out}");
-    let (code, out) = rnl(&["check", &f, "--draft"]);
     assert_eq!(code, 0, "{out}");
     assert!(out.lines().any(|l| l.starts_with("0 errors")), "{out}");
     // the solver's view reads it too
@@ -85,11 +83,29 @@ fn draft_reads_the_files_that_declare_the_draft_0_3() {
         let p: serde_json::Value = serde_json::from_str(&out).unwrap();
         p["levels"][0]["facts"].as_array().unwrap().iter().filter(|f| f["kind"] == "PLACE-x").count()
     };
-    assert_eq!(places(&["problem", &f]), 0);
-    assert_eq!(places(&["problem", &f, "--draft"]), 1);
-    // the switch is in the help, for development only
+    assert_eq!(places(&["problem", &f]), 1);
+    // --draft, kept for compatibility, is accepted and changes nothing, the snapshot's revision
+    // included
+    for command in ["check", "problem", "view", "snapshot"] {
+        assert_eq!(rnl(&[command, &f, "--draft"]), rnl(&[command, &f]), "{command}");
+    }
     let help = Command::new(env!("CARGO_BIN_EXE_rnl")).arg("--help").output().unwrap();
-    assert!(String::from_utf8_lossy(&help.stderr).contains("--draft             for development only"));
+    assert!(String::from_utf8_lossy(&help.stderr).contains("--draft             no effect"));
+}
+
+#[test]
+fn a_version_that_is_not_read_is_unsupported() {
+    let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("version-0.4.sp");
+    let text =
+        "* a file of 0.4\nR1 a b 1k\n* @RNL(type=\"header\") { @VERSION(\"0.4\")}\n* @RNL { #R1 @PLACE(3, 4)}\n.end\n";
+    std::fs::write(&f, text).unwrap();
+    let f = f.to_string_lossy();
+    // no RNL of the file is read (16.1)
+    let (code, out) = rnl(&["check", &f]);
+    assert_eq!(code, 1, "{out}");
+    let message =
+        "unsupported version 0.4: no RNL of this file is interpreted (16.1; this implementation reads 0.2 and 0.3)";
+    assert!(out.contains(message), "{out}");
 }
 
 #[test]

@@ -27,7 +27,7 @@ options:
   --no-std            do not use the standard package at the root (16.3)
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      spice or spectre, instead of guessing from the file
-  --draft             for development only: read the files that declare the draft 0.3 as well
+  --draft             no effect, kept for compatibility: the files of 0.3 are read without it
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -70,6 +70,8 @@ struct Args {
     std: bool,
     generated: bool,
     dialect: Option<String>,
+    /// `--draft`: accepted, with no effect, as [`Options::draft`] has none; kept for
+    /// compatibility, to be removed later.
     draft: bool,
     svg: bool,
     primitives: bool,
@@ -309,6 +311,10 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 fields.insert("author".into(), a.clone().into());
             }
             fields.entry("dialect").or_insert_with(|| "spice".into());
+            // the netlist is saved as OUT, so it is read under that name unless the request names one
+            if let Some(name) = out.file_name().and_then(|n| n.to_str()) {
+                fields.entry("file").or_insert_with(|| name.into());
+            }
             let request: rnl_edit::WriteRequest =
                 serde_json::from_value(request).map_err(|e| format!("the request is not valid: {e}"))?;
             std::fs::write(&out, rnl_edit::write(&request)?).map_err(|e| e.to_string())?;

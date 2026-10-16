@@ -205,6 +205,10 @@ export function updatePath() {
     );
   }
   const up = path.length > 1 ? doc.levels[path[path.length - 2].level].title : null;
+  // at the root the up button hides: the focus goes from it to the drawing first, so that the keys
+  // act on the drawing at once. A browser that moves the focus off a hidden element only later,
+  // as WebKit does, would otherwise give the next Enter to the hidden button.
+  if (up === null && document.activeElement === $("up")) $("canvas").focus({ preventScroll: true });
   $("up").hidden = up === null;
   if (up !== null) {
     $("up-name").textContent = up;

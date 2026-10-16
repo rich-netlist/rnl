@@ -99,14 +99,17 @@ fn a_wire_whose_middle_point_is_free_is_drawn_in_two_runs() {
 fn a_stale_numbering_leaves_the_free_point_free_and_the_wire_drawn_in_part() {
     // a file of the draft whose record of the solver is out of date: the statements with numbers
     // take no effect (5.9), so the free point has no position again, the labels go where the viewer
-    // puts them, and the wire through the point is drawn as far as it has positions
+    // puts them, and the wire through the point is drawn as far as it has positions. The pins are
+    // those of the symbols of the standard series 0.2, which the file pins: a file of 0.3 uses the
+    // series 0.3 otherwise (16.3)
     let authored = "*   &out @WIRE {#M1:1 (1, 3) (_, _) #R1:2};\n*   {#M1 #R1} @TEXT(\"${name}\")\n";
     let solver = "* @RNL(type=\"generated\", priority=\"high\", numbering=\"0123456789abcdef\") {\n\
                   *   #M1 @PLACE(0, 0); #R1 @PLACE(10, 0); %#3 @PLACE(6, 6); %#4 @PLACE(2, 1); %#5 @PLACE(12, 1)\n* }\n";
+    let header = "@VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
     let text = format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\")}}\nM1 out in vss vss nch\nR1 vdd out 10k\n* @RNL {{\n{authored}* }}\n{solver}.end\n"
+        "* t\n* @RNL(type=\"header\") {{ {header}}}\nM1 out in vss vss nch\nR1 vdd out 10k\n* @RNL {{\n{authored}* }}\n{solver}.end\n"
     );
-    let r = read(&text, &Options { draft: true, ..Options::default() });
+    let r = read(&text, &Options::default());
     assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
     let hints =
         r.diagnostics().into_iter().filter(|d| d.message.contains("out of date for the objects without a name"));

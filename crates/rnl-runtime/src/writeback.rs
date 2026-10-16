@@ -4,8 +4,9 @@
 //! level it solved, an editor appends its records after them. Everything else in the file, host
 //! statements, ordinary comments and other records, stays byte for byte, line endings included.
 //! New records go at the end of the level's own text, in the comment carrier the file already
-//! uses for RNL. A file a tool saves has a header record with its version ([`with_header`],
-//! 16.1).
+//! uses for RNL, `*` where the reading is in SPICE mode ([`carrier_at`]); a level that ends in a
+//! region written to be encrypted has its record before the region ([`record_line`]). A file a
+//! tool saves has a header record with its version ([`with_header`], 16.1).
 //!
 //! Every change is made at the positions of the document's reading of the text, from the end of
 //! the text up, so that each leaves the places of those above it as they were: the records of a
@@ -103,7 +104,23 @@ impl Lines {
         l.insert_str(at, s);
     }
 
+    /// Replace the characters of a line from `from` to `to`, 0-based, `to` not included, by `s`.
+    fn replace_in(&mut self, line: u32, from: usize, to: usize, s: &str) {
+        let Some(l) = self.lines.get_mut((line as usize).wrapping_sub(1)) else { return };
+        let end = Self::body(l).len();
+        let at = |col: usize| l.char_indices().nth(col).map_or(end, |(i, _)| i);
+        let (a, b) = (at(from), at(to));
+        l.replace_range(a..b.max(a), s);
+    }
+
     fn insert(&mut self, before_line: u32, new: &[String]) {
+        // a line not there yet, such as line 2 of an empty text, has empty lines before it
+        while self.lines.len() + 1 < before_line as usize {
+            if let Some(last) = self.lines.last_mut().filter(|l| !l.ends_with('\n')) {
+                last.push_str(self.eol);
+            }
+            self.lines.push(self.eol.to_string());
+        }
         let at = (before_line as usize).saturating_sub(1).min(self.lines.len());
         if at == self.lines.len() {
             if let Some(last) = self.lines.last_mut() {
@@ -126,6 +143,9 @@ enum Edit {
     Lines(u32, Vec<String>),
     /// Insert text into a line, 1-based, before a character, 0-based.
     Text(u32, usize, String),
+    /// Replace the characters of a line, 1-based, from one to another, 0-based, the second not
+    /// included, by text.
+    Replace(u32, usize, usize, String),
 }
 
 impl Edit {
@@ -135,7 +155,7 @@ impl Edit {
         match self {
             Edit::Remove(a, _) => (a.0, a.1 as usize),
             Edit::Lines(line, _) => (*line, 0),
-            Edit::Text(line, col, _) => (*line, col + 1),
+            Edit::Text(line, col, _) | Edit::Replace(line, col, _, _) => (*line, col + 1),
         }
     }
 }
@@ -151,6 +171,7 @@ fn apply(text: &str, marker: &str, edits: Vec<Edit>) -> String {
             Edit::Remove(a, b) => lines.remove(a, b, marker),
             Edit::Lines(before, new) => lines.insert(before, &new),
             Edit::Text(line, col, s) => lines.insert_in(line, col, &s),
+            Edit::Replace(line, from, to, s) => lines.replace_in(line, from, to, &s),
         }
     }
     lines.text()
@@ -170,6 +191,8 @@ fn holds_tokens(tail: &str) -> bool {
 }
 
 /// The comment marker that carries RNL in a file: what its records use, else the dialect's (2.2).
+/// Where the reading is in SPICE mode, `//` is no comment: [`carrier_at`] gives the marker of a
+/// record written at a line.
 pub fn carrier(doc: &HostDocument, file: &str, text: &str) -> &'static str {
     if file.to_lowercase().ends_with(".rnl") {
         return "";
@@ -194,6 +217,23 @@ pub fn carrier(doc: &HostDocument, file: &str, text: &str) -> &'static str {
         "//"
     } else {
         "*"
+    }
+}
+
+/// The comment marker of a record written into `file` before its line `line` (2.2): the file's
+/// ([`carrier`]), but `*` where the reading is in SPICE mode, where `//` is no comment, such as a
+/// `simulator lang=spice` section of a Spectre file.
+pub fn carrier_at(doc: &HostDocument, file: &str, text: &str, line: u32) -> &'static str {
+    in_mode(doc, file, line, carrier(doc, file, text))
+}
+
+/// `marker`, the marker that RNL written into `file` before its line `line` would follow, or `*`
+/// in its stead where the reading is in SPICE mode and it is `//` (2.2).
+fn in_mode(doc: &HostDocument, file: &str, line: u32, marker: &'static str) -> &'static str {
+    if marker == "//" && doc.in_spice_mode(file, line) {
+        "*"
+    } else {
+        marker
     }
 }
 
@@ -257,22 +297,65 @@ pub fn carried(record: &str, marker: &str) -> Vec<String> {
 }
 
 /// Add a record at the end of a level's own text (17): before the `.ends` of a subcircuit, before
-/// the `.end` of a main file, or at the end of the file. `text` is the text of the level's file.
+/// the `.end` of a main file, or at the end of the file, and before a region written to be
+/// encrypted that the end lies in ([`record_line`]), carried as the reading takes it there
+/// ([`carrier_at`]). `text` is the text of the level's file. A level that has no place for it,
+/// such as a subcircuit written in such a region, gets nothing: the text comes back as it is.
 pub fn append_record(doc: &HostDocument, level: LevelId, text: &str, record: &str) -> String {
-    let lv = &doc.levels[level];
-    let marker = carrier(doc, &lv.file, text);
+    let Ok(at) = record_line(doc, level, text) else { return text.to_string() };
     let mut lines = Lines::new(text);
-    lines.insert(end_of(doc, level, &lines), &carried(record, marker));
+    lines.insert(at, &carried(record, carrier_at(doc, &doc.levels[level].file, text, at)));
     lines.text()
 }
 
-/// The line before which a record added to the end of a level goes (17).
+/// The line before which text added to the end of a level goes (17).
 fn end_of(doc: &HostDocument, level: LevelId, lines: &Lines) -> u32 {
     let lv = &doc.levels[level];
     if lv.end_line > 0 {
         lv.end_line
     } else {
         lines.lines.len() as u32 + 1
+    }
+}
+
+/// The line before which a record added to the end of a level goes (17): the `.ends` of a
+/// subcircuit, the `.end` of a main file, or one past the last line of a file. A record in a
+/// region written to be encrypted (`.prot … .unprot`, `protect … unprotect`) is gone once the
+/// region is encrypted (2.2): when the end of the level lies in one, the record goes before the
+/// region instead, and before the subcircuit written in the level that holds that place, at the
+/// last place of the level's own text above the end that lies in no region. A level without one,
+/// such as a subcircuit whose `.subckt` lies in a region, gives that region, as the lines that open
+/// and close it ([`HostDocument::protected`]).
+pub fn record_line(doc: &HostDocument, level: LevelId, text: &str) -> Result<u32, (u32, u32)> {
+    let lv = &doc.levels[level];
+    // the first place of its own text: after its `.subckt`; line 2 of a file, as line 1 is not read
+    let first = if lv.kind == LevelKind::Subckt { lv.line + 1 } else { 2 };
+    free_place(doc, level, end_of(doc, level, &Lines::new(text)), first)
+}
+
+/// The last place of the own text of `level`, at the line `at` or above it, that lies in no region
+/// written to be encrypted (2.2) and in no subcircuit written in `level`, given as the line that
+/// text added there goes before; `first` is the first place of that text. A region that begins
+/// above `first` gives an error with its lines, as [`record_line`] says.
+fn free_place(doc: &HostDocument, level: LevelId, mut at: u32, first: u32) -> Result<u32, (u32, u32)> {
+    let lv = &doc.levels[level];
+    let below: Vec<&crate::host::Level> = doc
+        .descendants(level)
+        .into_iter()
+        .map(|k| &doc.levels[k])
+        .filter(|s| s.kind == LevelKind::Subckt && s.file == lv.file)
+        .collect();
+    loop {
+        if let Some((open, close)) = doc.protected_at(&lv.file, at) {
+            if open < first {
+                return Err((open, close));
+            }
+            at = open;
+        } else if let Some(start) = below.iter().filter(|s| s.line < at && at <= s.end_line).map(|s| s.line).min() {
+            at = start;
+        } else {
+            return Ok(at);
+        }
     }
 }
 
@@ -354,6 +437,11 @@ fn generated_removals(doc: &HostDocument, level: LevelId, file: &str) -> Vec<Edi
 /// to the level ([`generated_for`]) and are written in its file; one written with scope= in
 /// another file is removed from that file's text by [`remove_generated_for`]. A record with scope=
 /// written in the level's text for a subcircuit below it stays: it is that subcircuit's.
+///
+/// The new record goes where [`record_line`] puts it, before a region written to be encrypted that
+/// the end of the level lies in, carried as the reading takes it there ([`carrier_at`]); the
+/// records it replaces go wherever they are, in such a region as well, so that none of them comes
+/// after it. A level that has no place for it is left as it is: the text comes back unchanged.
 pub fn replace_generated(doc: &HostDocument, level: LevelId, text: &str, record: &str) -> String {
     let file = &doc.levels[level].file;
     let marker = carrier(doc, file, text);
@@ -374,7 +462,12 @@ pub fn replace_generated(doc: &HostDocument, level: LevelId, text: &str, record:
 /// sections, whose line 2 is not read (2.2), has it moved to the line above the subcircuit
 /// instead, the outermost one in the file that holds the level, inside the section. The record
 /// follows the carrier of a header written in the same pass (2.2), so that the next solve, which
-/// finds that header, writes it the same.
+/// finds that header, writes it the same, but for `*` where the reading is in SPICE mode.
+///
+/// Nothing is written in a region written to be encrypted (2.2): the record goes before it
+/// ([`record_line`]), and so does a header that moves above a subcircuit whose `.subckt` lies in
+/// one; a header there gets no VERSION. A level that has no place for its record is left as it
+/// is, and so is its file: the text comes back unchanged.
 pub fn replace_generated_with_header(
     doc: &HostDocument,
     level: LevelId,
@@ -382,6 +475,9 @@ pub fn replace_generated_with_header(
     record: &str,
     version: &str,
 ) -> String {
+    if record_line(doc, level, text).is_err() {
+        return text.to_string();
+    }
     let file = &doc.levels[level].file;
     let (mut edits, marker) =
         header_move(doc, level, text, version).unwrap_or_else(|| header_edits(doc, file, text, version));
@@ -405,23 +501,28 @@ pub fn move_header_for(doc: &HostDocument, level: LevelId, text: &str, version: 
 }
 
 /// The changes that move the header record of the level's file when the record of the solver
-/// written at the end of `level` (17) would come before it, as [`replace_generated_with_header`]
-/// says, and the carrier it has where it goes, which records written with it follow (2.2); None
-/// when it stays where it is.
+/// written at the end of `level` (17), or before a region written to be encrypted that the end
+/// lies in ([`record_line`]), would come before it, as [`replace_generated_with_header`] says, and
+/// the carrier it has where it goes, which records written with it follow (2.2); None when it
+/// stays where it is, or has no place to go out of such a region.
 fn header_move(doc: &HostDocument, level: LevelId, text: &str, version: &str) -> Option<(Vec<Edit>, &'static str)> {
     let file = &doc.levels[level].file;
-    let at = end_of(doc, level, &Lines::new(text));
+    let at = record_line(doc, level, text).ok()?;
     let header = first_header(doc, file).filter(|h| span(h).0 .0 >= at)?;
     let marker = carrier(doc, file, text);
     let to = top(doc, file, text, marker)
-        .or_else(|| subckt_start(doc, level).map(|line| Top { line, marker, bare: false }))?;
+        .or_else(|| subckt_start(doc, level).map(|line| Top { line, marker, bare: false }))
+        .and_then(|to| to.kept(doc, file))?;
     // the version it gets where it is goes with it
     Some((moved_header(header, version, to), to.marker))
 }
 
 /// The first line of the outermost subcircuit, in the file of `level`, that holds `level` or is
-/// it: the record written at the end of `level` lies inside it. None for a file level. Where the
-/// header of a file read only through library sections moves to (2.2).
+/// it: the record written at the end of `level` lies inside it; or, when that line lies in a
+/// region written to be encrypted, the last place above it in the text of the file level that
+/// holds no subcircuit and lies in no region ([`free_place`]). None for a file level, or when there
+/// is no such place. Where the header of a file read only through library sections moves to
+/// (2.2).
 fn subckt_start(doc: &HostDocument, level: LevelId) -> Option<u32> {
     let file = &doc.levels[level].file;
     let mut start = None;
@@ -434,7 +535,8 @@ fn subckt_start(doc: &HostDocument, level: LevelId) -> Option<u32> {
         start = Some(lv.line);
         at = lv.parent;
     }
-    start.filter(|&line| line > 0)
+    let (start, outer) = (start.filter(|&line| line > 0)?, at?);
+    free_place(doc, outer, start, 2).ok()
 }
 
 /// The changes that move a header record to `to`, carried by its marker, with VERSION when it has
@@ -510,14 +612,17 @@ fn first_header<'a>(doc: &'a HostDocument, file: &str) -> Option<&'a Record> {
 }
 
 /// The changes of [`replace_generated`]: the removal of the level's records of the solver in its
-/// file, and the new record at the end of the level (17). A record of the solver below the end of
-/// the level, written with scope= in the file level after a subcircuit, is removed before the new
-/// record goes in, those above after it.
-fn replacement(doc: &HostDocument, level: LevelId, text: &str, record: &str, marker: &str) -> Vec<Edit> {
+/// file, and the new record at the end of the level (17), or before a region written to be
+/// encrypted that the end lies in ([`record_line`]), carried by `marker`, the carrier of the
+/// file's records, but by `*` where the reading is in SPICE mode (2.2); none when the level has no
+/// place for it. A record of the solver below the place of the new record, written with scope= in
+/// the file level after a subcircuit, is removed before the new record goes in, those above after
+/// it.
+fn replacement(doc: &HostDocument, level: LevelId, text: &str, record: &str, marker: &'static str) -> Vec<Edit> {
     let file = &doc.levels[level].file;
-    let at = end_of(doc, level, &Lines::new(text));
+    let Ok(at) = record_line(doc, level, text) else { return Vec::new() };
     let mut edits = generated_removals(doc, level, file);
-    edits.push(Edit::Lines(at, carried(record, marker)));
+    edits.push(Edit::Lines(at, carried(record, in_mode(doc, file, at, marker))));
     edits
 }
 
@@ -531,14 +636,15 @@ fn replacement(doc: &HostDocument, level: LevelId, text: &str, record: &str, mar
 /// a subcircuit written above it comes before it, and a section of `.lib` that is read counts as a
 /// file ([`file_records`]).
 ///
-/// The first line of a host file never carries RNL (2.2): it is the title of the main file, and
-/// in an included file a comment or a statement. The header goes on the line after a title or a
-/// comment; before a statement, a comment line, the bare marker, is put first, so that the
-/// statement keeps its meaning on the third line. Spectre reads a file that is not a `.scs` file
-/// in SPICE mode until its `simulator lang=spectre`, and `//` is no comment there (2.2): a header
-/// carried by `//` goes after that statement, and after the lines that continue it, when no other
-/// statement and no record comes before it; otherwise it goes above the statement, written with
-/// `*`, which carries in both modes, and so does the bare marker.
+/// The first line of a host file never carries RNL (2.2): it is the title of the main file, and in
+/// an included file a comment or a statement. The header goes on the line after a title or a
+/// comment, and after the lines that continue it (`+` lines, or the line after one that ends with
+/// `\` in Spectre's dialect); before a statement, a comment line, the bare marker, is put first, so
+/// that the statement keeps its meaning on the third line. Spectre reads a file that is not a
+/// `.scs` file in SPICE mode until its `simulator lang=spectre`, and `//` is no comment there
+/// (2.2): a header carried by `//` goes after that statement, and after the lines that continue it,
+/// when no other statement and no record comes before it; otherwise it goes above the statement,
+/// written with `*`, which carries in both modes, and so does the bare marker.
 ///
 /// A file read only through library sections (`.lib file sec`, Spectre's `include "file"
 /// section=sec`, [`crate::host::Level::section`]) is read inside them alone, and tools must not
@@ -556,7 +662,8 @@ pub fn with_header(doc: &HostDocument, file: &str, text: &str, version: &str) ->
 
 /// The changes that give a file its header record and its version ([`with_header`]): none when it
 /// has them, or is left as it is; and the carrier that records written with them follow: that of
-/// a new header, else the file's ([`carrier`]).
+/// a new header, else the file's ([`carrier`]). Nothing is written in a region written to be
+/// encrypted (2.2): a header record there gets no VERSION.
 fn header_edits(doc: &HostDocument, file: &str, text: &str, version: &str) -> (Vec<Edit>, &'static str) {
     let marker = carrier(doc, file, text);
     if file.to_lowercase().ends_with(".rnl") {
@@ -569,15 +676,204 @@ fn header_edits(doc: &HostDocument, file: &str, text: &str, version: &str) -> (V
                 let at = first.loc(brace);
                 Edit::Text(at.line, at.col as usize, s)
             });
+            let edit = edit.filter(|e| doc.protected_at(file, e.at().0).is_none());
             return (edit.into_iter().collect(), marker);
         }
         None if records_of(doc, file).iter().any(|(_, r)| record_type(r) == "header") => return (Vec::new(), marker),
         None => {}
     }
-    let Some(to) = top(doc, file, text, marker) else { return (Vec::new(), marker) };
     let version_kw = format!("@VERSION({})", crate::problem::written_string(version));
-    let header = carried(&format!("@RNL(type=\"header\") {{ {version_kw}}}"), to.marker);
-    (vec![to.edit(header)], to.marker)
+    match new_header(doc, file, text, marker, |_| format!("@RNL(type=\"header\") {{ {version_kw}}}")) {
+        Some((edit, marker)) => (vec![edit], marker),
+        None => (Vec::new(), marker),
+    }
+}
+
+/// The change that writes a new header record at the top of `file` ([`top`]), the record that
+/// `record` gives for the marker that carries it there, and that marker; None where none can be
+/// written, such as in a file read only through library sections.
+fn new_header(
+    doc: &HostDocument,
+    file: &str,
+    text: &str,
+    marker: &'static str,
+    record: impl FnOnce(&'static str) -> String,
+) -> Option<(Edit, &'static str)> {
+    let to = top(doc, file, text, marker).and_then(|to| to.kept(doc, file))?;
+    Some((to.edit(carried(&record(to.marker), to.marker)), to.marker))
+}
+
+/// A file that has no header record, given one that is not [`with_header`]'s, such as one with
+/// USE-PACKAGE (16.3): `record` gives the whole record for the comment marker that carries it, so
+/// that it can fit its lines to it, and it goes where [`with_header`] puts a new header, by the
+/// same rules. A file that has a header record, or where none can be written, comes back as it
+/// is, and so does a package file. `text` is the text whose positions the document gives.
+pub fn add_header(doc: &HostDocument, file: &str, text: &str, record: impl FnOnce(&'static str) -> String) -> String {
+    if file.to_lowercase().ends_with(".rnl") || records_of(doc, file).iter().any(|(_, r)| record_type(r) == "header") {
+        return text.to_string();
+    }
+    let marker = carrier(doc, file, text);
+    match new_header(doc, file, text, marker, record) {
+        Some((edit, _)) => apply(text, marker, vec![edit]),
+        None => text.to_string(),
+    }
+}
+
+/// The USE-PACKAGE that keeps the standard series 0.2 in a file raised to 0.3 (16.3).
+pub const PIN_STD_0_2: &str = "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
+
+/// `text`, the text of `file`, raised to the version 0.3 (16.1): the VERSION of its header record
+/// says 0.3, and with `pin`, [`PIN_STD_0_2`] follows it, so that the file keeps the standard series
+/// 0.2 it was read with (16.3); a file without a header record gets one that says so, where a new
+/// header goes ([`with_header`]). None when it cannot be raised so: a package file, a header record
+/// that is not the first record of the file, a VERSION on several lines or in a region written to
+/// be encrypted (2.2), or a file read only through library sections that has no header record.
+pub fn raise_version(doc: &HostDocument, file: &str, text: &str, pin: bool) -> Option<String> {
+    if file.to_lowercase().ends_with(".rnl") {
+        return None;
+    }
+    let pinned = if pin { format!("; {PIN_STD_0_2}") } else { String::new() };
+    let raised = format!("@VERSION(\"0.3\"){pinned}");
+    let marker = carrier(doc, file, text);
+    let edit = match first_header(doc, file) {
+        Some(header) => {
+            let ast = parse_record(&header.text);
+            let body = ast.body?;
+            let call = |m: &crate::syntax::Member| m.segments.first().and_then(|s| s.call.clone());
+            match body.members.iter().filter_map(|m| call(m)).find(|c| c.kw == "VERSION") {
+                Some(version) => {
+                    let (a, b) = (header.loc(version.start), header.loc(version.end.saturating_sub(1)));
+                    if a.line != b.line {
+                        return None;
+                    }
+                    Edit::Replace(a.line, a.col as usize - 1, b.col as usize, raised)
+                }
+                // right after the `{` of the body, as `with_header` writes VERSION there
+                None => {
+                    let sep = if body.members.is_empty() { "" } else { ";" };
+                    let at = header.loc(body.start);
+                    Edit::Text(at.line, at.col as usize, format!(" {raised}{sep}"))
+                }
+            }
+        }
+        None if records_of(doc, file).iter().any(|(_, r)| record_type(r) == "header") => return None,
+        None => new_header(doc, file, text, marker, |_| format!("@RNL(type=\"header\") {{ {raised}}}"))?.0,
+    };
+    if doc.protected_at(file, edit.at().0).is_some() {
+        return None;
+    }
+    Some(apply(text, marker, vec![edit]))
+}
+
+/// Whether the header record of `file`, or that of a file that includes it, pins a version of
+/// the standard package, `@USE-PACKAGE(name="rnl-std", version="…")`, which then comes before the
+/// series that the version of the file implies (16.3).
+pub fn pins_std(doc: &HostDocument, file: &str) -> bool {
+    let mut files: Vec<&str> = vec![file];
+    for (k, lv) in doc.levels.iter().enumerate() {
+        if lv.file == file {
+            files.extend(doc.ancestors(k).into_iter().map(|a| doc.levels[a].file.as_str()));
+        }
+    }
+    files.into_iter().filter_map(|f| first_header(doc, f)).any(|h| {
+        let Some(body) = parse_record(&h.text).body else { return false };
+        body.members.iter().filter_map(|m| m.segments.first().and_then(|s| s.call.as_ref())).any(|c| {
+            let named = |n: &str| c.params.as_ref().and_then(|p| p.named.iter().find(|x| x.name == n));
+            c.kw == "USE-PACKAGE"
+                && named("name").is_some_and(|n| n.value == Value::Str("rnl-std".into()))
+                && named("version").is_some()
+        })
+    })
+}
+
+/// The names in `file` that have the spelling of a standard word that the version 0.3 adds,
+/// `numbering`, a field of the record head (2.8): keys of texts, role names, parameter names of
+/// definitions and of usages, sub-object names, aliases, fields of record heads, and the parameters
+/// of the host's instances, each as what it is and where. Raising the file to 0.3 would change
+/// their meaning, so a tool gives a warning for each and does not raise it (16.1, 16.5).
+pub fn spelled_like_new_words(doc: &HostDocument, file: &str) -> Vec<String> {
+    let words: Vec<&str> = crate::words::draft_header_fields().iter().map(|f| f.name.as_str()).collect();
+    let mut found: Vec<(&'static str, String, crate::diag::Loc)> = Vec::new();
+    for (_, rec) in records_of(doc, file) {
+        let ast = parse_record(&rec.text);
+        let mut names: Vec<(&'static str, String, usize)> = Vec::new();
+        for n in ast.header.iter().flat_map(|h| &h.named) {
+            names.push(("a field of a record head", n.name.clone(), n.off));
+        }
+        if let Some(body) = &ast.body {
+            names_in(&body.members, &mut names);
+        }
+        found.extend(
+            names.into_iter().filter(|(_, n, _)| words.contains(&n.as_str())).map(|(w, n, o)| (w, n, rec.loc(o))),
+        );
+    }
+    for lv in &doc.levels {
+        for inst in lv.instances.iter().filter(|i| i.file == file) {
+            for (name, _) in inst.params.iter().filter(|(n, _)| words.contains(&n.as_str())) {
+                found.push(("a parameter of an instance", name.clone(), crate::diag::Loc::line(file, inst.line)));
+            }
+        }
+    }
+    found.sort_by_key(|(_, _, at)| (at.line, at.col));
+    found.dedup();
+    found.into_iter().map(|(what, name, at)| format!("{what}, `{name}`, line {}", at.line)).collect()
+}
+
+/// The names written in a record's members, their definition bodies included, as
+/// [`spelled_like_new_words`] takes them: what each is, the name, and its offset in the record.
+fn names_in(members: &[std::rc::Rc<crate::syntax::Member>], out: &mut Vec<(&'static str, String, usize)>) {
+    use crate::syntax::{ObjExpr, Sep};
+    // the names of `roles=` and `parameters=`: a string, or the first of a list
+    let listed = |v: &Value| -> Vec<String> {
+        let Value::Arr(items) = v else { return Vec::new() };
+        items
+            .iter()
+            .filter_map(|i| match i {
+                Value::Str(s) => Some(s.clone()),
+                Value::Arr(xs) => match xs.first() {
+                    Some(Value::Str(s)) => Some(s.clone()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect()
+    };
+    for m in members {
+        for s in &m.segments {
+            for a in &s.args {
+                if let Some(role) = &a.role {
+                    out.push(("a role name", role.clone(), a.start));
+                }
+                match &a.obj {
+                    ObjExpr::Ref(r) => out.extend(
+                        r.path
+                            .iter()
+                            .filter(|p| p.sep == Sep::Sub)
+                            .map(|p| ("a sub-object name", p.name.clone(), r.start)),
+                    ),
+                    ObjExpr::Set(set) => names_in(&set.members, out),
+                    ObjExpr::Point(_) => {}
+                }
+            }
+            let Some(call) = &s.call else { continue };
+            let Some(params) = &call.params else { continue };
+            for n in &params.named {
+                match (call.kw.as_str(), n.name.as_str(), &n.value) {
+                    (_, "key", Value::Str(k)) => out.push(("the key of a text", k.clone(), n.off)),
+                    ("DEFINE", "roles", v) => out.extend(listed(v).into_iter().map(|r| ("a role name", r, n.off))),
+                    ("DEFINE", "parameters", v) => {
+                        out.extend(listed(v).into_iter().map(|p| ("a parameter of a definition", p, n.off)))
+                    }
+                    _ => out.push(("a parameter name", n.name.clone(), n.off)),
+                }
+            }
+            if call.kw == "ALIAS" {
+                if let Some(Value::Str(alias)) = params.positional.first() {
+                    out.push(("an alias", alias.trim_start_matches('@').to_string(), params.start));
+                }
+            }
+        }
+    }
 }
 
 /// Where a header record written at the top of a file goes: before the line `line`, 1-based,
@@ -590,6 +886,13 @@ struct Top {
 }
 
 impl Top {
+    /// Where the reading keeps a header written there (2.2): None in a region written to be
+    /// encrypted, and carried by `*` in its stead where the reading is in SPICE mode.
+    fn kept(self, doc: &HostDocument, file: &str) -> Option<Top> {
+        let marker = in_mode(doc, file, self.line, self.marker);
+        doc.protected_at(file, self.line).is_none().then_some(Top { marker, ..self })
+    }
+
     /// The change that writes these lines, each behind the marker already, there.
     fn edit(self, lines: Vec<String>) -> Edit {
         if self.bare {
@@ -602,8 +905,8 @@ impl Top {
 
 /// Where a file's header record goes at its top ([`with_header`]; the draft 0.3, 16.3 and 2.2),
 /// carried by `marker`, the file's carrier, unless said otherwise: line 2, after a title or a
-/// comment on the first line, which never carries RNL; the bare marker first before a statement on
-/// the first line of an included file. In a file that is not a `.scs` file, carried by `//`, whose
+/// comment on the first line, which never carries RNL, and after the lines that continue it; the
+/// bare marker first before a statement on the first line of an included file. In a file that is not a `.scs` file, carried by `//`, whose
 /// first statement is `simulator lang=spectre`, after that statement and the lines that continue
 /// it, when no record comes before it; otherwise above it, in SPICE mode, where only `*` is a
 /// comment (2.2), carried by `*`. None for a file read only through library sections: its line 2
@@ -628,8 +931,21 @@ fn top(doc: &HostDocument, file: &str, text: &str, marker: &'static str) -> Opti
     }
     let comment = |l: &str| l.starts_with('*') || (spectre && l.starts_with("//"));
     let first = lines.lines.first().map(|l| Lines::body(l));
-    let bare = !first.is_some_and(|l| main || l.trim().is_empty() || comment(l));
-    Some(Top { line: if bare { 1 } else { 2 }, marker, bare })
+    let bare = first.is_some_and(|l| !(main || l.trim().is_empty() || comment(l)));
+    if bare {
+        return Some(Top { line: 1, marker, bare });
+    }
+    // after the lines that continue line 1, such as a title: a `+` line, or in Spectre's dialect
+    // the line after one that ends with `\`; no comment goes between a line and its continuation
+    // (2.2)
+    let body = |line: usize| lines.lines.get(line - 1).map(|l| Lines::body(l));
+    let mut line = 2;
+    while body(line).is_some_and(|l| l.trim_start().starts_with('+'))
+        || (spectre && body(line - 1).is_some_and(|l| l.ends_with('\\')) && body(line).is_some())
+    {
+        line += 1;
+    }
+    Some(Top { line: line as u32, marker, bare })
 }
 
 /// The line, 1-based, after a file's `simulator lang=spectre` and the lines that continue it (a
@@ -662,8 +978,10 @@ mod tests {
     use crate::host::{Dialect, Level, LevelKind};
     use crate::records::{scan_run, CarrierLine};
 
-    /// A tiny SPICE reader for these tests: `*` carriers, `.subckt`/`.ends` levels; with `//`, a
-    /// Spectre reader, whose `*` lines carry as well.
+    /// A tiny SPICE reader for these tests: `*` carriers, `.subckt`/`.ends` levels, `.prot …
+    /// .unprot` regions; with `//`, a Spectre reader, whose `*` lines carry as well, with `protect …
+    /// unprotect` regions, and in SPICE mode from the start of a file that is not a .scs file, or
+    /// from a `simulator lang=spice`, up to a `simulator lang=spectre`.
     fn doc(text: &str, file: &str, marker: &str) -> HostDocument {
         let mut main = Level::new(LevelKind::File, file, file, file);
         main.circuit = true;
@@ -679,6 +997,7 @@ mod tests {
         let mut cur = 0;
         let mut run: Vec<CarrierLine> = Vec::new();
         let lines: Vec<&str> = text.lines().collect();
+        let (mut protect, mut spice) = (None, (marker == "//" && !file.ends_with(".scs")).then_some(0));
         for (k, l) in lines.iter().enumerate() {
             let no = k as u32 + 1;
             if k > 0 {
@@ -706,8 +1025,21 @@ mod tests {
                 cur = 0;
             } else if low == ".end" {
                 d.levels[0].end_line = no;
+            } else if low.starts_with(".prot") || low == "protect" {
+                protect.get_or_insert(no);
+            } else if low.starts_with(".unprot") || low == "unprotect" {
+                d.protected.extend(protect.take().map(|a| (file.to_string(), a, no)));
+            } else if low.starts_with("simulator") && marker == "//" {
+                if low.contains("spectre") {
+                    d.spice_mode.extend(spice.take().map(|a| (file.to_string(), a, no)));
+                } else {
+                    spice.get_or_insert(no);
+                }
             }
         }
+        let past = lines.len() as u32 + 1;
+        d.protected.extend(protect.map(|a| (file.to_string(), a, past)));
+        d.spice_mode.extend(spice.map(|a| (file.to_string(), a, past)));
         if d.levels[0].end_line == 0 {
             d.levels[0].end_line = lines.len() as u32 + 1;
         }
@@ -1035,5 +1367,187 @@ mod tests {
         let d = doc(net, "a.scs", "//");
         let out = append_record(&d, 0, net, "@RNL {#R1 @PLACE(0, 0)}");
         assert_eq!(out, "// t\nR1 (a b) resistor r=1k\n// @RNL {#R1 @PLACE(0, 0)}\n");
+    }
+
+    #[test]
+    fn a_record_goes_before_a_region_written_to_be_encrypted() {
+        // a record in `.prot … .unprot` is gone once the region is encrypted (2.2): a subcircuit
+        // whose `.ends` lies in one has its record before the region, inside the subcircuit, and
+        // the records of the solver it replaces go wherever they are, so that none comes after it
+        let net = "* t\n.subckt s a b\nR1 a b 1k\n.prot\nR2 a b 1k\n* @RNL(type=\"generated\") {#R1 @PLACE(9, 9)}\n\
+                   .ends\n.unprot\nX1 a b s\n.end\n";
+        let d = doc(net, "a.sp", "*");
+        assert_eq!(d.protected, [("a.sp".to_string(), 4, 8)]);
+        assert_eq!((record_line(&d, 1, net), record_line(&d, 0, net)), (Ok(4), Ok(10)));
+        let record = "@RNL(type=\"generated\") {#R1 @PLACE(0, 0)}";
+        let header = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+        assert_eq!(
+            replace_generated_with_header(&d, 1, net, record, "0.2"),
+            format!("* t\n{header}\n.subckt s a b\nR1 a b 1k\n* {record}\n.prot\nR2 a b 1k\n.ends\n.unprot\nX1 a b s\n.end\n")
+        );
+        // a main file whose `.end` lies in a region left open, which begins in a subcircuit: before
+        // that subcircuit, the last place of the file level's own text above the region
+        let net = "* t\nR0 a 0 1k\n.subckt s a b\nR1 a b 1k\n.prot\nR2 a b 1k\n.ends\nX1 a b s\n.end\n";
+        let d = doc(net, "a.sp", "*");
+        assert_eq!(d.protected, [("a.sp".to_string(), 5, 10)]);
+        assert_eq!((record_line(&d, 0, net), record_line(&d, 1, net)), (Ok(3), Ok(5)));
+        assert_eq!(
+            append_record(&d, 0, net, "@RNL {#X1 @PLACE(0, 0)}"),
+            net.replace("R0 a 0 1k\n", "R0 a 0 1k\n* @RNL {#X1 @PLACE(0, 0)}\n")
+        );
+    }
+
+    #[test]
+    fn a_subcircuit_written_in_a_region_written_to_be_encrypted_gets_no_record() {
+        // its `.subckt` lies in the region, and so does every place of its own text (2.2): its file
+        // is left as it is, the record of the solver there as well
+        let net =
+            "* t\n.prot\n.subckt s a b\nR1 a b 1k\n* @RNL(type=\"generated\") {#R1 @PLACE(9, 9)}\n.ends\n.unprot\n\
+                   X1 a b s\n.end\n";
+        let d = doc(net, "a.sp", "*");
+        assert_eq!((record_line(&d, 1, net), record_line(&d, 0, net)), (Err((2, 7)), Ok(9)));
+        let record = "@RNL(type=\"generated\") {#R1 @PLACE(0, 0)}";
+        assert_eq!(replace_generated_with_header(&d, 1, net, record, "0.2"), net);
+        assert_eq!(replace_generated(&d, 1, net, record), net);
+        assert_eq!(append_record(&d, 1, net, record), net);
+        assert_eq!(move_header_for(&d, 1, net, "0.2"), net);
+        // a header record in such a region gets no VERSION there
+        let net = "* t\n.prot\n* @RNL(type=\"header\") { }\nR1 a b 1k\n.unprot\n.end\n";
+        let d = doc(net, "a.sp", "*");
+        assert_eq!(with_header(&d, "a.sp", net, "0.2"), net);
+        let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.2");
+        assert_eq!(out, net.replace(".end\n", "* @RNL(type=\"generated\") {}\n.end\n"));
+    }
+
+    #[test]
+    fn a_header_that_moves_above_a_subcircuit_goes_before_a_region_written_to_be_encrypted() {
+        // a file read only through a library section, whose header moves above the subcircuit it
+        // comes after (2.8): the `.subckt` lies in a region, so the header goes before the region,
+        // still inside the section (2.2)
+        let lib = "* models\n.lib tt\nR0 a 0 1k\n.prot\n.subckt s a b\n.unprot\nR1 a b 1k\n.ends\n\
+                   * @RNL(type=\"header\") { }\n.endl tt\n";
+        let mut d = doc(lib, "models.lib", "*");
+        d.levels[0].section = Some("tt".into());
+        let out = replace_generated_with_header(&d, 1, lib, "@RNL(type=\"generated\") {}", "0.2");
+        let want =
+            "* models\n.lib tt\nR0 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.prot\n.subckt s a b\n\
+                    .unprot\nR1 a b 1k\n* @RNL(type=\"generated\") {}\n.ends\n.endl tt\n";
+        assert_eq!(out, want);
+    }
+
+    #[test]
+    fn in_spice_mode_a_record_is_carried_by_a_star() {
+        // in a `simulator lang=spice` section of a Spectre file, `//` is no comment, and a record
+        // carried by it would be lost: it is written with `*`, a comment in both modes (2.2); in
+        // Spectre mode, with the carrier of the file
+        let net =
+            "// t\nsubckt s (a b)\nR1 (a b) resistor r=1k\nends s\nsimulator lang=spice\n.subckt p a b\nR2 a b 1k\n\
+                   .ends\nsimulator lang=spectre\nX1 (a b) s\n";
+        let d = doc(net, "a.scs", "//");
+        assert_eq!(d.spice_mode, [("a.scs".to_string(), 5, 9)]);
+        let markers: Vec<&str> = [4, 8, 9, 10, 11].iter().map(|&l| carrier_at(&d, "a.scs", net, l)).collect();
+        assert_eq!(markers, ["//", "*", "*", "//", "//"]);
+        let record = "@RNL(type=\"generated\") {#R2 @PLACE(0, 0)}";
+        let out = replace_generated(&d, 2, net, record);
+        assert_eq!(out, net.replace("R2 a b 1k\n", &format!("R2 a b 1k\n* {record}\n")));
+        assert_eq!(append_record(&d, 2, net, record), out);
+        // a file whose records are in `//` after its switch to Spectre mode, with a subcircuit in a
+        // later SPICE section: its record in `*`, and so is that of the file level, at its end there
+        let net = "* t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nX1 (a b) p\n\
+                   simulator lang=spice\n.subckt p a b\nR2 a b 1k\n.ends\n";
+        let d = doc(net, "a.net", "//");
+        assert_eq!(carrier(&d, "a.net", net), "//");
+        let out = replace_generated_with_header(&d, 1, net, record, "0.2");
+        assert_eq!(out, net.replace("R2 a b 1k\n", &format!("R2 a b 1k\n* {record}\n")));
+        let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {}", "0.2");
+        assert_eq!(out, format!("{net}* @RNL(type=\"generated\") {{}}\n"));
+    }
+
+    #[test]
+    fn a_header_record_of_its_own_goes_where_a_new_header_goes() {
+        // `add_header` writes the record that its caller makes for the marker that carries it, by
+        // the rules of `with_header`: after line 1 and the lines that continue it, a `+` line, or
+        // in Spectre's dialect the line after one that ends with `\` (2.2)
+        let record = |m: &'static str| format!("@RNL(type=\"header\") {{ @VERSION(\"0.3\"); @DEVICE(m={})}}", m.len());
+        let net = "title\n+ more of it\nR1 a 0 1k\n";
+        let d = doc(net, "a.sp", "*");
+        let head = "title\n+ more of it\n* @RNL(type=\"header\") { @VERSION(\"0.3\")";
+        assert_eq!(add_header(&d, "a.sp", net, record), format!("{head}; @DEVICE(m=1)}}\nR1 a 0 1k\n"));
+        assert_eq!(with_header(&d, "a.sp", net, "0.3"), format!("{head}}}\nR1 a 0 1k\n"));
+        let net = "t \\\nmore\nR1 (a b) resistor r=1k\n";
+        let d = doc(net, "a.scs", "//");
+        assert_eq!(
+            add_header(&d, "a.scs", net, record),
+            "t \\\nmore\n// @RNL(type=\"header\") { @VERSION(\"0.3\"); @DEVICE(m=2)}\nR1 (a b) resistor r=1k\n"
+        );
+        // an empty text keeps line 1, which is never read, empty
+        let d = doc("", "a.sp", "*");
+        assert_eq!(with_header(&d, "a.sp", "", "0.3"), "\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n");
+        assert_eq!(
+            add_header(&d, "a.sp", "", record),
+            "\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @DEVICE(m=1)}\n"
+        );
+        // a file that has a header record, and a package file, come back as they are
+        let with = "* t\n* @RNL(type=\"header\") {}\n.end\n";
+        assert_eq!(add_header(&doc(with, "a.sp", "*"), "a.sp", with, record), with);
+        assert_eq!(add_header(&d, "p.rnl", "@RNL {}\n", record), "@RNL {}\n");
+    }
+
+    #[test]
+    fn a_file_raised_to_0_3_keeps_the_standard_series_it_was_read_with() {
+        // the VERSION of its header says 0.3, followed by the pin of the series 0.2 (16.1, 16.3)
+        let net = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @DEVICE(x) }\nR1 a b 1k\n.end\n";
+        let d = doc(net, "a.sp", "*");
+        assert!(!pins_std(&d, "a.sp"));
+        let raised = format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {PIN_STD_0_2}; @DEVICE(x) }}\nR1 a b 1k\n.end\n"
+        );
+        assert_eq!(raise_version(&d, "a.sp", net, true).as_deref(), Some(raised.as_str()));
+        // a pin of the standard package stays, the only one, in the file and for a file it includes
+        let pinned = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n.end\n";
+        let mut d = doc(pinned, "a.sp", "*");
+        assert!(pins_std(&d, "a.sp"));
+        let out = raise_version(&d, "a.sp", pinned, false).unwrap();
+        assert_eq!(out, pinned.replacen("\"0.2\"", "\"0.3\"", 1));
+        d.add_level(Level::new(LevelKind::File, "lib.inc", "lib.inc", "lib.inc"), Some(0));
+        assert!(pins_std(&d, "lib.inc"));
+        // a header without VERSION gets it after its `{`; a file without a header gets one
+        let pin = format!("{{ @VERSION(\"0.3\"); {PIN_STD_0_2}}}");
+        let bare = "* t\n* @RNL(type=\"header\") {}\n.end\n";
+        assert_eq!(raise_version(&doc(bare, "a.sp", "*"), "a.sp", bare, true), Some(bare.replace("{}", &pin)));
+        let none = "* t\nR1 a b 1k\n.end\n";
+        let out = raise_version(&doc(none, "a.sp", "*"), "a.sp", none, true);
+        assert_eq!(out, Some(format!("* t\n* @RNL(type=\"header\") {pin}\nR1 a b 1k\n.end\n")));
+        // a package file, a header that is not the first record, and one in a region written to be
+        // encrypted are not raised
+        assert_eq!(raise_version(&d, "p.rnl", "@RNL {}\n", true), None);
+        let late = "* t\n* @RNL {#R1}\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.end\n";
+        assert_eq!(raise_version(&doc(late, "a.sp", "*"), "a.sp", late, true), None);
+        let hidden = "* t\n.prot\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.unprot\n.end\n";
+        assert_eq!(raise_version(&doc(hidden, "a.sp", "*"), "a.sp", hidden, true), None);
+    }
+
+    #[test]
+    fn names_spelled_like_the_word_that_0_3_adds() {
+        // `numbering`, a field of the record head in 0.3 (2.8), would change the meaning of a name of
+        // that spelling (16.1, 16.5)
+        let net = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @ALIAS(\"numbering\", \"axis\")}\nR1 a b 1k\n\
+                   * @RNL(numbering=\"x\") { #R1 @TEXT(\"a\", key=\"numbering\"); \
+                   $D = @DEFINE(roles=[\"numbering\"], parameters=[[\"numbering\", 1]]) {} }\n.end\n";
+        let d = doc(net, "a.sp", "*");
+        let mut found = spelled_like_new_words(&d, "a.sp");
+        found.sort();
+        assert_eq!(
+            found,
+            [
+                "a field of a record head, `numbering`, line 4",
+                "a parameter of a definition, `numbering`, line 4",
+                "a role name, `numbering`, line 4",
+                "an alias, `numbering`, line 2",
+                "the key of a text, `numbering`, line 4",
+            ]
+        );
+        let plain = "* t\n* @RNL { #R1 @TEXT(\"numbering\", key=\"name\") }\n.end\n";
+        assert!(spelled_like_new_words(&doc(plain, "a.sp", "*"), "a.sp").is_empty());
     }
 }

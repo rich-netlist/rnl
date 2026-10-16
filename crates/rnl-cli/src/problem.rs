@@ -218,6 +218,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
                 "priority": u.priority.map(|p| p.as_str()),
                 "parent": u.parent,
                 "object": u.object,
+                "source": u.source.as_ref().map(|l| json!({"file": l.file, "line": l.line, "col": l.col})),
             });
             if numbers {
                 entry.as_object_mut().unwrap().insert("written_numbers".into(), json!(u.written_numbers));

@@ -15,8 +15,8 @@
  * @property {boolean} [std] Use the standard package at the root; true when not given.
  * @property {boolean} [svg] Write each level's SVG; true when not given.
  * @property {boolean} [primitives] Give each level's primitives; false when not given.
- * @property {boolean} [draft] For development only: read the files that declare the draft 0.3 as
- *   well; false when not given.
+ * @property {boolean} [draft] Accepted, with no effect: the files of 0.3 are read without it. Kept
+ *   for compatibility, to be removed later.
  * @property {{ drawing?: boolean, host?: boolean, model?: boolean }} [parts] The parts of the
  *   editor interface's snapshot to give: with them, the answer is a snapshot (snapshot.d.ts), with
  *   the Document as its `drawing` unless `drawing` is false.
@@ -27,9 +27,11 @@
  * The netlist is the entry; the other fields are a Request's.
  *
  * @typedef {object} WriteRequest
- * @property {{ dialect: "spice" | "spectre", netlist: string, author: string, ops: object[] }} write
- *   The netlist, without RNL records, its dialect, the author of the records, and the ops as the
- *   editor interface draft writes them.
+ * @property {{ dialect: "spice" | "spectre", netlist: string, author: string, ops: object[], file?: string }} write
+ *   The netlist, without RNL records, its dialect, the author of the records, the ops as the
+ *   editor interface draft writes them, and the name the netlist is saved under when it is known,
+ *   such as `top.net`: a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to
+ *   its `simulator lang=spectre`.
  * @property {Record<string, string>} [files] Further files, such as packages.
  * @property {string[]} [package_dirs]
  * @property {boolean} [std]

@@ -63,9 +63,9 @@ pub struct Options {
     /// written coordinates and conflicting coordinates are found (11.7). The standard leaves the
     /// tolerance to the tool; a viewer that does not solve uses [`crate::geom::TOL`].
     pub tolerance: f64,
-    /// For development only: read the files that declare the draft 0.3 as well
-    /// ([`unit::DRAFT_VERSION`]). The rules the draft changes apply only to those files, so a file
-    /// of 0.2 reads the same with this on or off.
+    /// No effect. Kept for compatibility, to be removed later: the files of 0.3, and a main file
+    /// without a header record, are read in 0.3 without any switch ([`unit::READ_VERSIONS`],
+    /// [`unit::DEFAULT_VERSION`]).
     pub draft: bool,
 }
 
@@ -101,8 +101,8 @@ pub struct Interpretation {
     /// [`Options::problems`] is set. Built without the generated records ([`Options::solver`]),
     /// it is the solver's input (2.8, 17).
     pub problems: Vec<crate::problem::LevelProblem>,
-    /// The numbers of the objects without a name of each drawing level, with their checks (the
-    /// draft 0.3, 5.9); empty unless [`Options::draft`] is set. See [`crate::numbering`].
+    /// The numbers of the objects without a name of each drawing level, with their checks, whatever
+    /// its version (5.9); empty for a package file checked on its own. See [`crate::numbering`].
     pub numbering: Vec<LevelNumbering>,
     /// For each level of the host document, by its index in [`HostDocument::levels`]: `None`
     /// when its RNL is interpreted, otherwise the file level on the way up from it, itself
@@ -153,6 +153,8 @@ pub struct Interp<'p> {
     pub(crate) pkg_sources: Vec<(String, String)>,
     pub(crate) packages: HashMap<(String, String), UnitId>,
     pub(crate) pkg_files: Option<Vec<(String, String, String)>>,
+    /// The language version each package file of the package directories is written in (16.1).
+    pub(crate) pkg_languages: HashMap<String, String>,
     pub(crate) memo: HashMap<(MemberKey, Option<SceneId>), Memo>,
     pub(crate) bound_memo: HashMap<(MemberKey, Option<SceneId>), Bound>,
     pub(crate) in_progress: HashSet<(MemberKey, Option<SceneId>)>,
@@ -184,9 +186,8 @@ pub struct Interp<'p> {
     pub(crate) want_problems: bool,
     /// The tolerance of the checks against written coordinates (`Options::tolerance`, 11.7).
     pub(crate) tol: f64,
-    /// Read the files that declare the draft 0.3 (`Options::draft`).
-    pub(crate) draft: bool,
-    pub(crate) std_cache: Option<Option<UnitId>>,
+    /// The standard package used implicitly for the files of each language version (16.3).
+    pub(crate) std_units: HashMap<String, Option<UnitId>>,
     /// The packages in effect on each chain of levels, and the number of units they were found
     /// among (16.2).
     pub(crate) effs: HashMap<EffKey, Rc<Eff>>,
@@ -274,6 +275,7 @@ impl<'p> Interp<'p> {
             pkg_sources: Vec::new(),
             packages: HashMap::new(),
             pkg_files: None,
+            pkg_languages: HashMap::new(),
             memo: HashMap::new(),
             bound_memo: HashMap::new(),
             in_progress: HashSet::new(),
@@ -294,8 +296,7 @@ impl<'p> Interp<'p> {
             read_generated: options.generated,
             want_problems: options.problems,
             tol: options.tolerance,
-            draft: options.draft,
-            std_cache: None,
+            std_units: HashMap::new(),
             effs: HashMap::new(),
             effs_units: 0,
             expansions: HashMap::new(),
@@ -387,8 +388,18 @@ impl<'p> Interp<'p> {
     }
 
     pub fn run(&mut self) {
-        // the standard package first: reading it reads the packages it references (16.3)
-        self.std_package();
+        // the standard package of each chain first, by the language version of its file: reading
+        // one reads the packages it references (16.3)
+        match self.package_main {
+            Some(pm) => {
+                self.implicit_std(EffKey::Alone(pm));
+            }
+            None => {
+                for lv in 0..self.doc.levels.len() {
+                    self.implicit_std(EffKey::Level(lv));
+                }
+            }
+        }
         if let Some(pm) = self.package_main {
             // checked on its own (2.7): the package and what its references bring in (16.2)
             let chain = EffKey::Alone(pm);
@@ -740,15 +751,15 @@ impl<'p> Interp<'p> {
         let model = self.build_model();
         let (problems, results) =
             if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Default::default() };
-        // the numbers and their checks, read with the draft only (5.9); a reading that counts the
-        // objects of the authored records for another gives those alone
+        // the numbers and their checks (5.9); a reading that counts the objects of the authored
+        // records for another gives those alone
         let counting = self.numbers.count;
         let counted: HashMap<LevelId, AuthoredCount> = if counting {
             (0..self.scenes.len()).map(|s| (self.scenes[s].level, self.counted_authored(s))).collect()
         } else {
             HashMap::new()
         };
-        let numbering: Vec<LevelNumbering> = if self.draft && !counting && self.package_main.is_none() {
+        let numbering: Vec<LevelNumbering> = if !counting && self.package_main.is_none() {
             (0..self.scenes.len()).map(|s| self.level_numbering(s)).collect()
         } else {
             Vec::new()
@@ -792,8 +803,8 @@ impl<'p> Interp<'p> {
 /// Interpret a host document: the effective model and the diagnostics. `sink` holds what the
 /// host adapter reported, if anything.
 ///
-/// The numbers of the draft 0.3 take more than one reading of the document (5.9), only when a file
-/// of the draft is read with its records of the solver:
+/// The numbers of 0.3 take more than one reading of the document (5.9), only when a file of 0.3 is
+/// read with its records of the solver:
 ///
 /// - the objects of the authored records are counted as the level reads without its records of
 ///   the solver, so that reading comes first (`NumberRun::authored`);
