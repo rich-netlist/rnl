@@ -18,6 +18,7 @@ mod output;
 mod packages;
 pub mod phases;
 pub mod scene;
+mod selfcheck;
 pub mod unit;
 
 use std::collections::{BTreeMap, HashMap, HashSet};

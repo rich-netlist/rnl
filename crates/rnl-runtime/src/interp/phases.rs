@@ -1493,6 +1493,19 @@ impl Interp<'_> {
                 self.constraint_mut(c).failed = true;
                 continue;
             }
+            // checked on its own first: one without a solution of its own fails and takes no part
+            // in the resolution, nor in what a solver is given (8.5)
+            if let Some(no) = self.self_contradiction(s, &cd, &members) {
+                let l = self.label(c);
+                self.diag_site(
+                    Severity::Error,
+                    &site,
+                    cd.off,
+                    format!("{l} has no solution on its own: {}; this constraint fails (8.5, {})", no.why, no.section),
+                );
+                self.constraint_mut(c).failed = true;
+                continue;
+            }
             let ok = self.satisfied(s, c, &members);
             match ok {
                 None => {
