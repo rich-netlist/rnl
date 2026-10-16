@@ -1,7 +1,8 @@
 //! A later segment of a pipe is written later, wherever the place of writing matters (5.5, as the
 //! draft 0.3 makes it clear, in every version): in the appearance queues (8.3), in override by key
 //! (8.4), in the order of resolution (8.5, in `solver.rs`), in the drawing order (11.6), and for
-//! PRIORITY (14.8) and CURRENT (15.2); the rewrites of a wire are in `rewrite.rs`. The later
+//! PRIORITY (14.8) and CURRENT (15.2), between the PLACE of a text and its offset (13.3), and for the
+//! statement that closes a cycle of sets (5.2.2); the rewrites of a wire are in `rewrite.rs`. The later
 //! segment comes after all that the earlier one holds, such as the statements nested in it: in
 //! `{#R2 @LAYER("top")} => @LAYER("bottom")`, the outer LAYER is the later. Before, the segments
 //! of one statement shared its position, so the earlier of two could win, and a statement nested
@@ -17,8 +18,17 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
 /// The main level of a netlist of R1 to R4, drawn with `$TALL` in a row, and `statements` after it
-/// in the same record; there are two symbols and two styles to give.
+/// in the same record, from line 14; there are two symbols and two styles to give.
 fn read(statements: &[&str]) -> Interpretation {
+    let r = read_with(statements, &Options { std: false, ..Options::default() });
+    let errors: Vec<String> =
+        r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    r
+}
+
+/// The same netlist read with `options`, whatever it reports.
+fn read_with(statements: &[&str], options: &Options) -> Interpretation {
     let mut text = String::from("* segments\nR1 a b 1k\nR2 c d 1k\nR3 e f 1k\nR4 g h 1k\n");
     text += "* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n* @RNL {\n";
     let mut all = vec![
@@ -33,11 +43,7 @@ fn read(statements: &[&str]) -> Interpretation {
     text += &all.iter().map(|s| format!("*   {s}")).collect::<Vec<_>>().join(";\n");
     text += "\n* }\n.end\n";
     let files = MemoryProvider::new().with("s.sp", &text);
-    let r = interpret_file(Path::new("s.sp"), None, &files, &Options { std: false, ..Options::default() }).unwrap();
-    let errors: Vec<String> =
-        r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
-    assert!(errors.is_empty(), "{errors:?}");
-    r
+    interpret_file(Path::new("s.sp"), None, &files, options).unwrap()
 }
 
 fn item<'a>(r: &'a Interpretation, id: &str) -> &'a ItemView {
@@ -129,4 +135,45 @@ fn in_a_symbol_body_the_later_pin_and_place_win() {
     let name =
         lv.texts.iter().find(|t| t.key.as_deref() == Some("name") && t.attach.as_deref() == Some("#R4")).unwrap();
     assert_eq!(name.anchor, (22.0, 5.0));
+}
+
+#[test]
+fn a_later_place_of_a_text_replaces_an_earlier_offset() {
+    // 13.3 compares where the PLACE of a text and its offset are written in the order of writing
+    // too: the PLACE of the later segment replaces the dx of a text made in a statement nested in the
+    // earlier one, for a text and for a text with a key alike; before, the nested offset won
+    let statements = ["{#R1 @TEXT(\"a\", dx=2)} => @PLACE(x=5)", "{#R2 @TEXT(\"b\", key=\"k\", dx=2)} => @PLACE(x=15)"];
+    let r = read(&statements);
+    let x = |m: &str| r.model.levels[0].texts.iter().find(|t| t.markup == m).unwrap().anchor.0;
+    assert_eq!((x("a"), x("b")), (5.0, 15.0));
+    // the problem of a solver has the PLACE of each, not the offset
+    let r = read_with(&statements, &Options { std: false, ..Options::solver() });
+    let kinds: Vec<&str> = r.problems[0]
+        .facts
+        .iter()
+        .filter(|f| f.label.contains("\"a\"") || f.label.contains("::k"))
+        .map(|f| f.kind.name())
+        .collect();
+    assert!(!kinds.is_empty() && kinds.iter().all(|k| k.starts_with("PLACE")), "{kinds:?}");
+}
+
+#[test]
+fn the_later_segment_closes_a_cycle_of_sets() {
+    // of the statements of a cycle of sets, the last in order of position fails (5.2.2), in the
+    // order of writing: the ADD-TO of the later segment, not the one nested in the earlier segment.
+    // So %y still holds %x, and R1 is blue with it; before, the nested ADD-TO failed instead
+    let r = read_with(
+        &["%x = {#R1}", "%y = {#R2}", "{%x @ADD-TO %y} => @ADD-TO %x", "%y @SET-STYLE $blue"],
+        &Options { std: false, ..Options::default() },
+    );
+    let errors: Vec<(u32, String)> = r
+        .diagnostics()
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .map(|d| (d.loc.as_ref().map_or(0, |l| l.line), d.message.clone()))
+        .collect();
+    assert!(errors.len() == 1 && errors[0].0 == 16 && errors[0].1.contains("cycle"), "{errors:?}");
+    for id in ["#R1", "#R2"] {
+        assert_eq!(item(&r, id).style.get("linecolor").and_then(Lit::str), Some("#0000ff"), "{id}");
+    }
 }

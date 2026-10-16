@@ -8,7 +8,11 @@
 //!   of the `use-package` ops, each name and version once;
 //! - one record of the author's for each level the ops name, at the end of the level's own text
 //!   (17): before the `.ends` of a subcircuit, or the `.end` of the file, or at the end of the file;
-//! - in the comment carrier of the dialect, `*` or `//`;
+//!   before a region written to be encrypted (`.prot … .unprot`, `protect … unprotect`) that the
+//!   end lies in, where a record is gone once the region is encrypted (2.2), and a level whose own
+//!   text lies in one is refused;
+//! - in the comment carrier of the dialect, `*` or `//`, and `*` in a `simulator lang=spice` section
+//!   of a Spectre netlist, where `//` is no comment (2.2);
 //! - the statements in the standard form (4.3), in the order of the ops, each line at most 132
 //!   characters long, broken only at spaces outside strings and brackets.
 //!
@@ -23,7 +27,7 @@ use std::collections::BTreeMap;
 use rnl_runtime::diag::Sink;
 use rnl_runtime::host::{HostDocument, LevelId, LevelKind};
 use rnl_runtime::source::MemoryProvider;
-use rnl_runtime::writeback::{append_record, carried, carrier};
+use rnl_runtime::writeback::{append_record, carried, carrier, record_line};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -95,24 +99,26 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
         levels.entry(level).or_default().extend(form::statements(&lop.op));
         first_op.entry(level).or_insert(k);
     }
-    // a record at the end of a level goes before its last line; in a region written to be
-    // encrypted it would be gone once the region is encrypted (2.2)
+    // a record goes at the end of a level, or before a region written to be encrypted that the end
+    // lies in, where it would be gone once the region is encrypted (2.2); a level whose own text
+    // lies in such a region has no place for it
+    let mut at: BTreeMap<LevelId, u32> = BTreeMap::new();
     for (&level, &k) in &first_op {
-        let at = doc.levels[level].end_line;
-        if let Some((_, a, b)) = doc.protected.iter().find(|(f, a, b)| *f == file && *a < at && at <= *b) {
+        let line = record_line(&doc, level, &request.netlist).map_err(|(a, b)| {
             let (what, title) = (ops[k].op.name(), doc.levels[level].title());
-            return Err(format!(
-                "op {k} ({what}): {title} ends in a region written to be encrypted, lines {a} to {b}, where a record \
+            format!(
+                "op {k} ({what}): {title} lies in a region written to be encrypted, lines {a} to {b}, where a record \
                  is gone once the region is encrypted (2.2)"
-            ));
-        }
+            )
+        })?;
+        at.insert(level, line);
     }
 
     let marker = carrier(&doc, &file, &request.netlist);
     let mut text = request.netlist.clone();
-    // from the bottom up, so that the end lines of the levels above stay where the reader found them
+    // from the bottom up, so that the places of the levels above stay where the reader found them
     let mut order: Vec<LevelId> = levels.keys().copied().collect();
-    order.sort_by_key(|lv| std::cmp::Reverse(doc.levels[*lv].end_line));
+    order.sort_by_key(|lv| std::cmp::Reverse(at[lv]));
     for lv in order {
         let record = record(&request.author, &levels[&lv], marker);
         text = append_record(&doc, lv, &text, &record);

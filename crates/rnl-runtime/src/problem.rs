@@ -423,6 +423,10 @@ pub struct UsageEntry {
     /// [`Reference::GeneratedNumber`] with `index` 1 and on, then the points that its roles are
     /// written with as coordinates. 0 for the other usages.
     pub written_numbers: usize,
+    /// Where it is written: its AS or ATTACH, or the generation rule that makes it (10.5), such as
+    /// a statement in the body of a definition for a usage made there. Like every place, it is left
+    /// out of the input digest ([`sig1`]).
+    pub source: Option<Loc>,
 }
 
 /// What a solver needs of one drawing level.

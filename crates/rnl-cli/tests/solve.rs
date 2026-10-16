@@ -1955,3 +1955,67 @@ fn a_place_decided_before_the_time_ran_out_is_written_as_written() {
     }
     assert!(cut > 0, "no limit decides #R1 and leaves #R2 undecided");
 }
+
+#[test]
+fn no_record_is_written_in_a_region_written_to_be_encrypted() {
+    // a record in `.prot … .unprot` is gone once the region is encrypted (2.2): a subcircuit whose
+    // `.subckt` lies in a region, as in an encrypted library, is solved but not written, and its
+    // report says so; one whose `.ends` lies in a region that begins inside it has its record
+    // before the region. Read back, every level written is placed whole, no record is in a region,
+    // and a second solve writes the same
+    let lib = "* lib\n.prot\n.subckt enc a b\nR1 a m 1k\nR2 m b 1k\n.ends\n.unprot\n\
+               .subckt half a b\nR1 a m 1k\n.prot\nR2 m b 1k\n.ends\n.unprot\n";
+    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include lib.inc\nX1 p q enc\nX2 p q half\n.end\n";
+    let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", lib);
+    let entry = Path::new("/w/top.sp");
+    let run = solve(entry, &files, &unlimited()).unwrap();
+    assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.sp", "enc", "half"]);
+    let note = "the record is not written: enc lies in a region written to be encrypted, lines 2 to 7 of lib.inc, \
+                where a record is gone once the region is encrypted (2.2)";
+    assert_eq!(run.levels[1].written.notes, [note]);
+    assert!(lines(&run, false).contains(&format!("    {note}")));
+    let text = &run.files.iter().find(|f| f.path == "/w/lib.inc").unwrap().text;
+    let head =
+        "* lib\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.prot\n.subckt enc a b\nR1 a m 1k\nR2 m b 1k\n.ends\n\
+                .unprot\n.subckt half a b\nR1 a m 1k\n* @RNL(type=\"generated\"";
+    assert!(text.starts_with(head) && text.ends_with("* }\n.prot\nR2 m b 1k\n.ends\n.unprot\n"), "{text}");
+    assert_eq!(text.matches("type=\"generated\"").count(), 1, "{text}");
+    let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+    let both = Layered { layers: vec![&solved, &files] };
+    let r = interpret_file(entry, None, &both, &Options::default()).unwrap();
+    assert!(messages(&r, Severity::Error).is_empty(), "{:?}", messages(&r, Severity::Error));
+    let warnings = messages(&r, Severity::Warning);
+    assert!(!warnings.iter().any(|w| w.contains("encrypted")), "{warnings:?}");
+    let again = interpret_file(entry, None, &both, &Options::solver()).unwrap();
+    for level in run.levels.iter().filter(|l| l.problem.title != "enc") {
+        let lv = r.model.levels.iter().find(|l| l.level == level.problem.level).unwrap();
+        assert!(lv.unplaced.is_empty(), "{}: {:?}", lv.title, lv.unplaced);
+        let q = again.problems.iter().find(|q| q.level == level.problem.level).unwrap();
+        assert_eq!(same_input(&level.hash, q), Some(true), "{}", lv.title);
+    }
+    assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files);
+}
+
+#[test]
+fn in_a_spice_section_of_a_spectre_file_a_record_is_carried_by_a_star() {
+    // after `simulator lang=spice`, `//` is no comment, and a record carried by it would not be
+    // read again (2.2): the record of a subcircuit that ends there is written with `*`; the file
+    // level, which ends in Spectre mode, keeps `//`
+    let net = "// top\nsimulator lang=spice\n.subckt half a b\nR1 a m 1k\nR2 m b 1k\n.ends\nsimulator lang=spectre\n\
+               X1 (p q) half\n";
+    let files = MemoryProvider::new().with("/w/top.scs", net);
+    let entry = Path::new("/w/top.scs");
+    let run = solve(entry, &files, &unlimited()).unwrap();
+    assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.scs", "half"]);
+    let text = &run.files[0].text;
+    assert!(
+        text.starts_with("// top\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spice\n"),
+        "{text}"
+    );
+    assert!(text.contains("\nR2 m b 1k\n* @RNL(type=\"generated\"") && text.contains("\n* }\n.ends\n"), "{text}");
+    assert!(text.contains("\nX1 (p q) half\n// @RNL(type=\"generated\""), "{text}");
+    let solved = MemoryProvider::new().with("/w/top.scs", text);
+    let both = Layered { layers: vec![&solved, &files] };
+    check_read_back(&run, entry, &both, false, "top.scs");
+    assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files);
+}

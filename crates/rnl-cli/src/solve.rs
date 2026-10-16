@@ -20,6 +20,13 @@
 //! writing one back moves the lines of those after it, so the document is read again before the
 //! next level, the texts written so far held in memory over the files.
 //!
+//! A record in a region written to be encrypted (`.prot … .unprot`, `protect … unprotect`) is
+//! gone once the region is encrypted (2.2): the record of a level whose end lies in one goes before
+//! the region (`writeback::record_line`), and a level whose own text lies in one, such as a
+//! subcircuit of an encrypted library, is solved but not written, with a note that says so. In a
+//! `simulator lang=spice` section of a Spectre file, where `//` is no comment, a record is carried
+//! by `*` (2.2).
+//!
 //! The resolution of each level is limited in time by the solver's `time_limit` (the draft 0.3,
 //! 8.5), 5 seconds unless `--solver-options` says otherwise, measured on the wall clock
 //! ([`WallClock`]): a fact whose check does not finish within it is discarded undecided, and the
@@ -63,7 +70,7 @@ use rnl_runtime::problem::{sig1, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{
-    generated_files, move_header_for, remove_generated_with_header, replace_generated_with_header,
+    generated_files, move_header_for, record_line, remove_generated_with_header, replace_generated_with_header,
 };
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Clock, Discarded, Solved, SolverOptions, Statement, AUTHOR};
@@ -106,10 +113,11 @@ pub struct SolvedLevel {
     pub problem: LevelProblem,
     pub solved: Solved,
     /// The record as [`write_record`] gives it, with what it cannot hold (`unsolved`) and what it
-    /// holds although a solver should not do it (`notes`).
+    /// holds although a solver should not do it (`notes`); and, among the notes, why it is not
+    /// written into the file when the level lies in a region written to be encrypted (2.2).
     pub written: Written,
     /// The record written into the file: [`Written::record`] finished by
-    /// `rnl_view::finish_record`.
+    /// `rnl_view::finish_record`; for a level not written, the record it would have.
     pub record: String,
     /// The `hash` of the record head (17).
     pub hash: String,
@@ -319,24 +327,38 @@ pub fn solve_with_clock(
         let solved = rnl_solver::solve_with_clock(p, &options.solver, clock);
         let time = start.elapsed();
         let hash = sig1(p, &canonical);
-        let written = write_record(p, &solved.solution, AUTHOR, &hash);
+        let mut written = write_record(p, &solved.solution, AUTHOR, &hash);
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);
         let (record, texts) = {
             let both = Layered { layers: vec![&memory, &files] };
             let record = rnl_view::finish_record(&r.doc, &both, &runtime, p, &written.record);
-            // the record and the header in one pass, at the positions of this reading: a header
-            // below the end of a subcircuit written moves to line 2, to stay the first record (2.8)
             let text = text_of(&r, &both, &host.file, &path)?;
-            let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
-            let mut texts = vec![(path.clone(), out)];
-            // a record of the solver for this level written with scope= in another file (2.6)
-            for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
-                let Some(lv) = r.doc.levels.iter().find(|l| l.file == other) else { continue };
-                let at = normalize(&lv.path);
-                let text = text_of(&r, &both, &other, &at)?;
-                let out = remove_generated_with_header(&r.doc, p.level, &other, &text, &version_of(&r, &other));
-                texts.push((at, out));
+            let mut texts = Vec::new();
+            match record_line(&r.doc, p.level, &text) {
+                // a level whose own text lies in a region written to be encrypted has no place for a
+                // record that is not gone once the region is encrypted (2.2): nothing is written for it
+                Err((a, b)) => written.notes.push(format!(
+                    "the record is not written: {} lies in a region written to be encrypted, lines {a} to {b} of {}, \
+                     where a record is gone once the region is encrypted (2.2)",
+                    p.title,
+                    file_name(&host.file)
+                )),
+                Ok(_) => {
+                    // the record and the header in one pass, at the positions of this reading: a
+                    // header below the end of a subcircuit written moves to line 2, to stay the first
+                    // record (2.8)
+                    let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
+                    texts.push((path.clone(), out));
+                    // a record of the solver for this level written with scope= in another file (2.6)
+                    for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
+                        let Some(lv) = r.doc.levels.iter().find(|l| l.file == other) else { continue };
+                        let at = normalize(&lv.path);
+                        let text = text_of(&r, &both, &other, &at)?;
+                        let out = remove_generated_with_header(&r.doc, p.level, &other, &text, &version_of(&r, &other));
+                        texts.push((at, out));
+                    }
+                }
             }
             (record, texts)
         };
@@ -594,12 +616,13 @@ fn fact_what(p: &LevelProblem, k: usize) -> String {
 
 /// A statement as the hints of 8.5 name it (the draft 0.3, 8.5; 7.6): where it is written, such
 /// as `T4-miller-conflicts.sp:37`; for one in the body of a definition, the usage written in the
-/// level that it was expanded from, the first of its chain, with how the level writes its roles,
-/// a role that cannot be referred to left out, and the line of the definition, such as `the usage
-/// of $MIRROR_PAIR with #M1(a) #M2(b) %ax(axis) (rnl-std-layout.rnl:10 of its definition)`. When the
+/// level that it was expanded from, the first of its chain, where it is written, with how the
+/// level writes its roles, a role that cannot be referred to left out, and the line of the
+/// definition, such as `the usage of $MIRROR_PAIR at T4-miller-conflicts.sp:22 with #M1(a) #M2(b) %ax(axis)
+/// (rnl-std-layout.rnl:10 of its definition)`. When the
 /// statement is in the body of a definition used inside another, the line is of the innermost,
 /// and every definition of the chain is named, outermost first, as for a fact: `%o1, the usage of
-/// $OUTER with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)`. For the coordinates of a
+/// $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)`. For the coordinates of a
 /// point, which have no statement of their own, the point.
 fn statement_name(p: &LevelProblem, s: &Statement) -> String {
     if let Some(k) = s.point {
@@ -611,6 +634,9 @@ fn statement_name(p: &LevelProblem, s: &Statement) -> String {
         Reference::Name(n) => format!("{n}, the usage of {}", u.definition),
         _ => format!("the usage of {}", u.definition),
     };
+    if let Some(at) = &u.source {
+        name.push_str(&format!(" at {}:{}", file_name(&at.file), at.line));
+    }
     let roles: Vec<String> =
         u.roles.iter().filter_map(|r| r.written.as_ref().map(|w| format!("{w}({})", r.role))).collect();
     if !roles.is_empty() {
@@ -860,17 +886,20 @@ mod tests {
         let f = p.facts.iter().position(|f| f.label == "%row").unwrap();
         let s = Statement::of(p, f);
         assert_eq!(s.chain.len(), 2, "{s:?}");
-        let named = "%o1, the usage of $OUTER with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
+        let named = "%o1, the usage of $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
         assert_eq!(statement_name(p, &s), named);
         assert!(describe_fact(p, f).ends_with("(normal, p.sp:6, from $OUTER in $PAIR)"), "{}", describe_fact(p, f));
         // a role that cannot be referred to is left out, not shown as `?`
         let mut q = p.clone();
         q.usages[s.chain[0]].roles[0].written = None;
-        let named = "%o1, the usage of $OUTER with #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
+        let named = "%o1, the usage of $OUTER at p.sp:8 with #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
         assert_eq!(statement_name(&q, &s), named);
         // a statement in the body of a definition the level uses itself
         let one = Statement { chain: s.chain[..1].to_vec(), ..s.clone() };
-        assert_eq!(statement_name(p, &one), "%o1, the usage of $OUTER with #R1(a) #R2(b) (p.sp:6 of its definition)");
+        assert_eq!(
+            statement_name(p, &one),
+            "%o1, the usage of $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of its definition)"
+        );
     }
 
     #[test]
