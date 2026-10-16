@@ -46,7 +46,7 @@ The bar above the drawing shows the path of the level shown, from its root down 
 
 - Going down into a subcircuit instance, by Enter, a double click, the open badge or View › Open Subcircuit, adds the instance to the path.
 - A subcircuit picked in the index is the root of a path of its own, with no way up from it; a row of the tree gives the path from the top level down to its instance; a level reached otherwise, such as by an object of it selected in the text, cuts the path back to it when it is on it, and is the root of a new path when not.
-- A click on a segment but the last goes back to its level, cutting the path there; the up button and Backspace go back one level, and at the root there is no up button and Backspace does nothing. The level comes back with the view it had when it was left and the instance it was left through selected.
+- A click on a segment but the last goes back to its level, cutting the path there; the up button and Backspace go back one level, and at the root there is no up button and Backspace does nothing. The up button that hides at the root gives the focus to the drawing, so that Enter goes back down at once, also in a browser that moves the focus off a hidden element only later, as WebKit does; Enter is left to a focused button only while the button is shown. The level comes back with the view it had when it was left and the instance it was left through selected.
 - Reading the document again keeps the path when its levels and instances are still there by their names; otherwise the level shown is the root.
 - The views kept are by path, the root's title and the instances on it, so a subcircuit reached two ways keeps a view for each.
 
