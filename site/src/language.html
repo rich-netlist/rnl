@@ -58,6 +58,7 @@
       <a href="#priority"><zh>优先级</zh><en>Priority</en></a>
       <a href="#header"><zh>文件头</zh><en>Header</en></a>
       <a class="toc-page" href="spec/"><zh>语言标准</zh><en>Standard</en><svg class="ico"><use href="#i-arrow"/></svg></a>
+      <a class="toc-page" href="packages.html"><zh>标准包</zh><en>Packages</en><svg class="ico"><use href="#i-arrow"/></svg></a>
       <a class="toc-page" href="tools.html"><zh>工具</zh><en>Tools</en><svg class="ico"><use href="#i-arrow"/></svg></a>
       <a class="toc-page" href="./"><svg class="ico"><use href="#i-back"/></svg><zh>介绍页</zh><en>Introduction</en></a>
     </nav>
@@ -225,8 +226,8 @@
     <header class="sheet-head">
       <p class="sheet-no"><zh>T3 · 标准包</zh><en>T3 · Defaults</en></p>
       <h2><zh>什么都不写，也能画出来。</zh><en>Write nothing, and it still draws.</en></h2>
-      <p class="lead"><zh>标准包是一份 RNL 文件：默认符号、样式、定义，和几条补位规则。它排在每个文件前面，所以文件里写的总能盖过它。下面这个共射级只有网表；依次加上三句，看标准包补上的东西怎样变化（灰色的都是它补的）。</zh>
-        <en>The standard package is an RNL file: default symbols, styles, definitions and a few fill rules. It comes before every file, so whatever a file writes can override it. The common-emitter stage below is a bare netlist; add three lines one by one and watch what the standard package fills in change (everything gray is its doing).</en></p>
+      <p class="lead"><zh>标准包是一份 RNL 文件：默认符号、样式、定义，和几条补位规则。它排在每个文件前面，所以文件里写的总能盖过它。每个包里有什么，见<a href="packages.html">标准包图库</a>。下面这个共射级只有网表；依次加上三句，看标准包补上的东西怎样变化（灰色的都是它补的）。</zh>
+        <en>The standard package is an RNL file: default symbols, styles, definitions and a few fill rules. It comes before every file, so whatever a file writes can override it; what each of its packages holds is in the <a href="packages.html">gallery of the standard packages</a>. The common-emitter stage below is a bare netlist; add three lines one by one and watch what the standard package fills in change (everything gray is its doing).</en></p>
     </header>
 
     <div class="preset seg" id="ce-seg" role="group" aria-label="<zh>写了什么</zh><en>What is written</en>">
@@ -548,6 +549,7 @@
       <ul>
         <li><a href="./"><zh>介绍页</zh><en>Introduction</en></a><zh>：动机、工具链、设计原则和现状</zh><en>: motivation, toolchain, principles and status</en></li>
         <li><a href="spec/0.2/"><zh>语言标准 0.2</zh><en>Language standard 0.2</en></a><zh>：正式文本，另有 PDF 和 Markdown 下载</zh><en>: the formal text, also as PDF and Markdown downloads</en></li>
+        <li><a href="packages.html"><zh>标准包图库</zh><en>Standard packages</en></a><zh>：每个包的定义原文，每个符号画出来的样子</zh><en>: the text of every package, and every symbol as it is drawn</en></li>
         <li><a href="tools.html"><zh>工具</zh><en>Tools</en></a><zh>：网页版查看器和桌面版的下载</zh><en>: the web viewer, and the desktop viewer to download</en></li>
         <li><zh>原则：</zh><en>Principles: </en><a href="https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md"><code>spec/rich-netlist.md</code></a></li>
         <li><zh>路线图：</zh><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a></li>

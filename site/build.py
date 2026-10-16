@@ -22,10 +22,10 @@ as 0.1.0) and {{viewer-tag}} (viewer-v0.1.0) filled in; the parts between <!--no
 nest, and that the fields are only used in <!--release--> blocks.
 
 Output (site/dist/ by default, ignored by Git), for each page in PAGES:
-    index.html, language.html, tools.html, assets/, *-standalone.html   Chinese, at the site root
-    en/index.html, en/language.html, en/tools.html, en/assets/, en/*-standalone.html   English
+    index.html, language.html, tools.html, packages.html, assets/, *-standalone.html   Chinese, at the site root
+    en/index.html, en/language.html, en/tools.html, en/packages.html, en/assets/, en/*-standalone.html   English
 The standalone files have the styles and scripts inlined and link the other pages to the published
-site. The pages of the standard (spec/, one folder for each version) and the web viewer (viewer/), which the pages link to,
+site; packages.html, the gallery of the standard packages, has none. The pages of the standard (spec/, one folder for each version), the web viewer (viewer/) and the gallery's data (gallery/), which the pages link to and load,
 are added by .github/workflows/pages.yml.
 
 Usage, from the repository root (standard library only, and git for the tags):
@@ -54,11 +54,13 @@ SITE_URL = "https://rich-netlist.github.io/rnl/"
 LANGS = [("zh", ""), ("en", "en/")]
 CODES = [code for code, _ in LANGS]
 
-# Each page and the name of its single-file version.
+# Each page and the name of its single-file version; None for a page that has none, such as the
+# gallery of the standard packages, which loads its data from gallery/ (site/gallery/build.mjs).
 PAGES = {
     "index.html": "rnl-intro-standalone.html",
     "language.html": "rnl-language-standalone.html",
     "tools.html": "rnl-tools-standalone.html",
+    "packages.html": None,
 }
 
 LANG_TAG = re.compile(r"</?(?:%s)>" % "|".join(CODES))
@@ -184,7 +186,8 @@ def build_language(files, index, version):
     out = {path: release(text, version) for path, text in out.items()}
     for page, single in PAGES.items():
         out[page] = out[page].replace("<!doctype html>\n", "<!doctype html>\n" + NOTICE, 1)
-        out[single] = standalone(page, out, SITE_URL + prefix)
+        if single:
+            out[single] = standalone(page, out, SITE_URL + prefix)
     return out
 
 
@@ -254,15 +257,16 @@ GUIDE = """RNL introduction pages / RNL 介绍页
 
 rnl-intro/ is the complete site: open rnl-intro/index.html (Chinese) or rnl-intro/en/index.html
 (English), or upload the folder to any static host. .nojekyll makes GitHub Pages publish it as is.
-language.html next to each index.html is the language tour, and tools.html the page of the viewers;
-the web viewer itself and the pages of the standard are published with the site, not packed here.
+language.html next to each index.html is the language tour, tools.html the page of the viewers, and
+packages.html the gallery of the standard packages; the web viewer itself, the pages of the standard
+and the gallery's data are published with the site, not packed here.
 The *-standalone.html files in each language folder are single files with everything inlined.
 Fonts load from Google Fonts; offline, system fonts are used and the pages still work.
 
 rnl-intro/ 是完整站点：打开 rnl-intro/index.html（中文）或 rnl-intro/en/index.html（英文），
 或把整个目录上传到任意静态主机；.nojekyll 让 GitHub Pages 原样发布。每个 index.html 旁边的
-language.html 是语言导览，tools.html 是查看器的介绍页；网页版查看器本身和语言标准的网页随网站发布，
-不在这个包里。各语言目录里的 *-standalone.html 是内联了全部样式和脚本的单文件版。
+language.html 是语言导览，tools.html 是查看器的介绍页，packages.html 是标准包图库；网页版查看器本身、
+语言标准的网页和图库的数据随网站发布，不在这个包里。各语言目录里的 *-standalone.html 是内联了全部样式和脚本的单文件版。
 字体从 Google Fonts 加载，离线时退回系统字体，页面照常可用。
 """
 
