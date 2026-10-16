@@ -737,7 +737,7 @@ impl Interp<'_> {
                         matches!(f.data, FactData::Coord(a, _) if a == axis)
                             && self.fact_priority(s, f) != Priority::Disabled
                     })
-                    .map(|f| f.pos.clone())
+                    .map(|f| f.order())
                     .max();
                 let off = self.offset_pos(s, *o, axis == 'x');
                 offset_wins.insert((*o, axis), latest_place.is_none_or(|p| off > p));
@@ -803,13 +803,9 @@ impl Interp<'_> {
                 }
                 let source = site.as_ref().and_then(|c| self.rec_loc(c.rec, self.text_off(*o)));
                 let label = format!("the d{axis} of {} = {}", self.label(*o), crate::geom::fmt_num(value));
-                // where the offset is written: in the statement that made the text, or in a later
-                // TEXT with the same key, whose segments are not known here
-                let at = self.offset_pos(s, *o, axis == 'x');
-                let order = match &site {
-                    Some(c) if at.starts_with(&c.pos) => order_pos(&at, &c.segments),
-                    _ => at,
-                };
+                // where the offset is written, in the statement that made the text or in a later
+                // TEXT with the same key, in the order of writing
+                let order = self.offset_pos(s, *o, axis == 'x');
                 ranked.push(Ranked {
                     key: (rank(p), order, 1, (axis == 'y') as u8, ranked.len()),
                     fact: ProblemFact {
