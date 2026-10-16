@@ -191,8 +191,14 @@ impl Interp<'_> {
             return s;
         }
         self.scan_packages();
-        let found: Vec<(String, String, String)> =
-            self.pkg_files.as_ref().unwrap().iter().filter(|c| c.0 == STD_NAME).cloned().collect();
+        // of the files of one version, the one found is the first in the order of the package
+        // directories (16.2): one of a frontend's own directories hides the bundled one
+        let mut found: Vec<(String, String, String)> = Vec::new();
+        for c in self.pkg_files.as_ref().unwrap().iter().filter(|c| c.0 == STD_NAME) {
+            if !found.iter().any(|f| f.1 == c.1) {
+                found.push(c.clone());
+            }
+        }
         let written_in = |c: &(String, String, String)| version_key(&self.pkg_languages[&c.2]);
         let want = version_key(language);
         // the series written in the file's language version; without one, the one written in the
@@ -209,8 +215,7 @@ impl Interp<'_> {
             // a language version with a standard series in it
             found.iter().any(|c| written_in(c) == *v)
         });
-        // of that series the newest version, and of equal versions the first in the order of the
-        // package directories (16.2)
+        // of that series the newest version
         let mut best: Option<&(String, String, String)> = None;
         for c in found.iter().filter(|c| Some(written_in(c)) == series) {
             if best.is_none_or(|b| version_key(&c.1) > version_key(&b.1)) {
@@ -230,11 +235,13 @@ impl Interp<'_> {
 
     /// The standard package used implicitly on a chain (16.3): the one of the language version of
     /// the file of its level, or of a package read alone; none where the file's version is not
-    /// supported (16.1).
+    /// supported (16.1), and none for a package read alone that is not read, such as one of a
+    /// version not supported.
     pub(crate) fn implicit_std(&mut self, key: EffKey) -> Option<UnitId> {
         let unit = match key {
             EffKey::Level(level) if !self.file_ok(level) => return None,
             EffKey::Level(level) => self.level_unit[level],
+            EffKey::Alone(u) if !self.units[u].ok => return None,
             EffKey::Alone(u) => u,
         };
         let language = self.version_of(Some(unit));

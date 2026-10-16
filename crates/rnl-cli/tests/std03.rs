@@ -152,6 +152,34 @@ fn a_file_that_includes_another_pins_its_series_too() {
     assert!(names(&root(level(&r, "t.sp"))).contains(&"rnl-std-basic"));
 }
 
+#[test]
+fn a_package_directory_hides_the_bundled_series_of_the_same_version() {
+    // a frontend's own rnl-std 0.3 written in the language 0.2, as Analog Canvas's preview of the
+    // series is, in a package directory, which comes before the bundled packages: it is the rnl-std
+    // 0.3 found (16.2), and the bundled one is not read. A file of 0.2 uses it, the newest written
+    // in 0.2; so does a file of 0.3, for which no series written in 0.3 is left
+    let own = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"rnl-std\", version=\"0.3\")}\n";
+    for version in ["0.2", "0.3"] {
+        let mut files = MemoryProvider::new().with("pkgs/rnl-std.rnl", own).with("t.sp", &netlist(version, "", ""));
+        files.package_dirs.push("pkgs".into());
+        let r = read(&files, "t.sp", &draft());
+        assert!(errors(&r).is_empty(), "{version}: {:?}", errors(&r));
+        assert_eq!(root(level(&r, "t.sp")), [("rnl-std", "0.3")], "{version}");
+        assert!(!r.sources.iter().any(|(f, _)| f == "rnl-std-basic.rnl"), "{version}");
+    }
+}
+
+#[test]
+fn a_package_that_is_not_read_uses_no_series() {
+    // a package of 0.3 checked on its own without the draft switch is not read (16.1): its version
+    // is the one error, and the series 0.3, which would not be read either, is not used
+    let f = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/standard/0.3/rnl-std-basic.rnl");
+    let r = interpret_file(&f, None, &FsProvider::new(&[]), &Options::default()).unwrap();
+    let e = errors(&r);
+    assert!(e.len() == 1 && e[0].contains("unsupported version 0.3"), "{e:?}");
+    assert!(!r.sources.iter().any(|(f, _)| f == "rnl-std-core.rnl"));
+}
+
 /// The draft cases of the corpus.
 fn case(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/draft-0.3").join(name)
