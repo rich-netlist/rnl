@@ -1295,9 +1295,10 @@ fn routed_whole(body: &str, options: &str) -> (LevelProblem, Solved, Exact) {
     (p, solved, e)
 }
 
-/// Rows without facts put pins of two nets face to face across the gap of 2 between neighbours,
-/// where both lead to one node: the net routed second leaves its pin along the edge of its
-/// symbol, and every net is one tree, with and without the objectives (review of S4).
+/// Pins of two nets face to face across a gap of 2 between neighbours, where both lead to one node
+/// (rows keep such pins of two nets routed three apart now, but facts may put them closer): the net
+/// routed second leaves its pin along the edge of its symbol, and every net is one tree, with and
+/// without the objectives (review of S4).
 #[test]
 fn pins_of_two_nets_face_to_face_in_a_row_are_both_routed() {
     for body in [
@@ -1427,6 +1428,30 @@ fn bends_by_net(p: &LevelProblem, solved: &Solved, e: &Exact) -> BTreeMap<String
     out
 }
 
+/// The ends of the wires routed that leave a pin against its exit (9.2.4), each said with its net
+/// and its pin: a wire from a pin whose first step of some length is not the pin's own way, as a
+/// lead along the edge of its symbol is (`crate::route`).
+fn violated_exits(p: &LevelProblem, solved: &Solved, e: &Exact) -> Vec<String> {
+    use rnl_runtime::solution::WirePoint;
+    let (s, ori) = (&e.structure, &e.placed.geometry.orient);
+    let mut out = Vec::new();
+    for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
+        let backwards: Vec<[Q; 2]> = path.iter().rev().cloned().collect();
+        for (end, path) in [(w.points.first(), path), (w.points.last(), &backwards)] {
+            let Some(WirePoint::Anchor(PointRef::Pin { object, pin, terminal })) = end else { continue };
+            let Some((x, y)) = s.exit(*object, *pin, ori[*object]) else { continue };
+            let Some(start) = path.first() else { continue };
+            let Some(next) = path.iter().find(|q| *q != start) else { continue };
+            let way = ((&next[0] - &start[0]).signum(), (&next[1] - &start[1]).signum());
+            if way != (int(x), int(y)) {
+                let label = &p.objects[*object].label;
+                out.push(format!("{} at {label}:{terminal}, its exit ({x}, {y}): {path:?}", p.routes[w.route].net));
+            }
+        }
+    }
+    out
+}
+
 /// The level of a case of the solver with a title, solved and checked.
 fn case_level(file: &str, title: &str) -> (LevelProblem, Solved, Exact) {
     level_in("tests/integration/solver", file, title)
@@ -1520,6 +1545,26 @@ fn t6_joins_each_source_to_its_leg_by_an_l() {
     }
     assert!(neighbours >= 6, "{neighbours}: {what}");
     assert_eq!(bends.get("n0"), Some(&0), "{what}");
+}
+
+/// No wire routed for T1–T6 leaves a pin against its exit (9.2.4). The compacted tail of T6's
+/// row put pins of two nets face to face two apart, R2B5's of b5 and R2B7's of b7, RS6's of n6 and
+/// RS5's of n5, their leads ending on one node, which neither net then keeps: b5 left R2B5 and n5
+/// left RS5 along the edges of their symbols. Such pins are three apart now (review of phase 1 of
+/// the quality review). T4 is left out: &tail leaves M1's source, at the corner of its box,
+/// sideways to the branch point beside it, as the router prices a violated exit as a bend.
+#[test]
+fn wires_routed_for_t1_to_t6_leave_each_pin_its_own_way() {
+    for file in netlists("tests/integration/solver", "T") {
+        if file.ends_with("T4-miller-conflicts.sp") {
+            continue;
+        }
+        for p in problems(&file) {
+            let (solved, e) = check_level(&file.to_string_lossy(), &p);
+            let bad = violated_exits(&p, &solved, &e);
+            assert!(bad.is_empty(), "{}: {bad:#?}\n{}", p.title, summary(&p, &solved, &e));
+        }
+    }
 }
 
 /// A port beside a pin that leaves up or down stays at the pin's height when wires written draw

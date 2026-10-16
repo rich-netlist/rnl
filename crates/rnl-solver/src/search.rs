@@ -562,22 +562,31 @@ fn relations_within(
         .map(|row| row.iter().copied().filter(inside).collect::<Vec<usize>>())
         .filter(|r| !r.is_empty())
         .collect();
-    for row in &rows {
-        for w in row.windows(2) {
+    // neighbours drawn to each other through their pins as [`row_link`] says; others by origin
+    let links: Vec<Vec<RowLink>> = rows
+        .iter()
+        .map(|row| {
+            row.windows(2).map(|w| row_link(s, w[0], w[1], ori, &grid).unwrap_or_else(RowLink::origins)).collect()
+        })
+        .collect();
+    for (row, links) in rows.iter().zip(&links) {
+        for (w, link) in row.windows(2).zip(links) {
             let (Some(a), Some(b)) = (o(w[0]), o(w[1])) else { continue };
-            // neighbours drawn to each other through their pins as [`row_link`] says; others by
-            // origin
-            let link = row_link(s, w[0], w[1], ori, &grid).unwrap_or_else(RowLink::origins);
             out.push(Tagged {
                 kind: RelKind::Row,
-                rel: Relation::Linear { axis: 1, terms: vec![(b, one()), (a, -one())], lo: link.lo, hi: link.hi },
+                rel: Relation::Linear {
+                    axis: 1,
+                    terms: vec![(b, one()), (a, -one())],
+                    lo: link.lo.clone(),
+                    hi: link.hi.clone(),
+                },
             });
         }
     }
-    for row in &rows {
-        for w in row.windows(2) {
+    for (row, links) in rows.iter().zip(&links) {
+        for (w, link) in row.windows(2).zip(links) {
             let (Some(a), Some(b)) = (o(w[0]), o(w[1])) else { continue };
-            let c = up(&eff[&w[0]][2] - &eff[&w[1]][0] + int(HGAP), &grid);
+            let c = up(row_gap(s, w[0], w[1], ori, &eff[&w[0]], &eff[&w[1]], link), &grid);
             out.push(Tagged {
                 kind: RelKind::Gap,
                 rel: Relation::Linear { axis: 0, terms: vec![(b, one()), (a, -one())], lo: Some(c), hi: None },
@@ -628,6 +637,37 @@ fn beyond_port(s: &Structure, k: usize, a: &Attach, f: PinKey, ori: &[Orient], g
     let c = &fp[1] - &pp[1];
     let (lo, hi) = if ey < 0 { (Some(up(c + step, grid)), None) } else { (None, Some(-up(step - c, grid))) };
     Some(Relation::Linear { axis: 1, terms: vec![(p, Q::one()), (h, -Q::one())], lo, hi })
+}
+
+/// The least distance of `b`'s origin to the right of `a`'s, neighbours in a row with the
+/// effective boxes `ea` and `eb`, held on their heights by `link`: the boxes `HGAP` apart; and a
+/// pin of `a` that leaves right and one of `b` that leaves left, on nets that the router draws
+/// apart, `2 CLEARANCE + 1` apart, so that their leads end on nodes of their own. On one node
+/// neither net keeps it (`crate::route`), and the one routed second leaves its pin along the edge
+/// of its symbol, against the pin's exit (9.2.4). Two such pins that `link` puts on different
+/// heights do not face each other.
+fn row_gap(s: &Structure, a: usize, b: usize, ori: &[Orient], ea: &[Q; 4], eb: &[Q; 4], link: &RowLink) -> Q {
+    let mut gap = &ea[2] - &eb[0] + int(HGAP);
+    // the height of b's origin above a's, when the link fixes it
+    let dy = link.lo.as_ref().filter(|lo| link.hi.as_ref() == Some(*lo));
+    let facing = |k: usize, way: i64| {
+        (0..s.pins(k).len()).filter_map(move |p| {
+            let net = s.connections.route_of.get(&(k, p))?;
+            (s.exit(k, p, ori[k]) == Some((way, 0))).then_some((*net, s.pin_offset(k, p, ori[k])?))
+        })
+    };
+    for (na, pa) in facing(a, 1) {
+        for (nb, pb) in facing(b, -1) {
+            if na == nb || dy.is_some_and(|d| &pb[1] + d != pa[1]) {
+                continue;
+            }
+            let least = &pa[0] - &pb[0] + int(2 * CLEARANCE + 1);
+            if least > gap {
+                gap = least;
+            }
+        }
+    }
+    gap
 }
 
 /// How two neighbours of a row are held on their heights through a pair of their pins drawn to
@@ -838,6 +878,8 @@ pub(crate) fn sketch(
         if let Some(pb) = &previous_bottom {
             y = &y + pb - int(VGAP) - &top;
         }
+        // packed with the boxes `HGAP` apart: the unit more between pins of two nets that face
+        // each other ([`row_gap`]) is left to the LP, as it turns no connection of the estimates
         let mut cursor = Q::zero();
         for ((&k, b), d) in row.iter().zip(&boxes).zip(&dy) {
             let x = &cursor - &b[0];
