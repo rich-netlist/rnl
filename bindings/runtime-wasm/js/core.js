@@ -27,9 +27,11 @@
  * The netlist is the entry; the other fields are a Request's.
  *
  * @typedef {object} WriteRequest
- * @property {{ dialect: "spice" | "spectre", netlist: string, author: string, ops: object[] }} write
- *   The netlist, without RNL records, its dialect, the author of the records, and the ops as the
- *   editor interface draft writes them.
+ * @property {{ dialect: "spice" | "spectre", netlist: string, author: string, ops: object[], file?: string }} write
+ *   The netlist, without RNL records, its dialect, the author of the records, the ops as the
+ *   editor interface draft writes them, and the name the netlist is saved under when it is known,
+ *   such as `top.net`: a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to
+ *   its `simulator lang=spectre`.
  * @property {Record<string, string>} [files] Further files, such as packages.
  * @property {string[]} [package_dirs]
  * @property {boolean} [std]

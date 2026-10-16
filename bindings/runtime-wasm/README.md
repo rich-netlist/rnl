@@ -99,7 +99,7 @@ A request with a `write` field writes an edit transaction's ops into a netlist (
 }
 ```
 
-The netlist is the entry, under `/rnl-edit/netlist.sp`, or `.scs` for Spectre; `files`, `package_dirs`, `std`, `svg` and `primitives` are a build's. The answer is `{"written": {"text": "...", "document": ...}}`: the netlist with the records written, and its Document, whose `diagnostics` say how the records read. An op that cannot be written is `{"error": "op 3 (set): ..."}`.
+The netlist is the entry, under `/rnl-edit/netlist.sp`, or `.scs` for Spectre; a `file` in `write`, the name the netlist is saved under, such as `"file": "top.net"`, puts it under that name instead, so that a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to its `simulator lang=spectre`, and its header and records go where that reading keeps them (2.2). A request without it writes as before; `files`, `package_dirs`, `std`, `svg` and `primitives` are a build's. The answer is `{"written": {"text": "...", "document": ...}}`: the netlist with the records written, and its Document, whose `diagnostics` say how the records read. An op that cannot be written is `{"error": "op 3 (set): ..."}`.
 
 ## JavaScript modules
 
