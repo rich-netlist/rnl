@@ -433,7 +433,7 @@ fn point(p: &LevelProblem, r: &PointRef) -> String {
 
 /// One fact as the report shows it: its rank, what it says, its priority and where it is
 /// written, and the definitions of the usages it was expanded from, such as
-/// `[9] ALIGN y {#M1 #M2} (normal, rnl-std.rnl:227, from $MIRROR_PAIR)`.
+/// `[9] ALIGN y {#M1 #M2} (normal, rnl-std-layout.rnl:10, from $MIRROR_PAIR)`.
 pub fn describe_fact(p: &LevelProblem, k: usize) -> String {
     let Some(f) = p.facts.get(k) else { return format!("[{k}]") };
     let list = |ms: &[PointRef]| format!("{{{}}}", ms.iter().map(|m| point(p, m)).collect::<Vec<_>>().join(" "));

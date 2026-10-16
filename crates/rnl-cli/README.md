@@ -69,13 +69,13 @@ For each level, `solve` prints the facts kept and discarded in the order of 8.5,
 level T4-miller-conflicts.sp (file in T4-miller-conflicts.sp): 38 kept, 3 discarded of 41 facts
   discarded [7] ALIGN x {#M6 #M7} (normal, T4-miller-conflicts.sp:28): it conflicts with
       [3] DISTANCE x either min=2 {#M6} {#M7} (normal, T4-miller-conflicts.sp:39)
-  discarded [16] ALIGN y {#M1 #M2} (normal, rnl-std.rnl:227, from $MIRROR_PAIR): it conflicts with
+  discarded [16] ALIGN y {#M1 #M2} (normal, rnl-std-layout.rnl:10, from $MIRROR_PAIR): it conflicts with
       [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:37)
       [4] the y of #M2 = 3 (normal, T4-miller-conflicts.sp:38)
   ...
   work: 1408 resolve nodes, 5839 pivots, 80 candidates, 21293 A* expansions
   time: 2.119 s
-  hash: sig1:2e2eb6c29c369899.e17f1522b2b059c0
+  hash: sig1:63355df81d54e09a.e17f1522b2b059c0
 wrote out/T4-miller-conflicts.sp
 ```
 

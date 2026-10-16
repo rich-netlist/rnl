@@ -3,7 +3,7 @@
 .subckt opamp inp inn out
 E1 out 0 inp inn 1e5
 * @RNL { # @SET-SYMBOL $OPAMP }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:30cf1131fb409563.e17f1522b2b059c0") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:91f5bdd803e84b2a.e17f1522b2b059c0") {
 *   %gnd_stub_E1_n = $GND_STUB @ATTACH(gap=2, priority="normal") #E1:n;
 *   %ioport_inp = $IOPORT @ATTACH(priority="normal") &inp;
 *   %ioport_inn = $IOPORT @ATTACH(priority="normal") &inn;
@@ -30,7 +30,7 @@ VIN vin 0 AC 1
 *   $IOPORT @ATTACH &n2 => %pout;
 *   $WIRE_NET_SET @ROUTE
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:e0b9075ac51e7fc2.e17f1522b2b059c0") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:b12c19712eb68687.e17f1522b2b059c0") {
 *   %gnd_stub_XA_inp = $GND_STUB @ATTACH(gap=2, priority="normal") #XA:inp;
 *   %gnd_stub_C1_n = $GND_STUB @ATTACH(gap=2, priority="normal") #C1:n;
 *   %gnd_stub_RL_n = $GND_STUB @ATTACH(gap=2, priority="normal") #RL:n;

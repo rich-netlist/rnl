@@ -7,7 +7,7 @@ C1 out 0 1n
 *   {#VIN #R1 #C1} @AS $FLOW;
 *   $WIRE_NET_SET @ROUTE
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:4ba29679af6c200a.e17f1522b2b059c0") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:f77bf03d1ee4f145.e17f1522b2b059c0") {
 *   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VIN:n;
 *   %gnd_stub_C1_n = $GND_STUB @ATTACH(gap=2, priority="normal") #C1:n;
 *   #VIN @PLACE(-7, 3) => @ORIENT("MY");

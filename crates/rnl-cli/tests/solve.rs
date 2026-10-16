@@ -374,7 +374,7 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
         discarded,
         [
             "  discarded [7] ALIGN x {#M6 #M7} (normal, T4-miller-conflicts.sp:28): it conflicts with",
-            "  discarded [16] ALIGN y {#M1 #M2} (normal, rnl-std.rnl:227, from $MIRROR_PAIR): it conflicts with",
+            "  discarded [16] ALIGN y {#M1 #M2} (normal, rnl-std-layout.rnl:10, from $MIRROR_PAIR): it conflicts with",
             "  discarded [40] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:31): it conflicts with",
         ]
     );
