@@ -14,7 +14,7 @@
 //! makes both changes in one pass ([`replace_generated_with_header`],
 //! [`remove_generated_with_header`]).
 
-use crate::host::{HostDocument, LevelId, LevelKind, Record};
+use crate::host::{HostDocument, Level, LevelId, LevelKind, Record};
 use crate::syntax::{parse_record, Value};
 
 /// The `type=` of a record's header: "authored" when not written.
@@ -330,7 +330,7 @@ pub fn remove_generated_with_header(
     text: &str,
     version: &str,
 ) -> String {
-    let mut edits = header_edits(doc, file, text, version);
+    let (mut edits, _) = header_edits(doc, file, text, version);
     edits.extend(generated_removals(doc, level, file));
     apply(text, carrier(doc, file, text), edits)
 }
@@ -356,7 +356,9 @@ pub fn replace_generated(doc: &HostDocument, level: LevelId, text: &str, record:
 /// [`with_header`] gives them, in one pass at the positions of the document's reading of `text`:
 /// what a solver writes into the file of a level it solved, which it saves (16.1). A header record
 /// below the level's end, such as one written after a subcircuit, gets its version where the
-/// reading found it, not inside the record put before it.
+/// reading found it, not inside the record put before it. The record follows the carrier of a
+/// header written in the same pass (2.2), so that the next solve, which finds that header, writes
+/// it the same.
 pub fn replace_generated_with_header(
     doc: &HostDocument,
     level: LevelId,
@@ -365,10 +367,9 @@ pub fn replace_generated_with_header(
     version: &str,
 ) -> String {
     let file = &doc.levels[level].file;
-    let marker = carrier(doc, file, text);
-    let mut edits = header_edits(doc, file, text, version);
+    let (mut edits, marker) = header_edits(doc, file, text, version);
     edits.extend(replacement(doc, level, text, record, marker));
-    apply(text, marker, edits)
+    apply(text, carrier(doc, file, text), edits)
 }
 
 /// The changes of [`replace_generated`]: the removal of the level's records of the solver in its
@@ -398,60 +399,82 @@ fn replacement(doc: &HostDocument, level: LevelId, text: &str, record: &str, mar
 /// statement keeps its meaning on the third line. Spectre reads a file that is not a `.scs` file
 /// in SPICE mode until its `simulator lang=spectre`, and `//` is no comment there (2.2): a header
 /// carried by `//` goes after that statement, and after the lines that continue it, when no other
-/// statement comes before it.
+/// statement and no record comes before it; otherwise it goes above the statement, written with
+/// `*`, which carries in both modes, and so does the bare marker.
+///
+/// A file read only through library sections (`.lib file sec`, Spectre's `include "file"
+/// section=sec`, [`Level::section`]) is read inside them alone, and tools must not write outside
+/// them (2.2): it gets no new header record, and takes the version of the file that includes it
+/// (16.1). A header record that the reading found inside a section gets its version there.
 ///
 /// `text` is the text whose positions the document gives, as the reading found it. To give a file
 /// its header together with the records a solver writes or removes, use
 /// [`replace_generated_with_header`] or [`remove_generated_with_header`], which make every change
 /// at those positions.
 pub fn with_header(doc: &HostDocument, file: &str, text: &str, version: &str) -> String {
-    apply(text, carrier(doc, file, text), header_edits(doc, file, text, version))
+    apply(text, carrier(doc, file, text), header_edits(doc, file, text, version).0)
 }
 
 /// The changes that give a file its header record and its version ([`with_header`]): none when it
-/// has them, or is left as it is.
-fn header_edits(doc: &HostDocument, file: &str, text: &str, version: &str) -> Vec<Edit> {
+/// has them, or is left as it is; and the carrier that records written with them follow: that of
+/// a new header, else the file's ([`carrier`]).
+fn header_edits(doc: &HostDocument, file: &str, text: &str, version: &str) -> (Vec<Edit>, &'static str) {
+    let marker = carrier(doc, file, text);
     if file.to_lowercase().ends_with(".rnl") {
-        return Vec::new();
+        return (Vec::new(), marker);
     }
     let version_kw = format!("@VERSION({})", crate::problem::written_string(version));
     let all = records_of(doc, file);
-    let file_level: Vec<&Record> = match doc.levels.iter().find(|lv| lv.kind == LevelKind::File && lv.file == file) {
+    // the file levels that read the file, one that reads it whole first
+    let mut levels: Vec<&Level> =
+        doc.levels.iter().filter(|lv| lv.kind == LevelKind::File && lv.file == file).collect();
+    levels.sort_by_key(|lv| lv.section.is_some());
+    let file_level: Vec<&Record> = match levels.first() {
         Some(lv) => lv.records.iter().filter(|r| r.file == file).collect(),
         None => all.iter().map(|(_, r)| *r).collect(),
     };
     match file_level.iter().min_by_key(|r| span(r).0) {
         Some(first) if record_type(first) == "header" => {
             let ast = parse_record(&first.text);
-            let Some(body) = ast.body else { return Vec::new() };
+            let Some(body) = ast.body else { return (Vec::new(), marker) };
             let call =
                 |m: &crate::syntax::Member| m.segments.first().and_then(|s| s.call.as_ref()).map(|c| c.kw.clone());
             if body.members.iter().any(|m| call(m).as_deref() == Some("VERSION")) {
-                return Vec::new();
+                return (Vec::new(), marker);
             }
             // right after the `{` of the body
             let at = first.loc(body.start);
             let sep = if body.members.is_empty() { "" } else { ";" };
-            return vec![Edit::Text(at.line, at.col as usize, format!(" {version_kw}{sep}"))];
+            return (vec![Edit::Text(at.line, at.col as usize, format!(" {version_kw}{sep}"))], marker);
         }
-        _ if all.iter().any(|(_, r)| record_type(r) == "header") => return Vec::new(),
+        _ if all.iter().any(|(_, r)| record_type(r) == "header") => return (Vec::new(), marker),
         _ => {}
     }
-    let marker = carrier(doc, file, text);
-    let header = carried(&format!("@RNL(type=\"header\") {{ {version_kw}}}"), marker);
+    // read only through library sections: line 2 lies outside each of them, and is not read (2.2)
+    if levels.first().is_some_and(|lv| lv.section.is_some()) {
+        return (Vec::new(), marker);
+    }
+    let header = |m: &str| carried(&format!("@RNL(type=\"header\") {{ {version_kw}}}"), m);
     let lines = Lines::new(text);
     let main = doc.levels.first().is_some_and(|l| l.file == file);
     let spectre = doc.dialect.name == "spectre";
+    let mut marker = marker;
     if spectre && marker == "//" && !file.to_lowercase().ends_with(".scs") {
-        if let Some(after) = after_spectre_switch(&lines, usize::from(main)) {
-            return vec![Edit::Lines(after, header)];
+        match after_spectre_switch(&lines, usize::from(main)) {
+            // a record above the switch is read: the header goes before it, to be the first (2.8)
+            Some(after) if !all.iter().any(|(_, r)| r.lines.0 < after) => {
+                return (vec![Edit::Lines(after, header(marker))], marker);
+            }
+            // above the switch, in SPICE mode, where only `*` is a comment (2.2)
+            _ => marker = "*",
         }
     }
     let comment = |l: &str| l.starts_with('*') || (spectre && l.starts_with("//"));
-    match lines.lines.first().map(|l| Lines::body(l)) {
-        Some(l) if main || l.trim().is_empty() || comment(l) => vec![Edit::Lines(2, header)],
-        _ => vec![Edit::Lines(1, [vec![marker.to_string()], header].concat())],
-    }
+    let edit = match lines.lines.first().map(|l| Lines::body(l)) {
+        Some(l) if main || l.trim().is_empty() || comment(l) => Edit::Lines(2, header(marker)),
+        _ => Edit::Lines(1, [vec![marker.to_string()], header(marker)].concat()),
+    };
+    (vec![edit], marker)
 }
 
 /// The line, 1-based, after a file's `simulator lang=spectre` and the lines that continue it (a
@@ -702,6 +725,57 @@ mod tests {
         d.add_level(Level::new(LevelKind::File, "lib.scs", "lib.scs", "lib.scs"), Some(0));
         let lib = format!("simulator lang=spectre\n{body}");
         assert_eq!(with_header(&d, "lib.scs", &lib, "0.2"), format!("//\n{header}\n{lib}"));
+    }
+
+    #[test]
+    fn above_the_switch_to_spectre_a_header_is_written_in_stars() {
+        // above the first `simulator lang=spectre` of a file that is not a .scs file, Spectre reads
+        // SPICE, where `//` is no comment (2.2): the header there, and the bare marker before a
+        // statement, are written with `*`, which carries in both modes
+        let star = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+        let mut d = doc("// t\nX1 (a b) div\n", "a.scs", "//");
+        d.add_level(Level::new(LevelKind::File, "lib.inc", "lib.inc", "lib.inc"), Some(0));
+        let body = "simulator lang=spectre\nsubckt div (p n)\nR1 (p n) resistor r=1k\nends div\n";
+        for (head, want) in [
+            ("* lib\n.param rr=1k\n", format!("* lib\n{star}\n.param rr=1k\n")),
+            ("simulator lang=spice\n.param rr=1k\n", format!("*\n{star}\nsimulator lang=spice\n.param rr=1k\n")),
+        ] {
+            let lib = format!("{head}{body}");
+            assert_eq!(carrier(&d, "lib.inc", &lib), "//");
+            assert_eq!(with_header(&d, "lib.inc", &lib, "0.2"), format!("{want}{body}"), "{head}");
+        }
+        // a main file; the record written with the header follows it, so that the next solve
+        // writes the same
+        let net = "* t\n.param rr=1k\nsimulator lang=spectre\nR1 (a b) resistor r=1k\n";
+        let d = doc(net, "a.net", "//");
+        let out = replace_generated_with_header(&d, 0, net, "@RNL(type=\"generated\") {#R1 @PLACE(0, 0)}", "0.2");
+        let want = format!("* t\n{star}\n.param rr=1k\nsimulator lang=spectre\nR1 (a b) resistor r=1k\n");
+        assert_eq!(out, format!("{want}* @RNL(type=\"generated\") {{#R1 @PLACE(0, 0)}}\n"));
+        // a record above the switch, which the reading takes: the header goes before it, not after
+        // the switch below it, where it would not be the first record (2.8)
+        let net = "* t\n// @RNL { /* note */ }\nsimulator lang=spectre\nR1 (a b) resistor r=1k\n";
+        let d = doc(net, "a.net", "//");
+        assert_eq!(d.levels[0].records.len(), 1);
+        assert_eq!(
+            with_header(&d, "a.net", net, "0.2"),
+            format!("* t\n{star}\n// @RNL {{ /* note */ }}\nsimulator lang=spectre\nR1 (a b) resistor r=1k\n")
+        );
+    }
+
+    #[test]
+    fn a_file_read_only_through_library_sections_gets_no_header() {
+        // what lies outside the selected section is not read, and tools must not write there
+        // (2.2): no header goes on line 2 of a file read only through its sections
+        let header = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+        let mut d = doc("* t\n.end\n", "a.sp", "*");
+        let mut tt = Level::new(LevelKind::File, "models.lib (tt)", "models.lib", "models.lib");
+        tt.section = Some("tt".into());
+        d.add_level(tt, Some(0));
+        let lib = "* models\n.lib tt\n.subckt pair a b\nR1 a b 1k\n.ends\n.endl tt\n";
+        assert_eq!(with_header(&d, "models.lib", lib, "0.2"), lib);
+        // read whole as well, it reads line 2
+        d.add_level(Level::new(LevelKind::File, "models.lib", "models.lib", "models.lib"), Some(0));
+        assert_eq!(with_header(&d, "models.lib", lib, "0.2"), format!("* models\n{header}\n{}", &lib[9..]));
     }
 
     #[test]

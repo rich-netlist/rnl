@@ -474,6 +474,7 @@ impl<'a> Reader<'a> {
             None => file_name(&display).to_string(),
         };
         let child = self.new_level(LevelKind::File, &name, &display, &full, cur, false, no);
+        self.doc.levels[child].section = section.map(String::from);
         let mut st = stack.to_vec();
         st.push(key);
         self.read_file(&full, child, circ, false, &st, section);
@@ -638,6 +639,8 @@ mod tests {
         let mut sink = Sink::new();
         let doc = read("top.sp", &p, &mut sink).unwrap();
         assert_eq!(doc.levels[1].name, "models.lib (tt)");
+        assert_eq!(doc.levels[1].section.as_deref(), Some("tt"));
+        assert_eq!(doc.levels[0].section, None);
         assert!(doc.subckt("CELL").is_some());
         assert_eq!(sink.all().len(), 1);
         assert_eq!(doc.main().instances[0].mtype.as_deref(), Some("nmos"));

@@ -1170,6 +1170,83 @@ fn an_included_file_that_switches_to_spectre_gets_its_header_after_the_switch() 
 }
 
 #[test]
+fn above_the_switch_to_spectre_an_included_file_gets_its_header_in_stars() {
+    // a file that is not a .scs file and does not start with `simulator lang=spectre` is in SPICE
+    // mode up to that statement, where only `*` is a comment (2.2): the header there, and the bare
+    // marker before a statement, are written with `*`, and the record of the solver follows them;
+    // so is a header put before a record that the reading takes above the switch, so that it is
+    // the first record (2.8)
+    let top = "// top\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spectre\ninclude \"div.inc\"\n\
+               X1 (p 0) div\n";
+    let body = "simulator lang=spectre\nsubckt div (p n)\nR1 (p m) resistor r=1k\nR2 (m n) resistor r=1k\nends div\n";
+    let star = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+    for (head, want) in [
+        ("* lib\n.param rr=1k\n", format!("* lib\n{star}\n.param rr=1k\n")),
+        ("simulator lang=spice\n.param rr=1k\n", format!("*\n{star}\nsimulator lang=spice\n.param rr=1k\n")),
+        ("// lib\n// @RNL { /* note */ }\n", format!("// lib\n{star}\n// @RNL {{ /* note */ }}\n")),
+    ] {
+        let files = MemoryProvider::new().with("/w/top.scs", top).with("/w/div.inc", &format!("{head}{body}"));
+        let entry = Path::new("/w/top.scs");
+        let before = interpret_file(entry, None, &files, &Options::default()).unwrap();
+        let run = solve(entry, &files, &SolveOptions::default()).unwrap();
+        let div = &run.files.iter().find(|f| f.path == "/w/div.inc").unwrap().text;
+        assert!(div.starts_with(&format!("{want}{body}").replace("ends div\n", "")), "{head}: {div}");
+        assert!(div.contains("\n* @RNL(type=\"generated\"") && !div.contains("\n// @RNL(type="), "{head}: {div}");
+        let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+        let both = Layered { layers: vec![&solved, &files] };
+        check_read_back(&run, entry, &both, false, head);
+        let after = read_solved(&run, &files, entry);
+        assert_eq!(messages(&after, Severity::Warning), messages(&before, Severity::Warning), "{head}");
+        assert_eq!(solve(entry, &both, &SolveOptions::default()).unwrap().files, run.files, "{head}");
+    }
+}
+
+#[test]
+fn a_file_read_only_through_a_library_section_gets_no_header_outside_it() {
+    // a file read through `.lib file sec` or `include … section=` is read only inside the
+    // section, and tools must not write outside it (2.2): it gets no header record there, the
+    // record of the subcircuit goes inside the section, no new warning comes, and a second solve
+    // writes the same. A header inside the section is read, and gets its version there.
+    let spice = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.lib models.lib tt\nX1 p q pair\n.end\n";
+    let tt = ".lib tt\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n.endl tt\n";
+    let ff = ".lib ff\n.subckt pair a b\nR1 a m 2k\nR2 m b 2k\n.ends\n.endl ff\n";
+    let spectre = "// top\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spectre\n\
+                   include \"models.scs\" section=tt\nX1 (p 0) div\n";
+    let scs = "// models\nsection tt\nsubckt div (p n)\nR1 (p m) resistor r=1k\nR2 (m n) resistor r=1k\nends div\n\
+               endsection tt\n";
+    let inside = format!("* models\n{}", tt.replacen("\n", "\n* @RNL(type=\"header\") {}\n", 1));
+    for (entry, top, lib_path, lib, header) in [
+        ("/w/top.sp", spice, "/w/models.lib", format!("* models\n{tt}{ff}"), None),
+        ("/w/top.scs", spectre, "/w/models.scs", scs.to_string(), None),
+        (
+            "/w/top.sp",
+            spice,
+            "/w/models.lib",
+            format!("{inside}{ff}"),
+            Some(".lib tt\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n"),
+        ),
+    ] {
+        let files = MemoryProvider::new().with(entry, top).with(lib_path, &lib);
+        let entry = Path::new(entry);
+        let before = interpret_file(entry, None, &files, &Options::default()).unwrap();
+        let run = solve(entry, &files, &SolveOptions::default()).unwrap();
+        let text = &run.files.iter().find(|f| f.path == lib_path).unwrap().text;
+        match header {
+            None => assert!(!text.contains("type=\"header\""), "{text}"),
+            Some(h) => assert!(text.contains(h) && text.matches("type=\"header\"").count() == 1, "{text}"),
+        }
+        let record = text.find("@RNL(type=\"generated\"").unwrap();
+        assert!(record < text.find("endsection tt").or(text.find(".endl tt")).unwrap(), "{text}");
+        let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+        let both = Layered { layers: vec![&solved, &files] };
+        check_read_back(&run, entry, &both, false, lib_path);
+        let after = read_solved(&run, &files, entry);
+        assert_eq!(messages(&after, Severity::Warning), messages(&before, Severity::Warning), "{lib_path}");
+        assert_eq!(solve(entry, &both, &SolveOptions::default()).unwrap().files, run.files, "{lib_path}");
+    }
+}
+
+#[test]
 fn a_text_whose_offset_or_place_the_solver_discards_is_written_where_it_put_it() {
     // high ALIGNs against the normal offsets of a label and of a text of its own (o7), and against
     // the one-axis PLACE of a label (p8): the record writes the position the solver chose on that

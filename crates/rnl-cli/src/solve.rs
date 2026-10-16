@@ -10,9 +10,10 @@
 //! the solver written for the level with scope= in another file, which a solver does not write
 //! (2.6) but which applies to the level all the same, is removed from that file. Every file written
 //! has its header record and its version (16.1), added when it has none, in the same pass as the
-//! record, at the positions the reading gives. A file may hold several levels, and
-//! writing one back moves the lines of those after it, so the document is read again before the
-//! next level, the texts written so far held in memory over the files.
+//! record, at the positions the reading gives; but a file read only through library sections,
+//! where what lies outside them is not read (2.2), gets no new header. A file may hold several
+//! levels, and writing one back moves the lines of those after it, so the document is read again
+//! before the next level, the texts written so far held in memory over the files.
 //!
 //! A level whose file, or a file above it, declares a language version that the reading does not
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
