@@ -10,7 +10,7 @@
 
 本文规划独立的 Rich Netlist（RNL）runtime、solver、viewer/editor，以及它们的模块、仓库和发行方式。目标工具链不依赖 Analog Canvas 的代码、运行环境或元件资产。
 
-语言背景见 [RNL 原则](../spec/rich-netlist.zh.md)和[语言标准 0.2](../spec/rnl-0.2.zh.md)（本文写于标准之前，当时依据的语法讨论稿 0.1-draft.2 已被它取代）。草案 0.3 让求解器把全部决定写回，尚未发布；工具包在开发开关后面实现了它，见 [rnl-runtime](../crates/rnl-runtime/README.md#for-a-solver)。本文中的接口名、目录名、包名和能力约定均为设计示意，不意味着已有对应实现，也不新增已获确认的 RNL 语法。
+语言背景见 [RNL 原则](../spec/rich-netlist.zh.md)和[语言标准 0.2](../spec/rnl-0.2.zh.md)（本文写于标准之前，当时依据的语法讨论稿 0.1-draft.2 已被它取代）。草案 0.3 让求解器把全部决定写回，尚未发布；本文引用的条文以研究仓库 rnl-dev 的提交 f76197d（2026-10-16）为准。工具包在开发开关后面实现了它，见 [rnl-runtime](../crates/rnl-runtime/README.md#for-a-solver)。本文中的接口名、目录名、包名和能力约定均为设计示意，不意味着已有对应实现，也不新增已获确认的 RNL 语法。
 
 ## 1. 用户需求与方案状态
 
