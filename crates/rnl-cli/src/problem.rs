@@ -66,7 +66,13 @@ fn position(p: &Position) -> Value {
     match p {
         Position::Own { x, y } => json!({"x": slot(x), "y": slot(y)}),
         Position::At(r) => json!({"at": point(r)}),
-        Position::InSymbol { owner, local } => json!({"in_symbol": owner, "local": [local.0, local.1]}),
+        Position::InSymbol { owner, local, replaced } => {
+            let mut v = json!({"in_symbol": owner, "local": [local.0, local.1]});
+            if let Some((axis, s)) = replaced {
+                v.as_object_mut().unwrap().insert(axis.as_str().into(), slot(s));
+            }
+            v
+        }
     }
 }
 

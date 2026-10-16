@@ -376,6 +376,32 @@ fn each_level_has_its_solve_status_when_asked() {
 }
 
 #[test]
+fn a_text_that_its_symbol_places_is_open_on_an_axis_that_an_offset_gives() {
+    // R1's symbol places its name; an offset on one axis replaces that axis (13.3), and the text's
+    // coordinate there is the solver's to decide, as with offsets on both axes; a PLACE fixes it
+    let one = |scene: &str| {
+        format!(
+            "* t\nR1 a b 1k\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n* @RNL {{\n\
+             *   $TAG = @DEFINE-SYMBOL(box=[-2, -0.5, 2, 0.5]) {{\n\
+             *     (-2, 0) @PIN(terminal=1, direction=\"left\"); (2, 0) @PIN(terminal=2, direction=\"right\");\n\
+             *     ? @TEXT(\"${{name}}\", key=\"name\") => @PLACE(1, 1)\n\
+             *   }};\n\
+             *   # @SELECT-INSTANCE => @SET-SYMBOL $TAG;\n\
+             *   #R1 @PLACE(0, 0) => @ORIENT(\"R0\"){scene}\n\
+             * }}\n.end\n"
+        )
+    };
+    let file = |status: &'static str| [("t.sp".to_string(), Some(status))];
+    assert_eq!(statuses(&one("")), file("fixed"));
+    assert_eq!(statuses(&one(";\n*   #R1::name @PLACE(x=-3)")), file("fixed"));
+    for open in
+        [";\n*   #R1 @TEXT(\"${name}\", key=\"name\", dx=3)", ";\n*   #R1 @TEXT(\"${name}\", key=\"name\", dx=3, dy=1)"]
+    {
+        assert_eq!(statuses(&one(open)), file("unsolved"), "{open}");
+    }
+}
+
+#[test]
 fn asking_for_the_status_changes_nothing_else_in_the_document() {
     let s = solved(&amp("0.3"), "amp");
     for text in [amp("0.2"), s.text.clone(), fixed_text()] {

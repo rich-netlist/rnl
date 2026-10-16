@@ -616,6 +616,7 @@ impl<'a> Reader<'a> {
         };
         let mut lv = Level::new(LevelKind::File, &name, &display, &full);
         lv.line = no;
+        lv.section = section.map(String::from);
         let child = self.doc.add_level(lv, Some(st.cur));
         let mut stck = stack.to_vec();
         stck.push(key);
@@ -913,6 +914,7 @@ mod tests {
         assert_eq!(doc.main().instances[0].value.as_deref(), Some("1k"));
         assert_eq!(doc.main().records.len(), 1);
         assert_eq!(doc.levels[1].name, "lib.scs (tt)");
+        assert_eq!(doc.levels[1].section.as_deref(), Some("tt"));
     }
 
     #[test]

@@ -48,7 +48,11 @@ fn stripping_generated_records_keeps_the_rest() {
                 .count()
         };
         assert_eq!(count(&again, true), 0, "{}", f.display());
-        assert_eq!(count(&again, false), count(&doc, false), "{}", f.display());
+        // a record removed before tokens on its line leaves an empty one, so that they still fail
+        // after a record (2.4), as in 12-diagnostics
+        let empty = |t: &str| t.matches("@RNL {} ").count();
+        let kept = count(&doc, false) + empty(&stripped) - empty(&text);
+        assert_eq!(count(&again, false), kept, "{}", f.display());
     }
 }
 

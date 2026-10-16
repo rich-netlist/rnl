@@ -108,6 +108,10 @@ pub struct Level {
     /// The file path, for `path=` relative to the writing file (16.2, 16.5).
     pub path: String,
     pub case_sensitive: bool,
+    /// For the level of an included file read through a library section (`.lib file sec`, or
+    /// Spectre's `include "file" section=sec`), the section: the reading reads only the text of
+    /// that section, and what lies outside it is not read (2.2).
+    pub section: Option<String>,
 }
 
 impl Level {
@@ -127,6 +131,7 @@ impl Level {
 
             path: path.into(),
             case_sensitive: false,
+            section: None,
         }
     }
 

@@ -110,16 +110,22 @@ impl SolveStatus {
 /// Nothing, when:
 ///
 /// - no object of the problem that can be referred to has a free coordinate or a free orientation
-///   ([`Slot::Free`], [`OrientSlot::Free`]). One that cannot ([`Reference::Anonymous`]), such as a
-///   text without a key that a rule makes, is not the solver's to decide (14.8): the viewer places
-///   it (13.3);
+///   ([`Slot::Free`], [`OrientSlot::Free`]): of its own, or on the axis that the scene gives a text
+///   that its owner's symbol places, as an offset does there (`replaced` of
+///   [`Position::InSymbol`], 13.3). One that cannot ([`Reference::Anonymous`]), such as a text
+///   without a key that a rule makes, is not the solver's to decide (14.8): the viewer places it
+///   (13.3);
 /// - no wire that can be referred to is `"auto"`, whose route is the solver's (13.1);
 /// - no ROUTE asks for wires (13.7);
 /// - no constraint has the status `needs-solver`: it comes before coordinates that it involves in
 ///   the order of 8.5, so that a solver moves them.
 pub fn is_fixed(p: &LevelProblem, view: &LevelView) -> bool {
     let open = |o: &crate::problem::ProblemObject| {
-        let free_position = matches!(&o.position, Position::Own { x, y } if *x == Slot::Free || *y == Slot::Free);
+        let free_position = match &o.position {
+            Position::Own { x, y } => *x == Slot::Free || *y == Slot::Free,
+            Position::InSymbol { replaced: Some((_, slot)), .. } => *slot == Slot::Free,
+            Position::InSymbol { replaced: None, .. } | Position::At(_) => false,
+        };
         o.reference != Reference::Anonymous && (free_position || o.orient == Some(OrientSlot::Free))
     };
     !p.objects.iter().any(open)

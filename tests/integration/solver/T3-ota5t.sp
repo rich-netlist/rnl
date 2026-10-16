@@ -29,7 +29,7 @@ M5 tail vbias vss vss nch W=4u L=1u
 *   %ax = (_, _);
 *   #M1(a) #M2(b) %ax(axis) @AS $MIRROR_PAIR;
 *   #M3(a) #M4(b) %ax(axis) @AS $MIRROR_PAIR;
-*   #M1(a) #M2(b) #M5(t) @AS $TAIL_CENTER;
+*   %tc = #M1(a) #M2(b) #M5(t) @AS $TAIL_CENTER;
 *   #M5 {#M1 #M2} @DISTANCE("bottom-to-top", min=2);
 *   {#M1 #M2} {#M3 #M4} @DISTANCE("bottom-to-top", min=2);
 *   &vdd @ADD-TO $SUPPLY_NET_SET;

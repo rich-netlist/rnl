@@ -1590,14 +1590,22 @@ impl Interp<'_> {
 
     /// Is no file on the way up from this level of an unsupported version (16.1)?
     pub(crate) fn file_ok(&self, level: LevelId) -> bool {
+        self.unsupported_file(level).is_none()
+    }
+
+    /// The file level on the way up from this level, itself included, that is of an unsupported
+    /// version (16.1), with the version it declares: no RNL of it is interpreted, nor of the
+    /// levels in it.
+    pub(crate) fn unsupported_file(&self, level: LevelId) -> Option<(LevelId, String)> {
         let mut lv = Some(level);
         while let Some(l) = lv {
-            if self.doc.levels[l].kind == LevelKind::File && !self.units[self.level_unit[l]].ok {
-                return false;
+            let unit = &self.units[self.level_unit[l]];
+            if self.doc.levels[l].kind == LevelKind::File && !unit.ok {
+                return Some((l, unit.version.clone()));
             }
             lv = self.doc.levels[l].parent;
         }
-        true
+        None
     }
 
     // ------------------------------------------------------------------ names (6.6)

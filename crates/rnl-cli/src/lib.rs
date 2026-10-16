@@ -1,10 +1,11 @@
-//! The pieces of the `rnl` command: reading files and JSON output. What reads no files, such as
-//! dialect detection, the bundled packages and the level status, comes from `rnl-view`. The
-//! conformance tests use them too.
+//! The pieces of the `rnl` command: reading files, JSON output and `rnl solve`. What reads no
+//! files, such as dialect detection, the bundled packages and the level status, comes from
+//! `rnl-view`; the solver is `rnl-solver`. The conformance tests use them too.
 
 pub mod dump;
 pub mod problem;
 pub mod provider;
+pub mod solve;
 
 use std::path::Path;
 
