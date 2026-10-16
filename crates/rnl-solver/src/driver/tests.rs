@@ -2,7 +2,7 @@
 //! solver and of the conformance corpus read from the files.
 
 use super::*;
-use crate::resolve::tests::{fact, instance, label, point, problem_of};
+use crate::resolve::tests::{fact, instance, label, point, problem_of, Ticks};
 use crate::Objectives;
 use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::{Axis, FactKind, PointRef};
@@ -10,16 +10,16 @@ use rnl_runtime::problem::{Axis, FactKind, PointRef};
 #[test]
 fn an_empty_level_gives_an_empty_solution_and_says_what_is_done() {
     let p = problem_of(Vec::new(), Vec::new());
-    let solved = crate::solve(&p, &SolverOptions::default());
+    let solved = crate::solve(&p, &SolverOptions::without_time_limit());
     assert_eq!(solved.solution, Solution::default());
     assert_eq!(solved.report.notes[0], METHOD_NOTE);
     assert!(solved.report.kept.is_empty() && solved.report.discarded.is_empty());
-    assert_eq!(solved, crate::solve(&p, &SolverOptions::default()));
+    assert_eq!(solved, crate::solve(&p, &SolverOptions::without_time_limit()));
 }
 
 #[test]
 fn options_that_make_no_sense_are_noted() {
-    let mut options = SolverOptions { beam: 0, ..SolverOptions::default() };
+    let mut options = SolverOptions { beam: 0, ..SolverOptions::without_time_limit() };
     options.objectives = Objectives::none();
     let solved = crate::solve(&problem_of(Vec::new(), Vec::new()), &options);
     assert!(solved.report.notes.iter().any(|n| n.contains("beam")));
@@ -36,7 +36,7 @@ fn every_object_is_placed_where_the_facts_put_it() {
             fact(FactKind::Place { at: PointRef::Origin(1), axis: Axis::Y, value: 2.5 }),
         ],
     );
-    let solved = crate::solve(&p, &SolverOptions::default());
+    let solved = crate::solve(&p, &SolverOptions::without_time_limit());
     assert_eq!(solved.report.kept, vec![0, 1, 2, 3]);
     assert_eq!(
         solved.solution.placements,
@@ -90,7 +90,7 @@ fn a_position_the_file_fixes_is_given_and_written_where_the_record_reaches_it() 
             fact(FactKind::PointCoordinate { point: 3, axis: Axis::Y, value: 8.0 }),
         ],
     );
-    let solved = crate::solve(&p, &SolverOptions::default());
+    let solved = crate::solve(&p, &SolverOptions::without_time_limit());
     assert_eq!(solved.report.kept, vec![0, 1, 2, 3, 4, 5, 7, 9]);
     let at: Vec<(usize, Option<(f64, f64)>)> = solved.solution.placements.iter().map(|pl| (pl.object, pl.at)).collect();
     assert_eq!(
@@ -305,7 +305,8 @@ fn holds_exactly(p: &LevelProblem, g: &crate::resolve::Geometry, kind: &FactKind
 /// Whether the facts kept leave no side to put two symbols apart, with the orientations the
 /// solve gave every free class: each of the four sides, touching allowed, is dropped.
 fn forced_overlap(e: &Exact, a: usize, b: usize) -> bool {
-    let s = &e.structure;
+    // with the caps of the implementation, whatever caps the solve had
+    let s = &Structure { caps: CAPS, ..e.structure.clone() };
     let ori = &e.placed.geometry.orient;
     let values: Vec<Orient> = s.open.classes.iter().map(|c| ori[c.root]).collect();
     let candidate = crate::search::Candidate { values, ..e.candidate.clone() };
@@ -326,7 +327,7 @@ fn forced_overlap(e: &Exact, a: usize, b: usize) -> bool {
             rel: Relation::Linear { axis, terms, lo: Some(c), hi: None },
         });
         let mut work = crate::Work::default();
-        with_relations(s, &rels, SolverOptions::default().budget, &mut work, |_, _, t| !t.kept[t.kept.len() - 1])
+        with_relations(s, &rels, &mut work, |_, _, t| !t.kept[t.kept.len() - 1])
     })
 }
 
@@ -561,14 +562,30 @@ fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
 
 /// Solves a level and checks it (see the tests below).
 fn check_level(file: &str, p: &LevelProblem) -> (Solved, Exact) {
-    check_with(file, p, &SolverOptions::default())
+    check_with(file, p, &SolverOptions::without_time_limit())
 }
 
 /// Solves a level with some options and checks it.
 fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> (Solved, Exact) {
+    check_capped(file, p, options, &StoppedClock, CAPS)
+}
+
+/// Solves a level with some options, the time limit on `clock` and the solver's own resolutions
+/// within `caps`, and checks it.
+fn check_capped(
+    file: &str,
+    p: &LevelProblem,
+    options: &SolverOptions,
+    clock: &dyn Clock,
+    caps: Caps,
+) -> (Solved, Exact) {
     let options = options.clone();
-    let (solved, e) = solve_exact(p, &options);
+    let (solved, e) = solve_exact_with(p, &options, clock, caps);
     let what = format!("{file} / {}", p.title);
+    // a fact discarded undecided, and only such a fact, has its warning (7.6)
+    assert_eq!(solved.report.warnings, e.resolved.warnings, "{what}");
+    let undecided = solved.report.discarded.iter().filter(|d| d.undecided).count();
+    assert_eq!(solved.report.warnings.len(), undecided, "{what}: {:?}", solved.report.warnings);
     // every fact kept holds where the objects are, exactly, before they become f64
     let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
     for &f in &solved.report.kept {
@@ -579,8 +596,8 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> (Solved,
             summary(p, &solved, &e)
         );
     }
-    // no two instances overlap unless the facts make them, or the budget of pivots ran out
-    let tight = options.budget.pivots < SolverOptions::default().budget.pivots;
+    // no two instances overlap unless the facts make them, or the cap of pivots ran out
+    let tight = caps.pivots < CAPS.pivots;
     for o in &e.placed.overlaps {
         let (a, b) = (o.a, o.b);
         let instance = |k: usize| matches!(p.objects[k].kind, ObjectKind::Instance | ObjectKind::Bundle);
@@ -599,7 +616,7 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> (Solved,
         }
     }
     // the same again, and nothing that RNL cannot write
-    assert_eq!(solved, crate::solve(p, &options), "{what}: not deterministic");
+    assert_eq!(solved, solve_exact_with(p, &options, clock, caps).0, "{what}: not deterministic");
     for pl in &solved.solution.placements {
         if let Some((x, y)) = pl.at {
             assert!(x.is_finite() && y.is_finite(), "{what}: {pl:?}");
@@ -648,14 +665,16 @@ fn every_case_of_the_solver_is_placed_keeping_every_fact_kept() {
 
 /// A budget too small for anything still gives a solution that RNL can write: every object placed
 /// and oriented, every fact kept holding, the wires made valid and the rest reported, the same
-/// twice.
+/// twice. The solver's own resolutions have caps of two nodes and 30 pivots.
 #[test]
 fn a_tiny_budget_still_gives_a_valid_solution() {
-    let options = SolverOptions::parse("budget=resolve_nodes:2,pivots:30,candidates:0,astar_expansions:12").unwrap();
+    let options =
+        SolverOptions::without_time_limit().with_overrides("budget=candidates:0,astar_expansions:12").unwrap();
+    let caps = Caps { nodes: 2, pivots: 30 };
     let mut left = 0;
     for f in netlists("tests/integration/solver", "T") {
         for p in problems(&f) {
-            let (solved, _) = check_with(&f.to_string_lossy(), &p, &options);
+            let (solved, _) = check_capped(&f.to_string_lossy(), &p, &options, &StoppedClock, caps);
             left += solved.report.unrouted.len();
             for u in &solved.report.unrouted {
                 assert!(u.parts >= 2, "{}: {u:?}", p.title);
@@ -664,6 +683,28 @@ fn a_tiny_budget_still_gives_a_valid_solution() {
         }
     }
     assert!(left > 0, "12 expansions leave some net in parts");
+}
+
+/// A resolution that runs out of time (the draft 0.3, 8.5), on a clock that counts its readings,
+/// still gives a solution that RNL can write, every fact kept holding, a warning for each fact
+/// left undecided, the same twice; with no time at all, and with a little.
+#[test]
+fn a_resolution_out_of_time_still_gives_a_valid_solution() {
+    let mut undecided = 0;
+    for seconds in [0.0, 25.0] {
+        let options = SolverOptions { time_limit: Some(seconds), ..SolverOptions::without_time_limit() };
+        for f in netlists("tests/integration/solver", "T") {
+            for p in problems(&f) {
+                let what = format!("{} at {seconds} s", f.to_string_lossy());
+                let (solved, e) = check_capped(&what, &p, &options, &Ticks::default(), CAPS);
+                undecided += solved.report.warnings.len();
+                // the solver's own work is not timed: the layout is searched and placed as usual
+                assert!(e.placed.optimised, "{what}");
+                assert!(!solved.report.notes.iter().any(|n| n.contains("a cap of work")), "{what}");
+            }
+        }
+    }
+    assert!(undecided > 0, "no time leaves some fact undecided");
 }
 
 #[test]
@@ -816,7 +857,7 @@ fn options_change_the_search_and_never_the_facts() {
     for text in
         ["objectives=none", "grid=none", "beam=1", "budget=candidates:0", "grid=0.5;objectives=area,wire_length"]
     {
-        let options = SolverOptions::parse(text).unwrap();
+        let options = SolverOptions::without_time_limit().with_overrides(text).unwrap();
         for p in &ps {
             let (solved, e) = solve_exact(p, &options);
             let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
@@ -838,7 +879,7 @@ fn options_change_the_search_and_never_the_facts() {
         }
     }
     // with no objective, the inert ones are not reported either: nothing is configured
-    let solved = crate::solve(&ps[0], &SolverOptions::parse("objectives=none").unwrap());
+    let solved = crate::solve(&ps[0], &SolverOptions::without_time_limit().with_overrides("objectives=none").unwrap());
     assert!(solved.report.inert_objectives.is_empty());
 }
 
@@ -852,7 +893,7 @@ fn layers_with_tolerances_rank_the_candidates_in_a_well_defined_order() {
          area~20,crossings~2,wire_length~8,aspect~0.5",
     ];
     for (i, text) in texts.into_iter().enumerate() {
-        let options = SolverOptions::parse(text).unwrap();
+        let options = SolverOptions::without_time_limit().with_overrides(text).unwrap();
         for f in netlists("tests/integration/solver", "T") {
             for p in problems(&f) {
                 let (solved, e) = solve_exact(&p, &options);
@@ -873,15 +914,16 @@ fn layers_with_tolerances_rank_the_candidates_in_a_well_defined_order() {
     }
 }
 
-/// A note on two symbols that overlap says why: with too few pivots, the budget; with the facts
-/// of corpus 03, which tie CL to M2, the facts.
+/// A note on two symbols that overlap says why: with too few pivots, the cap of work; with the
+/// facts of corpus 03, which tie CL to M2, the facts.
 #[test]
 fn an_overlap_is_noted_with_its_cause() {
     let ps = problems(&repo().join("tests/integration/solver/T4-miller-conflicts.sp"));
-    let options = SolverOptions::parse("budget=pivots:40").unwrap();
+    let options = SolverOptions::without_time_limit();
+    let caps = Caps { pivots: 40, ..CAPS };
     let mut budget = false;
     for p in &ps {
-        let (solved, e) = solve_exact(p, &options);
+        let (solved, e) = solve_exact_with(p, &options, &StoppedClock, caps);
         let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
         for &k in &solved.report.kept {
             assert!(holds_exactly(p, &e.placed.geometry, &p.facts[k].kind, &tol), "{} fact {k}", p.title);
@@ -895,15 +937,15 @@ fn an_overlap_is_noted_with_its_cause() {
         }
         if e.placed.undecided {
             assert!(
-                solved.report.notes.iter().any(|n| n.contains("the budget of pivots ran out")),
+                solved.report.notes.iter().any(|n| n.contains("a cap of work ran out")),
                 "{:?}",
                 solved.report.notes
             );
         }
     }
-    assert!(budget, "40 pivots leave some symbols overlapping for want of budget");
+    assert!(budget, "40 pivots leave some symbols overlapping for want of work");
     let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
-    let (solved, e) = solve_exact(&ps[0], &SolverOptions::default());
+    let (solved, e) = solve_exact(&ps[0], &SolverOptions::without_time_limit());
     let [m2, cl] = ["#M2", "#CL"].map(|l| object(&ps[0], l));
     assert!(
         e.placed
@@ -1083,7 +1125,7 @@ fn groups_that_make_the_same_set_twice_are_solved() {
             "* d\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n{chain}* @RNL {{ {groups}; $WIRE_NET_SET @ROUTE }}\n.end\n"
         );
         let ps = problems_of(&text);
-        let options = SolverOptions::parse(options).unwrap();
+        let options = SolverOptions::without_time_limit().with_overrides(options).unwrap();
         let (solved, e) = solve_exact(&ps[0], &options);
         let what = summary(&ps[0], &solved, &e);
         let tree = &e.structure.tree;
@@ -1112,8 +1154,8 @@ fn overlapping_groups_keep_the_shared_part_between_the_others() {
         );
         let ps = problems_of(&text);
         let p = &ps[0];
-        let options = SolverOptions::default();
-        let resolved = crate::resolve::resolve(p, &options);
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve(p, &options);
         let mut work = crate::Work::default();
         let s = analyse(p, &resolved, &options, &mut work);
         let nodes = &s.tree.nodes;
@@ -1158,7 +1200,7 @@ fn overlapping_groups_keep_the_shared_part_between_the_others() {
 fn groups_and_facts_drawn_at_random_are_solved() {
     let mut rng = crate::structure::tests::Lcg(0x9e37_79b9_7f4a_7c15);
     let chain = "R1 a b 1k\nR2 b c 1k\nR3 c d 1k\nR4 d e 1k\nR5 e f 1k\n";
-    let options = SolverOptions::default();
+    let options = SolverOptions::without_time_limit();
     let mut unions = 0;
     for i in 0..100 {
         let mut lines: Vec<String> = rng
@@ -1190,7 +1232,7 @@ fn groups_and_facts_drawn_at_random_are_solved() {
         );
         let ps = problems_of(&text);
         let p = &ps[0];
-        let resolved = crate::resolve::resolve(p, &options);
+        let resolved = crate::resolve(p, &options);
         let mut work = crate::Work::default();
         let s = analyse(p, &resolved, &options, &mut work);
         let free = s.precedence.is_empty() && s.reversible.is_empty();
@@ -1234,7 +1276,7 @@ fn routed_whole(body: &str, options: &str) -> (LevelProblem, Solved, Exact) {
     let ps = problems_of(&netlist(body));
     assert_eq!(ps.len(), 1, "{body}");
     let p = ps.into_iter().next().unwrap();
-    let (solved, e) = check_with(body, &p, &SolverOptions::parse(options).unwrap());
+    let (solved, e) = check_with(body, &p, &SolverOptions::without_time_limit().with_overrides(options).unwrap());
     assert!(
         solved.report.unrouted.is_empty(),
         "{body} / {options}: {:?}\n{}",
@@ -1352,7 +1394,7 @@ fn t3_has_a_junction_where_two_wires_meet_at_a_drain() {
 /// left two nets in parts before leads along the edges of symbols; review of S4).
 #[test]
 fn every_case_of_the_solver_is_routed_whole_without_objectives() {
-    let options = SolverOptions::parse("objectives=none").unwrap();
+    let options = SolverOptions::without_time_limit().with_overrides("objectives=none").unwrap();
     for f in netlists("tests/integration/solver", "T") {
         for p in problems(&f) {
             let (solved, _) = check_with(&f.to_string_lossy(), &p, &options);

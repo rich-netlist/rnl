@@ -41,8 +41,12 @@ solve options (the levels are read without their type=\"generated\" records; -o 
                       with a copy of the other files they read from there, such as includes
   --in-place          write them over the files read instead
   --level TITLE       only the level with this title
-  --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam
-                      and budget, as rnl-solver's canonical text writes them; the hash covers them
+  --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam,
+                      budget and time_limit, as rnl-solver's canonical text writes them; the hash
+                      covers them. time_limit is the seconds the resolution of a level may spend on
+                      checking (8.5), 5 by default, or none for no limit: a fact whose check does not
+                      finish within it is discarded with a warning, and the result may then differ
+                      from one run to the next
   --report            print what became of every fact, not only of the facts discarded
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default

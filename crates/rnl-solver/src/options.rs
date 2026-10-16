@@ -1,5 +1,6 @@
-//! The solver's options: the tolerance (11.7), the grid, the layered objectives, the beam and the
-//! budget, and their canonical text, which the options digest of `sig1` covers (chapter 17).
+//! The solver's options: the tolerance (11.7), the grid, the layered objectives, the beam, the
+//! budget and the time limit of the resolution (the draft 0.3, 8.5), and their canonical text,
+//! which the options digest of `sig1` covers (chapter 17).
 //!
 //! The objectives are configured in **layers**: the objectives of a layer add up with their
 //! weights, layers rank lexicographically, the first layer first, and a value of a layer within its
@@ -13,7 +14,7 @@
 //! reads some of its settings over other options, as `rnl solve --solver-options` does:
 //!
 //! ```text
-//! tolerance=0.000001;grid=1;objectives=current_direction,turns,…;beam=4;budget=resolve_nodes:10000,…
+//! tolerance=0.000001;grid=1;objectives=current_direction,turns,…;beam=4;budget=candidates:256,…;time_limit=5
 //! ```
 //!
 //! - `objectives` lists the layers in order, separated by `,`; the objectives of a layer are
@@ -23,8 +24,12 @@
 //!   and `wire_length*2+area` reads as the same layer. `none` is no objective at all.
 //! - `grid` is a number, or `none` to leave free coordinates where the LP puts them.
 //! - `budget` lists `name:count` pairs separated by `,`; an override may give some of them.
+//! - `time_limit` is a number of seconds, or `none` for no limit.
 
 use rnl_runtime::geom::{fmt_num, TOL};
+
+/// The time limit of the toolkit, in seconds: the standard does not fix one (the draft 0.3, 8.5).
+pub const DEFAULT_TIME_LIMIT: f64 = 5.0;
 
 /// The objectives the solver knows, by the names of the prototype (plan 5.4).
 pub const OBJECTIVES: [&str; 14] = [
@@ -196,24 +201,16 @@ impl Objectives {
     }
 }
 
-/// How much work the solver may do, counted in steps rather than time so that the result does not
-/// depend on the machine (plan 5.9). When a count runs out, the solver keeps the best it has: a
-/// fact it could not decide is discarded and reported as undecided, a search stops with the best
-/// candidate so far.
+/// How much work the search and the router may do, counted in steps rather than time so that
+/// their result does not depend on the machine (plan 5.9). When a count runs out, the solver keeps
+/// the best it has: the search stops with the best candidate so far, a net is left in parts.
+///
+/// The resolution of 8.5 has no budget of work: only the time limit bounds it
+/// ([`SolverOptions::time_limit`], the draft 0.3, 8.5). The solver's own uses of the resolution,
+/// for the relations of a candidate and the coordinate LP, stay counted, by caps that the
+/// implementation fixes rather than options (`Caps`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Budget {
-    /// The nodes of the search for the literals of one fact, in the resolution of 8.5.
-    pub resolve_nodes: u64,
-    /// The pivots of each simplex the solver builds: one per axis for the resolution of 8.5, for
-    /// each test of a conflict set, for each analysis of the rows, and for each candidate taken in
-    /// and placed. A simplex that reaches it stops: a fact it was deciding is discarded undecided,
-    /// a relation of the solver's own is dropped, an LP gives up and the candidate stays where its
-    /// resolution put it, and the report says so. The pivots of a level are the sum over all of
-    /// them ([`crate::Work::pivots`]), which this does not bound. A pivot rewrites the rows it
-    /// touches with exact rationals, so its cost grows with the size of the tableau and of its
-    /// numbers: the count bounds the work, not the time, and the default of 1,000,000 is far
-    /// more than a level of a few hundred objects needs, a backstop rather than a limit on time.
-    pub pivots: u64,
     /// The candidates the search makes over the whole level.
     pub candidates: u64,
     /// The cells the router expands for one net.
@@ -222,17 +219,38 @@ pub struct Budget {
 
 impl Default for Budget {
     fn default() -> Self {
-        Budget { resolve_nodes: 10_000, pivots: 1_000_000, candidates: 256, astar_expansions: 200_000 }
+        Budget { candidates: 256, astar_expansions: 200_000 }
     }
 }
 
+/// The work that the solver's own uses of the resolution may do: the relations of a candidate
+/// taken in after the facts kept, the analysis of the rows, and the coordinate LP. They are not
+/// the resolution of 8.5, which only the time limit bounds ([`SolverOptions::time_limit`]); they
+/// are counted, so that their result does not depend on the machine, by caps that the
+/// implementation fixes ([`CAPS`]), backstops far above what a level of a few hundred objects
+/// needs. A search that reaches its cap drops its relation without a conflict, a simplex that
+/// reaches its cap stops and the LP leaves the candidate where its resolution put it, and the
+/// report says so.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Caps {
+    /// The nodes of the search for the literals of one relation.
+    pub nodes: u64,
+    /// The pivots of each simplex. A pivot rewrites the rows it touches with exact rationals, so
+    /// its cost grows with the size of the tableau and of its numbers: the count bounds the work,
+    /// not the time. The pivots of a level are the sum over every simplex ([`crate::Work::pivots`]),
+    /// which this does not bound.
+    pub pivots: u64,
+}
+
+/// The caps of the solver's own uses of the resolution: those of the budget before the time
+/// limit replaced it for the resolution of 8.5.
+pub(crate) const CAPS: Caps = Caps { nodes: 10_000, pivots: 1_000_000 };
+
 impl Budget {
-    const NAMES: [&'static str; 4] = ["resolve_nodes", "pivots", "candidates", "astar_expansions"];
+    const NAMES: [&'static str; 2] = ["candidates", "astar_expansions"];
 
     fn get(&mut self, name: &str) -> Option<&mut u64> {
         Some(match name {
-            "resolve_nodes" => &mut self.resolve_nodes,
-            "pivots" => &mut self.pivots,
             "candidates" => &mut self.candidates,
             "astar_expansions" => &mut self.astar_expansions,
             _ => return None,
@@ -240,10 +258,8 @@ impl Budget {
     }
 
     fn canonical(&self) -> String {
-        let Budget { resolve_nodes, pivots, candidates, astar_expansions } = self;
-        format!(
-            "resolve_nodes:{resolve_nodes},pivots:{pivots},candidates:{candidates},astar_expansions:{astar_expansions}"
-        )
+        let Budget { candidates, astar_expansions } = self;
+        format!("candidates:{candidates},astar_expansions:{astar_expansions}")
     }
 
     /// Reads `name:count` pairs over this budget.
@@ -254,9 +270,13 @@ impl Budget {
                 return Err(format!("a budget is `name:count`, not `{}`", pair.trim()));
             };
             let name = name.trim();
-            let slot = self
-                .get(name)
-                .ok_or_else(|| format!("the budget has no `{name}`; it has {}", Budget::NAMES.join(", ")))?;
+            let slot = self.get(name).ok_or_else(|| {
+                let mut e = format!("the budget has no `{name}`; it has {}", Budget::NAMES.join(", "));
+                if matches!(name, "resolve_nodes" | "pivots") {
+                    e.push_str("; the resolution of 8.5 is bounded by `time_limit` instead");
+                }
+                e
+            })?;
             *slot = count
                 .trim()
                 .parse::<u64>()
@@ -285,6 +305,15 @@ pub struct SolverOptions {
     /// routes and scores.
     pub beam: usize,
     pub budget: Budget,
+    /// How many seconds the resolution of a level may spend on checking, none for no limit (the
+    /// draft 0.3, 8.5): the checks of the facts and the search for their conflict sets, nothing
+    /// else, on the clock the caller gives (`crate::solve_with_clock`). When the check of a fact
+    /// does not finish within it, the fact is discarded undecided, with a warning (7.6), and so
+    /// is every later fact that needs a check; a later fact that the placement reached by then
+    /// already satisfies is kept. The result may then differ from that of 8.5, and from one run
+    /// to the next; without a limit, and whenever no check reaches it, it is that of 8.5.
+    /// [`DEFAULT_TIME_LIMIT`] by default.
+    pub time_limit: Option<f64>,
 }
 
 impl Default for SolverOptions {
@@ -295,23 +324,33 @@ impl Default for SolverOptions {
             objectives: Objectives::default(),
             beam: 4,
             budget: Budget::default(),
+            time_limit: Some(DEFAULT_TIME_LIMIT),
         }
     }
 }
 
-const KEYS: [&str; 5] = ["tolerance", "grid", "objectives", "beam", "budget"];
+const KEYS: [&str; 6] = ["tolerance", "grid", "objectives", "beam", "budget", "time_limit"];
 
 impl SolverOptions {
+    /// The defaults without a time limit: the resolution is exactly that of 8.5, the same on every
+    /// run and every machine, however long it takes. What the tests use.
+    pub fn without_time_limit() -> SolverOptions {
+        SolverOptions { time_limit: None, ..SolverOptions::default() }
+    }
+
     /// The options as one string, every setting that changes the result, in a fixed order with
-    /// numbers by `fmt_num`: what the options digest of `sig1` hashes (chapter 17).
+    /// numbers by `fmt_num`: what the options digest of `sig1` hashes (chapter 17). The time limit
+    /// is among them, as it may change which facts are kept (8.5).
     pub fn canonical(&self) -> String {
-        let grid = self.grid.map_or_else(|| "none".to_string(), fmt_num);
+        let none = |v: Option<f64>| v.map_or_else(|| "none".to_string(), fmt_num);
         format!(
-            "tolerance={};grid={grid};objectives={};beam={};budget={}",
+            "tolerance={};grid={};objectives={};beam={};budget={};time_limit={}",
             fmt_num(self.tolerance),
+            none(self.grid),
             self.objectives.canonical(),
             self.beam,
-            self.budget.canonical()
+            self.budget.canonical(),
+            none(self.time_limit)
         )
     }
 
@@ -322,8 +361,8 @@ impl SolverOptions {
 
     /// These options with the settings of `text` over them: `key=value` pairs separated by `;`,
     /// as [`SolverOptions::canonical`] writes them. `objectives` replaces the whole list, `budget`
-    /// only the counts it names. An unknown key, a key given twice, or a value that does not
-    /// read is an error.
+    /// only the counts it names; `grid` and `time_limit` take `none` as well as a number. An
+    /// unknown key, a key given twice, or a value that does not read is an error.
     pub fn with_overrides(&self, text: &str) -> Result<SolverOptions, String> {
         let mut options = self.clone();
         let mut given: Vec<&str> = Vec::new();
@@ -350,6 +389,8 @@ impl SolverOptions {
                 "beam" => {
                     options.beam = value.parse::<usize>().map_err(|_| format!("the beam is not a count: `{value}`"))?
                 }
+                "time_limit" if value == "none" => options.time_limit = None,
+                "time_limit" => options.time_limit = Some(number("the time limit", value)?),
                 _ => options.budget.read(value)?,
             }
         }
@@ -358,7 +399,7 @@ impl SolverOptions {
     }
 
     /// Whether the options make sense: a tolerance not below 0, a grid above 0, objectives that
-    /// [`Objectives::validate`] accepts, a beam of at least 1.
+    /// [`Objectives::validate`] accepts, a beam of at least 1, a time limit not below 0.
     pub fn validate(&self) -> Result<(), String> {
         if !(self.tolerance.is_finite() && self.tolerance >= 0.0) {
             return Err(format!("the tolerance must be a number not below 0, not {}", self.tolerance));
@@ -366,6 +407,11 @@ impl SolverOptions {
         if let Some(grid) = self.grid {
             if !(grid.is_finite() && grid > 0.0) {
                 return Err(format!("the grid must be a number above 0, not {grid}"));
+            }
+        }
+        if let Some(limit) = self.time_limit {
+            if !(limit.is_finite() && limit >= 0.0) {
+                return Err(format!("the time limit must be a number of seconds not below 0, or none, not {limit}"));
             }
         }
         if self.beam == 0 {
@@ -390,13 +436,18 @@ mod tests {
 
     const DEFAULT: &str = "tolerance=0.000001;grid=1;objectives=current_direction,turns,ground_direction,\
         component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect;beam=4;\
-        budget=resolve_nodes:10000,pivots:1000000,candidates:256,astar_expansions:200000";
+        budget=candidates:256,astar_expansions:200000;time_limit=5";
 
     #[test]
     fn the_defaults_in_their_canonical_text() {
         let options = SolverOptions::default();
         assert_eq!(options.canonical(), DEFAULT);
         assert_eq!(options.tolerance, TOL);
+        // the toolkit's time limit of the resolution: 5 seconds (the draft 0.3, 8.5)
+        assert_eq!(options.time_limit, Some(5.0));
+        let unlimited = SolverOptions::without_time_limit();
+        assert_eq!(unlimited, SolverOptions { time_limit: None, ..SolverOptions::default() });
+        assert_eq!(unlimited.canonical(), DEFAULT.replace(";time_limit=5", ";time_limit=none"));
         assert_eq!(options.objectives.layers.len(), 11);
         assert!(options
             .objectives
@@ -421,20 +472,43 @@ mod tests {
                 ],
             },
             beam: 7,
-            budget: Budget { resolve_nodes: 5, pivots: 6, candidates: 7, astar_expansions: 8 },
+            budget: Budget { candidates: 7, astar_expansions: 8 },
+            time_limit: None,
         };
         let text = options.canonical();
         assert_eq!(
             text,
             "tolerance=0.001;grid=none;objectives=signal_flow,area+wire_length*2~0.5,crossings*3;beam=7;\
-             budget=resolve_nodes:5,pivots:6,candidates:7,astar_expansions:8"
+             budget=candidates:7,astar_expansions:8;time_limit=none"
         );
         assert_eq!(SolverOptions::parse(&text), Ok(options.clone()));
         options.objectives = Objectives::none();
         options.grid = Some(0.5);
+        options.time_limit = Some(0.25);
         assert!(options.canonical().contains(";grid=0.5;objectives=none;"));
+        assert!(options.canonical().ends_with(";time_limit=0.25"));
         assert_eq!(SolverOptions::parse(&options.canonical()), Ok(options));
         assert_eq!(SolverOptions::parse(DEFAULT), Ok(SolverOptions::default()));
+    }
+
+    #[test]
+    fn the_time_limit_reads_back_as_a_number_or_none() {
+        for (text, limit) in [("time_limit=5", Some(5.0)), ("time_limit=none", None), ("time_limit=0", Some(0.0))] {
+            let options = SolverOptions::parse(text).unwrap();
+            assert_eq!(options.time_limit, limit, "{text}");
+            assert!(options.canonical().ends_with(&format!(";{text}")), "{}", options.canonical());
+            assert_eq!(SolverOptions::parse(&options.canonical()), Ok(options));
+        }
+        // over options without a limit, a number sets one again
+        let five = SolverOptions::without_time_limit().with_overrides("time_limit=5").unwrap();
+        assert_eq!(five, SolverOptions::default());
+        // the limit is part of the options the hash covers
+        assert_ne!(SolverOptions::default().canonical(), SolverOptions::without_time_limit().canonical());
+        // the counts of work that the resolution had before are gone, and the error says why
+        for gone in ["budget=resolve_nodes:10", "budget=pivots:10"] {
+            let e = SolverOptions::parse(gone).unwrap_err();
+            assert!(e.contains("it has candidates, astar_expansions") && e.contains("`time_limit`"), "{e}");
+        }
     }
 
     #[test]
@@ -455,11 +529,12 @@ mod tests {
 
     #[test]
     fn overrides_change_only_what_they_give() {
-        let options = SolverOptions::parse(" beam = 2 ; budget=pivots:500 ;grid=none;").unwrap();
+        let options = SolverOptions::parse(" beam = 2 ; budget=candidates:500 ;grid=none;").unwrap();
         assert_eq!(options.beam, 2);
         assert_eq!(options.grid, None);
-        assert_eq!(options.budget, Budget { pivots: 500, ..Budget::default() });
+        assert_eq!(options.budget, Budget { candidates: 500, ..Budget::default() });
         assert_eq!(options.objectives, Objectives::default());
+        assert_eq!(options.time_limit, Some(DEFAULT_TIME_LIMIT));
         let options = options.with_overrides("objectives=turns + wire_length*3, area ~ 1e-3; tolerance=1e-4").unwrap();
         assert_eq!(options.tolerance, 0.0001);
         assert_eq!(options.objectives.layers[0].items, vec![("turns".to_string(), 1), ("wire_length".to_string(), 3)]);
@@ -488,10 +563,18 @@ mod tests {
             "objectives=turns*x",
             "objectives=turns~-1",
             "objectives=turns+",
-            "budget=pivots",
+            "budget=candidates",
             "budget=speed:3",
-            "budget=pivots:-3",
-            "budget=pivots:1,pivots:2",
+            "budget=candidates:-3",
+            "budget=candidates:1,candidates:2",
+            "budget=pivots:1000000",
+            "budget=resolve_nodes:10000",
+            "time_limit=",
+            "time_limit=-1",
+            "time_limit=inf",
+            "time_limit=NaN",
+            "time_limit=5s",
+            "time_limit=5;time_limit=none",
         ];
         for text in bad {
             let result = SolverOptions::parse(text);

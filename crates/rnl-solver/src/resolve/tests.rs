@@ -10,7 +10,35 @@ use rnl_runtime::model::PinView;
 use rnl_runtime::problem::*;
 
 use super::*;
+use crate::options::CAPS;
 use crate::rational::{frac, int};
+use crate::StoppedClock;
+
+/// The resolution of 8.5 with a clock that never advances: the time limit is never reached.
+fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
+    super::resolve(problem, options, &StoppedClock)
+}
+
+/// A clock that advances one second each time it is read: a time limit of `n` seconds is out at
+/// the `n + 1`-th reading after the resolution begins, at the same point on every run (the draft
+/// 0.3, 8.5).
+#[derive(Debug, Default)]
+pub(crate) struct Ticks(std::cell::Cell<u64>);
+
+impl Ticks {
+    /// How many times it was read.
+    pub(crate) fn reads(&self) -> u64 {
+        self.0.get()
+    }
+}
+
+impl Clock for Ticks {
+    fn elapsed(&self) -> f64 {
+        let t = self.0.get();
+        self.0.set(t + 1);
+        t as f64
+    }
+}
 
 // ---------------------------------------------------------------------------- building problems
 
@@ -210,7 +238,7 @@ fn check(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
         );
     }
     // the model's test of a unit is the standard's, on every fact
-    let mut probe = Resolver::new(&r.model, problem.objects.len(), options.budget);
+    let mut probe = Resolver::new(&r.model, problem.objects.len(), Limits::Caps(CAPS));
     probe.geometry = g.clone();
     for (f, pf) in problem.facts.iter().enumerate() {
         assert_eq!(probe.holds(f), semantic_holds(problem, &pf.kind, g, &tol), "fact {f}: {:?}", pf.kind);
@@ -218,7 +246,7 @@ fn check(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
     for d in r.discarded.iter().filter(|d| !d.undecided) {
         assert!(d.conflicts_with.iter().all(|c| *c < d.fact && r.kept.contains(c)), "{d:?}");
         let fits = |set: &[usize]| {
-            let mut s = Resolver::new(&r.model, problem.objects.len(), options.budget);
+            let mut s = Resolver::new(&r.model, problem.objects.len(), Limits::Caps(CAPS));
             assert!(set.iter().all(|&c| s.add(c) == Outcome::Kept));
             s.add(d.fact) == Outcome::Kept
         };
@@ -252,7 +280,7 @@ fn the_example_of_the_brainstorm_message() {
     facts[0].priority = Priority::High;
     facts[4].priority = Priority::Low;
     let p = problem_of(points(2), facts);
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2]);
     assert_eq!(r.discarded, vec![discarded(3, vec![0, 2]), discarded(4, vec![1])]);
 }
@@ -267,7 +295,7 @@ fn inequalities_in_a_cycle() {
             distance(Sense::Increasing, None, Some(15.0), vec![o(0)], vec![o(2)]),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.discarded, vec![discarded(2, vec![0, 1])]);
 }
 
@@ -281,7 +309,7 @@ fn an_equality_of_three_variables() {
             distance(Sense::Increasing, Some(15.0), Some(15.0), vec![o(1)], vec![o(2)]),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.discarded, vec![discarded(2, vec![0, 1])]);
 }
 
@@ -295,14 +323,14 @@ fn an_equality_with_inequalities() {
             distance(Sense::Increasing, None, Some(10.0), vec![o(0)], vec![o(1)]),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.discarded, vec![discarded(2, vec![0, 1])]);
 }
 
 #[test]
 fn two_orients_of_one_object() {
     let p = problem_of(vec![instance()], vec![orient(0, Orient::R0), orient(0, Orient::MY)]);
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.discarded, vec![discarded(1, vec![0])]);
     assert_eq!(r.orientation(0), Some(Orient::R0));
 }
@@ -317,7 +345,7 @@ fn a_relation_and_two_orients() {
             orient(1, Orient::R0),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.discarded, vec![discarded(2, vec![0, 1])]);
     assert_eq!((r.orientation(0), r.orientation(1)), (Some(Orient::R0), Some(Orient::MY)));
 }
@@ -339,7 +367,7 @@ fn an_orientation_matters_once_two_points_of_one_object_are_reached() {
             orient(0, Orient::MY),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2, 3, 4, 5]);
     assert_eq!(r.orientation(0), Some(Orient::R180));
     assert_eq!(r.point(&p, &pin(0, 0)), Some((3.0, 0.0)));
@@ -367,7 +395,7 @@ fn a_fact_against_a_kept_bound_that_a_held_orientation_tightened() {
             fact(FactKind::Distribute { axis: Axis::Y, members: vec![o(0), pin(0, 0), pin(0, 0)] }),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.discarded, vec![discarded(1, vec![0])]);
     assert!([Some(Orient::R270), Some(Orient::MYR90)].contains(&r.orientation(0)));
 }
@@ -397,7 +425,7 @@ fn a_text_that_the_scene_places_on_one_axis_leaves_its_owner_there() {
         place(o(1), Axis::Y, 5.0),
     ];
     let p = problem_of(vec![instance(), label(Some(Axis::X))], facts.clone());
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2, 3]);
     // R90 turns the text's (1, 1) to (-1, 1): its y is M's plus 1; no orientation puts it 5 above
     // M's y of 0
@@ -406,7 +434,7 @@ fn a_text_that_the_scene_places_on_one_axis_leaves_its_owner_there() {
     assert_eq!(r.point(&p, &o(0)), Some((0.0, 0.0)));
     // a text the symbol places on both axes moves its owner instead
     let p = problem_of(vec![instance(), label(None)], facts);
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.discarded[0], discarded(1, vec![0]));
 }
 
@@ -422,7 +450,7 @@ fn a_fixed_orientation_decides_the_pins() {
             place(pin(0, 0), Axis::X, -2.0),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2]);
     assert_eq!(r.discarded, vec![discarded(3, vec![2])]);
 }
@@ -438,7 +466,7 @@ fn an_order_given_only_an_axis_turns_round_when_it_must() {
             fact(FactKind::Order { axis: Axis::X, sense: Sense::Increasing, members: vec![o(0), o(1)] }),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2]);
     assert_eq!((x_of(&r, 0), x_of(&r, 1)), (int(5), int(0)));
     assert_eq!(r.discarded, vec![discarded(3, vec![1, 2])]);
@@ -458,7 +486,7 @@ fn distances_between_sets() {
             place(o(3), Axis::X, 6.5),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.discarded, vec![discarded(4, vec![0, 1, 2, 3])]);
     assert_eq!(x_of(&r, 3), frac(13, 2));
 }
@@ -476,7 +504,7 @@ fn distances_either_way_between_sets() {
             place(o(2), Axis::X, 11.0),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2, 3]);
     // C at 11 is within a unit of A and of B: either with the DISTANCE is a minimal conflict
     assert_eq!(r.discarded.len(), 1);
@@ -496,7 +524,7 @@ fn the_centre_of_a_set_of_three() {
             place(o(3), Axis::X, 7.0),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     // D at 7 would need A, B or C elsewhere: C beyond 10 would move the highest point
     assert_eq!(r.discarded, vec![discarded(4, vec![0, 1, 2, 3])]);
     assert_eq!(x_of(&r, 3), int(5));
@@ -513,7 +541,7 @@ fn a_centre_whose_extremes_must_change() {
             place(PointRef::Centre(vec![o(0), o(1), o(2)]), Axis::X, 6.0),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2]);
     assert_eq!(x_of(&r, 2), int(12));
 }
@@ -528,7 +556,7 @@ fn a_fact_that_cannot_hold_alone_conflicts_with_nothing() {
             align(Axis::X, vec![o(1)]),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![2]);
     assert_eq!(r.discarded, vec![discarded(0, vec![]), discarded(1, vec![])]);
 }
@@ -548,10 +576,10 @@ fn the_tolerance_widens_constants_only() {
             align(Axis::X, vec![o(2), o(3)]),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2, 3, 4, 5]);
     // with no tolerance, both conflict
-    let r = check(&p, &SolverOptions { tolerance: 0.0, ..SolverOptions::default() });
+    let r = check(&p, &SolverOptions { tolerance: 0.0, ..SolverOptions::without_time_limit() });
     assert_eq!(r.discarded, vec![discarded(2, vec![0, 1]), discarded(5, vec![3, 4])]);
 }
 
@@ -566,7 +594,7 @@ fn the_witness_keeps_the_constants_as_written() {
             place(o(1), Axis::Y, -1.5),
         ],
     );
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.position(0), Some((4.0, 0.0)));
     assert_eq!(r.position(1), Some((6.0, -1.5)));
 }
@@ -575,7 +603,7 @@ fn the_witness_keeps_the_constants_as_written() {
 fn within_the_tolerance_the_witness_keeps_the_constants_of_the_facts_that_rank_first() {
     // B at x 0.4 and A at x 0, on one x, hold together only within 0.5: the constant of the fact
     // that ranks first is held as written, the other within the tolerance (11.7, 8.5)
-    let options = SolverOptions { tolerance: 0.5, ..SolverOptions::default() };
+    let options = SolverOptions { tolerance: 0.5, ..SolverOptions::without_time_limit() };
     let b = from_f64(0.4).unwrap();
     let p = problem_of(
         points(2),
@@ -600,29 +628,6 @@ fn within_the_tolerance_the_witness_keeps_the_constants_of_the_facts_that_rank_f
     assert!(r.as_written && r.placing.exact.is_empty() && r.placing.tol.is_zero());
 }
 
-#[test]
-fn a_search_out_of_budget_leaves_its_fact_undecided() {
-    let p = problem_of(
-        points(2),
-        vec![
-            fact(FactKind::Order { axis: Axis::X, sense: Sense::Either, members: vec![o(0), o(1)] }),
-            place(o(0), Axis::X, 5.0),
-            place(o(1), Axis::X, 0.0),
-        ],
-    );
-    let mut options = SolverOptions::default();
-    options.budget.resolve_nodes = 1;
-    let r = resolve(&p, &options);
-    assert_eq!(r.kept, vec![0, 1]);
-    assert_eq!(r.discarded.len(), 1);
-    assert!(r.discarded[0].undecided);
-    assert_eq!(r.discarded[0].fact, 2);
-    assert!(r.notes[0].contains("undecided"));
-    // the witness still satisfies what is kept
-    let tol = r.model.tol.clone();
-    assert!(r.kept.iter().all(|&f| semantic_holds(&p, &p.facts[f].kind, &r.witness.geometry, &tol)));
-}
-
 /// Instances chained gate to origin on x, the first origin at 0, the last at 1: each link adds
 /// −3, 0 or 3, so no orientations reach 1.
 fn chain(n: usize) -> LevelProblem {
@@ -640,24 +645,166 @@ fn chain(n: usize) -> LevelProblem {
 fn orientations_that_give_the_same_constants_are_tried_once() {
     // four classes matter, three values each (the gate's x is −3, 0 or 3): 81 combinations at most
     let p = chain(5);
-    let r = check(&p, &SolverOptions::default());
+    let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.discarded, vec![discarded(5, vec![0, 1, 2, 3, 4])]);
-    let main = resolve(&p, &SolverOptions::default());
+    let main = resolve(&p, &SolverOptions::without_time_limit());
     assert!(main.work.resolve_nodes < 2000, "{} nodes", main.work.resolve_nodes);
 }
 
+// ---------------------------------------------------------------------------- the time limit
+
+/// Options without a time limit but `seconds`, which [`Ticks`] counts in readings.
+fn within(seconds: f64) -> SolverOptions {
+    SolverOptions { time_limit: Some(seconds), ..SolverOptions::without_time_limit() }
+}
+
+/// Resolves with a time limit of `seconds` on [`Ticks`] and checks what the draft 0.3 says of it
+/// (8.5, 7.6): every fact kept or discarded; those kept hold at the witness; each fact discarded
+/// undecided has no conflict set and a warning, in order; each other one conflicts with facts kept
+/// before it; and a fresh clock gives the same again. Gives the resolution and the readings.
+fn check_timed(problem: &LevelProblem, seconds: f64) -> (Resolved, u64) {
+    let clock = Ticks::default();
+    let r = super::resolve(problem, &within(seconds), &clock);
+    let mut all: Vec<usize> = r.kept.clone();
+    all.extend(r.discarded.iter().map(|d| d.fact));
+    all.sort_unstable();
+    assert_eq!(all, (0..problem.facts.len()).collect::<Vec<_>>());
+    let tol = r.model.tol.clone();
+    for &f in &r.kept {
+        assert!(semantic_holds(problem, &problem.facts[f].kind, &r.witness.geometry, &tol), "{seconds} s: fact {f}");
+    }
+    let undecided: Vec<&Discarded> = r.discarded.iter().filter(|d| d.undecided).collect();
+    assert_eq!(r.warnings.len(), undecided.len(), "{seconds} s: {:?}", r.warnings);
+    for (w, d) in r.warnings.iter().zip(&undecided) {
+        let end = format!(" was not decided within the time limit of {} s and is discarded (8.5)", fmt_num(seconds));
+        assert!(w.starts_with(&format!("the fact [{}] {} ", d.fact, problem.facts[d.fact].label)), "{w}");
+        assert!(w.ends_with(&end), "{w}");
+        assert!(d.conflicts_with.is_empty(), "{d:?}");
+    }
+    for d in r.discarded.iter().filter(|d| !d.undecided) {
+        assert!(d.conflicts_with.iter().all(|c| *c < d.fact && r.kept.contains(c)), "{seconds} s: {d:?}");
+        let mut s = Resolver::new(&r.model, problem.objects.len(), Limits::Caps(CAPS));
+        assert!(d.conflicts_with.iter().all(|&c| s.add(c) == Outcome::Kept), "{seconds} s: {d:?}");
+        assert!(matches!(s.add(d.fact), Outcome::Conflict(_)), "{seconds} s: {d:?} does not conflict");
+    }
+    assert_eq!(r, super::resolve(problem, &within(seconds), &Ticks::default()), "{seconds} s: not the same twice");
+    (r, clock.reads())
+}
+
 #[test]
-fn a_search_that_grows_too_large_stops_at_its_budget() {
-    // nine classes: 3^9 combinations, beyond the default budget of nodes
-    let p = chain(10);
-    let r = resolve(&p, &SolverOptions::default());
-    assert_eq!(r.kept, (0..10).collect::<Vec<_>>());
-    assert_eq!(r.discarded.len(), 1);
-    assert_eq!((r.discarded[0].fact, r.discarded[0].undecided), (10, true));
-    assert!(r.discarded[0].conflicts_with.contains(&9));
-    let budget = SolverOptions::default().budget.resolve_nodes;
-    // the search of the last fact, and the facts before it taken in once more for the witness
-    assert!(r.work.resolve_nodes <= budget + 40, "{} nodes", r.work.resolve_nodes);
+fn with_no_time_at_all_only_what_the_witness_satisfies_is_kept() {
+    // the time is out at the first check: a fact that needs one is discarded undecided, a fact that
+    // every object at the origin satisfies is kept without one (the draft 0.3, 8.5)
+    let p = problem_of(
+        points(3),
+        vec![
+            place(o(0), Axis::X, 0.0),
+            place(o(1), Axis::X, 5.0),
+            align(Axis::X, vec![o(0), o(2)]),
+            place(o(2), Axis::Y, 0.0),
+            distance(Sense::Either, Some(2.0), None, vec![o(1)], vec![o(2)]),
+        ],
+    );
+    let (r, _) = check_timed(&p, 0.0);
+    assert_eq!(r.kept, vec![0, 2, 3]);
+    let undecided: Vec<usize> = r.discarded.iter().filter(|d| d.undecided).map(|d| d.fact).collect();
+    assert_eq!(undecided, vec![1, 4]);
+    let label = &p.facts[1].label;
+    assert_eq!(
+        r.warnings[0],
+        format!("the fact [1] {label} was not decided within the time limit of 0 s and is discarded (8.5)")
+    );
+    assert_eq!(r.work.resolve_nodes, 0);
+    // the witness is the resolution's, within the tolerance: nothing more was resolved
+    assert!(!r.as_written && r.placing.tol == r.model.tol);
+    assert!(r.notes.is_empty(), "{:?}", r.notes);
+    // without a limit every fact is decided, and the same on a clock that never advances
+    let all = resolve(&p, &SolverOptions::without_time_limit());
+    assert_eq!(all.kept, vec![0, 1, 2, 3, 4]);
+    assert!(all.warnings.is_empty());
+    assert_eq!(resolve(&p, &within(0.0)), all);
+}
+
+#[test]
+fn a_check_out_of_time_leaves_its_fact_undecided() {
+    // the ORDER takes the witness's direction; the last PLACE needs the other, found by a search
+    let p = problem_of(
+        points(2),
+        vec![
+            fact(FactKind::Order { axis: Axis::X, sense: Sense::Either, members: vec![o(0), o(1)] }),
+            place(o(0), Axis::X, 5.0),
+            place(o(1), Axis::X, 0.0),
+        ],
+    );
+    let unlimited = resolve(&p, &SolverOptions::without_time_limit());
+    assert_eq!(unlimited.kept, vec![0, 1, 2]);
+    let (_, reads) = check_timed(&p, 1e9);
+    let mut cut = false;
+    for limit in 0..=reads {
+        let (r, _) = check_timed(&p, limit as f64);
+        cut |= r.kept == [0, 1] && r.discarded == [Discarded { fact: 2, conflicts_with: Vec::new(), undecided: true }];
+        if r.warnings.is_empty() {
+            // whenever no check reaches the limit, the facts kept are those of 8.5
+            assert_eq!(r.kept, unlimited.kept, "{limit} s");
+        }
+    }
+    assert!(cut, "no limit stops the search of the last PLACE alone");
+    // with time enough, the result is the one without a limit
+    assert_eq!(check_timed(&p, reads as f64).0, unlimited);
+}
+
+#[test]
+fn a_search_that_grows_too_large_stops_at_its_time_limit() {
+    // nine classes: 3^9 combinations, a search too long for 2000 readings; then a point, whose y
+    // at 0 the witness satisfies and whose x at 7 needs a check
+    let mut p = chain(10);
+    p.objects.push(point());
+    p.facts.push(place(o(10), Axis::Y, 0.0));
+    p.facts.push(place(o(10), Axis::X, 7.0));
+    let (r, reads) = check_timed(&p, 2000.0);
+    assert_eq!(r.kept, (0..10).chain([11]).collect::<Vec<_>>());
+    let undecided: Vec<usize> = r.discarded.iter().filter(|d| d.undecided).map(|d| d.fact).collect();
+    assert_eq!(undecided, vec![10, 12]);
+    assert_eq!(r.warnings.len(), 2);
+    // a reading at each node and every few pivots: the search stops within the limit's readings
+    assert!(r.work.resolve_nodes <= 2000 && reads == 2002, "{} nodes, {reads} readings", r.work.resolve_nodes);
+}
+
+#[test]
+fn the_time_limit_covers_the_witness_and_the_conflict_sets_too() {
+    // the example of the brainstorm: once every fact is decided, the time goes on to the witness
+    // taken as written and to the minimal conflict sets; a limit that cuts those keeps the facts
+    // of 8.5 and says what it left undone
+    let mut facts = vec![
+        place(o(0), Axis::Y, 0.0),
+        distance(Sense::Either, Some(2.0), None, vec![o(0)], vec![o(1)]),
+        place(o(1), Axis::Y, 3.0),
+        align(Axis::Y, vec![o(0), o(1)]),
+        align(Axis::X, vec![o(0), o(1)]),
+        place(o(1), Axis::X, 0.5),
+    ];
+    facts[0].priority = Priority::High;
+    let p = problem_of(points(2), facts);
+    let unlimited = resolve(&p, &SolverOptions::without_time_limit());
+    assert_eq!(unlimited.kept, vec![0, 1, 2, 5]);
+    let (_, reads) = check_timed(&p, 1e9);
+    let (mut witness, mut sets) = (false, false);
+    for limit in 0..=reads {
+        let (r, _) = check_timed(&p, limit as f64);
+        if !r.warnings.is_empty() {
+            continue;
+        }
+        assert_eq!(r.kept, unlimited.kept, "{limit} s");
+        assert_eq!(r.discarded.iter().map(|d| d.fact).collect::<Vec<_>>(), [3, 4], "{limit} s");
+        witness |= r.notes.iter().any(|n| n.contains("ran out after every fact was decided"));
+        sets |= r.notes.iter().any(|n| n.contains("were made minimal"));
+        if r.notes.is_empty() {
+            assert_eq!(r.witness, unlimited.witness, "{limit} s");
+            assert_eq!(r.discarded, unlimited.discarded, "{limit} s");
+        }
+    }
+    assert!(witness && sets, "the limit never cut the witness ({witness}) or the conflict sets ({sets})");
+    assert_eq!(check_timed(&p, reads as f64).0, unlimited);
 }
 
 // ---------------------------------------------------------------------------- against brute force
@@ -844,7 +991,7 @@ fn random_problem(rng: &mut Rng) -> LevelProblem {
 #[test]
 fn the_resolution_agrees_with_brute_force() {
     let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
-    let options = SolverOptions::default();
+    let options = SolverOptions::without_time_limit();
     let mut discards = 0;
     let mut skipped = 0;
     for case in 0..150 {

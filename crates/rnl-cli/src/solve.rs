@@ -15,6 +15,12 @@
 //! levels, and writing one back moves the lines of those after it, so the document is read again
 //! before the next level, the texts written so far held in memory over the files.
 //!
+//! The resolution of each level is limited in time by the solver's `time_limit` (the draft 0.3,
+//! 8.5), 5 seconds unless `--solver-options` says otherwise, measured on the wall clock
+//! ([`WallClock`]): a fact whose check does not finish within it is discarded undecided, and the
+//! report of the level has a warning for it (7.6). `time_limit=none` gives the resolution of 8.5
+//! exactly, the same on every run, however long it takes.
+//!
 //! A level whose file, or a file above it, declares a language version that the reading does not
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
 //! (16.1), so nothing is written into it.
@@ -35,7 +41,7 @@ use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{generated_files, remove_generated_with_header, replace_generated_with_header};
 use rnl_runtime::{Interpretation, Options};
-use rnl_solver::{Solved, SolverOptions, AUTHOR};
+use rnl_solver::{Clock, Solved, SolverOptions, AUTHOR};
 
 use crate::provider::path_str;
 
@@ -50,7 +56,8 @@ pub struct SolveOptions {
     pub draft: bool,
     /// Only the level with this title: a subcircuit name, or the file name.
     pub level: Option<String>,
-    /// The solver's options; their canonical text is the second segment of the hash (17).
+    /// The solver's options; their canonical text is the second segment of the hash (17). Its
+    /// time limit is the toolkit's default of 5 seconds unless set otherwise (the draft 0.3, 8.5).
     pub solver: SolverOptions,
 }
 
@@ -138,6 +145,29 @@ pub enum Target {
     InPlace,
 }
 
+/// The clock that the time limit of the resolution is measured on (the draft 0.3, 8.5): the
+/// seconds since it was made, by `std::time::Instant`, which the solver itself does not read.
+#[derive(Clone, Copy, Debug)]
+pub struct WallClock(Instant);
+
+impl WallClock {
+    pub fn new() -> WallClock {
+        WallClock(Instant::now())
+    }
+}
+
+impl Default for WallClock {
+    fn default() -> WallClock {
+        WallClock::new()
+    }
+}
+
+impl Clock for WallClock {
+    fn elapsed(&self) -> f64 {
+        self.0.elapsed().as_secs_f64()
+    }
+}
+
 /// The files given by another provider, with the paths of those it gave noted.
 struct Noting<'a> {
     files: &'a dyn Provider,
@@ -167,8 +197,20 @@ impl Provider for Noting<'_> {
 /// and each file written gets the header record it lacks (16.1). A level whose RNL is not
 /// interpreted, because its file or one above it declares a version the reading does not read,
 /// is not solved and nothing is written into it (16.1). Fails when the file cannot be read, or
-/// when no level has the title asked for.
+/// when no level has the title asked for. The time limit of the resolution is measured on the wall
+/// clock ([`WallClock`]).
 pub fn solve(file: &Path, files: &dyn Provider, options: &SolveOptions) -> Result<SolveRun, String> {
+    solve_with_clock(file, files, options, &WallClock::new())
+}
+
+/// [`solve`], with the time limit of the resolution of each level measured on `clock` (the draft
+/// 0.3, 8.5): the limit of a level runs from the reading when its resolution begins.
+pub fn solve_with_clock(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    clock: &dyn Clock,
+) -> Result<SolveRun, String> {
     let entry = path_str(file);
     let runtime = options.runtime();
     let canonical = options.solver.canonical();
@@ -226,7 +268,7 @@ pub fn solve(file: &Path, files: &dyn Provider, options: &SolveOptions) -> Resul
             .find(|p| p.level == level && p.title == title)
             .ok_or_else(|| format!("the level {title} is not read again after the levels before it were solved"))?;
         let start = Instant::now();
-        let solved = rnl_solver::solve(p, &options.solver);
+        let solved = rnl_solver::solve_with_clock(p, &options.solver, clock);
         let time = start.elapsed();
         let hash = sig1(p, &canonical);
         let written = write_record(p, &solved.solution, AUTHOR, &hash);
@@ -522,8 +564,9 @@ pub fn not_solved(n: &NotSolved) -> String {
 }
 
 /// What the command prints of one level: its title, the facts kept and discarded (every fact with
-/// `all`, otherwise the discarded ones with the facts they conflict with), what the record cannot
-/// hold, the ROUTEs left in parts, the inert objectives, the notes, the work and the time.
+/// `all`, otherwise the discarded ones with the facts they conflict with), the warnings of the
+/// solver, each on a line of its own (7.6), what the record cannot hold, the ROUTEs left in parts,
+/// the inert objectives, the notes, the work and the time.
 pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     let p = &level.problem;
     let r = &level.solved.report;
@@ -540,8 +583,7 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     let discarded = |out: &mut Vec<String>, k: usize, indent: &str| {
         let Some(d) = r.discarded.iter().find(|d| d.fact == k) else { return };
         let why = match (d.undecided, d.conflicts_with.is_empty()) {
-            (true, true) => "undecided: the budget for deciding it ran out",
-            (true, false) => "undecided: the budget for deciding it ran out; the conflict found by then is with",
+            (true, _) => "not decided within the time limit of the solver (8.5)",
             (false, true) => "it cannot hold even alone",
             (false, false) => "it conflicts with",
         };
@@ -564,6 +606,7 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
             discarded(&mut out, d.fact, "  ");
         }
     }
+    out.extend(r.warnings.iter().map(|w| format!("  warning: {w}")));
     let section = |out: &mut Vec<String>, head: &str, lines: Vec<String>| {
         if !lines.is_empty() {
             out.push(format!("  {head}:"));

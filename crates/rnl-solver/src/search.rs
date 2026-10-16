@@ -48,10 +48,10 @@ use crate::model::{Bound, Choice, ChoiceKind, LitKey, Model, OrientEffect, Point
 use crate::objectives::View;
 use crate::orient::{index, inverse};
 use crate::rational::{from_f64, int, Q};
-use crate::resolve::{Geometry, Outcome, Resolver};
+use crate::resolve::{Geometry, Limits, Outcome, Resolver};
 use crate::simplex::LinExpr;
 use crate::structure::{FreeClass, PinKey, PortKind, Role, Source, Structure};
-use crate::{Budget, SolverOptions, Work};
+use crate::{SolverOptions, Work};
 
 /// The gap between neighbours in a row, and between blocks, in units.
 pub(crate) const HGAP: i64 = 2;
@@ -270,17 +270,18 @@ impl Relation {
 pub(crate) struct Taken {
     /// Whether each was kept.
     pub kept: Vec<bool>,
-    /// Whether the budget ran out deciding any of them (`Outcome::Undecided`): those were
-    /// dropped without a conflict.
+    /// Whether a cap of work ran out deciding any of them (`Outcome::Undecided`, `Structure::caps`):
+    /// those were dropped without a conflict.
     pub undecided: bool,
 }
 
 /// The facts kept and then the relations, taken in by a resolution that starts from the witness
-/// (8.5): `f` is given the resolution, its model, and what became of the relations.
+/// (8.5): `f` is given the resolution, its model, and what became of the relations. The solver's
+/// own use of the resolution: bounded by the caps of work of the structure, not by the time limit
+/// of 8.5, so that the candidates do not depend on the machine.
 pub(crate) fn with_relations<R>(
     s: &Structure,
     relations: &[Tagged],
-    budget: Budget,
     work: &mut Work,
     f: impl FnOnce(&mut Resolver, &Model, &Taken) -> R,
 ) -> R {
@@ -288,7 +289,7 @@ pub(crate) fn with_relations<R>(
     let base = model.units.len();
     let units: Vec<Unit> = relations.iter().enumerate().map(|(i, r)| r.rel.unit(&mut model, base + i)).collect();
     model.units.extend(units);
-    let mut r = Resolver::new(&model, s.objects.len(), budget);
+    let mut r = Resolver::new(&model, s.objects.len(), Limits::Caps(s.caps));
     r.seed(s.witness.clone());
     for &f in &s.kept {
         let kept = r.add(f);
@@ -297,7 +298,7 @@ pub(crate) fn with_relations<R>(
     let outcomes: Vec<Outcome> = (0..relations.len()).map(|i| r.add(base + i)).collect();
     let taken = Taken {
         kept: outcomes.iter().map(|o| *o == Outcome::Kept).collect(),
-        undecided: outcomes.iter().any(|o| matches!(o, Outcome::Undecided(_))),
+        undecided: outcomes.contains(&Outcome::Undecided),
     };
     let out = f(&mut r, &model, &taken);
     work.resolve_nodes += r.nodes;
@@ -1486,8 +1487,7 @@ impl Search<'_> {
         let ori = c.orientations(s);
         let mut rels = orientation_relations(s, c);
         rels.extend(relations_within(s, c, &ori, self.options, Some(within)));
-        let budget = self.options.budget;
-        with_relations(s, &rels, budget, &mut *self.work, |_, _, t| t.kept.iter().filter(|k| !**k).count())
+        with_relations(s, &rels, &mut *self.work, |_, _, t| t.kept.iter().filter(|k| !**k).count())
     }
 }
 
@@ -1628,9 +1628,9 @@ mod tests {
         let o = PointRef::Origin;
         let order = FactKind::Order { axis: Axis::X, sense: Sense::Either, members: vec![o(0), o(2)] };
         let p = problem_of(vec![instance(), instance(), instance()], vec![crate::resolve::tests::fact(order)]);
-        let options = SolverOptions::default();
+        let options = SolverOptions::without_time_limit();
         let mut work = Work::default();
-        let resolved = crate::resolve::resolve(&p, &options);
+        let resolved = crate::resolve(&p, &options);
         let s = crate::structure::analyse(&p, &resolved, &options, &mut work);
         assert!(s.precedence.is_empty());
         assert_eq!(s.reversible.len(), 1);

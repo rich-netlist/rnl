@@ -32,8 +32,12 @@
 //! and junctions (13.2), and takes the best by the layered objectives in force on their wires.
 //! `rnl solve` (in `rnl-cli`) solves every level of a document and writes the records back.
 //!
-//! The crate does no file I/O and takes no time or randomness, so it builds for
-//! `wasm32-unknown-unknown` and the same input and options give the same result on every platform.
+//! The crate does no file I/O, reads no clock and takes no randomness, so it builds for
+//! `wasm32-unknown-unknown`. The resolution of 8.5 may be limited in time
+//! ([`SolverOptions::time_limit`], the draft 0.3, 8.5), on a [`Clock`] that the caller gives
+//! ([`solve_with_clock`]); [`solve`] gives one that never advances. Without a limit, and whenever
+//! no check reaches it, the same input and options give the same result on every platform; the
+//! search, the coordinates and the routing are counted in work, never timed, so they always do.
 
 mod coords;
 mod driver;
@@ -49,7 +53,7 @@ mod search;
 mod simplex;
 mod structure;
 
-pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, OBJECTIVES};
+pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};
 pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;
 pub use rnl_runtime::solution::Solution;
@@ -80,6 +84,10 @@ pub struct SolveReport {
     /// lines for what is left. Not an error.
     pub unrouted: Vec<Unrouted>,
     pub work: Work,
+    /// The warnings of the solve (7.6), one sentence each: a fact discarded because the check for
+    /// it did not finish within the time limit (the draft 0.3, 8.5), one for each such fact, in
+    /// the order of the facts.
+    pub warnings: Vec<String>,
     /// Anything else worth saying, such as a budget that ran out.
     pub notes: Vec<String>,
 }
@@ -92,11 +100,13 @@ pub struct Discarded {
     /// The facts kept before it that it conflicts with, by index, sorted: a minimal set, so that
     /// without any one of them it would fit. It is found from the facts that explain the conflict
     /// by leaving out those of the latest rank first, so of several such sets it leans towards
-    /// the facts that rank first. Empty when the fact cannot hold even alone.
+    /// the facts that rank first. Empty when the fact cannot hold even alone, and when it is
+    /// `undecided`. When the time limit runs out while it is made minimal, it is the set found by
+    /// then, which still conflicts with the fact but may not be minimal, and a note says so.
     pub conflicts_with: Vec<usize>,
-    /// The budget for deciding it ran out ([`Budget::resolve_nodes`]): it is discarded without
-    /// a proof that it conflicts, and `conflicts_with` is what the search had found by then. The
-    /// standard does not say yet what a solver does then.
+    /// The check for it did not finish within the time limit ([`SolverOptions::time_limit`], the
+    /// draft 0.3, 8.5): it is discarded without a proof that it conflicts, `conflicts_with` is
+    /// empty, and the report has a warning for it (7.6).
     pub undecided: bool,
 }
 
@@ -115,12 +125,15 @@ pub struct Unrouted {
     pub budget: bool,
 }
 
-/// The work done, counted as the [`Budget`] counts it.
+/// The work done. The candidates and the expansions are what the [`Budget`] counts; the nodes and
+/// the pivots are counted whatever bounds them: the time limit in the resolution of 8.5, the
+/// caps of the implementation in the solver's own uses of it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Work {
-    /// The nodes of the searches of the resolution of 8.5.
+    /// The nodes of the searches over the literals: those of the resolution of 8.5, and those of
+    /// the solver's own relations.
     pub resolve_nodes: u64,
-    /// The pivots of the simplex.
+    /// The pivots of every simplex.
     pub pivots: u64,
     /// The candidates the search made.
     pub candidates: u64,
@@ -128,8 +141,32 @@ pub struct Work {
     pub astar_expansions: u64,
 }
 
+/// The clock that the time limit of the resolution is measured on (the draft 0.3, 8.5): the
+/// caller gives it, as the crate reads no clock of its own and builds for
+/// `wasm32-unknown-unknown`. `rnl solve` gives one on `std::time::Instant`; a test can give one
+/// that advances by a step each time it is read, so that the limit is reached at the same point
+/// on every run.
+pub trait Clock {
+    /// The seconds since some start of the clock's own, never less than at an earlier reading.
+    /// Only differences count: the limit of a level runs from the reading when its resolution
+    /// begins.
+    fn elapsed(&self) -> f64;
+}
+
+/// A clock that never advances: no time limit is ever reached, and the resolution is that of 8.5
+/// whatever [`SolverOptions::time_limit`] says. What [`solve`] and [`resolve()`] measure on.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StoppedClock;
+
+impl Clock for StoppedClock {
+    fn elapsed(&self) -> f64 {
+        0.0
+    }
+}
+
 /// Solves one drawing level: resolves its facts (8.5), places and orients its objects, and
-/// routes its ROUTEs (13.7).
+/// routes its ROUTEs (13.7). The time limit is never reached: [`solve_with_clock`] with a
+/// [`StoppedClock`].
 ///
 /// Places every object with a position of its own and orients every object that has an
 /// orientation, as the best candidate of the search says, every fact kept holding exactly, the
@@ -138,13 +175,27 @@ pub struct Work {
 /// ROUTEs, each wire from a pin or a branch point to a pin or a branch point (13.2, 13.7). The
 /// objectives that are on but inert in the level, and the ROUTEs left in parts, are in the report.
 pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
-    driver::solve(problem, options)
+    solve_with_clock(problem, options, &StoppedClock)
+}
+
+/// [`solve`], with the time limit of the resolution ([`SolverOptions::time_limit`], the draft
+/// 0.3, 8.5) measured on `clock`. Only the resolution of 8.5 is timed, its checks and the search
+/// for its conflict sets; the search, the coordinates and the routing are counted in work.
+pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
+    driver::solve(problem, options, clock)
 }
 
 /// Resolves the facts of one drawing level (8.5): takes them in the order of
 /// [`LevelProblem::facts`], keeps each that fits with those kept before it and discards the others,
 /// each with a minimal set of facts it conflicts with, and gives a witness, a placement that
-/// satisfies every fact kept ([`Resolved`]).
+/// satisfies every fact kept ([`Resolved`]). The time limit is never reached: [`resolve_with_clock`]
+/// with a [`StoppedClock`].
 pub fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
-    resolve::resolve(problem, options)
+    resolve_with_clock(problem, options, &StoppedClock)
+}
+
+/// [`resolve()`], with the time limit ([`SolverOptions::time_limit`], the draft 0.3, 8.5) measured
+/// on `clock`.
+pub fn resolve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Resolved {
+    resolve::resolve(problem, options, clock)
 }

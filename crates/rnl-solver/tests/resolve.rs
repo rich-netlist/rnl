@@ -131,7 +131,7 @@ fn with_facts(p: &LevelProblem, facts: &[usize]) -> LevelProblem {
 
 /// Resolves a level and checks everything the module says.
 fn check_level(file: &str, p: &LevelProblem) -> Resolved {
-    let options = SolverOptions::default();
+    let options = SolverOptions::without_time_limit();
     let r = resolve(p, &options);
     let what = format!("{file} / {}", p.title);
     let mut all: Vec<usize> = r.kept.iter().copied().chain(r.discarded.iter().map(|d| d.fact)).collect();
