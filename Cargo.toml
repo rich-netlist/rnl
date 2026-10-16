@@ -7,6 +7,7 @@ members = [
     "crates/rnl-render",
     "crates/rnl-view",
     "crates/rnl-edit",
+    "crates/rnl-solver",
     "crates/rnl-cli",
     "bindings/runtime-wasm",
 ]
@@ -23,12 +24,17 @@ publish = false
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 libm = "0.2"
+num-bigint = "0.4"
+num-integer = "0.1"
+num-rational = "0.4"
+num-traits = "0.2"
 rnl-runtime = { path = "crates/rnl-runtime" }
 rnl-host-spice = { path = "crates/rnl-host-spice" }
 rnl-host-spectre = { path = "crates/rnl-host-spectre" }
 rnl-render = { path = "crates/rnl-render" }
 rnl-view = { path = "crates/rnl-view" }
 rnl-edit = { path = "crates/rnl-edit" }
+rnl-solver = { path = "crates/rnl-solver" }
 
 # The WebAssembly binding, small rather than fast, since a document takes milliseconds either way:
 # `cargo build --profile wasm --target wasm32-unknown-unknown -p rnl-runtime-wasm`. The CLI keeps

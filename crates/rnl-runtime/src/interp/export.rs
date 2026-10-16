@@ -162,9 +162,11 @@ impl Interp<'_> {
 
         let facts = self.problem_facts(s, &ix, &objs);
 
-        // the first coordinate fact of each object and axis, and the first ORIENT, in the order of 8.5
+        // the first coordinate fact of each object and axis, and the first ORIENT, in the order of 8.5;
+        // the axes of the texts that an offset places (13.3)
         let mut first_coord: HashMap<(usize, Axis), (f64, usize)> = HashMap::new();
         let mut first_orient: HashMap<usize, (Orient, usize)> = HashMap::new();
+        let mut offset: HashSet<(usize, Axis)> = HashSet::new();
         for (i, f) in facts.iter().enumerate() {
             match f.kind {
                 FactKind::Place { at: PointRef::Origin(k), axis, value }
@@ -173,6 +175,9 @@ impl Interp<'_> {
                 }
                 FactKind::Orient { object, code } => {
                     first_orient.entry(object).or_insert((code, i));
+                }
+                FactKind::Offset { text, axis, .. } => {
+                    offset.insert((text, axis));
                 }
                 _ => {}
             }
@@ -218,10 +223,18 @@ impl Interp<'_> {
                     let drawable =
                         matches!(self.o(att), ObjData::Inst { .. } | ObjData::Usage(_) | ObjData::Bundle { .. });
                     if let (Some(local), true, Some(&owner)) = (self.text_sym_pos(*o), drawable, ix.objects.get(&att)) {
-                        let both = matches!(&own, Position::Own { x: Slot::Fixed { .. }, y: Slot::Fixed { .. } });
-                        if !both {
-                            position = Position::InSymbol { owner, local };
-                        }
+                        // the scene replaces the symbol's position axis by axis, by a PLACE or an
+                        // offset, whichever is written later, and only that one is a fact (13.3)
+                        let replaced =
+                            |axis: Axis| matches!(slot(axis), Slot::Fixed { .. }) || offset.contains(&(k, axis));
+                        let partly =
+                            |axis: Axis| Position::InSymbol { owner, local, replaced: Some((axis, slot(axis))) };
+                        position = match (replaced(Axis::X), replaced(Axis::Y)) {
+                            (true, true) => own.clone(),
+                            (false, false) => Position::InSymbol { owner, local, replaced: None },
+                            (true, false) => partly(Axis::X),
+                            (false, true) => partly(Axis::Y),
+                        };
                     }
                     let lines = match &items.text {
                         Some(t) => crate::markup::parse(&self.expand_text(s, t, att)),
@@ -356,6 +369,7 @@ impl Interp<'_> {
                 parent: u.parent.and_then(|p| ix.usages.get(&p).copied()),
                 object: ix.objects.get(&a).copied(),
                 written_numbers,
+                source: u.site.as_ref().and_then(|c| self.rec_loc(c.rec, u.off)),
             });
         }
 
@@ -700,10 +714,11 @@ impl Interp<'_> {
     fn problem_facts(&mut self, s: SceneId, ix: &Index, objs: &[(ObjId, ObjectKind)]) -> Vec<ProblemFact> {
         let mut ranked: Vec<Ranked> = Vec::new();
         let rank = |p: Priority| p as u8;
-        // the texts whose offset on an axis replaces their PLACE on that axis, or the reverse (13.3)
+        // the texts whose offset on an axis replaces their PLACE on that axis, or the reverse; either
+        // replaces the position that the symbol gives a text on that axis (13.3)
         let mut offset_wins: HashMap<(ObjId, char), bool> = HashMap::new();
         for (o, kind) in objs {
-            if *kind != ObjectKind::Text || self.text_sym_pos(*o).is_some() {
+            if *kind != ObjectKind::Text {
                 continue;
             }
             let items = self.text_items(*o);
@@ -722,7 +737,7 @@ impl Interp<'_> {
                         matches!(f.data, FactData::Coord(a, _) if a == axis)
                             && self.fact_priority(s, f) != Priority::Disabled
                     })
-                    .map(|f| f.pos.clone())
+                    .map(|f| f.order())
                     .max();
                 let off = self.offset_pos(s, *o, axis == 'x');
                 offset_wins.insert((*o, axis), latest_place.is_none_or(|p| off > p));
@@ -788,13 +803,9 @@ impl Interp<'_> {
                 }
                 let source = site.as_ref().and_then(|c| self.rec_loc(c.rec, self.text_off(*o)));
                 let label = format!("the d{axis} of {} = {}", self.label(*o), crate::geom::fmt_num(value));
-                // where the offset is written: in the statement that made the text, or in a later
-                // TEXT with the same key, whose segments are not known here
-                let at = self.offset_pos(s, *o, axis == 'x');
-                let order = match &site {
-                    Some(c) if at.starts_with(&c.pos) => order_pos(&at, &c.segments),
-                    _ => at,
-                };
+                // where the offset is written, in the statement that made the text or in a later
+                // TEXT with the same key, in the order of writing
+                let order = self.offset_pos(s, *o, axis == 'x');
                 ranked.push(Ranked {
                     key: (rank(p), order, 1, (axis == 'y') as u8, ranked.len()),
                     fact: ProblemFact {

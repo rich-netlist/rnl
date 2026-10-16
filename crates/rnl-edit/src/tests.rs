@@ -198,14 +198,14 @@ fn refusals_name_the_op() {
 
 #[test]
 fn a_record_is_not_written_in_a_region_written_to_be_encrypted() {
-    // a subcircuit that ends in `.prot … .unprot` has its end there, and a record there would be
-    // gone once the region is encrypted (2.2): refused; the file level ends after the region
+    // a subcircuit written in `.prot … .unprot` has no place for a record that is not gone once the
+    // region is encrypted (2.2): refused; the file level ends after the region
     let net = "* t\n.prot\n.subckt cell a b\nR1 a b 1k\n.ends cell\n.unprot\nX1 n1 n2 cell\n.end\n";
     let refused =
         write(&request("spice", net, json!([{"level": "subckt:cell", "op": "set", "object": "#R1", "at": [0, 0]}])));
     assert_eq!(
         refused.unwrap_err(),
-        "op 0 (set): cell ends in a region written to be encrypted, lines 2 to 6, where a record is gone once the region \
+        "op 0 (set): cell lies in a region written to be encrypted, lines 2 to 6, where a record is gone once the region \
          is encrypted (2.2)"
     );
     let out =
@@ -214,6 +214,41 @@ fn a_record_is_not_written_in_a_region_written_to_be_encrypted() {
         out.ends_with(".unprot\nX1 n1 n2 cell\n* @RNL(author=\"test\") {\n*   #X1 @PLACE(0, 0)\n* }\n.end\n"),
         "{out}"
     );
+    // a subcircuit whose `.ends` lies in a region that begins inside it has its record before the
+    // region, and the file level whose `.end` lies in it has its record before the subcircuit: the
+    // levels are written from the bottom up, by these places
+    let net = "* t\nX1 n1 n2 cell\n.subckt cell a b\nR1 a b 1k\n.prot\nR2 a b 1k\n.ends cell\n.end\n";
+    let ops = json!([
+        {"level": "subckt:cell", "op": "set", "object": "#R1", "at": [0, 0]},
+        {"level": "file", "op": "set", "object": "#X1", "at": [0, 0]}
+    ]);
+    let out = write(&request("spice", net, ops)).unwrap();
+    let record = |name: &str| format!("* @RNL(author=\"test\") {{\n*   #{name} @PLACE(0, 0)\n* }}\n");
+    let (x1, r1) = (record("X1"), record("R1"));
+    let want = format!("X1 n1 n2 cell\n{x1}.subckt cell a b\nR1 a b 1k\n{r1}.prot\nR2 a b 1k\n.ends cell\n.end\n");
+    assert!(out.ends_with(&want), "{out}");
+}
+
+#[test]
+fn in_a_spice_section_of_a_spectre_netlist_a_record_is_carried_by_a_star() {
+    // after `simulator lang=spice`, `//` is no comment and only `*` carries (2.2)
+    let net = "// t\nsimulator lang=spice\n.subckt cell a b\nR1 a b 1k\n.ends cell\nsimulator lang=spectre\nX1 (n1 n2) cell\n";
+    let ops = json!([
+        {"level": "subckt:cell", "op": "set", "object": "#R1", "at": [0, 0]},
+        {"level": "file", "op": "set", "object": "#X1", "at": [0, 0]}
+    ]);
+    let out = write(&request("spectre", net, ops)).unwrap();
+    assert_eq!(
+        out,
+        "// t\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spice\n.subckt cell a b\nR1 a b 1k\n\
+         * @RNL(author=\"test\") {\n*   #R1 @PLACE(0, 0)\n* }\n.ends cell\nsimulator lang=spectre\nX1 (n1 n2) cell\n\
+         // @RNL(author=\"test\") {\n//   #X1 @PLACE(0, 0)\n// }\n"
+    );
+    // read back, each record is where it was written
+    let files = MemoryProvider::new().with(entry("spectre"), &out);
+    let doc = rnl_view::read_host(entry("spectre"), Some("spectre"), &files, &mut Sink::new()).unwrap();
+    let records: Vec<usize> = doc.levels.iter().map(|lv| lv.records.len()).collect();
+    assert_eq!(records, [2, 1]);
 }
 
 /// The runtime's runs as this crate's, to compare what the markup reads back as.

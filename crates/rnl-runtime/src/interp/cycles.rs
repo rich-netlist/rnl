@@ -50,12 +50,14 @@ impl StmtKey {
     }
 }
 
-/// Where a set made of other sets is made: its statement, and the member of a unit that statement
-/// is written in, which gives its position in the other levels.
+/// Where a set made of other sets is made: its statement, the member of a unit that statement is
+/// written in, which gives its position in the other levels, and the segments of the pipes it is
+/// written in, which give its place in the order of writing (5.5).
 #[derive(Clone, Debug)]
 pub struct MadeAt {
     pub key: StmtKey,
     pub member: MemberKey,
+    pub segments: Segments,
 }
 
 /// A dependency: `from` depends on `to`.
@@ -94,7 +96,9 @@ impl Interp<'_> {
     /// Note where a set is made when it is made of other sets (5.2.2).
     pub(crate) fn note_made(&mut self, set: ObjId, ctx: &Ctx, off: usize) {
         if self.set(set).made_of().any(|o| self.is_set(o)) {
-            self.made_at.insert(set, MadeAt { key: StmtKey::of(ctx, off), member: ctx.member_key.clone() });
+            let at =
+                MadeAt { key: StmtKey::of(ctx, off), member: ctx.member_key.clone(), segments: ctx.segments.clone() };
+            self.made_at.insert(set, at);
         }
     }
 
@@ -125,9 +129,11 @@ impl Interp<'_> {
             }
             return Ok(());
         }
-        let mut cycle = vec![(Dep { from: target, to: m.source, by: By::New }, ctx.pos.clone())];
-        cycle.extend(self.earliest_path(m.source, target, scene, &ctx.pos));
-        // the last in order of position; of several from the same statement, this edit
+        // in the order of writing, where a later segment of a pipe is written later (5.5)
+        let here = order_pos(&ctx.pos, &ctx.segments);
+        let mut cycle = vec![(Dep { from: target, to: m.source, by: By::New }, here.clone())];
+        cycle.extend(self.earliest_path(m.source, target, scene, &here));
+        // the last in order of position; of several at one place in it, this edit
         let mut last = 0;
         for (i, (_, p)) in cycle.iter().enumerate() {
             if *p > cycle[last].1 {
@@ -233,10 +239,14 @@ impl Interp<'_> {
         }
     }
 
-    /// The position in a level of the statement a dependency comes from (8.5).
+    /// The place in a level of the statement a dependency comes from, in the order of writing (5.5,
+    /// 8.5).
     fn dep_pos(&mut self, d: &Dep, scene: Option<SceneId>) -> Pos {
         match d.by {
-            By::Edit(k) => self.set(d.from).mods[k].pos.clone(),
+            By::Edit(k) => {
+                let m = &self.set(d.from).mods[k];
+                order_pos(&m.pos, &m.ctx.segments)
+            }
             By::Made => match self.made_at.get(&d.from).cloned() {
                 Some(at) => self.made_pos(&at, scene),
                 None => Pos::new(),
@@ -245,13 +255,14 @@ impl Interp<'_> {
         }
     }
 
-    /// The position of a set's statement in a level's order (8.5). A set is made once: in the
+    /// The place of a set's statement in a level's order of writing (5.5, 8.5). A set is made once: in the
     /// level of the name it is bound to, or before any level in a package. In another level its
     /// statement has the position of the member it is written in there; a statement that cannot be
     /// placed so counts as first.
     fn made_pos(&mut self, at: &MadeAt, scene: Option<SceneId>) -> Pos {
+        let order = order_pos(&at.key.pos, &at.segments);
         if at.key.scene == scene {
-            return at.key.pos.clone();
+            return order;
         }
         let (Some(s), MemberKey::M { unit, rec, k, embedded }) = (scene, &at.member) else { return Pos::new() };
         let (unit, k, embedded) = (*unit, *k, *embedded);
@@ -262,7 +273,8 @@ impl Interp<'_> {
             None => pos_of_ints(&[9, 0, rec.map(|r| r as i64).unwrap_or(0), k as i64]),
         };
         let home = base(self, at.key.scene);
-        let Some(rest) = at.key.pos.strip_prefix(&home[..]) else { return Pos::new() };
+        // the segments come after the position of the member, so the order keeps it as its start
+        let Some(rest) = order.strip_prefix(&home[..]) else { return Pos::new() };
         let mut p = base(self, Some(s));
         p.extend_from_slice(rest);
         p

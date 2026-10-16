@@ -66,7 +66,13 @@ fn position(p: &Position) -> Value {
     match p {
         Position::Own { x, y } => json!({"x": slot(x), "y": slot(y)}),
         Position::At(r) => json!({"at": point(r)}),
-        Position::InSymbol { owner, local } => json!({"in_symbol": owner, "local": [local.0, local.1]}),
+        Position::InSymbol { owner, local, replaced } => {
+            let mut v = json!({"in_symbol": owner, "local": [local.0, local.1]});
+            if let Some((axis, s)) = replaced {
+                v.as_object_mut().unwrap().insert(axis.as_str().into(), slot(s));
+            }
+            v
+        }
     }
 }
 
@@ -212,6 +218,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
                 "priority": u.priority.map(|p| p.as_str()),
                 "parent": u.parent,
                 "object": u.object,
+                "source": u.source.as_ref().map(|l| json!({"file": l.file, "line": l.line, "col": l.col})),
             });
             if numbers {
                 entry.as_object_mut().unwrap().insert("written_numbers".into(), json!(u.written_numbers));
