@@ -48,7 +48,7 @@ fn out_of_date(r: &Interpretation) -> usize {
 /// without a key that a rule makes on C1.
 fn amp(version: &str) -> String {
     format!(
-        "* a round trip\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\n\
+        "* a round trip\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"){}}}\n\
          .subckt amp in out vdd vss\nM1 out in vss vss nch\nR1 vdd out 10k\nC1 out vss 1p\n\
          * @RNL {{\n\
          *   #M1 #R1 @ALIGN(\"x\");\n\
@@ -58,8 +58,20 @@ fn amp(version: &str) -> String {
          *   &vss @WIRE {{#M1:3 #C1:2}};\n\
          *   %w = &out @WIRE {{#R1:2 #C1:1}};\n\
          *   # @SELECT-INSTANCE(name=\"C*\") => @TEXT(\"${{value}}\")\n\
-         * }}\n.ends amp\n.end\n"
+         * }}\n.ends amp\n.end\n",
+        pin_02(version)
     )
+}
+
+/// A file of 0.3 uses the standard series 0.3 (16.3), whose names differ: these tests write and
+/// look for those of the series 0.2, such as $GND and $GND_STUB, so a file of 0.3 pins that series
+/// in its header record.
+fn pin_02(version: &str) -> &'static str {
+    if version == "0.3" {
+        "; @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")"
+    } else {
+        ""
+    }
 }
 
 /// Where the solution puts the instances: M1 and R1 on one x, as the ALIGN asks.
@@ -335,9 +347,12 @@ fn in_a_file_of_0_2_no_number_and_no_rewrite_is_written() {
 fn the_wire_of_a_ground_that_a_rule_makes_is_routed_by_its_number() {
     // the standard package grounds V1:n and R1:n with a $GND_STUB each, whose wire, "auto" and
     // without a name in its body, the record numbers once it writes the stub out (5.9, 10.5)
-    let text = "* stubs\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nV1 a 0 1\nR1 a 0 1k\n\
-                * @RNL { (9, 9) @TEXT(\"note\") }\n.end\n";
-    let s = solved(text, "t.sp");
+    let text = format!(
+        "* stubs\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"){}}}\nV1 a 0 1\nR1 a 0 1k\n\
+         * @RNL {{ (9, 9) @TEXT(\"note\") }}\n.end\n",
+        pin_02("0.3")
+    );
+    let s = solved(&text, "t.sp");
     assert_eq!(s.p.authored_numbers, 2);
     let stubs: Vec<&ProblemWire> = s.p.wires.iter().filter(|w| w.generated).collect();
     assert_eq!(stubs.len(), 2);

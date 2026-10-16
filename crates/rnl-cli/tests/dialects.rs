@@ -11,7 +11,9 @@
 //!
 //! The standard package here is a small series 0.3 held in memory: `rnl-std` references
 //! `rnl-std-core`, which references `rnl-std-basic` with two symbols and the two rule packages,
-//! `rnl-std-spice` by name and `rnl-std-spectre` by master.
+//! `rnl-std-spice` by name and `rnl-std-spectre` by master. A file of 0.3 uses the series 0.3
+//! (16.3), and of the two series 0.3 this one comes first: its package directory comes before the
+//! bundled packages (16.2). A file of 0.2 uses the series 0.2 unless it pins 0.3.
 
 use std::path::Path;
 
@@ -231,9 +233,10 @@ fn nothing_is_dropped_without_rule_packages_to_drop() {
     let r = read("n.scs", &spectre_netlist("0.3", "; @USE-PACKAGE(name=\"rnl-std\") {}"), &draft());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert!(rules(&r, "n.scs").is_empty() && rules(&r, "spsub").is_empty());
-    // the toolkit's own series 0.2, which has no such packages: its rules by name still draw I0
-    // as a current source
-    let mut bundled = spectre_netlist("0.3", "");
+    // the toolkit's own series 0.2, which has no such packages, pinned by a file of 0.3 (16.3): its
+    // rules by name still draw I0 as a current source
+    let pin = "; @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
+    let mut bundled = spectre_netlist("0.3", pin);
     bundled.package_dirs.clear();
     for p in ["rnl-std", "rnl-std-core", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre"] {
         bundled.files.remove(&format!("pkgs/{p}.rnl"));
@@ -241,25 +244,38 @@ fn nothing_is_dropped_without_rule_packages_to_drop() {
     let with = read("n.scs", &bundled, &draft());
     assert!(errors(&with).is_empty(), "{:?}", errors(&with));
     assert_eq!(symbol(&with, "n.scs", "#I0"), "$ISRC");
-    let without = |r: &Interpretation| r.model.levels.iter().map(|l| l.packages.clone()).collect::<Vec<_>>();
-    let spice = read("t.sp", &MemoryProvider::new().with("t.sp", &spice_netlist("0.3", "")), &draft());
-    assert_eq!(without(&spice)[0], without(&with)[0]);
+    // the same packages as in a SPICE file, each brought in by the USE-PACKAGE of its own file
+    let without = |r: &Interpretation| {
+        r.model.levels[0].packages.iter().map(|p| (p.name.clone(), p.version.clone(), p.at)).collect::<Vec<_>>()
+    };
+    let spice = read("t.sp", &MemoryProvider::new().with("t.sp", &spice_netlist("0.3", pin)), &draft());
+    assert_eq!(without(&spice), without(&with));
+    assert!(with.model.levels[0]
+        .packages
+        .iter()
+        .all(|p| p.via.as_ref().is_some_and(|(n, l)| n == "rnl-std" && l.file == "n.scs")));
 }
 
 #[test]
 fn a_file_of_0_2_uses_both_rule_packages() {
-    // a file of 0.2 drops nothing, whatever its dialect (the series 0.3 is read with the switch)
+    // a file of 0.2 uses the series 0.2 (16.3), which has no rule packages
     let r = read("n.scs", &spectre_netlist("0.2", ""), &draft());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert!(rules(&r, "n.scs").is_empty());
+    // one that pins the series 0.3 drops nothing, whatever its dialect (the series 0.3 is read with
+    // the switch), and the files it includes take the version it pins
+    let pin = "; @USE-PACKAGE(name=\"rnl-std\", version=\"0.3\")";
+    let r = read("n.scs", &spectre_netlist("0.2", pin), &draft());
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     for title in ["n.scs", "spsub", "xsub", "mid"] {
         assert_eq!(rules(&r, title), BOTH, "{title}");
     }
     assert_eq!(symbol(&r, "n.scs", "#I0"), "$ISRC");
-    let r = read("t.sp", &with_std(&[("t.sp", &spice_netlist("0.2", ""))]), &draft());
+    let r = read("t.sp", &with_std(&[("t.sp", &spice_netlist("0.2", pin))]), &draft());
     assert_eq!(rules(&r, "t.sp"), BOTH);
     assert_eq!(symbol(&r, "t.sp", "#X1"), "$RES");
     // it drops one when it writes an empty inline package of its name (16.2)
-    let header = "; @USE-PACKAGE(name=\"rnl-std-spectre\") {}";
-    let r = read("t.sp", &with_std(&[("t.sp", &spice_netlist("0.2", header))]), &draft());
+    let header = format!("{pin}; @USE-PACKAGE(name=\"rnl-std-spectre\") {{}}");
+    let r = read("t.sp", &with_std(&[("t.sp", &spice_netlist("0.2", &header))]), &draft());
     assert_eq!((symbol(&r, "t.sp", "#R1"), symbol(&r, "t.sp", "#X1") == "$RES"), ("$RES".into(), false));
 }

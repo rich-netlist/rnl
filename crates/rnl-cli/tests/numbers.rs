@@ -28,9 +28,20 @@ fn read_files(files: MemoryProvider, options: &Options) -> Interpretation {
 /// A file of the draft whose main level has `records`, R1, R2, C1 and M1 between a, b and 0.
 fn netlist(version: &str, records: &str) -> String {
     format!(
-        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\nR1 a b 1k\nR2 b 0 1k\nC1 a 0 1p\nM1 b a 0 0 nch\n\
-         .model nch nmos level=1\n{records}.end\n"
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"){}}}\nR1 a b 1k\nR2 b 0 1k\nC1 a 0 1p\nM1 b a 0 0 nch\n\
+         .model nch nmos level=1\n{records}.end\n",
+        pin_02(version)
     )
+}
+
+/// A file of 0.3 uses the standard series 0.3 (16.3), whose names differ: these tests write those
+/// of the series 0.2, such as $GND, so a file of 0.3 pins that series in its header record.
+fn pin_02(version: &str) -> &'static str {
+    if version == "0.3" {
+        "; @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")"
+    } else {
+        ""
+    }
 }
 
 /// One record on one carrier line.
@@ -97,8 +108,10 @@ fn at(p: &LevelProblem, reference: &Reference) -> Option<(f64, f64)> {
 }
 
 /// The example of the draft, 2.5: a subcircuit whose authored record makes a ground, a wire with
-/// a free point and two labels, none with a name.
-const AMP: &str = "* the example of the draft 0.3, 2.5\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n\
+/// a free point and two labels, none with a name. It writes $GND, of the standard series 0.2, which
+/// it pins (16.3).
+const AMP: &str = "* the example of the draft 0.3, 2.5\n\
+* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n\
 .subckt amp in out vdd vss\nM1 out in vss vss nch\nR1 vdd out 10k\n\
 * @RNL {\n\
 *   #M1 #R1 @ALIGN(\"x\");\n\
