@@ -176,23 +176,12 @@ fn standard_packages_check_clean() {
     let lib = corpus().join("../../libraries/standard");
     let mut checked = 0;
     for dir in std::fs::read_dir(lib).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()) {
-        let series_0_3 = dir.file_name().is_some_and(|n| n == "0.3");
         for f in files(&dir, &["rnl"]) {
             let provider = FsProvider::new(&[]);
             let r = interpret_file(&f, None, &provider, &Options::default()).unwrap();
-            let d = r.diagnostics();
-            // the hints of a package checked on its own are its author's, such as the pins of the
-            // gates with four inputs of the series 0.3, which are not on integer points (9.2.4);
-            // the series 0.2 has none
-            let loud: Vec<String> = d
-                .iter()
-                .filter(|d| d.severity != rnl_runtime::diag::Severity::Hint)
-                .map(|d| r.sink.render(d))
-                .collect();
-            assert!(loud.is_empty(), "{}: {loud:?}", f.display());
-            if !series_0_3 {
-                assert!(d.is_empty(), "{}: {:?}", f.display(), d.iter().map(|d| r.sink.render(d)).collect::<Vec<_>>());
-            }
+            // not even a hint, such as one for a pin off the integer points (9.2.4)
+            let d: Vec<String> = r.diagnostics().iter().map(|d| r.sink.render(d)).collect();
+            assert!(d.is_empty(), "{}: {d:?}", f.display());
             checked += 1;
         }
     }
