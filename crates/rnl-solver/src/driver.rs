@@ -22,13 +22,17 @@
 //! is discarded (14.8); `rnl_runtime::solution::write_record` leaves to the file only the axes on
 //! which a text follows what it is attached to, where the solution has it there (13.3).
 //!
-//! **Budget** (`crate::Budget`): the work is counted, never timed, so the result is the same on
-//! every machine. The resolution stops deciding a fact after `resolve_nodes` nodes and discards it
-//! undecided; a simplex stops at `pivots`, a relation of the solver's own then dropped or an LP
-//! left where the resolution put the candidate; the search makes at most `candidates`, P0 always
-//! among them; the router expands at most `astar_expansions` cells for one net and leaves the
-//! rest of the net to flight lines. Each falls back to the best found so far, at worst P0, and
-//! the report says so.
+//! **Limits.** Only the resolution of 8.5 is timed (the draft 0.3, 8.5): its checks and the
+//! search for its minimal conflict groups stop when the time limit of the options is out, on the
+//! clock the caller gives (`crate::Clock`); a fact whose check did not finish is discarded
+//! undecided, with a warning in the report (7.6), and a fact whose groups were not all found says
+//! so (`crate::Discarded::complete`). Everything after it is counted, never timed, so that it is
+//! the same on every machine: the search makes at most `candidates`, P0 always among them
+//! (`crate::Budget`); the router expands at most `astar_expansions` cells for one net and leaves
+//! the rest of the net to flight lines; the witness of the resolution taken as written, the
+//! solver's own resolutions of the relations of a candidate and of the rows, and the coordinate LP
+//! stop at the caps of the implementation (`crate::options::CAPS`), a relation then dropped or an
+//! LP left where the resolution put the candidate. Each falls back to the best found so far, at worst P0, and the report says so.
 
 use std::collections::BTreeMap;
 
@@ -37,13 +41,14 @@ use rnl_runtime::problem::{LevelProblem, Position};
 use rnl_runtime::solution::{Placement, Solution};
 
 use crate::coords::{place, Cause, Placed};
+use crate::options::{Caps, CAPS};
 use crate::rational::{to_f64, Q};
 use crate::resolve::Resolved;
 use crate::route::{route, style_notes, Failure, Routing};
 use crate::score::{drawn, layers, misleading, order, Entry};
 use crate::search::{search, Candidate, RelKind};
 use crate::structure::{analyse, Structure};
-use crate::{SolveReport, Solved, SolverOptions, Unrouted};
+use crate::{Clock, SolveReport, Solved, SolverOptions, StoppedClock, Unrouted};
 
 /// The note of every solve: how this solver solves a level.
 pub(crate) const METHOD_NOTE: &str =
@@ -64,8 +69,8 @@ pub(crate) struct Exact {
     pub score: Vec<Q>,
 }
 
-pub(crate) fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
-    solve_exact(problem, options).0
+pub(crate) fn solve(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
+    solve_exact_with(problem, options, clock, CAPS).0
 }
 
 /// A count and its noun, singular for one: `count(1, "wire")` is "1 wire", `count(2, "wire")` "2
@@ -85,8 +90,23 @@ struct Placing {
     entry: Entry,
 }
 
-/// Solves a level, and gives the exact result with it.
+/// Solves a level, and gives the exact result with it: the time limit never reached, the caps of
+/// the implementation.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (Solved, Exact) {
+    solve_exact_with(problem, options, &StoppedClock, CAPS)
+}
+
+/// Solves a level with the time limit of the options on `clock`, and the solver's own resolutions,
+/// of the rows, of the relations of the candidates and of the coordinate LP, bounded by `caps`
+/// (other caps only in the tests; the witness taken as written in the resolution always has
+/// `CAPS`), and gives the exact result with it.
+pub(crate) fn solve_exact_with(
+    problem: &LevelProblem,
+    options: &SolverOptions,
+    clock: &dyn Clock,
+    caps: Caps,
+) -> (Solved, Exact) {
     let mut notes = vec![METHOD_NOTE.to_string()];
     if let Err(e) = options.validate() {
         notes.push(format!("the options are not valid: {e}"));
@@ -98,10 +118,10 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
         count(problem.facts.len(), "fact"),
         count(problem.routes.len(), "ROUTE")
     ));
-    let resolved = crate::resolve::resolve(problem, options);
+    let resolved = crate::resolve::resolve(problem, options, clock);
     notes.extend(resolved.notes.iter().cloned());
     let mut work = resolved.work;
-    let structure = analyse(problem, &resolved, options, &mut work);
+    let structure = analyse(problem, &resolved, options, caps, &mut work);
     notes.extend(structure.notes.iter().cloned());
     let candidates = search(problem, &structure, options, &mut work);
     let placed_count = candidates.len();
@@ -150,7 +170,8 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
     ));
     if !placed.optimised {
         notes.push(
-            "the coordinate LP ran out of its budget: the objects are where the resolution of the candidate put them"
+            "the coordinate LP reached its cap on pivots: the objects are where the resolution of the candidate put \
+             them"
                 .to_string(),
         );
     }
@@ -162,7 +183,7 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
         let list: Vec<String> = dropped.iter().map(|(k, n)| format!("{n} {}", k.name())).collect();
         notes.push(if placed.undecided {
             format!(
-                "the budget of pivots ran out while the layout taken was placed, and some of the solver's own \
+                "a cap of work ran out while the layout taken was placed, and some of the solver's own \
                  relations were left out, not all for a conflict with the facts: {}",
                 list.join(", ")
             )
@@ -178,7 +199,7 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
             Cause::Facts => "the facts kept, with the orientations taken, leave no side to put them apart",
             Cause::Others => "the symbols put apart before them leave no side for them",
             Cause::Rounds => "the rounds of putting symbols apart ran out before their turn",
-            Cause::Budget => "the budget of pivots ran out before they were put apart",
+            Cause::Budget => "a cap of work ran out before they were put apart",
         };
         notes.push(format!("{} and {} overlap: {why}", problem.objects[o.a].label, problem.objects[o.b].label));
     }
@@ -235,9 +256,13 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
     let report = SolveReport {
         kept: resolved.kept.clone(),
         discarded: resolved.discarded.clone(),
+        failed: resolved.failed.clone(),
+        statements: resolved.statements.clone(),
         inert_objectives: structure.active.inert.clone(),
         unrouted,
         work,
+        errors: resolved.errors.clone(),
+        warnings: resolved.warnings.clone(),
         notes,
     };
     let solution = Solution {

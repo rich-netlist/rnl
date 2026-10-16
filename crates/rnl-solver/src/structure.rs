@@ -46,6 +46,7 @@ use rnl_runtime::problem::{Axis, FactKind, Filler, LevelProblem, ObjectKind, Poi
 
 use crate::model::{turned, Model, PointId};
 use crate::objectives::{Active, Inputs, Objective};
+use crate::options::Caps;
 use crate::rational::{frac, from_f64, int, Q};
 use crate::resolve::{point_value, Geometry, Resolved};
 use crate::search::{with_relations, RelKind, Relation, Tagged};
@@ -455,6 +456,9 @@ pub(crate) struct Structure {
     pub witness: Geometry,
     /// The facts kept, in order.
     pub kept: Vec<usize>,
+    /// The caps of work of the solver's own resolutions on this structure: the relations of the
+    /// candidates, the analysis of the rows, the coordinate LP ([`crate::options::CAPS`]).
+    pub caps: Caps,
 }
 
 impl Structure {
@@ -558,12 +562,14 @@ impl Structure {
     }
 }
 
-/// The structure of a level, from its resolution, for the options given. The work of the
-/// resolutions it makes is added to `work`.
+/// The structure of a level, from its resolution, for the options given, its own resolutions,
+/// those of the rows here and of the relations of the candidates later, bounded by `caps`. The work
+/// of the resolutions it makes is added to `work`.
 pub(crate) fn analyse(
     problem: &LevelProblem,
     resolved: &Resolved,
     options: &SolverOptions,
+    caps: Caps,
     work: &mut Work,
 ) -> Structure {
     let mut notes = Vec::new();
@@ -640,11 +646,12 @@ pub(crate) fn analyse(
         model,
         witness,
         kept,
+        caps,
     };
     if s.has(Source::DepthRows) {
         s.depth = Some(depths(&s));
     }
-    s.rows = rows(problem, &s, options, work);
+    s.rows = rows(problem, &s, work);
     (s.precedence, s.reversible) = precedence(problem, &s);
     s
 }
@@ -1369,7 +1376,7 @@ impl Joined {
 }
 
 /// The rows the elements start in (see the module).
-fn rows(problem: &LevelProblem, s: &Structure, options: &SolverOptions, work: &mut Work) -> Vec<Vec<usize>> {
+fn rows(problem: &LevelProblem, s: &Structure, work: &mut Work) -> Vec<Vec<usize>> {
     if s.elements.is_empty() {
         return Vec::new();
     }
@@ -1408,7 +1415,7 @@ fn rows(problem: &LevelProblem, s: &Structure, options: &SolverOptions, work: &m
                     },
                 })
                 .collect();
-            let fits = with_relations(s, &rels, options.budget, work, |_, _, t| t.kept.clone());
+            let fits = with_relations(s, &rels, work, |_, _, t| t.kept.clone());
             for (&(a, b, _, _), fit) in pairs.iter().zip(fits) {
                 if fit {
                     joined.join(a, b);
@@ -1631,9 +1638,9 @@ pub(crate) mod tests {
     use rnl_runtime::problem::ProblemGroup;
 
     fn structure_of(p: &LevelProblem) -> Structure {
-        let options = SolverOptions::default();
-        let r = crate::resolve::resolve(p, &options);
-        analyse(p, &r, &options, &mut Work::default())
+        let options = SolverOptions::without_time_limit();
+        let r = crate::resolve(p, &options);
+        analyse(p, &r, &options, crate::options::CAPS, &mut Work::default())
     }
 
     #[test]

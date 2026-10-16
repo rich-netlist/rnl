@@ -305,10 +305,10 @@ mod tests {
         let mut ps = rnl_view::interpret("t.sp", None, &files, &rnl_runtime::Options::solver()).unwrap().problems;
         assert_eq!(ps.len(), 1);
         let p = ps.remove(0);
-        let options = crate::SolverOptions::default();
-        let resolved = crate::resolve::resolve(&p, &options);
+        let options = crate::SolverOptions::without_time_limit();
+        let resolved = crate::resolve(&p, &options);
         let mut work = resolved.work;
-        let s = crate::structure::analyse(&p, &resolved, &options, &mut work);
+        let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut work);
         (p, s)
     }
 

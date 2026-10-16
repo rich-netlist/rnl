@@ -377,6 +377,49 @@ fn the_budget_stops_the_pivots() {
     assert_eq!(sx.minimize(&LinExpr::term(v[2], int(-1))), Ok(int(-30)));
 }
 
+/// A chain `xᵢ₊₁ − xᵢ ≥ 1` of 60 variables, all at 0: its check pivots once for each link or more.
+fn chain_of_links() -> Simplex<usize> {
+    let n = 60;
+    let (mut sx, v) = simplex(n);
+    for i in 0..n - 1 {
+        sx.assert(&LinExpr::diff(v[i + 1], v[i]), Rel::Ge, &int(1), i).unwrap();
+    }
+    sx
+}
+
+#[test]
+fn a_check_stops_when_its_time_is_out_and_goes_on_after() {
+    // the time limit of the resolution (the draft 0.3, 8.5): asked every PIVOTS_PER_READ pivots
+    let mut sx = chain_of_links();
+    let reads = std::cell::Cell::new(0);
+    let out = || {
+        reads.set(reads.get() + 1);
+        reads.get() >= 2
+    };
+    assert_eq!(sx.check_until(&out), Err(Failure::Time));
+    assert_eq!((reads.get(), sx.pivots()), (2, 2 * PIVOTS_PER_READ));
+    sx.assert_invariants();
+    assert!(!sx.satisfied());
+    // a check after it goes on from where it stopped
+    assert_eq!(sx.check(), Ok(()));
+    assert!(sx.satisfied());
+    sx.assert_invariants();
+    // a time that is never out changes nothing: the same pivots as a check without it
+    let (mut a, mut b) = (chain_of_links(), chain_of_links());
+    let asked = std::cell::Cell::new(0);
+    assert_eq!(
+        a.check_until(&|| {
+            asked.set(asked.get() + 1);
+            false
+        }),
+        Ok(())
+    );
+    assert_eq!(b.check(), Ok(()));
+    assert_eq!(a.pivots(), b.pivots());
+    assert!(a.pivots() >= 59);
+    assert_eq!(asked.get(), (a.pivots() - 1) / PIVOTS_PER_READ);
+}
+
 // ------------------------------------------------------------------------------ deciders
 
 /// Whether difference constraints, `x_j − x_i rel c` or `x_i rel c`, have a solution: no

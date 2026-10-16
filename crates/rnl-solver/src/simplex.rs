@@ -37,7 +37,9 @@
 //! Every number is a [`Q`]: no decision compares floating point, and the result is the same on
 //! every platform. The pivots are counted, and with a limit ([`Simplex::set_pivot_limit`])
 //! [`Simplex::check`] and [`Simplex::minimize`] stop with [`Failure::Budget`] instead of going on,
-//! the solver's budget by amount of work (plan 5.9).
+//! the caps of the solver's own work (plan 5.9). The resolution of 8.5 is bounded by time instead
+//! (the draft 0.3, 8.5): [`Simplex::check_until`] asks the caller every [`PIVOTS_PER_READ`] pivots
+//! whether its time is out, and stops with [`Failure::Time`] when it is.
 
 // Used by `resolve`; what only the coordinate LP uses (minimisation) waits for stage S3.
 #![cfg_attr(not(test), allow(dead_code))]
@@ -163,6 +165,8 @@ pub(crate) enum Failure<T> {
     Unbounded,
     /// The limit on pivots was reached first ([`Simplex::set_pivot_limit`]).
     Budget,
+    /// The caller's time ran out first ([`Simplex::check_until`]).
+    Time,
 }
 
 #[derive(Clone, Debug)]
@@ -242,6 +246,11 @@ pub(crate) struct Simplex<T> {
 /// not finished after this many pivots more than there are variables chooses by Bland's rule,
 /// which terminates.
 pub(crate) const BLAND_AFTER: u64 = 1000;
+
+/// How many pivots of one [`Simplex::check_until`] pass between two questions to the caller
+/// whether its time is out: a pivot over exact rationals costs far more than reading a clock, so
+/// the question costs little, and a check that runs long is stopped within a few pivots.
+pub(crate) const PIVOTS_PER_READ: u64 = 16;
 
 impl<T: Clone + Ord> Default for Simplex<T> {
     fn default() -> Self {
@@ -448,9 +457,18 @@ impl<T: Clone + Ord> Simplex<T> {
 
     /// Brings every variable within its bounds, or explains why it cannot (see the module).
     pub(crate) fn check(&mut self) -> Result<(), Failure<T>> {
+        self.check_until(&|| false)
+    }
+
+    /// [`Simplex::check`], asking `out_of_time` after every [`PIVOTS_PER_READ`] pivots of this
+    /// check whether to stop, and stopping with [`Failure::Time`] when it says so: the time limit
+    /// of the resolution of 8.5 (the draft 0.3, 8.5). A check stopped leaves a valid tableau, its
+    /// variables not all within their bounds; a later check goes on from there.
+    pub(crate) fn check_until(&mut self, out_of_time: &dyn Fn() -> bool) -> Result<(), Failure<T>> {
         // the variables that have left the basis in this check, and how many times one left again
         let mut left = vec![false; self.vars.len()];
         let mut repeats: u64 = 0;
+        let mut made: u64 = 0;
         loop {
             // the smallest basic variable out of its bounds
             let mut pick: Option<(Var, bool)> = None;
@@ -469,10 +487,14 @@ impl<T: Clone + Ord> Simplex<T> {
             if self.out_of_budget() {
                 return Err(Failure::Budget);
             }
+            if made > 0 && made % PIVOTS_PER_READ == 0 && out_of_time() {
+                return Err(Failure::Time);
+            }
             let s = &self.vars[xi];
             let target = if below { &s.lower } else { &s.upper };
             let target = target.as_ref().expect("the violated bound").value.clone();
             self.pivot_and_update(xi, xj, target);
+            made += 1;
             if std::mem::replace(&mut left[xi], true) {
                 repeats += 1;
             }

@@ -44,7 +44,7 @@ fn problems(entry: &str, files: &dyn Provider) -> Vec<LevelProblem> {
 
 #[test]
 fn every_level_solved_and_written_back_is_drawn_with_its_wires() {
-    let options = SolverOptions::default();
+    let options = SolverOptions::without_time_limit();
     let files = cases();
     assert!(files.len() >= 7, "{files:?}");
     let mut levels = 0;
@@ -121,7 +121,7 @@ fn the_netlists_of_the_review_are_routed_whole_and_read_back() {
         "R1 a b 1k\nR2 a b 1k\n* @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(25000, 0); # @SELECT-NET => @ROUTE }\n"
             .to_string(),
     ];
-    let options = SolverOptions::default();
+    let options = SolverOptions::without_time_limit();
     for body in bodies {
         let entry = "t.sp";
         let text = format!("{head}{body}.end\n");

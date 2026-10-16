@@ -750,7 +750,7 @@ mod tests {
 
     #[test]
     fn objectives_without_their_inputs_are_inert_and_said_so() {
-        let options = SolverOptions::default();
+        let options = SolverOptions::without_time_limit();
         let all = Inputs { supply: true, ground: true, port_kinds: true, wires: true };
         let active = Active::new(&options.objectives, &all);
         // the default layers less terminal_wire_alignment, which this version does not compute

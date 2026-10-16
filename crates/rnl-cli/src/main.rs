@@ -41,9 +41,17 @@ solve options (the levels are read without their type=\"generated\" records; -o 
                       with a copy of the other files they read from there, such as includes
   --in-place          write them over the files read instead
   --level TITLE       only the level with this title
-  --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam
-                      and budget, as rnl-solver's canonical text writes them; the hash covers them
-  --report            print what became of every fact, not only of the facts discarded
+  --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam,
+                      budget and time_limit, as rnl-solver's canonical text writes them; the hash
+                      covers them. time_limit is the seconds the resolution of a level may spend on
+                      checking (8.5), 5 by default, or none for no limit: a fact whose check does not
+                      finish within it is discarded with a warning, and the result may then differ
+                      from one run to the next; when the conflict groups of a fact are not all found
+                      within it, its hint says that the list is not complete
+  --report            print what became of every fact, not only of the facts discarded, and the hints
+                      of the facts of priority low and of the statements only they lose (8.5)
+  a fact that has no solution on its own contradicts itself and fails (8.5): solve prints an error line
+  for it, solves the level and writes it back without it, and exits with 1
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
 write:
@@ -306,7 +314,9 @@ fn run(args: &Args) -> Result<ExitCode, String> {
     }
 }
 
-/// `rnl solve`: solve, print what became of each level, write the files (plan 5.10).
+/// `rnl solve`: solve, print what became of each level, write the files (plan 5.10). Exits with 1
+/// when the solver reports an error, a fact that contradicts itself (the draft 0.3, 8.5; 7.6), once
+/// the files are written.
 fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
     let target = match (&args.out, args.in_place) {
         (Some(_), true) => return Err("solve writes under -o DIR or --in-place, not both".into()),
@@ -356,8 +366,10 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
     if run.errors > 0 {
         eprintln!("{} errors in {} as a solver reads it; run `rnl check` to see them", run.errors, run.entry);
     }
+    // a fact that contradicts itself fails (8.5, 7.6): the levels are written all the same
     match writing.error {
         Some(e) => Err(e),
+        None if rnl_cli::solve::errors(&run) > 0 => Ok(ExitCode::from(1)),
         None => Ok(ExitCode::SUCCESS),
     }
 }

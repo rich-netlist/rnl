@@ -42,7 +42,7 @@
 //! least first, ranked after the facts and before the structural relations, so that it takes
 //! precedence over them; then the candidate is taken in again, for a few rounds. Two symbols that
 //! still overlap do so for a reason ([`Cause`]): the facts kept leave no side, the symbols put
-//! apart before them leave none, the rounds ran out, or the budget did.
+//! apart before them leave none, the rounds ran out, or a cap of work did.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -70,8 +70,8 @@ pub(crate) enum Cause {
     Others,
     /// The rounds of putting symbols apart ran out before they had their turn.
     Rounds,
-    /// The budget of pivots ran out while the candidate was taken in or placed, so a relation
-    /// may have been dropped without a conflict.
+    /// A cap of work ran out while the candidate was taken in or placed (`Structure::caps`), so a
+    /// relation may have been dropped without a conflict.
     Budget,
 }
 
@@ -95,10 +95,10 @@ pub(crate) struct Placed {
     pub dropped: Vec<RelKind>,
     /// The pairs of symbols that still overlap.
     pub overlaps: Vec<Overlap>,
-    /// Whether the LP ran: when its budget ran out, the placement is where the resolution of the
+    /// Whether the LP ran: when its cap on pivots ran out, the placement is where the resolution of the
     /// candidate put it.
     pub optimised: bool,
-    /// Whether the budget ran out deciding a relation of the candidate, which was then dropped
+    /// Whether a cap of work ran out deciding a relation of the candidate, which was then dropped
     /// without a conflict.
     pub undecided: bool,
 }
@@ -111,10 +111,9 @@ pub(crate) fn place(
     options: &SolverOptions,
     work: &mut Work,
 ) -> Placed {
-    let budget = options.budget;
     let grid = options.grid.and_then(from_f64).filter(|g| *g > Q::zero());
     let orient = orientation_relations(s, c);
-    let actual: Vec<Orient> = with_relations(s, &orient, budget, work, |r, _, _| r.geometry().orient.clone());
+    let actual: Vec<Orient> = with_relations(s, &orient, work, |r, _, _| r.geometry().orient.clone());
     let mut separations: Vec<Tagged> = Vec::new();
     let mut separated: BTreeSet<(usize, usize)> = BTreeSet::new();
     let mut round = 0;
@@ -122,7 +121,7 @@ pub(crate) fn place(
         let mut rels = orient.clone();
         rels.extend(separations.iter().cloned());
         rels.extend(relations(s, c, &actual, options));
-        let (geometry, kept, undecided, optimised) = with_relations(s, &rels, budget, work, |r, model, t| {
+        let (geometry, kept, undecided, optimised) = with_relations(s, &rels, work, |r, model, t| {
             let (g, optimised) = optimise(r, model, s, options);
             (g, t.kept.clone(), t.undecided, optimised)
         });
@@ -139,7 +138,7 @@ pub(crate) fn place(
                     } else if !separated.contains(&(a, b)) {
                         Cause::Rounds
                     } else {
-                        apart_cause(s, &origins, &geometry.orient, a, b, &grid, budget, work)
+                        apart_cause(s, &origins, &geometry.orient, a, b, &grid, work)
                     };
                     Overlap { a, b, cause }
                 })
@@ -158,7 +157,6 @@ pub(crate) fn place(
 
 /// Why two symbols that were given a relation to put them apart still overlap: whether the facts
 /// kept, with the orientations as placed, leave a side for them at all.
-#[allow(clippy::too_many_arguments)]
 fn apart_cause(
     s: &Structure,
     origins: &[[Q; 2]],
@@ -166,7 +164,6 @@ fn apart_cause(
     a: usize,
     b: usize,
     grid: &Option<Q>,
-    budget: crate::Budget,
     work: &mut Work,
 ) -> Cause {
     let Some(apart) = separation(s, origins, ori, a, b, grid) else { return Cause::Facts };
@@ -177,7 +174,7 @@ fn apart_cause(
         .map(|c| Tagged { kind: RelKind::Orientation, rel: Relation::Orient { root: c.root, value: ori[c.root] } })
         .collect();
     rels.push(apart);
-    let (fits, undecided) = with_relations(s, &rels, budget, work, |_, _, t| (t.kept[t.kept.len() - 1], t.undecided));
+    let (fits, undecided) = with_relations(s, &rels, work, |_, _, t| (t.kept[t.kept.len() - 1], t.undecided));
     match (fits, undecided) {
         (true, _) => Cause::Others,
         (false, true) => Cause::Budget,

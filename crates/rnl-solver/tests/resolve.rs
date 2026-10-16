@@ -3,17 +3,19 @@
 //! (`tests/conformance/cases`). Each level is read as a solver reads it (`Options::solver()`, the
 //! records of the solver left out, 2.8) and resolved; then:
 //!
-//! - every fact is kept or discarded, once;
+//! - every fact is kept or discarded, once: none contradicts itself (the draft 0.3, 8.5);
 //! - every fact kept holds where the witness puts the objects, checked as a viewer checks a
 //!   constraint (14.1–14.5, 14.9), in `f64` with the tolerance (11.7);
-//! - each conflict set is made of facts kept before its fact, conflicts with it, and is minimal:
-//!   the level with only those facts and the fact discarded discards it again, and without any one
-//!   of them keeps them all;
+//! - each fact discarded has all its minimal conflict groups (the draft 0.3, 8.5), and each group
+//!   is made of facts kept before its fact, conflicts with it, and is minimal: the level with only
+//!   those facts and the fact discarded discards it again, and without any one of them keeps them
+//!   all; the hints by statement are those of the groups;
 //! - a second run gives the same, and the placement of `solve` has no NaN.
 //!
 //! T4 has a reference resolution (the brief of the solver brainstorm): exactly three facts are
 //! discarded, `{#M6 #M7} @ALIGN("x")`, the ALIGN y that the `$MIRROR_PAIR` of M1 and M2 expands
-//! to, and the low `{#VIP #VIN} @ALIGN("y")`.
+//! to, and the low `{#VIP #VIN} @ALIGN("y")`, each with one minimal group, and the statements of
+//! those groups are those of lines 37 to 40 of the file.
 //!
 //! The solver itself does no file I/O; these tests read the files with `std`.
 
@@ -24,7 +26,7 @@ use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::problem::*;
 use rnl_runtime::source::Provider;
 use rnl_runtime::Options;
-use rnl_solver::{resolve, solve, Resolved, SolverOptions};
+use rnl_solver::{resolve, solve, Resolved, SolverOptions, Statement};
 
 /// Files from the disk, as the CLI reads them.
 struct Files;
@@ -131,29 +133,53 @@ fn with_facts(p: &LevelProblem, facts: &[usize]) -> LevelProblem {
 
 /// Resolves a level and checks everything the module says.
 fn check_level(file: &str, p: &LevelProblem) -> Resolved {
-    let options = SolverOptions::default();
+    let options = SolverOptions::without_time_limit();
     let r = resolve(p, &options);
     let what = format!("{file} / {}", p.title);
     let mut all: Vec<usize> = r.kept.iter().copied().chain(r.discarded.iter().map(|d| d.fact)).collect();
     all.sort_unstable();
     assert_eq!(all, (0..p.facts.len()).collect::<Vec<_>>(), "{what}");
+    // no fact of the cases contradicts itself (the draft 0.3, 8.5)
+    assert!(r.failed.is_empty() && r.errors.is_empty(), "{what}: {:?}", r.errors);
     // the witness is exact; converting it to f64 may cross the edge of the tolerance by rounding
     let tol = options.tolerance + 1e-9;
     for &f in &r.kept {
         assert!(holds(p, &r, &p.facts[f].kind, tol), "{what}: fact {f} kept but violated: {:?}", p.facts[f]);
     }
     for d in &r.discarded {
-        assert!(!d.undecided, "{what}: {d:?} undecided");
-        assert!(d.conflicts_with.iter().all(|c| *c < d.fact && r.kept.contains(c)), "{what}: {d:?}");
-        let set: Vec<usize> = d.conflicts_with.iter().copied().chain([d.fact]).collect();
-        let sub = resolve(&with_facts(p, &set), &options);
-        assert_eq!(sub.kept.len(), set.len() - 1, "{what}: {d:?} does not conflict alone: {sub:?}");
-        for c in &d.conflicts_with {
-            let rest: Vec<usize> = set.iter().copied().filter(|x| x != c).collect();
-            let sub = resolve(&with_facts(p, &rest), &options);
-            assert!(sub.discarded.is_empty(), "{what}: {d:?} is not minimal: without {c}, {:?}", sub.discarded);
+        assert!(!d.undecided && d.complete && !d.groups.is_empty(), "{what}: {d:?}");
+        assert!(d.groups.windows(2).all(|w| w[0] < w[1]), "{what}: {d:?} not sorted");
+        for group in &d.groups {
+            assert!(group.windows(2).all(|w| w[0] < w[1]), "{what}: {d:?} not sorted");
+            assert!(group.iter().all(|c| *c < d.fact && r.kept.contains(c)), "{what}: {d:?}");
+            let set: Vec<usize> = group.iter().copied().chain([d.fact]).collect();
+            let sub = resolve(&with_facts(p, &set), &options);
+            assert_eq!(sub.kept.len(), set.len() - 1, "{what}: {group:?} of {d:?} does not conflict alone: {sub:?}");
+            for c in group {
+                let rest: Vec<usize> = set.iter().copied().filter(|x| x != c).collect();
+                let sub = resolve(&with_facts(p, &rest), &options);
+                assert!(sub.discarded.is_empty(), "{what}: {group:?} of {d:?} is not minimal without {c}");
+            }
         }
     }
+    // the hints by statement: each statement of a fact in a group, with the facts discarded
+    // because of it
+    let mut named: Vec<(usize, usize)> = Vec::new();
+    for (s, hint) in &r.statements {
+        for &k in &hint.facts {
+            assert_eq!(&Statement::of(p, k), s, "{what}");
+            for &f in &hint.discarded {
+                if r.discarded.iter().any(|d| d.fact == f && d.in_groups().contains(&k)) {
+                    named.push((k, f));
+                }
+            }
+        }
+    }
+    named.sort_unstable();
+    let mut pairs: Vec<(usize, usize)> =
+        r.discarded.iter().flat_map(|d| d.in_groups().into_iter().map(move |k| (k, d.fact))).collect();
+    pairs.sort_unstable();
+    assert_eq!(named, pairs, "{what}: {:?}", r.statements);
     assert_eq!(r, resolve(p, &options), "{what}: not deterministic");
     let solved = solve(p, &options);
     assert_eq!(solved.report.kept, r.kept);
@@ -167,7 +193,7 @@ fn check_level(file: &str, p: &LevelProblem) -> Resolved {
 
 fn summary(p: &LevelProblem, r: &Resolved) -> String {
     let d: Vec<String> =
-        r.discarded.iter().map(|d| format!("{} {} ⟂ {:?}", d.fact, p.facts[d.fact].label, d.conflicts_with)).collect();
+        r.discarded.iter().map(|d| format!("{} {} ⟂ {:?}", d.fact, p.facts[d.fact].label, d.groups)).collect();
     format!(
         "{}: {} facts, kept {}, discarded [{}], {} nodes, {} pivots",
         p.title,
@@ -235,22 +261,41 @@ fn t4_resolves_as_the_reference_says() {
     let mut expected = vec![m6_m7, mirror, inputs];
     expected.sort_unstable();
     assert_eq!(discarded, expected, "{}", summary(p, &r));
-    // and what each conflicts with
-    let conflicts = |f: usize| r.discarded.iter().find(|d| d.fact == f).unwrap().conflicts_with.clone();
+    // and what each conflicts with: one minimal group each, every group it has (the draft 0.3, 8.5)
+    let groups = |f: usize| r.discarded.iter().find(|d| d.fact == f).unwrap().groups.clone();
     let distance_m6_m7 = find("DISTANCE x of M6 and M7", &|f| {
         matches!(&f.kind, FactKind::Distance { axis: Axis::X, sense: Sense::Either, min: Some(m), from, to, .. }
             if *m == 2.0 && *from == vec![origin("#M6")] && *to == vec![origin("#M7")])
     });
-    assert_eq!(conflicts(m6_m7), vec![distance_m6_m7]);
+    assert_eq!(groups(m6_m7), [vec![distance_m6_m7]]);
     let place = |label: &str, value: f64| {
         find("PLACE y", &|f| f.kind == FactKind::Place { at: origin(label), axis: Axis::Y, value })
     };
-    assert_eq!(conflicts(mirror), vec![place("#M1", 0.0), place("#M2", 3.0)]);
+    let (m1_y, m2_y) = (place("#M1", 0.0), place("#M2", 3.0));
+    assert_eq!(groups(mirror), [vec![m1_y, m2_y]]);
     let vip_vin = find("DISTANCE y of VIP and VIN", &|f| {
         matches!(&f.kind, FactKind::Distance { axis: Axis::Y, sense: Sense::Increasing, min: Some(a), max: Some(b), .. }
             if *a == 6.0 && *b == 6.0)
     });
-    assert_eq!(conflicts(inputs), vec![vip_vin]);
+    assert_eq!(groups(inputs), [vec![vip_vin]]);
+    // the hints by statement name the statements of lines 37 to 40 of the file, each with the facts
+    // discarded because of it, as the table of the development report has them
+    let hints: Vec<(String, u32, Vec<usize>, Vec<usize>)> = r
+        .statements
+        .iter()
+        .map(|(s, h)| {
+            let file = s.file.rsplit('/').next().unwrap_or_default().to_string();
+            (file, s.line, h.facts.clone(), h.discarded.clone())
+        })
+        .collect();
+    let at = |line: u32, fact: usize, discarded: usize| {
+        ("T4-miller-conflicts.sp".to_string(), line, vec![fact], vec![discarded])
+    };
+    assert_eq!(
+        hints,
+        [at(37, m1_y, mirror), at(38, m2_y, mirror), at(39, distance_m6_m7, m6_m7), at(40, vip_vin, inputs)]
+    );
+    assert!(r.statements.keys().all(|s| s.chain.is_empty() && s.point.is_none()), "{:?}", r.statements);
     // the rest is kept: the witness has M1 at the origin, M2 at y = 3, mirrored
     let (m1, m2) = (object(p, "#M1"), object(p, "#M2"));
     assert_eq!(r.position(m1), Some((0.0, 0.0)));

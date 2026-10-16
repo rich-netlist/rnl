@@ -42,6 +42,11 @@
 //! exact. A fact can be held with its constants as written all the same ([`Model::with_exact`]):
 //! the resolution does so with those that hold so, in the order of 8.5 (`crate::resolve`).
 //!
+//! **Facts left out**: a fact that contradicts itself takes no part in the resolution (the draft
+//! 0.3, 8.5). The model of the resolution leaves it out ([`Model::left_out`]): its unit is empty,
+//! and what only it reaches has no variable, so that the others are resolved as in the problem
+//! without it.
+//!
 //! Non-overlap and the grid are not facts (11.7) and are not here.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -245,6 +250,19 @@ pub(crate) struct Unit {
     pub centres: [Vec<usize>; 2],
 }
 
+impl Unit {
+    /// The unit of a fact left out of the model ([`Model::left_out`]): nothing at all.
+    fn none() -> Unit {
+        Unit {
+            fixed: Vec::new(),
+            choices: Vec::new(),
+            orient: OrientEffect::None,
+            touched: [Vec::new(), Vec::new()],
+            centres: [Vec::new(), Vec::new()],
+        }
+    }
+}
+
 /// The variables of a problem and its facts as units.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Model {
@@ -253,6 +271,12 @@ pub(crate) struct Model {
     /// The facts whose constants hold as written, without the tolerance, by index
     /// (`crate::resolve`).
     pub exact: BTreeSet<usize>,
+    /// The facts that take no part in the resolution, by index: those that contradict themselves
+    /// (the draft 0.3, 8.5). Each has an empty unit, and the points and the centres that only it
+    /// reaches are not made, so that the variables are those of the problem without these facts,
+    /// in the same order, and the resolution of the others is the same as there
+    /// (`crate::resolve`).
+    pub left_out: BTreeSet<usize>,
     pub vars: Vec<VarKind>,
     pub points: BTreeMap<PointId, PointInfo>,
     pub centres: Vec<Centre>,
@@ -282,16 +306,22 @@ const MAX_DEPTH: usize = 16;
 impl Model {
     /// The model of a problem, with the tolerance `tol` (11.7).
     pub(crate) fn new(problem: &LevelProblem, tol: Q) -> Model {
-        Model::with_exact(problem, tol, BTreeSet::new())
+        Model::with_exact(problem, tol, BTreeSet::new(), BTreeSet::new())
     }
 
     /// The model of a problem with the tolerance `tol` (11.7), but for the facts in `exact`, whose
-    /// constants hold as written.
-    pub(crate) fn with_exact(problem: &LevelProblem, tol: Q, exact: BTreeSet<usize>) -> Model {
+    /// constants hold as written, and without the facts in `left_out` ([`Model::left_out`]).
+    pub(crate) fn with_exact(
+        problem: &LevelProblem,
+        tol: Q,
+        exact: BTreeSet<usize>,
+        left_out: BTreeSet<usize>,
+    ) -> Model {
         let n = problem.objects.len();
         let mut m = Model {
             tol,
             exact,
+            left_out,
             vars: Vec::new(),
             points: BTreeMap::new(),
             centres: Vec::new(),
@@ -316,7 +346,7 @@ impl Model {
             }
         }
         for (i, fact) in problem.facts.iter().enumerate() {
-            let unit = m.encode(problem, i, &fact.kind);
+            let unit = if m.left_out.contains(&i) { Unit::none() } else { m.encode(problem, i, &fact.kind) };
             m.units.push(unit);
         }
         for w in &problem.wires {
