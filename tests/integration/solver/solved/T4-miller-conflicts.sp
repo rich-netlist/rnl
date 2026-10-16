@@ -39,7 +39,7 @@ CL out 0 2p
 *   #M6 #M7 @DISTANCE("x", min=2);
 *   #VIP #VIN @DISTANCE("bottom-to-top", exact=6)
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:63355df81d54e09a.e17f1522b2b059c0") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig1:63355df81d54e09a.1f3b310f8bee492a") {
 *   %gnd_stub_M5_s = $GND_STUB @ATTACH(gap=2, priority="normal") #M5:s;
 *   %gnd_stub_M7_s = $GND_STUB @ATTACH(gap=2, priority="normal") #M7:s;
 *   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VDD:n;
