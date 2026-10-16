@@ -230,7 +230,7 @@ impl Interp<'_> {
                     }
                 }
                 let b = self.new_obj(ObjData::Bundle { members, empty: false, site: Some(Rc::new(ctx.clone())) });
-                self.scene_add_bundle(s, b, ctx.pos.clone());
+                self.scene_add_bundle(s, b, ctx.pos.clone(), ctx);
                 self.note_birth(s, b, ctx, seg.call.as_ref().unwrap().start, None);
                 Ok((b, false))
             }
@@ -920,7 +920,7 @@ impl Interp<'_> {
             ctx_origin: ctx.origin.clone(),
         };
         let a = self.new_obj(ObjData::Usage(Box::new(u)));
-        self.scene_add_usage(s, a, ctx.pos.clone());
+        self.scene_add_usage(s, a, ctx.pos.clone(), ctx);
         let at = app.seg.call.as_ref().map_or(app.seg_start, |c| c.start);
         self.note_birth(s, a, ctx, at, each);
         self.expand(a, ctx, generated, app.seg_start)?;
@@ -1991,7 +1991,7 @@ impl Interp<'_> {
             off: seg.start,
         };
         let id = self.new_obj(ObjData::Constraint(Box::new(c)));
-        self.scene_add_constraint(s, id, ctx.pos.clone());
+        self.scene_add_constraint(s, id, ctx.pos.clone(), ctx);
         if lazy {
             self.rules.insert(ctx.member_key.clone());
         }

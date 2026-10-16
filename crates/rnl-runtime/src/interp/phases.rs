@@ -47,10 +47,10 @@ impl Fault {
 }
 
 /// A priority said of a fact by a PRIORITY statement or a usage's own priority (14.8).
-struct Said<'a> {
+struct Said {
     /// What ranks it: the depth of its target, from outside, a statement rather than a
-    /// parameter, and where it is written.
-    rank: (usize, bool, bool, Option<&'a Pos>),
+    /// parameter, and its place in the order of writing (5.5).
+    rank: (usize, bool, bool, Option<Pos>),
     /// The depth it is written at.
     at: usize,
     value: Priority,
@@ -121,7 +121,7 @@ impl Interp<'_> {
 
     fn resolve_bundles(&mut self, s: SceneId) {
         let mut bundles = self.scenes[s].bundles.clone();
-        bundles.sort_by(|a, b| self.scenes[s].created[a].cmp(&self.scenes[s].created[b]));
+        bundles.sort_by(|a, b| self.scenes[s].created_order[a].cmp(&self.scenes[s].created_order[b]));
         let mut owner: HashMap<ObjId, ObjId> = HashMap::new();
         for &b in &bundles {
             let ObjData::Bundle { members, site, .. } = self.o(b).clone() else { continue };
@@ -247,9 +247,9 @@ impl Interp<'_> {
                 let FactData::Symbol(sym) = f.data else { continue };
                 self.scenes[s].symbol_weighed.insert(k);
                 if f.direct {
-                    direct.push((f.pos.clone(), sym, Some(k)));
+                    direct.push((f.order(), sym, Some(k)));
                 } else {
-                    other.push((f.pos.clone(), sym, Some(k)));
+                    other.push((f.order(), sym, Some(k)));
                 }
             }
             // a symbol given to a member of a bundle fails, in the order of the facts (11.8)
@@ -399,8 +399,7 @@ impl Interp<'_> {
                     }
                     if self.scenes[s].listed_keytexts.insert(kt) {
                         self.scenes[s].texts.push(kt);
-                        let c = self.scenes[s].created.get(&owner).cloned().unwrap_or_else(|| pos(&[0]));
-                        self.scenes[s].created.insert(kt, c);
+                        self.made_with(s, kt, owner);
                     }
                 } else {
                     let t = self.new_obj(ObjData::Text {
@@ -415,11 +414,19 @@ impl Interp<'_> {
                         off: 0,
                     });
                     self.scenes[s].texts.push(t);
-                    let c = self.scenes[s].created.get(&owner).cloned().unwrap_or_else(|| pos(&[0]));
-                    self.scenes[s].created.insert(t, c);
+                    self.made_with(s, t, owner);
                 }
             }
         }
+    }
+
+    /// A text that a symbol gives is made where its owner is.
+    fn made_with(&mut self, s: SceneId, t: ObjId, owner: ObjId) {
+        let sc = &mut self.scenes[s];
+        let c = sc.created.get(&owner).cloned().unwrap_or_else(|| pos(&[0]));
+        let o = sc.created_order.get(&owner).cloned().unwrap_or_else(|| c.clone());
+        sc.created.insert(t, c);
+        sc.created_order.insert(t, o);
     }
 
     // ---- priorities (14.8)
@@ -459,14 +466,15 @@ impl Interp<'_> {
         let mut said: Vec<Said> = Vec::new();
         for (t, target) in chain.iter().copied().chain(own).enumerate() {
             // the target's own statement written last
-            let mut latest: Option<(&Pos, Priority)> = None;
+            let mut latest: Option<(Pos, Priority)> = None;
             for g in self.scenes[s].prioritys.iter().filter(|g| g.target == target) {
                 let FactData::Priority(value) = g.data else { continue };
                 let at = if g.direct { self.written_depth(g, chain) } else { t };
+                let order = g.order();
                 if at < t {
-                    said.push(Said { rank: (t, true, true, Some(&g.pos)), at, value });
-                } else if latest.is_none_or(|(q, _)| *q <= g.pos) {
-                    latest = Some((&g.pos, value));
+                    said.push(Said { rank: (t, true, true, Some(order)), at, value });
+                } else if latest.as_ref().is_none_or(|(q, _)| *q <= order) {
+                    latest = Some((order, value));
                 }
             }
             match latest {
@@ -1704,7 +1712,7 @@ impl Interp<'_> {
         let mut idx = StyleIndex::default();
         for (k, f) in self.scenes[s].styles.iter().enumerate() {
             match &f.data {
-                FactData::OwnStyle(m) => idx.own.entry(f.target).or_default().push((f.pos.clone(), m.clone())),
+                FactData::OwnStyle(m) => idx.own.entry(f.target).or_default().push((f.order(), m.clone())),
                 FactData::Style(sty) if matches!(self.o(*sty), ObjData::Style(_)) => {
                     idx.styles.entry(f.target).or_default().push(k)
                 }
@@ -1761,7 +1769,7 @@ impl Interp<'_> {
                 }
             }
             ObjData::Text { style, .. } if !style.is_empty() => {
-                let p = self.scenes[s].created.get(&o).cloned().unwrap_or_else(|| pos(&[0]));
+                let p = self.scenes[s].created_order.get(&o).cloned().unwrap_or_else(|| pos(&[0]));
                 put(&mut direct, &style, &p);
             }
             _ => {}
@@ -1771,9 +1779,9 @@ impl Interp<'_> {
             let FactData::Style(sty) = f.data else { continue };
             let ObjData::Style(props) = self.o(sty) else { continue };
             if f.direct {
-                put(&mut direct, props, &f.pos);
+                put(&mut direct, props, &f.order());
             } else {
-                put(&mut other, props, &f.pos);
+                put(&mut other, props, &f.order());
             }
         }
         // a style given to a member of a bundle fails, in the order of the facts (11.8)
@@ -1839,12 +1847,14 @@ impl Interp<'_> {
                 _ => {}
             }
             let FactData::Layer(name) = &f.data else { continue };
+            // of the segments of one pipe, the later is written later (5.5)
+            let order = f.order();
             let replace = match self.scenes[s].layer.get(&o) {
                 None => true,
-                Some(cur) => f.pos > cur.1,
+                Some(cur) => order >= cur.1,
             };
             if replace {
-                self.scenes[s].layer.insert(o, (name.clone(), f.pos.clone()));
+                self.scenes[s].layer.insert(o, (name.clone(), order));
             }
         }
     }

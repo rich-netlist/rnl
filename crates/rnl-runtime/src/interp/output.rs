@@ -354,12 +354,13 @@ impl Interp<'_> {
         self.scenes[s].layer.get(&o).map(|(l, _)| Layer::parse(l)).unwrap_or_default()
     }
 
-    /// Where the latest symbol of each object of a scene is given.
+    /// Where the latest symbol of each object of a scene is given, in the order of writing (5.5).
     fn last_symbol_pos(&self, s: SceneId) -> HashMap<ObjId, Pos> {
         let mut out: HashMap<ObjId, Pos> = HashMap::new();
         for f in &self.scenes[s].appear {
-            if out.get(&f.target).is_none_or(|p| f.pos > *p) {
-                out.insert(f.target, f.pos.clone());
+            let order = f.order();
+            if out.get(&f.target).is_none_or(|p| order > *p) {
+                out.insert(f.target, order);
             }
         }
         out
@@ -372,15 +373,18 @@ impl Interp<'_> {
             ObjData::Inst { .. } => vec![0.0, self.inst_of(o).order as f64],
             ObjData::Bundle { members, .. } => vec![0.0, self.inst_of(members[0]).order as f64],
             ObjData::Usage(_) => {
-                let p =
-                    last_symbol.get(&o).cloned().or_else(|| sc.created.get(&o).cloned()).unwrap_or_else(|| pos(&[9]));
+                let p = last_symbol
+                    .get(&o)
+                    .cloned()
+                    .or_else(|| sc.created_order.get(&o).cloned())
+                    .unwrap_or_else(|| pos(&[9]));
                 let mut k = vec![1.0];
                 k.extend(flat(&p));
                 k
             }
             _ => {
                 let mut k = vec![1.0];
-                k.extend(flat(&sc.created.get(&o).cloned().unwrap_or_else(|| pos(&[9]))));
+                k.extend(flat(&sc.created_order.get(&o).cloned().unwrap_or_else(|| pos(&[9]))));
                 k
             }
         }

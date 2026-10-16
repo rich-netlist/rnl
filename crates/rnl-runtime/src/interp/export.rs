@@ -428,16 +428,17 @@ impl Interp<'_> {
         // a statement of the record itself, not of the body of a usage it makes
         let of_record = |ctx: Option<&Rc<Ctx>>| ctx.is_some_and(|c| c.rec == Some(g) && c.frame_usage().is_none());
 
-        // the coordinates and orientations it gives, the latest of each
+        // the coordinates and orientations it gives, the latest of each in the order of writing (5.5)
         let sc = &self.scenes[s];
         let mut coords: HashMap<(ObjId, char), (Pos, f64)> = HashMap::new();
         for &k in &sc.at_live {
             let f = &sc.at[k];
             let FactData::Coord(axis, value) = f.data else { continue };
             if f.chain.is_empty() && of_record(f.ctx.as_ref()) {
-                let e = coords.entry((f.target, axis)).or_insert((f.pos.clone(), value));
-                if f.pos >= e.0 {
-                    *e = (f.pos.clone(), value);
+                let order = f.order();
+                let e = coords.entry((f.target, axis)).or_insert((order.clone(), value));
+                if order >= e.0 {
+                    *e = (order, value);
                 }
             }
         }
@@ -446,9 +447,10 @@ impl Interp<'_> {
             let f = &sc.orient[k];
             let FactData::Orient(code) = f.data else { continue };
             if f.chain.is_empty() && of_record(f.ctx.as_ref()) {
-                let e = orients.entry(f.target).or_insert((f.pos.clone(), code));
-                if f.pos >= e.0 {
-                    *e = (f.pos.clone(), code);
+                let order = f.order();
+                let e = orients.entry(f.target).or_insert((order.clone(), code));
+                if order >= e.0 {
+                    *e = (order, code);
                 }
             }
         }
