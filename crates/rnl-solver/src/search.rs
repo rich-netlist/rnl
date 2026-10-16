@@ -21,7 +21,8 @@
 //! 1. the variants of the children are combined, a beam of `beam` combinations kept;
 //! 2. the order of the items is made by the barycentre of what each is connected to, over a few
 //!    rounds, keeping the left-to-right precedences the facts give, then varied by swapping
-//!    neighbours;
+//!    neighbours, and by reversing each ORDER or DISTANCE on x whose side the facts leave open
+//!    (`crate::structure::Reversible`), which the resolution then turns;
 //! 3. each free class whose members lie in the node takes the orientation that turns most of its
 //!    pins towards what they connect to, among those its sources allow (sources towards the
 //!    ground, grounds below their pins), and is varied to its second best; mirror pairs take
@@ -264,14 +265,23 @@ impl Relation {
     }
 }
 
+/// What became of the relations that [`with_relations`] takes in.
+pub(crate) struct Taken {
+    /// Whether each was kept.
+    pub kept: Vec<bool>,
+    /// Whether the budget ran out deciding any of them (`Outcome::Undecided`): those were
+    /// dropped without a conflict.
+    pub undecided: bool,
+}
+
 /// The facts kept and then the relations, taken in by a resolution that starts from the witness
-/// (8.5): `f` is given the resolution, its model, and for each relation whether it was kept.
+/// (8.5): `f` is given the resolution, its model, and what became of the relations.
 pub(crate) fn with_relations<R>(
     s: &Structure,
     relations: &[Tagged],
     budget: Budget,
     work: &mut Work,
-    f: impl FnOnce(&mut Resolver, &Model, &[bool]) -> R,
+    f: impl FnOnce(&mut Resolver, &Model, &Taken) -> R,
 ) -> R {
     let mut model = s.model.clone();
     let base = model.units.len();
@@ -283,8 +293,12 @@ pub(crate) fn with_relations<R>(
         let kept = r.add(f);
         debug_assert_eq!(kept, Outcome::Kept, "the facts kept hold at the witness");
     }
-    let kept: Vec<bool> = (0..relations.len()).map(|i| r.add(base + i) == Outcome::Kept).collect();
-    let out = f(&mut r, &model, &kept);
+    let outcomes: Vec<Outcome> = (0..relations.len()).map(|i| r.add(base + i)).collect();
+    let taken = Taken {
+        kept: outcomes.iter().map(|o| *o == Outcome::Kept).collect(),
+        undecided: outcomes.iter().any(|o| matches!(o, Outcome::Undecided(_))),
+    };
+    let out = f(&mut r, &model, &taken);
     work.resolve_nodes += r.nodes;
     work.pivots += r.pivots();
     out
@@ -317,7 +331,7 @@ fn shifted(b: &[Q; 4], d: &[Q; 2]) -> [Q; 4] {
 
 /// A constant of a relation rounded up to the grid, so that the coordinates the LP gives stay on
 /// it: an inequality between origins on the grid with a constant on it has its optimum on it.
-fn up(c: Q, grid: &Option<Q>) -> Q {
+pub(crate) fn up(c: Q, grid: &Option<Q>) -> Q {
     match grid {
         Some(g) if g.is_positive() => (c / g).ceil() * g,
         _ => c,
@@ -859,18 +873,22 @@ struct Plan {
     values: Vec<Orient>,
     /// The order of the items of each node decided.
     items: BTreeMap<usize, Vec<Item>>,
+    /// The facts whose side is open that the plan reverses, by index in `Structure::reversible`.
+    flipped: BTreeSet<usize>,
 }
 
 /// A plan with its layered estimate and the canonical code of its candidate.
 type Scored = (Vec<Q>, Vec<u32>, Plan);
 
 /// A variant of a node: its elements in order, the values of the classes decided in it and below,
-/// and the orders of its items and of those below.
+/// the orders of its items and of those below, and whether it reverses each fact whose side is open
+/// decided in it and below.
 #[derive(Clone, Debug, PartialEq)]
 struct Variant {
     order: Vec<usize>,
     values: BTreeMap<usize, Orient>,
     items: BTreeMap<usize, Vec<Item>>,
+    flips: BTreeMap<usize, bool>,
 }
 
 /// The search in progress: the level, the options, the plan of the decisions so far and the
@@ -904,7 +922,21 @@ impl Search<'_> {
             p.values[c] = value;
         }
         p.items.extend(v.items.iter().map(|(n, items)| (*n, items.clone())));
+        for (&r, &flip) in &v.flips {
+            if flip {
+                p.flipped.insert(r);
+            } else {
+                p.flipped.remove(&r);
+            }
+        }
         p
+    }
+
+    /// The node at which a fact whose side is open is decided: the lowest that holds every
+    /// element it orders.
+    fn reversible_node(&self, r: usize) -> usize {
+        let elements: BTreeSet<usize> = self.s.reversible[r].pairs.iter().flat_map(|&(a, b)| [a, b]).collect();
+        self.s.tree.lowest_common(&elements.into_iter().collect::<Vec<usize>>())
     }
 
     /// The candidate of a plan: its rows in its order, the blocks apart in each node, each port's
@@ -967,10 +999,16 @@ impl Search<'_> {
     }
 
     /// The order of a node's items: a topological order of the precedences between them, the
-    /// smallest key first among those free to go. The precedences are those of the facts, and,
-    /// with the mirror pairs in force, the first role of a pair (`a`, `in_p`, `ref`) before the
-    /// second where the facts do not say otherwise.
-    fn order_items(&self, node: usize, items: &[Item], key: &dyn Fn(Item) -> (Q, usize)) -> Vec<Item> {
+    /// smallest key first among those free to go. The precedences are those of the facts, `before`
+    /// ([`precedences`]), and, with the mirror pairs in force, the first role of a pair (`a`,
+    /// `in_p`, `ref`) before the second where the facts do not say otherwise.
+    fn order_items(
+        &self,
+        node: usize,
+        items: &[Item],
+        key: &dyn Fn(Item) -> (Q, usize),
+        before: &BTreeSet<(usize, usize)>,
+    ) -> Vec<Item> {
         let s = self.s;
         let members = |i: Item| -> Vec<usize> {
             match i {
@@ -980,28 +1018,28 @@ impl Search<'_> {
         };
         let sets: Vec<Vec<usize>> = items.iter().map(|&i| members(i)).collect();
         let precedes = |a: usize, b: usize| {
-            s.precedence.contains(&(a, b))
+            before.contains(&(a, b))
                 || (s.has(Source::MirrorPairs)
-                    && !s.precedence.contains(&(b, a))
+                    && !before.contains(&(b, a))
                     && s.pairs.iter().any(|p| p.a == a && p.b == b))
         };
-        let mut before: BTreeSet<(usize, usize)> = BTreeSet::new();
+        let mut first: BTreeSet<(usize, usize)> = BTreeSet::new();
         for i in 0..items.len() {
             for j in 0..items.len() {
                 if i != j && sets[i].iter().any(|&a| sets[j].iter().any(|&b| precedes(a, b))) {
-                    before.insert((i, j));
+                    first.insert((i, j));
                 }
             }
         }
         if s.tree.nodes[node].fixed_order {
             for i in 1..items.len() {
-                before.insert((i - 1, i));
+                first.insert((i - 1, i));
             }
         }
         let mut done = vec![false; items.len()];
         let mut out = Vec::new();
         while out.len() < items.len() {
-            let free = |j: usize| !done[j] && (0..items.len()).all(|i| done[i] || !before.contains(&(i, j)));
+            let free = |j: usize| !done[j] && (0..items.len()).all(|i| done[i] || !first.contains(&(i, j)));
             let mut pick = (0..items.len()).filter(|&j| free(j)).min_by(|&a, &b| key(items[a]).cmp(&key(items[b])));
             if pick.is_none() {
                 // precedences in a cycle: the smallest key of those left
@@ -1126,7 +1164,7 @@ impl Search<'_> {
             if next.is_empty() {
                 continue;
             }
-            next.sort_by(|a, b| s.active.compare(&a.0, &b.0).then_with(|| a.1.cmp(&b.1)));
+            let mut next = ranked(s, next);
             next.truncate(beam);
             combos = next.into_iter().map(|(e, _, p)| (e, p)).collect();
         }
@@ -1142,14 +1180,15 @@ impl Search<'_> {
                 };
                 (Q::zero(), k)
             };
-            let mut orders: Vec<Vec<Item>> = vec![self.order_items(node, &items, &first_key)];
+            let before = precedences(s, &base.flipped);
+            let mut orders: Vec<Vec<Item>> = vec![self.order_items(node, &items, &first_key, &before)];
             if s.has(Source::Barycentre) || s.has(Source::InputsLeft) {
                 let mut current = orders[0].clone();
                 for _ in 0..BARYCENTRE_ROUNDS {
                     let p = Plan { order: self.place(base, &current), ..base.clone() };
                     let (p, _) = self.orient(&p, &classes);
                     let key = self.barycentre(&p, &current);
-                    let next = self.order_items(node, &items, &|i| key[&i].clone());
+                    let next = self.order_items(node, &items, &|i| key[&i].clone(), &before);
                     if orders.contains(&next) {
                         break;
                     }
@@ -1157,9 +1196,10 @@ impl Search<'_> {
                     current = next;
                 }
             }
-            let mut best: Option<(Scored, Vec<(usize, Orient)>)> = None;
+            let mut tried: Vec<Scored> = Vec::new();
+            let mut seconds: Vec<Vec<(usize, Orient)>> = Vec::new();
             for order in &orders {
-                if self.out_of_budget() && best.is_some() {
+                if self.out_of_budget() && !tried.is_empty() {
                     break;
                 }
                 let mut p = Plan { order: self.place(base, order), ..base.clone() };
@@ -1167,23 +1207,23 @@ impl Search<'_> {
                 let (p, second) = self.orient(&p, &classes);
                 let (e, cand) = self.estimate(&p);
                 let code = cand.code(s);
-                let better =
-                    best.as_ref().is_none_or(|(b, _)| s.active.compare(&e, &b.0).then_with(|| code.cmp(&b.1)).is_lt());
                 found.push((e.clone(), code.clone(), p.clone()));
-                if better {
-                    best = Some(((e, code, p), second));
-                }
+                tried.push((e, code, p));
+                seconds.push(second);
             }
             // 3. the neighbourhood of the best: neighbours swapped, a class at its second best
-            let Some(((_, _, bp), second)) = best else { continue };
+            let Some(&b) = rank_of(s, &tried).first() else { continue };
+            let (bp, second) = (tried.swap_remove(b).2, seconds.swap_remove(b));
             let border = bp.items.get(&node).cloned().unwrap_or_default();
+            let before = precedences(s, &bp.flipped);
             for i in 1..border.len() {
                 if self.out_of_budget() {
                     break;
                 }
                 let mut o = border.clone();
                 o.swap(i - 1, i);
-                if self.order_items(node, &o, &|it| (Q::zero(), o.iter().position(|x| *x == it).unwrap_or(0))) != o {
+                let place = |it: Item| (Q::zero(), o.iter().position(|x| *x == it).unwrap_or(0));
+                if self.order_items(node, &o, &place, &before) != o {
                     continue;
                 }
                 let mut p = Plan { order: self.place(&bp, &o), ..bp.clone() };
@@ -1200,9 +1240,14 @@ impl Search<'_> {
                 let (e, cand) = self.estimate(&p);
                 found.push((e, cand.code(s), p));
             }
+            // and each fact whose side is open decided here reversed
+            let reversed = self.reversed(node, &bp, &border);
+            found.extend(reversed);
         }
-        found.sort_by(|a, b| s.active.compare(&a.0, &b.0).then_with(|| a.1.cmp(&b.1)));
-        found.dedup_by(|a, b| a.1 == b.1);
+        // ranked, each candidate once
+        let mut codes: BTreeSet<Vec<u32>> = BTreeSet::new();
+        let found: Vec<Scored> =
+            ranked(s, found).into_iter().filter(|(_, code, _)| codes.insert(code.clone())).collect();
         // diversity: the best of each order of the items first, then the rest by rank
         let order_of = |p: &Plan| p.items.get(&node).cloned().unwrap_or_default();
         let mut picked: Vec<usize> = Vec::new();
@@ -1248,14 +1293,48 @@ impl Search<'_> {
                     .map(|c| (c, p.values[c]))
                     .collect();
                 let items = p.items.iter().filter(|(n, _)| subtree.contains(n)).map(|(n, v)| (*n, v.clone())).collect();
-                Variant { order, values, items }
+                let flips = (0..s.reversible.len())
+                    .filter(|&r| subtree.contains(&self.reversible_node(r)))
+                    .map(|r| (r, p.flipped.contains(&r)))
+                    .collect();
+                Variant { order, values, items, flips }
             })
             .collect()
     }
 
+    /// The plan `bp` with each fact whose side is open decided at `node` reversed in turn
+    /// (`Structure::reversible`), its items in the order nearest to `border` that the reversed
+    /// precedences allow, each with its estimate.
+    fn reversed(&mut self, node: usize, bp: &Plan, border: &[Item]) -> Vec<Scored> {
+        let s = self.s;
+        let mut out = Vec::new();
+        let local: Vec<usize> = (0..s.reversible.len()).filter(|&r| self.reversible_node(r) == node).collect();
+        for r in local {
+            if self.out_of_budget() {
+                break;
+            }
+            let mut p = bp.clone();
+            if !p.flipped.remove(&r) {
+                p.flipped.insert(r);
+            }
+            let place = |it: Item| (Q::zero(), border.iter().position(|x| *x == it).unwrap_or(0));
+            let o = self.order_items(node, border, &place, &precedences(s, &p.flipped));
+            p.order = self.place(bp, &o);
+            p.items.insert(node, o);
+            let (e, cand) = self.estimate(&p);
+            out.push((e, cand.code(s), p));
+        }
+        out
+    }
+
     /// The global order with a node's elements in the order of its items.
     fn place(&self, plan: &Plan, items: &[Item]) -> Vec<usize> {
-        let v = Variant { order: self.flatten(plan, items), values: BTreeMap::new(), items: BTreeMap::new() };
+        let v = Variant {
+            order: self.flatten(plan, items),
+            values: BTreeMap::new(),
+            items: BTreeMap::new(),
+            flips: BTreeMap::new(),
+        };
         self.with(plan, &v).order
     }
 
@@ -1334,24 +1413,49 @@ impl Search<'_> {
         let mut rels = orientation_relations(s, c);
         rels.extend(relations_within(s, c, &ori, self.options, Some(within)));
         let budget = self.options.budget;
-        with_relations(s, &rels, budget, &mut *self.work, |_, _, kept| kept.iter().filter(|k| !**k).count())
+        with_relations(s, &rels, budget, &mut *self.work, |_, _, t| t.kept.iter().filter(|k| !**k).count())
     }
 }
 
+/// The order of scored plans, best first ([`crate::objectives::Active::rank`]).
+fn rank_of(s: &Structure, list: &[Scored]) -> Vec<usize> {
+    let entries: Vec<(&[Q], &[u32])> = list.iter().map(|(e, code, _)| (e.as_slice(), code.as_slice())).collect();
+    s.active.rank(&entries)
+}
+
+/// Scored plans put in the order of [`rank_of`].
+fn ranked(s: &Structure, list: Vec<Scored>) -> Vec<Scored> {
+    let order = rank_of(s, &list);
+    let mut slots: Vec<Option<Scored>> = list.into_iter().map(Some).collect();
+    order.into_iter().filter_map(|i| slots[i].take()).collect()
+}
+
+/// The left-to-right precedences between elements: those of the facts with a side, and those of
+/// the facts whose side is open, reversed for the facts of `flipped` (`Structure::reversible`).
+fn precedences(s: &Structure, flipped: &BTreeSet<usize>) -> BTreeSet<(usize, usize)> {
+    let mut out = s.precedence.clone();
+    for (r, rev) in s.reversible.iter().enumerate() {
+        let flip = flipped.contains(&r);
+        out.extend(rev.pairs.iter().map(|&(a, b)| if flip { (b, a) } else { (a, b) }));
+    }
+    out
+}
+
 /// The plan of P0: the elements in the order of the netlist, as the precedences of the facts
-/// allow; every free class R0.
+/// allow, those left open as the witness has them; every free class R0.
 fn p0_plan(s: &Structure) -> Plan {
+    let before = precedences(s, &BTreeSet::new());
     let mut order: Vec<usize> = Vec::new();
     let mut done: BTreeSet<usize> = BTreeSet::new();
     while order.len() < s.elements.len() {
         let free = s.elements.iter().copied().find(|&k| {
-            !done.contains(&k) && s.elements.iter().all(|&a| done.contains(&a) || !s.precedence.contains(&(a, k)))
+            !done.contains(&k) && s.elements.iter().all(|&a| done.contains(&a) || !before.contains(&(a, k)))
         });
         let Some(k) = free.or_else(|| s.elements.iter().copied().find(|k| !done.contains(k))) else { break };
         done.insert(k);
         order.push(k);
     }
-    Plan { order, values: vec![Orient::R0; s.open.classes.len()], items: BTreeMap::new() }
+    Plan { order, values: vec![Orient::R0; s.open.classes.len()], items: BTreeMap::new(), flipped: BTreeSet::new() }
 }
 
 /// The candidates of a level (see the module): the root's variants best first, then P0, and with
@@ -1440,6 +1544,39 @@ mod tests {
         assert_eq!(u.choices[0].values.len(), 2);
         assert_eq!(u.choices[0].kind, ChoiceKind::Ranked);
         assert_eq!(u.touched, [vec![o(0), o(1)], vec![o(0)]]);
+    }
+
+    /// An ORDER given only an axis fixes no precedence; reversed, its members swap their order,
+    /// the others staying where they were.
+    #[test]
+    fn a_fact_whose_side_is_open_is_reversed() {
+        use rnl_runtime::problem::{Axis, FactKind, PointRef, Sense};
+        let o = PointRef::Origin;
+        let order = FactKind::Order { axis: Axis::X, sense: Sense::Either, members: vec![o(0), o(2)] };
+        let p = problem_of(vec![instance(), instance(), instance()], vec![crate::resolve::tests::fact(order)]);
+        let options = SolverOptions::default();
+        let mut work = Work::default();
+        let resolved = crate::resolve::resolve(&p, &options);
+        let s = crate::structure::analyse(&p, &resolved, &options, &mut work);
+        assert!(s.precedence.is_empty());
+        assert_eq!(s.reversible.len(), 1);
+        let (a, b) = s.reversible[0].pairs[0];
+        let mut search = Search { problem: &p, s: &s, options: &options, made: 0, work: &mut work };
+        let border = vec![Item::Element(0), Item::Element(1), Item::Element(2)];
+        let mut plan = p0_plan(&s);
+        plan.items.insert(0, border.clone());
+        let reversed = search.reversed(0, &plan, &border);
+        assert_eq!(reversed.len(), 1);
+        let q = &reversed[0].2;
+        assert_eq!(q.flipped, BTreeSet::from([0]));
+        let at = |k: usize| q.order.iter().position(|&j| j == k).unwrap();
+        // the witness had a before b: now b goes first
+        assert!(at(b) < at(a), "{:?}", q.order);
+        // and reversed again, back as the witness had it
+        let again = search.reversed(0, q, &q.items[&0].clone());
+        assert!(again[0].2.flipped.is_empty());
+        let at = |k: usize| again[0].2.order.iter().position(|&j| j == k).unwrap();
+        assert!(at(a) < at(b), "{:?}", again[0].2.order);
     }
 
     #[test]

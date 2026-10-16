@@ -16,7 +16,7 @@ use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::{LevelProblem, Position};
 use rnl_runtime::solution::{Placement, Solution};
 
-use crate::coords::{place, Placed};
+use crate::coords::{place, Cause, Placed};
 use crate::objectives::View;
 use crate::rational::{to_f64, Q};
 use crate::resolve::Resolved;
@@ -61,32 +61,25 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
     let resolved = crate::resolve::resolve(problem, options);
     notes.extend(resolved.notes.iter().cloned());
     let mut work = resolved.work;
-    let structure = analyse(problem, &resolved, options);
+    let structure = analyse(problem, &resolved, options, &mut work);
     notes.extend(structure.notes.iter().cloned());
     let candidates = search(problem, &structure, options, &mut work);
     let count = candidates.len();
-    let mut best: Option<(Vec<Q>, Vec<u32>, Candidate, Placed)> = None;
+    let mut all: Vec<(Vec<Q>, Vec<u32>, Candidate, Placed)> = Vec::new();
     for c in candidates {
         let placed = place(problem, &structure, &c, options, &mut work);
         let view = View { s: &structure, at: &placed.origins, orient: &placed.geometry.orient };
         let score = structure.active.score(&view, None);
         let code = c.code(&structure);
-        // not overlapping is the solver's own rule, ranked after the facts and before the
-        // objectives (8.5, 11.7)
-        let better = best.as_ref().is_none_or(|(s, k, _, p)| {
-            placed
-                .overlaps
-                .len()
-                .cmp(&p.overlaps.len())
-                .then_with(|| structure.active.compare(&score, s))
-                .then_with(|| code.cmp(k))
-                .is_lt()
-        });
-        if better {
-            best = Some((score, code, c, placed));
-        }
+        all.push((score, code, c, placed));
     }
-    let (score, _, candidate, placed) = best.expect("the search gives P0 at least");
+    // not overlapping is the solver's own rule, ranked after the facts and before the objectives
+    // (8.5, 11.7): the fewest overlaps first, then the layers as `Active::rank` orders them
+    let fewest = all.iter().map(|(_, _, _, p)| p.overlaps.len()).min().expect("the search gives P0 at least");
+    all.retain(|(_, _, _, p)| p.overlaps.len() == fewest);
+    let entries: Vec<(&[Q], &[u32])> = all.iter().map(|(e, code, _, _)| (e.as_slice(), code.as_slice())).collect();
+    let best = structure.active.rank(&entries)[0];
+    let (score, _, candidate, placed) = all.swap_remove(best);
     notes.push(format!(
         "{count} candidates placed; the one taken comes from {}",
         if candidate.origin == "P0" { "P0, the order of the netlist" } else { "the beam search" }
@@ -103,16 +96,27 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
     }
     if !dropped.is_empty() {
         let list: Vec<String> = dropped.iter().map(|(k, n)| format!("{n} {}", k.name())).collect();
-        notes.push(format!(
-            "the facts kept leave out some of the solver's own relations of the layout taken: {}",
-            list.join(", ")
-        ));
+        notes.push(if placed.undecided {
+            format!(
+                "the budget of pivots ran out while the layout taken was placed, and some of the solver's own \
+                 relations were left out, not all for a conflict with the facts: {}",
+                list.join(", ")
+            )
+        } else {
+            format!(
+                "the facts kept leave out some of the solver's own relations of the layout taken: {}",
+                list.join(", ")
+            )
+        });
     }
-    for &(a, b) in &placed.overlaps {
-        notes.push(format!(
-            "{} and {} overlap: the facts kept leave no side to put them apart",
-            problem.objects[a].label, problem.objects[b].label
-        ));
+    for o in &placed.overlaps {
+        let why = match o.cause {
+            Cause::Facts => "the facts kept, with the orientations taken, leave no side to put them apart",
+            Cause::Others => "the symbols put apart before them leave no side for them",
+            Cause::Rounds => "the rounds of putting symbols apart ran out before their turn",
+            Cause::Budget => "the budget of pivots ran out before they were put apart",
+        };
+        notes.push(format!("{} and {} overlap: {why}", problem.objects[o.a].label, problem.objects[o.b].label));
     }
     let mut placements = Vec::new();
     for (k, o) in problem.objects.iter().enumerate() {

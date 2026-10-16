@@ -13,7 +13,8 @@
 //!   carry the netlist itself, so a net that is neither routed nor wired is known only through
 //!   the usages on it.
 //! - **Supply and ground** ([`Power`]): the usages of `$SUPPLY_STUB`, `$GND_STUB`, `$SUPPLY` and
-//!   `$GND`, the nets they attach to and the terminals they hang from.
+//!   `$GND`, the nets they attach to, the terminals they hang from or are drawn on (12.1), and the
+//!   nets of those terminals as far as the problem shows them.
 //! - **Current depth**: the distance from a supply terminal through the pins the current runs
 //!   through (drain and source, collector and emitter, both ends of other devices) to each element,
 //!   by breadth-first search, no operating point; an element reached only through a gate takes the
@@ -25,25 +26,30 @@
 //! - **What is left to decide** ([`Open`]): the orientation classes no ORIENT fixes, and the
 //!   ORDERs and DISTANCEs whose direction or side the facts leave open.
 //! - **Rows and precedences**: the rows the elements start in, by current depth when the current
-//!   direction is in force, otherwise by the height the witness of the resolution gives them, with
-//!   the elements an ALIGN on y joins in one row; and the left-to-right precedences that the facts
-//!   on x give the elements they join.
+//!   direction is in force, otherwise by the height the witness of the resolution gives them. The
+//!   facts are rows and columns too (plan 5.4): an ALIGN on y joins its elements in one row, and so,
+//!   without the current depth, does an ORDER or a DISTRIBUTE on x, as far as the facts kept let
+//!   its elements share a height; an ALIGN on x is a column, its elements in rows of their own.
+//!   The left-to-right precedences are those that the facts on x with a side give the elements
+//!   they join; an ORDER or a DISTANCE whose side is left open gives its own as the witness has
+//!   them, and the search may reverse them ([`Reversible`]).
 //! - **The sources of candidates** ([`Source`]), instantiated from the configured objectives in
 //!   the order of their layers, each objective with a structural side adding its own, and the
 //!   objectives configured but inert recorded with the reason ([`crate::objectives::Active`]).
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use num_traits::Zero;
+use num_traits::{One, Signed, Zero};
 use rnl_runtime::geom::Orient;
 use rnl_runtime::markup::Run;
-use rnl_runtime::problem::{FactKind, Filler, LevelProblem, ObjectKind, PointRef, Position, TextInfo};
+use rnl_runtime::problem::{Axis, FactKind, Filler, LevelProblem, ObjectKind, PointRef, Position, Sense, TextInfo};
 
 use crate::model::{turned, Model, PointId};
 use crate::objectives::{Active, Inputs, Objective};
 use crate::rational::{frac, from_f64, int, Q};
 use crate::resolve::{point_value, Geometry, Resolved};
-use crate::SolverOptions;
+use crate::search::{with_relations, RelKind, Relation, Tagged};
+use crate::{SolverOptions, Work};
 
 /// A pin, by object and by the index of the pin in its symbol (9.2.4).
 pub(crate) type PinKey = (usize, usize);
@@ -193,8 +199,8 @@ pub(crate) struct Power {
     pub ground: Vec<usize>,
     pub supply_nets: BTreeSet<String>,
     pub ground_nets: BTreeSet<String>,
-    /// The pins on a supply or ground net: the terminals stubs hang from, and the pins on those
-    /// nets.
+    /// The pins on a supply or ground net: the terminals stubs hang from, the terminals a supply
+    /// or ground symbol is drawn on (12.1), and the pins on those nets.
     pub supply_pins: BTreeSet<PinKey>,
     pub ground_pins: BTreeSet<PinKey>,
 }
@@ -311,6 +317,15 @@ pub(crate) struct Open {
     pub sides: Vec<usize>,
 }
 
+/// A fact kept on x whose direction or side the facts leave open ([`Open::orders`],
+/// [`Open::sides`]): the pairs of elements `(a, b)` it puts `a` left of `b`, as the witness has
+/// them. The search may reverse them all, and the resolution then turns the fact's literal.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Reversible {
+    pub fact: usize,
+    pub pairs: Vec<(usize, usize)>,
+}
+
 /// A source of candidates (algorithm synthesis 5.3), what a configured objective's structural
 /// side, or the problem itself, contributes to making them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -338,7 +353,9 @@ pub(crate) enum Source {
     Columns,
     /// Pins turned to face what they are connected to: always.
     FacingPins,
-    /// The facts: an ALIGN on y joins a row, the facts on x order what they join: always.
+    /// The facts: an ALIGN on y joins a row, and so, without the current depth, does an ORDER or
+    /// a DISTRIBUTE on x; an ALIGN on x is a column; the facts on x with a side order what they
+    /// join: always.
     Facts,
     /// The order of the netlist, the last tie-break: always.
     NetlistOrder,
@@ -370,8 +387,12 @@ pub(crate) struct Structure {
     pub depth: Option<Vec<Option<u32>>>,
     /// The rows the elements start in, the top first, each in the order of the objects.
     pub rows: Vec<Vec<usize>>,
-    /// Pairs of elements `(a, b)` that the facts on x join and the witness puts `a` left of `b`.
+    /// Pairs of elements `(a, b)` that a fact kept on x with a side puts `a` left of `b`, as the
+    /// witness has them: an ORDER with a direction, a DISTANCE with a direction and a gap not
+    /// below 0.
     pub precedence: BTreeSet<(usize, usize)>,
+    /// The facts kept on x whose side is open, with the pairs they order.
+    pub reversible: Vec<Reversible>,
     pub active: Active,
     pub sources: Vec<Source>,
     /// Anything worth saying, such as groups that cannot be nested.
@@ -486,8 +507,14 @@ impl Structure {
     }
 }
 
-/// The structure of a level, from its resolution, for the options given.
-pub(crate) fn analyse(problem: &LevelProblem, resolved: &Resolved, options: &SolverOptions) -> Structure {
+/// The structure of a level, from its resolution, for the options given. The work of the
+/// resolutions it makes is added to `work`.
+pub(crate) fn analyse(
+    problem: &LevelProblem,
+    resolved: &Resolved,
+    options: &SolverOptions,
+    work: &mut Work,
+) -> Structure {
     let mut notes = Vec::new();
     let symbols: Vec<SymbolInfo> = problem.symbols.iter().map(symbol_info).collect();
     let model = if resolved.as_written { Model::new(problem, Q::zero()) } else { resolved.model.clone() };
@@ -495,8 +522,8 @@ pub(crate) fn analyse(problem: &LevelProblem, resolved: &Resolved, options: &Sol
     let kept = resolved.kept.clone();
     let mut objects = object_infos(problem, &model, &kept);
     let power = power(problem, &mut objects);
-    let connections = connections(problem, &model, &power);
-    let power = power_pins(power, &connections);
+    let mut connections = connections(problem, &model);
+    let power = power_pins(power, &mut connections);
     let elements: Vec<usize> = (0..objects.len()).filter(|&k| objects[k].role == Role::Element).collect();
     let ports = ports(problem, &objects, &symbols, &connections);
     let pairs = pairs(problem, &objects);
@@ -552,6 +579,7 @@ pub(crate) fn analyse(problem: &LevelProblem, resolved: &Resolved, options: &Sol
         depth: None,
         rows: Vec::new(),
         precedence: BTreeSet::new(),
+        reversible: Vec::new(),
         active,
         sources,
         notes,
@@ -562,8 +590,8 @@ pub(crate) fn analyse(problem: &LevelProblem, resolved: &Resolved, options: &Sol
     if s.has(Source::DepthRows) {
         s.depth = Some(depths(&s));
     }
-    s.rows = rows(problem, &s);
-    s.precedence = precedence(problem, &s);
+    s.rows = rows(problem, &s, options, work);
+    (s.precedence, s.reversible) = precedence(problem, &s);
     s
 }
 
@@ -711,7 +739,8 @@ fn param(problem: &LevelProblem, u: usize, name: &str) -> Option<Q> {
     problem.usages[u].params.iter().find(|(n, _)| n == name).and_then(|(_, v)| v.num()).and_then(from_f64)
 }
 
-/// The supply and ground symbols, their nets, and the stubs with the pins they hang from.
+/// The supply and ground symbols, the nets they attach to, the terminals they are drawn on, and
+/// the stubs with the pins they hang from.
 fn power(problem: &LevelProblem, objects: &mut [ObjectInfo]) -> Power {
     let mut p = Power::default();
     for usage in &problem.usages {
@@ -729,12 +758,22 @@ fn power(problem: &LevelProblem, objects: &mut [ObjectInfo]) -> Power {
         }
         for role in usage.roles.iter().filter(|r| r.role == "p") {
             for m in &role.members {
-                if let Filler::Net(name) = m {
-                    if supply {
+                match m {
+                    Filler::Net(name) if supply => {
                         p.supply_nets.insert(name.clone());
-                    } else {
+                    }
+                    Filler::Net(name) => {
                         p.ground_nets.insert(name.clone());
                     }
+                    // drawn right on a terminal (12.1): the terminal is on the supply or the
+                    // ground, and so is its net when the problem shows it ([`power_pins`])
+                    Filler::Terminal { object, pin: Some(pin), .. } if supply => {
+                        p.supply_pins.insert((*object, *pin));
+                    }
+                    Filler::Terminal { object, pin: Some(pin), .. } => {
+                        p.ground_pins.insert((*object, *pin));
+                    }
+                    _ => {}
                 }
             }
         }
@@ -766,45 +805,75 @@ fn power(problem: &LevelProblem, objects: &mut [ObjectInfo]) -> Power {
     p
 }
 
-/// The pins on the supply and ground nets added to those the stubs hang from, and the nets marked.
-fn power_pins(mut p: Power, c: &Connections) -> Power {
+/// The supply and ground nets marked: those the usages attach a supply or ground symbol to, and
+/// those of the terminals one is drawn on or a stub hangs from; then the pins on those nets added
+/// to the supply and ground pins.
+fn power_pins(mut p: Power, c: &mut Connections) -> Power {
     for net in &c.nets {
-        if p.supply_nets.contains(&net.name) {
+        if net.pins.iter().any(|q| p.supply_pins.contains(q)) {
+            p.supply_nets.insert(net.name.clone());
+        }
+        if net.pins.iter().any(|q| p.ground_pins.contains(q)) {
+            p.ground_nets.insert(net.name.clone());
+        }
+    }
+    for net in &mut c.nets {
+        net.supply = p.supply_nets.contains(&net.name);
+        net.ground = p.ground_nets.contains(&net.name);
+        if net.supply {
             p.supply_pins.extend(net.pins.iter().copied());
         }
-        if p.ground_nets.contains(&net.name) {
+        if net.ground {
             p.ground_pins.extend(net.pins.iter().copied());
         }
     }
     p
 }
 
-fn connections(problem: &LevelProblem, model: &Model, power: &Power) -> Connections {
+/// The connection graph; the nets are marked supply or ground by [`power_pins`].
+fn connections(problem: &LevelProblem, model: &Model) -> Connections {
     let mut nets: BTreeMap<String, BTreeSet<PinKey>> = BTreeMap::new();
     let pin_of = |r: &PointRef| match r {
         PointRef::Pin { object, pin, .. } => Some((*object, *pin)),
         _ => None,
     };
-    let mut drawn = Vec::new();
+    let mut drawn: Vec<Drawn> = Vec::new();
     let mut targets: BTreeMap<PinKey, BTreeSet<PinKey>> = BTreeMap::new();
-    let mut seen_routes: BTreeSet<&str> = BTreeSet::new();
+    // a net asked for twice, as by a ROUTE that flows down and one of the level's own, is drawn
+    // once, with the pins and points of each, in order, none twice
+    let mut routed: Vec<(String, Vec<PinKey>)> = Vec::new();
     for (i, route) in problem.routes.iter().enumerate() {
         let pins: Vec<PinKey> = route.pins.iter().filter_map(pin_of).collect();
         nets.entry(route.net.clone()).or_default().extend(pins.iter().copied());
-        // a net asked for twice, as by a ROUTE that flows down and one of the level's own, is drawn once
-        if !seen_routes.insert(route.net.as_str()) {
-            continue;
-        }
         let points: Vec<PointId> =
             model.route_points.get(i).map_or(Vec::new(), |ps| ps.iter().flatten().copied().collect());
-        for a in &pins {
-            for b in &pins {
+        let at = match routed.iter().position(|(net, _)| *net == route.net) {
+            Some(at) => at,
+            None => {
+                routed.push((route.net.clone(), Vec::new()));
+                drawn.push(Drawn { net: route.net.clone(), points: Vec::new(), routed: true });
+                routed.len() - 1
+            }
+        };
+        for p in pins {
+            if !routed[at].1.contains(&p) {
+                routed[at].1.push(p);
+            }
+        }
+        for p in points {
+            if !drawn[at].points.contains(&p) {
+                drawn[at].points.push(p);
+            }
+        }
+    }
+    for (_, pins) in &routed {
+        for a in pins {
+            for b in pins {
                 if a.0 != b.0 {
                     targets.entry(*a).or_default().insert(*b);
                 }
             }
         }
-        drawn.push(Drawn { net: route.net.clone(), points, routed: true });
     }
     for (i, wire) in problem.wires.iter().enumerate() {
         let pins: Vec<PinKey> = wire.anchors.iter().filter_map(pin_of).collect();
@@ -843,12 +912,7 @@ fn connections(problem: &LevelProblem, model: &Model, power: &Power) -> Connecti
         for p in &pins {
             out.nets_of.entry(*p).or_default().push(i);
         }
-        out.nets.push(Net {
-            supply: power.supply_nets.contains(&name),
-            ground: power.ground_nets.contains(&name),
-            name,
-            pins: pins.into_iter().collect(),
-        });
+        out.nets.push(Net { supply: false, ground: false, name, pins: pins.into_iter().collect() });
     }
     out.targets = targets.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect();
     out
@@ -1182,70 +1246,147 @@ fn depths(s: &Structure) -> Vec<Option<u32>> {
     depth
 }
 
+/// Classes of elements that share a row, a union-find: each class by its smallest element.
+struct Joined {
+    parent: BTreeMap<usize, usize>,
+}
+
+impl Joined {
+    fn new(elements: &[usize]) -> Joined {
+        Joined { parent: elements.iter().map(|&k| (k, k)).collect() }
+    }
+
+    fn find(&self, mut k: usize) -> usize {
+        while self.parent[&k] != k {
+            k = self.parent[&k];
+        }
+        k
+    }
+
+    fn join(&mut self, a: usize, b: usize) {
+        let (a, b) = (self.find(a), self.find(b));
+        if a != b {
+            let (lo, hi) = if a < b { (a, b) } else { (b, a) };
+            self.parent.insert(hi, lo);
+        }
+    }
+}
+
 /// The rows the elements start in (see the module).
-fn rows(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
+fn rows(problem: &LevelProblem, s: &Structure, options: &SolverOptions, work: &mut Work) -> Vec<Vec<usize>> {
     if s.elements.is_empty() {
         return Vec::new();
     }
-    // the key of each element's row: larger keys higher
+    let kind = |f: usize| &problem.facts[f].kind;
+    // an ALIGN on y kept joins its elements in one row
+    let mut joined = Joined::new(&s.elements);
+    for &f in &s.kept {
+        if matches!(kind(f), FactKind::Align { axis: Axis::Y, .. }) {
+            for w in touched_elements(s, f, 1).windows(2) {
+                joined.join(w[0], w[1]);
+            }
+        }
+    }
+    if s.depth.is_none() {
+        // without the current depth, an ORDER or a DISTRIBUTE on x is a row too, as far as the
+        // facts kept let its elements share a height: each pair of neighbours at one height is a
+        // relation of the solver's own taken in after the facts (8.5), and the pairs that fit join
+        let origin = |k: usize| s.model.origin_point.get(k).copied().flatten();
+        let mut pairs: Vec<(usize, usize, PointId, PointId)> = Vec::new();
+        for &f in &s.kept {
+            if matches!(kind(f), FactKind::Order { axis: Axis::X, .. } | FactKind::Distribute { axis: Axis::X, .. }) {
+                let elements = touched_elements(s, f, 0);
+                pairs.extend(elements.windows(2).filter_map(|w| Some((w[0], w[1], origin(w[0])?, origin(w[1])?))));
+            }
+        }
+        if !pairs.is_empty() {
+            let rels: Vec<Tagged> = pairs
+                .iter()
+                .map(|&(_, _, a, b)| Tagged {
+                    kind: RelKind::Row,
+                    rel: Relation::Linear {
+                        axis: 1,
+                        terms: vec![(b, Q::one()), (a, -Q::one())],
+                        lo: Some(Q::zero()),
+                        hi: Some(Q::zero()),
+                    },
+                })
+                .collect();
+            let fits = with_relations(s, &rels, options.budget, work, |_, _, t| t.kept.clone());
+            for (&(a, b, _, _), fit) in pairs.iter().zip(fits) {
+                if fit {
+                    joined.join(a, b);
+                }
+            }
+        }
+    }
+    // the height of each class's row, by its smallest element: larger keys higher
     let mut key: BTreeMap<usize, Q> = BTreeMap::new();
     match &s.depth {
         Some(depth) => {
             let last = s.elements.iter().filter_map(|&k| depth[k]).max().map_or(0, |d| d + 1);
             for &k in &s.elements {
-                key.insert(k, -int(i64::from(depth[k].unwrap_or(last))));
-            }
-            // an ALIGN on y kept joins its elements in the row of the first of them
-            let mut parent: BTreeMap<usize, usize> = s.elements.iter().map(|&k| (k, k)).collect();
-            fn find(parent: &BTreeMap<usize, usize>, mut k: usize) -> usize {
-                while parent[&k] != k {
-                    k = parent[&k];
+                if joined.find(k) == k {
+                    key.insert(k, -int(i64::from(depth[k].unwrap_or(last))));
                 }
-                k
-            }
-            for &f in &s.kept {
-                if !matches!(problem.facts[f].kind, FactKind::Align { axis: rnl_runtime::problem::Axis::Y, .. }) {
-                    continue;
-                }
-                let joined = touched_elements(s, f, 1);
-                for w in joined.windows(2) {
-                    let (a, b) = (find(&parent, w[0]), find(&parent, w[1]));
-                    if a != b {
-                        let (lo, hi) = if a < b { (a, b) } else { (b, a) };
-                        parent.insert(hi, lo);
-                    }
-                }
-            }
-            let keys = key.clone();
-            for &k in &s.elements {
-                key.insert(k, keys[&find(&parent, k)].clone());
             }
         }
         None => {
             // the heights of the elements that a fact kept on y relates to another element, or
-            // places; other facts that reach one element only, such as those of its stubs, say
-            // nothing of rows
+            // places, the first of a class giving the class its height; other facts that reach
+            // one element only, such as those of its stubs, say nothing of rows
             let mut related = BTreeSet::new();
             for &f in &s.kept {
-                let joined = touched_elements(s, f, 1);
+                let joins = touched_elements(s, f, 1);
                 let placed = matches!(
-                    problem.facts[f].kind,
-                    FactKind::Place { axis: rnl_runtime::problem::Axis::Y, .. }
-                        | FactKind::PointCoordinate { axis: rnl_runtime::problem::Axis::Y, .. }
+                    kind(f),
+                    FactKind::Place { axis: Axis::Y, .. } | FactKind::PointCoordinate { axis: Axis::Y, .. }
                 );
-                if joined.len() >= 2 || placed {
-                    related.extend(joined);
+                if joins.len() >= 2 || placed {
+                    related.extend(joins);
                 }
             }
             for &k in &related {
-                key.insert(k, s.witness.origin[k][1].clone());
+                key.entry(joined.find(k)).or_insert_with(|| s.witness.origin[k][1].clone());
             }
-            spread(s, &mut key);
+            spread(s, &joined, &mut key);
+        }
+    }
+    // an ALIGN on x kept is a column: the classes it reaches go in rows of their own, one under
+    // the other, the highest at the witness on top
+    let mut apart: BTreeSet<(usize, usize)> = BTreeSet::new();
+    for &f in &s.kept {
+        if matches!(kind(f), FactKind::Align { axis: Axis::X, .. }) {
+            let roots: BTreeSet<usize> = touched_elements(s, f, 0).into_iter().map(|k| joined.find(k)).collect();
+            for &a in &roots {
+                apart.extend(roots.iter().filter(|&&b| a < b).map(|&b| (a, b)));
+            }
         }
     }
     let mut levels: Vec<Q> = key.values().cloned().collect::<BTreeSet<Q>>().into_iter().collect();
     levels.reverse();
-    levels.iter().map(|l| s.elements.iter().copied().filter(|k| key[k] == *l).collect()).collect()
+    let mut rows = Vec::new();
+    for level in levels {
+        let mut classes: Vec<usize> = key.iter().filter(|(_, q)| **q == level).map(|(r, _)| *r).collect();
+        classes.sort_by(|a, b| s.witness.origin[*b][1].cmp(&s.witness.origin[*a][1]).then(a.cmp(b)));
+        // each class in the first row of its level that holds no class of a column with it
+        let mut sub: BTreeMap<usize, usize> = BTreeMap::new();
+        for &r in &classes {
+            let taken: BTreeSet<usize> =
+                sub.iter().filter(|(q, _)| apart.contains(&((**q).min(r), (**q).max(r)))).map(|(_, c)| *c).collect();
+            let c = (0..classes.len()).find(|c| !taken.contains(c)).unwrap_or(0);
+            sub.insert(r, c);
+        }
+        let count = sub.values().max().map_or(0, |c| c + 1);
+        for c in 0..count {
+            let row: Vec<usize> =
+                s.elements.iter().copied().filter(|&k| sub.get(&joined.find(k)) == Some(&c)).collect();
+            if !row.is_empty() {
+                rows.push(row);
+            }
+        }
+    }
+    rows
 }
 
 /// The elements that share a net with an element, supply and ground nets left out, sorted.
@@ -1263,16 +1404,23 @@ fn neighbours(s: &Structure, k: usize) -> Vec<usize> {
     out.into_iter().collect()
 }
 
-/// The row keys of the elements without one: the key of the first element they are connected to
-/// that has one, round after round; then, for those connected to none, the key that most elements
-/// have, the highest of equals; 0 when no element has one.
-fn spread(s: &Structure, key: &mut BTreeMap<usize, Q>) {
+/// The row keys of the classes without one: the key of the first element their elements are
+/// connected to whose class has one, round after round; then, for those connected to none, the key
+/// that most elements have, the highest of equals; 0 when no element has one.
+fn spread(s: &Structure, joined: &Joined, key: &mut BTreeMap<usize, Q>) {
+    let roots: Vec<usize> = s.elements.iter().copied().filter(|&k| joined.find(k) == k).collect();
     loop {
-        let found: Vec<(usize, Q)> = s
-            .elements
+        let found: Vec<(usize, Q)> = roots
             .iter()
-            .filter(|k| !key.contains_key(k))
-            .filter_map(|&k| neighbours(s, k).into_iter().find_map(|j| key.get(&j).cloned()).map(|q| (k, q)))
+            .filter(|r| !key.contains_key(r))
+            .filter_map(|&r| {
+                s.elements
+                    .iter()
+                    .filter(|&&k| joined.find(k) == r)
+                    .flat_map(|&k| neighbours(s, k))
+                    .find_map(|j| key.get(&joined.find(j)).cloned())
+                    .map(|q| (r, q))
+            })
             .collect();
         if found.is_empty() {
             break;
@@ -1280,13 +1428,15 @@ fn spread(s: &Structure, key: &mut BTreeMap<usize, Q>) {
         key.extend(found);
     }
     let mut counts: BTreeMap<Q, usize> = BTreeMap::new();
-    for q in key.values() {
-        *counts.entry(q.clone()).or_default() += 1;
+    for &k in &s.elements {
+        if let Some(q) = key.get(&joined.find(k)) {
+            *counts.entry(q.clone()).or_default() += 1;
+        }
     }
     let common = counts.iter().max_by(|a, b| a.1.cmp(b.1).then_with(|| a.0.cmp(b.0))).map(|(q, _)| q.clone());
     let common = common.unwrap_or_default();
-    for &k in &s.elements {
-        key.entry(k).or_insert_with(|| common.clone());
+    for r in roots {
+        key.entry(r).or_insert_with(|| common.clone());
     }
 }
 
@@ -1306,37 +1456,63 @@ fn touched_elements(s: &Structure, f: usize, axis: usize) -> Vec<usize> {
     out.into_iter().collect()
 }
 
-/// The left-to-right precedences the facts kept on x give the elements they join, as the witness
-/// orders them: for each fact, each member at the witness's x of the point the fact takes it by,
-/// the elements of a set (a centre, 6.5) all at the centre's, and an element before another when
-/// it is further left.
-fn precedence(problem: &LevelProblem, s: &Structure) -> BTreeSet<(usize, usize)> {
-    let mut out = BTreeSet::new();
+/// The left-to-right precedences of the facts kept on x ([`Structure::precedence`],
+/// [`Reversible`]), as the witness orders their elements: each member at the witness's x of the
+/// point the fact takes it by, the elements of a set (a centre, 6.5) all at the centre's, and an
+/// element before another when it is further left. An ORDER puts every member before the next; a
+/// DISTANCE puts one side before the other only when its gap is not below 0, and leaves the
+/// members of one side unordered; an ALIGN and a DISTRIBUTE fix no side (14.2, 14.4).
+fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)>, Vec<Reversible>) {
     let element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
-    for &f in &s.kept {
-        let members: Vec<&PointRef> = match &problem.facts[f].kind {
-            FactKind::Align { axis: rnl_runtime::problem::Axis::X, members }
-            | FactKind::Order { axis: rnl_runtime::problem::Axis::X, members, .. }
-            | FactKind::Distribute { axis: rnl_runtime::problem::Axis::X, members } => members.iter().collect(),
-            FactKind::Distance { axis: rnl_runtime::problem::Axis::X, from, to, .. } => from.iter().chain(to).collect(),
-            _ => continue,
-        };
-        let mut at: Vec<(usize, Q)> = Vec::new();
-        for m in members {
+    let at = |ms: &[PointRef]| -> Vec<(usize, Q)> {
+        let mut out = Vec::new();
+        for m in ms {
             let Some(v) = point_value(problem, &s.witness, m, 0, 0) else { continue };
             let mut ks = Vec::new();
             elements_of(m, &mut ks);
-            at.extend(ks.into_iter().filter(|&k| element(k)).map(|k| (k, v.clone())));
+            out.extend(ks.into_iter().filter(|&k| element(k)).map(|k| (k, v.clone())));
         }
-        for (a, va) in &at {
-            for (b, vb) in &at {
-                if a != b && va < vb {
-                    out.insert((*a, *b));
+        out
+    };
+    let before = |a: &[(usize, Q)], b: &[(usize, Q)]| -> Vec<(usize, usize)> {
+        let mut out = Vec::new();
+        for (x, vx) in a {
+            out.extend(b.iter().filter(|(y, vy)| x != y && vx < vy).map(|(y, _)| (*x, *y)));
+        }
+        out
+    };
+    let mut fixed = BTreeSet::new();
+    let mut open = Vec::new();
+    for &f in &s.kept {
+        let (sense, mut pairs) = match &problem.facts[f].kind {
+            FactKind::Order { axis: Axis::X, sense, members } => {
+                let at = at(members);
+                (*sense, before(&at, &at))
+            }
+            FactKind::Distance { axis: Axis::X, sense, min, from, to, .. } => {
+                if !min.and_then(from_f64).is_some_and(|m| !m.is_negative()) {
+                    continue;
+                }
+                let (a, b) = (at(from), at(to));
+                let mut pairs = before(&a, &b);
+                pairs.extend(before(&b, &a));
+                (*sense, pairs)
+            }
+            _ => continue,
+        };
+        pairs.sort_unstable();
+        pairs.dedup();
+        match sense {
+            Sense::Either if s.open.orders.contains(&f) || s.open.sides.contains(&f) => {
+                if !pairs.is_empty() {
+                    open.push(Reversible { fact: f, pairs });
                 }
             }
+            Sense::Either => {}
+            Sense::Increasing | Sense::Decreasing => fixed.extend(pairs),
         }
     }
-    out
+    (fixed, open)
 }
 
 /// The objects a point refers to: its object, or the members of a set followed down.
@@ -1356,12 +1532,12 @@ fn elements_of(r: &PointRef, out: &mut Vec<usize>) {
 mod tests {
     use super::*;
     use crate::resolve::tests::{fact, instance, problem_of};
-    use rnl_runtime::problem::{Axis, ProblemGroup};
+    use rnl_runtime::problem::ProblemGroup;
 
     fn structure_of(p: &LevelProblem) -> Structure {
         let options = SolverOptions::default();
         let r = crate::resolve::resolve(p, &options);
-        analyse(p, &r, &options)
+        analyse(p, &r, &options, &mut Work::default())
     }
 
     #[test]
@@ -1432,15 +1608,97 @@ mod tests {
         );
         let s = structure_of(&p);
         assert!(s.depth.is_none());
-        // 1 above 0, 3 placed below; 2, related to nothing on y and connected to nothing, goes
-        // with the most, the highest of equals
-        assert_eq!(s.rows, vec![vec![1, 2], vec![0], vec![3]]);
+        // 1 above 0, 3 placed below; 2, which the ORDER joins to 0 and nothing on y keeps from
+        // it, in the row of 0
+        assert_eq!(s.rows, vec![vec![1], vec![0, 2], vec![3]]);
         assert!(s.precedence.contains(&(2, 0)) && !s.precedence.contains(&(0, 2)));
         // every element is its own free class
         assert_eq!(s.open.classes.len(), 4);
         // no wires, no supply: current_direction and the routing objectives are inert
         assert!(s.active.inert.iter().any(|i| i.starts_with("current_direction")));
         assert!(!s.has(Source::DepthRows) && s.has(Source::Barycentre) && s.has(Source::FacingPins));
+    }
+
+    #[test]
+    fn an_order_is_a_row_where_the_facts_let_it_be_and_an_align_on_x_a_column() {
+        let o = |k| PointRef::Origin(k);
+        let order = |members: Vec<PointRef>| {
+            fact(FactKind::Order { axis: Axis::X, sense: rnl_runtime::problem::Sense::Increasing, members })
+        };
+        let p = problem_of(
+            (0..6).map(|_| instance()).collect(),
+            vec![
+                // 1 is kept above 0 by 5, so the ORDER cannot hold them in one row; 2 joins 1
+                fact(FactKind::Distance {
+                    axis: Axis::Y,
+                    sense: rnl_runtime::problem::Sense::Increasing,
+                    min: Some(5.0),
+                    max: None,
+                    from: vec![o(0)],
+                    to: vec![o(1)],
+                }),
+                order(vec![o(0), o(1), o(2)]),
+                // 3 and 4 in one column: rows of their own, though nothing else tells them apart
+                fact(FactKind::Align { axis: Axis::X, members: vec![o(3), o(4)] }),
+            ],
+        );
+        let s = structure_of(&p);
+        let row_of = |k: usize| s.rows.iter().position(|r| r.contains(&k)).unwrap();
+        assert_eq!(row_of(1), row_of(2), "{:?}", s.rows);
+        assert_ne!(row_of(0), row_of(1), "{:?}", s.rows);
+        assert_ne!(row_of(3), row_of(4), "{:?}", s.rows);
+        // 5, connected to nothing, goes with the most
+        assert_eq!(row_of(5), row_of(3).min(row_of(4)), "{:?}", s.rows);
+    }
+
+    #[test]
+    fn only_the_facts_with_a_side_give_precedences_and_those_left_open_can_be_reversed() {
+        let o = |k| PointRef::Origin(k);
+        let distance = |sense, min: Option<f64>, max: Option<f64>, a: usize, b: usize| {
+            fact(FactKind::Distance { axis: Axis::X, sense, min, max, from: vec![o(a)], to: vec![o(b)] })
+        };
+        use rnl_runtime::problem::Sense::{Either, Increasing};
+        let p = problem_of(
+            (0..8).map(|_| instance()).collect(),
+            vec![
+                // a side: 0 before 1
+                distance(Increasing, Some(2.0), None, 0, 1),
+                // no side: within 5 of each other, either way; and a DISTRIBUTE, an ALIGN
+                distance(Either, None, Some(5.0), 2, 3),
+                fact(FactKind::Distribute { axis: Axis::X, members: vec![o(2), o(3), o(4)] }),
+                fact(FactKind::Align { axis: Axis::X, members: vec![o(5), o(6)] }),
+                // a side left open: reversible
+                fact(FactKind::Order { axis: Axis::X, sense: Either, members: vec![o(6), o(7)] }),
+            ],
+        );
+        let s = structure_of(&p);
+        assert_eq!(s.precedence.iter().copied().collect::<Vec<_>>(), vec![(0, 1)]);
+        assert_eq!(s.open.orders, vec![4]);
+        assert_eq!(s.reversible.len(), 1, "{:?}", s.reversible);
+        assert_eq!(s.reversible[0].fact, 4);
+        let [(a, b)] = s.reversible[0].pairs[..] else { panic!("{:?}", s.reversible) };
+        assert_eq!((a.min(b), a.max(b)), (6, 7));
+    }
+
+    #[test]
+    fn a_net_routed_twice_is_drawn_once_with_the_pins_of_both() {
+        let mut p = problem_of(vec![instance(), instance(), instance()], Vec::new());
+        let pin = |object: usize, pin: usize| PointRef::Pin { object, pin, terminal: ["g", "d", "s"][pin].to_string() };
+        let route = |pins: Vec<PointRef>| rnl_runtime::problem::RouteIntent {
+            net: "n".to_string(),
+            mode: "auto".to_string(),
+            style: Vec::new(),
+            pins,
+            wires: Vec::new(),
+        };
+        p.routes = vec![route(vec![pin(0, 1), pin(1, 1)]), route(vec![pin(1, 1), pin(2, 0)])];
+        let s = structure_of(&p);
+        let drawn = &s.connections.drawn;
+        assert_eq!(drawn.len(), 1, "{drawn:?}");
+        assert_eq!(drawn[0].points, vec![PointId::Pin(0, 1), PointId::Pin(1, 1), PointId::Pin(2, 0)]);
+        // every pin of the net drawn to the others
+        assert_eq!(s.connections.targets[&(0, 1)], vec![(1, 1), (2, 0)]);
+        assert_eq!(s.connections.targets[&(2, 0)], vec![(0, 1), (1, 1)]);
     }
 
     #[test]

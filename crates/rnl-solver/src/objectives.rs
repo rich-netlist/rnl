@@ -16,9 +16,9 @@
 //! `terminal_wire_alignment`, `labels` and `bend_alignment`.
 //!
 //! **Values.** Every value is an exact rational ([`Q`]), so that candidates compare alike on
-//! every platform. A layer's value is the weighted sum of its objectives; layers compare
-//! lexicographically, the first first, two values of a layer within its tolerance counting as
-//! equal ([`Active::compare`]).
+//! every platform. A layer's value is the weighted sum of its objectives; layers rank
+//! lexicographically, the first first, a value within the layer's tolerance of the least counting
+//! as equal to it ([`Active::rank`]).
 //!
 //! - [`estimate`] measures a sketch: the rough placement of a partial candidate in the search
 //!   (`crate::search`), with the routing objectives measured on straight connections, since
@@ -31,7 +31,6 @@
 //! so they never enter the coordinate LP, which minimises linear stand-ins (plan 5.6); they rank
 //! candidates once placed.
 
-use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
 use num_traits::{Signed, Zero};
@@ -290,17 +289,42 @@ impl Active {
             .collect()
     }
 
-    /// Compares two tuples of layer values: the first layer whose values differ by more than its
-    /// tolerance decides, the smaller first. Equal when none does; the caller breaks the tie by
-    /// the canonical code of the candidates, never by an objective that is off.
-    pub(crate) fn compare(&self, a: &[Q], b: &[Q]) -> Ordering {
-        for (i, layer) in self.layers.iter().enumerate() {
-            let (Some(x), Some(y)) = (a.get(i), b.get(i)) else { break };
-            if (x - y).abs() > layer.tolerance {
-                return x.cmp(y);
-            }
+    /// The order of some candidates, best first, from the value of each layer and the canonical
+    /// code of each (plan 5.8). The best is chosen layer by layer: the least value of the first
+    /// layer, the candidates within its tolerance of that value kept, then the least value of the
+    /// next layer among those, and so on; of the candidates left, the smallest code wins, then the
+    /// earlier entry. The best of the others comes next, and so on.
+    ///
+    /// A layer is compared with its least value, never one candidate with another: within a
+    /// tolerance, "equal" is not transitive (0 ≈ 0.6 t and 0.6 t ≈ 1.2 t, yet 0 < 1.2 t), so a
+    /// sort by a pairwise comparison would not be well defined. This order is, whatever the
+    /// tolerances, and does not depend on the order of the entries but for those equal in
+    /// everything. With every tolerance 0 it is the lexicographic order of the values, then the
+    /// codes. An objective that is off has no layer here, so it breaks no tie.
+    pub(crate) fn rank(&self, entries: &[(&[Q], &[u32])]) -> Vec<usize> {
+        let by_code = |a: &usize, b: &usize| entries[*a].1.cmp(entries[*b].1).then(a.cmp(b));
+        if self.layers.iter().all(|l| l.tolerance.is_zero()) {
+            let mut order: Vec<usize> = (0..entries.len()).collect();
+            order.sort_by(|a, b| entries[*a].0.cmp(entries[*b].0).then_with(|| by_code(a, b)));
+            return order;
         }
-        Ordering::Equal
+        let mut left: Vec<usize> = (0..entries.len()).collect();
+        let mut order = Vec::with_capacity(entries.len());
+        while !left.is_empty() {
+            let mut pool = left.clone();
+            for (i, layer) in self.layers.iter().enumerate() {
+                if pool.len() < 2 {
+                    break;
+                }
+                let Some(least) = pool.iter().filter_map(|&j| entries[j].0.get(i)).min().cloned() else { break };
+                let bound = least + &layer.tolerance;
+                pool.retain(|&j| entries[j].0.get(i).is_none_or(|v| *v <= bound));
+            }
+            let Some(best) = pool.into_iter().min_by(by_code) else { break };
+            order.push(best);
+            left.retain(|&j| j != best);
+        }
+        order
     }
 }
 
@@ -748,8 +772,13 @@ mod tests {
         assert!(!active.inert.iter().any(|s| s.starts_with("signal_flow")));
     }
 
+    fn ranked(active: &Active, entries: &[(Vec<Q>, Vec<u32>)]) -> Vec<usize> {
+        let refs: Vec<(&[Q], &[u32])> = entries.iter().map(|(v, c)| (v.as_slice(), c.as_slice())).collect();
+        active.rank(&refs)
+    }
+
     #[test]
-    fn layers_compare_lexicographically_within_their_tolerances() {
+    fn layers_rank_lexicographically_within_their_tolerances() {
         let objectives = Objectives {
             layers: vec![
                 Layer { items: vec![("area".to_string(), 1)], tolerance: 0.5 },
@@ -758,11 +787,60 @@ mod tests {
         };
         let active = Active::new(&objectives, &Inputs::default());
         assert_eq!(active.layers[0].tolerance, frac(1, 2));
-        let t = |a: i64, b: i64| vec![int(a), int(b)];
-        assert_eq!(active.compare(&t(1, 5), &t(2, 0)), Ordering::Less);
+        let e = |a: Q, b: i64, code: u32| (vec![a, int(b)], vec![code]);
+        // 1 and 2 are further apart than the tolerance: the first layer decides
+        assert_eq!(ranked(&active, &[e(int(2), 0, 0), e(int(1), 5, 1)]), vec![1, 0]);
         // within the tolerance of the first layer, the second decides
-        assert_eq!(active.compare(&[frac(1, 1), int(5)], &[frac(3, 2), int(0)]), Ordering::Greater);
-        assert_eq!(active.compare(&t(1, 5), &t(1, 5)), Ordering::Equal);
+        assert_eq!(ranked(&active, &[e(int(1), 5, 0), e(frac(3, 2), 0, 1)]), vec![1, 0]);
+        // equal in every layer: the smaller code, then the earlier entry
+        assert_eq!(ranked(&active, &[e(int(1), 5, 3), e(int(1), 5, 2), e(int(1), 5, 2)]), vec![1, 2, 0]);
+    }
+
+    /// Within a tolerance "equal" is not transitive: a pairwise comparison would put A before C,
+    /// C before B and B before A. The rank is still one order, whatever the order of the entries.
+    #[test]
+    fn a_rank_is_well_defined_where_tolerances_are_not_transitive() {
+        let objectives = Objectives {
+            layers: vec![
+                Layer { items: vec![("area".to_string(), 1)], tolerance: 1.0 },
+                Layer { items: vec![("aspect".to_string(), 1)], tolerance: 0.0 },
+            ],
+        };
+        let active = Active::new(&objectives, &Inputs::default());
+        let (a, b, c) =
+            ((vec![int(0), int(5)], vec![0]), (vec![frac(3, 5), int(3)], vec![1]), (vec![frac(6, 5), int(1)], vec![2]));
+        // the least of the first layer is 0: A and B are within 1 of it, and B is better in the
+        // second; then A, the least of what is left; then C
+        let entries = [a.clone(), b.clone(), c.clone()];
+        let codes = |order: Vec<usize>, entries: &[(Vec<Q>, Vec<u32>)]| -> Vec<u32> {
+            order.into_iter().map(|i| entries[i].1[0]).collect()
+        };
+        assert_eq!(codes(ranked(&active, &entries), &entries), vec![1, 0, 2]);
+        for permutation in
+            [[c.clone(), b.clone(), a.clone()], [b.clone(), c.clone(), a.clone()], [c.clone(), a.clone(), b.clone()]]
+        {
+            assert_eq!(codes(ranked(&active, &permutation), &permutation), vec![1, 0, 2]);
+        }
+        // with no tolerance it is the lexicographic order
+        let exact = Active::new(
+            &Objectives { layers: vec![Layer::single("area"), Layer::single("aspect")] },
+            &Inputs::default(),
+        );
+        assert_eq!(codes(ranked(&exact, &entries), &entries), vec![0, 1, 2]);
+        // and the layer-by-layer choice agrees with the sort when every tolerance is 0
+        let many: Vec<(Vec<Q>, Vec<u32>)> = (0..40u32)
+            .map(|i| (vec![int(i64::from(i % 5)), int(i64::from((i * 7) % 3))], vec![(i * 13) % 11]))
+            .collect();
+        let mut by_hand: Vec<usize> = (0..many.len()).collect();
+        by_hand.sort_by(|&x, &y| many[x].0.cmp(&many[y].0).then(many[x].1.cmp(&many[y].1)).then(x.cmp(&y)));
+        assert_eq!(ranked(&exact, &many), by_hand);
+        let tiny = Active::new(
+            &Objectives {
+                layers: vec![Layer { items: vec![("area".to_string(), 1)], tolerance: 1e-9 }, Layer::single("aspect")],
+            },
+            &Inputs::default(),
+        );
+        assert_eq!(ranked(&tiny, &many), by_hand);
     }
 
     #[test]

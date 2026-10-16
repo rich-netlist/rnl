@@ -2,10 +2,10 @@
 //! budget, and their canonical text, which the options digest of `sig1` covers (chapter 17).
 //!
 //! The objectives are configured in **layers**: the objectives of a layer add up with their
-//! weights, layers compare lexicographically, the first layer first, and two values of a layer
-//! within its tolerance count as equal. An objective left out is off: it is not computed, does not
-//! order candidates and breaks no ties. The default order of the layers is the prototype's, one
-//! objective per layer with weight 1 ([`DEFAULT_LAYERS`]).
+//! weights, layers rank lexicographically, the first layer first, and a value of a layer within its
+//! tolerance of the least value of that layer counts as equal to it. An objective left out is off:
+//! it is not computed, does not order candidates and breaks no ties. The default order of the
+//! layers is the prototype's, one objective per layer with weight 1 ([`DEFAULT_LAYERS`]).
 //!
 //! [`SolverOptions::canonical`] writes every setting that changes the result in a fixed order,
 //! numbers by `fmt_num`, so the same options give the same text, and so the same hash, on every
@@ -66,9 +66,12 @@ pub struct Layer {
     /// The objectives, by name ([`OBJECTIVES`]), with their weights. Their order means nothing:
     /// [`SolverOptions::parse`] gives them sorted by name, and the canonical text writes them so.
     pub items: Vec<(String, u32)>,
-    /// Two values of this layer that differ by no more than this count as equal, and the next
-    /// layer decides; 0 by default. It also bounds how much of this layer's optimum the next
-    /// layers of the coordinate LP may give up.
+    /// Where candidates are ranked, a value of this layer no more than this above the least value
+    /// of the layer counts as equal to it, and the next layer decides among those (plan 5.8); 0 by
+    /// default. Each layer is held against its least value, never one candidate against another,
+    /// so the ranking is well defined whatever the tolerances. The coordinate LP of a candidate
+    /// has layers of its own, linear stand-ins (plan 5.6), and keeps each of their optima
+    /// exactly: this tolerance does not reach it.
     pub tolerance: f64,
 }
 
@@ -201,10 +204,15 @@ impl Objectives {
 pub struct Budget {
     /// The nodes of the search for the literals of one fact, in the resolution of 8.5.
     pub resolve_nodes: u64,
-    /// The pivots of the simplex over the whole level. A pivot rewrites the rows it touches with
-    /// exact rationals, so its cost grows with the size of the tableau and of its numbers: the
-    /// count bounds the work, not the time, and the default of 1,000,000 is far more than a
-    /// level of a few hundred objects needs, a backstop rather than a limit on time.
+    /// The pivots of each simplex the solver builds: one per axis for the resolution of 8.5, for
+    /// each test of a conflict set, for each analysis of the rows, and for each candidate taken in
+    /// and placed. A simplex that reaches it stops: a fact it was deciding is discarded undecided,
+    /// a relation of the solver's own is dropped, an LP gives up and the candidate stays where its
+    /// resolution put it, and the report says so. The pivots of a level are the sum over all of
+    /// them ([`crate::Work::pivots`]), which this does not bound. A pivot rewrites the rows it
+    /// touches with exact rationals, so its cost grows with the size of the tableau and of its
+    /// numbers: the count bounds the work, not the time, and the default of 1,000,000 is far
+    /// more than a level of a few hundred objects needs, a backstop rather than a limit on time.
     pub pivots: u64,
     /// The candidates the search makes over the whole level.
     pub candidates: u64,

@@ -189,7 +189,7 @@ fn forced_overlap(e: &Exact, a: usize, b: usize) -> bool {
             rel: Relation::Linear { axis, terms, lo: Some(c), hi: None },
         });
         let mut work = crate::Work::default();
-        with_relations(s, &rels, SolverOptions::default().budget, &mut work, |_, _, kept| !kept[kept.len() - 1])
+        with_relations(s, &rels, SolverOptions::default().budget, &mut work, |_, _, t| !t.kept[t.kept.len() - 1])
     })
 }
 
@@ -237,9 +237,11 @@ fn check_level(file: &str, p: &LevelProblem) -> (Solved, Exact) {
         );
     }
     // no two instances overlap unless the facts make them
-    for &(a, b) in &e.placed.overlaps {
+    for o in &e.placed.overlaps {
+        let (a, b) = (o.a, o.b);
         let instance = |k: usize| matches!(p.objects[k].kind, ObjectKind::Instance | ObjectKind::Bundle);
         if instance(a) && instance(b) {
+            assert_eq!(o.cause, crate::coords::Cause::Facts, "{what}: {o:?}\n{}", summary(p, &solved, &e));
             assert!(
                 forced_overlap(&e, a, b),
                 "{what}: {} and {} overlap, and the facts allow them apart\n{}",
@@ -327,7 +329,11 @@ fn t3_is_drawn_as_the_plan_pictures_it() {
     for k in [m3, m4] {
         assert!(pin(k, "3")[1] > pin(k, "1")[1], "{what}: {}", p.objects[k].label);
     }
-    // the gates: the pair's outwards, the mirror's facing each other
+    // the gates: the pair's outwards, the mirror's facing each other, towards the gate net between
+    // them. The plan's picture labels M3 R0 and M4 MY; with the gate of $PMOS on its left, that
+    // turns the mirror's gates outwards, away from that net. The solver turns pins towards what
+    // they connect to, which gives M3 MY and M4 R0, the textbook drawing: a deviation from the
+    // labels of the picture, not from its layout
     let gate = |k: usize| s.exit(k, s.pins(k).iter().position(|pi| pi.terminals == ["2"]).unwrap(), g.orient[k]);
     assert_eq!(gate(m1), Some((-1, 0)), "{what}");
     assert_eq!(gate(m2), Some((1, 0)), "{what}");
@@ -423,4 +429,223 @@ fn options_change_the_search_and_never_the_facts() {
     // with no objective, the inert ones are not reported either: nothing is configured
     let solved = crate::solve(&ps[0], &SolverOptions::parse("objectives=none").unwrap());
     assert!(solved.report.inert_objectives.is_empty());
+}
+
+/// Tolerances on the layers make "equal" not transitive (0 ≈ 0.6 t ≈ 1.2 t, yet 0 < 1.2 t): the
+/// candidates are still ranked in a well-defined order, the same twice, and every fact kept holds.
+#[test]
+fn layers_with_tolerances_rank_the_candidates_in_a_well_defined_order() {
+    let texts = [
+        "objectives=component_alignment~2,distribution~1,area~50,wire_length~10,symmetry~1",
+        "objectives=current_direction~1,turns~3,ground_direction~1,component_alignment~4,distribution~2,symmetry~1,\
+         area~20,crossings~2,wire_length~8,aspect~0.5",
+    ];
+    for (i, text) in texts.into_iter().enumerate() {
+        let options = SolverOptions::parse(text).unwrap();
+        for f in netlists("tests/integration/solver", "T") {
+            for p in problems(&f) {
+                let (solved, e) = solve_exact(&p, &options);
+                let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
+                for &k in &solved.report.kept {
+                    assert!(
+                        holds_exactly(&p, &e.placed.geometry, &p.facts[k].kind, &tol),
+                        "{text}: {} fact {k}",
+                        p.title
+                    );
+                }
+                // the same twice, for the first; the second only once, to keep the test short
+                if i == 0 {
+                    assert_eq!(solved, crate::solve(&p, &options), "{text}: {}", p.title);
+                }
+            }
+        }
+    }
+}
+
+/// A note on two symbols that overlap says why: with too few pivots, the budget; with the facts
+/// of corpus 03, which tie CL to M2, the facts.
+#[test]
+fn an_overlap_is_noted_with_its_cause() {
+    let ps = problems(&repo().join("tests/integration/solver/T4-miller-conflicts.sp"));
+    let options = SolverOptions::parse("budget=pivots:40").unwrap();
+    let mut budget = false;
+    for p in &ps {
+        let (solved, e) = solve_exact(p, &options);
+        let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
+        for &k in &solved.report.kept {
+            assert!(holds_exactly(p, &e.placed.geometry, &p.facts[k].kind, &tol), "{} fact {k}", p.title);
+        }
+        for o in &e.placed.overlaps {
+            budget |= o.cause == crate::coords::Cause::Budget;
+            assert!(matches!(o.cause, crate::coords::Cause::Budget | crate::coords::Cause::Facts), "{o:?}");
+        }
+        for n in solved.report.notes.iter().filter(|n| n.contains(" overlap: ")) {
+            assert!(!n.contains("the facts kept") || !e.placed.undecided, "{n}");
+        }
+        if e.placed.undecided {
+            assert!(
+                solved.report.notes.iter().any(|n| n.contains("the budget of pivots ran out")),
+                "{:?}",
+                solved.report.notes
+            );
+        }
+    }
+    assert!(budget, "40 pivots leave some symbols overlapping for want of budget");
+    let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
+    let (solved, e) = solve_exact(&ps[0], &SolverOptions::default());
+    let [m2, cl] = ["#M2", "#CL"].map(|l| object(&ps[0], l));
+    assert!(
+        e.placed
+            .overlaps
+            .iter()
+            .any(|o| (o.a, o.b) == (m2.min(cl), m2.max(cl)) && o.cause == crate::coords::Cause::Facts),
+        "{:?}",
+        e.placed.overlaps
+    );
+    assert!(solved.report.notes.iter().any(|n| n.contains("overlap: the facts kept, with the orientations taken")));
+}
+
+// ------------------------------------------------------------------------ netlists given as text
+
+/// The levels of a netlist given as text, read as the CLI reads a file.
+fn problems_of(text: &str) -> Vec<LevelProblem> {
+    let files = rnl_runtime::source::MemoryProvider::new().with("t.sp", text);
+    rnl_view::interpret("t.sp", None, &files, &rnl_runtime::Options::solver()).unwrap().problems
+}
+
+/// Solves the one level of a netlist given as text, checked as the cases of the files are.
+fn solve_text(text: &str) -> (LevelProblem, Solved, Exact) {
+    let ps = problems_of(text);
+    assert_eq!(ps.len(), 1, "{text}");
+    let p = ps.into_iter().next().unwrap();
+    let (solved, e) = check_level("text", &p);
+    (p, solved, e)
+}
+
+/// A lower bound whose constant is off the grid: the free coordinate goes to the grid point past it,
+/// not to the nearer one, which the bound does not allow.
+#[test]
+fn a_bound_off_the_grid_puts_what_it_moves_on_the_next_grid_point() {
+    let (p, solved, e) = solve_text(
+        "* g1\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 a b 1k\n\
+         * @RNL { #R1 @PLACE(0, 0); #R1 #R2 @DISTANCE(\"left-to-right\", min=7.4); {#R1 #R2} @ALIGN(\"y\") }\n.end\n",
+    );
+    let what = summary(&p, &solved, &e);
+    let [r1, r2] = ["#R1", "#R2"].map(|l| object(&p, l));
+    let at = &e.placed.geometry.origin;
+    assert_eq!(at[r1], [int(0), int(0)], "{what}");
+    assert!(at[r2][0].is_integer() && at[r2][0] >= crate::rational::frac(37, 5), "{what}");
+    assert!(at[r2][1].is_integer(), "{what}");
+    // the same with points, which go on the grid after the symbols
+    let (p, solved, e) = solve_text(
+        "* g2\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\n\
+         * @RNL { %a = (0, 0); %b = (_, _); %a %b @DISTANCE(\"left-to-right\", min=0.4) }\n.end\n",
+    );
+    let what = summary(&p, &solved, &e);
+    let b = object(&p, "%b");
+    let at = &e.placed.geometry.origin;
+    assert!(at[b][0].is_integer() && at[b][0] >= crate::rational::frac(2, 5), "{what}");
+    for k in &e.structure.elements {
+        assert!(at[*k][0].is_integer() && at[*k][1].is_integer(), "{what}");
+    }
+}
+
+/// A symbol with a text a half unit off the grid from it: the symbol is on the grid, and the text,
+/// which its offset makes follow, is off it.
+#[test]
+fn a_text_with_an_offset_off_the_grid_leaves_its_symbol_on_the_grid() {
+    let (p, solved, e) = solve_text(
+        "* h1\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n\
+         * @RNL { #R1 @TEXT(\"x\", key=\"code\", dx=-2, dy=3.5); #R2 @TEXT(\"y\", key=\"code\", dx=0.5, dy=-1.5) }\n.end\n",
+    );
+    let what = summary(&p, &solved, &e);
+    let at = &e.placed.geometry.origin;
+    for &k in &e.structure.elements {
+        assert!(at[k][0].is_integer() && at[k][1].is_integer(), "{what}: {}", p.objects[k].label);
+    }
+    let texts: Vec<usize> = (0..p.objects.len())
+        .filter(|&k| {
+            matches!(p.objects[k].kind, ObjectKind::Text) && matches!(p.objects[k].position, Position::Own { .. })
+        })
+        .collect();
+    assert_eq!(texts.len(), 2, "{what}");
+    assert!(texts.iter().all(|&t| !at[t][1].is_integer()), "{what}");
+}
+
+/// A supply and a ground drawn right on the terminals (12.1): their terminals are on the supply and
+/// the ground, so the current depth puts the PMOS above the NMOS.
+#[test]
+fn a_supply_and_a_ground_on_terminals_give_the_current_depth() {
+    let (p, solved, e) = solve_text(
+        "* s1\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.model nch nmos level=1\n.model pch pmos level=1\n\
+         M1 out in vdd vdd pch\nM2 out in vss vss nch\n\
+         * @RNL {\n\
+         *   # @SELECT-INSTANCE(model=\"nch\") => @SET-SYMBOL $NMOS;\n\
+         *   # @SELECT-INSTANCE(model=\"pch\") => @SET-SYMBOL $PMOS;\n\
+         *   $SUPPLY @ATTACH #M1:3;\n\
+         *   $GND @ATTACH #M2:3;\n\
+         *   $WIRE_NET_SET @ROUTE\n\
+         * }\n.end\n",
+    );
+    let what = summary(&p, &solved, &e);
+    let s = &e.structure;
+    let [m1, m2] = ["#M1", "#M2"].map(|l| object(&p, l));
+    let depth = s.depth.as_ref().unwrap_or_else(|| panic!("no current depth: {what}"));
+    assert_eq!((depth[m1], depth[m2]), (Some(0), Some(1)), "{what}");
+    assert_eq!(s.rows, vec![vec![m1], vec![m2]], "{what}");
+    let at = &e.placed.origins;
+    assert!(at[m1][1] > at[m2][1], "{what}");
+    assert!(!solved.report.inert_objectives.iter().any(|i| i.starts_with("current_direction")), "{what}");
+}
+
+/// An ORDER on x is a row (plan 5.4), even when a neighbour of one of its members sits at another
+/// height.
+#[test]
+fn an_order_on_x_is_one_row() {
+    let (p, solved, e) = solve_text(
+        "* o1\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 c d 1k\nR3 e f 1k\nR4 g h 1k\nR5 c k 1k\n\
+         * @RNL {\n\
+         *   {#R1 #R2 #R3 #R4} @ORDER(\"left-to-right\");\n\
+         *   #R1 #R5 @DISTANCE(\"bottom-to-top\", min=5);\n\
+         *   $WIRE_NET_SET @ROUTE\n\
+         * }\n.end\n",
+    );
+    let what = summary(&p, &solved, &e);
+    let [r1, r2, r3, r4, r5] = ["#R1", "#R2", "#R3", "#R4", "#R5"].map(|l| object(&p, l));
+    assert!(e.structure.rows.contains(&vec![r1, r2, r3, r4]), "{what}: {:?}", e.structure.rows);
+    let y = |k: usize| e.placed.origins[k][1].clone();
+    assert!(y(r1) == y(r2) && y(r2) == y(r3) && y(r3) == y(r4), "{what}");
+    assert!(y(r5) >= y(r1) + int(5), "{what}");
+}
+
+/// An ORDER given only an axis leaves its direction open (14.3): it fixes no precedence, the search
+/// may reverse it (`search::tests::a_fact_whose_side_is_open_is_reversed`), and its members share a
+/// row.
+#[test]
+fn an_order_given_only_an_axis_fixes_no_precedence() {
+    let (p, solved, e) = solve_text(
+        "* r1\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\nR3 c d 1k\n\
+         * @RNL { {#R1 #R3} @ORDER(\"x\"); $WIRE_NET_SET @ROUTE }\n.end\n",
+    );
+    let [r1, r3] = ["#R1", "#R3"].map(|l| object(&p, l));
+    let s = &e.structure;
+    assert!(s.precedence.is_empty(), "{:?}", s.precedence);
+    assert_eq!(s.reversible.len(), 1, "{:?}", s.reversible);
+    assert!(s.rows.iter().any(|row| row.contains(&r1) && row.contains(&r3)), "{:?}", s.rows);
+    assert!(e.candidate.rows.iter().any(|row| row.contains(&r1) && row.contains(&r3)), "{}", summary(&p, &solved, &e));
+}
+
+/// An ALIGN on x is a column: its members go in rows of their own, one above the other, not side by
+/// side in one row, where the gaps of the row could not hold.
+#[test]
+fn an_align_on_x_is_a_column() {
+    let (p, solved, e) = solve_text(
+        "* c1\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\nR3 c d 1k\n\
+         * @RNL { {#R1 #R2} @ALIGN(\"x\"); $WIRE_NET_SET @ROUTE }\n.end\n",
+    );
+    let what = summary(&p, &solved, &e);
+    let [r1, r2] = ["#R1", "#R2"].map(|l| object(&p, l));
+    assert!(!e.structure.rows.iter().any(|row| row.contains(&r1) && row.contains(&r2)), "{what}");
+    assert!(e.placed.overlaps.is_empty(), "{what}");
+    assert!(!e.placed.dropped.contains(&crate::search::RelKind::Gap), "{what}: {:?}", e.placed.dropped);
 }

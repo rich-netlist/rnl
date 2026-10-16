@@ -22,20 +22,25 @@
 //!    the grid: the tie-break that makes the result stable.
 //!
 //! **Rounding.** The grid is the solver's own rule, ranked after every description (11.7), and
-//! also after the layers above: with the layers' bounds taken away, each origin off the grid, in
-//! the order of the objects, is put on the nearest point of it when the facts and relations
-//! allow, and kept there; then the layers are solved again with those origins kept, and the
-//! rounding done once more. A coordinate that the facts force off the grid stays as they force
-//! it. The constants of the relations are themselves on the grid ([`crate::search`]), so that the
-//! LP's vertices mostly are.
+//! also after the layers above: with the layers' bounds taken away, the origins are visited, the
+//! symbols first in the order of the objects, then the points and texts, which mostly follow a
+//! symbol. Each goes to the nearer grid point beside it when the facts and relations allow, or
+//! else to the other, and each that ends up on the grid is held there, so that a later one cannot
+//! move it off again. A symbol that fits on neither is tried once more before the others held in
+//! the visit, which are then held again on the grid (a centre is tied to its set). Then the layers
+//! are solved again with the origins moved kept, and the rounding done once more. A coordinate
+//! that the facts force off the grid stays as they force it. The constants of the relations are
+//! themselves on the grid ([`crate::search`]), those that put overlapping symbols apart too, so
+//! that the LP's vertices mostly are.
 //!
 //! **Overlaps.** Not overlapping is the solver's own rule too (11.7): two symbols whose boxes
 //! still overlap are put apart by a relation with four sides to choose from, the one that moves
 //! least first, ranked after the facts and before the structural relations, so that it takes
 //! precedence over them; then the candidate is taken in again, for a few rounds. Two symbols that
-//! no side puts apart overlap because the facts make them.
+//! still overlap do so for a reason ([`Cause`]): the facts kept leave no side, the symbols put
+//! apart before them leave none, the rounds ran out, or the budget did.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use num_traits::{One, Zero};
 use rnl_runtime::geom::Orient;
@@ -44,13 +49,35 @@ use rnl_runtime::problem::LevelProblem;
 use crate::model::{turned, Model, PointId};
 use crate::rational::{from_f64, Q};
 use crate::resolve::{Geometry, Resolver, Tag};
-use crate::search::{orientation_relations, relations, with_relations, Candidate, RelKind, Relation, Tagged};
+use crate::search::{orientation_relations, relations, up, with_relations, Candidate, RelKind, Relation, Tagged};
 use crate::simplex::{LinExpr, Rel, Simplex, Var};
 use crate::structure::{Role, Structure};
 use crate::{SolverOptions, Work};
 
 /// How many rounds of putting overlapping symbols apart.
 const REPAIR_ROUNDS: usize = 6;
+
+/// Why two symbols still overlap.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Cause {
+    /// The facts kept, with the orientations taken, leave no side to put them apart.
+    Facts,
+    /// A side fits with the facts kept, but not with the symbols put apart before them.
+    Others,
+    /// The rounds of putting symbols apart ran out before they had their turn.
+    Rounds,
+    /// The budget of pivots ran out while the candidate was taken in or placed, so a relation
+    /// may have been dropped without a conflict.
+    Budget,
+}
+
+/// Two symbols that overlap, the earlier first, and why.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Overlap {
+    pub a: usize,
+    pub b: usize,
+    pub cause: Cause,
+}
 
 /// A candidate placed.
 #[derive(Clone, Debug, PartialEq)]
@@ -63,10 +90,13 @@ pub(crate) struct Placed {
     /// The relations the resolution dropped, by kind, with repeats.
     pub dropped: Vec<RelKind>,
     /// The pairs of symbols that still overlap.
-    pub overlaps: Vec<(usize, usize)>,
+    pub overlaps: Vec<Overlap>,
     /// Whether the LP ran: when its budget ran out, the placement is where the resolution of the
     /// candidate put it.
     pub optimised: bool,
+    /// Whether the budget ran out deciding a relation of the candidate, which was then dropped
+    /// without a conflict.
+    pub undecided: bool,
 }
 
 /// Places a candidate (see the module).
@@ -78,6 +108,7 @@ pub(crate) fn place(
     work: &mut Work,
 ) -> Placed {
     let budget = options.budget;
+    let grid = options.grid.and_then(from_f64).filter(|g| *g > Q::zero());
     let orient = orientation_relations(s, c);
     let actual: Vec<Orient> = with_relations(s, &orient, budget, work, |r, _, _| r.geometry().orient.clone());
     let mut separations: Vec<Tagged> = Vec::new();
@@ -87,24 +118,66 @@ pub(crate) fn place(
         let mut rels = orient.clone();
         rels.extend(separations.iter().cloned());
         rels.extend(relations(s, c, &actual, options));
-        let (geometry, kept, optimised) = with_relations(s, &rels, budget, work, |r, model, kept| {
+        let (geometry, kept, undecided, optimised) = with_relations(s, &rels, budget, work, |r, model, t| {
             let (g, optimised) = optimise(r, model, s, options);
-            (g, kept.to_vec(), optimised)
+            (g, t.kept.clone(), t.undecided, optimised)
         });
         let origins = s.origins(problem, &geometry);
         let overlaps = overlapping(s, &origins, &geometry.orient);
         let new: Vec<(usize, usize)> = overlaps.iter().copied().filter(|p| !separated.contains(p)).collect();
         if new.is_empty() || round >= REPAIR_ROUNDS {
             let dropped = rels.iter().zip(&kept).filter(|(_, k)| !**k).map(|(t, _)| t.kind).collect();
-            return Placed { geometry, origins, dropped, overlaps, optimised };
+            let overlaps = overlaps
+                .into_iter()
+                .map(|(a, b)| {
+                    let cause = if undecided || !optimised {
+                        Cause::Budget
+                    } else if !separated.contains(&(a, b)) {
+                        Cause::Rounds
+                    } else {
+                        apart_cause(s, &origins, &geometry.orient, a, b, &grid, budget, work)
+                    };
+                    Overlap { a, b, cause }
+                })
+                .collect();
+            return Placed { geometry, origins, dropped, overlaps, optimised, undecided };
         }
         for (a, b) in new {
             separated.insert((a, b));
-            if let Some(t) = separation(s, &origins, &geometry.orient, a, b) {
+            if let Some(t) = separation(s, &origins, &geometry.orient, a, b, &grid) {
                 separations.push(t);
             }
         }
         round += 1;
+    }
+}
+
+/// Why two symbols that were given a relation to put them apart still overlap: whether the facts
+/// kept, with the orientations as placed, leave a side for them at all.
+#[allow(clippy::too_many_arguments)]
+fn apart_cause(
+    s: &Structure,
+    origins: &[[Q; 2]],
+    ori: &[Orient],
+    a: usize,
+    b: usize,
+    grid: &Option<Q>,
+    budget: crate::Budget,
+    work: &mut Work,
+) -> Cause {
+    let Some(apart) = separation(s, origins, ori, a, b, grid) else { return Cause::Facts };
+    let mut rels: Vec<Tagged> = s
+        .open
+        .classes
+        .iter()
+        .map(|c| Tagged { kind: RelKind::Orientation, rel: Relation::Orient { root: c.root, value: ori[c.root] } })
+        .collect();
+    rels.push(apart);
+    let (fits, undecided) = with_relations(s, &rels, budget, work, |_, _, t| (t.kept[t.kept.len() - 1], t.undecided));
+    match (fits, undecided) {
+        (true, _) => Cause::Others,
+        (false, true) => Cause::Budget,
+        (false, false) => Cause::Facts,
     }
 }
 
@@ -138,8 +211,16 @@ pub(crate) fn overlapping(s: &Structure, origins: &[[Q; 2]], ori: &[Orient]) -> 
 type SideBound = (usize, Vec<(PointId, Q)>, Q, Q);
 
 /// The relation that puts two symbols apart: `b` right of, left of, above or below `a`, a unit
-/// apart, those that move least first, then the same touching.
-pub(crate) fn separation(s: &Structure, origins: &[[Q; 2]], ori: &[Orient], a: usize, b: usize) -> Option<Tagged> {
+/// apart, those that move least first, then the same touching; each distance rounded up to the
+/// grid.
+pub(crate) fn separation(
+    s: &Structure,
+    origins: &[[Q; 2]],
+    ori: &[Orient],
+    a: usize,
+    b: usize,
+    grid: &Option<Q>,
+) -> Option<Tagged> {
     let (pa, pb) = (s.model.origin_point.get(a).copied().flatten()?, s.model.origin_point.get(b).copied().flatten()?);
     let ba = s.box_offset(a, ori[a])?;
     let bb = s.box_offset(b, ori[b])?;
@@ -160,7 +241,8 @@ pub(crate) fn separation(s: &Structure, origins: &[[Q; 2]], ori: &[Orient], a: u
     for gap in [one(), Q::zero()] {
         for &i in &order {
             let (axis, terms, c, _) = &sides[i];
-            alternatives.push(vec![(*axis, terms.clone(), c + &gap)]);
+            // on the grid, as the constants of the other relations are
+            alternatives.push(vec![(*axis, terms.clone(), up(c + &gap, grid))]);
         }
     }
     Some(Tagged { kind: RelKind::Separation, rel: Relation::OneOf(alternatives) })
@@ -250,29 +332,95 @@ fn layers(
     minimise_and_keep(sx, &objective)
 }
 
-/// The origins off the grid, in the order of the objects, put on it where that is feasible and
-/// kept there; those put on it are added to `fixed`.
-fn round_to_grid(sx: &mut Simplex<Tag>, own: &[(usize, Var)], grid: &Option<Q>, fixed: &mut BTreeSet<usize>) {
-    if grid.is_none() {
-        return;
+/// Holds `v` at `r` when the bounds allow it, and says whether they did.
+fn try_pin(sx: &mut Simplex<Tag>, v: Var, r: &Q) -> bool {
+    let cp = sx.checkpoint();
+    if sx.assert(&LinExpr::var(v), Rel::Eq, r, Tag::Def).is_ok() && sx.check().is_ok() {
+        return true;
     }
-    for &(k, v) in own {
-        if fixed.contains(&k) {
+    sx.backtrack(cp);
+    let _ = sx.check();
+    false
+}
+
+/// The grid points to try for a value: itself when it is on the grid; otherwise the nearer grid
+/// point beside it, then the other.
+fn grid_points(x: &Q, grid: &Q) -> Vec<Q> {
+    let near = round(x, &Some(grid.clone()));
+    if near == *x {
+        return vec![near];
+    }
+    let far = if near > *x { &near - grid } else { &near + grid };
+    vec![near, far]
+}
+
+/// An origin to put on the grid: the object, its variable on the axis, and whether it is a symbol.
+type Visit = (usize, Var, bool);
+
+/// Puts origins on the grid (see the module), in the order given, and holds each one visited that
+/// ends up on it there, so that a later one put on the grid cannot move it off again. An origin
+/// off the grid goes to the nearer grid point beside it when the bounds allow it, otherwise to the
+/// other. When they allow neither and it is a symbol, the origins held in this call are let go, it
+/// is put on the grid first, and they are held again, each where it was or on a grid point beside
+/// where it is now: the facts may tie it to them, as a centre is tied to its set. When one of them
+/// can no longer be on the grid, all is as before, and the origin stays where it is, free. `kept`
+/// are the origins held on the grid already, which are left as they are. Gives the origins moved
+/// onto the grid, with where.
+fn round_to_grid(sx: &mut Simplex<Tag>, order: &[Visit], grid: &Q, kept: &BTreeSet<usize>) -> Vec<(usize, Q)> {
+    let start = sx.checkpoint();
+    // the origins held in this call, in the order they were held, with where
+    let mut held: Vec<(usize, Var, Q)> = Vec::new();
+    let mut moved: BTreeMap<usize, Q> = BTreeMap::new();
+    for &(k, v, symbol) in order {
+        if kept.contains(&k) {
             continue;
         }
         let x = sx.value(v).clone();
-        let r = round(&x, grid);
-        if r == x {
+        let points = grid_points(&x, grid);
+        if let Some(r) = points.iter().find(|r| try_pin(sx, v, r)) {
+            if *r != x {
+                moved.insert(k, r.clone());
+            }
+            held.push((k, v, r.clone()));
             continue;
         }
-        let cp = sx.checkpoint();
-        if sx.assert(&LinExpr::var(v), Rel::Eq, &r, Tag::Def).is_ok() && sx.check().is_ok() {
-            fixed.insert(k);
+        if !symbol || held.is_empty() {
+            continue;
+        }
+        // this one first, then those held before it again
+        sx.backtrack(start);
+        let _ = sx.check();
+        let mut again: Vec<(usize, Var, Q)> = Vec::new();
+        if let Some(r) = points.iter().find(|r| try_pin(sx, v, r)) {
+            again.push((k, v, r.clone()));
+            for (j, w, at) in &held {
+                let now = sx.value(*w).clone();
+                let mut tries = vec![at.clone()];
+                tries.extend(grid_points(&now, grid).into_iter().filter(|q| q != at));
+                match tries.into_iter().find(|q| try_pin(sx, *w, q)) {
+                    Some(q) => again.push((*j, *w, q)),
+                    None => break,
+                }
+            }
+        }
+        if again.len() == held.len() + 1 {
+            for (j, _, q) in &again {
+                let before = held.iter().find(|(i, _, _)| i == j).map(|(_, _, at)| at);
+                if before != Some(q) {
+                    moved.insert(*j, q.clone());
+                }
+            }
+            held = again;
         } else {
-            sx.backtrack(cp);
+            // as before
+            sx.backtrack(start);
+            for (_, w, at) in &held {
+                let _ = sx.assert(&LinExpr::var(*w), Rel::Eq, at, Tag::Def);
+            }
             let _ = sx.check();
         }
     }
+    moved.into_iter().collect()
 }
 
 /// The coordinates of what a resolution holds (see the module); the resolution's own witness when
@@ -285,6 +433,9 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
         .filter(|&k| s.objects[k].own)
         .filter_map(|k| Some((k, model.points.get(&PointId::Origin(k))?.var)))
         .collect();
+    // the symbols go on the grid first, then the points and texts, which mostly follow a symbol
+    let mut order: Vec<Visit> = own.iter().filter(|(k, _)| solid(s, *k)).map(|&(k, v)| (k, v, true)).collect();
+    order.extend(own.iter().filter(|(k, _)| !solid(s, *k)).map(|&(k, v)| (k, v, false)));
     let mut out = fallback.clone();
     for axis in 0..2 {
         let sx = r.simplex_mut(axis);
@@ -292,21 +443,50 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
         if !linked {
             return (fallback, false);
         }
-        let targets: Vec<Q> = own.iter().map(|(k, _)| round(&fallback.origin[*k][axis], &grid)).collect();
-        let mut fixed = BTreeSet::new();
-        for pass in 0..2 {
+        // where the resolution of the candidate put each origin, a symbol's on the grid; a text or a
+        // point follows what it is placed from, and a target rounded on its own would pull that
+        // off the grid
+        let targets: Vec<Q> = own
+            .iter()
+            .map(|(k, _)| {
+                let at = &fallback.origin[*k][axis];
+                if solid(s, *k) {
+                    round(at, &grid)
+                } else {
+                    at.clone()
+                }
+            })
+            .collect();
+        let base = sx.checkpoint();
+        let mut moved: Vec<(usize, Q)> = Vec::new();
+        // two passes at most: the layers, the grid, and once more when the grid moved something
+        for _ in 0..2 {
+            // the origins the grid moved in the pass before stay where it put them; the others are
+            // free for the layers again
+            sx.backtrack(base);
+            for (k, at) in &moved {
+                let Some(&(_, v)) = own.iter().find(|(j, _)| j == k) else { continue };
+                if sx.assert(&LinExpr::var(v), Rel::Eq, at, Tag::Def).is_err() {
+                    return (fallback, false);
+                }
+            }
+            if sx.check().is_err() {
+                return (fallback, false);
+            }
             let cp = sx.checkpoint();
             let solved = layers(sx, model, s, &ori, &own, &targets, axis).is_ok();
             sx.backtrack(cp);
             if !solved && sx.check().is_err() {
                 return (fallback, false);
             }
-            let before = fixed.len();
-            round_to_grid(sx, &own, &grid, &mut fixed);
+            let Some(g) = &grid else { break };
+            let kept: BTreeSet<usize> = moved.iter().map(|(k, _)| *k).collect();
+            let now = round_to_grid(sx, &order, g, &kept);
             // the layers again only when the grid moved something
-            if pass == 0 && fixed.len() == before {
+            if now.is_empty() {
                 break;
             }
+            moved.extend(now);
         }
         if sx.check().is_err() {
             return (fallback, false);
