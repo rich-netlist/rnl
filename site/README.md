@@ -1,14 +1,15 @@
 # site
 
-Three static pages, in Chinese and English, for circuit designers who have not worked on EDA tooling:
+Four static pages, in Chinese and English, for circuit designers who have not worked on EDA tooling:
 
 - `index.html`, the introduction: what RNL is, the problem it addresses, the goal, before/after scenarios, the toolchain, the settled principles, the language at a glance, and a few examples.
 - `language.html`, the language tour: nine hands-on sections on the parts of the language the introduction does not unpack (standard sentences and Chinese, definitions, the standard package's defaults, sets and selections, wires, text, orientation, priority, the header record).
 - `tools.html`, the page of the tools: what the viewers of the first toolkit, 0.1, do; the web viewer, with a few samples to open in it; the desktop viewer for Windows, with the files of its newest release; and their licences.
+- `packages.html`, the gallery of the standard packages: every package in [`libraries/`](../libraries/README.md), with what it is for, what it references and its text, every symbol as the core draws it, with its pins and box, and the rules that give elements their symbols ([The gallery](#the-gallery-of-the-standard-packages)).
 
-The site also publishes the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of both languages link to, with the conformance corpus as its samples; and the pages of the language standard, at `spec/0.2/`. [`pages.yml`](../.github/workflows/pages.yml) adds both to what `build.py` writes.
+The site also publishes the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of both languages link to, with the conformance corpus as its samples; the pages of the language standard, at `spec/0.2/`; and the gallery's data, at `gallery/`. [`pages.yml`](../.github/workflows/pages.yml) adds them to what `build.py` writes.
 
-**Status:** an explainer, not a specification. The RNL snippets follow language draft 0.2 (2026-10-12), which has since been consolidated into the language standard 0.2 in [`spec/`](../spec/README.md); the pages say so and link to it. The snippets have been checked with the RNL interpreter prototype, which lives in a research repository that is not public yet. Layouts in the drawings are placed by hand, not produced by a solver.
+**Status:** an explainer, not a specification. The RNL snippets follow language draft 0.2 (2026-10-12), which has since been consolidated into the language standard 0.2 in [`spec/`](../spec/README.md); the pages say so and link to it. The snippets have been checked with the RNL interpreter prototype, which lives in a research repository that is not public yet. Layouts in the drawings are placed by hand, not produced by a solver; the symbols of the gallery are drawn by the core.
 
 ## One source, two languages
 
@@ -48,6 +49,18 @@ With a release, the build keeps the `<!--release-->` blocks and fills in `{{view
 
 `pages.yml` checks out the whole history, tags included, and runs again after each release of the desktop viewer, so that the published page links to the new files. `--viewer-version` sets the version for a local build or a test, whatever the tags say, and `--viewer-version none` builds the page as before the first release.
 
+## The gallery of the standard packages
+
+`packages.html` shows what [`gallery/build.mjs`](gallery/build.mjs) writes into `site/dist/gallery/` from the package files in [`libraries/`](../libraries/README.md). The page is built by `build.py` like the others; its data is not, and is the same for both languages.
+
+- **Groups.** Every directory under `libraries/` that holds `.rnl` files is a group, one tab of the page: `libraries/standard/0.2/` is the standard series 0.2, and any other directory, such as one of packages that are not standard, is a group of its own, marked as not in the standard series. The newest series comes first. A package is known by the name and version its header record declares; what it references and the order in which using it brings packages in come from its `USE-PACKAGE`s, and the packages `rnl-std` brings in are the ones every netlist has by default. Adding a directory or a file needs no change to the code.
+- **Statements.** [`gallery/package-file.mjs`](gallery/package-file.mjs) splits each record of a package file into its statements and sorts them by their first tokens: symbols, styles, definitions, sets, rules (symbol, style, text and set rules) and definitions attached to sets. It is not an interpreter; what a statement means and how a symbol looks come from the core.
+- **Symbols.** Every symbol a package defines with a `$` name is drawn by the core as WebAssembly, the one the web viewer runs: the build writes a netlist with a subcircuit for each symbol, in which one instance is drawn with the symbol at the origin, and asks the core for the drawing and the snapshot of every level, with the package files of `libraries/` in the request, so that they are drawn as they are there whatever the core bundles. The labels a symbol fills with `${…}` show their keys, such as `name` and `value`. The pins, their directions and the box come from the core; the labels of the pins and the texts of the labels, from the text. Each pin is marked on the picture with its terminal number and the arrow of the direction it points, where its wire leaves, such as `1↑`. The names of the terminals, which the picture does not show, are listed under it when the comment right before a symbol starts with them, as `d g s b; from Analog Canvas nmos`. All symbols are drawn at the same scale, and the page shows or hides the pins, the box and the labels on demand. A thumbnail, as in the table of symbol rules, is framed on the symbol alone and scaled to fit.
+- **What each package is for**: a sentence in both languages in `SUMMARY` in [`src/assets/gallery.js`](src/assets/gallery.js); a package without one shows the comment its file starts with.
+- **Problems.** A package file the core reports errors or warnings for, a symbol it reports them for while drawing, or one whose pins it gives differently from the text, is listed by the build, as a warning annotation in GitHub Actions, and marked on the page. The build fails only when the core cannot read a gallery's netlist or draws no level for a symbol.
+
+The data is scripts that the page loads with `<script>`, `index.js` and one file per group, so that the page also works opened from the disk.
+
 ## Building and viewing
 
 From the repository root, with Python 3 and nothing else (and git, for the tags):
@@ -70,15 +83,25 @@ cp -r apps/web/dist site/dist/viewer
 python -m http.server --directory site/dist
 ```
 
+The gallery's data needs the core as WebAssembly too, as `node apps/web/build.mjs` or `node bindings/runtime-wasm/build.mjs` builds it into `bindings/runtime-wasm/dist/`, and Node 18 or later with nothing to install. After `build.py`, which empties `site/dist/`:
+
+```bash
+node site/gallery/build.mjs                   # write site/dist/gallery/
+node --test site/gallery/package-file.test.mjs   # the tests of reading package files
+```
+
+`--core DIR` takes the core from another directory, `--out DIR` writes into another built site, and `--libraries DIR` reads the package files of another checkout. Opened from the disk or served, `packages.html` then shows the gallery; without its data, it says how to build it.
+
 | Output in `site/dist/` | Content |
 | --- | --- |
-| `index.html`, `language.html`, `tools.html`, `assets/` | Chinese pages, at the site root |
-| `en/index.html`, `en/language.html`, `en/tools.html`, `en/assets/` | English pages |
+| `index.html`, `language.html`, `tools.html`, `packages.html`, `assets/` | Chinese pages, at the site root |
+| `en/index.html`, `en/language.html`, `en/tools.html`, `en/packages.html`, `en/assets/` | English pages |
+| `gallery/` | The gallery's data, for both languages: `index.js`, the groups, and one script per group, such as `standard-0.2.js`. Not written by `build.py`: `pages.yml` writes it with `node site/gallery/build.mjs`, after building the web viewer and so the core. |
 | `spec/<version>/`, `en/spec/<version>/`, and `spec/`, `en/spec/` | The language standard: for each version in `spec/`, one page per language with its PDF and Markdown downloads, and next to it the pages that compare it with each earlier version, such as `compare-0.2.html`; `spec/` and `en/spec/` lead to the newest version, which the top bar links to. Not written by `build.py`: [`pages.yml`](../.github/workflows/pages.yml) adds them with `python scripts/spec/build.py --site site/dist` ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). |
 | `viewer/` | The web viewer with its samples, one copy for both languages, its interface in English. Not written by `build.py`: `pages.yml` builds it with `node apps/web/build.mjs --samples` and copies `apps/web/dist/` here. |
 | `rnl-intro-standalone.html`, `rnl-language-standalone.html`, `rnl-tools-standalone.html`, and the same under `en/` | Single-file pages with the styles and scripts inlined; their links to the other pages, the languages and the web viewer point to the published site |
 
-[`pages.yml`](../.github/workflows/pages.yml) publishes `site/dist/` to GitHub Pages, at <https://rich-netlist.github.io/rnl/>, whenever `site/`, `spec/` or `scripts/spec/` changes on `main`, or what the web viewer is built from; after a revision of the standard is released; and after a release of the desktop viewer. The web viewer is at <https://rich-netlist.github.io/rnl/viewer/>. The language switch keeps the reader on the same section.
+[`pages.yml`](../.github/workflows/pages.yml) publishes `site/dist/` to GitHub Pages, at <https://rich-netlist.github.io/rnl/>, whenever `site/`, `spec/` or `scripts/spec/` changes on `main`, or what the web viewer is built from, the package files in `libraries/` among it; after a revision of the standard is released; and after a release of the desktop viewer. The web viewer is at <https://rich-netlist.github.io/rnl/viewer/>. The language switch keeps the reader on the same section.
 
 ## Files
 
@@ -87,13 +110,19 @@ python -m http.server --directory site/dist
 | `src/index.html` | Introduction: structure and text |
 | `src/language.html` | Language tour: structure and text |
 | `src/tools.html` | Page of the tools: structure and text, with the blocks that depend on the desktop viewer's release |
+| `src/packages.html` | Gallery of the standard packages: structure and text; the gallery itself is drawn by `gallery.js` from the data |
+| `src/assets/gallery.js` | The gallery: loading the data, the groups, search, the packages and their statements, the symbol cards and the details of a symbol, what each package is for |
+| `src/assets/gallery.css` | Styles of the gallery, on top of `intro.css`, with the colours of the core's drawings mapped to the theme |
+| `gallery/build.mjs` | Builds the gallery's data from `libraries/`, with the symbols drawn by the core as WebAssembly |
+| `gallery/package-file.mjs` | Reads a package file: its header record, its comments, and its statements by kind, with the pins and labels of the symbols |
+| `gallery/package-file.test.mjs` | Tests of `package-file.mjs`, and that every package file in `libraries/` reads as a package |
 | `src/assets/intro.css` | Styles of all pages: light and dark palettes, narrow-screen layout, no animation under `prefers-reduced-motion`, fonts per language |
 | `src/assets/schem.js` | Small schematic renderer in RNL coordinates (x right, y up): self-drawn textbook symbols with the standard package's pin positions, the eight orientation codes, pin-based wiring, animated layout transitions, annotation layer |
-| `src/assets/rnl-code.js` | Display-only highlighting of SPICE lines and `@RNL` records (keywords, aliases, references, free text), and code-line/drawing cross-highlighting |
+| `src/assets/rnl-code.js` | Display-only highlighting of SPICE lines, `@RNL` records (keywords, aliases, references, free text) and whole package files, and code-line/drawing cross-highlighting |
 | `src/assets/scenes.js` | Circuits, layouts, wiring, annotations, and example files for the introduction's demos |
 | `src/assets/common.js` | Shared by all pages: theme, navigation, tabs, segmented controls, highlighting of static snippets |
 | `src/assets/intro.js` | Introduction interactions, including the 46-keyword reference |
 | `src/assets/tour.js` | Language tour interactions |
-| `build.py` | Builds every page in both languages, the single-file pages, and the optional zip; checks the language pairs and the release blocks, and finds the desktop viewer's newest release |
+| `build.py` | Builds every page in both languages, the single-file pages (the gallery has none), and the optional zip; checks the language pairs and the release blocks, and finds the desktop viewer's newest release |
 
 The symbols are drawn for this page and contain no Analog Canvas material. Like other paths outside `spec/`, `docs/`, and the data directories, this directory is licensed under [MIT](../LICENSE).

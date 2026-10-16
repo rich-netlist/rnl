@@ -115,6 +115,20 @@
         a.setAttribute('href', base + (on ? on.getAttribute('href') : ''));
       });
     });
+    /* A top bar whose links do not fit beside the brand draws them closer together, and when they
+       still do not fit, folds them into the menu, as on narrow screens */
+    var topbar = $('.topbar'), row = $('.topbar-in');
+    function fit() {
+      if (!topbar || !row) return;
+      var over = function () { return row.scrollWidth > row.clientWidth + 1; };
+      topbar.classList.remove('is-tight', 'is-compact');
+      if (!over()) return;
+      topbar.classList.add('is-tight');
+      if (over()) topbar.classList.replace('is-tight', 'is-compact');
+    }
+    window.addEventListener('resize', debounce(fit, 100));
+    fit();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
     var tb = $('#toc-btn'), toc = $('#toc');
     if (tb && toc) {
       tb.addEventListener('click', function () {

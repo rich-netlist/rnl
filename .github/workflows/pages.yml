@@ -1,10 +1,12 @@
 # Builds the project site and publishes it to GitHub Pages: the pages in site/ (the introduction, the
-# language tour and the page of the tools), the pages of the language standard (scripts/spec/), and the
-# web viewer with its samples (apps/web) under viewer/. It publishes on a push to main; after a revision
+# language tour, the page of the tools and the gallery of the standard packages), the pages of the
+# language standard (scripts/spec/), the web viewer with its samples (apps/web) under viewer/, and the
+# gallery's data, from libraries/, under gallery/. It publishes on a push to main; after a revision
 # of the standard is released, so that its pages carry the new revision label; and after a release of
 # the desktop viewer, so that the page of the tools links to its files.
 # Pull requests only run the build, which fails when a text is missing one of its languages, when a
-# check of the standard fails (decision 0007), or when the web viewer does not build.
+# check of the standard fails (decision 0007), when the web viewer does not build, or when the
+# gallery cannot read a package file or draw a symbol.
 # Requires Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
 name: Pages
 
@@ -125,6 +127,15 @@ jobs:
         run: |
           node apps/web/build.mjs --samples
           cp -r apps/web/dist site/dist/viewer
+
+      # The data of the gallery of the standard packages (packages.html), which the pages of both
+      # languages load: every package file in libraries/ read, and every symbol drawn by the core the
+      # step above built into bindings/runtime-wasm/dist/, written into site/dist/gallery/. The tests of
+      # its reading of package files run first.
+      - name: Build the gallery of the standard packages
+        run: |
+          node --test site/gallery/package-file.test.mjs
+          node site/gallery/build.mjs
 
       - if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6

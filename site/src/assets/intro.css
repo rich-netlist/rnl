@@ -231,6 +231,10 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
 .progress { height: 2px; background: transparent; }
 .progress span { display: block; height: 100%; width: 0; background: var(--markup); transition: width .1s linear; }
 
+.brand { flex: none; }
+
+/* Narrow screens, and a top bar whose links do not fit beside the brand even drawn closer (common.js
+   marks it is-tight, then is-compact), fold the links into a menu */
 @media (max-width: 1200px) {
   .toc {
     display: none; position: absolute; top: 57px; right: 16px; left: 16px; flex-direction: column;
@@ -241,6 +245,16 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
   .toc a.is-on { box-shadow: inset 3px 0 0 var(--markup); }
   .toc-btn { display: inline-grid; margin-left: auto; }
 }
+.topbar.is-tight .topbar-in { gap: 12px; }
+.topbar.is-tight .toc a { padding-inline: 4px; }
+.topbar.is-compact .toc {
+  display: none; position: absolute; top: 57px; right: 16px; left: 16px; flex-direction: column;
+  padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.topbar.is-compact .toc.is-open { display: flex; }
+.topbar.is-compact .toc a { padding: 10px 12px; font-size: 15px; }
+.topbar.is-compact .toc a.is-on { box-shadow: inset 3px 0 0 var(--markup); }
+.topbar.is-compact .toc-btn { display: inline-grid; margin-left: auto; }
 
 /* ---------- Shared components ---------- */
 

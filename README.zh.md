@@ -4,7 +4,7 @@
 
 RNL 写在电路网表的注释里，描述电路怎样画成原理图、各部分是什么意思；电路本身只由网表定义。本仓库存放这门语言的标准，今后会逐步加入可移植的 RNL 运行时、求解器、查看器、编辑器和标准符号库。
 
-**网站：[rich-netlist.github.io/rnl](https://rich-netlist.github.io/rnl/)**，有[写给电路设计者的介绍](https://rich-netlist.github.io/rnl/)、[语言导览](https://rich-netlist.github.io/rnl/language.html)、[语言标准 0.2](https://rich-netlist.github.io/rnl/spec/0.2/)和[查看器](https://rich-netlist.github.io/rnl/tools.html)：一个[在浏览器里用](https://rich-netlist.github.io/rnl/viewer/)，一个供 Windows 下载。每页都有英文版。
+**网站：[rich-netlist.github.io/rnl](https://rich-netlist.github.io/rnl/)**，有[写给电路设计者的介绍](https://rich-netlist.github.io/rnl/)、[语言导览](https://rich-netlist.github.io/rnl/language.html)、[语言标准 0.2](https://rich-netlist.github.io/rnl/spec/0.2/)、画出每个符号的[标准包图库](https://rich-netlist.github.io/rnl/packages.html)和[查看器](https://rich-netlist.github.io/rnl/tools.html)：一个[在浏览器里用](https://rich-netlist.github.io/rnl/viewer/)，一个供 Windows 下载。每页都有英文版。
 
 **状态：** 本仓库存放 RNL 语言标准 0.2 版及其原则、项目文档，以及第一版 RNL 工具链（0.1 版，不含求解器）。工具链读取带 RNL 记录的 SPICE 和 Spectre 网表，报告诊断，生成有效模型，画出有坐标的部分，并能把记录写回网表；附带 `rnl` 命令，以及标准包和符号的草稿。原理图由一个共享核心决定（[决定 0008](docs/decisions/0008-shared-core-per-platform-frontends.md)）：它用随附的字体排字（[决定 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)），原生运行和编译成 WebAssembly 运行得到的结果完全相同（[`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)）。两个查看器共用一个页面（[`apps/viewer-ui`](apps/viewer-ui/README.md)）：Windows 桌面版（[`apps/desktop`](apps/desktop/README.md)）和网页版（[`apps/web`](apps/web/README.md)）；它们打开网表，画出各层，显示网表文本、诊断和层次结构，并在原理图和文本之间跟随选中的实例或网络。还没有求解器和编辑器。语言的 0.x 各版本之间不承诺兼容。
 

@@ -169,6 +169,12 @@
     });
   }
 
+  /* A package file (.rnl): records and the comments between them, with no host lines */
+  function hlPackage(texts) {
+    var st = new State();
+    return texts.map(function (text) { return hlRnl(text, st); });
+  }
+
   /* A fragment inside a record (without the host prefix), for inline examples */
   function hlSnippet(text) {
     var st = new State();
@@ -245,5 +251,5 @@
     };
   }
 
-  global.RNLCode = { hlFile: hlFile, hlSnippet: hlSnippet, hlAuto: hlAuto, render: render, link: link, esc: esc };
+  global.RNLCode = { hlFile: hlFile, hlPackage: hlPackage, hlSnippet: hlSnippet, hlAuto: hlAuto, render: render, link: link, esc: esc };
 })(window);
