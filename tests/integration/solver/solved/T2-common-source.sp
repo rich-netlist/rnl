@@ -22,13 +22,13 @@ VIN in 0 DC 0.6 AC 1
 *   #M1 @PLACE(7, -11) => @ORIENT("R0");
 *   #RD @PLACE(7, 0) => @ORIENT("R0");
 *   #VDD @PLACE(0, 0) => @ORIENT("R0");
-*   #VIN @PLACE(-7, -14) => @ORIENT("R0");
+*   #VIN @PLACE(-7, -15) => @ORIENT("R0");
 *   %gnd_stub_M1_s::g @PLACE(7, -15) => @ORIENT("R0");
 *   %gnd_stub_VDD_n::g @PLACE(0, -5) => @ORIENT("R0");
-*   %gnd_stub_VIN_n::g @PLACE(-7, -19) => @ORIENT("R0");
+*   %gnd_stub_VIN_n::g @PLACE(-7, -20) => @ORIENT("R0");
 *   %supply_stub_RD_p::s @PLACE(7, 5) => @ORIENT("R0");
 *   %supply_stub_VDD_p::s @PLACE(0, 5) => @ORIENT("R0");
 *   &out @WIRE(mode="straight") {#M1:d #RD:n};
-*   &in @WIRE(mode="straight") {#VIN:p (-7, -10) (3, -10) (3, -11) #M1:g}
+*   &in @WIRE(mode="straight") {#VIN:p (-7, -11) #M1:g}
 * }
 .end
