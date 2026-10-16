@@ -56,6 +56,10 @@ pub enum Op {
     Membership { add: bool, items: Vec<String>, set: String },
     /// A package at the root, in the header record (16.3).
     UsePackage { name: String, version: Option<String>, path: Option<String> },
+    /// A graphic in the scene (13.4), on a layer when given (11.6).
+    AddShape { name: Option<String>, shape: ShapeOp, layer: Option<String> },
+    /// A symbol (9.2): its box, pins and graphics, in its own coordinates.
+    DefineSymbol { name: String, bbox: Option<[f64; 4]>, pins: Vec<PinOp>, prims: Vec<ShapeOp> },
 }
 
 impl Op {
@@ -69,8 +73,39 @@ impl Op {
             Op::Membership { add: true, .. } => "add-to",
             Op::Membership { add: false, .. } => "remove-from",
             Op::UsePackage { .. } => "use-package",
+            Op::AddShape { .. } => "add-shape",
+            Op::DefineSymbol { .. } => "define-symbol",
         }
     }
+}
+
+/// A graphic (9.2.5): `line`, `rectangle`, `circle`, `ellipse`, `arc` or `bezier`, its points, and
+/// its parameters and style properties in the order given. A rectangle, circle or ellipse is given
+/// by its centre and its size, or by two points.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShapeOp {
+    pub shape: String,
+    pub points: Vec<Point>,
+    pub params: Vec<(String, Literal)>,
+    pub style: Vec<(String, Literal)>,
+}
+
+/// A pin of a symbol (9.2.4).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PinOp {
+    /// One terminal, or several for a bus pin, by number or by name.
+    pub terminals: Vec<TermKey>,
+    pub at: Point,
+    /// "right", "up", "left" or "down".
+    pub direction: Option<String>,
+    /// The pin's name for display, in markup or as lines of runs.
+    pub label: Option<TextContent>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TermKey {
+    Num(u32),
+    Name(String),
 }
 
 /// What a usage attaches to in one role: an object by its id, or a point.
@@ -159,7 +194,9 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
         }
         "add-to" | "remove-from" => &["items", "set"],
         "use-package" => &["name", "version", "path"],
-        "unset" | "add-shape" | "remove" => return Err(fail(kind, "not written yet".into())),
+        "add-shape" => &["name", "shape", "points", "params", "style", "layer"],
+        "define-symbol" => &["name", "box", "pins", "prims"],
+        "unset" | "remove" => return Err(fail(kind, "not written yet".into())),
         _ => return Err(format!("op {k}: unknown op \"{kind}\"")),
     };
     if let Some(f) = obj.keys().find(|f| *f != "op" && *f != "level" && !allowed.contains(&f.as_str())) {
@@ -200,6 +237,58 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
             at: r.point("at")?,
             junction: r.opt_bool("junction")?.unwrap_or(false),
         },
+        "add-shape" => Op::AddShape {
+            name: r.opt_string("name")?,
+            shape: shape_op(obj).map_err(|why| fail(kind, why))?,
+            layer: match r.opt_string("layer")? {
+                Some(l) if !["bottom", "middle", "top"].contains(&l.as_str()) => {
+                    return Err(fail(kind, format!("`layer` \"{l}\" is not bottom, middle or top")))
+                }
+                l => l,
+            },
+        },
+        "define-symbol" => {
+            let name = r.string("name")?;
+            if !(name.starts_with('$') || name.starts_with('%')) || name.len() < 2 {
+                return Err(fail(kind, format!("`name` \"{name}\" is not a $ or % name")));
+            }
+            let bbox = match obj.get("box") {
+                None | Some(Value::Null) => None,
+                Some(v) => {
+                    let b: Option<Vec<f64>> = v.as_array().and_then(|a| a.iter().map(Value::as_f64).collect());
+                    match b.as_deref() {
+                        Some(&[x1, y1, x2, y2]) => Some([x1, y1, x2, y2]),
+                        _ => return Err(fail(kind, "`box` is not [x1, y1, x2, y2]".into())),
+                    }
+                }
+            };
+            let list = |f: &str| -> Result<Vec<Value>, String> {
+                match obj.get(f) {
+                    None | Some(Value::Null) => Ok(Vec::new()),
+                    Some(Value::Array(a)) => Ok(a.clone()),
+                    Some(_) => Err(fail(kind, format!("`{f}` is not a list"))),
+                }
+            };
+            let pins = list("pins")?
+                .iter()
+                .enumerate()
+                .map(|(n, p)| pin_op(p).map_err(|why| fail(kind, format!("pin {n}: {why}"))))
+                .collect::<Result<_, _>>()?;
+            let prims = list("prims")?
+                .iter()
+                .enumerate()
+                .map(|(n, p)| {
+                    let o = p.as_object().ok_or("not an object".to_string()).and_then(|o| {
+                        match o.keys().find(|f| !["shape", "points", "params", "style"].contains(&f.as_str())) {
+                            Some(f) => Err(format!("unknown field `{f}`")),
+                            None => Ok(o),
+                        }
+                    });
+                    o.and_then(shape_op).map_err(|why| fail(kind, format!("prim {n}: {why}")))
+                })
+                .collect::<Result<_, _>>()?;
+            Op::DefineSymbol { name, bbox, pins, prims }
+        }
         "add-wire" => Op::AddWire {
             name: r.opt_string("name")?,
             nets: r.strings("nets")?,
@@ -361,6 +450,95 @@ impl Reader<'_> {
             })
             .collect()
     }
+}
+
+/// Literals by name, in order: a parameter list or a style.
+fn literals(v: Option<&Value>, what: &str) -> Result<Vec<(String, Literal)>, String> {
+    let Some(v) = v.filter(|v| !v.is_null()) else { return Ok(Vec::new()) };
+    let map = v.as_object().ok_or_else(|| format!("`{what}` is not an object"))?;
+    map.iter()
+        .map(|(name, v)| {
+            let lit = match v {
+                Value::String(s) => Literal::Str(s.clone()),
+                Value::Bool(b) => Literal::Bool(*b),
+                Value::Number(n) => Literal::Num(n.as_f64().unwrap_or(f64::NAN)),
+                _ => return Err(format!("`{what}`: `{name}` is not a string, number or boolean")),
+            };
+            Ok((name.clone(), lit))
+        })
+        .collect()
+}
+
+/// A graphic, from an add-shape op or a prim of define-symbol.
+fn shape_op(obj: &Map<String, Value>) -> Result<ShapeOp, String> {
+    let shape = obj.get("shape").and_then(Value::as_str).ok_or("no `shape`")?.to_string();
+    let points: Vec<Point> = match obj.get("points").and_then(Value::as_array) {
+        Some(a) => a.iter().map(as_point).collect::<Option<_>>().ok_or("`points` is not a list of [x, y]")?,
+        None => return Err("no `points`".into()),
+    };
+    let params = literals(obj.get("params"), "params")?;
+    if let Some((p, _)) =
+        params.iter().find(|(p, _)| !["width", "height", "radius", "fill", "arrow"].contains(&p.as_str()))
+    {
+        return Err(format!("`params`: `{p}` is not width, height, radius, fill or arrow"));
+    }
+    let has = |p: &str| params.iter().any(|(q, _)| q == p);
+    let n = points.len();
+    let ok = match shape.as_str() {
+        "line" => n >= 2,
+        "arc" => n == 3,
+        "bezier" => n >= 4 && (n - 1) % 3 == 0,
+        // the centre and a size, or two points (9.2.5)
+        "rectangle" | "ellipse" => {
+            (n == 1 && has("width") && has("height")) || (n == 2 && !has("width") && !has("height"))
+        }
+        "circle" => (n == 1 && has("radius")) || (n == 2 && !has("radius")),
+        _ => return Err(format!("`shape` \"{shape}\" is not line, rectangle, circle, ellipse, arc or bezier")),
+    };
+    if !ok {
+        return Err(format!("{n} points with these params do not make the shape {shape} (9.2.5)"));
+    }
+    Ok(ShapeOp { shape, points, params, style: literals(obj.get("style"), "style")? })
+}
+
+/// A pin of define-symbol.
+fn pin_op(v: &Value) -> Result<PinOp, String> {
+    let o = v.as_object().ok_or("not an object")?;
+    if let Some(f) = o.keys().find(|f| !["terminals", "at", "direction", "label"].contains(&f.as_str())) {
+        return Err(format!("unknown field `{f}`"));
+    }
+    let terminals: Vec<TermKey> = o
+        .get("terminals")
+        .and_then(Value::as_array)
+        .filter(|a| !a.is_empty())
+        .and_then(|a| {
+            a.iter()
+                .map(|t| match t {
+                    Value::String(s) => Some(TermKey::Name(s.clone())),
+                    Value::Number(n) => n.as_u64().filter(|n| *n >= 1).map(|n| TermKey::Num(n as u32)),
+                    _ => None,
+                })
+                .collect()
+        })
+        .ok_or("`terminals` is not a list of terminal numbers and names")?;
+    let at = o.get("at").and_then(as_point).ok_or("`at` is not a point [x, y]")?;
+    let direction = match o.get("direction") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(d)) if ["right", "up", "left", "down"].contains(&d.as_str()) => Some(d.clone()),
+        Some(_) => return Err("`direction` is not right, up, left or down".into()),
+    };
+    let label = match o.get("label") {
+        None | Some(Value::Null) => None,
+        Some(Value::Object(l)) => match (l.get("markup"), l.get("lines")) {
+            (Some(Value::String(m)), None) => Some(TextContent::Markup(m.clone())),
+            (None, Some(lines)) => {
+                Some(TextContent::Lines(serde_json::from_value(lines.clone()).map_err(|e| format!("`label`: {e}"))?))
+            }
+            _ => return Err("`label` is not {markup} or {lines}".into()),
+        },
+        Some(_) => return Err("`label` is not {markup} or {lines}".into()),
+    };
+    Ok(PinOp { terminals, at, direction, label })
 }
 
 fn as_point(v: &Value) -> Option<Point> {

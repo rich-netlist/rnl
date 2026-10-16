@@ -8,6 +8,7 @@ rnl render FILE -o DIR [options]  write one SVG per drawing level
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
 rnl view FILE [options]           print the Document a viewer shows, as JSON
 rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
+rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
 rnl strip-generated FILE -o OUT   write FILE without its type="generated" records
 rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
@@ -26,12 +27,14 @@ problem options (the levels are read without their type="generated" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)
   --previous          give each level what its type="generated" record decided, as hints
+snapshot options:
+  --parts LIST        the parts to give, of drawing, host and model; host,model by default
 write:
   REQUEST.json is {"dialect", "netlist", "author", "ops"}, the ops as the editor interface
   draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out
 ```
 
-`write` writes the ops into the netlist with [`rnl-edit`](../rnl-edit/README.md) and saves the result as OUT; `rnl check OUT` then says how it reads.
+`snapshot` prints the snapshot of [`rnl-view`](../rnl-view/README.md#snapshots): the host circuit and the model of each drawing level, by ids a transaction can write back. `write` writes the ops into the netlist with [`rnl-edit`](../rnl-edit/README.md) and saves the result as OUT; `rnl check OUT` then says how it reads.
 
 Without a solver, `render` draws only what has coordinates. `check` says what is missing: after the diagnostics it prints, for each drawing level, how many objects have no position and how many constraints hold, need a solver to move something, or could not be checked. `view` prints the Document of [`rnl-view`](../rnl-view/README.md), what the desktop viewer shows, for tools and for comparing builds; with `--primitives` each level has its primitives as well, with `--no-svg` no SVG, and with `--status` its solve status, `solve`: `fixed`, `unsolved`, `solved` or `stale`. The standard packages in [`libraries/standard`](../../libraries/standard/README.md) are built into the command through `rnl-view`; this crate adds the files and package directories on disk (`FsProvider`).
 

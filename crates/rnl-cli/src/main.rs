@@ -14,6 +14,7 @@ const USAGE: &str = "usage:
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
+  rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
@@ -32,6 +33,8 @@ problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)
   --previous          give each level what its type=\"generated\" record decided, as hints
+snapshot options:
+  --parts LIST        the parts to give, of drawing, host and model; host,model by default
 write:
   REQUEST.json is {\"dialect\", \"netlist\", \"author\", \"ops\"}, the ops as the editor interface
   draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out";
@@ -52,6 +55,7 @@ struct Args {
     solver_options: String,
     previous: bool,
     author: Option<String>,
+    parts: Option<String>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -72,6 +76,7 @@ fn parse_args() -> Result<Args, String> {
     let mut previous = false;
     let mut solver_options = format!("tolerance={}", rnl_runtime::geom::fmt_num(rnl_runtime::geom::TOL));
     let mut author = None;
+    let mut parts = None;
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
@@ -87,6 +92,7 @@ fn parse_args() -> Result<Args, String> {
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
             "--solver-options" => solver_options = it.next().ok_or("--solver-options needs a text")?,
             "--author" => author = Some(it.next().ok_or("--author needs a name")?),
+            "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
@@ -108,6 +114,7 @@ fn parse_args() -> Result<Args, String> {
         solver_options,
         previous,
         author,
+        parts,
     })
 }
 
@@ -198,6 +205,28 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
+        "snapshot" => {
+            let list = args.parts.as_deref().unwrap_or("host,model");
+            let mut parts = rnl_view::Parts { drawing: false, host: false, model: false };
+            for p in list.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+                match p {
+                    "drawing" => parts.drawing = true,
+                    "host" => parts.host = true,
+                    "model" => parts.model = true,
+                    _ => return Err(format!("--parts: unknown part {p}; the parts are drawing, host and model")),
+                }
+            }
+            let options = BuildOptions {
+                dialect: args.dialect.clone(),
+                runtime: options(args),
+                svg: args.svg,
+                primitives: args.primitives,
+                status: args.status,
+            };
+            let snapshot = rnl_view::snapshot(&args.file.to_string_lossy(), &provider, &options, parts)?;
+            println!("{}", serde_json::to_string_pretty(&snapshot).unwrap());
             Ok(ExitCode::SUCCESS)
         }
         "render" => {

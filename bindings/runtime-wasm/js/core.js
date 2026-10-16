@@ -17,6 +17,9 @@
  * @property {boolean} [primitives] Give each level's primitives; false when not given.
  * @property {boolean} [draft] For development only: read the files that declare the draft 0.3 as
  *   well; false when not given.
+ * @property {{ drawing?: boolean, host?: boolean, model?: boolean }} [parts] The parts of the
+ *   editor interface's snapshot to give: with them, the answer is a snapshot (snapshot.d.ts), with
+ *   the Document as its `drawing` unless `drawing` is false.
  */
 
 /**
@@ -41,6 +44,8 @@
  * @property {(request: Request | string) => object} build Build the Document of a request, given as
  *   an object or as the JSON text `requestText` makes of one. Throws an Error with the core's message
  *   when there is none, such as when the entry is not among the files.
+ * @property {(request: Request | string) => object} snapshot Build the snapshot of a request with
+ *   `parts`, as build builds the Document.
  * @property {(request: WriteRequest | string) => { text: string, document: object }} write Write the
  *   ops of a request into its netlist, and build what was written. Throws an Error with the core's
  *   message when an op cannot be written.
@@ -50,6 +55,8 @@
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+/** What a request asks for, by the part of the answer that gives it. */
+const ASKS = { document: "a build without parts", snapshot: "a build with parts", written: "a write" };
 const REPLACEMENT = String.fromCharCode(0xfffd);
 
 /**
@@ -113,13 +120,14 @@ export async function loadCore(wasm) {
   function part(request, name) {
     const response = respond(request);
     if ("error" in response) throw new Error(response.error);
-    if (!(name in response)) throw new Error(`The core answered with no ${name}: the request is not a ${name === "document" ? "build" : "write"}.`);
+    if (!(name in response)) throw new Error(`The core answered with no ${name}: the request is not ${ASKS[name]}.`);
     return response[name];
   }
 
   return {
     respond,
     build: (request) => part(request, "document"),
+    snapshot: (request) => part(request, "snapshot"),
     write: (request) => part(request, "written"),
   };
 }

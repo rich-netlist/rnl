@@ -257,3 +257,120 @@ fn what_it_writes_interprets_without_errors() {
         r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
     assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
 }
+
+#[test]
+fn graphics_and_a_symbol_in_the_file_level() {
+    let net = "\n.subckt top a b\nX1 a b blk\n.ends top\n";
+    let bold = json!([[{"kind": "text", "text": "OUT", "style": {"level": 0, "bold": true, "italic": false, "overline": false}}]]);
+    let ops = json!([
+        {"level": "file", "op": "define-symbol", "name": "$blk_SYMBOL", "box": [-3, -2, 3, 2],
+         "pins": [{"terminals": [1], "at": [-3, 0], "direction": "left", "label": {"markup": "IN"}},
+                  {"terminals": [2], "at": [3, 0], "direction": "right", "label": {"lines": bold}}],
+         "prims": [{"shape": "rectangle", "points": [[0, 0]], "params": {"width": 4, "height": 4}},
+                   {"shape": "line", "points": [[-3, 0], [-2, 0]]},
+                   {"shape": "line", "points": [[2, 0], [3, 0]]}]},
+        {"level": "subckt:top", "op": "set", "object": "#X1", "symbol": "$blk_SYMBOL", "at": [10, 0]},
+        {"level": "subckt:top", "op": "add-shape", "shape": "circle", "points": [[0, 5]], "params": {"radius": 1.5, "fill": "fillcolor"},
+         "style": {"fillcolor": "#eef4ff", "linestyle": "dashed"}, "layer": "bottom"},
+        {"level": "subckt:top", "op": "add-shape", "shape": "line", "points": [[0, 0], [4, 0]], "params": {"arrow": "end"},
+         "style": {"arrowsize": 1.5}},
+        {"level": "subckt:top", "op": "add-shape", "shape": "bezier", "points": [[0, 0], [1, 1], [2, 1], [3, 0]]}
+    ]);
+    let out = write(&request("spice", net, ops)).unwrap();
+    assert_eq!(
+        out,
+        r##"
+* @RNL(type="header") { @VERSION("0.2")}
+.subckt top a b
+X1 a b blk
+* @RNL(author="test") {
+*   #X1 @SET-SYMBOL $blk_SYMBOL => @PLACE(10, 0);
+*   (0, 5) @CIRCLE(radius=1.5, fill="fillcolor", fillcolor="#eef4ff", linestyle="dashed") => @LAYER("bottom");
+*   @LINE(arrow="end", arrowsize=1.5) {(0, 0) (4, 0)};
+*   @BEZIER {(0, 0) (1, 1) (2, 1) (3, 0)}
+* }
+.ends top
+* @RNL(author="test") {
+*   $blk_SYMBOL = @DEFINE-SYMBOL(box=[-3, -2, 3, 2]) {
+*     (-3, 0) @PIN(terminal=1, label="IN", direction="left");
+*     (3, 0) @PIN(terminal=2, label="\textbf{OUT}", direction="right");
+*     (0, 0) @RECTANGLE(width=4, height=4);
+*     @LINE {(-3, 0) (-2, 0)};
+*     @LINE {(2, 0) (3, 0)}
+*   }
+* }
+"##
+    );
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: true, ..Options::default() })
+        .unwrap();
+    let loud: Vec<String> =
+        r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
+    assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
+}
+
+#[test]
+fn a_bus_pin_and_names_in_a_subcircuit_symbol() {
+    let ops = json!([
+        {"level": "subckt:rc_lowpass", "op": "define-symbol", "name": "%rc_lowpass_SYMBOL",
+         "pins": [{"terminals": ["VSS", 2], "at": [0, -2], "direction": "down"}], "prims": []},
+        {"level": "subckt:rc_lowpass", "op": "set", "object": "#", "symbol": "%rc_lowpass_SYMBOL"}
+    ]);
+    let out = write(&request("spice", RC, ops)).unwrap();
+    assert!(
+        out.contains("*   %rc_lowpass_SYMBOL = @DEFINE-SYMBOL {\n*     (0, -2) @PIN(terminal=[\"VSS\", 2], direction=\"down\")\n*   };\n*   # @SET-SYMBOL %rc_lowpass_SYMBOL\n"),
+        "{out}"
+    );
+}
+
+#[test]
+fn graphics_that_are_not_well_formed_are_refused() {
+    let refused = |op: Value| write(&request("spice", RC, json!([op]))).unwrap_err();
+    let level = "subckt:rc_lowpass";
+    assert_eq!(
+        refused(json!({"level": level, "op": "add-shape", "shape": "arc", "points": [[0, 0], [1, 1]]})),
+        "op 0 (add-shape): 2 points with these params do not make the shape arc (9.2.5)"
+    );
+    assert_eq!(
+        refused(json!({"level": level, "op": "add-shape", "shape": "rectangle", "points": [[0, 0]]})),
+        "op 0 (add-shape): 1 points with these params do not make the shape rectangle (9.2.5)"
+    );
+    assert_eq!(
+        refused(json!({"level": level, "op": "add-shape", "shape": "polygon", "points": [[0, 0], [1, 1]]})),
+        "op 0 (add-shape): `shape` \"polygon\" is not line, rectangle, circle, ellipse, arc or bezier"
+    );
+    assert_eq!(
+        refused(
+            json!({"level": level, "op": "add-shape", "shape": "line", "points": [[0, 0], [1, 1]], "layer": "under"})
+        ),
+        "op 0 (add-shape): `layer` \"under\" is not bottom, middle or top"
+    );
+    assert_eq!(
+        refused(json!({"level": level, "op": "define-symbol", "name": "blk", "pins": [], "prims": []})),
+        "op 0 (define-symbol): `name` \"blk\" is not a $ or % name"
+    );
+    assert_eq!(
+        refused(
+            json!({"level": level, "op": "define-symbol", "name": "%b", "pins": [{"terminals": [0], "at": [0, 0]}]})
+        ),
+        "op 0 (define-symbol): pin 0: `terminals` is not a list of terminal numbers and names"
+    );
+    assert_eq!(
+        refused(
+            json!({"level": level, "op": "define-symbol", "name": "%b", "prims": [{"shape": "line", "points": [[0, 0], [1, 0]], "layer": "top"}]})
+        ),
+        "op 0 (define-symbol): prim 0: unknown field `layer`"
+    );
+}
+
+#[test]
+fn a_long_text_breaks_between_its_parameters() {
+    let long = "x".repeat(110);
+    let ops = json!([{"level": "subckt:rc_lowpass", "op": "add-text", "at": [0, 0], "markup": long, "size": 1.5116, "style": {"bold": true}}]);
+    let out = write(&request("spice", RC, ops)).unwrap();
+    assert!(
+        out.contains(&format!("*   (0, 0)\n*       @TEXT(\"{long}\",\n*       size=1.5116, bold=true)\n")),
+        "{out}"
+    );
+    assert!(out.lines().all(|l| l.chars().count() <= LINE), "{out}");
+}

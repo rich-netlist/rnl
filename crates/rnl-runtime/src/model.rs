@@ -12,6 +12,16 @@ use crate::markup::Line;
 
 pub type Style = BTreeMap<String, Lit>;
 
+/// A name as a reference writes it (3.3): as it is when it is ASCII letters, digits and `_`,
+/// else in double quotes, a quote doubled, such as `"vdd!"`.
+pub fn quoted(name: &str) -> String {
+    if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        name.to_string()
+    } else {
+        format!("\"{}\"", name.replace('"', "\"\""))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum Layer {
     Bottom,
@@ -82,6 +92,20 @@ pub struct SymbolView {
 
     /// The viewer's own stand-in for an instance with no symbol (9.2.6).
     pub default: bool,
+    /// Where the symbol is defined: [`SymbolOrigin`].
+    pub origin: SymbolOrigin,
+}
+
+/// Where a symbol is defined: in a package, or in a level of the document, such as the symbol of
+/// a subcircuit (9.2.6), which may share its name with one in a package or another level.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum SymbolOrigin {
+    Package(String),
+    /// The host level whose records define it.
+    Level(usize),
+    /// The viewer's own stand-in, or not found.
+    #[default]
+    None,
 }
 
 /// An instance, bundle or usage drawn with a symbol.
@@ -113,22 +137,51 @@ pub struct ItemView {
 #[derive(Clone, Debug)]
 pub struct WireView {
     pub id: String,
+    /// Its id in the editor interface: [`ObjectInfo::id`].
+    pub object_id: String,
     pub nets: Vec<String>,
     /// The vertices after the routing mode (13.1).
     pub points: Vec<Pt>,
+    /// The vertices as the statement gives them.
+    pub via: Vec<Vertex>,
     pub mode: String,
     pub style: Style,
+    /// The properties of `style` the document's own records give, not a package.
+    pub own_style: Style,
     pub layer: Layer,
     pub order: Vec<f64>,
+    /// The whole wire, drawn through all its points; false for a run of a wire some of whose
+    /// points have no position, which the editor interface's snapshot leaves out.
+    pub whole: bool,
+}
+
+/// A vertex of a wire as written: a pin, a named point, a role of a usage, or coordinates.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Vertex {
+    /// `#M1:1`, `#:inp`.
+    Terminal(String),
+    /// `%j1`.
+    Point(String),
+    /// `%gnd1:p`: the usage's id and the role.
+    Usage {
+        usage: String,
+        role: String,
+    },
+    At(Pt),
 }
 
 /// A graphic written in the scene: an annotation (13.4).
 #[derive(Clone, Debug)]
 pub struct ShapeView {
+    /// Its id in the editor interface: `%box1` when the level names it, else where the statement
+    /// that made it is, as [`ObjectInfo::id`].
+    pub object_id: String,
     pub shape: Shape,
     pub points: Vec<Pt>,
     pub params: PrimParams,
     pub style: Style,
+    /// The properties of `style` the document's own records give, not a package.
+    pub own_style: Style,
     pub layer: Layer,
     pub order: Vec<f64>,
 }
@@ -136,6 +189,16 @@ pub struct ShapeView {
 #[derive(Clone, Debug)]
 pub struct TextView {
     pub id: String,
+    /// Its id in the editor interface: [`ObjectInfo::id`], or `#M1::name` for a key text.
+    pub object_id: String,
+    /// The id of the object it is attached to; None for a text at a point.
+    pub attach: Option<String>,
+    /// The key of a label, such as "name".
+    pub key: Option<String>,
+    /// The text as written, before `${…}` is read (13.6).
+    pub markup: String,
+    /// The document's records write it, or a part of it; false for a label its symbol alone gives.
+    pub written: bool,
     pub anchor: Pt,
     pub lines: Vec<Line>,
     pub halign: String,
@@ -144,6 +207,8 @@ pub struct TextView {
     /// A text written in a symbol turns with its instance (9.2.5); scene texts do not.
     pub orient: Orient,
     pub style: Style,
+    /// The properties of `style` the document's own records give, not a package.
+    pub own_style: Style,
     pub layer: Layer,
     pub order: Vec<f64>,
 }
@@ -179,6 +244,90 @@ pub struct LevelView {
     pub constraints: Vec<ConstraintView>,
     /// Drawn objects without a position, left to a solver.
     pub unplaced: Vec<String>,
+    /// The instances, bundles and usages of the level, drawn or not, as the editor interface
+    /// sees them.
+    pub objects: Vec<ObjectInfo>,
+    /// The named points of the level.
+    pub points: Vec<PointInfo>,
+    /// The terminal names of each host instance of the level, in the order of its nodes: from
+    /// DEVICE, the subcircuit's ports or the adapter's defaults (6.4, 6.12); None where there is
+    /// no name.
+    pub terminal_names: Vec<Vec<Option<String>>>,
+    /// A subcircuit's own symbol, `# @SET-SYMBOL` (9.2.6).
+    pub block_symbol: Option<BlockSymbol>,
+}
+
+/// The symbol a subcircuit gives itself (9.2.6): what its instances are drawn with when they are
+/// given no other.
+#[derive(Clone, Debug)]
+pub struct BlockSymbol {
+    pub info: SymbolInfo,
+    /// What it is made of, without the symbols drawn in it (9.2.7). It is not among the level's
+    /// `symbols`, which are those of the level's own items.
+    pub view: SymbolView,
+}
+
+/// An instance, bundle or usage of a level, drawn or not: what the editor interface's snapshot
+/// gives of it (`notes/rnl-editor-interface` in rnl-dev, 3.5).
+#[derive(Clone, Debug)]
+pub struct ObjectInfo {
+    /// Its id, unique in the level: `#M1` for an instance, `%gnd1` for an object named in the level,
+    /// or, for one without a name of its own, where the statement that made it is,
+    /// `@file:line:col`, with `#n` after it when that statement made several.
+    pub id: String,
+    /// "instance", "bundle" or "usage".
+    pub kind: &'static str,
+    /// The ids of the host instances it draws: one for an instance, the members of a bundle, none
+    /// for a usage.
+    pub host: Vec<String>,
+    /// A usage's definition, such as `$GROUND`.
+    pub definition: Option<String>,
+    /// A usage's roles in order, with what each is attached to.
+    pub attach: Vec<(String, Attach)>,
+    /// The symbol it is drawn with.
+    pub symbol: Option<SymbolInfo>,
+    pub at: Option<Pt>,
+    pub orient: Orient,
+    /// The symbol's pins where they are drawn, when it has a symbol and a position.
+    pub pins: Vec<PinPlace>,
+    /// Its symbol, by index in `LevelView::symbols`, when it is drawn.
+    pub symbol_view: Option<usize>,
+}
+
+/// What a role of a usage is attached to: an object, by its id, or a point.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Attach {
+    Object(String),
+    At(Pt),
+}
+
+/// A symbol an object is drawn with, as the snapshot names it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SymbolInfo {
+    pub name: String,
+    pub origin: SymbolOrigin,
+    pub default: bool,
+}
+
+/// A pin of a drawn object, in scene coordinates.
+#[derive(Clone, Debug)]
+pub struct PinPlace {
+    /// The terminals at the pin: an instance's by number, `#M1:1`; a usage's by role, `p`.
+    pub terminals: Vec<String>,
+    pub at: Pt,
+    /// The exit direction after the object's orientation, in degrees.
+    pub dir: Option<u16>,
+    /// The nets at the pin, as ids.
+    pub nets: Vec<String>,
+}
+
+/// A named point of a level.
+#[derive(Clone, Debug)]
+pub struct PointInfo {
+    pub id: String,
+    pub at: Option<Pt>,
+    /// A junction dot is drawn at it (a usage of `$JUNCTION`).
+    pub junction: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -187,6 +336,11 @@ pub struct Model {
     /// Set when the whole interpretation failed (1.5 rule 3, 7.6). Draft 0.2 has no case of it
     /// (7.5), so it is never set.
     pub failed: Option<String>,
+    /// The language version the main file declares (16.1); empty when it declares none.
+    pub language: String,
+    /// The packages in effect in some drawing level, by name and version, the standard package
+    /// first, each once.
+    pub packages: Vec<(String, String)>,
 }
 
 /// A reference to a host object written in a record (6.3), found while interpreting: where the

@@ -7,9 +7,59 @@ use std::path::Path;
 use ts_rs::{Config, TS};
 
 use crate::{
-    Bar, Cap, Child, Color, Diagnostic, Document, HAlign, Hit, Join, Layer, Level, Object, Primitive, Run, RunStyle,
-    Segment, Shape, SourceFile, Span, Stroke, Text, TextRun, Unit, VAlign,
+    Bar, Cap, Child, Color, Diagnostic, Document, FileRef, HAlign, Hit, HostInstance, HostLevel, HostNet, HostTerminal,
+    Join, Layer, Level, LevelModel, LevelSnapshot, Object, ObjectView, PackageUse, PinLabel, PinView, PointView,
+    Primitive, Run, RunStyle, Segment, Shape, ShapeView, Slot, Snapshot, SourceFile, Span, Stroke, SymbolDefinition,
+    SymbolPin, SymbolPrim, SymbolRef, Text, TextRun, TextView, Unit, VAlign, Vertex, WireView,
 };
+
+const SNAPSHOT_HEADER: &str = "\
+// The snapshot of the editor interface (crates/rnl-view/src/snapshot.rs) as TypeScript
+// declarations, generated from its Rust types by ts-rs. Do not edit: after changing the types, run
+//   RNL_BLESS=1 cargo test -p rnl-view types
+// The snapshot is plain JSON; these are its shapes, with nothing to load at run time.
+
+import type { Diagnostic, Document, Run } from \"./document.js\";
+";
+
+/// The documentation and the declaration of the snapshot and of everything in it.
+fn snapshot_all() -> Vec<(String, String)> {
+    fn one<T: TS>(cfg: &Config) -> (String, String) {
+        (T::docs().unwrap_or_default(), T::decl(cfg))
+    }
+    let cfg = Config::new();
+    vec![
+        one::<Snapshot>(&cfg),
+        one::<PackageUse>(&cfg),
+        one::<FileRef>(&cfg),
+        one::<LevelSnapshot>(&cfg),
+        one::<HostLevel>(&cfg),
+        one::<HostInstance>(&cfg),
+        one::<HostTerminal>(&cfg),
+        one::<HostNet>(&cfg),
+        one::<LevelModel>(&cfg),
+        one::<SymbolRef>(&cfg),
+        one::<SymbolDefinition>(&cfg),
+        one::<SymbolPin>(&cfg),
+        one::<PinLabel>(&cfg),
+        one::<SymbolPrim>(&cfg),
+        one::<Slot<String>>(&cfg),
+        one::<ObjectView>(&cfg),
+        one::<PinView>(&cfg),
+        one::<PointView>(&cfg),
+        one::<WireView>(&cfg),
+        one::<Vertex>(&cfg),
+        one::<TextView>(&cfg),
+        one::<ShapeView>(&cfg),
+    ]
+}
+
+/// The text of `types/snapshot.d.ts`.
+fn snapshot_declarations() -> String {
+    let all: Vec<String> =
+        snapshot_all().iter().map(|(docs, decl)| format!("{docs}export {}\n", layout(decl))).collect();
+    format!("{SNAPSHOT_HEADER}\n{}", all.join("\n"))
+}
 
 const HEADER: &str = "\
 // The Document of rnl-view (crates/rnl-view/README.md) as TypeScript declarations, generated from
@@ -197,6 +247,18 @@ fn the_type_declarations_are_those_of_the_rust_types() {
     let want = std::fs::read_to_string(&path).unwrap_or_default();
     // line endings may differ
     assert!(want.replace("\r\n", "\n") == text, "types/document.d.ts is out of date; run with RNL_BLESS=1");
+}
+
+#[test]
+fn the_snapshot_declarations_are_those_of_the_rust_types() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("types/snapshot.d.ts");
+    let text = snapshot_declarations();
+    if std::env::var("RNL_BLESS").is_ok() {
+        std::fs::write(&path, &text).unwrap();
+        return;
+    }
+    let want = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(want.replace("\r\n", "\n") == text, "types/snapshot.d.ts is out of date; run with RNL_BLESS=1");
 }
 
 #[test]

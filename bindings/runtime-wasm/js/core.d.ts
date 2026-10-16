@@ -3,8 +3,9 @@
 // copies next to this file.
 
 import type { Document } from "./document.js";
+import type { Snapshot } from "./snapshot.js";
 
-export type { Document };
+export type { Document, Snapshot };
 
 /** What to build: the workspace and how. Fields the core does not know are ignored. */
 export interface Request {
@@ -22,6 +23,11 @@ export interface Request {
   svg?: boolean;
   /** Give each level's primitives; false when not given. */
   primitives?: boolean;
+  /**
+   * The parts of the editor interface's snapshot to give: with them, the answer is a Snapshot,
+   * with the Document as its `drawing` unless `drawing` is false.
+   */
+  parts?: { drawing?: boolean; host?: boolean; model?: boolean };
 }
 
 export type Point = [number, number];
@@ -79,7 +85,41 @@ export type Op = { level?: string } & (
     }
   | { op: "add-to" | "remove-from"; items: string[]; set: string }
   | { op: "use-package"; name: string; version?: string; path?: string }
+  | ({ op: "add-shape"; name?: string; layer?: "bottom" | "middle" | "top" } & Shape)
+  | {
+      op: "define-symbol";
+      /** `$NAME`, or `%NAME` for a symbol of the level, such as a subcircuit's block. */
+      name: string;
+      box?: [number, number, number, number];
+      pins: SymbolPin[];
+      /** The symbol's graphics, in its own coordinates. */
+      prims: Shape[];
+    }
 );
+
+/**
+ * A graphic (9.2.5): a rectangle, circle or ellipse by its centre and its size (width and height,
+ * or radius), or by two points; a line by two points or more, an arc by three, a Bezier curve by
+ * 3n+1.
+ */
+export interface Shape {
+  shape: "line" | "rectangle" | "circle" | "ellipse" | "arc" | "bezier";
+  points: Point[];
+  /** width, height, radius, fill ("none", "linecolor", "fillcolor") and arrow ("start", "end", "both"). */
+  params?: Record<string, Literal>;
+  /** Style properties such as linecolor, linestyle, linewidth, fillcolor and arrowsize. */
+  style?: Record<string, Literal>;
+}
+
+/** A pin of a symbol (9.2.4). */
+export interface SymbolPin {
+  /** One terminal, or several for a bus pin, by number or by name. */
+  terminals: (number | string)[];
+  at: Point;
+  direction?: "right" | "up" | "left" | "down";
+  /** The pin's name for display. */
+  label?: { markup: string } | { lines: Run[][] };
+}
 
 /** What to write: an edit transaction's ops into its netlist, and how to build what was written. */
 export interface WriteRequest {
@@ -109,10 +149,14 @@ export interface Written {
 export interface Core {
   /** Build the Document of a request; throws an Error with the core's message when there is none. */
   build(request: Request | string): Document;
+  /** Build the snapshot of a request with `parts`, as build builds the Document. */
+  snapshot(request: Request | string): Snapshot;
   /** Write the ops into the netlist and build it; throws an Error when an op cannot be written. */
   write(request: WriteRequest | string): Written;
   /** The core's answer as it gives it; throws only when the core stops. */
-  respond(request: Request | WriteRequest | string): { document: Document } | { written: Written } | { error: string };
+  respond(
+    request: Request | WriteRequest | string,
+  ): { document: Document } | { snapshot: Snapshot } | { written: Written } | { error: string };
 }
 
 /** Load the core: the module by URL, as a response, as bytes, or compiled. */

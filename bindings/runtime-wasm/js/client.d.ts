@@ -1,13 +1,15 @@
 // client.js as TypeScript declarations, written by hand; keep them with the JSDoc in client.js.
 
-import type { Document, Request, WriteRequest, Written } from "./core.js";
+import type { Document, Request, Snapshot, WriteRequest, Written } from "./core.js";
 
-export type { Document, Literal, Op, Point, Request, Run, RunStyle, Vertex, WriteRequest, Written } from "./core.js";
+export type { Document, Literal, Op, Point, Request, Run, RunStyle, Snapshot, Vertex, WriteRequest, Written } from "./core.js";
 
 /** The core, running in a Worker. */
 export interface CoreWorker {
   /** Build the Document of a request; rejects with the core's message when there is none. */
   build(request: Request): Promise<Document>;
+  /** Build the snapshot of a request with `parts`: the editor interface's view of the document. */
+  snapshot(request: Request): Promise<Snapshot>;
   /** Write the ops into the netlist and build what was written; rejects when an op cannot be written. */
   write(request: WriteRequest): Promise<Written>;
   /** Stop the Worker; calls still waiting, and later ones, reject. */

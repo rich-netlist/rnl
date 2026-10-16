@@ -107,9 +107,9 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
 }
 
 /// The level an op names: `subckt:NAME`, a subcircuit of the netlist, by the dialect's case rule;
-/// `file:…`, the netlist's file level.
+/// `file` or `file:…`, the netlist's file level.
 fn find_level(doc: &HostDocument, file: &str, id: &str) -> Result<LevelId, String> {
-    if id.starts_with("file:") {
+    if id == "file" || id.starts_with("file:") {
         return Ok(0);
     }
     let name = id.strip_prefix("subckt:").ok_or_else(|| format!("level \"{id}\" is not subckt:NAME or file:PATH"))?;
@@ -131,7 +131,13 @@ fn record(author: &str, statements: &[String], marker: &str) -> String {
     let mut out = vec![format!("@RNL(author={}) {{", form::quote(author))];
     for (k, s) in statements.iter().enumerate() {
         let s = if k + 1 < statements.len() { format!("{s};") } else { s.clone() };
-        out.extend(form::wrap(&s, width, 4).into_iter().map(|l| format!("  {l}")));
+        // a statement of several lines, such as a symbol's definition, keeps its lines' indents
+        for line in s.lines() {
+            let body = line.trim_start();
+            let indent = line.len() - body.len();
+            let pad = " ".repeat(2 + indent);
+            out.extend(form::wrap(body, width.saturating_sub(indent), 4).into_iter().map(|l| format!("{pad}{l}")));
+        }
     }
     out.push("}".into());
     out.join("\n")
