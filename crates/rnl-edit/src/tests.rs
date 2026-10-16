@@ -240,7 +240,7 @@ fn in_a_spice_section_of_a_spectre_netlist_a_record_is_carried_by_a_star() {
     let out = write(&request("spectre", net, ops)).unwrap();
     assert_eq!(
         out,
-        "// t\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spice\n.subckt cell a b\nR1 a b 1k\n\
+        "// t\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nsimulator lang=spice\n.subckt cell a b\nR1 a b 1k\n\
          * @RNL(author=\"test\") {\n*   #R1 @PLACE(0, 0)\n* }\n.ends cell\nsimulator lang=spectre\nX1 (n1 n2) cell\n\
          // @RNL(author=\"test\") {\n//   #X1 @PLACE(0, 0)\n// }\n"
     );
