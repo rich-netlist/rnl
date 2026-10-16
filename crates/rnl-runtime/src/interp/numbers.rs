@@ -361,6 +361,41 @@ impl Interp<'_> {
             .collect()
     }
 
+    /// The records of the solver in the level's own text of scene `s`, in order (5.9).
+    pub(crate) fn solver_records(&self, s: SceneId) -> Vec<RecId> {
+        self.level_records(s).solver
+    }
+
+    /// The objects without a name in the bodies of the usages that the statements of the record of
+    /// the solver `g` make in scene `s`, by usage, each list in the order of the body, depth first,
+    /// as [`Interp::generated_bodies`] gives those of the usages that rules make: once the record
+    /// writes such a usage out, the objects of its body are these (5.9, 10.5).
+    pub(crate) fn written_bodies(&self, s: SceneId, g: RecId) -> HashMap<ObjId, Vec<ObjId>> {
+        let mut keyed: HashMap<ObjId, Vec<(Vec<u64>, ObjId)>> = HashMap::new();
+        for (i, b) in self.births.iter().enumerate() {
+            if !matches!(b.root, MemberKey::M { rec, .. } if rec == g) || !self.numbered_birth(s, b) {
+                continue;
+            }
+            // the outermost usage whose body it is in
+            let mut top = None;
+            let mut at = b.parent;
+            while let Some(u) = at {
+                top = Some(u);
+                at = self.usage(u).parent;
+            }
+            if let Some(u) = top {
+                keyed.entry(u).or_default().push((self.birth_key(i), b.obj));
+            }
+        }
+        keyed
+            .into_iter()
+            .map(|(u, mut list)| {
+                list.sort();
+                (u, list.into_iter().map(|(_, o)| o).collect())
+            })
+            .collect()
+    }
+
     /// The numbers of the objects of scene `s` for its problem (5.9): those of the authored records,
     /// and after them, for each record of the solver read, the record's own objects.
     pub(crate) fn problem_numbers(&mut self, s: SceneId) -> HashMap<ObjId, usize> {

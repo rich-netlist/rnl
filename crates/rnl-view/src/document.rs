@@ -77,6 +77,13 @@ pub struct Level {
     pub empty: bool,
     /// What the level lacks without a solver; see [`crate::level_status`].
     pub status: Option<String>,
+    /// Whether to solve the level (decision 0008): "fixed", nothing for a solver to decide;
+    /// "unsolved", something to decide and no record of the solver; "solved", a record of the
+    /// solver that is up to date; "stale", one whose input or numbering is out of date. Absent
+    /// unless `BuildOptions::status` asks for it; see `rnl_runtime::previous::solve_status`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub solve: Option<&'static str>,
     /// What can be clicked on the drawing, in SVG pixels.
     pub hits: Vec<Hit>,
     /// The subcircuit instances of the level, in netlist order: the hierarchy below it.
@@ -160,7 +167,7 @@ pub struct Span {
     pub kind: &'static str,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Diagnostic {
     /// "error", "warning" or "hint".
@@ -458,6 +465,7 @@ impl<'a> Index<'a> {
             scale: render.scale,
             empty: prims.is_empty(),
             status: crate::level_status(lv),
+            solve: None,
             hits,
             children: Vec::new(),
         }

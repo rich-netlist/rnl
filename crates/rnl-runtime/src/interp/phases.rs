@@ -1174,6 +1174,79 @@ impl Interp<'_> {
         }
     }
 
+    /// Where a viewer that does not solve draws a text (13.3; the draft 0.3, section 9): at its
+    /// anchor, or, when the anchor leaves it without a position while what it is attached to is
+    /// drawn, beside that by this implementation's default rule. That is a wire drawn only in part
+    /// or as a flyline, a net none of whose wires has all its points placed, and a graphic. The axes
+    /// that a PLACE fixes keep their values. This place is the viewer's only: constraints and the
+    /// solver's view still see such a text without a position.
+    pub(crate) fn text_drawn_at(&mut self, s: SceneId, t: ObjId) -> Option<Pt> {
+        if let Some(at) = self.text_anchor(s, t) {
+            return Some(at);
+        }
+        let att = self.text_attach(t);
+        let xy = self.scenes[s].pos.get(&t).copied().unwrap_or([None, None]);
+        let free = self.drawn_default_place(s, att)?;
+        Some((xy[0].unwrap_or(free.0), xy[1].unwrap_or(free.1)))
+    }
+
+    /// The default place of a text whose attached object is drawn although `text_default_place`
+    /// finds no place for it: above the middle of what is drawn of a wire, flylines included; at
+    /// the start of the first wire of a net that is drawn at all, else at the first pin on the net
+    /// that is drawn (13.3: next to one of its wires or terminals); beside the first point of a
+    /// graphic, as beside the origin of an object. None when nothing of it is drawn.
+    fn drawn_default_place(&mut self, s: SceneId, att: ObjId) -> Option<Pt> {
+        match self.o(att).clone() {
+            ObjData::Wire { .. } => {
+                let pts = self.wire_path(s, att);
+                if pts.len() < 2 {
+                    return None;
+                }
+                let k = pts.len() / 2;
+                let (a, b) = (pts[k - 1], pts[k]);
+                Some(((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0 + 0.6))
+            }
+            ObjData::Net { .. } => {
+                for w in self.scenes[s].wires_by_net.get(&att).cloned().unwrap_or_default() {
+                    if !matches!(self.o(w), ObjData::Wire { failed: false, .. }) {
+                        continue;
+                    }
+                    let pts = self.wire_path(s, w);
+                    if pts.len() >= 2 {
+                        return pts.first().copied();
+                    }
+                }
+                let terms = self.route_terms(s);
+                for &(_, t, _) in terms.get(&att).into_iter().flatten() {
+                    if self.has_pin(s, t) {
+                        if let Some(p) = self.point_of(s, t) {
+                            return Some(p);
+                        }
+                    }
+                }
+                None
+            }
+            ObjData::Prim { points, .. } => {
+                // a graphic is drawn when all its points have a position (13.4)
+                let mut first = None;
+                for q in points {
+                    let p = self.point_of(s, q)?;
+                    first.get_or_insert(p);
+                }
+                first.map(|p| (p.0 + 1.2, p.1 + 1.2))
+            }
+            _ => None,
+        }
+    }
+
+    /// What is drawn of a wire, as one line: its runs of points that have a position after its
+    /// mode, joined by its flylines ([`Interp::wire_runs`]); the vertices of the wire when all its
+    /// points have a position.
+    fn wire_path(&mut self, s: SceneId, w: ObjId) -> Vec<Pt> {
+        let Some((runs, mode)) = self.wire_runs(s, w) else { return Vec::new() };
+        runs.iter().flat_map(|run| if run.len() >= 2 { route(run, &mode) } else { run.clone() }).collect()
+    }
+
     pub(crate) fn text_items(&self, t: ObjId) -> TextItems {
         match self.o(t) {
             ObjData::KeyText { layers, .. } => {
@@ -1314,6 +1387,38 @@ impl Interp<'_> {
             pts.push(self.point_of(s, q)?);
         }
         Some(route(&pts, &mode))
+    }
+
+    /// What a viewer that does not solve draws of a wire some of whose points have no position yet,
+    /// such as a free point `(_, _)` or the pin of an instance not placed (13.1; the draft 0.3,
+    /// section 9): the runs of consecutive points that have one, each of two or more drawn as the
+    /// wire after its mode, and a flyline from the end of each run to the start of the next, over
+    /// the points that have none. Each run is its points as written, and the mode is the wire's;
+    /// a wire whose points all have a position is one run.
+    pub(crate) fn wire_runs(&mut self, s: SceneId, w: ObjId) -> Option<(Vec<Vec<Pt>>, String)> {
+        let WireShape { points, mode, .. } = self.wire_shape(s, w)?;
+        let mut runs: Vec<Vec<Pt>> = Vec::new();
+        let mut gap = true;
+        for q in points {
+            match self.point_of(s, q) {
+                Some(xy) if gap => {
+                    runs.push(vec![xy]);
+                    gap = false;
+                }
+                Some(xy) => runs.last_mut().unwrap().push(xy),
+                None => gap = true,
+            }
+        }
+        Some((runs, mode))
+    }
+
+    /// A wire as a viewer that does not solve draws it ([`Interp::wire_runs`]): its runs of two
+    /// points or more after its mode, and its flylines.
+    pub(crate) fn wire_drawing(&mut self, s: SceneId, w: ObjId) -> (Vec<Vec<Pt>>, Vec<(Pt, Pt)>) {
+        let Some((runs, mode)) = self.wire_runs(s, w) else { return (Vec::new(), Vec::new()) };
+        let flylines = runs.windows(2).map(|pair| (pair[0][pair[0].len() - 1], pair[1][0])).collect();
+        let drawn = runs.iter().filter(|run| run.len() >= 2).map(|run| route(run, &mode)).collect();
+        (drawn, flylines)
     }
 
     // ---- constraints (14)

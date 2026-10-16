@@ -25,6 +25,7 @@ use crate::diag::{DiagId, Sink};
 use crate::host::{HostDocument, Level, LevelId, LevelKind, Record};
 use crate::model::{FailedSpan, HostRef, Model};
 use crate::numbering::LevelNumbering;
+use crate::previous::RecordResult;
 use crate::source::Provider;
 use crate::syntax::RecordAst;
 
@@ -117,6 +118,9 @@ pub struct Interpretation {
     pub(crate) own: HashMap<RecId, Vec<Counted>>,
     /// A number was used before the member that makes its object, while that member was read.
     pub(crate) forward: bool,
+    /// What the last record of the solver of each level gives, read with the records of the solver
+    /// and with [`Options::problems`] (see [`crate::previous::previous`]).
+    pub(crate) results: Vec<RecordResult>,
 }
 
 impl Interpretation {
@@ -674,8 +678,8 @@ impl<'p> Interp<'p> {
     /// Build the output.
     pub fn finish(mut self) -> Interpretation {
         let model = self.build_model();
-        let problems =
-            if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Vec::new() };
+        let (problems, results) =
+            if self.want_problems && self.package_main.is_none() { self.build_problems() } else { Default::default() };
         // the numbers and their checks, read with the draft only (5.9); a reading that counts the
         // objects of the authored records for another gives those alone
         let counting = self.numbers.count;
@@ -714,6 +718,7 @@ impl<'p> Interp<'p> {
             counted,
             own,
             forward,
+            results,
             doc: self.doc,
         }
     }

@@ -8,8 +8,9 @@ The Rust workspace ([`../Cargo.toml`](../Cargo.toml)). The crates implement the 
 | [`rnl-host-spice`](rnl-host-spice/README.md) | Reads SPICE netlists into the runtime's host document. |
 | [`rnl-host-spectre`](rnl-host-spectre/README.md) | Reads Spectre netlists, including `simulator lang=spice` parts. |
 | [`rnl-render`](rnl-render/README.md) | Draws an effective model as basic primitives and SVG. |
-| [`rnl-view`](rnl-view/README.md) | The core interface for frontends: a workspace in, a Document out, with the standard packages bundled. Reads no files. |
-| [`rnl-cli`](rnl-cli/README.md) | The `rnl` command: check, render, dump, view, problem, solve, and strip generated records. Its `FsProvider` reads files for the desktop viewer too. |
+| [`rnl-view`](rnl-view/README.md) | The core interface for frontends: a workspace in, a Document out, with the standard packages bundled; and the editor interface's snapshot. Reads no files. |
+| [`rnl-edit`](rnl-edit/README.md) | Writing RNL into host netlists: the ops of an edit transaction into a netlist without RNL, in the standard form. Reads no files. |
+| [`rnl-cli`](rnl-cli/README.md) | The `rnl` command: check, render, dump, view, snapshot, problem, solve, strip generated records, and write a transaction's ops. Its `FsProvider` reads files for the desktop viewer too. |
 | [`rnl-solver`](rnl-solver/README.md) | The solver (solver v1): the resolution of 8.5 with exact rationals, a structure-first search, coordinates by a lexicographic LP, the routing of the ROUTEs and the layered objectives; `rnl solve` writes its results back. Reads no files. |
 
 ```bash

@@ -77,8 +77,10 @@ jobs:
 
       - uses: ./.github/actions/install-spec-tools
 
-      # Checks the standard, then writes its pages and downloads: site/dist/spec/0.2/ (Chinese) and
-      # site/dist/en/spec/0.2/ (English).
+      # Checks every version of the standard in spec/, then writes the pages and downloads of each:
+      # site/dist/spec/<version>/ (Chinese) and site/dist/en/spec/<version>/ (English), with the pages
+      # that compare it with each earlier version; site/dist/spec/ and site/dist/en/spec/ lead to the
+      # newest version.
       - name: Build the pages of the standard
         run: python3 scripts/spec/build.py --site site/dist
 

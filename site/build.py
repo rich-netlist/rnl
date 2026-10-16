@@ -25,7 +25,7 @@ Output (site/dist/ by default, ignored by Git), for each page in PAGES:
     index.html, language.html, tools.html, assets/, *-standalone.html   Chinese, at the site root
     en/index.html, en/language.html, en/tools.html, en/assets/, en/*-standalone.html   English
 The standalone files have the styles and scripts inlined and link the other pages to the published
-site. The pages of the standard (spec/0.2/) and the web viewer (viewer/), which the pages link to,
+site. The pages of the standard (spec/, one folder for each version) and the web viewer (viewer/), which the pages link to,
 are added by .github/workflows/pages.yml.
 
 Usage, from the repository root (standard library only, and git for the tags):

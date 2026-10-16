@@ -22,6 +22,7 @@
   --ink: #132033; --ink-2: #435368; --ink-3: #74849a; --signal: #1f4fd8; --signal-2: #e7edfd;
   --markup: #c2410c; --markup-2: #fdf0e6; --markup-line: #f0c6a6; --err: #c81e1e; --err-2: #fde8e8;
   --grid-a: rgba(19, 32, 51, .04); --grid-b: rgba(19, 32, 51, .07);
+  --ins: #15803d; --ins-2: #dcfce7; --del: #b91c1c; --del-2: #fde4e4;
   --t-kw: #c2410c; --t-inst: #1f4fd8; --t-net: #0f766e; --t-obj: #7c3aed; --t-def: #ad1f78; --t-slot: #975a06;
   --t-pt: #15803d; --t-str: #8a5a00; --t-num: #0e7490; --t-free: #8792a3; --t-cmt: #97a2b0;
   --shadow: 0 1px 2px rgba(19, 32, 51, .05), 0 12px 32px -16px rgba(19, 32, 51, .22);
@@ -41,6 +42,7 @@ html[lang="en"] {
     --ink: #e3e9f0; --ink-2: #a9b6c5; --ink-3: #75859a; --signal: #82a6ff; --signal-2: #1a2744;
     --markup: #ff8c42; --markup-2: #231811; --markup-line: #6b3a17; --err: #f87171; --err-2: #341515;
     --grid-a: rgba(180, 200, 225, .035); --grid-b: rgba(180, 200, 225, .06);
+    --ins: #4ade80; --ins-2: rgba(74, 222, 128, .16); --del: #f87171; --del-2: rgba(248, 113, 113, .16);
     --t-kw: #ff8c42; --t-inst: #82a6ff; --t-net: #2dd4bf; --t-obj: #b79cff; --t-def: #f472b6; --t-slot: #fbbf24;
     --t-pt: #4ade80; --t-str: #e8b66a; --t-num: #67d4e8; --t-free: #7f8da0; --t-cmt: #697789;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 14px 36px -18px rgba(0, 0, 0, .7);
@@ -52,6 +54,7 @@ html[lang="en"] {
   --ink: #e3e9f0; --ink-2: #a9b6c5; --ink-3: #75859a; --signal: #82a6ff; --signal-2: #1a2744;
   --markup: #ff8c42; --markup-2: #231811; --markup-line: #6b3a17; --err: #f87171; --err-2: #341515;
   --grid-a: rgba(180, 200, 225, .035); --grid-b: rgba(180, 200, 225, .06);
+  --ins: #4ade80; --ins-2: rgba(74, 222, 128, .16); --del: #f87171; --del-2: rgba(248, 113, 113, .16);
   --t-kw: #ff8c42; --t-inst: #82a6ff; --t-net: #2dd4bf; --t-obj: #b79cff; --t-def: #f472b6; --t-slot: #fbbf24;
   --t-pt: #4ade80; --t-str: #e8b66a; --t-num: #67d4e8; --t-free: #7f8da0; --t-cmt: #697789;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 14px 36px -18px rgba(0, 0, 0, .7);
@@ -127,6 +130,8 @@ main { min-width: 0; padding: 36px clamp(20px, 4vw, 56px) 96px; max-width: 900px
 .kicker::after { content: ""; width: 40px; height: 1px; background: var(--markup-line); }
 html[lang="zh-CN"] main h1.title { font-weight: 900; letter-spacing: .02em; }
 .rev { margin: 0; font: 13px/1.6 var(--f-mono); color: var(--ink-3); }
+.versions { margin: 2px 0 0; font: 13px/1.6 var(--f-mono); color: var(--ink-3); }
+.versions b { color: var(--ink-2); font-weight: 600; }
 .downloads { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .dl {
   display: inline-flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 8px;
@@ -152,6 +157,8 @@ main :is(h1, h2, h3) .self { margin-left: 8px; color: var(--ink-3); font-weight:
 main :is(h1, h2, h3):hover .self { visibility: visible; }
 code { font-family: var(--f-mono); font-size: .88em; }
 :not(pre) > code { padding: 1px 5px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); }
+/* A run such as "net"、"wire"、"usage" has nowhere else to break on a narrow screen, and would widen the page */
+:not(pre) > code { overflow-wrap: anywhere; }
 pre {
   overflow-x: auto; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel);
   font: 13.5px/1.6 var(--f-mono);
@@ -169,6 +176,39 @@ th { background: var(--panel-2); font-weight: 600; }
 .t-pt { color: var(--t-pt); } .t-s { color: var(--t-str); } .t-o { color: var(--ink-2); font-weight: 600; }
 .t-t { color: var(--t-free); font-style: italic; } .t-c { color: var(--t-cmt); font-style: italic; }
 .t-h { color: var(--ink-2); } .t-hi { color: var(--ink); font-weight: 600; }
+
+/* A page that compares two versions: added text on green, removed text struck through on red */
+.compare-with { margin: 16px 0 4px; font-size: 14.5px; color: var(--ink-2); }
+.compare-with span { margin-left: 6px; padding: 0 6px; }
+.compare-list { margin: 2px 0 0; font: 13px/1.9 var(--f-mono); color: var(--ink-3); }
+.compare-list b { margin-right: 8px; font: 600 12.5px var(--f-body); color: var(--ink-2); }
+.compare-list a { margin-right: 9px; white-space: nowrap; }
+span.diff-ins { background: var(--ins-2); box-shadow: 0 1px 0 var(--ins); border-radius: 2px; }
+span.diff-del { background: var(--del-2); color: var(--ink-2); border-radius: 2px; }
+:is(span, div, section).diff-del, tr.diff-del > * { text-decoration: line-through; text-decoration-color: var(--del); }
+:is(div, section).diff-ins, :is(div, section).diff-del { margin-left: -14px; padding-left: 11px; border-left: 3px solid var(--ins); }
+:is(div, section).diff-ins { background: linear-gradient(90deg, var(--ins-2), transparent 75%); }
+:is(div, section).diff-del { border-left-color: var(--del); color: var(--ink-2); }
+tr.diff-ins > * { background: var(--ins-2); }
+tr.diff-del > * { background: var(--del-2); color: var(--ink-2); }
+.code .d-ins, .code .d-del { display: inline-block; min-width: 100%; vertical-align: top; }
+.code .d-ins { background: var(--ins-2); box-shadow: inset 3px 0 var(--ins); }
+.code .d-del { background: var(--del-2); box-shadow: inset 3px 0 var(--del); }
+.diff-at { outline: 2px solid var(--signal); outline-offset: 3px; }
+#toc a:is(.is-changed, .is-added, .is-removed)::after {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 7px; border-radius: 50%; vertical-align: 1px; background: var(--markup);
+}
+#toc a.is-added::after { background: var(--ins); }
+#toc a.is-removed { text-decoration: line-through; }
+#toc a.is-removed::after { background: var(--del); }
+body.only-changes :is(main section, #toc li).diff-same { display: none; }
+.diffbar {
+  position: fixed; z-index: 45; right: 20px; bottom: 20px; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); font-size: 13.5px;
+}
+.diffbar .icon-btn { width: 32px; height: 32px; }
+#diff-pos { min-width: 5.5em; text-align: center; font: 13px var(--f-mono); color: var(--ink-2); }
+.diff-only { display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; color: var(--ink-2); cursor: pointer; }
 
 .foot { border-top: 1px solid var(--line); padding: 28px 20px 40px; text-align: center; font-size: 13px; color: var(--ink-3); }
 .foot .brand-mark { display: block; margin-bottom: 8px; color: var(--ink-2); }
@@ -189,7 +229,7 @@ th { background: var(--panel-2); font-weight: 600; }
   .lang-link { margin-left: auto; }
 }
 @media print {
-  .topbar, #toc, .downloads { display: none; }
+  .topbar, #toc, .downloads, .versions, .diffbar { display: none; }
   .layout { display: block; }
   body { background: none; }
 }
@@ -202,6 +242,8 @@ th { background: var(--panel-2); font-weight: 600; }
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
   <symbol id="i-zip" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M10 5v2M10 9v2M10 13v2"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
 </svg>
 <header class="topbar">
   <div class="topbar-in">
@@ -227,16 +269,31 @@ $table-of-contents$
   <div class="kicker">$kicker$</div>
   <h1 class="title">$title$</h1>
   <p class="rev">$revision-label$</p>
+$if(versions-html)$
+  <p class="versions">$versions-html$</p>
+$endif$
+$if(compare-html)$
+  $compare-html$
+$else$
   <div class="downloads">
     <a class="dl" href="$pdf-href$" download><svg class="ico"><use href="#i-file"/></svg><b>PDF</b><small>$pdf-size$</small></a>
     <a class="dl" href="$md-href$" download><svg class="ico"><use href="#i-file"/></svg><b>$md-label$</b><small>$md-size$</small></a>
     <a class="dl" href="$zip-href$" download><svg class="ico"><use href="#i-zip"/></svg><b>$zip-label$</b><small>$zip-size$</small></a>
     <a class="sums" href="SHA256SUMS">$sums-label$</a>
   </div>
+$endif$
 </header>
 $body$
 </main>
 </div>
+$if(compare-html)$
+<nav class="diffbar" aria-label="$changes-label$">
+  <button class="icon-btn" id="diff-prev" type="button" aria-label="$prev-label$" title="$prev-label$"><svg class="ico"><use href="#i-up"/></svg></button>
+  <span id="diff-pos" aria-live="polite"></span>
+  <button class="icon-btn" id="diff-next" type="button" aria-label="$next-label$" title="$next-label$"><svg class="ico"><use href="#i-down"/></svg></button>
+  <label class="diff-only"><input type="checkbox" id="diff-only"> $only-label$</label>
+</nav>
+$endif$
 <footer class="foot">
   <span class="brand-mark">RNL</span>
   $foot-note$
@@ -302,6 +359,55 @@ $body$
   }
   window.addEventListener("scroll", progress, { passive: true });
   progress();
+
+  // A page that compares two versions: marks in the contents, from one change to the next, and only the
+  // sections that changed
+  var diffbar = document.querySelector(".diffbar");
+  if (!diffbar) return;
+  var CHANGE = ".diff-ins, .diff-del, .d-ins, .d-del";
+  // A change is a mark, or marks next to each other, such as a removed word and the word added for it
+  var stops = Array.prototype.filter.call(document.querySelectorAll("main " + CHANGE), function (el) {
+    if (el.parentElement.closest(CHANGE) || el.closest(".doc-head")) return false;
+    var p = el.previousSibling;
+    while (p && p.nodeType === 3 && !p.textContent.trim()) p = p.previousSibling;
+    return !(p && p.nodeType === 1 && p.matches(CHANGE));
+  });
+  var pos = document.getElementById("diff-pos"), at = -1;
+  pos.textContent = stops.length ? "– / " + stops.length : "0";
+  function show(i) {
+    if (!stops.length) return;
+    at = (i + stops.length) % stops.length;
+    var el = stops[at];
+    el.scrollIntoView({ block: "center" });
+    pos.textContent = (at + 1) + " / " + stops.length;
+    el.classList.add("diff-at");
+    setTimeout(function () { el.classList.remove("diff-at"); }, 1200);
+  }
+  function go(step) {
+    var r = at >= 0 && stops[at].getBoundingClientRect();
+    if (r && r.bottom > 0 && r.top < innerHeight) return show(at + step);
+    var mid = innerHeight / 2, i = step > 0 ? 0 : stops.length - 1;
+    for (var k = 0; k < stops.length; k++) {
+      var b = stops[k].getBoundingClientRect();
+      if (step > 0 && b.top > mid) { i = k; break; }
+      if (step < 0 && b.bottom < mid) i = k;
+    }
+    show(i);
+  }
+  document.getElementById("diff-prev").addEventListener("click", function () { go(-1); });
+  document.getElementById("diff-next").addEventListener("click", function () { go(1); });
+  document.querySelectorAll("main section[id]").forEach(function (s) {
+    var a = links[s.id], whole = s.closest(".diff-ins, .diff-del"), mark = null;
+    if (whole) mark = whole.classList.contains("diff-ins") ? "is-added" : "is-removed";
+    else if (Array.prototype.some.call(s.querySelectorAll(CHANGE), function (el) { return el.closest("section") === s; })) mark = "is-changed";
+    if (a && mark) a.classList.add(mark);
+    if (!whole && !s.querySelector(CHANGE)) {
+      s.classList.add("diff-same");
+      if (a) a.parentElement.classList.add("diff-same");
+    }
+  });
+  var only = document.getElementById("diff-only");
+  only.addEventListener("change", function () { document.body.classList.toggle("only-changes", only.checked); });
 })();
 </script>
 </body>

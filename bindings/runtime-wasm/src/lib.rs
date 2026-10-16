@@ -1,6 +1,7 @@
-//! The core for WebAssembly (decision 0008): [`rnl_view::build`] behind a small C-style interface
-//! over linear memory, a JSON request in and a JSON response out. It needs no generated glue: the
-//! module imports nothing, and a page or a Worker calls its exports as `js/core.js` does.
+//! The core for WebAssembly (decision 0008): [`rnl_view::build`], and [`rnl_edit::write`] with a
+//! build of what it wrote, behind a small C-style interface over linear memory, a JSON request in
+//! and a JSON response out. It needs no generated glue: the module imports nothing, and a page or a
+//! Worker calls its exports as `js/core.js` does.
 //!
 //! A call goes like this:
 //!
@@ -27,7 +28,7 @@ use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
 use rnl_runtime::source::{normalize, MemoryProvider};
 use rnl_runtime::Options;
-use rnl_view::{BuildOptions, Document};
+use rnl_view::{BuildOptions, Document, Parts, Snapshot};
 use serde::{Deserialize, Serialize};
 
 /// What to build: the workspace and how. Fields the core does not know are ignored, so that a
@@ -57,6 +58,13 @@ pub struct Request {
     /// given.
     #[serde(default)]
     pub draft: bool,
+    /// Give each level its solve status, what a frontend decides from whether to solve it
+    /// (decision 0008); false when not given.
+    #[serde(default)]
+    pub status: bool,
+    /// The parts of the editor interface's snapshot to give: with them, the answer is a
+    /// [`rnl_view::Snapshot`] instead of a Document.
+    pub parts: Option<PartsRequest>,
     /// Panic with this message, to test that the caller still gets an answer.
     #[cfg(feature = "test-panic")]
     pub panic: Option<String>,
@@ -70,21 +78,81 @@ fn yes() -> bool {
     true
 }
 
-/// The answer to a request: `{"document": ...}` or `{"error": "..."}`.
+/// The parts of a snapshot ([`rnl_view::Parts`]): the Document unless `drawing` is false, and
+/// each level's host circuit and model when asked for.
+#[derive(Deserialize, Debug)]
+pub struct PartsRequest {
+    #[serde(default = "yes")]
+    pub drawing: bool,
+    #[serde(default)]
+    pub host: bool,
+    #[serde(default)]
+    pub model: bool,
+}
+
+/// What to write: an edit transaction's ops into its netlist ([`rnl_edit::write`]), and the
+/// Document of what was written. The fields beside `write` are those of a [`Request`], but
+/// `entry` and `dialect`: the netlist is the entry, in the dialect of the write.
+#[derive(Deserialize, Debug)]
+pub struct WriteRequest {
+    pub write: rnl_edit::WriteRequest,
+    /// Further files, such as the packages of `package_dirs`.
+    #[serde(default)]
+    pub files: BTreeMap<String, String>,
+    #[serde(default)]
+    pub package_dirs: Vec<String>,
+    #[serde(default = "yes")]
+    pub std: bool,
+    #[serde(default = "yes")]
+    pub svg: bool,
+    #[serde(default)]
+    pub primitives: bool,
+    #[serde(default)]
+    pub draft: bool,
+    #[serde(default)]
+    pub status: bool,
+}
+
+/// What a write answers: the netlist with the ops written into it, and its Document, whose
+/// diagnostics say how what was written reads.
+#[derive(Serialize, Debug)]
+pub struct Written {
+    pub text: String,
+    pub document: Document,
+}
+
+/// The answer to a request: `{"document": ...}`, `{"snapshot": ...}`, `{"written": ...}` or
+/// `{"error": "..."}`.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Response {
     /// The Document of the entry.
     Document(Box<Document>),
-    /// Why there is none: the request is not a [`Request`], or the entry cannot be read.
+    /// The snapshot of the entry, when the request asks for `parts`.
+    Snapshot(Box<Snapshot>),
+    /// The netlist a [`WriteRequest`] wrote, and its Document.
+    Written(Box<Written>),
+    /// Why there is none: the request is neither a [`Request`] nor a [`WriteRequest`], the entry
+    /// cannot be read, or an op cannot be written.
     Error(String),
 }
 
-/// Answer a request given as JSON.
+/// Answer a request given as JSON: a write when it has a `write` field, else a build.
 pub fn respond(request: &[u8]) -> Response {
-    let request: Request = match serde_json::from_slice(request) {
+    let invalid = |e: serde_json::Error| Response::Error(format!("the request is not valid: {e}"));
+    let value: serde_json::Value = match serde_json::from_slice(request) {
+        Ok(v) => v,
+        Err(e) => return invalid(e),
+    };
+    if value.get("write").is_some() {
+        return match serde_json::from_value(value) {
+            Ok(w) => write(w),
+            Err(e) => invalid(e),
+        };
+    }
+    let request: Request = match serde_json::from_value(value) {
         Ok(r) => r,
-        Err(e) => return Response::Error(format!("the request is not valid: {e}")),
+        Err(e) => return invalid(e),
     };
     #[cfg(feature = "test-panic")]
     if let Some(message) = &request.panic {
@@ -105,9 +173,41 @@ pub fn respond(request: &[u8]) -> Response {
         runtime: Options { std: request.std, draft: request.draft, ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
+        status: request.status,
     };
+    if let Some(p) = request.parts {
+        let parts = Parts { drawing: p.drawing, host: p.host, model: p.model };
+        return match rnl_view::snapshot(&request.entry, &files, &options, parts) {
+            Ok(s) => Response::Snapshot(Box::new(s)),
+            Err(e) => Response::Error(e),
+        };
+    }
     match rnl_view::build(&request.entry, &files, &options) {
         Ok(d) => Response::Document(Box::new(d)),
+        Err(e) => Response::Error(e),
+    }
+}
+
+/// Write, then build what was written as the entry, among the request's files.
+fn write(request: WriteRequest) -> Response {
+    let text = match rnl_edit::write(&request.write) {
+        Ok(t) => t,
+        Err(e) => return Response::Error(e),
+    };
+    let entry = rnl_edit::entry(&request.write.dialect);
+    let mut files: BTreeMap<String, String> =
+        request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
+    files.insert(normalize(entry), text.clone());
+    let files = MemoryProvider { files, package_dirs: request.package_dirs };
+    let options = BuildOptions {
+        dialect: Some(request.write.dialect),
+        runtime: Options { std: request.std, draft: request.draft, ..Options::default() },
+        svg: request.svg,
+        primitives: request.primitives,
+        status: request.status,
+    };
+    match rnl_view::build(entry, &files, &options) {
+        Ok(document) => Response::Written(Box::new(Written { text, document })),
         Err(e) => Response::Error(e),
     }
 }
@@ -298,6 +398,13 @@ C1 a 0 1p
         let without = answer(json!({ "entry": "a.sp", "files": files, "std": false }));
         let count = |v: &Value| v["document"]["diagnostics"].as_array().unwrap().len();
         assert_ne!(count(&with), count(&without));
+        // the solve status only when asked for
+        assert!(with["document"]["levels"][0].get("solve").is_none());
+        let status = answer(json!({ "entry": "a.sp", "files": files, "status": true }));
+        assert_eq!(status["document"]["levels"][0]["solve"], "unsolved");
+        let native = BuildOptions { status: true, ..BuildOptions::default() };
+        let native = rnl_view::build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &native).unwrap();
+        assert_eq!(status["document"], serde_json::to_value(native).unwrap());
     }
 
     #[test]
@@ -352,6 +459,87 @@ R1 a 0 1k
             let v: Value = serde_json::from_str(&respond_json(request)).unwrap();
             assert!(v["error"].as_str().unwrap().starts_with("the request is not valid: "), "{v}");
         }
+    }
+
+    #[test]
+    fn a_write_answers_the_text_and_its_document() {
+        let netlist = "\n.subckt rc VSS\nR1 in VSS 1k\n.ends rc\n";
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"acme\", version=\"1.0\")}";
+        let ops = json!([
+            {"level": "subckt:rc", "op": "use-package", "name": "acme", "version": "1.0"},
+            {"level": "subckt:rc", "op": "set", "object": "#R1", "at": [2, 0]}
+        ]);
+        let write = json!({ "dialect": "spice", "netlist": netlist, "author": "test", "ops": ops });
+        let v = answer(
+            json!({ "write": write, "files": { "/p/acme.rnl": package }, "package_dirs": ["/p"], "svg": false }),
+        );
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys, ["written"]);
+        let text = v["written"]["text"].as_str().unwrap();
+        assert_eq!(
+            text,
+            "\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author=\"test\") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n"
+        );
+        let d = &v["written"]["document"];
+        assert_eq!(
+            (&d["path"], &d["dialect"], &d["files"][0]["text"]),
+            (&json!("/rnl-edit/netlist.sp"), &json!("spice"), &json!(text))
+        );
+        let errors =
+            |d: &Value| d["diagnostics"].as_array().unwrap().iter().filter(|d| d["severity"] == "error").count();
+        assert_eq!(errors(d), 0, "{d}");
+        assert_eq!(d["levels"][1]["svg"], Value::Null, "{d}");
+        // without the package directory, the header's package cannot be found
+        let v = answer(json!({ "write": write, "svg": false }));
+        assert!(errors(&v["written"]["document"]) > 0);
+        // Spectre: its extension and carrier
+        let scs = json!({ "dialect": "spectre", "netlist": "simulator lang=spectre\nr1 (a 0) resistor r=1k\n", "author": "test",
+                          "ops": [{"level": "file:x", "op": "set", "object": "#r1", "at": [0, 0]}] });
+        let v = answer(json!({ "write": scs }));
+        assert_eq!(v["written"]["document"]["path"], "/rnl-edit/netlist.scs");
+        assert!(
+            v["written"]["text"]
+                .as_str()
+                .unwrap()
+                .contains("// @RNL(author=\"test\") {\n//   #r1 @PLACE(0, 0)\n// }\n"),
+            "{v}"
+        );
+    }
+
+    #[test]
+    fn parts_ask_for_a_snapshot() {
+        let files = json!({ "/w/a.sp": NETLIST });
+        let v = answer(
+            json!({ "entry": "/w/a.sp", "files": files, "parts": { "drawing": false, "host": true, "model": true } }),
+        );
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys, ["snapshot"]);
+        let s = &v["snapshot"];
+        assert_eq!(s["schema"], "rnl-snapshot/1");
+        assert!(s.get("drawing").is_none());
+        let level = &s["levels"][0];
+        assert_eq!(level["host"]["instances"][0]["id"], "#R1");
+        assert_eq!(level["model"]["objects"][1]["at"]["value"], json!([4.0, 0.0]));
+        // the snapshot is the one rnl-view gives, and its drawing the Document of a build
+        let provider = MemoryProvider::new().with("/w/a.sp", NETLIST);
+        let parts = Parts { drawing: true, host: false, model: true };
+        let native = rnl_view::snapshot("/w/a.sp", &provider, &BuildOptions::default(), parts).unwrap();
+        let v = answer(json!({ "entry": "/w/a.sp", "files": files, "parts": { "model": true } }));
+        assert_eq!(v["snapshot"], serde_json::to_value(native).unwrap());
+        let built = answer(json!({ "entry": "/w/a.sp", "files": files }));
+        assert_eq!(v["snapshot"]["drawing"], built["document"]);
+    }
+
+    #[test]
+    fn what_cannot_be_written_is_an_error() {
+        let write = json!({ "dialect": "spice", "netlist": "\nR1 a 0 1k\n", "author": "test",
+                            "ops": [{"level": "subckt:none", "op": "set", "object": "#R1", "at": [0, 0]}] });
+        assert_eq!(
+            answer(json!({ "write": write })),
+            json!({ "error": "op 0 (set): the netlist has no subcircuit none" })
+        );
+        let v = answer(json!({ "write": { "dialect": "spice", "netlist": "" } }));
+        assert!(v["error"].as_str().unwrap().starts_with("the request is not valid: missing field `author`"), "{v}");
     }
 
     #[test]

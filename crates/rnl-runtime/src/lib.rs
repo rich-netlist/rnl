@@ -11,6 +11,7 @@ pub mod interp;
 pub mod markup;
 pub mod model;
 pub mod numbering;
+pub mod previous;
 pub mod problem;
 pub mod records;
 pub mod solution;

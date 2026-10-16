@@ -2,9 +2,11 @@
 
 use serde_json::{json, Value};
 
+use rnl_runtime::geom::Pt;
 use rnl_runtime::interp::obj::Lit;
 use rnl_runtime::interp::unit::DRAFT_VERSION;
 use rnl_runtime::markup::plain;
+use rnl_runtime::previous::Previous;
 use rnl_runtime::problem::*;
 
 fn lit(v: &Lit) -> Value {
@@ -227,4 +229,24 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
         v.as_object_mut().unwrap().insert("authored_numbers".into(), json!(p.authored_numbers));
     }
     v
+}
+
+/// The previous result of a level, for `rnl problem --previous`: null when the level has no record
+/// of the solver, otherwise what the record holds that maps onto the problem, by the indexes of the
+/// problem's objects and wires, and whether it is up to date.
+pub fn previous(p: Option<&Previous>) -> Value {
+    let Some(p) = p else { return Value::Null };
+    let path = |points: &[Pt]| points.iter().map(|(x, y)| json!([x, y])).collect::<Vec<_>>();
+    json!({
+        "hash": p.hash,
+        "same_input": p.same_input,
+        "numbering": p.numbering,
+        "placements": p.placements.iter().map(|pl| json!({
+            "object": pl.object,
+            "at": pl.at.map(|(x, y)| [x, y]),
+            "orient": pl.orient.map(|o| o.as_str()),
+        })).collect::<Vec<_>>(),
+        "wire_routes": p.wire_routes.iter().map(|r| json!({"wire": r.wire, "points": path(&r.points)})).collect::<Vec<_>>(),
+        "wires": p.wires.iter().map(|w| json!({"nets": w.nets, "points": path(&w.points)})).collect::<Vec<_>>(),
+    })
 }

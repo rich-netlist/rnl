@@ -17,7 +17,9 @@ const USAGE: &str = "usage:
   rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
+  rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
+  rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
 options:
@@ -29,9 +31,11 @@ options:
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
+  --status            give each level its solve status: fixed, unsolved, solved or stale
 problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  key=value;... over the solver's defaults, as for solve: the options the hash covers
+  --previous          give each level what its type=\"generated\" record decided, as hints
 solve options (the levels are read without their type=\"generated\" records; -o or --in-place is needed):
   -o DIR              write the files solved under DIR, named as they are relative to FILE's directory,
                       with a copy of the other files they read from there, such as includes
@@ -39,7 +43,12 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   --level TITLE       only the level with this title
   --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam
                       and budget, as rnl-solver's canonical text writes them; the hash covers them
-  --report            print what became of every fact, not only of the facts discarded";
+  --report            print what became of every fact, not only of the facts discarded
+snapshot options:
+  --parts LIST        the parts to give, of drawing, host and model; host,model by default
+write:
+  REQUEST.json is {\"dialect\", \"netlist\", \"author\", \"ops\"}, the ops as the editor interface
+  draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out";
 
 struct Args {
     command: String,
@@ -52,11 +61,15 @@ struct Args {
     draft: bool,
     svg: bool,
     primitives: bool,
+    status: bool,
     level: Option<String>,
     /// As given; `problem` and `solve` each have their own default.
     solver_options: Option<String>,
     in_place: bool,
     report: bool,
+    previous: bool,
+    author: Option<String>,
+    parts: Option<String>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -72,10 +85,13 @@ fn parse_args() -> Result<Args, String> {
     let mut generated = true;
     let mut dialect = None;
     let mut draft = false;
-    let (mut svg, mut primitives) = (true, false);
+    let (mut svg, mut primitives, mut status) = (true, false, false);
     let mut level = None;
+    let mut previous = false;
     let mut solver_options = None;
     let (mut in_place, mut report) = (false, false);
+    let mut author = None;
+    let mut parts = None;
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
@@ -86,10 +102,14 @@ fn parse_args() -> Result<Args, String> {
             "--draft" => draft = true,
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
+            "--status" => status = true,
+            "--previous" => previous = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
             "--solver-options" => solver_options = Some(it.next().ok_or("--solver-options needs a text")?),
             "--in-place" => in_place = true,
             "--report" => report = true,
+            "--author" => author = Some(it.next().ok_or("--author needs a name")?),
+            "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
@@ -106,10 +126,14 @@ fn parse_args() -> Result<Args, String> {
         draft,
         svg,
         primitives,
+        status,
         level,
         solver_options,
         in_place,
         report,
+        previous,
+        author,
+        parts,
     })
 }
 
@@ -169,12 +193,24 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 .map_err(|e| format!("--solver-options: {e}"))?
                 .canonical();
             let options = Options { std: args.std, draft: args.draft, ..Options::solver() };
-            let r = rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), &provider, &options)?;
+            let (r, previous) = if args.previous {
+                rnl_view::read_previous(&args.file.to_string_lossy(), args.dialect.as_deref(), &provider, &options)?
+            } else {
+                (rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), &provider, &options)?, Vec::new())
+            };
             let levels: Vec<_> = r
                 .problems
                 .iter()
-                .filter(|p| args.level.as_ref().is_none_or(|t| *t == p.title))
-                .map(|p| rnl_cli::problem::level(p, &problem_options))
+                .enumerate()
+                .filter(|(_, p)| args.level.as_ref().is_none_or(|t| *t == p.title))
+                .map(|(k, p)| {
+                    let mut level = rnl_cli::problem::level(p, &problem_options);
+                    if args.previous {
+                        let hints = rnl_cli::problem::previous(previous.get(k).and_then(Option::as_ref));
+                        level.as_object_mut().unwrap().insert("previous".into(), hints);
+                    }
+                    level
+                })
                 .collect();
             if levels.is_empty() {
                 if let Some(t) = &args.level {
@@ -190,9 +226,32 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 runtime: options(args),
                 svg: args.svg,
                 primitives: args.primitives,
+                status: args.status,
             };
             let doc = rnl_view::build(&args.file.to_string_lossy(), &provider, &options)?;
             println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
+        "snapshot" => {
+            let list = args.parts.as_deref().unwrap_or("host,model");
+            let mut parts = rnl_view::Parts { drawing: false, host: false, model: false };
+            for p in list.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+                match p {
+                    "drawing" => parts.drawing = true,
+                    "host" => parts.host = true,
+                    "model" => parts.model = true,
+                    _ => return Err(format!("--parts: unknown part {p}; the parts are drawing, host and model")),
+                }
+            }
+            let options = BuildOptions {
+                dialect: args.dialect.clone(),
+                runtime: options(args),
+                svg: args.svg,
+                primitives: args.primitives,
+                status: args.status,
+            };
+            let snapshot = rnl_view::snapshot(&args.file.to_string_lossy(), &provider, &options, parts)?;
+            println!("{}", serde_json::to_string_pretty(&snapshot).unwrap());
             Ok(ExitCode::SUCCESS)
         }
         "render" => {
@@ -222,6 +281,25 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             let text = doc.source(&main).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
             let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);
             std::fs::write(&out, stripped).map_err(|e| e.to_string())?;
+            Ok(ExitCode::SUCCESS)
+        }
+        "write" => {
+            let out = args.out.clone().ok_or("write needs -o OUT")?;
+            let text =
+                std::fs::read_to_string(&args.file).map_err(|e| format!("cannot read {}: {e}", args.file.display()))?;
+            let mut request: serde_json::Value =
+                serde_json::from_str(&text).map_err(|e| format!("{}: {e}", args.file.display()))?;
+            let fields = request.as_object_mut().ok_or("the request is not a JSON object")?;
+            if let Some(d) = &args.dialect {
+                fields.insert("dialect".into(), d.clone().into());
+            }
+            if let Some(a) = &args.author {
+                fields.insert("author".into(), a.clone().into());
+            }
+            fields.entry("dialect").or_insert_with(|| "spice".into());
+            let request: rnl_edit::WriteRequest =
+                serde_json::from_value(request).map_err(|e| format!("the request is not valid: {e}"))?;
+            std::fs::write(&out, rnl_edit::write(&request)?).map_err(|e| e.to_string())?;
             Ok(ExitCode::SUCCESS)
         }
         _ => Err(format!("unknown command {}\n{USAGE}", args.command)),

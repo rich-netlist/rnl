@@ -53,6 +53,14 @@ pub struct RecordNumbering {
     pub uses_numbers: bool,
 }
 
+impl RecordNumbering {
+    /// Do its numbers take effect (5.9)? When it uses none, or when its `numbering` is its check,
+    /// as hexadecimal digits in either case; not when `numbering` is missing or out of date.
+    pub fn holds(&self) -> bool {
+        !self.uses_numbers || self.written.as_deref().is_some_and(|w| w.eq_ignore_ascii_case(&self.check))
+    }
+}
+
 /// The check that the record of the solver of a level holds, as the level reads in an
 /// interpretation made with [`crate::Options::draft`]: of the lines of its last record of the
 /// solver, the authored records' objects and the record's own, or of the authored records' alone

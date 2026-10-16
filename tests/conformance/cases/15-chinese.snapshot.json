@@ -1,0 +1,3314 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.2",
+  "levels": [
+    {
+      "id": "file:15-chinese.sp",
+      "kind": "file",
+      "name": "15-chinese.sp",
+      "file": 0,
+      "line": 0,
+      "status": null,
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#M1",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&x"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&inp"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&tail"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vss"
+              }
+            ]
+          },
+          {
+            "id": "#M2",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&inn"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&tail"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vss"
+              }
+            ]
+          },
+          {
+            "id": "#M3",
+            "subckt": false,
+            "master": "pch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&x"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&x"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&vdd"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vdd"
+              }
+            ]
+          },
+          {
+            "id": "#M4",
+            "subckt": false,
+            "master": "pch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&x"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&vdd"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vdd"
+              }
+            ]
+          },
+          {
+            "id": "#M5",
+            "subckt": false,
+            "master": "nch",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&tail"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&bias"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&vss"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&vss"
+              }
+            ]
+          },
+          {
+            "id": "#R1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&vdd"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&n1"
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&n1"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&bias"
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&bias"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&vss"
+              }
+            ]
+          },
+          {
+            "id": "#CL",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&vss"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&x",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&inp",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&tail",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&vss",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&out",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&inn",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&vdd",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&bias",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&n1",
+            "global": false,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$NMOS",
+            "name": "$NMOS",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$PMOS",
+            "name": "$PMOS",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$RES",
+            "name": "$RES",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$CAP",
+            "name": "$CAP",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$PORT_TAG",
+            "name": "$PORT_TAG",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$JUNCTION_DOT",
+            "name": "$JUNCTION_DOT",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND",
+            "name": "$GROUND",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$SUPPLY_BAR",
+            "name": "$SUPPLY_BAR",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#M1",
+            "kind": "instance",
+            "host": [
+              "#M1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#M1:2"
+                ],
+                "at": [
+                  -9.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inp"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M1:1"
+                ],
+                "at": [
+                  -6.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M1:3"
+                ],
+                "at": [
+                  -6.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&tail"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#M2",
+            "kind": "instance",
+            "host": [
+              "#M2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#M2:2"
+                ],
+                "at": [
+                  9.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&inn"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M2:1"
+                ],
+                "at": [
+                  6.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M2:3"
+                ],
+                "at": [
+                  6.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&tail"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#M3",
+            "kind": "instance",
+            "host": [
+              "#M3"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#M3:2"
+                ],
+                "at": [
+                  -3.0,
+                  8.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M3:1"
+                ],
+                "at": [
+                  -6.0,
+                  6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M3:3"
+                ],
+                "at": [
+                  -6.0,
+                  10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#M4",
+            "kind": "instance",
+            "host": [
+              "#M4"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#M4:2"
+                ],
+                "at": [
+                  3.0,
+                  8.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&x"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M4:1"
+                ],
+                "at": [
+                  6.0,
+                  6.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M4:3"
+                ],
+                "at": [
+                  6.0,
+                  10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#M5",
+            "kind": "instance",
+            "host": [
+              "#M5"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NMOS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -6.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#M5:2"
+                ],
+                "at": [
+                  -3.0,
+                  -6.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&bias"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M5:1"
+                ],
+                "at": [
+                  0.0,
+                  -4.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&tail"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M5:3"
+                ],
+                "at": [
+                  0.0,
+                  -8.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R1",
+            "kind": "instance",
+            "host": [
+              "#R1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -24.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R1:1"
+                ],
+                "at": [
+                  -27.0,
+                  -12.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&vdd"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R1:2"
+                ],
+                "at": [
+                  -21.0,
+                  -12.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&n1"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "kind": "instance",
+            "host": [
+              "#R2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -16.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R2:1"
+                ],
+                "at": [
+                  -19.0,
+                  -12.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&n1"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R2:2"
+                ],
+                "at": [
+                  -13.0,
+                  -12.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&bias"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "kind": "instance",
+            "host": [
+              "#R3"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -8.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R3:1"
+                ],
+                "at": [
+                  -11.0,
+                  -12.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&bias"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R3:2"
+                ],
+                "at": [
+                  -5.0,
+                  -12.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#CL",
+            "kind": "instance",
+            "host": [
+              "#CL"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$CAP",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#CL:1"
+                ],
+                "at": [
+                  16.0,
+                  3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "terminals": [
+                  "#CL:2"
+                ],
+                "at": [
+                  16.0,
+                  -1.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%dp",
+            "kind": "usage",
+            "host": [],
+            "definition": "$DIFFPAIR",
+            "attach": {
+              "in_p": "#M1",
+              "in_n": "#M2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:24:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$CURRENT_MIRROR",
+            "attach": {
+              "ref": "#M3",
+              "out": "#M4"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:25:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$INPUT_STAGE",
+            "attach": {
+              "pair": "%dp",
+              "tail": "#M5"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:29:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$MIRROR_PAIR",
+            "attach": {
+              "a": "#M1",
+              "b": "#M2",
+              "axis": "%ax"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:30:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$MIRROR_PAIR",
+            "attach": {
+              "a": "#M3",
+              "b": "#M4",
+              "axis": "%ax"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%tc",
+            "kind": "usage",
+            "host": [],
+            "definition": "$TAIL_CENTER",
+            "attach": {
+              "a": "#M1",
+              "b": "#M2",
+              "t": "#M5"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:32:5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$FLOW",
+            "attach": {
+              "path": "@487"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%bc",
+            "kind": "usage",
+            "host": [],
+            "definition": "$偏置链",
+            "attach": {
+              "电阻": "@503"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%po",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&out"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                21.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  21.0,
+                  4.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&out"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@15-chinese.sp:65:5#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jd"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:65:5#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jg"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -2.0,
+                8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:65:5#3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jo"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:65:5#4",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jc"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:65:5#5",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jt"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@15-chinese.sp:65:5#6",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jb"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -12.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%pi",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&inp"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -11.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -11.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&inp"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%pn",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&inn"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                11.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  11.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inn"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%g0",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&vss"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                16.0,
+                -4.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  16.0,
+                  -4.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gr",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#R3:2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -5.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&vss"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -5.0,
+                -15.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -5.0,
+                  -15.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_M5_3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#M5:3"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -8.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&vss"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  0.0,
+                  -10.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&vss"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%ss_M3_3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY_STUB",
+            "attach": {
+              "t": "#M3:3"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:243:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_BAR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -6.0,
+                12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -6.0,
+                  12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%ss_M4_3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY_STUB",
+            "attach": {
+              "t": "#M4:3"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:243:9#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_BAR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  6.0,
+                  12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%ss_R1_1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY_STUB",
+            "attach": {
+              "t": "#R1:1"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -27.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:243:9#3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$SUPPLY",
+            "attach": {
+              "p": "&vdd"
+            },
+            "symbol": {
+              "value": "$SUPPLY_BAR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -27.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -27.0,
+                  -10.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&vdd"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [
+          {
+            "id": "%ax",
+            "at": {
+              "value": [
+                0.0,
+                3.0
+              ],
+              "source": null
+            },
+            "junction": false
+          },
+          {
+            "id": "%jc",
+            "at": {
+              "value": [
+                16.0,
+                4.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jd",
+            "at": {
+              "value": [
+                -6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jg",
+            "at": {
+              "value": [
+                -2.0,
+                8.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jo",
+            "at": {
+              "value": [
+                6.0,
+                4.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jt",
+            "at": {
+              "value": [
+                0.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jb",
+            "at": {
+              "value": [
+                -12.0,
+                -12.0
+              ],
+              "source": null
+            },
+            "junction": true
+          }
+        ],
+        "wires": [
+          {
+            "id": "@15-chinese.sp:53:8",
+            "nets": [
+              "&x"
+            ],
+            "via": [
+              {
+                "terminal": "#M3:1"
+              },
+              {
+                "point": "%jd"
+              },
+              {
+                "terminal": "#M1:1"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                6.0
+              ],
+              [
+                -6.0,
+                4.0
+              ],
+              [
+                -6.0,
+                2.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:54:8",
+            "nets": [
+              "&x"
+            ],
+            "via": [
+              {
+                "terminal": "#M3:2"
+              },
+              {
+                "point": "%jg"
+              },
+              {
+                "terminal": "#M4:2"
+              }
+            ],
+            "points": [
+              [
+                -3.0,
+                8.0
+              ],
+              [
+                -2.0,
+                8.0
+              ],
+              [
+                3.0,
+                8.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:55:8",
+            "nets": [
+              "&x"
+            ],
+            "via": [
+              {
+                "point": "%jd"
+              },
+              {
+                "point": "%jg"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                4.0
+              ],
+              [
+                -2.0,
+                4.0
+              ],
+              [
+                -2.0,
+                8.0
+              ]
+            ],
+            "mode": "horizontal-vertical",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:56:8",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "terminal": "#M4:1"
+              },
+              {
+                "point": "%jo"
+              },
+              {
+                "terminal": "#M2:1"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                6.0
+              ],
+              [
+                6.0,
+                4.0
+              ],
+              [
+                6.0,
+                2.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:57:8",
+            "nets": [
+              "&tail"
+            ],
+            "via": [
+              {
+                "terminal": "#M1:3"
+              },
+              {
+                "point": "%jt"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                -2.0
+              ],
+              [
+                -6.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -3.0
+              ]
+            ],
+            "mode": "vertical-horizontal",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:58:8",
+            "nets": [
+              "&tail"
+            ],
+            "via": [
+              {
+                "terminal": "#M2:3"
+              },
+              {
+                "point": "%jt"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                -2.0
+              ],
+              [
+                6.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -3.0
+              ]
+            ],
+            "mode": "vertical-horizontal",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:59:8",
+            "nets": [
+              "&tail"
+            ],
+            "via": [
+              {
+                "point": "%jt"
+              },
+              {
+                "terminal": "#M5:1"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -4.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:60:8",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "point": "%jo"
+              },
+              {
+                "point": "%jc"
+              },
+              {
+                "usage": "%po",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                4.0
+              ],
+              [
+                16.0,
+                4.0
+              ],
+              [
+                21.0,
+                4.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:61:8",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "point": "%jc"
+              },
+              {
+                "terminal": "#CL:1"
+              }
+            ],
+            "points": [
+              [
+                16.0,
+                4.0
+              ],
+              [
+                16.0,
+                3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:62:8",
+            "nets": [
+              "&n1"
+            ],
+            "via": [
+              {
+                "terminal": "#R1:2"
+              },
+              {
+                "terminal": "#R2:1"
+              }
+            ],
+            "points": [
+              [
+                -21.0,
+                -12.0
+              ],
+              [
+                -19.0,
+                -12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:63:8",
+            "nets": [
+              "&bias"
+            ],
+            "via": [
+              {
+                "terminal": "#R2:2"
+              },
+              {
+                "point": "%jb"
+              },
+              {
+                "terminal": "#R3:1"
+              }
+            ],
+            "points": [
+              [
+                -13.0,
+                -12.0
+              ],
+              [
+                -12.0,
+                -12.0
+              ],
+              [
+                -11.0,
+                -12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:64:8",
+            "nets": [
+              "&bias"
+            ],
+            "via": [
+              {
+                "point": "%jb"
+              },
+              {
+                "terminal": "#M5:2"
+              }
+            ],
+            "points": [
+              [
+                -12.0,
+                -12.0
+              ],
+              [
+                -12.0,
+                -6.0
+              ],
+              [
+                -3.0,
+                -6.0
+              ]
+            ],
+            "mode": "vertical-horizontal",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:70:8",
+            "nets": [
+              "&inp"
+            ],
+            "via": [
+              {
+                "usage": "%pi",
+                "role": "p"
+              },
+              {
+                "terminal": "#M1:2"
+              }
+            ],
+            "points": [
+              [
+                -11.0,
+                0.0
+              ],
+              [
+                -9.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:71:8",
+            "nets": [
+              "&inn"
+            ],
+            "via": [
+              {
+                "usage": "%pn",
+                "role": "p"
+              },
+              {
+                "terminal": "#M2:2"
+              }
+            ],
+            "points": [
+              [
+                11.0,
+                0.0
+              ],
+              [
+                9.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@15-chinese.sp:74:8",
+            "nets": [
+              "&vss"
+            ],
+            "via": [
+              {
+                "terminal": "#CL:2"
+              },
+              {
+                "usage": "%g0",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                16.0,
+                -1.0
+              ],
+              [
+                16.0,
+                -4.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:238:5#1",
+            "nets": [
+              "&vss"
+            ],
+            "via": [
+              {
+                "terminal": "#R3:2"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9#1",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -5.0,
+                -12.0
+              ],
+              [
+                -5.0,
+                -15.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:238:5#2",
+            "nets": [
+              "&vss"
+            ],
+            "via": [
+              {
+                "terminal": "#M5:3"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9#2",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                -8.0
+              ],
+              [
+                0.0,
+                -10.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:244:5#1",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#M3:3"
+              },
+              {
+                "usage": "@rnl-std.rnl:243:9#1",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -6.0,
+                10.0
+              ],
+              [
+                -6.0,
+                12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:244:5#2",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#M4:3"
+              },
+              {
+                "usage": "@rnl-std.rnl:243:9#2",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                10.0
+              ],
+              [
+                6.0,
+                12.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:244:5#3",
+            "nets": [
+              "&vdd"
+            ],
+            "via": [
+              {
+                "terminal": "#R1:1"
+              },
+              {
+                "usage": "@rnl-std.rnl:243:9#3",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -27.0,
+                -12.0
+              ],
+              [
+                -27.0,
+                -10.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {}
+          }
+        ],
+        "texts": [
+          {
+            "id": "#M1::wl",
+            "attach": "#M1",
+            "key": "wl",
+            "markup": {
+              "value": "W/L = ${w}/${l}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "W/L = 4u/0.5u",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -15.0,
+              -4.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "%title",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "五管 OTA：偏置由 R1、R2、R3 分压给出",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "五管 OTA：偏置由 R1、R2、R3 分压给出",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -28.0,
+              18.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.1,
+            "style": {
+              "size": 1.1
+            }
+          },
+          {
+            "id": "#M1::name",
+            "attach": "#M1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -5.5,
+              1.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "#M1::model",
+            "attach": "#M1",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "nch",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -5.5,
+              -1.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "#M2::name",
+            "attach": "#M2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              5.5,
+              1.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "#M2::model",
+            "attach": "#M2",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "nch",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              5.5,
+              -1.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            }
+          },
+          {
+            "id": "#M3::name",
+            "attach": "#M3",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M3",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.5,
+              9.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M3::model",
+            "attach": "#M3",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "pch",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.5,
+              6.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M4::name",
+            "attach": "#M4",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M4",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              6.5,
+              9.05
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M4::model",
+            "attach": "#M4",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "pch",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              6.5,
+              6.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M5::name",
+            "attach": "#M5",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M5",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.5,
+              -4.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M5::model",
+            "attach": "#M5",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "nch",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.5,
+              -7.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::name",
+            "attach": "#R1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -24.25,
+              -10.9
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R1::value",
+            "attach": "#R1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "20k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -23.05,
+              -10.9
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R2::name",
+            "attach": "#R2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -16.25,
+              -10.9
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R2::value",
+            "attach": "#R2",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "20k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -15.05,
+              -10.9
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R3::name",
+            "attach": "#R3",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R3",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -8.25,
+              -10.9
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#R3::value",
+            "attach": "#R3",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "10k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -7.05,
+              -10.9
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "linecolor": "#e07000",
+              "textcolor": "#e07000"
+            }
+          },
+          {
+            "id": "#CL::name",
+            "attach": "#CL",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "CL",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              17.4,
+              1.35
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#CL::value",
+            "attach": "#CL",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1p",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              17.4,
+              -0.050000000000000044
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%po::name",
+            "attach": "%po",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "out",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              24.3,
+              4.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%pi::name",
+            "attach": "%pi",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "inp",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -14.3,
+              0.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "%pn::name",
+            "attach": "%pn",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "inn",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              14.3,
+              0.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:243:9#1::name",
+            "attach": "@rnl-std.rnl:243:9#1",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -6.0,
+              13.1
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:243:9#2::name",
+            "attach": "@rnl-std.rnl:243:9#2",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              6.0,
+              13.1
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@rnl-std.rnl:243:9#3::name",
+            "attach": "@rnl-std.rnl:243:9#3",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "vdd",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -27.0,
+              -8.9
+            ],
+            "halign": "middle",
+            "valign": "bottom",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": [
+          {
+            "id": "@15-chinese.sp:79:7",
+            "shape": "rectangle",
+            "points": [
+              [
+                -3.0,
+                -1.0
+              ]
+            ],
+            "params": {
+              "width": 62.0,
+              "height": 34.0,
+              "fill": "fillcolor"
+            },
+            "style": {
+              "fillcolor": "#1f4fd80d",
+              "linestyle": "dotted"
+            },
+            "layer": "bottom"
+          }
+        ]
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std",
+      "version": "0.2"
+    }
+  ],
+  "files": [
+    {
+      "path": "15-chinese.sp",
+      "name": "15-chinese.sp"
+    }
+  ]
+}

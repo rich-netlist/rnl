@@ -1,6 +1,7 @@
 // The core as WebAssembly: the module the binding builds (rnl_runtime_wasm.wasm), behind one call
-// that takes a request and returns the Document. The call is synchronous, so the web viewer runs it
-// in a Worker (worker.js); the tests run it in Node.
+// that takes a request and returns the Document, or for a write the netlist written and its
+// Document. The call is synchronous, so the web viewer runs it in a Worker (worker.js); the tests
+// run it in Node.
 
 /**
  * What to build: the workspace and how. Fields the core does not know are ignored.
@@ -16,6 +17,24 @@
  * @property {boolean} [primitives] Give each level's primitives; false when not given.
  * @property {boolean} [draft] For development only: read the files that declare the draft 0.3 as
  *   well; false when not given.
+ * @property {{ drawing?: boolean, host?: boolean, model?: boolean }} [parts] The parts of the
+ *   editor interface's snapshot to give: with them, the answer is a snapshot (snapshot.d.ts), with
+ *   the Document as its `drawing` unless `drawing` is false.
+ */
+
+/**
+ * What to write: an edit transaction's ops into its netlist, and how to build what was written.
+ * The netlist is the entry; the other fields are a Request's.
+ *
+ * @typedef {object} WriteRequest
+ * @property {{ dialect: "spice" | "spectre", netlist: string, author: string, ops: object[] }} write
+ *   The netlist, without RNL records, its dialect, the author of the records, and the ops as the
+ *   editor interface draft writes them.
+ * @property {Record<string, string>} [files] Further files, such as packages.
+ * @property {string[]} [package_dirs]
+ * @property {boolean} [std]
+ * @property {boolean} [svg]
+ * @property {boolean} [primitives]
  */
 
 /**
@@ -25,10 +44,19 @@
  * @property {(request: Request | string) => object} build Build the Document of a request, given as
  *   an object or as the JSON text `requestText` makes of one. Throws an Error with the core's message
  *   when there is none, such as when the entry is not among the files.
+ * @property {(request: Request | string) => object} snapshot Build the snapshot of a request with
+ *   `parts`, as build builds the Document.
+ * @property {(request: WriteRequest | string) => { text: string, document: object }} write Write the
+ *   ops of a request into its netlist, and build what was written. Throws an Error with the core's
+ *   message when an op cannot be written.
+ * @property {(request: Request | WriteRequest | string) => object} respond The core's answer as it
+ *   gives it: `{ document }`, `{ written }` or `{ error }`. Throws only when the core stops.
  */
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+/** What a request asks for, by the part of the answer that gives it. */
+const ASKS = { document: "a build without parts", snapshot: "a build with parts", written: "a write" };
 const REPLACEMENT = String.fromCharCode(0xfffd);
 
 /**
@@ -69,7 +97,7 @@ export async function loadCore(wasm) {
     }
   }
 
-  function build(request) {
+  function respond(request) {
     if (!instance) throw new Error("The core is starting again after a failure; build again in a moment.");
     const exports = instance.exports;
     const bytes = encoder.encode(typeof request === "string" ? request : requestText(request));
@@ -85,12 +113,23 @@ export async function loadCore(wasm) {
       restart();
       throw new Error(`The core stopped: ${message || e.message}`, { cause: e });
     }
-    const response = JSON.parse(answer);
-    if ("error" in response) throw new Error(response.error);
-    return response.document;
+    return JSON.parse(answer);
   }
 
-  return { build };
+  /** The part of the answer a call wants, or the core's error. */
+  function part(request, name) {
+    const response = respond(request);
+    if ("error" in response) throw new Error(response.error);
+    if (!(name in response)) throw new Error(`The core answered with no ${name}: the request is not ${ASKS[name]}.`);
+    return response[name];
+  }
+
+  return {
+    respond,
+    build: (request) => part(request, "document"),
+    snapshot: (request) => part(request, "snapshot"),
+    write: (request) => part(request, "written"),
+  };
 }
 
 /** The module compiled, from wherever it is. */
