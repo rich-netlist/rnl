@@ -23,9 +23,10 @@
 //! which a text follows what it is attached to, where the solution has it there (13.3).
 //!
 //! **Limits.** Only the resolution of 8.5 is timed (the draft 0.3, 8.5): its checks and the
-//! search for its conflict sets stop when the time limit of the options is out, on the clock the
-//! caller gives (`crate::Clock`), and a fact whose check did not finish is discarded undecided,
-//! with a warning in the report (7.6). Everything after it is counted, never timed, so that it is
+//! search for its minimal conflict groups stop when the time limit of the options is out, on the
+//! clock the caller gives (`crate::Clock`); a fact whose check did not finish is discarded
+//! undecided, with a warning in the report (7.6), and a fact whose groups were not all found says
+//! so (`crate::Discarded::complete`). Everything after it is counted, never timed, so that it is
 //! the same on every machine: the search makes at most `candidates`, P0 always among them
 //! (`crate::Budget`); the router expands at most `astar_expansions` cells for one net and leaves
 //! the rest of the net to flight lines; the witness of the resolution taken as written, the
@@ -255,6 +256,7 @@ pub(crate) fn solve_exact_with(
     let report = SolveReport {
         kept: resolved.kept.clone(),
         discarded: resolved.discarded.clone(),
+        statements: resolved.statements.clone(),
         inert_objectives: structure.active.inert.clone(),
         unrouted,
         work,

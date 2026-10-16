@@ -18,8 +18,15 @@
 //! The resolution of each level is limited in time by the solver's `time_limit` (the draft 0.3,
 //! 8.5), 5 seconds unless `--solver-options` says otherwise, measured on the wall clock
 //! ([`WallClock`]): a fact whose check does not finish within it is discarded undecided, and the
-//! report of the level has a warning for it (7.6). `time_limit=none` gives the resolution of 8.5
-//! exactly, the same on every run, however long it takes.
+//! report of the level has a warning for it (7.6); a fact whose minimal conflict groups are not
+//! all found within it has those found, and its hint says that the list is not complete.
+//! `time_limit=none` gives the resolution of 8.5 exactly, the same on every run, however long it
+//! takes.
+//!
+//! The report of a level gives each fact discarded with every minimal group of facts it conflicts
+//! with, and each statement whose facts are in such a group with the facts discarded because of it
+//! (the draft 0.3, 8.5); the hints of a fact of priority low, and of the statements that only such
+//! facts lose, only with `--report` ([`report`]), as 7.6 allows them to be left out.
 //!
 //! A level whose file, or a file above it, declares a language version that the reading does not
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
@@ -35,13 +42,14 @@ use std::time::{Duration, Instant};
 
 use rnl_runtime::diag::Severity;
 use rnl_runtime::host::file_name;
+use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::interp::unit::{DRAFT_VERSION, SUPPORTED_VERSION};
 use rnl_runtime::problem::{sig1, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{generated_files, remove_generated_with_header, replace_generated_with_header};
 use rnl_runtime::{Interpretation, Options};
-use rnl_solver::{Clock, Solved, SolverOptions, AUTHOR};
+use rnl_solver::{Clock, Discarded, Solved, SolverOptions, Statement, AUTHOR};
 
 use crate::provider::path_str;
 
@@ -478,6 +486,20 @@ fn point(p: &LevelProblem, r: &PointRef) -> String {
 /// `[9] ALIGN y {#M1 #M2} (normal, rnl-std.rnl:227, from $MIRROR_PAIR)`.
 pub fn describe_fact(p: &LevelProblem, k: usize) -> String {
     let Some(f) = p.facts.get(k) else { return format!("[{k}]") };
+    let mut context = vec![f.priority.as_str().to_string()];
+    if let Some(l) = &f.source {
+        context.push(format!("{}:{}", file_name(&l.file), l.line));
+    }
+    if !f.chain.is_empty() {
+        let defs: Vec<&str> = f.chain.iter().filter_map(|u| p.usages.get(*u)).map(|u| u.definition.as_str()).collect();
+        context.push(format!("from {}", defs.join(" in ")));
+    }
+    format!("{} ({})", fact_what(p, k), context.join(", "))
+}
+
+/// A fact by its rank and what it says, without its context, such as `[9] ALIGN y {#M1 #M2}`.
+fn fact_what(p: &LevelProblem, k: usize) -> String {
+    let Some(f) = p.facts.get(k) else { return format!("[{k}]") };
     let list = |ms: &[PointRef]| format!("{{{}}}", ms.iter().map(|m| point(p, m)).collect::<Vec<_>>().join(" "));
     let objects = |ks: &[usize]| list(&ks.iter().map(|k| PointRef::Origin(*k)).collect::<Vec<_>>());
     let what = match &f.kind {
@@ -522,15 +544,59 @@ pub fn describe_fact(p: &LevelProblem, k: usize) -> String {
         FactKind::Place { .. } | FactKind::PointCoordinate { .. } | FactKind::Offset { .. } | FactKind::Orient { .. }
     );
     let named = if own || f.label == f.kind.name() || f.label == what { what } else { format!("{} = {what}", f.label) };
-    let mut context = vec![f.priority.as_str().to_string()];
-    if let Some(l) = &f.source {
-        context.push(format!("{}:{}", file_name(&l.file), l.line));
+    format!("[{k}] {named}")
+}
+
+/// A statement as the hints of 8.5 name it (the draft 0.3, 8.5; 7.6): where it is written, such
+/// as `T4-miller-conflicts.sp:37`; for one in the body of a definition, the usage written in the
+/// level that it was expanded from, the first of its chain, with how the level writes its roles,
+/// and the line of the definition, such as `the usage of $MIRROR_PAIR with #M1(a) #M2(b) %ax(axis)
+/// (rnl-std.rnl:227 of its definition)`; for the coordinates of a point, which have no statement of
+/// their own, the point.
+fn statement_name(p: &LevelProblem, s: &Statement) -> String {
+    if let Some(k) = s.point {
+        return format!("the coordinates of {}", point(p, &PointRef::Origin(k)));
     }
-    if !f.chain.is_empty() {
-        let defs: Vec<&str> = f.chain.iter().filter_map(|u| p.usages.get(*u)).map(|u| u.definition.as_str()).collect();
-        context.push(format!("from {}", defs.join(" in ")));
+    let place = format!("{}:{}", file_name(&s.file), s.line);
+    let Some(u) = s.chain.first().and_then(|u| p.usages.get(*u)) else { return place };
+    let mut name = match &u.reference {
+        Reference::Name(n) => format!("{n}, the usage of {}", u.definition),
+        _ => format!("the usage of {}", u.definition),
+    };
+    let roles: Vec<String> =
+        u.roles.iter().map(|r| format!("{}({})", r.written.as_deref().unwrap_or("?"), r.role)).collect();
+    if !roles.is_empty() {
+        name.push_str(&format!(" with {}", roles.join(" ")));
     }
-    format!("[{k}] {named} ({})", context.join(", "))
+    format!("{name} ({place} of its definition)")
+}
+
+/// Some ranks as a list: `[3]`, `[0] and [4]`, `[0], [2] and [3]`, or with another last word.
+fn ranks(ks: &[usize], last: &str) -> String {
+    let names: Vec<String> = ks.iter().map(|k| format!("[{k}]")).collect();
+    match names.split_last() {
+        None => String::new(),
+        Some((one, [])) => one.clone(),
+        Some((end, rest)) => format!("{} {last} {end}", rest.join(", ")),
+    }
+}
+
+/// What the hint of a fact discarded says of it (the draft 0.3, 8.5): every minimal group of facts
+/// kept before it that it conflicts with, such as `it conflicts with [3]; or with [0] and [4]`,
+/// and that the list is not complete when the time limit cut it.
+fn conflicts(d: &Discarded) -> String {
+    let mut why = if d.groups == [Vec::<usize>::new()] {
+        "it cannot hold even alone".to_string()
+    } else if d.groups.is_empty() {
+        "no group of facts it conflicts with was found within the time limit of the solver".to_string()
+    } else {
+        let groups: Vec<String> = d.groups.iter().map(|g| ranks(g, "and")).collect();
+        format!("it conflicts with {}", groups.join("; or with "))
+    };
+    if !d.complete {
+        why.push_str(" (the list is not complete: the time limit was reached)");
+    }
+    why
 }
 
 fn num(v: f64) -> String {
@@ -563,11 +629,13 @@ pub fn not_solved(n: &NotSolved) -> String {
     )
 }
 
-/// What the command prints of one level: its title, the facts kept and discarded (every fact with
-/// `all`, otherwise the discarded ones with the facts they conflict with, marked when the time
-/// limit left the set not minimal), the warnings of the solver, each on a line of its own (7.6),
-/// what the record cannot hold, the ROUTEs left in parts, the inert objectives, the notes, the work
-/// and the time.
+/// What the command prints of one level: its title; the facts kept and discarded, every fact with
+/// `all`, otherwise the discarded ones, each with its hint (the draft 0.3, 8.5): every minimal
+/// group of facts it conflicts with, and whether the list is complete; the hints by statement,
+/// each statement whose facts took part in discarding with the facts discarded because of it; the
+/// hints of a fact of priority low, and of the statements that only such facts lose, only with
+/// `all` (7.6); the warnings of the solver, each on a line of its own (7.6), what the record cannot
+/// hold, the ROUTEs left in parts, the inert objectives, the notes, the work and the time.
 pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     let p = &level.problem;
     let r = &level.solved.report;
@@ -580,22 +648,26 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
         r.discarded.len(),
         count(p.facts.len(), "fact")
     )];
-    // a fact discarded, and the minimal set of facts kept before it that it conflicts with, or the
-    // set found when the time limit ran out before it was made minimal (the draft 0.3, 8.5)
+    // Discarding a fact of priority low is expected, and its hints may be left out (the draft 0.3,
+    // 8.5; 7.6): they are printed with `all` alone, the hint of the fact and those of the
+    // statements that only such facts lose.
+    let hinted = |f: usize| all || p.facts.get(f).is_none_or(|f| f.priority != Priority::Low);
+    // a fact discarded and its hint: every minimal group of facts kept before it that it conflicts
+    // with, each fact of them described once below it, and whether the list is complete
     let discarded = |out: &mut Vec<String>, k: usize, indent: &str| {
         let Some(d) = r.discarded.iter().find(|d| d.fact == k) else { return };
-        let why = match (d.undecided, d.conflicts_with.is_empty(), d.minimal) {
-            (true, _, _) => "not decided within the time limit of the solver (8.5)",
-            (false, true, _) => "it cannot hold even alone",
-            (false, false, true) => "it conflicts with",
-            (false, false, false) => {
-                "it conflicts with these, a set not made minimal within the time limit of the solver, so the \
-                 list of its sets is not complete (8.5)"
-            }
+        let why = if d.undecided {
+            "not decided within the time limit of the solver (8.5)".to_string()
+        } else if !hinted(k) {
+            "of priority low, which is expected; --report lists what it conflicts with (8.5)".to_string()
+        } else {
+            conflicts(d)
         };
         out.push(format!("{indent}discarded {}: {why}", describe_fact(p, k)));
-        for c in &d.conflicts_with {
-            out.push(format!("{indent}    {}", describe_fact(p, *c)));
+        if hinted(k) {
+            for c in d.in_groups() {
+                out.push(format!("{indent}    {}", describe_fact(p, c)));
+            }
         }
     };
     if all {
@@ -612,13 +684,43 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
             discarded(&mut out, d.fact, "  ");
         }
     }
-    out.extend(r.warnings.iter().map(|w| format!("  warning: {w}")));
     let section = |out: &mut Vec<String>, head: &str, lines: Vec<String>| {
         if !lines.is_empty() {
             out.push(format!("  {head}:"));
             out.extend(lines.into_iter().map(|l| format!("    {l}")));
         }
     };
+    // the hints by statement (the draft 0.3, 8.5): each statement whose facts are in a group, with
+    // the facts discarded because of it
+    let mut statements = Vec::new();
+    for (s, hint) in &r.statements {
+        let lost: Vec<&Discarded> =
+            r.discarded.iter().filter(|d| hint.discarded.contains(&d.fact) && hinted(d.fact)).collect();
+        let facts: Vec<String> = hint
+            .facts
+            .iter()
+            .filter(|k| lost.iter().any(|d| d.in_groups().contains(k)))
+            .map(|k| fact_what(p, *k))
+            .collect();
+        if lost.is_empty() || facts.is_empty() {
+            continue;
+        }
+        let lost: Vec<String> = lost.iter().map(|d| format!("[{}]", d.fact)).collect();
+        statements.push(format!(
+            "{} {} took part in discarding {}",
+            statement_name(p, s),
+            facts.join(" and "),
+            lost.join(", ")
+        ));
+    }
+    let cut = r.discarded.iter().any(|d| !d.undecided && !d.complete && hinted(d.fact));
+    let head = if cut {
+        "statements whose facts took part in discarding (8.5; the list is not complete: the time limit was reached)"
+    } else {
+        "statements whose facts took part in discarding (8.5)"
+    };
+    section(&mut out, head, statements);
+    out.extend(r.warnings.iter().map(|w| format!("  warning: {w}")));
     section(&mut out, "unsolved", level.written.unsolved.iter().map(|u| u.to_string()).collect());
     section(
         &mut out,

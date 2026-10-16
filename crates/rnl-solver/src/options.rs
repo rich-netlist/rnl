@@ -307,12 +307,14 @@ pub struct SolverOptions {
     pub beam: usize,
     pub budget: Budget,
     /// How many seconds the resolution of a level may spend on checking, none for no limit (the
-    /// draft 0.3, 8.5): the checks of the facts and the search for their conflict sets, nothing
-    /// else, on the clock the caller gives (`crate::solve_with_clock`). When the check of a fact
-    /// does not finish within it, the fact is discarded undecided, with a warning (7.6), and so
-    /// is every later fact that needs a check; a later fact that the placement reached by then
-    /// already satisfies is kept. The result may then differ from that of 8.5, and from one run
-    /// to the next; without a limit, and whenever no check reaches it, it is that of 8.5.
+    /// draft 0.3, 8.5): the checks of the facts and the search for all their minimal conflict
+    /// groups, nothing else, on the clock the caller gives (`crate::solve_with_clock`). When the
+    /// check of a fact does not finish within it, the fact is discarded undecided, with a warning
+    /// (7.6), and so is every later fact that needs a check; a later fact that the placement
+    /// reached by then already satisfies is kept. The result may then differ from that of 8.5,
+    /// and from one run to the next; without a limit, and whenever no check reaches it, it is that
+    /// of 8.5. When the groups are not all found within it, those found are given, each minimal,
+    /// and the hint says that its list is not complete (`crate::Discarded::complete`).
     /// [`DEFAULT_TIME_LIMIT`] by default.
     pub time_limit: Option<f64>,
 }

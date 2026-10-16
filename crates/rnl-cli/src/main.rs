@@ -46,8 +46,10 @@ solve options (the levels are read without their type=\"generated\" records; -o 
                       covers them. time_limit is the seconds the resolution of a level may spend on
                       checking (8.5), 5 by default, or none for no limit: a fact whose check does not
                       finish within it is discarded with a warning, and the result may then differ
-                      from one run to the next
-  --report            print what became of every fact, not only of the facts discarded
+                      from one run to the next; when the conflict groups of a fact are not all found
+                      within it, its hint says that the list is not complete
+  --report            print what became of every fact, not only of the facts discarded, and the hints
+                      of the facts of priority low and of the statements only they lose (8.5)
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
 write:

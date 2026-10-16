@@ -157,8 +157,62 @@ fn points(n: usize) -> Vec<ProblemObject> {
     (0..n).map(|_| point()).collect()
 }
 
-fn discarded(fact: usize, conflicts_with: Vec<usize>) -> Discarded {
-    Discarded { fact, conflicts_with, minimal: true, undecided: false }
+/// A fact discarded with one minimal conflict group, which is all it has.
+fn discarded(fact: usize, group: Vec<usize>) -> Discarded {
+    Discarded { fact, groups: vec![group], complete: true, undecided: false }
+}
+
+/// A fact discarded with these minimal conflict groups, which are all it has.
+fn discarded_with(fact: usize, groups: Vec<Vec<usize>>) -> Discarded {
+    Discarded { fact, groups, complete: true, undecided: false }
+}
+
+/// Whether some facts, which hold together, have no solution with `f`, decided with the caps of
+/// the implementation.
+fn conflicts_with(model: &Model, n: usize, set: &[usize], f: usize) -> bool {
+    let mut s = Resolver::new(model, n, Limits::Caps(CAPS));
+    assert!(set.iter().all(|&c| s.add(c) == Outcome::Kept), "{set:?} do not hold together");
+    matches!(s.add(f), Outcome::Conflict(_))
+}
+
+/// Checks that a group of `f` is one the hint of 8.5 names (the draft 0.3, 8.5): facts kept before
+/// `f`, sorted, that have no solution together with it, and from which no fact can be left out.
+fn check_group(r: &Resolved, n: usize, f: usize, group: &[usize], what: &str) {
+    assert!(group.windows(2).all(|w| w[0] < w[1]), "{what}: {group:?} not sorted");
+    assert!(group.iter().all(|c| *c < f && r.kept.contains(c)), "{what}: {group:?}");
+    assert!(conflicts_with(&r.model, n, group, f), "{what}: {group:?} does not conflict with {f}");
+    for c in group {
+        let rest: Vec<usize> = group.iter().copied().filter(|x| x != c).collect();
+        assert!(!conflicts_with(&r.model, n, &rest, f), "{what}: {group:?} of {f} is not minimal: {c} is not needed");
+    }
+}
+
+/// Every minimal conflict group of `f` among `before`, found by trying the subsets, smallest
+/// first: a subset with a subset one fact smaller that conflicts is not minimal and is not tried.
+/// None when there are too many subsets.
+fn every_group(model: &Model, n: usize, f: usize, before: &[usize]) -> Option<Vec<Vec<usize>>> {
+    let m = before.len();
+    if m > 10 {
+        return None;
+    }
+    let mut masks: Vec<usize> = (0..1 << m).collect();
+    masks.sort_by_key(|mask| mask.count_ones());
+    let mut conflicting = vec![false; 1 << m];
+    let mut groups = Vec::new();
+    for mask in masks {
+        let members: Vec<usize> = (0..m).filter(|i| mask >> i & 1 == 1).collect();
+        if members.iter().any(|i| conflicting[mask & !(1 << i)]) {
+            conflicting[mask] = true;
+            continue;
+        }
+        let set: Vec<usize> = members.iter().map(|&i| before[i]).collect();
+        if conflicts_with(model, n, &set, f) {
+            conflicting[mask] = true;
+            groups.push(set);
+        }
+    }
+    groups.sort();
+    Some(groups)
 }
 
 // ---------------------------------------------------------------------------- checking results
@@ -219,9 +273,10 @@ pub(crate) fn semantic_holds(problem: &LevelProblem, kind: &FactKind, g: &Geomet
 }
 
 /// Resolves a problem and checks what every resolution must give: the witness satisfies every
-/// fact kept, the model's own test agrees with the standard's on every fact, each conflict set is
-/// made of facts kept before its fact, conflicts with it and is minimal, and a second run gives
-/// the same.
+/// fact kept, the model's own test agrees with the standard's on every fact, each conflict group
+/// is made of facts kept before its fact, conflicts with it and is minimal, the groups of each
+/// fact are all of them (the draft 0.3, 8.5), tried subset by subset when there are few enough,
+/// the hints by statement are those of the groups, and a second run gives the same.
 fn check(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
     let r = resolve(problem, options);
     let tol = r.model.tol.clone();
@@ -243,17 +298,26 @@ fn check(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
     for (f, pf) in problem.facts.iter().enumerate() {
         assert_eq!(probe.holds(f), semantic_holds(problem, &pf.kind, g, &tol), "fact {f}: {:?}", pf.kind);
     }
+    let n = problem.objects.len();
     for d in r.discarded.iter().filter(|d| !d.undecided) {
-        assert!(d.conflicts_with.iter().all(|c| *c < d.fact && r.kept.contains(c)), "{d:?}");
-        let fits = |set: &[usize]| {
-            let mut s = Resolver::new(&r.model, problem.objects.len(), Limits::Caps(CAPS));
-            assert!(set.iter().all(|&c| s.add(c) == Outcome::Kept));
-            s.add(d.fact) == Outcome::Kept
-        };
-        assert!(!fits(&d.conflicts_with), "{d:?} does not conflict");
-        for c in &d.conflicts_with {
-            let rest: Vec<usize> = d.conflicts_with.iter().copied().filter(|x| x != c).collect();
-            assert!(fits(&rest), "{d:?} is not minimal: {c} is not needed");
+        assert!(d.complete && !d.groups.is_empty(), "{d:?}");
+        assert!(d.groups.windows(2).all(|w| w[0] < w[1]), "{d:?}: the groups are not sorted");
+        for g in &d.groups {
+            check_group(&r, n, d.fact, g, &format!("{d:?}"));
+        }
+        let before: Vec<usize> = r.kept.iter().copied().filter(|&k| k < d.fact).collect();
+        if let Some(every) = every_group(&r.model, n, d.fact, &before) {
+            assert_eq!(d.groups, every, "{d:?}: not every group");
+        }
+    }
+    assert_eq!(r.statements, statement_hints(problem, &r.discarded));
+    for (s, hint) in &r.statements {
+        for &k in &hint.facts {
+            assert_eq!(&Statement::of(problem, k), s);
+        }
+        for &f in &hint.discarded {
+            let d = r.discarded.iter().find(|d| d.fact == f).unwrap();
+            assert!(hint.facts.iter().any(|k| d.in_groups().contains(k)), "{s:?}: {d:?}");
         }
     }
     assert_eq!(r, resolve(problem, options), "not deterministic");
@@ -282,7 +346,11 @@ fn the_example_of_the_brainstorm_message() {
     let p = problem_of(points(2), facts);
     let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2]);
+    // fact 2 has exactly one minimal group, facts 1 and 3, and fact 4 exactly one, fact 5 (the
+    // draft 0.3, 8.5)
     assert_eq!(r.discarded, vec![discarded(3, vec![0, 2]), discarded(4, vec![1])]);
+    assert_eq!(r.discarded[0].groups, [[0, 2]]);
+    assert_eq!(r.discarded[1].groups, [[1]]);
 }
 
 #[test]
@@ -452,7 +520,9 @@ fn a_fixed_orientation_decides_the_pins() {
     );
     let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2]);
-    assert_eq!(r.discarded, vec![discarded(3, vec![2])]);
+    // the gate at −2 conflicts with the gate at 4, and with MY and the origin at 1, which put the
+    // gate at 4 too: two minimal groups (the draft 0.3, 8.5)
+    assert_eq!(r.discarded, vec![discarded_with(3, vec![vec![0, 1], vec![2]])]);
 }
 
 #[test]
@@ -507,9 +577,8 @@ fn distances_either_way_between_sets() {
     let r = check(&p, &SolverOptions::without_time_limit());
     assert_eq!(r.kept, vec![0, 1, 2, 3]);
     // C at 11 is within a unit of A and of B: either with the DISTANCE is a minimal conflict
-    assert_eq!(r.discarded.len(), 1);
-    assert_eq!(r.discarded[0].fact, 4);
-    assert!([vec![0, 1], vec![0, 2]].contains(&r.discarded[0].conflicts_with), "{:?}", r.discarded);
+    // group, and the hint names both (the draft 0.3, 8.5)
+    assert_eq!(r.discarded, vec![discarded_with(4, vec![vec![0, 1], vec![0, 2]])]);
 }
 
 #[test]
@@ -660,9 +729,9 @@ fn within(seconds: f64) -> SolverOptions {
 
 /// Resolves with a time limit of `seconds` on [`Ticks`] and checks what the draft 0.3 says of it
 /// (8.5, 7.6): every fact kept or discarded; those kept hold at the witness; each fact discarded
-/// undecided has no conflict set and a warning, in order; each other one conflicts with facts kept
-/// before it, with a set that is minimal unless it says otherwise; nothing is noted; and a fresh
-/// clock gives the same again. Gives the resolution and the readings.
+/// undecided has no group and a warning, in order; each other one has groups of facts kept before
+/// it, each conflicting with it and minimal, all of them only when it says so; nothing is noted;
+/// and a fresh clock gives the same again. Gives the resolution and the readings.
 fn check_timed(problem: &LevelProblem, seconds: f64) -> (Resolved, u64) {
     let clock = Ticks::default();
     let r = super::resolve(problem, &within(seconds), &clock);
@@ -680,24 +749,17 @@ fn check_timed(problem: &LevelProblem, seconds: f64) -> (Resolved, u64) {
         let end = format!(" was not decided within the time limit of {} s and is discarded (8.5)", fmt_num(seconds));
         assert!(w.starts_with(&format!("the fact [{}] {} ", d.fact, problem.facts[d.fact].label)), "{w}");
         assert!(w.ends_with(&end), "{w}");
-        assert!(d.conflicts_with.is_empty() && !d.minimal, "{d:?}");
+        assert!(d.groups.is_empty() && !d.complete, "{d:?}");
     }
     let n = problem.objects.len();
-    let conflicts = |set: &[usize], f: usize| {
-        let mut s = Resolver::new(&r.model, n, Limits::Caps(CAPS));
-        assert!(set.iter().all(|&c| s.add(c) == Outcome::Kept), "{seconds} s: {set:?} do not fit");
-        matches!(s.add(f), Outcome::Conflict(_))
-    };
     for d in r.discarded.iter().filter(|d| !d.undecided) {
-        assert!(d.conflicts_with.iter().all(|c| *c < d.fact && r.kept.contains(c)), "{seconds} s: {d:?}");
-        assert!(conflicts(&d.conflicts_with, d.fact), "{seconds} s: {d:?} does not conflict");
-        if d.minimal {
-            for c in &d.conflicts_with {
-                let rest: Vec<usize> = d.conflicts_with.iter().copied().filter(|x| x != c).collect();
-                assert!(!conflicts(&rest, d.fact), "{seconds} s: {d:?} is not minimal without {c}");
-            }
+        assert!(d.groups.windows(2).all(|w| w[0] < w[1]), "{seconds} s: {d:?}");
+        assert!(!d.complete || !d.groups.is_empty(), "{seconds} s: {d:?}");
+        for g in &d.groups {
+            check_group(&r, n, d.fact, g, &format!("{seconds} s: {d:?}"));
         }
     }
+    assert_eq!(r.statements, statement_hints(problem, &r.discarded), "{seconds} s");
     assert!(r.notes.is_empty(), "{seconds} s: {:?}", r.notes);
     assert_eq!(r, super::resolve(problem, &within(seconds), &Ticks::default()), "{seconds} s: not the same twice");
     (r, clock.reads())
@@ -761,7 +823,7 @@ fn a_check_out_of_time_leaves_its_fact_undecided() {
     for limit in 0..=reads {
         let (r, _) = check_timed(&p, limit as f64);
         cut |= r.kept == [0, 1]
-            && r.discarded == [Discarded { fact: 2, conflicts_with: Vec::new(), minimal: false, undecided: true }];
+            && r.discarded == [Discarded { fact: 2, groups: Vec::new(), complete: false, undecided: true }];
         if r.warnings.is_empty() {
             // whenever no check reaches the limit, the facts kept are those of 8.5
             assert_eq!(r.kept, unlimited.kept, "{limit} s");
@@ -790,10 +852,10 @@ fn a_search_that_grows_too_large_stops_at_its_time_limit() {
 }
 
 #[test]
-fn the_time_limit_covers_the_conflict_sets_but_not_the_witness() {
+fn the_time_limit_covers_the_conflict_groups_but_not_the_witness() {
     // the example of the brainstorm: once every fact is decided, the time goes on to the minimal
-    // conflict sets alone (the draft 0.3, 8.5); the witness taken as written is counted in work,
-    // not timed. A limit that cuts the sets keeps the facts of 8.5 and their witness
+    // conflict groups alone (the draft 0.3, 8.5); the witness taken as written is counted in work,
+    // not timed. A limit that cuts the groups keeps the facts of 8.5 and their witness
     let mut facts = vec![
         place(o(0), Axis::Y, 0.0),
         distance(Sense::Either, Some(2.0), None, vec![o(0)], vec![o(1)]),
@@ -806,9 +868,9 @@ fn the_time_limit_covers_the_conflict_sets_but_not_the_witness() {
     let p = problem_of(points(2), facts);
     let unlimited = resolve(&p, &SolverOptions::without_time_limit());
     assert_eq!(unlimited.kept, vec![0, 1, 2, 5]);
-    assert!(unlimited.discarded.iter().all(|d| d.minimal), "{:?}", unlimited.discarded);
+    assert!(unlimited.discarded.iter().all(|d| d.complete), "{:?}", unlimited.discarded);
     let (_, reads) = check_timed(&p, 1e9);
-    let mut sets = false;
+    let mut cut = false;
     for limit in 0..=reads {
         let (r, _) = check_timed(&p, limit as f64);
         if !r.warnings.is_empty() {
@@ -819,16 +881,161 @@ fn the_time_limit_covers_the_conflict_sets_but_not_the_witness() {
         assert_eq!(r.discarded.iter().map(|d| d.fact).collect::<Vec<_>>(), [3, 4], "{limit} s");
         assert_eq!(r.witness, unlimited.witness, "{limit} s");
         assert_eq!((r.as_written, &r.placing), (unlimited.as_written, &unlimited.placing), "{limit} s");
-        // a set the limit cut says so; the others are those of 8.5
-        sets |= r.discarded.iter().any(|d| !d.minimal);
+        // groups the limit cut say so, and are among those of 8.5; the others are those of 8.5
+        cut |= r.discarded.iter().any(|d| !d.complete);
         for (d, u) in r.discarded.iter().zip(&unlimited.discarded) {
-            if d.minimal {
+            if d.complete {
                 assert_eq!(d, u, "{limit} s");
+            } else {
+                assert!(d.groups.iter().all(|g| u.groups.contains(g)), "{limit} s: {d:?}");
             }
         }
     }
-    assert!(sets, "the limit never cut the conflict sets");
+    assert!(cut, "the limit never cut the conflict groups");
     assert_eq!(check_timed(&p, reads as f64).0, unlimited);
+}
+
+// ---------------------------------------------------------------------------- every group, and the hints by statement
+
+#[test]
+fn a_fact_with_two_minimal_groups_names_both() {
+    // A.y = 0, B.y = 5 and C.y = 5 kept; ALIGN y {A B C} has no solution with A and B, nor with A
+    // and C, and the hint names both groups (the draft 0.3, 8.5)
+    let p = problem_of(
+        points(3),
+        vec![
+            place(o(0), Axis::Y, 0.0),
+            place(o(1), Axis::Y, 5.0),
+            place(o(2), Axis::Y, 5.0),
+            align(Axis::Y, vec![o(0), o(1), o(2)]),
+        ],
+    );
+    let r = check(&p, &SolverOptions::without_time_limit());
+    assert_eq!(r.kept, vec![0, 1, 2]);
+    assert_eq!(r.discarded, vec![discarded_with(3, vec![vec![0, 1], vec![0, 2]])]);
+    assert_eq!(r.discarded[0].first_group(), Some(&[0, 1][..]));
+    assert_eq!(r.discarded[0].in_groups(), vec![0, 1, 2]);
+}
+
+/// Three points apart on x, at 0, 10 and 20, then an ALIGN x of them all: each pair of the
+/// PLACEs is a minimal conflict group of the ALIGN.
+fn three_apart() -> LevelProblem {
+    problem_of(
+        points(3),
+        vec![
+            place(o(0), Axis::X, 0.0),
+            place(o(1), Axis::X, 10.0),
+            place(o(2), Axis::X, 20.0),
+            align(Axis::X, vec![o(0), o(1), o(2)]),
+        ],
+    )
+}
+
+#[test]
+fn every_pair_of_points_placed_apart_is_a_group_of_their_align() {
+    let r = check(&three_apart(), &SolverOptions::without_time_limit());
+    assert_eq!(r.discarded, vec![discarded_with(3, vec![vec![0, 1], vec![0, 2], vec![1, 2]])]);
+}
+
+#[test]
+fn groups_of_different_sizes_that_share_a_fact() {
+    // A at 0, B 5 right of A, C on A's x, B 5 right of C, A's y at 1; then B at 7: B is at 5 by A
+    // and its DISTANCE, and by A, C and theirs, and A's y is in no group
+    let exactly =
+        |from: usize, to: usize| distance(Sense::Increasing, Some(5.0), Some(5.0), vec![o(from)], vec![o(to)]);
+    let p = problem_of(
+        points(3),
+        vec![
+            place(o(0), Axis::X, 0.0),
+            exactly(0, 1),
+            align(Axis::X, vec![o(0), o(2)]),
+            exactly(2, 1),
+            place(o(0), Axis::Y, 1.0),
+            place(o(1), Axis::X, 7.0),
+        ],
+    );
+    let r = check(&p, &SolverOptions::without_time_limit());
+    assert_eq!(r.kept, vec![0, 1, 2, 3, 4]);
+    assert_eq!(r.discarded, vec![discarded_with(5, vec![vec![0, 1], vec![0, 2, 3]])]);
+}
+
+#[test]
+fn a_limit_that_cuts_the_enumeration_gives_the_groups_found_and_says_so() {
+    // three groups to find: a limit that runs out after the first, or the second, gives those, each
+    // minimal, and says that the list is not complete (the draft 0.3, 8.5)
+    let p = three_apart();
+    let unlimited = resolve(&p, &SolverOptions::without_time_limit());
+    let all = &unlimited.discarded[0];
+    let (_, reads) = check_timed(&p, 1e9);
+    let mut cut = Vec::new();
+    for limit in 0..=reads {
+        let (r, _) = check_timed(&p, limit as f64);
+        if !r.warnings.is_empty() {
+            continue;
+        }
+        assert_eq!(r.kept, unlimited.kept, "{limit} s");
+        let d = &r.discarded[0];
+        if d.complete {
+            assert_eq!(d, all, "{limit} s");
+        } else {
+            assert!(d.groups.iter().all(|g| all.groups.contains(g)), "{limit} s: {d:?}");
+            cut.push(d.groups.len());
+        }
+        // the hints by statement name the statements of the groups found
+        let named: Vec<usize> = r.statements.values().flat_map(|h| h.facts.clone()).collect();
+        assert_eq!(named, d.in_groups(), "{limit} s");
+    }
+    // cut before the first group, after it, and after the second
+    assert!(cut.contains(&0) && cut.contains(&1) && cut.contains(&2), "{cut:?}");
+    assert_eq!(check_timed(&p, reads as f64).0, unlimited);
+}
+
+#[test]
+fn each_statement_is_told_what_was_discarded_because_of_it() {
+    // A's PLACE writes its x and its y on one line; the x of B and the y of B come from one line of a
+    // definition, expanded by two usages; a point's coordinate has no statement of its own. ALIGN x
+    // {A B} and ALIGN y {A B} conflict with them, and a PLACE of the point's x with its coordinate
+    let at = |line: u32| Some(rnl_runtime::diag::Loc::new("cases/t.sp", line, 3));
+    let mut facts = vec![
+        place(o(0), Axis::X, 0.0),
+        place(o(0), Axis::Y, 0.0),
+        place(o(1), Axis::X, 4.0),
+        place(o(1), Axis::Y, 4.0),
+        fact(FactKind::PointCoordinate { point: 2, axis: Axis::X, value: 9.0 }),
+        align(Axis::X, vec![o(0), o(1)]),
+        align(Axis::Y, vec![o(0), o(1)]),
+        place(o(2), Axis::X, 1.0),
+    ];
+    for f in [0, 1] {
+        facts[f].source = at(5);
+    }
+    for (f, usage) in [(2, 0), (3, 1)] {
+        facts[f].source = Some(rnl_runtime::diag::Loc::new("lib/def.rnl", 7, 5));
+        facts[f].chain = vec![usage];
+    }
+    facts[5].source = at(8);
+    facts[6].source = at(9);
+    facts[7].source = at(10);
+    let p = problem_of(points(3), facts);
+    let r = check(&p, &SolverOptions::without_time_limit());
+    assert_eq!(r.discarded, vec![discarded(5, vec![0, 2]), discarded(6, vec![1, 3]), discarded(7, vec![4])]);
+    let statement = |file: &str, line: u32, col: u32, chain: Vec<usize>, point: Option<usize>| Statement {
+        file: file.to_string(),
+        line,
+        col,
+        chain,
+        point,
+    };
+    let hint = |facts: Vec<usize>, discarded: Vec<usize>| StatementHint { facts, discarded };
+    assert_eq!(
+        r.statements,
+        BTreeMap::from([
+            (statement("", 0, 0, vec![], Some(2)), hint(vec![4], vec![7])),
+            (statement("cases/t.sp", 5, 3, vec![], None), hint(vec![0, 1], vec![5, 6])),
+            (statement("lib/def.rnl", 7, 5, vec![0], None), hint(vec![2], vec![5])),
+            (statement("lib/def.rnl", 7, 5, vec![1], None), hint(vec![3], vec![6])),
+        ])
+    );
 }
 
 // ---------------------------------------------------------------------------- against brute force

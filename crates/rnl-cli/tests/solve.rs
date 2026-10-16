@@ -37,6 +37,13 @@ fn unlimited() -> SolveOptions {
 #[derive(Default)]
 struct Ticks(std::cell::Cell<u64>);
 
+impl Ticks {
+    /// How many times it was read.
+    fn reads(&self) -> u64 {
+        self.0.get()
+    }
+}
+
 impl rnl_solver::Clock for Ticks {
     fn elapsed(&self) -> f64 {
         let t = self.0.get();
@@ -394,18 +401,35 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     let level = &run.levels[0];
     let lines = rnl_cli::solve::report(level, false);
     let discarded: Vec<&str> = lines.iter().filter(|l| l.starts_with("  discarded ")).map(String::as_str).collect();
+    // each with its one minimal group (the draft 0.3, 8.5); the low one without its hint (7.6)
     assert_eq!(
         discarded,
         [
-            "  discarded [7] ALIGN x {#M6 #M7} (normal, T4-miller-conflicts.sp:28): it conflicts with",
-            "  discarded [16] ALIGN y {#M1 #M2} (normal, rnl-std.rnl:227, from $MIRROR_PAIR): it conflicts with",
-            "  discarded [40] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:31): it conflicts with",
+            "  discarded [7] ALIGN x {#M6 #M7} (normal, T4-miller-conflicts.sp:28): it conflicts with [3]",
+            "  discarded [16] ALIGN y {#M1 #M2} (normal, rnl-std.rnl:227, from $MIRROR_PAIR): it conflicts with [0] \
+             and [4]",
+            "  discarded [40] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:31): of priority low, which is \
+             expected; --report lists what it conflicts with (8.5)",
         ]
     );
     // each followed by the facts it conflicts with
     let at = lines.iter().position(|l| l.starts_with("  discarded [16]")).unwrap();
     assert_eq!(lines[at + 1], "      [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:37)");
     assert_eq!(lines[at + 2], "      [4] the y of #M2 = 3 (normal, T4-miller-conflicts.sp:38)");
+    let at = lines.iter().position(|l| l.starts_with("  discarded [40]")).unwrap();
+    assert!(!lines[at + 1].starts_with("      ["), "{lines:#?}");
+    // then the statements of those groups, each with the facts discarded because of it; the one
+    // that only the low fact loses only with --report
+    let statements = [
+        "    T4-miller-conflicts.sp:37 [0] the y of #M1 = 0 took part in discarding [16]",
+        "    T4-miller-conflicts.sp:38 [4] the y of #M2 = 3 took part in discarding [16]",
+        "    T4-miller-conflicts.sp:39 [3] DISTANCE x either min=2 {#M6} {#M7} took part in discarding [7]",
+        "    T4-miller-conflicts.sp:40 [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} took part in discarding \
+         [40]",
+    ];
+    let head = lines.iter().position(|l| l == "  statements whose facts took part in discarding (8.5):").unwrap();
+    assert_eq!(lines[head + 1..head + 4], statements[..3], "{lines:#?}");
+    assert!(!lines[head + 4].starts_with("    "), "{lines:#?}");
     assert!(lines[0].starts_with(
         "level T4-miller-conflicts.sp (file in T4-miller-conflicts.sp): 38 kept, 3 discarded of 41 facts"
     ));
@@ -418,6 +442,18 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     assert_eq!(all.iter().filter(|l| l.starts_with("    kept [")).count(), 38);
     assert_eq!(all.iter().filter(|l| l.starts_with("    discarded [")).count(), 3);
     assert!(all.iter().any(|l| l == "    kept [0] the y of #M1 = 0 (high, T4-miller-conflicts.sp:37)"), "{all:#?}");
+    // and the hints of the low fact, and of the statement that only it loses
+    let at = all.iter().position(|l| l.starts_with("    discarded [40]")).unwrap();
+    assert_eq!(
+        all[at],
+        "    discarded [40] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:31): it conflicts with [2]"
+    );
+    assert_eq!(
+        all[at + 1],
+        "        [2] DISTANCE y increasing min=6 max=6 {#VIP} {#VIN} (normal, T4-miller-conflicts.sp:40)"
+    );
+    let head = all.iter().position(|l| l == "  statements whose facts took part in discarding (8.5):").unwrap();
+    assert_eq!(all[head + 1..head + 5], statements, "{all:#?}");
 }
 
 #[test]
@@ -1483,7 +1519,7 @@ fn with_no_time_at_all_only_what_the_origin_satisfies_is_kept_and_the_rest_is_wa
     let r = &level.solved.report;
     let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
     let (x2, align) = (fact("the x of #R2 = 10"), fact("ALIGN y {#R1 #R2}"));
-    assert!(r.discarded.iter().any(|d| d.fact == x2 && d.undecided && d.conflicts_with.is_empty()), "{r:?}");
+    assert!(r.discarded.iter().any(|d| d.fact == x2 && d.undecided && d.groups.is_empty() && !d.complete), "{r:?}");
     for kept in [align, fact("the x of #R1 = 0"), fact("the y of #R1 = 0"), fact("the y of #R2 = 0")] {
         assert!(r.kept.contains(&kept), "{}: {r:?}", describe_fact(p, kept));
     }
@@ -1506,22 +1542,53 @@ fn with_no_time_at_all_only_what_the_origin_satisfies_is_kept_and_the_rest_is_wa
 }
 
 #[test]
-fn a_conflict_set_the_time_limit_left_not_minimal_is_marked() {
-    // three resistors placed apart on x and an ALIGN on x of them all, which conflicts with the
-    // PLACEs. A limit that runs out after every fact is decided, while the conflict sets are made
-    // minimal, keeps the facts of 8.5, and the line of each fact whose set it cut says that the
-    // set is not minimal and the list not complete (the draft 0.3, 8.5); with more time, the sets
-    // are those of 8.5, and so they stay
+fn every_minimal_group_is_named_and_a_limit_that_cuts_them_says_the_list_is_not_complete() {
+    // an ALIGN on x of three resistors written before their PLACEs apart on x, which rank first:
+    // each pair of the PLACEs is a minimal conflict group of the ALIGN, and its line names the three
+    // (the draft 0.3, 8.5). A limit that runs out after every fact is decided, while the groups are
+    // found, keeps the facts of 8.5 and gives the groups found by then, each minimal, and the line
+    // of the ALIGN says that the list is not complete, as does the head of the hints by statement;
+    // with more time, the groups are those of 8.5
     let body = "* cut\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\nR3 c d 1k\n* @RNL { \
-                #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); #R3 @PLACE(20, 0); {#R1 #R2 #R3} @ALIGN(\"x\") }\n.end\n";
+                {#R1 #R2 #R3} @ALIGN(\"x\"); #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); #R3 @PLACE(20, 0) }\n.end\n";
     let files = MemoryProvider::new().with("/w/t.sp", body);
-    let all = solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap();
-    let whole = &all.levels[0].solved.report;
-    assert!(!whole.discarded.is_empty() && whole.discarded.iter().all(|d| d.minimal), "{whole:?}");
-    let marked = "it conflicts with these, a set not made minimal within the time limit of the solver, so the list \
-                  of its sets is not complete (8.5)";
-    let mut cut = false;
-    for limit in 0..400 {
+    let clock = Ticks::default();
+    let all = solve_with_clock(Path::new("/w/t.sp"), &files, &within(1e9), &clock).unwrap();
+    let reads = clock.reads();
+    let level = &all.levels[0];
+    let p = &level.problem;
+    let whole = &level.solved.report;
+    assert_eq!(whole, &solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap().levels[0].solved.report);
+    let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
+    let align = fact("ALIGN x");
+    let xs = [fact("the x of #R1 = 0"), fact("the x of #R2 = 10"), fact("the x of #R3 = 20")];
+    let mut groups: Vec<Vec<usize>> = [(0, 1), (0, 2), (1, 2)]
+        .iter()
+        .map(|&(a, b)| {
+            let mut g = vec![xs[a], xs[b]];
+            g.sort_unstable();
+            g
+        })
+        .collect();
+    groups.sort();
+    assert_eq!(whole.discarded.len(), 1, "{whole:?}");
+    let d = &whole.discarded[0];
+    assert_eq!((d.fact, &d.groups, d.complete), (align, &groups, true));
+    let lines = rnl_cli::solve::report(level, false);
+    let listed: Vec<String> = groups.iter().map(|g| format!("[{}] and [{}]", g[0], g[1])).collect();
+    let line = format!("  discarded {}: it conflicts with {}", describe_fact(p, align), listed.join("; or with "));
+    assert!(lines.contains(&line), "{line}\n{lines:#?}");
+    // each PLACE's statement took part in discarding the ALIGN
+    for x in xs {
+        let end = format!(" took part in discarding [{align}]");
+        let named =
+            |l: &&String| l.starts_with("    t.sp:6 ") && l.contains(&format!(" [{x}] the x of ")) && l.ends_with(&end);
+        assert!(lines.iter().any(|l| named(&l)), "{x}: {lines:#?}");
+    }
+    let incomplete = " (the list is not complete: the time limit was reached)";
+    assert!(!lines.iter().any(|l| l.contains(incomplete)), "{lines:#?}");
+    let mut cut = Vec::new();
+    for limit in 0..=reads {
         let run = solve_with_clock(Path::new("/w/t.sp"), &files, &within(limit as f64), &Ticks::default()).unwrap();
         let level = &run.levels[0];
         let r = &level.solved.report;
@@ -1531,26 +1598,25 @@ fn a_conflict_set_the_time_limit_left_not_minimal_is_marked() {
             continue;
         }
         assert_eq!(r.kept, whole.kept, "{limit} s");
-        assert_eq!(r.discarded.len(), whole.discarded.len(), "{limit} s");
+        let d = &r.discarded[0];
         let lines = rnl_cli::solve::report(level, false);
-        let mut minimal = true;
-        for (d, u) in r.discarded.iter().zip(&whole.discarded) {
-            assert_eq!(d.fact, u.fact, "{limit} s");
-            let line = format!("  discarded {}: ", describe_fact(&level.problem, d.fact));
-            if d.minimal {
-                assert_eq!(d, u, "{limit} s");
-                assert!(lines.contains(&format!("{line}it conflicts with")), "{limit} s: {lines:#?}");
-            } else {
-                (cut, minimal) = (true, false);
-                assert!(lines.contains(&format!("{line}{marked}")), "{limit} s: {lines:#?}");
-                assert!(d.conflicts_with.iter().all(|c| r.kept.contains(c)), "{limit} s: {d:?}");
-            }
+        if d.complete {
+            assert_eq!(r.discarded, whole.discarded, "{limit} s");
+            assert_eq!(r.statements, whole.statements, "{limit} s");
+            assert!(!lines.iter().any(|l| l.contains(incomplete)), "{limit} s: {lines:#?}");
+            continue;
         }
-        if minimal {
-            break;
-        }
+        cut.push(d.groups.len());
+        assert!(d.groups.iter().all(|g| groups.contains(g)), "{limit} s: {d:?}");
+        let start = format!("  discarded {}: ", describe_fact(p, align));
+        let line = lines.iter().find(|l| l.starts_with(&start)).unwrap();
+        assert!(line.ends_with(incomplete), "{limit} s: {line}");
+        let head =
+            "  statements whose facts took part in discarding (8.5; the list is not complete: the time limit was reached):";
+        assert_eq!(lines.iter().any(|l| l == head), !d.groups.is_empty(), "{limit} s: {lines:#?}");
     }
-    assert!(cut, "no limit cut a conflict set");
+    // cut before the first group was found, after it, and after the second
+    assert!(cut.contains(&0) && cut.contains(&1) && cut.contains(&2), "{cut:?}");
 }
 
 #[test]

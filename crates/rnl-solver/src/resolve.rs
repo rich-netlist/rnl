@@ -1,6 +1,7 @@
 //! The resolution of 8.5: the facts in the order of [`LevelProblem::facts`], each kept when it fits
 //! with those kept before it, its literals searched depth first, a fact that does not fit
-//! discarded with a minimal conflict set, and a witness that satisfies every fact kept (plan 5.3).
+//! discarded with every minimal conflict group it has, the hints of each statement, and a witness
+//! that satisfies every fact kept (plan 5.3; the draft 0.3, 8.5).
 //!
 //! **State.** One incremental simplex per axis ([`crate::simplex`]) holds the bounds of the facts
 //! kept that hold whatever is chosen, each tagged with its fact, and the bounds of every literal
@@ -41,28 +42,44 @@
 //! 3. When the root fails, the fact is discarded. The facts of its explanation conflict with it;
 //!    a deletion filter makes the set minimal: from the latest rank on, each fact is left out when
 //!    the rest still conflicts with the fact discarded, each test a small resolution of its own.
-//!    So the set leans towards the facts that rank first.
+//!    So this first group leans towards the facts that rank first.
+//! 4. Once every fact is decided and each fact discarded has its first group, the other minimal
+//!    conflict groups of each are enumerated (the draft 0.3, 8.5: the hint names every set of
+//!    facts taken in that has no solution together with the discarded fact and from which no fact
+//!    can be left out). MARCO over the deletion filter ([`all_groups`]): a seed, a largest subset
+//!    of the facts kept before the fact that holds none of the groups found and is no subset of a
+//!    set found to fit, either fits with the fact, and every later seed must hold one fact outside
+//!    it, or holds a new group, which the filter makes minimal, and every later seed must leave out
+//!    one fact of it. When no seed is left, the groups are all.
 //!
 //! The search is complete: a fact is discarded only when no values of the literals have a
 //! solution, so what is kept is the lexicographically greatest consistent subset in the order of
 //! 8.5. Every decision compares exact rationals.
 //!
+//! **The hints by statement** (the draft 0.3, 8.5; 7.6). A fact is named by the statement that
+//! wrote it ([`Statement`]): where it is written, and, for a fact expanded from a usage, the usages
+//! of its chain, the first of them the AS or ATTACH statement of the level. Each statement whose
+//! facts are in a group gets the facts discarded because of them ([`StatementHint`]).
+//!
 //! **The time limit** (the draft 0.3, 8.5; [`SolverOptions::time_limit`]). Deciding the facts is
 //! NP-hard in general (the side of `"x"` DISTANCEs alone can encode graph colouring), so the
 //! resolution of a level may be limited in time, on the clock the caller gives ([`Deadline`]). The
-//! limit runs from the start of the resolution and covers the checks of the facts and then the
-//! deletion filters of their conflict sets, nothing else. The time is read at the start of each
-//! check of a fact, at each node of a search, and every few pivots of a simplex
-//! ([`crate::simplex::PIVOTS_PER_READ`]). When it is out during the check of a fact, the fact is
-//! discarded **undecided**, with no conflict set and a warning (7.6), and so is every later fact
-//! that needs a check; a later fact that the witness already satisfies is kept, as step 1 needs no
+//! limit runs from the start of the resolution and covers the checks of the facts, then the first
+//! group of each fact discarded, then the other groups, nothing else. The time is read at the
+//! start of each check of a fact, at each node of a search, every few pivots of a simplex
+//! ([`crate::simplex::PIVOTS_PER_READ`]), at each seed of the enumeration and every few nodes of
+//! its search ([`SEED_NODES_PER_READ`]). When it is out during the check of a fact, the fact is
+//! discarded **undecided**, with no group and a warning (7.6), and so is every later fact that
+//! needs a check; a later fact that the witness already satisfies is kept, as step 1 needs no
 //! check, so that the witness satisfies every fact kept. When it is out after every fact is
-//! decided, a conflict set not yet made minimal is the explanation found, or the set its filter
-//! reached, which still conflicts with its fact, and [`Discarded::minimal`] is false. Without a
-//! limit, and whenever no check reaches it, the result is the one of 8.5. What is not the
-//! resolution of 8.5 is not timed: the witness taken as written below, and the solver's own uses
-//! of the resolution, for the relations of a candidate (`crate::search`), are bounded by caps of
-//! work ([`Caps`]), and a search or a simplex that reaches its cap leaves its relation undecided.
+//! decided, the groups found by then are given, each minimal, and [`Discarded::complete`] is false
+//! for each fact whose groups were not all found: a group that its filter had not made minimal is
+//! left out, as the hint names only minimal ones. Without a limit, and whenever no check reaches
+//! it, the facts kept are those of 8.5; when the enumeration ends within it too, the groups are
+//! all. What is not the resolution of 8.5 is not timed: the witness taken as written below, and
+//! the solver's own uses of the resolution, for the relations of a candidate (`crate::search`),
+//! are bounded by caps of work ([`Caps`]), and a search or a simplex that reaches its cap leaves
+//! its relation undecided.
 //!
 //! **The witness given back** is taken, when it can be, from the facts kept resolved once more
 //! without the tolerance: the tolerance decides conflicts (11.7), but a simplex stops on the bounds
@@ -91,7 +108,7 @@ use crate::options::{Caps, CAPS};
 use crate::orient::{from_index, index, OrientClasses};
 use crate::rational::{from_f64, to_f64, Q};
 use crate::simplex::{Failure, LinExpr, Rel, Simplex, Var};
-use crate::{Clock, Discarded, SolverOptions, Work};
+use crate::{Clock, Discarded, SolverOptions, Statement, StatementHint, Work};
 
 /// The time limit of the resolution of one level (the draft 0.3, 8.5), on the clock the caller
 /// gives: it runs from the reading when the resolution begins, and once it is out it stays out,
@@ -1239,9 +1256,12 @@ pub(crate) struct Witness {
 pub struct Resolved {
     /// The facts kept, by their index in [`LevelProblem::facts`], in that order (8.5).
     pub kept: Vec<usize>,
-    /// The facts discarded, in that order, each with a minimal set of facts kept before it that it
-    /// conflicts with, a set the time limit left not minimal, or undecided ([`Discarded`]).
+    /// The facts discarded, in that order, each with its minimal conflict groups, all of them
+    /// unless the time limit ran out before they were found, or undecided ([`Discarded`]).
     pub discarded: Vec<Discarded>,
+    /// The hints of 8.5 by statement (the draft 0.3, 8.5): each statement whose facts are in a
+    /// group of `discarded`, with those facts and the facts discarded because of them.
+    pub statements: BTreeMap<Statement, StatementHint>,
     pub work: Work,
     /// The warnings (7.6): one for each fact discarded undecided because the time limit was out
     /// (the draft 0.3, 8.5), in the order of the facts.
@@ -1322,8 +1342,9 @@ pub(crate) fn point_value(problem: &LevelProblem, g: &Geometry, r: &PointRef, ax
 }
 
 /// Resolves the facts of a level (8.5), with the time limit of the options on `clock` (the draft
-/// 0.3, 8.5): the facts first, then the deletion filters of their conflict sets, within the one
-/// limit; then, counted in work and not timed, the witness taken as written (see the module).
+/// 0.3, 8.5): the facts first, then a first minimal conflict group of each fact discarded, then
+/// the other groups of each, within the one limit; then, counted in work and not timed, the
+/// witness taken as written (see the module).
 pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Resolved {
     let tol = from_f64(options.tolerance)
         .filter(|t| *t >= Q::zero())
@@ -1354,16 +1375,27 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     }
     work.resolve_nodes += r.nodes;
     work.pivots += r.pivots();
-    // the minimal conflict sets, still within the limit (8.5)
+    // The minimal conflict groups, still within the limit (the draft 0.3, 8.5): first one group
+    // of each fact discarded, the deletion filter of its explanation, so that every fact has one
+    // before the time goes to the others; then the others of each, in the order of the facts.
     let mut discarded: Vec<Discarded> = undecided
         .iter()
-        .map(|&fact| Discarded { fact, conflicts_with: Vec::new(), minimal: false, undecided: true })
+        .map(|&fact| Discarded { fact, groups: Vec::new(), complete: false, undecided: true })
         .collect();
+    let mut found = Vec::new();
     for (f, set) in conflicts {
-        let (conflicts_with, minimal) = minimize(&model, n, limits, f, set, &mut work);
-        discarded.push(Discarded { fact: f, conflicts_with, minimal, undecided: false });
+        let (group, minimal) = minimize(&model, n, limits, f, set, &mut work);
+        let groups = if minimal { vec![group] } else { Vec::new() };
+        found.push(Discarded { fact: f, groups, complete: false, undecided: false });
     }
+    for d in &mut found {
+        let Some(first) = d.groups.first().cloned() else { continue };
+        let before: Vec<usize> = kept.iter().copied().take_while(|&k| k < d.fact).collect();
+        (d.groups, d.complete) = all_groups(&model, n, limits, d.fact, &before, first, &mut work);
+    }
+    discarded.extend(found);
     discarded.sort_by_key(|d| d.fact);
+    let statements = statement_hints(problem, &discarded);
     // The tolerance decides conflicts (11.7); it need not move what the facts do not move. When
     // the facts kept hold with their constants as written, the witness is taken from them so: a
     // PLACE at 4 puts the object at 4, not at 4 less the tolerance, where a simplex stops.
@@ -1373,7 +1405,25 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     let placed = if undecided.is_empty() { taken_as_written(problem, &model, &kept, &mut work) } else { None };
     let (witness, as_written, placing) = placed.unwrap_or_else(|| (witness_of(&r, &model), false, model.clone()));
     drop(r);
-    Resolved { kept, discarded, work, warnings, notes: Vec::new(), witness, model, as_written, placing }
+    Resolved { kept, discarded, statements, work, warnings, notes: Vec::new(), witness, model, as_written, placing }
+}
+
+/// The hints of 8.5 by statement (the draft 0.3, 8.5): for each statement whose facts are in a
+/// minimal conflict group of a fact discarded, those facts and the facts discarded because of them.
+pub(crate) fn statement_hints(problem: &LevelProblem, discarded: &[Discarded]) -> BTreeMap<Statement, StatementHint> {
+    let mut by: BTreeMap<Statement, (BTreeSet<usize>, BTreeSet<usize>)> = BTreeMap::new();
+    for d in discarded {
+        for k in d.in_groups() {
+            let (facts, lost) = by.entry(Statement::of(problem, k)).or_default();
+            facts.insert(k);
+            lost.insert(d.fact);
+        }
+    }
+    by.into_iter()
+        .map(|(s, (facts, lost))| {
+            (s, StatementHint { facts: facts.into_iter().collect(), discarded: lost.into_iter().collect() })
+        })
+        .collect()
 }
 
 /// A fact as a warning names it: its index, its label, where its statement is written and the
@@ -1468,13 +1518,13 @@ fn held_as_written(problem: &LevelProblem, model: &Model, kept: &[usize], work: 
     exact
 }
 
-/// The deletion filter (step 3 of the module): a minimal subset of `set` that `f` conflicts with,
-/// the facts of the latest rank left out first, and whether it is minimal. When `f` still
-/// conflicts without a fact, the set shrinks to what that test's own explanation names, which
-/// leaves out at once the facts the conflict does not need. When the time is out, before the
-/// filter or during it, the filter stops, and the set it has reached, which still conflicts with
-/// `f`, is not known to be minimal: a test that did not finish keeps its fact. An empty set is
-/// minimal as it is.
+/// The deletion filter (steps 3 and 4 of the module): a minimal subset of `set` that `f`
+/// conflicts with, the facts of the latest rank left out first, and whether it is minimal. When
+/// `f` still conflicts without a fact, the set shrinks to what that test's own explanation names,
+/// which leaves out at once the facts the conflict does not need. When the time is out, before
+/// the filter or during it, the filter stops, and the set it has reached, which still conflicts
+/// with `f`, is not known to be minimal: a test that did not finish keeps its fact. The caller
+/// then leaves it out of the groups. An empty set is minimal as it is.
 fn minimize(model: &Model, n: usize, limits: Limits, f: usize, set: Vec<usize>, work: &mut Work) -> (Vec<usize>, bool) {
     let mut set = set;
     let mut tried: BTreeSet<usize> = BTreeSet::new();
@@ -1500,6 +1550,159 @@ fn minimize(model: &Model, n: usize, limits: Limits, f: usize, set: Vec<usize>, 
         }
     }
     (set, true)
+}
+
+/// Every minimal conflict group of `f` (step 4 of the module): the minimal subsets of `before`,
+/// the facts kept before `f` in order, that have no solution together with `f`, `first` among
+/// them; sorted by rank inside and between groups, and whether they are all, which they are
+/// unless the time is out before the enumeration ends.
+///
+/// MARCO (Liffiton, Previti, Malik and Marques-Silva, 2016) over the deletion filter: a [`Map`]
+/// of the subsets not yet explored gives a seed, a largest subset that holds no group found whole
+/// and is no subset of a set found to fit. A seed that fits with `f` is a largest set that does,
+/// as each fact more would complete a group: every later seed must hold one fact outside it. A
+/// seed that does not fit holds a group not found yet; [`minimize`] makes its explanation
+/// minimal, and every later seed must leave out one fact of that group. When the map has no seed
+/// left, every group is found: a group not found would be a subset of no set that fits and hold
+/// none of the groups found.
+fn all_groups(
+    model: &Model,
+    n: usize,
+    limits: Limits,
+    f: usize,
+    before: &[usize],
+    first: Vec<usize>,
+    work: &mut Work,
+) -> (Vec<Vec<usize>>, bool) {
+    let at = |facts: &[usize]| -> Vec<usize> { facts.iter().filter_map(|g| before.binary_search(g).ok()).collect() };
+    let mut map = Map { size: before.len(), groups: vec![at(&first)], fits: Vec::new() };
+    let mut groups = vec![first];
+    let complete = loop {
+        if limits.out_of_time() {
+            break false;
+        }
+        let seed = match map.seed(limits) {
+            Seed::Found(seed) => seed,
+            Seed::None => break true,
+            Seed::Stopped => break false,
+        };
+        let facts: Vec<usize> = seed.iter().map(|&i| before[i]).collect();
+        let mut r = Resolver::new(model, n, limits);
+        let fits = facts.iter().all(|&g| r.add(g) == Outcome::Kept);
+        // the facts kept before `f` hold together, so every seed does, unless the time is out
+        let outcome = if fits { r.add(f) } else { Outcome::Undecided };
+        work.resolve_nodes += r.nodes;
+        work.pivots += r.pivots();
+        match outcome {
+            Outcome::Kept => map.fits.push((0..before.len()).filter(|i| seed.binary_search(i).is_err()).collect()),
+            Outcome::Conflict(explanation) => {
+                let (group, minimal) = minimize(model, n, limits, f, explanation, work);
+                if !minimal {
+                    break false;
+                }
+                map.groups.push(at(&group));
+                groups.push(group);
+            }
+            Outcome::Undecided => break false,
+        }
+    };
+    groups.sort();
+    (groups, complete)
+}
+
+/// What [`Map::seed`] gives.
+enum Seed {
+    /// A seed, by position, sorted.
+    Found(Vec<usize>),
+    /// No subset is left to explore.
+    None,
+    /// The time was out.
+    Stopped,
+}
+
+/// The subsets of the facts that a fact discarded may conflict with, by position among them, that
+/// MARCO has not explored yet ([`all_groups`]): those that hold no group found whole and are no
+/// subset of a set found to fit.
+struct Map {
+    /// How many facts there are.
+    size: usize,
+    /// The groups found: a seed leaves out one position of each.
+    groups: Vec<Vec<usize>>,
+    /// The positions that each set found to fit leaves out: a seed holds one of each.
+    fits: Vec<Vec<usize>>,
+}
+
+/// How many nodes the search of a seed makes between two readings of the clock.
+const SEED_NODES_PER_READ: u64 = 4096;
+
+impl Map {
+    /// A seed: a subset not explored, as large as can be, so that no position can be added without
+    /// completing a group found. The positions are taken in, in order, before they are left out,
+    /// so that the seed leans towards the facts that rank first; a search with backtracking, in
+    /// which a position is in or out, finds a subset not explored, and the positions left out that
+    /// complete no group are then taken in. None when every subset is explored.
+    fn seed(&self, limits: Limits) -> Seed {
+        if self.groups.iter().chain(&self.fits).any(Vec::is_empty) {
+            return Seed::None;
+        }
+        // the clauses of each position
+        let mut groups_of: Vec<Vec<usize>> = vec![Vec::new(); self.size];
+        for (c, g) in self.groups.iter().enumerate() {
+            for &i in g {
+                groups_of[i].push(c);
+            }
+        }
+        let mut fits_of: Vec<Vec<usize>> = vec![Vec::new(); self.size];
+        for (c, s) in self.fits.iter().enumerate() {
+            for &i in s {
+                fits_of[i].push(c);
+            }
+        }
+        let mut value: Vec<Option<bool>> = vec![None; self.size];
+        let mut i = 0;
+        let mut nodes: u64 = 0;
+        while i < self.size {
+            let next = match value[i] {
+                None => Some(true),
+                Some(true) => Some(false),
+                Some(false) => None,
+            };
+            let Some(v) = next else {
+                // both values of `i` fail: back to the position before
+                value[i] = None;
+                if i == 0 {
+                    return Seed::None;
+                }
+                i -= 1;
+                continue;
+            };
+            value[i] = Some(v);
+            nodes += 1;
+            if nodes % SEED_NODES_PER_READ == 0 && limits.out_of_time() {
+                return Seed::Stopped;
+            }
+            // only the clauses of `i` can have changed: a group all in, or a set to meet all out
+            let whole = |g: &Vec<usize>, want: bool| g.iter().all(|&j| value[j] == Some(want));
+            let fails = if v {
+                groups_of[i].iter().any(|&c| whole(&self.groups[c], true))
+            } else {
+                fits_of[i].iter().any(|&c| whole(&self.fits[c], false))
+            };
+            if !fails {
+                i += 1;
+            }
+        }
+        let mut seed: Vec<bool> = value.iter().map(|v| *v == Some(true)).collect();
+        for i in 0..self.size {
+            if !seed[i] {
+                seed[i] = true;
+                if groups_of[i].iter().any(|&c| self.groups[c].iter().all(|&j| seed[j])) {
+                    seed[i] = false;
+                }
+            }
+        }
+        Seed::Found((0..self.size).filter(|&i| seed[i]).collect())
+    }
 }
 
 #[cfg(test)]
