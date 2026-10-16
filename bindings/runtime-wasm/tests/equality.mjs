@@ -1,5 +1,5 @@
 // Native and WebAssembly builds give identical Documents (decision 0008). For every file of the
-// conformance corpus and the standard packages, the Document that `rnl view` prints and the one the
+// conformance corpus and the packages of libraries/, the Document that `rnl view` prints and the one the
 // WebAssembly core builds must be deep-equal, numbers compared exactly. Both get the same entry, an
 // absolute path; natively `rnl view` reads the disk, and in WebAssembly client.js's collect gives
 // the core the files it asks for, read from the disk as `rnl` reads them. With --snapshot, the
@@ -55,7 +55,7 @@ const { collect, decodeText } = await import(pathToFileURL(join(dist, "client.js
 const core = await loadCore(pathToFileURL(join(dist, "rnl_runtime_wasm.wasm")));
 
 const entries = [];
-for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "tests/conformance/cases-0.3", "libraries/standard"]) {
+for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "tests/conformance/cases-0.3", "libraries/standard", "libraries/analog-canvas-extensions"]) {
   entries.push(...files(join(root, dir)).filter((path) => /\.(sp|scs|inc|rnl)$/.test(path)));
 }
 if (entries.length < 20) fail(`only ${entries.length} files found under ${root}`);

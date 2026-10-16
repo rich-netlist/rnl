@@ -37,10 +37,11 @@ pub use snapshot::{
 include!(concat!(env!("OUT_DIR"), "/bundled.rs"));
 
 /// The directory of the bundled packages, as the runtime names it. Each version of the standard
-/// series has a directory of its own in it, as in `libraries/standard`, such as `<bundled>/0.2`.
+/// series has a directory of its own in it, as in `libraries/standard`, such as `<bundled>/0.2`,
+/// and so has Analog Canvas's package, `<bundled>/analog-canvas-extensions`.
 pub const BUNDLED_DIR: &str = "<bundled>";
 
-/// The bundled standard packages, each version directory a package directory of its own (16.2).
+/// The bundled packages, each directory a package directory of its own (16.2).
 pub fn bundled() -> MemoryProvider {
     let mut p = MemoryProvider::default();
     for &(path, text) in BUNDLED {
