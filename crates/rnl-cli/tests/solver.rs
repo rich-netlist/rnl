@@ -670,3 +670,20 @@ fn the_draft_switch_changes_no_problem_of_a_file_of_0_2() {
         assert_eq!(json(&Options { draft: true, ..Options::solver() }), json(&Options::solver()), "{}", f.display());
     }
 }
+
+#[test]
+fn a_usage_has_the_place_it_is_written() {
+    // where each usage is written (UsageEntry::source), so that the hints of 8.5 can name it by its
+    // line: the AS of the level for the mirror pairs, the rule of the standard package for a stub
+    // that it makes, and the body of $GND_STUB for the ground in it
+    let ps = problems(&solver_case("T4-miller-conflicts.sp"), &FsProvider::new(&[]));
+    let p = &ps[0];
+    let at = |u: &UsageEntry| u.source.as_ref().map(|l| (l.file.clone(), l.line)).unwrap();
+    let pairs: Vec<(String, u32)> = p.usages.iter().filter(|u| u.definition == "$MIRROR_PAIR").map(at).collect();
+    assert_eq!(pairs, [("T4-miller-conflicts.sp".to_string(), 22), ("T4-miller-conflicts.sp".to_string(), 23)]);
+    let stub = p.usages.iter().position(|u| u.definition == "$GND_STUB" && u.rule_made).unwrap();
+    assert_eq!(at(&p.usages[stub]).0, "rnl-std-fill.rnl");
+    let ground = p.usages.iter().find(|u| u.parent == Some(stub)).unwrap();
+    assert_eq!((ground.definition.as_str(), at(ground).0.as_str()), ("$GND", "rnl-std-virtual.rnl"));
+    // like every place, it is left out of the hash: the test of the hash moves lines down
+}

@@ -594,12 +594,13 @@ fn fact_what(p: &LevelProblem, k: usize) -> String {
 
 /// A statement as the hints of 8.5 name it (the draft 0.3, 8.5; 7.6): where it is written, such
 /// as `T4-miller-conflicts.sp:37`; for one in the body of a definition, the usage written in the
-/// level that it was expanded from, the first of its chain, with how the level writes its roles,
-/// a role that cannot be referred to left out, and the line of the definition, such as `the usage
-/// of $MIRROR_PAIR with #M1(a) #M2(b) %ax(axis) (rnl-std-layout.rnl:10 of its definition)`. When the
+/// level that it was expanded from, the first of its chain, where it is written, with how the
+/// level writes its roles, a role that cannot be referred to left out, and the line of the
+/// definition, such as `the usage of $MIRROR_PAIR at T4-miller-conflicts.sp:22 with #M1(a) #M2(b) %ax(axis)
+/// (rnl-std-layout.rnl:10 of its definition)`. When the
 /// statement is in the body of a definition used inside another, the line is of the innermost,
 /// and every definition of the chain is named, outermost first, as for a fact: `%o1, the usage of
-/// $OUTER with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)`. For the coordinates of a
+/// $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)`. For the coordinates of a
 /// point, which have no statement of their own, the point.
 fn statement_name(p: &LevelProblem, s: &Statement) -> String {
     if let Some(k) = s.point {
@@ -611,6 +612,9 @@ fn statement_name(p: &LevelProblem, s: &Statement) -> String {
         Reference::Name(n) => format!("{n}, the usage of {}", u.definition),
         _ => format!("the usage of {}", u.definition),
     };
+    if let Some(at) = &u.source {
+        name.push_str(&format!(" at {}:{}", file_name(&at.file), at.line));
+    }
     let roles: Vec<String> =
         u.roles.iter().filter_map(|r| r.written.as_ref().map(|w| format!("{w}({})", r.role))).collect();
     if !roles.is_empty() {
@@ -860,17 +864,20 @@ mod tests {
         let f = p.facts.iter().position(|f| f.label == "%row").unwrap();
         let s = Statement::of(p, f);
         assert_eq!(s.chain.len(), 2, "{s:?}");
-        let named = "%o1, the usage of $OUTER with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
+        let named = "%o1, the usage of $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
         assert_eq!(statement_name(p, &s), named);
         assert!(describe_fact(p, f).ends_with("(normal, p.sp:6, from $OUTER in $PAIR)"), "{}", describe_fact(p, f));
         // a role that cannot be referred to is left out, not shown as `?`
         let mut q = p.clone();
         q.usages[s.chain[0]].roles[0].written = None;
-        let named = "%o1, the usage of $OUTER with #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
+        let named = "%o1, the usage of $OUTER at p.sp:8 with #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)";
         assert_eq!(statement_name(&q, &s), named);
         // a statement in the body of a definition the level uses itself
         let one = Statement { chain: s.chain[..1].to_vec(), ..s.clone() };
-        assert_eq!(statement_name(p, &one), "%o1, the usage of $OUTER with #R1(a) #R2(b) (p.sp:6 of its definition)");
+        assert_eq!(
+            statement_name(p, &one),
+            "%o1, the usage of $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of its definition)"
+        );
     }
 
     #[test]

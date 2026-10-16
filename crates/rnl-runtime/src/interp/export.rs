@@ -369,6 +369,7 @@ impl Interp<'_> {
                 parent: u.parent.and_then(|p| ix.usages.get(&p).copied()),
                 object: ix.objects.get(&a).copied(),
                 written_numbers,
+                source: u.site.as_ref().and_then(|c| self.rec_loc(c.rec, u.off)),
             });
         }
 
