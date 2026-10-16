@@ -1,4 +1,5 @@
 * Inverting amplifier: styles, layers, notes and rich text
+* @RNL(type="header") { @VERSION("0.2")}
 *! 样式：继承（{$base}）、直接指派盖过选择指派（与先后无关）、图元自己的参数最高、标签按项覆盖（只改颜色）；SET-SYMBOL 的直接与规则（匿名的嵌套定义，5.6）；
 *! 导线的线型参数；LAYER 背景；场景里的说明图元（框、箭头、只填充不描边的 linestyle="none"）；富文本：上下标嵌套、粗斜体、上划线、希腊字母、分式、换行、转义、${x}，不认识的记号给警告；
 *! 文字默认按基线对齐（锚点在第一行的基线上），另写 valign 的按文字框对齐；dx、dy 让文字跟着附着的点走。
@@ -16,7 +17,6 @@ Vin in 0 AC 1
 Rin in inn 10k
 Rf inn out 100k
 X1 0 inn out opamp
-* @RNL(type="header") { @VERSION("0.2")}
 * @RNL {
 *   $theme = @DEFINE-STYLE(linecolor="#37474f", textcolor="#37474f") {$base};
 *   $hot = @DEFINE-STYLE(linecolor="#c62828", textcolor="#c62828") {};

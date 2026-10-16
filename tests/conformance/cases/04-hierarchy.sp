@@ -1,4 +1,5 @@
 * Two-stage buffer with subcircuits
+* @RNL(type="header") { @VERSION("0.2")}
 *! 层：子电路各一张图；block symbol（子电路里的 `# @SET-SYMBOL`）作为上层实例的外观，引脚按端口名；.include 的文件自成一层；
 *! scope= 从外面写进子电路；上层规则作用到下层，recursive=false 只管本层；子电路里 USE-PACKAGE 内嵌包换电阻画法；
 *! 端口补位（$PORT_FILL_SET）与先占；生成的端口只能经选择定位，接不上导线（findings）。
@@ -50,7 +51,6 @@ X2 b c vdd 0 amp
 X3 c d 0 rdiv
 Vdd vdd 0 1.8
 Vin a 0 0.9
-* @RNL(type="header") { @VERSION("0.2")}
 * @RNL {
 *   &vdd @ADD-TO $SUPPLY_NET_SET;
 *   # @SELECT-INSTANCE(name="R*") => @SET-STYLE $grey;

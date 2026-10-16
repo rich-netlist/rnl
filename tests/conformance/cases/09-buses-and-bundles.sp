@@ -1,4 +1,5 @@
 * 4-bit register: subscripts, buses, bus pins and stacks
+* @RNL(type="header") { @VERSION("0.2")}
 *! 下标：#XI0<3:0>、&Q<3:0>、#XR:Q<3>、#RL<3:0>、步长与混写 &Q<0:3:2, 1>；总线导线收网络的集合，${net} 用逗号连起来；
 *! block symbol 的总线引脚（terminal= 收数组）；分接线与总线共用点；合画 BUNDLE 把迭代实例画成一个，接到合画的端子；标准包给总线加粗。
 .subckt dff d clk q
@@ -51,7 +52,6 @@ RL<2> Q<2> 0 10k
 RL<1> Q<1> 0 10k
 RL<0> Q<0> 0 10k
 V1 clk 0 PULSE(0 1.8 0 1n 1n 5n 10n)
-* @RNL(type="header") { @VERSION("0.2")}
 * @RNL {
 *   %t3 = (10, 1); %t2 = (14, 1); %t1 = (18, 1); %t0 = (22, 1);
 *   %bus = &Q<3:0> @WIRE {#XR:Q<3> %t3 %t2 %t1 %t0};

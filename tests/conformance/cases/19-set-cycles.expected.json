@@ -885,13 +885,13 @@
     {
       "severity": "error",
       "file": "19-set-cycles.sp",
-      "line": 12,
+      "line": 13,
       "col": 10
     },
     {
       "severity": "hint",
       "file": "19-set-cycles.sp",
-      "line": 10,
+      "line": 11,
       "col": 0
     }
   ]
