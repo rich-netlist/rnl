@@ -572,6 +572,35 @@ fn the_witness_keeps_the_constants_as_written() {
 }
 
 #[test]
+fn within_the_tolerance_the_witness_keeps_the_constants_of_the_facts_that_rank_first() {
+    // B at x 0.4 and A at x 0, on one x, hold together only within 0.5: the constant of the fact
+    // that ranks first is held as written, the other within the tolerance (11.7, 8.5)
+    let options = SolverOptions { tolerance: 0.5, ..SolverOptions::default() };
+    let b = from_f64(0.4).unwrap();
+    let p = problem_of(
+        points(2),
+        vec![align(Axis::X, vec![o(0), o(1)]), place(o(1), Axis::X, 0.4), place(o(0), Axis::X, 0.0)],
+    );
+    let r = check(&p, &options);
+    assert_eq!(r.kept, vec![0, 1, 2]);
+    assert!(!r.as_written);
+    assert_eq!((x_of(&r, 0), x_of(&r, 1)), (b.clone(), b));
+    assert_eq!(r.placing.exact, BTreeSet::from([1]));
+    // A's 0 first
+    let p = problem_of(
+        points(2),
+        vec![align(Axis::X, vec![o(0), o(1)]), place(o(0), Axis::X, 0.0), place(o(1), Axis::X, 0.4)],
+    );
+    let r = check(&p, &options);
+    assert_eq!((x_of(&r, 0), x_of(&r, 1)), (Q::zero(), Q::zero()));
+    assert_eq!(r.placing.exact, BTreeSet::from([1]));
+    // what holds as written is held so whole: no fact is singled out
+    let p = problem_of(points(2), vec![place(o(1), Axis::X, 0.4), place(o(0), Axis::X, 0.0)]);
+    let r = check(&p, &options);
+    assert!(r.as_written && r.placing.exact.is_empty() && r.placing.tol.is_zero());
+}
+
+#[test]
 fn a_search_out_of_budget_leaves_its_fact_undecided() {
     let p = problem_of(
         points(2),

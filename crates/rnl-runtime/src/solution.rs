@@ -416,6 +416,12 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
 /// ORIENT gives (11.2), within [`TOL`]: a viewer that does not solve draws the object so all the
 /// same. A record that reaches the object writes them, so that they rank with its priority (14.8).
 ///
+/// The record holds what the solution gives, and a viewer checks it with its own tolerance (11.7),
+/// such as [`TOL`]. Facts that hold together only within a larger tolerance of the solver do not
+/// all hold so, whatever the record writes: a solver then keeps the constants of the facts that
+/// rank first as written, as rnl-solver does, so that a viewer drops the later ones, in the order
+/// of 8.5.
+///
 /// In a level of the draft 0.3 the record is not finished: when it uses a number,
 /// [`finish_record`] gives it the check of its numbers.
 pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &str) -> Written {

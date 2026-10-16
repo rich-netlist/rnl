@@ -448,7 +448,8 @@ pub(crate) struct Structure {
     /// Anything worth saying, such as groups that cannot be nested.
     pub notes: Vec<String>,
     /// The model the candidates are resolved on: without the tolerance when the facts kept hold so
-    /// (`Resolved::as_written`).
+    /// (`Resolved::as_written`), otherwise with the constants of the facts kept that rank first held
+    /// as written as far as they can be (`Resolved::placing`).
     pub model: Model,
     /// The witness of the resolution: the facts kept hold there.
     pub witness: Geometry,
@@ -567,7 +568,7 @@ pub(crate) fn analyse(
 ) -> Structure {
     let mut notes = Vec::new();
     let symbols: Vec<SymbolInfo> = problem.symbols.iter().map(symbol_info).collect();
-    let model = if resolved.as_written { Model::new(problem, Q::zero()) } else { resolved.model.clone() };
+    let model = resolved.placing.clone();
     let witness = resolved.witness.geometry.clone();
     let kept = resolved.kept.clone();
     let mut objects = object_infos(problem, &model, &kept);

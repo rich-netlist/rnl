@@ -39,11 +39,12 @@
 //! **Tolerance** (11.7; plan section 4): only the constant bounds of the facts are widened, `x = v`
 //! becoming `v − tol ≤ x ≤ v + tol`, the `min` of DISTANCE lowered and its `max` raised by it, and
 //! so the one unit of ORDER; equalities between variables, ALIGN, DISTRIBUTE and the centres, stay
-//! exact.
+//! exact. A fact can be held with its constants as written all the same ([`Model::with_exact`]):
+//! the resolution does so with those that hold so, in the order of 8.5 (`crate::resolve`).
 //!
 //! Non-overlap and the grid are not facts (11.7) and are not here.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use num_traits::{One, Zero};
 use rnl_runtime::geom::Orient;
@@ -249,6 +250,9 @@ pub(crate) struct Unit {
 pub(crate) struct Model {
     /// The tolerance (11.7).
     pub tol: Q,
+    /// The facts whose constants hold as written, without the tolerance, by index
+    /// (`crate::resolve`).
+    pub exact: BTreeSet<usize>,
     pub vars: Vec<VarKind>,
     pub points: BTreeMap<PointId, PointInfo>,
     pub centres: Vec<Centre>,
@@ -278,9 +282,16 @@ const MAX_DEPTH: usize = 16;
 impl Model {
     /// The model of a problem, with the tolerance `tol` (11.7).
     pub(crate) fn new(problem: &LevelProblem, tol: Q) -> Model {
+        Model::with_exact(problem, tol, BTreeSet::new())
+    }
+
+    /// The model of a problem with the tolerance `tol` (11.7), but for the facts in `exact`, whose
+    /// constants hold as written.
+    pub(crate) fn with_exact(problem: &LevelProblem, tol: Q, exact: BTreeSet<usize>) -> Model {
         let n = problem.objects.len();
         let mut m = Model {
             tol,
+            exact,
             vars: Vec::new(),
             points: BTreeMap::new(),
             centres: Vec::new(),
@@ -515,7 +526,7 @@ impl Model {
 
     /// The unit of a fact (8.5).
     fn encode(&mut self, problem: &LevelProblem, unit: usize, kind: &FactKind) -> Unit {
-        let tol = self.tol.clone();
+        let tol = if self.exact.contains(&unit) { Q::zero() } else { self.tol.clone() };
         let mut fixed = Vec::new();
         let mut choices = Vec::new();
         let mut orient = OrientEffect::None;

@@ -53,13 +53,19 @@
 //! **The witness given back** is taken, when it can be, from the facts kept resolved once more
 //! without the tolerance: the tolerance decides conflicts (11.7), but a simplex stops on the bounds
 //! it widens, and a PLACE at 4 should put its object at 4. When the facts kept need the tolerance
-//! to hold together, the witness of the resolution itself is given.
+//! to hold together, each that has a constant (a coordinate, an offset, an ORDER, a DISTANCE with a
+//! bound) is held with its constant as written, in the order of 8.5, as long as the facts kept
+//! still hold together, the others within the tolerance ([`Model::with_exact`]); the witness is
+//! taken from them so. Of two facts that hold together only within the tolerance, the one that
+//! ranks first keeps its constant, and the coordinates sought on that model are what it says, so
+//! that the record of the solver, which a viewer checks with its own tolerance (11.7), writes the
+//! constants of the facts that rank first (17).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use num_traits::Zero;
 use rnl_runtime::geom::Orient;
-use rnl_runtime::problem::{LevelProblem, PointRef, Position};
+use rnl_runtime::problem::{FactKind, LevelProblem, PointRef, Position};
 
 use crate::model::{ax, turned, Bound, ChoiceKind, LitKey, Model, OrientEffect, PointId, VarKind};
 use crate::orient::{from_index, index, OrientClasses};
@@ -1154,6 +1160,10 @@ pub struct Resolved {
     /// Whether the facts kept hold together with their constants as written, the tolerance not
     /// needed: the witness is then taken from them so, and the coordinates are sought so.
     pub(crate) as_written: bool,
+    /// The model the witness is taken from and the coordinates are sought on: without the
+    /// tolerance when the facts kept hold so (`as_written`), otherwise with the facts kept that
+    /// hold with their constants as written held so, in the order of 8.5 (see the module).
+    pub(crate) placing: Model,
 }
 
 impl Resolved {
@@ -1252,18 +1262,75 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolv
     // The tolerance decides conflicts (11.7); it need not move what the facts do not move. When
     // the facts kept hold with their constants as written, the witness is taken from them so: a
     // PLACE at 4 puts the object at 4, not at 4 less the tolerance, where a simplex stops.
+    // Otherwise as many of them as can, in the order of 8.5 (see the module).
     let exact = Model::new(problem, Q::zero());
     let mut e = Resolver::new(&exact, n, budget);
     let as_written = kept.iter().all(|&f| e.add(f) == Outcome::Kept);
     work.resolve_nodes += e.nodes;
     work.pivots += e.pivots();
-    let witness = if as_written { &e } else { &r };
-    let geometry = witness.geometry().clone();
-    let classes = witness.classes().clone();
-    let values = [0, 1].map(|axis| (0..model.vars.len()).map(|v| geometry.var_value(&model, v, axis)).collect());
-    drop(r);
+    if as_written {
+        let witness = witness_of(&e, &model);
+        drop(e);
+        drop(r);
+        return Resolved { kept, discarded, work, notes, witness, model, as_written, placing: exact };
+    }
     drop(e);
-    Resolved { kept, discarded, work, notes, witness: Witness { geometry, values, classes }, model, as_written }
+    let placing =
+        Model::with_exact(problem, model.tol.clone(), held_as_written(problem, &model, &kept, budget, &mut work));
+    let mut w = Resolver::new(&placing, n, budget);
+    let holds = kept.iter().all(|&f| w.add(f) == Outcome::Kept);
+    work.resolve_nodes += w.nodes;
+    work.pivots += w.pivots();
+    let witness = witness_of(if holds { &w } else { &r }, &model);
+    drop(w);
+    drop(r);
+    let placing = if holds { placing } else { model.clone() };
+    Resolved { kept, discarded, work, notes, witness, model, as_written, placing }
+}
+
+/// The placement a resolution has reached, with every variable of `model` on each axis.
+fn witness_of(r: &Resolver, model: &Model) -> Witness {
+    let geometry = r.geometry().clone();
+    let classes = r.classes().clone();
+    let values = [0, 1].map(|axis| (0..model.vars.len()).map(|v| geometry.var_value(model, v, axis)).collect());
+    Witness { geometry, values, classes }
+}
+
+/// The facts kept whose constants can hold as written, in the order of 8.5: each in turn is held
+/// so when the facts kept still hold together with it and those before it held so, the others
+/// within the tolerance of `model`. A fact without a constant to widen is the same either way.
+fn held_as_written(
+    problem: &LevelProblem,
+    model: &Model,
+    kept: &[usize],
+    budget: Budget,
+    work: &mut Work,
+) -> BTreeSet<usize> {
+    let n = problem.objects.len();
+    let mut exact = BTreeSet::new();
+    for &f in kept {
+        let widened = matches!(
+            problem.facts[f].kind,
+            FactKind::Place { .. }
+                | FactKind::PointCoordinate { .. }
+                | FactKind::Offset { .. }
+                | FactKind::Order { .. }
+                | FactKind::Distance { .. }
+        );
+        if !widened {
+            continue;
+        }
+        exact.insert(f);
+        let trial = Model::with_exact(problem, model.tol.clone(), exact.clone());
+        let mut t = Resolver::new(&trial, n, budget);
+        let holds = kept.iter().all(|&g| t.add(g) == Outcome::Kept);
+        work.resolve_nodes += t.nodes;
+        work.pivots += t.pivots();
+        if !holds {
+            exact.remove(&f);
+        }
+    }
+    exact
 }
 
 /// The deletion filter (step 3 of the module): a minimal subset of `set` that `f` conflicts with,

@@ -6,10 +6,11 @@
 //! `solution::write_record`, the hash `sig1` of its problem and of the solver's canonical options in
 //! the head, finished with `rnl_view::finish_record`, which adds the check of its numbers in a file
 //! of the draft 0.3 (5.9), and put in place of the level's records of the solver with
-//! `writeback::replace_generated`, at the end of the level's own text (17). A record of the solver
-//! written for the level with scope= in another file, which a solver does not write (2.6) but which
-//! applies to the level all the same, is removed from that file. Every file written has its header
-//! record and its version (16.1), added when it has none. A file may hold several levels, and
+//! `writeback::replace_generated_with_header`, at the end of the level's own text (17). A record of
+//! the solver written for the level with scope= in another file, which a solver does not write
+//! (2.6) but which applies to the level all the same, is removed from that file. Every file written
+//! has its header record and its version (16.1), added when it has none, in the same pass as the
+//! record, at the positions the reading gives. A file may hold several levels, and
 //! writing one back moves the lines of those after it, so the document is read again before the
 //! next level, the texts written so far held in memory over the files.
 //!
@@ -31,7 +32,7 @@ use rnl_runtime::interp::unit::{DRAFT_VERSION, SUPPORTED_VERSION};
 use rnl_runtime::problem::{sig1, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
-use rnl_runtime::writeback::{generated_files, remove_generated_for, replace_generated, with_header};
+use rnl_runtime::writeback::{generated_files, remove_generated_with_header, replace_generated_with_header};
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Solved, SolverOptions, AUTHOR};
 
@@ -238,14 +239,18 @@ pub fn solve(file: &Path, files: &dyn Provider, options: &SolveOptions) -> Resul
                 Some(t) => Ok(t.to_string()),
                 None => both.read(path).ok_or_else(|| format!("cannot read {path}")),
             };
-            let out = replace_generated(&r.doc, p.level, &text_of(&host.file, &path)?, &record);
-            let mut texts = vec![(path.clone(), with_header(&r.doc, &host.file, &out, &p.version))];
+            // the record and the header in one pass, at the positions of this reading: a header
+            // below the level's end keeps its place
+            let text = text_of(&host.file, &path)?;
+            let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
+            let mut texts = vec![(path.clone(), out)];
             // a record of the solver for this level written with scope= in another file (2.6)
             for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
                 let Some(lv) = r.doc.levels.iter().find(|l| l.file == other) else { continue };
                 let at = normalize(&lv.path);
-                let out = remove_generated_for(&r.doc, p.level, &other, &text_of(&other, &at)?);
-                texts.push((at, with_header(&r.doc, &other, &out, &version_of(&r, &other))));
+                let text = text_of(&other, &at)?;
+                let out = remove_generated_with_header(&r.doc, p.level, &other, &text, &version_of(&r, &other));
+                texts.push((at, out));
             }
             (record, texts)
         };
@@ -437,10 +442,11 @@ pub fn describe_fact(p: &LevelProblem, k: usize) -> String {
         FactKind::PointCoordinate { point: k, axis, value } => {
             format!("the {} of {} = {}", axis.as_str(), point(p, &PointRef::Origin(*k)), num(*value))
         }
+        // the `dx` or `dy` of a text, from the point it is attached to (13.3)
         FactKind::Offset { text, from, axis, value } => format!(
-            "{} {} from {} by {}",
-            point(p, &PointRef::Origin(*text)),
+            "the d{} of {} from {} = {}",
             axis.as_str(),
+            point(p, &PointRef::Origin(*text)),
             point(p, from),
             num(*value)
         ),
@@ -466,9 +472,12 @@ pub fn describe_fact(p: &LevelProblem, k: usize) -> String {
             format!("ORIENT-RELATION {} {} {}", relation.as_str(), objects(from), objects(to))
         }
     };
-    // a handle, such as %c1, or a label of its own; the label of a coordinate or an orientation
-    // says what the fact says
-    let own = matches!(f.kind, FactKind::Place { .. } | FactKind::PointCoordinate { .. } | FactKind::Orient { .. });
+    // a handle, such as %c1, or a label of its own; the label of a coordinate, an offset or an
+    // orientation says what the fact says, so the fact is described once
+    let own = matches!(
+        f.kind,
+        FactKind::Place { .. } | FactKind::PointCoordinate { .. } | FactKind::Offset { .. } | FactKind::Orient { .. }
+    );
     let named = if own || f.label == f.kind.name() || f.label == what { what } else { format!("{} = {what}", f.label) };
     let mut context = vec![f.priority.as_str().to_string()];
     if let Some(l) = &f.source {

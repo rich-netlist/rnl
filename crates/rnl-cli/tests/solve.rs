@@ -1093,3 +1093,216 @@ fn the_problem_command_hashes_the_options_as_solve_writes_them() {
     assert_eq!(code, 2);
     assert!(err.contains("--solver-options: the solver has no option `speed`"), "{err}");
 }
+
+/// The texts solved, as `rnl solve` wrote them back, read again as a viewer reads them, with the
+/// files the document is read from besides.
+fn read_solved(run: &SolveRun, files: &dyn Provider, entry: &Path) -> rnl_runtime::Interpretation {
+    let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+    interpret_file(entry, None, &Layered { layers: vec![&solved, files] }, &Options::default()).unwrap()
+}
+
+#[test]
+fn a_header_after_a_subcircuit_solved_gets_its_version_where_it_is() {
+    // a header record without VERSION after the subcircuit that is solved, in an included file and
+    // in a main file solved a level at a time: the record of the subcircuit goes in before its
+    // `.ends`, above the header, and VERSION into the header, not into that record (16.1, 17)
+    let files = MemoryProvider::new()
+        .with(
+            "/w/top4.sp",
+            "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include lib4.inc\nX1 p q pair\n.end\n",
+        )
+        .with("/w/lib4.inc", "* lib\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") { }\n");
+    let entry = Path::new("/w/top4.sp");
+    let run = solve(entry, &files, &SolveOptions::default()).unwrap();
+    let lib = &run.files.iter().find(|f| f.path == "/w/lib4.inc").unwrap().text;
+    assert!(lib.ends_with("* }\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n"), "{lib}");
+    assert_eq!(lib.matches("@VERSION").count(), 1, "{lib}");
+    let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+    let both = Layered { layers: vec![&solved, &files] };
+    check_read_back(&run, entry, &both, false, "lib4.inc");
+    assert_eq!(solve(entry, &both, &SolveOptions::default()).unwrap().files, run.files);
+
+    let top = "* top\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") { }\nX1 p q pair\n.end\n";
+    let files = MemoryProvider::new().with("/w/top.sp", top);
+    let entry = Path::new("/w/top.sp");
+    for level in ["pair", "top.sp"] {
+        let one = SolveOptions { level: Some(level.into()), ..SolveOptions::default() };
+        let run = solve(entry, &files, &one).unwrap();
+        let text = &run.files[0].text;
+        let header = "\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\nX1 p q pair\n";
+        assert!(text.contains(header) && text.matches("@VERSION").count() == 1, "{level}: {text}");
+        let solved = MemoryProvider::new().with("/w/top.sp", text);
+        let both = Layered { layers: vec![&solved, &files] };
+        check_read_back(&run, entry, &both, false, level);
+        // the other level solved after it finds the header whole
+        let all = solve(entry, &both, &SolveOptions::default()).unwrap();
+        assert_eq!(all.files[0].text.matches("@VERSION").count(), 1, "{level}: {}", all.files[0].text);
+        let solved = MemoryProvider::new().with("/w/top.sp", &all.files[0].text);
+        check_read_back(&all, entry, &Layered { layers: vec![&solved, &files] }, false, level);
+    }
+}
+
+#[test]
+fn an_included_file_that_switches_to_spectre_gets_its_header_after_the_switch() {
+    // a file that is not a .scs file is read in SPICE mode until its `simulator lang=spectre`,
+    // where `//` is no comment (2.2): the header in `//` goes after that statement
+    let files = MemoryProvider::new()
+        .with(
+            "/w/top.scs",
+            "// top\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spectre\ninclude \"div.inc\"\n\
+             X1 (p 0) div\n",
+        )
+        .with(
+            "/w/div.inc",
+            "simulator lang=spectre\nsubckt div (p n)\nR1 (p m) resistor r=1k\nR2 (m n) resistor r=1k\nends div\n",
+        );
+    let entry = Path::new("/w/top.scs");
+    let run = solve(entry, &files, &SolveOptions::default()).unwrap();
+    assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.scs", "div"]);
+    let div = &run.files.iter().find(|f| f.path == "/w/div.inc").unwrap().text;
+    let head = "simulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsubckt div (p n)\n";
+    assert!(div.starts_with(head), "{div}");
+    assert!(div.contains("\n// @RNL(type=\"generated\""), "{div}");
+    let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+    let both = Layered { layers: vec![&solved, &files] };
+    check_read_back(&run, entry, &both, false, "div.inc");
+    assert_eq!(solve(entry, &both, &SolveOptions::default()).unwrap().files, run.files);
+}
+
+#[test]
+fn a_text_whose_offset_or_place_the_solver_discards_is_written_where_it_put_it() {
+    // high ALIGNs against the normal offsets of a label and of a text of its own (o7), and against
+    // the one-axis PLACE of a label (p8): the record writes the position the solver chose on that
+    // axis, which replaces the offset there (13.3), and the level reads back with every fact kept
+    // ok and no fact dropped but the PLACE that the solver discarded (8.5). Each fact discarded is
+    // described once.
+    let cases = [
+        (
+            "o7",
+            "#R1 @PLACE(0, 0, priority=\"high\"); #C1 @PLACE(20, 10, priority=\"high\"); \
+             #R1 @TEXT(\"${name}\", key=\"name\", dx=3); %t = #C1 @TEXT(\"note\", dx=2, dy=2); \
+             {#R1::name #C1} @ALIGN(\"x\", priority=\"high\"); {%t #R1} @ALIGN(\"y\", priority=\"high\")",
+            vec!["the dy of %t from #C1 = 2", "the dx of #R1::name from #R1 = 3"],
+            vec!["#R1::name @PLACE(x=20)", "%t @PLACE(y=0)"],
+            vec![],
+        ),
+        (
+            "p8",
+            "#R1 @PLACE(0, 0); #C1 @PLACE(40, 10, priority=\"high\"); #R1::name @PLACE(x=-30); \
+             {#R1::name #C1} @ALIGN(\"x\", priority=\"high\")",
+            vec!["the x of #R1::name = -30"],
+            vec!["#R1::name @PLACE(x=40)"],
+            vec!["the x of #R1::name = -30 conflicts with the x of #R1::name = 40 and is dropped in the order of 8.5 (8.5)"],
+        ),
+    ];
+    for (name, body, discarded, lines, dropped_back) in cases {
+        let path = format!("/w/{name}.sp");
+        let text = format!(
+            "* {name}\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\nR1 a b 1k\nC1 b 0 1p\n* @RNL {{ {body} }}\n.end\n"
+        );
+        let files = MemoryProvider::new().with(&path, &text);
+        let entry = Path::new(&path);
+        let run = solve(entry, &files, &SolveOptions::default()).unwrap();
+        let level = &run.levels[0];
+        let p = &level.problem;
+        let described: Vec<String> = level.solved.report.discarded.iter().map(|d| describe_fact(p, d.fact)).collect();
+        let want: Vec<String> = discarded
+            .iter()
+            .zip(&level.solved.report.discarded)
+            .map(|(w, d)| format!("[{}] {w} (normal, {name}.sp:5)", d.fact))
+            .collect();
+        assert_eq!(described, want, "{name}");
+        for line in &lines {
+            assert!(level.record.contains(line), "{name}: {line}\n{}", level.record);
+        }
+        assert!(level.written.unsolved.is_empty(), "{name}: {:?}", level.written.unsolved);
+        check_facts(&run, name);
+        let solved = MemoryProvider::new().with(&path, &run.files[0].text);
+        check_read_back(&run, entry, &Layered { layers: vec![&solved, &files] }, false, name);
+        let r = read_solved(&run, &files, entry);
+        assert_eq!(dropped(&r), dropped_back, "{name}");
+        // the texts written read back where the solver put them
+        let placed = Placed { p, s: &level.solved.solution };
+        for line in lines {
+            let id = &line[..line.find(' ').unwrap()];
+            let k = p.objects.iter().position(|o| o.reference == Reference::Name(id.into())).unwrap();
+            let texts = &r.model.levels[0].texts;
+            let t = texts.iter().find(|t| t.object_id == id).unwrap_or_else(|| panic!("{name}: {id} in {texts:?}"));
+            assert_eq!(t.anchor, placed.origin(k), "{name}: {id}");
+        }
+    }
+}
+
+#[test]
+fn an_orientation_without_a_name_is_unsolved_only_where_the_file_does_not_fix_it() {
+    // two grounds without a name in a file of 0.2, which the record cannot refer to (5.9): the one
+    // whose ORIENT the solver keeps is drawn so all the same, and its orientation is not unsolved;
+    // the other's the solver chooses, and it is (14.8)
+    let files = MemoryProvider::new().with(
+        "/w/an.sp",
+        "* anonymous\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a 0 1k\nR2 b 0 1k\n\
+         * @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); $GND @ATTACH #R1:n => @ORIENT(\"R90\"); $GND @ATTACH #R2:n }\n\
+         .end\n",
+    );
+    let entry = Path::new("/w/an.sp");
+    let run = solve(entry, &files, &SolveOptions::default()).unwrap();
+    let level = &run.levels[0];
+    let p = &level.problem;
+    let grounds: Vec<usize> = (0..p.objects.len()).filter(|&k| p.objects[k].label == "a usage of $GND").collect();
+    let fixed: Vec<usize> = grounds
+        .iter()
+        .copied()
+        .filter(|&k| matches!(p.objects[k].orient, Some(OrientSlot::Fixed { code: Orient::R90, .. })))
+        .collect();
+    let free: Vec<usize> =
+        grounds.iter().copied().filter(|&k| matches!(p.objects[k].orient, Some(OrientSlot::Free))).collect();
+    assert_eq!((grounds.len(), fixed.len(), free.len()), (2, 1, 1), "{:?}", p.objects);
+    let turned = |k: usize| level.solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.orient);
+    assert_eq!(turned(fixed[0]), Some(Orient::R90));
+    assert!(turned(free[0]).is_some());
+    let unsolved: Vec<Decision> = level.written.unsolved.iter().map(|u| u.decision).collect();
+    assert_eq!(unsolved, [Decision::Orientation { object: free[0] }], "{:?}", level.written.unsolved);
+    let solved = MemoryProvider::new().with("/w/an.sp", &run.files[0].text);
+    check_read_back(&run, entry, &Layered { layers: vec![&solved, &files] }, false, "an");
+}
+
+#[test]
+fn within_its_tolerance_the_record_writes_the_constants_of_the_facts_that_rank_first() {
+    // with tolerance=0.5 the high facts hold together: #R1 at x 0 and #R2 at x 0.4, on one x. A
+    // viewer checks with its own tolerance (11.7); the record keeps the constant of the fact that
+    // ranks first, #R2's 0.4, and a viewer drops only the last, #R1's 0 (8.5, 17)
+    let files = MemoryProvider::new().with(
+        "/w/tol.sp",
+        "* tol\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n\
+         * @RNL { #R1 @PLACE(0, 0, priority=\"high\"); #R2 @PLACE(x=0.4, priority=\"high\"); \
+         {#R1 #R2} @ALIGN(\"x\", priority=\"high\") }\n.end\n",
+    );
+    let entry = Path::new("/w/tol.sp");
+    let solver = SolverOptions { tolerance: 0.5, ..SolverOptions::default() };
+    let run = solve(entry, &files, &SolveOptions { solver, ..SolveOptions::default() }).unwrap();
+    let level = &run.levels[0];
+    let p = &level.problem;
+    assert!(level.solved.report.discarded.is_empty(), "{:#?}", lines(&run, true));
+    let placed = Placed { p, s: &level.solved.solution };
+    for f in &p.facts {
+        assert!(placed.holds(&f.kind, 0.5), "{}", f.label);
+    }
+    for line in ["#R1 @PLACE(0.4, 0)", "#R2 @PLACE(0.4, "] {
+        assert!(level.record.contains(line), "{line}\n{}", level.record);
+    }
+    let r = read_solved(&run, &files, entry);
+    assert_eq!(
+        dropped(&r),
+        ["the x of #R1 = 0 conflicts with the x of #R1 = 0.4 and is dropped in the order of 8.5 (8.5)"]
+    );
+    // with the default tolerance the first conflict is the solver's to resolve: nothing changes there
+    let run = solve(entry, &files, &SolveOptions::default()).unwrap();
+    let discarded: Vec<&str> = run.levels[0]
+        .solved
+        .report
+        .discarded
+        .iter()
+        .map(|d| run.levels[0].problem.facts[d.fact].label.as_str())
+        .collect();
+    assert_eq!(discarded, ["the x of #R1 = 0"]);
+}
