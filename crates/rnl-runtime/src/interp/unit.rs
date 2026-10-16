@@ -340,6 +340,21 @@ pub fn scan_package_decl(text: &str) -> Option<(String, String)> {
     Some((field("name")?, field("version")?))
 }
 
+/// The language version a package file declares, "@VERSION(…)" in its text, read as the version
+/// of the file is (16.1); None when it declares none. The standard series a package is of is
+/// written in this version (16.3).
+pub fn scan_language_decl(text: &str) -> Option<String> {
+    let at = text.find("@VERSION(")?;
+    let rest = text[at + "@VERSION(".len()..].trim_start();
+    // given by position or by name
+    let rest = match rest.strip_prefix("version") {
+        Some(named) => named.trim_start().strip_prefix('=')?.trim_start(),
+        None => rest,
+    };
+    let rest = rest.strip_prefix('"')?;
+    Some(rest[..rest.find('"')?].to_string())
+}
+
 /// A record whose head writes `type="generated"`: the solver's result (2.8).
 pub fn is_generated_record(ast: &RecordAst) -> bool {
     ast.header.as_ref().and_then(|h| h.get("type")).is_some_and(|v| *v == Value::Str("generated".into()))
@@ -1377,6 +1392,9 @@ impl Interp<'_> {
         for f in self.provider.package_files() {
             if let Some(text) = self.provider.read(&f) {
                 if let Some((n, v)) = scan_package_decl(&text) {
+                    // the language version it is written in, the tool's default when it declares none (16.1)
+                    let language = scan_language_decl(&text).unwrap_or_else(|| SUPPORTED_VERSION.to_string());
+                    self.pkg_languages.insert(f.clone(), language);
                     out.push((n, v, f));
                 }
             }

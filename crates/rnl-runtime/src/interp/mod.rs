@@ -146,6 +146,8 @@ pub struct Interp<'p> {
     pub(crate) pkg_sources: Vec<(String, String)>,
     pub(crate) packages: HashMap<(String, String), UnitId>,
     pub(crate) pkg_files: Option<Vec<(String, String, String)>>,
+    /// The language version each package file of the package directories is written in (16.1).
+    pub(crate) pkg_languages: HashMap<String, String>,
     pub(crate) memo: HashMap<(MemberKey, Option<SceneId>), Memo>,
     pub(crate) bound_memo: HashMap<(MemberKey, Option<SceneId>), Bound>,
     pub(crate) in_progress: HashSet<(MemberKey, Option<SceneId>)>,
@@ -179,7 +181,8 @@ pub struct Interp<'p> {
     pub(crate) tol: f64,
     /// Read the files that declare the draft 0.3 (`Options::draft`).
     pub(crate) draft: bool,
-    pub(crate) std_cache: Option<Option<UnitId>>,
+    /// The standard package used implicitly for the files of each language version (16.3).
+    pub(crate) std_units: HashMap<String, Option<UnitId>>,
     /// The packages in effect on each chain of levels, and the number of units they were found
     /// among (16.2).
     pub(crate) effs: HashMap<EffKey, Rc<Eff>>,
@@ -267,6 +270,7 @@ impl<'p> Interp<'p> {
             pkg_sources: Vec::new(),
             packages: HashMap::new(),
             pkg_files: None,
+            pkg_languages: HashMap::new(),
             memo: HashMap::new(),
             bound_memo: HashMap::new(),
             in_progress: HashSet::new(),
@@ -288,7 +292,7 @@ impl<'p> Interp<'p> {
             want_problems: options.problems,
             tol: options.tolerance,
             draft: options.draft,
-            std_cache: None,
+            std_units: HashMap::new(),
             effs: HashMap::new(),
             effs_units: 0,
             expansions: HashMap::new(),
@@ -380,8 +384,18 @@ impl<'p> Interp<'p> {
     }
 
     pub fn run(&mut self) {
-        // the standard package first: reading it reads the packages it references (16.3)
-        self.std_package();
+        // the standard package of each chain first, by the language version of its file: reading
+        // one reads the packages it references (16.3)
+        match self.package_main {
+            Some(pm) => {
+                self.implicit_std(EffKey::Alone(pm));
+            }
+            None => {
+                for lv in 0..self.doc.levels.len() {
+                    self.implicit_std(EffKey::Level(lv));
+                }
+            }
+        }
         if let Some(pm) = self.package_main {
             // checked on its own (2.7): the package and what its references bring in (16.2)
             let chain = EffKey::Alone(pm);

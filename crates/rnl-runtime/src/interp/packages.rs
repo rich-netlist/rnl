@@ -178,28 +178,67 @@ pub(crate) fn shown(b: &Binding) -> String {
 }
 
 impl Interp<'_> {
-    /// The standard package: the newest `rnl-std` in the package directories (16.3). Reading it
-    /// reads the packages it references.
-    pub(crate) fn std_package(&mut self) -> Option<UnitId> {
+    /// The standard package used implicitly for the files of the language version `language`
+    /// (16.3): the newest version in the package directories of the standard series written in
+    /// that version, as the header record of its `rnl-std` declares, so that a file of 0.2 uses
+    /// the series 0.2 and a file of 0.3 the series 0.3. Reading it reads the packages it
+    /// references.
+    pub(crate) fn std_package(&mut self, language: &str) -> Option<UnitId> {
         if !self.std_enabled {
             return None;
         }
-        if let Some(s) = self.std_cache {
+        if let Some(&s) = self.std_units.get(language) {
             return s;
         }
         self.scan_packages();
-        let same: Vec<(String, String, String)> =
+        let found: Vec<(String, String, String)> =
             self.pkg_files.as_ref().unwrap().iter().filter(|c| c.0 == STD_NAME).cloned().collect();
-        let mut out = None;
-        if let Some(c) = same.iter().max_by_key(|c| version_key(&c.1)) {
-            let key = (c.0.clone(), c.1.clone());
-            out = Some(match self.packages.get(&key) {
-                Some(&u) => u,
-                None => self.load_package_file(&c.2, Some(key)),
-            });
+        let written_in = |c: &(String, String, String)| version_key(&self.pkg_languages[&c.2]);
+        let want = version_key(language);
+        // the series written in the file's language version; without one, the one written in the
+        // nearest older version, which the tool reads too, else in the nearest newer one
+        let nearest = |older: bool| {
+            let side = found.iter().map(written_in).filter(|v| if older { *v < want } else { *v > want });
+            if older {
+                side.max()
+            } else {
+                side.min()
+            }
+        };
+        let series = [Some(want), nearest(true), nearest(false)].into_iter().flatten().find(|v| {
+            // a language version with a standard series in it
+            found.iter().any(|c| written_in(c) == *v)
+        });
+        // of that series the newest version, and of equal versions the first in the order of the
+        // package directories (16.2)
+        let mut best: Option<&(String, String, String)> = None;
+        for c in found.iter().filter(|c| Some(written_in(c)) == series) {
+            if best.is_none_or(|b| version_key(&c.1) > version_key(&b.1)) {
+                best = Some(c);
+            }
         }
-        self.std_cache = Some(out);
+        let out = best.cloned().map(|(n, v, path)| {
+            let key = (n, v);
+            match self.packages.get(&key) {
+                Some(&u) => u,
+                None => self.load_package_file(&path, Some(key)),
+            }
+        });
+        self.std_units.insert(language.to_string(), out);
         out
+    }
+
+    /// The standard package used implicitly on a chain (16.3): the one of the language version of
+    /// the file of its level, or of a package read alone; none where the file's version is not
+    /// supported (16.1).
+    pub(crate) fn implicit_std(&mut self, key: EffKey) -> Option<UnitId> {
+        let unit = match key {
+            EffKey::Level(level) if !self.file_ok(level) => return None,
+            EffKey::Level(level) => self.level_unit[level],
+            EffKey::Alone(u) => u,
+        };
+        let language = self.version_of(Some(unit));
+        self.std_package(&language)
     }
 
     /// A package's version: what its PACKAGE says, or the `version=` of the USE-PACKAGE of an
@@ -220,8 +259,8 @@ impl Interp<'_> {
 
     /// The packages in effect on a chain, computed once.
     pub(crate) fn eff(&mut self, key: EffKey) -> Rc<Eff> {
-        // the standard package first: reading it reads the packages it references
-        self.std_package();
+        // the standard package of the chain first: reading it reads the packages it references
+        self.implicit_std(key);
         if self.effs_units != self.units.len() {
             self.effs.clear();
             self.envs.clear();
@@ -241,10 +280,7 @@ impl Interp<'_> {
     /// level by level the USE-PACKAGEs of the header record (at the root) and of the level (16.3).
     fn uses_on(&mut self, key: EffKey) -> Vec<Use> {
         let mut uses = Vec::new();
-        let std = match key {
-            EffKey::Level(level) if !self.file_ok(level) => None,
-            _ => self.std_package(),
-        };
+        let std = self.implicit_std(key);
         if let Some(s) = std {
             uses.push(Use { decl: None, unit: Some(s), at: At::Root, name: STD_NAME.into() });
         }
@@ -263,6 +299,17 @@ impl Interp<'_> {
                             let at = if header { At::Root } else { At::Level(lv) };
                             uses.push(Use { decl: Some(d.clone()), unit: d.pkg, at, name: d.name.clone() });
                         }
+                    }
+                }
+                // a version of the standard package that a header record on the chain pins comes
+                // first (16.3): it stands in the place of the one of the file's language version,
+                // so that the packages at the root are in the order of the series in effect. An
+                // inline package of its name, which drops or freezes it, leaves the place as it is
+                let pinned =
+                    uses.iter().rev().find(|u| u.decl.is_some() && u.name == STD_NAME && matches!(u.at, At::Root));
+                if let (Some(_), Some(p)) = (std, pinned.and_then(|u| u.unit)) {
+                    if !self.units[p].embedded && self.units[p].ok {
+                        uses[0].unit = Some(p);
                     }
                 }
                 if let Some(name) = self.other_dialect_rules(level, &uses) {
