@@ -323,10 +323,8 @@
      1.657 long and 0.79 wide, centred on the point */
   $ARROW_SYMBOL = @DEFINE-SYMBOL(box=[-0.85, -0.4, 0.85, 0.4]) { @LINE(fill="linecolor", linestyle="none") {(0.8285, 0) (-0.8285, 0.3953) (-0.8285, -0.3953) (0.8285, 0)}};
 
-  /* E and G with all four terminals, p n cp cn = 1 2 3 4: the layout of rnl-std 0.2, with the output
-     pins at (0, ±2) as in $VCVS and $VCCS and the diamond of Analog Canvas's diamond sources. The
-     leads of the control pins reach the diamond's left sides halfway, apart from each other and from
-     the output pins, with + and − between them */
+  /* E and G with four terminals, p n cp cn = 1 2 3 4: rnl-std 0.2's layout, the output pins at (0, ±2)
+     as in $VCVS, Analog Canvas's diamond, and control leads that reach its sides, + and − between */
   %CONTROLLED_SOURCE_BODY = @DEFINE-SYMBOL {
     (0, 2) @PIN(terminal=1, direction="up");
     (0, -2) @PIN(terminal=2, direction="down");
