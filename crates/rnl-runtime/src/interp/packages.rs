@@ -23,6 +23,38 @@ use super::Interp;
 /// The name of the standard package, used implicitly at the root (16.3).
 pub const STD_NAME: &str = "rnl-std";
 
+/// The rule packages of the standard series 0.3, which give instances their symbols in each
+/// dialect: by element letter and model type in SPICE, by master and model type in Spectre (16.3).
+pub const SPICE_RULES: &str = "rnl-std-spice";
+pub const SPECTRE_RULES: &str = "rnl-std-spectre";
+
+/// The dialect of one file of a netlist, "spice" or "spectre": the language mode in which the
+/// file's first line is read (2.2, 16.3). `netlist` is the dialect of the netlist, as the adapter
+/// that reads it names it ([`crate::host::Dialect::name`]), `path` and `text` are the file's.
+/// Every file of a SPICE netlist is in the SPICE dialect. In a Spectre netlist a `.scs` file, or
+/// one that says `simulator lang=spectre` at its top, within its first five lines as the Spectre
+/// adapter reads them (S1 p89), is in the Spectre dialect, and any other file in the SPICE
+/// dialect: a `simulator lang=` further down switches the mode of what follows it, not the
+/// dialect of the file. A netlist of another host keeps its own dialect.
+///
+/// This is the rule of the draft 0.3 for dropping the rule package of the other dialect, and the
+/// one place that decides it.
+pub fn file_dialect<'a>(netlist: &'a str, path: &str, text: &str) -> &'a str {
+    if netlist != "spectre" {
+        return netlist;
+    }
+    let spectre = path.to_lowercase().ends_with(".scs")
+        || text.lines().take(5).any(|l| {
+            let l = l.trim().to_lowercase();
+            l.starts_with("simulator") && l.contains("spectre")
+        });
+    if spectre {
+        "spectre"
+    } else {
+        "spice"
+    }
+}
+
 /// A reference, a USE-PACKAGE in the header record of a package file (16.2): the package and the
 /// index of the reference among its references.
 pub(crate) type RefKey = (UnitId, usize);
@@ -217,6 +249,12 @@ impl Interp<'_> {
                         }
                     }
                 }
+                if let Some(name) = self.other_dialect_rules(level, &uses) {
+                    // as if the header record of the level's file wrote an empty inline package of
+                    // that name: in effect, it brings nothing in. No other use names it, so where
+                    // it stands among the uses changes nothing
+                    uses.push(Use { decl: None, unit: None, at: At::Root, name });
+                }
             }
             EffKey::Alone(u) => {
                 let name = self.units[u].pkg_name.clone();
@@ -224,6 +262,39 @@ impl Interp<'_> {
             }
         }
         uses
+    }
+
+    /// The dialect of the file a level's text is in (2.2, 16.3): [`file_dialect`] of that file, in
+    /// the dialect of the netlist.
+    pub(crate) fn level_dialect(&self, level: LevelId) -> &str {
+        let lv = &self.doc.levels[level];
+        let text = self.doc.source(&lv.file).unwrap_or("");
+        file_dialect(&self.doc.dialect.name, &lv.path, text)
+    }
+
+    /// The rule package of the other dialect that a level of a file of the draft 0.3 drops
+    /// implicitly (16.3): `rnl-std-spectre` in a file of the SPICE dialect, `rnl-std-spice` in one
+    /// of the Spectre dialect, each file by its own dialect, also when another file includes it.
+    /// None when a file on the chain, the level's own or one that includes it, writes a
+    /// USE-PACKAGE of that package, the package or an inline package of its name: that one takes
+    /// effect (16.2). None too when no standard package is used, or when the one in effect does
+    /// not bring that package in, as the series 0.2 does not.
+    fn other_dialect_rules(&mut self, level: LevelId, uses: &[Use]) -> Option<String> {
+        if !self.follows_0_3(self.level_unit[level]) {
+            return None;
+        }
+        let other = match self.level_dialect(level) {
+            "spice" => SPECTRE_RULES,
+            "spectre" => SPICE_RULES,
+            _ => return None,
+        };
+        if uses.iter().any(|u| u.decl.is_some() && u.name == other) {
+            return None;
+        }
+        // the standard package in effect: the use of it nearest to the level
+        let std = uses.iter().rev().find(|u| u.name == STD_NAME)?;
+        let brought = self.expansion(&std.name, std.unit);
+        brought.0.iter().any(|n| n == other).then(|| other.to_string())
     }
 
     /// What a package brings in when used, as its references are written: the packages it
@@ -734,4 +805,33 @@ struct Walk<'a> {
     direct: &'a HashMap<&'a str, usize>,
     chosen: &'a HashMap<String, UnitId>,
     failed: &'a HashSet<RefKey>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::file_dialect;
+
+    #[test]
+    fn every_file_of_a_spice_netlist_is_in_the_spice_dialect() {
+        for (path, text) in [("a.sp", "R1 a 0 1k\n"), ("lib.scs", ""), ("x.inc", "simulator lang=spectre\n")] {
+            assert_eq!(file_dialect("spice", path, text), "spice", "{path}");
+        }
+        // a netlist of another host keeps its own dialect
+        assert_eq!(file_dialect("none", "a.rnl", ""), "none");
+    }
+
+    #[test]
+    fn a_file_of_a_spectre_netlist_is_in_the_mode_of_its_first_line() {
+        // by the name of the file, in any case
+        assert_eq!(file_dialect("spectre", "a.scs", "R1 a 0 1k\n"), "spectre");
+        assert_eq!(file_dialect("spectre", "lib/A.SCS", ""), "spectre");
+        // by `simulator lang=spectre` at its top, after a title or a comment too
+        assert_eq!(file_dialect("spectre", "a.inc", "simulator lang=spectre\nR1 (a 0) resistor\n"), "spectre");
+        assert_eq!(file_dialect("spectre", "a.sp", "* title\n  Simulator Lang = Spectre\n"), "spectre");
+        // any other file is in the SPICE dialect, and a switch further down changes only the mode
+        // of what follows it
+        assert_eq!(file_dialect("spectre", "a.sp", "R1 a 0 1k\n"), "spice");
+        assert_eq!(file_dialect("spectre", "a.inc", "* 1\n* 2\n* 3\n* 4\n* 5\nsimulator lang=spectre\n"), "spice");
+        assert_eq!(file_dialect("spectre", "a.scs.bak", "simulator lang=spice\n"), "spice");
+    }
 }
