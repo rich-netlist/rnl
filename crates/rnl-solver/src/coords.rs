@@ -16,7 +16,9 @@
 //! next:
 //!
 //! 1. the wire length: for each net drawn as wires, the extent of its points, `hi − lo` with
-//!    `lo ≤ xₚ ≤ hi`, summed: half the perimeter of its box, the stand-in for its length;
+//!    `lo ≤ xₚ ≤ hi`, summed: half the perimeter of its box, the stand-in for its length; a pin
+//!    of a net routed counts by the end of its lead, a unit its own way, as the router leaves it
+//!    (quality review LP-1);
 //! 2. compactness: the extent of the boxes of the components;
 //! 3. the L1 distance of each origin to where the resolution of the candidate put it: the
 //!    tie-break that makes the result stable. A symbol's target is that place rounded to the grid;
@@ -51,11 +53,12 @@ use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::LevelProblem;
 
 use crate::model::{turned, Model, PointId};
-use crate::rational::{from_f64, Q};
+use crate::rational::{from_f64, int, Q};
 use crate::resolve::{Geometry, Resolver, Tag};
+use crate::route::CLEARANCE;
 use crate::search::{orientation_relations, relations, up, with_relations, Candidate, RelKind, Relation, Tagged};
 use crate::simplex::{LinExpr, Rel, Simplex, Var};
-use crate::structure::{Role, Structure};
+use crate::structure::{Drawn, Role, Structure};
 use crate::{SolverOptions, Work};
 
 /// How many rounds of putting overlapping symbols apart.
@@ -318,6 +321,21 @@ fn targets(
         .collect()
 }
 
+/// Where the wire of a net drawn leaves a point of it, from the point, on an axis: for a pin of a
+/// net routed, the end of the lead the router gives it, `CLEARANCE` its own way (`crate::route`),
+/// so that the wire length sees the L that a pin leaving up and one leaving sideways towards it
+/// make, rather than the jog it would take to join them at one height (quality review LP-1); the
+/// point itself otherwise. Linear, as the orientations are decided.
+fn lead(s: &Structure, ori: &[Orient], d: &Drawn, p: PointId, axis: usize) -> Q {
+    match p {
+        PointId::Pin(k, pin) if d.routed => match s.exit(k, pin, ori[k]) {
+            Some((x, y)) => int(CLEARANCE * if axis == 0 { x } else { y }),
+            None => Q::zero(),
+        },
+        _ => Q::zero(),
+    }
+}
+
 /// The three layers of the LP on one axis (see the module).
 fn layers(
     sx: &mut Simplex<Tag>,
@@ -328,19 +346,20 @@ fn layers(
     targets: &[Target],
     axis: usize,
 ) -> Result<(), ()> {
-    let zero = Q::zero();
     let fail = |_| ();
-    // 1. the wire length
+    // 1. the wire length: a pin of a net routed by the end of its lead
     let mut objective = LinExpr::default();
     for d in &s.connections.drawn {
-        let vars: BTreeSet<Var> = d.points.iter().filter_map(|p| model.points.get(p).map(|i| i.var)).collect();
-        if vars.len() < 2 {
+        let ends: BTreeSet<(Var, Q)> =
+            d.points.iter().filter_map(|p| Some((model.points.get(p)?.var, lead(s, ori, d, *p, axis)))).collect();
+        if ends.iter().map(|(v, _)| v).collect::<BTreeSet<_>>().len() < 2 {
             continue;
         }
         let (hi, lo) = (sx.new_var(), sx.new_var());
-        for &v in &vars {
-            sx.assert(&LinExpr::diff(hi, v), Rel::Ge, &zero, Tag::Def).map_err(fail)?;
-            sx.assert(&LinExpr::diff(v, lo), Rel::Ge, &zero, Tag::Def).map_err(fail)?;
+        // hi ≥ v + c and lo ≤ v + c
+        for (v, c) in &ends {
+            sx.assert(&LinExpr::diff(hi, *v), Rel::Ge, c, Tag::Def).map_err(fail)?;
+            sx.assert(&LinExpr::diff(*v, lo), Rel::Ge, &-c.clone(), Tag::Def).map_err(fail)?;
         }
         objective.add_term(hi, &Q::one());
         objective.add_term(lo, &-Q::one());

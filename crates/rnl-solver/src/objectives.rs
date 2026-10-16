@@ -38,6 +38,7 @@ use rnl_runtime::geom::Orient;
 
 use crate::model::PointId;
 use crate::rational::{frac, from_f64, int, Q};
+use crate::route::CLEARANCE;
 use crate::structure::{Role, Structure};
 use crate::{Objectives, OBJECTIVES};
 
@@ -391,8 +392,8 @@ pub(crate) struct Routed {
 /// The value of an objective on a sketch, for a partial candidate (plan 5.5): as [`score`]
 /// measures a placed candidate that is not routed. The routing objectives measure the straight
 /// connections of a minimum spanning tree of each net: their length; an L for each connection not
-/// along an axis, crossing what it crosses; a turn for each such L and for each end whose pin
-/// does not leave towards the other end.
+/// along an axis, crossing what it crosses; the turns the router makes of each, by the direction
+/// each pin leaves ([`connection_turns`]).
 pub(crate) fn estimate(o: Objective, view: &View) -> Q {
     score(o, view, None)
 }
@@ -607,35 +608,97 @@ pub(crate) fn spanning_tree(points: &[[Q; 2]]) -> Vec<(usize, usize)> {
     edges
 }
 
-/// The turns of the connections drawn straight: one for a connection not along an axis, and one
-/// at each end whose pin does not leave towards the other end (9.2.4), as a wire must turn there.
+/// The turns of the connections drawn straight, with the direction each pin leaves (9.2.4): for a
+/// net routed, as the router draws each ([`connection_turns`]); for a wire written, one for a
+/// connection not along an axis and one at each end whose pin does not leave towards the other
+/// end.
 fn turns(view: &View) -> Q {
     let mut count = 0usize;
     for drawn in &view.s.connections.drawn {
         let points: Vec<(PointId, [Q; 2])> = drawn.points.iter().filter_map(|p| Some((*p, view.point(*p)?))).collect();
         let positions: Vec<[Q; 2]> = points.iter().map(|(_, q)| q.clone()).collect();
+        let exit = |p: PointId| match p {
+            PointId::Pin(k, pin) => view.s.exit(k, pin, view.orient[k]),
+            _ => None,
+        };
         for (a, b) in spanning_tree(&positions) {
             let (pa, qa) = &points[a];
             let (pb, qb) = &points[b];
-            count += usize::from(qa[0] != qb[0] && qa[1] != qb[1]);
-            count += usize::from(!leaves_towards(view, *pa, qa, qb));
-            count += usize::from(!leaves_towards(view, *pb, qb, qa));
+            let (ea, eb) = (exit(*pa), exit(*pb));
+            count += if drawn.routed {
+                connection_turns(qa, ea, qb, eb)
+            } else {
+                usize::from(qa[0] != qb[0] && qa[1] != qb[1])
+                    + usize::from(!leaves_towards(qa, ea, qb))
+                    + usize::from(!leaves_towards(qb, eb, qa))
+            };
         }
     }
     count.into_q()
 }
 
-/// Whether a pin at `from` leaves towards `to`; a point that is no pin, or a pin without a
-/// direction, leaves any way.
-fn leaves_towards(view: &View, p: PointId, from: &[Q; 2], to: &[Q; 2]) -> bool {
-    let PointId::Pin(k, pin) = p else { return true };
-    let Some((x, y)) = view.s.exit(k, pin, view.orient[k]) else { return true };
+/// Whether a pin at `from` that leaves by `exit` leaves towards `to`; a point that is no pin, or a
+/// pin without a direction, leaves any way.
+fn leaves_towards(from: &[Q; 2], exit: Option<(i64, i64)>, to: &[Q; 2]) -> bool {
+    let Some((x, y)) = exit else { return true };
     let dot = int(x) * (&to[0] - &from[0]) + int(y) * (&to[1] - &from[1]);
     dot.is_positive()
 }
 
+/// How the end of a connection leaves towards its other end.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Leaving {
+    /// Any way: a point that is no pin, or a pin without a direction.
+    Free,
+    /// Towards the other end: straight at it, or so that the other end is beyond the end of its
+    /// lead, `CLEARANCE` its own way.
+    Towards,
+    /// Across the connection, the other end not beyond the end of its lead: the direction.
+    Across((i64, i64)),
+    /// Away from the other end.
+    Away,
+}
+
+/// How a pin at `from` that leaves by `exit` leaves towards `to`.
+fn leaving(from: &[Q; 2], exit: Option<(i64, i64)>, to: &[Q; 2]) -> Leaving {
+    let Some((x, y)) = exit else { return Leaving::Free };
+    let v = [&to[0] - &from[0], &to[1] - &from[1]];
+    let along = int(x) * &v[0] + int(y) * &v[1];
+    let aside = int(-y) * &v[0] + int(x) * &v[1];
+    if along.is_negative() {
+        Leaving::Away
+    } else if aside.is_zero() || along >= int(CLEARANCE) {
+        Leaving::Towards
+    } else {
+        Leaving::Across((x, y))
+    }
+}
+
+/// The turns of a straight connection between two points of a net, `a` leaving by `ea` and `b` by
+/// `eb`, as the router draws it, a pin leaving by a lead a unit its own way (quality review SC-1):
+/// none for a straight line, one for an L, that is a connection not along an axis whose ends
+/// leave towards each other; three for a jog, where an end leaves across the connection and the
+/// other is not beyond its lead, as the wire must go out, across and back; two for a U, where both
+/// leave across the same way, and four where they leave across opposite ways; and two more for
+/// each end that leaves away from the other, as the wire must turn round its symbol.
+fn connection_turns(a: &[Q; 2], ea: Option<(i64, i64)>, b: &[Q; 2], eb: Option<(i64, i64)>) -> usize {
+    let (la, lb) = (leaving(a, ea, b), leaving(b, eb, a));
+    let away = 2 * usize::from(la == Leaving::Away) + 2 * usize::from(lb == Leaving::Away);
+    match (la, lb) {
+        (Leaving::Across(x), Leaving::Across(y)) => {
+            if x == y {
+                2
+            } else {
+                4
+            }
+        }
+        (Leaving::Across(_), _) | (_, Leaving::Across(_)) => 3,
+        _ => usize::from(a[0] != b[0] && a[1] != b[1]) + away,
+    }
+}
+
 /// The bends of a polyline: vertices where it changes direction.
-fn bends(path: &[[Q; 2]]) -> usize {
+pub(crate) fn bends(path: &[[Q; 2]]) -> usize {
     let dir = |a: &[Q; 2], b: &[Q; 2]| ((&b[0] - &a[0]).signum(), (&b[1] - &a[1]).signum());
     let mut dirs: Vec<(Q, Q)> =
         path.windows(2).map(|w| dir(&w[0], &w[1])).filter(|d| !(d.0.is_zero() && d.1.is_zero())).collect();
@@ -880,5 +943,35 @@ mod tests {
         assert_eq!(crossings(&[(0, p(0, 0), p(4, 0)), (1, p(4, 0), p(4, 3))]), int(0));
         assert_eq!(aspect(&int(16), &int(9)), int(0));
         assert_eq!(aspect(&int(4), &int(0)), int(4));
+    }
+
+    /// The turns of a connection as the router draws it (quality review SC-1), with T1's pins: the
+    /// source's pin leaving up, the resistor's leaving left towards it.
+    #[test]
+    fn a_connection_counts_the_turns_of_a_jog_an_l_and_a_straight_line() {
+        let p = |x: i64, y: i64| [int(x), int(y)];
+        let (up, down, left, right) = (Some((0, 1)), Some((0, -1)), Some((-1, 0)), Some((1, 0)));
+        // the jog: on one height, the wire goes up, across and down again
+        assert_eq!(connection_turns(&p(-7, 6), up, &p(-3, 6), left), 3);
+        assert_eq!(connection_turns(&p(-3, 6), left, &p(-7, 6), up), 3);
+        // less than a lead above is a jog too, off the grid
+        assert_eq!(connection_turns(&p(0, 0), up, &[int(4), frac(1, 2)], left), 3);
+        // the L: the resistor's pin above the end of the source's lead
+        assert_eq!(connection_turns(&p(-7, 6), up, &p(-3, 7), left), 1);
+        assert_eq!(connection_turns(&p(-7, 6), up, &p(-3, 9), left), 1);
+        // the straight line: two pins facing each other, or a pin and a point on its way
+        assert_eq!(connection_turns(&p(0, 0), right, &p(5, 0), left), 0);
+        assert_eq!(connection_turns(&p(0, 0), up, &p(0, 4), down), 0);
+        assert_eq!(connection_turns(&p(0, 0), right, &p(5, 0), None), 0);
+        // a U: both leave up on one height; an S: one up, one down
+        assert_eq!(connection_turns(&p(0, 0), up, &p(5, 0), up), 2);
+        assert_eq!(connection_turns(&p(0, 0), up, &p(5, 0), down), 4);
+        // an end that leaves away from the other: two more
+        assert_eq!(connection_turns(&p(0, 0), left, &p(5, 0), left), 2);
+        assert_eq!(connection_turns(&p(0, 0), left, &p(5, 3), left), 3);
+        assert_eq!(connection_turns(&p(0, 0), up, &p(5, 0), right), 3);
+        // points that are no pins: an L when not along an axis
+        assert_eq!(connection_turns(&p(0, 0), None, &p(5, 3), None), 1);
+        assert_eq!(connection_turns(&p(0, 0), None, &p(5, 0), None), 0);
     }
 }
