@@ -93,10 +93,13 @@ impl Placed<'_> {
             Position::InSymbol { owner, local, replaced } => {
                 let (x, y) = self.origin(*owner);
                 let (dx, dy) = self.orient(*owner).apply(*local);
-                // on the axis that the scene gives it, where its PLACE or its offset puts it (13.3)
-                let own = |axis: Axis, s: &Slot| match s {
-                    Slot::Fixed { value, .. } => *value,
-                    Slot::Free => self.offset(k, axis).unwrap_or(0.0),
+                // on the axis that the scene gives it, where the solver puts it, or else where its
+                // PLACE or its offset puts it (13.3)
+                let solved = self.s.placements.iter().find(|q| q.object == k).and_then(|q| q.at);
+                let own = |axis: Axis, s: &Slot| match (solved, s) {
+                    (Some(at), _) => self.along(at, axis),
+                    (None, Slot::Fixed { value, .. }) => *value,
+                    (None, Slot::Free) => self.offset(k, axis).unwrap_or(0.0),
                 };
                 match replaced {
                     Some((Axis::X, s)) => (own(Axis::X, s), y + dy),
@@ -149,7 +152,10 @@ impl Placed<'_> {
     }
 
     fn coordinate(&self, r: &PointRef, axis: Axis) -> f64 {
-        let (x, y) = self.at(r);
+        self.along(self.at(r), axis)
+    }
+
+    fn along(&self, (x, y): Pt, axis: Axis) -> f64 {
         if axis == Axis::X {
             x
         } else {
@@ -866,14 +872,22 @@ fn a_label_that_the_scene_places_on_one_axis_keeps_its_owner_where_it_is() {
     assert!(matches!(at("#R2::name"), Position::InSymbol { replaced: Some((Axis::X, Slot::Free)), .. }));
     assert!(matches!(at("#R5::name"), Position::InSymbol { replaced: None, .. }));
     assert!(matches!(at("#R6::name"), Position::Own { x: Slot::Free, y: Slot::Free }));
-    // the PLACEs of R1 and R3, and of #R3::name and #R4::value with the offsets on their other
-    // axes, are the file's, and the record leaves them to it
-    for line in ["#R1 @ORIENT(\"R0\");", "#R3 @ORIENT(\"R0\");"] {
+    // the record writes every position, those the file fixes too (14.8), but where a text follows
+    // its offset or its symbol: the x of #R3::name and #R4::value and not their y, the x of
+    // #R1::name and not its y, nothing for #R2::name, #R5::name and the texts of R6
+    for line in [
+        "#R1 @PLACE(0, 0) => @ORIENT(\"R0\");",
+        "#R3 @PLACE(20, 0) => @ORIENT(\"R0\");",
+        "#R1::name @PLACE(x=-3);",
+        "#R3::name @PLACE(x=25);",
+        "#R4::value @PLACE(x=1)",
+    ] {
         assert!(level.record.contains(line), "{}", level.record);
     }
-    for text in ["#R1 @PLACE", "#R3 @PLACE", "#R3::name", "#R4::value", "#R6::name", "#R6::note"] {
+    for text in ["#R2::name", "#R5::name", "#R6::name", "#R6::note"] {
         assert!(!level.record.contains(text), "{}", level.record);
     }
+    assert!(level.written.unsolved.is_empty(), "{:?}", level.written.unsolved);
     let anchors = |r: &rnl_runtime::Interpretation| {
         let mut out: Vec<(String, Pt)> = r.model.levels[0].texts.iter().map(|t| (t.id.clone(), t.anchor)).collect();
         out.sort_by(|a, b| a.0.cmp(&b.0));
@@ -884,6 +898,60 @@ fn a_label_that_the_scene_places_on_one_axis_keeps_its_owner_where_it_is() {
     let after = interpret_file(&f, None, &Layered { layers: vec![&mem, &fs] }, &Options::default()).unwrap();
     assert_eq!(anchors(&after), anchors(&before));
     assert!(after.diagnostics().is_empty(), "{:?}", after.diagnostics());
+}
+
+#[test]
+fn a_text_whose_offset_the_solver_discards_reads_back_where_the_solver_put_it() {
+    // an offset is a fact that 8.5 resolves, and a PLACE written after it replaces it on its axis
+    // (13.3): when the solver discards it, the record writes the text's position on that axis, so
+    // that the level read back needs no solver; on an axis that its offset or its symbol still
+    // places, the record leaves it to them. A text of its own with dx and dy, and a label of the
+    // symbol whose dy the scene gives.
+    for (text, line) in [
+        ("#R1 @TEXT(\"note\", key=\"note\", dx=-1, dy=2)", "#R1::note @PLACE(y=10)"),
+        ("#R1 @TEXT(\"${name}\", key=\"name\", dy=2)", "#R1::name @PLACE(y=10)"),
+    ] {
+        let label = &line[..line.find(' ').unwrap()];
+        let body = format!(
+            "* offsets\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\nR1 a b 1k\nR2 b c 1k\n* @RNL {{ {text}; \
+             #R1 @PLACE(0, 0); #R2 @PLACE(10, 10); {{{label} #R2}} @ALIGN(\"y\", priority=\"high\") }}\n.end\n"
+        );
+        let files = MemoryProvider::new().with("/w/t.sp", &body);
+        let run = solve(Path::new("/w/t.sp"), &files, &SolveOptions::default()).unwrap();
+        let level = &run.levels[0];
+        let p = &level.problem;
+        let discarded: Vec<&FactKind> = level.solved.report.discarded.iter().map(|d| &p.facts[d.fact].kind).collect();
+        assert!(
+            matches!(discarded.as_slice(), [FactKind::Offset { axis: Axis::Y, value, .. }] if *value == 2.0),
+            "{label}: {discarded:?}"
+        );
+        assert!(level.record.contains(line), "{}", level.record);
+        assert!(!level.record.contains(&format!("{label} @PLACE(-1")), "{}", level.record);
+        assert!(level.written.unsolved.is_empty(), "{label}: {:?}", level.written.unsolved);
+        check_facts(&run, label);
+        let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
+        check_read_back(&run, Path::new("/w/t.sp"), &Layered { layers: vec![&solved, &files] }, false, label);
+    }
+}
+
+#[test]
+fn a_statement_written_after_the_record_that_conflicts_with_it_is_dropped() {
+    // the record writes every position, those the file fixes too, with priority high (14.8): a
+    // statement of normal priority written after it, as between two solves, that conflicts with
+    // the solver's results is dropped until the next solve, and not drawn as needing a solver
+    let body = "* between\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+    let files = MemoryProvider::new().with("/w/t.sp", body);
+    let run = solve(Path::new("/w/t.sp"), &files, &SolveOptions::default()).unwrap();
+    let record = &run.levels[0].record;
+    assert!(record.contains("#R1 @PLACE(0, 0) => @ORIENT("), "{record}");
+    assert!(record.contains("#R2 @PLACE(") && !record.contains("#R2 @PLACE(0, "), "{record}");
+    let edited = run.files[0].text.replace(".end", "* @RNL { {#R1 #R2} @ALIGN(\"x\")}\n.end");
+    let files = MemoryProvider::new().with("/w/t.sp", &edited);
+    let r = interpret_file(Path::new("/w/t.sp"), None, &files, &Options::default()).unwrap();
+    let statuses: Vec<(&str, &str)> =
+        r.model.levels[0].constraints.iter().map(|c| (c.kind.as_str(), c.status.as_str())).collect();
+    assert_eq!(statuses, vec![("ALIGN", "dropped")]);
+    assert!(dropped(&r).iter().any(|m| m.starts_with("ALIGN conflicts with fixed coordinates")), "{:?}", dropped(&r));
 }
 
 #[test]

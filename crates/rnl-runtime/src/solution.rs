@@ -34,14 +34,22 @@
 //!   with `mode="straight"` and the style of its ROUTE; the points where wires branch are named
 //!   points, with `$JUNCTION` where the solver wants a dot (13.2, 13.7).
 //! - Coordinates are written by [`fmt_num`], which reads back as the same value (11.7).
-//! - A text that an offset (`dx`, `dy`) places on an axis keeps it: the record writes its position
-//!   on the other axis only, `@PLACE(x=…)` or `@PLACE(y=…)`, or none, since a PLACE written after
-//!   the offset would replace it and the text would no longer follow what it is attached to (13.3).
+//! - A text that the file places on an axis by what it is attached to, by an offset (`dx`, `dy`)
+//!   or as its owner's symbol does, keeps that where the solution has it there: the record writes
+//!   its position on the other axis only, `@PLACE(x=…)` or `@PLACE(y=…)`, or none, since a PLACE
+//!   written after would replace it and the text would no longer follow what it is attached to
+//!   (13.3). Where the solution has it elsewhere, as when the solver discarded the offset (8.5),
+//!   the record writes the PLACE on that axis, which replaces the offset there (13.3).
+//! - What the file fixes, where the solution has it, is no decision lost: a position or an
+//!   orientation that the record cannot hold, such as that of a point without a name in a file of
+//!   0.2, is not unsolved when it is what the facts of the file give the object (11.1, 11.2), since
+//!   a viewer that does not solve draws it there all the same. An object that the record reaches
+//!   has them written all the same, with the record's priority (14.8).
 
 use std::fmt;
 
 use crate::diag::Sink;
-use crate::geom::{fmt_num, Orient, Pt};
+use crate::geom::{fmt_num, Orient, Pt, TOL};
 use crate::host::{HostDocument, Record, Seg};
 use crate::interp::obj::Priority;
 use crate::interp::unit::DRAFT_VERSION;
@@ -384,7 +392,7 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
 /// solver's options.
 ///
 /// Every decision of the solution is in the record, or in [`Written::unsolved`] with the reason
-/// the record cannot hold it:
+/// the record cannot hold it, but what the file fixes (below):
 ///
 /// - in a level of a file of 0.2: the position or orientation of an object without a name, and
 ///   the route of a wire (the draft 0.3 writes them, by number and with WIRE given the wire);
@@ -397,8 +405,16 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
 ///   two points (13.1), or through the centre of a set; a coordinate that is NaN or infinite
 ///   (3.7); an index that is not in the problem or the solution.
 ///
-/// The position of a text that an offset places on an axis is written on the other axis only, or
-/// not at all: the offset keeps placing it (13.3).
+/// A text keeps the axes on which the file places it by what it is attached to, where the solution
+/// has it there: by an offset (13.3), or by its owner's symbol on an axis that the scene does not
+/// replace (9.2.5, 13.3). Its position is written on its other axes only, or not at all. On such an
+/// axis where the solution has it elsewhere, as when the solver discarded the offset (8.5), the
+/// PLACE is written, and replaces the offset there (13.3).
+///
+/// A position or an orientation that the record cannot hold is not unsolved when it is what the
+/// file fixes, the coordinates that the facts of the file give (11.1) and the orientation that an
+/// ORIENT gives (11.2), within [`TOL`]: a viewer that does not solve draws the object so all the
+/// same. A record that reaches the object writes them, so that they rank with its priority (14.8).
 ///
 /// In a level of the draft 0.3 the record is not finished: when it uses a number,
 /// [`finish_record`] gives it the check of its numbers.
@@ -429,10 +445,8 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
         branch_names.push(Some(format!("rt{n}")));
     }
 
-    // positions and orientations; a text keeps the axes that an offset places it on (13.3)
-    let by_offset = |k: usize, axis: Axis| {
-        p.facts.iter().any(|f| matches!(f.kind, FactKind::Offset { text, axis: a, .. } if text == k && a == axis))
-    };
+    // positions and orientations, a text keeping the axes that the file places it on by what it is
+    // attached to, where the solution has it there (13.3)
     let mut placements: Vec<(Reference, [Option<f64>; 2], Option<Orient>)> = Vec::new();
     let mut sorted: Vec<&Placement> = solution.placements.iter().collect();
     sorted.sort_by_key(|pl| pl.object);
@@ -467,7 +481,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
             orient = None;
         }
         let at = at.map_or([None, None], |(x, y)| {
-            [(!by_offset(pl.object, Axis::X)).then_some(x), (!by_offset(pl.object, Axis::Y)).then_some(y)]
+            [(Axis::X, x), (Axis::Y, y)].map(|(axis, v)| (!follows(p, solution, o, pl.object, axis, v)).then_some(v))
         });
         let placed = at.iter().any(Option::is_some);
         if !placed && orient.is_none() {
@@ -483,10 +497,15 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
             Err(why) => {
                 let keyless = o.text.as_ref().is_some_and(|t| t.key.is_none());
                 let why = if why == ANONYMOUS && o.generated && keyless { RULE_TEXT } else { why };
-                if placed {
+                // what the file fixes, where the solution has it, a viewer draws there all the same
+                let fixed =
+                    [Axis::X, Axis::Y].into_iter().zip(at).all(|(axis, v)| v.is_none_or(|v| fixed_at(o, axis, v)));
+                let fixed_orient =
+                    orient.is_none_or(|c| matches!(o.orient, Some(OrientSlot::Fixed { code, .. }) if code == c));
+                if placed && !fixed {
                     lost(position, &o.label, why);
                 }
-                if orient.is_some() {
+                if orient.is_some() && !fixed_orient {
                     lost(orientation, &o.label, why);
                 }
             }
@@ -620,6 +639,111 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
         format!("{head} {{\n  {}\n}}", statements.join(";\n  "))
     };
     Written { record, unsolved, notes }
+}
+
+/// How deep the points that points are placed from are followed.
+const MAX_DEPTH: usize = 16;
+
+/// A coordinate of a point on an axis.
+fn along((x, y): Pt, axis: Axis) -> f64 {
+    match axis {
+        Axis::X => x,
+        Axis::Y => y,
+    }
+}
+
+/// The coordinate that a slot fixes (11.1).
+fn fixed(slot: &Slot) -> Option<f64> {
+    match slot {
+        Slot::Fixed { value, .. } => Some(*value),
+        Slot::Free => None,
+    }
+}
+
+/// The orientation of an object once the record is read: the solution's, or the one an ORIENT of
+/// the file gives, or `"R0"` (11.2).
+fn orientation(p: &LevelProblem, s: &Solution, k: usize) -> Orient {
+    let solved = s.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.orient);
+    let written = match p.objects.get(k).and_then(|o| o.orient.as_ref()) {
+        Some(OrientSlot::Fixed { code, .. }) => Some(*code),
+        _ => None,
+    };
+    solved.or(written).unwrap_or(Orient::R0)
+}
+
+/// Where a point of the problem is on an axis once the record is read (14.1): an object where the
+/// solution places it, or else where the facts of the file fix it, a text that its owner's symbol
+/// places with its owner (13.3), an object drawn at the point of its main object there (12.1); a
+/// pin turned with its object (9.2.4); the middle of the extent of a set (6.5). None for a point
+/// that neither the solution nor the file places.
+fn coordinate(p: &LevelProblem, s: &Solution, r: &PointRef, axis: Axis, depth: usize) -> Option<f64> {
+    if depth > MAX_DEPTH {
+        return None;
+    }
+    match r {
+        PointRef::Origin(k) => {
+            let o = p.objects.get(*k)?;
+            if let Position::At(main) = &o.position {
+                return coordinate(p, s, main, axis, depth + 1);
+            }
+            if let Some(at) = s.placements.iter().find(|pl| pl.object == *k).and_then(|pl| pl.at) {
+                return Some(along(at, axis));
+            }
+            match &o.position {
+                Position::Own { x, y } => fixed(if axis == Axis::X { x } else { y }),
+                Position::InSymbol { replaced: Some((a, slot)), .. } if *a == axis => fixed(slot),
+                Position::InSymbol { owner, local, .. } => {
+                    let base = coordinate(p, s, &PointRef::Origin(*owner), axis, depth + 1)?;
+                    Some(base + along(orientation(p, s, *owner).apply(*local), axis))
+                }
+                Position::At(_) => None,
+            }
+        }
+        PointRef::Pin { object, pin, .. } => {
+            let o = p.objects.get(*object)?;
+            let pos = p.symbols.get(o.symbol?)?.pins.get(*pin)?.pos;
+            let base = coordinate(p, s, &PointRef::Origin(*object), axis, depth + 1)?;
+            Some(base + along(orientation(p, s, *object).apply(pos), axis))
+        }
+        PointRef::Centre(members) => {
+            let mut values = members.iter().map(|m| coordinate(p, s, m, axis, depth + 1));
+            let first = values.next()??;
+            let (lo, hi) = values.try_fold((first, first), |(lo, hi), v| v.map(|v| (lo.min(v), hi.max(v))))?;
+            Some((lo + hi) / 2.0)
+        }
+    }
+}
+
+/// Whether the solution has object `k`, `o`, at `v` on an axis on which the file places it by
+/// what it is attached to (13.3): a text by its offset on that axis, or by its owner's symbol on an
+/// axis that the scene does not replace (9.2.5), within [`TOL`]. The record then writes no PLACE
+/// there, which would replace it. A text attached to a point that neither the solution nor the
+/// file places follows it all the same.
+fn follows(p: &LevelProblem, s: &Solution, o: &ProblemObject, k: usize, axis: Axis, v: f64) -> bool {
+    let offset = p.facts.iter().find_map(|f| match &f.kind {
+        FactKind::Offset { text, from, axis: a, value } if *text == k && *a == axis => Some((from, *value)),
+        _ => None,
+    });
+    let target = match (&o.position, offset) {
+        (_, Some((from, value))) => coordinate(p, s, from, axis, 0).map(|c| c + value),
+        (position @ Position::InSymbol { owner, local, .. }, None) if position.from_symbol(axis) => {
+            let base = coordinate(p, s, &PointRef::Origin(*owner), axis, 0);
+            base.map(|c| c + along(orientation(p, s, *owner).apply(*local), axis))
+        }
+        _ => return false,
+    };
+    target.is_none_or(|t| (v - t).abs() <= TOL)
+}
+
+/// Whether a fact of the file fixes the coordinate of an object on an axis at `v`, within [`TOL`]
+/// (11.1): its own coordinate there, or that of a text on the axis that the scene gives it (13.3).
+fn fixed_at(o: &ProblemObject, axis: Axis, v: f64) -> bool {
+    let slot = match &o.position {
+        Position::Own { x, y } => Some(if axis == Axis::X { x } else { y }),
+        Position::InSymbol { replaced: Some((a, slot)), .. } if *a == axis => Some(slot),
+        _ => None,
+    };
+    slot.and_then(fixed).is_some_and(|value| (value - v).abs() <= TOL)
 }
 
 /// The record of the solver of a level, finished: `record` is what [`write_record`] gives for the

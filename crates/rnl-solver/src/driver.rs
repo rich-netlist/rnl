@@ -14,10 +14,13 @@
 //! net, a wire through a symbol, 13.2) and then joins left undone, as the solver's own rules rank
 //! after every fact and before every objective (8.5, 11.7).
 //!
-//! **The solution** gives every object with a position of its own its position and every object
-//! with an orientation its orientation, but not a position that the file gives on both axes, each
-//! by a fact kept (PLACE, a point's coordinates) where the object is or by the offset of a text
-//! (13.3): that is the file's, not the solver's, and the record leaves it to the file.
+//! **The solution** gives every object with a position of its own its position, a position the
+//! file fixes included (plan 3.2), and every object with an orientation its orientation. A text
+//! that its owner's symbol places, on the axis that the scene gives it (13.3), has a coordinate of
+//! its own there, and the solution gives its position too. The record writes them all (the draft
+//! 0.3, 14.8), so that between two solves a statement written after it that conflicts with them
+//! is discarded (14.8); `rnl_runtime::solution::write_record` leaves to the file only the axes on
+//! which a text follows what it is attached to, where the solution has it there (13.3).
 //!
 //! **Budget** (`crate::Budget`): the work is counted, never timed, so the result is the same on
 //! every machine. The resolution stops deciding a fact after `resolve_nodes` nodes and discards it
@@ -30,11 +33,11 @@
 use std::collections::BTreeMap;
 
 use rnl_runtime::geom::Orient;
-use rnl_runtime::problem::{Axis, FactKind, LevelProblem, Position, Slot};
+use rnl_runtime::problem::{LevelProblem, Position};
 use rnl_runtime::solution::{Placement, Solution};
 
 use crate::coords::{place, Cause, Placed};
-use crate::rational::{from_f64, to_f64, Q};
+use crate::rational::{to_f64, Q};
 use crate::resolve::Resolved;
 use crate::route::{route, style_notes, Failure, Routing};
 use crate::score::{drawn, layers, misleading, order, Entry};
@@ -207,39 +210,25 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
             budget: l.failure == Failure::Budget,
         });
     }
-    let mut kept = vec![false; problem.facts.len()];
-    for &i in &resolved.kept {
-        kept[i] = true;
-    }
-    let by_offset = |k: usize, axis: Axis| {
-        problem.facts.iter().any(|f| matches!(f.kind, FactKind::Offset { text, axis: a, .. } if text == k && a == axis))
-    };
-    // an axis on which the file gives the position: a coordinate fact kept, where the object is
-    // (8.5), or an offset that places a text, which a record does not write over (13.3)
-    let the_files = |k: usize, axis: Axis, slot: &Slot| match slot {
-        Slot::Fixed { value, fact } => {
-            kept[*fact] && from_f64(*value).as_ref() == Some(&placed.geometry.origin[k][usize::from(axis == Axis::Y)])
-        }
-        Slot::Free => by_offset(k, axis),
-    };
     let mut placements = Vec::new();
     for (k, o) in problem.objects.iter().enumerate() {
         let orient: Option<Orient> = o.orient.is_some().then(|| placed.geometry.orient[k]);
         match &o.position {
-            // a position the file gives on both axes is not a decision of the solver's, and only
-            // the orientation is given, if any (plan 3.2)
-            Position::Own { x, y } if the_files(k, Axis::X, x) && the_files(k, Axis::Y, y) => {
-                if orient.is_some() {
-                    placements.push(Placement { object: k, at: None, orient });
-                }
-            }
+            // every position of its own, those the file fixes too (plan 3.2)
             Position::Own { .. } => {
                 let [x, y] = &placed.geometry.origin[k];
                 placements.push(Placement { object: k, at: Some((to_f64(x), to_f64(y))), orient })
             }
             // drawn at the point of its main object: only its orientation is the solver's (12.1)
             Position::At(_) if orient.is_some() => placements.push(Placement { object: k, at: None, orient }),
-            // a text placed by its symbol goes with its owner (13.3)
+            // a text that its owner's symbol places has a coordinate of its own on the axis that
+            // the scene gives it (13.3): where it is, which the record writes on that axis unless
+            // its offset still places it there
+            Position::InSymbol { replaced: Some(_), .. } => {
+                let [x, y] = &placed.origins[k];
+                placements.push(Placement { object: k, at: Some((to_f64(x), to_f64(y))), orient: None })
+            }
+            // a text placed by its symbol alone goes with its owner (13.3)
             Position::At(_) | Position::InSymbol { .. } => {}
         }
     }

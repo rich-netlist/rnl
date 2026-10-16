@@ -48,50 +48,62 @@ fn every_object_is_placed_where_the_facts_put_it() {
     assert!(solved.report.work.resolve_nodes > 0);
 }
 
-/// A position that the file gives on both axes, by facts kept, is the file's: the solution leaves
-/// it out, gives the orientation alone where there is one, and the record of a file of 0.2 then
-/// has nothing it cannot hold for a point without a name. A position whose fact is discarded is
-/// the solver's.
+/// A position that the file fixes is given all the same (plan 3.2), and the record writes it for
+/// an object it reaches, so that it ranks with the record's priority between two solves (the draft
+/// 0.3, 14.8). A point without a name, which the record of a file of 0.2 cannot refer to, is not
+/// unsolved where the solution has it where its coordinates put it, a viewer drawing it there all
+/// the same, and is where the solver discarded one of them.
 #[test]
-fn a_position_the_file_gives_by_facts_kept_is_left_to_the_file() {
+fn a_position_the_file_fixes_is_given_and_written_where_the_record_reaches_it() {
     use rnl_runtime::problem::{ProblemObject, Reference, Slot};
     let fixed = |value: f64, fact: usize| Slot::Fixed { value, fact };
-    let m = ProblemObject { position: Position::Own { x: fixed(-10.0, 1), y: fixed(2.0, 2) }, ..instance() };
-    let p0 = ProblemObject {
-        label: "(3, 4)".to_string(),
+    let m = ProblemObject { position: Position::Own { x: fixed(-10.0, 2), y: fixed(2.0, 3) }, ..instance() };
+    let anonymous = |label: &str, x: Slot, y: Slot| ProblemObject {
+        label: label.to_string(),
         reference: Reference::Anonymous,
-        position: Position::Own { x: fixed(3.0, 3), y: fixed(4.0, 4) },
+        position: Position::Own { x, y },
         ..point()
     };
     let n = ProblemObject {
         label: "#N".to_string(),
         reference: Reference::Name("#N".to_string()),
-        position: Position::Own { x: fixed(9.0, 5), y: fixed(-10.0, 6) },
+        position: Position::Own { x: fixed(9.0, 6), y: fixed(-10.0, 7) },
         ..instance()
     };
     let p = problem_of(
-        vec![m, p0, n],
+        vec![
+            m,
+            anonymous("(3, 4)", fixed(3.0, 4), fixed(4.0, 5)),
+            n,
+            anonymous("(7, 8)", fixed(7.0, 8), fixed(8.0, 9)),
+        ],
         vec![
             fact(FactKind::Align { axis: Axis::X, members: vec![PointRef::Origin(2), PointRef::Origin(1)] }),
+            fact(FactKind::Align { axis: Axis::X, members: vec![PointRef::Origin(3), PointRef::Origin(0)] }),
             fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: -10.0 }),
             fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::Y, value: 2.0 }),
             fact(FactKind::PointCoordinate { point: 1, axis: Axis::X, value: 3.0 }),
             fact(FactKind::PointCoordinate { point: 1, axis: Axis::Y, value: 4.0 }),
             fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::X, value: 9.0 }),
             fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::Y, value: -10.0 }),
+            fact(FactKind::PointCoordinate { point: 3, axis: Axis::X, value: 7.0 }),
+            fact(FactKind::PointCoordinate { point: 3, axis: Axis::Y, value: 8.0 }),
         ],
     );
     let solved = crate::solve(&p, &SolverOptions::default());
-    assert_eq!(solved.report.kept, vec![0, 1, 2, 3, 4, 6]);
-    let placements = &solved.solution.placements;
-    assert_eq!(placements.len(), 2, "{placements:?}");
-    assert_eq!((placements[0].object, placements[0].at), (0, None));
-    assert!(placements[0].orient.is_some());
-    assert_eq!((placements[1].object, placements[1].at), (2, Some((3.0, -10.0))));
+    assert_eq!(solved.report.kept, vec![0, 1, 2, 3, 4, 5, 7, 9]);
+    let at: Vec<(usize, Option<(f64, f64)>)> = solved.solution.placements.iter().map(|pl| (pl.object, pl.at)).collect();
+    assert_eq!(
+        at,
+        vec![(0, Some((-10.0, 2.0))), (1, Some((3.0, 4.0))), (2, Some((3.0, -10.0))), (3, Some((-10.0, 8.0)))]
+    );
+    assert!(solved.solution.placements[0].orient.is_some());
     let written = rnl_runtime::solution::write_record(&p, &solved.solution, "t", "h");
-    assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
-    assert!(written.record.contains("#M @ORIENT(") && !written.record.contains("#M @PLACE"), "{}", written.record);
-    assert!(written.record.contains("#N @PLACE(3, -10)"), "{}", written.record);
+    let unsolved: Vec<String> = written.unsolved.iter().map(|u| u.to_string()).collect();
+    assert_eq!(unsolved.len(), 1, "{unsolved:?}");
+    assert!(unsolved[0].starts_with("the position of (7, 8): "), "{unsolved:?}");
+    assert!(written.record.contains("#M @PLACE(-10, 2) => @ORIENT("), "{}", written.record);
+    assert!(written.record.contains("#N @PLACE(3, -10) => @ORIENT("), "{}", written.record);
 }
 
 #[test]
@@ -116,16 +128,69 @@ fn a_text_that_an_offset_places_on_one_axis_follows_its_owner_there_only() {
     assert_eq!(at(&PointRef::Origin(1), 0), int(13));
     // R180 turns (1, 1) to (-1, -1)
     assert_eq!(at(&PointRef::Origin(1), 1), at(&PointRef::Origin(0), 1) - int(1));
-    assert!(solved.solution.placements.iter().all(|pl| pl.object != 1), "{:?}", solved.solution.placements);
+    // the solution gives the text where it is; the record leaves its x to the offset and its y to
+    // the symbol, which still place it there (13.3)
+    let text: Vec<&Placement> = solved.solution.placements.iter().filter(|pl| pl.object == 1).collect();
+    assert_eq!(text.len(), 1, "{:?}", solved.solution.placements);
+    assert_eq!(text[0].at.map(|(x, _)| x), Some(13.0));
+    let written = rnl_runtime::solution::write_record(&p, &solved.solution, "t", "h");
+    assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
+    assert!(written.record.contains("#M @PLACE(10, ") && !written.record.contains("#M::name"), "{}", written.record);
+}
+
+/// A text whose offset the solver discards (8.5) is where the solver puts it, and the record writes
+/// that axis, which replaces the offset there (13.3): a label of its owner's symbol whose `dy` the
+/// scene gives, and a text of its own with `dx` and `dy`, which keeps its `dx`.
+#[test]
+fn a_text_whose_offset_is_discarded_is_written_on_that_axis() {
+    use rnl_runtime::problem::{ProblemObject, Reference, Slot};
+    let fixed = |value: f64, fact: usize| Slot::Fixed { value, fact };
+    let m = ProblemObject { position: Position::Own { x: fixed(0.0, 2), y: fixed(0.0, 3) }, ..instance() };
+    let n = ProblemObject {
+        label: "#N".to_string(),
+        reference: Reference::Name("#N".to_string()),
+        position: Position::Own { x: fixed(10.0, 4), y: fixed(10.0, 5) },
+        ..instance()
+    };
+    let name = label(Some(Axis::Y));
+    let note = ProblemObject {
+        label: "#M::note".to_string(),
+        reference: Reference::Name("#M::note".to_string()),
+        position: Position::Own { x: Slot::Free, y: Slot::Free },
+        ..label(None)
+    };
+    let p = problem_of(
+        vec![m, name, n, note],
+        vec![
+            fact(FactKind::Align { axis: Axis::Y, members: vec![PointRef::Origin(1), PointRef::Origin(2)] }),
+            fact(FactKind::Align { axis: Axis::Y, members: vec![PointRef::Origin(3), PointRef::Origin(2)] }),
+            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: 0.0 }),
+            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::Y, value: 0.0 }),
+            fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::X, value: 10.0 }),
+            fact(FactKind::Place { at: PointRef::Origin(2), axis: Axis::Y, value: 10.0 }),
+            fact(FactKind::Offset { text: 1, from: PointRef::Origin(0), axis: Axis::Y, value: 2.0 }),
+            fact(FactKind::Offset { text: 3, from: PointRef::Origin(0), axis: Axis::X, value: -1.0 }),
+            fact(FactKind::Offset { text: 3, from: PointRef::Origin(0), axis: Axis::Y, value: 2.0 }),
+        ],
+    );
+    let (solved, _) = check_level("discarded offsets", &p);
+    let discarded: Vec<usize> = solved.report.discarded.iter().map(|d| d.fact).collect();
+    assert_eq!(discarded, vec![6, 8]);
+    let written = rnl_runtime::solution::write_record(&p, &solved.solution, "t", "h");
+    assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
+    for line in ["#M::name @PLACE(y=10)", "#M::note @PLACE(y=10)"] {
+        assert!(written.record.contains(line), "{}", written.record);
+    }
+    assert!(!written.record.contains("#M::note @PLACE(-1"), "{}", written.record);
 }
 
 // ------------------------------------------------------------------------------------ the files
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use num_traits::{One, Signed, Zero};
-use rnl_runtime::problem::{LevelProblem, ObjectKind, Sense, Slot};
+use rnl_runtime::problem::{LevelProblem, ObjectKind, Sense};
 use rnl_runtime::source::Provider;
 
 use crate::rational::{from_f64, int};
@@ -540,25 +605,19 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> (Solved,
             assert!(x.is_finite() && y.is_finite(), "{what}: {pl:?}");
         }
     }
-    // every object with a position of its own placed, but one that the file places on both axes,
-    // by facts kept where it is or by offsets; and every orientation given
-    let kept: BTreeSet<usize> = solved.report.kept.iter().copied().collect();
-    let by_file = |k: usize, axis: Axis, slot: &Slot| match slot {
-        Slot::Fixed { value, fact } => {
-            kept.contains(fact)
-                && from_f64(*value).as_ref() == Some(&e.placed.geometry.origin[k][usize::from(axis == Axis::Y)])
-        }
-        Slot::Free => {
-            p.facts.iter().any(|f| matches!(f.kind, FactKind::Offset { text, axis: a, .. } if text == k && a == axis))
-        }
-    };
+    // every object with a position of its own placed, those the file fixes too (plan 3.2), and
+    // every text that its symbol places on one axis only, where it is (13.3); and every
+    // orientation given
     for (k, o) in p.objects.iter().enumerate() {
         let pl: Vec<&Placement> = solved.solution.placements.iter().filter(|pl| pl.object == k).collect();
         assert!(pl.len() <= 1, "{what}: {pl:?}");
         let at = pl.first().and_then(|pl| pl.at);
         let orient = pl.first().and_then(|pl| pl.orient);
-        if let Position::Own { x, y } = &o.position {
-            assert_eq!(at.is_none(), by_file(k, Axis::X, x) && by_file(k, Axis::Y, y), "{what}: {} {pl:?}", o.label);
+        let own = matches!(o.position, Position::Own { .. } | Position::InSymbol { replaced: Some(_), .. });
+        assert_eq!(at.is_some(), own, "{what}: {} {pl:?}", o.label);
+        if let (Some((x, y)), Position::InSymbol { .. }) = (at, &o.position) {
+            let origin = &e.placed.origins[k];
+            assert_eq!((from_f64(x).as_ref(), from_f64(y).as_ref()), (Some(&origin[0]), Some(&origin[1])), "{what}");
         }
         let oriented = o.orient.is_some() && !matches!(o.position, Position::InSymbol { .. });
         assert_eq!(orient.is_some(), oriented, "{what}: {} {pl:?}", o.label);
