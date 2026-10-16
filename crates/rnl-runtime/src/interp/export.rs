@@ -57,6 +57,7 @@ impl Interp<'_> {
         let level = self.doc.levels[lv].clone();
         let packages = self
             .effective_packages(lv)
+            .entries
             .iter()
             .map(|e| (self.units[e.unit].pkg_name.clone(), self.units[e.unit].pkg_version.clone()))
             .collect();

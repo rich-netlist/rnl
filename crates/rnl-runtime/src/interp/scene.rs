@@ -545,23 +545,22 @@ impl Interp<'_> {
             }
             return pos(&[9, 0, tail[0], tail[1]]);
         }
-        for e in self.effective_packages(lv) {
-            if e.unit == u {
-                match e.place {
-                    Place::Root(k0) => return pos(&[0, k0 as i64, tail[0], tail[1]]),
-                    Place::Level(at, upos) => {
-                        let decl = e.decl.unwrap();
-                        let au = self.level_unit[at];
-                        let mut base = self.position_of(s, au, decl.rec, Some(upos.1));
-                        base.push(PosElem::Tag("pkg"));
-                        base.push(PosElem::Int(tail[0]));
-                        base.push(PosElem::Int(tail[1]));
-                        return base;
-                    }
-                }
+        // a package's content at the place of the USE-PACKAGE that brings it in, in the order of
+        // what that brings in (16.2)
+        let eff = self.effective_packages(lv);
+        match eff.entry(u).map(|e| (e.place, e.decl.as_ref().map(|d| d.rec))) {
+            Some((Place::Root(k0, j), _)) => pos(&[0, k0 as i64, j as i64, tail[0], tail[1]]),
+            Some((Place::Level(at, upos, j), Some(rec))) => {
+                let au = self.level_unit[at];
+                let mut base = self.position_of(s, au, rec, Some(upos.1));
+                base.push(PosElem::Tag("pkg"));
+                base.push(PosElem::Int(j as i64));
+                base.push(PosElem::Int(tail[0]));
+                base.push(PosElem::Int(tail[1]));
+                base
             }
+            _ => pos(&[9, 1, tail[0], tail[1]]),
         }
-        pos(&[9, 1, tail[0], tail[1]])
     }
 
     // ------------------------------------------------------------------ creation (phase 3)

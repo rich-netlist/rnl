@@ -529,7 +529,8 @@ impl Interp<'_> {
                             let n = r.name.clone().unwrap_or_default();
                             if let Some((member, unit)) = d.defining.get(&(r.prefix, n.clone())).cloned() {
                                 if !(r.prefix == '%' && locals.contains(&n)) {
-                                    if let super::eval::Found::NoOuter = self.outer_lookup(r.prefix, &n, &member, unit)
+                                    if let super::eval::Found::NoOuter =
+                                        self.outer_lookup(r.prefix, &n, &member, unit, ctx.scene)
                                     {
                                         let msg = super::eval::no_outer_message(r);
                                         let diag = self.err(ctx, msg, r.start);
