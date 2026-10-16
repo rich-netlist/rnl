@@ -117,6 +117,7 @@ version = "0.1.0"
 dependencies = [
  "rnl-render",
  "rnl-runtime",
+ "rnl-solver",
  "rnl-view",
  "serde_json",
 ]

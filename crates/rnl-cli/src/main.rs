@@ -1,11 +1,13 @@
-//! `rnl`: check and draw Rich Netlist documents.
+//! `rnl`: check, draw and solve Rich Netlist documents.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use rnl_cli::solve::{SolveOptions, Target};
 use rnl_cli::{dump, FsProvider};
 use rnl_runtime::diag::{Severity, Sink};
 use rnl_runtime::{Interpretation, Options};
+use rnl_solver::SolverOptions;
 use rnl_view::BuildOptions;
 
 const USAGE: &str = "usage:
@@ -14,6 +16,7 @@ const USAGE: &str = "usage:
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
   rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
+  rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
@@ -28,7 +31,14 @@ view options:
   --no-svg            leave out each level's SVG
 problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
-  --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)";
+  --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)
+solve options (the levels are read without their type=\"generated\" records; -o or --in-place is needed):
+  -o DIR              write the files solved under DIR, named as they are relative to FILE's directory
+  --in-place          write them over the files read instead
+  --level TITLE       only the level with this title
+  --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam
+                      and budget, as rnl-solver's canonical text writes them; the hash covers them
+  --report            print what became of every fact, not only of the facts discarded";
 
 struct Args {
     command: String,
@@ -42,7 +52,10 @@ struct Args {
     svg: bool,
     primitives: bool,
     level: Option<String>,
-    solver_options: String,
+    /// As given; `problem` and `solve` each have their own default.
+    solver_options: Option<String>,
+    in_place: bool,
+    report: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -60,7 +73,8 @@ fn parse_args() -> Result<Args, String> {
     let mut draft = false;
     let (mut svg, mut primitives) = (true, false);
     let mut level = None;
-    let mut solver_options = format!("tolerance={}", rnl_runtime::geom::fmt_num(rnl_runtime::geom::TOL));
+    let mut solver_options = None;
+    let (mut in_place, mut report) = (false, false);
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
@@ -72,7 +86,9 @@ fn parse_args() -> Result<Args, String> {
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
-            "--solver-options" => solver_options = it.next().ok_or("--solver-options needs a text")?,
+            "--solver-options" => solver_options = Some(it.next().ok_or("--solver-options needs a text")?),
+            "--in-place" => in_place = true,
+            "--report" => report = true,
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
@@ -91,6 +107,8 @@ fn parse_args() -> Result<Args, String> {
         primitives,
         level,
         solver_options,
+        in_place,
+        report,
     })
 }
 
@@ -143,13 +161,17 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         "problem" => {
+            let problem_options = args
+                .solver_options
+                .clone()
+                .unwrap_or_else(|| format!("tolerance={}", rnl_runtime::geom::fmt_num(rnl_runtime::geom::TOL)));
             let options = Options { std: args.std, draft: args.draft, ..Options::solver() };
             let r = rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), &provider, &options)?;
             let levels: Vec<_> = r
                 .problems
                 .iter()
                 .filter(|p| args.level.as_ref().is_none_or(|t| *t == p.title))
-                .map(|p| rnl_cli::problem::level(p, &args.solver_options))
+                .map(|p| rnl_cli::problem::level(p, &problem_options))
                 .collect();
             if levels.is_empty() {
                 if let Some(t) = &args.level {
@@ -187,6 +209,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             }
             Ok(ExitCode::SUCCESS)
         }
+        "solve" => solve(args, &provider),
         "strip-generated" => {
             let out = args.out.clone().ok_or("strip-generated needs -o OUT")?;
             let mut sink = Sink::new();
@@ -200,6 +223,48 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         }
         _ => Err(format!("unknown command {}\n{USAGE}", args.command)),
     }
+}
+
+/// `rnl solve`: solve, print what became of each level, write the files (plan 5.10).
+fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
+    let target = match (&args.out, args.in_place) {
+        (Some(_), true) => return Err("solve writes under -o DIR or --in-place, not both".into()),
+        (Some(dir), false) => Target::Dir(dir.clone()),
+        (None, true) => Target::InPlace,
+        (None, false) => return Err(
+            "solve needs -o DIR, to write the files solved under DIR, or --in-place, to write them over the files read"
+                .into(),
+        ),
+    };
+    let solver = SolverOptions::default()
+        .with_overrides(args.solver_options.as_deref().unwrap_or(""))
+        .map_err(|e| format!("--solver-options: {e}"))?;
+    let options = SolveOptions {
+        dialect: args.dialect.clone(),
+        std: args.std,
+        draft: args.draft,
+        level: args.level.clone(),
+        solver,
+    };
+    let run = rnl_cli::solve::solve(&args.file, provider, &options)?;
+    // nothing is written when a file has no place to go
+    rnl_cli::solve::destinations(&run, &target)?;
+    println!("solver options: {}", options.solver.canonical());
+    if run.levels.is_empty() {
+        println!("{} has no drawing level to solve", run.entry);
+    }
+    for level in &run.levels {
+        for line in rnl_cli::solve::report(level, args.report) {
+            println!("{line}");
+        }
+    }
+    for path in rnl_cli::solve::write(&run, &target)? {
+        println!("wrote {}", rnl_cli::path_str(&path));
+    }
+    if run.errors > 0 {
+        eprintln!("{} errors in {} as a solver reads it; run `rnl check` to see them", run.errors, run.entry);
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 fn sanitize(s: &str) -> String {

@@ -1,6 +1,6 @@
 # crates
 
-The Rust workspace ([`../Cargo.toml`](../Cargo.toml)). The crates implement the RNL language standard 0.2 ([`spec/`](../spec/README.md)) without a solver: they read a netlist and its records, report diagnostics, build the effective model, and draw what has coordinates. They were written against the draft the standard was consolidated from; section numbers in code comments and diagnostics are the standard's.
+The Rust workspace ([`../Cargo.toml`](../Cargo.toml)). The crates implement the RNL language standard 0.2 ([`spec/`](../spec/README.md)): they read a netlist and its records, report diagnostics, build the effective model, draw what has coordinates, and solve what has not ([`rnl-solver`](rnl-solver/README.md)). They were written against the draft the standard was consolidated from; section numbers in code comments and diagnostics are the standard's.
 
 | Crate | Responsibility |
 | --- | --- |
@@ -9,8 +9,8 @@ The Rust workspace ([`../Cargo.toml`](../Cargo.toml)). The crates implement the 
 | [`rnl-host-spectre`](rnl-host-spectre/README.md) | Reads Spectre netlists, including `simulator lang=spice` parts. |
 | [`rnl-render`](rnl-render/README.md) | Draws an effective model as basic primitives and SVG. |
 | [`rnl-view`](rnl-view/README.md) | The core interface for frontends: a workspace in, a Document out, with the standard packages bundled. Reads no files. |
-| [`rnl-cli`](rnl-cli/README.md) | The `rnl` command: check, render, dump, view, and strip generated records. Its `FsProvider` reads files for the desktop viewer too. |
-| [`rnl-solver`](rnl-solver/README.md) | The solver, in progress: options and exact arithmetic (rationals, an incremental simplex); resolution, placement and routing to come. Reads no files. |
+| [`rnl-cli`](rnl-cli/README.md) | The `rnl` command: check, render, dump, view, problem, solve, and strip generated records. Its `FsProvider` reads files for the desktop viewer too. |
+| [`rnl-solver`](rnl-solver/README.md) | The solver (solver v1): the resolution of 8.5 with exact rationals, a structure-first search, coordinates by a lexicographic LP, the routing of the ROUTEs and the layered objectives; `rnl solve` writes its results back. Reads no files. |
 
 ```bash
 cargo build --release -p rnl-cli

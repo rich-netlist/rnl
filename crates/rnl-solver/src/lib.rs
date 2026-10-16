@@ -24,12 +24,13 @@
 //! - coordinates by a lexicographic LP, routing of the ROUTEs, layered scoring (`coords`, `route`,
 //!   `score`, `driver`).
 //!
-//! **Status: stage S4.** [`resolve()`] resolves the facts of a level as 8.5 says, exactly, and gives
+//! **Status: stage S5.** [`resolve()`] resolves the facts of a level as 8.5 says, exactly, and gives
 //! a witness, a placement that satisfies every fact kept. [`solve`] then analyses the structure of
 //! the level, searches candidates structure first (rows by current depth, orders, orientations),
 //! places each by a lexicographic LP rounded to the grid, keeping every fact kept, routes the
 //! ROUTEs of the best of them by a rectilinear A* around the symbols (13.7), with branch points
 //! and junctions (13.2), and takes the best by the layered objectives in force on their wires.
+//! `rnl solve` (in `rnl-cli`) solves every level of a document and writes the records back.
 //!
 //! The crate does no file I/O and takes no time or randomness, so it builds for
 //! `wasm32-unknown-unknown` and the same input and options give the same result on every platform.

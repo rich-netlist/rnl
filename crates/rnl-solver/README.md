@@ -8,7 +8,24 @@ let hash = rnl_runtime::problem::sig1(problem, &options.canonical());
 let written = rnl_runtime::solution::write_record(problem, &solved.solution, rnl_solver::AUTHOR, &hash);
 ```
 
-**Status: stage S4 of solver v1.** The crate, its options, its exact arithmetic, the resolution of 8.5, the structure of a level, the search, the coordinates, the routing and the layered score are in place: `resolve` keeps or discards each fact, exactly, with minimal conflict sets; `solve` then searches candidates structure first, places each by a lexicographic LP rounded to the grid, every fact kept holding exactly, routes the ROUTEs of the best of them around the symbols, with branch points and junctions, and takes the best by the layered objectives in force on their wires. The stages that follow are the `rnl solve` command (S5) and the end-to-end demonstration (S6).
+`rnl solve FILE -o DIR` of [`rnl-cli`](../rnl-cli/README.md#solve) does this for every drawing level of a document: it reads the files as a solver reads them, solves each level, writes its record back at the end of the level's text, and reads the document again before the next level.
+
+**Status: stage S5 of solver v1.** The crate, its options, its exact arithmetic, the resolution of 8.5, the structure of a level, the search, the coordinates, the routing and the layered score are in place: `resolve` keeps or discards each fact, exactly, with minimal conflict sets; `solve` then searches candidates structure first, places each by a lexicographic LP rounded to the grid, every fact kept holding exactly, routes the ROUTEs of the best of them around the symbols, with branch points and junctions, and takes the best by the layered objectives in force on their wires. `rnl solve` writes the results back into the files. What follows is the end-to-end demonstration (S6); [Not yet done](#not-yet-done) lists what solver v1 leaves out.
+
+## Pipeline
+
+```text
+LevelProblem
+  → resolve (8.5)    keep or discard each fact in its order, exactly; a witness that satisfies those kept
+  → structure        devices, nets, supply and ground, current depth, groups, rows, what is left to decide
+  → search           candidates: P0 and a beam search up the tree of groups, as the objectives in force ask
+  → coords           each candidate placed by a lexicographic LP, every fact kept holding, rounded to the grid
+  → route (13.7)     the best `beam` by the estimate: the ROUTEs routed by a rectilinear A* around the symbols
+  → score            the layered objectives measured on the wires; the best is the solution
+Solution, SolveReport
+```
+
+Each step is a module; the sections below describe them, and [Modules](#modules) lists them. Every decision is exact and counted work, never time, so the same problem and options give the same solution on every machine.
 
 ## Interface
 
@@ -16,7 +33,7 @@ let written = rnl_runtime::solution::write_record(problem, &solved.solution, rnl
 - `solve(&LevelProblem, &SolverOptions) -> Solved`: the `Solution`, and a `SolveReport` of what became of each fact. 8.5 takes the facts in the order of `LevelProblem::facts`, which is their rank, and keeps each that fits with those kept before it. `kept` lists the facts kept; `discarded` each fact discarded, with `conflicts_with`, a minimal set of facts kept before it that it conflicts with, the facts that rank first preferred, and `undecided` when the budget for deciding it ran out. `inert_objectives` lists the objectives that are on but have nothing to work with; `unrouted` the ROUTEs whose nets the router left in parts (`Unrouted`: the ROUTE, the net, the parts, whether its budget ran out), which is not an error, the viewer drawing flight lines for what is left; `work` counts what was done, as the budget counts it.
 - The `Solution` places every object with a position of its own and orients every object that has an orientation; it routes the ROUTEs (13.7): `wires`, each from a pin, a point of a wire written on the net or a branch point to another, `Bend`s between, with the ROUTE whose net and style it takes, the first ROUTE of the net; `branches`, the points where three wires or more meet, and the points on a pin where a wire routed meets another, each with a junction (13.2). `wire_routes` is empty: the `"auto"` wires written are not rewritten in this version.
 - `SolverOptions`: the tolerance (11.7, `geom::TOL` by default), the grid free coordinates are rounded to (1), the layered objectives, the beam (4) and the budget.
-- `SolverOptions::canonical()`: every setting that changes the result, in a fixed order, numbers by `geom::fmt_num`. It is what the options digest of `sig1` hashes (chapter 17), so the same options give the same hash on every platform. `SolverOptions::parse` reads it back, and `with_overrides` reads some of its settings over other options:
+- `SolverOptions::canonical()`: every setting that changes the result, in a fixed order, numbers by `geom::fmt_num`. It is what the options digest of `sig1` hashes (chapter 17), so the same options give the same hash on every platform. `SolverOptions::parse` reads it back, and `with_overrides` reads some of its settings over other options, as `rnl solve --solver-options` does; an unknown key, a key given twice or a value that does not read is an error. The defaults:
 
   ```text
   tolerance=0.000001;grid=1;objectives=current_direction,turns,ground_direction,component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect;beam=4;budget=resolve_nodes:10000,pivots:1000000,candidates:256,astar_expansions:200000
@@ -114,5 +131,17 @@ The tests of `route` route layouts given as plain geometry: two pins that face e
 The tests of `resolve` include the examples of the development plan, an orientation that matters only once two points of an object are reached, a randomized check that the explanations of the orientation classes are minimal, and, in `tests/resolve.rs`, every level of the cases written for the solver (`tests/integration/solver`) and of the conformance corpus, read from the files: every fact kept holds at the witness as a viewer checks it, every conflict set conflicts and is minimal, and T4 resolves as its reference says.
 
 The crate does no file I/O and takes no time or randomness, so it builds for `wasm32-unknown-unknown` and the same input and options give the same output on every platform. Its dependencies are pure Rust: the runtime and the `num` crates.
+
+## Not yet done
+
+Solver v1 leaves these out; the interfaces have room for them.
+
+- **Templates, channels and the feedback of the routes** (5.5 and 5.6 of the synthesis of the brainstorm, `notes/solver-design/algorithm-synthesis.md` in rnl-dev): the ROUTEs are routed by A* alone, net by net, once the coordinates are fixed. No wire template is chosen while the candidates are searched, no channels or tracks are assigned between rows, the bends the router finds are not fed back to the coordinate LP for another round, and the nets of a symmetric group are not routed as mirror images. The `"auto"` wires written are drawn straight and not rewritten (`Solution::wire_routes` is empty, the draft 0.3, 13.1).
+- **Warm start and drag projection** (5.9 of the synthesis): every solve starts from the problem alone. The previous record of the solver is not read (2.8), so a solve does not stay near the last one, and an editor's drag is not projected onto the facts; it takes effect as the editor's record is read, as for T2b.
+- **Polish** (5.8 of the synthesis): no one-step neighbourhood search improves the candidate taken.
+- **Labels**: no placement of labels or texts beyond what their facts and symbols say; `labels`, `terminal_wire_alignment` and `bend_alignment` are inert (see [Objectives](#objectives)).
+- **WebAssembly**: the crate builds for `wasm32-unknown-unknown`, but there is no binding (`bindings/solver-wasm`), no check that native and WebAssembly builds give the same solutions, and the viewer does not solve on demand.
+- **What a file of 0.2 cannot hold**: the record of a file of 0.2 cannot refer to an object without a name, such as the middle point of a `$TAIL_CENTER` written without a name in T3 and T4. The solver decides it all the same; `Written::unsolved` lists it, it stays without a position, and the constraints that reach it cannot be checked. The draft 0.3 writes it by number (5.9).
+- **A fact the budget leaves undecided** is discarded and reported `undecided`; the standard does not say yet what a solver does then.
 
 See the [roadmap](../../docs/roadmap.md) for planned work.
