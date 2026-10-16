@@ -115,7 +115,7 @@
           {
             "id": "$RES",
             "name": "$RES",
-            "package": "rnl-std",
+            "package": "rnl-std-symbols",
             "level": null,
             "default": false,
             "definition": null
@@ -123,7 +123,7 @@
           {
             "id": "$GROUND",
             "name": "$GROUND",
-            "package": "rnl-std",
+            "package": "rnl-std-virtual",
             "level": null,
             "default": false,
             "definition": null
@@ -416,7 +416,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:237:9",
+            "id": "@rnl-std-virtual.rnl:52:9",
             "kind": "usage",
             "host": [],
             "definition": "$GND",
@@ -575,7 +575,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:238:5",
+            "id": "@rnl-std-virtual.rnl:53:5",
             "nets": [
               "&0"
             ],
@@ -584,7 +584,7 @@
                 "terminal": "#R4:2"
               },
               {
-                "usage": "@rnl-std.rnl:237:9",
+                "usage": "@rnl-std-virtual.rnl:52:9",
                 "role": "p"
               }
             ],
@@ -907,6 +907,34 @@
   ],
   "dialect": "spice",
   "packages": [
+    {
+      "name": "rnl-std-style",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-symbols",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-virtual",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-core",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-layout",
+      "version": "0.2"
+    },
     {
       "name": "rnl-std",
       "version": "0.2"
