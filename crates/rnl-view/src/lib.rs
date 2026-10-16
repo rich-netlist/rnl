@@ -575,10 +575,11 @@ R1 p q 1k
 
     #[test]
     fn the_bundled_packages_are_by_version() {
-        // the standard package 0.2 and its sub-packages (16.3), and the Chinese aliases
+        // the series 0.2 with the Chinese aliases, and the series 0.3, each in its own directory
         let names: Vec<&str> = BUNDLED.iter().map(|(path, _)| *path).collect();
+        let series = |v: &str| names.iter().filter(|n| n.starts_with(&format!("{v}/"))).count();
         assert_eq!(
-            names,
+            names[..9],
             [
                 "0.2/rnl-std-core.rnl",
                 "0.2/rnl-std-fill.rnl",
@@ -591,8 +592,14 @@ R1 p q 1k
                 "0.2/rnl-zh.rnl",
             ]
         );
+        // the series 0.3: the packages of 16.3 of the language 0.3
+        assert_eq!(series("0.3"), 16);
+        for name in ["rnl-std", "rnl-std-core", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre", "rnl-std-full"] {
+            assert!(names.contains(&format!("0.3/{name}.rnl").as_str()), "{name}");
+        }
+        assert_eq!(names.len(), 9 + 16);
         let p = bundled();
-        assert_eq!(p.package_dirs, [format!("{BUNDLED_DIR}/0.2")]);
+        assert_eq!(p.package_dirs, [format!("{BUNDLED_DIR}/0.2"), format!("{BUNDLED_DIR}/0.3")]);
         assert_eq!(p.package_files().len(), names.len());
     }
 
@@ -638,10 +645,15 @@ R1 p q 1k
         assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
         assert_eq!(r.model.levels[0].items.iter().filter(|i| !i.host.is_empty()).count(), 2);
         for (path, _) in BUNDLED {
-            let package =
-                interpret(&format!("{BUNDLED_DIR}/{path}"), None, &MemoryProvider::new(), &Options::default());
+            // the series 0.3 is written in the language 0.3, which is read with the draft switch
+            // until it is released; its packages' own hints are left to their authors
+            let draft = path.starts_with(&format!("{}/", rnl_runtime::interp::unit::DRAFT_VERSION));
+            let options = Options { draft, ..Options::default() };
+            let package = interpret(&format!("{BUNDLED_DIR}/{path}"), None, &MemoryProvider::new(), &options);
             let package = package.unwrap();
-            assert!(package.diagnostics().is_empty(), "{path}: {:?}", package.diagnostics());
+            let loud: Vec<_> = package.diagnostics().into_iter().filter(|d| d.severity != Severity::Hint).collect();
+            assert!(loud.is_empty(), "{path}: {loud:?}");
+            assert!(draft || package.diagnostics().is_empty(), "{path}: {:?}", package.diagnostics());
         }
     }
 

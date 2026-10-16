@@ -172,17 +172,31 @@ fn spice_and_spectre_give_the_same_model() {
 
 #[test]
 fn standard_packages_check_clean() {
-    // every version of the standard series, in a directory of its own
+    // every version of the standard series, in a directory of its own; the series of the draft 0.3
+    // is written in the language 0.3, which the toolkit reads with the draft switch until it is
+    // released
     let lib = corpus().join("../../libraries/standard");
     let mut checked = 0;
     for dir in std::fs::read_dir(lib).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()) {
+        let draft_series = dir.file_name().is_some_and(|n| n == rnl_runtime::interp::unit::DRAFT_VERSION);
+        let options = if draft_series { draft() } else { Options::default() };
         for f in files(&dir, &["rnl"]) {
             let provider = FsProvider::new(&[]);
-            let r = interpret_file(&f, None, &provider, &Options::default()).unwrap();
+            let r = interpret_file(&f, None, &provider, &options).unwrap();
             let d = r.diagnostics();
-            assert!(d.is_empty(), "{}: {:?}", f.display(), d.iter().map(|d| r.sink.render(d)).collect::<Vec<_>>());
+            // the hints of a package checked on its own are its author's, such as the pins of the
+            // gates with four inputs, which are not on integer points (9.2.4)
+            let loud: Vec<String> = d
+                .iter()
+                .filter(|d| d.severity != rnl_runtime::diag::Severity::Hint)
+                .map(|d| r.sink.render(d))
+                .collect();
+            assert!(loud.is_empty(), "{}: {loud:?}", f.display());
+            if !draft_series {
+                assert!(d.is_empty(), "{}: {:?}", f.display(), d.iter().map(|d| r.sink.render(d)).collect::<Vec<_>>());
+            }
             checked += 1;
         }
     }
-    assert!(checked >= 9, "only {checked} package files");
+    assert!(checked >= 25, "only {checked} package files");
 }
