@@ -337,9 +337,13 @@ impl<'a> Reader<'a> {
         // a region written to be encrypted, while in it: the line that opens it, and the warning
         // for a record there (2.2)
         let mut protect: Option<(u32, &str)> = None;
+        // a run of lines read in SPICE mode, while in it: the line after which it began, 0 from
+        // the start of the file (`HostDocument::spice_mode`)
+        let mut spice = (mode == Mode::Spice).then_some(0);
         let n = lines.len();
         let mut idx = 0usize;
         while idx < n {
+            spice_mode(&mut spice, st.mode, idx as u32, &fname, &mut self.doc.spice_mode);
             let raw = lines[idx];
             let no = idx as u32 + 1;
             idx += 1;
@@ -536,6 +540,10 @@ impl<'a> Reader<'a> {
         }
         if let Some((start, _)) = protect {
             self.doc.protected.push((fname.clone(), start, n as u32 + 1));
+        }
+        spice_mode(&mut spice, st.mode, idx as u32, &fname, &mut self.doc.spice_mode);
+        if let Some(from) = spice {
+            self.doc.spice_mode.push((fname.clone(), from, n as u32 + 1));
         }
         if !st.stack.is_empty() {
             self.sink.error("a subcircuit has no `ends`", Some(Loc::line(&fname, n as u32)));
@@ -846,6 +854,20 @@ fn start_mode(path: &str) -> Mode {
     }
 }
 
+/// Follow the mode of a reading of `file` after its line `after` (`HostDocument::spice_mode`):
+/// `spice` holds the line after which the run of lines read in SPICE mode began, while in one; a
+/// run that a line ends, the switch to Spectre mode, goes into `regions` with that line.
+fn spice_mode(spice: &mut Option<u32>, mode: Mode, after: u32, file: &str, regions: &mut Vec<(String, u32, u32)>) {
+    match (mode, *spice) {
+        (Mode::Spice, None) => *spice = Some(after),
+        (Mode::Spectre, Some(from)) => {
+            regions.push((file.to_string(), from, after));
+            *spice = None;
+        }
+        _ => {}
+    }
+}
+
 /// Read a Spectre document whose main file is `path`.
 pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<HostDocument> {
     let path = normalize(path);
@@ -930,6 +952,31 @@ mod tests {
         let said: Vec<(&str, Option<Loc>)> = sink.all().iter().map(|d| (d.message.as_str(), d.loc.clone())).collect();
         assert_eq!(said, [(PROTECTED, Some(Loc::line("a.scs", 5))), (PROTECTED_SPICE, Some(Loc::line("a.scs", 11)))]);
         assert_eq!(doc.protected, [("a.scs".to_string(), 2, 7), ("a.scs".to_string(), 9, 12)]);
+    }
+
+    #[test]
+    fn the_lines_read_in_spice_mode() {
+        // where `//` is no comment (2.2): from a `simulator lang=spice` to the `simulator
+        // lang=spectre` after it, or to the end of the file; from the start of a file that is not a
+        // .scs file; from the opening of a `.lib` section
+        let net = "// t\nsimulator lang=spice\nR1 a 0 1k\nsimulator lang=spectre\ninclude \"x.inc\"\n\
+                   simulator lang=spice\n.lib \"m.scs\" tt\nR2 a 0 1k\n";
+        let inc = "* x\nsimulator lang=spectre\nR3 (a 0) resistor r=1k\n";
+        let lib = "* m\n.lib tt\n.model nch nmos\n.endl tt\n";
+        let p = MemoryProvider::new().with("a.scs", net).with("x.inc", inc).with("m.scs", lib);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        // the circuit of the main file holds what its included file writes
+        let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, ["R1", "R3", "R2"]);
+        let region = |f: &str, a, b| (f.to_string(), a, b);
+        assert_eq!(
+            doc.spice_mode,
+            [region("a.scs", 2, 4), region("x.inc", 0, 2), region("m.scs", 2, 5), region("a.scs", 6, 9)]
+        );
+        // the switches themselves: each is read in the mode before it
+        let spice: Vec<u32> = (1..=9).filter(|&l| doc.in_spice_mode("a.scs", l)).collect();
+        assert_eq!(spice, [3, 4, 7, 8, 9]);
     }
 
     #[test]

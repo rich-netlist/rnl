@@ -20,6 +20,13 @@
 //! writing one back moves the lines of those after it, so the document is read again before the
 //! next level, the texts written so far held in memory over the files.
 //!
+//! A record in a region written to be encrypted (`.prot … .unprot`, `protect … unprotect`) is
+//! gone once the region is encrypted (2.2): the record of a level whose end lies in one goes before
+//! the region (`writeback::record_line`), and a level whose own text lies in one, such as a
+//! subcircuit of an encrypted library, is solved but not written, with a note that says so. In a
+//! `simulator lang=spice` section of a Spectre file, where `//` is no comment, a record is carried
+//! by `*` (2.2).
+//!
 //! The resolution of each level is limited in time by the solver's `time_limit` (the draft 0.3,
 //! 8.5), 5 seconds unless `--solver-options` says otherwise, measured on the wall clock
 //! ([`WallClock`]): a fact whose check does not finish within it is discarded undecided, and the
@@ -63,7 +70,7 @@ use rnl_runtime::problem::{sig1, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{
-    generated_files, move_header_for, remove_generated_with_header, replace_generated_with_header,
+    generated_files, move_header_for, record_line, remove_generated_with_header, replace_generated_with_header,
 };
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Clock, Discarded, Solved, SolverOptions, Statement, AUTHOR};
@@ -106,10 +113,11 @@ pub struct SolvedLevel {
     pub problem: LevelProblem,
     pub solved: Solved,
     /// The record as [`write_record`] gives it, with what it cannot hold (`unsolved`) and what it
-    /// holds although a solver should not do it (`notes`).
+    /// holds although a solver should not do it (`notes`); and, among the notes, why it is not
+    /// written into the file when the level lies in a region written to be encrypted (2.2).
     pub written: Written,
     /// The record written into the file: [`Written::record`] finished by
-    /// `rnl_view::finish_record`.
+    /// `rnl_view::finish_record`; for a level not written, the record it would have.
     pub record: String,
     /// The `hash` of the record head (17).
     pub hash: String,
@@ -319,24 +327,38 @@ pub fn solve_with_clock(
         let solved = rnl_solver::solve_with_clock(p, &options.solver, clock);
         let time = start.elapsed();
         let hash = sig1(p, &canonical);
-        let written = write_record(p, &solved.solution, AUTHOR, &hash);
+        let mut written = write_record(p, &solved.solution, AUTHOR, &hash);
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);
         let (record, texts) = {
             let both = Layered { layers: vec![&memory, &files] };
             let record = rnl_view::finish_record(&r.doc, &both, &runtime, p, &written.record);
-            // the record and the header in one pass, at the positions of this reading: a header
-            // below the end of a subcircuit written moves to line 2, to stay the first record (2.8)
             let text = text_of(&r, &both, &host.file, &path)?;
-            let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
-            let mut texts = vec![(path.clone(), out)];
-            // a record of the solver for this level written with scope= in another file (2.6)
-            for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
-                let Some(lv) = r.doc.levels.iter().find(|l| l.file == other) else { continue };
-                let at = normalize(&lv.path);
-                let text = text_of(&r, &both, &other, &at)?;
-                let out = remove_generated_with_header(&r.doc, p.level, &other, &text, &version_of(&r, &other));
-                texts.push((at, out));
+            let mut texts = Vec::new();
+            match record_line(&r.doc, p.level, &text) {
+                // a level whose own text lies in a region written to be encrypted has no place for a
+                // record that is not gone once the region is encrypted (2.2): nothing is written for it
+                Err((a, b)) => written.notes.push(format!(
+                    "the record is not written: {} lies in a region written to be encrypted, lines {a} to {b} of {}, \
+                     where a record is gone once the region is encrypted (2.2)",
+                    p.title,
+                    file_name(&host.file)
+                )),
+                Ok(_) => {
+                    // the record and the header in one pass, at the positions of this reading: a
+                    // header below the end of a subcircuit written moves to line 2, to stay the first
+                    // record (2.8)
+                    let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
+                    texts.push((path.clone(), out));
+                    // a record of the solver for this level written with scope= in another file (2.6)
+                    for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
+                        let Some(lv) = r.doc.levels.iter().find(|l| l.file == other) else { continue };
+                        let at = normalize(&lv.path);
+                        let text = text_of(&r, &both, &other, &at)?;
+                        let out = remove_generated_with_header(&r.doc, p.level, &other, &text, &version_of(&r, &other));
+                        texts.push((at, out));
+                    }
+                }
             }
             (record, texts)
         };

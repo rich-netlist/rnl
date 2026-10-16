@@ -193,6 +193,12 @@ pub struct HostDocument {
     /// open closes after the last line of the file. Records there are read, with a warning, but
     /// they are gone once the region is encrypted, so tools do not write there (2.2).
     pub protected: Vec<(String, u32, u32)>,
+    /// The regions that a reading in Spectre's dialect reads in SPICE mode, where `//` is no
+    /// comment and only `*` carries (2.2): the file, the line after which the mode holds, that of
+    /// the `simulator lang=spice` or of the `.lib` section that switches to it, 0 in a file that
+    /// starts in it, and the line of the `simulator lang=spectre` that ends it, one past the last
+    /// line of the file when none does. The rest of a file of such a reading is in Spectre mode.
+    pub spice_mode: Vec<(String, u32, u32)>,
 }
 
 impl HostDocument {
@@ -204,11 +210,25 @@ impl HostDocument {
             globals: HashSet::new(),
             sources: Vec::new(),
             protected: Vec::new(),
+            spice_mode: Vec::new(),
         }
     }
 
     pub fn main(&self) -> &Level {
         &self.levels[0]
+    }
+
+    /// The region written to be encrypted ([`HostDocument::protected`]) that holds the line `line`
+    /// of `file`, or what is written in before that line, as the lines that open and close it.
+    pub fn protected_at(&self, file: &str, line: u32) -> Option<(u32, u32)> {
+        self.protected.iter().find(|(f, a, b)| f == file && *a < line && line <= *b).map(|(_, a, b)| (*a, *b))
+    }
+
+    /// Whether the line `line` of `file`, or what is written in before that line, is read in SPICE
+    /// mode, where only `*` is a comment (2.2): in a document of Spectre's dialect, in the regions
+    /// of [`HostDocument::spice_mode`]; in a document of another dialect, everywhere.
+    pub fn in_spice_mode(&self, file: &str, line: u32) -> bool {
+        self.dialect.name != "spectre" || self.spice_mode.iter().any(|(f, a, b)| f == file && *a < line && line <= *b)
     }
 
     /// The key a name is compared by in this dialect.

@@ -175,7 +175,9 @@ pub struct Written {
     /// decision is in the record.
     pub unsolved: Vec<Unsolved>,
     /// What is written although the standard says that a solver should not do it, such as a route
-    /// that does not keep the points of its wire (13.1).
+    /// that does not keep the points of its wire (13.1). A tool that writes the record into its
+    /// file adds why it does not, when it does not, such as `rnl solve` for a level in a region
+    /// written to be encrypted (2.2).
     pub notes: Vec<String>,
 }
 
