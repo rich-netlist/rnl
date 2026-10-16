@@ -28,10 +28,10 @@
 //! with a warning in the report (7.6). Everything after it is counted, never timed, so that it is
 //! the same on every machine: the search makes at most `candidates`, P0 always among them
 //! (`crate::Budget`); the router expands at most `astar_expansions` cells for one net and leaves
-//! the rest of the net to flight lines; the solver's own resolutions of the relations of a
-//! candidate and the coordinate LP stop at the caps of the implementation
-//! (`crate::options::CAPS`), a relation then dropped or an LP left where the resolution put the
-//! candidate. Each falls back to the best found so far, at worst P0, and the report says so.
+//! the rest of the net to flight lines; the witness of the resolution taken as written, the
+//! solver's own resolutions of the relations of a candidate and of the rows, and the coordinate LP
+//! stop at the caps of the implementation (`crate::options::CAPS`), a relation then dropped or an
+//! LP left where the resolution put the candidate. Each falls back to the best found so far, at worst P0, and the report says so.
 
 use std::collections::BTreeMap;
 
@@ -96,8 +96,10 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
     solve_exact_with(problem, options, &StoppedClock, CAPS)
 }
 
-/// Solves a level with the time limit of the options on `clock`, and the solver's own resolutions
-/// bounded by `caps` (other caps only in the tests), and gives the exact result with it.
+/// Solves a level with the time limit of the options on `clock`, and the solver's own resolutions,
+/// of the rows, of the relations of the candidates and of the coordinate LP, bounded by `caps`
+/// (other caps only in the tests; the witness taken as written in the resolution always has
+/// `CAPS`), and gives the exact result with it.
 pub(crate) fn solve_exact_with(
     problem: &LevelProblem,
     options: &SolverOptions,
@@ -118,8 +120,7 @@ pub(crate) fn solve_exact_with(
     let resolved = crate::resolve::resolve(problem, options, clock);
     notes.extend(resolved.notes.iter().cloned());
     let mut work = resolved.work;
-    let mut structure = analyse(problem, &resolved, options, &mut work);
-    structure.caps = caps;
+    let structure = analyse(problem, &resolved, options, caps, &mut work);
     notes.extend(structure.notes.iter().cloned());
     let candidates = search(problem, &structure, options, &mut work);
     let placed_count = candidates.len();

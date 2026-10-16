@@ -158,7 +158,7 @@ fn points(n: usize) -> Vec<ProblemObject> {
 }
 
 fn discarded(fact: usize, conflicts_with: Vec<usize>) -> Discarded {
-    Discarded { fact, conflicts_with, undecided: false }
+    Discarded { fact, conflicts_with, minimal: true, undecided: false }
 }
 
 // ---------------------------------------------------------------------------- checking results
@@ -661,7 +661,8 @@ fn within(seconds: f64) -> SolverOptions {
 /// Resolves with a time limit of `seconds` on [`Ticks`] and checks what the draft 0.3 says of it
 /// (8.5, 7.6): every fact kept or discarded; those kept hold at the witness; each fact discarded
 /// undecided has no conflict set and a warning, in order; each other one conflicts with facts kept
-/// before it; and a fresh clock gives the same again. Gives the resolution and the readings.
+/// before it, with a set that is minimal unless it says otherwise; nothing is noted; and a fresh
+/// clock gives the same again. Gives the resolution and the readings.
 fn check_timed(problem: &LevelProblem, seconds: f64) -> (Resolved, u64) {
     let clock = Ticks::default();
     let r = super::resolve(problem, &within(seconds), &clock);
@@ -679,14 +680,25 @@ fn check_timed(problem: &LevelProblem, seconds: f64) -> (Resolved, u64) {
         let end = format!(" was not decided within the time limit of {} s and is discarded (8.5)", fmt_num(seconds));
         assert!(w.starts_with(&format!("the fact [{}] {} ", d.fact, problem.facts[d.fact].label)), "{w}");
         assert!(w.ends_with(&end), "{w}");
-        assert!(d.conflicts_with.is_empty(), "{d:?}");
+        assert!(d.conflicts_with.is_empty() && !d.minimal, "{d:?}");
     }
+    let n = problem.objects.len();
+    let conflicts = |set: &[usize], f: usize| {
+        let mut s = Resolver::new(&r.model, n, Limits::Caps(CAPS));
+        assert!(set.iter().all(|&c| s.add(c) == Outcome::Kept), "{seconds} s: {set:?} do not fit");
+        matches!(s.add(f), Outcome::Conflict(_))
+    };
     for d in r.discarded.iter().filter(|d| !d.undecided) {
         assert!(d.conflicts_with.iter().all(|c| *c < d.fact && r.kept.contains(c)), "{seconds} s: {d:?}");
-        let mut s = Resolver::new(&r.model, problem.objects.len(), Limits::Caps(CAPS));
-        assert!(d.conflicts_with.iter().all(|&c| s.add(c) == Outcome::Kept), "{seconds} s: {d:?}");
-        assert!(matches!(s.add(d.fact), Outcome::Conflict(_)), "{seconds} s: {d:?} does not conflict");
+        assert!(conflicts(&d.conflicts_with, d.fact), "{seconds} s: {d:?} does not conflict");
+        if d.minimal {
+            for c in &d.conflicts_with {
+                let rest: Vec<usize> = d.conflicts_with.iter().copied().filter(|x| x != c).collect();
+                assert!(!conflicts(&rest, d.fact), "{seconds} s: {d:?} is not minimal without {c}");
+            }
+        }
     }
+    assert!(r.notes.is_empty(), "{seconds} s: {:?}", r.notes);
     assert_eq!(r, super::resolve(problem, &within(seconds), &Ticks::default()), "{seconds} s: not the same twice");
     (r, clock.reads())
 }
@@ -695,7 +707,7 @@ fn check_timed(problem: &LevelProblem, seconds: f64) -> (Resolved, u64) {
 fn with_no_time_at_all_only_what_the_witness_satisfies_is_kept() {
     // the time is out at the first check: a fact that needs one is discarded undecided, a fact that
     // every object at the origin satisfies is kept without one (the draft 0.3, 8.5)
-    let p = problem_of(
+    let mut p = problem_of(
         points(3),
         vec![
             place(o(0), Axis::X, 0.0),
@@ -705,14 +717,20 @@ fn with_no_time_at_all_only_what_the_witness_satisfies_is_kept() {
             distance(Sense::Either, Some(2.0), None, vec![o(1)], vec![o(2)]),
         ],
     );
+    p.facts[4].source = Some(rnl_runtime::diag::Loc::new("cases/t.sp", 12, 5));
     let (r, _) = check_timed(&p, 0.0);
     assert_eq!(r.kept, vec![0, 2, 3]);
     let undecided: Vec<usize> = r.discarded.iter().filter(|d| d.undecided).map(|d| d.fact).collect();
     assert_eq!(undecided, vec![1, 4]);
+    // each warning names its fact, with where its statement is written when it has a place
     let label = &p.facts[1].label;
     assert_eq!(
-        r.warnings[0],
-        format!("the fact [1] {label} was not decided within the time limit of 0 s and is discarded (8.5)")
+        r.warnings,
+        [
+            format!("the fact [1] {label} was not decided within the time limit of 0 s and is discarded (8.5)"),
+            "the fact [4] DISTANCE (t.sp:12) was not decided within the time limit of 0 s and is discarded (8.5)"
+                .to_string(),
+        ]
     );
     assert_eq!(r.work.resolve_nodes, 0);
     // the witness is the resolution's, within the tolerance: nothing more was resolved
@@ -742,7 +760,8 @@ fn a_check_out_of_time_leaves_its_fact_undecided() {
     let mut cut = false;
     for limit in 0..=reads {
         let (r, _) = check_timed(&p, limit as f64);
-        cut |= r.kept == [0, 1] && r.discarded == [Discarded { fact: 2, conflicts_with: Vec::new(), undecided: true }];
+        cut |= r.kept == [0, 1]
+            && r.discarded == [Discarded { fact: 2, conflicts_with: Vec::new(), minimal: false, undecided: true }];
         if r.warnings.is_empty() {
             // whenever no check reaches the limit, the facts kept are those of 8.5
             assert_eq!(r.kept, unlimited.kept, "{limit} s");
@@ -771,10 +790,10 @@ fn a_search_that_grows_too_large_stops_at_its_time_limit() {
 }
 
 #[test]
-fn the_time_limit_covers_the_witness_and_the_conflict_sets_too() {
-    // the example of the brainstorm: once every fact is decided, the time goes on to the witness
-    // taken as written and to the minimal conflict sets; a limit that cuts those keeps the facts
-    // of 8.5 and says what it left undone
+fn the_time_limit_covers_the_conflict_sets_but_not_the_witness() {
+    // the example of the brainstorm: once every fact is decided, the time goes on to the minimal
+    // conflict sets alone (the draft 0.3, 8.5); the witness taken as written is counted in work,
+    // not timed. A limit that cuts the sets keeps the facts of 8.5 and their witness
     let mut facts = vec![
         place(o(0), Axis::Y, 0.0),
         distance(Sense::Either, Some(2.0), None, vec![o(0)], vec![o(1)]),
@@ -787,23 +806,28 @@ fn the_time_limit_covers_the_witness_and_the_conflict_sets_too() {
     let p = problem_of(points(2), facts);
     let unlimited = resolve(&p, &SolverOptions::without_time_limit());
     assert_eq!(unlimited.kept, vec![0, 1, 2, 5]);
+    assert!(unlimited.discarded.iter().all(|d| d.minimal), "{:?}", unlimited.discarded);
     let (_, reads) = check_timed(&p, 1e9);
-    let (mut witness, mut sets) = (false, false);
+    let mut sets = false;
     for limit in 0..=reads {
         let (r, _) = check_timed(&p, limit as f64);
         if !r.warnings.is_empty() {
             continue;
         }
+        // every fact decided: what is kept, and the witness, are those of 8.5
         assert_eq!(r.kept, unlimited.kept, "{limit} s");
         assert_eq!(r.discarded.iter().map(|d| d.fact).collect::<Vec<_>>(), [3, 4], "{limit} s");
-        witness |= r.notes.iter().any(|n| n.contains("ran out after every fact was decided"));
-        sets |= r.notes.iter().any(|n| n.contains("were made minimal"));
-        if r.notes.is_empty() {
-            assert_eq!(r.witness, unlimited.witness, "{limit} s");
-            assert_eq!(r.discarded, unlimited.discarded, "{limit} s");
+        assert_eq!(r.witness, unlimited.witness, "{limit} s");
+        assert_eq!((r.as_written, &r.placing), (unlimited.as_written, &unlimited.placing), "{limit} s");
+        // a set the limit cut says so; the others are those of 8.5
+        sets |= r.discarded.iter().any(|d| !d.minimal);
+        for (d, u) in r.discarded.iter().zip(&unlimited.discarded) {
+            if d.minimal {
+                assert_eq!(d, u, "{limit} s");
+            }
         }
     }
-    assert!(witness && sets, "the limit never cut the witness ({witness}) or the conflict sets ({sets})");
+    assert!(sets, "the limit never cut the conflict sets");
     assert_eq!(check_timed(&p, reads as f64).0, unlimited);
 }
 

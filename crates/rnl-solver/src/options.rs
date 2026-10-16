@@ -206,9 +206,9 @@ impl Objectives {
 /// the best it has: the search stops with the best candidate so far, a net is left in parts.
 ///
 /// The resolution of 8.5 has no budget of work: only the time limit bounds it
-/// ([`SolverOptions::time_limit`], the draft 0.3, 8.5). The solver's own uses of the resolution,
-/// for the relations of a candidate and the coordinate LP, stay counted, by caps that the
-/// implementation fixes rather than options (`Caps`).
+/// ([`SolverOptions::time_limit`], the draft 0.3, 8.5). The witness taken as written and the
+/// solver's own uses of the resolution, for the relations of a candidate and the coordinate LP,
+/// stay counted, by caps that the implementation fixes rather than options (`Caps`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Budget {
     /// The candidates the search makes over the whole level.
@@ -223,14 +223,15 @@ impl Default for Budget {
     }
 }
 
-/// The work that the solver's own uses of the resolution may do: the relations of a candidate
-/// taken in after the facts kept, the analysis of the rows, and the coordinate LP. They are not
-/// the resolution of 8.5, which only the time limit bounds ([`SolverOptions::time_limit`]); they
-/// are counted, so that their result does not depend on the machine, by caps that the
-/// implementation fixes ([`CAPS`]), backstops far above what a level of a few hundred objects
-/// needs. A search that reaches its cap drops its relation without a conflict, a simplex that
-/// reaches its cap stops and the LP leaves the candidate where its resolution put it, and the
-/// report says so.
+/// The work that the uses of the resolution other than the resolution of 8.5 itself may do: the
+/// witness taken as written (`crate::resolve`), the relations of a candidate taken in after the
+/// facts kept, the analysis of the rows, and the coordinate LP. They are not the checks of 8.5,
+/// which only the time limit bounds ([`SolverOptions::time_limit`]); they are counted, so that
+/// their result does not depend on the machine, by caps that the implementation fixes ([`CAPS`]),
+/// backstops far above what a level of a few hundred objects needs. A search that reaches its cap
+/// drops its relation without a conflict, a simplex that reaches its cap stops and the LP leaves
+/// the candidate where its resolution put it, the witness is the resolution's when it cannot be
+/// taken as written, and the report says so.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Caps {
     /// The nodes of the search for the literals of one relation.

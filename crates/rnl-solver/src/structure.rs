@@ -46,7 +46,7 @@ use rnl_runtime::problem::{Axis, FactKind, Filler, LevelProblem, ObjectKind, Poi
 
 use crate::model::{turned, Model, PointId};
 use crate::objectives::{Active, Inputs, Objective};
-use crate::options::{Caps, CAPS};
+use crate::options::Caps;
 use crate::rational::{frac, from_f64, int, Q};
 use crate::resolve::{point_value, Geometry, Resolved};
 use crate::search::{with_relations, RelKind, Relation, Tagged};
@@ -562,12 +562,14 @@ impl Structure {
     }
 }
 
-/// The structure of a level, from its resolution, for the options given. The work of the
-/// resolutions it makes is added to `work`.
+/// The structure of a level, from its resolution, for the options given, its own resolutions,
+/// those of the rows here and of the relations of the candidates later, bounded by `caps`. The work
+/// of the resolutions it makes is added to `work`.
 pub(crate) fn analyse(
     problem: &LevelProblem,
     resolved: &Resolved,
     options: &SolverOptions,
+    caps: Caps,
     work: &mut Work,
 ) -> Structure {
     let mut notes = Vec::new();
@@ -644,7 +646,7 @@ pub(crate) fn analyse(
         model,
         witness,
         kept,
-        caps: CAPS,
+        caps,
     };
     if s.has(Source::DepthRows) {
         s.depth = Some(depths(&s));
@@ -1638,7 +1640,7 @@ pub(crate) mod tests {
     fn structure_of(p: &LevelProblem) -> Structure {
         let options = SolverOptions::without_time_limit();
         let r = crate::resolve(p, &options);
-        analyse(p, &r, &options, &mut Work::default())
+        analyse(p, &r, &options, crate::options::CAPS, &mut Work::default())
     }
 
     #[test]

@@ -564,9 +564,10 @@ pub fn not_solved(n: &NotSolved) -> String {
 }
 
 /// What the command prints of one level: its title, the facts kept and discarded (every fact with
-/// `all`, otherwise the discarded ones with the facts they conflict with), the warnings of the
-/// solver, each on a line of its own (7.6), what the record cannot hold, the ROUTEs left in parts,
-/// the inert objectives, the notes, the work and the time.
+/// `all`, otherwise the discarded ones with the facts they conflict with, marked when the time
+/// limit left the set not minimal), the warnings of the solver, each on a line of its own (7.6),
+/// what the record cannot hold, the ROUTEs left in parts, the inert objectives, the notes, the work
+/// and the time.
 pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     let p = &level.problem;
     let r = &level.solved.report;
@@ -579,13 +580,18 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
         r.discarded.len(),
         count(p.facts.len(), "fact")
     )];
-    // a fact discarded, and the minimal set of facts kept before it that it conflicts with
+    // a fact discarded, and the minimal set of facts kept before it that it conflicts with, or the
+    // set found when the time limit ran out before it was made minimal (the draft 0.3, 8.5)
     let discarded = |out: &mut Vec<String>, k: usize, indent: &str| {
         let Some(d) = r.discarded.iter().find(|d| d.fact == k) else { return };
-        let why = match (d.undecided, d.conflicts_with.is_empty()) {
-            (true, _) => "not decided within the time limit of the solver (8.5)",
-            (false, true) => "it cannot hold even alone",
-            (false, false) => "it conflicts with",
+        let why = match (d.undecided, d.conflicts_with.is_empty(), d.minimal) {
+            (true, _, _) => "not decided within the time limit of the solver (8.5)",
+            (false, true, _) => "it cannot hold even alone",
+            (false, false, true) => "it conflicts with",
+            (false, false, false) => {
+                "it conflicts with these, a set not made minimal within the time limit of the solver, so the \
+                 list of its sets is not complete (8.5)"
+            }
         };
         out.push(format!("{indent}discarded {}: {why}", describe_fact(p, k)));
         for c in &d.conflicts_with {

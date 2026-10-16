@@ -665,7 +665,8 @@ fn every_case_of_the_solver_is_placed_keeping_every_fact_kept() {
 
 /// A budget too small for anything still gives a solution that RNL can write: every object placed
 /// and oriented, every fact kept holding, the wires made valid and the rest reported, the same
-/// twice. The solver's own resolutions have caps of two nodes and 30 pivots.
+/// twice. The solver's own resolutions, of the rows, of the relations of the candidates and of the
+/// coordinate LP, have caps of two nodes and 30 pivots.
 #[test]
 fn a_tiny_budget_still_gives_a_valid_solution() {
     let options =
@@ -1157,7 +1158,7 @@ fn overlapping_groups_keep_the_shared_part_between_the_others() {
         let options = SolverOptions::without_time_limit();
         let resolved = crate::resolve(p, &options);
         let mut work = crate::Work::default();
-        let s = analyse(p, &resolved, &options, &mut work);
+        let s = analyse(p, &resolved, &options, CAPS, &mut work);
         let nodes = &s.tree.nodes;
         let union = nodes.iter().position(|n| n.fixed_order).unwrap_or_else(|| panic!("{groups}: {nodes:?}"));
         let parts: Vec<Vec<usize>> = nodes[union].children.iter().map(|&c| nodes[c].members.clone()).collect();
@@ -1234,7 +1235,7 @@ fn groups_and_facts_drawn_at_random_are_solved() {
         let p = &ps[0];
         let resolved = crate::resolve(p, &options);
         let mut work = crate::Work::default();
-        let s = analyse(p, &resolved, &options, &mut work);
+        let s = analyse(p, &resolved, &options, CAPS, &mut work);
         let free = s.precedence.is_empty() && s.reversible.is_empty();
         let nodes = &s.tree.nodes;
         for c in search(p, &s, &options, &mut work) {

@@ -706,7 +706,8 @@ fn a_write_that_fails_says_what_it_wrote_before() {
     // the command says so before it fails
     let dir = scratch("failing-command");
     std::fs::create_dir_all(dir.join("04-hierarchy-lib.inc")).unwrap();
-    let (code, stdout, stderr) = rnl(&["solve", &path_str(&f), "-o", &path_str(&dir)]);
+    let (code, stdout, stderr) =
+        rnl(&["solve", &path_str(&f), "-o", &path_str(&dir), "--solver-options", "time_limit=none"]);
     assert_eq!(code, 2, "{stdout}{stderr}");
     assert!(stdout.ends_with(&format!("wrote {}\n", path_str(&dir.join("04-hierarchy.sp")))), "{stdout}");
     assert!(stderr.contains("rnl: cannot write "), "{stderr}");
@@ -724,15 +725,18 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
     let dir = scratch("command");
     let out = path_str(&dir.join("out"));
     // where to write is not optional, and what does not read is an error
-    let (code, _, err) = rnl(&["solve", &f]);
+    let (code, _, err) = rnl(&["solve", &f, "--solver-options", "time_limit=none"]);
     assert_eq!(code, 2);
     assert!(err.contains("solve needs -o DIR"), "{err}");
-    assert_eq!(rnl(&["solve", &f, "-o", &out, "--in-place"]).0, 2);
+    assert_eq!(rnl(&["solve", &f, "-o", &out, "--in-place", "--solver-options", "time_limit=none"]).0, 2);
     let (code, _, err) = rnl(&["solve", &f, "-o", &out, "--solver-options", "speed=3"]);
     assert_eq!(code, 2);
     assert!(err.contains("--solver-options: the solver has no option `speed`"), "{err}");
-    assert_eq!(rnl(&["solve", &f, "-o", &out, "--level", "nope"]).0, 2);
-    assert_eq!(rnl(&["solve", &path_str(&dir.join("missing.sp")), "-o", &out]).0, 2);
+    assert_eq!(rnl(&["solve", &f, "-o", &out, "--level", "nope", "--solver-options", "time_limit=none"]).0, 2);
+    assert_eq!(
+        rnl(&["solve", &path_str(&dir.join("missing.sp")), "-o", &out, "--solver-options", "time_limit=none"]).0,
+        2
+    );
     assert!(!dir.join("out").exists());
 
     // the command's time limit is the toolkit's 5 seconds unless the options say otherwise
@@ -763,7 +767,8 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
 
     // a file whose RNL is not interpreted: said, and nothing written
     let unsupported = path_str(&corpus("13-unsupported-version.sp"));
-    let (code, stdout, _) = rnl(&["solve", &unsupported, "-o", &path_str(&dir.join("none"))]);
+    let (code, stdout, _) =
+        rnl(&["solve", &unsupported, "-o", &path_str(&dir.join("none")), "--solver-options", "time_limit=none"]);
     assert_eq!(code, 0, "{stdout}");
     assert!(stdout.contains("): not solved, and nothing is written for it: "), "{stdout}");
     assert!(!stdout.contains("\nwrote "), "{stdout}");
@@ -771,7 +776,8 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
 
     // the files beside the netlist that it reads are copied
     let alias = path_str(&corpus("11-header-alias-device.sp"));
-    let (code, stdout, _) = rnl(&["solve", &alias, "-o", &path_str(&dir.join("alias"))]);
+    let (code, stdout, _) =
+        rnl(&["solve", &alias, "-o", &path_str(&dir.join("alias")), "--solver-options", "time_limit=none"]);
     assert_eq!(code, 0, "{stdout}");
     assert!(
         stdout.ends_with(&format!("copied {}\n", path_str(&dir.join("alias").join("11-acme-style.rnl")))),
@@ -1445,6 +1451,15 @@ fn check_undecided(level: &rnl_cli::solve::SolvedLevel, what: &str) {
     assert_eq!(r.warnings.len(), undecided.len(), "{what}: {:?}", r.warnings);
     for (k, w) in undecided.iter().zip(&r.warnings) {
         assert!(w.starts_with(&format!("the fact [{k}] ")) && w.ends_with(" and is discarded (8.5)"), "{w}");
+        // with where its statement is written and the definitions it was expanded from
+        let f = &p.facts[*k];
+        if let Some(l) = &f.source {
+            let at = format!("{} ({}:{}", f.label, rnl_runtime::host::file_name(&l.file), l.line);
+            assert!(w.contains(&at), "{w}: {at}");
+        }
+        for u in &f.chain {
+            assert!(w.contains(&p.usages[*u].definition), "{w}");
+        }
         let line =
             format!("  discarded {}: not decided within the time limit of the solver (8.5)", describe_fact(p, *k));
         assert!(lines.contains(&line), "{what}: {line}\n{lines:#?}");
@@ -1488,6 +1503,54 @@ fn with_no_time_at_all_only_what_the_origin_satisfies_is_kept_and_the_rest_is_wa
     let all = solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap();
     let report = &all.levels[0].solved.report;
     assert!(report.discarded.is_empty() && report.warnings.is_empty(), "{report:?}");
+}
+
+#[test]
+fn a_conflict_set_the_time_limit_left_not_minimal_is_marked() {
+    // three resistors placed apart on x and an ALIGN on x of them all, which conflicts with the
+    // PLACEs. A limit that runs out after every fact is decided, while the conflict sets are made
+    // minimal, keeps the facts of 8.5, and the line of each fact whose set it cut says that the
+    // set is not minimal and the list not complete (the draft 0.3, 8.5); with more time, the sets
+    // are those of 8.5, and so they stay
+    let body = "* cut\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\nR3 c d 1k\n* @RNL { \
+                #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); #R3 @PLACE(20, 0); {#R1 #R2 #R3} @ALIGN(\"x\") }\n.end\n";
+    let files = MemoryProvider::new().with("/w/t.sp", body);
+    let all = solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap();
+    let whole = &all.levels[0].solved.report;
+    assert!(!whole.discarded.is_empty() && whole.discarded.iter().all(|d| d.minimal), "{whole:?}");
+    let marked = "it conflicts with these, a set not made minimal within the time limit of the solver, so the list \
+                  of its sets is not complete (8.5)";
+    let mut cut = false;
+    for limit in 0..400 {
+        let run = solve_with_clock(Path::new("/w/t.sp"), &files, &within(limit as f64), &Ticks::default()).unwrap();
+        let level = &run.levels[0];
+        let r = &level.solved.report;
+        check_undecided(level, &format!("{limit} s"));
+        check_kept(&run, &format!("{limit} s"));
+        if !r.warnings.is_empty() {
+            continue;
+        }
+        assert_eq!(r.kept, whole.kept, "{limit} s");
+        assert_eq!(r.discarded.len(), whole.discarded.len(), "{limit} s");
+        let lines = rnl_cli::solve::report(level, false);
+        let mut minimal = true;
+        for (d, u) in r.discarded.iter().zip(&whole.discarded) {
+            assert_eq!(d.fact, u.fact, "{limit} s");
+            let line = format!("  discarded {}: ", describe_fact(&level.problem, d.fact));
+            if d.minimal {
+                assert_eq!(d, u, "{limit} s");
+                assert!(lines.contains(&format!("{line}it conflicts with")), "{limit} s: {lines:#?}");
+            } else {
+                (cut, minimal) = (true, false);
+                assert!(lines.contains(&format!("{line}{marked}")), "{limit} s: {lines:#?}");
+                assert!(d.conflicts_with.iter().all(|c| r.kept.contains(c)), "{limit} s: {d:?}");
+            }
+        }
+        if minimal {
+            break;
+        }
+    }
+    assert!(cut, "no limit cut a conflict set");
 }
 
 #[test]

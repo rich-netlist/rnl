@@ -308,7 +308,7 @@ mod tests {
         let options = crate::SolverOptions::without_time_limit();
         let resolved = crate::resolve(&p, &options);
         let mut work = resolved.work;
-        let s = crate::structure::analyse(&p, &resolved, &options, &mut work);
+        let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut work);
         (p, s)
     }
 

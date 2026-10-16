@@ -50,19 +50,19 @@
 //! **The time limit** (the draft 0.3, 8.5; [`SolverOptions::time_limit`]). Deciding the facts is
 //! NP-hard in general (the side of `"x"` DISTANCEs alone can encode graph colouring), so the
 //! resolution of a level may be limited in time, on the clock the caller gives ([`Deadline`]). The
-//! limit runs from the start of the resolution and covers all of it: the checks of the facts, the
-//! witness taken as written, and the deletion filters, in that order, so that what is decided goes
-//! first. The time is read at the start of each check of a fact, at each node of a search, and
-//! every few pivots of a simplex ([`crate::simplex::PIVOTS_PER_READ`]). When it is out during the
-//! check of a fact, the fact is discarded **undecided**, with no conflict set and a warning (7.6),
-//! and so is every later fact that needs a check; a later fact that the witness already satisfies
-//! is kept, as step 1 needs no check, so that the witness satisfies every fact kept. When it is
-//! out after every fact is decided, the witness is the one of the resolution, within the
-//! tolerance, and a conflict set not yet made minimal is the explanation found, which a note
-//! says. Without a limit, and whenever no check reaches it, the result is the one of 8.5. The
-//! solver's own uses of the resolution, for the relations of a candidate (`crate::search`), are
-//! not timed: they are bounded by caps of work ([`Caps`]), and a search or a simplex that reaches
-//! its cap leaves its relation undecided.
+//! limit runs from the start of the resolution and covers the checks of the facts and then the
+//! deletion filters of their conflict sets, nothing else. The time is read at the start of each
+//! check of a fact, at each node of a search, and every few pivots of a simplex
+//! ([`crate::simplex::PIVOTS_PER_READ`]). When it is out during the check of a fact, the fact is
+//! discarded **undecided**, with no conflict set and a warning (7.6), and so is every later fact
+//! that needs a check; a later fact that the witness already satisfies is kept, as step 1 needs no
+//! check, so that the witness satisfies every fact kept. When it is out after every fact is
+//! decided, a conflict set not yet made minimal is the explanation found, or the set its filter
+//! reached, which still conflicts with its fact, and [`Discarded::minimal`] is false. Without a
+//! limit, and whenever no check reaches it, the result is the one of 8.5. What is not the
+//! resolution of 8.5 is not timed: the witness taken as written below, and the solver's own uses
+//! of the resolution, for the relations of a candidate (`crate::search`), are bounded by caps of
+//! work ([`Caps`]), and a search or a simplex that reaches its cap leaves its relation undecided.
 //!
 //! **The witness given back** is taken, when it can be, from the facts kept resolved once more
 //! without the tolerance: the tolerance decides conflicts (11.7), but a simplex stops on the bounds
@@ -73,17 +73,21 @@
 //! taken from them so. Of two facts that hold together only within the tolerance, the one that
 //! ranks first keeps its constant, and the coordinates sought on that model are what it says, so
 //! that the record of the solver, which a viewer checks with its own tolerance (11.7), writes the
-//! constants of the facts that rank first (17).
+//! constants of the facts that rank first (17). These resolutions are not timed but bounded by the
+//! caps of work ([`CAPS`]), so the witness is the same whenever every fact is decided; when a fact
+//! is left undecided they are not made, and the witness is the one of the resolution, which
+//! satisfies the facts kept within the tolerance.
 
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use num_traits::Zero;
 use rnl_runtime::geom::{fmt_num, Orient};
+use rnl_runtime::host::file_name;
 use rnl_runtime::problem::{FactKind, LevelProblem, PointRef, Position};
 
 use crate::model::{ax, turned, Bound, ChoiceKind, LitKey, Model, OrientEffect, PointId, VarKind};
-use crate::options::Caps;
+use crate::options::{Caps, CAPS};
 use crate::orient::{from_index, index, OrientClasses};
 use crate::rational::{from_f64, to_f64, Q};
 use crate::simplex::{Failure, LinExpr, Rel, Simplex, Var};
@@ -124,7 +128,8 @@ impl<'c> Deadline<'c> {
 }
 
 /// What bounds a resolution: the resolution of 8.5 has the time limit and no cap of work; the
-/// solver's own uses of it have caps of work and no time limit (see the module).
+/// witness taken as written and the solver's own uses of the resolution have caps of work and no
+/// time limit (see the module).
 #[derive(Clone, Copy)]
 pub(crate) enum Limits<'a> {
     Time(&'a Deadline<'a>),
@@ -1235,13 +1240,14 @@ pub struct Resolved {
     /// The facts kept, by their index in [`LevelProblem::facts`], in that order (8.5).
     pub kept: Vec<usize>,
     /// The facts discarded, in that order, each with a minimal set of facts kept before it that it
-    /// conflicts with, or undecided.
+    /// conflicts with, a set the time limit left not minimal, or undecided ([`Discarded`]).
     pub discarded: Vec<Discarded>,
     pub work: Work,
     /// The warnings (7.6): one for each fact discarded undecided because the time limit was out
     /// (the draft 0.3, 8.5), in the order of the facts.
     pub warnings: Vec<String>,
-    /// Anything else worth saying, such as conflict sets the time limit left as they were found.
+    /// Anything else worth saying of the resolution, one sentence each. What the time limit left
+    /// undone is not here but in `warnings` and [`Discarded::minimal`].
     pub notes: Vec<String>,
     pub(crate) model: Model,
     pub(crate) witness: Witness,
@@ -1316,8 +1322,8 @@ pub(crate) fn point_value(problem: &LevelProblem, g: &Geometry, r: &PointRef, ax
 }
 
 /// Resolves the facts of a level (8.5), with the time limit of the options on `clock` (the draft
-/// 0.3, 8.5): the facts first, then the witness taken as written, then the deletion filters of the
-/// conflict sets, all within the one limit, so that what is decided goes first (see the module).
+/// 0.3, 8.5): the facts first, then the deletion filters of their conflict sets, within the one
+/// limit; then, counted in work and not timed, the witness taken as written (see the module).
 pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Resolved {
     let tol = from_f64(options.tolerance)
         .filter(|t| *t >= Q::zero())
@@ -1332,7 +1338,6 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     let mut conflicts: Vec<(usize, Vec<usize>)> = Vec::new();
     let mut undecided = Vec::new();
     let mut warnings = Vec::new();
-    let mut notes = Vec::new();
     let mut r = Resolver::new(&model, n, limits);
     for f in 0..problem.facts.len() {
         match r.add(f) {
@@ -1340,8 +1345,8 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
             Outcome::Conflict(set) => conflicts.push((f, set)),
             Outcome::Undecided => {
                 warnings.push(format!(
-                    "the fact [{f}] {} was not decided within the time limit of {seconds} s and is discarded (8.5)",
-                    problem.facts[f].label
+                    "the fact {} was not decided within the time limit of {seconds} s and is discarded (8.5)",
+                    fact_name(problem, f)
                 ));
                 undecided.push(f);
             }
@@ -1349,46 +1354,46 @@ pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &d
     }
     work.resolve_nodes += r.nodes;
     work.pivots += r.pivots();
-    let decided = !deadline.has_passed();
+    // the minimal conflict sets, still within the limit (8.5)
+    let mut discarded: Vec<Discarded> = undecided
+        .iter()
+        .map(|&fact| Discarded { fact, conflicts_with: Vec::new(), minimal: false, undecided: true })
+        .collect();
+    for (f, set) in conflicts {
+        let (conflicts_with, minimal) = minimize(&model, n, limits, f, set, &mut work);
+        discarded.push(Discarded { fact: f, conflicts_with, minimal, undecided: false });
+    }
+    discarded.sort_by_key(|d| d.fact);
     // The tolerance decides conflicts (11.7); it need not move what the facts do not move. When
     // the facts kept hold with their constants as written, the witness is taken from them so: a
     // PLACE at 4 puts the object at 4, not at 4 less the tolerance, where a simplex stops.
-    // Otherwise as many of them as can, in the order of 8.5 (see the module). When the time is
-    // out, the witness of the resolution, which satisfies them within the tolerance.
-    let placed = if decided { taken_as_written(problem, &model, &kept, limits, &mut work) } else { None };
-    let (witness, as_written, placing) = match placed {
-        Some(p) => p,
-        None => {
-            if decided && deadline.has_passed() {
-                notes.push(format!(
-                    "the time limit of {seconds} s ran out after every fact was decided, while the facts kept were \
-                     held with their constants as written: the solution satisfies them within the tolerance (11.7)"
-                ));
-            }
-            (witness_of(&r, &model), false, model.clone())
-        }
-    };
+    // Otherwise as many of them as can, in the order of 8.5 (see the module). Not timed, so that
+    // it is the same whenever every fact is decided; when one is not, the witness of the
+    // resolution, which satisfies the facts kept within the tolerance.
+    let placed = if undecided.is_empty() { taken_as_written(problem, &model, &kept, &mut work) } else { None };
+    let (witness, as_written, placing) = placed.unwrap_or_else(|| (witness_of(&r, &model), false, model.clone()));
     drop(r);
-    let mut discarded: Vec<Discarded> =
-        undecided.into_iter().map(|fact| Discarded { fact, conflicts_with: Vec::new(), undecided: true }).collect();
-    let mut loose = Vec::new();
-    for (f, set) in conflicts {
-        let (conflicts_with, minimal) =
-            if deadline.has_passed() { (set, false) } else { minimize(&model, n, limits, f, set, &mut work) };
-        if !minimal {
-            loose.push(format!("[{f}]"));
-        }
-        discarded.push(Discarded { fact: f, conflicts_with, undecided: false });
+    Resolved { kept, discarded, work, warnings, notes: Vec::new(), witness, model, as_written, placing }
+}
+
+/// A fact as a warning names it: its index, its label, where its statement is written and the
+/// definitions whose usages expanded to it, outermost first (8.5, 7.6).
+fn fact_name(problem: &LevelProblem, f: usize) -> String {
+    let fact = &problem.facts[f];
+    let mut place = Vec::new();
+    if let Some(l) = &fact.source {
+        place.push(format!("{}:{}", file_name(&l.file), l.line));
     }
-    discarded.sort_by_key(|d| d.fact);
-    if !loose.is_empty() {
-        notes.push(format!(
-            "the time limit of {seconds} s ran out before the facts that {} conflict with were made minimal: those \
-             listed conflict with them, but not every one of them may be needed (8.5)",
-            loose.join(", ")
-        ));
+    let defs: Vec<&str> =
+        fact.chain.iter().filter_map(|u| problem.usages.get(*u)).map(|u| u.definition.as_str()).collect();
+    if !defs.is_empty() {
+        place.push(format!("from {}", defs.join(" in ")));
     }
-    Resolved { kept, discarded, work, warnings, notes, witness, model, as_written, placing }
+    if place.is_empty() {
+        format!("[{f}] {}", fact.label)
+    } else {
+        format!("[{f}] {} ({})", fact.label, place.join(", "))
+    }
 }
 
 /// The placement a resolution has reached, with every variable of `model` on each axis.
@@ -1400,16 +1405,17 @@ fn witness_of(r: &Resolver, model: &Model) -> Witness {
 }
 
 /// The witness taken from the facts kept with their constants as written, as far as they hold so
-/// (see the module), whether all of them do, and the model it is taken from; none when the time is
-/// out first, or when the facts kept do not hold again on that model.
+/// (see the module), whether all of them do, and the model it is taken from; none when the facts
+/// kept do not hold again on that model, as when a cap runs out. Bounded by the caps of work
+/// ([`CAPS`]), not timed.
 fn taken_as_written(
     problem: &LevelProblem,
     model: &Model,
     kept: &[usize],
-    limits: Limits,
     work: &mut Work,
 ) -> Option<(Witness, bool, Model)> {
     let n = problem.objects.len();
+    let limits = Limits::Caps(CAPS);
     let exact = Model::new(problem, Q::zero());
     let mut e = Resolver::new(&exact, n, limits);
     let all = kept.iter().all(|&f| e.add(f) == Outcome::Kept);
@@ -1420,10 +1426,7 @@ fn taken_as_written(
     if let Some(witness) = witness {
         return Some((witness, true, exact));
     }
-    if limits.was_out() {
-        return None;
-    }
-    let placing = Model::with_exact(problem, model.tol.clone(), held_as_written(problem, model, kept, limits, work)?);
+    let placing = Model::with_exact(problem, model.tol.clone(), held_as_written(problem, model, kept, work));
     let mut w = Resolver::new(&placing, n, limits);
     let holds = kept.iter().all(|&f| w.add(f) == Outcome::Kept);
     work.resolve_nodes += w.nodes;
@@ -1436,14 +1439,8 @@ fn taken_as_written(
 /// The facts kept whose constants can hold as written, in the order of 8.5: each in turn is held
 /// so when the facts kept still hold together with it and those before it held so, the others
 /// within the tolerance of `model`. A fact without a constant to widen is the same either way.
-/// None when the time is out first.
-fn held_as_written(
-    problem: &LevelProblem,
-    model: &Model,
-    kept: &[usize],
-    limits: Limits,
-    work: &mut Work,
-) -> Option<BTreeSet<usize>> {
+/// Bounded by the caps of work ([`CAPS`]): a trial that reaches one does not hold its fact so.
+fn held_as_written(problem: &LevelProblem, model: &Model, kept: &[usize], work: &mut Work) -> BTreeSet<usize> {
     let n = problem.objects.len();
     let mut exact = BTreeSet::new();
     for &f in kept {
@@ -1460,31 +1457,32 @@ fn held_as_written(
         }
         exact.insert(f);
         let trial = Model::with_exact(problem, model.tol.clone(), exact.clone());
-        let mut t = Resolver::new(&trial, n, limits);
+        let mut t = Resolver::new(&trial, n, Limits::Caps(CAPS));
         let holds = kept.iter().all(|&g| t.add(g) == Outcome::Kept);
         work.resolve_nodes += t.nodes;
         work.pivots += t.pivots();
-        if limits.was_out() {
-            return None;
-        }
         if !holds {
             exact.remove(&f);
         }
     }
-    Some(exact)
+    exact
 }
 
 /// The deletion filter (step 3 of the module): a minimal subset of `set` that `f` conflicts with,
 /// the facts of the latest rank left out first, and whether it is minimal. When `f` still
 /// conflicts without a fact, the set shrinks to what that test's own explanation names, which
-/// leaves out at once the facts the conflict does not need. When the time is out, the filter
-/// stops, and the set it has reached, which still conflicts with `f`, is not known to be minimal:
-/// a test that did not finish keeps its fact.
+/// leaves out at once the facts the conflict does not need. When the time is out, before the
+/// filter or during it, the filter stops, and the set it has reached, which still conflicts with
+/// `f`, is not known to be minimal: a test that did not finish keeps its fact. An empty set is
+/// minimal as it is.
 fn minimize(model: &Model, n: usize, limits: Limits, f: usize, set: Vec<usize>, work: &mut Work) -> (Vec<usize>, bool) {
     let mut set = set;
     let mut tried: BTreeSet<usize> = BTreeSet::new();
     // the latest fact of the set not tried yet
     while let Some(c) = set.iter().rev().copied().find(|c| !tried.contains(c)) {
+        if limits.was_out() {
+            return (set, false);
+        }
         tried.insert(c);
         let rest: Vec<usize> = set.iter().copied().filter(|&g| g != c).collect();
         let mut r = Resolver::new(model, n, limits);

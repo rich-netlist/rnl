@@ -98,15 +98,21 @@ pub struct Discarded {
     /// Its index in [`LevelProblem::facts`].
     pub fact: usize,
     /// The facts kept before it that it conflicts with, by index, sorted: a minimal set, so that
-    /// without any one of them it would fit. It is found from the facts that explain the conflict
-    /// by leaving out those of the latest rank first, so of several such sets it leans towards
-    /// the facts that rank first. Empty when the fact cannot hold even alone, and when it is
-    /// `undecided`. When the time limit runs out while it is made minimal, it is the set found by
-    /// then, which still conflicts with the fact but may not be minimal, and a note says so.
+    /// without any one of them it would fit, when `minimal` says so. It is found from the facts
+    /// that explain the conflict by leaving out those of the latest rank first, so of several such
+    /// sets it leans towards the facts that rank first. Empty when the fact cannot hold even
+    /// alone, and when it is `undecided`.
     pub conflicts_with: Vec<usize>,
+    /// Whether `conflicts_with` is minimal, a set from which no fact can be left out, as every set
+    /// that the hint of 8.5 names is (the draft 0.3, 8.5). False when the time limit ran out
+    /// before it was made minimal: it is then the set found by then, which still conflicts with
+    /// the fact but may hold facts it does not need, so that the hint's list of sets is not
+    /// complete. False too for a fact `undecided`, which has no set.
+    pub minimal: bool,
     /// The check for it did not finish within the time limit ([`SolverOptions::time_limit`], the
     /// draft 0.3, 8.5): it is discarded without a proof that it conflicts, `conflicts_with` is
-    /// empty, and the report has a warning for it (7.6).
+    /// empty, and the report has a warning for it (7.6), which names it by its index, its label
+    /// and where its statement is written.
     pub undecided: bool,
 }
 
@@ -180,7 +186,8 @@ pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
 
 /// [`solve`], with the time limit of the resolution ([`SolverOptions::time_limit`], the draft
 /// 0.3, 8.5) measured on `clock`. Only the resolution of 8.5 is timed, its checks and the search
-/// for its conflict sets; the search, the coordinates and the routing are counted in work.
+/// for its conflict sets; the witness taken as written, the search, the coordinates and the
+/// routing are counted in work.
 pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
     driver::solve(problem, options, clock)
 }

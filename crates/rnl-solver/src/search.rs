@@ -1631,7 +1631,7 @@ mod tests {
         let options = SolverOptions::without_time_limit();
         let mut work = Work::default();
         let resolved = crate::resolve(&p, &options);
-        let s = crate::structure::analyse(&p, &resolved, &options, &mut work);
+        let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut work);
         assert!(s.precedence.is_empty());
         assert_eq!(s.reversible.len(), 1);
         let (a, b) = s.reversible[0].pairs[0];
