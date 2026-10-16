@@ -385,6 +385,35 @@ fn each_level_has_its_solve_status_when_asked() {
 }
 
 #[test]
+fn a_text_on_what_has_no_coordinate_point_that_no_fact_reaches_is_the_viewers() {
+    // a text attached to a wire or a net, which have no coordinate point (13.3), and that no fact
+    // reaches, a solver leaves free, and the viewer places it: nothing to decide, in 0.2 and in the
+    // draft 0.3, which numbers it (5.9). One that a fact reaches, and one on an instance, which the
+    // solver puts beside it, are the solver's to place
+    let one = |version: &str, scene: &str| {
+        format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\nR1 a b 1k\nR2 b c 1k\n* @RNL {{\n\
+             *   #R1 @PLACE(0, 0) => @ORIENT(\"R0\"); #R2 @PLACE(10, 0) => @ORIENT(\"R0\");\n\
+             *   %w = &b @WIRE(mode=\"straight\") {{#R1:2 #R2:1}}{scene}\n* }}\n.end\n"
+        )
+    };
+    let file = |status: &'static str| [("t.sp".to_string(), Some(status))];
+    for version in ["0.2", "0.3"] {
+        assert_eq!(statuses(&one(version, "")), file("fixed"), "{version}");
+        for free in
+            [";\n*   &b @TEXT(\"on the net\")", ";\n*   %w @TEXT(\"on the wire\")", ";\n*   &c @TEXT(\"no wire\")"]
+        {
+            assert_eq!(statuses(&one(version, free)), file("fixed"), "{version}: {free}");
+        }
+        for open in
+            [";\n*   %t = &b @TEXT(\"aligned\");\n*   {%t #R1} @ALIGN(\"y\")", ";\n*   #R1 @TEXT(\"beside R1\")"]
+        {
+            assert_eq!(statuses(&one(version, open)), file("unsolved"), "{version}: {open}");
+        }
+    }
+}
+
+#[test]
 fn a_text_that_its_symbol_places_is_open_on_an_axis_that_an_offset_gives() {
     // R1's symbol places its name; an offset on one axis replaces that axis (13.3), and the text's
     // coordinate there is the solver's to decide, as with offsets on both axes; a PLACE fixes it

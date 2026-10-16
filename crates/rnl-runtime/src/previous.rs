@@ -28,7 +28,10 @@ use crate::diag::Sink;
 use crate::geom::{Orient, Pt};
 use crate::host::{HostDocument, Record};
 use crate::model::LevelView;
-use crate::problem::{same_input, written_name, LevelProblem, OrientSlot, Position, Reference, Slot};
+use crate::problem::{
+    same_input, written_name, FactKind, Filler, LevelProblem, ObjectKind, OrientSlot, PointRef, Position, Reference,
+    Slot,
+};
 use crate::solution::{generated_names, Placement};
 use crate::source::Provider;
 use crate::writeback::{field, record_type};
@@ -114,7 +117,9 @@ impl SolveStatus {
 ///   that its owner's symbol places, as an offset does there (`replaced` of
 ///   [`Position::InSymbol`], 13.3). One that cannot ([`Reference::Anonymous`]), such as a text
 ///   without a key that a rule makes, is not the solver's to decide (14.8): the viewer places it
-///   (13.3);
+///   (13.3). Nor is a text attached to what has no coordinate point, a wire, a net, a graphic, a
+///   usage without a symbol or a terminal without a pin, that no fact reaches ([`left_to_viewer`]):
+///   a solver leaves it free, and the viewer places it next to what it is attached to (13.3);
 /// - no wire that can be referred to is `"auto"`, whose route is the solver's (13.1);
 /// - no ROUTE asks for wires (13.7);
 /// - no constraint has the status `needs-solver`: it comes before coordinates that it involves in
@@ -128,10 +133,52 @@ pub fn is_fixed(p: &LevelProblem, view: &LevelView) -> bool {
         };
         o.reference != Reference::Anonymous && (free_position || o.orient == Some(OrientSlot::Free))
     };
-    !p.objects.iter().any(open)
+    !p.objects.iter().enumerate().any(|(k, o)| open(o) && !left_to_viewer(p, k))
         && !p.wires.iter().any(|w| w.mode == "auto" && w.reference != Reference::Anonymous)
         && p.routes.is_empty()
         && !view.constraints.iter().any(|c| c.status == "needs-solver")
+}
+
+/// Whether a text of a problem is the viewer's to place: one with a position of its own,
+/// attached to what has no coordinate point, a wire or a net ("Wires and nets have no coordinate
+/// point", 13.3), or anything else that a solver has no point for, a graphic, a usage without a
+/// symbol or a terminal without a pin, that no fact of the problem reaches. "When no PLACE, dx, dy
+/// or constraint fixes it, the solver and the viewer decide" (13.3); a solver has nothing to
+/// decide it by, as `rnl-solver` leaves it free, and the viewer puts it next to what it is
+/// attached to. A text attached to a point, or to an object or a terminal drawn with a coordinate
+/// point, is the solver's to place, at it or beside it.
+fn left_to_viewer(p: &LevelProblem, k: usize) -> bool {
+    let Some(o) = p.objects.get(k) else { return false };
+    let (ObjectKind::Text, Position::Own { .. }, Some(t)) = (o.kind, &o.position, &o.text) else { return false };
+    let point = match &t.attach {
+        Filler::Object(j) => p.objects.get(*j).is_some_and(|a| {
+            matches!(a.kind, ObjectKind::Point | ObjectKind::Instance | ObjectKind::Usage | ObjectKind::Bundle)
+        }),
+        Filler::Terminal { pin, .. } => pin.is_some(),
+        Filler::Usage(_) | Filler::Net(_) | Filler::Wire(_) | Filler::Other(_) => false,
+    };
+    !point && !p.facts.iter().any(|f| reaches(&f.kind, k))
+}
+
+/// Whether a fact relates a point of object `k`: its origin, one of its pins, or a set it is in.
+fn reaches(f: &FactKind, k: usize) -> bool {
+    fn on(r: &PointRef, k: usize) -> bool {
+        match r {
+            PointRef::Origin(j) => *j == k,
+            PointRef::Pin { object, .. } => *object == k,
+            PointRef::Centre(members) => members.iter().any(|m| on(m, k)),
+        }
+    }
+    match f {
+        FactKind::Place { at, .. } => on(at, k),
+        FactKind::PointCoordinate { point, .. } => *point == k,
+        FactKind::Offset { text, from, .. } => *text == k || on(from, k),
+        FactKind::Align { members, .. } | FactKind::Order { members, .. } | FactKind::Distribute { members, .. } => {
+            members.iter().any(|m| on(m, k))
+        }
+        FactKind::Distance { from, to, .. } => from.iter().chain(to).any(|m| on(m, k)),
+        FactKind::Orient { .. } | FactKind::OrientRelation { .. } => false,
+    }
 }
 
 /// The solve status of a level. `p` and `view` are its problem and its model in the reading

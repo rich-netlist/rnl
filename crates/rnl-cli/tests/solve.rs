@@ -75,6 +75,11 @@ fn corpus(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases").join(name)
 }
 
+/// A case of the corpus of the draft 0.3.
+fn corpus_03(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/conformance/cases-0.3").join(name)
+}
+
 /// A directory of its own for a test, empty.
 fn scratch(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("rnl-solve").join(name);
@@ -914,8 +919,8 @@ fn every_corpus_case_solved_reads_back_as_its_authors_wrote_it() {
     // what `rnl solve` writes changes the drawing only where the authors left it to a solver: read
     // back, the case has the errors it has as written, without its records of the solver (2.8),
     // and no fact the authors wrote is dropped that is not dropped there; every level solved is
-    // placed but for what its record cannot hold, has the input its hash says, and solved again
-    // comes out the same
+    // placed but for what its record cannot hold and what the solver leaves free, has the input its
+    // hash says, and solved again comes out the same
     let fs = FsProvider::new(&[]);
     let mut solved = 0;
     for f in corpus_cases() {
@@ -966,7 +971,20 @@ fn every_corpus_case_solved_reads_back_as_its_authors_wrote_it() {
                 .filter(|u| matches!(u.decision, Decision::Position { .. }))
                 .map(|u| u.label.as_str())
                 .collect();
-            let left: Vec<&String> = lv.unplaced.iter().filter(|u| !unsolved.contains(&u.as_str())).collect();
+            // with a position of its own and none in the solution: a symbol that the solver has no
+            // pin to put beside (11.1)
+            let free: Vec<&str> = p
+                .objects
+                .iter()
+                .enumerate()
+                .filter(|(k, o)| {
+                    let placed = level.solved.solution.placements.iter().any(|pl| pl.object == *k && pl.at.is_some());
+                    matches!(o.position, Position::Own { .. }) && !placed
+                })
+                .map(|(_, o)| o.label.as_str())
+                .collect();
+            let left: Vec<&String> =
+                lv.unplaced.iter().filter(|u| !unsolved.contains(&u.as_str()) && !free.contains(&u.as_str())).collect();
             assert!(left.is_empty(), "{name} / {}: {left:?}, the record cannot hold {unsolved:?}", p.title);
             let q = again.problems.iter().find(|q| q.level == p.level).unwrap();
             assert_eq!(same_input(&level.hash, q), Some(true), "{name} / {}", p.title);
@@ -1268,7 +1286,8 @@ fn labels_on_a_wire_and_a_net_are_left_to_the_viewer_and_one_a_fact_reaches_is_w
     // fact reaches, has no decision in the record, which needs no number for it: the file stays
     // 0.2, and read back the viewer draws the label of the wire above its middle and that of the
     // net at the start of its wire. A label of the wire whose y an ALIGN gives is the solver's: the
-    // record writes it, its x beside the wire, not at the origin
+    // record writes it, its x in the middle of the wire, where the viewer puts such a label, not at
+    // the origin
     let body = concat!(
         "* labels\n",
         "* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n",
@@ -1297,8 +1316,8 @@ fn labels_on_a_wire_and_a_net_are_left_to_the_viewer_and_one_a_fact_reaches_is_w
     let named = |n: &str| p.objects.iter().position(|o| o.reference == Reference::Name(n.into())).unwrap();
     let (x, y) = placed.origin(named("%l"));
     assert_eq!(y, placed.origin(named("#R2")).1);
-    let pin = placed.at(&p.wires[0].anchors[0]);
-    assert!((x - pin.0).abs() <= 1.5, "{x} beside {pin:?}");
+    let (a, b) = (placed.at(&p.wires[0].anchors[0]), placed.at(&p.wires[0].anchors[1]));
+    assert_eq!(x, (a.0 + b.0) / 2.0, "{x} between {a:?} and {b:?}");
     let written = format!("%l @PLACE({}, {})", rnl_runtime::geom::fmt_num(x), rnl_runtime::geom::fmt_num(y));
     assert!(level.record.contains(&written), "{}", level.record);
     let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
@@ -1311,6 +1330,45 @@ fn labels_on_a_wire_and_a_net_are_left_to_the_viewer_and_one_a_fact_reaches_is_w
     let lv = &back.model.levels[0];
     let on_net = lv.texts.iter().find(|t| t.markup == "on the net").unwrap();
     assert_eq!(Some(on_net.anchor), lv.wires[0].points.first().copied(), "{:?}", lv.wires[0]);
+}
+
+#[test]
+fn a_ground_without_a_name_on_a_net_that_nothing_draws_is_left_unplaced() {
+    // corpus 0.3/09: the subcircuit divider, in an included file read in 0.2, writes `$GND @ATTACH
+    // &bot` without a name, on a net that no ROUTE or wire written draws, so that the solver knows
+    // no pin of R2 on it and has nothing to put the ground beside. Placed where the witness and the
+    // repair of overlaps put it, (3, 0), it was drawn beside the wire of &mid, as if that net were
+    // grounded, and the record needed its number, which raised the included file to 0.3. The
+    // solver leaves it free: the record has no decision for it, nothing is raised, and read back it
+    // is unplaced, as it is unsolved (11.1); the ports that the rules make there are placed, and
+    // the record names them (10.5)
+    let fs = FsProvider::new(&[]);
+    let f = corpus_03("09-include-without-header.sp");
+    let run = solve(&f, &fs, &unlimited()).unwrap();
+    assert!(run.raised.is_empty(), "{:?}", run.raised);
+    let level = run.levels.iter().find(|l| l.problem.title == "divider").unwrap();
+    let p = &level.problem;
+    let ground = p.objects.iter().position(|o| o.label == "a usage of $GND").unwrap();
+    assert!(matches!(p.objects[ground].reference, Reference::Number { .. }), "{:?}", p.objects[ground]);
+    assert!(level.solved.solution.placements.iter().all(|pl| pl.object != ground));
+    assert!(level.written.unsolved.is_empty(), "{:?}", level.written.unsolved);
+    assert!(!level.record.contains("%#"), "{}", level.record);
+    assert!(level.record.contains("%ioport_top @PLACE("), "{}", level.record);
+    let notes = &level.solved.report.notes;
+    let note = "1 symbol without a name that no fact kept reaches is left free";
+    assert!(notes.iter().any(|n| n.starts_with(note)), "{notes:#?}");
+    let lib = run.files.iter().find(|f| f.path.ends_with("09-include-without-header-lib.inc")).unwrap();
+    assert!(lib.text.contains("@VERSION(\"0.2\")") && !lib.text.contains("numbering="), "{}", lib.text);
+    let back = read_solved(&run, &fs, &f);
+    let lv = back.model.levels.iter().find(|l| l.level == p.level).unwrap();
+    assert_eq!(lv.unplaced, ["a usage of $GND"]);
+    let unsolved = interpret_file(&f, None, &fs, &Options { generated: false, ..Options::default() }).unwrap();
+    let before = unsolved.model.levels.iter().find(|l| l.level == p.level).unwrap();
+    assert!(before.unplaced.iter().any(|u| u == "a usage of $GND"), "{:?}", before.unplaced);
+    // solved again from what it wrote: the same
+    let texts = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+    let twice = solve(&f, &Layered { layers: vec![&texts, &fs] }, &unlimited()).unwrap();
+    assert_eq!(twice.files, run.files);
 }
 
 // TODO: under RNL_BLESS=1 this test can read T1's snapshot before the test that blesses it has
@@ -2160,7 +2218,7 @@ fn a_file_of_0_2_is_raised_to_0_3_when_its_record_needs_it() {
     let net = |header: &str, more: &str| {
         format!(
             "* raise\n* @RNL(type=\"header\") {{ {header}}}\nR1 a b 1k\nR2 b c 1k\n\
-             * @RNL {{ $GND @ATTACH &c; &b @WIRE {{#R1:2 (_, _) #R2:1}}{more} }}\n.end\n"
+             * @RNL {{ $GND @ATTACH &b; &b @WIRE {{#R1:2 (_, _) #R2:1}}{more} }}\n.end\n"
         )
     };
     let entry = Path::new("/w/raise.sp");

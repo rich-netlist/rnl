@@ -25,14 +25,17 @@
 //!    a point's is the place itself, as it mostly follows a symbol. A text attached to a point or
 //!    to an object with a coordinate point has its target there instead, `x_text − x_anchor = c`,
 //!    at the point or beside the object ([`crate::structure::Anchor`], 13.3), so that a text no
-//!    fact places goes beside what it is attached to.
+//!    fact places goes beside what it is attached to; one attached to a wire, on the axis that no
+//!    fact reaches, above the midpoint of two of its points, `x_text − (x_a + x_b) / 2 = c`.
 //!
 //! **Rounding.** The grid is the solver's own rule, ranked after every description (11.7), and
 //! also after the layers above: with the layers' bounds taken away, the origins are visited, the
 //! symbols first in the order of the objects, then the points and texts, which mostly follow a
-//! symbol. Each goes to the nearer grid point beside it when the facts and relations allow, or
-//! else to the other, and each that ends up on the grid is held there, so that a later one cannot
-//! move it off again. A symbol that fits on neither is tried once more before the others held in
+//! symbol. A text on an axis that no fact kept reaches is not visited: it is held at its anchor
+//! there, where the viewer puts it (13.3), and follows what the grid moves. Each origin visited
+//! goes to the nearer grid point beside it when the facts and relations allow, or else to the
+//! other, and each that ends up on the grid is held there, so that a later one cannot move it off
+//! again. A symbol that fits on neither is tried once more before the others held in
 //! the visit, which are then held again on the grid (a centre is tied to its set). Then the layers
 //! are solved again with the origins moved kept, and the rounding done once more. A coordinate
 //! that the facts force off the grid stays as they force it. The constants of the relations are
@@ -186,10 +189,11 @@ fn apart_cause(
 }
 
 /// The symbols placed by their own position: elements, supply, ground and port symbols, and other
-/// virtual parts with a position of their own.
+/// virtual parts with a position of their own; not those that the solution leaves free
+/// (`crate::structure::ObjectInfo::left_free`), which are no part of the drawing.
 pub(crate) fn solid(s: &Structure, k: usize) -> bool {
     let o = &s.objects[k];
-    o.own && o.symbol.is_some() && !matches!(o.role, Role::Point | Role::Text)
+    o.own && o.symbol.is_some() && !o.left_free && !matches!(o.role, Role::Point | Role::Text)
 }
 
 /// The pairs of symbols whose boxes overlap with some area, the earlier first.
@@ -290,8 +294,8 @@ fn minimise_and_keep(sx: &mut Simplex<Tag>, objective: &LinExpr) -> Result<(), (
 enum Target {
     /// To a place.
     At(Q),
-    /// To a place relative to another variable: `v − base = c`.
-    From(Var, Q),
+    /// To a place relative to other variables, the mean of them: `v − Σ base / n = c`.
+    From(Vec<Var>, Q),
 }
 
 /// The target of each origin on an axis: a text's at its anchor, the others where the resolution
@@ -308,12 +312,16 @@ fn targets(
     own.iter()
         .map(|(k, _)| {
             let anchored = s.anchors.get(k).and_then(|a| {
-                let base = model.points.get(&model.origin_point.get(a.object).copied().flatten()?)?.var;
-                let pin = match a.pin {
-                    Some(pin) => s.pin_offset(a.object, pin, ori[a.object])?[axis].clone(),
-                    None => Q::zero(),
-                };
-                Some(Target::From(base, pin + &a.offset[axis]))
+                let mut bases = Vec::new();
+                let mut c = Q::zero();
+                for &(object, pin) in &a.from {
+                    bases.push(model.points.get(&model.origin_point.get(object).copied().flatten()?)?.var);
+                    if let Some(pin) = pin {
+                        c += &s.pin_offset(object, pin, ori[object])?[axis];
+                    }
+                }
+                let n = int(i64::try_from(bases.len()).ok()?);
+                (!bases.is_empty()).then(|| Target::From(bases, c / n + &a.offset[axis]))
             });
             let at = &fallback.origin[*k][axis];
             anchored.unwrap_or_else(|| Target::At(if solid(s, *k) { round(at, grid) } else { at.clone() }))
@@ -381,15 +389,16 @@ fn layers(
     let mut objective = LinExpr::default();
     for ((_, v), t) in own.iter().zip(targets) {
         let d = sx.new_var();
-        let (base, c) = match t {
-            Target::At(c) => (None, c),
-            Target::From(base, c) => (Some(*base), c),
+        let (bases, c) = match t {
+            Target::At(c) => (&[][..], c),
+            Target::From(bases, c) => (&bases[..], c),
         };
         let mut below = LinExpr::from_terms([(d, Q::one()), (*v, -Q::one())], Q::zero());
         let mut above = LinExpr::from_terms([(d, Q::one()), (*v, Q::one())], Q::zero());
-        if let Some(b) = base {
-            below.add_term(b, &Q::one());
-            above.add_term(b, &-Q::one());
+        let share = Q::one() / int(i64::try_from(bases.len().max(1)).unwrap_or(1));
+        for b in bases {
+            below.add_term(*b, &share);
+            above.add_term(*b, &-share.clone());
         }
         sx.assert(&below, Rel::Ge, &-c.clone(), Tag::Def).map_err(fail)?;
         sx.assert(&above, Rel::Ge, c, Tag::Def).map_err(fail)?;
@@ -499,11 +508,13 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
         .filter(|&k| s.objects[k].own)
         .filter_map(|k| Some((k, model.points.get(&PointId::Origin(k))?.var)))
         .collect();
-    // the symbols go on the grid first, then the points and texts, which mostly follow a symbol
-    let mut order: Vec<Visit> = own.iter().filter(|(k, _)| solid(s, *k)).map(|&(k, v)| (k, v, true)).collect();
-    order.extend(own.iter().filter(|(k, _)| !solid(s, *k)).map(|&(k, v)| (k, v, false)));
+    // the symbols go on the grid first, then the points and texts, which mostly follow a symbol; a
+    // text on an axis that no fact kept reaches stays at its anchor, where the viewer puts it (13.3)
+    let at_anchor = |k: usize, axis: usize| s.anchors.contains_key(&k) && !s.objects[k].fact_axes[axis];
     let mut out = fallback.clone();
     for axis in 0..2 {
+        let mut order: Vec<Visit> = own.iter().filter(|(k, _)| solid(s, *k)).map(|&(k, v)| (k, v, true)).collect();
+        order.extend(own.iter().filter(|(k, _)| !solid(s, *k) && !at_anchor(*k, axis)).map(|&(k, v)| (k, v, false)));
         let sx = r.simplex_mut(axis);
         let linked = link(sx, model, &ori, axis);
         if !linked {
@@ -513,6 +524,21 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
         // point follows what it is placed from, and a target rounded on its own would pull that
         // off the grid; a text goes to its anchor
         let targets = targets(model, s, &own, &fallback, &grid, axis);
+        // a text on an axis that no fact kept reaches is held at its anchor, which nothing else
+        // there bounds, so that what the grid moves takes it along
+        for ((k, v), t) in own.iter().zip(&targets) {
+            let (true, Target::From(bases, c)) = (at_anchor(*k, axis), t) else { continue };
+            let share = Q::one() / int(i64::try_from(bases.len()).unwrap_or(1));
+            let mut e = LinExpr::var(*v);
+            for b in bases {
+                e.add_term(*b, &-share.clone());
+            }
+            let cp = sx.checkpoint();
+            if sx.assert(&e, Rel::Eq, c, Tag::Def).is_err() || sx.check().is_err() {
+                sx.backtrack(cp);
+                let _ = sx.check();
+            }
+        }
         let base = sx.checkpoint();
         let mut moved: Vec<(usize, Q)> = Vec::new();
         // two passes at most: the layers, the grid, and once more when the grid moved something

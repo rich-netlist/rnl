@@ -1532,7 +1532,8 @@ pub(crate) fn route(
             layout.boxes.push((k, b));
         }
     }
-    for k in 0..problem.objects.len() {
+    // the pins of what is drawn: a symbol that the solution leaves free is not
+    for k in (0..problem.objects.len()).filter(|&k| !s.objects[k].left_free) {
         for pin in 0..s.pins(k).len() {
             layout.pins.extend(s.pin_at(origins, &g.orient, k, pin));
         }

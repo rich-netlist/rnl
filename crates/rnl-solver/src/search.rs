@@ -356,7 +356,9 @@ fn grid_of(options: &SolverOptions) -> Option<Q> {
 /// of the topmost element on its net, on the right for an output and on the left otherwise, with
 /// the pin that faces that one from the next row, if any, when the router joins them
 /// ([`Attach::facing`]); a supply above and a ground below the first pin on their net. Objects
-/// that a fact kept reaches are left where the facts put them.
+/// that a fact kept reaches are left where the facts put them. One on no net with a pin of an
+/// element that the problem shows has no pin to go beside ([`Structure::attach_pins`]); without
+/// a name, the solution leaves it free (`crate::structure::ObjectInfo::left_free`).
 pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) -> BTreeMap<usize, Attach> {
     let row_of: BTreeMap<usize, usize> =
         rows.iter().enumerate().flat_map(|(r, row)| row.iter().map(move |&k| (k, r))).collect();
@@ -365,21 +367,9 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
         if !info.own || info.fact_touched || info.stub.is_some() || origin(s, k).is_none() || s.pins(k).is_empty() {
             continue;
         }
-        let net_pins = |k: usize| -> Vec<PinKey> {
-            let mut pins: Vec<PinKey> = s.connections.targets.get(&(k, 0)).cloned().unwrap_or_default();
-            if pins.is_empty() {
-                for &i in s.connections.nets_of.get(&(k, 0)).map_or(&[][..], |v| v) {
-                    pins.extend(s.connections.nets[i].pins.iter().copied().filter(|p| p.0 != k));
-                }
-            }
-            pins.retain(|p| s.objects[p.0].role == Role::Element);
-            pins.sort_unstable();
-            pins.dedup();
-            pins
-        };
         match info.role {
             Role::Port => {
-                let pins = net_pins(k);
+                let pins = s.attach_pins(k);
                 let sideways = pins.iter().find_map(|&p| match s.exit(p.0, p.1, ori[p.0]) {
                     Some((-1, 0)) => Some((p, Side::Left)),
                     Some((1, 0)) => Some((p, Side::Right)),
@@ -404,7 +394,7 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
                 }
             }
             Role::Supply | Role::Ground => {
-                if let Some(&host) = net_pins(k).first() {
+                if let Some(&host) = s.attach_pins(k).first() {
                     let side = if info.role == Role::Supply { Side::Above } else { Side::Below };
                     out.insert(k, Attach { host, side, facing: None });
                 }

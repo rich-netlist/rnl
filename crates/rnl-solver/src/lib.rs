@@ -267,12 +267,14 @@ impl Clock for StoppedClock {
 /// Places every object with a position of its own and orients every object that has an
 /// orientation, as the best candidate of the search says, every fact kept holding exactly, the
 /// positions that the file fixes included (the draft 0.3, 14.8); a text that its owner's symbol
-/// places is given its position when the scene gives it an axis of its own (13.3). A text attached
-/// to a wire or a net, which has no coordinate point, or to anything else the solver has no point
-/// for, and that no fact kept reaches, is left free: the viewer places it next to what it is
-/// attached to (13.3). Routes the
-/// ROUTEs, each wire from a pin or a branch point to a pin or a branch point (13.2, 13.7). The
-/// objectives that are on but inert in the level, and the ROUTEs left in parts, are in the report.
+/// places is given its position when the scene gives it an axis of its own (13.3). What the solver
+/// has nothing to place by is left free, neither placed nor oriented: a text attached to a wire or
+/// a net, which has no coordinate point, or to anything else the solver has no point for, and that
+/// no fact kept reaches, which the viewer places next to what it is attached to (13.3); and a
+/// supply, ground or port symbol without a name that no fact kept reaches, on no net with a pin
+/// that the problem shows, which a viewer leaves unplaced (11.1). Routes the ROUTEs, each wire from
+/// a pin or a branch point to a pin or a branch point (13.2, 13.7). The objectives that are on but
+/// inert in the level, and the ROUTEs left in parts, are in the report.
 pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
     solve_with_clock(problem, options, &StoppedClock)
 }

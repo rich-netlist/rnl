@@ -20,10 +20,13 @@
 //! its own there, and the solution gives its position too. The record writes them all (the draft
 //! 0.3, 14.8), so that between two solves a statement written after it that conflicts with them
 //! is discarded (14.8); `rnl_runtime::solution::write_record` leaves to the file only the axes on
-//! which a text follows what it is attached to, where the solution has it there (13.3). But a text
-//! attached to a wire or a net, which has no coordinate point, or to anything else the solver has
-//! no point for, and that no fact kept reaches, is left free ([`left_free`]): the viewer places it
-//! next to what it is attached to (13.3), and the report says how many.
+//! which a text follows what it is attached to, where the solution has it there (13.3). But what
+//! the solver has nothing to place by is left free ([`left_free`]), and the report says how many:
+//! a text attached to a wire or a net, which has no coordinate point, or to anything else the
+//! solver has no point for, and that no fact kept reaches, which the viewer places next to what it
+//! is attached to (13.3); and a supply, ground or port symbol without a name that no fact kept
+//! reaches and that is on no net with a pin that the problem shows, which a viewer leaves
+//! unplaced.
 //!
 //! **Limits.** Only the resolution of 8.5 is timed (the draft 0.3, 8.5): its checks and the
 //! search for its minimal conflict groups stop when the time limit of the options is out, on the
@@ -235,12 +238,21 @@ pub(crate) fn solve_exact_with(
         });
     }
     let mut placements = Vec::new();
-    let mut free = 0;
+    let (mut texts, mut symbols) = (0, 0);
     for (k, o) in problem.objects.iter().enumerate() {
         let orient: Option<Orient> = o.orient.is_some().then(|| placed.geometry.orient[k]);
         match &o.position {
-            // a text on a wire or a net that no fact kept reaches: the viewer places it (13.3)
-            Position::Own { .. } if left_free(&structure, k) => free += 1,
+            // a text attached to what the solver has no point for, a wire, a net, a graphic or a
+            // terminal without a pin, named or not, and a supply, ground or port symbol without a
+            // name on no net that the problem shows, that no fact kept reaches: neither its
+            // position nor its orientation is decided (13.3, 11.1)
+            Position::Own { .. } if left_free(&structure, k) => {
+                if structure.objects[k].role == Role::Text {
+                    texts += 1;
+                } else {
+                    symbols += 1;
+                }
+            }
             // every position of its own, those the file fixes too (plan 3.2)
             Position::Own { .. } => {
                 let [x, y] = &placed.geometry.origin[k];
@@ -259,12 +271,21 @@ pub(crate) fn solve_exact_with(
             Position::At(_) | Position::InSymbol { .. } => {}
         }
     }
-    if free > 0 {
-        let is = if free == 1 { "is" } else { "are" };
+    if texts > 0 {
+        let is = if texts == 1 { "is" } else { "are" };
         notes.push(format!(
             "{} that no fact kept reaches {is} left free, attached to a wire, a net or anything else the solver has no \
              point for: the viewer places such a text next to what it is attached to (13.3)",
-            count(free, "text")
+            count(texts, "text")
+        ));
+    }
+    if symbols > 0 {
+        let is = if symbols == 1 { "is" } else { "are" };
+        notes.push(format!(
+            "{} without a name that no fact kept reaches {is} left free, a supply, ground or port symbol on no net \
+             with a pin that the problem shows, as no ROUTE or wire written draws one: the solver has no pin to put it \
+             beside, and a viewer leaves it unplaced (11.1)",
+            count(symbols, "symbol")
         ));
     }
     let report = SolveReport {
@@ -289,23 +310,21 @@ pub(crate) fn solve_exact_with(
     (solved, Exact { resolved, structure, candidate, placed, routing, score })
 }
 
-/// Whether the solution leaves the position of object `k` free, for the viewer to place: a text
-/// with a position of its own that no fact kept reaches, attached to what has no coordinate point,
-/// a wire or a net ("Wires and nets have no coordinate point", 13.3), or anything else that the
-/// solver has no point for, such as a terminal without a pin or a graphic. "When no PLACE, dx, dy
-/// or constraint fixes it, the solver and the viewer decide" (13.3), and the solver has nothing to
-/// decide it by: the LP would leave it where the witness of the resolution happens to be, such as
-/// the origin, and the record would fix it there. Left free, the viewer places it next to what it
-/// is attached to (13.3), a label of a wire above the middle of the wire drawn, one of a net at
-/// the start of its first wire or on one of its pins, and it follows them when they move; or not
-/// at all, when nothing of that is drawn. A text that a fact kept reaches is the solver's to
-/// place, beside a point of the wire or the net on the axis that no fact reaches
-/// (`crate::structure::Anchor`). A text attached to a point or to an object with a coordinate
-/// point goes at it or beside it, as the viewer puts it (13.3), and a point `(_, _)` that nothing
-/// else places is the solver's to place all the same (11.1).
+/// Whether the solution leaves the position and the orientation of object `k` free, as what the
+/// solver has nothing to place by and no part of the drawing it makes
+/// (`crate::structure::ObjectInfo::left_free`): a text with a position of its own that no fact kept
+/// reaches, attached to what has no coordinate point, a wire or a net ("Wires and nets have no
+/// coordinate point", 13.3), or to anything else that the solver has no point for, such as a
+/// terminal without a pin or a graphic, named or not, which the viewer places next to what it is
+/// attached to (13.3); and a supply, ground or port symbol without a name that no fact kept
+/// reaches and that is on no net with a pin of an element that the problem shows, so that the
+/// search has no pin to put it beside, which a viewer leaves unplaced, as a record of 0.2 did. A
+/// text that a fact kept reaches is the solver's to place, at its anchor on the axis that no fact
+/// reaches (`crate::structure::Anchor`); so is a text attached to a point or to an object with a
+/// coordinate point, at it or beside it, as the viewer puts it (13.3), and a point `(_, _)` that
+/// nothing else places (11.1).
 pub(crate) fn left_free(s: &Structure, k: usize) -> bool {
-    let Some(o) = s.objects.get(k) else { return false };
-    o.role == Role::Text && o.own && !o.fact_touched && s.anchors.get(&k).is_none_or(|a| !a.point)
+    s.objects.get(k).is_some_and(|o| o.left_free)
 }
 
 #[cfg(test)]

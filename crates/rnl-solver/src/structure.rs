@@ -5,7 +5,12 @@
 //!   (11.8) or a virtual part with a position of its own, 12.1), a supply, ground or port symbol,
 //!   a point or a text; the device it is, read off its symbol (NMOS, PMOS, NPN, PNP: the pins
 //!   by the positional order of SPICE, drain or collector 1, gate or base 2, source or emitter 3);
-//!   for a stub of the standard package, the pin it hangs from.
+//!   for a stub of the standard package, the pin it hangs from; whether the solution leaves it
+//!   free ([`left_free`]), as what the solver has nothing to place by: a text that no fact kept
+//!   reaches attached to what has no coordinate point, and a supply, ground or port symbol without
+//!   a name that no fact kept reaches on no net with a pin that the problem shows.
+//! - **Anchors** ([`Anchor`]): where a text with a position of its own goes on an axis that no
+//!   fact kept reaches, as the viewer puts it (13.3).
 //! - **The connection graph** ([`Connections`]): the nets as far as the problem shows them, from
 //!   the ROUTEs (13.7), the wires (13.1) and the usages that attach a symbol to a net (12.1); and
 //!   what is drawn as wires, the nets of the ROUTEs and the wires written, which the routing
@@ -42,7 +47,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use num_traits::{One, Signed, Zero};
 use rnl_runtime::geom::Orient;
 use rnl_runtime::markup::Run;
-use rnl_runtime::problem::{Axis, FactKind, Filler, LevelProblem, ObjectKind, PointRef, Position, Sense, TextInfo};
+use rnl_runtime::problem::{
+    Axis, FactKind, Filler, LevelProblem, ObjectKind, PointRef, Position, Reference, Sense, TextInfo,
+};
 
 use crate::model::{turned, Model, PointId};
 use crate::objectives::{Active, Inputs, Objective};
@@ -157,6 +164,11 @@ pub(crate) struct ObjectInfo {
     pub stub: Option<Stub>,
     /// A fact kept reaches one of its points.
     pub fact_touched: bool,
+    /// On each axis, a fact kept reaches one of its points there.
+    pub fact_axes: [bool; 2],
+    /// The solution leaves its position free ([`left_free`]): it is no part of the drawing that
+    /// the solver makes.
+    pub left_free: bool,
 }
 
 /// A net as far as the problem shows it.
@@ -239,81 +251,159 @@ pub(crate) struct Port {
 /// goes at that point, and a text attached to an object next to the object". At the point itself,
 /// or beside the coordinate point of the object, the origin of an instance, a usage drawn or a
 /// bundle, or the pin of a terminal, by the offset that a viewer that does not solve puts it at.
-/// A wire or a net has no coordinate point (13.3), and a text attached to one is anchored beside
-/// one of its points only for the axis that no fact kept reaches, when a fact kept reaches the
-/// other: with no fact kept reaching it, the solution leaves it free and the viewer places it
-/// (`crate::driver`).
+/// A wire or a net has no coordinate point (13.3), and a text attached to one is anchored where
+/// the viewer puts such a text only for the axis that no fact kept reaches, when a fact kept
+/// reaches the other: with no fact kept reaching it, the solution leaves it free and the viewer
+/// places it ([`left_free`]).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Anchor {
-    /// The object it is attached to, or whose terminal; for a wire or a net, the object of the
-    /// point it is beside.
-    pub object: usize,
-    /// The pin of the terminal, in the object's symbol.
-    pub pin: Option<usize>,
-    /// From the point, along the axes of the scene.
+    /// The points it is from, each the origin of an object or a pin of it, by the object and the
+    /// pin in the object's symbol: the one it is attached to, or whose terminal; for a wire, the
+    /// two in the middle of its points, whose midpoint it is from; for a net, one of its points.
+    pub from: Vec<(usize, Option<usize>)>,
+    /// From the point, or the midpoint, along the axes of the scene.
     pub offset: [Q; 2],
     /// What the text is attached to has a coordinate point (13.3), which the anchor is: a point,
-    /// an object or a terminal; not a wire or a net, whose anchor is only one of its points.
+    /// an object or a terminal; not a wire or a net, whose anchor is only near some of its points.
     pub point: bool,
 }
 
 /// Where a viewer that does not solve puts a text attached to an object, from the object's
 /// coordinate point (13.3); the solver puts it there too, so that a text looks the same solved.
 fn beside() -> [Q; 2] {
-    [Q::new(6.into(), 5.into()), Q::new(6.into(), 5.into())]
+    [frac(6, 5), frac(6, 5)]
 }
 
-/// The first of some points that is the origin of an object or a pin, as an anchor's object and
-/// pin.
-fn first_point(points: &[PointRef]) -> Option<(usize, Option<usize>)> {
-    points.iter().find_map(|r| match r {
+/// The origin of an object or a pin, as a point of an anchor.
+fn anchor_point(r: &PointRef) -> Option<(usize, Option<usize>)> {
+    match r {
         PointRef::Origin(k) => Some((*k, None)),
         PointRef::Pin { object, pin, .. } => Some((*object, Some(*pin))),
         PointRef::Centre(_) => None,
-    })
+    }
+}
+
+/// The first of some points that is the origin of an object or a pin, as a point of an anchor.
+fn first_point(points: &[PointRef]) -> Option<(usize, Option<usize>)> {
+    points.iter().find_map(anchor_point)
 }
 
 /// The anchors of the texts with a position of their own ([`Structure::anchors`]): those attached
-/// to a point, an object with a coordinate point, or a terminal with a pin; and those attached to
-/// a wire, beside its first point, or to a net, beside the first point of its first wire, else of
-/// its first ROUTE, else beside its first pin, as the viewer puts a net's label at the start of
-/// its first wire, else on one of its pins (13.3).
-fn anchors(problem: &LevelProblem, connections: &Connections) -> BTreeMap<usize, Anchor> {
+/// to a point, an object with a coordinate point, or a terminal with a pin; and, as the viewer
+/// puts a text attached to what has no coordinate point (13.3), those attached to a wire 0.6
+/// above the midpoint of the two points in the middle of the wire's, the middle of its middle
+/// segment when the wire is drawn straight between them, and those attached to a net at the first
+/// point of its first wire, else of its first ROUTE, else at its first pin of an object that the
+/// solution places. `objects` say which objects the solution leaves free.
+fn anchors(problem: &LevelProblem, connections: &Connections, objects: &[ObjectInfo]) -> BTreeMap<usize, Anchor> {
     let mut out = BTreeMap::new();
+    let zero = || [Q::zero(), Q::zero()];
     for (k, o) in problem.objects.iter().enumerate() {
         let (ObjectKind::Text, Position::Own { .. }, Some(t)) = (o.kind, &o.position, &o.text) else { continue };
         let anchor = match &t.attach {
             Filler::Object(j) => match problem.objects.get(*j).map(|a| a.kind) {
-                Some(ObjectKind::Point) => {
-                    Anchor { object: *j, pin: None, offset: [Q::zero(), Q::zero()], point: true }
-                }
+                Some(ObjectKind::Point) => Anchor { from: vec![(*j, None)], offset: zero(), point: true },
                 Some(ObjectKind::Instance | ObjectKind::Usage | ObjectKind::Bundle) => {
-                    Anchor { object: *j, pin: None, offset: beside(), point: true }
+                    Anchor { from: vec![(*j, None)], offset: beside(), point: true }
                 }
                 _ => continue,
             },
             Filler::Terminal { object, pin: Some(pin), .. } => {
-                Anchor { object: *object, pin: Some(*pin), offset: beside(), point: true }
+                Anchor { from: vec![(*object, Some(*pin))], offset: beside(), point: true }
             }
             Filler::Wire(w) => {
-                let Some((object, pin)) = problem.wires.get(*w).and_then(|w| first_point(&w.anchors)) else { continue };
-                Anchor { object, pin, offset: beside(), point: false }
+                let Some(w) = problem.wires.get(*w) else { continue };
+                let points: Vec<(usize, Option<usize>)> = w.anchors.iter().filter_map(anchor_point).collect();
+                if points.len() < 2 {
+                    continue;
+                }
+                let m = points.len() / 2;
+                Anchor { from: points[m - 1..=m].to_vec(), offset: [Q::zero(), frac(3, 5)], point: false }
             }
             Filler::Net(name) => {
                 let wire = problem.wires.iter().filter(|w| w.nets.contains(name)).find_map(|w| first_point(&w.anchors));
                 let route = || problem.routes.iter().filter(|r| r.net == *name).find_map(|r| first_point(&r.pins));
                 let pin = || {
                     let net = connections.nets.iter().find(|n| n.name == *name)?;
-                    net.pins.first().map(|&(object, pin)| (object, Some(pin)))
+                    net.pins.iter().find(|p| !objects[p.0].left_free).map(|&(object, pin)| (object, Some(pin)))
                 };
-                let Some((object, pin)) = wire.or_else(route).or_else(pin) else { continue };
-                Anchor { object, pin, offset: beside(), point: false }
+                let Some(point) = wire.or_else(route).or_else(pin) else { continue };
+                Anchor { from: vec![point], offset: zero(), point: false }
             }
             _ => continue,
         };
         out.insert(k, anchor);
     }
     out
+}
+
+/// Whether the solution leaves the position of object `k` free, so that it is no part of the
+/// drawing that the solver makes ([`ObjectInfo::left_free`]): an object with a position of its
+/// own that no fact kept reaches, and that the solver has nothing to place by. The LP would leave
+/// it where the witness of the resolution happens to be, such as the origin, and the record would
+/// fix it there.
+///
+/// - A text attached to what has no coordinate point, a wire or a net ("Wires and nets have no
+///   coordinate point", 13.3), or to anything else that the solver has no point for, such as a
+///   terminal without a pin or a graphic, named or not: "When no PLACE, dx, dy or constraint fixes
+///   it, the solver and the viewer decide" (13.3). Left free, the viewer places it next to what it
+///   is attached to (13.3): a label of a wire above the middle of the wire drawn, one of a net at
+///   the start of its first wire or on one of its pins, one of a graphic beside its first point;
+///   and it follows them when they move, or is not drawn when nothing of that is. A text attached
+///   to a point or to an object with a coordinate point is placed at its [`Anchor`].
+/// - A supply, ground or port symbol without a name (5.9), no stub, that has no pin or is on no
+///   net with a pin of an element that the problem shows, by a ROUTE or a wire written
+///   ([`Connections`]), so that the search has no pin to put it beside (`crate::search`): nothing
+///   decides where it goes in the drawing, and drawn where the witness is, beside a wire of
+///   another net, it would say that it is on that one. Left free, a viewer leaves it unplaced, as
+///   a record of 0.2, which cannot refer to it, did; in the draft 0.3, which could refer to it by
+///   its number, it is left free all the same, so that a level is solved the same in both
+///   versions (16.1), and a file of 0.2 is not raised to 0.3 for it. One with a name, its own or
+///   the one that the record gives a usage made by a rule (10.5), is placed where the witness and
+///   the repair of overlaps put it, as it was before files were raised: it is still drawn, beside
+///   nothing it is on, rather than not at all, as the ports of a level without an element are.
+///
+/// A point `(_, _)` that nothing else places is the solver's to place all the same (11.1).
+fn left_free(
+    problem: &LevelProblem,
+    objects: &[ObjectInfo],
+    symbols: &[SymbolInfo],
+    connections: &Connections,
+    anchors: &BTreeMap<usize, Anchor>,
+    k: usize,
+) -> bool {
+    let o = &objects[k];
+    if !o.own || o.fact_touched {
+        return false;
+    }
+    match o.role {
+        Role::Text => anchors.get(&k).is_none_or(|a| !a.point),
+        Role::Port | Role::Supply | Role::Ground => {
+            let unnamed = matches!(
+                problem.objects[k].reference,
+                Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous
+            );
+            let pinless = o.symbol.and_then(|s| symbols.get(s)).is_none_or(|s| s.pins.is_empty());
+            let nowhere = pinless || attach_pins(objects, connections, k).is_empty();
+            o.symbol.is_some() && o.stub.is_none() && unnamed && nowhere
+        }
+        _ => false,
+    }
+}
+
+/// The pins of elements that a port or a supply or ground symbol `k` goes beside
+/// ([`Structure::attach_pins`]).
+fn attach_pins(objects: &[ObjectInfo], connections: &Connections, k: usize) -> Vec<PinKey> {
+    let mut pins: Vec<PinKey> = connections.targets.get(&(k, 0)).cloned().unwrap_or_default();
+    if pins.is_empty() {
+        for &i in connections.nets_of.get(&(k, 0)).map_or(&[][..], |v| v) {
+            pins.extend(connections.nets[i].pins.iter().copied().filter(|p| p.0 != k));
+        }
+    }
+    pins.retain(|p| objects[p.0].role == Role::Element);
+    pins.sort_unstable();
+    pins.dedup();
+    pins
 }
 
 /// A pair drawn as mirror images: `b` is `a` mirrored (14.9), about `axis` when it has one. From
@@ -477,7 +567,8 @@ pub(crate) struct Structure {
     /// coordinates, by the object ([`text_box`]).
     pub labels: BTreeMap<usize, [Q; 4]>,
     /// Where each text with a position of its own goes when nothing decides it, by the text: at
-    /// the point it is attached to, or beside the object (13.3).
+    /// the point it is attached to, or beside the object; above the middle of a wire, at the start
+    /// of a net (13.3).
     pub anchors: BTreeMap<usize, Anchor>,
     pub tree: GroupTree,
     /// The components of each scope of the objectives measured within groups: each group, then
@@ -519,12 +610,19 @@ impl Structure {
     }
 
     /// The objects measured as components: elements, and supply, ground and port symbols, with a
-    /// symbol and a place.
+    /// symbol and a place, but those that the solution leaves free.
     pub(crate) fn components(&self) -> impl Iterator<Item = usize> + '_ {
         self.objects.iter().enumerate().filter_map(|(k, o)| {
             let component = matches!(o.role, Role::Element | Role::Supply | Role::Ground | Role::Port);
-            (component && o.symbol.is_some()).then_some(k)
+            (component && o.symbol.is_some() && !o.left_free).then_some(k)
         })
+    }
+
+    /// The pins of elements that a port or a supply or ground symbol `k` goes beside: those its
+    /// pin is drawn to, or else those on its nets, as far as the problem shows them (the nets of
+    /// the ROUTEs and the wires written, [`Connections`]).
+    pub(crate) fn attach_pins(&self, k: usize) -> Vec<PinKey> {
+        attach_pins(&self.objects, &self.connections, k)
     }
 
     /// The pins of an object's symbol.
@@ -673,7 +771,20 @@ pub(crate) fn analyse(
             })
             .or_insert(b);
     }
-    let anchors = anchors(problem, &connections);
+    // the symbols that the solution leaves free first, as no text is anchored on their pins, then
+    // the texts
+    let none = BTreeMap::new();
+    for k in 0..objects.len() {
+        if objects[k].role != Role::Text {
+            objects[k].left_free = left_free(problem, &objects, &symbols, &connections, &none, k);
+        }
+    }
+    let anchors = anchors(problem, &connections, &objects);
+    for k in 0..objects.len() {
+        if objects[k].role == Role::Text {
+            objects[k].left_free = left_free(problem, &objects, &symbols, &connections, &anchors, k);
+        }
+    }
     let mut s = Structure {
         symbols,
         objects,
@@ -800,7 +911,7 @@ fn symbol_info(s: &rnl_runtime::problem::ProblemSymbol) -> SymbolInfo {
 }
 
 fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<ObjectInfo> {
-    let mut touched = vec![false; problem.objects.len()];
+    let mut touched = vec![[false; 2]; problem.objects.len()];
     for &f in kept {
         for axis in 0..2 {
             for p in &model.units[f].touched[axis] {
@@ -813,7 +924,7 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                     PointId::Centre(_) => None,
                 };
                 if let Some(t) = k.and_then(|k| touched.get_mut(k)) {
-                    *t = true;
+                    t[axis] = true;
                 }
             }
         }
@@ -844,7 +955,9 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
                 oriented: o.orient.is_some(),
                 own,
                 stub: None,
-                fact_touched: touched[k],
+                fact_touched: touched[k][0] || touched[k][1],
+                fact_axes: touched[k],
+                left_free: false,
             }
         })
         .collect()

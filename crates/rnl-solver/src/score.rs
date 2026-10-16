@@ -86,7 +86,8 @@ pub(crate) fn layers(s: &Structure, origins: &[[Q; 2]], g: &Geometry, routed: Op
 ///   known from its ROUTE, a wire written on that one net that ends at it, or a usage that attaches
 ///   its symbol to the net (12.1, `Connections::nets_of`). The problem holds no connections of the
 ///   netlist, so a pin of a net that nothing draws, or one that only the wire of a bus reaches, is
-///   on no net known, and a wire over it is not counted;
+///   on no net known, and a wire over it is not counted; nor is a pin of a symbol that the
+///   solution leaves free, which is not drawn (`crate::structure::ObjectInfo::left_free`);
 /// - a segment through the inside of a symbol's box over some length, but one that ends at a pin
 ///   of that symbol inside its box, which has no other way to the pin.
 ///
@@ -125,7 +126,7 @@ pub(crate) fn misleading(
             }
         }
     }
-    for (&(k, pin), on) in &s.connections.nets_of {
+    for (&(k, pin), on) in s.connections.nets_of.iter().filter(|((k, _), _)| !s.objects[*k].left_free) {
         let names: BTreeSet<&str> =
             on.iter().filter_map(|&i| s.connections.nets.get(i)).map(|net| net.name.as_str()).collect();
         if names.is_empty() {
