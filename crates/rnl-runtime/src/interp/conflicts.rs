@@ -433,7 +433,8 @@ impl Interp<'_> {
                 let mut idx: Vec<usize> = (0..size).collect();
                 loop {
                     let set = idx.iter().fold(0u64, |m, &i| m | 1 << i);
-                    if !found.iter().any(|&f| f & set == f) {
+                    // one that holds a set found is not one from which no fact can be left out
+                    if !found.iter().any(|&f| f & !set == 0) {
                         checks += 1;
                         if checks > MOST_CHECKS {
                             complete = false;

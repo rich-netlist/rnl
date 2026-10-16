@@ -59,11 +59,11 @@ fn at(what: &str, k: usize, col: u32) -> String {
 }
 
 /// The hint of the fact `what`, discarded: each set by its facts.
-fn discarded(what: &str, sets: &[&[String]]) -> String {
+fn discarded(what: &str, sets: &[&[&str]]) -> String {
     let sets: Vec<String> = sets
         .iter()
         .map(|set| match set {
-            [one] => one.clone(),
+            [one] => one.to_string(),
             [rest @ .., last] => format!("{} and {last} together", rest.join(", ")),
             [] => panic!("an empty set"),
         })
@@ -72,7 +72,7 @@ fn discarded(what: &str, sets: &[&[String]]) -> String {
 }
 
 /// The hint of a statement whose facts are in the sets of the facts `discarded`.
-fn note(discarded: &[String]) -> String {
+fn note(discarded: &[&str]) -> String {
     format!("facts discarded in the order of 8.5 because of this statement: {} (8.5)", discarded.join("; "))
 }
 
@@ -87,7 +87,7 @@ fn two_place_facts_on_one_axis() {
     let r = read(&netlist("0.3", &["#R1 @PLACE(0, 0)", "#R1 @PLACE(x=10)"]), &draft());
     let x0 = at("the x of #R1 = 0", 0, 5);
     let x10 = at("the x of #R1 = 10", 1, 5);
-    assert_eq!(hints(&r), [(line(0), 5, discarded("the x of #R1 = 0", &[&[x10]])), (line(1), 5, note(&[x0]))]);
+    assert_eq!(hints(&r), [(line(0), 5, discarded("the x of #R1 = 0", &[&[&x10]])), (line(1), 5, note(&[&x0]))]);
     assert_eq!(drawn(&r, "#R1").0, (10.0, 0.0));
 }
 
@@ -99,9 +99,9 @@ fn three_place_facts_on_one_axis() {
     assert_eq!(
         hints(&r),
         [
-            (line(0), 5, discarded("the x of #R1 = 0", &[&[x10.clone()]])),
-            (line(1), 5, discarded("the x of #R1 = 5", &[&[x10]])),
-            (line(2), 5, note(&[at("the x of #R1 = 0", 0, 5), at("the x of #R1 = 5", 1, 5)])),
+            (line(0), 5, discarded("the x of #R1 = 0", &[&[&x10]])),
+            (line(1), 5, discarded("the x of #R1 = 5", &[&[&x10]])),
+            (line(2), 5, note(&[&at("the x of #R1 = 0", 0, 5), &at("the x of #R1 = 5", 1, 5)])),
         ]
     );
     assert_eq!(drawn(&r, "#R1").0, (10.0, 0.0));
@@ -116,10 +116,10 @@ fn three_place_facts_on_one_axis() {
             (
                 line(0),
                 5,
-                discarded("the x of #R1 = 0", &[&[at("the x of #R1 = 10", 2, 5)], &[at("the x of #R1 = 10", 1, 5)]])
+                discarded("the x of #R1 = 0", &[&[&at("the x of #R1 = 10", 2, 5)], &[&at("the x of #R1 = 10", 1, 5)]])
             ),
-            (line(1), 5, note(&[x0.clone()])),
-            (line(2), 5, note(&[x0])),
+            (line(1), 5, note(&[&x0])),
+            (line(2), 5, note(&[&x0])),
         ]
     );
 
@@ -133,10 +133,10 @@ fn three_place_facts_on_one_axis() {
             (
                 line(1),
                 5,
-                discarded("the y of #R1 = 5", &[&[at("the y of #R1 = 0", 2, 5)], &[at("the y of #R1 = 0", 0, 5)]])
+                discarded("the y of #R1 = 5", &[&[&at("the y of #R1 = 0", 2, 5)], &[&at("the y of #R1 = 0", 0, 5)]])
             ),
-            (line(0), 5, note(&[y5.clone()])),
-            (line(2), 5, note(&[y5])),
+            (line(0), 5, note(&[&y5])),
+            (line(2), 5, note(&[&y5])),
         ]
     );
     assert_eq!(drawn(&r, "#R1").0, (0.0, 0.0));
@@ -149,8 +149,8 @@ fn an_orient_conflict() {
     assert_eq!(
         hints(&r),
         [
-            (line(0), 25, discarded("the orientation R90 of #R1", &[&[at("the orientation MY of #R1", 1, 5)]])),
-            (line(1), 5, note(&[at("the orientation R90 of #R1", 0, 25)])),
+            (line(0), 25, discarded("the orientation R90 of #R1", &[&[&at("the orientation MY of #R1", 1, 5)]])),
+            (line(1), 5, note(&[&at("the orientation R90 of #R1", 0, 25)])),
         ]
     );
     assert_eq!(drawn(&r, "#R1").1, Orient::MY);
@@ -171,9 +171,9 @@ fn priorities_decide_and_a_low_fact_gives_no_hint() {
     assert_eq!(
         hints(&r),
         [
-            (line(1), 5, discarded("the x of #R1 = 5", &[&[at("the x of #R1 = 0", 0, 5)]])),
-            (line(1), 5, discarded("the y of #R1 = 5", &[&[at("the y of #R1 = 0", 0, 5)]])),
-            (line(0), 5, note(&[x5, y5])),
+            (line(1), 5, discarded("the x of #R1 = 5", &[&[&at("the x of #R1 = 0", 0, 5)]])),
+            (line(1), 5, discarded("the y of #R1 = 5", &[&[&at("the y of #R1 = 0", 0, 5)]])),
+            (line(0), 5, note(&[&x5, &y5])),
         ]
     );
     assert_eq!(drawn(&r, "#R1").0, (0.0, 0.0));
@@ -190,8 +190,8 @@ fn a_fact_of_an_expansion_is_named_with_its_origin() {
     assert_eq!(
         hints(&r),
         [
-            (line(0), 34, discarded("the x of #R1 = 0", &[&[at("the x of #R1 = 10", 2, 5)]])),
-            (line(2), 5, note(&[format!("{} [{applying}]", at("the x of #R1 = 0", 0, 34))])),
+            (line(0), 34, discarded("the x of #R1 = 0", &[&[&at("the x of #R1 = 10", 2, 5)]])),
+            (line(2), 5, note(&[&format!("{} [{applying}]", at("the x of #R1 = 0", 0, 34))])),
         ]
     );
     assert_eq!(r.diagnostics()[0].origin, applying);
@@ -213,10 +213,10 @@ fn a_constraint_names_the_smallest_sets_it_conflicts_with() {
     assert_eq!(
         hints(&r),
         [
-            (line(0), 5, discarded("ALIGN", &[&[y1, y3.clone()], &[y2, y3]])),
-            (line(1), 5, note(&[align.clone()])),
-            (line(2), 5, note(&[align.clone()])),
-            (line(3), 5, note(&[align])),
+            (line(0), 5, discarded("ALIGN", &[&[&y1, &y3], &[&y2, &y3]])),
+            (line(1), 5, note(&[&align])),
+            (line(2), 5, note(&[&align])),
+            (line(3), 5, note(&[&align])),
         ]
     );
     assert_eq!(r.model.levels[0].constraints[0].status, "dropped");
