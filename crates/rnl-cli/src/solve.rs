@@ -12,10 +12,10 @@
 //! has its header record and its version (16.1), added when it has none, in the same pass as the
 //! record, at the positions the reading gives; but a file read only through library sections,
 //! where what lies outside them is not read (2.2), gets no new header. The header record stays the
-//! first record of its file (2.8): one written after a subcircuit that gets its record moves above
-//! that subcircuit. A file may hold several levels, and writing one back moves the lines of those
-//! after it, so the document is read again before the next level, the texts written so far held in
-//! memory over the files.
+//! first record of its file (2.8): one written after a subcircuit that gets its record moves where
+//! a new header goes, to line 2 (the draft 0.3, 16.3 and 2.2). A file may hold several levels, and
+//! writing one back moves the lines of those after it, so the document is read again before the
+//! next level, the texts written so far held in memory over the files.
 //!
 //! The resolution of each level is limited in time by the solver's `time_limit` (the draft 0.3,
 //! 8.5), 5 seconds unless `--solver-options` says otherwise, measured on the wall clock
@@ -300,7 +300,7 @@ pub fn solve_with_clock(
                 None => both.read(path).ok_or_else(|| format!("cannot read {path}")),
             };
             // the record and the header in one pass, at the positions of this reading: a header
-            // below the end of a subcircuit written moves above it, to stay the first record (2.8)
+            // below the end of a subcircuit written moves to line 2, to stay the first record (2.8)
             let text = text_of(&host.file, &path)?;
             let out = replace_generated_with_header(&r.doc, p.level, &text, &record, &p.version);
             let mut texts = vec![(path.clone(), out)];

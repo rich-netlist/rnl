@@ -1184,33 +1184,42 @@ fn read_solved(run: &SolveRun, files: &dyn Provider, entry: &Path) -> rnl_runtim
 }
 
 #[test]
-fn a_header_after_a_subcircuit_solved_moves_above_it() {
+fn a_header_after_a_subcircuit_solved_moves_to_line_2() {
     // a header record without VERSION after the subcircuit that is solved, in an included file and
     // in a main file solved a level at a time: the record of the subcircuit goes in before its
     // `.ends`, and would come before the header, which is the first record of its file (2.8); so
-    // the header moves above the subcircuit, and VERSION goes into it, not into that record (16.1,
-    // 17)
-    let files = MemoryProvider::new()
-        .with(
-            "/w/top4.sp",
-            "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include lib4.inc\nX1 p q pair\n.end\n",
-        )
-        .with("/w/lib4.inc", "* lib\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") { }\n");
-    let entry = Path::new("/w/top4.sp");
-    let run = solve(entry, &files, &unlimited()).unwrap();
-    let lib = &run.files.iter().find(|f| f.path == "/w/lib4.inc").unwrap().text;
-    let moved = "* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.subckt pair a b\n";
-    assert!(lib.starts_with(&format!("* lib\n{moved}")) && lib.ends_with("* }\n.ends\n"), "{lib}");
-    assert_eq!(lib.matches("type=\"header\"").count(), 1, "{lib}");
-    let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
-    let both = Layered { layers: vec![&solved, &files] };
-    check_read_back(&run, entry, &both, false, "lib4.inc");
-    assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files);
+    // the header moves where a new header goes, to line 2 after the first line (the draft 0.3,
+    // 16.3 and 2.2), after a bare marker put first when that line is a statement, and VERSION goes
+    // into it, not into that record (16.1, 17)
+    let header = "* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n";
+    let body = ".subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") { }\n";
+    let model = ".model nch nmos level=1\n";
+    for (head, want) in
+        [(format!("* lib\n{model}"), format!("* lib\n{header}{model}")), (String::new(), format!("*\n{header}"))]
+    {
+        let files = MemoryProvider::new()
+            .with(
+                "/w/top4.sp",
+                "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include lib4.inc\nX1 p q pair\n.end\n",
+            )
+            .with("/w/lib4.inc", &format!("{head}{body}"));
+        let entry = Path::new("/w/top4.sp");
+        let run = solve(entry, &files, &unlimited()).unwrap();
+        let lib = &run.files.iter().find(|f| f.path == "/w/lib4.inc").unwrap().text;
+        assert!(lib.starts_with(&format!("{want}.subckt pair a b\n")) && lib.ends_with("* }\n.ends\n"), "{lib}");
+        assert_eq!(lib.matches("type=\"header\"").count(), 1, "{lib}");
+        let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+        let both = Layered { layers: vec![&solved, &files] };
+        check_read_back(&run, entry, &both, false, "lib4.inc");
+        assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files, "{head}");
+    }
 
-    let top = "* top\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") { }\nX1 p q pair\n.end\n";
-    let files = MemoryProvider::new().with("/w/top.sp", top);
+    let top =
+        format!("* top\n{model}.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") {{ }}\nX1 p q pair\n.end\n");
+    let files = MemoryProvider::new().with("/w/top.sp", &top);
     let entry = Path::new("/w/top.sp");
     // the main file alone keeps the header below the subcircuit, its record going at the end
+    let moved = format!("{header}{model}.subckt pair a b\n");
     let below = "\n.ends\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\nX1 p q pair\n";
     for (level, header) in [("pair", format!("* top\n{moved}")), ("top.sp", below.to_string())] {
         let one = SolveOptions { level: Some(level.into()), ..unlimited() };
@@ -1221,7 +1230,7 @@ fn a_header_after_a_subcircuit_solved_moves_above_it() {
         let solved = MemoryProvider::new().with("/w/top.sp", text);
         let both = Layered { layers: vec![&solved, &files] };
         check_read_back(&run, entry, &both, false, level);
-        // the other level solved after it finds the header whole, above the subcircuit at the end
+        // the other level solved after it finds the header whole, on line 2 at the end
         let all = solve(entry, &both, &unlimited()).unwrap();
         let text = &all.files[0].text;
         assert!(text.starts_with(&format!("* top\n{moved}")), "{level}: {text}");
