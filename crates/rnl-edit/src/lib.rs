@@ -29,8 +29,8 @@ use serde_json::Value;
 
 pub use ops::{LevelOp, Op};
 
-/// The language version the header record declares: the one this toolkit reads (16.1).
-pub const VERSION: &str = "0.2";
+/// The language version the header record declares: the toolkit's default (16.1).
+pub const VERSION: &str = "0.3";
 
 /// The longest line written, comment marker included (4.3).
 pub const LINE: usize = 132;

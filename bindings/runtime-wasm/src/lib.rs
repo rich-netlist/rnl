@@ -486,7 +486,7 @@ R1 a 0 1k
         let text = v["written"]["text"].as_str().unwrap();
         assert_eq!(
             text,
-            "\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author=\"test\") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n"
+            "\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"acme\", version=\"1.0\")}\n.subckt rc VSS\nR1 in VSS 1k\n* @RNL(author=\"test\") {\n*   #R1 @PLACE(2, 0)\n* }\n.ends rc\n"
         );
         let d = &v["written"]["document"];
         assert_eq!(
