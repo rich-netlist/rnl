@@ -196,6 +196,26 @@ fn refusals_name_the_op() {
     );
 }
 
+#[test]
+fn a_record_is_not_written_in_a_region_written_to_be_encrypted() {
+    // a subcircuit that ends in `.prot … .unprot` has its end there, and a record there would be
+    // gone once the region is encrypted (2.2): refused; the file level ends after the region
+    let net = "* t\n.prot\n.subckt cell a b\nR1 a b 1k\n.ends cell\n.unprot\nX1 n1 n2 cell\n.end\n";
+    let refused =
+        write(&request("spice", net, json!([{"level": "subckt:cell", "op": "set", "object": "#R1", "at": [0, 0]}])));
+    assert_eq!(
+        refused.unwrap_err(),
+        "op 0 (set): cell ends in a region written to be encrypted, lines 2 to 6, where a record is gone once the region \
+         is encrypted (2.2)"
+    );
+    let out =
+        write(&request("spice", net, json!([{"level": "file", "op": "set", "object": "#X1", "at": [0, 0]}]))).unwrap();
+    assert!(
+        out.ends_with(".unprot\nX1 n1 n2 cell\n* @RNL(author=\"test\") {\n*   #X1 @PLACE(0, 0)\n* }\n.end\n"),
+        "{out}"
+    );
+}
+
 /// The runtime's runs as this crate's, to compare what the markup reads back as.
 fn ours(runs: &[markup::Run]) -> Vec<Run> {
     let style =

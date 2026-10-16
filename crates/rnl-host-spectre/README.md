@@ -6,6 +6,7 @@ Reads Spectre netlists into an `rnl_runtime::host::HostDocument`.
 - `model` cards: an instance of a model gets the terminals and type of the model's family (MOS, BJT, diode, JFET, R, C, L), including binned models.
 - `subckt`/`ends` (also `inline subckt`), `global`, `include` with `section=`, `library`/`section`/`endsection`.
 - `simulator lang=spice` parts are read with the SPICE adapter's rules.
+- `protect … unprotect`, and `.prot … .unprot` in SPICE mode, regions written to be encrypted, are read; a record in one gives a warning, and the regions are listed in `HostDocument::protected` (2.2).
 - Comment lines starting with `//` or `*` are carriers of RNL records (2.2); names are case-sensitive and only `0` is ground.
 
 A Spectre netlist and its SPICE translation with the same records give the same effective model; [`tests/conformance/equivalence`](../../tests/conformance/README.md) checks this.

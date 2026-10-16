@@ -20,6 +20,13 @@ use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, Level
 use rnl_runtime::records::{scan_run, CarrierLine};
 use rnl_runtime::source::{dirname, join, normalize, relative_to, Provider};
 
+/// A record in a region written to be encrypted (2.2): Spectre's `protect … unprotect`, and
+/// `.prot … .unprot` in SPICE mode.
+const PROTECTED: &str =
+    "RNL between `protect` and `unprotect` is read, but it is gone once the region is encrypted (2.2)";
+const PROTECTED_SPICE: &str =
+    "RNL between `.prot` and `.unprot` is read, but it is gone once the region is encrypted (2.2)";
+
 /// The Spectre dialect: names compare by case; `0` is ground.
 pub fn dialect() -> Dialect {
     Dialect { name: "spectre".into(), case_sensitive: true, ground_aliases: Vec::new() }
@@ -327,6 +334,9 @@ impl<'a> Reader<'a> {
         let mut pending: Option<(u32, String)> = None;
         let mut in_section = section.is_none();
         let mut skip_section: Option<String> = None;
+        // a region written to be encrypted, while in it: the line that opens it, and the warning
+        // for a record there (2.2)
+        let mut protect: Option<(u32, &str)> = None;
         let n = lines.len();
         let mut idx = 0usize;
         while idx < n {
@@ -385,6 +395,9 @@ impl<'a> Reader<'a> {
             };
             if let Some((rest, col)) = carrier_rest {
                 if rest.trim().is_empty() || rest.starts_with(' ') {
+                    if let Some((_, warning)) = protect.filter(|_| rest.contains("@RNL")) {
+                        self.sink.warning(warning, Some(Loc::line(&fname, no)));
+                    }
                     run.push(CarrierLine { line: no, content: rest.to_string(), col });
                     continue;
                 }
@@ -461,6 +474,16 @@ impl<'a> Reader<'a> {
                         }
                         continue;
                     }
+                    ".prot" | ".protect" => {
+                        protect.get_or_insert((no, PROTECTED_SPICE));
+                        continue;
+                    }
+                    ".unprot" | ".unprotect" => {
+                        if let Some((start, _)) = protect.take() {
+                            self.doc.protected.push((fname.clone(), start, no));
+                        }
+                        continue;
+                    }
                     _ => {}
                 }
                 pending = Some((no, stripped.to_string()));
@@ -490,6 +513,19 @@ impl<'a> Reader<'a> {
                 break;
             }
             let _ = last;
+            match stmt.split_whitespace().next() {
+                Some("protect") => {
+                    protect.get_or_insert((no, PROTECTED));
+                    continue;
+                }
+                Some("unprotect") => {
+                    if let Some((start, _)) = protect.take() {
+                        self.doc.protected.push((fname.clone(), start, no));
+                    }
+                    continue;
+                }
+                _ => {}
+            }
             if self.spectre_statement(&stmt, no, &fname, path, &mut st, stack, section) == Some(true) {
                 in_section = false;
             }
@@ -497,6 +533,9 @@ impl<'a> Reader<'a> {
         self.flush(&mut run, &fname, st.cur);
         if let Some((pl, pt)) = pending.take() {
             self.spice_statement(&pt, pl, &fname, path, &mut st, stack);
+        }
+        if let Some((start, _)) = protect {
+            self.doc.protected.push((fname.clone(), start, n as u32 + 1));
         }
         if !st.stack.is_empty() {
             self.sink.error("a subcircuit has no `ends`", Some(Loc::line(&fname, n as u32)));
@@ -875,6 +914,21 @@ mod tests {
         assert_eq!(doc.main().instances[0].value.as_deref(), Some("1k"));
         assert_eq!(doc.main().records.len(), 1);
         assert_eq!(doc.levels[1].name, "lib.scs (tt)");
+    }
+
+    #[test]
+    fn protected_regions() {
+        // Spectre's protect … unprotect, and .prot … .unprot in SPICE mode: read, a record in them
+        // with a warning (2.2)
+        let net = "// t\nprotect\nsubckt cell (a b)\nR1 (a b) resistor r=1k\n// @RNL {#R1 @PLACE(0, 0)}\nends cell\n\
+                   unprotect\nsimulator lang=spice\n.prot\nX1 n1 n2 cell\n* @RNL {#X1 @PLACE(5, 0)}\n.unprot\n";
+        let p = MemoryProvider::new().with("a.scs", net);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        assert_eq!((doc.levels[1].records.len(), doc.main().records.len(), doc.main().instances.len()), (1, 1, 1));
+        let said: Vec<(&str, Option<Loc>)> = sink.all().iter().map(|d| (d.message.as_str(), d.loc.clone())).collect();
+        assert_eq!(said, [(PROTECTED, Some(Loc::line("a.scs", 5))), (PROTECTED_SPICE, Some(Loc::line("a.scs", 11)))]);
+        assert_eq!(doc.protected, [("a.scs".to_string(), 2, 7), ("a.scs".to_string(), 9, 12)]);
     }
 
     #[test]

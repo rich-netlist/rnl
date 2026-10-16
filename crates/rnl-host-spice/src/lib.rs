@@ -16,6 +16,9 @@ use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, Level
 use rnl_runtime::records::{scan_run, CarrierLine};
 use rnl_runtime::source::{dirname, join, normalize, relative_to, Provider};
 
+/// A record in a region written to be encrypted (2.2).
+const PROTECTED: &str = "RNL between `.prot` and `.unprot` is read, but it is gone once the region is encrypted (2.2)";
+
 /// The SPICE dialect: names ignore case; ngspice's `gnd` is ground (6.3).
 pub fn dialect() -> Dialect {
     Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec!["gnd".into()] }
@@ -268,6 +271,8 @@ impl<'a> Reader<'a> {
         let mut sub_stack: Vec<(LevelId, LevelId)> = Vec::new();
         let mut run: Vec<CarrierLine> = Vec::new();
         let mut in_control = false;
+        // the line of the `.prot` of a region written to be encrypted, while in it (2.2)
+        let mut protect: Option<u32> = None;
         let mut ended = false;
         let mut pending: Option<Pending> = None;
         let mut continued = Continued::default();
@@ -341,6 +346,9 @@ impl<'a> Reader<'a> {
                             Some(Loc::line(&fname, no)),
                         );
                     }
+                    if protect.is_some() && rest.contains("@RNL") {
+                        self.sink.warning(PROTECTED, Some(Loc::line(&fname, no)));
+                    }
                     run.push(CarrierLine { line: no, content: rest.to_string(), col: 1 });
                     continue;
                 }
@@ -392,6 +400,16 @@ impl<'a> Reader<'a> {
                 in_control = true;
                 continue;
             }
+            if first == ".prot" || first == ".protect" {
+                protect.get_or_insert(no);
+                continue;
+            }
+            if first == ".unprot" || first == ".unprotect" {
+                if let Some(start) = protect.take() {
+                    self.doc.protected.push((fname.clone(), start, no));
+                }
+                continue;
+            }
             if first == ".lib" {
                 let toks: Vec<&str> = stripped.split_whitespace().collect();
                 if toks.len() == 2 {
@@ -428,6 +446,9 @@ impl<'a> Reader<'a> {
         self.flush_run(&mut run, &fname, cur);
         if let Some(p) = pending.take() {
             self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
+        }
+        if let Some(start) = protect {
+            self.doc.protected.push((fname.clone(), start, lines.len() as u32 + 1));
         }
         if !sub_stack.is_empty() {
             self.sink.error("a subcircuit has no `.ends`", Some(Loc::line(&fname, lines.len() as u32)));
@@ -641,6 +662,21 @@ mod tests {
         assert!(doc.subckt("CELL").is_some());
         assert_eq!(sink.all().len(), 1);
         assert_eq!(doc.main().instances[0].mtype.as_deref(), Some("nmos"));
+    }
+
+    #[test]
+    fn protected_regions() {
+        // a region written to be encrypted is read, a record in it with a warning, since the record
+        // is gone once the region is encrypted (2.2); one left open closes after the last line
+        let net = "* t\n.prot\n.subckt cell a b\nR1 a b 1k\n* @RNL {#R1 @PLACE(0, 0)}\n.ends\n.unprot\nX1 n1 n2 cell\n\
+                   .PROTECT\nR2 n1 0 1k\n.end\n";
+        let p = MemoryProvider::new().with("t.sp", net);
+        let mut sink = Sink::new();
+        let doc = read("t.sp", &p, &mut sink).unwrap();
+        assert_eq!((doc.levels[1].records.len(), doc.levels[1].instances.len(), doc.main().instances.len()), (1, 1, 2));
+        let said: Vec<(&str, Option<Loc>)> = sink.all().iter().map(|d| (d.message.as_str(), d.loc.clone())).collect();
+        assert_eq!(said, [(PROTECTED, Some(Loc::line("t.sp", 5)))]);
+        assert_eq!(doc.protected, [("t.sp".to_string(), 2, 7), ("t.sp".to_string(), 9, 12)]);
     }
 
     #[test]
