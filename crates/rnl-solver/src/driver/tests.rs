@@ -50,6 +50,7 @@ fn every_object_is_placed_where_the_facts_put_it() {
 
 // ------------------------------------------------------------------------------------ the files
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use num_traits::{One, Signed, Zero};
@@ -218,12 +219,176 @@ fn summary(p: &LevelProblem, solved: &Solved, e: &Exact) -> String {
     for n in &solved.report.inert_objectives {
         lines.push(format!("  inert: {n}"));
     }
+    for w in &solved.solution.wires {
+        let points: Vec<String> = w
+            .points
+            .iter()
+            .map(|q| match q {
+                rnl_runtime::solution::WirePoint::Anchor(PointRef::Pin { object, terminal, .. }) => {
+                    format!("{}:{terminal}", p.objects[*object].label)
+                }
+                rnl_runtime::solution::WirePoint::Anchor(a) => format!("{a:?}"),
+                rnl_runtime::solution::WirePoint::Branch(b) => format!("branch {b}"),
+                rnl_runtime::solution::WirePoint::Bend((x, y)) => format!("({x}, {y})"),
+            })
+            .collect();
+        lines.push(format!("  wire &{}: {}", p.routes[w.route].net, points.join(" ")));
+    }
     lines.join("\n")
+}
+
+/// The wires of the ROUTEs (13.7, 13.2): each from a pin of its net, a point of a wire written on
+/// it or a branch point, to another, its bends between, as the exact paths have them; along the
+/// axes and through no symbol's box; every branch point the end of three wires or more, with a
+/// junction; every net one tree but those the report leaves in parts, in as many as it says.
+fn check_wires(p: &LevelProblem, solved: &Solved, e: &Exact, what: &str) {
+    use rnl_runtime::solution::WirePoint;
+    let s = &e.structure;
+    let g = &e.placed.geometry;
+    let sol = &solved.solution;
+    let r = &e.routing;
+    assert_eq!((&sol.wires, &sol.branches), (&r.wires, &r.branches), "{what}");
+    assert_eq!(r.paths.len(), sol.wires.len(), "{what}");
+    let at = |q: &PointRef| [point_value(p, g, q, 0, 0).unwrap(), point_value(p, g, q, 1, 0).unwrap()];
+    let boxes: Vec<(usize, [Q; 4])> =
+        s.components().filter_map(|k| Some((k, s.box_at(&e.placed.origins, &g.orient, k)?))).collect();
+    let mut ends_at = vec![0usize; sol.branches.len()];
+    for (w, path) in sol.wires.iter().zip(&r.paths) {
+        let what = format!("{what}: {w:?}");
+        let net = &p.routes[w.route].net;
+        assert_eq!(p.routes.iter().position(|x| x.net == *net), Some(w.route), "{what}: the first ROUTE of its net");
+        let routes: Vec<&rnl_runtime::problem::RouteIntent> = p.routes.iter().filter(|x| x.net == *net).collect();
+        let n = w.points.len();
+        assert!(n >= 2 && path.len() == n, "{what}");
+        for (i, q) in w.points.iter().enumerate() {
+            let end = i == 0 || i == n - 1;
+            match q {
+                WirePoint::Anchor(a) => {
+                    assert!(end, "{what}");
+                    let pin = routes.iter().any(|x| x.pins.contains(a));
+                    let written = routes.iter().flat_map(|x| &x.wires).any(|&k| p.wires[k].anchors.contains(a));
+                    assert!(pin || written, "{what}: {a:?} is not a point of the net");
+                    assert_eq!(at(a), path[i], "{what}");
+                }
+                WirePoint::Branch(b) => {
+                    assert!(end, "{what}");
+                    ends_at[*b] += 1;
+                    let xy = sol.branches[*b].at;
+                    assert_eq!(
+                        (from_f64(xy.0).unwrap(), from_f64(xy.1).unwrap()),
+                        (path[i][0].clone(), path[i][1].clone())
+                    );
+                }
+                WirePoint::Bend(xy) => {
+                    assert!(!end && xy.0.is_finite() && xy.1.is_finite(), "{what}");
+                    assert_eq!(*xy, (crate::rational::to_f64(&path[i][0]), crate::rational::to_f64(&path[i][1])));
+                }
+            }
+        }
+        // a pin strictly inside its own box may lead out through it
+        let inside_own = |k: usize, b: &[Q; 4]| {
+            [&w.points[0], &w.points[n - 1]].iter().any(|q| match q {
+                WirePoint::Anchor(a @ PointRef::Pin { object, .. }) if *object == k => {
+                    let xy = at(a);
+                    b[0] < xy[0] && xy[0] < b[2] && b[1] < xy[1] && xy[1] < b[3]
+                }
+                _ => false,
+            })
+        };
+        for seg in path.windows(2) {
+            assert!(seg[0][0] == seg[1][0] || seg[0][1] == seg[1][1], "{what}: not along an axis");
+            for (k, b) in &boxes {
+                assert!(
+                    !crate::route::meets_inside(b, &seg[0], &seg[1]) || inside_own(*k, b),
+                    "{what}: through the box of {}",
+                    p.objects[*k].label
+                );
+            }
+        }
+    }
+    for (b, n) in ends_at.iter().enumerate() {
+        assert!(*n >= 3 && sol.branches[b].junction, "{what}: branch point {b} ends {n} wires");
+    }
+    for x in sol.branches.iter().map(|b| b.at) {
+        assert!(x.0.is_finite() && x.1.is_finite(), "{what}");
+    }
+    // every net one tree, but those left in parts
+    let mut nets: Vec<&String> = p.routes.iter().map(|x| &x.net).collect();
+    nets.dedup();
+    nets.sort();
+    nets.dedup();
+    for net in nets {
+        let mut parent: BTreeMap<(u8, usize, usize), (u8, usize, usize)> = BTreeMap::new();
+        fn find(
+            parent: &mut BTreeMap<(u8, usize, usize), (u8, usize, usize)>,
+            k: (u8, usize, usize),
+        ) -> (u8, usize, usize) {
+            let mut k = k;
+            while let Some(&up) = parent.get(&k) {
+                if up == k {
+                    break;
+                }
+                k = up;
+            }
+            parent.entry(k).or_insert(k);
+            k
+        }
+        let key = |q: &PointRef| match q {
+            PointRef::Pin { object, pin, .. } => Some((0u8, *object, *pin)),
+            PointRef::Origin(k) if p.objects[*k].kind == ObjectKind::Point => Some((1, *k, 0)),
+            _ => None,
+        };
+        let unite = |parent: &mut BTreeMap<_, _>, a: (u8, usize, usize), b: (u8, usize, usize)| {
+            let (ra, rb) = (find(parent, a), find(parent, b));
+            if ra != rb {
+                parent.insert(ra.max(rb), ra.min(rb));
+            }
+        };
+        let mut points: Vec<(u8, usize, usize)> = Vec::new();
+        for x in p.routes.iter().filter(|x| x.net == *net) {
+            points.extend(x.pins.iter().filter_map(key));
+            for &k in &x.wires {
+                let ends: Vec<_> = p.wires[k].anchors.iter().filter_map(key).collect();
+                points.extend(ends.iter().copied());
+                for pair in ends.windows(2) {
+                    unite(&mut parent, pair[0], pair[1]);
+                }
+            }
+        }
+        points.sort_unstable();
+        points.dedup();
+        for w in sol.wires.iter().filter(|w| p.routes[w.route].net == *net) {
+            let end = |q: &WirePoint| match q {
+                WirePoint::Anchor(a) => key(a),
+                WirePoint::Branch(b) => Some((2, *b, 0)),
+                WirePoint::Bend(_) => None,
+            };
+            let (a, b) = (end(&w.points[0]).unwrap(), end(&w.points[w.points.len() - 1]).unwrap());
+            unite(&mut parent, a, b);
+        }
+        let mut roots: Vec<_> = points.iter().map(|q| find(&mut parent, *q)).collect();
+        roots.sort_unstable();
+        roots.dedup();
+        let left = solved.report.unrouted.iter().find(|u| u.net == *net);
+        if points.len() < 2 {
+            assert!(left.is_none(), "{what}: &{net}");
+            continue;
+        }
+        match left {
+            None => assert_eq!(roots.len(), 1, "{what}: &{net} is not one tree"),
+            Some(u) => assert_eq!(roots.len(), u.parts, "{what}: &{net}"),
+        }
+    }
 }
 
 /// Solves a level and checks it (see the tests below).
 fn check_level(file: &str, p: &LevelProblem) -> (Solved, Exact) {
-    let options = SolverOptions::default();
+    check_with(file, p, &SolverOptions::default())
+}
+
+/// Solves a level with some options and checks it.
+fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> (Solved, Exact) {
+    let options = options.clone();
     let (solved, e) = solve_exact(p, &options);
     let what = format!("{file} / {}", p.title);
     // every fact kept holds where the objects are, exactly, before they become f64
@@ -236,10 +401,14 @@ fn check_level(file: &str, p: &LevelProblem) -> (Solved, Exact) {
             summary(p, &solved, &e)
         );
     }
-    // no two instances overlap unless the facts make them
+    // no two instances overlap unless the facts make them, or the budget of pivots ran out
+    let tight = options.budget.pivots < SolverOptions::default().budget.pivots;
     for o in &e.placed.overlaps {
         let (a, b) = (o.a, o.b);
         let instance = |k: usize| matches!(p.objects[k].kind, ObjectKind::Instance | ObjectKind::Bundle);
+        if tight && o.cause == crate::coords::Cause::Budget {
+            continue;
+        }
         if instance(a) && instance(b) {
             assert_eq!(o.cause, crate::coords::Cause::Facts, "{what}: {o:?}\n{}", summary(p, &solved, &e));
             assert!(
@@ -264,6 +433,7 @@ fn check_level(file: &str, p: &LevelProblem) -> (Solved, Exact) {
     for pl in &solved.solution.placements {
         assert_eq!(pl.orient.is_some(), p.objects[pl.object].orient.is_some(), "{what}: {pl:?}");
     }
+    check_wires(p, &solved, &e, &what);
     (solved, e)
 }
 
@@ -271,12 +441,40 @@ fn check_level(file: &str, p: &LevelProblem) -> (Solved, Exact) {
 fn every_case_of_the_solver_is_placed_keeping_every_fact_kept() {
     let files = netlists("tests/integration/solver", "T");
     assert!(files.len() >= 7, "{files:?}");
+    let mut routed = 0;
     for f in files {
         for p in problems(&f) {
             let (solved, e) = check_level(&f.to_string_lossy(), &p);
             eprintln!("{}", summary(&p, &solved, &e));
+            // every ROUTE of the cases written for the solver is routed whole
+            assert!(solved.report.unrouted.is_empty(), "{}: {:?}", p.title, solved.report.unrouted);
+            if !p.routes.is_empty() {
+                assert!(!solved.solution.wires.is_empty(), "{}", p.title);
+                routed += 1;
+            }
         }
     }
+    assert!(routed >= 7, "{routed}");
+}
+
+/// A budget too small for anything still gives a solution that RNL can write: every object placed
+/// and oriented, every fact kept holding, the wires made valid and the rest reported, the same
+/// twice.
+#[test]
+fn a_tiny_budget_still_gives_a_valid_solution() {
+    let options = SolverOptions::parse("budget=resolve_nodes:2,pivots:30,candidates:0,astar_expansions:12").unwrap();
+    let mut left = 0;
+    for f in netlists("tests/integration/solver", "T") {
+        for p in problems(&f) {
+            let (solved, _) = check_with(&f.to_string_lossy(), &p, &options);
+            left += solved.report.unrouted.len();
+            for u in &solved.report.unrouted {
+                assert!(u.parts >= 2, "{}: {u:?}", p.title);
+                assert!(solved.report.notes.iter().any(|n| n.contains(&format!("&{} is left in", u.net))));
+            }
+        }
+    }
+    assert!(left > 0, "12 expansions leave some net in parts");
 }
 
 #[test]

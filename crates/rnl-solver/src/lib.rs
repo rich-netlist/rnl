@@ -24,11 +24,12 @@
 //! - coordinates by a lexicographic LP, routing of the ROUTEs, layered scoring (`coords`, `route`,
 //!   `score`, `driver`).
 //!
-//! **Status: stage S3.** [`resolve()`] resolves the facts of a level as 8.5 says, exactly, and gives
+//! **Status: stage S4.** [`resolve()`] resolves the facts of a level as 8.5 says, exactly, and gives
 //! a witness, a placement that satisfies every fact kept. [`solve`] then analyses the structure of
 //! the level, searches candidates structure first (rows by current depth, orders, orientations),
-//! places each by a lexicographic LP rounded to the grid, keeping every fact kept, and takes the
-//! best by the layered objectives in force. Nothing is routed yet, and the report's notes say so.
+//! places each by a lexicographic LP rounded to the grid, keeping every fact kept, routes the
+//! ROUTEs of the best of them by a rectilinear A* around the symbols (13.7), with branch points
+//! and junctions (13.2), and takes the best by the layered objectives in force on their wires.
 //!
 //! The crate does no file I/O and takes no time or randomness, so it builds for
 //! `wasm32-unknown-unknown` and the same input and options give the same result on every platform.
@@ -73,6 +74,10 @@ pub struct SolveReport {
     /// without a supply or ground symbol, or that this version does not compute: one sentence
     /// each.
     pub inert_objectives: Vec<String>,
+    /// The ROUTEs whose nets the router could not join into one tree (13.7), in the order of the
+    /// ROUTEs. The wires it made for them are in the solution all the same; a viewer draws flight
+    /// lines for what is left. Not an error.
+    pub unrouted: Vec<Unrouted>,
     pub work: Work,
     /// Anything else worth saying, such as a budget that ran out.
     pub notes: Vec<String>,
@@ -94,6 +99,21 @@ pub struct Discarded {
     pub undecided: bool,
 }
 
+/// A ROUTE whose net the router left in parts (13.7).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unrouted {
+    /// The ROUTE, by its index in [`LevelProblem::routes`]: the first ROUTE of its net, whose style
+    /// the wires routed for it take.
+    pub route: usize,
+    pub net: String,
+    /// The parts the net is left in, two or more: its pins, and the wires written on it, that no
+    /// wire joins to the rest.
+    pub parts: usize,
+    /// The budget of the router for the net ran out ([`Budget::astar_expansions`]); otherwise no
+    /// path around the symbols and the other wires joins a part to the rest.
+    pub budget: bool,
+}
+
 /// The work done, counted as the [`Budget`] counts it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Work {
@@ -103,17 +123,18 @@ pub struct Work {
     pub pivots: u64,
     /// The candidates the search made.
     pub candidates: u64,
-    /// The cells the router expanded.
+    /// The cells the router expanded, over every candidate routed.
     pub astar_expansions: u64,
 }
 
 /// Solves one drawing level: resolves its facts (8.5), places and orients its objects, and
 /// routes its ROUTEs (13.7).
 ///
-/// Stage S3: places every object with a position of its own and orients every object that has
-/// an orientation, as the best candidate of the search says, every fact kept holding exactly; the
-/// objectives that are on but inert in the level are in the report; a note says that nothing is
-/// routed yet.
+/// Places every object with a position of its own and orients every object that has an
+/// orientation, as the best candidate of the search says, every fact kept holding exactly; routes
+/// the ROUTEs, each wire from a pin or a branch point to a pin or a branch point (13.2, 13.7). The
+/// objectives that are on but inert in the level, and the ROUTEs left in parts, are in the
+/// report.
 pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
     driver::solve(problem, options)
 }

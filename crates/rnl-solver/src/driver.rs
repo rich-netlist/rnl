@@ -1,14 +1,25 @@
 //! The flow of a solve, its budget and its report (plan 5.9).
 //!
 //! ```text
-//! resolve (8.5) → structure → search → for each candidate: coords → score
+//! resolve (8.5) → structure → search → for each candidate: coords
+//! → the best `beam` by the estimate: route (13.7) → score
 //! → the best by the layered tuple, ties by the canonical code
 //! ```
 //!
-//! Stage S3: the facts are resolved, the candidates of the search placed by the lexicographic LP
-//! and rounded to the grid, and the best by the layered score of the objectives in force taken.
-//! Nothing is routed yet (stage S4): the routing objectives measure the straight connections of
-//! each net, and a note says so.
+//! Every candidate the search makes is placed by the lexicographic LP (`crate::coords`) and
+//! ranked by the estimate of the objectives, the routing objectives measuring the straight
+//! connections of each net; the best `beam` of them are routed (`crate::route`) and scored on
+//! their wires (`crate::score`), and the best of those is the solution. Overlapping symbols rank
+//! first and then joins left undone, as the solver's own rules rank after every fact and before
+//! every objective (8.5, 11.7).
+//!
+//! **Budget** (`crate::Budget`): the work is counted, never timed, so the result is the same on
+//! every machine. The resolution stops deciding a fact after `resolve_nodes` nodes and discards it
+//! undecided; a simplex stops at `pivots`, a relation of the solver's own then dropped or an LP
+//! left where the resolution put the candidate; the search makes at most `candidates`, P0 always
+//! among them; the router expands at most `astar_expansions` cells for one net and leaves the
+//! rest of the net to flight lines. Each falls back to the best found so far, at worst P0, and
+//! the report says so.
 
 use std::collections::BTreeMap;
 
@@ -17,17 +28,18 @@ use rnl_runtime::problem::{LevelProblem, Position};
 use rnl_runtime::solution::{Placement, Solution};
 
 use crate::coords::{place, Cause, Placed};
-use crate::objectives::View;
 use crate::rational::{to_f64, Q};
 use crate::resolve::Resolved;
+use crate::route::{route, Failure, Routing};
+use crate::score::{drawn, layers, order, Entry};
 use crate::search::{search, Candidate, RelKind};
 use crate::structure::{analyse, Structure};
-use crate::{SolveReport, Solved, SolverOptions};
+use crate::{SolveReport, Solved, SolverOptions, Unrouted};
 
 /// The note of a solve at this stage.
-pub(crate) const STAGE_NOTE: &str = "rnl-solver is at stage S3 of solver v1: the facts are resolved (8.5), the \
-     candidates of the structure-first search placed by the lexicographic LP and rounded to the grid, and the best by \
-     the layered objectives taken; nothing is routed yet, so the routing objectives measure straight connections";
+pub(crate) const STAGE_NOTE: &str = "rnl-solver is at stage S4 of solver v1: the facts are resolved (8.5), the \
+     candidates of the structure-first search placed by the lexicographic LP and rounded to the grid, the best of them \
+     by the estimate routed (13.7), and the best by the layered objectives on their wires taken";
 
 /// A solve with its exact result, for the tests.
 #[derive(Clone, Debug)]
@@ -37,12 +49,20 @@ pub(crate) struct Exact {
     pub structure: Structure,
     pub candidate: Candidate,
     pub placed: Placed,
-    /// The value of each layer of the objectives in force.
+    pub routing: Routing,
+    /// The value of each layer of the objectives in force, on the wires.
     pub score: Vec<Q>,
 }
 
 pub(crate) fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
     solve_exact(problem, options).0
+}
+
+/// A candidate placed, with how it ranks.
+struct Placing {
+    candidate: Candidate,
+    placed: Placed,
+    entry: Entry,
 }
 
 /// Solves a level, and gives the exact result with it.
@@ -65,23 +85,35 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
     notes.extend(structure.notes.iter().cloned());
     let candidates = search(problem, &structure, options, &mut work);
     let count = candidates.len();
-    let mut all: Vec<(Vec<Q>, Vec<u32>, Candidate, Placed)> = Vec::new();
+    let mut all: Vec<Placing> = Vec::new();
     for c in candidates {
         let placed = place(problem, &structure, &c, options, &mut work);
-        let view = View { s: &structure, at: &placed.origins, orient: &placed.geometry.orient };
-        let score = structure.active.score(&view, None);
-        let code = c.code(&structure);
-        all.push((score, code, c, placed));
+        let estimate = layers(&structure, &placed.origins, &placed.geometry, None);
+        let entry =
+            Entry { overlaps: placed.overlaps.len(), joins_left: 0, layers: estimate, code: c.code(&structure) };
+        all.push(Placing { candidate: c, placed, entry });
     }
-    // not overlapping is the solver's own rule, ranked after the facts and before the objectives
-    // (8.5, 11.7): the fewest overlaps first, then the layers as `Active::rank` orders them
-    let fewest = all.iter().map(|(_, _, _, p)| p.overlaps.len()).min().expect("the search gives P0 at least");
-    all.retain(|(_, _, _, p)| p.overlaps.len() == fewest);
-    let entries: Vec<(&[Q], &[u32])> = all.iter().map(|(e, code, _, _)| (e.as_slice(), code.as_slice())).collect();
-    let best = structure.active.rank(&entries)[0];
-    let (score, _, candidate, placed) = all.swap_remove(best);
+    // the best `beam` by the estimate are routed and scored on their wires (plan 5.8)
+    let estimated: Vec<Entry> = all.iter().map(|c| c.entry.clone()).collect();
+    let ranked = order(&structure.active, &estimated);
+    let beam = options.beam.max(1);
+    let mut finals: Vec<(usize, Routing, Entry)> = Vec::new();
+    for &i in ranked.iter().take(beam) {
+        let p = &all[i];
+        let routing = route(problem, &structure, &p.placed.geometry, &p.placed.origins, options, &mut work);
+        let wires = drawn(problem, &structure, &p.placed.geometry, &routing);
+        let score = layers(&structure, &p.placed.origins, &p.placed.geometry, Some(&wires));
+        let entry = Entry { joins_left: routing.joins_left(), layers: score, ..p.entry.clone() };
+        finals.push((i, routing, entry));
+    }
+    let entries: Vec<Entry> = finals.iter().map(|(_, _, e)| e.clone()).collect();
+    let best = order(&structure.active, &entries)[0];
+    let (taken, routing, entry) = finals.swap_remove(best);
+    let Placing { candidate, placed, .. } = all.swap_remove(taken);
+    let score = entry.layers;
     notes.push(format!(
-        "{count} candidates placed; the one taken comes from {}",
+        "{count} candidates placed and {} routed; the one taken comes from {}",
+        entries.len(),
         if candidate.origin == "P0" { "P0, the order of the netlist" } else { "the beam search" }
     ));
     if !placed.optimised {
@@ -118,6 +150,32 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
         };
         notes.push(format!("{} and {} overlap: {why}", problem.objects[o.a].label, problem.objects[o.b].label));
     }
+    if !problem.routes.is_empty() {
+        let mut nets: Vec<usize> = routing.wires.iter().map(|w| w.route).collect();
+        nets.dedup();
+        notes.push(format!(
+            "{} wires and {} branch points routed for the ROUTEs of {} nets, {} cells expanded",
+            routing.wires.len(),
+            routing.branches.len(),
+            nets.len(),
+            routing.expansions
+        ));
+    }
+    let mut unrouted = Vec::new();
+    for l in &routing.left {
+        notes.push(format!(
+            "the ROUTE of &{} is left in {} parts, which a viewer draws flight lines between: {}",
+            l.net,
+            l.parts,
+            l.failure.reason()
+        ));
+        unrouted.push(Unrouted {
+            route: l.route,
+            net: l.net.clone(),
+            parts: l.parts,
+            budget: l.failure == Failure::Budget,
+        });
+    }
     let mut placements = Vec::new();
     for (k, o) in problem.objects.iter().enumerate() {
         let orient: Option<Orient> = o.orient.is_some().then(|| placed.geometry.orient[k]);
@@ -136,11 +194,18 @@ pub(crate) fn solve_exact(problem: &LevelProblem, options: &SolverOptions) -> (S
         kept: resolved.kept.clone(),
         discarded: resolved.discarded.clone(),
         inert_objectives: structure.active.inert.clone(),
+        unrouted,
         work,
         notes,
     };
-    let solved = Solved { solution: Solution { placements, ..Solution::default() }, report };
-    (solved, Exact { resolved, structure, candidate, placed, score })
+    let solution = Solution {
+        placements,
+        branches: routing.branches.clone(),
+        wires: routing.wires.clone(),
+        wire_routes: Vec::new(),
+    };
+    let solved = Solved { solution, report };
+    (solved, Exact { resolved, structure, candidate, placed, routing, score })
 }
 
 #[cfg(test)]
