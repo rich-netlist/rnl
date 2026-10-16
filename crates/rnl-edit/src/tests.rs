@@ -374,3 +374,19 @@ fn a_long_text_breaks_between_its_parameters() {
     );
     assert!(out.lines().all(|l| l.chars().count() <= LINE), "{out}");
 }
+
+#[test]
+fn several_items_of_add_to_and_remove_from_are_one_set() {
+    let level = "subckt:rc_lowpass";
+    let ops = json!([
+        {"level": level, "op": "remove-from", "items": ["&in", "&VSS"], "set": "$PORT_FILL_SET"},
+        {"level": level, "op": "add-to", "items": ["&VSS"], "set": "$GROUND_NET_SET"}
+    ]);
+    let out = write(&request("spice", RC, ops)).unwrap();
+    assert!(out.contains("*   {&in &VSS} @REMOVE-FROM $PORT_FILL_SET;\n*   &VSS @ADD-TO $GROUND_NET_SET\n"), "{out}");
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: true }).unwrap();
+    let loud: Vec<String> =
+        r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
+    assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
+}
