@@ -190,6 +190,19 @@ pub(crate) struct Connections {
     /// For each pin, the pins of other objects it is drawn to: those of its ROUTE's net, and its
     /// neighbours along the wires written.
     pub targets: BTreeMap<PinKey, Vec<PinKey>>,
+    /// The net a ROUTE asks to draw that each pin is on, by its index in `drawn`: two pins with
+    /// one are joined by the router, which leaves each by its lead (13.7).
+    pub route_of: BTreeMap<PinKey, usize>,
+    /// The modes of the wires written that run from a pin straight to the next one, by the pair
+    /// in the order written (13.1).
+    pub written: BTreeMap<(PinKey, PinKey), Vec<String>>,
+}
+
+impl Connections {
+    /// Whether the router joins two pins: a ROUTE asks for the net they are both on.
+    pub(crate) fn routed(&self, a: PinKey, b: PinKey) -> bool {
+        self.route_of.get(&a).is_some_and(|n| self.route_of.get(&b) == Some(n))
+    }
 }
 
 /// Supply and ground.
@@ -384,7 +397,8 @@ pub(crate) enum Source {
     /// end on a supply or the ground hung towards it, those between two signals laid across
     /// (current_direction).
     SourcesDown,
-    /// Ground symbols hang below their pins (ground_direction).
+    /// Ground symbols hang below their pins, two-terminal elements with an end on the ground hang
+    /// that end down (ground_direction).
     GroundsDown,
     /// Inputs on the left, outputs on the right (signal_flow).
     InputsLeft,
@@ -930,8 +944,10 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
             }
         }
     }
-    for (_, pins) in &routed {
+    let mut route_of: BTreeMap<PinKey, usize> = BTreeMap::new();
+    for (i, (_, pins)) in routed.iter().enumerate() {
         for a in pins {
+            route_of.insert(*a, i);
             for b in pins {
                 if a.0 != b.0 {
                     targets.entry(*a).or_default().insert(*b);
@@ -939,6 +955,7 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
             }
         }
     }
+    let mut written: BTreeMap<(PinKey, PinKey), Vec<String>> = BTreeMap::new();
     for (i, wire) in problem.wires.iter().enumerate() {
         let pins: Vec<PinKey> = wire.anchors.iter().filter_map(pin_of).collect();
         if let [net] = wire.nets.as_slice() {
@@ -949,6 +966,7 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
                 if a.0 != b.0 {
                     targets.entry(a).or_default().insert(b);
                     targets.entry(b).or_default().insert(a);
+                    written.entry((a, b)).or_default().push(wire.mode.clone());
                 }
             }
         }
@@ -970,7 +988,8 @@ fn connections(problem: &LevelProblem, model: &Model) -> Connections {
             }
         }
     }
-    let mut out = Connections { drawn, ..Connections::default() };
+    // the routes are the first of `drawn`, one per net, in the order of `routed`
+    let mut out = Connections { drawn, route_of, written, ..Connections::default() };
     for (name, pins) in nets {
         let i = out.nets.len();
         for p in &pins {

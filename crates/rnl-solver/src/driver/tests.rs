@@ -807,17 +807,21 @@ fn t3_is_drawn_as_the_plan_pictures_it() {
     assert_eq!(s.objects[grounds[0]].stub.as_ref().unwrap().host.0, m5);
     assert!(y(grounds[0]) < y(m5) && x(grounds[0]) == x(m5), "{what}");
     assert_eq!(g.orient[grounds[0]], Orient::R0, "{what}");
-    // the ports beside what they connect to: inp left of M1's gate, inn right of M2's, out right
-    // of M4's drain, vbias left of M5's gate
+    // the ports beside what they connect to: inp left of M1's gate, inn right of M2's, vbias left
+    // of M5's gate
     let port = |net: &str| s.ports.iter().find(|q| q.net.as_deref() == Some(net)).unwrap().object;
     let tag = |net: &str| s.pin_at(at, &g.orient, port(net), 0).unwrap();
-    for (net, host, terminal, left) in
-        [("inp", m1, "2", true), ("inn", m2, "2", false), ("out", m4, "1", false), ("vbias", m5, "2", true)]
-    {
+    for (net, host, terminal, left) in [("inp", m1, "2", true), ("inn", m2, "2", false), ("vbias", m5, "2", true)] {
         let (t, h) = (tag(net), pin(host, terminal));
         assert_eq!(t[1], h[1], "{what}: {net}");
         assert!(if left { t[0] < h[0] } else { t[0] > h[0] }, "{what}: {net}");
     }
+    // and out right of M4's drain, which leaves down to M2's: two below it, in the gap between the
+    // two rows, above M2's drain (quality review SE-13)
+    let (t, top, bottom) = (tag("out"), pin(m4, "1"), pin(m2, "1"));
+    assert!(t[0] > top[0], "{what}");
+    assert_eq!(t[1], &top[1] - int(2), "{what}");
+    assert!(bottom[1] < t[1], "{what}");
     assert_eq!(s.ports.iter().find(|q| q.net.as_deref() == Some("inp")).unwrap().kind, PortKind::Input);
     assert_eq!(s.ports.iter().find(|q| q.net.as_deref() == Some("out")).unwrap().kind, PortKind::Output);
     // nothing overlaps, and every relation of the layout fits but the column of M5 under M1,
@@ -1371,28 +1375,31 @@ fn routes_of_one_net_with_different_styles_are_noted() {
     );
 }
 
-/// T3: the two wires of &out that meet at M4's drain end at a branch point there with a junction,
-/// which a wire of length 0 joins to the drain (13.2; review of S4).
+/// T3: the wire of the port of &out meets the wire between the drains of M4 and M2 in its middle,
+/// at a branch point with a junction, not at M4's drain by a wire of length 0, which the port
+/// beside the drain at its height made (13.2; quality review SE-13).
 #[test]
-fn t3_has_a_junction_where_two_wires_meet_at_a_drain() {
+fn t3_has_a_junction_where_the_port_meets_the_wire_between_the_drains() {
     let ps = problems(&repo().join("tests/integration/solver/T3-ota5t.sp"));
     let p = ps.iter().find(|p| p.title == "ota5t").unwrap();
     let (solved, e) = check_level("T3", p);
-    let m4 = object(p, "#M4");
-    let drain = |q: &rnl_runtime::solution::WirePoint| matches!(q, rnl_runtime::solution::WirePoint::Anchor(PointRef::Pin { object, terminal, .. }) if *object == m4 && terminal == "d");
-    let at_drain: Vec<(usize, &rnl_runtime::solution::RoutedWire)> = solved
-        .solution
-        .wires
-        .iter()
-        .enumerate()
-        .filter(|(_, w)| p.routes[w.route].net == "out" && w.points.iter().any(drain))
-        .collect();
-    assert_eq!(at_drain.len(), 1, "{}", summary(p, &solved, &e));
-    let (i, w) = at_drain[0];
-    let path = &e.routing.paths[i];
-    assert_eq!(path[0], path[1], "of length 0: {w:?}");
-    let rnl_runtime::solution::WirePoint::Branch(b) = w.points[0] else { panic!("{w:?}") };
-    assert!(solved.solution.branches[b].junction);
+    let what = summary(p, &solved, &e);
+    for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
+        assert!(path.windows(2).any(|s| s[0] != s[1]), "{what}: of length 0: {w:?}");
+    }
+    let (m2, m4) = (object(p, "#M2"), object(p, "#M4"));
+    let s = &e.structure;
+    let drain = |k: usize| {
+        let j = s.pins(k).iter().position(|pi| pi.terminals.iter().any(|t| t == "1")).unwrap();
+        s.pin_at(&e.placed.origins, &e.placed.geometry.orient, k, j).unwrap()
+    };
+    let (top, bottom) = (drain(m4), drain(m2));
+    assert_eq!(top[0], bottom[0], "{what}");
+    let inside = solved.solution.branches.iter().filter(|b| {
+        let (x, y) = (from_f64(b.at.0).unwrap(), from_f64(b.at.1).unwrap());
+        x == top[0] && bottom[1] < y && y < top[1]
+    });
+    assert_eq!(inside.filter(|b| b.junction).count(), 1, "{what}");
 }
 
 /// Without objectives the candidates differ, and every ROUTE of T1–T6 is still routed whole (T4
@@ -1405,5 +1412,152 @@ fn every_case_of_the_solver_is_routed_whole_without_objectives() {
             let (solved, _) = check_with(&f.to_string_lossy(), &p, &options);
             assert!(solved.report.unrouted.is_empty(), "{}: {:?}", p.title, solved.report.unrouted);
         }
+    }
+}
+
+// ------------------------------------------------------- the quality review of the first drawings
+
+/// The bends of the wires routed for each net, by its name (the turns of the objectives on the
+/// wires, net by net).
+fn bends_by_net(p: &LevelProblem, solved: &Solved, e: &Exact) -> BTreeMap<String, usize> {
+    let mut out: BTreeMap<String, usize> = BTreeMap::new();
+    for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
+        *out.entry(p.routes[w.route].net.clone()).or_default() += crate::objectives::bends(path);
+    }
+    out
+}
+
+/// The level of a case of the solver with a title, solved and checked.
+fn case_level(file: &str, title: &str) -> (LevelProblem, Solved, Exact) {
+    let ps = problems(&repo().join("tests/integration/solver").join(file));
+    let p = ps.into_iter().find(|p| p.title == title).unwrap_or_else(|| panic!("{file}: no level {title}"));
+    let (solved, e) = check_level(file, &p);
+    (p, solved, e)
+}
+
+/// T1, the RC low-pass filter: a pin that leaves sideways towards its neighbour and a pin that
+/// leaves up are not put on one height, which leaves the router only a jog of three bends, but
+/// the sideways one above the other's lead, an L of one bend (quality review SE-1, LP-1, SC-1):
+/// R1 is the rail on top, C1 lower, two bends in all.
+#[test]
+fn t1_is_drawn_with_an_l_for_each_wire() {
+    let (p, solved, e) = case_level("T1-rc-lowpass.sp", "T1-rc-lowpass.sp");
+    let what = summary(&p, &solved, &e);
+    let bends = bends_by_net(&p, &solved, &e);
+    assert_eq!(bends.get("in"), Some(&1), "{what}");
+    assert_eq!(bends.get("out"), Some(&1), "{what}");
+    let at = &e.placed.origins;
+    let [vin, r1, c1] = ["#VIN", "#R1", "#C1"].map(|l| object(&p, l));
+    let pin = |k: usize, j: usize| e.structure.pin_at(at, &e.placed.geometry.orient, k, j).unwrap();
+    // R1 lies across, above the top pins of VIN and C1
+    assert_eq!(pin(r1, 0)[1], pin(r1, 1)[1], "{what}");
+    for k in [vin, c1] {
+        let top = (0..2).map(|j| pin(k, j)[1].clone()).max().unwrap();
+        assert!(top < pin(r1, 0)[1], "{what}: {}", p.objects[k].label);
+    }
+}
+
+/// T2 and T2b, the common-source stage: the gate wire from VIN is an L, not a jog of three bends
+/// (quality review SE-1, LP-1, SC-1).
+#[test]
+fn t2_has_an_l_from_the_source_to_the_gate() {
+    for file in ["T2-common-source.sp", "T2b-common-source-dragged.sp"] {
+        let (p, solved, e) = case_level(file, file);
+        assert_eq!(bends_by_net(&p, &solved, &e).get("in"), Some(&1), "{}", summary(&p, &solved, &e));
+    }
+}
+
+/// T3's testbench: &inn goes up from VIN and turns once into the input of XU1, with no jog round
+/// the corner of its box (quality review LP-1).
+#[test]
+fn t3_has_no_jog_into_the_input_of_the_ota() {
+    let (p, solved, e) = case_level("T3-ota5t.sp", "T3-ota5t.sp");
+    assert_eq!(bends_by_net(&p, &solved, &e).get("inn"), Some(&1), "{}", summary(&p, &solved, &e));
+}
+
+/// T5: &vin is an L from the source to RI; the tops of RL and C1, which both leave up to &n2, on
+/// one line (quality review SE-1, SE-16); the output of the level of the subcircuit an L from the
+/// port two above E1's pin (SE-13).
+#[test]
+fn t5_has_an_l_for_the_input_and_one_rail_on_the_load() {
+    let (p, solved, e) = case_level("T5-inverting-amp-rlc.sp", "T5-inverting-amp-rlc.sp");
+    let what = summary(&p, &solved, &e);
+    assert_eq!(bends_by_net(&p, &solved, &e).get("vin"), Some(&1), "{what}");
+    let s = &e.structure;
+    let top = |label: &str| {
+        let k = object(&p, label);
+        let j = s.pins(k).iter().position(|pi| pi.terminals.iter().any(|t| t == "1")).unwrap();
+        assert_eq!(s.exit(k, j, e.placed.geometry.orient[k]), Some((0, 1)), "{what}: {label}");
+        s.pin_at(&e.placed.origins, &e.placed.geometry.orient, k, j).unwrap()
+    };
+    assert_eq!(top("#RL")[1], top("#C1")[1], "{what}");
+    let (p, solved, e) = case_level("T5-inverting-amp-rlc.sp", "opamp");
+    assert_eq!(bends_by_net(&p, &solved, &e).get("out"), Some(&1), "{}", summary(&p, &solved, &e));
+}
+
+/// T6, the R-2R ladder: each source next to its leg of 2R in the row joins it by an L, and &n0
+/// has no jog: RT, R2B0 and RS0 meet on one line (quality review SE-1). The legs whose sources
+/// the order of the row puts elsewhere are SE-10's.
+#[test]
+fn t6_joins_each_source_to_its_leg_by_an_l() {
+    let (p, solved, e) = case_level("T6-r2r-ladder.sp", "T6-r2r-ladder.sp");
+    let what = summary(&p, &solved, &e);
+    let bends = bends_by_net(&p, &solved, &e);
+    let row = &e.candidate.rows[0];
+    let mut neighbours = 0;
+    for i in 0..8 {
+        let (vb, leg) = (object(&p, &format!("#VB{i}")), object(&p, &format!("#R2B{i}")));
+        let at = |k: usize| row.iter().position(|&j| j == k).unwrap();
+        if at(vb).abs_diff(at(leg)) == 1 {
+            neighbours += 1;
+            assert_eq!(bends.get(&format!("b{i}")), Some(&1), "{what}: b{i}");
+        }
+    }
+    assert!(neighbours >= 6, "{neighbours}: {what}");
+    assert_eq!(bends.get("n0"), Some(&0), "{what}");
+}
+
+/// A pin that leaves up and one that leaves sideways towards it, neighbours in a row: the router
+/// joins them by an L, the sideways one above the other's lead; a wire written that its mode draws
+/// straight keeps them on one height, so that it is not oblique; one written vertical first from
+/// the pin that leaves up is an L too (quality review SE-1; 13.1).
+#[test]
+fn neighbours_are_held_as_the_wire_between_them_is_drawn() {
+    let body = |statement: &str| {
+        format!(
+            "V1 a 0 1
+R1 a b 1k
+* @RNL {{ {{#V1 #R1}} @AS $FLOW; {statement} }}
+"
+        )
+    };
+    for (statement, l) in [
+        ("&a @ROUTE", true),
+        ("&a @WIRE {#V1:1 #R1:1}", false),
+        ("&a @WIRE(mode=\"vertical-horizontal\") {#V1:1 #R1:1}", true),
+    ] {
+        let (p, solved, e) = routed_whole(&body(statement), "");
+        let what = format!(
+            "{statement}
+{}",
+            summary(&p, &solved, &e)
+        );
+        let s = &e.structure;
+        let pin = |label: &str| {
+            let k = object(&p, label);
+            let j = s.pins(k).iter().position(|pi| pi.terminals.iter().any(|t| t == "1")).unwrap();
+            (
+                s.exit(k, j, e.placed.geometry.orient[k]),
+                s.pin_at(&e.placed.origins, &e.placed.geometry.orient, k, j).unwrap(),
+            )
+        };
+        let ((up, source), (left, resistor)) = (pin("#V1"), pin("#R1"));
+        assert_eq!((up, left), (Some((0, 1)), Some((-1, 0))), "{what}");
+        if l {
+            assert!(resistor[1] > source[1], "{what}");
+        } else {
+            assert_eq!(resistor[1], source[1], "{what}");
+        }
+        assert!(e.placed.dropped.is_empty(), "{what}: {:?}", e.placed.dropped);
     }
 }

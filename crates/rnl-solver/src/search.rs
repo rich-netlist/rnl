@@ -3,11 +3,12 @@
 //! A **candidate** ([`Candidate`]) is a set of discrete decisions: the orientation of every free
 //! orientation class, the rows of the elements and their order left to right, the groups kept
 //! apart as blocks, and the structural relations that follow from them ([`relations`]): the
-//! members of a row on one height, neighbours in a row apart by their boxes and a gap, neighbouring
-//! rows apart likewise, neighbouring blocks of a group apart, ports beside the pins they connect
-//! to, and, for a candidate with even rows, equal steps in each row. Each relation is a unit of
-//! the solver's own, ranked after every fact (8.5): the resolution takes it in after the facts
-//! kept, and one that does not fit with them is dropped, never a fact.
+//! neighbours in a row on heights that suit the way the pins they are drawn to each other by leave
+//! ([`RowLink`]), apart by their boxes and a gap, neighbouring rows apart likewise, neighbouring
+//! blocks of a group apart, ports beside the pins they connect to, and, for a candidate with even
+//! rows, equal steps in each row. Each relation is a unit of the solver's own, ranked after every
+//! fact (8.5): the resolution takes it in after the facts kept, and one that does not fit with
+//! them is dropped, never a fact.
 //!
 //! **P0**, the baseline and fallback: rows by current depth (one row when there is no
 //! supply and the facts say nothing of heights), the order of the netlist in a row, every free
@@ -25,8 +26,8 @@
 //!    (`crate::structure::Reversible`), which the resolution then turns;
 //! 3. each free class whose members lie in the node takes the orientation that turns most of its
 //!    pins towards what they connect to, among those its sources allow (sources towards the
-//!    ground, grounds below their pins), and is varied to its second best; mirror pairs take
-//!    mirrored orientations;
+//!    ground, an end on the ground and grounds below their pins), and is varied to its second
+//!    best; mirror pairs take mirrored orientations;
 //! 4. every variant is ranked by the layered estimates of the objectives in force
 //!    (`crate::objectives::estimate`) on a sketch of the whole level, ties by the canonical
 //!    code; the best are checked by the resolution with the node's relations, and `beam` of them
@@ -49,6 +50,7 @@ use crate::objectives::View;
 use crate::orient::{index, inverse};
 use crate::rational::{from_f64, int, Q};
 use crate::resolve::{Geometry, Limits, Outcome, Resolver};
+use crate::route::CLEARANCE;
 use crate::simplex::LinExpr;
 use crate::structure::{FreeClass, PinKey, PortKind, Role, Source, Structure};
 use crate::{SolverOptions, Work};
@@ -78,6 +80,11 @@ pub(crate) enum Side {
 pub(crate) struct Attach {
     pub host: PinKey,
     pub side: Side,
+    /// For a port beside a pin that leaves up or down: the pin on its net, in the next row that
+    /// way, that leaves back towards the host's. The port hangs in the gap between the two rows,
+    /// beside the wire that joins those pins, and that pin is kept beyond it, so that the port's
+    /// wire meets that one in its middle (quality review SE-13).
+    pub facing: Option<PinKey>,
 }
 
 /// A candidate: the discrete decisions of a layout (see the module).
@@ -346,9 +353,10 @@ fn grid_of(options: &SolverOptions) -> Option<Q> {
 
 /// Where each port and free supply or ground symbol goes (see the module): a port beside the pin
 /// it connects to, on the side the pin leaves when it leaves sideways, otherwise beside the pin
-/// of the topmost element on its net, on the right for an output and on the left otherwise; a
-/// supply above and a ground below the first pin on their net. Objects that a fact kept reaches
-/// are left where the facts put them.
+/// of the topmost element on its net, on the right for an output and on the left otherwise, with
+/// the pin that faces that one from the next row, if any ([`Attach::facing`]); a supply above and
+/// a ground below the first pin on their net. Objects that a fact kept reaches are left where the
+/// facts put them.
 pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) -> BTreeMap<usize, Attach> {
     let row_of: BTreeMap<usize, usize> =
         rows.iter().enumerate().flat_map(|(r, row)| row.iter().map(move |&k| (k, r))).collect();
@@ -385,15 +393,14 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
                         .map(|&p| (p, side))
                 });
                 if let Some((host, side)) = attach {
-                    out.insert(k, Attach { host, side });
+                    let facing = facing_pin(s, &row_of, &pins, host, ori);
+                    out.insert(k, Attach { host, side, facing });
                 }
             }
             Role::Supply | Role::Ground => {
                 if let Some(&host) = net_pins(k).first() {
-                    out.insert(
-                        k,
-                        Attach { host, side: if info.role == Role::Supply { Side::Above } else { Side::Below } },
-                    );
+                    let side = if info.role == Role::Supply { Side::Above } else { Side::Below };
+                    out.insert(k, Attach { host, side, facing: None });
                 }
             }
             _ => {}
@@ -402,7 +409,27 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
     out
 }
 
-/// Where an attached object's origin is from its host's origin, tight against its gap.
+/// The pin on a port's net that faces its host's pin across the gap between two rows (see
+/// [`Attach::facing`]): when the host's pin leaves up or down, the first pin of the net, in the
+/// next row that way, that leaves the other way.
+fn facing_pin(
+    s: &Structure,
+    row_of: &BTreeMap<usize, usize>,
+    pins: &[PinKey],
+    host: PinKey,
+    ori: &[Orient],
+) -> Option<PinKey> {
+    let (0, ey) = s.exit(host.0, host.1, ori[host.0])? else { return None };
+    let row = *row_of.get(&host.0)?;
+    // the rows are listed from the top down
+    let next = if ey < 0 { row.checked_add(1)? } else { row.checked_sub(1)? };
+    pins.iter().copied().find(|&f| row_of.get(&f.0) == Some(&next) && s.exit(f.0, f.1, ori[f.0]) == Some((0, -ey)))
+}
+
+/// Where an attached object's origin is from its host's origin, tight against its gap. A port
+/// beside a pin that leaves up or down goes `ATTACH_GAP` beyond the pin that way, not at its
+/// height, which no wire reaches but by a jog: its wire is then an L to the pin's lead, or a T on
+/// the wire the pin leads to (quality review SE-13).
 fn attach_offset(s: &Structure, k: usize, a: &Attach, ori: &[Orient]) -> Option<[Q; 2]> {
     let (h, hp) = a.host;
     let hpin = s.pin_offset(h, hp, ori[h])?;
@@ -414,7 +441,11 @@ fn attach_offset(s: &Structure, k: usize, a: &Attach, ori: &[Orient]) -> Option<
             let hb = dressed_box(s, h, ori[h]).unwrap_or_else(empty_box);
             let pb = s.box_offset(k, ori[k]).unwrap_or_else(empty_box);
             let x = if a.side == Side::Left { &hb[0] - &gap - &pb[2] } else { &hb[2] + &gap - &pb[0] };
-            [x, &hpin[1] - &ppin[1]]
+            let rise = match s.exit(h, hp, ori[h]) {
+                Some((0, ey)) if ey != 0 => int(ATTACH_GAP * ey.signum()),
+                _ => Q::zero(),
+            };
+            [x, &hpin[1] + rise - &ppin[1]]
         }
         Side::Below => [&hpin[0] - &ppin[0], &hpin[1] - &gap - &ppin[1]],
         Side::Above => [&hpin[0] - &ppin[0], &hpin[1] + &gap - &ppin[1]],
@@ -446,7 +477,13 @@ fn effective_box(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usiz
     }
     for (&j, a) in attach.iter().filter(|(_, a)| a.host.0 == k) {
         if let (Some(at), Some(sb)) = (attach_offset(s, j, a, ori), dressed_box(s, j, ori[j])) {
-            union(&mut b, &shifted(&sb, &at));
+            let mut sb = shifted(&sb, &at);
+            if a.facing.is_some() {
+                // a port in the gap between two rows widens its host, and leaves its height alone
+                sb[1] = b[1].clone();
+                sb[3] = b[3].clone();
+            }
+            union(&mut b, &sb);
         }
     }
     b
@@ -504,6 +541,11 @@ fn relations_within(
                 }
             };
             out.push(Tagged { kind: RelKind::Attachment, rel });
+            // the pin that faces the host's from the next row at least a step of the grid beyond
+            // the port, so that the port's wire meets theirs in its middle (quality review SE-13)
+            if let Some(rel) = a.facing.and_then(|f| beyond_port(s, k, a, f, ori, &grid)) {
+                out.push(Tagged { kind: RelKind::Attachment, rel });
+            }
         }
     }
     let rows: Vec<Vec<usize>> = c
@@ -515,17 +557,12 @@ fn relations_within(
     for row in &rows {
         for w in row.windows(2) {
             let (Some(a), Some(b)) = (o(w[0]), o(w[1])) else { continue };
-            // neighbours drawn to each other through a pin that leaves sideways: those pins on
-            // one horizontal line, so that the wire between them is straight; others by origin
-            let c = row_link(s, w[0], w[1], ori).map_or_else(Q::zero, |(p, q)| &p[1] - &q[1]);
+            // neighbours drawn to each other through their pins as [`row_link`] says; others by
+            // origin
+            let link = row_link(s, w[0], w[1], ori, &grid).unwrap_or_else(RowLink::origins);
             out.push(Tagged {
                 kind: RelKind::Row,
-                rel: Relation::Linear {
-                    axis: 1,
-                    terms: vec![(b, one()), (a, -one())],
-                    lo: Some(c.clone()),
-                    hi: Some(c),
-                },
+                rel: Relation::Linear { axis: 1, terms: vec![(b, one()), (a, -one())], lo: link.lo, hi: link.hi },
             });
         }
     }
@@ -571,33 +608,131 @@ fn relations_within(
     out
 }
 
-/// The pins by which two neighbours of a row are drawn to each other, when one of them leaves
-/// sideways: their offsets from their origins, `a`'s first; the pair that leave towards each other
-/// first, then the first pins.
-fn row_link(s: &Structure, a: usize, b: usize, ori: &[Orient]) -> Option<([Q; 2], [Q; 2])> {
-    let mut best: Option<((u8, usize, usize), usize, usize)> = None;
+/// The relation that keeps the pin facing a port's host from the next row at least a step of the
+/// grid beyond the port, on `port − holder of the pin` on y (see [`Attach::facing`]).
+fn beyond_port(s: &Structure, k: usize, a: &Attach, f: PinKey, ori: &[Orient], grid: &Option<Q>) -> Option<Relation> {
+    let (Some(p), Some(h)) = (origin(s, k), origin(s, f.0)) else { return None };
+    let (0, ey) = s.exit(a.host.0, a.host.1, ori[a.host.0])? else { return None };
+    let (fp, pp) = (s.pin_offset(f.0, f.1, ori[f.0])?, s.pin_offset(k, 0, ori[k])?);
+    // ey (f's pin − the port's pin) ≥ step, each pin at its object's origin plus its offset
+    let step = up(int(CLEARANCE), grid);
+    let c = &fp[1] - &pp[1];
+    let (lo, hi) = if ey < 0 { (Some(c + step), None) } else { (None, Some(c - step)) };
+    Some(Relation::Linear { axis: 1, terms: vec![(p, Q::one()), (h, -Q::one())], lo, hi })
+}
+
+/// How two neighbours of a row are held on their heights through a pair of their pins drawn to
+/// each other ([`row_link`]): `lo ≤ y_b − y_a ≤ hi`, `a` the left one.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct RowLink {
+    /// What the pins are, the better first:
+    ///
+    /// 0. they leave towards each other: on one horizontal line, so that the wire between them is
+    ///    straight;
+    /// 1. one leaves sideways towards the other, which has no direction: on one line too; and,
+    ///    for a wire written that its mode draws straight, one leaves sideways: on one line, so
+    ///    that the wire is not oblique;
+    /// 2. one leaves sideways towards the other, which leaves up or down, and the wire between them
+    ///    is the router's or a wire written whose mode draws an L from the pin that leaves up or
+    ///    down (13.1): the sideways one at least `CLEARANCE` beyond the other that way, past the
+    ///    end of its lead, so that the wire is an L; on one height it could only be a jog of three
+    ///    bends;
+    /// 3. both leave up, or both down, and the router joins them: on one horizontal line, so that
+    ///    their net is one straight rail between them rather than a step.
+    ///
+    /// (Quality review SE-1, SE-16.)
+    pub rank: u8,
+    pub lo: Option<Q>,
+    pub hi: Option<Q>,
+}
+
+impl RowLink {
+    /// Neighbours drawn to each other through none of their pins so linked: their origins on one
+    /// height.
+    fn origins() -> RowLink {
+        RowLink { rank: u8::MAX, lo: Some(Q::zero()), hi: Some(Q::zero()) }
+    }
+
+    /// The height of `b` above `a` that a sketch takes: the bound, tight.
+    fn dy(&self) -> Q {
+        self.lo.clone().or_else(|| self.hi.clone()).unwrap_or_default()
+    }
+}
+
+/// How two neighbours of a row, `a` on the left, are drawn to each other through a pair of their
+/// pins ([`RowLink`]), the best pair first, then the first pins; none when no pair of their pins
+/// so drawn is one of those ranks. A pin that leaves sideways links by the router's wire only when
+/// it leaves towards the neighbour: `a`'s to the right, `b`'s to the left. A wire written straight
+/// from one pin to the other is drawn by its mode, not by the router (13.1). The constant of an
+/// inequality is on the grid.
+fn row_link(s: &Structure, a: usize, b: usize, ori: &[Orient], grid: &Option<Q>) -> Option<RowLink> {
+    let vertical = |e: Option<(i64, i64)>| match e {
+        Some((0, y)) if y != 0 => Some(y.signum()),
+        _ => None,
+    };
+    let sideways = |e: Option<(i64, i64)>| e.is_some_and(|(_, y)| y == 0);
+    let mut best: Option<((u8, usize, usize), RowLink)> = None;
     for p in 0..s.pins(a).len() {
         for &t in s.connections.targets.get(&(a, p)).map_or(&[][..], |v| v) {
             if t.0 != b {
                 continue;
             }
+            let (Some(pa), Some(pb)) = (s.pin_offset(a, p, ori[a]), s.pin_offset(b, t.1, ori[b])) else { continue };
             let (ea, eb) = (s.exit(a, p, ori[a]), s.exit(b, t.1, ori[b]));
-            let sideways = |e: Option<(i64, i64)>| e.is_some_and(|(_, y)| y == 0);
-            let rank = if ea == Some((1, 0)) && eb == Some((-1, 0)) {
-                0
-            } else if sideways(ea) || sideways(eb) {
-                1
+            // the modes of the wires written from one to the other, with whether from a's pin
+            let written = &s.connections.written;
+            let modes: Vec<(bool, &str)> =
+                (written.get(&((a, p), t)).into_iter().flatten().map(|m| (true, m.as_str())))
+                    .chain(written.get(&(t, (a, p))).into_iter().flatten().map(|m| (false, m.as_str())))
+                    .collect();
+            let routed = modes.is_empty() && s.connections.routed((a, p), t);
+            // the pins on one height: y_b − y_a = c
+            let c = &pa[1] - &pb[1];
+            let (to_b, to_a) = (ea == Some((1, 0)), eb == Some((-1, 0)));
+            // an L from the pin that leaves up or down, a's when b's leaves towards it: the
+            // router's, or a wire written whose mode leaves that pin vertically
+            let l_drawn = routed
+                || modes.iter().any(|&(from_a, mode)| match mode {
+                    "vertical-horizontal" => from_a == to_a,
+                    "horizontal-vertical" => from_a == to_b,
+                    _ => false,
+                });
+            let link = if to_b && to_a {
+                RowLink { rank: 0, lo: Some(c.clone()), hi: Some(c) }
+            } else if routed && ((to_b && eb.is_none()) || (to_a && ea.is_none())) {
+                RowLink { rank: 1, lo: Some(c.clone()), hi: Some(c) }
+            } else if let (Some(ey), true) = (
+                if to_b {
+                    vertical(eb)
+                } else if to_a {
+                    vertical(ea)
+                } else {
+                    None
+                },
+                l_drawn,
+            ) {
+                // ey (sideways pin − the other) ≥ CLEARANCE, where sideways pin − the other is
+                // y_b − y_a − c when the sideways pin is b's, and its opposite when it is a's
+                let clearance = int(CLEARANCE);
+                if (to_a && ey > 0) || (to_b && ey < 0) {
+                    RowLink { rank: 2, lo: Some(up(c + clearance, grid)), hi: None }
+                } else {
+                    RowLink { rank: 2, lo: None, hi: Some(-up(clearance - c, grid)) }
+                }
+            } else if routed && vertical(ea).is_some() && vertical(ea) == vertical(eb) {
+                RowLink { rank: 3, lo: Some(c.clone()), hi: Some(c) }
+            } else if !routed && (sideways(ea) || sideways(eb)) {
+                RowLink { rank: 1, lo: Some(c.clone()), hi: Some(c) }
             } else {
                 continue;
             };
-            let key = (rank, p, t.1);
-            if best.as_ref().is_none_or(|(k, _, _)| key < *k) {
-                best = Some((key, p, t.1));
+            let key = (link.rank, p, t.1);
+            if best.as_ref().is_none_or(|(k, _)| key < *k) {
+                best = Some((key, link));
             }
         }
     }
-    let (_, p, q) = best?;
-    Some((s.pin_offset(a, p, ori[a])?, s.pin_offset(b, q, ori[b])?))
+    best.map(|(_, link)| link)
 }
 
 /// What orders the columns an element may join: see [`columns`].
@@ -664,7 +799,14 @@ pub(crate) fn orientation_relations(s: &Structure, c: &Candidate) -> Vec<Tagged>
 /// down, each packed from the left with its boxes and gaps, stubs where their facts put them,
 /// attached objects beside their pins, everything else where the witness has it. Gives the origin
 /// of every object ([`Structure::origins`]).
-pub(crate) fn sketch(problem: &LevelProblem, s: &Structure, c: &Candidate, ori: &[Orient]) -> Vec<[Q; 2]> {
+pub(crate) fn sketch(
+    problem: &LevelProblem,
+    s: &Structure,
+    c: &Candidate,
+    ori: &[Orient],
+    options: &SolverOptions,
+) -> Vec<[Q; 2]> {
+    let grid = grid_of(options);
     let attach = attachments(s, &c.rows, ori);
     let mut g: Geometry = s.witness.clone();
     g.orient = ori.to_vec();
@@ -672,10 +814,11 @@ pub(crate) fn sketch(problem: &LevelProblem, s: &Structure, c: &Candidate, ori: 
     let mut previous_bottom: Option<Q> = None;
     for row in &c.rows {
         let boxes: Vec<[Q; 4]> = row.iter().map(|&k| effective_box(s, k, ori, &attach)).collect();
-        // each member's height from the first, as the row's relations put it
+        // each member's height from the first, as the row's relations put it, an inequality
+        // tight
         let mut dy = vec![Q::zero(); row.len()];
         for i in 1..row.len() {
-            let c = row_link(s, row[i - 1], row[i], ori).map_or_else(Q::zero, |(p, q)| &p[1] - &q[1]);
+            let c = row_link(s, row[i - 1], row[i], ori, &grid).map_or_else(Q::zero, |l| l.dy());
             dy[i] = &dy[i - 1] + c;
         }
         let top = boxes.iter().zip(&dy).map(|(b, d)| &b[3] + d).max().unwrap_or_default();
@@ -712,8 +855,9 @@ pub(crate) fn sketch(problem: &LevelProblem, s: &Structure, c: &Candidate, ori: 
 /// The orientations a free class may take: those that keep the stubs of its members off their
 /// bodies, always; that turn the sources of its transistors towards the ground, hang its
 /// two-terminal elements with an end on a supply or the ground towards it and lay those between
-/// two signals across, and hang its grounds below their pins, as far as the sources in force ask.
-/// All eight when none satisfies them.
+/// two signals across, and hang its grounds below their pins, as far as the sources in force ask:
+/// the ground direction alone hangs an end on the ground down ([`grounded_end_down`]). All eight
+/// when none satisfies them.
 fn domain(s: &Structure, class: &FreeClass) -> Vec<Orient> {
     let ok = |v: Orient| {
         class.members.iter().all(|&(m, label)| {
@@ -723,6 +867,9 @@ fn domain(s: &Structure, class: &FreeClass) -> Vec<Orient> {
                 return false;
             }
             if s.has(Source::SourcesDown) && !two_terminal_ok(s, m, o) {
+                return false;
+            }
+            if s.has(Source::GroundsDown) && !grounded_end_down(s, m, o) {
                 return false;
             }
             let down = match info.device.n_type() {
@@ -804,6 +951,18 @@ fn two_terminal_ok(s: &Structure, m: usize, o: Orient) -> bool {
     } else {
         rails.iter().all(|&(j, d)| s.exit(m, j, o).is_none_or(|e| e == d))
     }
+}
+
+/// Whether a two-terminal element turned by `o` hangs each end it has on the ground down, towards
+/// the ground: the ground direction asks it with or without the current direction, so that a
+/// load to the ground stands up even where it would lie across with one turn less (quality review
+/// SE-7, its first half). Other objects, and pins without a direction, are not judged.
+fn grounded_end_down(s: &Structure, m: usize, o: Orient) -> bool {
+    let info = &s.objects[m];
+    if info.role != Role::Element || info.device.n_type().is_some() || s.pins(m).len() != 2 {
+        return true;
+    }
+    (0..2).filter(|&j| s.power.ground_pins.contains(&(m, j))).all(|j| s.exit(m, j, o).is_none_or(|e| e == (0, -1)))
 }
 
 /// The order in which equally good orientations are preferred: unturned, then mirrored, then
@@ -1001,7 +1160,7 @@ impl Search<'_> {
         self.made += 1;
         let c = self.candidate(plan, "beam");
         let ori = c.orientations(self.s);
-        let at = sketch(self.problem, self.s, &c, &ori);
+        let at = sketch(self.problem, self.s, &c, &ori, self.options);
         let e = self.s.active.estimate(&View { s: self.s, at: &at, orient: &ori });
         (e, c)
     }
@@ -1148,7 +1307,7 @@ impl Search<'_> {
         // one sketch for all: a class turned moves its own pins, not where the others are
         let cand = self.candidate(&p, "beam");
         let mut ori = cand.orientations(s);
-        let at = sketch(self.problem, s, &cand, &ori);
+        let at = sketch(self.problem, s, &cand, &ori, self.options);
         for &c in classes {
             let class = &s.open.classes[c];
             let ranked = ranked_values(s, &at, &ori, class);
@@ -1421,7 +1580,7 @@ impl Search<'_> {
         let s = self.s;
         let cand = self.candidate(plan, "beam");
         let ori = cand.orientations(s);
-        let at = sketch(self.problem, s, &cand, &ori);
+        let at = sketch(self.problem, s, &cand, &ori, self.options);
         let mut out = BTreeMap::new();
         for &item in items {
             let members: Vec<usize> = match item {
