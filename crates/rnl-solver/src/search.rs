@@ -29,8 +29,9 @@
 //!    mirrored orientations;
 //! 4. every variant is ranked by the layered estimates of the objectives in force
 //!    (`crate::objectives::estimate`) on a sketch of the whole level, ties by the canonical
-//!    code; the best are checked by the resolution with the node's relations, those whose
-//!    relations all fit first, and `beam` of them are kept.
+//!    code; the best are checked by the resolution with the node's relations, and `beam` of them
+//!    are kept: those whose relations all fit first, the best of each order of the items before
+//!    the rest, so that different arrangements each keep a place.
 //!
 //! The root's variants are the complete candidates; P0 joins them, and with the even rows in force
 //! each has a twin with evenly spaced rows. The coordinates of each are then sought by the
@@ -910,6 +911,12 @@ impl Search<'_> {
     fn with(&self, plan: &Plan, v: &Variant) -> Plan {
         let mut p = plan.clone();
         let set: BTreeSet<usize> = v.order.iter().copied().collect();
+        debug_assert!(
+            set.len() == v.order.len() && p.order.iter().filter(|k| set.contains(k)).count() == set.len(),
+            "a variant orders elements of the plan, each once: {:?} in {:?}",
+            v.order,
+            p.order
+        );
         let mut next = v.order.iter();
         for slot in p.order.iter_mut() {
             if set.contains(slot) {
@@ -1001,7 +1008,8 @@ impl Search<'_> {
     /// The order of a node's items: a topological order of the precedences between them, the
     /// smallest key first among those free to go. The precedences are those of the facts, `before`
     /// ([`precedences`]), and, with the mirror pairs in force, the first role of a pair (`a`,
-    /// `in_p`, `ref`) before the second where the facts do not say otherwise.
+    /// `in_p`, `ref`) before the second where the facts do not say otherwise. The parts of a
+    /// union stay in their order or the reverse, the shared one in the middle.
     fn order_items(
         &self,
         node: usize,
@@ -1031,40 +1039,68 @@ impl Search<'_> {
                 }
             }
         }
-        if s.tree.nodes[node].fixed_order {
-            for i in 1..items.len() {
-                first.insert((i - 1, i));
+        // a topological order of the precedences between positions, and whether they have no cycle
+        let sort = |first: &BTreeSet<(usize, usize)>| -> (Vec<Item>, bool) {
+            let mut done = vec![false; items.len()];
+            let mut out = Vec::new();
+            let mut acyclic = true;
+            while out.len() < items.len() {
+                let free = |j: usize| !done[j] && (0..items.len()).all(|i| done[i] || !first.contains(&(i, j)));
+                let mut pick = (0..items.len()).filter(|&j| free(j)).min_by(|&a, &b| key(items[a]).cmp(&key(items[b])));
+                if pick.is_none() {
+                    // precedences in a cycle: the smallest key of those left
+                    acyclic = false;
+                    pick = (0..items.len()).filter(|&j| !done[j]).min_by(|&a, &b| key(items[a]).cmp(&key(items[b])));
+                }
+                let Some(j) = pick else { break };
+                done[j] = true;
+                out.push(items[j]);
             }
+            (out, acyclic)
+        };
+        let n = &s.tree.nodes[node];
+        if !n.fixed_order {
+            return sort(&first).0;
         }
-        let mut done = vec![false; items.len()];
-        let mut out = Vec::new();
-        while out.len() < items.len() {
-            let free = |j: usize| !done[j] && (0..items.len()).all(|i| done[i] || !first.contains(&(i, j)));
-            let mut pick = (0..items.len()).filter(|&j| free(j)).min_by(|&a, &b| key(items[a]).cmp(&key(items[b])));
-            if pick.is_none() {
-                // precedences in a cycle: the smallest key of those left
-                pick = (0..items.len()).filter(|&j| !done[j]).min_by(|&a, &b| key(items[a]).cmp(&key(items[b])));
+        // a union keeps the part its two groups share between the other two, so that both groups
+        // are in one piece (algorithm synthesis 3.5): its parts in their order or reversed, by
+        // what they are, wherever `items` has them. The direction is the one the keys of the outer
+        // parts give, unless only the other fits the precedences
+        let chain: Vec<usize> =
+            n.children.iter().filter_map(|&c| items.iter().position(|&i| i == Item::Block(c))).collect();
+        let forward = match (chain.first(), chain.last()) {
+            (Some(&a), Some(&b)) => key(items[a]) <= key(items[b]),
+            _ => true,
+        };
+        let chained = |forward: bool| {
+            let mut f = first.clone();
+            for w in chain.windows(2) {
+                f.insert(if forward { (w[0], w[1]) } else { (w[1], w[0]) });
             }
-            let Some(j) = pick else { break };
-            done[j] = true;
-            out.push(items[j]);
+            sort(&f)
+        };
+        let (out, acyclic) = chained(forward);
+        if acyclic {
+            return out;
         }
-        out
+        match chained(!forward) {
+            (other, true) => other,
+            _ => out,
+        }
     }
 
-    /// The elements of items in order, each block in the order of the plan.
+    /// The elements of items in order, each block in the order of the plan, each element once.
     fn flatten(&self, plan: &Plan, items: &[Item]) -> Vec<usize> {
         let rank: BTreeMap<usize, usize> = plan.order.iter().enumerate().map(|(i, &k)| (k, i)).collect();
         let mut out = Vec::new();
+        let mut seen: BTreeSet<usize> = BTreeSet::new();
         for &i in items {
-            match i {
-                Item::Element(k) => out.push(k),
-                Item::Block(b) => {
-                    let mut m = self.s.tree.nodes[b].members.clone();
-                    m.sort_by_key(|k| rank[k]);
-                    out.extend(m);
-                }
-            }
+            let mut m = match i {
+                Item::Element(k) => vec![k],
+                Item::Block(b) => self.s.tree.nodes[b].members.clone(),
+            };
+            m.sort_by_key(|k| rank.get(k).copied().unwrap_or(usize::MAX));
+            out.extend(m.into_iter().filter(|&k| seen.insert(k)));
         }
         out
     }
@@ -1231,6 +1267,17 @@ impl Search<'_> {
                 let (e, cand) = self.estimate(&p);
                 found.push((e, cand.code(s), p));
             }
+            // a union, whose parts no swap moves, reversed
+            if n.fixed_order && border.len() > 1 && !self.out_of_budget() {
+                let o: Vec<Item> = border.iter().rev().copied().collect();
+                let place = |it: Item| (Q::zero(), o.iter().position(|x| *x == it).unwrap_or(0));
+                if self.order_items(node, &o, &place, &before) == o {
+                    let mut p = Plan { order: self.place(&bp, &o), ..bp.clone() };
+                    p.items.insert(node, o);
+                    let (e, cand) = self.estimate(&p);
+                    found.push((e, cand.code(s), p));
+                }
+            }
             for (c, v) in second {
                 if self.out_of_budget() {
                     break;
@@ -1281,12 +1328,39 @@ impl Search<'_> {
             checked.push((usize::from(rejected > 0), i));
         }
         checked.sort();
-        checked
-            .into_iter()
-            .take(beam)
+        // diversity in what is kept too: the best of each order of the items whose relations all
+        // fit first, then the rest as checked; best first
+        let mut kept: Vec<(usize, usize)> = Vec::new();
+        let mut kept_orders: Vec<Vec<Item>> = Vec::new();
+        for &(r, i) in &checked {
+            let o = order_of(&found[i].2);
+            if r == 0 && kept.len() < beam && !kept_orders.contains(&o) {
+                kept_orders.push(o);
+                kept.push((r, i));
+            }
+        }
+        for &c in &checked {
+            if kept.len() >= beam {
+                break;
+            }
+            if !kept.contains(&c) {
+                kept.push(c);
+            }
+        }
+        kept.sort_unstable();
+        kept.into_iter()
             .map(|(_, i)| {
                 let p = &found[i].2;
                 let order = self.flatten(p, p.items.get(&node).map_or(&[][..], |v| v));
+                debug_assert!(
+                    {
+                        let mut sorted = order.clone();
+                        sorted.sort_unstable();
+                        sorted == n.members
+                    },
+                    "the order of a variant of node {node} is its members: {order:?} for {:?}",
+                    n.members
+                );
                 // the decisions of this node and those below, and nothing else
                 let values = (0..s.open.classes.len())
                     .filter(|&c| self.class_node(c).is_some_and(|n| subtree.contains(&n)))

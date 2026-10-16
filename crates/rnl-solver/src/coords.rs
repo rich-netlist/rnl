@@ -18,8 +18,9 @@
 //! 1. the wire length: for each net drawn as wires, the extent of its points, `hi − lo` with
 //!    `lo ≤ xₚ ≤ hi`, summed: half the perimeter of its box, the stand-in for its length;
 //! 2. compactness: the extent of the boxes of the components;
-//! 3. the L1 distance of each origin to where the resolution of the candidate put it, rounded to
-//!    the grid: the tie-break that makes the result stable.
+//! 3. the L1 distance of each origin to where the resolution of the candidate put it: the
+//!    tie-break that makes the result stable. A symbol's target is that place rounded to the grid;
+//!    a text's or a point's is the place itself, as it mostly follows a symbol.
 //!
 //! **Rounding.** The grid is the solver's own rule, ranked after every description (11.7), and
 //! also after the layers above: with the layers' bounds taken away, the origins are visited, the

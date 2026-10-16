@@ -238,9 +238,11 @@ pub(crate) enum NodeKind {
     /// A group, by its index in [`LevelProblem::groups`].
     Group(usize),
     /// Two groups that overlap, by index: their union, whose children are the part only in the
-    /// first, the part they share and the part only in the second, in that order.
+    /// first, the part they share and the part only in the second, in that order. A group with
+    /// the same members is this node.
     Union(usize, usize),
     /// A part of a [`NodeKind::Union`]: 0 only in the first group, 1 shared, 2 only in the second.
+    /// A part with the members of a node made before is that node, of its own kind.
     Part(usize, usize, u8),
 }
 
@@ -254,7 +256,8 @@ pub(crate) struct GroupNode {
     pub children: Vec<usize>,
     /// The elements in it and in no child, sorted.
     pub own: Vec<usize>,
-    /// The order of its children is fixed: a union keeps the shared part between the others.
+    /// The order of its children is fixed: a union keeps the shared part between the others, its
+    /// children in their order or the reverse.
     pub fixed_order: bool,
 }
 
@@ -1024,29 +1027,38 @@ fn open(problem: &LevelProblem, resolved: &Resolved) -> Open {
     out
 }
 
-/// The tree of groups over the elements.
+/// The tree of groups over the elements (algorithm synthesis 3.5). Every set of elements is one
+/// block, made once: a group written again, or the same set as a part or the union of two groups
+/// that overlap, is that block.
 fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]) -> (GroupTree, Vec<String>) {
     let mut notes = Vec::new();
-    // blocks: (members, kind); the root last added
-    let mut blocks: Vec<(BTreeSet<usize>, NodeKind)> = Vec::new();
-    let laminar = |a: &BTreeSet<usize>, b: &BTreeSet<usize>| a.is_disjoint(b) || a.is_subset(b) || b.is_subset(a);
-    for (g, group) in problem.groups.iter().enumerate() {
-        let set: BTreeSet<usize> = group
+    let elements_of = |g: usize| -> BTreeSet<usize> {
+        problem.groups[g]
             .members
             .iter()
             .copied()
             .filter(|&k| objects.get(k).is_some_and(|o| o.role == Role::Element))
-            .collect();
-        if set.len() < 2 || blocks.iter().any(|(b, _)| *b == set) {
+            .collect()
+    };
+    // blocks: (members, kind), no two with the same members
+    let mut blocks: Vec<(BTreeSet<usize>, NodeKind)> = Vec::new();
+    // the two groups of each union, which are no blocks themselves: a later group must nest with
+    // them as with the blocks, so that both stay in one piece
+    let mut absorbed: Vec<BTreeSet<usize>> = Vec::new();
+    let laminar = |a: &BTreeSet<usize>, b: &BTreeSet<usize>| a.is_disjoint(b) || a.is_subset(b) || b.is_subset(a);
+    for g in 0..problem.groups.len() {
+        let set = elements_of(g);
+        if set.len() < 2 || blocks.iter().any(|(b, _)| *b == set) || absorbed.contains(&set) {
             continue;
         }
         let crossing: Vec<usize> = (0..blocks.len()).filter(|&i| !laminar(&blocks[i].0, &set)).collect();
-        if crossing.is_empty() {
+        let nests_absorbed = absorbed.iter().all(|a| laminar(a, &set));
+        if crossing.is_empty() && nests_absorbed {
             blocks.push((set, NodeKind::Group(g)));
             continue;
         }
         // one group it overlaps: the union, with three parts, when that nests with the rest
-        if let [i] = crossing.as_slice() {
+        if let ([i], true) = (crossing.as_slice(), nests_absorbed) {
             if let NodeKind::Group(h) = blocks[*i].1 {
                 let other = blocks[*i].0.clone();
                 let parts = [
@@ -1060,13 +1072,26 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
                 let nests = std::iter::once(&union)
                     .chain(parts.iter().map(|(p, _)| p))
                     .all(|x| rest.iter().all(|b| laminar(x, b)));
-                if nests {
-                    blocks[*i] = (union, NodeKind::Union(h, g));
+                // a block with the members of the union is the union: a group, or a part of
+                // another union, not itself a union, whose order it would have to keep too
+                let same = blocks.iter().position(|(b, _)| *b == union);
+                let reusable = same.is_none_or(|j| !matches!(blocks[j].1, NodeKind::Union(..)));
+                if nests && reusable {
+                    match same {
+                        Some(j) => {
+                            blocks[j].1 = NodeKind::Union(h, g);
+                            blocks.remove(*i);
+                        }
+                        None => blocks[*i] = (union, NodeKind::Union(h, g)),
+                    }
+                    // a part with the members of a block is that block
                     for (p, which) in parts {
-                        if !p.is_empty() {
+                        if !p.is_empty() && !blocks.iter().any(|(b, _)| *b == p) {
                             blocks.push((p, NodeKind::Part(h, g, which)));
                         }
                     }
+                    absorbed.push(other);
+                    absorbed.push(set);
                     continue;
                 }
             }
@@ -1103,17 +1128,34 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
         sets.push(set.clone());
         nodes[parent].children.push(n);
     }
-    // a union's parts in their order; other children by their first element
+    // a union's parts in their order, by where their members are, as a part may be a block made
+    // before; other children by their first element
     for n in 0..nodes.len() {
         let mut children = std::mem::take(&mut nodes[n].children);
-        children.sort_by_key(|&c| match nodes[c].kind {
-            NodeKind::Part(_, _, which) => (u64::from(which), 0),
-            _ => (0, nodes[c].members[0] as u64),
+        let groups = match nodes[n].kind {
+            NodeKind::Union(h, g) => Some((elements_of(h), elements_of(g))),
+            _ => None,
+        };
+        children.sort_by_key(|&c| {
+            let first = nodes[c].members[0];
+            match &groups {
+                Some((h, g)) => (u8::from(g.contains(&first)) + u8::from(!h.contains(&first)), first),
+                None => (0, first),
+            }
         });
         let inner: BTreeSet<usize> = children.iter().flat_map(|&c| nodes[c].members.iter().copied()).collect();
         nodes[n].own = nodes[n].members.iter().copied().filter(|k| !inner.contains(k)).collect();
         nodes[n].children = children;
     }
+    debug_assert!(
+        nodes.iter().all(|n| {
+            let mut m: Vec<usize> = n.children.iter().flat_map(|&c| nodes[c].members.iter().copied()).collect();
+            m.extend(n.own.iter().copied());
+            m.sort_unstable();
+            m == n.members
+        }),
+        "the children of a node and its own elements are its members, each once: {nodes:?}"
+    );
     (GroupTree { nodes }, notes)
 }
 
@@ -1529,7 +1571,7 @@ fn elements_of(r: &PointRef, out: &mut Vec<usize>) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::resolve::tests::{fact, instance, problem_of};
     use rnl_runtime::problem::ProblemGroup;
@@ -1582,6 +1624,128 @@ mod tests {
         let s = structure_of(&p);
         assert_eq!(s.tree.nodes.len(), 3);
         assert!(s.notes[0].contains("%c"), "{:?}", s.notes);
+    }
+
+    /// The tree of groups over `n` free instances with these groups, `%g0`, `%g1`, …, and the notes.
+    fn tree_of(n: usize, groups: &[Vec<usize>]) -> (GroupTree, Vec<String>) {
+        let mut p = problem_of((0..n).map(|_| instance()).collect(), Vec::new());
+        p.groups = groups
+            .iter()
+            .enumerate()
+            .map(|(i, m)| ProblemGroup { label: format!("%g{i}"), members: m.clone() })
+            .collect();
+        let s = structure_of(&p);
+        (s.tree, s.notes)
+    }
+
+    #[test]
+    fn a_part_or_a_union_with_the_members_of_a_group_is_that_group() {
+        // the first part of the union of %g1 and %g2 is %g0
+        let (t, notes) = tree_of(4, &[vec![0, 1], vec![0, 1, 2], vec![2, 3]]);
+        let nodes = &t.nodes;
+        assert!(notes.is_empty(), "{notes:?}");
+        assert_eq!(nodes.len(), 5, "{nodes:?}");
+        let union = nodes.iter().position(|n| n.kind == NodeKind::Union(1, 2)).unwrap();
+        assert_eq!(nodes[0].children, vec![union]);
+        let parts: Vec<(&NodeKind, &Vec<usize>)> =
+            nodes[union].children.iter().map(|&c| (&nodes[c].kind, &nodes[c].members)).collect();
+        assert_eq!(
+            parts,
+            vec![
+                (&NodeKind::Group(0), &vec![0, 1]),
+                (&NodeKind::Part(1, 2, 1), &vec![2]),
+                (&NodeKind::Part(1, 2, 2), &vec![3])
+            ]
+        );
+        // the union of %g2 and %g3 is %g1, inside %g0: %g1 is the union, its parts what only %g2
+        // has, what both have, what only %g3 has
+        let (t, notes) = tree_of(5, &[vec![0, 1, 2, 3, 4], vec![0, 1, 2, 3], vec![2, 3], vec![0, 1, 2]]);
+        let nodes = &t.nodes;
+        assert!(notes.is_empty(), "{notes:?}");
+        assert_eq!(nodes.len(), 6, "{nodes:?}");
+        let top = nodes.iter().position(|n| n.kind == NodeKind::Group(0)).unwrap();
+        let union = nodes.iter().position(|n| n.kind == NodeKind::Union(2, 3)).unwrap();
+        assert_eq!((nodes[0].children.clone(), nodes[top].children.clone()), (vec![top], vec![union]));
+        assert_eq!(nodes[union].members, vec![0, 1, 2, 3]);
+        assert!(nodes[union].fixed_order);
+        let parts: Vec<&Vec<usize>> = nodes[union].children.iter().map(|&c| &nodes[c].members).collect();
+        assert_eq!(parts, vec![&vec![3], &vec![2], &vec![0, 1]]);
+        // a group written after the union that is one of its two groups is in it already; one with
+        // the two outer parts and not the shared one cannot be in one piece with them
+        let (t, notes) = tree_of(4, &[vec![0, 1, 2], vec![2, 3], vec![0, 1, 2], vec![0, 1, 3]]);
+        assert_eq!(t.nodes.len(), 5, "{:?}", t.nodes);
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert!(notes[0].contains("%g3"), "{notes:?}");
+    }
+
+    /// A fixed sequence of pseudo-random numbers below `n`, for the tests.
+    pub(crate) struct Lcg(pub u64);
+
+    impl Lcg {
+        pub(crate) fn below(&mut self, n: u64) -> u64 {
+            self.0 = self.0.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            (self.0 >> 33) % n
+        }
+
+        /// Sets of groups over `n` elements: two to five, each element in each by a coin.
+        pub(crate) fn groups(&mut self, n: usize) -> Vec<Vec<usize>> {
+            let count = 2 + self.below(4) as usize;
+            (0..count).map(|_| (0..n).filter(|_| self.below(2) == 0).collect()).collect()
+        }
+    }
+
+    /// Groups drawn at random: the nodes nest, each set of elements is one node, the children of a
+    /// node and its own elements are its members, each once, a union's three parts are what only
+    /// its first group has, what both have and what only the second has, and every group is a
+    /// node, one of the two groups of a union, or noted.
+    #[test]
+    fn every_tree_of_groups_holds_each_set_once_and_splits_a_union_in_three() {
+        let mut rng = Lcg(0x2545_f491_4f6c_dd1d);
+        let mut unions = 0;
+        for _ in 0..500 {
+            let groups = rng.groups(6);
+            let (t, notes) = tree_of(6, &groups);
+            let nodes = &t.nodes;
+            let what = format!("{groups:?}: {nodes:?}");
+            let set = |n: usize| nodes[n].members.iter().copied().collect::<BTreeSet<usize>>();
+            for a in 0..nodes.len() {
+                for b in a + 1..nodes.len() {
+                    let (x, y) = (set(a), set(b));
+                    assert!(x.is_disjoint(&y) || x.is_subset(&y) || y.is_subset(&x), "{what}");
+                    assert!(a == 0 || x != y, "{what}");
+                }
+                let mut m: Vec<usize> = nodes[a].children.iter().flat_map(|&c| nodes[c].members.clone()).collect();
+                m.extend(nodes[a].own.iter().copied());
+                m.sort_unstable();
+                assert_eq!(m, nodes[a].members, "{what}");
+                assert!(nodes[a].children.iter().all(|&c| a == 0 || nodes[c].members.len() < nodes[a].members.len()));
+                if let NodeKind::Union(h, g) = nodes[a].kind {
+                    unions += 1;
+                    let (h, g): (BTreeSet<usize>, BTreeSet<usize>) =
+                        (groups[h].iter().copied().collect(), groups[g].iter().copied().collect());
+                    let parts: Vec<BTreeSet<usize>> = nodes[a].children.iter().map(|&c| set(c)).collect();
+                    let expected: Vec<BTreeSet<usize>> = vec![
+                        h.difference(&g).copied().collect(),
+                        h.intersection(&g).copied().collect(),
+                        g.difference(&h).copied().collect(),
+                    ];
+                    assert_eq!(parts, expected, "{what}");
+                    assert!(nodes[a].fixed_order && nodes[a].own.is_empty(), "{what}");
+                }
+            }
+            for (i, g) in groups.iter().enumerate() {
+                let g: BTreeSet<usize> = g.iter().copied().collect();
+                let in_union = nodes.iter().any(|n| match n.kind {
+                    NodeKind::Union(a, b) => {
+                        [a, b].iter().any(|&j| groups[j].iter().copied().collect::<BTreeSet<usize>>() == g)
+                    }
+                    _ => false,
+                });
+                let noted = notes.iter().any(|n| n.contains(&format!("%g{i} ")));
+                assert!(g.len() < 2 || (0..nodes.len()).any(|n| set(n) == g) || in_union || noted, "%g{i}: {what}");
+            }
+        }
+        assert!(unions > 50, "{unions}");
     }
 
     #[test]

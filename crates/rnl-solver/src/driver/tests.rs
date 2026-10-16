@@ -649,3 +649,165 @@ fn an_align_on_x_is_a_column() {
     assert!(e.placed.overlaps.is_empty(), "{what}");
     assert!(!e.placed.dropped.contains(&crate::search::RelKind::Gap), "{what}: {:?}", e.placed.dropped);
 }
+
+/// Groups whose parts or union are the same set as another group (synthesis 3.5): each set is one
+/// block of the tree, and the solve places every element once, keeping every fact.
+#[test]
+fn groups_that_make_the_same_set_twice_are_solved() {
+    let chain = "R1 a b 1k\nR2 b c 1k\nR3 c d 1k\nR4 d e 1k\nR5 f g 1k\n";
+    for (groups, options) in [
+        // the first part of the union of %b and %c is %a
+        ("%a = {#R1 #R2} @GROUP; %b = {#R1 #R2 #R3} @GROUP; %c = {#R3 #R4} @GROUP", "objectives=none"),
+        ("%a = {#R1 #R2} @GROUP; %b = {#R1 #R2 #R3} @GROUP; %c = {#R3 #R4} @GROUP", ""),
+        // the union of %g2 and %g1 is %g0, inside %top
+        (
+            "%top = {#R1 #R2 #R3 #R4 #R5} @GROUP; %g0 = {#R1 #R2 #R3 #R4} @GROUP; %g2 = {#R3 #R4} @GROUP; \
+             %g1 = {#R1 #R2 #R3} @GROUP",
+            "",
+        ),
+        // a group written after the union that is one of its two groups again
+        ("%b = {#R1 #R2 #R3} @GROUP; %c = {#R3 #R4} @GROUP; %d = {#R1 #R2 #R3} @GROUP", ""),
+    ] {
+        let text = format!(
+            "* d\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n{chain}* @RNL {{ {groups}; $WIRE_NET_SET @ROUTE }}\n.end\n"
+        );
+        let ps = problems_of(&text);
+        let options = SolverOptions::parse(options).unwrap();
+        let (solved, e) = solve_exact(&ps[0], &options);
+        let what = summary(&ps[0], &solved, &e);
+        let tree = &e.structure.tree;
+        let sets: Vec<&Vec<usize>> = tree.nodes[1..].iter().map(|n| &n.members).collect();
+        for (i, a) in sets.iter().enumerate() {
+            assert!(!sets[i + 1..].contains(a), "{groups}: {:?}", tree.nodes);
+        }
+        let mut placed: Vec<usize> = e.candidate.rows.concat();
+        placed.sort_unstable();
+        assert_eq!(placed, e.structure.elements, "{groups}: {what}");
+        check_level("groups", &ps[0]);
+    }
+}
+
+/// The parts of the union of two groups that overlap stay in their order or the reverse, the
+/// shared one between the other two, in every candidate of the search (algorithm synthesis 3.5);
+/// in the placement taken their boxes follow one another on x, so that both groups are in one piece.
+#[test]
+fn overlapping_groups_keep_the_shared_part_between_the_others() {
+    let chain = "R1 a b 1k\nR2 b c 1k\nR3 c d 1k\nR4 d e 1k\n";
+    for groups in
+        ["%g2 = {#R3 #R4} @GROUP; %g1 = {#R1 #R2 #R3} @GROUP", "%g1 = {#R1 #R4} @GROUP; %g2 = {#R1 #R2} @GROUP"]
+    {
+        let text = format!(
+            "* u\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n{chain}* @RNL {{ {groups}; $WIRE_NET_SET @ROUTE }}\n.end\n"
+        );
+        let ps = problems_of(&text);
+        let p = &ps[0];
+        let options = SolverOptions::default();
+        let resolved = crate::resolve::resolve(p, &options);
+        let mut work = crate::Work::default();
+        let s = analyse(p, &resolved, &options, &mut work);
+        let nodes = &s.tree.nodes;
+        let union = nodes.iter().position(|n| n.fixed_order).unwrap_or_else(|| panic!("{groups}: {nodes:?}"));
+        let parts: Vec<Vec<usize>> = nodes[union].children.iter().map(|&c| nodes[c].members.clone()).collect();
+        assert_eq!(parts.len(), 3, "{groups}: {nodes:?}");
+        let forward = vec![(parts[0].clone(), parts[1].clone()), (parts[1].clone(), parts[2].clone())];
+        let backward = vec![(parts[2].clone(), parts[1].clone()), (parts[1].clone(), parts[0].clone())];
+        let candidates = search(p, &s, &options, &mut work);
+        assert!(candidates.iter().filter(|c| c.origin == "beam").count() >= 2, "{groups}");
+        for c in candidates.iter().filter(|c| c.origin == "beam") {
+            let between: Vec<(Vec<usize>, Vec<usize>)> =
+                c.apart.iter().filter(|(a, b)| parts.contains(a) && parts.contains(b)).cloned().collect();
+            assert!(between == forward || between == backward, "{groups}: {:?}", c.apart);
+        }
+        let (solved, e) = check_level("union", p);
+        let what = summary(p, &solved, &e);
+        assert!(!e.placed.dropped.contains(&RelKind::BlocksApart), "{groups}: {what}");
+        let extent = |part: &[usize]| {
+            let boxes: Vec<[Q; 4]> = part
+                .iter()
+                .map(|&k| e.structure.box_at(&e.placed.origins, &e.placed.geometry.orient, k).unwrap())
+                .collect();
+            let lo = boxes.iter().map(|b| b[0].clone()).min().unwrap();
+            let hi = boxes.iter().map(|b| b[2].clone()).max().unwrap();
+            (lo, hi)
+        };
+        let x: Vec<(Q, Q)> = parts.iter().map(|part| extent(part)).collect();
+        let follow = |a: &(Q, Q), b: &(Q, Q)| a.1 <= b.0;
+        assert!(
+            (follow(&x[0], &x[1]) && follow(&x[1], &x[2])) || (follow(&x[2], &x[1]) && follow(&x[1], &x[0])),
+            "{groups}: {x:?}\n{what}"
+        );
+    }
+}
+
+/// Groups and a fact drawn at random over a chain of five resistors. Every search orders every
+/// element once in each candidate and, where no fact orders elements on x, keeps the shared part
+/// of each union between the other two; one level in five is solved and checked as the files are
+/// (`check_level`).
+#[test]
+fn groups_and_facts_drawn_at_random_are_solved() {
+    let mut rng = crate::structure::tests::Lcg(0x9e37_79b9_7f4a_7c15);
+    let chain = "R1 a b 1k\nR2 b c 1k\nR3 c d 1k\nR4 d e 1k\nR5 e f 1k\n";
+    let options = SolverOptions::default();
+    let mut unions = 0;
+    for i in 0..100 {
+        let mut lines: Vec<String> = rng
+            .groups(5)
+            .iter()
+            .enumerate()
+            .filter(|(_, g)| !g.is_empty())
+            .map(|(j, g)| {
+                let members: Vec<String> = g.iter().map(|k| format!("#R{}", k + 1)).collect();
+                format!("%g{j} = {{{}}} @GROUP", members.join(" "))
+            })
+            .collect();
+        let (a, b) = (rng.below(5) + 1, rng.below(5) + 1);
+        let fact = match rng.below(6) {
+            0 => format!("#R{a} #R{b} @DISTANCE(\"left-to-right\", min=3)"),
+            1 => format!("{{#R{a} #R{b}}} @ALIGN(\"y\")"),
+            2 => format!("{{#R{a} #R{b}}} @ALIGN(\"x\")"),
+            3 => format!("{{#R{a} #R{b}}} @ORDER(\"x\")"),
+            4 => format!("{{#R{a} #R{b}}} @ORDER(\"left-to-right\")"),
+            _ => String::new(),
+        };
+        if a != b && !fact.is_empty() {
+            lines.push(fact);
+        }
+        lines.push("$WIRE_NET_SET @ROUTE".to_string());
+        let text = format!(
+            "* f\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n{chain}* @RNL {{ {} }}\n.end\n",
+            lines.join("; ")
+        );
+        let ps = problems_of(&text);
+        let p = &ps[0];
+        let resolved = crate::resolve::resolve(p, &options);
+        let mut work = crate::Work::default();
+        let s = analyse(p, &resolved, &options, &mut work);
+        let free = s.precedence.is_empty() && s.reversible.is_empty();
+        let nodes = &s.tree.nodes;
+        for c in search(p, &s, &options, &mut work) {
+            let mut placed: Vec<usize> = c.rows.concat();
+            placed.sort_unstable();
+            assert_eq!(placed, s.elements, "{text}: {c:?}");
+            if c.origin != "beam" || !free {
+                continue;
+            }
+            for n in nodes.iter().filter(|n| n.fixed_order) {
+                unions += 1;
+                let parts: Vec<&Vec<usize>> = n.children.iter().map(|&c| &nodes[c].members).collect();
+                let between: Vec<(&Vec<usize>, &Vec<usize>)> = c
+                    .apart
+                    .iter()
+                    .filter(|(a, b)| parts.contains(&a) && parts.contains(&b))
+                    .map(|(a, b)| (a, b))
+                    .collect();
+                let forward = vec![(parts[0], parts[1]), (parts[1], parts[2])];
+                let backward = vec![(parts[2], parts[1]), (parts[1], parts[0])];
+                assert!(between == forward || between == backward, "{text}: {:?}", c.apart);
+            }
+        }
+        if i % 5 == 0 {
+            check_level(&text, p);
+        }
+    }
+    assert!(unions > 20, "{unions}");
+}
