@@ -221,6 +221,50 @@ pub(crate) struct Port {
     pub kind: PortKind,
 }
 
+/// Where a text goes when no fact decides its position (13.3): "a text attached to a point usually
+/// goes at that point, and a text attached to an object next to the object". At the point itself,
+/// or beside the coordinate point of the object, the origin of an instance, a usage drawn or a
+/// bundle, or the pin of a terminal, by the offset that a viewer that does not solve puts it at.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Anchor {
+    /// The object it is attached to, or whose terminal.
+    pub object: usize,
+    /// The pin of the terminal, in the object's symbol.
+    pub pin: Option<usize>,
+    /// From the point, along the axes of the scene.
+    pub offset: [Q; 2],
+}
+
+/// Where a viewer that does not solve puts a text attached to an object, from the object's
+/// coordinate point (13.3); the solver puts it there too, so that a text looks the same solved.
+fn beside() -> [Q; 2] {
+    [Q::new(6.into(), 5.into()), Q::new(6.into(), 5.into())]
+}
+
+/// The anchors of the texts with a position of their own ([`Structure::anchors`]): those attached
+/// to a point, an object with a coordinate point, or a terminal with a pin.
+fn anchors(problem: &LevelProblem) -> BTreeMap<usize, Anchor> {
+    let mut out = BTreeMap::new();
+    for (k, o) in problem.objects.iter().enumerate() {
+        let (ObjectKind::Text, Position::Own { .. }, Some(t)) = (o.kind, &o.position, &o.text) else { continue };
+        let anchor = match &t.attach {
+            Filler::Object(j) => match problem.objects.get(*j).map(|a| a.kind) {
+                Some(ObjectKind::Point) => Anchor { object: *j, pin: None, offset: [Q::zero(), Q::zero()] },
+                Some(ObjectKind::Instance | ObjectKind::Usage | ObjectKind::Bundle) => {
+                    Anchor { object: *j, pin: None, offset: beside() }
+                }
+                _ => continue,
+            },
+            Filler::Terminal { object, pin: Some(pin), .. } => {
+                Anchor { object: *object, pin: Some(*pin), offset: beside() }
+            }
+            _ => continue,
+        };
+        out.insert(k, anchor);
+    }
+    out
+}
+
 /// A pair drawn as mirror images: `b` is `a` mirrored (14.9), about `axis` when it has one. From
 /// `$MIRROR_PAIR`, `$DIFFPAIR`, `$DIFFPAIR_TAIL` and `$CURRENT_MIRROR`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -380,6 +424,9 @@ pub(crate) struct Structure {
     /// The box of the texts each object's symbol places (13.3), estimated, in the symbol's own
     /// coordinates, by the object ([`text_box`]).
     pub labels: BTreeMap<usize, [Q; 4]>,
+    /// Where each text with a position of its own goes when nothing decides it, by the text: at
+    /// the point it is attached to, or beside the object (13.3).
+    pub anchors: BTreeMap<usize, Anchor>,
     pub tree: GroupTree,
     /// The components of each scope of the objectives measured within groups: each group, then
     /// those in no group (when any).
@@ -550,7 +597,9 @@ pub(crate) fn analyse(
     }
     let mut labels: BTreeMap<usize, [Q; 4]> = BTreeMap::new();
     for o in &problem.objects {
-        let (Position::InSymbol { owner, local }, Some(t)) = (&o.position, &o.text) else { continue };
+        // the texts that move with their owner on both axes; one that the scene places on an axis
+        // does not (13.3)
+        let (Position::InSymbol { owner, local, replaced: None }, Some(t)) = (&o.position, &o.text) else { continue };
         let Some(b) = text_box(t, (number(local.0), number(local.1))) else { continue };
         labels
             .entry(*owner)
@@ -576,6 +625,7 @@ pub(crate) fn analyse(
         pairs,
         hanging,
         labels,
+        anchors: anchors(problem),
         tree,
         scopes,
         open,
@@ -696,7 +746,10 @@ fn object_infos(problem: &LevelProblem, model: &Model, kept: &[usize]) -> Vec<Ob
             for p in &model.units[f].touched[axis] {
                 let k = match p {
                     PointId::Origin(k) => Some(*k),
-                    PointId::Pin(k, _) | PointId::Text(k) => model.points.get(p).and_then(|i| i.object).or(Some(*k)),
+                    PointId::Pin(k, _) => model.points.get(p).and_then(|i| i.object).or(Some(*k)),
+                    // the owner of a text on the axes its symbol gives; on the one the scene gives,
+                    // the fact reaches the text alone (13.3)
+                    PointId::Text(k) => model.points.get(p).and_then(|i| i.object_on(axis)).or(Some(*k)),
                     PointId::Centre(_) => None,
                 };
                 if let Some(t) = k.and_then(|k| touched.get_mut(k)) {

@@ -6,9 +6,12 @@
 //! `solution::write_record`, the hash `sig1` of its problem and of the solver's canonical options in
 //! the head, finished with `rnl_view::finish_record`, which adds the check of its numbers in a file
 //! of the draft 0.3 (5.9), and put in place of the level's records of the solver with
-//! `writeback::replace_generated`, at the end of the level's own text (17). A file may hold several
-//! levels, and writing one back moves the lines of those after it, so the document is read again
-//! before the next level, the texts written so far held in memory over the files.
+//! `writeback::replace_generated`, at the end of the level's own text (17). A record of the solver
+//! written for the level with scope= in another file, which a solver does not write (2.6) but which
+//! applies to the level all the same, is removed from that file. Every file written has its header
+//! record and its version (16.1), added when it has none. A file may hold several levels, and
+//! writing one back moves the lines of those after it, so the document is read again before the
+//! next level, the texts written so far held in memory over the files.
 //!
 //! A level whose file, or a file above it, declares a language version that the reading does not
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
@@ -24,11 +27,11 @@ use std::time::{Duration, Instant};
 
 use rnl_runtime::diag::Severity;
 use rnl_runtime::host::file_name;
-use rnl_runtime::interp::unit::DRAFT_VERSION;
-use rnl_runtime::problem::{sig1, FactKind, LevelProblem, PointRef};
+use rnl_runtime::interp::unit::{DRAFT_VERSION, SUPPORTED_VERSION};
+use rnl_runtime::problem::{sig1, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
-use rnl_runtime::writeback::replace_generated;
+use rnl_runtime::writeback::{generated_files, remove_generated_for, replace_generated, with_header};
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Solved, SolverOptions, AUTHOR};
 
@@ -157,7 +160,9 @@ impl Provider for Noting<'_> {
 
 /// Reads `file` as a solver reads it, solves every drawing level, or the one `options.level`
 /// names, and writes each level's record of the solver back into the text of its file: the
-/// texts are in [`SolveRun::files`], and nothing is written to disk. A level whose RNL is not
+/// texts are in [`SolveRun::files`], and nothing is written to disk. A record of the solver that
+/// applies to the level from another file, written there with scope=, is removed from that file,
+/// and each file written gets the header record it lacks (16.1). A level whose RNL is not
 /// interpreted, because its file or one above it declares a version the reading does not read,
 /// is not solved and nothing is written into it (16.1). Fails when the file cannot be read, or
 /// when no level has the title asked for.
@@ -225,27 +230,46 @@ pub fn solve(file: &Path, files: &dyn Provider, options: &SolveOptions) -> Resul
         let written = write_record(p, &solved.solution, AUTHOR, &hash);
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);
-        let (record, text) = {
+        let (record, texts) = {
             let both = Layered { layers: vec![&memory, &files] };
             let record = rnl_view::finish_record(&r.doc, &both, &runtime, p, &written.record);
             // the text as the adapter read it, which the positions of its records refer to
-            let text = match r.doc.source(&host.file) {
-                Some(t) => t.to_string(),
-                None => both.read(&path).ok_or_else(|| format!("cannot read {path}"))?,
+            let text_of = |file: &str, path: &str| match r.doc.source(file) {
+                Some(t) => Ok(t.to_string()),
+                None => both.read(path).ok_or_else(|| format!("cannot read {path}")),
             };
-            (record, text)
+            let out = replace_generated(&r.doc, p.level, &text_of(&host.file, &path)?, &record);
+            let mut texts = vec![(path.clone(), with_header(&r.doc, &host.file, &out, &p.version))];
+            // a record of the solver for this level written with scope= in another file (2.6)
+            for other in generated_files(&r.doc, p.level).into_iter().filter(|f| *f != host.file) {
+                let Some(lv) = r.doc.levels.iter().find(|l| l.file == other) else { continue };
+                let at = normalize(&lv.path);
+                let out = remove_generated_for(&r.doc, p.level, &other, &text_of(&other, &at)?);
+                texts.push((at, with_header(&r.doc, &other, &out, &version_of(&r, &other))));
+            }
+            (record, texts)
         };
-        let out = replace_generated(&r.doc, p.level, &text, &record);
-        memory.insert(&path, &out);
-        match solved_files.iter_mut().find(|f| f.path == path) {
-            Some(f) => f.text = out,
-            None => solved_files.push(SolvedFile { path: path.clone(), text: out }),
+        for (at, out) in texts {
+            memory.insert(&at, &out);
+            match solved_files.iter_mut().find(|f| f.path == at) {
+                Some(f) => f.text = out,
+                None => solved_files.push(SolvedFile { path: at, text: out }),
+            }
         }
         levels.push(SolvedLevel { problem: p.clone(), solved, written, record, hash, path, time });
     }
     let packages: Vec<String> = files.files.package_files().iter().map(|p| normalize(p)).collect();
     let read: Vec<String> = files.read.take().into_iter().filter(|p| !packages.contains(p)).collect();
     Ok(SolveRun { entry, levels, not_solved, files: solved_files, read, errors })
+}
+
+/// The version a file of the document was read in (16.1): that of a level in it, else the tool's
+/// default, which a file without a header is read in.
+fn version_of(r: &Interpretation, file: &str) -> String {
+    r.problems
+        .iter()
+        .find(|q| r.doc.levels.get(q.level).is_some_and(|l| l.file == file))
+        .map_or_else(|| SUPPORTED_VERSION.to_string(), |q| q.version.clone())
 }
 
 /// Where each file of a run goes: under `-o DIR` by its name relative to the directory of the
@@ -382,9 +406,18 @@ pub fn write(run: &SolveRun, target: &Target) -> Writing {
     out
 }
 
-/// A point of a fact, as diagnostics show its object: `#M1`, `#M1:d`, `{#M1 #M2}` for a centre.
+/// A point of a fact, by its object's name when it has one, such as `%t` for a text named so, else
+/// as diagnostics show its object: `#M1`, `#M1:d`, `{#M1 #M2}` for a centre.
 fn point(p: &LevelProblem, r: &PointRef) -> String {
-    let label = |k: usize| p.objects.get(k).map_or_else(|| format!("object {k}"), |o| o.label.clone());
+    let label = |k: usize| {
+        p.objects.get(k).map_or_else(
+            || format!("object {k}"),
+            |o| match &o.reference {
+                Reference::Name(n) => n.clone(),
+                _ => o.label.clone(),
+            },
+        )
+    };
     match r {
         PointRef::Origin(k) => label(*k),
         PointRef::Pin { object, terminal, .. } => format!("{}:{terminal}", label(*object)),

@@ -118,8 +118,24 @@ pub enum Position {
     /// own: only its orientation is the solver's (12.1 rule 5).
     At(PointRef),
     /// A text placed by the symbol of `owner`: the owner's origin plus `local` turned with the
-    /// owner (9.2.5, 13.3). A PLACE in the scene that gives both coordinates replaces it.
-    InSymbol { owner: usize, local: Pt },
+    /// owner (9.2.5, 13.3). A PLACE or an offset (`dx`, `dy`) in the scene replaces the symbol's
+    /// position axis by axis, whichever of the two is written later (13.3): `replaced` is the axis
+    /// that the scene gives, when it gives one, with the text's own coordinate there, as in
+    /// [`Position::Own`]: fixed by the first PLACE on that axis, or free, and then placed by the
+    /// offset, a [`FactKind::Offset`]. The symbol still gives the other axis, turned with the owner.
+    /// A text whose two axes the scene gives is [`Position::Own`].
+    InSymbol { owner: usize, local: Pt, replaced: Option<(Axis, Slot)> },
+}
+
+impl Position {
+    /// Whether the symbol of an owner gives the coordinate on `axis`: on the axes of a
+    /// [`Position::InSymbol`] that the scene does not replace (13.3).
+    pub fn from_symbol(&self, axis: Axis) -> bool {
+        match self {
+            Position::InSymbol { replaced, .. } => replaced.as_ref().is_none_or(|(a, _)| *a != axis),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -588,11 +604,17 @@ pub fn canonical(p: &LevelProblem) -> String {
                 c.word("at");
                 c.point(r);
             }
-            Position::InSymbol { owner, local } => {
+            Position::InSymbol { owner, local, replaced } => {
                 c.word("in-symbol");
                 c.index(*owner);
                 c.num(local.0);
                 c.num(local.1);
+                // nothing more when the symbol gives both axes, so that the digest stays as it was
+                if let Some((axis, slot)) = replaced {
+                    c.word("replaced");
+                    c.word(axis.as_str());
+                    c.slot(slot);
+                }
             }
         }
         match &o.orient {

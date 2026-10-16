@@ -34,6 +34,9 @@
 //!   with `mode="straight"` and the style of its ROUTE; the points where wires branch are named
 //!   points, with `$JUNCTION` where the solver wants a dot (13.2, 13.7).
 //! - Coordinates are written by [`fmt_num`], which reads back as the same value (11.7).
+//! - A text that an offset (`dx`, `dy`) places on an axis keeps it: the record writes its position
+//!   on the other axis only, `@PLACE(x=…)` or `@PLACE(y=…)`, or none, since a PLACE written after
+//!   the offset would replace it and the text would no longer follow what it is attached to (13.3).
 
 use std::fmt;
 
@@ -394,6 +397,9 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
 ///   two points (13.1), or through the centre of a set; a coordinate that is NaN or infinite
 ///   (3.7); an index that is not in the problem or the solution.
 ///
+/// The position of a text that an offset places on an axis is written on the other axis only, or
+/// not at all: the offset keeps placing it (13.3).
+///
 /// In a level of the draft 0.3 the record is not finished: when it uses a number,
 /// [`finish_record`] gives it the check of its numbers.
 pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &str) -> Written {
@@ -423,8 +429,11 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
         branch_names.push(Some(format!("rt{n}")));
     }
 
-    // positions and orientations
-    let mut placements: Vec<(Reference, Option<Pt>, Option<Orient>)> = Vec::new();
+    // positions and orientations; a text keeps the axes that an offset places it on (13.3)
+    let by_offset = |k: usize, axis: Axis| {
+        p.facts.iter().any(|f| matches!(f.kind, FactKind::Offset { text, axis: a, .. } if text == k && a == axis))
+    };
+    let mut placements: Vec<(Reference, [Option<f64>; 2], Option<Orient>)> = Vec::new();
     let mut sorted: Vec<&Placement> = solution.placements.iter().collect();
     sorted.sort_by_key(|pl| pl.object);
     for pl in sorted {
@@ -457,7 +466,11 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
             lost(orientation, &o.label, NO_ORIENTATION);
             orient = None;
         }
-        if at.is_none() && orient.is_none() {
+        let at = at.map_or([None, None], |(x, y)| {
+            [(!by_offset(pl.object, Axis::X)).then_some(x), (!by_offset(pl.object, Axis::Y)).then_some(y)]
+        });
+        let placed = at.iter().any(Option::is_some);
+        if !placed && orient.is_none() {
             continue;
         }
         match refs.reach(&o.reference) {
@@ -470,7 +483,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
             Err(why) => {
                 let keyless = o.text.as_ref().is_some_and(|t| t.key.is_none());
                 let why = if why == ANONYMOUS && o.generated && keyless { RULE_TEXT } else { why };
-                if at.is_some() {
+                if placed {
                     lost(position, &o.label, why);
                 }
                 if orient.is_some() {
@@ -570,8 +583,11 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     }
     for (r, at, orient) in &placements {
         let mut parts = Vec::new();
-        if let Some((x, y)) = at {
-            parts.push(format!("@PLACE({}, {})", fmt_num(*x), fmt_num(*y)));
+        match at {
+            [Some(x), Some(y)] => parts.push(format!("@PLACE({}, {})", fmt_num(*x), fmt_num(*y))),
+            [Some(x), None] => parts.push(format!("@PLACE(x={})", fmt_num(*x))),
+            [None, Some(y)] => parts.push(format!("@PLACE(y={})", fmt_num(*y))),
+            [None, None] => {}
         }
         if let Some(code) = orient {
             parts.push(format!("@ORIENT(\"{}\")", code.as_str()));

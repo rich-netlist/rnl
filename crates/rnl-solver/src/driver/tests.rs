@@ -2,7 +2,7 @@
 //! solver and of the conformance corpus read from the files.
 
 use super::*;
-use crate::resolve::tests::{fact, instance, point, problem_of};
+use crate::resolve::tests::{fact, instance, label, point, problem_of};
 use crate::Objectives;
 use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::{Axis, FactKind, PointRef};
@@ -46,6 +46,31 @@ fn every_object_is_placed_where_the_facts_put_it() {
         ]
     );
     assert!(solved.report.work.resolve_nodes > 0);
+}
+
+#[test]
+fn a_text_that_an_offset_places_on_one_axis_follows_its_owner_there_only() {
+    // the dx of #M::name replaces the x its symbol gives it (13.3): wherever M goes, the text is 3
+    // right of it, its y still from the symbol, turned with M; the solution places M only
+    let p = problem_of(
+        vec![instance(), label(Some(Axis::X)), point()],
+        vec![
+            fact(FactKind::Offset { text: 1, from: PointRef::Origin(0), axis: Axis::X, value: 3.0 }),
+            fact(FactKind::PointCoordinate { point: 2, axis: Axis::X, value: 10.0 }),
+            fact(FactKind::PointCoordinate { point: 2, axis: Axis::Y, value: 4.0 }),
+            fact(FactKind::Align { axis: Axis::X, members: vec![PointRef::Origin(0), PointRef::Origin(2)] }),
+            fact(FactKind::Orient { object: 0, code: Orient::R180 }),
+        ],
+    );
+    let (solved, e) = check_level("offset", &p);
+    assert_eq!(solved.report.kept, vec![0, 1, 2, 3, 4]);
+    let g = &e.placed.geometry;
+    let at = |r: &PointRef, axis: usize| point_value(&p, g, r, axis, 0).unwrap();
+    assert_eq!(at(&PointRef::Origin(0), 0), int(10));
+    assert_eq!(at(&PointRef::Origin(1), 0), int(13));
+    // R180 turns (1, 1) to (-1, -1)
+    assert_eq!(at(&PointRef::Origin(1), 1), at(&PointRef::Origin(0), 1) - int(1));
+    assert!(solved.solution.placements.iter().all(|pl| pl.object != 1), "{:?}", solved.solution.placements);
 }
 
 // ------------------------------------------------------------------------------------ the files

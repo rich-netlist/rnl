@@ -14,7 +14,9 @@ use rnl_cli::solve::{describe_fact, destinations, lines, solve, write, SolveOpti
 use rnl_cli::{interpret_file, path_str, FsProvider};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::geom::{Orient, Pt};
-use rnl_runtime::problem::{same_input, Axis, FactKind, LevelProblem, OrientSlot, PointRef, Position, Sense, Slot};
+use rnl_runtime::problem::{
+    same_input, Axis, FactKind, LevelProblem, OrientSlot, PointRef, Position, Reference, Sense, Slot,
+};
 use rnl_runtime::solution::{Decision, Solution};
 use rnl_runtime::source::{normalize, Layered, MemoryProvider, Provider};
 use rnl_runtime::Options;
@@ -92,16 +94,35 @@ impl Placed<'_> {
         };
         match &self.p.objects[k].position {
             Position::At(r) => self.at(r),
-            Position::InSymbol { owner, local } => {
+            Position::InSymbol { owner, local, replaced } => {
                 let (x, y) = self.origin(*owner);
                 let (dx, dy) = self.orient(*owner).apply(*local);
-                (x + dx, y + dy)
+                // on the axis that the scene gives it, where its PLACE or its offset puts it (13.3)
+                let own = |axis: Axis, s: &Slot| match s {
+                    Slot::Fixed { value, .. } => *value,
+                    Slot::Free => self.offset(k, axis).unwrap_or(0.0),
+                };
+                match replaced {
+                    Some((Axis::X, s)) => (own(Axis::X, s), y + dy),
+                    Some((Axis::Y, s)) => (x + dx, own(Axis::Y, s)),
+                    None => (x + dx, y + dy),
+                }
             }
             Position::Own { x, y } => {
                 let solved = self.s.placements.iter().find(|q| q.object == k).and_then(|q| q.at);
                 solved.unwrap_or((slot(x), slot(y)))
             }
         }
+    }
+
+    /// Where the first offset of a text on an axis puts it (13.3).
+    fn offset(&self, k: usize, axis: Axis) -> Option<f64> {
+        self.p.facts.iter().find_map(|f| match &f.kind {
+            FactKind::Offset { text, from, axis: a, value } if *text == k && *a == axis => {
+                Some(self.coordinate(from, axis) + value)
+            }
+            _ => None,
+        })
     }
 
     fn at(&self, r: &PointRef) -> Pt {
@@ -719,4 +740,284 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
         stdout.ends_with(&format!("copied {}\n", path_str(&dir.join("alias").join("11-acme-style.rnl")))),
         "{stdout}"
     );
+}
+
+/// The messages of the diagnostics of a reading of one severity, sorted, without where they are,
+/// also where a message names a place: writing a record back moves the lines after it.
+fn messages(r: &rnl_runtime::Interpretation, severity: Severity) -> Vec<String> {
+    let place = |w: &str| {
+        let core = w.trim_end_matches([';', ',', ')', '.']);
+        let line = core.rsplit(':').next().is_some_and(|d| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit()));
+        let file = [".sp:", ".inc:", ".scs:", ".rnl:"].iter().any(|e| core.contains(e));
+        if file && line {
+            format!("<place>{}", &w[core.len()..])
+        } else {
+            w.to_string()
+        }
+    };
+    let mut out: Vec<String> = r
+        .diagnostics()
+        .into_iter()
+        .filter(|d| d.severity == severity)
+        .map(|d| d.message.split(' ').map(place).collect::<Vec<_>>().join(" "))
+        .collect();
+    out.sort();
+    out
+}
+
+/// The hints of 8.5 among them: a fact dropped in a conflict.
+fn dropped(r: &rnl_runtime::Interpretation) -> Vec<String> {
+    messages(r, Severity::Hint).into_iter().filter(|m| m.contains("in the order of 8.5")).collect()
+}
+
+/// The main files of the conformance corpus.
+fn corpus_cases() -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = std::fs::read_dir(corpus(""))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "sp" || x == "scs"))
+        .collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn every_corpus_case_solved_reads_back_as_its_authors_wrote_it() {
+    // what `rnl solve` writes changes the drawing only where the authors left it to a solver: read
+    // back, the case has the errors it has as written, without its records of the solver (2.8),
+    // and no fact the authors wrote is dropped that is not dropped there; every level solved is
+    // placed but for what its record cannot hold, has the input its hash says, and solved again
+    // comes out the same
+    let fs = FsProvider::new(&[]);
+    let mut solved = 0;
+    for f in corpus_cases() {
+        let name = f.file_name().unwrap().to_string_lossy().to_string();
+        let run = solve(&f, &fs, &SolveOptions::default()).unwrap_or_else(|e| panic!("{name}: {e}"));
+        if run.files.is_empty() {
+            assert!(run.levels.is_empty(), "{name}");
+            continue;
+        }
+        solved += 1;
+        let dir = scratch(&format!("corpus-{name}"));
+        let writing = write(&run, &Target::Dir(dir.clone()));
+        assert_eq!(writing.error, None, "{name}");
+        let back = dir.join(&name);
+        let authored = interpret_file(&f, None, &fs, &Options { generated: false, ..Options::default() }).unwrap();
+        let r = interpret_file(&back, None, &fs, &Options::default()).unwrap();
+        assert_eq!(messages(&r, Severity::Error), messages(&authored, Severity::Error), "{name}: the errors");
+        // a fact dropped once solved is one the solver discarded, in a conflict that a reading
+        // without a solver may not see; but a coordinate that such a reading draws as written is
+        // not one to discard
+        let (before, after) = (dropped(&authored), dropped(&r));
+        let discarded: Vec<&rnl_runtime::problem::ProblemFact> = run
+            .levels
+            .iter()
+            .flat_map(|l| l.solved.report.discarded.iter().map(|d| &l.problem.facts[d.fact]))
+            .collect();
+        let by_solver = |m: &String| discarded.iter().any(|f| m.starts_with(&format!("{} conflicts with", f.label)));
+        let new: Vec<&String> = after.iter().filter(|m| !before.contains(m) && !by_solver(m)).collect();
+        assert!(new.is_empty(), "{name}: dropped once solved: {new:#?}");
+        for f in discarded.iter().filter(|f| {
+            matches!(f.kind, FactKind::Place { .. } | FactKind::PointCoordinate { .. } | FactKind::Offset { .. })
+        }) {
+            let said = before.iter().any(|m| m.starts_with(&format!("{} conflicts with", f.label)));
+            assert!(said, "{name}: the solver discarded {}, which holds as written", f.label);
+        }
+        let again = interpret_file(&back, None, &fs, &Options::solver()).unwrap();
+        for level in &run.levels {
+            let p = &level.problem;
+            let lv = r.model.levels.iter().find(|l| l.level == p.level).unwrap();
+            let unsolved: Vec<&str> = level
+                .written
+                .unsolved
+                .iter()
+                .filter(|u| matches!(u.decision, Decision::Position { .. }))
+                .map(|u| u.label.as_str())
+                .collect();
+            let left: Vec<&String> = lv.unplaced.iter().filter(|u| !unsolved.contains(&u.as_str())).collect();
+            assert!(left.is_empty(), "{name} / {}: {left:?}, the record cannot hold {unsolved:?}", p.title);
+            let q = again.problems.iter().find(|q| q.level == p.level).unwrap();
+            assert_eq!(same_input(&level.hash, q), Some(true), "{name} / {}", p.title);
+        }
+        // solved again from what it wrote: the same
+        let texts = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+        let twice = solve(&f, &Layered { layers: vec![&texts, &fs] }, &SolveOptions::default()).unwrap();
+        assert_eq!(twice.files, run.files, "{name}: not the same solved again");
+    }
+    assert!(solved >= 18, "{solved}");
+}
+
+#[test]
+fn a_label_that_the_scene_places_on_one_axis_keeps_its_owner_where_it_is() {
+    // corpus 20: #R1::name @PLACE(x=-3) replaces only the x its symbol gives it, and an offset
+    // replaces it on its axis (13.3); R1 and R3 stay where their PLACE puts them, and the solver
+    // writes no PLACE over an offset, so the texts read back where they were written
+    let fs = FsProvider::new(&[]);
+    let f = corpus("20-label-positions.sp");
+    let run = solve(&f, &fs, &SolveOptions::default()).unwrap();
+    let level = &run.levels[0];
+    assert!(level.solved.report.discarded.is_empty(), "{:#?}", lines(&run, false));
+    check_facts(&run, "20-label-positions");
+    let p = &level.problem;
+    let at = |label: &str| p.objects.iter().find(|o| o.label == label).unwrap().position.clone();
+    assert!(matches!(at("#R1::name"), Position::InSymbol { replaced: Some((Axis::X, Slot::Fixed { .. })), .. }));
+    assert!(matches!(at("#R2::name"), Position::InSymbol { replaced: Some((Axis::X, Slot::Free)), .. }));
+    assert!(matches!(at("#R5::name"), Position::InSymbol { replaced: None, .. }));
+    assert!(matches!(at("#R6::name"), Position::Own { x: Slot::Free, y: Slot::Free }));
+    for line in
+        ["#R1 @PLACE(0, 0) => @ORIENT(\"R0\");", "#R3 @PLACE(20, 0) => @ORIENT(\"R0\");", "#R4::value @PLACE(x=1)"]
+    {
+        assert!(level.record.contains(line), "{}", level.record);
+    }
+    assert!(!level.record.contains("#R6::name") && !level.record.contains("#R6::note"), "{}", level.record);
+    let anchors = |r: &rnl_runtime::Interpretation| {
+        let mut out: Vec<(String, Pt)> = r.model.levels[0].texts.iter().map(|t| (t.id.clone(), t.anchor)).collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
+    };
+    let before = interpret_file(&f, None, &fs, &Options::default()).unwrap();
+    let mem = MemoryProvider::new().with(&run.files[0].path, &run.files[0].text);
+    let after = interpret_file(&f, None, &Layered { layers: vec![&mem, &fs] }, &Options::default()).unwrap();
+    assert_eq!(anchors(&after), anchors(&before));
+    assert!(after.diagnostics().is_empty(), "{:?}", after.diagnostics());
+}
+
+#[test]
+fn a_file_saved_without_a_header_gets_one() {
+    // tools write the header record and the version when they save a file (16.1): a main file
+    // after its title, an included file after its first line, which is a comment
+    let fs = FsProvider::new(&[]);
+    let dir = scratch("header");
+    let plain = dir.join("plain.sp");
+    std::fs::write(&plain, "* plain\nR1 a 0 1k\nR2 a b 2k\n.end\n").unwrap();
+    let hint = "the main file has no header record";
+    let first = interpret_file(&plain, None, &fs, &Options::default()).unwrap();
+    assert!(messages(&first, Severity::Hint).iter().any(|m| m.starts_with(hint)));
+    let run = solve(&plain, &fs, &SolveOptions::default()).unwrap();
+    assert!(run.files[0].text.starts_with("* plain\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a 0 1k\n"));
+    let out = dir.join("out");
+    assert_eq!(write(&run, &Target::Dir(out.clone())).error, None);
+    let back = interpret_file(&out.join("plain.sp"), None, &fs, &Options::default()).unwrap();
+    assert!(!messages(&back, Severity::Hint).iter().any(|m| m.starts_with(hint)), "{:?}", back.diagnostics());
+    check_read_back(&run, &out.join("plain.sp"), &fs, false, "plain");
+    let again = solve(&out.join("plain.sp"), &fs, &SolveOptions::default()).unwrap();
+    assert_eq!(again.files[0].text, run.files[0].text);
+
+    // the included file of 04-hierarchy, and a subcircuit on the first line of one
+    let run = solve(&corpus("04-hierarchy.sp"), &fs, &SolveOptions::default()).unwrap();
+    let lib = run.files.iter().find(|f| f.path.ends_with("04-hierarchy-lib.inc")).unwrap();
+    let text = lib.text.replace("\r\n", "\n");
+    let head = "* library for 04-hierarchy: a resistor divider without a block symbol\n\
+                * @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt rdiv";
+    assert!(text.starts_with(head), "{text}");
+    let files = MemoryProvider::new()
+        .with(
+            "/w/top.sp",
+            "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.include div.inc\nX1 a 0 div\nR1 a 0 1k\n.end\n",
+        )
+        .with("/w/div.inc", ".subckt div p n\nR1 p m 1k\nR2 m n 1k\n.ends div\n");
+    let run = solve(Path::new("/w/top.sp"), &files, &SolveOptions::default()).unwrap();
+    let div = run.files.iter().find(|f| f.path == "/w/div.inc").unwrap();
+    assert!(div.text.starts_with("*\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt div p n\n"), "{}", div.text);
+    let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+    let both = Layered { layers: vec![&solved, &files] };
+    check_read_back(&run, Path::new("/w/top.sp"), &both, false, "div.inc");
+    let again = solve(Path::new("/w/top.sp"), &both, &SolveOptions::default()).unwrap();
+    assert_eq!(again.files, run.files);
+}
+
+#[test]
+fn a_record_of_the_solver_written_with_scope_is_replaced_by_its_subcircuit() {
+    // a record of the solver does not use scope= (2.6), but one written so applies to its
+    // subcircuit: solving the subcircuit replaces it, wherever it is written, and solving the
+    // level it is written in leaves it to the subcircuit
+    let stale =
+        "* @RNL(type=\"generated\", scope=\"pair\", priority=\"high\") { #R1 @PLACE(0, 0); #R2 @PLACE(50, 50) }\n";
+    let top = format!(
+        "* scoped\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n\
+         * @RNL {{ {{#R1 #R2}} @ALIGN(\"y\") }}\n.ends\nX1 p q pair\n{stale}.end\n"
+    );
+    let files = MemoryProvider::new().with("/w/scoped.sp", &top);
+    let entry = Path::new("/w/scoped.sp");
+    let pair = SolveOptions { level: Some("pair".into()), ..SolveOptions::default() };
+    let run = solve(entry, &files, &pair).unwrap();
+    let text = &run.files[0].text;
+    assert!(!text.contains("scope=") && text.matches("type=\"generated\"").count() == 1, "{text}");
+    let solved = MemoryProvider::new().with("/w/scoped.sp", text);
+    let both = Layered { layers: vec![&solved, &files] };
+    let r = interpret_file(entry, None, &both, &Options::default()).unwrap();
+    assert!(dropped(&r).is_empty(), "{:?}", dropped(&r));
+    check_read_back(&run, entry, &both, false, "pair");
+    // the file level alone keeps it
+    let only = SolveOptions { level: Some("scoped.sp".into()), ..SolveOptions::default() };
+    let run = solve(entry, &files, &only).unwrap();
+    assert!(run.files[0].text.contains(stale.trim_start_matches("* ").trim_end()), "{}", run.files[0].text);
+
+    // written in the main file for a subcircuit of the file it includes: both files are written
+    let files = MemoryProvider::new()
+        .with(
+            "/w/top.sp",
+            &format!(
+                "* top\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\")}}\n.include pair.inc\nX1 p q pair\n{stale}.end\n"
+            ),
+        )
+        .with(
+            "/w/pair.inc",
+            "* pair\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n",
+        );
+    let run = solve(Path::new("/w/top.sp"), &files, &pair).unwrap();
+    let paths: Vec<&str> = run.files.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(paths, ["/w/pair.inc", "/w/top.sp"]);
+    assert!(!run.files[1].text.contains("generated"), "{}", run.files[1].text);
+    let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+    check_read_back(&run, Path::new("/w/top.sp"), &Layered { layers: vec![&solved, &files] }, false, "pair.inc");
+}
+
+#[test]
+fn a_free_text_goes_beside_what_it_is_attached_to() {
+    // a text that no fact places goes at the point it is attached to, or beside the object, as a
+    // viewer that does not solve puts it (13.3); the report names a text by its name
+    let files = MemoryProvider::new().with(
+        "/w/t.sp",
+        "* texts\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 p 0 1k\nC1 p 0 1p\n* @RNL {\n\
+         *   %t = #R1:p @TEXT(\"hi\");\n*   %u = #C1 @TEXT(\"cap\");\n*   %q = (_, _);\n*   %v = %q @TEXT(\"at q\");\n\
+         *   {%t #C1} @ALIGN(\"x\")\n* }\n.end\n",
+    );
+    let run = solve(Path::new("/w/t.sp"), &files, &SolveOptions::default()).unwrap();
+    let level = &run.levels[0];
+    let report = rnl_cli::solve::report(level, true);
+    assert!(report.iter().any(|l| l.starts_with("    kept [0] ALIGN x {%t #C1} (normal, t.sp:10)")), "{report:#?}");
+    let p = &level.problem;
+    let placed = Placed { p, s: &level.solved.solution };
+    let named = |n: &str| p.objects.iter().position(|o| o.reference == Reference::Name(n.into())).unwrap();
+    let at = |n: &str| placed.origin(named(n));
+    let pin = placed.at(&PointRef::Pin { object: 0, pin: 0, terminal: "p".into() });
+    let near = |a: Pt, b: Pt| (a.0 - b.0).abs() <= 1.5 && (a.1 - b.1).abs() <= 1.5;
+    // %t: on C1's x by the ALIGN, its y beside the pin
+    let t = at("%t");
+    assert_eq!(t.0, at("#C1").0);
+    assert!((t.1 - pin.1).abs() <= 1.5, "{t:?} {pin:?}");
+    assert!(near(at("%u"), at("#C1")), "{:?} {:?}", at("%u"), at("#C1"));
+    assert_eq!(at("%v"), at("%q"));
+    let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
+    check_read_back(&run, Path::new("/w/t.sp"), &Layered { layers: vec![&solved, &files] }, false, "texts");
+}
+
+#[test]
+fn the_problem_command_hashes_the_options_as_solve_writes_them() {
+    let f = path_str(&case("T1-rc-lowpass"));
+    let hash = |args: &[&str]| {
+        let (code, out, err) = rnl(args);
+        assert_eq!(code, 0, "{err}");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        v["levels"][0]["hash"].as_str().unwrap().to_string()
+    };
+    let snapshot = std::fs::read_to_string(solver_dir().join("solved/T1-rc-lowpass.sp")).unwrap();
+    assert!(snapshot.contains(&format!("hash=\"{}\"", hash(&["problem", &f]))));
+    let beam = SolverOptions { beam: 2, ..SolverOptions::default() }.canonical();
+    let with = hash(&["problem", &f, "--solver-options", "beam=2"]);
+    assert!(with.ends_with(&rnl_runtime::problem::options_digest(&beam)), "{with}");
+    let (code, _, err) = rnl(&["problem", &f, "--solver-options", "speed=3"]);
+    assert_eq!(code, 2);
+    assert!(err.contains("--solver-options: the solver has no option `speed`"), "{err}");
 }

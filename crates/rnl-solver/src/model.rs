@@ -74,7 +74,8 @@ pub(crate) enum PointId {
     Origin(usize),
     /// A pin of an object, by object and by the index of the pin in its symbol (9.2.4).
     Pin(usize, usize),
-    /// A text placed by its owner's symbol (13.3), by object: a point of the owner.
+    /// A text placed by its owner's symbol (13.3), by object: a point of the owner, on the axes
+    /// that the scene does not replace ([`PointInfo::free`]).
     Text(usize),
     /// The centre of a set (6.5, 14.1), by its index in [`Model::centres`].
     Centre(usize),
@@ -106,6 +107,24 @@ pub(crate) struct PointInfo {
     pub object: Option<usize>,
     /// For a pin or a text: its position in the object's symbol (9.2.4, 13.3).
     pub local: Option<(Q, Q)>,
+    /// For a text placed by its owner's symbol: the axis on which a PLACE or an offset in the scene
+    /// replaces that position (13.3). On that axis the text is not a point of its owner, its
+    /// orientation does not turn it, and its variable is its own coordinate.
+    pub free: Option<usize>,
+}
+
+impl PointInfo {
+    /// Whether the point is tied to its object's origin on an axis by the object's orientation:
+    /// a pin, or a text on an axis that its owner's symbol gives (9.2.4, 13.3).
+    pub(crate) fn linked(&self, axis: usize) -> bool {
+        self.local.is_some() && self.free != Some(axis)
+    }
+
+    /// The object whose point it is on an axis: none for a centre, and none for a text on the
+    /// axis that the scene gives it ([`PointInfo::free`]).
+    pub(crate) fn object_on(&self, axis: usize) -> Option<usize> {
+        self.object.filter(|_| self.free != Some(axis))
+    }
 }
 
 /// The centre of a set of points (6.5, 14.1): the middle of their extent.
@@ -320,7 +339,7 @@ impl Model {
     fn add_point(&mut self, id: PointId, object: Option<usize>, local: Option<(Q, Q)>) -> PointId {
         if !self.points.contains_key(&id) {
             let var = self.new_var(VarKind::Point(id));
-            self.points.insert(id, PointInfo { var, object, local });
+            self.points.insert(id, PointInfo { var, object, local, free: None });
         }
         id
     }
@@ -335,9 +354,13 @@ impl Model {
             PointRef::Origin(k) => match &problem.objects.get(*k)?.position {
                 Position::Own { .. } => Some(PointId::Origin(*k)),
                 Position::At(main) => self.point(problem, main, depth + 1),
-                Position::InSymbol { owner, local } => {
+                Position::InSymbol { owner, local, replaced } => {
                     let local = (from_f64(local.0).unwrap_or_default(), from_f64(local.1).unwrap_or_default());
-                    Some(self.add_point(PointId::Text(*k), Some(*owner), Some(local)))
+                    let id = self.add_point(PointId::Text(*k), Some(*owner), Some(local));
+                    if let Some(info) = self.points.get_mut(&id) {
+                        info.free = replaced.as_ref().map(|(axis, _)| ax(*axis));
+                    }
+                    Some(id)
                 }
             },
             PointRef::Pin { object, pin, .. } => {
@@ -378,7 +401,7 @@ impl Model {
         let c = self.centres.len();
         let id = PointId::Centre(c);
         let var = self.new_var(VarKind::Point(id));
-        self.points.insert(id, PointInfo { var, object: None, local: None });
+        self.points.insert(id, PointInfo { var, object: None, local: None, free: None });
         let lo = self.new_var(VarKind::CentreLo(c));
         let hi = self.new_var(VarKind::CentreHi(c));
         self.centre_index.insert(members.clone(), c);

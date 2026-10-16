@@ -31,7 +31,7 @@ view options:
   --no-svg            leave out each level's SVG
 problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
-  --solver-options S  the solver's options the hash covers (default: tolerance=0.000001)
+  --solver-options S  key=value;... over the solver's defaults, as for solve: the options the hash covers
 solve options (the levels are read without their type=\"generated\" records; -o or --in-place is needed):
   -o DIR              write the files solved under DIR, named as they are relative to FILE's directory,
                       with a copy of the other files they read from there, such as includes
@@ -162,10 +162,12 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         "problem" => {
-            let problem_options = args
-                .solver_options
-                .clone()
-                .unwrap_or_else(|| format!("tolerance={}", rnl_runtime::geom::fmt_num(rnl_runtime::geom::TOL)));
+            // the options as the solver's canonical text writes them, so that the hash is the one
+            // `rnl solve` writes with the same options
+            let problem_options = SolverOptions::default()
+                .with_overrides(args.solver_options.as_deref().unwrap_or(""))
+                .map_err(|e| format!("--solver-options: {e}"))?
+                .canonical();
             let options = Options { std: args.std, draft: args.draft, ..Options::solver() };
             let r = rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), &provider, &options)?;
             let levels: Vec<_> = r

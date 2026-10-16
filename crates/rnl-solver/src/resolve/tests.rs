@@ -372,6 +372,44 @@ fn a_fact_against_a_kept_bound_that_a_held_orientation_tightened() {
     assert!([Some(Orient::R270), Some(Orient::MYR90)].contains(&r.orientation(0)));
 }
 
+/// A text the symbol of object 0 places at (1, 1), with the axis the scene gives it, if any.
+pub(crate) fn label(replaced: Option<Axis>) -> ProblemObject {
+    ProblemObject {
+        kind: ObjectKind::Text,
+        label: "#M::name".to_string(),
+        reference: Reference::Name("#M::name".to_string()),
+        symbol: None,
+        position: Position::InSymbol { owner: 0, local: (1.0, 1.0), replaced: replaced.map(|a| (a, Slot::Free)) },
+        orient: None,
+        ..instance()
+    }
+}
+
+#[test]
+fn a_text_that_the_scene_places_on_one_axis_leaves_its_owner_there() {
+    // #M::name @PLACE(x=-3) replaces the x the symbol gives the text, and only that (13.3): M stays
+    // at (0, 0), the text's y still follows M, turned with it
+    let facts = vec![
+        place(o(1), Axis::X, -3.0),
+        place(o(0), Axis::X, 0.0),
+        place(o(0), Axis::Y, 0.0),
+        orient(0, Orient::R90),
+        place(o(1), Axis::Y, 5.0),
+    ];
+    let p = problem_of(vec![instance(), label(Some(Axis::X))], facts.clone());
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.kept, vec![0, 1, 2, 3]);
+    // R90 turns the text's (1, 1) to (-1, 1): its y is M's plus 1; no orientation puts it 5 above
+    // M's y of 0
+    assert_eq!(r.discarded, vec![discarded(4, vec![2])]);
+    assert_eq!(r.point(&p, &o(1)), Some((-3.0, 1.0)));
+    assert_eq!(r.point(&p, &o(0)), Some((0.0, 0.0)));
+    // a text the symbol places on both axes moves its owner instead
+    let p = problem_of(vec![instance(), label(None)], facts);
+    let r = check(&p, &SolverOptions::default());
+    assert_eq!(r.discarded[0], discarded(1, vec![0]));
+}
+
 #[test]
 fn a_fixed_orientation_decides_the_pins() {
     // with ORIENT first, the class has one value, and the pins follow it
@@ -681,7 +719,7 @@ fn brute_feasible(model: &Model, problem: &LevelProblem, units: &[usize]) -> Opt
                 if let (Some(k), Some(local)) = (info.object, &info.local) {
                     if let Some(origin) = model.origin_point[k] {
                         if model.oriented[k] && origin != *p {
-                            for axis in 0..2 {
+                            for axis in (0..2).filter(|&a| info.linked(a)) {
                                 let c = turned(g[k], local, axis);
                                 let e = LinExpr::diff(info.var, model.var(origin));
                                 put(&Bound { axis, expr: e, lo: Some(c.clone()), hi: Some(c) }, &mut sx);

@@ -20,7 +20,10 @@
 //! 2. compactness: the extent of the boxes of the components;
 //! 3. the L1 distance of each origin to where the resolution of the candidate put it: the
 //!    tie-break that makes the result stable. A symbol's target is that place rounded to the grid;
-//!    a text's or a point's is the place itself, as it mostly follows a symbol.
+//!    a point's is the place itself, as it mostly follows a symbol. A text attached to a point or
+//!    to an object with a coordinate point has its target there instead, `x_text − x_anchor = c`,
+//!    at the point or beside the object ([`crate::structure::Anchor`], 13.3), so that a text no
+//!    fact places goes beside what it is attached to.
 //!
 //! **Rounding.** The grid is the solver's own rule, ranked after every description (11.7), and
 //! also after the layers above: with the layers' bounds taken away, the origins are visited, the
@@ -257,10 +260,11 @@ fn round(v: &Q, grid: &Option<Q>) -> Q {
     }
 }
 
-/// Every pin and text of the model linked to its object's origin by its orientation; then a check.
+/// Every pin and text of the model linked to its object's origin by its orientation, a text only
+/// on the axes its owner's symbol gives (13.3); then a check.
 fn link(sx: &mut Simplex<Tag>, model: &Model, ori: &[Orient], axis: usize) -> bool {
     for (id, info) in &model.points {
-        let (Some(k), Some(local)) = (info.object, &info.local) else { continue };
+        let (Some(k), Some(local), true) = (info.object, &info.local, info.linked(axis)) else { continue };
         let Some(base) = model.origin_point.get(k).copied().flatten() else { continue };
         if base == *id {
             continue;
@@ -282,6 +286,41 @@ fn minimise_and_keep(sx: &mut Simplex<Tag>, objective: &LinExpr) -> Result<(), (
     sx.keep_optimum(objective, Tag::Def).map_err(|_| ())
 }
 
+/// Where layer 3 of the LP pulls an origin (see the module).
+enum Target {
+    /// To a place.
+    At(Q),
+    /// To a place relative to another variable: `v − base = c`.
+    From(Var, Q),
+}
+
+/// The target of each origin on an axis: a text's at its anchor, the others where the resolution
+/// of the candidate put them, a symbol's on the grid.
+fn targets(
+    model: &Model,
+    s: &Structure,
+    own: &[(usize, Var)],
+    fallback: &Geometry,
+    grid: &Option<Q>,
+    axis: usize,
+) -> Vec<Target> {
+    let ori = &fallback.orient;
+    own.iter()
+        .map(|(k, _)| {
+            let anchored = s.anchors.get(k).and_then(|a| {
+                let base = model.points.get(&model.origin_point.get(a.object).copied().flatten()?)?.var;
+                let pin = match a.pin {
+                    Some(pin) => s.pin_offset(a.object, pin, ori[a.object])?[axis].clone(),
+                    None => Q::zero(),
+                };
+                Some(Target::From(base, pin + &a.offset[axis]))
+            });
+            let at = &fallback.origin[*k][axis];
+            anchored.unwrap_or_else(|| Target::At(if solid(s, *k) { round(at, grid) } else { at.clone() }))
+        })
+        .collect()
+}
+
 /// The three layers of the LP on one axis (see the module).
 fn layers(
     sx: &mut Simplex<Tag>,
@@ -289,7 +328,7 @@ fn layers(
     s: &Structure,
     ori: &[Orient],
     own: &[(usize, Var)],
-    targets: &[Q],
+    targets: &[Target],
     axis: usize,
 ) -> Result<(), ()> {
     let zero = Q::zero();
@@ -321,13 +360,23 @@ fn layers(
         }
         minimise_and_keep(sx, &LinExpr::diff(hi, lo))?;
     }
-    // 3. the distance to where the resolution put each origin
+    // 3. the distance to where the resolution put each origin, or to a text's anchor:
+    // d ≥ e − c and d ≥ c − e, for e = v or e = v − base
     let mut objective = LinExpr::default();
     for ((_, v), t) in own.iter().zip(targets) {
         let d = sx.new_var();
-        sx.assert(&LinExpr::diff(d, *v), Rel::Ge, &-t.clone(), Tag::Def).map_err(fail)?;
-        let sum = LinExpr::from_terms([(d, Q::one()), (*v, Q::one())], Q::zero());
-        sx.assert(&sum, Rel::Ge, t, Tag::Def).map_err(fail)?;
+        let (base, c) = match t {
+            Target::At(c) => (None, c),
+            Target::From(base, c) => (Some(*base), c),
+        };
+        let mut below = LinExpr::from_terms([(d, Q::one()), (*v, -Q::one())], Q::zero());
+        let mut above = LinExpr::from_terms([(d, Q::one()), (*v, Q::one())], Q::zero());
+        if let Some(b) = base {
+            below.add_term(b, &Q::one());
+            above.add_term(b, &-Q::one());
+        }
+        sx.assert(&below, Rel::Ge, &-c.clone(), Tag::Def).map_err(fail)?;
+        sx.assert(&above, Rel::Ge, c, Tag::Def).map_err(fail)?;
         objective.add_term(d, &Q::one());
     }
     minimise_and_keep(sx, &objective)
@@ -446,18 +495,8 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
         }
         // where the resolution of the candidate put each origin, a symbol's on the grid; a text or a
         // point follows what it is placed from, and a target rounded on its own would pull that
-        // off the grid
-        let targets: Vec<Q> = own
-            .iter()
-            .map(|(k, _)| {
-                let at = &fallback.origin[*k][axis];
-                if solid(s, *k) {
-                    round(at, &grid)
-                } else {
-                    at.clone()
-                }
-            })
-            .collect();
+        // off the grid; a text goes to its anchor
+        let targets = targets(model, s, &own, &fallback, &grid, axis);
         let base = sx.checkpoint();
         let mut moved: Vec<(usize, Q)> = Vec::new();
         // two passes at most: the layers, the grid, and once more when the grid moved something
@@ -494,6 +533,14 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
         }
         for (k, v) in &own {
             out.origin[*k][axis] = sx.value(*v).clone();
+        }
+        // a text on the axis that the scene gives it has its own coordinate there (13.3)
+        for (id, info) in &model.points {
+            if let (PointId::Text(t), Some(free)) = (id, info.free) {
+                if free == axis {
+                    out.origin[*t][axis] = sx.value(info.var).clone();
+                }
+            }
         }
     }
     (out, true)

@@ -61,7 +61,7 @@ use num_traits::Zero;
 use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::{LevelProblem, PointRef, Position};
 
-use crate::model::{turned, Bound, ChoiceKind, LitKey, Model, OrientEffect, PointId, VarKind};
+use crate::model::{ax, turned, Bound, ChoiceKind, LitKey, Model, OrientEffect, PointId, VarKind};
 use crate::orient::{from_index, index, OrientClasses};
 use crate::rational::{from_f64, to_f64, Q};
 use crate::simplex::{Failure, LinExpr, Rel, Simplex, Var};
@@ -100,7 +100,8 @@ impl Geometry {
     }
 
     /// The value of a point on an axis (14.1): an origin as placed, a pin or a text as its object
-    /// turns it, a centre the middle of the extent of its set.
+    /// turns it, a text on the axis that the scene gives it as placed, a centre the middle of the
+    /// extent of its set.
     pub(crate) fn value(&self, model: &Model, p: PointId, axis: usize) -> Q {
         self.value_at(model, p, axis, 0)
     }
@@ -108,6 +109,7 @@ impl Geometry {
     fn value_at(&self, model: &Model, p: PointId, axis: usize, depth: usize) -> Q {
         match p {
             PointId::Origin(k) => self.origin[k][axis].clone(),
+            PointId::Text(t) if model.points[&p].free == Some(axis) => self.origin[t][axis].clone(),
             PointId::Pin(..) | PointId::Text(_) => {
                 let info = &model.points[&p];
                 let Some(k) = info.object else { return Q::zero() };
@@ -473,7 +475,7 @@ impl<'a> Resolver<'a> {
             for p in &unit.touched[axis] {
                 let mut point = Some(*p);
                 for _ in 0..MAX_DEPTH {
-                    let Some(k) = point.and_then(|p| model.points[&p].object) else { break };
+                    let Some(k) = point.and_then(|p| model.points[&p].object_on(axis)) else { break };
                     objects.insert(k);
                     point = if model.own[k] { None } else { model.origin_point[k] };
                 }
@@ -508,7 +510,7 @@ impl<'a> Resolver<'a> {
         let points: Vec<PointId> = model.object_points[k]
             .iter()
             .copied()
-            .filter(|p| *p != origin && self.touched[axis].contains(p) && model.points[p].local.is_some())
+            .filter(|p| *p != origin && self.touched[axis].contains(p) && model.points[p].linked(axis))
             .collect();
         if points.len() + usize::from(self.touched[axis].contains(&origin)) < 2 {
             return Vec::new();
@@ -575,7 +577,7 @@ impl<'a> Resolver<'a> {
         if !self.touched[axis].insert(p) {
             return;
         }
-        if let Some(k) = self.model.points[&p].object {
+        if let Some(k) = self.model.points[&p].object_on(axis) {
             if let Some(o) = self.model.origin_point[k] {
                 if o != p && !self.model.own[k] {
                     self.touch(o, axis);
@@ -1010,8 +1012,13 @@ impl<'a> Resolver<'a> {
         let mut of: BTreeMap<(usize, usize), Vec<PointId>> = BTreeMap::new();
         for axis in 0..2 {
             for &p in &self.touched[axis] {
-                if let Some(k) = model.points[&p].object {
-                    of.entry((k, axis)).or_default().push(p);
+                match (p, model.points[&p].object_on(axis)) {
+                    // a text on the axis that the scene gives it: its own coordinate (13.3)
+                    (PointId::Text(t), None) => {
+                        self.geometry.origin[t][axis] = self.sx[axis].value(model.var(p)).clone()
+                    }
+                    (_, Some(k)) => of.entry((k, axis)).or_default().push(p),
+                    _ => {}
                 }
             }
         }
@@ -1183,7 +1190,9 @@ pub(crate) fn point_value(problem: &LevelProblem, g: &Geometry, r: &PointRef, ax
         match &problem.objects.get(k)?.position {
             Position::Own { .. } => Some(g.origin[k][axis].clone()),
             Position::At(main) => point_value(problem, g, main, axis, depth + 1),
-            Position::InSymbol { owner, local } => {
+            // on the axis that the scene gives it, a text is where it is placed (13.3)
+            Position::InSymbol { replaced: Some((a, _)), .. } if ax(*a) == axis => Some(g.origin[k][axis].clone()),
+            Position::InSymbol { owner, local, .. } => {
                 let base = point_value(problem, g, &PointRef::Origin(*owner), axis, depth + 1)?;
                 let local = (from_f64(local.0)?, from_f64(local.1)?);
                 Some(base + turned(g.orient[*owner], &local, axis))
