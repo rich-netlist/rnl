@@ -679,9 +679,15 @@ fn leaving(from: &[Q; 2], exit: Option<(i64, i64)>, to: &[Q; 2]) -> Leaving {
 /// none for a straight line, one for an L, that is a connection not along an axis whose ends
 /// leave towards each other; three for a jog, where an end leaves across the connection and the
 /// other is not beyond its lead, as the wire must go out, across and back; two for a U, where both
-/// leave across the same way, and four where they leave across opposite ways; and two more for
-/// each end that leaves away from the other, as the wire must turn round its symbol.
+/// leave the same way, across the connection, or off an axis the one beyond the other, as the wire
+/// goes out past the farther and comes back to it; four where they leave across opposite ways;
+/// and two more for each end that leaves away from the other, as the wire must turn round its
+/// symbol.
 fn connection_turns(a: &[Q; 2], ea: Option<(i64, i64)>, b: &[Q; 2], eb: Option<(i64, i64)>) -> usize {
+    let off_axis = a[0] != b[0] && a[1] != b[1];
+    if off_axis && ea.is_some() && ea == eb {
+        return 2;
+    }
     let (la, lb) = (leaving(a, ea, b), leaving(b, eb, a));
     let away = 2 * usize::from(la == Leaving::Away) + 2 * usize::from(lb == Leaving::Away);
     match (la, lb) {
@@ -693,7 +699,7 @@ fn connection_turns(a: &[Q; 2], ea: Option<(i64, i64)>, b: &[Q; 2], eb: Option<(
             }
         }
         (Leaving::Across(_), _) | (_, Leaving::Across(_)) => 3,
-        _ => usize::from(a[0] != b[0] && a[1] != b[1]) + away,
+        _ => usize::from(off_axis) + away,
     }
 }
 
@@ -966,10 +972,17 @@ mod tests {
         // a U: both leave up on one height; an S: one up, one down
         assert_eq!(connection_turns(&p(0, 0), up, &p(5, 0), up), 2);
         assert_eq!(connection_turns(&p(0, 0), up, &p(5, 0), down), 4);
+        // a U too: both leave the same way, off an axis, the wire out past the farther and back
+        // to it, (0, 0) (0, 2) (4, 2) (4, 1) and (0, 0) (-1, 0) (-1, 3) (5, 3)
+        assert_eq!(connection_turns(&p(0, 0), up, &p(4, 1), up), 2);
+        assert_eq!(connection_turns(&p(4, 1), up, &p(0, 0), up), 2);
+        assert_eq!(connection_turns(&p(0, 0), up, &p(4, 5), up), 2);
+        assert_eq!(connection_turns(&p(0, 0), down, &[int(4), frac(1, 2)], down), 2);
+        assert_eq!(connection_turns(&p(0, 0), left, &p(5, 3), left), 2);
         // an end that leaves away from the other: two more
         assert_eq!(connection_turns(&p(0, 0), left, &p(5, 0), left), 2);
-        assert_eq!(connection_turns(&p(0, 0), left, &p(5, 3), left), 3);
         assert_eq!(connection_turns(&p(0, 0), up, &p(5, 0), right), 3);
+        assert_eq!(connection_turns(&p(0, 0), up, &p(5, 3), right), 3);
         // points that are no pins: an L when not along an axis
         assert_eq!(connection_turns(&p(0, 0), None, &p(5, 3), None), 1);
         assert_eq!(connection_turns(&p(0, 0), None, &p(5, 0), None), 0);

@@ -80,10 +80,10 @@ pub(crate) enum Side {
 pub(crate) struct Attach {
     pub host: PinKey,
     pub side: Side,
-    /// For a port beside a pin that leaves up or down: the pin on its net, in the next row that
-    /// way, that leaves back towards the host's. The port hangs in the gap between the two rows,
-    /// beside the wire that joins those pins, and that pin is kept beyond it, so that the port's
-    /// wire meets that one in its middle (quality review SE-13).
+    /// For a port that the router joins to a pin that leaves up or down: the pin on its net, in
+    /// the next row that way, that leaves back towards the host's. The port hangs in the gap
+    /// between the two rows, beside the wire that joins those pins, and that pin is kept beyond
+    /// it, so that the port's wire meets that one in its middle (quality review SE-13).
     pub facing: Option<PinKey>,
 }
 
@@ -354,9 +354,9 @@ fn grid_of(options: &SolverOptions) -> Option<Q> {
 /// Where each port and free supply or ground symbol goes (see the module): a port beside the pin
 /// it connects to, on the side the pin leaves when it leaves sideways, otherwise beside the pin
 /// of the topmost element on its net, on the right for an output and on the left otherwise, with
-/// the pin that faces that one from the next row, if any ([`Attach::facing`]); a supply above and
-/// a ground below the first pin on their net. Objects that a fact kept reaches are left where the
-/// facts put them.
+/// the pin that faces that one from the next row, if any, when the router joins them
+/// ([`Attach::facing`]); a supply above and a ground below the first pin on their net. Objects
+/// that a fact kept reaches are left where the facts put them.
 pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) -> BTreeMap<usize, Attach> {
     let row_of: BTreeMap<usize, usize> =
         rows.iter().enumerate().flat_map(|(r, row)| row.iter().map(move |&k| (k, r))).collect();
@@ -393,7 +393,13 @@ pub(crate) fn attachments(s: &Structure, rows: &[Vec<usize>], ori: &[Orient]) ->
                         .map(|&p| (p, side))
                 });
                 if let Some((host, side)) = attach {
-                    let facing = facing_pin(s, &row_of, &pins, host, ori);
+                    // only the router leaves a pin by its lead: a port that its net's wires
+                    // written, or nothing, join to the host stays at the host's pin
+                    let facing = if s.connections.routed((k, 0), host) {
+                        facing_pin(s, &row_of, &pins, host, ori)
+                    } else {
+                        None
+                    };
                     out.insert(k, Attach { host, side, facing });
                 }
             }
@@ -427,9 +433,11 @@ fn facing_pin(
 }
 
 /// Where an attached object's origin is from its host's origin, tight against its gap. A port
-/// beside a pin that leaves up or down goes `ATTACH_GAP` beyond the pin that way, not at its
-/// height, which no wire reaches but by a jog: its wire is then an L to the pin's lead, or a T on
-/// the wire the pin leads to (quality review SE-13).
+/// that the router joins to a pin that leaves up or down goes `ATTACH_GAP` beyond the pin that
+/// way, not at its height, which the router reaches only by a jog, as it leaves the pin by its
+/// lead (13.7): its wire is then an L to the pin's lead, or a T on the wire the pin leads to
+/// (quality review SE-13). A port on a net that wires written draw, or that nothing draws, stays
+/// at the pin's height: the wires written are drawn by their mode (13.1), not by the router.
 fn attach_offset(s: &Structure, k: usize, a: &Attach, ori: &[Orient]) -> Option<[Q; 2]> {
     let (h, hp) = a.host;
     let hpin = s.pin_offset(h, hp, ori[h])?;
@@ -442,7 +450,7 @@ fn attach_offset(s: &Structure, k: usize, a: &Attach, ori: &[Orient]) -> Option<
             let pb = s.box_offset(k, ori[k]).unwrap_or_else(empty_box);
             let x = if a.side == Side::Left { &hb[0] - &gap - &pb[2] } else { &hb[2] + &gap - &pb[0] };
             let rise = match s.exit(h, hp, ori[h]) {
-                Some((0, ey)) if ey != 0 => int(ATTACH_GAP * ey.signum()),
+                Some((0, ey)) if ey != 0 && s.connections.routed((k, 0), a.host) => int(ATTACH_GAP * ey.signum()),
                 _ => Q::zero(),
             };
             [x, &hpin[1] + rise - &ppin[1]]
@@ -614,10 +622,11 @@ fn beyond_port(s: &Structure, k: usize, a: &Attach, f: PinKey, ori: &[Orient], g
     let (Some(p), Some(h)) = (origin(s, k), origin(s, f.0)) else { return None };
     let (0, ey) = s.exit(a.host.0, a.host.1, ori[a.host.0])? else { return None };
     let (fp, pp) = (s.pin_offset(f.0, f.1, ori[f.0])?, s.pin_offset(k, 0, ori[k])?);
-    // ey (f's pin − the port's pin) ≥ step, each pin at its object's origin plus its offset
+    // ey (f's pin − the port's pin) ≥ step, each pin at its object's origin plus its offset; the
+    // bound on the grid
     let step = up(int(CLEARANCE), grid);
     let c = &fp[1] - &pp[1];
-    let (lo, hi) = if ey < 0 { (Some(c + step), None) } else { (None, Some(c - step)) };
+    let (lo, hi) = if ey < 0 { (Some(up(c + step, grid)), None) } else { (None, Some(-up(step - c, grid))) };
     Some(Relation::Linear { axis: 1, terms: vec![(p, Q::one()), (h, -Q::one())], lo, hi })
 }
 
@@ -640,7 +649,10 @@ pub(crate) struct RowLink {
     /// 3. both leave up, or both down, and the router joins them: on one horizontal line, so that
     ///    their net is one straight rail between them rather than a step.
     ///
-    /// (Quality review SE-1, SE-16.)
+    /// The router's wire between a pin that leaves sideways towards the other and one that leaves
+    /// sideways too, the same way, away from the first, has to go round the second's symbol: one
+    /// height does not make it straight, and such a pair links by none of these ranks; nor does a
+    /// pin that leaves sideways away from its neighbour. (Quality review SE-1, SE-16.)
     pub rank: u8,
     pub lo: Option<Q>,
     pub hi: Option<Q>,

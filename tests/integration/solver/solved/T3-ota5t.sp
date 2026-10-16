@@ -61,8 +61,8 @@ M5 tail vbias vss vss nch W=4u L=1u
 *   %ioport_inp @PLACE(-13, -5) => @ORIENT("R0");
 *   %ioport_inn @PLACE(5, -5) => @ORIENT("MY");
 *   %ioport_out @PLACE(5, -2) => @ORIENT("MY");
-*   %ioport_vdd @PLACE(-13, 6) => @ORIENT("R0");
-*   %ioport_vss @PLACE(-9, -16) => @ORIENT("R0");
+*   %ioport_vdd @PLACE(-13, 4) => @ORIENT("R0");
+*   %ioport_vss @PLACE(-9, -14) => @ORIENT("R0");
 *   %ioport_vbias @PLACE(-9, -12) => @ORIENT("R0");
 *   %ax @PLACE(-4, 0);
 *   %tc::mid @PLACE(-4, 0);

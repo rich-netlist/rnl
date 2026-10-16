@@ -1429,7 +1429,12 @@ fn bends_by_net(p: &LevelProblem, solved: &Solved, e: &Exact) -> BTreeMap<String
 
 /// The level of a case of the solver with a title, solved and checked.
 fn case_level(file: &str, title: &str) -> (LevelProblem, Solved, Exact) {
-    let ps = problems(&repo().join("tests/integration/solver").join(file));
+    level_in("tests/integration/solver", file, title)
+}
+
+/// The level with a title of a netlist in a directory of the repository, solved and checked.
+fn level_in(dir: &str, file: &str, title: &str) -> (LevelProblem, Solved, Exact) {
+    let ps = problems(&repo().join(dir).join(file));
     let p = ps.into_iter().find(|p| p.title == title).unwrap_or_else(|| panic!("{file}: no level {title}"));
     let (solved, e) = check_level(file, &p);
     (p, solved, e)
@@ -1515,6 +1520,34 @@ fn t6_joins_each_source_to_its_leg_by_an_l() {
     }
     assert!(neighbours >= 6, "{neighbours}: {what}");
     assert_eq!(bends.get("n0"), Some(&0), "{what}");
+}
+
+/// A port beside a pin that leaves up or down stays at the pin's height when wires written draw
+/// its net, or nothing does: only the router leaves a pin by its lead, and a wire written is drawn
+/// by its mode (13.1). Raised past the pin, corpus 03's port of &out, written from the junction to
+/// the port, put the port's box in the way of the oblique &bias written, and the ports of rdiv in
+/// corpus 04 turned R1 and R2 round, so that &mid ran lengthwise over R1 (review of phase 1 of the
+/// quality review, SE-13).
+#[test]
+fn a_port_on_a_net_written_stays_at_the_height_of_its_pin() {
+    use crate::search::{attachments, Side};
+    for (file, title) in [("03-five-transistor-ota.sp", "03-five-transistor-ota.sp"), ("04-hierarchy.sp", "rdiv")] {
+        let (p, solved, e) = level_in("tests/conformance/cases", file, title);
+        let what = summary(&p, &solved, &e);
+        let (s, ori, at) = (&e.structure, &e.placed.geometry.orient, &e.placed.origins);
+        let mut vertical = 0;
+        for (k, a) in attachments(s, &e.candidate.rows, ori) {
+            if s.objects[k].role != Role::Port || !matches!(a.side, Side::Left | Side::Right) {
+                continue;
+            }
+            let label = &p.objects[k].label;
+            assert!(!s.connections.routed((k, 0), a.host), "{what}: {label}");
+            let (port, host) = (s.pin_at(at, ori, k, 0).unwrap(), s.pin_at(at, ori, a.host.0, a.host.1).unwrap());
+            assert_eq!(port[1], host[1], "{what}: {label}");
+            vertical += usize::from(matches!(s.exit(a.host.0, a.host.1, ori[a.host.0]), Some((0, _))));
+        }
+        assert!(vertical > 0, "{what}");
+    }
 }
 
 /// A pin that leaves up and one that leaves sideways towards it, neighbours in a row: the router
