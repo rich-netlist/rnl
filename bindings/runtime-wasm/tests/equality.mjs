@@ -2,9 +2,11 @@
 // conformance corpus and the standard packages, the Document that `rnl view` prints and the one the
 // WebAssembly core builds must be deep-equal, numbers compared exactly. Both get the same entry, an
 // absolute path; natively `rnl view` reads the disk, and in WebAssembly client.js's collect gives
-// the core the files it asks for, read from the disk as `rnl` reads them.
+// the core the files it asks for, read from the disk as `rnl` reads them. With --snapshot, the
+// editor interface's snapshots are compared instead, with the host circuit and the model: the one
+// `rnl snapshot` prints and the one the core gives for the files collect read, revision included.
 //
-//   node bindings/runtime-wasm/tests/equality.mjs [--rnl PATH] [--dist DIR] [--view ARG]... [--request JSON]
+//   node bindings/runtime-wasm/tests/equality.mjs [--snapshot] [--rnl PATH] [--dist DIR] [--view ARG]... [--request JSON]
 //
 // --rnl: the rnl command, target/debug/rnl by default. --dist: the directory build.mjs wrote, dist/
 // by default. --view passes an argument on to `rnl view` and --request adds fields to every request,
@@ -22,14 +24,19 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
 const usage =
-  "usage: node bindings/runtime-wasm/tests/equality.mjs [--rnl PATH] [--dist DIR] [--view ARG]... [--request JSON]";
+  "usage: node bindings/runtime-wasm/tests/equality.mjs [--snapshot] [--rnl PATH] [--dist DIR] [--view ARG]... [--request JSON]";
 
 let rnl = resolve(root, "target/debug", process.platform === "win32" ? "rnl.exe" : "rnl");
 let dist = resolve(here, "../dist");
 const view = [];
 let extra = {};
+let snapshot = false;
 const args = process.argv.slice(2);
 for (let k = 0; k < args.length; k++) {
+  if (args[k] === "--snapshot") {
+    snapshot = true;
+    continue;
+  }
   const value = k + 1 < args.length ? args[k + 1] : null;
   if (value === null) fail(usage);
   if (args[k] === "--rnl") rnl = resolve(value);
@@ -78,13 +85,14 @@ for (const entry of entries) {
     console.log(`DIFF ${name}: ${d}`);
   } else {
     const count = (n, what) => `${n} ${what}${n === 1 ? "" : "s"}`;
-    const what = want.error ? `the same error: ${want.error}` : `${count(read, "file")}, ${count(got.document.levels.length, "level")}`;
+    const what = want.error ? `the same error: ${want.error}` : `${count(read, "file")}, ${count(got.value.levels.length, "level")}`;
     console.log(`ok   ${name} (${what})`);
   }
 }
 const all = `${entries.length} files, ${builds} WebAssembly builds`;
-if (differ) fail(`${all}: ${differ} Documents differ between the native and the WebAssembly build`);
-console.log(`${all}: the native and the WebAssembly Documents are identical`);
+const outputs = snapshot ? "snapshots" : "Documents";
+if (differ) fail(`${all}: ${differ} ${outputs} differ between the native and the WebAssembly build`);
+console.log(`${all}: the native and the WebAssembly ${outputs} are identical`);
 
 /**
  * The files in a directory and in its subdirectories, such as the version directories of the
@@ -100,11 +108,12 @@ function files(dir) {
   return out;
 }
 
-/** The Document `rnl view` prints, or its error. */
+/** The Document `rnl view` prints, or with --snapshot the snapshot `rnl snapshot` prints; or its error. */
 function native(entry) {
+  const command = snapshot ? ["snapshot", entry, "--parts", "host,model"] : ["view", entry];
   try {
-    const out = execFileSync(rnl, ["view", entry, ...view], { encoding: "utf8", maxBuffer: 1 << 30, stdio: "pipe" });
-    return { document: JSON.parse(out) };
+    const out = execFileSync(rnl, [...command, ...view], { encoding: "utf8", maxBuffer: 1 << 30, stdio: "pipe" });
+    return { value: JSON.parse(out) };
   } catch (e) {
     if (typeof e.status !== "number") throw e;
     return { error: e.stderr.trim().replace(/^rnl: /, "") };
@@ -112,14 +121,18 @@ function native(entry) {
 }
 
 /**
- * The Document the WebAssembly core builds, with the files collected from the disk, or its error;
- * and how many files were read.
+ * The Document the WebAssembly core builds, with the files collected from the disk, or with
+ * --snapshot its snapshot of those files; or its error; and how many files were read.
  */
 async function webAssembly(entry) {
   const counted = { build: (request) => (builds++, core.build(request)) };
   try {
     const { document, files } = await collect(counted, { ...extra, entry, files: packages }, readText);
-    return [{ document }, Object.keys(files).length - Object.keys(packages).length];
+    const read = Object.keys(files).length - Object.keys(packages).length;
+    if (!snapshot) return [{ value: document }, read];
+    builds++;
+    const parts = { drawing: false, host: true, model: true };
+    return [{ value: core.snapshot({ ...extra, entry, files, parts }) }, read];
   } catch (e) {
     return [{ error: e.message }, 0];
   }

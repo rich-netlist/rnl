@@ -1,0 +1,2324 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.2",
+  "levels": [
+    {
+      "id": "file:08-styles-and-text.sp",
+      "kind": "file",
+      "name": "08-styles-and-text.sp",
+      "file": 0,
+      "line": 0,
+      "status": null,
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#Vin",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&in"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#Rin",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&in"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&inn"
+              }
+            ]
+          },
+          {
+            "id": "#Rf",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&inn"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&out"
+              }
+            ]
+          },
+          {
+            "id": "#X1",
+            "subckt": true,
+            "master": "opamp",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "inp",
+                "net": "&0"
+              },
+              {
+                "n": 2,
+                "name": "inn",
+                "net": "&inn"
+              },
+              {
+                "n": 3,
+                "name": "out",
+                "net": "&out"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&in",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false
+          },
+          {
+            "id": "&inn",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&out",
+            "global": false,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$VSRC",
+            "name": "$VSRC",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "a symbol",
+            "name": "a symbol",
+            "package": null,
+            "level": null,
+            "default": false,
+            "definition": {
+              "box": [
+                -0.6,
+                -3.0,
+                0.6,
+                3.0
+              ],
+              "box_written": false,
+              "pins": [
+                {
+                  "terminals": [
+                    "1"
+                  ],
+                  "at": [
+                    0.0,
+                    3.0
+                  ],
+                  "dir": 90,
+                  "label": null
+                },
+                {
+                  "terminals": [
+                    "2"
+                  ],
+                  "at": [
+                    0.0,
+                    -3.0
+                  ],
+                  "dir": 270,
+                  "label": null
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      0.0,
+                      0.0
+                    ]
+                  ],
+                  "params": {
+                    "width": 1.2,
+                    "height": 3.6
+                  },
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      0.0,
+                      3.0
+                    ],
+                    [
+                      0.0,
+                      1.8
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      0.0,
+                      -1.8
+                    ],
+                    [
+                      0.0,
+                      -3.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                }
+              ]
+            }
+          },
+          {
+            "id": "$RES",
+            "name": "$RES",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$OPAMP",
+            "name": "$OPAMP",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$JUNCTION_DOT",
+            "name": "$JUNCTION_DOT",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND",
+            "name": "$GROUND",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#Vin",
+            "kind": "instance",
+            "host": [
+              "#Vin"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$VSRC",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -4.0,
+                -2.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#Vin:1"
+                ],
+                "at": [
+                  -4.0,
+                  1.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&in"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Vin:2"
+                ],
+                "at": [
+                  -4.0,
+                  -5.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#Rin",
+            "kind": "instance",
+            "host": [
+              "#Rin"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "a symbol",
+              "source": null
+            },
+            "at": {
+              "value": [
+                2.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#Rin:1"
+                ],
+                "at": [
+                  -1.0,
+                  1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&in"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Rin:2"
+                ],
+                "at": [
+                  5.0,
+                  1.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&inn"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#Rf",
+            "kind": "instance",
+            "host": [
+              "#Rf"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                5.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#Rf:1"
+                ],
+                "at": [
+                  7.0,
+                  5.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inn"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Rf:2"
+                ],
+                "at": [
+                  13.0,
+                  5.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&out"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#X1",
+            "kind": "instance",
+            "host": [
+              "#X1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$OPAMP",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#X1:1"
+                ],
+                "at": [
+                  6.0,
+                  -1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&0"
+                ]
+              },
+              {
+                "terminals": [
+                  "#X1:2"
+                ],
+                "at": [
+                  6.0,
+                  1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inn"
+                ]
+              },
+              {
+                "terminals": [
+                  "#X1:3"
+                ],
+                "at": [
+                  14.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&out"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@08-styles-and-text.sp:49:5#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%ji"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                5.5,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@08-styles-and-text.sp:49:5#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$JUNCTION",
+            "attach": {
+              "p": "%jo"
+            },
+            "symbol": {
+              "value": "$JUNCTION_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                15.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "%gs_Vin_2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#Vin:2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                -4.0,
+                -5.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -4.0,
+                -7.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -4.0,
+                  -7.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_X1_1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#X1:1"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                -1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                6.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  6.0,
+                  -3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [
+          {
+            "id": "%ji",
+            "at": {
+              "value": [
+                5.5,
+                1.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%jo",
+            "at": {
+              "value": [
+                15.0,
+                0.0
+              ],
+              "source": null
+            },
+            "junction": true
+          },
+          {
+            "id": "%vo",
+            "at": {
+              "value": [
+                18.0,
+                0.0
+              ],
+              "source": null
+            },
+            "junction": false
+          },
+          {
+            "id": "%p",
+            "at": {
+              "value": [
+                -7.0,
+                -11.0
+              ],
+              "source": null
+            },
+            "junction": false
+          }
+        ],
+        "wires": [
+          {
+            "id": "@08-styles-and-text.sp:44:5",
+            "nets": [
+              "&in"
+            ],
+            "via": [
+              {
+                "terminal": "#Vin:1"
+              },
+              {
+                "terminal": "#Rin:1"
+              }
+            ],
+            "points": [
+              [
+                -4.0,
+                1.0
+              ],
+              [
+                -1.0,
+                1.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linestyle": "double",
+              "linewidth": 0.08,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:45:5",
+            "nets": [
+              "&inn"
+            ],
+            "via": [
+              {
+                "terminal": "#Rin:2"
+              },
+              {
+                "point": "%ji"
+              },
+              {
+                "terminal": "#X1:2"
+              }
+            ],
+            "points": [
+              [
+                5.0,
+                1.0
+              ],
+              [
+                5.5,
+                1.0
+              ],
+              [
+                6.0,
+                1.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:46:5",
+            "nets": [
+              "&inn"
+            ],
+            "via": [
+              {
+                "point": "%ji"
+              },
+              {
+                "terminal": "#Rf:1"
+              }
+            ],
+            "points": [
+              [
+                5.5,
+                1.0
+              ],
+              [
+                5.5,
+                5.0
+              ],
+              [
+                7.0,
+                5.0
+              ]
+            ],
+            "mode": "vertical-horizontal",
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linestyle": "dash-dot",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:47:5",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "terminal": "#Rf:2"
+              },
+              {
+                "point": "%jo"
+              }
+            ],
+            "points": [
+              [
+                13.0,
+                5.0
+              ],
+              [
+                15.0,
+                5.0
+              ],
+              [
+                15.0,
+                0.0
+              ]
+            ],
+            "mode": "horizontal-vertical",
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:48:5",
+            "nets": [
+              "&out"
+            ],
+            "via": [
+              {
+                "terminal": "#X1:3"
+              },
+              {
+                "point": "%jo"
+              },
+              {
+                "point": "%vo"
+              }
+            ],
+            "points": [
+              [
+                14.0,
+                0.0
+              ],
+              [
+                15.0,
+                0.0
+              ],
+              [
+                18.0,
+                0.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#2e7d32",
+              "linestyle": "bold",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@rnl-std.rnl:238:5#1",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#Vin:2"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9#1",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                -4.0,
+                -5.0
+              ],
+              [
+                -4.0,
+                -7.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@rnl-std.rnl:238:5#2",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#X1:1"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9#2",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                6.0,
+                -1.0
+              ],
+              [
+                6.0,
+                -3.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          }
+        ],
+        "texts": [
+          {
+            "id": "#Rin::name",
+            "attach": "#Rin",
+            "key": "name",
+            "markup": {
+              "value": "R_{in}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "in",
+                  "style": {
+                    "level": -1,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.75,
+              2.1
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#9a9a9a",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#9a9a9a"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:50:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "V_{out}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "V",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "out",
+                  "style": {
+                    "level": -1,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              18.4,
+              0.0
+            ],
+            "halign": "start",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:55:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "A_{v} = −\\frac{R_{f}}{R_{in}} = −10",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "A",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "v",
+                  "style": {
+                    "level": -1,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " = −",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "frac",
+                  "num": [
+                    {
+                      "kind": "text",
+                      "text": "R",
+                      "style": {
+                        "level": 0,
+                        "bold": false,
+                        "italic": false,
+                        "overline": false
+                      }
+                    },
+                    {
+                      "kind": "text",
+                      "text": "f",
+                      "style": {
+                        "level": -1,
+                        "bold": false,
+                        "italic": false,
+                        "overline": false
+                      }
+                    }
+                  ],
+                  "den": [
+                    {
+                      "kind": "text",
+                      "text": "R",
+                      "style": {
+                        "level": 0,
+                        "bold": false,
+                        "italic": false,
+                        "overline": false
+                      }
+                    },
+                    {
+                      "kind": "text",
+                      "text": "in",
+                      "style": {
+                        "level": -1,
+                        "bold": false,
+                        "italic": false,
+                        "overline": false
+                      }
+                    }
+                  ],
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " = −10",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              17.2,
+              6.6
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#c62828"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:56:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "\\textbf{Inverting amplifier}\\\\\\textit{V}_{\\textit{DD}} = 1.8 V, I_{D_{1}} = 10 \\mu A, \\overline{RST} \\pm 5\\%",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Inverting amplifier",
+                  "style": {
+                    "level": 0,
+                    "bold": true,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "V",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": true,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "DD",
+                  "style": {
+                    "level": -1,
+                    "bold": false,
+                    "italic": true,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " = 1.8 V, I",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "D",
+                  "style": {
+                    "level": -1,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "1",
+                  "style": {
+                    "level": -2,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " = 10 μA, ",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "RST",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": true
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " ±5%",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -7.0,
+              9.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:57:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "escapes, a\\_b \\$5 \\${x} \\{ \\} C:\\temp, unknown \\sqrt{2}",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "escapes, a_b $5 ${x} { } C:\\temp, unknown \\sqrt{2}",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -7.0,
+              -9.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.8,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 0.8,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:59:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "this note is at (${x}, ${y})",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "this note is at (-7, -11)",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -7.0,
+              -11.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 0.8,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 0.8,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@08-styles-and-text.sp:60:5",
+            "attach": null,
+            "key": null,
+            "markup": {
+              "value": "rot=90 note",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rot=90 note",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -9.0,
+              0.0
+            ],
+            "halign": "middle",
+            "valign": "baseline",
+            "rotate": 90.0,
+            "size": 0.8,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 0.8,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "#Vin::name",
+            "attach": "#Vin",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Vin",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -2.1,
+              -1.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "#Vin::value",
+            "attach": "#Vin",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "AC 1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -2.1,
+              -2.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "#Rin::value",
+            "attach": "#Rin",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "10k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              2.95,
+              2.1
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#9a9a9a",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#9a9a9a"
+            }
+          },
+          {
+            "id": "#Rf::name",
+            "attach": "#Rf",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Rf",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              9.75,
+              6.1
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "bold": true,
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#1565c0"
+            }
+          },
+          {
+            "id": "#Rf::value",
+            "attach": "#Rf",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "100k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.95,
+              6.1
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "#X1::name",
+            "attach": "#X1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "X1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.0,
+              1.85
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          }
+        ],
+        "shapes": [
+          {
+            "id": "@08-styles-and-text.sp:52:5",
+            "shape": "rectangle",
+            "points": [
+              [
+                5.0,
+                0.5
+              ]
+            ],
+            "params": {
+              "width": 24.0,
+              "height": 14.0,
+              "fill": "fillcolor"
+            },
+            "style": {
+              "fillcolor": "#1f4fd81a",
+              "linecolor": "#1f4fd8",
+              "linestyle": "dotted",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
+            "layer": "bottom"
+          },
+          {
+            "id": "@08-styles-and-text.sp:53:5",
+            "shape": "line",
+            "points": [
+              [
+                17.0,
+                6.0
+              ],
+              [
+                15.3,
+                0.6
+              ]
+            ],
+            "params": {
+              "arrow": "end"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#c62828",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
+            "layer": "middle"
+          },
+          {
+            "id": "@08-styles-and-text.sp:54:5",
+            "shape": "circle",
+            "points": [
+              [
+                16.6,
+                6.95
+              ]
+            ],
+            "params": {
+              "radius": 0.25,
+              "fill": "linecolor"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#c62828",
+              "linestyle": "none",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
+            "layer": "middle"
+          }
+        ]
+      }
+    },
+    {
+      "id": "subckt:opamp",
+      "kind": "subckt",
+      "name": "opamp",
+      "file": 0,
+      "line": 5,
+      "status": null,
+      "host": {
+        "ports": [
+          "&inp",
+          "&inn",
+          "&out"
+        ],
+        "instances": [
+          {
+            "id": "#E1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&out"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              },
+              {
+                "n": 3,
+                "name": "cp",
+                "net": "&inp"
+              },
+              {
+                "n": 4,
+                "name": "cn",
+                "net": "&inn"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&inp",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&inn",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&out",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$VCVS",
+            "name": "$VCVS",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND",
+            "name": "$GROUND",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$PORT_TAG",
+            "name": "$PORT_TAG",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#E1",
+            "kind": "instance",
+            "host": [
+              "#E1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$VCVS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#E1:1"
+                ],
+                "at": [
+                  0.0,
+                  3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&out"
+                ]
+              },
+              {
+                "terminals": [
+                  "#E1:2"
+                ],
+                "at": [
+                  0.0,
+                  -3.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              },
+              {
+                "terminals": [
+                  "#E1:3"
+                ],
+                "at": [
+                  -4.0,
+                  1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inp"
+                ]
+              },
+              {
+                "terminals": [
+                  "#E1:4"
+                ],
+                "at": [
+                  -4.0,
+                  -1.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&inn"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "%gs_E1_2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#E1:2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:237:9",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -5.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  0.0,
+                  -5.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&inp"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -4.0,
+                1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -4.0,
+                  1.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&inp"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&inn"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                -4.0,
+                -1.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  -4.0,
+                  -1.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&inn"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&out"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R270",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "p"
+                ],
+                "at": [
+                  0.0,
+                  3.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&out"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [],
+        "wires": [
+          {
+            "id": "@rnl-std.rnl:238:5",
+            "nets": [
+              "&0"
+            ],
+            "via": [
+              {
+                "terminal": "#E1:2"
+              },
+              {
+                "usage": "@rnl-std.rnl:237:9",
+                "role": "p"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                -3.0
+              ],
+              [
+                0.0,
+                -5.0
+              ]
+            ],
+            "mode": "auto",
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          }
+        ],
+        "texts": [
+          {
+            "id": "#E1::name",
+            "attach": "#E1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "E1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.9,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "#E1::value",
+            "attach": "#E1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1e5",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.9,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#1::name",
+            "attach": "@rnl-std.rnl:323:3#1",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "inp",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -7.3,
+              1.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#2::name",
+            "attach": "@rnl-std.rnl:323:3#2",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "inn",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -7.3,
+              -1.0
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#3::name",
+            "attach": "@rnl-std.rnl:323:3#3",
+            "key": "name",
+            "markup": {
+              "value": "${p}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "out",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.0,
+              6.3
+            ],
+            "halign": "end",
+            "valign": "middle",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            }
+          }
+        ],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std",
+      "version": "0.2"
+    }
+  ],
+  "files": [
+    {
+      "path": "08-styles-and-text.sp",
+      "name": "08-styles-and-text.sp"
+    }
+  ]
+}

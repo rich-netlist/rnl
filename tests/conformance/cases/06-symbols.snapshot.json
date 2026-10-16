@@ -1,0 +1,2822 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.2",
+  "levels": [
+    {
+      "id": "file:06-symbols.sp",
+      "kind": "file",
+      "name": "06-symbols.sp",
+      "file": 0,
+      "line": 0,
+      "status": null,
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#R1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a1"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b1"
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a2"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b2"
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a3"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b3"
+              }
+            ]
+          },
+          {
+            "id": "#R4",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a4"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b4"
+              }
+            ]
+          },
+          {
+            "id": "#R5",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a5"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b5"
+              }
+            ]
+          },
+          {
+            "id": "#R6",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a6"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b6"
+              }
+            ]
+          },
+          {
+            "id": "#R7",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a7"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b7"
+              }
+            ]
+          },
+          {
+            "id": "#R8",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a8"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b8"
+              }
+            ]
+          },
+          {
+            "id": "#D1",
+            "subckt": false,
+            "master": "led",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "a",
+                "net": "&k1"
+              },
+              {
+                "n": 2,
+                "name": "k",
+                "net": "&k2"
+              }
+            ]
+          },
+          {
+            "id": "#D2",
+            "subckt": false,
+            "master": "led",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "a",
+                "net": "&k3"
+              },
+              {
+                "n": 2,
+                "name": "k",
+                "net": "&k4"
+              }
+            ]
+          },
+          {
+            "id": "#X1",
+            "subckt": true,
+            "master": "shapes",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "a",
+                "net": "&s1"
+              },
+              {
+                "n": 2,
+                "name": "b",
+                "net": "&s2"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&a1",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b1",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a2",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b2",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a3",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b3",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a4",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b4",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a5",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b5",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a6",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b6",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a7",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b7",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a8",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b8",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&k1",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&k2",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&k3",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&k4",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&s1",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&s2",
+            "global": false,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$ASYM",
+            "name": "$ASYM",
+            "package": null,
+            "level": "file:06-symbols.sp",
+            "default": false,
+            "definition": {
+              "box": [
+                -3.0,
+                -0.6,
+                3.0,
+                1.8
+              ],
+              "box_written": false,
+              "pins": [
+                {
+                  "terminals": [
+                    "1"
+                  ],
+                  "at": [
+                    -3.0,
+                    0.0
+                  ],
+                  "dir": 180,
+                  "label": {
+                    "markup": "a",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "a",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "terminals": [
+                    "2"
+                  ],
+                  "at": [
+                    3.0,
+                    0.0
+                  ],
+                  "dir": 0,
+                  "label": {
+                    "markup": "b",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "b",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -3.0,
+                      0.0
+                    ],
+                    [
+                      -1.5,
+                      0.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      1.5,
+                      0.0
+                    ],
+                    [
+                      3.0,
+                      0.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      -1.5,
+                      -0.6
+                    ],
+                    [
+                      1.5,
+                      0.6
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      1.5,
+                      0.6
+                    ],
+                    [
+                      1.5,
+                      1.8
+                    ],
+                    [
+                      2.5,
+                      1.2
+                    ],
+                    [
+                      1.5,
+                      0.6
+                    ]
+                  ],
+                  "params": {
+                    "fill": "linecolor"
+                  },
+                  "style": {}
+                }
+              ]
+            }
+          },
+          {
+            "id": "$ASYM_DOT",
+            "name": "$ASYM_DOT",
+            "package": null,
+            "level": "file:06-symbols.sp",
+            "default": false,
+            "definition": {
+              "box": [
+                -3.0,
+                -0.6,
+                3.0,
+                1.8
+              ],
+              "box_written": false,
+              "pins": [
+                {
+                  "terminals": [
+                    "1"
+                  ],
+                  "at": [
+                    -3.0,
+                    0.0
+                  ],
+                  "dir": 180,
+                  "label": {
+                    "markup": "a",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "a",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "terminals": [
+                    "2"
+                  ],
+                  "at": [
+                    3.0,
+                    0.0
+                  ],
+                  "dir": 0,
+                  "label": {
+                    "markup": "b",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "b",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -3.0,
+                      0.0
+                    ],
+                    [
+                      -1.5,
+                      0.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      1.5,
+                      0.0
+                    ],
+                    [
+                      3.0,
+                      0.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      -1.5,
+                      -0.6
+                    ],
+                    [
+                      1.5,
+                      0.6
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      1.5,
+                      0.6
+                    ],
+                    [
+                      1.5,
+                      1.8
+                    ],
+                    [
+                      2.5,
+                      1.2
+                    ],
+                    [
+                      1.5,
+                      0.6
+                    ]
+                  ],
+                  "params": {
+                    "fill": "linecolor"
+                  },
+                  "style": {}
+                },
+                {
+                  "shape": "circle",
+                  "points": [
+                    [
+                      0.0,
+                      0.0
+                    ]
+                  ],
+                  "params": {
+                    "radius": 0.3,
+                    "fill": "linecolor"
+                  },
+                  "style": {}
+                }
+              ]
+            }
+          },
+          {
+            "id": "$ASYM_SHORT",
+            "name": "$ASYM_SHORT",
+            "package": null,
+            "level": "file:06-symbols.sp",
+            "default": false,
+            "definition": {
+              "box": [
+                -3.0,
+                -0.6,
+                3.0,
+                1.8
+              ],
+              "box_written": false,
+              "pins": [
+                {
+                  "terminals": [
+                    "2"
+                  ],
+                  "at": [
+                    3.0,
+                    0.0
+                  ],
+                  "dir": 0,
+                  "label": {
+                    "markup": "b",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "b",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                },
+                {
+                  "terminals": [
+                    "1"
+                  ],
+                  "at": [
+                    -2.0,
+                    0.0
+                  ],
+                  "dir": 180,
+                  "label": {
+                    "markup": "a'",
+                    "lines": [
+                      [
+                        {
+                          "kind": "text",
+                          "text": "a'",
+                          "style": {
+                            "level": 0,
+                            "bold": false,
+                            "italic": false,
+                            "overline": false
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -3.0,
+                      0.0
+                    ],
+                    [
+                      -1.5,
+                      0.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      1.5,
+                      0.0
+                    ],
+                    [
+                      3.0,
+                      0.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      -1.5,
+                      -0.6
+                    ],
+                    [
+                      1.5,
+                      0.6
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      1.5,
+                      0.6
+                    ],
+                    [
+                      1.5,
+                      1.8
+                    ],
+                    [
+                      2.5,
+                      1.2
+                    ],
+                    [
+                      1.5,
+                      0.6
+                    ]
+                  ],
+                  "params": {
+                    "fill": "linecolor"
+                  },
+                  "style": {}
+                }
+              ]
+            }
+          },
+          {
+            "id": "$LED",
+            "name": "$LED",
+            "package": null,
+            "level": "file:06-symbols.sp",
+            "default": false,
+            "definition": {
+              "box": [
+                -0.7,
+                -2.0,
+                0.7,
+                2.0
+              ],
+              "box_written": true,
+              "pins": [
+                {
+                  "terminals": [
+                    "1"
+                  ],
+                  "at": [
+                    0.0,
+                    2.0
+                  ],
+                  "dir": 90,
+                  "label": null
+                },
+                {
+                  "terminals": [
+                    "2"
+                  ],
+                  "at": [
+                    0.0,
+                    -2.0
+                  ],
+                  "dir": 270,
+                  "label": null
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      0.0,
+                      2.0
+                    ],
+                    [
+                      0.0,
+                      0.5
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      0.0,
+                      -0.5
+                    ],
+                    [
+                      0.0,
+                      -2.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -0.7,
+                      0.5
+                    ],
+                    [
+                      0.7,
+                      0.5
+                    ],
+                    [
+                      0.0,
+                      -0.5
+                    ],
+                    [
+                      -0.7,
+                      0.5
+                    ]
+                  ],
+                  "params": {
+                    "fill": "linecolor"
+                  },
+                  "style": {
+                    "linestyle": "none"
+                  }
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -0.7,
+                      -0.5
+                    ],
+                    [
+                      0.7,
+                      -0.5
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                }
+              ]
+            }
+          },
+          {
+            "id": "$SHAPES",
+            "name": "$SHAPES",
+            "package": null,
+            "level": "file:06-symbols.sp",
+            "default": false,
+            "definition": {
+              "box": [
+                -9.0,
+                -5.0,
+                9.0,
+                5.0
+              ],
+              "box_written": true,
+              "pins": [
+                {
+                  "terminals": [
+                    "a"
+                  ],
+                  "at": [
+                    -9.0,
+                    0.0
+                  ],
+                  "dir": 180,
+                  "label": null
+                },
+                {
+                  "terminals": [
+                    "b"
+                  ],
+                  "at": [
+                    9.0,
+                    0.0
+                  ],
+                  "dir": 0,
+                  "label": null
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -9.0,
+                      0.0
+                    ],
+                    [
+                      -8.0,
+                      0.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      8.0,
+                      0.0
+                    ],
+                    [
+                      9.0,
+                      0.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      -8.0,
+                      -5.0
+                    ],
+                    [
+                      8.0,
+                      5.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      -5.5,
+                      2.3
+                    ]
+                  ],
+                  "params": {
+                    "width": 3.0,
+                    "height": 2.0,
+                    "fill": "fillcolor"
+                  },
+                  "style": {
+                    "linestyle": "dashed"
+                  }
+                },
+                {
+                  "shape": "circle",
+                  "points": [
+                    [
+                      -1.0,
+                      2.3
+                    ],
+                    [
+                      0.0,
+                      2.3
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "circle",
+                  "points": [
+                    [
+                      2.5,
+                      2.3
+                    ]
+                  ],
+                  "params": {
+                    "radius": 1.0,
+                    "fill": "linecolor"
+                  },
+                  "style": {}
+                },
+                {
+                  "shape": "ellipse",
+                  "points": [
+                    [
+                      4.5,
+                      1.3
+                    ],
+                    [
+                      7.5,
+                      3.3
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                },
+                {
+                  "shape": "ellipse",
+                  "points": [
+                    [
+                      -5.5,
+                      -2.5
+                    ]
+                  ],
+                  "params": {
+                    "width": 3.0,
+                    "height": 1.5,
+                    "fill": "linecolor"
+                  },
+                  "style": {}
+                },
+                {
+                  "shape": "arc",
+                  "points": [
+                    [
+                      -2.0,
+                      -3.5
+                    ],
+                    [
+                      -0.5,
+                      -1.5
+                    ],
+                    [
+                      1.0,
+                      -3.5
+                    ]
+                  ],
+                  "params": {
+                    "arrow": "end"
+                  },
+                  "style": {}
+                },
+                {
+                  "shape": "bezier",
+                  "points": [
+                    [
+                      2.0,
+                      -3.5
+                    ],
+                    [
+                      3.0,
+                      -1.0
+                    ],
+                    [
+                      5.0,
+                      -4.0
+                    ],
+                    [
+                      7.0,
+                      -2.0
+                    ]
+                  ],
+                  "params": {
+                    "arrow": "start"
+                  },
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -7.5,
+                      -4.5
+                    ],
+                    [
+                      -6.5,
+                      -4.5
+                    ],
+                    [
+                      -7.0,
+                      -3.8
+                    ],
+                    [
+                      -7.5,
+                      -4.5
+                    ]
+                  ],
+                  "params": {
+                    "fill": "linecolor"
+                  },
+                  "style": {}
+                },
+                {
+                  "shape": "line",
+                  "points": [
+                    [
+                      -8.0,
+                      -0.5
+                    ],
+                    [
+                      8.0,
+                      -0.5
+                    ]
+                  ],
+                  "params": {
+                    "arrow": "both"
+                  },
+                  "style": {
+                    "linestyle": "dotted"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#R1",
+            "kind": "instance",
+            "host": [
+              "#R1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ASYM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R1:1"
+                ],
+                "at": [
+                  -3.0,
+                  10.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&a1"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R1:2"
+                ],
+                "at": [
+                  3.0,
+                  10.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&b1"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "kind": "instance",
+            "host": [
+              "#R2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ASYM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R2:1"
+                ],
+                "at": [
+                  10.0,
+                  7.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&a2"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R2:2"
+                ],
+                "at": [
+                  10.0,
+                  13.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&b2"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "kind": "instance",
+            "host": [
+              "#R3"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ASYM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                20.0,
+                10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R180",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R3:1"
+                ],
+                "at": [
+                  23.0,
+                  10.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&a3"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R3:2"
+                ],
+                "at": [
+                  17.0,
+                  10.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b3"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R4",
+            "kind": "instance",
+            "host": [
+              "#R4"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ASYM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                30.0,
+                10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R270",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R4:1"
+                ],
+                "at": [
+                  30.0,
+                  13.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a4"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R4:2"
+                ],
+                "at": [
+                  30.0,
+                  7.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b4"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R5",
+            "kind": "instance",
+            "host": [
+              "#R5"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ASYM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MX",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R5:1"
+                ],
+                "at": [
+                  -3.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&a5"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R5:2"
+                ],
+                "at": [
+                  3.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&b5"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R6",
+            "kind": "instance",
+            "host": [
+              "#R6"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ASYM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MY",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R6:1"
+                ],
+                "at": [
+                  13.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&a6"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R6:2"
+                ],
+                "at": [
+                  7.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b6"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R7",
+            "kind": "instance",
+            "host": [
+              "#R7"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ASYM_DOT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                20.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MXR90",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R7:1"
+                ],
+                "at": [
+                  20.0,
+                  -3.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&a7"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R7:2"
+                ],
+                "at": [
+                  20.0,
+                  3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&b7"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R8",
+            "kind": "instance",
+            "host": [
+              "#R8"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ASYM_SHORT",
+              "source": null
+            },
+            "at": {
+              "value": [
+                30.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "MYR90",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R8:2"
+                ],
+                "at": [
+                  30.0,
+                  -3.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b8"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R8:1"
+                ],
+                "at": [
+                  30.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a8"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#D1",
+            "kind": "instance",
+            "host": [
+              "#D1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$LED",
+              "source": null
+            },
+            "at": {
+              "value": [
+                42.0,
+                10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#D1:1"
+                ],
+                "at": [
+                  42.0,
+                  12.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&k1"
+                ]
+              },
+              {
+                "terminals": [
+                  "#D1:2"
+                ],
+                "at": [
+                  42.0,
+                  8.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&k2"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#D2",
+            "kind": "instance",
+            "host": [
+              "#D2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$LED",
+              "source": null
+            },
+            "at": {
+              "value": [
+                42.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R90",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#D2:1"
+                ],
+                "at": [
+                  40.0,
+                  0.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&k3"
+                ]
+              },
+              {
+                "terminals": [
+                  "#D2:2"
+                ],
+                "at": [
+                  44.0,
+                  0.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&k4"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#X1",
+            "kind": "instance",
+            "host": [
+              "#X1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$SHAPES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                12.0,
+                -14.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#X1:1"
+                ],
+                "at": [
+                  3.0,
+                  -14.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&s1"
+                ]
+              },
+              {
+                "terminals": [
+                  "#X1:2"
+                ],
+                "at": [
+                  21.0,
+                  -14.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&s2"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [],
+        "wires": [],
+        "texts": [
+          {
+            "id": "#R1::code",
+            "attach": "#R1",
+            "key": "code",
+            "markup": {
+              "value": "R0",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R0",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -1.0,
+              13.5
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R2::code",
+            "attach": "#R2",
+            "key": "code",
+            "markup": {
+              "value": "R90",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              9.0,
+              13.5
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R3::code",
+            "attach": "#R3",
+            "key": "code",
+            "markup": {
+              "value": "R180",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R180",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              19.0,
+              13.5
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R4::code",
+            "attach": "#R4",
+            "key": "code",
+            "markup": {
+              "value": "R270",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R270",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              29.0,
+              13.5
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R5::code",
+            "attach": "#R5",
+            "key": "code",
+            "markup": {
+              "value": "MX",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "MX",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -1.0,
+              3.5
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R6::code",
+            "attach": "#R6",
+            "key": "code",
+            "markup": {
+              "value": "MY",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "MY",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              9.0,
+              3.5
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R7::code",
+            "attach": "#R7",
+            "key": "code",
+            "markup": {
+              "value": "MXR90\\\\变体：加圆点",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "MXR90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "变体：加圆点",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              19.0,
+              4.6
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R8::code",
+            "attach": "#R8",
+            "key": "code",
+            "markup": {
+              "value": "MYR90\\\\变体：挪引脚 1",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "MYR90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "变体：挪引脚 1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              29.0,
+              4.6
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#D2::code",
+            "attach": "#D2",
+            "key": "code",
+            "markup": {
+              "value": "LED R90",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "LED R90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.0,
+              3.0
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#D1::code",
+            "attach": "#D1",
+            "key": "code",
+            "markup": {
+              "value": "LED R0",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "LED R0",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.0,
+              13.5
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::name",
+            "attach": "#R1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.0,
+              9.0
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::side",
+            "attach": "#R1",
+            "key": "side",
+            "markup": {
+              "value": "rot=90",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rot=90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -2.2,
+              10.6
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 90.0,
+            "size": 0.6,
+            "style": {
+              "size": 0.6
+            }
+          },
+          {
+            "id": "#R2::name",
+            "attach": "#R2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              11.0,
+              10.0
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R2::side",
+            "attach": "#R2",
+            "key": "side",
+            "markup": {
+              "value": "rot=90",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rot=90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              9.4,
+              7.8
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 90.0,
+            "size": 0.6,
+            "style": {
+              "size": 0.6
+            }
+          },
+          {
+            "id": "#R3::name",
+            "attach": "#R3",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R3",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              20.0,
+              11.0
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R3::side",
+            "attach": "#R3",
+            "key": "side",
+            "markup": {
+              "value": "rot=90",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rot=90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              22.2,
+              9.4
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 90.0,
+            "size": 0.6,
+            "style": {
+              "size": 0.6
+            }
+          },
+          {
+            "id": "#R4::name",
+            "attach": "#R4",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R4",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              29.0,
+              10.0
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R4::side",
+            "attach": "#R4",
+            "key": "side",
+            "markup": {
+              "value": "rot=90",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rot=90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              30.6,
+              12.2
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 90.0,
+            "size": 0.6,
+            "style": {
+              "size": 0.6
+            }
+          },
+          {
+            "id": "#R5::name",
+            "attach": "#R5",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R5",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.0,
+              1.0
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R5::side",
+            "attach": "#R5",
+            "key": "side",
+            "markup": {
+              "value": "rot=90",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rot=90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              -2.2,
+              -0.6
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 90.0,
+            "size": 0.6,
+            "style": {
+              "size": 0.6
+            }
+          },
+          {
+            "id": "#R6::name",
+            "attach": "#R6",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R6",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.0,
+              -1.0
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R6::side",
+            "attach": "#R6",
+            "key": "side",
+            "markup": {
+              "value": "rot=90",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rot=90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              12.2,
+              0.6
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 90.0,
+            "size": 0.6,
+            "style": {
+              "size": 0.6
+            }
+          },
+          {
+            "id": "#R7::name",
+            "attach": "#R7",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R7",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              19.0,
+              0.0
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R7::side",
+            "attach": "#R7",
+            "key": "side",
+            "markup": {
+              "value": "rot=90",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rot=90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              20.6,
+              -2.2
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 90.0,
+            "size": 0.6,
+            "style": {
+              "size": 0.6
+            }
+          },
+          {
+            "id": "#R8::name",
+            "attach": "#R8",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R8",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              31.0,
+              0.0
+            ],
+            "halign": "middle",
+            "valign": "top",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R8::side",
+            "attach": "#R8",
+            "key": "side",
+            "markup": {
+              "value": "rot=90",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rot=90",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              29.4,
+              2.2
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 90.0,
+            "size": 0.6,
+            "style": {
+              "size": 0.6
+            }
+          },
+          {
+            "id": "#D1::name",
+            "attach": "#D1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "D1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              43.1,
+              10.15
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#D2::name",
+            "attach": "#D2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "D2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              41.85,
+              1.1
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#X1::name",
+            "attach": "#X1",
+            "key": "name",
+            "markup": {
+              "value": "${name} (${model})",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "X1 (shapes)",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              4.0,
+              -8.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": []
+      }
+    },
+    {
+      "id": "subckt:shapes",
+      "kind": "subckt",
+      "name": "shapes",
+      "file": 0,
+      "line": 16,
+      "status": "2 without a position",
+      "host": {
+        "ports": [
+          "&a",
+          "&b"
+        ],
+        "instances": [],
+        "nets": [
+          {
+            "id": "&a",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&b",
+            "global": false,
+            "port": true
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$PORT_TAG",
+            "name": "$PORT_TAG",
+            "package": "rnl-std",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "@rnl-std.rnl:323:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&a"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std.rnl:323:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&b"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          }
+        ],
+        "points": [],
+        "wires": [],
+        "texts": [],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std",
+      "version": "0.2"
+    }
+  ],
+  "files": [
+    {
+      "path": "06-symbols.sp",
+      "name": "06-symbols.sp"
+    }
+  ]
+}

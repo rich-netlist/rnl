@@ -1,8 +1,8 @@
 //! The conformance corpus in `tests/conformance`.
 //!
 //! - `cases/NAME.sp` (or `.scs`) with `NAME.expected.json`: the effective model and the places of
-//!   the diagnostics must match. Run with `RNL_BLESS=1` to write the expected files after a change
-//!   that is meant.
+//!   the diagnostics must match; and with `NAME.snapshot.json`, the editor interface's snapshot.
+//!   Run with `RNL_BLESS=1` to write the expected files after a change that is meant.
 //! - `equivalence/NAME.sp` and `NAME.scs`: the same circuit in SPICE and Spectre with the same RNL
 //!   gives the same effective model (architecture 4.1, 10.2).
 
@@ -36,29 +36,54 @@ fn run_with(path: &Path, options: &Options) -> Value {
     dump::conformance(&r)
 }
 
-#[test]
-fn cases_match_their_expected_models() {
+/// The editor interface's snapshot of a file, as `rnl snapshot` prints it, without what changes
+/// with the toolkit rather than with the case: the runtime's version, the revision, which follows
+/// the bundled packages' texts, and the diagnostics, which the expected file holds.
+fn snapshot(path: &Path) -> Value {
+    let provider = FsProvider::new(&[]);
+    let parts = rnl_view::Parts { drawing: false, host: true, model: true };
+    let s = rnl_view::snapshot(&path.to_string_lossy(), &provider, &rnl_view::BuildOptions::default(), parts).unwrap();
+    let mut v = serde_json::to_value(s).unwrap();
+    for k in ["runtime", "revision", "diagnostics"] {
+        v.as_object_mut().unwrap().remove(k);
+    }
+    v
+}
+
+/// Each case's `output` against `NAME.{kind}.json`, or with `RNL_BLESS=1` written there.
+fn check_cases(kind: &str, what: &str, output: fn(&Path) -> Value) {
     let dir = corpus().join("cases");
     let bless = std::env::var("RNL_BLESS").is_ok();
     let mut failed = Vec::new();
     for f in files(&dir, &["sp", "scs"]) {
-        let got = run(&f);
-        let expected = f.with_extension("expected.json");
+        let got = output(&f);
+        let expected = f.with_extension(format!("{kind}.json"));
         let text = serde_json::to_string_pretty(&got).unwrap() + "\n";
         if bless {
             std::fs::write(&expected, &text).unwrap();
             continue;
         }
         let want = std::fs::read_to_string(&expected)
-            .unwrap_or_else(|_| panic!("{} has no expected file; run with RNL_BLESS=1", f.display()));
+            .unwrap_or_else(|_| panic!("{} has no {kind} file; run with RNL_BLESS=1", f.display()));
         // compared as text: numbers are written in their shortest exact form, line endings may differ
         if want.replace("\r\n", "\n") != text {
-            // the model as computed now, next to the expected one, to compare
-            let _ = std::fs::write(f.with_extension("actual.json"), &text);
+            // the output as computed now, next to the expected one, to compare
+            let actual = if kind == "expected" { "actual".to_string() } else { format!("actual-{kind}") };
+            let _ = std::fs::write(f.with_extension(format!("{actual}.json")), &text);
             failed.push(f.file_name().unwrap().to_string_lossy().to_string());
         }
     }
-    assert!(failed.is_empty(), "the effective model differs from the expected one: {failed:?}");
+    assert!(failed.is_empty(), "the {what} differs from the expected one: {failed:?}");
+}
+
+#[test]
+fn cases_match_their_expected_models() {
+    check_cases("expected", "effective model", run);
+}
+
+#[test]
+fn cases_match_their_expected_snapshots() {
+    check_cases("snapshot", "snapshot", snapshot);
 }
 
 #[test]

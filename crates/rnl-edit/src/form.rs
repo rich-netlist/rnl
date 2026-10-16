@@ -212,8 +212,13 @@ pub fn statements(op: &Op) -> Vec<String> {
             }
             vec![out]
         }
+        // several items are one set, whose members are added or removed (5.2.2)
         Op::Membership { add, items, set } => {
-            vec![format!("{} @{} {set}", items.join(" "), if *add { "ADD-TO" } else { "REMOVE-FROM" })]
+            let what = match items.as_slice() {
+                [one] => one.clone(),
+                _ => format!("{{{}}}", items.join(" ")),
+            };
+            vec![format!("{what} @{} {set}", if *add { "ADD-TO" } else { "REMOVE-FROM" })]
         }
         Op::UsePackage { .. } => Vec::new(),
         Op::AddShape { name, shape: s, layer } => {
