@@ -1558,6 +1558,17 @@ impl<'p> Interp<'p> {
                 mapped.insert(p.name.clone(), objs[0].clone());
             } else if let Some(a) = unpacked_from {
                 mapped.insert(p.name.clone(), a);
+            } else if let Some(d0) = defs.first() {
+                // a definition takes a slot too (5.2.1 item 3): `#M1 #M2 @SET-SYMBOL $X` is three
+                // objects for two slots; the objects of one slot are written in `{…}`
+                let these: Vec<String> = objs.iter().map(|a| self.label(a.obj)).collect();
+                let def = self.label(mapped[&d0.name].obj);
+                let msg = format!(
+                    "@{kw} has 2 slots, and {} objects are written (5.2.1); for several objects, write {{{}}} @{kw} {def}",
+                    objs.len() + 1,
+                    these.join(" ")
+                );
+                return self.fail(ctx, msg, seg.start);
             } else {
                 let items: Vec<(ObjId, bool)> = objs.iter().map(|a| (a.obj, !a.explicit)).collect();
                 let sel = objs.iter().any(|a| a.sel);
@@ -1572,11 +1583,12 @@ impl<'p> Interp<'p> {
             return Ok(mapped);
         }
         if objs.len() != rest.len() {
-            return self.fail(
-                ctx,
-                format!("@{kw} takes {} objects, {} are written (5.2.1)", rest.len(), objs.len()),
-                seg.start,
-            );
+            // a definition takes a slot too (5.2.1 item 3)
+            let def = usize::from(!defs.is_empty());
+            let (slots, written) = (rest.len() + def, objs.len() + def);
+            let objects = if written == 1 { "1 object is".to_string() } else { format!("{written} objects are") };
+            let hint = if written > slots { "; the objects of one slot are written in {…}" } else { "" };
+            return self.fail(ctx, format!("@{kw} has {slots} slots, and {objects} written (5.2.1){hint}"), seg.start);
         }
         for (p, a) in rest.iter().zip(objs) {
             mapped.insert(p.name.clone(), a);
