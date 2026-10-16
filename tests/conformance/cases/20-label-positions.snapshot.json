@@ -997,6 +997,34 @@
   "dialect": "spice",
   "packages": [
     {
+      "name": "rnl-std-style",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-symbols",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-virtual",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-core",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-layout",
+      "version": "0.2"
+    },
+    {
       "name": "rnl-std",
       "version": "0.2"
     }

@@ -136,11 +136,17 @@ fn spice_and_spectre_give_the_same_model() {
 
 #[test]
 fn standard_packages_check_clean() {
+    // every version of the standard series, in a directory of its own
     let lib = corpus().join("../../libraries/standard");
-    for f in files(&lib, &["rnl"]) {
-        let provider = FsProvider::new(&[]);
-        let r = interpret_file(&f, None, &provider, &Options::default()).unwrap();
-        let d = r.diagnostics();
-        assert!(d.is_empty(), "{}: {:?}", f.display(), d.iter().map(|d| r.sink.render(d)).collect::<Vec<_>>());
+    let mut checked = 0;
+    for dir in std::fs::read_dir(lib).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()) {
+        for f in files(&dir, &["rnl"]) {
+            let provider = FsProvider::new(&[]);
+            let r = interpret_file(&f, None, &provider, &Options::default()).unwrap();
+            let d = r.diagnostics();
+            assert!(d.is_empty(), "{}: {:?}", f.display(), d.iter().map(|d| r.sink.render(d)).collect::<Vec<_>>());
+            checked += 1;
+        }
     }
+    assert!(checked >= 9, "only {checked} package files");
 }

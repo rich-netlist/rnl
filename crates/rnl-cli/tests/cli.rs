@@ -94,10 +94,10 @@ fn draft_reads_the_files_that_declare_the_draft_0_3() {
 
 #[test]
 fn strip_generated_reads_the_bundled_packages_too() {
-    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("strip-generated-rnl-std.rnl");
-    let (code, _) = rnl(&["strip-generated", "<bundled>/rnl-std.rnl", "-o", &out.to_string_lossy()]);
+    let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("strip-generated-rnl-std-symbols.rnl");
+    let (code, _) = rnl(&["strip-generated", "<bundled>/0.2/rnl-std-symbols.rnl", "-o", &out.to_string_lossy()]);
     assert_eq!(code, 0);
     // the standard package has no generated records, so it comes out as it is
-    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/standard/rnl-std.rnl");
+    let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/standard/0.2/rnl-std-symbols.rnl");
     assert_eq!(std::fs::read_to_string(out).unwrap(), std::fs::read_to_string(std).unwrap());
 }

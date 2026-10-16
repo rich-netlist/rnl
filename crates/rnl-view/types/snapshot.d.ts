@@ -33,7 +33,8 @@ export type Snapshot = {
    */
   dialect: string,
   /**
-   * The packages in effect, by name and version, the standard package first.
+   * The packages in effect, by name and version, in the order they are brought in: those of
+   * the standard package first, the packages it references before it (16.2, 16.3).
    */
   packages: Array<PackageUse>,
   /**

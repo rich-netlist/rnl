@@ -18,7 +18,7 @@ use rnl_runtime::host::{file_name, HostDocument};
 use rnl_runtime::model::LevelView;
 use rnl_runtime::previous::{solve_status, Previous, SolveStatus};
 use rnl_runtime::problem::LevelProblem;
-use rnl_runtime::source::Provider;
+use rnl_runtime::source::{dirname, Provider};
 use rnl_runtime::writeback::record_type;
 use rnl_runtime::{Interpretation, Options};
 
@@ -34,20 +34,21 @@ pub use snapshot::{
     TextView, Vertex, WireView, SCHEMA,
 };
 
-/// The standard packages bundled with the core (16.2, 16.3).
-const BUNDLED: [(&str, &str); 2] = [
-    ("rnl-std.rnl", include_str!("../../../libraries/standard/rnl-std.rnl")),
-    ("rnl-zh.rnl", include_str!("../../../libraries/standard/rnl-zh.rnl")),
-];
+include!(concat!(env!("OUT_DIR"), "/bundled.rs"));
 
-/// The directory of the bundled packages, as the runtime names it.
+/// The directory of the bundled packages, as the runtime names it. Each version of the standard
+/// series has a directory of its own in it, as in `libraries/standard`, such as `<bundled>/0.2`.
 pub const BUNDLED_DIR: &str = "<bundled>";
 
-/// The bundled standard packages, as a package directory of their own (16.2).
+/// The bundled standard packages, each version directory a package directory of its own (16.2).
 pub fn bundled() -> MemoryProvider {
-    let mut p = MemoryProvider { package_dirs: vec![BUNDLED_DIR.into()], ..MemoryProvider::default() };
-    for (name, text) in BUNDLED {
-        p.insert(&format!("{BUNDLED_DIR}/{name}"), text);
+    let mut p = MemoryProvider::default();
+    for &(path, text) in BUNDLED {
+        p.insert(&format!("{BUNDLED_DIR}/{path}"), text);
+        let dir = format!("{BUNDLED_DIR}/{}", dirname(path));
+        if !p.package_dirs.contains(&dir) {
+            p.package_dirs.push(dir);
+        }
     }
     p
 }
@@ -566,18 +567,43 @@ R1 p q 1k
 
     #[test]
     fn a_package_file_is_checked_on_its_own() {
-        let d = build(&format!("{BUNDLED_DIR}/rnl-std.rnl"), &MemoryProvider::new(), &BuildOptions::default());
+        let d = build(&format!("{BUNDLED_DIR}/0.2/rnl-std.rnl"), &MemoryProvider::new(), &BuildOptions::default());
         let d = d.unwrap();
         assert!(d.diagnostics.is_empty(), "{:?}", d.diagnostics);
         assert!(d.missing.is_empty());
     }
 
     #[test]
+    fn the_bundled_packages_are_by_version() {
+        // the standard package 0.2 and its sub-packages (16.3), and the Chinese aliases
+        let names: Vec<&str> = BUNDLED.iter().map(|(path, _)| *path).collect();
+        assert_eq!(
+            names,
+            [
+                "0.2/rnl-std-core.rnl",
+                "0.2/rnl-std-fill.rnl",
+                "0.2/rnl-std-layout.rnl",
+                "0.2/rnl-std-semantics.rnl",
+                "0.2/rnl-std-style.rnl",
+                "0.2/rnl-std-symbols.rnl",
+                "0.2/rnl-std-virtual.rnl",
+                "0.2/rnl-std.rnl",
+                "0.2/rnl-zh.rnl",
+            ]
+        );
+        let p = bundled();
+        assert_eq!(p.package_dirs, [format!("{BUNDLED_DIR}/0.2")]);
+        assert_eq!(p.package_files().len(), names.len());
+    }
+
+    #[test]
     fn a_bundled_package_file_is_read_like_any_host_file() {
         let mut sink = Sink::new();
-        let doc = read_host(&format!("{BUNDLED_DIR}/rnl-std.rnl"), None, &MemoryProvider::new(), &mut sink).unwrap();
+        let path = format!("{BUNDLED_DIR}/0.2/rnl-std.rnl");
+        let doc = read_host(&path, None, &MemoryProvider::new(), &mut sink).unwrap();
         assert_eq!(doc.main().file, "rnl-std.rnl");
-        assert_eq!(doc.source("rnl-std.rnl"), Some(BUNDLED[0].1));
+        let text = BUNDLED.iter().find(|(p, _)| *p == "0.2/rnl-std.rnl").map(|(_, text)| *text);
+        assert_eq!(doc.source("rnl-std.rnl"), text);
     }
 
     #[test]
@@ -611,9 +637,12 @@ R1 p q 1k
         let r = interpret("untitled-1", None, &files, &Options::default()).unwrap();
         assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
         assert_eq!(r.model.levels[0].items.iter().filter(|i| !i.host.is_empty()).count(), 2);
-        let path = format!("{BUNDLED_DIR}/rnl-std.rnl");
-        let package = interpret(&path, None, &MemoryProvider::new(), &Options::default()).unwrap();
-        assert!(package.diagnostics().is_empty());
+        for (path, _) in BUNDLED {
+            let package =
+                interpret(&format!("{BUNDLED_DIR}/{path}"), None, &MemoryProvider::new(), &Options::default());
+            let package = package.unwrap();
+            assert!(package.diagnostics().is_empty(), "{path}: {:?}", package.diagnostics());
+        }
     }
 
     #[test]

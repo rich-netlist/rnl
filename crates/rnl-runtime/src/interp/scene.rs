@@ -57,6 +57,14 @@ pub struct Fact {
     pub direct: bool,
     /// The usages whose expansion made it, outermost first (14.8).
     pub chain: Vec<ObjId>,
+    pub segments: Segments,
+}
+
+impl Fact {
+    /// Its position in the order of resolution (8.5).
+    pub fn order(&self) -> Pos {
+        order_pos(&self.pos, &self.segments)
+    }
 }
 
 /// A WIRE given a wire in a statement of the draft 0.3, which rewrites the wire (its 13.1): the
@@ -68,6 +76,8 @@ pub struct Fact {
 /// mode of the latest rewrite that holds, or those it was made with.
 #[derive(Clone, Debug)]
 pub struct Rewrite {
+    /// Its place in the order of writing: its position, with the segment of each pipe it is
+    /// written in (5.5).
     pub pos: Pos,
     /// The order in which the rewrites of the scene were read.
     pub seq: usize,
@@ -128,12 +138,16 @@ pub struct Scene {
     pub styles: Vec<Fact>,
     pub layers: Vec<Fact>,
     pub prioritys: Vec<Fact>,
+    /// CURRENT on host terminals, each with its place in the order of writing (5.5, 15.2).
     pub currents: Vec<(Pos, ObjId, String)>,
     /// The sets given GROUP (11.5), each with where it is written and the usages whose expansion
     /// wrote it, outermost first (14.8).
     pub groups: Vec<(Pos, ObjId, Vec<ObjId>)>,
     pub tasks: Vec<Vec<(Pos, Task)>>,
     pub created: HashMap<ObjId, Pos>,
+    /// Where each object is made, in the order of writing: `created` with the segment of each
+    /// pipe (5.5), for the drawing order (11.6), bundles (11.8) and the style of a text (8.3).
+    pub created_order: HashMap<ObjId, Pos>,
     pub items_cache: HashMap<(ObjId, usize), Vec<ObjId>>,
     pub pos_cache: HashMap<ObjId, ObjId>,
     pub symbol: HashMap<ObjId, ObjId>,
@@ -162,6 +176,12 @@ pub struct Scene {
 
 impl Scene {
     /// Add a coordinate fact (PLACE, or the coordinates of a point).
+    /// Note where an object is made, by the context of its statement.
+    pub(crate) fn note_created(&mut self, o: ObjId, at: Pos, ctx: &Ctx) {
+        self.created_order.insert(o, order_pos(&at, &ctx.segments));
+        self.created.insert(o, at);
+    }
+
     pub(crate) fn add_at(&mut self, f: Fact) {
         self.at_by_target.entry(f.target).or_default().push(self.at.len());
         self.at.push(f);
@@ -206,6 +226,7 @@ impl Scene {
             groups: Vec::new(),
             tasks: (0..10).map(|_| Vec::new()).collect(),
             created: HashMap::new(),
+            created_order: HashMap::new(),
             items_cache: HashMap::new(),
             pos_cache: HashMap::new(),
             symbol: HashMap::new(),
@@ -545,35 +566,34 @@ impl Interp<'_> {
             }
             return pos(&[9, 0, tail[0], tail[1]]);
         }
-        for e in self.effective_packages(lv) {
-            if e.unit == u {
-                match e.place {
-                    Place::Root(k0) => return pos(&[0, k0 as i64, tail[0], tail[1]]),
-                    Place::Level(at, upos) => {
-                        let decl = e.decl.unwrap();
-                        let au = self.level_unit[at];
-                        let mut base = self.position_of(s, au, decl.rec, Some(upos.1));
-                        base.push(PosElem::Tag("pkg"));
-                        base.push(PosElem::Int(tail[0]));
-                        base.push(PosElem::Int(tail[1]));
-                        return base;
-                    }
-                }
+        // a package's content at the place of the USE-PACKAGE that brings it in, in the order of
+        // what that brings in (16.2)
+        let eff = self.effective_packages(lv);
+        match eff.entry(u).map(|e| (e.place, e.decl.as_ref().map(|d| d.rec))) {
+            Some((Place::Root(k0, j), _)) => pos(&[0, k0 as i64, j as i64, tail[0], tail[1]]),
+            Some((Place::Level(at, upos, j), Some(rec))) => {
+                let au = self.level_unit[at];
+                let mut base = self.position_of(s, au, rec, Some(upos.1));
+                base.push(PosElem::Tag("pkg"));
+                base.push(PosElem::Int(j as i64));
+                base.push(PosElem::Int(tail[0]));
+                base.push(PosElem::Int(tail[1]));
+                base
             }
+            _ => pos(&[9, 1, tail[0], tail[1]]),
         }
-        pos(&[9, 1, tail[0], tail[1]])
     }
 
     // ------------------------------------------------------------------ creation (phase 3)
 
-    pub(crate) fn scene_add_point(&mut self, s: SceneId, p: ObjId, at: Pos) {
+    pub(crate) fn scene_add_point(&mut self, s: SceneId, p: ObjId, at: Pos, ctx: &Ctx) {
         let (x, y) = match self.o(p) {
             ObjData::Point { x, y, .. } => (*x, *y),
             _ => return,
         };
         let sc = &mut self.scenes[s];
         sc.points.push(p);
-        sc.created.insert(p, at.clone());
+        sc.note_created(p, at.clone(), ctx);
         let mut fp = at;
         fp.push(PosElem::Tag("p"));
         for (axis, v) in [('x', x), ('y', y)] {
@@ -587,14 +607,15 @@ impl Interp<'_> {
                     off: 0,
                     direct: true,
                     chain: Vec::new(),
+                    segments: ctx.segments.clone(),
                 });
             }
         }
     }
 
-    pub(crate) fn scene_add_usage(&mut self, s: SceneId, a: ObjId, at: Pos) {
+    pub(crate) fn scene_add_usage(&mut self, s: SceneId, a: ObjId, at: Pos, ctx: &Ctx) {
         self.scenes[s].usages.push(a);
-        self.scenes[s].created.insert(a, at);
+        self.scenes[s].note_created(a, at, ctx);
     }
 
     pub(crate) fn scene_add_prim(&mut self, s: SceneId, prim: ObjId, at: Pos, ctx: &Ctx) {
@@ -604,7 +625,7 @@ impl Interp<'_> {
         };
         let sc = &mut self.scenes[s];
         sc.prims.push(prim);
-        sc.created.insert(prim, at.clone());
+        sc.note_created(prim, at.clone(), ctx);
         if !style.is_empty() {
             sc.styles.push(Fact {
                 pos: at,
@@ -615,6 +636,7 @@ impl Interp<'_> {
                 off: 0,
                 direct: true,
                 chain: Vec::new(),
+                segments: ctx.segments.clone(),
             });
         }
     }
@@ -681,7 +703,9 @@ impl Interp<'_> {
                         *g = generated;
                     }
                     let sc = &mut self.scenes[s];
-                    sc.created.entry(kt).or_insert(at);
+                    if !sc.created.contains_key(&kt) {
+                        sc.note_created(kt, at, ctx);
+                    }
                     if sc.listed_keytexts.insert(kt) {
                         sc.texts.push(kt);
                     }
@@ -712,7 +736,7 @@ impl Interp<'_> {
             }
         };
         self.scenes[s].texts.push(t);
-        self.scenes[s].created.insert(t, at);
+        self.scenes[s].note_created(t, at, ctx);
         Ok(t)
     }
 
@@ -729,7 +753,7 @@ impl Interp<'_> {
                 sc.wires_by_net.entry(*n).or_default().push(w);
             }
         }
-        sc.created.insert(w, at.clone());
+        sc.note_created(w, at.clone(), ctx);
         if !style.is_empty() {
             sc.styles.push(Fact {
                 pos: at,
@@ -740,6 +764,7 @@ impl Interp<'_> {
                 off: 0,
                 direct: true,
                 chain: Vec::new(),
+                segments: ctx.segments.clone(),
             });
         }
     }
@@ -774,10 +799,12 @@ impl Interp<'_> {
                 off: 0,
                 direct: true,
                 chain: Vec::new(),
+                segments: ctx.segments.clone(),
             });
             sc.styles.len() - 1
         });
-        let r = Rewrite { pos: ctx.pos.clone(), seq, points, mode, generated, site, off, fault: None, style };
+        let pos = order_pos(&ctx.pos, &ctx.segments);
+        let r = Rewrite { pos, seq, points, mode, generated, site, off, fault: None, style };
         sc.rewrites.entry(w).or_default().push(r);
     }
 
@@ -815,14 +842,14 @@ impl Interp<'_> {
         })
     }
 
-    pub(crate) fn scene_add_bundle(&mut self, s: SceneId, b: ObjId, at: Pos) {
+    pub(crate) fn scene_add_bundle(&mut self, s: SceneId, b: ObjId, at: Pos, ctx: &Ctx) {
         self.scenes[s].bundles.push(b);
-        self.scenes[s].created.insert(b, at);
+        self.scenes[s].note_created(b, at, ctx);
     }
 
-    pub(crate) fn scene_add_constraint(&mut self, s: SceneId, c: ObjId, at: Pos) {
+    pub(crate) fn scene_add_constraint(&mut self, s: SceneId, c: ObjId, at: Pos, ctx: &Ctx) {
         self.scenes[s].constraints.push(c);
-        self.scenes[s].created.insert(c, at);
+        self.scenes[s].note_created(c, at, ctx);
     }
 
     /// Apply a single-object statement to one object.
@@ -853,6 +880,7 @@ impl Interp<'_> {
                         off: *off,
                         direct,
                         chain: chain.clone(),
+                        segments: ctx.segments.clone(),
                     });
                 }
                 if let Some(y) = y {
@@ -865,6 +893,7 @@ impl Interp<'_> {
                         off: *off,
                         direct,
                         chain,
+                        segments: ctx.segments.clone(),
                     });
                 }
             }
@@ -878,6 +907,7 @@ impl Interp<'_> {
                     off: *off,
                     direct,
                     chain,
+                    segments: ctx.segments.clone(),
                 });
             }
             TargetOp::Layer { layer, off } => {
@@ -890,6 +920,7 @@ impl Interp<'_> {
                     off: *off,
                     direct,
                     chain: Vec::new(),
+                    segments: ctx.segments.clone(),
                 });
             }
             TargetOp::Symbol { symbol, off } => {
@@ -902,6 +933,7 @@ impl Interp<'_> {
                     off: *off,
                     direct,
                     chain: Vec::new(),
+                    segments: ctx.segments.clone(),
                 });
             }
             TargetOp::Style { style, off } => {
@@ -914,6 +946,7 @@ impl Interp<'_> {
                     off: *off,
                     direct,
                     chain: Vec::new(),
+                    segments: ctx.segments.clone(),
                 });
             }
             TargetOp::Current { direction, off } => {
@@ -927,7 +960,7 @@ impl Interp<'_> {
                     let l = self.label(obj);
                     return self.fail(ctx, format!("CURRENT takes host terminals only, not {l} (15.2)"), *off);
                 }
-                self.scenes[s].currents.push((at, obj, direction.clone()));
+                self.scenes[s].currents.push((order_pos(&at, &ctx.segments), obj, direction.clone()));
             }
             TargetOp::Priority { priority, off, spread } => {
                 if !matches!(self.o(obj), ObjData::Constraint(_) | ObjData::Usage(_) | ObjData::Set(_)) {
@@ -954,6 +987,7 @@ impl Interp<'_> {
                     off: *off,
                     direct,
                     chain: Vec::new(),
+                    segments: ctx.segments.clone(),
                 });
             }
             TargetOp::Route { mode, style, off } => {
@@ -963,7 +997,7 @@ impl Interp<'_> {
                 }
                 let r = self.new_obj(ObjData::Route { net: obj, mode: mode.clone(), style: style.clone() });
                 self.scenes[s].routes.push(r);
-                self.scenes[s].created.insert(r, at);
+                self.scenes[s].note_created(r, at, ctx);
                 self.made_routes.push(r);
             }
         }
@@ -1003,12 +1037,12 @@ impl Interp<'_> {
             return Vec::new();
         }
         self.scenes[s].busy.insert(key);
-        // this scene's edits as they are now, in the order of their positions; the edits of the
-        // other scenes are not looked at
+        // this scene's edits as they are now, in the order of writing, where of the segments of
+        // one pipe the later is later (5.5); the edits of the other scenes are not looked at
         let mods: Vec<(bool, ObjId, Rc<Ctx>)> = {
             let sd = self.set(obj);
             let mut ks = sd.mods_by_scene.get(&Some(s)).cloned().unwrap_or_default();
-            ks.sort_by(|a, b| sd.mods[*a].pos.cmp(&sd.mods[*b].pos));
+            ks.sort_by_cached_key(|&k| order_pos(&sd.mods[k].pos, &sd.mods[k].ctx.segments));
             ks.into_iter().map(|k| (sd.mods[k].add, sd.mods[k].source, sd.mods[k].ctx.clone())).collect()
         };
         let mut base: Vec<ObjId> = match &self.set(obj).kind {

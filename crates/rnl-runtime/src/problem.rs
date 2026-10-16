@@ -444,7 +444,8 @@ pub struct LevelProblem {
     pub line: u32,
     /// The line before which a record added to the end of the level goes (17).
     pub end_line: u32,
-    /// The packages in effect, standard package included, with their versions (16.2, 16.3).
+    /// The packages in effect, those of the standard package included, with their versions, in
+    /// the order they are brought in (16.2, 16.3).
     pub packages: Vec<(String, String)>,
     /// The `%` names bound in the level, so that new ones do not clash (6.6).
     pub names: Vec<String>,

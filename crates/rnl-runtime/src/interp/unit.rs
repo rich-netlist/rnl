@@ -82,7 +82,8 @@ impl UnitMember {
     }
 }
 
-/// A USE-PACKAGE or USE-ALIASES (16.2, 16.5).
+/// A USE-PACKAGE or USE-ALIASES (16.2, 16.5). In the header record of a package file, a
+/// USE-PACKAGE is a reference to another package (16.2).
 #[derive(Clone, Debug)]
 pub struct UseDecl {
     pub name: String,
@@ -96,6 +97,13 @@ pub struct UseDecl {
     pub rec: Option<RecId>,
     pub offset: usize,
     pub pkg: Option<UnitId>,
+}
+
+impl UseDecl {
+    /// Is it the same statement as `other`?
+    pub fn same(&self, other: &UseDecl) -> bool {
+        self.unit == other.unit && self.rec == other.rec && self.pos == other.pos && self.offset == other.offset
+    }
 }
 
 /// The aliases scoped to one definition: (alias, (original, where it is declared)).
@@ -134,6 +142,8 @@ pub struct Unit {
     pub dups: Vec<Binding>,
     pub members: Vec<UnitMember>,
     pub uses: Vec<UseDecl>,
+    /// A package file: the packages its header record references, in order (16.2).
+    pub refs: Vec<UseDecl>,
     pub header_record: Option<RecId>,
     /// alias -> original: keywords with "@", `$` names with "$", other standard words bare.
     pub aliases: HashMap<String, String>,
@@ -147,7 +157,6 @@ pub struct Unit {
     pub header_kws: Vec<String>,
     pub other_records: usize,
     pub devices: Vec<DeviceDecl>,
-    pub std: Option<UnitId>,
     pub ok: bool,
     pub scope_records: Vec<(RecId, Rc<RecordAst>, Rc<Header>)>,
     /// The indexes in `scope_records` by the key of the subcircuit named in scope=, in order.
@@ -178,6 +187,7 @@ impl Unit {
             dups: Vec::new(),
             members: Vec::new(),
             uses: Vec::new(),
+            refs: Vec::new(),
             header_record: None,
             aliases: HashMap::new(),
             alias_decls: Vec::new(),
@@ -188,7 +198,6 @@ impl Unit {
             header_kws: Vec::new(),
             other_records: 0,
             devices: Vec::new(),
-            std: None,
             ok: true,
             scope_records: Vec::new(),
             scope_index: HashMap::new(),
@@ -209,17 +218,22 @@ impl Unit {
     }
 }
 
-/// Where an effective package sits (8.3, 16.2, 16.3).
-#[derive(Clone, Debug)]
+/// Where an effective package sits (8.3, 16.2, 16.3). `j` is its place in what one USE-PACKAGE
+/// brings in: the packages it references first, then the package itself (16.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Place {
-    /// At the root: the standard package first, then the header USE-PACKAGEs.
-    Root(usize),
-    /// At a USE-PACKAGE in a level: the level and the (record, member) position.
-    Level(LevelId, (usize, usize)),
+    /// At the root: `k` counts the USE-PACKAGEs at the root that bring in packages not placed
+    /// there yet, the standard package's first, then those of the header records (16.3).
+    Root(usize, usize),
+    /// At a USE-PACKAGE in a level: the level, the (record, member) position, and `j`.
+    Level(LevelId, (usize, usize), usize),
 }
 
+/// A package in effect on a chain of levels.
 #[derive(Clone, Debug)]
 pub struct EffPackage {
+    /// The USE-PACKAGE written in a file that brings it in; none for the standard package used
+    /// implicitly (16.3) and for a package checked on its own (2.7).
     pub decl: Option<UseDecl>,
     pub unit: UnitId,
     pub place: Place,
@@ -285,7 +299,7 @@ fn str_val(v: Option<&Value>) -> Option<String> {
     }
 }
 
-fn version_key(v: &str) -> (i64, i64) {
+pub(crate) fn version_key(v: &str) -> (i64, i64) {
     let mut it = v.split('.');
     match (it.next().and_then(|a| a.parse().ok()), it.next().and_then(|b| b.parse().ok()), it.next()) {
         (Some(a), Some(b), None) => (a, b),
@@ -764,8 +778,16 @@ impl Interp<'_> {
                             .error("@PACKAGE is written only in the header record of a package file (2.7)", Some(loc));
                         continue;
                     }
-                    self.units[u].pkg_name = str_val(p.get("name")).unwrap_or_default();
-                    self.units[u].pkg_version = str_val(p.get("version")).unwrap_or_default();
+                    let name = str_val(p.get("name")).unwrap_or_default();
+                    let version = str_val(p.get("version")).unwrap_or_default();
+                    self.units[u].pkg_name = name.clone();
+                    self.units[u].pkg_version = version.clone();
+                    // a package checked on its own is the one that its references, and the
+                    // standard package's, find by its name and version; one that a USE-PACKAGE
+                    // or a reference found is there already (16.2)
+                    if !name.is_empty() {
+                        self.packages.entry((name, version)).or_insert(u);
+                    }
                 }
                 "USE-ALIASES" => self.use_aliases(u, &p, &loc),
                 "ALIAS" => {
@@ -1236,21 +1258,39 @@ impl Interp<'_> {
         self.follows_0_3(ctx.rec.map_or(ctx.unit, |r| self.rec_unit[r]))
     }
 
+    /// A USE-PACKAGE written in a level or in a file's header record (16.2, 16.3), or, in the
+    /// header record of a package file, a reference to another package (16.2).
     fn use_decl(&mut self, u: UnitId, rec: Option<RecId>, k: usize, seg: &syntax::Segment, in_header: bool) {
         let call = seg.call.as_ref().unwrap();
         let loc = self.rec_loc(rec, call.start).unwrap();
         let pkg = self.units[u].pkg().to_string();
-        if self.units[u].kind == UnitKind::Package {
-            self.diag_in(Severity::Error, "a package cannot USE-PACKAGE in this version (16.2)", Some(loc), &pkg);
+        let reference = self.units[u].kind == UnitKind::Package;
+        if reference && !in_header {
+            self.diag_in(
+                Severity::Error,
+                "USE-PACKAGE is not written in the records of a package other than its header record: a package file references other packages in its header record (16.2)",
+                Some(loc),
+                &pkg,
+            );
             return;
         }
         let Some(p) = self.header_params("USE-PACKAGE", call.params.as_ref(), u, &loc, in_header) else { return };
         let Some(name) = str_val(p.get("name")) else {
-            self.sink.error("@USE-PACKAGE takes name (16.2)", Some(loc));
+            self.diag_in(Severity::Error, "@USE-PACKAGE takes name (16.2)", Some(loc), &pkg);
             return;
         };
         let mut body = None;
         if !seg.args.is_empty() {
+            if reference {
+                // inline content has no version and cannot take part in choosing one (16.2)
+                self.diag_in(
+                    Severity::Error,
+                    "a reference to another package in the header record of a package file writes only name, version and path, without a body: this reference fails (16.2)",
+                    Some(loc),
+                    &pkg,
+                );
+                return;
+            }
             match (seg.args.len(), &seg.args[0].obj) {
                 (1, ObjExpr::Set(s)) => body = Some(s.clone()),
                 _ => {
@@ -1271,22 +1311,29 @@ impl Interp<'_> {
             offset: call.start,
             pkg: None,
         };
-        decl.pkg = self.resolve_package(&decl, loc.clone(), None, "USE-PACKAGE");
+        let what = if reference { "reference" } else { "USE-PACKAGE" };
+        decl.pkg = self.resolve_package(&decl, loc.clone(), None, what);
         if let (Some(pk), None) = (decl.pkg, &body) {
             if is_alias_package(&self.units[pk]) && self.units[pk].header_kws.iter().any(|k| k == "ALIAS") {
-                self.sink.error(
-                    format!("package {name} is an alias package; load it with @USE-ALIASES(name=\"{name}\") in the header record. This USE-PACKAGE fails (16.5)"),
+                self.diag_in(
+                    Severity::Error,
+                    format!("package {name} is an alias package; load it with @USE-ALIASES(name=\"{name}\") in the header record. This {what} fails (16.5)"),
                     Some(loc),
+                    &pkg,
                 );
                 decl.pkg = None;
             }
         }
-        self.units[u].uses.push(decl);
+        if reference {
+            self.units[u].refs.push(decl);
+        } else {
+            self.units[u].uses.push(decl);
+        }
     }
 
     // ------------------------------------------------------------------ packages (16.2)
 
-    fn scan_packages(&mut self) {
+    pub(crate) fn scan_packages(&mut self) {
         if self.pkg_files.is_some() {
             return;
         }
@@ -1302,7 +1349,8 @@ impl Interp<'_> {
     }
 
     /// Find a package by path= or in the package directories (16.2). path= is relative to the
-    /// directory of the file that writes the USE-PACKAGE or USE-ALIASES.
+    /// directory of the file that writes the USE-PACKAGE or USE-ALIASES, or the reference: `what`
+    /// is "USE-PACKAGE", "USE-ALIASES" or "reference".
     pub(crate) fn resolve_package(
         &mut self,
         decl: &UseDecl,
@@ -1312,6 +1360,8 @@ impl Interp<'_> {
     ) -> Option<UnitId> {
         let sec = if what == "USE-ALIASES" { "16.5" } else { "16.2" };
         let kind = if what == "USE-ALIASES" { "alias package" } else { "package" };
+        // a reference in the header record of a package file is reported in that package (7.6)
+        let pkg = if what == "reference" { self.units[decl.unit].pkg_name.clone() } else { String::new() };
         if let Some(body) = &decl.body {
             let mut u = Unit::new(UnitKind::Package, &format!("{} (embedded)", decl.name));
             u.pkg_name = decl.name.clone();
@@ -1333,9 +1383,11 @@ impl Interp<'_> {
                     if n == decl.name && version_ok(decl.version.as_deref(), &v) {
                         if let Some(want) = &decl.version {
                             if *want != v {
-                                self.sink.warning(
+                                self.diag_in(
+                                    Severity::Warning,
                                     format!("{path} is {kind} {} {v}, not {want}: a different version may draw differently (16.2)", decl.name),
                                     Some(loc.clone()),
+                                    &pkg,
                                 );
                             }
                         }
@@ -1344,7 +1396,12 @@ impl Interp<'_> {
                 }
             }
             if cand.is_none() {
-                self.sink.warning(format!("the file named by path= does not exist or its @PACKAGE does not match; looking the package up by name ({sec})"), Some(loc.clone()));
+                self.diag_in(
+                    Severity::Warning,
+                    format!("the file named by path= does not exist or its @PACKAGE does not match; looking the package up by name ({sec})"),
+                    Some(loc.clone()),
+                    &pkg,
+                );
             }
         }
         if cand.is_none() {
@@ -1360,40 +1417,50 @@ impl Interp<'_> {
                         .collect();
                     newer.sort_by_key(|c| version_key(&c.1));
                     if let Some(c) = newer.first() {
-                        self.sink.warning(
+                        self.diag_in(
+                            Severity::Warning,
                             format!("{kind} {} has no version {want}; using {}: a different version may draw differently (16.2)", decl.name, c.1),
                             Some(loc.clone()),
+                            &pkg,
                         );
                         cand = Some((*c).clone());
                     }
                 }
             } else if let Some(c) = same.iter().max_by_key(|c| version_key(&c.1)) {
-                self.sink.hint(
-                    format!("{what} {} names no version; using the newest found, {} ({sec})", decl.name, c.1),
+                let this = if what == "reference" { "the reference to".to_string() } else { what.to_string() };
+                self.diag_in(
+                    Severity::Hint,
+                    format!("{this} {} names no version; using the newest found, {} ({sec})", decl.name, c.1),
                     Some(loc.clone()),
+                    &pkg,
                 );
                 cand = Some(c.clone());
             }
         }
         let Some((n, v, path)) = cand else {
-            let then = if what == "USE-ALIASES" { "; statements using its aliases fail" } else { "" };
+            let then = match what {
+                "USE-ALIASES" => "; statements using its aliases fail".to_string(),
+                "reference" => format!(", and the statements of package {pkg} that use its names fail with it"),
+                _ => String::new(),
+            };
             let ver = decl.version.as_ref().map(|v| format!(" {v}")).unwrap_or_default();
-            self.sink.error(
+            self.diag_in(
+                Severity::Error,
                 format!("{kind} {}{ver} cannot be found: this {what} fails{then} ({sec})", decl.name),
                 Some(loc),
+                &pkg,
             );
             return None;
         };
         if let Some(&u) = self.packages.get(&(n.clone(), v.clone())) {
             return Some(u);
         }
-        let u = self.load_package_file(&path);
-        self.packages.insert((n, v), u);
-        Some(u)
+        Some(self.load_package_file(&path, Some((n, v))))
     }
 
-    /// Read a package file into a unit (2.7).
-    pub(crate) fn load_package_file(&mut self, path: &str) -> UnitId {
+    /// Read a package file into a unit (2.7). `key`, the name and version it is found by, holds it
+    /// before its header record is read, so that a reference back to it finds it (16.2).
+    pub(crate) fn load_package_file(&mut self, path: &str, key: Option<(String, String)>) -> UnitId {
         let text = self.provider.read(path).unwrap_or_default();
         let fname = file_name(path).to_string();
         let mut lv = Level::new(LevelKind::Package, &fname, &fname, normalize(path));
@@ -1408,6 +1475,9 @@ impl Interp<'_> {
         u.pkg_level = Some(pl);
         let id = self.units.len();
         self.units.push(u);
+        if let Some(key) = key {
+            self.packages.insert(key, id);
+        }
         let rec_ids: Vec<RecId> = recs.into_iter().map(|r| self.add_record(r, id)).collect();
         self.unit_recs.push(rec_ids);
         self.read_unit(id);
@@ -1448,105 +1518,20 @@ impl Interp<'_> {
                 self.note_failed(rec, m.start, m.end, false);
                 continue;
             }
+            // an inline package has no header record, so it references no other package (16.2)
+            let call = m.segments.first().and_then(|s| s.call.as_ref()).filter(|_| m.segments.len() == 1);
+            if let Some(call) = call.filter(|c| self.kw(&c.kw, u) == "USE-PACKAGE") {
+                let loc = self.rec_loc(rec, call.start);
+                self.sink.error(
+                    "an inline package has no header record and cannot reference other packages; to use the definitions of another package, write them into its body (16.2)",
+                    loc,
+                );
+                self.note_failed(rec, m.start, m.end, false);
+                continue;
+            }
             self.units[u].members.push(UnitMember { rec, k, embedded: true, m: m.clone(), header: header.clone() });
             self.declare(u, rec, k, true, m, &header);
         }
-    }
-
-    /// The standard package: the newest `rnl-std` in the package directories (16.3).
-    pub(crate) fn std_package(&mut self) -> Option<UnitId> {
-        if !self.std_enabled {
-            return None;
-        }
-        if let Some(s) = self.std_cache {
-            return s;
-        }
-        self.scan_packages();
-        let same: Vec<(String, String, String)> =
-            self.pkg_files.as_ref().unwrap().iter().filter(|c| c.0 == "rnl-std").cloned().collect();
-        let mut out = None;
-        if let Some(c) = same.iter().max_by_key(|c| version_key(&c.1)) {
-            let key = (c.0.clone(), c.1.clone());
-            let u = match self.packages.get(&key) {
-                Some(&u) => u,
-                None => {
-                    let u = self.load_package_file(&c.2);
-                    self.packages.insert(key, u);
-                    u
-                }
-            };
-            out = Some(u);
-        }
-        self.std_cache = Some(out);
-        out
-    }
-
-    /// The packages in effect at a host level, in queue order (8.3, 16.2, 16.3).
-    pub(crate) fn effective_packages(&mut self, level: LevelId) -> Vec<EffPackage> {
-        let mut chain = self.doc.ancestors(level);
-        chain.reverse();
-        chain.push(level);
-        let mut eff: Vec<(String, EffPackage)> = Vec::new();
-        let mut root_order: Vec<String> = Vec::new();
-        let put = |eff: &mut Vec<(String, EffPackage)>, name: &str, e: EffPackage| {
-            if let Some(slot) = eff.iter_mut().find(|(n, _)| n == name) {
-                slot.1 = e;
-            } else {
-                eff.push((name.to_string(), e));
-            }
-        };
-        let std = if self.file_ok(level) { self.std_package() } else { None };
-        if let Some(s) = std {
-            put(&mut eff, "rnl-std", EffPackage { decl: None, unit: s, place: Place::Root(0) });
-            root_order.push("rnl-std".into());
-        }
-        for lv in chain {
-            let u = self.level_unit[lv];
-            if !self.units[u].ok {
-                continue;
-            }
-            let uses = self.units[u].uses.clone();
-            for d in uses.iter().filter(|d| d.in_header) {
-                if !root_order.contains(&d.name) {
-                    root_order.push(d.name.clone());
-                }
-                let k = root_order.iter().position(|n| *n == d.name).unwrap();
-                if let Some(pk) = d.pkg {
-                    put(&mut eff, &d.name, EffPackage { decl: Some(d.clone()), unit: pk, place: Place::Root(k) });
-                } else {
-                    eff.retain(|(n, _)| *n != d.name);
-                }
-            }
-            for d in uses.iter().filter(|d| !d.in_header) {
-                if let Some(pk) = d.pkg {
-                    put(
-                        &mut eff,
-                        &d.name,
-                        EffPackage { decl: Some(d.clone()), unit: pk, place: Place::Level(lv, d.pos) },
-                    );
-                } else {
-                    eff.retain(|(n, _)| *n != d.name);
-                }
-            }
-        }
-        eff.into_iter().map(|(_, e)| e).filter(|e| self.units[e.unit].ok).collect()
-    }
-
-    /// DEVICE entries in effect at a level; later ones win (6.12).
-    pub(crate) fn devices_for(&mut self, level: LevelId) -> Vec<DeviceDecl> {
-        let mut out = Vec::new();
-        for e in self.effective_packages(level) {
-            out.extend(self.units[e.unit].devices.clone());
-        }
-        let mut chain = self.doc.ancestors(level);
-        chain.reverse();
-        chain.push(level);
-        for lv in chain {
-            if self.doc.levels[lv].kind == LevelKind::File {
-                out.extend(self.units[self.level_unit[lv]].devices.clone());
-            }
-        }
-        out
     }
 
     /// Is no file on the way up from this level of an unsupported version (16.1)?

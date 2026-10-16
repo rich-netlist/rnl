@@ -59,7 +59,8 @@ pub struct Snapshot {
     pub revision: String,
     /// "spice" or "spectre".
     pub dialect: String,
-    /// The packages in effect, by name and version, the standard package first.
+    /// The packages in effect, by name and version, in the order they are brought in: those of
+    /// the standard package first, the packages it references before it (16.2, 16.3).
     pub packages: Vec<PackageUse>,
     /// The host files, as in the Document: the opened file first.
     pub files: Vec<FileRef>,
@@ -790,7 +791,14 @@ R2 a vdd! 2k
         let s = snap(Parts { drawing: false, host: true, model: true });
         assert_eq!((&s["schema"], &s["language"], &s["dialect"]), (&json!(SCHEMA), &json!("0.2"), &json!("spice")));
         assert!(s.get("drawing").is_none());
-        assert_eq!(s["packages"][0]["name"], "rnl-std");
+        // as they are brought in: the standard package after the sub-packages it references (16.3)
+        let packages = s["packages"].as_array().unwrap();
+        let names: Vec<&str> = packages.iter().map(|p| p["name"].as_str().unwrap()).collect();
+        let std = ["style", "symbols", "virtual", "core", "fill", "semantics", "layout"];
+        assert_eq!(names.len(), std.len() + 1);
+        assert!(std.iter().zip(&names).all(|(p, n)| n.strip_prefix("rnl-std-") == Some(*p)), "{names:?}");
+        assert_eq!(names[std.len()], "rnl-std");
+        assert!(packages.iter().all(|p| p["version"] == "0.2"), "{packages:?}");
         let file = s["files"][0]["path"].as_str().unwrap().to_string();
         let ids: Vec<&str> = s["levels"].as_array().unwrap().iter().map(|l| l["id"].as_str().unwrap()).collect();
         assert_eq!(ids, [format!("file:{file}").as_str(), "subckt:amp"]);

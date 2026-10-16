@@ -15,7 +15,7 @@
 // given with it, as a frontend does.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -56,8 +56,7 @@ const core = await loadCore(pathToFileURL(join(dist, "rnl_runtime_wasm.wasm")));
 
 const entries = [];
 for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "libraries/standard"]) {
-  const names = readdirSync(join(root, dir)).filter((name) => /\.(sp|scs|inc|rnl)$/.test(name));
-  entries.push(...names.sort().map((name) => join(root, dir, name)));
+  entries.push(...files(join(root, dir)).filter((path) => /\.(sp|scs|inc|rnl)$/.test(path)));
 }
 if (entries.length < 20) fail(`only ${entries.length} files found under ${root}`);
 // and a file that is not UTF-8, which rnl reads as Latin-1
@@ -94,6 +93,20 @@ const all = `${entries.length} files, ${builds} WebAssembly builds`;
 const outputs = snapshot ? "snapshots" : "Documents";
 if (differ) fail(`${all}: ${differ} ${outputs} differ between the native and the WebAssembly build`);
 console.log(`${all}: the native and the WebAssembly ${outputs} are identical`);
+
+/**
+ * The files in a directory and in its subdirectories, such as the version directories of the
+ * standard packages, by name.
+ */
+function files(dir) {
+  const out = [];
+  for (const name of readdirSync(dir).sort()) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) out.push(...files(path));
+    else out.push(path);
+  }
+  return out;
+}
 
 /** The Document `rnl view` prints, or with --snapshot the snapshot `rnl snapshot` prints; or its error. */
 function native(entry) {

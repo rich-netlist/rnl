@@ -317,7 +317,7 @@
           {
             "id": "$VSRC",
             "name": "$VSRC",
-            "package": "rnl-std",
+            "package": "rnl-std-symbols",
             "level": null,
             "default": false,
             "definition": null
@@ -325,7 +325,7 @@
           {
             "id": "$GROUND",
             "name": "$GROUND",
-            "package": "rnl-std",
+            "package": "rnl-std-virtual",
             "level": null,
             "default": false,
             "definition": null
@@ -333,7 +333,7 @@
           {
             "id": "$SUPPLY_BAR",
             "name": "$SUPPLY_BAR",
-            "package": "rnl-std",
+            "package": "rnl-std-virtual",
             "level": null,
             "default": false,
             "definition": null
@@ -695,7 +695,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:237:9#1",
+            "id": "@rnl-std-virtual.rnl:52:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$GND",
@@ -759,7 +759,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:237:9#2",
+            "id": "@rnl-std-virtual.rnl:52:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$GND",
@@ -823,7 +823,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:237:9#3",
+            "id": "@rnl-std-virtual.rnl:52:9#3",
             "kind": "usage",
             "host": [],
             "definition": "$GND",
@@ -887,7 +887,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:237:9#4",
+            "id": "@rnl-std-virtual.rnl:52:9#4",
             "kind": "usage",
             "host": [],
             "definition": "$GND",
@@ -951,7 +951,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:237:9#5",
+            "id": "@rnl-std-virtual.rnl:52:9#5",
             "kind": "usage",
             "host": [],
             "definition": "$GND",
@@ -1015,7 +1015,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:243:9#1",
+            "id": "@rnl-std-virtual.rnl:58:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$SUPPLY",
@@ -1079,7 +1079,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:243:9#2",
+            "id": "@rnl-std-virtual.rnl:58:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$SUPPLY",
@@ -1143,7 +1143,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:243:9#3",
+            "id": "@rnl-std-virtual.rnl:58:9#3",
             "kind": "usage",
             "host": [],
             "definition": "$SUPPLY",
@@ -1267,7 +1267,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:238:5#1",
+            "id": "@rnl-std-virtual.rnl:53:5#1",
             "nets": [
               "&0"
             ],
@@ -1276,7 +1276,7 @@
                 "terminal": "#X1:4"
               },
               {
-                "usage": "@rnl-std.rnl:237:9#1",
+                "usage": "@rnl-std-virtual.rnl:52:9#1",
                 "role": "p"
               }
             ],
@@ -1294,7 +1294,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:238:5#2",
+            "id": "@rnl-std-virtual.rnl:53:5#2",
             "nets": [
               "&0"
             ],
@@ -1303,7 +1303,7 @@
                 "terminal": "#X2:4"
               },
               {
-                "usage": "@rnl-std.rnl:237:9#2",
+                "usage": "@rnl-std-virtual.rnl:52:9#2",
                 "role": "p"
               }
             ],
@@ -1321,7 +1321,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:238:5#3",
+            "id": "@rnl-std-virtual.rnl:53:5#3",
             "nets": [
               "&0"
             ],
@@ -1330,7 +1330,7 @@
                 "terminal": "#X3:3"
               },
               {
-                "usage": "@rnl-std.rnl:237:9#3",
+                "usage": "@rnl-std-virtual.rnl:52:9#3",
                 "role": "p"
               }
             ],
@@ -1348,7 +1348,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:238:5#4",
+            "id": "@rnl-std-virtual.rnl:53:5#4",
             "nets": [
               "&0"
             ],
@@ -1357,7 +1357,7 @@
                 "terminal": "#Vdd:2"
               },
               {
-                "usage": "@rnl-std.rnl:237:9#4",
+                "usage": "@rnl-std-virtual.rnl:52:9#4",
                 "role": "p"
               }
             ],
@@ -1375,7 +1375,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:238:5#5",
+            "id": "@rnl-std-virtual.rnl:53:5#5",
             "nets": [
               "&0"
             ],
@@ -1384,7 +1384,7 @@
                 "terminal": "#Vin:2"
               },
               {
-                "usage": "@rnl-std.rnl:237:9#5",
+                "usage": "@rnl-std-virtual.rnl:52:9#5",
                 "role": "p"
               }
             ],
@@ -1402,7 +1402,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:244:5#1",
+            "id": "@rnl-std-virtual.rnl:59:5#1",
             "nets": [
               "&vdd"
             ],
@@ -1411,7 +1411,7 @@
                 "terminal": "#X1:3"
               },
               {
-                "usage": "@rnl-std.rnl:243:9#1",
+                "usage": "@rnl-std-virtual.rnl:58:9#1",
                 "role": "p"
               }
             ],
@@ -1429,7 +1429,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:244:5#2",
+            "id": "@rnl-std-virtual.rnl:59:5#2",
             "nets": [
               "&vdd"
             ],
@@ -1438,7 +1438,7 @@
                 "terminal": "#X2:3"
               },
               {
-                "usage": "@rnl-std.rnl:243:9#2",
+                "usage": "@rnl-std-virtual.rnl:58:9#2",
                 "role": "p"
               }
             ],
@@ -1456,7 +1456,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:244:5#3",
+            "id": "@rnl-std-virtual.rnl:59:5#3",
             "nets": [
               "&vdd"
             ],
@@ -1465,7 +1465,7 @@
                 "terminal": "#Vdd:1"
               },
               {
-                "usage": "@rnl-std.rnl:243:9#3",
+                "usage": "@rnl-std-virtual.rnl:58:9#3",
                 "role": "p"
               }
             ],
@@ -1810,8 +1810,8 @@
             }
           },
           {
-            "id": "@rnl-std.rnl:243:9#1::name",
-            "attach": "@rnl-std.rnl:243:9#1",
+            "id": "@rnl-std-virtual.rnl:58:9#1::name",
+            "attach": "@rnl-std-virtual.rnl:58:9#1",
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -1843,8 +1843,8 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:243:9#2::name",
-            "attach": "@rnl-std.rnl:243:9#2",
+            "id": "@rnl-std-virtual.rnl:58:9#2::name",
+            "attach": "@rnl-std-virtual.rnl:58:9#2",
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -1876,8 +1876,8 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:243:9#3::name",
-            "attach": "@rnl-std.rnl:243:9#3",
+            "id": "@rnl-std-virtual.rnl:58:9#3::name",
+            "attach": "@rnl-std-virtual.rnl:58:9#3",
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -1984,7 +1984,7 @@
           {
             "id": "$RES",
             "name": "$RES",
-            "package": "rnl-std",
+            "package": "rnl-std-symbols",
             "level": null,
             "default": false,
             "definition": null
@@ -1992,7 +1992,7 @@
           {
             "id": "$JUNCTION_DOT",
             "name": "$JUNCTION_DOT",
-            "package": "rnl-std",
+            "package": "rnl-std-virtual",
             "level": null,
             "default": false,
             "definition": null
@@ -2000,7 +2000,7 @@
           {
             "id": "$PORT_TAG",
             "name": "$PORT_TAG",
-            "package": "rnl-std",
+            "package": "rnl-std-virtual",
             "level": null,
             "default": false,
             "definition": null
@@ -2141,7 +2141,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:323:3#1",
+            "id": "@rnl-std-fill.rnl:37:3#1",
             "kind": "usage",
             "host": [],
             "definition": "$IOPORT",
@@ -2180,7 +2180,7 @@
             ]
           },
           {
-            "id": "@rnl-std.rnl:323:3#2",
+            "id": "@rnl-std-fill.rnl:37:3#2",
             "kind": "usage",
             "host": [],
             "definition": "$IOPORT",
@@ -2219,7 +2219,7 @@
             ]
           },
           {
-            "id": "@rnl-std.rnl:323:3#3",
+            "id": "@rnl-std-fill.rnl:37:3#3",
             "kind": "usage",
             "host": [],
             "definition": "$IOPORT",
@@ -2539,8 +2539,8 @@
             }
           },
           {
-            "id": "@rnl-std.rnl:323:3#1::name",
-            "attach": "@rnl-std.rnl:323:3#1",
+            "id": "@rnl-std-fill.rnl:37:3#1::name",
+            "attach": "@rnl-std-fill.rnl:37:3#1",
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2572,8 +2572,8 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:323:3#2::name",
-            "attach": "@rnl-std.rnl:323:3#2",
+            "id": "@rnl-std-fill.rnl:37:3#2::name",
+            "attach": "@rnl-std-fill.rnl:37:3#2",
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2605,8 +2605,8 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:323:3#3::name",
-            "attach": "@rnl-std.rnl:323:3#3",
+            "id": "@rnl-std-fill.rnl:37:3#3::name",
+            "attach": "@rnl-std-fill.rnl:37:3#3",
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -2729,7 +2729,7 @@
           {
             "id": "$NMOS",
             "name": "$NMOS",
-            "package": "rnl-std",
+            "package": "rnl-std-symbols",
             "level": null,
             "default": false,
             "definition": null
@@ -2745,7 +2745,7 @@
           {
             "id": "$PORT_TAG",
             "name": "$PORT_TAG",
-            "package": "rnl-std",
+            "package": "rnl-std-virtual",
             "level": null,
             "default": false,
             "definition": null
@@ -2753,7 +2753,7 @@
           {
             "id": "$JUNCTION_DOT",
             "name": "$JUNCTION_DOT",
-            "package": "rnl-std",
+            "package": "rnl-std-virtual",
             "level": null,
             "default": false,
             "definition": null
@@ -2761,7 +2761,7 @@
           {
             "id": "$GROUND",
             "name": "$GROUND",
-            "package": "rnl-std",
+            "package": "rnl-std-virtual",
             "level": null,
             "default": false,
             "definition": null
@@ -2769,7 +2769,7 @@
           {
             "id": "$SUPPLY_BAR",
             "name": "$SUPPLY_BAR",
-            "package": "rnl-std",
+            "package": "rnl-std-virtual",
             "level": null,
             "default": false,
             "definition": null
@@ -3134,7 +3134,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:237:9",
+            "id": "@rnl-std-virtual.rnl:52:9",
             "kind": "usage",
             "host": [],
             "definition": "$GND",
@@ -3198,7 +3198,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std.rnl:243:9",
+            "id": "@rnl-std-virtual.rnl:58:9",
             "kind": "usage",
             "host": [],
             "definition": "$SUPPLY",
@@ -3237,7 +3237,7 @@
             ]
           },
           {
-            "id": "@rnl-std.rnl:323:3",
+            "id": "@rnl-std-fill.rnl:37:3",
             "kind": "usage",
             "host": [],
             "definition": "$IOPORT",
@@ -3380,7 +3380,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:238:5",
+            "id": "@rnl-std-virtual.rnl:53:5",
             "nets": [
               "&vss"
             ],
@@ -3389,7 +3389,7 @@
                 "terminal": "#M1:3"
               },
               {
-                "usage": "@rnl-std.rnl:237:9",
+                "usage": "@rnl-std-virtual.rnl:52:9",
                 "role": "p"
               }
             ],
@@ -3407,7 +3407,7 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:244:5",
+            "id": "@rnl-std-virtual.rnl:59:5",
             "nets": [
               "&vdd"
             ],
@@ -3416,7 +3416,7 @@
                 "terminal": "#R1:1"
               },
               {
-                "usage": "@rnl-std.rnl:243:9",
+                "usage": "@rnl-std-virtual.rnl:58:9",
                 "role": "p"
               }
             ],
@@ -3631,8 +3631,8 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:243:9::name",
-            "attach": "@rnl-std.rnl:243:9",
+            "id": "@rnl-std-virtual.rnl:58:9::name",
+            "attach": "@rnl-std-virtual.rnl:58:9",
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -3664,8 +3664,8 @@
             "style": {}
           },
           {
-            "id": "@rnl-std.rnl:323:3::name",
-            "attach": "@rnl-std.rnl:323:3",
+            "id": "@rnl-std-fill.rnl:37:3::name",
+            "attach": "@rnl-std-fill.rnl:37:3",
             "key": "name",
             "markup": {
               "value": "${p}",
@@ -3703,6 +3703,34 @@
   ],
   "dialect": "spice",
   "packages": [
+    {
+      "name": "rnl-std-style",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-symbols",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-virtual",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-core",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-layout",
+      "version": "0.2"
+    },
     {
       "name": "rnl-std",
       "version": "0.2"

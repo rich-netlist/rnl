@@ -255,6 +255,24 @@ pub struct LevelView {
     pub terminal_names: Vec<Vec<Option<String>>>,
     /// A subcircuit's own symbol, `# @SET-SYMBOL` (9.2.6).
     pub block_symbol: Option<BlockSymbol>,
+    /// The packages in effect at the level, one of each name, in the order of their places:
+    /// those at the root first (16.2, 16.3).
+    pub packages: Vec<LevelPackage>,
+}
+
+/// A package in effect at a drawing level (16.2, 16.3).
+#[derive(Clone, Debug, PartialEq)]
+pub struct LevelPackage {
+    pub name: String,
+    /// What its PACKAGE says, or the `version=` of the USE-PACKAGE of an inline package.
+    pub version: String,
+    /// Where its content is placed: at the root (None), or at a USE-PACKAGE written in a level,
+    /// the host level's index.
+    pub at: Option<usize>,
+    /// The USE-PACKAGE written in a file that brings it in, itself or through the packages it
+    /// references: the package it names, and where it is written. None for the standard package
+    /// used implicitly and what it references.
+    pub via: Option<(String, crate::diag::Loc)>,
 }
 
 /// The symbol a subcircuit gives itself (9.2.6): what its instances are drawn with when they are
@@ -338,8 +356,9 @@ pub struct Model {
     pub failed: Option<String>,
     /// The language version the main file declares (16.1); empty when it declares none.
     pub language: String,
-    /// The packages in effect in some drawing level, by name and version, the standard package
-    /// first, each once.
+    /// The packages in effect in some drawing level, by name and version, each once, in the
+    /// order they are brought in: those of the standard package first, the packages a package
+    /// references before it (16.2, 16.3).
     pub packages: Vec<(String, String)>,
 }
 
