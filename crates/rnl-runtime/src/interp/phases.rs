@@ -654,6 +654,7 @@ impl Interp<'_> {
         }
         // 4. check constraints against the positions (no solver)
         self.check_constraints(s);
+        self.report_discards(s);
         // 5. failures that need symbols: wires to pinless terminals, labels on symbol-less usages.
         // A rewrite of the draft 0.3 that fails so is an error and has no effect, its style
         // parameters included: the wire keeps the list and mode of the latest rewrite that holds,
@@ -867,6 +868,12 @@ impl Interp<'_> {
     }
 
     fn drop_fact(&mut self, s: SceneId, loser: &Fact, winner: &Fact) {
+        if self.conflicts_0_3(s) {
+            // the hint names the kept facts, known once every fact of the object and axis is
+            // weighed: `report_discards` gives it
+            self.note_conflict(s, loser);
+            return;
+        }
         if self.fact_priority(s, loser) == Priority::Low || loser.ctx.is_none() {
             return;
         }
@@ -883,7 +890,7 @@ impl Interp<'_> {
         );
     }
 
-    fn fact_text(&self, f: &Fact) -> String {
+    pub(super) fn fact_text(&self, f: &Fact) -> String {
         match &f.data {
             FactData::Coord(axis, v) => format!("the {axis} of {} = {}", self.label(f.target), fmt_num(*v)),
             FactData::Orient(c) => format!("the orientation {} of {}", c.as_str(), self.label(f.target)),
@@ -1532,12 +1539,17 @@ impl Interp<'_> {
                     if let Some(sc) = &site {
                         self.note_failed_at(sc.rec, cd.off, true);
                     }
-                    self.diag_site(
-                        Severity::Hint,
-                        &site,
-                        cd.off,
-                        format!("{l} conflicts with fixed {what} and is dropped in the order of 8.5 (8.5)"),
-                    );
+                    if self.conflicts_0_3(s) {
+                        // its hint, with the other discards, once the geometry is resolved
+                        self.note_discarded(s, c, &cd, &members, &involved);
+                    } else {
+                        self.diag_site(
+                            Severity::Hint,
+                            &site,
+                            cd.off,
+                            format!("{l} conflicts with fixed {what} and is dropped in the order of 8.5 (8.5)"),
+                        );
+                    }
                 }
             } else {
                 self.constraint_mut(c).status = Some("needs-solver");

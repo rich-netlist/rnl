@@ -259,6 +259,23 @@ fn what_it_writes_interprets_without_errors() {
 }
 
 #[test]
+fn the_nets_of_a_wire_on_several_nets_are_one_set() {
+    // written loose, two nets and the points would be three objects for the two slots of WIRE
+    // (5.2.1); in braces they are one set, which the net slot takes whole, a bus (13.1)
+    let net = "\n.subckt amp in out VSS\nR1 in out 10k\n.ends amp\n";
+    let ops = json!([{"level": "subckt:amp", "op": "add-wire", "nets": ["&in", "&out"], "mode": "straight",
+        "via": [{"terminal": "#R1:1"}, {"terminal": "#R1:2"}]}]);
+    let out = write(&request("spice", net, ops)).unwrap();
+    assert!(out.contains("*   {&in &out} @WIRE(mode=\"straight\") {#R1:1 #R1:2}\n"), "{out}");
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: true, ..Options::default() })
+        .unwrap();
+    let errors: Vec<String> =
+        r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
+    assert!(errors.is_empty(), "{out}\n{}", errors.join("\n"));
+}
+
+#[test]
 fn graphics_and_a_symbol_in_the_file_level() {
     let net = "\n.subckt top a b\nX1 a b blk\n.ends top\n";
     let bold = json!([[{"kind": "text", "text": "OUT", "style": {"level": 0, "bold": true, "italic": false, "overline": false}}]]);
