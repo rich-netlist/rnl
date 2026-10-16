@@ -399,15 +399,20 @@ fn subckt_start(doc: &HostDocument, level: LevelId) -> Option<u32> {
 }
 
 /// The changes that move a header record to the line `above`, carried by `marker`, with VERSION
-/// when it has none: removed where the reading found it, and written whole there.
+/// when it has none: removed where the reading found it, and written whole there, each of its
+/// lines after the first as it was after its marker, so that its indentation stays.
 fn moved_header(header: &Record, version: &str, marker: &str, above: u32) -> Vec<Edit> {
     let mut text = header.text.clone();
     if let Some((brace, s)) = version_insert(header, version) {
         let at = text.char_indices().nth(brace + 1).map_or(text.len(), |(b, _)| b);
         text.insert_str(at, &s);
     }
+    let lines = text
+        .split('\n')
+        .enumerate()
+        .map(|(k, l)| if k == 0 { format!("{marker} {l}") } else { format!("{marker}{l}") });
     let (a, b) = span(header);
-    vec![Edit::Remove(a, b), Edit::Lines(above, carried(&text, marker))]
+    vec![Edit::Remove(a, b), Edit::Lines(above, lines.collect())]
 }
 
 /// Where VERSION goes into a header record that has none: after the `{` of its body, given as the
@@ -771,6 +776,11 @@ mod tests {
         assert_eq!(top, kept);
         let both = replace_generated_with_header(&doc(&top, "a.sp", "*"), 1, &top, record, "0.2");
         assert_eq!(both, moved.replace(".end\n", "* @RNL(type=\"generated\") {}\n.end\n"));
+        // a header on several lines keeps its indentation where it goes
+        let long = net.replace("{ }", "{\n*   @DEVICE(x)\n* }");
+        let out = replace_generated_with_header(&doc(&long, "a.sp", "*"), 1, &long, record, "0.2");
+        let header = "* @RNL(type=\"header\") { @VERSION(\"0.2\");\n*   @DEVICE(x)\n* }\n.subckt s a b\n";
+        assert!(out.starts_with(&format!("* t\n{header}")) && out.matches("type=\"header\"").count() == 1, "{out}");
         // a header after a record of a subcircuit is not the first record of the file: an error
         // its author fixes, left as it is
         let late = net.replace("R1 a b 1k\n", "R1 a b 1k\n* @RNL {#R1}\n");
