@@ -8,13 +8,14 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::diag::{DiagId, Extra, Severity};
+use crate::host::LevelId;
 use crate::model::{FailedSpan, HostRef, RefTarget};
 use crate::syntax::{Coord, Member, ObjExpr, Params, PathItem, Point, Ref, Segment, Sep, SetExpr, Value};
 use crate::words::{words, ParamSpec, ParamType, Takes};
 
 use super::ctx::{Ctx, Defining, FrameKind, Nested, StmtSpan};
 use super::obj::*;
-use super::unit::{closest, Binding, UnitKind};
+use super::unit::{closest, Binding, Place, UnitKind};
 use super::{Interp, Memo};
 
 /// Why evaluation stopped.
@@ -428,10 +429,10 @@ impl<'p> Interp<'p> {
             }
         }
         if let Some((member, unit)) = defining {
-            return Some(self.outer_lookup(prefix, name, &member, unit));
+            return Some(self.outer_lookup(prefix, name, &member, unit, ctx.scene));
         }
         let u = self.name_unit(ctx);
-        self.lookup_unit(prefix, name, u, false).map(Found::Binding)
+        self.lookup_unit(prefix, name, u, false, ctx.scene).map(Found::Binding)
     }
 
     /// The unit whose names a reference is resolved with: a body's names are those of where the
@@ -446,22 +447,38 @@ impl<'p> Interp<'p> {
     }
 
     /// The outer definition of a name whose own binding is `member`: the next one in the lookup
-    /// order of 6.8 and 16.2, or NoOuter (6.9).
-    pub(crate) fn outer_lookup(&mut self, prefix: char, name: &str, member: &MemberRef, unit: UnitId) -> Found {
+    /// order of 6.8 and 16.2, or NoOuter (6.9). `scene` is the level drawn, if any.
+    pub(crate) fn outer_lookup(
+        &mut self,
+        prefix: char,
+        name: &str,
+        member: &MemberRef,
+        unit: UnitId,
+        scene: Option<SceneId>,
+    ) -> Found {
         if let Some(b) = self.units[unit].names.get(&(prefix, name.to_string())) {
             if !Rc::ptr_eq(&b.member, &member.m) {
                 return Found::Binding(b.clone());
             }
         }
-        match self.lookup_unit(prefix, name, unit, true) {
+        match self.lookup_unit(prefix, name, unit, true, scene) {
             Some(b) => Found::Binding(b),
             None => Found::NoOuter,
         }
     }
 
     /// skip_own: what a level's own binding hides, from the levels above and the packages (6.8,
-    /// 16.2); in a package, the standard package in effect (16.2).
-    pub(crate) fn lookup_unit(&mut self, prefix: char, name: &str, u: UnitId, skip_own: bool) -> Option<Binding> {
+    /// 16.2). In a package, after its own names, the packages it references and the standard
+    /// package in effect where it is used, on the chain of the level drawn (`scene`) or else on
+    /// its own first chain (16.2).
+    pub(crate) fn lookup_unit(
+        &mut self,
+        prefix: char,
+        name: &str,
+        u: UnitId,
+        skip_own: bool,
+        scene: Option<SceneId>,
+    ) -> Option<Binding> {
         let key = (prefix, name.to_string());
         if self.units[u].kind == UnitKind::Package {
             if !skip_own {
@@ -469,20 +486,10 @@ impl<'p> Interp<'p> {
                     return Some(b.clone());
                 }
             }
-            if prefix == '$' {
-                let std = match self.units[u].std {
-                    Some(s) => Some(s),
-                    None => self.std_package(),
-                };
-                if let Some(s) = std {
-                    if s != u {
-                        if let Some(b) = self.units[s].names.get(&key) {
-                            return Some(b.clone());
-                        }
-                    }
-                }
+            if prefix != '$' {
+                return None; // `%` names are private to each package
             }
-            return None;
+            return self.package_lookup(name, u, scene);
         }
         if !skip_own {
             if let Some(b) = self.units[u].names.get(&key) {
@@ -493,18 +500,23 @@ impl<'p> Interp<'p> {
             return None;
         }
         let lv = self.units[u].level?;
-        let pk = self.effective_packages(lv);
-        // this level's USE-PACKAGE packages, later first
-        let mut mine: Vec<(&(usize, usize), UnitId)> = pk
-            .iter()
-            .filter_map(|e| match &e.place {
-                super::unit::Place::Level(l, p) if *l == lv => Some((p, e.unit)),
-                _ => None,
-            })
-            .collect();
-        mine.sort_by(|a, b| b.0.cmp(a.0));
-        for (_, pu) in &mine {
-            if let Some(b) = self.units[*pu].names.get(&key) {
+        let eff = self.effective_packages(lv);
+        // the packages a level's USE-PACKAGEs bring in, the later first, and of what one brings
+        // in, the package itself first, then what it references (16.2)
+        let at_level = |l: LevelId| {
+            let mut out: Vec<((usize, usize), usize, UnitId)> = eff
+                .entries
+                .iter()
+                .filter_map(|e| match e.place {
+                    Place::Level(at, p, j) if at == l => Some((p, j, e.unit)),
+                    _ => None,
+                })
+                .collect();
+            out.sort_by_key(|p| std::cmp::Reverse((p.0, p.1)));
+            out
+        };
+        for (_, _, pu) in at_level(lv) {
+            if let Some(b) = self.units[pu].names.get(&key) {
                 if b.prefix != '%' {
                     return Some(b.clone());
                 }
@@ -515,25 +527,18 @@ impl<'p> Interp<'p> {
             if let Some(b) = self.units[au].names.get(&key) {
                 return Some(b.clone());
             }
-            let mut theirs: Vec<(&(usize, usize), UnitId)> = pk
-                .iter()
-                .filter_map(|e| match &e.place {
-                    super::unit::Place::Level(l, p) if *l == anc => Some((p, e.unit)),
-                    _ => None,
-                })
-                .collect();
-            theirs.sort_by(|a, b| b.0.cmp(a.0));
-            for (_, pu) in &theirs {
-                if let Some(b) = self.units[*pu].names.get(&key) {
+            for (_, _, pu) in at_level(anc) {
+                if let Some(b) = self.units[pu].names.get(&key) {
                     return Some(b.clone());
                 }
             }
         }
-        let mut roots: Vec<(usize, UnitId)> = pk
+        let mut roots: Vec<((usize, usize), UnitId)> = eff
+            .entries
             .iter()
-            .filter_map(|e| match &e.place {
-                super::unit::Place::Root(k) => Some((*k, e.unit)),
-                _ => None,
+            .filter_map(|e| match e.place {
+                Place::Root(k, j) => Some(((k, j), e.unit)),
+                Place::Level(..) => None,
             })
             .collect();
         roots.sort_by_key(|r| std::cmp::Reverse(r.0));
@@ -644,6 +649,7 @@ impl<'p> Interp<'p> {
             def_unit: None,
             scope_in: rec.is_some_and(|r| self.units[u].scope_places.contains_key(&r)),
             stmt: Some(StmtSpan { rec, start: m.start, end: m.end }),
+            segments: Rc::new([]),
         };
         let (r, bound) = self.eval_member(m, &ctx);
         self.in_progress.remove(&skey);
@@ -678,7 +684,7 @@ impl<'p> Interp<'p> {
         let mut bound: Bound = Vec::new();
         for (k, seg) in m.segments.iter().enumerate() {
             let piped = if k > 0 { Some((val, sel)) } else { None };
-            match self.eval_segment(seg, ctx, piped, m) {
+            match self.eval_segment(seg, &ctx.in_segment(k), piped, m) {
                 Ok((v, s)) => {
                     val = v;
                     sel = s;
@@ -847,7 +853,7 @@ impl<'p> Interp<'p> {
         }
         let p = self.new_obj(ObjData::Point { x, y, local });
         if let (Some(s), false) = (ctx.scene, local) {
-            self.scene_add_point(s, p, ctx.pos.clone());
+            self.scene_add_point(s, p, ctx.pos.clone(), ctx);
             self.note_birth(s, p, ctx, e.start, None);
         }
         Ok(p)
@@ -990,6 +996,14 @@ impl<'p> Interp<'p> {
                     return Err(Stop::Fail(Some(d)));
                 }
                 None => {
+                    let u = self.name_unit(ctx);
+                    if let Some(gone) = (e.prefix == '$').then(|| self.missing_from_reference(&name, u)).flatten() {
+                        return self.fail(
+                            ctx,
+                            format!("${name} cannot be found: it is in package {gone}, and the {gone} in effect here does not have it (dropped, replaced, or its reference failed); this statement fails (16.2)"),
+                            e.start,
+                        );
+                    }
                     let close = {
                         let mut names: Vec<String> = self.units[ctx.unit]
                             .names

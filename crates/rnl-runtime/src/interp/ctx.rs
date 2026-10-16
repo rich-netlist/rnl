@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use super::obj::{Lit, MemberKey, MemberRef, ObjId, Pos, RecId, SceneId, UnitId};
+use super::obj::{Lit, MemberKey, MemberRef, ObjId, Pos, RecId, SceneId, Segments, UnitId};
 use super::unit::Header;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -116,6 +116,8 @@ pub struct Ctx {
     /// The statement being evaluated: the member of the record, or in a definition body the member
     /// of the body (the draft 0.3, 5.9).
     pub stmt: Option<StmtSpan>,
+    /// The segments of the pipes being evaluated, for the order of resolution (8.5).
+    pub segments: Segments,
 }
 
 impl Ctx {
@@ -147,6 +149,13 @@ impl Ctx {
             }
             None => false,
         }
+    }
+
+    /// Segment `k` of the pipe of the statement at this position.
+    pub fn in_segment(&self, k: usize) -> Ctx {
+        let mut c = self.clone();
+        c.segments = self.segments.iter().copied().chain([(self.pos.len(), k)]).collect();
+        c
     }
 
     pub fn with_pos(&self, pos: Pos) -> Ctx {

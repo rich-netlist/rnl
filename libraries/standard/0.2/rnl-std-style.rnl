@@ -1,0 +1,24 @@
+/* rnl-std-style, a sub-package of the standard package rnl-std through rnl-std-core (16.3): the
+   styles (9.3) and the default style rules, which give every kind of object $base and bus wires
+   $bus. */
+@RNL(type="header") { @VERSION("0.2"); @PACKAGE(name="rnl-std-style", version="0.2")}
+
+/* ---------------------------------------------------------------- styles (9.3) */
+@RNL {
+  $base = @DEFINE-STYLE(linecolor="#1d1d1f", textcolor="#1d1d1f", fillcolor="#ffffff", linewidth=0, size=1) {};
+  $bus = @DEFINE-STYLE(linestyle="bold") {};
+  $signal = @DEFINE-STYLE(linecolor="#1f4fd8", linestyle="bold") {$base};
+  $note = @DEFINE-STYLE(textcolor="#555555", size=0.9) {};
+  $grey = @DEFINE-STYLE(linecolor="#9a9a9a", textcolor="#9a9a9a") {}
+}
+
+/* ---------------------------------------------------------------- default style rules (8.3, 16.3) */
+@RNL {
+  /* style first, so every later rule and user statement overrides it */
+  # @SELECT-INSTANCE => @SET-STYLE $base;
+  # @SELECT-USAGE => @SET-STYLE $base;
+  # @SELECT-WIRE => @SET-STYLE $base;
+  # @SELECT-LABEL => @SET-STYLE $base;
+  # @SELECT-ANNOTATION => @SET-STYLE $base;
+  # @SELECT-WIRE(bus=true) => @SET-STYLE $bus
+}

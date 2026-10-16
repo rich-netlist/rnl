@@ -110,6 +110,29 @@ pub fn pos_plus(p: &Pos, tag: &'static str, k: i64) -> Pos {
     out
 }
 
+/// The segments of the pipes that something is written in, outermost first: for each pipe, the
+/// length of the position of its statement and the index of the segment.
+pub type Segments = Rc<[(usize, usize)]>;
+
+/// A position in the order of resolution (8.5): `pos`, of what is written in `segments`, with the
+/// index of each segment after the position of its pipe's statement. So of the segments of one
+/// pipe the later is later, whatever the position adds within a segment: the members a statement
+/// works on, an expansion, a nested statement, the axis of a PLACE.
+pub fn order_pos(pos: &Pos, segments: &[(usize, usize)]) -> Pos {
+    let mut out = Pos::with_capacity(pos.len() + segments.len());
+    let mut from = 0;
+    for &(len, k) in segments {
+        if len < from || len > pos.len() {
+            break;
+        }
+        out.extend_from_slice(&pos[from..len]);
+        out.push(PosElem::Int(k as i64));
+        from = len;
+    }
+    out.extend_from_slice(&pos[from..]);
+    out
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Priority {
     Disabled,

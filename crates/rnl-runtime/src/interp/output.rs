@@ -8,6 +8,7 @@ use crate::markup;
 use crate::model::*;
 
 use super::obj::*;
+use super::unit::Place;
 use super::Interp;
 
 fn flat(p: &Pos) -> Vec<f64> {
@@ -66,7 +67,8 @@ impl Interp<'_> {
         let mut packages: Vec<(String, String)> = Vec::new();
         for s in 0..self.scenes.len() {
             let lv = self.scenes[s].level;
-            for e in self.effective_packages(lv) {
+            let eff = self.effective_packages(lv);
+            for e in &eff.entries {
                 let u = &self.units[e.unit];
                 let p = (u.pkg_name.clone(), u.pkg_version.clone());
                 if !packages.contains(&p) {
@@ -352,12 +354,13 @@ impl Interp<'_> {
         self.scenes[s].layer.get(&o).map(|(l, _)| Layer::parse(l)).unwrap_or_default()
     }
 
-    /// Where the latest symbol of each object of a scene is given.
+    /// Where the latest symbol of each object of a scene is given, in the order of writing (5.5).
     fn last_symbol_pos(&self, s: SceneId) -> HashMap<ObjId, Pos> {
         let mut out: HashMap<ObjId, Pos> = HashMap::new();
         for f in &self.scenes[s].appear {
-            if out.get(&f.target).is_none_or(|p| f.pos > *p) {
-                out.insert(f.target, f.pos.clone());
+            let order = f.order();
+            if out.get(&f.target).is_none_or(|p| order > *p) {
+                out.insert(f.target, order);
             }
         }
         out
@@ -370,15 +373,18 @@ impl Interp<'_> {
             ObjData::Inst { .. } => vec![0.0, self.inst_of(o).order as f64],
             ObjData::Bundle { members, .. } => vec![0.0, self.inst_of(members[0]).order as f64],
             ObjData::Usage(_) => {
-                let p =
-                    last_symbol.get(&o).cloned().or_else(|| sc.created.get(&o).cloned()).unwrap_or_else(|| pos(&[9]));
+                let p = last_symbol
+                    .get(&o)
+                    .cloned()
+                    .or_else(|| sc.created_order.get(&o).cloned())
+                    .unwrap_or_else(|| pos(&[9]));
                 let mut k = vec![1.0];
                 k.extend(flat(&p));
                 k
             }
             _ => {
                 let mut k = vec![1.0];
-                k.extend(flat(&sc.created.get(&o).cloned().unwrap_or_else(|| pos(&[9]))));
+                k.extend(flat(&sc.created_order.get(&o).cloned().unwrap_or_else(|| pos(&[9]))));
                 k
             }
         }
@@ -760,6 +766,7 @@ impl Interp<'_> {
                 priority: cd.eff.unwrap_or(Priority::Normal).as_str().to_string(),
             });
         }
+        let packages = self.level_packages(lv);
         LevelView {
             level: lv,
             title: level.title(),
@@ -779,7 +786,32 @@ impl Interp<'_> {
             points,
             terminal_names,
             block_symbol: self.block_symbol_of(lv),
+            packages,
         }
+    }
+
+    /// The packages in effect at a level in the order of their places (8.3, 16.2, 16.3): at the
+    /// root, then at the USE-PACKAGEs of the levels from the top down.
+    fn level_packages(&mut self, lv: usize) -> Vec<LevelPackage> {
+        let mut chain = self.doc.ancestors(lv);
+        chain.reverse();
+        chain.push(lv);
+        let eff = self.effective_packages(lv);
+        let mut out: Vec<(_, LevelPackage)> = eff
+            .entries
+            .iter()
+            .map(|e| {
+                let (at, key) = match e.place {
+                    Place::Root(k, j) => (None, (0, k, (0, 0), j)),
+                    Place::Level(l, p, j) => (Some(l), (1 + chain.iter().position(|c| *c == l).unwrap_or(0), 0, p, j)),
+                };
+                let via = e.decl.as_ref().and_then(|d| Some((d.name.clone(), self.rec_loc(d.rec, d.offset)?)));
+                let u = &self.units[e.unit];
+                (key, LevelPackage { name: u.pkg_name.clone(), version: self.pkg_ver(e.unit), at, via })
+            })
+            .collect();
+        out.sort_by_key(|(key, _)| *key);
+        out.into_iter().map(|(_, p)| p).collect()
     }
 
     /// The symbol a subcircuit gives itself with `# @SET-SYMBOL`, the later one when it is written

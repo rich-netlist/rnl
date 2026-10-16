@@ -1,0 +1,51 @@
+/* rnl-std-fill, a sub-package of the standard package rnl-std (16.3); it references
+   rnl-std-virtual. It holds the sets the user edits with ADD-TO and REMOVE-FROM (10.5) and the
+   fill rules: a ground or supply stub for every unwired pin on a ground or supply net, a port tag
+   for every port net that has none; the net-name label set and the wire net set are there but
+   not applied by default. A file that does not want the automatic fill drops this sub-package
+   with an empty inline package of the same name in its header record (16.3). */
+@RNL(type="header") {
+  @VERSION("0.2");
+  @PACKAGE(name="rnl-std-fill", version="0.2");
+  @USE-PACKAGE(name="rnl-std-virtual", version="0.2")
+}
+
+/* ---------------------------------------------------------------- sets and fill (10.5, 16.3) */
+@RNL {
+  /* sets the user edits with ADD-TO / REMOVE-FROM (10.5) */
+  $GROUND_NET_SET = # @SELECT-NET(name="0");
+  $SUPPLY_NET_SET = {};
+  $PORT_FILL_SET = # @SELECT-NET(port=true);
+
+  /* ground and supply for unwired pins: a stub with its own wire, gap below or above the pin
+     (10.5, PR3). The solver places it and writes it back as an explicit statement; its wire then
+     makes the terminal wired, so the fill does not come back (10.5 V8, PR2). A ground drawn right
+     on a pin (12.1 rule 5) is left to the user; through the usages only their terminal members are
+     selected (10.1, PR16), so such a pin is taken out of the fill. */
+  $GND_FILL_SET = $GROUND_NET_SET @SELECT-TERMINAL(wired=false);
+  # @SELECT-USAGE $NC => @SELECT-TERMINAL => @REMOVE-FROM $GND_FILL_SET;
+  # @SELECT-USAGE $GND => @SELECT-TERMINAL => @REMOVE-FROM $GND_FILL_SET;
+  $GND_STUB @ATTACH $GND_FILL_SET;
+
+  $SUPPLY_FILL_SET = $SUPPLY_NET_SET @SELECT-TERMINAL(wired=false);
+  # @SELECT-USAGE $NC => @SELECT-TERMINAL => @REMOVE-FROM $SUPPLY_FILL_SET;
+  # @SELECT-USAGE $SUPPLY => @SELECT-TERMINAL => @REMOVE-FROM $SUPPLY_FILL_SET;
+  $SUPPLY_STUB @ATTACH $SUPPLY_FILL_SET;
+
+  /* ports of a subcircuit: one tag per port net that has none yet */
+  # @SELECT-USAGE $IOPORT => @SELECT-NET => @REMOVE-FROM $PORT_FILL_SET;
+  $IOPORT @ATTACH $PORT_FILL_SET;
+
+  /* net-name labels for unwired pins: not applied by default; a document opts in with
+     $LABEL_TERM_SET @TEXT("${net}", key="netname") */
+  $LABEL_TERM_SET = # @SELECT-TERMINAL(wired=false);
+  $GROUND_NET_SET @SELECT-TERMINAL => @REMOVE-FROM $LABEL_TERM_SET;
+  $SUPPLY_NET_SET @SELECT-TERMINAL => @REMOVE-FROM $LABEL_TERM_SET;
+  # @SELECT-USAGE $NC => @SELECT-TERMINAL => @REMOVE-FROM $LABEL_TERM_SET;
+
+  /* nets to draw with wires, routed by the solver: not applied by default; a document or a style
+     package opts in with $WIRE_NET_SET @ROUTE (13.7, PR5) */
+  $WIRE_NET_SET = # @SELECT-NET;
+  $GROUND_NET_SET @REMOVE-FROM $WIRE_NET_SET;
+  $SUPPLY_NET_SET @REMOVE-FROM $WIRE_NET_SET
+}

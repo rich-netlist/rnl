@@ -15,6 +15,7 @@ pub mod kw;
 mod numbers;
 pub mod obj;
 mod output;
+mod packages;
 pub mod phases;
 pub mod scene;
 pub mod unit;
@@ -33,8 +34,9 @@ use crate::syntax::RecordAst;
 use eval::{Bound, Stop, R};
 use numbers::{AuthoredCount, Birth, Counted, LevelNumbers, NumberRun};
 use obj::*;
+use packages::{Eff, EffKey, Expansion};
 use scene::Scene;
-use unit::{Header, Unit, UnitKind};
+use unit::{Header, Place, Unit, UnitKind};
 
 /// The memoised value of a member in a scene.
 #[derive(Clone, Debug)]
@@ -177,6 +179,21 @@ pub struct Interp<'p> {
     /// Read the files that declare the draft 0.3 (`Options::draft`).
     pub(crate) draft: bool,
     pub(crate) std_cache: Option<Option<UnitId>>,
+    /// The packages in effect on each chain of levels, and the number of units they were found
+    /// among (16.2).
+    pub(crate) effs: HashMap<EffKey, Rc<Eff>>,
+    pub(crate) effs_units: usize,
+    /// What each package brings in when used (16.2).
+    pub(crate) expansions: HashMap<UnitId, Expansion>,
+    /// Where the names of a package are looked up after its own, on each chain (16.2).
+    pub(crate) envs: HashMap<(EffKey, UnitId), Rc<Vec<UnitId>>>,
+    /// The standard package in effect on each chain and what it references (16.2, 16.3).
+    #[allow(clippy::type_complexity)]
+    pub(crate) std_envs: HashMap<EffKey, Rc<(HashSet<String>, Vec<UnitId>)>>,
+    /// The chain each package's statements are read on without a level (16.2).
+    pub(crate) home: HashMap<UnitId, EffKey>,
+    /// The packages whose references were checked for hiding (16.2).
+    pub(crate) refs_checked: HashSet<UnitId>,
     pub(crate) scoped_memo: HashMap<(UnitId, ObjId), Vec<(String, String)>>,
     pub(crate) body_errors: HashMap<usize, DiagId>,
     pub(crate) made_routes: Vec<ObjId>,
@@ -271,6 +288,13 @@ impl<'p> Interp<'p> {
             tol: options.tolerance,
             draft: options.draft,
             std_cache: None,
+            effs: HashMap::new(),
+            effs_units: 0,
+            expansions: HashMap::new(),
+            envs: HashMap::new(),
+            std_envs: HashMap::new(),
+            home: HashMap::new(),
+            refs_checked: HashSet::new(),
             scoped_memo: HashMap::new(),
             body_errors: HashMap::new(),
             made_routes: Vec::new(),
@@ -349,31 +373,42 @@ impl<'p> Interp<'p> {
         it.units.push(u);
         it.unit_recs.push(Vec::new());
         it.checking_path = Some(crate::source::normalize(path));
-        let pu = it.load_package_file(path);
+        let pu = it.load_package_file(path, None);
         it.package_main = Some(pu);
         it
     }
 
     pub fn run(&mut self) {
+        // the standard package first: reading it reads the packages it references (16.3)
+        self.std_package();
         if let Some(pm) = self.package_main {
-            self.classify(pm);
+            // checked on its own (2.7): the package and what its references bring in (16.2)
+            let chain = EffKey::Alone(pm);
+            self.set_home(chain);
+            let eff = self.eff(chain);
+            let name = self.units[pm].pkg_name.clone();
+            let brought: Vec<UnitId> =
+                self.expansion(&name, Some(pm)).0.iter().filter_map(|n| eff.unit.get(n).copied().flatten()).collect();
+            for &u in &brought {
+                self.classify(u);
+            }
+            for &u in &brought {
+                self.check_package_refs(u);
+            }
             return;
         }
-        let mut todo: Vec<UnitId> = self
-            .units
-            .iter()
-            .enumerate()
-            .filter(|(_, u)| u.kind == UnitKind::Package && !u.embedded)
-            .map(|(i, _)| i)
-            .collect();
-        if let Some(s) = self.std_package() {
-            todo.push(s);
-        }
-        for (i, u) in self.units.iter().enumerate() {
-            if u.embedded {
-                todo.push(i);
+        // a package's statements read without a level take the packages in effect on the first
+        // chain it is in effect on (16.2)
+        for lv in 0..self.doc.levels.len() {
+            if self.file_ok(lv) {
+                self.set_home(EffKey::Level(lv));
             }
         }
+        let packages: Vec<UnitId> = (0..self.units.len())
+            .filter(|&i| self.units[i].kind == UnitKind::Package && !self.units[i].embedded)
+            .collect();
+        let embedded = (0..self.units.len()).filter(|&i| self.units[i].embedded);
+        let todo: Vec<UnitId> = packages.iter().copied().chain(embedded).collect();
         for u in todo {
             self.classify(u);
         }
@@ -386,6 +421,9 @@ impl<'p> Interp<'p> {
         self.check_scopes();
         self.check_shadowing();
         self.check_package_shadowing();
+        for u in packages {
+            self.check_package_refs(u);
+        }
         self.prescan_blocks();
         for lv in 0..self.doc.levels.len() {
             if self.restart.is_some() {
@@ -435,7 +473,8 @@ impl<'p> Interp<'p> {
             m: unit::UnitMember,
         }
         let mut work: Vec<Work> = Vec::new();
-        for e in self.effective_packages(lv) {
+        let eff = self.effective_packages(lv);
+        for e in &eff.entries {
             for m in self.rule_members(e.unit).iter() {
                 work.push(Work { u: e.unit, m: m.clone() });
             }
@@ -577,71 +616,86 @@ impl<'p> Interp<'p> {
                     continue;
                 }
                 let b = self.units[u].names[&key].clone();
-                let Some(hidden) = self.lookup_unit('$', &key.1, u, true) else { continue };
+                let Some(hidden) = self.lookup_unit('$', &key.1, u, true, None) else { continue };
                 let owner = hidden.owner;
                 let wher = if self.units[owner].kind == UnitKind::Package {
-                    if Some(owner) == self.std_package() {
-                        format!("in the standard package {}", self.units[owner].pkg_name)
+                    // one of the packages of the standard package in effect (16.3)
+                    let pn = self.units[owner].pkg_name.clone();
+                    if !self.std_env(EffKey::Level(lv)).0.contains(&pn) {
+                        format!("in the package {pn}")
+                    } else if pn == packages::STD_NAME {
+                        format!("in the standard package {pn}")
                     } else {
-                        format!("in the package {}", self.units[owner].pkg_name)
+                        format!("in {pn} of the standard package {}", packages::STD_NAME)
                     }
                 } else {
                     let l = self.units[owner].level.map(|l| self.doc.levels[l].title()).unwrap_or_default();
                     format!("in the level above, {l}")
                 };
-                let name = format!("${}", key.1);
-                let written = if b.written == name { b.written.clone() } else { format!("{} ({name})", b.written) };
+                let written = packages::shown(&b);
                 let loc = self.rec_loc(b.rec, b.off);
                 self.sink.hint(format!("{written} hides the definition of the same name {wher}; this level and below use this one (6.8)"), loc);
             }
         }
     }
 
-    /// Packages used in the same level that define the same `$X`: the later hides the earlier (16.2).
+    /// Packages used in the same level, or at the root, that define the same `$X`: the later
+    /// hides the earlier (16.2). What one USE-PACKAGE brings in is the business of its package.
     fn check_package_shadowing(&mut self) {
-        let mut seen: HashSet<(usize, String)> = HashSet::new();
+        // each USE-PACKAGE, by its unit and place, and name: hinted once
+        let mut seen: HashSet<(UnitId, (usize, usize), String)> = HashSet::new();
         for lv in 0..self.doc.levels.len() {
             let u = self.level_unit[lv];
             if !self.units[u].ok || !self.file_ok(lv) {
                 continue;
             }
-            let pk = self.effective_packages(lv);
+            let eff = self.effective_packages(lv);
+            let std = self.std_env(EffKey::Level(lv));
             let mut mine: Vec<&unit::EffPackage> =
-                pk.iter().filter(|e| matches!(e.place, unit::Place::Level(l, _) if l == lv)).collect();
-            mine.sort_by_key(|e| e.decl.as_ref().map(|d| d.pos).unwrap_or((0, 0)));
+                eff.entries.iter().filter(|e| matches!(e.place, Place::Level(l, _, _) if l == lv)).collect();
+            mine.sort_by_key(|e| match e.place {
+                Place::Level(_, pos, j) => (pos, j),
+                Place::Root(..) => ((0, 0), 0),
+            });
             let mut roots: Vec<&unit::EffPackage> =
-                pk.iter().filter(|e| matches!(e.place, unit::Place::Root(_))).collect();
+                eff.entries.iter().filter(|e| matches!(e.place, Place::Root(..))).collect();
             roots.sort_by_key(|e| match e.place {
-                unit::Place::Root(k) => k,
-                _ => 0,
+                Place::Root(k, j) => (k, j),
+                Place::Level(..) => (0, 0),
             });
             for (at, group) in [("at the root", roots), ("in the same level", mine)] {
-                let mut before: HashMap<String, UnitId> = HashMap::new();
+                // each name: the package that defines it and the USE-PACKAGE that brings it in
+                let mut before: HashMap<String, (UnitId, Option<&unit::UseDecl>)> = HashMap::new();
                 for e in group {
                     let p = e.unit;
                     for key in self.units[p].name_order.clone() {
                         if key.0 != '$' {
                             continue;
                         }
-                        let prev = before.insert(key.1.clone(), p);
-                        let Some(prev) = prev else { continue };
-                        let Some(d) = &e.decl else { continue };
-                        let tag = (d.rec.unwrap_or(0) * 100_000 + d.pos.1, key.1.clone());
-                        if !seen.insert(tag) {
+                        let prev = before.insert(key.1.clone(), (p, e.decl.as_ref()));
+                        let (Some((q, by)), Some(d)) = (prev, &e.decl) else { continue };
+                        if by.is_some_and(|by| by.same(d)) {
                             continue;
                         }
-                        let b = self.units[p].names[&key].clone();
-                        let name = format!("${}", key.1);
-                        let written =
-                            if b.written == name { b.written.clone() } else { format!("{} ({name})", b.written) };
-                        let what = if self.units[prev].pkg_name == "rnl-std" {
-                            format!("the standard package {}", self.units[prev].pkg_name)
+                        if !seen.insert((d.unit, d.pos, key.1.clone())) {
+                            continue;
+                        }
+                        let written = packages::shown(&self.units[p].names[&key]);
+                        let (pn, qn) = (self.units[p].pkg_name.clone(), self.units[q].pkg_name.clone());
+                        let what = match by {
+                            _ if std.0.contains(&qn) => format!("the standard package {}", packages::STD_NAME),
+                            Some(by) if Some(q) != by.pkg => {
+                                format!("the package {qn} that the earlier USE-PACKAGE of {} brings in", by.name)
+                            }
+                            _ => format!("the earlier USE-PACKAGE of {qn}"),
+                        };
+                        let who = if Some(p) == d.pkg {
+                            format!("package {pn}")
                         } else {
-                            format!("the earlier USE-PACKAGE of {}", self.units[prev].pkg_name)
+                            format!("package {pn}, which the USE-PACKAGE of {} brings in,", d.name)
                         };
                         let loc = self.rec_loc(d.rec, d.offset);
-                        let pn = self.units[p].pkg_name.clone();
-                        self.sink.hint(format!("{written} in package {pn} hides the definition of the same name in {what} {at}; this level and below use the one of {pn} (16.2)"), loc);
+                        self.sink.hint(format!("{written} in {who} hides the definition of the same name in {what} {at}; this level and below use the one of {pn} (16.2)"), loc);
                     }
                 }
             }
