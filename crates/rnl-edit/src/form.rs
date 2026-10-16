@@ -183,7 +183,12 @@ pub fn statements(op: &Op) -> Vec<String> {
                     Vertex::At(p) => point(*p),
                 })
                 .collect();
-            let wire = format!("{} @WIRE{params} {{{}}}", nets.join(" "), vertices.join(" "));
+            // several nets are one set, which the net slot takes whole: a bus (5.2.1, 13.1)
+            let nets = match nets.as_slice() {
+                [one] => one.clone(),
+                _ => format!("{{{}}}", nets.join(" ")),
+            };
+            let wire = format!("{nets} @WIRE{params} {{{}}}", vertices.join(" "));
             vec![match name {
                 Some(n) => format!("{wire} => {n}"),
                 None => wire,

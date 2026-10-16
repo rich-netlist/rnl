@@ -2101,7 +2101,7 @@
       "kind": "subckt",
       "name": "dff",
       "file": 0,
-      "line": 4,
+      "line": 5,
       "status": null,
       "host": {
         "ports": [
@@ -2373,7 +2373,7 @@
       "kind": "subckt",
       "name": "reg4",
       "file": 0,
-      "line": 11,
+      "line": 12,
       "status": null,
       "host": {
         "ports": [
@@ -3139,7 +3139,7 @@
             "style": {}
           },
           {
-            "id": "@09-buses-and-bundles.sp:40:5",
+            "id": "@09-buses-and-bundles.sp:41:5",
             "attach": null,
             "key": null,
             "markup": {
@@ -3172,7 +3172,7 @@
             "style": {}
           },
           {
-            "id": "@09-buses-and-bundles.sp:41:5",
+            "id": "@09-buses-and-bundles.sp:42:5",
             "attach": null,
             "key": null,
             "markup": {

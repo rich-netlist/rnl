@@ -692,7 +692,7 @@ R1 p q 1k
         // a subcircuit's definition, from its header to its .ends, in the file that has it
         let lines = |title: &str| d.levels.iter().find(|l| l.title == title).and_then(|l| l.lines);
         assert_eq!((d.levels[0].kind, d.levels[0].lines), ("file", None));
-        assert_eq!(lines("amp"), Some([0, 7, 47]));
+        assert_eq!(lines("amp"), Some([0, 8, 48]));
         assert_eq!(lines("rdiv"), Some([1, 2, 19]));
     }
 

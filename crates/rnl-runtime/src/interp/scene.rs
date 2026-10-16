@@ -265,6 +265,17 @@ pub(crate) fn dedup(objs: Vec<ObjId>) -> Vec<ObjId> {
     objs.into_iter().filter(|o| seen.insert(*o)).collect()
 }
 
+/// The terminal names that the draft 0.3 adds to the defaults of the SPICE family, by element
+/// letter (6.12): `p1 n1 p2 n2` for T and O, `a b ref` for U, `d g s` for Z.
+pub(crate) fn added_terminals(letter: char) -> Option<&'static [&'static str]> {
+    Some(match letter {
+        'T' | 'O' => &["p1", "n1", "p2", "n2"],
+        'U' => &["a", "b", "ref"],
+        'Z' => &["d", "g", "s"],
+        _ => return None,
+    })
+}
+
 impl Interp<'_> {
     // ------------------------------------------------------------------ the scene of a level
 
@@ -366,7 +377,29 @@ impl Interp<'_> {
                 );
             }
         }
-        found.or_else(|| inst.default_terminals.clone())
+        found.or_else(|| self.default_terminals(s, inst))
+    }
+
+    /// The default terminal names of an instance, the defaults of the adapter (6.12): the table
+    /// every version has, which the adapter gives, and for an instance written in a file of the
+    /// draft 0.3 the names the draft adds for the SPICE family ([`added_terminals`]). The adapter
+    /// reads the host and does not know the language version of a file, so the runtime gives
+    /// these by the element letter.
+    fn default_terminals(&self, s: SceneId, inst: &crate::host::Instance) -> Option<Vec<String>> {
+        if inst.default_terminals.is_some() {
+            return inst.default_terminals.clone();
+        }
+        let names = added_terminals(inst.letter?)?;
+        self.written_in_0_3(s, inst).then(|| names.iter().map(|n| n.to_string()).collect())
+    }
+
+    /// Is an instance written in a file that follows the draft 0.3? The file of its line: in an
+    /// included file, an element outside a subcircuit belongs to the circuit that includes it
+    /// (6.1) and is still written in that file.
+    fn written_in_0_3(&self, s: SceneId, inst: &crate::host::Instance) -> bool {
+        let file = (0..self.doc.levels.len())
+            .find(|&l| self.doc.levels[l].kind == crate::host::LevelKind::File && self.doc.levels[l].file == inst.file);
+        self.follows_0_3(self.level_unit[file.unwrap_or(self.scenes[s].level)])
     }
 
     /// The terminals of an owner: (index from 1, name).

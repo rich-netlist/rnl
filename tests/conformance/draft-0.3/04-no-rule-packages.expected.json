@@ -1,0 +1,403 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "04-no-rule-packages.scs",
+      "kind": "file",
+      "file": "04-no-rule-packages.scs",
+      "symbols": [
+        {
+          "name": "$ISRC",
+          "box": [
+            -1.5,
+            -3.0,
+            1.5,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  3.0
+                ],
+                [
+                  0.0,
+                  1.5
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.5
+                ],
+                [
+                  0.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.9
+                ],
+                [
+                  0.0,
+                  -0.9
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$RES",
+          "box": [
+            -0.6,
+            -3.0,
+            0.6,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  3.0
+                ],
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.6,
+                  1.667
+                ],
+                [
+                  -0.6,
+                  1.0
+                ],
+                [
+                  0.6,
+                  0.333
+                ],
+                [
+                  -0.6,
+                  -0.333
+                ],
+                [
+                  0.6,
+                  -1.0
+                ],
+                [
+                  -0.6,
+                  -1.667
+                ],
+                [
+                  0.0,
+                  -2.0
+                ],
+                [
+                  0.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#I0",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R0",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#I0::name",
+          "anchor": [
+            1.9,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "I0",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#I0::value",
+          "anchor": [
+            1.9,
+            -0.95
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R0::name",
+          "anchor": [
+            11.1,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "R0",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R0::value",
+          "anchor": [
+            11.1,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "fillcolor": "#ffffff",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.0,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "normal"
+        }
+      ],
+      "unplaced": [
+        "%g",
+        "%g"
+      ]
+    },
+    {
+      "title": "cell",
+      "kind": "subckt",
+      "file": "04-no-rule-packages.scs",
+      "symbols": [],
+      "items": [],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "a usage of $IOPORT",
+        "a usage of $IOPORT"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "04-no-rule-packages.scs",
+      "line": 1,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "04-no-rule-packages.scs",
+      "line": 5,
+      "col": 0
+    }
+  ]
+}

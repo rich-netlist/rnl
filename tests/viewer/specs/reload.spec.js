@@ -24,7 +24,7 @@ test("F5 and Ctrl+R read the document again and keep the level, the view and the
     await expect(page.locator("#level-name")).toHaveText("amp");
     expect(await viewer.viewBox()).toBe(view);
     await viewer.selected("instance M1 in amp");
-    expect(await viewer.markedLines()).toEqual([8]);
+    expect(await viewer.markedLines()).toEqual([9]);
     await expect(page.locator("#canvas > svg .overlay rect")).toHaveCount(1);
   }
   expect(await viewer.calls("build")).toEqual(Array(4).fill(["04-hierarchy"]));
@@ -61,7 +61,7 @@ test("reading again keeps the views left on other levels, and the tree's folded 
 test("a file that changed keeps the selection on its statement, which moved", async ({ page, viewer }) => {
   await viewer.click("X2");
   await viewer.selected(`instance X2 in ${TOP}`);
-  expect(await viewer.markedLines()).toEqual([49]);
+  expect(await viewer.markedLines()).toEqual([50]);
   await page.keyboard.press("Control+=");
   const view = await viewer.viewBox();
   const scroll = await page.locator("#source").evaluate((s) => s.scrollTop);
@@ -69,9 +69,9 @@ test("a file that changed keeps the selection on its statement, which moved", as
 
   await page.evaluate(() => { window.fakeShell.next = "04-hierarchy-changed"; });
   await viewer.build(() => page.keyboard.press("F5"));
-  await expect(viewer.line(53)).toHaveText(/Vin a 0 1\.2/);
+  await expect(viewer.line(54)).toHaveText(/Vin a 0 1\.2/);
   await viewer.selected(`instance X2 in ${TOP}`);
-  expect(await viewer.markedLines()).toEqual([50]);
+  expect(await viewer.markedLines()).toEqual([51]);
   expect(await viewer.viewBox()).toBe(view);
   expect(await page.locator("#source").evaluate((s) => s.scrollTop)).toBe(scroll);
 

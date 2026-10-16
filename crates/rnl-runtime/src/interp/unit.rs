@@ -455,14 +455,19 @@ impl Interp<'_> {
                 self.diag_in(Severity::Hint, super::numbers::STALE_HINT, Some(loc), &pkg);
             }
             if header.type_ == "header" {
-                if !is_file_level || index != 0 || self.units[u].header_record.is_some() {
+                // at the file level, the first record of the whole file, and at most one (2.8)
+                let wrong = if !is_file_level {
+                    Some("a header record is written at the file level, not inside a subcircuit (2.8); this one is ignored")
+                } else if self.units[u].header_record.is_some() {
+                    Some("a file has at most one header record (2.8); this one is ignored")
+                } else if index != 0 || self.after_a_record_of_its_file(u, rec) {
+                    Some("a header record is the first record of a file, and a record comes before this one (2.8); this one is ignored")
+                } else {
+                    None
+                };
+                if let Some(msg) = wrong {
                     let loc = self.recs[rec].loc(0);
-                    self.diag_in(
-                        Severity::Error,
-                        "a header record is the first record of a file, at most one (2.8); this one is ignored",
-                        Some(loc),
-                        &pkg,
-                    );
+                    self.diag_in(Severity::Error, msg, Some(loc), &pkg);
                     self.units[u].other_records += 1;
                     continue;
                 }
@@ -546,6 +551,31 @@ impl Interp<'_> {
                 Some(Loc::line(file, 2)),
             );
         }
+    }
+
+    /// Whether a record comes before this one in the file whose file level is the unit `u`: a
+    /// record of that level or of a level below it in the same file, such as a subcircuit written
+    /// above it. A section of `.lib` that is read counts as a file, with a file level of its own
+    /// (2.8).
+    fn after_a_record_of_its_file(&self, u: UnitId, rec: RecId) -> bool {
+        let Some(top) = self.units[u].level else { return false };
+        let at = self.recs[rec].loc(0);
+        let in_file = |mut l: LevelId| loop {
+            if self.doc.levels[l].kind == LevelKind::File {
+                return l == top;
+            }
+            match self.doc.levels[l].parent {
+                Some(p) => l = p,
+                None => return false,
+            }
+        };
+        self.doc.levels.iter().enumerate().any(|(l, lv)| {
+            in_file(l)
+                && lv.records.iter().any(|o| {
+                    let p = o.loc(0);
+                    (p.line, p.col) < (at.line, at.col)
+                })
+        })
     }
 
     pub(crate) fn unit_level_kind(&self, u: UnitId) -> Option<LevelKind> {
@@ -1235,13 +1265,19 @@ impl Interp<'_> {
         dirname(&self.doc.levels[0].path)
     }
 
-    /// The language version a unit's file is read in (16.1).
+    /// The language version a unit's file is read in (16.1): what its header record declares; for
+    /// an included file without one, the version of the file that includes it; for the main file
+    /// and a package file without one, the tool's default.
     pub(crate) fn version_of(&self, u: Option<UnitId>) -> String {
-        let fu = u.and_then(|u| self.file_unit(u));
-        match fu {
-            Some(f) if !self.units[f].version.is_empty() => self.units[f].version.clone(),
-            _ => SUPPORTED_VERSION.to_string(),
+        let mut fu = u.and_then(|u| self.file_unit(u));
+        while let Some(f) = fu {
+            if !self.units[f].version.is_empty() {
+                return self.units[f].version.clone();
+            }
+            let above = self.units[f].level.and_then(|l| self.doc.levels[l].parent);
+            fu = above.and_then(|p| self.file_unit(self.level_unit[p]));
         }
+        SUPPORTED_VERSION.to_string()
     }
 
     /// Does a unit follow the draft 0.3? Only when the draft is read (`Options::draft`) and the

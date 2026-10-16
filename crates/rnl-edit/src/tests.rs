@@ -196,6 +196,26 @@ fn refusals_name_the_op() {
     );
 }
 
+#[test]
+fn a_record_is_not_written_in_a_region_written_to_be_encrypted() {
+    // a subcircuit that ends in `.prot … .unprot` has its end there, and a record there would be
+    // gone once the region is encrypted (2.2): refused; the file level ends after the region
+    let net = "* t\n.prot\n.subckt cell a b\nR1 a b 1k\n.ends cell\n.unprot\nX1 n1 n2 cell\n.end\n";
+    let refused =
+        write(&request("spice", net, json!([{"level": "subckt:cell", "op": "set", "object": "#R1", "at": [0, 0]}])));
+    assert_eq!(
+        refused.unwrap_err(),
+        "op 0 (set): cell ends in a region written to be encrypted, lines 2 to 6, where a record is gone once the region \
+         is encrypted (2.2)"
+    );
+    let out =
+        write(&request("spice", net, json!([{"level": "file", "op": "set", "object": "#X1", "at": [0, 0]}]))).unwrap();
+    assert!(
+        out.ends_with(".unprot\nX1 n1 n2 cell\n* @RNL(author=\"test\") {\n*   #X1 @PLACE(0, 0)\n* }\n.end\n"),
+        "{out}"
+    );
+}
+
 /// The runtime's runs as this crate's, to compare what the markup reads back as.
 fn ours(runs: &[markup::Run]) -> Vec<Run> {
     let style =
@@ -256,6 +276,23 @@ fn what_it_writes_interprets_without_errors() {
     let loud: Vec<String> =
         r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
     assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
+}
+
+#[test]
+fn the_nets_of_a_wire_on_several_nets_are_one_set() {
+    // written loose, two nets and the points would be three objects for the two slots of WIRE
+    // (5.2.1); in braces they are one set, which the net slot takes whole, a bus (13.1)
+    let net = "\n.subckt amp in out VSS\nR1 in out 10k\n.ends amp\n";
+    let ops = json!([{"level": "subckt:amp", "op": "add-wire", "nets": ["&in", "&out"], "mode": "straight",
+        "via": [{"terminal": "#R1:1"}, {"terminal": "#R1:2"}]}]);
+    let out = write(&request("spice", net, ops)).unwrap();
+    assert!(out.contains("*   {&in &out} @WIRE(mode=\"straight\") {#R1:1 #R1:2}\n"), "{out}");
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: true, ..Options::default() })
+        .unwrap();
+    let errors: Vec<String> =
+        r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
+    assert!(errors.is_empty(), "{out}\n{}", errors.join("\n"));
 }
 
 #[test]

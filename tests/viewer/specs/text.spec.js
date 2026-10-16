@@ -29,20 +29,20 @@ test("the host statements and the records are highlighted", async ({ viewer }) =
   await viewer.open("04-hierarchy");
   // the title line, directives, and an instance's name and parameters
   expect(await highlighted(viewer, 1)).toEqual([["* Two-stage buffer with subcircuits", "comment"]]);
-  expect(await highlighted(viewer, 6)).toEqual([[".model", "directive"], ["level", "param"]]);
-  expect(await highlighted(viewer, 8)).toEqual([["M1", "inst"], ["w", "param"], ["l", "param"]]);
+  expect(await highlighted(viewer, 7)).toEqual([[".model", "directive"], ["level", "param"]]);
+  expect(await highlighted(viewer, 9)).toEqual([["M1", "inst"], ["w", "param"], ["l", "param"]]);
   // records: the comment marker, keywords, references of each kind, parameters, strings and numbers
-  expect(await highlighted(viewer, 10)).toEqual([["* ", "marker"], ["@RNL", "keyword"], ["{", "punct"]]);
-  expect(await highlighted(viewer, 16)).toEqual([
+  expect(await highlighted(viewer, 11)).toEqual([["* ", "marker"], ["@RNL", "keyword"], ["{", "punct"]]);
+  expect(await highlighted(viewer, 17)).toEqual([
     ["*", "marker"], ["?", "local"], ["@TEXT", "keyword"], ["(", "punct"], ['"${name}"', "string"], [",", "punct"],
     ["key", "param"], ["=", "punct"], ['"name"', "string"], [")", "punct"], ["=>", "punct"], ["@PLACE", "keyword"],
     ["(", "punct"], ["1.1", "number"], [",", "punct"], ["0.25", "number"], [");", "punct"],
   ]);
-  expect(await highlighted(viewer, 19)).toEqual([
+  expect(await highlighted(viewer, 20)).toEqual([
     ["*", "marker"], ["#", "host"], ["@SELECT-INSTANCE", "keyword"], ["(", "punct"], ["name", "param"], ["=", "punct"],
     ['"R*"', "string"], [")", "punct"], ["=>", "punct"], ["@SET-SYMBOL", "keyword"], ["$RES_IEC", "def"],
   ]);
-  expect(await highlighted(viewer, 21)).toEqual([
+  expect(await highlighted(viewer, 22)).toEqual([
     ["*", "marker"], ["%amp_block", "local"], ["=", "punct"], ["@DEFINE-SYMBOL", "keyword"], ["{", "punct"],
   ]);
   expect(await highlighted(viewer, 60)).toEqual([
@@ -164,9 +164,9 @@ test("clicking a problem shows its line in the middle of the text and flashes it
 
 test("selecting on the drawing shows the file and the line of the statement", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy");
-  expect(await viewer.within(viewer.line(49))).toBe(false);
+  expect(await viewer.within(viewer.line(50))).toBe(false);
   await viewer.click("X2");
-  await expect.poll(() => viewer.within(viewer.line(49))).toBe(true);
+  await expect.poll(() => viewer.within(viewer.line(50))).toBe(true);
   const main = await page.locator("#source").evaluate((s) => s.scrollTop);
   expect(main).toBeGreaterThan(0);
 
@@ -193,7 +193,7 @@ test("a line to show waits until the text pane is shown", async ({ page, viewer 
   await viewer.selected(`instance X2 in ${TOP}`);
   await page.keyboard.press("Control+B");
   await expect(page.locator("#sidebar")).toBeVisible();
-  await expect.poll(() => viewer.within(viewer.line(49))).toBe(true);
+  await expect.poll(() => viewer.within(viewer.line(50))).toBe(true);
 
   // the hierarchy view shown instead of the text
   await page.locator("#tab-hierarchy").click();
@@ -201,5 +201,5 @@ test("a line to show waits until the text pane is shown", async ({ page, viewer 
   await viewer.click("Vin");
   await viewer.selected(`instance Vin in ${TOP}`);
   await page.locator("#tab-netlist").click();
-  await expect.poll(() => viewer.within(viewer.line(52))).toBe(true);
+  await expect.poll(() => viewer.within(viewer.line(53))).toBe(true);
 });

@@ -6,6 +6,7 @@
 //! written above it are evaluated again in it (10.3).
 
 pub mod attrs;
+mod conflicts;
 pub mod ctx;
 pub mod cycles;
 pub mod eval;
@@ -17,6 +18,7 @@ mod output;
 mod packages;
 pub mod phases;
 pub mod scene;
+mod selfcheck;
 pub mod unit;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -241,6 +243,9 @@ pub struct Interp<'p> {
     pub(crate) forward: bool,
     /// What this run takes from the readings before it (5.9).
     pub(crate) numbers: NumberRun,
+    /// The conflicts found while the geometry of a level of the draft 0.3 is resolved, whose
+    /// hints are given once it is (its 8.5).
+    pub(crate) conflicts: conflicts::Conflicts,
 }
 
 impl<'p> Interp<'p> {
@@ -320,6 +325,7 @@ impl<'p> Interp<'p> {
             identities: HashMap::new(),
             forward: false,
             numbers,
+            conflicts: conflicts::Conflicts::default(),
         };
         for _ in 0..3 {
             it.objs.push(Obj { data: ObjData::Marker, name: String::new() }); // LEVEL, OWNER, NOTHING

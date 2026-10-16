@@ -188,6 +188,11 @@ pub struct HostDocument {
     pub globals: HashSet<String>,
     /// File name -> text, for display and writeback.
     pub sources: Vec<(String, String)>,
+    /// The regions written to be encrypted, SPICE's `.prot … .unprot` and Spectre's `protect …
+    /// unprotect`: the file, and the lines of the statements that open and close each; one left
+    /// open closes after the last line of the file. Records there are read, with a warning, but
+    /// they are gone once the region is encrypted, so tools do not write there (2.2).
+    pub protected: Vec<(String, u32, u32)>,
 }
 
 impl HostDocument {
@@ -198,6 +203,7 @@ impl HostDocument {
             subckts: HashMap::new(),
             globals: HashSet::new(),
             sources: Vec::new(),
+            protected: Vec::new(),
         }
     }
 

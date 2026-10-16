@@ -54,7 +54,8 @@ fn refs<'a>(list: &'a [(&'a str, &'a str, String)]) -> Vec<(&'a str, &'a str, &'
 fn doc(header: &str, body: &str, netlist: &str) -> String {
     let header = if header.is_empty() { String::new() } else { format!("; {header}") };
     let body = if body.is_empty() { String::new() } else { format!("* @RNL {{ {body} }}\n") };
-    format!("* t\n{netlist}* @RNL(type=\"header\") {{ @VERSION(\"0.2\"){header}}}\n{body}.end\n")
+    // the header record is the first record of the file, above the subcircuits (2.8)
+    format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\"){header}}}\n{netlist}{body}.end\n")
 }
 
 fn read(files: &MemoryProvider, entry: &str) -> Interpretation {
@@ -181,7 +182,7 @@ fn a_package_brings_in_what_it_references_first() {
         assert_eq!(root_names(top), want);
         // what the USE-PACKAGE of b brings in is placed at it, and says so
         let via = &package(top, "q").via.as_ref().unwrap();
-        assert_eq!((via.0.as_str(), via.1.file.as_str(), via.1.line), ("b", "t.sp", 8));
+        assert_eq!((via.0.as_str(), via.1.file.as_str(), via.1.line), ("b", "t.sp", 2));
         assert_eq!(linecolor(top, "#R1"), color);
         assert_eq!(linecolor(sub, "#R9"), color);
         // q, a and c again, now at the subcircuit's USE-PACKAGE, in the order b2 brings them in
@@ -299,7 +300,7 @@ fn an_empty_inline_package_drops_the_fill() {
     let fill = package(top, "rnl-std-fill");
     assert_eq!(
         (fill.version.as_str(), fill.via.as_ref().map(|v| (v.0.as_str(), v.1.line))),
-        ("", Some(("rnl-std-fill", 8)))
+        ("", Some(("rnl-std-fill", 2)))
     );
     let r = read_doc(&doc(drop, "&vdd @ADD-TO $SUPPLY_NET_SET", net));
     assert!(errors(&r).contains("$SUPPLY_NET_SET cannot be found"), "{}", errors(&r));
@@ -403,7 +404,7 @@ fn references_take_the_newest_version_of_one_major_version() {
         "package pk-a references package q 1.0; of the references to it, the newest within that major version is 1.2, which is used (16.2)"
     );
     let loc = hints[0].loc.as_ref().unwrap();
-    assert_eq!((loc.file.as_str(), loc.line), ("t.sp", 4)); // at the USE-PACKAGE of pk-a
+    assert_eq!((loc.file.as_str(), loc.line), ("t.sp", 2)); // at the USE-PACKAGE of pk-a
 }
 
 #[test]
@@ -426,7 +427,7 @@ fn a_reference_of_another_major_version_fails() {
         files_of(&r, Severity::Error).iter().map(|f| f.0.as_str()).collect::<Vec<_>>(),
         ["pk-c.rnl", "pk-c.rnl"]
     );
-    assert!(errors[0].origin.starts_with("brought in by the USE-PACKAGE of pk-c (t.sp:4:"), "{}", errors[0].origin);
+    assert!(errors[0].origin.starts_with("brought in by the USE-PACKAGE of pk-c (t.sp:2:"), "{}", errors[0].origin);
     assert_eq!(linecolor(top, "#R1"), "#1d1d1f");
 }
 
@@ -441,7 +442,7 @@ fn a_package_written_in_the_file_wins_over_references() {
         messages(&r, Severity::Warning),
         ["package q is 2.0 here, and package pk-a references 1.0: another major version, so pk-a may use names that q 2.0 does not have (16.2)"]
     );
-    assert_eq!(files_of(&r, Severity::Warning), [("t.sp".to_string(), 4)]);
+    assert_eq!(files_of(&r, Severity::Warning), [("t.sp".to_string(), 2)]);
     // the name pk-a uses is not in q 2.0
     let errors = errors(&r);
     assert!(errors.contains("pk-a.rnl:2:") && errors.contains("$Q_NEW cannot be found"), "{errors}");
