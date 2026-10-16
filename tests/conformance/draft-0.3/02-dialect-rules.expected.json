@@ -89,12 +89,12 @@
           "nested": []
         },
         {
-          "name": "$RES",
+          "name": "$RESISTOR",
           "box": [
             -1.0,
-            -3.0,
+            -2.4,
             1.0,
-            3.0
+            2.4
           ],
           "box_written": true,
           "default": false,
@@ -102,7 +102,7 @@
             {
               "pos": [
                 0.0,
-                3.0
+                2.0
               ],
               "terminals": [
                 "1"
@@ -113,7 +113,7 @@
             {
               "pos": [
                 0.0,
-                -3.0
+                -2.0
               ],
               "terminals": [
                 "2"
@@ -124,15 +124,47 @@
           ],
           "prims": [
             {
-              "shape": "RECTANGLE",
+              "shape": "LINE",
               "points": [
                 [
-                  -1.0,
-                  -2.0
+                  0.0,
+                  2.0
                 ],
                 [
-                  1.0,
-                  2.0
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
                 ]
               ],
               "style": {}
@@ -151,7 +183,15 @@
             0.0
           ],
           "orient": "R0",
-          "style": {},
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
           "layer": "middle",
           "texts": {}
         },
@@ -164,7 +204,15 @@
             0.0
           ],
           "orient": "R0",
-          "style": {},
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
           "layer": "middle",
           "texts": {}
         }
@@ -193,13 +241,113 @@
           "valign": "bottom",
           "rotate": 0.0,
           "orient": "R0",
-          "style": {},
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R0::name",
+          "anchor": [
+            10.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "R0",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R0::value",
+          "anchor": [
+            10.95,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
           "layer": "middle"
         }
       ],
       "flylines": [],
-      "constraints": [],
-      "unplaced": []
+      "constraints": [
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "ALIGN",
+          "kind": "ALIGN",
+          "status": "unsolved",
+          "priority": "normal"
+        },
+        {
+          "label": "DISTANCE",
+          "kind": "DISTANCE",
+          "status": "unsolved",
+          "priority": "normal"
+        }
+      ],
+      "unplaced": [
+        "%g",
+        "%g"
+      ]
     },
     {
       "title": "cell",
@@ -212,7 +360,10 @@
       "texts": [],
       "flylines": [],
       "constraints": [],
-      "unplaced": []
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
     },
     {
       "title": "spsub",
@@ -220,12 +371,12 @@
       "file": "02-dialect-rules-sp.inc",
       "symbols": [
         {
-          "name": "$ISRC",
+          "name": "$CURRENT_SOURCE",
           "box": [
-            -2.0,
-            -3.0,
-            2.0,
-            3.0
+            -1.5,
+            -2.4,
+            1.5,
+            2.4
           ],
           "box_written": true,
           "default": false,
@@ -233,7 +384,7 @@
             {
               "pos": [
                 0.0,
-                3.0
+                2.0
               ],
               "terminals": [
                 "1"
@@ -244,7 +395,7 @@
             {
               "pos": [
                 0.0,
-                -3.0
+                -2.0
               ],
               "terminals": [
                 "2"
@@ -269,11 +420,63 @@
               "points": [
                 [
                   0.0,
-                  1.0
+                  0.6977
                 ],
                 [
                   0.0,
-                  -1.0
+                  0.2326
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -0.6977
+                ],
+                [
+                  -0.4651,
+                  0.2326
+                ],
+                [
+                  0.4651,
+                  0.2326
+                ],
+                [
+                  0.0,
+                  -0.6977
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  1.0756
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.0756
+                ],
+                [
+                  0.0,
+                  -2.0
                 ]
               ],
               "style": {}
@@ -282,12 +485,12 @@
           "nested": []
         },
         {
-          "name": "$RES",
+          "name": "$RESISTOR",
           "box": [
             -1.0,
-            -3.0,
+            -2.4,
             1.0,
-            3.0
+            2.4
           ],
           "box_written": true,
           "default": false,
@@ -295,7 +498,7 @@
             {
               "pos": [
                 0.0,
-                3.0
+                2.0
               ],
               "terminals": [
                 "1"
@@ -306,7 +509,7 @@
             {
               "pos": [
                 0.0,
-                -3.0
+                -2.0
               ],
               "terminals": [
                 "2"
@@ -317,15 +520,47 @@
           ],
           "prims": [
             {
-              "shape": "RECTANGLE",
+              "shape": "LINE",
               "points": [
                 [
-                  -1.0,
-                  -2.0
+                  0.0,
+                  2.0
                 ],
                 [
-                  1.0,
-                  2.0
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
                 ]
               ],
               "style": {}
@@ -344,7 +579,15 @@
             0.0
           ],
           "orient": "R0",
-          "style": {},
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
           "layer": "middle",
           "texts": {}
         },
@@ -357,17 +600,157 @@
             0.0
           ],
           "orient": "R0",
-          "style": {},
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
           "layer": "middle",
           "texts": {}
         }
       ],
       "wires": [],
       "shapes": [],
-      "texts": [],
+      "texts": [
+        {
+          "id": "#I1::name",
+          "anchor": [
+            1.5,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "I1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#I1::value",
+          "anchor": [
+            1.5,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1m",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R1::name",
+          "anchor": [
+            10.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "R1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#R1::value",
+          "anchor": [
+            10.95,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
       "flylines": [],
       "constraints": [],
-      "unplaced": []
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
     },
     {
       "title": "mid",
@@ -467,7 +850,15 @@
             0.0
           ],
           "orient": "R0",
-          "style": {},
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
           "layer": "middle",
           "texts": {}
         }
@@ -496,14 +887,50 @@
           "valign": "bottom",
           "rotate": 0.0,
           "orient": "R0",
-          "style": {},
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
           "layer": "middle"
         }
       ],
       "flylines": [],
       "constraints": [],
-      "unplaced": []
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "02-dialect-rules.scs",
+      "line": 1,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "02-dialect-rules.scs",
+      "line": 8,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "02-dialect-rules-sp.inc",
+      "line": 3,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "02-dialect-rules.scs",
+      "line": 14,
+      "col": 0
+    }
+  ]
 }

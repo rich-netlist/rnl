@@ -1,0 +1,43 @@
+// Every element the Spectre adapter reads natively, each with its default symbol of the series 0.3
+*! 0.3 版的 Spectre 文件隐式用标准包 0.3（16.3），按 Spectre 的规则包 rnl-std-spectre 配符号：内置元件按 master，模型卡的实例按模型类型，P 型最后；不按名字，不用 rnl-std-spice。
+*! 除了子电路调用，Spectre 适配器原生读的每种元件各一行（取自 rnl-dev 的 std-0.3/sheet/native.scs）；relay、transformer 适配器还不认，读成子电路调用，也按 master 配上符号。叫 M3 的电阻按 master 画成电阻：不按名字。
+simulator lang=spectre
+// @RNL(type="header") { @VERSION("0.3")}
+r1 (a1 b1) resistor r=1k
+c1 (a2 b2) capacitor c=1p
+l1 (a3 b3) inductor l=1n
+v1 (a4 0) vsource dc=1
+i1 (a5 b5) isource dc=1m
+e1 (a6 b6 c6 d6) vcvs gain=2
+g1 (a7 b7 c7 d7) vccs gm=1m
+f1 (a8 b8) cccs gain=2 probe=v1
+h1 (a9 b9) ccvs rm=1k probe=v1
+b1 (a10 b10) bsource v=2*v(a1)
+sw1 (a11 b11) switch dc_position=1
+p1 (a12 0) port r=50
+d1 (a13 b13) dmod
+q1 (a14 b14 c14) npnmod
+q2 (a15 b15 c15) pnpmod
+m1 (a16 b16 c16 d16) nmosmod
+m2 (a17 b17 c17 d17) pmosmod
+j1 (a18 b18 c18) njfmod
+j2 (a19 b19 c19) pjfmod
+rp1 (a20 b20) rpolymod r=1k
+rel1 (a21 b21 c21 d21) relay
+t1 (a22 b22 c22 d22) transformer n1=1 n2=2
+M3 (a23 b23) resistor r=1k
+model dmod diode
+model npnmod bjt type=npn
+model pnpmod bjt type=pnp
+model nmosmod bsim4 type=n
+model pmosmod bsim4 type=p
+model njfmod jfet type=n
+model pjfmod jfet type=p
+model rpolymod resistor
+// @RNL {
+//   #r1 @PLACE(0, 0); #c1 @PLACE(10, 0); #l1 @PLACE(20, 0); #v1 @PLACE(30, 0); #i1 @PLACE(40, 0);
+//   #e1 @PLACE(0, -10); #g1 @PLACE(10, -10); #f1 @PLACE(20, -10); #h1 @PLACE(30, -10); #b1 @PLACE(40, -10);
+//   #sw1 @PLACE(0, -20); #p1 @PLACE(10, -20); #d1 @PLACE(20, -20); #q1 @PLACE(30, -20); #q2 @PLACE(40, -20);
+//   #m1 @PLACE(0, -30); #m2 @PLACE(10, -30); #j1 @PLACE(20, -30); #j2 @PLACE(30, -30); #rp1 @PLACE(40, -30);
+//   #rel1 @PLACE(0, -40); #t1 @PLACE(10, -40); #M3 @PLACE(20, -40)
+// }

@@ -1,0 +1,4182 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.3",
+  "levels": [
+    {
+      "id": "file:05-native-spice.sp",
+      "kind": "file",
+      "name": "05-native-spice.sp",
+      "file": 0,
+      "line": 0,
+      "status": "1 without a position; constraints: 2 unsolved",
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#R1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a1"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b1"
+              }
+            ]
+          },
+          {
+            "id": "#C1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a2"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b2"
+              }
+            ]
+          },
+          {
+            "id": "#L1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a3"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b3"
+              }
+            ]
+          },
+          {
+            "id": "#V1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a4"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#I1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a5"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b5"
+              }
+            ]
+          },
+          {
+            "id": "#E1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a6"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b6"
+              },
+              {
+                "n": 3,
+                "name": "cp",
+                "net": "&c6"
+              },
+              {
+                "n": 4,
+                "name": "cn",
+                "net": "&d6"
+              }
+            ]
+          },
+          {
+            "id": "#G1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a7"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b7"
+              },
+              {
+                "n": 3,
+                "name": "cp",
+                "net": "&c7"
+              },
+              {
+                "n": 4,
+                "name": "cn",
+                "net": "&d7"
+              }
+            ]
+          },
+          {
+            "id": "#F1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a8"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b8"
+              }
+            ]
+          },
+          {
+            "id": "#H1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a9"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b9"
+              }
+            ]
+          },
+          {
+            "id": "#B1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a10"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b10"
+              }
+            ]
+          },
+          {
+            "id": "#S1",
+            "subckt": false,
+            "master": "smod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a11"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b11"
+              },
+              {
+                "n": 3,
+                "name": "cp",
+                "net": "&c11"
+              },
+              {
+                "n": 4,
+                "name": "cn",
+                "net": "&d11"
+              }
+            ]
+          },
+          {
+            "id": "#W1",
+            "subckt": false,
+            "master": "wmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a12"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b12"
+              }
+            ]
+          },
+          {
+            "id": "#D1",
+            "subckt": false,
+            "master": "dmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "a",
+                "net": "&a13"
+              },
+              {
+                "n": 2,
+                "name": "k",
+                "net": "&b13"
+              }
+            ]
+          },
+          {
+            "id": "#Q1",
+            "subckt": false,
+            "master": "npnmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "c",
+                "net": "&a14"
+              },
+              {
+                "n": 2,
+                "name": "b",
+                "net": "&b14"
+              },
+              {
+                "n": 3,
+                "name": "e",
+                "net": "&c14"
+              }
+            ]
+          },
+          {
+            "id": "#Q2",
+            "subckt": false,
+            "master": "pnpmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "c",
+                "net": "&a15"
+              },
+              {
+                "n": 2,
+                "name": "b",
+                "net": "&b15"
+              },
+              {
+                "n": 3,
+                "name": "e",
+                "net": "&c15"
+              }
+            ]
+          },
+          {
+            "id": "#M1",
+            "subckt": false,
+            "master": "nmosmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&a16"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&b16"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&c16"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&d16"
+              }
+            ]
+          },
+          {
+            "id": "#M2",
+            "subckt": false,
+            "master": "pmosmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&a17"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&b17"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&c17"
+              },
+              {
+                "n": 4,
+                "name": "b",
+                "net": "&d17"
+              }
+            ]
+          },
+          {
+            "id": "#J1",
+            "subckt": false,
+            "master": "njfmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&a18"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&b18"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&c18"
+              }
+            ]
+          },
+          {
+            "id": "#J2",
+            "subckt": false,
+            "master": "pjfmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&a19"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&b19"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&c19"
+              }
+            ]
+          },
+          {
+            "id": "#Z1",
+            "subckt": false,
+            "master": "nmfmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&a20"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&b20"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&c20"
+              }
+            ]
+          },
+          {
+            "id": "#Z2",
+            "subckt": false,
+            "master": "pmfmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "d",
+                "net": "&a21"
+              },
+              {
+                "n": 2,
+                "name": "g",
+                "net": "&b21"
+              },
+              {
+                "n": 3,
+                "name": "s",
+                "net": "&c21"
+              }
+            ]
+          },
+          {
+            "id": "#T1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p1",
+                "net": "&a22"
+              },
+              {
+                "n": 2,
+                "name": "n1",
+                "net": "&b22"
+              },
+              {
+                "n": 3,
+                "name": "p2",
+                "net": "&c22"
+              },
+              {
+                "n": 4,
+                "name": "n2",
+                "net": "&d22"
+              }
+            ]
+          },
+          {
+            "id": "#O1",
+            "subckt": false,
+            "master": "ltramod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p1",
+                "net": "&a23"
+              },
+              {
+                "n": 2,
+                "name": "n1",
+                "net": "&b23"
+              },
+              {
+                "n": 3,
+                "name": "p2",
+                "net": "&c23"
+              },
+              {
+                "n": 4,
+                "name": "n2",
+                "net": "&d23"
+              }
+            ]
+          },
+          {
+            "id": "#U1",
+            "subckt": false,
+            "master": "urcmod",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "a",
+                "net": "&a24"
+              },
+              {
+                "n": 2,
+                "name": "b",
+                "net": "&b24"
+              },
+              {
+                "n": 3,
+                "name": "ref",
+                "net": "&c24"
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a25"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b25"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&a1",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b1",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a2",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b2",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a3",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b3",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a4",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false
+          },
+          {
+            "id": "&a5",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b5",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a6",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b6",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c6",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&d6",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a7",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b7",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c7",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&d7",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a8",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b8",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a9",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b9",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a10",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b10",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a11",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b11",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c11",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&d11",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a12",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b12",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a13",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b13",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a14",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b14",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c14",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a15",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b15",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c15",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a16",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b16",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c16",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&d16",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a17",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b17",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c17",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&d17",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a18",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b18",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c18",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a19",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b19",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c19",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a20",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b20",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c20",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a21",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b21",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c21",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a22",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b22",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c22",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&d22",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a23",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b23",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c23",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&d23",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a24",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b24",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&c24",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&a25",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b25",
+            "global": false,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$RESISTOR",
+            "name": "$RESISTOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$CAPACITOR",
+            "name": "$CAPACITOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$INDUCTOR",
+            "name": "$INDUCTOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$VOLTAGE_SOURCE",
+            "name": "$VOLTAGE_SOURCE",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$CURRENT_SOURCE",
+            "name": "$CURRENT_SOURCE",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$VCVS_4TERM",
+            "name": "$VCVS_4TERM",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$VCCS_4TERM",
+            "name": "$VCCS_4TERM",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$CCCS",
+            "name": "$CCCS",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$CCVS",
+            "name": "$CCVS",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$BEHAVIORAL_SOURCE",
+            "name": "$BEHAVIORAL_SOURCE",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$VOLTAGE_CONTROLLED_SWITCH",
+            "name": "$VOLTAGE_CONTROLLED_SWITCH",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$SWITCH",
+            "name": "$SWITCH",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$DIODE",
+            "name": "$DIODE",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NPN",
+            "name": "$NPN",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$PNP",
+            "name": "$PNP",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NMOS_4TERM",
+            "name": "$NMOS_4TERM",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$PMOS_4TERM",
+            "name": "$PMOS_4TERM",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$NJFET",
+            "name": "$NJFET",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$PJFET",
+            "name": "$PJFET",
+            "package": "rnl-std-semiconductors",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$TRANSMISSION_LINE",
+            "name": "$TRANSMISSION_LINE",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$RC_LINE",
+            "name": "$RC_LINE",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND_SYMBOL",
+            "name": "$GROUND_SYMBOL",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#R1",
+            "kind": "instance",
+            "host": [
+              "#R1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R1:1"
+                ],
+                "at": [
+                  0.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a1"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R1:2"
+                ],
+                "at": [
+                  0.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b1"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#C1",
+            "kind": "instance",
+            "host": [
+              "#C1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$CAPACITOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#C1:1"
+                ],
+                "at": [
+                  10.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a2"
+                ]
+              },
+              {
+                "terminals": [
+                  "#C1:2"
+                ],
+                "at": [
+                  10.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b2"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#L1",
+            "kind": "instance",
+            "host": [
+              "#L1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$INDUCTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                20.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#L1:1"
+                ],
+                "at": [
+                  20.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a3"
+                ]
+              },
+              {
+                "terminals": [
+                  "#L1:2"
+                ],
+                "at": [
+                  20.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b3"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#V1",
+            "kind": "instance",
+            "host": [
+              "#V1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$VOLTAGE_SOURCE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                30.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#V1:1"
+                ],
+                "at": [
+                  30.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a4"
+                ]
+              },
+              {
+                "terminals": [
+                  "#V1:2"
+                ],
+                "at": [
+                  30.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#I1",
+            "kind": "instance",
+            "host": [
+              "#I1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$CURRENT_SOURCE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                40.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#I1:1"
+                ],
+                "at": [
+                  40.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a5"
+                ]
+              },
+              {
+                "terminals": [
+                  "#I1:2"
+                ],
+                "at": [
+                  40.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b5"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#E1",
+            "kind": "instance",
+            "host": [
+              "#E1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$VCVS_4TERM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#E1:1"
+                ],
+                "at": [
+                  0.0,
+                  -8.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a6"
+                ]
+              },
+              {
+                "terminals": [
+                  "#E1:2"
+                ],
+                "at": [
+                  0.0,
+                  -12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b6"
+                ]
+              },
+              {
+                "terminals": [
+                  "#E1:3"
+                ],
+                "at": [
+                  -4.0,
+                  -9.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&c6"
+                ]
+              },
+              {
+                "terminals": [
+                  "#E1:4"
+                ],
+                "at": [
+                  -4.0,
+                  -11.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&d6"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#G1",
+            "kind": "instance",
+            "host": [
+              "#G1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$VCCS_4TERM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#G1:1"
+                ],
+                "at": [
+                  10.0,
+                  -8.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a7"
+                ]
+              },
+              {
+                "terminals": [
+                  "#G1:2"
+                ],
+                "at": [
+                  10.0,
+                  -12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b7"
+                ]
+              },
+              {
+                "terminals": [
+                  "#G1:3"
+                ],
+                "at": [
+                  6.0,
+                  -9.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&c7"
+                ]
+              },
+              {
+                "terminals": [
+                  "#G1:4"
+                ],
+                "at": [
+                  6.0,
+                  -11.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&d7"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#F1",
+            "kind": "instance",
+            "host": [
+              "#F1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$CCCS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                20.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#F1:1"
+                ],
+                "at": [
+                  20.0,
+                  -8.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a8"
+                ]
+              },
+              {
+                "terminals": [
+                  "#F1:2"
+                ],
+                "at": [
+                  20.0,
+                  -12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b8"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#H1",
+            "kind": "instance",
+            "host": [
+              "#H1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$CCVS",
+              "source": null
+            },
+            "at": {
+              "value": [
+                30.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#H1:1"
+                ],
+                "at": [
+                  30.0,
+                  -8.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a9"
+                ]
+              },
+              {
+                "terminals": [
+                  "#H1:2"
+                ],
+                "at": [
+                  30.0,
+                  -12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b9"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#B1",
+            "kind": "instance",
+            "host": [
+              "#B1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$BEHAVIORAL_SOURCE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                40.0,
+                -10.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#B1:1"
+                ],
+                "at": [
+                  40.0,
+                  -8.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a10"
+                ]
+              },
+              {
+                "terminals": [
+                  "#B1:2"
+                ],
+                "at": [
+                  40.0,
+                  -12.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b10"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#S1",
+            "kind": "instance",
+            "host": [
+              "#S1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$VOLTAGE_CONTROLLED_SWITCH",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -20.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#S1:1"
+                ],
+                "at": [
+                  -2.0,
+                  -20.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&a11"
+                ]
+              },
+              {
+                "terminals": [
+                  "#S1:2"
+                ],
+                "at": [
+                  2.0,
+                  -20.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&b11"
+                ]
+              },
+              {
+                "terminals": [
+                  "#S1:3"
+                ],
+                "at": [
+                  -2.0,
+                  -23.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&c11"
+                ]
+              },
+              {
+                "terminals": [
+                  "#S1:4"
+                ],
+                "at": [
+                  2.0,
+                  -23.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&d11"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#W1",
+            "kind": "instance",
+            "host": [
+              "#W1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$SWITCH",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                -20.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#W1:1"
+                ],
+                "at": [
+                  8.0,
+                  -20.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&a12"
+                ]
+              },
+              {
+                "terminals": [
+                  "#W1:2"
+                ],
+                "at": [
+                  12.0,
+                  -20.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&b12"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#D1",
+            "kind": "instance",
+            "host": [
+              "#D1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$DIODE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                20.0,
+                -20.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#D1:1"
+                ],
+                "at": [
+                  18.0,
+                  -20.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&a13"
+                ]
+              },
+              {
+                "terminals": [
+                  "#D1:2"
+                ],
+                "at": [
+                  22.0,
+                  -20.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&b13"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#Q1",
+            "kind": "instance",
+            "host": [
+              "#Q1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NPN",
+              "source": null
+            },
+            "at": {
+              "value": [
+                30.0,
+                -20.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#Q1:1"
+                ],
+                "at": [
+                  30.0,
+                  -18.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a14"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Q1:2"
+                ],
+                "at": [
+                  27.0,
+                  -20.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b14"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Q1:3"
+                ],
+                "at": [
+                  30.0,
+                  -22.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&c14"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#Q2",
+            "kind": "instance",
+            "host": [
+              "#Q2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PNP",
+              "source": null
+            },
+            "at": {
+              "value": [
+                40.0,
+                -20.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#Q2:1"
+                ],
+                "at": [
+                  40.0,
+                  -22.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&a15"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Q2:2"
+                ],
+                "at": [
+                  37.0,
+                  -20.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b15"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Q2:3"
+                ],
+                "at": [
+                  40.0,
+                  -18.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&c15"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#M1",
+            "kind": "instance",
+            "host": [
+              "#M1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NMOS_4TERM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -30.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#M1:1"
+                ],
+                "at": [
+                  0.0,
+                  -28.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a16"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M1:2"
+                ],
+                "at": [
+                  -3.0,
+                  -30.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b16"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M1:3"
+                ],
+                "at": [
+                  0.0,
+                  -32.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&c16"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M1:4"
+                ],
+                "at": [
+                  1.0,
+                  -30.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&d16"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#M2",
+            "kind": "instance",
+            "host": [
+              "#M2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PMOS_4TERM",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                -30.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#M2:1"
+                ],
+                "at": [
+                  10.0,
+                  -32.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&a17"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M2:2"
+                ],
+                "at": [
+                  7.0,
+                  -30.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b17"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M2:3"
+                ],
+                "at": [
+                  10.0,
+                  -28.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&c17"
+                ]
+              },
+              {
+                "terminals": [
+                  "#M2:4"
+                ],
+                "at": [
+                  11.0,
+                  -30.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&d17"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#J1",
+            "kind": "instance",
+            "host": [
+              "#J1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NJFET",
+              "source": null
+            },
+            "at": {
+              "value": [
+                20.0,
+                -30.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#J1:1"
+                ],
+                "at": [
+                  20.0,
+                  -28.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a18"
+                ]
+              },
+              {
+                "terminals": [
+                  "#J1:2"
+                ],
+                "at": [
+                  17.0,
+                  -30.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b18"
+                ]
+              },
+              {
+                "terminals": [
+                  "#J1:3"
+                ],
+                "at": [
+                  20.0,
+                  -32.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&c18"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#J2",
+            "kind": "instance",
+            "host": [
+              "#J2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PJFET",
+              "source": null
+            },
+            "at": {
+              "value": [
+                30.0,
+                -30.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#J2:1"
+                ],
+                "at": [
+                  30.0,
+                  -28.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a19"
+                ]
+              },
+              {
+                "terminals": [
+                  "#J2:2"
+                ],
+                "at": [
+                  27.0,
+                  -30.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b19"
+                ]
+              },
+              {
+                "terminals": [
+                  "#J2:3"
+                ],
+                "at": [
+                  30.0,
+                  -32.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&c19"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#Z1",
+            "kind": "instance",
+            "host": [
+              "#Z1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$NJFET",
+              "source": null
+            },
+            "at": {
+              "value": [
+                40.0,
+                -30.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#Z1:1"
+                ],
+                "at": [
+                  40.0,
+                  -28.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a20"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Z1:2"
+                ],
+                "at": [
+                  37.0,
+                  -30.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b20"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Z1:3"
+                ],
+                "at": [
+                  40.0,
+                  -32.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&c20"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#Z2",
+            "kind": "instance",
+            "host": [
+              "#Z2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$PJFET",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -40.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#Z2:1"
+                ],
+                "at": [
+                  0.0,
+                  -38.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a21"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Z2:2"
+                ],
+                "at": [
+                  -3.0,
+                  -40.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&b21"
+                ]
+              },
+              {
+                "terminals": [
+                  "#Z2:3"
+                ],
+                "at": [
+                  0.0,
+                  -42.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&c21"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#T1",
+            "kind": "instance",
+            "host": [
+              "#T1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$TRANSMISSION_LINE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                -40.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#T1:1"
+                ],
+                "at": [
+                  6.0,
+                  -40.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&a22"
+                ]
+              },
+              {
+                "terminals": [
+                  "#T1:2"
+                ],
+                "at": [
+                  8.0,
+                  -42.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b22"
+                ]
+              },
+              {
+                "terminals": [
+                  "#T1:3"
+                ],
+                "at": [
+                  14.0,
+                  -40.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&c22"
+                ]
+              },
+              {
+                "terminals": [
+                  "#T1:4"
+                ],
+                "at": [
+                  12.0,
+                  -42.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&d22"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#O1",
+            "kind": "instance",
+            "host": [
+              "#O1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$TRANSMISSION_LINE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                20.0,
+                -40.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#O1:1"
+                ],
+                "at": [
+                  16.0,
+                  -40.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&a23"
+                ]
+              },
+              {
+                "terminals": [
+                  "#O1:2"
+                ],
+                "at": [
+                  18.0,
+                  -42.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b23"
+                ]
+              },
+              {
+                "terminals": [
+                  "#O1:3"
+                ],
+                "at": [
+                  24.0,
+                  -40.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&c23"
+                ]
+              },
+              {
+                "terminals": [
+                  "#O1:4"
+                ],
+                "at": [
+                  22.0,
+                  -42.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&d23"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#U1",
+            "kind": "instance",
+            "host": [
+              "#U1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RC_LINE",
+              "source": null
+            },
+            "at": {
+              "value": [
+                30.0,
+                -40.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#U1:1"
+                ],
+                "at": [
+                  26.0,
+                  -40.0
+                ],
+                "dir": 180,
+                "nets": [
+                  "&a24"
+                ]
+              },
+              {
+                "terminals": [
+                  "#U1:2"
+                ],
+                "at": [
+                  34.0,
+                  -40.0
+                ],
+                "dir": 0,
+                "nets": [
+                  "&b24"
+                ]
+              },
+              {
+                "terminals": [
+                  "#U1:3"
+                ],
+                "at": [
+                  30.0,
+                  -42.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&c24"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "kind": "instance",
+            "host": [
+              "#R2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                40.0,
+                -40.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R2:1"
+                ],
+                "at": [
+                  40.0,
+                  -38.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a25"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R2:2"
+                ],
+                "at": [
+                  40.0,
+                  -42.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b25"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:28:3",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND_STUB",
+            "attach": {
+              "t": "#V1:2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                30.0,
+                -2.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-basic.rnl:457:9",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GROUND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND_SYMBOL",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          }
+        ],
+        "points": [],
+        "wires": [],
+        "texts": [
+          {
+            "id": "#R1::name",
+            "attach": "#R1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.95,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::value",
+            "attach": "#R1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.95,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#C1::name",
+            "attach": "#C1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "C1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              11.2,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#C1::value",
+            "attach": "#C1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1p",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              11.2,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#L1::name",
+            "attach": "#L1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "L1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              20.7,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#L1::value",
+            "attach": "#L1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1n",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              20.7,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#V1::name",
+            "attach": "#V1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "V1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              31.5,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#V1::value",
+            "attach": "#V1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "dc 1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              31.5,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#I1::name",
+            "attach": "#I1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "I1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              41.5,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#I1::value",
+            "attach": "#I1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "dc 1m",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              41.5,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#E1::name",
+            "attach": "#E1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "E1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.65,
+              -9.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#E1::value",
+            "attach": "#E1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.65,
+              -10.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#G1::name",
+            "attach": "#G1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "G1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              11.65,
+              -9.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#G1::value",
+            "attach": "#G1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1m",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              11.65,
+              -10.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#F1::name",
+            "attach": "#F1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "F1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              21.5,
+              -9.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#F1::value",
+            "attach": "#F1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "V1 2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              21.5,
+              -10.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#H1::name",
+            "attach": "#H1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "H1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              31.5,
+              -9.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#H1::value",
+            "attach": "#H1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "V1 1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              31.5,
+              -10.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#B1::name",
+            "attach": "#B1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "B1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              41.5,
+              -9.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#S1::name",
+            "attach": "#S1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "S1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.0,
+              -18.35
+            ],
+            "halign": "middle",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#W1::name",
+            "attach": "#W1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "W1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.0,
+              -18.35
+            ],
+            "halign": "middle",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#D1::name",
+            "attach": "#D1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "D1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              20.0,
+              -18.9
+            ],
+            "halign": "middle",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Q1::name",
+            "attach": "#Q1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Q1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              30.5,
+              -18.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Q1::model",
+            "attach": "#Q1",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "npnmod",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              30.5,
+              -21.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Q2::name",
+            "attach": "#Q2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Q2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.5,
+              -18.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Q2::model",
+            "attach": "#Q2",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "pnpmod",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.5,
+              -21.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M1::name",
+            "attach": "#M1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.5,
+              -28.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M1::model",
+            "attach": "#M1",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "nmosmod",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.5,
+              -31.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M2::name",
+            "attach": "#M2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "M2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.5,
+              -28.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#M2::model",
+            "attach": "#M2",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "pmosmod",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.5,
+              -31.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#J1::name",
+            "attach": "#J1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "J1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              20.5,
+              -28.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#J1::model",
+            "attach": "#J1",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "njfmod",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              20.5,
+              -31.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#J2::name",
+            "attach": "#J2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "J2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              30.5,
+              -28.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#J2::model",
+            "attach": "#J2",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "pjfmod",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              30.5,
+              -31.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Z1::name",
+            "attach": "#Z1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Z1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.5,
+              -28.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Z1::model",
+            "attach": "#Z1",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "nmfmod",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.5,
+              -31.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Z2::name",
+            "attach": "#Z2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "Z2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.5,
+              -38.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#Z2::model",
+            "attach": "#Z2",
+            "key": "model",
+            "markup": {
+              "value": "${model}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "pmfmod",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.5,
+              -41.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#T1::name",
+            "attach": "#T1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "T1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.0,
+              -38.85
+            ],
+            "halign": "middle",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#O1::name",
+            "attach": "#O1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "O1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              20.0,
+              -38.85
+            ],
+            "halign": "middle",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#U1::name",
+            "attach": "#U1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "U1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              30.0,
+              -39.25
+            ],
+            "halign": "middle",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R2::name",
+            "attach": "#R2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.95,
+              -39.75
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R2::value",
+            "attach": "#R2",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "rmod",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.95,
+              -40.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std-style",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-basic",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-semiconductors",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-spice",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-core",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-layout",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std",
+      "version": "0.3"
+    }
+  ],
+  "files": [
+    {
+      "path": "05-native-spice.sp",
+      "name": "05-native-spice.sp"
+    }
+  ]
+}

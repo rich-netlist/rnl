@@ -3,8 +3,7 @@
 *! X1 是名叫 resistor 的子电路的实例，按 Spectre 的规则以 master 画成电阻；R1 按 SPICE 的规则画。
 * @RNL(type="header") {
 *   @VERSION("0.3");
-*   @USE-PACKAGE(name="rnl-std", version="0.3", path="std-0.3/rnl-std.rnl");
-*   @USE-PACKAGE(name="rnl-std-spectre", version="0.3", path="std-0.3/rnl-std-spectre.rnl")
+*   @USE-PACKAGE(name="rnl-std-spectre", version="0.3")
 * }
 .subckt resistor p n
 .ends

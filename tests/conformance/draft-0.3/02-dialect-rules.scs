@@ -1,13 +1,10 @@
 // The rule package of the other dialect, dropped by the dialect of each file
 *! 0.3 版的文件不用另一种方言的规则包（16.3）：这个 .scs 文件是 Spectre 方言，不用 rnl-std-spice；它 include 的 02-dialect-rules-sp.inc 是 SPICE 方言，不用 rnl-std-spectre。
-*! 标准包用本目录的 std-0.3（0.3 系列的替身，经 path= 写在头段记录里）：rnl-std-spice 按名字给 R*、I* 符号，rnl-std-spectre 按 master 给 resistor、isource 符号。
+*! 标准包是工具自带的 0.3 系列：0.3 版的文件隐式用它（16.3）。rnl-std-spice 按元件字母给 R*、I* 符号，rnl-std-spectre 按 master 给 resistor、isource 符号。
 *! I0 是子电路 cell 的实例，Virtuoso 常这样起名；SPICE 的规则包去掉了，它不再画成电流源。R0 按 master 画成电阻。
 *! 文件中间的 simulator lang=spice 不改变文件的方言：子电路 mid 里按 SPICE 写的电流源 I3 也不按 SPICE 的规则画。spsub 里的 I1、R1 按 SPICE 的规则画。
 simulator lang=spectre
-// @RNL(type="header") {
-//   @VERSION("0.3");
-//   @USE-PACKAGE(name="rnl-std", version="0.3", path="std-0.3/rnl-std.rnl")
-// }
+// @RNL(type="header") { @VERSION("0.3")}
 subckt cell (p n)
 ends cell
 I0 (a 0) cell
