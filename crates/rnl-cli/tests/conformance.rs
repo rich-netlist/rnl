@@ -5,6 +5,9 @@
 //!   Run with `RNL_BLESS=1` to write the expected files after a change that is meant.
 //! - `equivalence/NAME.sp` and `NAME.scs`: the same circuit in SPICE and Spectre with the same RNL
 //!   gives the same effective model (architecture 4.1, 10.2).
+//! - `draft-0.3/NAME.sp` (or `.scs`): cases of the draft 0.3, read with the draft switch, with
+//!   expected files of their own as in `cases`. `RNL_BLESS_DRAFT=1` writes them, so that writing
+//!   them never touches the expected files of the corpus of 0.2.
 
 use std::path::{Path, PathBuf};
 
@@ -36,13 +39,30 @@ fn run_with(path: &Path, options: &Options) -> Value {
     dump::conformance(&r)
 }
 
+fn draft() -> Options {
+    Options { draft: true, ..Options::default() }
+}
+
+fn run_draft(path: &Path) -> Value {
+    run_with(path, &draft())
+}
+
 /// The editor interface's snapshot of a file, as `rnl snapshot` prints it, without what changes
 /// with the toolkit rather than with the case: the runtime's version, the revision, which follows
 /// the bundled packages' texts, and the diagnostics, which the expected file holds.
 fn snapshot(path: &Path) -> Value {
+    snapshot_with(path, &Options::default())
+}
+
+fn snapshot_draft(path: &Path) -> Value {
+    snapshot_with(path, &draft())
+}
+
+fn snapshot_with(path: &Path, options: &Options) -> Value {
     let provider = FsProvider::new(&[]);
     let parts = rnl_view::Parts { drawing: false, host: true, model: true };
-    let s = rnl_view::snapshot(&path.to_string_lossy(), &provider, &rnl_view::BuildOptions::default(), parts).unwrap();
+    let build = rnl_view::BuildOptions { runtime: options.clone(), ..rnl_view::BuildOptions::default() };
+    let s = rnl_view::snapshot(&path.to_string_lossy(), &provider, &build, parts).unwrap();
     let mut v = serde_json::to_value(s).unwrap();
     for k in ["runtime", "revision", "diagnostics"] {
         v.as_object_mut().unwrap().remove(k);
@@ -52,8 +72,14 @@ fn snapshot(path: &Path) -> Value {
 
 /// Each case's `output` against `NAME.{kind}.json`, or with `RNL_BLESS=1` written there.
 fn check_cases(kind: &str, what: &str, output: fn(&Path) -> Value) {
-    let dir = corpus().join("cases");
-    let bless = std::env::var("RNL_BLESS").is_ok();
+    check_cases_in("cases", "RNL_BLESS", kind, what, output)
+}
+
+/// The cases of a directory of the corpus against their expected files, or with `bless` set in
+/// the environment written there.
+fn check_cases_in(dir: &str, bless: &str, kind: &str, what: &str, output: fn(&Path) -> Value) {
+    let dir = corpus().join(dir);
+    let bless = std::env::var(bless).is_ok();
     let mut failed = Vec::new();
     for f in files(&dir, &["sp", "scs"]) {
         let got = output(&f);
@@ -84,6 +110,16 @@ fn cases_match_their_expected_models() {
 #[test]
 fn cases_match_their_expected_snapshots() {
     check_cases("snapshot", "snapshot", snapshot);
+}
+
+#[test]
+fn draft_cases_match_their_expected_models() {
+    check_cases_in("draft-0.3", "RNL_BLESS_DRAFT", "expected", "effective model of the draft 0.3", run_draft);
+}
+
+#[test]
+fn draft_cases_match_their_expected_snapshots() {
+    check_cases_in("draft-0.3", "RNL_BLESS_DRAFT", "snapshot", "snapshot of the draft 0.3", snapshot_draft);
 }
 
 #[test]

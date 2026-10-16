@@ -1,0 +1,10 @@
+/* The stand-in of rnl-std-spectre 0.3: symbols by master, as in Spectre. */
+@RNL(type="header") {
+  @VERSION("0.3");
+  @PACKAGE(name="rnl-std-spectre", version="0.3");
+  @USE-PACKAGE(name="rnl-std-basic", version="0.3", path="rnl-std-basic.rnl")
+}
+@RNL {
+  # @SELECT-INSTANCE(model="resistor") => @SET-SYMBOL $RES;
+  # @SELECT-INSTANCE(model="isource") => @SET-SYMBOL $ISRC
+}

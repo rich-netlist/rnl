@@ -1,0 +1,509 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "02-dialect-rules.scs",
+      "kind": "file",
+      "file": "02-dialect-rules.scs",
+      "symbols": [
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -1.0,
+            3.0,
+            1.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "p",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "n",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$RES",
+          "box": [
+            -1.0,
+            -3.0,
+            1.0,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -1.0,
+                  -2.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#I0",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R0",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#I0::name",
+          "anchor": [
+            0.0,
+            1.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "I0",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    },
+    {
+      "title": "cell",
+      "kind": "subckt",
+      "file": "02-dialect-rules.scs",
+      "symbols": [],
+      "items": [],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    },
+    {
+      "title": "spsub",
+      "kind": "subckt",
+      "file": "02-dialect-rules-sp.inc",
+      "symbols": [
+        {
+          "name": "$ISRC",
+          "box": [
+            -2.0,
+            -3.0,
+            2.0,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  0.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$RES",
+          "box": [
+            -1.0,
+            -3.0,
+            1.0,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -1.0,
+                  -2.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#I1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    },
+    {
+      "title": "mid",
+      "kind": "subckt",
+      "file": "02-dialect-rules.scs",
+      "symbols": [
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -1.0,
+            3.0,
+            1.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "p",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "n",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#I3",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#I3::name",
+          "anchor": [
+            0.0,
+            1.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "I3",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {},
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": []
+}

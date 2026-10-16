@@ -1,0 +1,112 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "03-written-rules.sp",
+      "kind": "file",
+      "file": "03-written-rules.sp",
+      "symbols": [
+        {
+          "name": "$RES",
+          "box": [
+            -1.0,
+            -3.0,
+            1.0,
+            3.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                3.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -3.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -1.0,
+                  -2.0
+                ],
+                [
+                  1.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#R1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#X1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {},
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    },
+    {
+      "title": "resistor",
+      "kind": "subckt",
+      "file": "03-written-rules.sp",
+      "symbols": [],
+      "items": [],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": []
+}

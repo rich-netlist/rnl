@@ -1,0 +1,536 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.3",
+  "levels": [
+    {
+      "id": "file:04-no-rule-packages.scs",
+      "kind": "file",
+      "name": "04-no-rule-packages.scs",
+      "file": 0,
+      "line": 0,
+      "status": "2 without a position; constraints: 4 unsolved",
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#I0",
+            "subckt": true,
+            "master": "cell",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          },
+          {
+            "id": "#R0",
+            "subckt": false,
+            "master": "resistor",
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&0"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&a",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&0",
+            "global": true,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$ISRC",
+            "name": "$ISRC",
+            "package": "rnl-std-symbols",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$RES",
+            "name": "$RES",
+            "package": "rnl-std-symbols",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$GROUND",
+            "name": "$GROUND",
+            "package": "rnl-std-virtual",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#I0",
+            "kind": "instance",
+            "host": [
+              "#I0"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ISRC",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#I0:1"
+                ],
+                "at": [
+                  0.0,
+                  3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "terminals": [
+                  "#I0:2"
+                ],
+                "at": [
+                  0.0,
+                  -3.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R0",
+            "kind": "instance",
+            "host": [
+              "#R0"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RES",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R0:1"
+                ],
+                "at": [
+                  10.0,
+                  3.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R0:2"
+                ],
+                "at": [
+                  10.0,
+                  -3.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "@rnl-std-fill.rnl:28:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#I0:2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-virtual.rnl:52:9#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-fill.rnl:28:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND_STUB",
+            "attach": {
+              "t": "#R0:2"
+            },
+            "symbol": {
+              "value": null,
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                -3.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-virtual.rnl:52:9#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$GND",
+            "attach": {
+              "p": "&0"
+            },
+            "symbol": {
+              "value": "$GROUND",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          }
+        ],
+        "points": [],
+        "wires": [],
+        "texts": [
+          {
+            "id": "#I0::name",
+            "attach": "#I0",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "I0",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.9,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R0::name",
+            "attach": "#R0",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R0",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              11.1,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R0::value",
+            "attach": "#R0",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              11.1,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": []
+      }
+    },
+    {
+      "id": "subckt:cell",
+      "kind": "subckt",
+      "name": "cell",
+      "file": 0,
+      "line": 5,
+      "status": "2 without a position",
+      "host": {
+        "ports": [
+          "&p",
+          "&n"
+        ],
+        "instances": [],
+        "nets": [
+          {
+            "id": "&p",
+            "global": false,
+            "port": true
+          },
+          {
+            "id": "&n",
+            "global": false,
+            "port": true
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$PORT_TAG",
+            "name": "$PORT_TAG",
+            "package": "rnl-std-virtual",
+            "level": null,
+            "default": false,
+            "definition": null
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "@rnl-std-fill.rnl:37:3#1",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&p"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          },
+          {
+            "id": "@rnl-std-fill.rnl:37:3#2",
+            "kind": "usage",
+            "host": [],
+            "definition": "$IOPORT",
+            "attach": {
+              "p": "&n"
+            },
+            "symbol": {
+              "value": "$PORT_TAG",
+              "source": null
+            },
+            "at": {
+              "value": null,
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": []
+          }
+        ],
+        "points": [],
+        "wires": [],
+        "texts": [],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spectre",
+  "packages": [
+    {
+      "name": "rnl-std-style",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-symbols",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-virtual",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-core",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-semantics",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std-layout",
+      "version": "0.2"
+    },
+    {
+      "name": "rnl-std",
+      "version": "0.2"
+    }
+  ],
+  "files": [
+    {
+      "path": "04-no-rule-packages.scs",
+      "name": "04-no-rule-packages.scs"
+    }
+  ]
+}

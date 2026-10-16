@@ -1,0 +1,9 @@
+/* A stand-in for the standard series 0.3 (16.3), which the cases of this directory use by path=
+   until the series is published: only the structure that the drop of the rule package of the
+   other dialect needs. rnl-std references rnl-std-core, which references the symbols and the
+   rule packages of the two dialects. */
+@RNL(type="header") {
+  @VERSION("0.3");
+  @PACKAGE(name="rnl-std", version="0.3");
+  @USE-PACKAGE(name="rnl-std-core", version="0.3", path="rnl-std-core.rnl")
+}
