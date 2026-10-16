@@ -692,10 +692,11 @@ pub fn not_solved(n: &NotSolved) -> String {
 /// minimal group of facts it conflicts with, and whether the list is complete; the hints by
 /// statement, each statement whose facts took part in discarding with the facts discarded because
 /// of it; the hints of a fact of priority low, and of the statements that only such facts lose,
-/// only with `all`, when the solver sought them ([`SolvedLevel::hints_for_low`], 7.6); the errors
-/// of the solver, the facts that contradict themselves, each on a line of its own beginning with
-/// `error:`, and its warnings, each beginning with `warning:` (7.6); what the record cannot hold, the ROUTEs left in parts, the inert objectives, the notes,
-/// the work and the time.
+/// only with `all`, when the solver sought them ([`SolvedLevel::hints_for_low`], 7.6), and with
+/// `all` when it did not, the line of such a fact says so; the errors of the solver, the facts
+/// that contradict themselves, each on a line of its own beginning with `error:`, and its
+/// warnings, each beginning with `warning:` (7.6); what the record cannot hold, the ROUTEs left in
+/// parts, the inert objectives, the notes, the work and the time.
 pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     let p = &level.problem;
     let r = &level.solved.report;
@@ -719,6 +720,11 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
         let Some(d) = r.discarded.iter().find(|d| d.fact == k) else { return };
         let why = if d.undecided {
             "not decided within the time limit of the solver (8.5)".to_string()
+        } else if !hinted(k) && all {
+            // every fact, of a level solved without the groups of the low facts sought
+            "of priority low, which is expected; the solver did not seek what it conflicts with (hints_for_low, \
+             which --report sets; 8.5)"
+                .to_string()
         } else if !hinted(k) {
             "of priority low, which is expected; --report lists what it conflicts with (8.5)".to_string()
         } else {

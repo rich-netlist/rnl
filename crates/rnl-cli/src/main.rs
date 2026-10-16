@@ -372,7 +372,10 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
         }
     }
     if run.errors > 0 {
-        eprintln!("{} errors in {} as a solver reads it; run `rnl check` to see them", run.errors, run.entry);
+        eprintln!(
+            "{} errors in {} as a solver reads it; run `rnl check --no-generated` to see them",
+            run.errors, run.entry
+        );
     }
     // an error of the netlist, or a fact that contradicts itself (8.5, 7.6): the levels are written
     // all the same

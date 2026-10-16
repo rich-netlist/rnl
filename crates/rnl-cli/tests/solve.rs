@@ -440,7 +440,7 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
     assert!(level.record.contains("%tc::mid @PLACE("), "{}", level.record);
     assert!(lines.iter().any(|l| l.starts_with("  work: ")) && lines.iter().any(|l| l.starts_with("  time: ")));
     // the solver gave the low fact its first group only, which a note says (8.5, 7.6), so that even
-    // the report of every fact leaves out its hints
+    // the report of every fact leaves out its hints, and says that the solver did not seek them
     let low = level.solved.report.discarded.iter().find(|d| d.fact == 40).unwrap();
     assert_eq!((&low.groups, low.complete), (&vec![vec![2]], false));
     let note = "    the minimal conflict groups of a fact of priority low discarded are listed only with --report \
@@ -448,7 +448,12 @@ fn the_discarded_facts_of_t4_are_those_of_its_reference() {
                 no hint by statement";
     assert!(lines.iter().any(|l| l == note), "{lines:#?}");
     let every = rnl_cli::solve::report(level, true);
-    assert!(every.contains(&format!("  {}", discarded[2])), "{every:#?}");
+    let unsought = "    discarded [40] ALIGN y {#VIP #VIN} (low, T4-miller-conflicts.sp:31): of priority low, \
+                    which is expected; the solver did not seek what it conflicts with (hints_for_low, which \
+                    --report sets; 8.5)";
+    assert!(every.iter().any(|l| l == unsought), "{every:#?}");
+    let at = every.iter().position(|l| l == unsought).unwrap();
+    assert!(!every[at + 1].starts_with("        ["), "{every:#?}");
     // with --report the solver seeks them: every fact, in the order of 8.5, the same solution, and
     // no note
     let options = SolveOptions {
@@ -1892,7 +1897,8 @@ fn a_fact_that_the_runtime_sees_contradict_itself_never_reaches_the_solver() {
 #[test]
 fn the_command_exits_with_1_on_the_errors_of_the_netlist() {
     // the corpus cases written with errors (7.6) are solved and written all the same, and the
-    // command exits with 1, as `rnl check` does, with their number on the standard error
+    // command exits with 1, as `rnl check --no-generated` does, with their number on the standard
+    // error, and that command to see them
     for name in ["12-diagnostics.sp", "16-ties.sp", "19-set-cycles.sp"] {
         let f = corpus(name);
         let errors = interpret_file(&f, None, &FsProvider::new(&[]), &Options::solver()).unwrap();
@@ -1905,6 +1911,7 @@ fn the_command_exits_with_1_on_the_errors_of_the_netlist() {
             rnl(&["solve", &path_str(&f), "-o", &path_str(&out), "--solver-options", "time_limit=none"]);
         assert_eq!(code, 1, "{name}: {stdout}{stderr}");
         assert!(stderr.contains(&format!("{errors} errors in ")), "{name}: {stderr}");
+        assert!(stderr.contains("; run `rnl check --no-generated` to see them"), "{name}: {stderr}");
         assert!(stdout.contains(&format!("wrote {}", path_str(&out.join(name)))), "{name}: {stdout}");
     }
 }
