@@ -207,13 +207,17 @@ function draw(pkg, symbols) {
       x1 = Math.max(x1, c);
       y1 = Math.max(y1, d);
     };
-    for (const prim of level.primitives || []) grow(...prim.bbox);
+    for (const prim of level.primitives || []) if (!prim.owner.startsWith("#X1::")) grow(...prim.bbox);
     if (box) grow(...box);
-    // a pin's terminal number sits beyond its end (see card), about a grid step out
+    // a thumbnail shows the symbol alone, without its labels, pins and their tags
+    const thumb = Number.isFinite(x0)
+      ? [x0 - 0.2, -(y1 + 0.2), x1 - x0 + 0.4, y1 - y0 + 0.4].map((v) => num(v * scale)).join(" ")
+      : null;
+    for (const prim of level.primitives || []) grow(...prim.bbox);
+    // a pin's mark, and its terminal number and direction beyond its end (see card)
     for (const p of pins) {
-      const [dx, dy] = unit(p.dir);
-      const [ox, oy] = [p.at[0] + dx * 1.1, p.at[1] + dy * 1.1];
-      grow(Math.min(p.at[0], ox) - 0.4, Math.min(p.at[1], oy) - 0.4, Math.max(p.at[0], ox) + 0.4, Math.max(p.at[1], oy) + 0.4);
+      grow(p.at[0] - 0.3, p.at[1] - 0.3, p.at[0] + 0.3, p.at[1] + 0.3);
+      grow(...pinTag(p, scale).box);
     }
     if (!Number.isFinite(x0)) [x0, y0, x1, y1] = [-1, -1, 1, 1];
     x0 -= MARGIN;
@@ -221,8 +225,32 @@ function draw(pkg, symbols) {
     x1 += MARGIN;
     y1 += MARGIN;
     const svg = card(level.svg, scale, [x0, y0, x1, y1], box, pins);
-    return { svg, width: num((x1 - x0) * SCALE_UNIT), height: num((y1 - y0) * SCALE_UNIT), box, pins, problems };
+    return { svg, thumb, width: num((x1 - x0) * SCALE_UNIT), height: num((y1 - y0) * SCALE_UNIT), box, pins, problems };
   });
+}
+
+/** The direction a pin points, away from the symbol, where its wire leaves (9.2.4). */
+const ARROWS = { 0: "→", 90: "↑", 180: "←", 270: "↓" };
+const TAG_SIZE = 11; // the size of a pin's tag in the core's pixels, as the page's stylesheet sets it
+
+/**
+ * Where a pin's tag goes: its terminal number with the arrow of its direction after it, such as
+ * `1↑`, beyond the end of the pin: beside a pin that points left or right, above or below one that
+ * points up or down. Returns the anchor of the text in the core's pixels (y down), and the box it
+ * takes in scene units (y up), from an estimate of its width: a monospaced figure is 0.6 em.
+ */
+function pinTag(p, scale) {
+  const text = [].concat(p.terminal).join(",");
+  const [dx, dy] = unit(p.dir);
+  const [x, y] = [p.at[0] * scale, -p.at[1] * scale];
+  const width = (text.length + (ARROWS[p.dir] ? 1 : 0)) * 0.6 * TAG_SIZE;
+  const anchor = dx > 0.5 ? "start" : dx < -0.5 ? "end" : p.dir === null ? "start" : "middle";
+  const tx = x + dx * 5 + (p.dir === null ? 5 : 0);
+  const ty = y - dy * 6 + (Math.abs(dy) > 0.5 ? (dy < 0 ? 8 : 0) : 3.8);
+  // the box in pixels, from the baseline up by the figures' height and down by a little
+  const left = anchor === "start" ? tx : anchor === "end" ? tx - width : tx - width / 2;
+  const [top, bottom] = [ty - 0.75 * TAG_SIZE, ty + 0.2 * TAG_SIZE];
+  return { text, anchor, x: tx, y: ty, box: [left / scale, -bottom / scale, (left + width) / scale, -top / scale] };
 }
 
 /**
@@ -246,16 +274,11 @@ function card(svg, scale, [x0, y0, x1, y1], box, pins) {
     );
   }
   for (const p of pins) {
-    const [x, y] = [p.at[0] * scale, -p.at[1] * scale];
-    // the number of the terminal beyond the end of the pin, where its wire leaves: beside a pin
-    // that points left or right, above or below one that points up or down
-    const [dx, dy] = unit(p.dir);
-    const anchor = dx > 0.5 ? "start" : dx < -0.5 ? "end" : "middle";
-    const tx = x + dx * 5 + (p.dir === null ? 5 : 0);
-    const ty = y - dy * 6 + (Math.abs(dy) > 0.5 ? (dy < 0 ? 8 : 0) : 3.8);
+    const tag = pinTag(p, scale);
+    const arrow = ARROWS[p.dir] ? `<tspan class="g-dir">${ARROWS[p.dir]}</tspan>` : "";
     over.push(
-      `<g class="g-pn"><circle cx="${num(x)}" cy="${num(y)}" r="2.6"/>` +
-        `<text x="${num(tx)}" y="${num(ty)}" text-anchor="${anchor}">${esc([].concat(p.terminal).join(","))}</text></g>`,
+      `<g class="g-pn"><circle cx="${num(p.at[0] * scale)}" cy="${num(-p.at[1] * scale)}" r="2.6"/>` +
+        `<text x="${num(tag.x)}" y="${num(tag.y)}" text-anchor="${tag.anchor}">${esc(tag.text)}${arrow}</text></g>`,
     );
   }
   const vb = [x0 * scale, -y1 * scale, (x1 - x0) * scale, (y1 - y0) * scale].map(num).join(" ");

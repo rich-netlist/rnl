@@ -107,7 +107,7 @@
 .gl-card {
   display: flex; flex-direction: column; min-width: 0; padding: 0; overflow: hidden; cursor: pointer; text-align: left;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: inherit; font: inherit;
-  transition: border-color .15s, box-shadow .15s;
+  padding-bottom: 10px; transition: border-color .15s, box-shadow .15s;
 }
 .gl-card:hover { border-color: var(--ink-3); box-shadow: var(--shadow); }
 .gl-fig {
@@ -116,17 +116,16 @@
   background-image: radial-gradient(circle, var(--sc-dot) .8px, transparent 1.2px);
   background-size: 13px 13px; background-position: center;
 }
-.gl-fig svg, .gl-thumb svg, .gl-dlg-fig svg { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; overflow: visible; }
+.gl-fig svg, .gl-dlg-fig svg { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; overflow: visible; }
 .gl-card-name { display: flex; align-items: center; gap: 6px; padding: 9px 12px 0; font: 600 13.5px/1.4 var(--f-mono); color: var(--ink); }
 .gl-card-name > span { min-width: 0; overflow-wrap: anywhere; }
 .gl-warn { width: 15px; height: 15px; color: var(--warn); }
-.gl-pins { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 12px 11px; }
+.gl-pins { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 12px 0; }
 .gl-pin {
   display: inline-flex; align-items: baseline; gap: 3px; padding: 0 6px; border-radius: 4px;
   background: var(--signal-2); color: var(--signal); font: 500 11.5px/1.75 var(--f-mono);
 }
 .gl-pin i { font-style: normal; color: var(--ink-2); }
-.gl-pin b { font-weight: 700; }
 
 /* The core's drawing in the page's colours: it writes the standard style's ink and paper */
 .gl-page svg [stroke="#1d1d1f"] { stroke: var(--sc-ink); }
@@ -140,6 +139,7 @@
 .g-bx { fill: var(--markup); fill-opacity: .05; stroke: var(--markup); stroke-width: 1.2; stroke-dasharray: 4 3; }
 .g-pn circle { fill: var(--panel); stroke: var(--signal); stroke-width: 1.6; }
 .g-pn text { font: 600 11px var(--f-mono); fill: var(--signal); }
+.g-pn .g-dir { font-family: var(--f-body); font-weight: 700; }
 
 /* ---------- Tables and lists ---------- */
 
@@ -150,15 +150,20 @@
 .gl-table tbody tr:last-child td { border-bottom: 0; }
 .gl-table tbody tr:hover { background: var(--panel-2); }
 .gl-table td:last-child { text-align: right; width: 1%; white-space: nowrap; }
-.gl-to { display: flex; align-items: center; gap: 10px; }
+.gl-to { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* A thumbnail: the symbol alone (build.mjs frames it so), scaled to fit and centred */
 .gl-thumb {
-  flex: none; display: inline-grid; place-items: center; width: 46px; height: 38px; padding: 4px; cursor: pointer;
+  flex: none; display: inline-block; width: 52px; height: 42px; padding: 5px; overflow: hidden; cursor: pointer; vertical-align: middle;
   border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2);
 }
+.gl-thumb svg { display: block; width: 100%; height: 100%; max-width: none; overflow: hidden; }
+/* lines keep the drawing's width however small the thumbnail */
+.gl-thumb svg :is(path, rect, circle, ellipse, line, polyline, polygon) { vector-effect: non-scaling-stroke; }
+.gl-thumb svg [fill="#ffffff"] { fill: var(--panel-2); }
 .gl-thumb:hover { border-color: var(--ink-3); }
 .gl-thumb .g-ov, .gl-thumb .g-lbl { display: none !important; }
 .gl-code { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.gl-name { font: 600 13.5px var(--f-mono); color: var(--t-def); overflow-wrap: anywhere; }
+.gl-name { font: 600 13.5px var(--f-mono); color: var(--t-def); overflow-wrap: break-word; }
 .gl-line { margin-left: auto; font-size: 12.5px; color: var(--ink-3); text-decoration: none; white-space: nowrap; }
 .gl-line:hover { color: var(--signal); text-decoration: underline; }
 .gl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -251,7 +256,15 @@
   .gl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .gl-fig { height: 112px; padding: 8px; }
   .gl-card-name { font-size: 13px; padding: 8px 10px 0; }
-  .gl-pins { padding: 5px 10px 9px; }
+  .gl-pins { padding: 5px 10px 0; }
+  .gl-card { padding-bottom: 9px; }
+  /* a rule on two lines: what it selects, then its symbol and its line */
+  .gl-rules-table thead { display: none; }
+  .gl-rules-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .gl-rules-table tbody tr:last-child { border-bottom: 0; }
+  .gl-rules-table td { display: block; padding: 0; border: 0; }
+  .gl-rules-table td:first-child { grid-column: 1 / -1; }
+  .gl-rules-table td:last-child { width: auto; }
   .gl-meta { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .gl-meta dt { line-height: 1.6; margin-top: 6px; }
   .gl-table th, .gl-table td { padding: 6px 8px; }

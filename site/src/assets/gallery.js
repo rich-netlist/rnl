@@ -117,25 +117,36 @@
 
   /* ---------------- rendering a package ---------------- */
 
+  /* A card: the picture, whose pins carry their terminal numbers and directions, the name, and the
+     names of the terminals when the package gives them, which the picture does not show */
   function symbolCard(pkg, s) {
-    var pins = (s.pins || []).map(function (p) {
-      return '<span class="gl-pin" title="' + esc(fill('<zh>端子 {t}，朝{d}</zh><en>terminal {t}, pointing {d}</en>', { t: terminalText(p), d: DIRS[p.dir] || '?' })) + '">' +
-        esc(terminalText(p)) + (p.name ? '<i>' + esc(p.name) + '</i>' : '') + '<b>' + (ARROWS[p.dir] || '·') + '</b></span>';
-    }).join('');
+    var pins = s.pins || [];
+    var named = pins.some(function (p) { return p.label || p.name; });
+    var row = !pins.length ? '<span class="gl-none"><zh>没有引脚</zh><en>no pins</en></span>'
+      : named ? pins.map(function (p) {
+        return '<span class="gl-pin">' + esc(terminalText(p)) + '<i>' + esc(p.label || p.name || '') + '</i></span>';
+      }).join('') : '';
     var warn = s.problems && s.problems.length ? '<svg class="ico gl-warn" aria-label="<zh>构建时有提示</zh><en>The build noted something</en>"><use href="#i-warn"/></svg>' : '';
-    var label = fill('<zh>{s}，{n} 个引脚</zh><en>{s}, {n} pins</en>', { s: s.name, n: (s.pins || []).length });
+    var label = fill('<zh>{s}，{n} 个引脚</zh><en>{s}, {n} pins</en>', { s: s.name, n: pins.length }) + pins.map(function (p) {
+      return fill('<zh>；端子 {t}{m}朝{d}</zh><en>; terminal {t}{m} pointing {d}</en>', { t: terminalText(p), m: p.label || p.name ? ' ' + (p.label || p.name) + ' ' : ' ', d: DIRS[p.dir] || '?' });
+    }).join('');
     return '<button type="button" class="gl-card" data-sym="' + esc(s.name) + '" data-pkg="' + esc(pkg.name) + '" aria-label="' + esc(label) + '">' +
       '<span class="gl-fig" aria-hidden="true">' + s.svg + '</span>' +
       '<span class="gl-card-name"><span>' + breakable(s.name) + '</span>' + warn + '</span>' +
-      '<span class="gl-pins">' + (pins || '<span class="gl-none"><zh>没有引脚</zh><en>no pins</en></span>') + '</span>' +
+      (row ? '<span class="gl-pins">' + row + '</span>' : '') +
       '</button>';
+  }
+
+  /* A small picture of a symbol, framed on the symbol alone, that opens its details */
+  function thumb(symName, entry) {
+    var svg = entry.sym.thumb ? entry.sym.svg.replace(/viewBox="[^"]*"/, 'viewBox="' + entry.sym.thumb + '"') : entry.sym.svg;
+    return '<button type="button" class="gl-thumb" data-sym="' + esc(symName) + '" data-pkg="' + esc(entry.pkg.name) + '" aria-label="' + esc(symName) + '">' + svg + '</button>';
   }
 
   function ruleRows(pkg, rules, symbols) {
     return rules.map(function (r) {
       var target = r.target && symbols[r.target];
-      var thumb = target ? '<button type="button" class="gl-thumb" data-sym="' + esc(r.target) + '" data-pkg="' + esc(target.pkg.name) + '">' + target.sym.svg + '</button>' : '';
-      return '<tr><td>' + code(r.select) + '</td><td class="gl-to">' + thumb + (r.target ? name(r.target) : code(r.last)) + '</td><td>' + lineLink(pkg, r.line) + '</td></tr>';
+      return '<tr><td>' + code(r.select) + '</td><td><div class="gl-to">' + (target ? thumb(r.target, target) : '') + (r.target ? name(r.target) : code(r.last)) + '</div></td><td>' + lineLink(pkg, r.line) + '</td></tr>';
     }).join('');
   }
 
@@ -202,7 +213,7 @@
     if (symRules.length) {
       h += block('rules', '<zh>配符号的规则</zh><en>Symbol rules</en>', symRules.length,
         '<p class="gl-hint"><zh>按顺序执行，后面的覆盖前面的：先宽（元件字母），后窄（模型类型）。</zh><en>Applied in order, later ones overriding earlier ones: broad (element letter) first, narrow (model type) later.</en></p>' +
-        '<div class="gl-table-wrap"><table class="gl-table"><thead><tr><th><zh>选出</zh><en>Selects</en></th><th><zh>配上的符号</zh><en>Symbol</en></th><th></th></tr></thead><tbody>' +
+        '<div class="gl-table-wrap"><table class="gl-table gl-rules-table"><thead><tr><th><zh>选出</zh><en>Selects</en></th><th><zh>配上的符号</zh><en>Symbol</en></th><th></th></tr></thead><tbody>' +
         ruleRows(pkg, symRules, symbols) + '</tbody></table></div>');
     }
     if (defs.length) {
@@ -210,7 +221,7 @@
         var drawn = drawnAs(group, s.name);
         var by = drawn && symbols[drawn.target];
         return '<li><div class="gl-li-head">' + name(s.name) + (s.roles ? code('roles=' + s.roles) : '') + (s.parameters ? code('parameters=' + s.parameters) : '') +
-          (by ? '<span class="gl-drawn"><zh>画成</zh><en>drawn as</en> <button type="button" class="gl-thumb" data-sym="' + esc(drawn.target) + '" data-pkg="' + esc(by.pkg.name) + '">' + by.sym.svg + '</button>' + name(drawn.target) + '</span>' : '') +
+          (by ? '<span class="gl-drawn"><zh>画成</zh><en>drawn as</en> ' + thumb(drawn.target, by) + name(drawn.target) + '</span>' : '') +
           lineLink(pkg, s.line, s.endLine) + '</div>' +
           (docText(s) ? '<p class="gl-doc">' + esc(docText(s)) + '</p>' : '') +
           (s.body ? '<pre class="gl-pre">' + C.hlSnippet(s.text) + '</pre>' : '') + '</li>';
