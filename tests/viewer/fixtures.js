@@ -1,7 +1,8 @@
 // The Documents the fake shell serves: `rnl view` of a few files of the conformance corpus, built
 // natively before the tests run; a changed copy of one of them, for reading a file again; a netlist
 // with many subcircuits, for the subcircuit index; subcircuits nested four deep, for the hierarchy
-// path; and statements over several lines in both dialects, which the corpus has none of.
+// path; statements over several lines in both dialects, which the corpus has none of; and netlists
+// of the solver's tests that `rnl solve` solved, for a drawing that no PLACE fixes.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -19,6 +20,16 @@ export const FILES = {
   "12-diagnostics": "tests/conformance/cases/12-diagnostics.sp",
   "17-line-styles": "tests/conformance/cases/17-line-styles.sp",
   "inverter-chain": "tests/conformance/equivalence/inverter-chain.scs",
+};
+
+/**
+ * The fixtures of netlists that only a solver draws, and the files of tests/integration/solver they
+ * are built from: `rnl solve` solves each file into the fixtures' directory, and the fixture is
+ * `rnl view` of the file solved, with the records of the solver it wrote.
+ */
+export const SOLVED = {
+  "T2-common-source-solved": "tests/integration/solver/T2-common-source.sp",
+  "T3-ota5t-solved": "tests/integration/solver/T3-ota5t.sp",
 };
 
 /** The subcircuits of the "subcircuits" fixture: two under M, one under each other initial, and one under #. */
@@ -102,8 +113,9 @@ function view(rnl, file, cwd) {
  * Document of 04-hierarchy.sp after a comment line was added below its title and Vin's value
  * changed, so that every statement below the title moved down a line, with the same file names;
  * "subcircuits", a netlist that instantiates each of SUBCIRCUITS once at the top level; "nested",
- * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3; and
- * "continued" and "continued-spectre", the netlists of CONTINUED.
+ * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3;
+ * "continued" and "continued-spectre", the netlists of CONTINUED; and those of SOLVED, from the
+ * files that `rnl solve` writes under `solved` in `dir`.
  */
 export function writeFixtures(rnl, dir) {
   for (const [name, file] of Object.entries(FILES)) {
@@ -137,5 +149,12 @@ export function writeFixtures(rnl, dir) {
     fs.writeFileSync(path.join(dir, file), text.concat("").join("\n"));
     const name = file.endsWith(".scs") ? "continued-spectre" : "continued";
     fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, dir));
+  }
+
+  const solved = path.join(dir, "solved");
+  for (const [name, file] of Object.entries(SOLVED)) {
+    // what the solver prints of each level is not needed; it fails, and the setup with it, on an error
+    execFileSync(rnl, ["solve", file, "-o", solved], { cwd: root, encoding: "utf8", maxBuffer: 1 << 26 });
+    fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, path.basename(file), solved));
   }
 }
