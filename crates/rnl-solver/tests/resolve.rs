@@ -205,7 +205,7 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> Resolved
     let solved = solve(p, &options);
     assert_eq!(solved.report.kept, r.kept);
     for pl in &solved.solution.placements {
-        if let Some((x, y)) = pl.at {
+        if let Some((x, y)) = pl.at() {
             assert!(x.is_finite() && y.is_finite(), "{what}: {pl:?}");
         }
     }

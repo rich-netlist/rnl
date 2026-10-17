@@ -130,7 +130,7 @@ impl Placed<'_> {
                 let (dx, dy) = self.orient(*owner).apply(*local);
                 // on the axis that the scene gives it, where the solver puts it, or else where its
                 // PLACE or its offset puts it (13.3)
-                let solved = self.s.placements.iter().find(|q| q.object == k).and_then(|q| q.at);
+                let solved = self.s.placements.iter().find(|q| q.object == k).and_then(|q| q.at());
                 let own = |axis: Axis, s: &Slot| match (solved, s) {
                     (Some(at), _) => self.along(at, axis),
                     (None, Slot::Fixed { value, .. }) => *value,
@@ -143,7 +143,7 @@ impl Placed<'_> {
                 }
             }
             Position::Own { x, y } => {
-                let solved = self.s.placements.iter().find(|q| q.object == k).and_then(|q| q.at);
+                let solved = self.s.placements.iter().find(|q| q.object == k).and_then(|q| q.at());
                 // without a position from the solver, where the file puts it: by its coordinate
                 // facts, or as a text by its offsets (13.3)
                 let own = |axis: Axis, s: &Slot| match s {
@@ -312,7 +312,7 @@ fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, draft: bo
             .unsolved
             .iter()
             .filter_map(|u| match u.decision {
-                Decision::Position { object } => Some(object),
+                Decision::Position { object, .. } => Some(object),
                 _ => None,
             })
             .collect();
@@ -978,7 +978,7 @@ fn every_corpus_case_solved_reads_back_as_its_authors_wrote_it() {
                 .iter()
                 .enumerate()
                 .filter(|(k, o)| {
-                    let placed = level.solved.solution.placements.iter().any(|pl| pl.object == *k && pl.at.is_some());
+                    let placed = level.solved.solution.placements.iter().any(|pl| pl.object == *k && pl.at().is_some());
                     matches!(o.position, Position::Own { .. }) && !placed
                 })
                 .map(|(_, o)| o.label.as_str())
@@ -1262,7 +1262,7 @@ fn a_label_on_a_bus_that_no_fact_reaches_reads_back_on_the_bus() {
     let Reference::Number { number, .. } = &p.objects[label].reference else { panic!("{:?}", p.objects[label]) };
     assert!(!level.record.contains(&format!("%#{number} @")), "{}", level.record);
     assert!(level.solved.solution.placements.iter().all(|pl| pl.object != label));
-    assert!(!level.written.unsolved.iter().any(|u| u.decision == Decision::Position { object: label }));
+    assert!(!level.written.unsolved.iter().any(|u| u.decision == Decision::Position { object: label, axis: None }));
     let notes = &level.solved.report.notes;
     assert!(notes.iter().any(|n| n.starts_with("1 text that no fact kept reaches is left free")), "{notes:#?}");
     let back = read_solved(&run, &fs, &f);
