@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><zh>RNL 语言导览 · Rich Netlist</zh><en>RNL language tour · Rich Netlist</en></title>
-<meta name="description" content="<zh>Rich Netlist（RNL）语言标准 0.2 的互动导览：标准例句与中文写法、定义与套用、标准包的默认行为、集合与选择、导线、文字、朝向、优先级和文件头。</zh>
-  <en>An interactive tour of Rich Netlist (RNL) language standard 0.2: standard sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en>">
+<meta name="description" content="<zh>Rich Netlist（RNL）语言标准 0.3 的互动导览：标准例句与中文写法、定义与套用、标准包的默认行为、集合与选择、导线、文字、朝向、优先级和文件头。</zh>
+  <en>An interactive tour of Rich Netlist (RNL) language standard 0.3: standard sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&<zh>family=Noto+Sans+SC:wght@400;500;700;900</zh><en>family=IBM+Plex+Sans:wght@400;500;600;700</en>&display=swap">
@@ -74,7 +74,7 @@
 <!-- ===================== Intro ===================== -->
 <section class="hero tour-hero" id="top" aria-labelledby="tour-title">
   <div class="wrap">
-    <p class="eyebrow"><span>RICH NETLIST · LANGUAGE 0.2</span><span class="chip chip-warn"><zh>草稿 · 2026-10-12</zh><en>Draft · 2026-10-12</en></span></p>
+    <p class="eyebrow"><span>RICH NETLIST · LANGUAGE 0.3</span><span class="chip"><zh>标准系列 0.3</zh><en>Standard series 0.3</en></span></p>
     <h1 id="tour-title" class="tour-h1"><zh>语言导览</zh><en>Language tour</en></h1>
     <p class="thesis"><zh>九个小节，每节讲一件事，都可以动手试。</zh><en>Nine sections, one idea each, all hands-on.</en></p>
     <p class="lead"><zh>介绍页讲了 RNL 为什么存在、长什么样；这里讲<a href="spec/0.2/">语言标准 0.2</a> 里那些介绍页没有展开的规则。例子都在 RNL 原型里检查过，能读通；图是本页手工排的，求解器还没有正式版。</zh>
@@ -168,19 +168,19 @@
     <div class="cmp">
       <div class="cmp-card">
         <span class="cmp-k">@AS</span>
-        <code data-hl="%dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFPAIR"></code>
+        <code data-hl="%dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR"></code>
         <p><zh>对象合起来构成这个东西。定义写在最后，对象按角色填进去：M1 填 in_p，M2 填 in_n。</zh><en>The objects together form the thing. The definition comes last, and the objects fill its roles: M1 fills in_p, M2 fills in_n.</en></p>
       </div>
       <div class="cmp-card">
         <span class="cmp-k">@ATTACH</span>
-        <code data-hl="$GND is @ATTACH to &amp;vss"></code>
+        <code data-hl="$GROUND is @ATTACH to &amp;vss"></code>
         <p><zh>这个东西添在对象上。定义写在最前：地符号添在网络 vss 上，它只为显示而存在，不产生连接。</zh><en>The thing is added onto the objects. The definition comes first: a ground is added on net vss; it exists only for display and makes no connection.</en></p>
       </div>
     </div>
 
     <h3 class="sub-h"><zh>语义定义和布局定义</zh><en>Semantic and layout definitions</en></h3>
-    <p class="sub-lead"><zh>$DIFFPAIR 的体是空的，套用它只记下“这是差分对”，不改画法。$MIRROR_PAIR 的体里写了约束，套用时角色换成对象，约束就展开到这一层。“是什么”和“怎么画”分开套用。</zh>
-      <en>$DIFFPAIR has an empty body: applying it records “this is a differential pair” and changes nothing in the drawing. $MIRROR_PAIR has constraints in its body; when it is applied, the roles are replaced by the objects and the constraints expand into this level. What things are and how to draw them are applied separately.</en></p>
+    <p class="sub-lead"><zh>$DIFFERENTIAL_PAIR 的体是空的，套用它只记下“这是差分对”，不改画法（标准包另有一条 low 的规则，给带尾管的差分对把尾管放在中间）。$MIRROR_PAIR 的体里写了约束，套用时角色换成对象，约束就展开到这一层。“是什么”和“怎么画”分开套用。</zh>
+      <en>$DIFFERENTIAL_PAIR has an empty body: applying it records “this is a differential pair” and changes nothing in the drawing (a low rule of the standard package centers the tail of a pair that has one). $MIRROR_PAIR has constraints in its body; when it is applied, the roles are replaced by the objects and the constraints expand into this level. What things are and how to draw them are applied separately.</en></p>
     <div class="duo">
       <div class="panel">
         <div class="ph"><svg class="ico"><use href="#i-file"/></svg><span class="ph-title"><zh>套用与展开</zh><en>Applying and expanding</en></span><span class="ph-right">
@@ -233,7 +233,7 @@
     <div class="preset seg" id="ce-seg" role="group" aria-label="<zh>写了什么</zh><en>What is written</en>">
       <button type="button" data-p="0" aria-pressed="true"><span class="n">0</span><zh>什么都不写</zh><en>Nothing written</en></button>
       <button type="button" data-p="1" aria-pressed="false"><span class="n">1</span><zh>加入电源、地网络集</zh><en>Add to supply and ground sets</en></button>
-      <button type="button" data-p="2" aria-pressed="false"><span class="n">2</span><zh>不给 vdd、vss 画端口</zh><en>No port tags for vdd, vss</en></button>
+      <button type="button" data-p="2" aria-pressed="false"><span class="n">2</span><zh>地下面不写网络名</zh><en>No net name under the grounds</en></button>
     </div>
     <div class="duo">
       <div class="panel">
@@ -250,22 +250,23 @@
     <div class="two-col">
       <div>
         <h3 class="sub-h"><zh>默认符号</zh><en>Default symbols</en></h3>
-        <p class="sub-lead"><zh>先按名字的首字母，再按模型的类型。文件里写的 SET-SYMBOL 排在后面，所以盖过它们。</zh><en>First by the first letter of the name, then by the model’s type. SET-SYMBOL in a file comes later, so it overrides them.</en></p>
+        <p class="sub-lead"><zh>SPICE 网表先按名字的首字母，再按模型的类型；Spectre 网表按元件的 master 和模型的类型。文件里写的 SET-SYMBOL 排在后面，所以盖过它们。</zh><en>In a SPICE netlist, first by the first letter of the name, then by the model’s type; in a Spectre netlist, by the master and the model’s type. SET-SYMBOL in a file comes later, so it overrides them.</en></p>
         <table class="symtab">
           <thead><tr><th><zh>元件</zh><en>Instances</en></th><th><zh>符号</zh><en>Symbol</en></th><th><zh>端子</zh><en>Terminals</en></th></tr></thead>
           <tbody>
-            <tr><td><code>R* C* L*</code></td><td><code>$RES $CAP $IND</code></td><td>p n</td></tr>
-            <tr><td><code>V* I*</code></td><td><code>$VSRC $ISRC</code></td><td>p n</td></tr>
+            <tr><td><code>R* C* L*</code></td><td><code>$RESISTOR $CAPACITOR $INDUCTOR</code></td><td>p n</td></tr>
+            <tr><td><code>V* I*</code></td><td><code>$VOLTAGE_SOURCE $CURRENT_SOURCE</code></td><td>p n</td></tr>
             <tr><td><code>D*</code></td><td><code>$DIODE</code></td><td>a k</td></tr>
-            <tr><td><code>E* G*</code></td><td><code>$VCVS $VCCS</code></td><td>p n cp cn</td></tr>
-            <tr><td><code>M*</code></td><td><code>$NMOS4</code><zh>；pmos 类型</zh><en>; type pmos</en> <code>$PMOS4</code></td><td>d g s b</td></tr>
+            <tr><td><code>E* G*</code></td><td><code>$VCVS_4TERM $VCCS_4TERM</code></td><td>p n cp cn</td></tr>
+            <tr><td><code>M*</code></td><td><code>$NMOS_4TERM</code><zh>；pmos 类型</zh><en>; type pmos</en> <code>$PMOS_4TERM</code></td><td>d g s b</td></tr>
             <tr><td><code>Q*</code></td><td><code>$NPN</code><zh>；pnp 类型</zh><en>; type pnp</en> <code>$PNP</code></td><td>c b e</td></tr>
           </tbody>
         </table>
+        <p class="sub-lead"><zh>F、H、B、S、W、J、T、U 等其余元件的符号，以及每个符号的样子，见<a href="packages.html">标准包图库</a>。</zh><en>The symbols of the other elements, such as F, H, B, S, W, J, T and U, and how every symbol looks, are in the <a href="packages.html">gallery of the standard packages</a>.</en></p>
       </div>
       <div>
         <h3 class="sub-h"><zh>补位规则（节选）</zh><en>Fill rules (excerpt)</en></h3>
-        <p class="sub-lead"><zh>标准包本身就是 RNL。三个集合给文件留了口子：往里加、从里去，补位就跟着变。</zh><en>The standard package is RNL itself. Three sets are the hooks for a file: add to them or take from them, and the fill follows.</en></p>
+        <p class="sub-lead"><zh>标准包本身就是 RNL。几个集合给文件留了口子：往里加、从里去，补位就跟着变。</zh><en>The standard package is RNL itself. A few sets are the hooks for a file: add to them or take from them, and the fill follows.</en></p>
         <div class="code code-static" id="fill-code"></div>
       </div>
     </div>
@@ -541,8 +542,8 @@
   <div class="wrap foot-grid">
     <div>
       <span class="brand-mark">RNL</span>
-      <p><zh>Rich Netlist（RNL）语言导览。写法照语言标准 0.2；例子都在 RNL 原型里检查过。图中的坐标由本页手工排布，符号由本页自绘，引脚位置与标准包一致。</zh>
-        <en>Rich Netlist (RNL) language tour. The notation follows language standard 0.2; every example has been checked in the RNL prototype. The coordinates in the drawings were placed by hand and the symbols drawn for this page, with pins where the standard package puts them.</en></p>
+      <p><zh>Rich Netlist（RNL）语言导览。写法照语言标准 0.3 和标准系列 0.3；例子都用 rnl check 检查过。图中的坐标由本页手工排布，符号由本页自绘，引脚位置与标准包一致。</zh>
+        <en>Rich Netlist (RNL) language tour. The notation follows language standard 0.3 and the standard series 0.3; every example has been checked with rnl check. The coordinates in the drawings were placed by hand and the symbols drawn for this page, with pins where the standard package puts them.</en></p>
     </div>
     <div>
       <h4><zh>另见</zh><en>See also</en></h4>
