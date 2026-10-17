@@ -299,7 +299,7 @@ fn every_package_of_the_series_names_what_it_uses_through_its_references() {
         assert!(errors(&r).is_empty(), "{}: {:?}", f.display(), errors(&r));
         checked += 1;
     }
-    assert_eq!(checked, 16);
+    assert_eq!(checked, 17);
 }
 
 #[test]
@@ -619,4 +619,32 @@ fn a_definition_that_the_series_0_3_left_out_is_told_what_to_write() {
     );
     let e = errors(&read(&MemoryProvider::new().with("t.sp", &pinned), "t.sp", &Options::default()));
     assert!(e.is_empty(), "{e:?}");
+}
+
+#[test]
+fn the_chinese_aliases_of_the_series_0_3_name_its_symbols_definitions_and_roles() {
+    // rnl-zh 0.3, which a file loads with USE-ALIASES (16.5): the standard words as rnl-zh 0.2 has
+    // them, and the names of the series 0.3 and of the roles of its definitions
+    let text = text_with_record(
+        "@USE-ALIASES(name=\"rnl-zh\", version=\"0.3\")",
+        &[
+            "#R2 @使用符号 $\"电阻\"",
+            "#M5 @使用符号 $\"四端子NMOS\"",
+            "#M1(正输入) #M2(负输入) #M5(尾管) @视作 $\"差分对\"",
+            "{#M3 #M9}(参考管) {#M4 #M6}(输出管) @视作 $\"电流镜\"",
+            "#R1(源) {#R2 #R3}(链条) #R4(负载) @视作 $\"信号链\"",
+        ],
+    );
+    let r = read(&MemoryProvider::new().with("t.sp", &text), "t.sp", &Options::solver());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(fills(&r, "$DIFFERENTIAL_PAIR"), [["in_p=#M1", "in_n=#M2", "tail={#M5}"]]);
+    assert_eq!(fills(&r, "$CURRENT_MIRROR"), [["ref={#M3 #M9}", "out={#M4 #M6}"]]);
+    assert_eq!(fills(&r, "$CHAIN"), [["source=#R1", "chain={#R2 #R3}", "load=#R4"]]);
+    let lv = level(&r, "t.sp");
+    let symbol = |id: &str| lv.objects.iter().find(|o| o.id == id).and_then(|o| o.symbol.as_ref()).unwrap().name.clone();
+    assert_eq!((symbol("#R2"), symbol("#M5")), ("$RESISTOR".to_string(), "$NMOS_4TERM".to_string()));
+    // the aliases of the definitions that the series 0.3 left out are not in it
+    let gone = text_with_record("@USE-ALIASES(name=\"rnl-zh\", version=\"0.3\")", &["#M1 #M2 #M5 @视作 $\"带尾管差分对\""]);
+    let e = errors(&read(&MemoryProvider::new().with("t.sp", &gone), "t.sp", &Options::default()));
+    assert!(e.iter().any(|m| m.contains("带尾管差分对")), "{e:?}");
 }
