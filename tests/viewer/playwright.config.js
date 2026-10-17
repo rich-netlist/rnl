@@ -4,6 +4,11 @@
 // projects need Playwright's builds of theirs. Two workers at most run at a time, as every one
 // starts a browser of its own.
 //
+// specs/long.spec.js, a file of 200 000 lines, runs in a project of its own, long, in Chromium only:
+// what it guards against is Chrome's limit on the arguments of a call, and in the other engines it
+// would only add load. It depends on the three others, so it runs after them and alone, and does not
+// slow down their tests on a busy machine. `--project long --no-deps` runs it on its own.
+//
 // The web viewer's smoke tests (specs/web.spec.js) need its site: Playwright builds it with the
 // samples and serves it before the tests, on the port RNL_WEB_PORT names or a free one, and the
 // tests find it at RNL_WEB_URL. A command line that names spec files, none of them web.spec.js,
@@ -19,6 +24,8 @@ const ci = !!process.env.CI;
 const channel = process.env.RNL_CHANNEL || (ci ? undefined : "chrome");
 // the size of the desktop viewer's window
 const viewport = { width: 1200, height: 800 };
+// the file of the long netlist's test, which runs in a project of its own
+const LONG = /long\.spec\.js$/;
 
 /** A port on 127.0.0.1 that nothing listens on. */
 function freePort() {
@@ -67,8 +74,14 @@ export default defineConfig({
       }
     : undefined,
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"], channel, viewport } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"], viewport } },
-    { name: "webkit", use: { ...devices["Desktop Safari"], viewport } },
+    { name: "chromium", use: { ...devices["Desktop Chrome"], channel, viewport }, testIgnore: LONG },
+    { name: "firefox", use: { ...devices["Desktop Firefox"], viewport }, testIgnore: LONG },
+    { name: "webkit", use: { ...devices["Desktop Safari"], viewport }, testIgnore: LONG },
+    {
+      name: "long",
+      use: { ...devices["Desktop Chrome"], channel, viewport },
+      testMatch: LONG,
+      dependencies: ["chromium", "firefox", "webkit"],
+    },
   ],
 });
