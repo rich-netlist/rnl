@@ -11,8 +11,9 @@
 //! one row a gap above the highest of the next; then the rows are kept in the order of their
 //! origins, and only the pairs of elements of two rows whose parts that LP made neighbours on x
 //! are kept a gap apart on y, so that a row rises into the gaps of the one above, beside what is
-//! there (`crate::search::row_pairs`; quality review SE-4); placed again, at most twice more as
-//! new pairs come.
+//! there, but over the span of each wire that the router draws between two rows, where they stay
+//! apart as wholes (`crate::search::row_pairs`; quality review SE-4 and the review of its phase
+//! 2); placed again, at most twice more as new pairs come.
 //!
 //! **The LP** (each axis on its own, as the axes are independent once the orientations are
 //! decided, algorithm synthesis 3.2). Every pin and text the model has is first linked to its

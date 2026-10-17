@@ -589,6 +589,92 @@ fn wire_parts(
     out
 }
 
+/// The wires that the router draws between rows, with the elements placed at some origins (see
+/// [`corridors`] and [`row_pairs`]).
+#[derive(Clone, Debug, Default)]
+struct Corridors {
+    /// For each two pins of elements in different rows that the router joins, but those of which
+    /// one leaves sideways towards the other: the span on x from one to the other, once for each
+    /// gap between neighbouring rows that the wire passes, by the upper of those two rows.
+    spans: BTreeSet<(usize, Q, Q)>,
+    /// For each gap between neighbouring rows, the stretch on x that each net runs along it, one
+    /// track: the shortest of its spans there, when the pins of the net above the gap and those
+    /// below it do not overlap on x; where they overlap, a wire straight down joins the two sides.
+    runs: BTreeMap<usize, Vec<(Q, Q)>>,
+}
+
+impl Corridors {
+    /// How many nets run along the gap `band` somewhere over a span, at most, and one at least:
+    /// the runs over a point of it, at its start or at the start of a run. Each needs a track.
+    fn tracks(&self, band: usize, x0: &Q, x1: &Q) -> usize {
+        let runs = self.runs.get(&band).map_or(&[][..], |v| v);
+        let points = std::iter::once(x0).chain(runs.iter().map(|(a, _)| a).filter(|a| *a > x0 && *a <= x1));
+        points.map(|x| runs.iter().filter(|(a, b)| a <= x && x <= b).count()).max().unwrap_or(0).max(1)
+    }
+}
+
+/// The wires that the router draws between rows ([`Corridors`]), with the elements placed at
+/// `origins`.
+fn corridors(s: &Structure, c: &Candidate, ori: &[Orient], origins: &[[Q; 2]]) -> Corridors {
+    let row_of: BTreeMap<usize, usize> =
+        c.rows.iter().enumerate().flat_map(|(r, row)| row.iter().map(move |&k| (k, r))).collect();
+    let mut out = Corridors::default();
+    // the x of the pins of each net routed, with their rows, and the spans of each net by gap
+    let mut pins: BTreeMap<usize, Vec<(usize, Q)>> = BTreeMap::new();
+    let mut spans: BTreeMap<(usize, usize), Vec<(Q, Q)>> = BTreeMap::new();
+    for (&b, &rb) in &row_of {
+        for q in 0..s.pins(b).len() {
+            let (Some(qo), Some(&net)) = (s.pin_offset(b, q, ori[b]), s.connections.route_of.get(&(b, q))) else {
+                continue;
+            };
+            let xb = &origins[b][0] + &qo[0];
+            pins.entry(net).or_default().push((rb, xb.clone()));
+            for &t in s.connections.targets.get(&(b, q)).map_or(&[][..], |v| v) {
+                // each two pins once, from the upper; the rows are listed from the top down
+                let Some(&rt) = row_of.get(&t.0) else { continue };
+                if rt <= rb || !s.connections.routed((b, q), t) {
+                    continue;
+                }
+                let Some(to) = s.pin_offset(t.0, t.1, ori[t.0]) else { continue };
+                let xt = &origins[t.0][0] + &to[0];
+                // a pin that leaves sideways towards the other's x has the wire along its own
+                // height, which its wire part keeps clear ([`wire_parts`]), not along the gap
+                let towards = |k: usize, pin: usize, from: &Q, to: &Q| match s.exit(k, pin, ori[k]) {
+                    Some((ex, 0)) => ex != 0 && (to - from).signum() == int(ex),
+                    _ => false,
+                };
+                if towards(b, q, &xb, &xt) || towards(t.0, t.1, &xt, &xb) {
+                    continue;
+                }
+                let (x0, x1) = if xb <= xt { (xb.clone(), xt) } else { (xt, xb.clone()) };
+                for band in rb..rt {
+                    out.spans.insert((band, x0.clone(), x1.clone()));
+                    spans.entry((band, net)).or_default().push((x0.clone(), x1.clone()));
+                }
+            }
+        }
+    }
+    let range = |xs: &mut dyn Iterator<Item = &Q>| -> Option<(Q, Q)> {
+        xs.fold(None, |r: Option<(Q, Q)>, x| match r {
+            None => Some((x.clone(), x.clone())),
+            Some((a, b)) => Some((if *x < a { x.clone() } else { a }, if *x > b { x.clone() } else { b })),
+        })
+    };
+    for ((band, net), list) in spans {
+        let at = &pins[&net];
+        let above = range(&mut at.iter().filter(|(r, _)| *r <= band).map(|(_, x)| x));
+        let below = range(&mut at.iter().filter(|(r, _)| *r > band).map(|(_, x)| x));
+        let (Some((a0, a1)), Some((b0, b1))) = (above, below) else { continue };
+        if a0 <= b1 && b0 <= a1 {
+            continue;
+        }
+        if let Some(run) = list.into_iter().min_by(|p, q| (&p.1 - &p.0).cmp(&(&q.1 - &q.0)).then_with(|| p.cmp(q))) {
+            out.runs.entry(band).or_default().push(run);
+        }
+    }
+    out
+}
+
 /// The pairs of elements of a candidate in two rows, one in the upper and one in a lower row, that
 /// two of their [`parts`] make neighbours on x where the elements are placed at `origins`: parts
 /// that overlap on x, or are less than `HGAP` apart. Each pair with the least height of the upper
@@ -599,6 +685,16 @@ fn wire_parts(
 /// risen into a gap does not shut the way of a wire: VIN's to the gate of M1 under the ground of
 /// VDD in T2, those from the sources of T3's testbench up to XU1 under the grounds of VDD and XU1,
 /// which they would otherwise cross.
+///
+/// Over the span of each wire that the router draws between two rows ([`corridors`]), the rows
+/// stay apart as wholes: every part of an element of the upper row and every part of one of the
+/// lower that come within `CLEARANCE` of the span on x are kept `VGAP` apart, and a unit more for
+/// each other net that runs along the gap there ([`Corridors::tracks`]), so that the wire has a
+/// way along the gap whichever way its pins leave, and does not cross the lead of a stub hanging
+/// from the upper row beside an element risen into its gap (review of phase 2 of the quality
+/// review): T4's &vb, from VB on the left of the upper row, which leaves up, to the gates of M5
+/// and M7, which leave towards each other, past the ground of VIP; corpus 14's &in and &out, side
+/// by side under the ground of R2.
 pub(crate) fn row_pairs(
     s: &Structure,
     c: &Candidate,
@@ -618,14 +714,20 @@ pub(crate) fn row_pairs(
     for (k, wire) in wire_parts(s, c, ori, origins, &grid) {
         parts.entry(k).or_default().push((wire, true));
     }
+    // the least height of each pair, the larger of what it asks
+    let mut least: BTreeMap<(usize, usize), Q> = BTreeMap::new();
+    let mut ask = |a: usize, b: usize, need: Q| {
+        let l = least.entry((a, b)).or_insert_with(|| need.clone());
+        if need > *l {
+            *l = need;
+        }
+    };
     let near = int(HGAP);
-    let mut out = Vec::new();
     for (i, upper) in c.rows.iter().enumerate() {
         for lower in &c.rows[i + 1..] {
             for &a in upper {
                 for &b in lower {
                     let (xa, xb) = (&origins[a][0], &origins[b][0]);
-                    let mut least: Option<Q> = None;
                     for (pa, wa) in &parts[&a] {
                         for (pb, wb) in &parts[&b] {
                             let apart = (xb + &pb[0]) - (xa + &pa[2]) >= near || (xa + &pa[0]) - (xb + &pb[2]) >= near;
@@ -634,20 +736,38 @@ pub(crate) fn row_pairs(
                             }
                             // y_a + the bottom of pa >= y_b + the top of pb + the gap
                             let gap = if *wa || *wb { CLEARANCE } else { VGAP };
-                            let need = &pb[3] - &pa[1] + int(gap);
-                            if least.as_ref().is_none_or(|l| need > *l) {
-                                least = Some(need);
-                            }
+                            ask(a, b, &pb[3] - &pa[1] + int(gap));
                         }
-                    }
-                    if let Some(least) = least {
-                        out.push(RowPair { upper: a, lower: b, least: up(least, &grid) });
                     }
                 }
             }
         }
     }
-    out
+    // the parts of the elements of a row within CLEARANCE of a span on x, each with its element
+    let margin = int(CLEARANCE);
+    let within = |row: &[usize], x0: &Q, x1: &Q| -> Vec<(usize, [Q; 4])> {
+        row.iter()
+            .flat_map(|&k| parts[&k].iter().filter(|(_, wire)| !*wire).map(move |(p, _)| (k, p)))
+            .filter(|(k, p)| {
+                let x = &origins[*k][0];
+                x + &p[0] < x1 + &margin && x + &p[2] > x0 - &margin
+            })
+            .map(|(k, p)| (k, p.clone()))
+            .collect()
+    };
+    let corridors = corridors(s, c, ori, origins);
+    for (band, x0, x1) in &corridors.spans {
+        let (Some(upper), Some(lower)) = (c.rows.get(*band), c.rows.get(band + 1)) else { continue };
+        // a unit more for each other net along the gap there
+        let more = i64::try_from(corridors.tracks(*band, x0, x1)).unwrap_or(1) - 1;
+        let (high, low) = (within(upper, x0, x1), within(lower, x0, x1));
+        for (a, pa) in &high {
+            for (b, pb) in &low {
+                ask(*a, *b, &pb[3] - &pa[1] + int(VGAP + more));
+            }
+        }
+    }
+    least.into_iter().map(|((upper, lower), least)| RowPair { upper, lower, least: up(least, &grid) }).collect()
 }
 
 /// The relations of a candidate (see the module), with the orientations `ori` of the objects:

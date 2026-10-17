@@ -1717,11 +1717,15 @@ fn the_drawings_are_not_stretched() {
     let view = crate::objectives::View { s: &e.structure, at: &e.placed.origins, orient: &e.placed.geometry.orient };
     let crossings = crate::objectives::score(crate::objectives::Objective::Crossings, &view, Some(&wires));
     assert!(crossings.is_zero(), "{what}");
-    // T4: M5 and M7 nearer the input pair (at -15), lower (44.3)
+    // T4: lower (44.3), the rows of the PMOS and of the input pair nearer each other; M5 and M7
+    // where they were (-15), not lower: &vb runs from VB, which leaves up on the left of the row
+    // of the pair, to their gates, under the ground of VIP, and the rows stay apart as wholes over
+    // its span (a_wire_between_two_rows_crosses_no_lead_of_a_stub); risen to -12, M5 and M7 had it
+    // cross that ground's lead. Until VB hangs by the gates (quality review ST-3)
     let (p, solved, e) = case_level("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
     let what = summary(&p, &solved, &e);
     for label in ["#M5", "#M7"] {
-        assert!(e.placed.origins[object(&p, label)][1] > int(-15), "{what}: {label}");
+        assert!(e.placed.origins[object(&p, label)][1] >= int(-15), "{what}: {label}");
     }
     assert!(extent(&e)[1] < num(44.3), "{what}");
     // T5: the row not evenly spaced (13 apart), narrower (80.5)
@@ -1730,11 +1734,80 @@ fn the_drawings_are_not_stretched() {
     let row = e.candidate.rows[0].clone();
     assert!(row.len() >= 7 && !evenly_spaced(&e, &row), "{what}");
     assert!(extent(&e)[0] < num(80.5), "{what}");
-    // T6: compact again (348 wide after phase 1, 302 before it)
+    // T6: compact again (348 wide after phase 1, 302 before it), in the order of the bits: the
+    // legs of 2R from b0 to b5 and the series arm from RS0 to RS4 left to right, the tail after
+    // them SE-10's; each source next to its leg joined to it by an L
+    // (t6_joins_each_source_to_its_leg_by_an_l)
     let (p, solved, e) = case_level("T6-r2r-ladder.sp", "T6-r2r-ladder.sp");
     let what = summary(&p, &solved, &e);
     assert!(!e.candidate.even, "{what}");
     assert!(extent(&e)[0] <= int(220), "{what}");
+    let x = |label: String| e.placed.origins[object(&p, &label)][0].clone();
+    let legs: Vec<Q> = (0..6).map(|i| x(format!("#R2B{i}"))).collect();
+    let arm: Vec<Q> = (0..5).map(|i| x(format!("#RS{i}"))).collect();
+    for xs in [&legs, &arm] {
+        assert!(xs.windows(2).all(|w| w[0] < w[1]), "{xs:?}: {what}");
+    }
+}
+
+/// The places where a wire routed crosses the lead of a stub of another net, from the pin it hangs
+/// from to its symbol's pin, strictly inside both, each said with the nets and the stub's host.
+fn stub_leads_crossed(p: &LevelProblem, solved: &Solved, e: &Exact) -> Vec<String> {
+    let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
+    let net_names = |k: usize| -> Vec<&str> {
+        s.connections
+            .nets_of
+            .get(&(k, 0))
+            .map_or(Vec::new(), |v| v.iter().map(|&n| s.connections.nets[n].name.as_str()).collect())
+    };
+    let inside = |v: &Q, a: &Q, b: &Q| (v > a && v < b) || (v > b && v < a);
+    let mut out = Vec::new();
+    for (j, info) in s.objects.iter().enumerate() {
+        let Some(stub) = &info.stub else { continue };
+        let (Some(top), Some(end)) = (s.pin_at(at, ori, stub.host.0, stub.host.1), s.pin_at(at, ori, j, 0)) else {
+            continue;
+        };
+        // a lead runs up or down from its pin
+        if top[0] != end[0] {
+            continue;
+        }
+        let nets = net_names(j);
+        for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
+            let net = &p.routes[w.route].net;
+            if nets.contains(&net.as_str()) {
+                continue;
+            }
+            for seg in path.windows(2) {
+                let (a, b) = (&seg[0], &seg[1]);
+                if a[1] == b[1] && inside(&top[0], &a[0], &b[0]) && inside(&a[1], &top[1], &end[1]) {
+                    let host = &p.objects[stub.host.0].label;
+                    out.push(format!("{net} over the lead of {nets:?} from {host} at ({}, {})", top[0], a[1]));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// A wire routed between two rows crosses no lead of a stub hanging from the upper one: the rows
+/// stay apart as wholes over its span (`crate::search::row_pairs`). Pair by pair alone, M5 and M7
+/// rose beside the ground of VIP in T4, and &vb, which leaves VB upwards on the left of the upper
+/// row, ran across that ground's lead to their gates (review of phase 2 of the quality review).
+/// T6 is left out: &b5 crosses the lead of a leg's ground, as the order of the row puts its source
+/// far from its leg (quality review SE-10).
+#[test]
+fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
+    let files = netlists("tests/integration/solver", "T").into_iter().chain(netlists("tests/conformance/cases", ""));
+    for file in files {
+        if file.ends_with("T6-r2r-ladder.sp") {
+            continue;
+        }
+        for p in problems(&file) {
+            let (solved, e) = check_level(&file.to_string_lossy(), &p);
+            let crossed = stub_leads_crossed(&p, &solved, &e);
+            assert!(crossed.is_empty(), "{}: {crossed:#?}\n{}", p.title, summary(&p, &solved, &e));
+        }
+    }
 }
 
 /// The structure of the level with a title of a case of the solver, not solved.
