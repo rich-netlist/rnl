@@ -210,12 +210,12 @@
             "terminals": [
               {
                 "n": 1,
-                "name": "p",
+                "name": "t0",
                 "net": "&a11"
               },
               {
                 "n": 2,
-                "name": "n",
+                "name": "t1",
                 "net": "&b11"
               }
             ]
@@ -415,54 +415,54 @@
           },
           {
             "id": "#rel1",
-            "subckt": true,
+            "subckt": false,
             "master": "relay",
             "terminals": [
               {
                 "n": 1,
-                "name": null,
+                "name": "p",
                 "net": "&a21"
               },
               {
                 "n": 2,
-                "name": null,
+                "name": "n",
                 "net": "&b21"
               },
               {
                 "n": 3,
-                "name": null,
+                "name": "cp",
                 "net": "&c21"
               },
               {
                 "n": 4,
-                "name": null,
+                "name": "cn",
                 "net": "&d21"
               }
             ]
           },
           {
             "id": "#t1",
-            "subckt": true,
+            "subckt": false,
             "master": "transformer",
             "terminals": [
               {
                 "n": 1,
-                "name": null,
+                "name": "p_plus",
                 "net": "&a22"
               },
               {
                 "n": 2,
-                "name": null,
+                "name": "p_minus",
                 "net": "&b22"
               },
               {
                 "n": 3,
-                "name": null,
+                "name": "s_plus",
                 "net": "&c22"
               },
               {
                 "n": 4,
-                "name": null,
+                "name": "s_minus",
                 "net": "&d22"
               }
             ]

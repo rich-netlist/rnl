@@ -4,6 +4,7 @@
 //!
 //! The crate does no file I/O, so it builds for `wasm32-unknown-unknown`.
 
+mod catalog;
 mod document;
 mod primitive;
 mod snapshot;
@@ -22,6 +23,10 @@ use rnl_runtime::source::{dirname, Provider};
 use rnl_runtime::writeback::record_type;
 use rnl_runtime::{Interpretation, Options};
 
+pub use catalog::{
+    Catalog, CatalogDefinition, CatalogLabel, CatalogOptions, CatalogPackage, CatalogPin, CatalogSet, CatalogSymbol,
+    Terminal,
+};
 pub use document::{Child, Diagnostic, Document, Hit, Level, Object, SourceFile, Span};
 pub use primitive::{
     Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
@@ -148,6 +153,17 @@ pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts
         if parts.drawing { options.clone() } else { BuildOptions { svg: false, primitives: false, ..options.clone() } };
     let document = document::document(entry, &r, ws.missing.into_inner(), &draw);
     Ok(snapshot::snapshot(&r, document, parts, &options.runtime))
+}
+
+/// The catalog of the packages the core has: those of the package directories of `files`, the
+/// frontend's file access, and the bundled packages under them, the standard series and
+/// `analog-canvas-extensions`. It lists their symbols, with their pins, boxes and labels, their
+/// ordinary definitions and their sets, each package file read as `rnl check` reads it, checked on
+/// its own with `options.runtime` (2.7); of each name the newest version, or every version with
+/// `options.all_versions`, and only the names `options.packages` gives, when it gives them. A file
+/// that the runtime does not read as a package is not listed.
+pub fn catalog(files: &dyn Provider, options: &CatalogOptions) -> Catalog {
+    catalog::catalog(&Workspace::new(files), options)
 }
 
 /// Is the entry Spectre? By `dialect`, by the `.scs` extension, or a `simulator lang=spectre`

@@ -421,7 +421,7 @@ pub fn remove_generated_with_header(
     text: &str,
     version: &str,
 ) -> String {
-    let (mut edits, _) = header_edits(doc, file, text, version);
+    let (mut edits, _) = header_edits(doc, file, None, text, version);
     edits.extend(generated_removals(doc, level, file));
     apply(text, carrier(doc, file, text), edits)
 }
@@ -479,8 +479,9 @@ pub fn replace_generated_with_header(
         return text.to_string();
     }
     let file = &doc.levels[level].file;
+    let at = Some(doc.file_level(level));
     let (mut edits, marker) =
-        header_move(doc, level, text, version).unwrap_or_else(|| header_edits(doc, file, text, version));
+        header_move(doc, level, text, version).unwrap_or_else(|| header_edits(doc, file, at, text, version));
     edits.extend(replacement(doc, level, text, record, marker));
     apply(text, carrier(doc, file, text), edits)
 }
@@ -508,7 +509,7 @@ pub fn move_header_for(doc: &HostDocument, level: LevelId, text: &str, version: 
 fn header_move(doc: &HostDocument, level: LevelId, text: &str, version: &str) -> Option<(Vec<Edit>, &'static str)> {
     let file = &doc.levels[level].file;
     let at = record_line(doc, level, text).ok()?;
-    let header = first_header(doc, file).filter(|h| span(h).0 .0 >= at)?;
+    let header = first_header(doc, file, Some(doc.file_level(level))).filter(|h| span(h).0 .0 >= at)?;
     let marker = carrier(doc, file, text);
     let to = top(doc, file, text, marker)
         .or_else(|| subckt_start(doc, level).map(|line| Top { line, marker, bare: false }))
@@ -571,15 +572,20 @@ fn version_insert(header: &Record, version: &str) -> Option<(usize, String)> {
 }
 
 /// The records of a file as a reading of it takes them (2.8), each with its level: those of the
-/// file level that reads it, one that reads it whole before one that reads a section of it, and of
-/// the subcircuits written in it; a section of `.lib` that is read counts as a file. With that file
-/// level, None when no file level reads the file.
-fn file_records<'a>(doc: &'a HostDocument, file: &str) -> (Option<LevelId>, Vec<(LevelId, &'a Record)>) {
+/// file level `at`, or when it is None of the file level that reads `file`, one that reads it whole
+/// before one that reads a section of it, and of the subcircuits written in it; a section of
+/// `.lib` that is read counts as a file, so that two sections of one file have their records
+/// apart. With that file level, None when no file level reads the file.
+fn file_records<'a>(
+    doc: &'a HostDocument,
+    file: &str,
+    at: Option<LevelId>,
+) -> (Option<LevelId>, Vec<(LevelId, &'a Record)>) {
     let mut levels: Vec<LevelId> = (0..doc.levels.len())
         .filter(|&l| doc.levels[l].kind == LevelKind::File && doc.levels[l].file == file)
         .collect();
     levels.sort_by_key(|&l| doc.levels[l].section.is_some());
-    let Some(&top) = levels.first() else {
+    let Some(top) = at.or(levels.first().copied()) else {
         return (None, records_of(doc, file));
     };
     let in_top = |mut l: LevelId| loop {
@@ -600,13 +606,13 @@ fn file_records<'a>(doc: &'a HostDocument, file: &str) -> (Option<LevelId>, Vec<
 }
 
 /// The header record of a file, when it is the first record of the file as the reading takes it,
-/// written at its file level ([`file_records`], 2.8); a package file has a header by rule (16.2)
-/// and gives none.
-fn first_header<'a>(doc: &'a HostDocument, file: &str) -> Option<&'a Record> {
+/// written at its file level, `at` or the one that reads `file` ([`file_records`], 2.8); a package
+/// file has a header by rule (16.2) and gives none.
+fn first_header<'a>(doc: &'a HostDocument, file: &str, at: Option<LevelId>) -> Option<&'a Record> {
     if file.to_lowercase().ends_with(".rnl") {
         return None;
     }
-    let (top, records) = file_records(doc, file);
+    let (top, records) = file_records(doc, file, at);
     let first = records.into_iter().min_by_key(|(_, r)| span(r).0);
     first.filter(|(l, r)| top.is_none_or(|t| t == *l) && record_type(r) == "header").map(|(_, r)| r)
 }
@@ -657,19 +663,26 @@ fn replacement(doc: &HostDocument, level: LevelId, text: &str, record: &str, mar
 /// [`replace_generated_with_header`] or [`remove_generated_with_header`], which make every change
 /// at those positions.
 pub fn with_header(doc: &HostDocument, file: &str, text: &str, version: &str) -> String {
-    apply(text, carrier(doc, file, text), header_edits(doc, file, text, version).0)
+    apply(text, carrier(doc, file, text), header_edits(doc, file, None, text, version).0)
 }
 
 /// The changes that give a file its header record and its version ([`with_header`]): none when it
 /// has them, or is left as it is; and the carrier that records written with them follow: that of
 /// a new header, else the file's ([`carrier`]). Nothing is written in a region written to be
-/// encrypted (2.2): a header record there gets no VERSION.
-fn header_edits(doc: &HostDocument, file: &str, text: &str, version: &str) -> (Vec<Edit>, &'static str) {
+/// encrypted (2.2): a header record there gets no VERSION. `at` is the file level whose header it
+/// is, a library section read as a file (2.8), or None for the one that reads `file`.
+fn header_edits(
+    doc: &HostDocument,
+    file: &str,
+    at: Option<LevelId>,
+    text: &str,
+    version: &str,
+) -> (Vec<Edit>, &'static str) {
     let marker = carrier(doc, file, text);
     if file.to_lowercase().ends_with(".rnl") {
         return (Vec::new(), marker);
     }
-    match first_header(doc, file) {
+    match first_header(doc, file, at) {
         Some(first) => {
             // right after the `{` of the body
             let edit = version_insert(first, version).map(|(brace, s)| {
@@ -679,7 +692,9 @@ fn header_edits(doc: &HostDocument, file: &str, text: &str, version: &str) -> (V
             let edit = edit.filter(|e| doc.protected_at(file, e.at().0).is_none());
             return (edit.into_iter().collect(), marker);
         }
-        None if records_of(doc, file).iter().any(|(_, r)| record_type(r) == "header") => return (Vec::new(), marker),
+        None if headers_of(doc, file, at) => return (Vec::new(), marker),
+        // a library section, whose text is all a reading of it reads, gets no new header (2.2)
+        None if at.is_some_and(|l| doc.levels[l].section.is_some()) => return (Vec::new(), marker),
         None => {}
     }
     let version_kw = format!("@VERSION({})", crate::problem::written_string(version));
@@ -722,20 +737,42 @@ pub fn add_header(doc: &HostDocument, file: &str, text: &str, record: impl FnOnc
 /// The USE-PACKAGE that keeps the standard series 0.2 in a file raised to 0.3 (16.3).
 pub const PIN_STD_0_2: &str = "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
 
-/// `text`, the text of `file`, raised to the version 0.3 (16.1): the VERSION of its header record
-/// says 0.3, and with `pin`, [`PIN_STD_0_2`] follows it, so that the file keeps the standard series
-/// 0.2 it was read with (16.3); a file without a header record gets one that says so, where a new
-/// header goes ([`with_header`]). None when it cannot be raised so: a package file, a header record
-/// that is not the first record of the file, a VERSION on several lines or in a region written to
-/// be encrypted (2.2), or a file read only through library sections that has no header record.
-pub fn raise_version(doc: &HostDocument, file: &str, text: &str, pin: bool) -> Option<String> {
+/// `text`, the text of one file, with the file levels `levels` that read it raised to the version
+/// 0.3 (16.1), each with whether it was: the VERSION of the header record of each says 0.3, and
+/// with its `pin`, [`PIN_STD_0_2`] follows it, so that it keeps the standard series 0.2 it was read
+/// with (16.3); a file level without a header record gets one that says so, where a new header
+/// goes ([`with_header`]). A library section is read as a file (2.8): two sections of one file are
+/// raised apart, and the text outside them stays as it is. One is not raised when it cannot be so:
+/// a package file, a header record that is not the first record of its file level, a VERSION on
+/// several lines or in a region written to be encrypted (2.2), or a library section that has no
+/// header record.
+pub fn raise_version(doc: &HostDocument, text: &str, levels: &[(LevelId, bool)]) -> (String, Vec<bool>) {
+    let mut edits: Vec<Edit> = Vec::new();
+    let mut raised = Vec::new();
+    for &(level, pin) in levels {
+        let edit = raise_edit(doc, level, text, pin);
+        raised.push(edit.is_some());
+        // a section read twice has one header record: it is raised once
+        edits.extend(edit.filter(|e| !edits.iter().any(|o| o.at() == e.at())));
+    }
+    if edits.is_empty() {
+        return (text.to_string(), raised);
+    }
+    let marker = levels.first().map_or("*", |&(l, _)| carrier(doc, &doc.levels[l].file, text));
+    (apply(text, marker, edits), raised)
+}
+
+/// The change that raises the file level `level` to 0.3 ([`raise_version`]), None when it cannot
+/// be raised.
+fn raise_edit(doc: &HostDocument, level: LevelId, text: &str, pin: bool) -> Option<Edit> {
+    let file = &doc.levels[level].file;
     if file.to_lowercase().ends_with(".rnl") {
         return None;
     }
     let pinned = if pin { format!("; {PIN_STD_0_2}") } else { String::new() };
     let raised = format!("@VERSION(\"0.3\"){pinned}");
     let marker = carrier(doc, file, text);
-    let edit = match first_header(doc, file) {
+    let edit = match first_header(doc, file, Some(level)) {
         Some(header) => {
             let ast = parse_record(&header.text);
             let body = ast.body?;
@@ -756,26 +793,38 @@ pub fn raise_version(doc: &HostDocument, file: &str, text: &str, pin: bool) -> O
                 }
             }
         }
-        None if records_of(doc, file).iter().any(|(_, r)| record_type(r) == "header") => return None,
+        None if headers_of(doc, file, Some(level)) => return None,
+        None if doc.levels[level].section.is_some() => return None,
         None => new_header(doc, file, text, marker, |_| format!("@RNL(type=\"header\") {{ {raised}}}"))?.0,
     };
     if doc.protected_at(file, edit.at().0).is_some() {
         return None;
     }
-    Some(apply(text, marker, vec![edit]))
+    Some(edit)
 }
 
-/// Whether the header record of `file`, or that of a file that includes it, pins a version of
-/// the standard package, `@USE-PACKAGE(name="rnl-std", version="…")`, which then comes before the
-/// series that the version of the file implies (16.3).
-pub fn pins_std(doc: &HostDocument, file: &str) -> bool {
-    let mut files: Vec<&str> = vec![file];
-    for (k, lv) in doc.levels.iter().enumerate() {
-        if lv.file == file {
-            files.extend(doc.ancestors(k).into_iter().map(|a| doc.levels[a].file.as_str()));
+/// Whether a file has a header record anywhere, or the file level `at` has one: one that is not
+/// the first record is an error its author fixes, and a tool writes no other.
+fn headers_of(doc: &HostDocument, file: &str, at: Option<LevelId>) -> bool {
+    let header = |r: &&Record| record_type(r) == "header";
+    match at {
+        Some(_) => file_records(doc, file, at).1.iter().map(|(_, r)| r).any(header),
+        None => records_of(doc, file).iter().map(|(_, r)| r).any(header),
+    }
+}
+
+/// Whether the header record of the file level `level`, a library section read as a file (2.8),
+/// or that of a file level above it, which includes it, pins a version of the standard package,
+/// `@USE-PACKAGE(name="rnl-std", version="…")`, which then comes before the series that the
+/// version of the file implies (16.3).
+pub fn pins_std(doc: &HostDocument, level: LevelId) -> bool {
+    let mut files: Vec<LevelId> = Vec::new();
+    for l in std::iter::once(level).chain(doc.ancestors(level)).map(|l| doc.file_level(l)) {
+        if !files.contains(&l) {
+            files.push(l);
         }
     }
-    files.into_iter().filter_map(|f| first_header(doc, f)).any(|h| {
+    files.into_iter().filter_map(|l| first_header(doc, &doc.levels[l].file, Some(l))).any(|h| {
         let Some(body) = parse_record(&h.text).body else { return false };
         body.members.iter().filter_map(|m| m.segments.first().and_then(|s| s.call.as_ref())).any(|c| {
             let named = |n: &str| c.params.as_ref().and_then(|p| p.named.iter().find(|x| x.name == n));
@@ -786,15 +835,17 @@ pub fn pins_std(doc: &HostDocument, file: &str) -> bool {
     })
 }
 
-/// The names in `file` that have the spelling of a standard word that the version 0.3 adds,
-/// `numbering`, a field of the record head (2.8): keys of texts, role names, parameter names of
-/// definitions and of usages, sub-object names, aliases, fields of record heads, and the parameters
-/// of the host's instances, each as what it is and where. Raising the file to 0.3 would change
-/// their meaning, so a tool gives a warning for each and does not raise it (16.1, 16.5).
-pub fn spelled_like_new_words(doc: &HostDocument, file: &str) -> Vec<String> {
+/// The names in the text of the file level `level`, a library section read as a file (2.8), that
+/// have the spelling of a standard word that the version 0.3 adds, `numbering`, a field of the
+/// record head (2.8): keys of texts, role names, parameter names of definitions and of usages,
+/// sub-object names, aliases, fields of record heads, and the parameters of the host's instances,
+/// each as what it is and where. Raising the file level to 0.3 would change their meaning, so a
+/// tool gives a warning for each and does not raise it (16.1, 16.5).
+pub fn spelled_like_new_words(doc: &HostDocument, level: LevelId) -> Vec<String> {
+    let file = doc.levels[level].file.as_str();
     let words: Vec<&str> = crate::words::draft_header_fields().iter().map(|f| f.name.as_str()).collect();
     let mut found: Vec<(&'static str, String, crate::diag::Loc)> = Vec::new();
-    for (_, rec) in records_of(doc, file) {
+    for (_, rec) in file_records(doc, file, Some(level)).1 {
         let ast = parse_record(&rec.text);
         let mut names: Vec<(&'static str, String, usize)> = Vec::new();
         for n in ast.header.iter().flat_map(|h| &h.named) {
@@ -808,7 +859,7 @@ pub fn spelled_like_new_words(doc: &HostDocument, file: &str) -> Vec<String> {
         );
     }
     for lv in &doc.levels {
-        for inst in lv.instances.iter().filter(|i| i.file == file) {
+        for inst in lv.instances.iter().filter(|i| i.file == file && doc.file_level_at(file, i.line) == Some(level)) {
             for (name, _) in inst.params.iter().filter(|(n, _)| words.contains(&n.as_str())) {
                 found.push(("a parameter of an instance", name.clone(), crate::diag::Loc::line(file, inst.line)));
             }
@@ -912,7 +963,7 @@ impl Top {
 /// comment (2.2), carried by `*`. None for a file read only through library sections: its line 2
 /// lies outside each of them, and is not read (2.2).
 fn top(doc: &HostDocument, file: &str, text: &str, marker: &'static str) -> Option<Top> {
-    if file_records(doc, file).0.is_some_and(|top| doc.levels[top].section.is_some()) {
+    if file_records(doc, file, None).0.is_some_and(|top| doc.levels[top].section.is_some()) {
         return None;
     }
     let lines = Lines::new(text);
@@ -1496,35 +1547,40 @@ mod tests {
     #[test]
     fn a_file_raised_to_0_3_keeps_the_standard_series_it_was_read_with() {
         // the VERSION of its header says 0.3, followed by the pin of the series 0.2 (16.1, 16.3)
+        let raise = |d: &HostDocument, text: &str, pin: bool| {
+            let (out, done) = raise_version(d, text, &[(0, pin)]);
+            done[0].then_some(out)
+        };
         let net = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @DEVICE(x) }\nR1 a b 1k\n.end\n";
         let d = doc(net, "a.sp", "*");
-        assert!(!pins_std(&d, "a.sp"));
+        assert!(!pins_std(&d, 0));
         let raised = format!(
             "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {PIN_STD_0_2}; @DEVICE(x) }}\nR1 a b 1k\n.end\n"
         );
-        assert_eq!(raise_version(&d, "a.sp", net, true).as_deref(), Some(raised.as_str()));
+        assert_eq!(raise(&d, net, true).as_deref(), Some(raised.as_str()));
         // a pin of the standard package stays, the only one, in the file and for a file it includes
         let pinned = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n.end\n";
         let mut d = doc(pinned, "a.sp", "*");
-        assert!(pins_std(&d, "a.sp"));
-        let out = raise_version(&d, "a.sp", pinned, false).unwrap();
+        assert!(pins_std(&d, 0));
+        let out = raise(&d, pinned, false).unwrap();
         assert_eq!(out, pinned.replacen("\"0.2\"", "\"0.3\"", 1));
-        d.add_level(Level::new(LevelKind::File, "lib.inc", "lib.inc", "lib.inc"), Some(0));
-        assert!(pins_std(&d, "lib.inc"));
+        let lib = d.add_level(Level::new(LevelKind::File, "lib.inc", "lib.inc", "lib.inc"), Some(0));
+        assert!(pins_std(&d, lib));
         // a header without VERSION gets it after its `{`; a file without a header gets one
         let pin = format!("{{ @VERSION(\"0.3\"); {PIN_STD_0_2}}}");
         let bare = "* t\n* @RNL(type=\"header\") {}\n.end\n";
-        assert_eq!(raise_version(&doc(bare, "a.sp", "*"), "a.sp", bare, true), Some(bare.replace("{}", &pin)));
+        assert_eq!(raise(&doc(bare, "a.sp", "*"), bare, true), Some(bare.replace("{}", &pin)));
         let none = "* t\nR1 a b 1k\n.end\n";
-        let out = raise_version(&doc(none, "a.sp", "*"), "a.sp", none, true);
+        let out = raise(&doc(none, "a.sp", "*"), none, true);
         assert_eq!(out, Some(format!("* t\n* @RNL(type=\"header\") {pin}\nR1 a b 1k\n.end\n")));
         // a package file, a header that is not the first record, and one in a region written to be
         // encrypted are not raised
-        assert_eq!(raise_version(&d, "p.rnl", "@RNL {}\n", true), None);
+        let package = d.add_level(Level::new(LevelKind::File, "p.rnl", "p.rnl", "p.rnl"), Some(0));
+        assert_eq!(raise_version(&d, "@RNL {}\n", &[(package, true)]), ("@RNL {}\n".to_string(), vec![false]));
         let late = "* t\n* @RNL {#R1}\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.end\n";
-        assert_eq!(raise_version(&doc(late, "a.sp", "*"), "a.sp", late, true), None);
+        assert_eq!(raise(&doc(late, "a.sp", "*"), late, true), None);
         let hidden = "* t\n.prot\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.unprot\n.end\n";
-        assert_eq!(raise_version(&doc(hidden, "a.sp", "*"), "a.sp", hidden, true), None);
+        assert_eq!(raise(&doc(hidden, "a.sp", "*"), hidden, true), None);
     }
 
     #[test]
@@ -1535,7 +1591,7 @@ mod tests {
                    * @RNL(numbering=\"x\") { #R1 @TEXT(\"a\", key=\"numbering\"); \
                    $D = @DEFINE(roles=[\"numbering\"], parameters=[[\"numbering\", 1]]) {} }\n.end\n";
         let d = doc(net, "a.sp", "*");
-        let mut found = spelled_like_new_words(&d, "a.sp");
+        let mut found = spelled_like_new_words(&d, 0);
         found.sort();
         assert_eq!(
             found,
@@ -1548,6 +1604,6 @@ mod tests {
             ]
         );
         let plain = "* t\n* @RNL { #R1 @TEXT(\"numbering\", key=\"name\") }\n.end\n";
-        assert!(spelled_like_new_words(&doc(plain, "a.sp", "*"), "a.sp").is_empty());
+        assert!(spelled_like_new_words(&doc(plain, "a.sp", "*"), 0).is_empty());
     }
 }

@@ -440,7 +440,7 @@ impl Interp<'_> {
                     );
                 }
                 seen.push(name.clone());
-                roles.push(Role { name, kinds, is_set });
+                roles.push(Role { name, kinds, is_set, written: r });
             }
         }
         let mut params: Vec<(String, Option<Lit>)> = Vec::new();
@@ -1681,9 +1681,12 @@ impl Interp<'_> {
         let sym = self.anon_def(mapped["symbol"].obj);
         if !matches!(self.o(sym), ObjData::Symbol(_)) {
             let l = self.label(sym);
+            // a symbol of the standard series 0.2 whose name the series 0.3 gives to a definition
+            let why = l.strip_prefix('$').and_then(|n| self.no_longer_a_symbol(n, ctx));
+            let why = why.map(|w| format!(": {w}")).unwrap_or_default();
             return self.fail(
                 ctx,
-                format!("the last object of SET-SYMBOL must be a symbol, not {l} (11.3)"),
+                format!("the last object of SET-SYMBOL must be a symbol, not {l} (11.3){why}"),
                 mapped["symbol"].off,
             );
         }

@@ -106,6 +106,37 @@ fn the_names_follow_the_file_the_instance_is_written_in() {
 }
 
 #[test]
+fn the_names_follow_the_library_section_the_instance_is_written_in() {
+    // two sections of one library, of 0.2 and of 0.3: a section read is a file (2.8), whose
+    // instances have the names of its version, in a subcircuit and outside one, whichever section
+    // is read first
+    let lib = "* lib\n.lib old\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt legacy a b c d\n\
+               T1 a b c d z0=50 td=1n\n.ends legacy\nT3 e 0 f 0 z0=50 td=1n\n.endl old\n\
+               .lib new\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.subckt modern a b c d\n\
+               T2 a b c d z0=50 td=1n\n* @RNL { #T2:p1 @TEXT(\"first port\") }\n.ends modern\n\
+               T4 g 0 h 0 z0=50 td=1n\n.endl new\n";
+    let tl = named(&["p1", "n1", "p2", "n2"]);
+    for order in [["old", "new"], ["new", "old"]] {
+        let main = format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\")}}\n.lib v.lib {}\n.lib v.lib {}\n\
+             X1 a b c d legacy\nX2 a b c d modern\n.end\n",
+            order[0], order[1]
+        );
+        let files = MemoryProvider::new().with("t.sp", &main).with("v.lib", lib);
+        let r = read("t.sp", &files, &options());
+        assert!(errors(&r).is_empty(), "{order:?}: {:?}", errors(&r));
+        let of = |title: &str, name: &str| {
+            let lv = r.model.levels.iter().find(|l| l.title == title).unwrap();
+            let insts = &r.doc.levels[lv.level].instances;
+            lv.terminal_names[insts.iter().position(|i| i.name == name).unwrap()].clone()
+        };
+        assert_eq!((of("legacy", "T1"), of("modern", "T2")), (vec![None; 4], tl.clone()), "{order:?}");
+        // outside a subcircuit, the elements of a section belong to the circuit that reads it (6.1)
+        assert_eq!((of("t.sp", "T3"), of("t.sp", "T4")), (vec![None; 4], tl.clone()), "{order:?}");
+    }
+}
+
+#[test]
 fn the_spice_mode_of_a_spectre_netlist_has_them_too() {
     let net = "// t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR0 (a 0) resistor r=1k\n\
                simulator lang=spice\nT1 a 0 b 0 z0=50 td=1n\nsimulator lang=spectre\n";

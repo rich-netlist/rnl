@@ -4,7 +4,6 @@ use serde_json::{json, Value};
 
 use rnl_runtime::geom::Pt;
 use rnl_runtime::interp::obj::Lit;
-use rnl_runtime::interp::unit::DRAFT_VERSION;
 use rnl_runtime::markup::plain;
 use rnl_runtime::previous::Previous;
 use rnl_runtime::problem::*;
@@ -145,7 +144,7 @@ fn fact(f: &ProblemFact, numbers: bool) -> Value {
 /// only in a level of a file of the draft 0.3, which alone has `authored_numbers` and the
 /// `written_numbers` of each usage as well.
 pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
-    let numbers = p.version == DRAFT_VERSION;
+    let numbers = p.follows_0_3();
     let mut v = json!({
         "level": p.level,
         "title": p.title,

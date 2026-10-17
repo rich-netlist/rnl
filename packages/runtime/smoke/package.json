@@ -1,0 +1,10 @@
+{
+  "name": "rnl-runtime-smoke",
+  "private": true,
+  "type": "module",
+  "description": "A frontend built with Vite that installs @rich-netlist/runtime, for smoke.mjs",
+  "devDependencies": {
+    "playwright": "1.63.0",
+    "vite": "8.2.1"
+  }
+}

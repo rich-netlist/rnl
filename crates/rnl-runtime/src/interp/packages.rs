@@ -40,13 +40,40 @@ pub const SPECTRE_RULES: &str = "rnl-std-spectre";
 /// without a statement is in the mode it ends in. A netlist of another host keeps its own dialect.
 ///
 /// This is the rule of the draft 0.3 for dropping the rule package of the other dialect, and the
-/// one place that decides it.
+/// one place that decides it, with [`section_dialect`] for a library section.
 pub fn file_dialect<'a>(netlist: &'a str, path: &str, text: &str, main: bool) -> &'a str {
     if netlist != "spectre" {
         return netlist;
     }
-    let mut spectre = path.to_lowercase().ends_with(".scs");
-    for (k, raw) in text.lines().enumerate() {
+    dialect_named(first_statement_mode(path.to_lowercase().ends_with(".scs"), text.lines().enumerate(), main))
+}
+
+/// The dialect of a library section, which is read as a file (2.8): [`file_dialect`] of the lines
+/// of `text` between those that open and close it, `lines` ([`crate::host::Level::section_lines`]),
+/// from the mode it starts in, as the Spectre adapter reads it: Spectre's after `section`, SPICE's
+/// after `.lib`. What lies outside the section is not read (2.2), and does not count.
+pub fn section_dialect<'a>(netlist: &'a str, text: &str, lines: (u32, u32)) -> &'a str {
+    if netlist != "spectre" {
+        return netlist;
+    }
+    let (open, close) = (lines.0 as usize, lines.1 as usize);
+    let spectre = !text.lines().nth(open.saturating_sub(1)).unwrap_or("").trim_start().starts_with('.');
+    let inside = text.lines().enumerate().skip(open).take(close.saturating_sub(open + 1));
+    dialect_named(first_statement_mode(spectre, inside, false))
+}
+
+fn dialect_named(spectre: bool) -> &'static str {
+    if spectre {
+        "spectre"
+    } else {
+        "spice"
+    }
+}
+
+/// Whether the first statement of the host among `lines`, each with its index in its file, is read
+/// in Spectre mode, from `spectre`, the mode they start in ([`file_dialect`]).
+fn first_statement_mode<'t>(mut spectre: bool, lines: impl Iterator<Item = (usize, &'t str)>, main: bool) -> bool {
+    for (k, raw) in lines {
         // the title of the main file; a comment line, `*` in both modes, `//` in Spectre's, and on
         // the first line of an included file either, as the adapter reads them
         let comment = raw.starts_with('*') || ((spectre || k == 0) && raw.starts_with("//"));
@@ -64,11 +91,7 @@ pub fn file_dialect<'a>(netlist: &'a str, path: &str, text: &str, main: bool) ->
         }
         break;
     }
-    if spectre {
-        "spectre"
-    } else {
-        "spice"
-    }
+    spectre
 }
 
 /// A reference, a USE-PACKAGE in the header record of a package file (16.2): the package and the
@@ -181,8 +204,9 @@ impl Interp<'_> {
     /// The standard package used implicitly for the files of the language version `language`
     /// (16.3): the newest version in the package directories of the standard series written in
     /// that version, as the header record of its `rnl-std` declares, so that a file of 0.2 uses
-    /// the series 0.2 and a file of 0.3 the series 0.3. Reading it reads the packages it
-    /// references.
+    /// the series 0.2 and a file of 0.3 the series 0.3; or the version that the reading asks for
+    /// ([`crate::Options::std_version`]), whatever the language version. Reading it reads the
+    /// packages it references.
     pub(crate) fn std_package(&mut self, language: &str) -> Option<UnitId> {
         if !self.std_enabled {
             return None;
@@ -199,30 +223,44 @@ impl Interp<'_> {
                 found.push(c.clone());
             }
         }
-        let written_in = |c: &(String, String, String)| version_key(&self.pkg_languages[&c.2]);
-        let want = version_key(language);
-        // the series written in the file's language version; without one, the one written in the
-        // nearest older version, which the tool reads too, else in the nearest newer one
-        let nearest = |older: bool| {
-            let side = found.iter().map(written_in).filter(|v| if older { *v < want } else { *v > want });
-            if older {
-                side.max()
-            } else {
-                side.min()
+        let chosen = if let Some(v) = self.std_version.clone() {
+            // a reading that asks for a version takes that one, whatever the language version of
+            // the file (16.3: the version of the standard package is the tool's default)
+            let c = found.iter().find(|c| c.1 == v).cloned();
+            if c.is_none() && !self.std_units.values().any(Option::is_none) {
+                self.sink.error(
+                    format!("the standard package rnl-std {v} that the reading asks for cannot be found, in the package directories or among the bundled packages: the files are read without a standard package (16.3)"),
+                    None,
+                );
             }
+            c
+        } else {
+            let written_in = |c: &(String, String, String)| version_key(&self.pkg_languages[&c.2]);
+            let want = version_key(language);
+            // the series written in the file's language version; without one, the one written in
+            // the nearest older version, which the tool reads too, else in the nearest newer one
+            let nearest = |older: bool| {
+                let side = found.iter().map(written_in).filter(|v| if older { *v < want } else { *v > want });
+                if older {
+                    side.max()
+                } else {
+                    side.min()
+                }
+            };
+            let series = [Some(want), nearest(true), nearest(false)].into_iter().flatten().find(|v| {
+                // a language version with a standard series in it
+                found.iter().any(|c| written_in(c) == *v)
+            });
+            // of that series the newest version
+            let mut best: Option<&(String, String, String)> = None;
+            for c in found.iter().filter(|c| Some(written_in(c)) == series) {
+                if best.is_none_or(|b| version_key(&c.1) > version_key(&b.1)) {
+                    best = Some(c);
+                }
+            }
+            best.cloned()
         };
-        let series = [Some(want), nearest(true), nearest(false)].into_iter().flatten().find(|v| {
-            // a language version with a standard series in it
-            found.iter().any(|c| written_in(c) == *v)
-        });
-        // of that series the newest version
-        let mut best: Option<&(String, String, String)> = None;
-        for c in found.iter().filter(|c| Some(written_in(c)) == series) {
-            if best.is_none_or(|b| version_key(&c.1) > version_key(&b.1)) {
-                best = Some(c);
-            }
-        }
-        let out = best.cloned().map(|(n, v, path)| {
+        let out = chosen.map(|(n, v, path)| {
             let key = (n, v);
             match self.packages.get(&key) {
                 Some(&u) => u,
@@ -334,12 +372,18 @@ impl Interp<'_> {
         uses
     }
 
-    /// The dialect of the file a level's text is in (2.2, 16.3): [`file_dialect`] of that file, in
-    /// the dialect of the netlist.
+    /// The dialect of the file a level's text is in (2.2, 16.3), in the dialect of the netlist:
+    /// [`file_dialect`] of that file, whose first line is a title when it is the main file, the
+    /// subcircuits written in it included; or [`section_dialect`] of the library section it is
+    /// read through, which is read as a file (2.8).
     pub(crate) fn level_dialect(&self, level: LevelId) -> &str {
-        let lv = &self.doc.levels[level];
+        let file = self.doc.file_level(level);
+        let lv = &self.doc.levels[file];
         let text = self.doc.source(&lv.file).unwrap_or("");
-        file_dialect(&self.doc.dialect.name, &lv.path, text, level == 0)
+        match lv.section_lines {
+            Some(lines) => section_dialect(&self.doc.dialect.name, text, lines),
+            None => file_dialect(&self.doc.dialect.name, &lv.path, text, file == 0),
+        }
     }
 
     /// The rule package of the other dialect that a level of a file of the draft 0.3 drops

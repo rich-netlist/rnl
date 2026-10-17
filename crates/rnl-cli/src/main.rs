@@ -18,16 +18,19 @@ const USAGE: &str = "usage:
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
+  rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
-FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
+FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl); catalog takes none.
 options:
   --package-dir DIR   look for packages in DIR as well (16.2); repeatable
   --no-std            do not use the standard package at the root (16.3)
+  --std-version V     use rnl-std V at the root, whatever the files' language version, such as 0.2
+                      to read a file of 0.3 with the series 0.2; a version pinned in a header
+                      record still comes first (16.3). rnl solve does not take it
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      spice or spectre, instead of guessing from the file
-  --draft             no effect, kept for compatibility: the files of 0.3 are read without it
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -58,6 +61,10 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   them, or one of the solver
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
+catalog options (the packages are those of --package-dir and the bundled ones, each read as rnl
+check reads a package file, with --no-std and --std-version):
+  --package NAME      only the packages of this name; repeatable
+  --all-versions      every version of each package, not only the newest
 write:
   REQUEST.json is {\"dialect\", \"netlist\", \"author\", \"ops\"}, the ops as the editor interface
   draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out";
@@ -68,11 +75,9 @@ struct Args {
     out: Option<PathBuf>,
     package_dirs: Vec<PathBuf>,
     std: bool,
+    std_version: Option<String>,
     generated: bool,
     dialect: Option<String>,
-    /// `--draft`: accepted, with no effect, as [`Options::draft`] has none; kept for
-    /// compatibility, to be removed later.
-    draft: bool,
     svg: bool,
     primitives: bool,
     status: bool,
@@ -84,6 +89,9 @@ struct Args {
     previous: bool,
     author: Option<String>,
     parts: Option<String>,
+    /// `--package`: the names `catalog` lists; every name when there are none.
+    packages: Vec<String>,
+    all_versions: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -96,9 +104,9 @@ fn parse_args() -> Result<Args, String> {
     let mut out = None;
     let mut package_dirs = Vec::new();
     let mut std = true;
+    let mut std_version = None;
     let mut generated = true;
     let mut dialect = None;
-    let mut draft = false;
     let (mut svg, mut primitives, mut status) = (true, false, false);
     let mut level = None;
     let mut previous = false;
@@ -106,14 +114,16 @@ fn parse_args() -> Result<Args, String> {
     let (mut in_place, mut report) = (false, false);
     let mut author = None;
     let mut parts = None;
+    let mut packages = Vec::new();
+    let mut all_versions = false;
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
             "--package-dir" => package_dirs.push(PathBuf::from(it.next().ok_or("--package-dir needs a directory")?)),
             "--no-std" => std = false,
+            "--std-version" => std_version = Some(it.next().ok_or("--std-version needs a version, such as 0.2")?),
             "--no-generated" => generated = false,
             "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
-            "--draft" => draft = true,
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--status" => status = true,
@@ -124,20 +134,27 @@ fn parse_args() -> Result<Args, String> {
             "--report" => report = true,
             "--author" => author = Some(it.next().ok_or("--author needs a name")?),
             "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
+            "--package" => packages.push(it.next().ok_or("--package needs a name, such as rnl-std-basic")?),
+            "--all-versions" => all_versions = true,
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
     }
-    let file = file.ok_or(USAGE)?;
+    // the catalog reads the package directories and the bundled packages, not a file
+    let file = match (command.as_str(), file) {
+        ("catalog", None) => PathBuf::new(),
+        ("catalog", Some(f)) => return Err(format!("rnl catalog takes no FILE, not {}\n{USAGE}", f.display())),
+        (_, file) => file.ok_or(USAGE)?,
+    };
     Ok(Args {
         command,
         file,
         out,
         package_dirs,
         std,
+        std_version,
         generated,
         dialect,
-        draft,
         svg,
         primitives,
         status,
@@ -148,6 +165,8 @@ fn parse_args() -> Result<Args, String> {
         previous,
         author,
         parts,
+        packages,
+        all_versions,
     })
 }
 
@@ -170,7 +189,7 @@ fn main() -> ExitCode {
 
 /// The runtime's options the command line gives.
 fn options(args: &Args) -> Options {
-    Options { std: args.std, generated: args.generated, draft: args.draft, ..Options::default() }
+    Options { std: args.std, std_version: args.std_version.clone(), generated: args.generated, ..Options::default() }
 }
 
 fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, String> {
@@ -206,7 +225,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 .with_overrides(args.solver_options.as_deref().unwrap_or(""))
                 .map_err(|e| format!("--solver-options: {e}"))?
                 .canonical();
-            let options = Options { std: args.std, draft: args.draft, ..Options::solver() };
+            let options = Options { std: args.std, std_version: args.std_version.clone(), ..Options::solver() };
             let (r, previous) = if args.previous {
                 rnl_view::read_previous(&args.file.to_string_lossy(), args.dialect.as_deref(), &provider, &options)?
             } else {
@@ -266,6 +285,15 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             };
             let snapshot = rnl_view::snapshot(&args.file.to_string_lossy(), &provider, &options, parts)?;
             println!("{}", serde_json::to_string_pretty(&snapshot).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
+        "catalog" => {
+            let options = rnl_view::CatalogOptions {
+                packages: (!args.packages.is_empty()).then(|| args.packages.clone()),
+                all_versions: args.all_versions,
+                runtime: options(args),
+            };
+            println!("{}", serde_json::to_string_pretty(&rnl_view::catalog(&provider, &options)).unwrap());
             Ok(ExitCode::SUCCESS)
         }
         "render" => {
@@ -344,13 +372,7 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
         .map_err(|e| format!("--solver-options: {e}"))?;
     // the groups of the facts of priority low are sought only for their hints (8.5, 7.6)
     let solver = SolverOptions { hints_for_low: args.report, ..solver };
-    let options = SolveOptions {
-        dialect: args.dialect.clone(),
-        std: args.std,
-        draft: args.draft,
-        level: args.level.clone(),
-        solver,
-    };
+    let options = SolveOptions { dialect: args.dialect.clone(), std: args.std, level: args.level.clone(), solver };
     let run = rnl_cli::solve::solve(&args.file, provider, &options)?;
     // nothing is written when a file has no place to go
     rnl_cli::solve::destinations(&run, &target)?;

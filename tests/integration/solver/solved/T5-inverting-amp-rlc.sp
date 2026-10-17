@@ -1,5 +1,5 @@
 * T5 Inverting amplifier with an RLC output filter
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="rnl-std", version="0.2")}
 .subckt opamp inp inn out
 E1 out 0 inp inn 1e5
 * @RNL { # @SET-SYMBOL $OPAMP }

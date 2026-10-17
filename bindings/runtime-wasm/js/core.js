@@ -1,7 +1,7 @@
 // The core as WebAssembly: the module the binding builds (rnl_runtime_wasm.wasm), behind one call
-// that takes a request and returns the Document, or for a write the netlist written and its
-// Document. The call is synchronous, so the web viewer runs it in a Worker (worker.js); the tests
-// run it in Node.
+// that takes a request and returns the Document, for a write the netlist written and its Document,
+// or for a catalog request the catalog of the packages the core has. The call is synchronous, so
+// the web viewer runs it in a Worker (worker.js); the tests run it in Node.
 
 /**
  * What to build: the workspace and how. Fields the core does not know are ignored.
@@ -13,10 +13,12 @@
  *   found by name.
  * @property {"spice" | "spectre"} [dialect] The dialect, instead of guessing it from the entry.
  * @property {boolean} [std] Use the standard package at the root; true when not given.
+ * @property {string} [std_version] The version of the standard package at the root, whatever the
+ *   files' language version, such as "0.2"; by the language version when not given.
  * @property {boolean} [svg] Write each level's SVG; true when not given.
  * @property {boolean} [primitives] Give each level's primitives; false when not given.
- * @property {boolean} [draft] Accepted, with no effect: the files of 0.3 are read without it. Kept
- *   for compatibility, to be removed later.
+ * @property {boolean} [status] Give each level its solve status, `solve`, what a frontend decides
+ *   from whether to solve it: "fixed", "unsolved", "solved" or "stale"; false when not given.
  * @property {{ drawing?: boolean, host?: boolean, model?: boolean }} [parts] The parts of the
  *   editor interface's snapshot to give: with them, the answer is a snapshot (snapshot.d.ts), with
  *   the Document as its `drawing` unless `drawing` is false.
@@ -35,8 +37,26 @@
  * @property {Record<string, string>} [files] Further files, such as packages.
  * @property {string[]} [package_dirs]
  * @property {boolean} [std]
+ * @property {string} [std_version]
  * @property {boolean} [svg]
  * @property {boolean} [primitives]
+ * @property {boolean} [status]
+ */
+
+/**
+ * What to list: the catalog of the packages the core has, those of `package_dirs` among `files`
+ * and the bundled ones, the standard series and analog-canvas-extensions (catalog.d.ts).
+ *
+ * @typedef {object} CatalogRequest
+ * @property {{ packages?: string[], all_versions?: boolean }} catalog `packages`: only the packages
+ *   of these names, every package when not given; `all_versions`: every version of each package,
+ *   not only the newest.
+ * @property {Record<string, string>} [files] The frontend's files, among them its packages.
+ * @property {string[]} [package_dirs] The directories, among the paths of `files`, whose packages
+ *   are listed.
+ * @property {boolean} [std] Read each package with the standard package of its language version;
+ *   true when not given.
+ * @property {string} [std_version]
  */
 
 /**
@@ -51,14 +71,22 @@
  * @property {(request: WriteRequest | string) => { text: string, document: object }} write Write the
  *   ops of a request into its netlist, and build what was written. Throws an Error with the core's
  *   message when an op cannot be written.
- * @property {(request: Request | WriteRequest | string) => object} respond The core's answer as it
- *   gives it: `{ document }`, `{ written }` or `{ error }`. Throws only when the core stops.
+ * @property {(request: CatalogRequest | string) => object} catalog List the symbols, definitions and
+ *   sets of the packages the core has, as a catalog request asks.
+ * @property {(request: Request | WriteRequest | CatalogRequest | string) => object} respond The core's
+ *   answer as it gives it: `{ document }`, `{ snapshot }`, `{ written }`, `{ catalog }` or `{ error }`.
+ *   Throws only when the core stops.
  */
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 /** What a request asks for, by the part of the answer that gives it. */
-const ASKS = { document: "a build without parts", snapshot: "a build with parts", written: "a write" };
+const ASKS = {
+  document: "a build without parts",
+  snapshot: "a build with parts",
+  written: "a write",
+  catalog: "a catalog request",
+};
 const REPLACEMENT = String.fromCharCode(0xfffd);
 
 /**
@@ -131,6 +159,7 @@ export async function loadCore(wasm) {
     build: (request) => part(request, "document"),
     snapshot: (request) => part(request, "snapshot"),
     write: (request) => part(request, "written"),
+    catalog: (request) => part(request, "catalog"),
   };
 }
 

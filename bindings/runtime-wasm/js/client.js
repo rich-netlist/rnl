@@ -17,6 +17,9 @@ import { requestText } from "./core.js";
  *   write Write the ops of a request into its netlist, and build what was written: the netlist
  *   written and its Document, whose diagnostics say how it reads. Rejects with the core's message
  *   when an op cannot be written.
+ * @property {(request: import("./core.js").CatalogRequest) => Promise<object>} catalog List the
+ *   symbols, definitions and sets of the packages the core has, the bundled ones and those of the
+ *   request's package directories (catalog.d.ts).
  * @property {() => void} terminate Stop the Worker; calls still waiting, and later ones, reject.
  */
 
@@ -80,6 +83,7 @@ export function startCore(options = {}) {
     build: (request) => send(request, "document"),
     snapshot: (request) => send(request, "snapshot"),
     write: (request) => send(request, "written"),
+    catalog: (request) => send(request, "catalog"),
     terminate() {
       stop(new Error("The core was stopped."));
       worker.then((w) => w.terminate(), () => {});

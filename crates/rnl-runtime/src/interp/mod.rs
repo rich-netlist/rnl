@@ -6,6 +6,7 @@
 //! written above it are evaluated again in it (10.3).
 
 pub mod attrs;
+pub mod catalog;
 mod conflicts;
 pub mod ctx;
 pub mod cycles;
@@ -17,6 +18,7 @@ pub mod obj;
 mod output;
 mod packages;
 pub mod phases;
+mod renames;
 pub mod scene;
 mod selfcheck;
 pub mod unit;
@@ -54,6 +56,11 @@ pub(crate) type RuleMembers = ((usize, usize), Rc<Vec<unit::UnitMember>>);
 pub struct Options {
     /// Use the standard package implicitly at the root (16.3).
     pub std: bool,
+    /// The version of the standard package at the root, instead of the newest of the series written
+    /// in the file's language version (16.3: its version is the tool's default), such as "0.2" to
+    /// read a file of 0.3 with the series 0.2. A version pinned in a header record still comes
+    /// first. None: by the language version.
+    pub std_version: Option<String>,
     /// Read the records with `type="generated"`, the solver's results. A solver interprets a level
     /// without them (2.8, 14.8): every file of the document is read as if they were not written.
     pub generated: bool,
@@ -63,15 +70,11 @@ pub struct Options {
     /// written coordinates and conflicting coordinates are found (11.7). The standard leaves the
     /// tolerance to the tool; a viewer that does not solve uses [`crate::geom::TOL`].
     pub tolerance: f64,
-    /// No effect. Kept for compatibility, to be removed later: the files of 0.3, and a main file
-    /// without a header record, are read in 0.3 without any switch ([`unit::READ_VERSIONS`],
-    /// [`unit::DEFAULT_VERSION`]).
-    pub draft: bool,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { std: true, generated: true, problems: false, tolerance: crate::geom::TOL, draft: false }
+        Options { std: true, std_version: None, generated: true, problems: false, tolerance: crate::geom::TOL }
     }
 }
 
@@ -180,6 +183,8 @@ pub struct Interp<'p> {
     /// evaluated: the run stops, and the interpretation is run again with it in `closing`.
     pub(crate) restart: Option<(cycles::StmtKey, String)>,
     pub(crate) std_enabled: bool,
+    /// [`Options::std_version`].
+    pub(crate) std_version: Option<String>,
     /// Read the records with `type="generated"` (`Options::generated`).
     pub(crate) read_generated: bool,
     /// Build the problems (`Options::problems`).
@@ -293,6 +298,7 @@ impl<'p> Interp<'p> {
             closing: HashMap::new(),
             restart: None,
             std_enabled: options.std,
+            std_version: options.std_version.clone(),
             read_generated: options.generated,
             want_problems: options.problems,
             tol: options.tolerance,
@@ -457,7 +463,12 @@ impl<'p> Interp<'p> {
     /// Run, and run again from the start as long as a run finds a statement that closes a cycle of
     /// sets after a statement placed before it was evaluated (5.2.2): each run has the statements
     /// found so far fail from the start. `again` makes a new interpreter from the one that stopped.
-    fn run_settled(mut self, again: impl Fn(Interp<'p>) -> Interp<'p>) -> Interpretation {
+    fn run_settled(self, again: impl Fn(Interp<'p>) -> Interp<'p>) -> Interpretation {
+        self.settled(again).finish()
+    }
+
+    /// [`Self::run_settled`] without the output: the interpreter of the last run.
+    fn settled(mut self, again: impl Fn(Interp<'p>) -> Interp<'p>) -> Interp<'p> {
         self.run();
         while let Some((key, msg)) = self.restart.take() {
             let mut closing = std::mem::take(&mut self.closing);
@@ -466,7 +477,7 @@ impl<'p> Interp<'p> {
             self.closing = closing;
             self.run();
         }
-        self.finish()
+        self
     }
 
     /// Evaluate the statements of a unit without a circuit once: definitions, rules, errors.

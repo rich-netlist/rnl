@@ -112,6 +112,11 @@ pub struct Level {
     /// Spectre's `include "file" section=sec`), the section: the reading reads only the text of
     /// that section, and what lies outside it is not read (2.2).
     pub section: Option<String>,
+    /// For the level of a library section, the lines of its file that open and close the section
+    /// (`.lib sec` and `.endl`, Spectre's `section sec` and `endsection`), the second one past the
+    /// last line of the file when nothing closes it. The section is read as a file of its own (2.8):
+    /// two sections of one file are two file levels, each with its header record and its version.
+    pub section_lines: Option<(u32, u32)>,
 }
 
 impl Level {
@@ -132,6 +137,7 @@ impl Level {
             path: path.into(),
             case_sensitive: false,
             section: None,
+            section_lines: None,
         }
     }
 
@@ -139,6 +145,14 @@ impl Level {
         match self.kind {
             LevelKind::Subckt => self.name.clone(),
             _ => file_name(&self.file).to_string(),
+        }
+    }
+
+    /// Close the library section the level reads at the line `line`, when it is open
+    /// ([`Level::section_lines`]).
+    pub fn close_section(&mut self, line: u32) {
+        if let Some((_, end @ 0)) = self.section_lines.as_mut() {
+            *end = line;
         }
     }
 
@@ -252,6 +266,31 @@ impl HostDocument {
 
     pub fn subckt(&self, name: &str) -> Option<LevelId> {
         self.subckts.get(&self.key(name)).copied()
+    }
+
+    /// The file level whose text holds `level`: `level` itself when it is a file level, else the
+    /// file level that its subcircuit is written in, a library section read as a file (2.8).
+    pub fn file_level(&self, level: LevelId) -> LevelId {
+        let mut at = level;
+        while self.levels[at].kind == LevelKind::Subckt {
+            match self.levels[at].parent {
+                Some(p) => at = p,
+                None => break,
+            }
+        }
+        at
+    }
+
+    /// The file level whose text holds the line `line` of `file`: the one that reads the library
+    /// section that holds it, else the first that reads the file whole. None when no file level
+    /// reads that line.
+    pub fn file_level_at(&self, file: &str, line: u32) -> Option<LevelId> {
+        let of_file = || {
+            (0..self.levels.len()).filter(|&l| self.levels[l].kind == LevelKind::File && self.levels[l].file == file)
+        };
+        of_file()
+            .find(|&l| self.levels[l].section_lines.is_some_and(|(a, b)| a < line && line < b))
+            .or_else(|| of_file().find(|&l| self.levels[l].section.is_none()))
     }
 
     pub fn ancestors(&self, lv: LevelId) -> Vec<LevelId> {

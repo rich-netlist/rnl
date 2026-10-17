@@ -264,6 +264,27 @@ fn a_subcircuit_instance_named_i0_is_no_current_source() {
 }
 
 #[test]
+fn a_relay_of_a_model_card_goes_by_its_type() {
+    // the Spectre adapter reads switch, relay and transformer natively: an instance of a relay's
+    // model card goes by its model type, sw, as S of SPICE does; a switch of three throws is still
+    // drawn as $SWITCH, its pins on t0 and t1 (Annex C)
+    let text = "// t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nmodel rl relay\n\
+                K1 (a b c d) rl\nS1 (a b c d) switch position=3\nT1 (a b c d) transformer\n\
+                // @RNL { #K1 @PLACE(0, 0); #S1 @PLACE(10, 0); #T1 @PLACE(20, 0) }\n";
+    let files = MemoryProvider::new().with("t.scs", text);
+    let r = read(&files, "t.scs", &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let lv = &r.model.levels[0];
+    let got: Vec<(&str, &str)> = lv
+        .items
+        .iter()
+        .filter(|i| i.kind == "instance")
+        .map(|i| (i.id.as_str(), lv.symbols[i.symbol].name.as_str()))
+        .collect();
+    assert_eq!(got, [("#K1", "$VOLTAGE_CONTROLLED_SWITCH"), ("#S1", "$SWITCH"), ("#T1", "$TRANSFORMER")]);
+}
+
+#[test]
 fn every_package_of_the_series_names_what_it_uses_through_its_references() {
     // without any standard package in effect, each package of the series checked on its own sees
     // only itself and what it references (16.2), and finds every name it uses
@@ -321,4 +342,56 @@ fn the_fill_puts_no_port_tag_on_ground_and_supply_nets() {
         })
         .collect();
     assert!(!distances.is_empty() && distances.iter().all(|d| *d == (Some(2.0), None)), "{distances:?}");
+}
+
+#[test]
+fn a_reading_can_ask_for_a_version_of_the_standard_package() {
+    // the tool's default version (16.3), whatever the language version of the file: a file of 0.3
+    // read with the series 0.2, and a file of 0.2 with the series 0.3, both rule packages and all
+    let with = |v: &str| Options { std_version: Some(v.into()), ..Options::default() };
+    let files = MemoryProvider::new().with("t.sp", &netlist("0.3", "", ""));
+    let r = read(&files, "t.sp", &with("0.2"));
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(names(&root(level(&r, "t.sp"))), SERIES_02);
+    let files = MemoryProvider::new().with("t.sp", &netlist("0.2", "", ""));
+    let r = read(&files, "t.sp", &with("0.3"));
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(names(&root(level(&r, "t.sp"))), SERIES_03);
+    // a version that a header record pins still comes first
+    let pinned = netlist("0.3", "@USE-PACKAGE(name=\"rnl-std\", version=\"0.3\")", "");
+    let r = read(&MemoryProvider::new().with("t.sp", &pinned), "t.sp", &with("0.2"));
+    assert!(root(level(&r, "t.sp")).iter().all(|(_, v)| *v == "0.3"));
+    // a version that there is not: once said, and no standard package
+    let files = MemoryProvider::new().with("t.sp", &netlist("0.3", "", ""));
+    let r = read(&files, "t.sp", &with("9.9"));
+    let e = errors(&r);
+    assert!(e.len() == 1 && e[0].contains("rnl-std 9.9 that the reading asks for cannot be found"), "{e:?}");
+    assert!(root(level(&r, "t.sp")).is_empty());
+}
+
+#[test]
+fn a_name_of_the_series_0_2_is_told_its_name_in_the_series_0_3() {
+    let record = "* @RNL {\n*   $GND @ATTACH &a;\n*   #R1 @SET-SYMBOL $RES;\n*   #R1 @SET-SYMBOL $OPAMP;\n\
+                  *   #R1 @SET-SYMBOL $GROUND\n* }\n";
+    let files = MemoryProvider::new().with("t.sp", &netlist("0.3", "", record));
+    let e = errors(&read(&files, "t.sp", &Options::default()));
+    let has = |s: &str| e.iter().any(|m| m.contains(s));
+    assert!(
+        has("$GND cannot be found: the standard series 0.3 calls it $GROUND; write that, or pin the series 0.2"),
+        "{e:?}"
+    );
+    assert!(has("$RES cannot be found: the standard series 0.3 calls it $RESISTOR"), "{e:?}");
+    assert!(has("$OPAMP cannot be found: the standard series 0.3 has it in rnl-std-functional"), "{e:?}");
+    assert!(
+        has("not $GROUND (11.3): in the standard series 0.3 $GROUND is a definition, and $GROUND_SYMBOL the symbol"),
+        "{e:?}"
+    );
+    // pinning the series 0.2 makes them names that are found
+    let pinned = netlist("0.3", "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")", record);
+    let e = errors(&read(&MemoryProvider::new().with("t.sp", &pinned), "t.sp", &Options::default()));
+    assert!(!e.iter().any(|m| m.contains("cannot be found") || m.contains("series 0.3")), "{e:?}");
+    // without the series 0.3 in effect, nothing is said of it
+    let e = errors(&read(&files, "t.sp", &Options { std: false, ..Options::default() }));
+    assert!(e.iter().any(|m| m.contains("$GND cannot be found (6.6)")), "{e:?}");
+    assert!(!e.iter().any(|m| m.contains("series 0.3")), "{e:?}");
 }

@@ -387,7 +387,8 @@ pub struct TextView {
     pub style: Map<String, Value>,
 }
 
-fn lit(v: &Lit) -> Value {
+/// A literal (3.7) as JSON.
+pub(crate) fn lit(v: &Lit) -> Value {
     match v {
         Lit::Num(n) => serde_json::json!(n),
         Lit::Str(s) => Value::String(s.as_str().to_string()),
@@ -461,17 +462,21 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, opt
 
 /// The fingerprint of what a snapshot is made from (3.7): every file read, the host files and the
 /// packages, by name and text with its line endings made "\n"; the dialect; the options that change
-/// what the texts give: the standard package at the root, the generated records and the tolerance.
-/// Each part has its length before it, so that no two inputs give the same bytes. The draft switch,
-/// which has no effect, is written as off, as the revisions made before it lost its effect have
-/// it, so that the same texts keep their revisions.
+/// what the texts give: the standard package at the root and the version asked for, if any, the
+/// generated records and the tolerance. Each part has its length before it, so that no two inputs
+/// give the same bytes. `draft=false` stays in the text, as the revisions made while there was a
+/// switch for the draft 0.3 have it, so that the same texts keep their revisions.
 fn revision(r: &Interpretation, options: &Options) -> String {
     let mut files: Vec<(&str, String)> =
         r.sources.iter().map(|(name, text)| (name.as_str(), text.replace("\r\n", "\n").replace('\r', "\n"))).collect();
     files.sort();
     files.dedup();
-    let reading =
+    let mut reading =
         format!("std={} generated={} draft=false tolerance={}", options.std, options.generated, options.tolerance);
+    // only when asked for, so that the revisions made before the option keep their values
+    if let Some(v) = &options.std_version {
+        reading.push_str(&format!(" std_version={v}"));
+    }
     let mut bytes = Vec::new();
     let mut field = |part: &[u8]| {
         bytes.extend_from_slice(&(part.len() as u64).to_le_bytes());
@@ -938,11 +943,65 @@ R2 a vdd! 2k
         assert_ne!(rev(&NETLIST.replace("R1 in out 1k", "R1 in out  1k"), &options), r);
         let no_std = BuildOptions { runtime: Options { std: false, ..Options::default() }, ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &no_std), r);
-        // the draft switch has no effect, and so does not change the revision
-        let draft = BuildOptions { runtime: Options { draft: true, ..Options::default() }, ..BuildOptions::default() };
-        assert_eq!(rev(NETLIST, &draft), r);
+        // a version of the standard package asked for changes it
+        let v02 = Options { std_version: Some("0.2".into()), ..Options::default() };
+        assert_ne!(rev(NETLIST, &BuildOptions { runtime: v02, ..BuildOptions::default() }), r);
         let spectre = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &spectre), r);
+    }
+
+    #[test]
+    fn the_revision_counts_files_of_one_name_in_two_package_directories() {
+        // two packages whose files are both pk.rnl, in two package directories, as the files of two
+        // standard series are: the text of each counts
+        let netlist = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); \
+                       @USE-PACKAGE(name=\"pa\", version=\"1.0\"); @USE-PACKAGE(name=\"pb\", version=\"1.0\")}\n\
+                       R1 a 0 1k\n.end\n";
+        let package = |name: &str, comment: &str| {
+            format!("/* {comment} */\n@RNL(type=\"header\") {{ @VERSION(\"0.3\"); @PACKAGE(name=\"{name}\", version=\"1.0\")}}\n")
+        };
+        let snapshot = |second: &str| {
+            let mut files = MemoryProvider::new()
+                .with("/w/t.sp", netlist)
+                .with("/p1/pk.rnl", &package("pa", "the first"))
+                .with("/p2/pk.rnl", &package("pb", second));
+            files.package_dirs = vec!["/p1".into(), "/p2".into()];
+            crate::snapshot("/w/t.sp", &files, &BuildOptions::default(), Parts::default()).unwrap()
+        };
+        let s = snapshot("the second");
+        let names: Vec<&str> = s.packages.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"pa") && names.contains(&"pb"), "{names:?}");
+        assert_ne!(snapshot("the second, changed").revision, s.revision);
+    }
+
+    #[test]
+    fn the_revision_counts_included_files_of_one_name_in_two_directories() {
+        // a/x and b/x, both included by the main file, in SPICE and in Spectre: the text of each
+        // counts
+        let spice = (
+            "/w/t.sp",
+            "* t\n.include \"a/x.inc\"\n.include \"b/x.inc\"\nX1 n1 0 ca\nX2 n2 0 cb\n.end\n",
+            ["/w/a/x.inc", "/w/b/x.inc"],
+            ["* a\n.subckt ca p n\nR1 p n 1k\n.ends\n", "* b\n.subckt cb p n\nR1 p n 2k\n.ends\n"],
+        );
+        let spectre = (
+            "/w/t.scs",
+            "// t\nsimulator lang=spectre\ninclude \"a/x.scs\"\ninclude \"b/x.scs\"\nX1 (n1 0) ca\nX2 (n2 0) cb\n",
+            ["/w/a/x.scs", "/w/b/x.scs"],
+            [
+                "// a\nsubckt ca (p n)\nR1 (p n) resistor r=1k\nends ca\n",
+                "// b\nsubckt cb (p n)\nR1 (p n) resistor r=2k\nends cb\n",
+            ],
+        );
+        for (entry, main, paths, texts) in [spice, spectre] {
+            let revision = |first: &str, second: &str| {
+                let files = MemoryProvider::new().with(entry, main).with(paths[0], first).with(paths[1], second);
+                crate::snapshot(entry, &files, &BuildOptions::default(), Parts::default()).unwrap().revision
+            };
+            let r = revision(texts[0], texts[1]);
+            assert_ne!(revision(texts[0], &texts[1].replace("2k", "3k")), r, "{entry}");
+            assert_ne!(revision(&texts[0].replace("1k", "3k"), texts[1]), r, "{entry}");
+        }
     }
 
     #[test]

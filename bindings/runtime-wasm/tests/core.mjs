@@ -253,6 +253,42 @@ test("the Worker writes, and gives every request the packages its build brings",
   }
 });
 
+test("a catalog request lists the packages, through the core and through the Worker", async () => {
+  const c = core.catalog({ catalog: {} });
+  assert.deepEqual(Object.keys(c), ["packages", "symbols", "definitions", "sets"]);
+  const resistor = c.symbols.find((s) => s.symbol === "$RESISTOR");
+  assert.deepEqual([resistor.package, resistor.version, resistor.file], ["rnl-std-basic", "0.3", "rnl-std-basic.rnl"]);
+  assert.deepEqual(resistor.pins, [
+    { terminal: 1, at: [0, 2], direction: "up" },
+    { terminal: 2, at: [0, -2], direction: "down" },
+  ]);
+  assert.deepEqual(resistor.box, [-1, -2.4, 1, 2.4]);
+  assert.deepEqual(resistor.labels.map((l) => l.key), ["name", "value"]);
+  assert.equal(c.symbols.find((s) => s.symbol === "$GROUND_SYMBOL").definition, "$GROUND");
+  assert.equal(c.definitions.find((d) => d.definition === "$GROUND").symbol, "$GROUND_SYMBOL");
+  // of each name the newest version: rnl-std 0.3, not 0.2
+  const versions = (catalog, name) => catalog.packages.filter((p) => p.name === name).map((p) => p.version);
+  assert.deepEqual(versions(c, "rnl-std"), ["0.3"]);
+  assert.deepEqual(versions(core.catalog({ catalog: { all_versions: true } }), "rnl-std"), ["0.2", "0.3"]);
+  // a request's own package, by name
+  const acme = '@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="acme", version="1.0")}\n@RNL { $ACME = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1, direction="up") } }\n';
+  const own = { catalog: { packages: ["acme"] }, files: { "/p/acme.rnl": acme }, package_dirs: ["/p"] };
+  assert.deepEqual(core.catalog(own).symbols.map((s) => [s.symbol, s.package, s.box]), [["$ACME", "acme", [0, 0, 0, 0]]]);
+  // a catalog request and a build each want their own answer
+  assert.throws(() => core.build({ catalog: {} }), /the request is not a build without parts/);
+  assert.throws(() => core.catalog(untitled), /the request is not a catalog request/);
+  assert.ok("catalog" in core.respond({ catalog: {} }));
+  // in a Node worker thread, as loadCore gives it
+  const worker = startCore();
+  try {
+    assert.deepEqual(await worker.catalog({ catalog: {} }), c);
+    assert.deepEqual(await worker.catalog(own), core.catalog(own));
+    await assert.rejects(worker.catalog({ catalog: { all_versions: "yes" } }), /^Error: the request is not valid: /);
+  } finally {
+    worker.terminate();
+  }
+});
+
 test("decodeText reads bytes as rnl reads a file", () => {
   const encoded = (text) => new TextEncoder().encode(text);
   // UTF-8, without a byte order mark at the start

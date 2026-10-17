@@ -1,5 +1,5 @@
 * T4 Two-stage Miller OTA, with facts that conflict
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="rnl-std", version="0.2")}
 .model nch nmos level=1
 .model pch pmos level=1
 M1 x inp tail 0 nch W=2u L=0.5u

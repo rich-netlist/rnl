@@ -1,7 +1,9 @@
 // The text pane: the highlighting of the host statements and the records, the statements over
 // several lines, the statements that do not take effect and the box that marks them, the problems
-// that show their lines, the file tabs, and a line that waits for the text pane to be shown.
+// that show their lines, the file tabs, a line that waits for the text pane to be shown, and the
+// places after characters outside the BMP, which JavaScript counts as two UTF-16 units.
 
+import { CJK } from "../fixtures.js";
 import { expect, test } from "../viewer.js";
 
 const TOP = "04-hierarchy.sp";
@@ -202,4 +204,27 @@ test("a line to show waits until the text pane is shown", async ({ page, viewer 
   await viewer.selected(`instance Vin in ${TOP}`);
   await page.locator("#tab-netlist").click();
   await expect.poll(() => viewer.within(viewer.line(53))).toBe(true);
+});
+
+test("characters outside the BMP move no place of an object, a record or a failed statement", async ({ viewer }) => {
+  // the Document counts an emoji or a CJK character of the extension planes as one character, and
+  // JavaScript as two UTF-16 units; lines 4 and 5 have them before the places
+  await viewer.open("unicode");
+  const texts = (locator) => locator.evaluateAll((els) => els.map((e) => e.textContent));
+  const [r1, r2] = [
+    await viewer.object("instance", "R1", "unicode.sp"),
+    await viewer.object("instance", `R${CJK}2`, "unicode.sp"),
+  ];
+  expect(await texts(viewer.line(4).locator(`[data-obj~="${r1}"]`))).toEqual(["#R1"]);
+  expect(await texts(viewer.line(5).locator(`[data-obj~="${r2}"]`))).toEqual([`#"R${CJK}2"`]);
+  // the statement that fails, from its first character to its last
+  expect((await texts(viewer.line(5).locator(".x-failed"))).join("")).toBe("#R9 @PLACE(0, 0)");
+  // each record to its last character, and a name with a character outside the BMP highlighted whole
+  expect((await highlighted(viewer, 4)).at(-1)).toEqual(["}", "punct"]);
+  const line5 = await highlighted(viewer, 5);
+  expect(line5.at(-1)).toEqual(["}", "punct"]);
+  expect(line5).toContainEqual([`#"R${CJK}2"`, "host"]);
+  // a click on a place selects its object
+  await viewer.line(4).locator(`[data-obj~="${r1}"]`).click();
+  await viewer.selected("instance R1 in unicode.sp");
 });

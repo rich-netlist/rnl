@@ -1,7 +1,7 @@
-//! The core for WebAssembly (decision 0008): [`rnl_view::build`], and [`rnl_edit::write`] with a
-//! build of what it wrote, behind a small C-style interface over linear memory, a JSON request in
-//! and a JSON response out. It needs no generated glue: the module imports nothing, and a page or a
-//! Worker calls its exports as `js/core.js` does.
+//! The core for WebAssembly (decision 0008): [`rnl_view::build`], [`rnl_edit::write`] with a build
+//! of what it wrote, and [`rnl_view::catalog`], behind a small C-style interface over linear memory,
+//! a JSON request in and a JSON response out. It needs no generated glue: the module imports
+//! nothing, and a page or a Worker calls its exports as `js/core.js` does.
 //!
 //! A call goes like this:
 //!
@@ -28,7 +28,7 @@ use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
 use rnl_runtime::source::{normalize, MemoryProvider};
 use rnl_runtime::Options;
-use rnl_view::{BuildOptions, Document, Parts, Snapshot};
+use rnl_view::{BuildOptions, Catalog, CatalogOptions, Document, Parts, Snapshot};
 use serde::{Deserialize, Serialize};
 
 /// What to build: the workspace and how. Fields the core does not know are ignored, so that a
@@ -48,16 +48,16 @@ pub struct Request {
     /// Use the standard package at the root (16.3); true when not given.
     #[serde(default = "yes")]
     pub std: bool,
+    /// The version of the standard package at the root, whatever the files' language version, such
+    /// as "0.2" ([`rnl_runtime::Options::std_version`]); by the language version when not given.
+    #[serde(default)]
+    pub std_version: Option<String>,
     /// Write each level's SVG; true when not given.
     #[serde(default = "yes")]
     pub svg: bool,
     /// Give each level's primitives; false when not given.
     #[serde(default)]
     pub primitives: bool,
-    /// Accepted, with no effect, as [`rnl_runtime::Options::draft`] has none: the files of 0.3
-    /// are read without it. Kept for compatibility, to be removed later.
-    #[serde(default)]
-    pub draft: bool,
     /// Give each level its solve status, what a frontend decides from whether to solve it
     /// (decision 0008); false when not given.
     #[serde(default)]
@@ -103,12 +103,12 @@ pub struct WriteRequest {
     pub package_dirs: Vec<String>,
     #[serde(default = "yes")]
     pub std: bool,
+    #[serde(default)]
+    pub std_version: Option<String>,
     #[serde(default = "yes")]
     pub svg: bool,
     #[serde(default)]
     pub primitives: bool,
-    #[serde(default)]
-    pub draft: bool,
     #[serde(default)]
     pub status: bool,
 }
@@ -121,8 +121,37 @@ pub struct Written {
     pub document: Document,
 }
 
-/// The answer to a request: `{"document": ...}`, `{"snapshot": ...}`, `{"written": ...}` or
-/// `{"error": "..."}`.
+/// What to list: the catalog of the packages the core has ([`rnl_view::catalog`]), those of
+/// `package_dirs` among `files` and the bundled ones under them, as a build finds packages by name.
+#[derive(Deserialize, Debug)]
+pub struct CatalogRequest {
+    pub catalog: CatalogQuery,
+    /// The frontend's files, among them those of its package directories, as in a [`Request`].
+    #[serde(default)]
+    pub files: BTreeMap<String, String>,
+    #[serde(default)]
+    pub package_dirs: Vec<String>,
+    /// Read each package with the standard package of its language version (16.3); true when not
+    /// given.
+    #[serde(default = "yes")]
+    pub std: bool,
+    /// The version of the standard package each package is read with, as in a [`Request`].
+    #[serde(default)]
+    pub std_version: Option<String>,
+}
+
+/// Which packages a catalog lists ([`rnl_view::CatalogOptions`]).
+#[derive(Deserialize, Debug)]
+pub struct CatalogQuery {
+    /// Only the packages of these names; every package when not given.
+    pub packages: Option<Vec<String>>,
+    /// Every version of each package, not only the newest; false when not given.
+    #[serde(default)]
+    pub all_versions: bool,
+}
+
+/// The answer to a request: `{"document": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
+/// `{"catalog": ...}` or `{"error": "..."}`.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Response {
@@ -132,12 +161,15 @@ pub enum Response {
     Snapshot(Box<Snapshot>),
     /// The netlist a [`WriteRequest`] wrote, and its Document.
     Written(Box<Written>),
-    /// Why there is none: the request is neither a [`Request`] nor a [`WriteRequest`], the entry
-    /// cannot be read, or an op cannot be written.
+    /// The catalog a [`CatalogRequest`] asks for.
+    Catalog(Box<Catalog>),
+    /// Why there is none: the request is not a [`Request`], a [`WriteRequest`] or a
+    /// [`CatalogRequest`], the entry cannot be read, or an op cannot be written.
     Error(String),
 }
 
-/// Answer a request given as JSON: a write when it has a `write` field, else a build.
+/// Answer a request given as JSON: a write when it has a `write` field, a catalog when it has a
+/// `catalog` field, else a build.
 pub fn respond(request: &[u8]) -> Response {
     let invalid = |e: serde_json::Error| Response::Error(format!("the request is not valid: {e}"));
     let value: serde_json::Value = match serde_json::from_slice(request) {
@@ -147,6 +179,12 @@ pub fn respond(request: &[u8]) -> Response {
     if value.get("write").is_some() {
         return match serde_json::from_value(value) {
             Ok(w) => write(w),
+            Err(e) => invalid(e),
+        };
+    }
+    if value.get("catalog").is_some() {
+        return match serde_json::from_value(value) {
+            Ok(c) => catalog(c),
             Err(e) => invalid(e),
         };
     }
@@ -170,7 +208,7 @@ pub fn respond(request: &[u8]) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: request.dialect,
-        runtime: Options { std: request.std, draft: request.draft, ..Options::default() },
+        runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
@@ -202,7 +240,7 @@ fn write(request: WriteRequest) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: Some(request.write.dialect),
-        runtime: Options { std: request.std, draft: request.draft, ..Options::default() },
+        runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
@@ -211,6 +249,18 @@ fn write(request: WriteRequest) -> Response {
         Ok(document) => Response::Written(Box::new(Written { text, document })),
         Err(e) => Response::Error(e),
     }
+}
+
+/// List the packages a catalog request asks for.
+fn catalog(request: CatalogRequest) -> Response {
+    let files = request.files.into_iter().map(|(path, text)| (normalize(&path), text)).collect();
+    let files = MemoryProvider { files, package_dirs: request.package_dirs };
+    let options = CatalogOptions {
+        packages: request.catalog.packages,
+        all_versions: request.catalog.all_versions,
+        runtime: Options { std: request.std, std_version: request.std_version, ..Options::default() },
+    };
+    Response::Catalog(Box::new(rnl_view::catalog(&files, &options)))
 }
 
 /// [`respond`], with the answer as JSON.
@@ -358,6 +408,19 @@ C1 a 0 1p
     }
 
     #[test]
+    fn a_request_can_ask_for_a_version_of_the_standard_package() {
+        // a file of 0.3 that writes $GND of the series 0.2: an error, unless the request asks for it
+        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { $GND @ATTACH &a }\n.end\n";
+        let errors = |request: Value| {
+            let v = answer(request);
+            let d = v["document"]["diagnostics"].as_array().unwrap().clone();
+            d.into_iter().filter(|d| d["severity"] == "error").count()
+        };
+        assert_eq!(errors(json!({ "entry": "t.sp", "files": { "t.sp": text } })), 1);
+        assert_eq!(errors(json!({ "entry": "t.sp", "files": { "t.sp": text }, "std_version": "0.2" })), 0);
+    }
+
+    #[test]
     fn an_untitled_text_is_an_entry_in_memory() {
         let v = answer(json!({ "entry": "untitled-1", "files": { "untitled-1": NETLIST } }));
         let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
@@ -406,7 +469,8 @@ C1 a 0 1p
         let native = BuildOptions { status: true, ..BuildOptions::default() };
         let native = rnl_view::build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &native).unwrap();
         assert_eq!(status["document"], serde_json::to_value(native).unwrap());
-        // `draft`, kept for compatibility, changes nothing: a file of 0.3 is read without it
+        // a file of 0.3 is read without any switch; `draft`, which the core once accepted with no
+        // effect, is ignored as every field it does not know
         let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
         let files = json!({ "t.sp": text });
         let plain = answer(json!({ "entry": "t.sp", "files": files }));
@@ -547,6 +611,35 @@ R1 a 0 1k
         assert_eq!(v["snapshot"], serde_json::to_value(native).unwrap());
         let built = answer(json!({ "entry": "/w/a.sp", "files": files }));
         assert_eq!(v["snapshot"]["drawing"], built["document"]);
+    }
+
+    #[test]
+    fn a_catalog_request_answers_the_catalog() {
+        let v = answer(json!({ "catalog": {} }));
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys, ["catalog"]);
+        let symbols = v["catalog"]["symbols"].as_array().unwrap();
+        let resistor = symbols.iter().find(|s| s["symbol"] == "$RESISTOR").unwrap();
+        assert_eq!((&resistor["package"], &resistor["version"]), (&json!("rnl-std-basic"), &json!("0.3")));
+        assert_eq!(resistor["pins"][0], json!({"terminal": 1, "at": [0.0, 2.0], "direction": "up"}));
+        // the catalog rnl-view lists
+        let native = rnl_view::catalog(&MemoryProvider::new(), &CatalogOptions::default());
+        assert_eq!(v["catalog"], serde_json::to_value(native).unwrap());
+        // the frontend's own packages with the bundled ones, by name, every version
+        let package = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}";
+        let request = json!({ "catalog": { "packages": ["acme", "rnl-std"], "all_versions": true },
+                              "files": { "/p/acme.rnl": package }, "package_dirs": ["/p"] });
+        let v = answer(request);
+        let listed: Vec<(&str, &str)> = v["catalog"]["packages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| (p["name"].as_str().unwrap(), p["version"].as_str().unwrap()))
+            .collect();
+        assert_eq!(listed, [("acme", "1.0"), ("rnl-std", "0.2"), ("rnl-std", "0.3")]);
+        // a catalog request of another shape is not valid
+        let v = answer(json!({ "catalog": { "all_versions": "yes" } }));
+        assert!(v["error"].as_str().unwrap().starts_with("the request is not valid: "), "{v}");
     }
 
     #[test]

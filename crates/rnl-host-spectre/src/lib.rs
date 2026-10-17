@@ -32,8 +32,9 @@ pub fn dialect() -> Dialect {
     Dialect { name: "spectre".into(), case_sensitive: true, ground_aliases: Vec::new() }
 }
 
-/// Built-in primitives: (master, default terminal names, the parameter shown as `${value}`).
-const PRIMITIVES: [(&str, &[&str], Option<&str>); 13] = [
+/// Built-in primitives: (master, default terminal names, the parameter shown as `${value}`). The
+/// `switch` is not among them: its terminals depend on its nodes ([`SWITCH`]).
+const PRIMITIVES: [(&str, &[&str], Option<&str>); 14] = [
     ("resistor", &["p", "n"], Some("r")),
     ("capacitor", &["p", "n"], Some("c")),
     ("inductor", &["p", "n"], Some("l")),
@@ -45,9 +46,17 @@ const PRIMITIVES: [(&str, &[&str], Option<&str>); 13] = [
     ("ccvs", &["p", "n"], Some("rm")),
     ("cccs", &["p", "n"], Some("gain")),
     ("bsource", &["p", "n"], None),
-    ("switch", &["p", "n", "cp", "cn"], None),
+    // a switch between p and n, controlled by the voltage between cp and cn, as S of SPICE
+    ("relay", &["p", "n", "cp", "cn"], None),
+    // its first winding between p_plus and p_minus, its second between s_plus and s_minus
+    ("transformer", &["p_plus", "p_minus", "s_plus", "s_minus"], None),
     ("port", &["p", "n"], Some("r")),
 ];
+
+/// The master of Spectre's switch, `Name (t0 t1 … tn) switch`: a common terminal, t0, and its
+/// throws, t1 to tn. It has as many terminals as nodes, named as Spectre numbers them, so that its
+/// `position` is the number of a terminal.
+const SWITCH: &str = "switch";
 
 /// Device families of model masters (6.12): the default terminal names and the model type.
 fn family(master: &str) -> Option<&'static str> {
@@ -104,6 +113,8 @@ fn family(master: &str) -> Option<&'static str> {
         Some("capacitor")
     } else if m == "inductor" {
         Some("inductor")
+    } else if m == "relay" {
+        Some("relay")
     } else {
         None
     }
@@ -116,12 +127,13 @@ fn family_terminals(f: &str) -> Option<Vec<String>> {
         "diode" => &["a", "k"],
         "jfet" => &["d", "g", "s"],
         "resistor" | "capacitor" | "inductor" => &["p", "n"],
+        "relay" => &["p", "n", "cp", "cn"],
         _ => return None,
     };
     Some(t.iter().map(|s| s.to_string()).collect())
 }
 
-/// The model type in the words SPICE uses (10.1): nmos, pmos, npn, pnp, d, r, c, l.
+/// The model type in the words SPICE uses (10.1): nmos, pmos, npn, pnp, d, r, c, l, sw.
 fn family_type(f: &str, params: &[(String, String)]) -> Option<String> {
     let ty = params.iter().find(|(k, _)| k.eq_ignore_ascii_case("type")).map(|(_, v)| v.to_lowercase());
     Some(match f {
@@ -141,6 +153,8 @@ fn family_type(f: &str, params: &[(String, String)]) -> Option<String> {
         "resistor" => "r".into(),
         "capacitor" => "c".into(),
         "inductor" => "l".into(),
+        // a relay, a switch controlled by a voltage: S of SPICE, whose model type is sw
+        "relay" => "sw".into(),
         _ => return None,
     })
 }
@@ -332,6 +346,8 @@ impl<'a> Reader<'a> {
         let mut st = State { mode, cur: level, circ, stack: Vec::new() };
         let mut run: Vec<CarrierLine> = Vec::new();
         let mut pending: Option<(u32, String)> = None;
+        // a `.subckt` read in SPICE mode whose `+` lines add ports, until its parameters begin
+        let mut subckt_more: Option<LevelId> = None;
         let mut in_section = section.is_none();
         let mut skip_section: Option<String> = None;
         // a region written to be encrypted, while in it: the line that opens it, and the warning
@@ -379,6 +395,7 @@ impl<'a> Reader<'a> {
                     let opens = (first == "section" || first == ".lib") && words.len() == 2;
                     if opens && section.is_some_and(|s| s.eq_ignore_ascii_case(words[1])) {
                         in_section = true;
+                        self.doc.levels[level].section_lines.get_or_insert((no, 0));
                         // each section sets its own language; it starts in SPICE mode (S1 p498)
                         st.mode = if first == "section" { Mode::Spectre } else { Mode::Spice };
                     } else if raw.contains("@RNL") {
@@ -429,9 +446,18 @@ impl<'a> Reader<'a> {
                     if let Some(p) = pending.as_mut() {
                         p.1.push(' ');
                         p.1.push_str(cont);
+                    } else if let Some(sub) = subckt_more {
+                        let toks = rnl_host_spice::subckt_tokens(cont);
+                        let toks: Vec<&str> = toks.iter().map(String::as_str).collect();
+                        let (ports, params) = rnl_host_spice::subckt_ports(&toks);
+                        self.doc.levels[sub].ports.extend(ports);
+                        if params {
+                            subckt_more = None;
+                        }
                     }
                     continue;
                 }
+                subckt_more = None;
                 if let Some((pl, pt)) = pending.take() {
                     self.spice_statement(&pt, pl, &fname, path, &mut st, stack);
                 }
@@ -448,6 +474,7 @@ impl<'a> Reader<'a> {
                     ".endl" => {
                         if section.is_some() {
                             in_section = false;
+                            self.doc.levels[level].close_section(no);
                         }
                         continue;
                     }
@@ -461,10 +488,12 @@ impl<'a> Reader<'a> {
                         continue;
                     }
                     ".subckt" => {
-                        let toks: Vec<&str> = stripped.split_whitespace().collect();
+                        let toks = rnl_host_spice::subckt_tokens(stripped);
+                        let toks: Vec<&str> = toks.iter().map(String::as_str).collect();
                         let name = toks.get(1).copied().unwrap_or("?");
-                        let ports = rnl_host_spice::subckt_ports(&toks[2.min(toks.len())..]);
+                        let (ports, params) = rnl_host_spice::subckt_ports(&toks[2.min(toks.len())..]);
                         self.open_subckt(name, ports, &fname, path, no, &mut st, false);
+                        subckt_more = (!params).then_some(st.cur);
                         continue;
                     }
                     ".ends" => {
@@ -532,6 +561,7 @@ impl<'a> Reader<'a> {
             }
             if self.spectre_statement(&stmt, no, &fname, path, &mut st, stack, section) == Some(true) {
                 in_section = false;
+                self.doc.levels[level].close_section(no);
             }
         }
         self.flush(&mut run, &fname, st.cur);
@@ -551,6 +581,7 @@ impl<'a> Reader<'a> {
         if self.doc.levels[level].end_line == 0 {
             self.doc.levels[level].end_line = n as u32 + 1;
         }
+        self.doc.levels[level].close_section(n as u32 + 1);
     }
 
     fn flush(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {
@@ -817,20 +848,21 @@ impl<'a> Reader<'a> {
                     continue;
                 }
                 let master = inst.model.clone().unwrap_or_default();
-                let (terms, value_param, mtype, is_subckt) =
-                    if let Some((_, t, v)) = PRIMITIVES.iter().find(|(m, _, _)| *m == master) {
-                        (Some(t.iter().map(|s| s.to_string()).collect::<Vec<_>>()), v.map(String::from), None, false)
-                    } else if let Some(m) = self.models.get(&master) {
-                        match family(&m.master) {
-                            Some(f) => (family_terminals(f), None, family_type(f, &m.params), false),
-                            None => (None, None, None, false),
-                        }
-                    } else if self.doc.subckts.contains_key(&master) {
-                        (None, None, None, true)
-                    } else {
-                        // neither a primitive nor a model card: a subcircuit defined elsewhere, such as a PDK device (6.4)
-                        (None, None, None, true)
-                    };
+                let (terms, value_param, mtype, is_subckt) = if master == SWITCH {
+                    (Some((0..inst.nodes.len()).map(|k| format!("t{k}")).collect()), None, None, false)
+                } else if let Some((_, t, v)) = PRIMITIVES.iter().find(|(m, _, _)| *m == master) {
+                    (Some(t.iter().map(|s| s.to_string()).collect::<Vec<_>>()), v.map(String::from), None, false)
+                } else if let Some(m) = self.models.get(&master) {
+                    match family(&m.master) {
+                        Some(f) => (family_terminals(f), None, family_type(f, &m.params), false),
+                        None => (None, None, None, false),
+                    }
+                } else if self.doc.subckts.contains_key(&master) {
+                    (None, None, None, true)
+                } else {
+                    // neither a primitive nor a model card: a subcircuit defined elsewhere, such as a PDK device (6.4)
+                    (None, None, None, true)
+                };
                 let inst = &mut self.doc.levels[lv].instances[k];
                 inst.default_terminals = terms;
                 inst.mtype = mtype;
@@ -924,6 +956,33 @@ mod tests {
     }
 
     #[test]
+    fn switches_relays_and_transformers() {
+        // a switch has a terminal for each node, t0 its common one; a relay is S of SPICE, as a
+        // primitive or a model card of type sw; a transformer has two windings
+        let net = "// t\nsimulator lang=spectre\nmodel rl relay ropen=1G\nS1 (a b) switch\n\
+                   S2 (a b c d) switch position=2\nK1 (a b c d) relay\nK2 (a b c d) rl\n\
+                   T1 (a b c d) transformer n1=1 n2=2\n";
+        let p = MemoryProvider::new().with("a.scs", net);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        let seen: Vec<(Vec<String>, Option<&str>)> =
+            doc.main().instances.iter().map(|i| (i.default_terminals.clone().unwrap(), i.mtype.as_deref())).collect();
+        let t = |n: &[&str]| n.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            seen,
+            [
+                (t(&["t0", "t1"]), None),
+                (t(&["t0", "t1", "t2", "t3"]), None),
+                (t(&["p", "n", "cp", "cn"]), None),
+                (t(&["p", "n", "cp", "cn"]), Some("sw")),
+                (t(&["p_plus", "p_minus", "s_plus", "s_minus"]), None),
+            ]
+        );
+        assert!(doc.main().instances.iter().all(|i| !i.is_subckt));
+    }
+
+    #[test]
     fn spice_mode_and_sections() {
         let net = "// t\nsimulator lang=spectre\ninclude \"lib.scs\" section=tt\nsimulator lang=spice\nR1 a 0 1k\n* @RNL {#R1 @PLACE(0, 0)}\nsimulator lang=spectre\nR2 (a 0) resistor r=2k\n";
         let lib = "simulator lang=spectre\nlibrary models\nsection ff\n// @RNL {#X}\nmodel nch bsim4 type=n\nendsection ff\nsection tt\nmodel nch bsim4 type=n\nendsection tt\nendlibrary\n";
@@ -980,6 +1039,23 @@ mod tests {
     }
 
     #[test]
+    fn the_ports_of_a_subckt_read_in_spice_mode_on_its_continuation_lines() {
+        // as the SPICE adapter reads them: the `+` lines of a `.subckt` add ports, up to its
+        // parameters, and an end-of-line comment holds none
+        for (text, ports) in [
+            (".subckt cell a\n+ b\nR1 a b 1k\n.ends cell\n", vec!["a", "b"]),
+            (".subckt cell a b ; two ports\nR1 a b 1k\n.ends cell\n", vec!["a", "b"]),
+            (".subckt cell a\n+ b params: w=1\n+ c=2\n.ends cell\n", vec!["a", "b"]),
+        ] {
+            let p = MemoryProvider::new().with("t.scs", &format!("// t\nsimulator lang=spice\n{text}"));
+            let mut sink = Sink::new();
+            let doc = read("t.scs", &p, &mut sink).unwrap();
+            assert!(sink.all().is_empty(), "{text}: {:?}", sink.all());
+            assert_eq!(doc.levels[1].ports, ports, "{text}");
+        }
+    }
+
+    #[test]
     fn a_file_that_is_not_a_scs_file_is_in_spice_mode_up_to_its_switch() {
         // also within its first lines: before `simulator lang=spectre`, `//` is no comment and
         // carries no record; after it, it does (2.2). So for the main file and an included one
@@ -1032,5 +1108,20 @@ mod tests {
             let places: Vec<Option<Loc>> = sink.all().iter().map(|d| d.loc.clone()).collect();
             assert_eq!(places, [Some(Loc::line("x.scs", 3)), Some(Loc::line("sub/y.scs", 3))], "{dir}");
         }
+    }
+
+    #[test]
+    fn included_files_of_one_name_in_two_directories_are_two_sources() {
+        // a/x.scs and b/x.scs: each is a source, by its name relative to the main file, with its text
+        let top =
+            "// top\nsimulator lang=spectre\ninclude \"a/x.scs\"\ninclude \"b/x.scs\"\nX1 (n1 0) ca\nX2 (n2 0) cb\n";
+        let a = "// a\nsubckt ca (p n)\nR1 (p n) resistor r=1k\nends ca\n";
+        let b = "// b\nsubckt cb (p n)\nR1 (p n) resistor r=2k\nends cb\n";
+        let p = MemoryProvider::new().with("/w/top.scs", top).with("/w/a/x.scs", a).with("/w/b/x.scs", b);
+        let mut sink = Sink::new();
+        let doc = read("/w/top.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        let sources: Vec<(&str, &str)> = doc.sources.iter().map(|(f, t)| (f.as_str(), t.as_str())).collect();
+        assert_eq!(sources, [("top.scs", top), ("a/x.scs", a), ("b/x.scs", b)]);
     }
 }

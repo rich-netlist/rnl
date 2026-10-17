@@ -53,7 +53,6 @@ use crate::diag::Sink;
 use crate::geom::{fmt_num, Orient, Pt, TOL};
 use crate::host::{HostDocument, Record, Seg};
 use crate::interp::obj::Priority;
-use crate::interp::unit::DRAFT_VERSION;
 use crate::numbering::level_check;
 use crate::problem::*;
 use crate::source::Provider;
@@ -292,8 +291,8 @@ struct Refs<'a> {
     p: &'a LevelProblem,
     /// The names of the usages made by rules, written out ([`generated_names`]).
     names: Vec<Option<String>>,
-    /// The level's file declares the draft 0.3: numbers and rewrites can be written.
-    draft: bool,
+    /// The level's file follows 0.3: numbers and rewrites can be written.
+    numbers: bool,
     /// For each usage written out: the number before those of the objects its statement makes.
     offsets: Vec<Option<usize>>,
 }
@@ -304,7 +303,7 @@ impl Refs<'_> {
     fn reach(&self, r: &Reference) -> Result<Option<usize>, &'static str> {
         match r {
             Reference::Name(_) => Ok(None),
-            Reference::Number { .. } | Reference::GeneratedNumber { .. } if !self.draft => Err(NO_NUMBERS),
+            Reference::Number { .. } | Reference::GeneratedNumber { .. } if !self.numbers => Err(NO_NUMBERS),
             // in a problem read with the records of the solver, their own objects come after the
             // authored ones: this record replaces them, and its numbers would name others (5.9)
             Reference::Number { number, .. } if *number > self.p.authored_numbers => Err(OLD_RECORD),
@@ -459,8 +458,7 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
 /// In a level of the draft 0.3 the record is not finished: when it uses a number,
 /// [`finish_record`] gives it the check of its numbers.
 pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &str) -> Written {
-    let mut refs =
-        Refs { p, names: generated_names(p), draft: p.version == DRAFT_VERSION, offsets: vec![None; p.usages.len()] };
+    let mut refs = Refs { p, names: generated_names(p), numbers: p.follows_0_3(), offsets: vec![None; p.usages.len()] };
     let mut unsolved = Vec::new();
     let mut notes = Vec::new();
     let mut needed = vec![false; p.usages.len()];
@@ -590,7 +588,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
             lost(decision, &format!("wire {}", wr.wire), NOT_IN_PROBLEM);
             continue;
         };
-        if !refs.draft {
+        if !refs.numbers {
             lost(decision, &wire.label, NO_REWRITE);
             continue;
         }
@@ -815,7 +813,7 @@ pub fn finish_record(
 ) -> String {
     let ast = parse_record_with(record, true);
     let uses_numbers = ast.body.as_ref().is_some_and(|b| b.members.iter().any(|m| uses_number(m)));
-    if p.version != DRAFT_VERSION || !uses_numbers {
+    if !p.follows_0_3() || !uses_numbers {
         return record.to_string();
     }
     let mut doc = doc.clone();

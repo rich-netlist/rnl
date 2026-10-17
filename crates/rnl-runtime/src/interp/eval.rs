@@ -1004,6 +1004,10 @@ impl<'p> Interp<'p> {
                             e.start,
                         );
                     }
+                    // a name of the standard series 0.2 where the series 0.3 is in effect
+                    if let Some(why) = (e.prefix == '$').then(|| self.renamed_in_0_3(&name, ctx)).flatten() {
+                        return self.fail(ctx, format!("${name} cannot be found: {why}"), e.start);
+                    }
                     let close = {
                         let mut names: Vec<String> = self.units[ctx.unit]
                             .names
