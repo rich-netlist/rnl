@@ -66,11 +66,30 @@ use crate::Options;
 pub struct Placement {
     /// The object, by its index in [`LevelProblem::objects`].
     pub object: usize,
-    /// Its position; none for a virtual part drawn at the point of its main object, which has no
-    /// position of its own (12.1), or when only the orientation is given.
-    pub at: Option<Pt>,
+    /// Its coordinate on each axis that the solver decides: both, one alone, which the record
+    /// writes as `@PLACE(x=…)` or `@PLACE(y=…)` (11.1), or none, for a virtual part drawn at the
+    /// point of its main object, which has no position of its own (12.1), or when only the
+    /// orientation is given. An axis not given is no decision of the solver's: it stays as the
+    /// file leaves it, and is not unsolved.
+    pub x: Option<f64>,
+    pub y: Option<f64>,
     /// Its orientation, for the objects that have one: not points and texts (11.2).
     pub orient: Option<Orient>,
+}
+
+impl Placement {
+    /// Its position, when both coordinates are given.
+    pub fn at(&self) -> Option<Pt> {
+        self.x.zip(self.y)
+    }
+
+    /// Its coordinate on an axis, when given.
+    pub fn on(&self, axis: Axis) -> Option<f64> {
+        match axis {
+            Axis::X => self.x,
+            Axis::Y => self.y,
+        }
+    }
 }
 
 /// A point where wires routed for ROUTE branch (13.7).
@@ -130,8 +149,9 @@ pub struct Solution {
 /// One decision of a [`Solution`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Decision {
-    /// The position of an object, by its index in [`LevelProblem::objects`].
-    Position { object: usize },
+    /// The position of an object, by its index in [`LevelProblem::objects`], on one axis, or on
+    /// both when `axis` is None.
+    Position { object: usize, axis: Option<Axis> },
     /// The orientation of an object, by its index in [`LevelProblem::objects`].
     Orientation { object: usize },
     /// The route of a wire, by its index in [`LevelProblem::wires`].
@@ -165,7 +185,9 @@ impl Unsolved {
 impl fmt::Display for Unsolved {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let what = match self.decision {
-            Decision::Position { .. } => "the position of ",
+            Decision::Position { axis: None, .. } => "the position of ",
+            Decision::Position { axis: Some(Axis::X), .. } => "the x of ",
+            Decision::Position { axis: Some(Axis::Y), .. } => "the y of ",
             Decision::Orientation { .. } => "the orientation of ",
             Decision::WireRoute { .. } => "the route of ",
             Decision::RoutedWire { .. } | Decision::Branch { .. } => "",
@@ -400,7 +422,7 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
 /// written out; the branch points of routed wires; the positions and orientations; the wires
 /// routed for ROUTE; the routes of the wires written in RNL; the junctions. `p` is the problem the
 /// solver read, without the records of the solver ([`crate::Options::solver`]). `author` and
-/// `hash` go in the record head, the hash being what [`sig1`] gives for the problem and the
+/// `hash` go in the record head, the hash being what [`crate::problem::sig2`] gives for the problem and the
 /// solver's options.
 ///
 /// Every decision of the solution is in the record, or in [`Written::unsolved`] with the reason
@@ -469,38 +491,45 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     let mut sorted: Vec<&Placement> = solution.placements.iter().collect();
     sorted.sort_by_key(|pl| pl.object);
     for pl in sorted {
-        let (position, orientation) =
-            (Decision::Position { object: pl.object }, Decision::Orientation { object: pl.object });
+        let orientation = Decision::Orientation { object: pl.object };
+        // the position on the axes that `on` marks: one alone, or both
+        let position = |on: [bool; 2]| Decision::Position {
+            object: pl.object,
+            axis: match on {
+                [true, false] => Some(Axis::X),
+                [false, true] => Some(Axis::Y),
+                _ => None,
+            },
+        };
+        let given = [pl.x, pl.y];
         let Some(o) = p.objects.get(pl.object) else {
             let label = format!("object {}", pl.object);
-            if pl.at.is_some() {
-                lost(position, &label, NOT_IN_PROBLEM);
+            if given.iter().any(Option::is_some) {
+                lost(position(given.map(|v| v.is_some())), &label, NOT_IN_PROBLEM);
             }
             if pl.orient.is_some() {
                 lost(orientation, &label, NOT_IN_PROBLEM);
             }
             continue;
         };
-        let mut at = pl.at;
-        if let Some(xy) = at {
-            let why = match o.position {
-                Position::At(_) => Some(AT_POINT),
-                _ if coords(xy).is_err() => Some(NOT_A_NUMBER),
-                _ => None,
-            };
-            if let Some(why) = why {
-                lost(position, &o.label, why);
-                at = None;
-            }
+        let mut at = given;
+        if matches!(o.position, Position::At(_)) && at.iter().any(Option::is_some) {
+            lost(position(at.map(|v| v.is_some())), &o.label, AT_POINT);
+            at = [None, None];
+        }
+        // a coordinate that is not a number, axis by axis
+        let bad = at.map(|v| v.is_some_and(|v| !v.is_finite()));
+        if bad.iter().any(|b| *b) {
+            lost(position(bad), &o.label, NOT_A_NUMBER);
+            at = [at[0].filter(|_| !bad[0]), at[1].filter(|_| !bad[1])];
         }
         let mut orient = pl.orient;
         if orient.is_some() && o.orient.is_none() {
             lost(orientation, &o.label, NO_ORIENTATION);
             orient = None;
         }
-        let at = at.map_or([None, None], |(x, y)| {
-            [(Axis::X, x), (Axis::Y, y)].map(|(axis, v)| (!follows(p, solution, o, pl.object, axis, v)).then_some(v))
-        });
+        let at = [(Axis::X, at[0]), (Axis::Y, at[1])]
+            .map(|(axis, v)| v.filter(|&v| !follows(p, solution, o, pl.object, axis, v)));
         let placed = at.iter().any(Option::is_some);
         if !placed && orient.is_none() {
             continue;
@@ -515,13 +544,14 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
             Err(why) => {
                 let keyless = o.text.as_ref().is_some_and(|t| t.key.is_none());
                 let why = if why == ANONYMOUS && o.generated && keyless { RULE_TEXT } else { why };
-                // what the file fixes, where the solution has it, a viewer draws there all the same
-                let fixed =
-                    [Axis::X, Axis::Y].into_iter().zip(at).all(|(axis, v)| v.is_none_or(|v| fixed_at(o, axis, v)));
+                // what the file fixes, where the solution has it, a viewer draws there all the same:
+                // unsolved are the axes given that the file does not fix so
+                let unfixed =
+                    [(Axis::X, at[0]), (Axis::Y, at[1])].map(|(axis, v)| v.is_some_and(|v| !fixed_at(o, axis, v)));
                 let fixed_orient =
                     orient.is_none_or(|c| matches!(o.orient, Some(OrientSlot::Fixed { code, .. }) if code == c));
-                if placed && !fixed {
-                    lost(position, &o.label, why);
+                if unfixed.iter().any(|u| *u) {
+                    lost(position(unfixed), &o.label, why);
                 }
                 if orient.is_some() && !fixed_orient {
                     lost(orientation, &o.label, why);
@@ -704,8 +734,8 @@ fn coordinate(p: &LevelProblem, s: &Solution, r: &PointRef, axis: Axis, depth: u
             if let Position::At(main) = &o.position {
                 return coordinate(p, s, main, axis, depth + 1);
             }
-            if let Some(at) = s.placements.iter().find(|pl| pl.object == *k).and_then(|pl| pl.at) {
-                return Some(along(at, axis));
+            if let Some(v) = s.placements.iter().find(|pl| pl.object == *k).and_then(|pl| pl.on(axis)) {
+                return Some(v);
             }
             match &o.position {
                 Position::Own { x, y } => fixed(if axis == Axis::X { x } else { y }),

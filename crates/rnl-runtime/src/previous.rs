@@ -45,14 +45,16 @@ pub struct Previous {
     /// The `hash` in the record head, as written (2.8, 17).
     pub hash: Option<String>,
     /// Whether the input digest of `hash` is the problem's ([`same_input`]); None for a record
-    /// without a `sig1` hash, which is not compared (17).
+    /// without a `sig2` or a `sig1` hash, which is not compared (17).
     pub same_input: Option<bool>,
     /// Whether its numbers hold (5.9); None when it uses no number. False when its `numbering` is
     /// missing or not the check of the level: then its statements that use a number take no
     /// effect, and give nothing here.
     pub numbering: Option<bool>,
     /// The objects of the problem that the record places or turns, in the order of the objects:
-    /// the position, when the record gives both coordinates, and the orientation it gives.
+    /// the coordinates it gives, on both axes or on one alone, as by `@PLACE(x=…)` or of a text
+    /// that its owner's symbol or an offset places on the other axis (13.3), and the orientation it
+    /// gives. An axis that the record does not write is not given.
     pub placements: Vec<Placement>,
     /// The wires of the problem that the record rewrites with WIRE given the wire (13.1), in the
     /// order of the wires, with the routes it gives them.
@@ -89,7 +91,7 @@ pub enum SolveStatus {
     /// Something for a solver to decide, and no record of the solver.
     Unsolved,
     /// A record of the solver that is up to date: the input digest of its `hash` is that of the
-    /// level now, or it has no `sig1` hash to compare (17), and its numbers hold when it uses
+    /// level now, or it has no `sig2` or `sig1` hash to compare (17), and its numbers hold when it uses
     /// numbers (5.9).
     Solved,
     /// A record of the solver whose `hash` is of another input, or whose `numbering` is missing or
@@ -235,10 +237,9 @@ pub fn previous(p: &LevelProblem, with: &Interpretation) -> Option<Previous> {
     }
     for given in &result.placed {
         let Some(&object) = objects.get(&given.key) else { continue };
-        let at = given.x.zip(given.y);
         let orient = given.orient.filter(|_| p.objects[object].orient.is_some());
-        if at.is_some() || orient.is_some() {
-            out.placements.push(Placement { object, at, orient });
+        if given.x.is_some() || given.y.is_some() || orient.is_some() {
+            out.placements.push(Placement { object, x: given.x, y: given.y, orient });
         }
     }
     out.placements.sort_by_key(|pl| pl.object);

@@ -71,6 +71,7 @@ pub(crate) fn instance() -> ProblemObject {
         orient: Some(OrientSlot::Free),
         usage: None,
         text: None,
+        nets: Vec::new(),
     }
 }
 
@@ -86,6 +87,7 @@ pub(crate) fn point() -> ProblemObject {
         orient: None,
         usage: None,
         text: None,
+        nets: Vec::new(),
     }
 }
 
@@ -122,6 +124,7 @@ pub(crate) fn problem_of(objects: Vec<ProblemObject>, facts: Vec<ProblemFact>) -
         routes: Vec::new(),
         groups: Vec::new(),
         usages: Vec::new(),
+        nets: Vec::new(),
     }
 }
 

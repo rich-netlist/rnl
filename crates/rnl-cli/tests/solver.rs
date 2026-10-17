@@ -393,7 +393,8 @@ fn write_back(f: &Path, p: &LevelProblem, written: &Written) -> (String, rnl_run
 fn a_solution_written_back_reads_back() {
     let f = case("01-rc-lowpass.sp");
     let p = &problems(&f, &FsProvider::new(&[]))[0];
-    let place = |object: usize, x: f64, y: f64, orient: Option<Orient>| Placement { object, at: Some((x, y)), orient };
+    let place =
+        |object: usize, x: f64, y: f64, orient: Option<Orient>| Placement { object, x: Some(x), y: Some(y), orient };
     let solution = Solution {
         placements: vec![
             place(object(p, "#C1"), 12.0, 3.0, None),
@@ -407,7 +408,7 @@ fn a_solution_written_back_reads_back() {
         ],
         ..Solution::default()
     };
-    let hash = sig1(p, OPTIONS);
+    let hash = sig2(p, OPTIONS);
     let written = write_record(p, &solution, "rnl-solver test", &hash);
     // neither is left out silently (the draft 0.3, 14.8)
     let unsolved: Vec<String> = written.unsolved.iter().map(|u| u.to_string()).collect();
@@ -468,7 +469,8 @@ fn a_routed_net_written_back_reads_back() {
         (g1, (0.0, -5.0), Orient::R0),
         (g2, (12.0, -1.0), Orient::R0),
     ];
-    let placements = at.iter().map(|(o, xy, r)| Placement { object: *o, at: Some(*xy), orient: Some(*r) }).collect();
+    let placements =
+        at.iter().map(|(o, xy, r)| Placement { object: *o, x: Some(xy.0), y: Some(xy.1), orient: Some(*r) }).collect();
     let route = |net: &str| p.routes.iter().position(|r| r.net == net).unwrap();
     // the pins each ROUTE joins
     let pin = |object: usize, terminal: &str| -> PointRef {
@@ -496,7 +498,7 @@ fn a_routed_net_written_back_reads_back() {
         ],
         ..Solution::default()
     };
-    let written = write_record(p, &solution, "rnl-solver test", &sig1(p, OPTIONS));
+    let written = write_record(p, &solution, "rnl-solver test", &sig2(p, OPTIONS));
     assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
     assert!(written.record.contains("&in @WIRE(mode=\"straight\") {#VIN:p (0, 6) #R1:p}"), "{}", written.record);
     assert!(written.record.contains("%rt1 = (12, 6)") && written.record.contains("$JUNCTION @ATTACH %rt1"));
@@ -557,8 +559,8 @@ fn the_hash_follows_the_input_and_nothing_else() {
 
     // the options are a segment of their own, which a viewer does not compare
     let p = &problems(&f, &FsProvider::new(&[]))[0];
-    let (a, b) = (sig1(p, OPTIONS), sig1(p, "tolerance=0.01"));
-    assert_eq!(a.len(), "sig1:".len() + 33);
+    let (a, b) = (sig2(p, OPTIONS), sig2(p, "tolerance=0.01"));
+    assert_eq!(a.len(), "sig2:".len() + 33);
     assert_eq!(a[..21], b[..21]);
     assert_ne!(a[22..], b[22..]);
     assert_eq!(same_input(&b, p), Some(true));

@@ -276,6 +276,7 @@ impl Interp<'_> {
                 orient,
                 usage,
                 text,
+                nets: Vec::new(),
             });
         }
 
@@ -322,6 +323,78 @@ impl Interp<'_> {
                     wires: on_net.iter().filter_map(|w| ix.wires.get(w).copied()).collect(),
                 });
             }
+        }
+
+        // the nets (6.3), in the order the netlist first names them: each with the wires that draw
+        // it, the ROUTEs that ask for it and its place among the ports of the subcircuit
+        let port_keys: Vec<String> = level.ports.iter().map(|p| self.doc.net_key(p)).collect();
+        let mut nets: Vec<ProblemNet> = Vec::new();
+        let mut net_at: HashMap<ObjId, usize> = HashMap::new();
+        for n in self.scenes[s].nets.clone() {
+            let ObjData::Net { key, .. } = self.o(n).clone() else { continue };
+            let name = self.net_display(n);
+            let on_net = self.scenes[s].wires_by_net.get(&n).cloned().unwrap_or_default();
+            let mut on_wires: Vec<usize> = on_net.iter().filter_map(|w| ix.wires.get(w).copied()).collect();
+            on_wires.sort_unstable();
+            on_wires.dedup();
+            net_at.insert(n, nets.len());
+            nets.push(ProblemNet {
+                reference: Reference::Name(format!("&{}", written_name(&name))),
+                pins: Vec::new(),
+                wires: on_wires,
+                routes: routes.iter().enumerate().filter(|(_, r)| r.net == name).map(|(i, _)| i).collect(),
+                port: port_keys.iter().position(|p| *p == key),
+                name,
+            });
+        }
+        // the pins on each net: every terminal with a pin of an instance, a bundle or a virtual
+        // part, on each of its nets; and the nets of each virtual part and of each text, by what it
+        // is attached to
+        let mut owners: Vec<(usize, ObjId)> = ix.objects.iter().map(|(&o, &k)| (k, o)).collect();
+        owners.sort_unstable();
+        for (k, o) in owners {
+            let kind = objects[k].kind;
+            let mut on: Vec<ObjId> = Vec::new();
+            match kind {
+                ObjectKind::Instance | ObjectKind::Bundle | ObjectKind::Usage => {
+                    for t in self.terms_of(s, o) {
+                        let at = self.term_nets(s, t);
+                        if kind == ObjectKind::Usage {
+                            on.extend(at.iter().copied());
+                        }
+                        let Some(PointRef::Pin { object, pin, terminal }) = self.point_ref(s, &ix, t) else { continue };
+                        for n in at {
+                            let Some(&i) = net_at.get(&n) else { continue };
+                            let pins = &mut nets[i].pins;
+                            if !pins.iter().any(
+                                |q| matches!(q, PointRef::Pin { object: a, pin: b, .. } if *a == object && *b == pin),
+                            ) {
+                                pins.push(PointRef::Pin { object, pin, terminal: terminal.clone() });
+                            }
+                        }
+                    }
+                }
+                ObjectKind::Text => {
+                    let att = self.text_attach(o);
+                    on = match self.o(att).clone() {
+                        ObjData::Net { .. } => vec![att],
+                        ObjData::Term { .. } => self.term_nets(s, att),
+                        ObjData::Wire { nets, .. } => nets,
+                        _ => Vec::new(),
+                    };
+                }
+                ObjectKind::Point => {}
+            }
+            let mut at: Vec<usize> = on.iter().filter_map(|n| net_at.get(n).copied()).collect();
+            at.sort_unstable();
+            at.dedup();
+            objects[k].nets = at;
+        }
+        for n in &mut nets {
+            n.pins.sort_by_key(|q| match q {
+                PointRef::Pin { object, pin, .. } => (*object, *pin),
+                _ => (usize::MAX, usize::MAX),
+            });
         }
 
         // GROUP (11.5), without those PRIORITY turns off
@@ -401,6 +474,7 @@ impl Interp<'_> {
             routes,
             groups,
             usages: entries,
+            nets,
         };
         (problem, result)
     }

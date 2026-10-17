@@ -85,7 +85,7 @@ fn instance_at(label: &str) -> Option<Pt> {
 fn point_at(p: &LevelProblem, s: &Solution, r: &PointRef) -> Pt {
     let placed = |k: usize| {
         let pl = s.placements.iter().find(|pl| pl.object == k).unwrap();
-        (pl.at.unwrap(), pl.orient.unwrap_or_default())
+        (pl.at().unwrap(), pl.orient.unwrap_or_default())
     };
     match r {
         PointRef::Origin(k) => placed(*k).0,
@@ -108,7 +108,7 @@ fn solve(p: &LevelProblem) -> Solution {
         let at = instance_at(&o.label).or_else(|| free.then_some((30.0 + 2.0 * k as f64, 10.0 + k as f64)));
         let orient = matches!(o.orient, Some(OrientSlot::Free)).then_some(Orient::R0);
         if at.is_some() || orient.is_some() {
-            placements.push(Placement { object: k, at, orient });
+            placements.push(Placement { object: k, x: at.map(|a| a.0), y: at.map(|a| a.1), orient });
         }
     }
     let mut solution = Solution { placements, ..Solution::default() };
@@ -149,7 +149,7 @@ fn solved(text: &str, title: &str) -> Solved {
     let r = interpret_file(Path::new("t.sp"), None, &files, &Options::solver()).unwrap();
     let p = problem(&r, title).clone();
     let solution = solve(&p);
-    let written = write_record(&p, &solution, "rnl-solver test", &sig1(&p, OPTIONS));
+    let written = write_record(&p, &solution, "rnl-solver test", &sig2(&p, OPTIONS));
     let record = rnl_view::finish_record(&r.doc, &files, &Options::default(), &p, &written.record);
     let text = replace_generated(&r.doc, p.level, text, &record);
     Solved { p, solution, written, record, text }
@@ -216,7 +216,7 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
     }
     assert!(s
         .record
-        .starts_with("@RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver test\", hash=\"sig1:"));
+        .starts_with("@RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver test\", hash=\"sig2:"));
     let check = numbering(&s.record).unwrap();
 
     // read back with the switch: no error, and the check of the level is the record's
@@ -228,12 +228,12 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
     let back = problem(&r, "amp");
     for pl in &s.solution.placements {
         let o = &s.p.objects[pl.object];
-        if s.written.unsolved.iter().any(|u| u.decision == Decision::Position { object: pl.object }) {
+        if s.written.unsolved.iter().any(|u| u.decision == Decision::Position { object: pl.object, axis: None }) {
             continue;
         }
         let reference = read_back(&s.p, &o.reference);
         let b = back.objects.iter().find(|b| b.reference == reference).unwrap_or_else(|| panic!("{reference:?}"));
-        assert_eq!(fixed_at(&b.position), pl.at, "{}", o.label);
+        assert_eq!(fixed_at(&b.position), pl.at(), "{}", o.label);
         if let Some(code) = pl.orient {
             assert!(matches!(b.orient, Some(OrientSlot::Fixed { code: c, .. }) if c == code), "{}", o.label);
         }
@@ -256,7 +256,7 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
     let bend = back.objects.iter().position(|o| o.label == "(10, 18)").unwrap();
     assert_eq!(back.objects[bend].reference, Reference::Number { number: 7, path: Vec::new() });
     let again = Solution {
-        placements: vec![Placement { object: bend, at: Some((1.0, 1.0)), orient: None }],
+        placements: vec![Placement { object: bend, x: Some(1.0), y: Some(1.0), orient: None }],
         ..Solution::default()
     };
     let written = write_record(back, &again, "rnl-solver test", "sig1:0000000000000000.0000000000000000");
@@ -415,7 +415,7 @@ fn the_writer_says_what_it_does_not_write_and_what_a_solver_should_not_do() {
             WireRoute { wire: v, points: vec![anchor(v, 0), WirePoint::Bend((f64::NAN, 0.0)), anchor(v, 1)] },
             WireRoute { wire: 99, points: Vec::new() },
         ],
-        placements: vec![Placement { object: 0, at: Some((f64::INFINITY, 0.0)), orient: None }],
+        placements: vec![Placement { object: 0, x: Some(f64::INFINITY), y: Some(0.0), orient: None }],
         ..Solution::default()
     };
     let written = write_record(p, &solution, "rnl-solver test", "sig1:0000000000000000.0000000000000000");
@@ -423,12 +423,14 @@ fn the_writer_says_what_it_does_not_write_and_what_a_solver_should_not_do() {
     assert!(written.notes[0].starts_with("the route of %w: the wire is not \"auto\" but \"manhattan\""));
     assert!(written.notes[1].starts_with("the route of %v does not keep the points of the wire in order"));
     assert!(written.record.contains("%w @WIRE(mode=\"straight\") {#R1:p (5, 3) #C1:p}"), "{}", written.record);
+    // the coordinate that is not a number is dropped, its other one is written
+    assert!(written.record.contains("#R1 @PLACE(y=0)"), "{}", written.record);
     assert!(written.record.contains("%v @WIRE(mode=\"straight\") {#R1:n %#1 (7, -5)}"), "{}", written.record);
     let unsolved: Vec<String> = written.unsolved.iter().map(|u| u.to_string()).collect();
     assert_eq!(
         unsolved,
         [
-            "the position of #R1: a coordinate is not a number of RNL, which has no NaN and no Infinity (3.7)",
+            "the x of #R1: a coordinate is not a number of RNL, which has no NaN and no Infinity (3.7)",
             "the route of %v: a wire has at least two points (13.1)",
             "the route of %v: a bend of it: a coordinate is not a number of RNL, which has no NaN and no Infinity (3.7)",
             "the route of wire 99: it is not in the problem",
@@ -446,12 +448,13 @@ fn a_record_that_uses_no_number_has_no_numbering() {
     let p = problem(&r, "t.sp");
     let place = |label: &str, at: Pt| Placement {
         object: p.objects.iter().position(|o| o.label == label).unwrap(),
-        at: Some(at),
+        x: Some(at.0),
+        y: Some(at.1),
         orient: Some(Orient::R0),
     };
     let solution =
         Solution { placements: vec![place("#R1", (0.0, 0.0)), place("#C1", (10.0, 0.0))], ..Solution::default() };
-    let written = write_record(p, &solution, "rnl-solver test", &sig1(p, OPTIONS));
+    let written = write_record(p, &solution, "rnl-solver test", &sig2(p, OPTIONS));
     assert!(written.unsolved.is_empty() && !written.record.contains("%#"), "{}", written.record);
     let record = rnl_view::finish_record(&r.doc, &files, &Options::default(), p, &written.record);
     assert_eq!(record, written.record);
@@ -463,4 +466,68 @@ fn a_record_that_uses_no_number_has_no_numbering() {
     assert_eq!(out_of_date(&back), 0);
     let r1 = problem(&back, "t.sp").objects.iter().find(|o| o.label == "#R1").unwrap();
     assert_eq!(fixed_at(&r1.position), Some((0.0, 0.0)));
+}
+
+#[test]
+fn a_position_on_one_axis_is_written_on_that_axis_alone() {
+    // the solver may decide one coordinate alone: the record writes `@PLACE(x=…)` or
+    // `@PLACE(y=…)` (11.1), and the other axis is no decision of the solver's, so not unsolved
+    let text =
+        "* one axis\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n\
+                R1 a b 1k\nR2 b c 1k\nR3 c 0 1k\n* @RNL { %p = (_, _) }\n.end\n";
+    let r = read(text, &Options::solver());
+    let p = problem(&r, "t.sp");
+    let at = |label: &str| p.objects.iter().position(|o| o.label == label).unwrap();
+    let place = |label: &str, x: Option<f64>, y: Option<f64>| Placement { object: at(label), x, y, orient: None };
+    let solution = Solution {
+        placements: vec![
+            place("#R1", Some(4.0), None),
+            place("#R2", None, Some(-2.0)),
+            place("#R3", Some(1.0), Some(2.0)),
+            place("%p", Some(7.0), None),
+        ],
+        ..Solution::default()
+    };
+    let written = write_record(p, &solution, "rnl-solver test", "sig1:0000000000000000.0000000000000000");
+    assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
+    for statement in ["#R1 @PLACE(x=4)", "#R2 @PLACE(y=-2)", "#R3 @PLACE(1, 2)", "%p @PLACE(x=7)"] {
+        assert!(written.record.contains(statement), "{statement}\n{}", written.record);
+    }
+    // read back, the hints give each axis that the record writes, and no other
+    let back = replace_generated(&r.doc, p.level, text, &written.record);
+    let with = read(&back, &Options { problems: true, ..Options::default() });
+    let hints = rnl_runtime::previous::previous(p, &with).unwrap();
+    let given: Vec<(usize, Option<f64>, Option<f64>)> =
+        hints.placements.iter().map(|pl| (pl.object, pl.x, pl.y)).collect();
+    assert_eq!(
+        given,
+        [
+            (at("#R1"), Some(4.0), None),
+            (at("#R2"), None, Some(-2.0)),
+            (at("#R3"), Some(1.0), Some(2.0)),
+            (at("%p"), Some(7.0), None)
+        ]
+    );
+
+    // in a file of 0.2, a point without a name: the axis given is unsolved, by itself
+    let text = "* one axis\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\nR2 b c 1k\n\
+                * @RNL { &b @WIRE {#R1:2 (_, _) #R2:1} }\n.end\n";
+    let r = read(text, &Options::solver());
+    let p = problem(&r, "t.sp");
+    let point = p.objects.iter().position(|o| o.label == "(_, _)").unwrap();
+    let solution = Solution {
+        placements: vec![Placement { object: point, x: Some(3.0), y: None, orient: None }],
+        ..Solution::default()
+    };
+    let written = write_record(p, &solution, "rnl-solver test", "sig1:0000000000000000.0000000000000000");
+    let unsolved: Vec<(Decision, String)> = written.unsolved.iter().map(|u| (u.decision, u.to_string())).collect();
+    assert_eq!(
+        unsolved,
+        [(
+            Decision::Position { object: point, axis: Some(Axis::X) },
+            "the x of (_, _): it has no name, and a file of 0.2 cannot refer to it; the draft 0.3 refers to it by its \
+             number (5.9)"
+                .to_string()
+        )]
+    );
 }

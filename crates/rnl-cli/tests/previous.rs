@@ -77,7 +77,7 @@ fn instance_at(label: &str) -> Option<Pt> {
 fn point_at(p: &LevelProblem, s: &Solution, r: &PointRef) -> Pt {
     let placed = |k: usize| {
         let pl = s.placements.iter().find(|pl| pl.object == k).unwrap();
-        (pl.at.unwrap(), pl.orient.unwrap_or_default())
+        (pl.at().unwrap(), pl.orient.unwrap_or_default())
     };
     match r {
         PointRef::Origin(k) => placed(*k).0,
@@ -100,7 +100,7 @@ fn solve(p: &LevelProblem) -> Solution {
         let at = instance_at(&o.label).or_else(|| free.then_some((30.0 + 2.0 * k as f64, 10.0 + k as f64)));
         let orient = matches!(o.orient, Some(OrientSlot::Free)).then_some(Orient::R0);
         if at.is_some() || orient.is_some() {
-            placements.push(Placement { object: k, at, orient });
+            placements.push(Placement { object: k, x: at.map(|a| a.0), y: at.map(|a| a.1), orient });
         }
     }
     let mut solution = Solution { placements, ..Solution::default() };
@@ -140,7 +140,7 @@ fn solved_with(text: &str, title: &str, solver: impl Fn(&LevelProblem) -> Soluti
     let r = rnl_view::interpret("t.sp", None, &files, &Options::solver()).unwrap();
     let p = r.problems.iter().find(|p| p.title == title).unwrap().clone();
     let solution = solver(&p);
-    let written = write_record(&p, &solution, "rnl-solver test", &sig1(&p, OPTIONS));
+    let written = write_record(&p, &solution, "rnl-solver test", &sig2(&p, OPTIONS));
     let record = rnl_view::finish_record(&r.doc, &files, &Options::default(), &p, &written.record);
     let text = replace_generated(&r.doc, p.level, text, &record);
     Solved { p, solution, written, text }
@@ -169,10 +169,10 @@ impl Solved {
     fn placements(&self) -> Vec<Placement> {
         let mut out: Vec<Placement> = Vec::new();
         for pl in &self.solution.placements {
-            let at = pl.at.filter(|_| !self.unsolved(Decision::Position { object: pl.object }));
+            let at = pl.at().filter(|_| !self.unsolved(Decision::Position { object: pl.object, axis: None }));
             let orient = pl.orient.filter(|_| !self.unsolved(Decision::Orientation { object: pl.object }));
             if at.is_some() || orient.is_some() {
-                out.push(Placement { object: pl.object, at, orient });
+                out.push(Placement { object: pl.object, x: at.map(|a| a.0), y: at.map(|a| a.1), orient });
             }
         }
         out.sort_by_key(|pl| pl.object);
@@ -204,7 +204,7 @@ fn the_hints_of_a_level_of_the_draft_map_by_name_and_by_number() {
     let (p, previous) = hints(&s.text, "amp");
     assert_eq!(p, LevelProblem { end_line: p.end_line, ..s.p.clone() });
     let previous = previous.unwrap();
-    assert_eq!(previous.hash, Some(sig1(&p, OPTIONS)));
+    assert_eq!(previous.hash, Some(sig2(&p, OPTIONS)));
     assert_eq!((previous.same_input, previous.numbering), (Some(true), Some(true)));
     // every position and orientation of the record, on the objects of the problem
     let placements = s.placements();
@@ -308,7 +308,7 @@ fn a_change_to_the_authored_text_is_another_input_and_keeps_the_hints() {
     let (p, previous) = hints(&changed, "amp");
     let previous = previous.unwrap();
     assert_eq!((previous.same_input, previous.numbering), (Some(false), Some(true)));
-    assert_ne!(sig1(&p, OPTIONS), sig1(&s.p, OPTIONS));
+    assert_ne!(sig2(&p, OPTIONS), sig2(&s.p, OPTIONS));
     assert_eq!(previous.placements, s.placements());
     assert_eq!(previous.wire_routes, s.routes());
     assert_eq!(status(&s.text, "amp"), "solved");
@@ -356,7 +356,7 @@ fn each_level_has_its_solve_status_when_asked() {
     // with a record of the solver, as one writes it with nothing to decide: solved, and stale once
     // R2 moves
     let r = rnl_view::interpret("t.sp", None, &MemoryProvider::new().with("t.sp", &fixed), &Options::solver());
-    let hash = sig1(&r.unwrap().problems[0], OPTIONS);
+    let hash = sig2(&r.unwrap().problems[0], OPTIONS);
     let recorded = one(&format!("{authored}* @RNL(type=\"generated\", priority=\"high\", hash=\"{hash}\") {{}}\n"));
     assert_eq!(statuses(&recorded), [("t.sp".to_string(), Some("solved"))]);
     let moved = recorded.replace("#R2 @PLACE(10, 0)", "#R2 @PLACE(12, 0)");
@@ -372,7 +372,8 @@ fn each_level_has_its_solve_status_when_asked() {
     // a record that uses no number needs no numbering: a wrong one leaves it solved (5.9)
     let named = solved_with(&stubs("0.3"), "t.sp", |p| {
         let at = |label: &str| p.objects.iter().position(|o| o.label == label).unwrap();
-        let place = |k: usize| Placement { object: k, at: Some((k as f64 * 10.0, 0.0)), orient: Some(Orient::R0) };
+        let place =
+            |k: usize| Placement { object: k, x: Some(k as f64 * 10.0), y: Some(0.0), orient: Some(Orient::R0) };
         Solution { placements: vec![place(at("#V1")), place(at("#R1"))], ..Solution::default() }
     });
     assert!(!named.text.contains("%#") && !named.text.contains("numbering"));

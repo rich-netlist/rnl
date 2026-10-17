@@ -1,6 +1,6 @@
 //! The solver's options: the tolerance (11.7), the grid, the layered objectives, the beam, the
 //! budget and the time limit of the resolution (the draft 0.3, 8.5), and their canonical text,
-//! which the options digest of `sig1` covers (chapter 17).
+//! which the options digest of the hash, `sig2`, covers (chapter 17).
 //!
 //! The objectives are configured in **layers**: the objectives of a layer add up with their
 //! weights, layers rank lexicographically, the first layer first, and a value of a layer within its
@@ -356,7 +356,7 @@ impl SolverOptions {
     }
 
     /// The options as one string, every setting that changes the result, in a fixed order with
-    /// numbers by `fmt_num`: what the options digest of `sig1` hashes (chapter 17). The time limit
+    /// numbers by `fmt_num`: what the options digest of the hash, `sig2`, hashes (chapter 17). The time limit
     /// is among them, as it may change which facts are kept (8.5); `hints_for_low`, which changes
     /// only the report, is not.
     pub fn canonical(&self) -> String {

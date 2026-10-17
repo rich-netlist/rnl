@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use rnl_runtime::diag::{Severity, Sink};
-use rnl_runtime::problem::{same_input, sig1, LevelProblem};
+use rnl_runtime::problem::{same_input, sig2, LevelProblem};
 use rnl_runtime::solution::{write_record, Decision, WirePoint};
 use rnl_runtime::source::{Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::replace_generated;
@@ -63,7 +63,7 @@ fn every_level_solved_and_written_back_is_drawn_with_its_wires() {
                     }
                 }
             }
-            let hash = sig1(&p, &options.canonical());
+            let hash = sig2(&p, &options.canonical());
             let written = write_record(&p, &solved.solution, AUTHOR, &hash);
             let lost: Vec<String> = written
                 .unsolved
@@ -131,7 +131,7 @@ fn the_netlists_of_the_review_are_routed_whole_and_read_back() {
         let p = &ps[0];
         let solved = solve(p, &options);
         assert!(solved.report.unrouted.is_empty(), "{body}: {:?}", solved.report.unrouted);
-        let hash = sig1(p, &options.canonical());
+        let hash = sig2(p, &options.canonical());
         let written = write_record(p, &solved.solution, AUTHOR, &hash);
         let lost: Vec<String> = written
             .unsolved

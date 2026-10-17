@@ -1,0 +1,150 @@
+# Publishes the runtime package, the core as WebAssembly with its JavaScript modules, to npm as
+# @rich-netlist/runtime. A pushed tag runtime-v<version> builds the package with build.mjs, its version
+# the tag's without runtime-v and without --packages, as the core bundles the standard packages; tests
+# its modules, checks what npm would get, and publishes it under the dist-tag next, with provenance.
+# Only versions with a pre-release suffix, such as 0.1.0-preview.7, are published for now: a version
+# without one fails.
+#
+# npm takes the publish by trusted publishing (OIDC) once the package's settings on npmjs.com name
+# this repository and this workflow file; until then a repository secret NPM_TOKEN, if there is one,
+# authenticates it. The first publish can also be made by hand with two-factor authentication
+# (decision 0003). The build runs in a job of its own, which cannot publish: the publishing job only
+# publishes the tarball the build packed. Run by hand, it builds and checks the package, and publishes
+# it only with dry_run set to false on a runtime-v tag; on a pull request that changes the package, it
+# builds and checks it only.
+name: Publish runtime
+
+on:
+  push:
+    tags: ["runtime-v*"]
+  pull_request:
+    paths:
+      - "bindings/runtime-wasm/**"
+      - "packages/runtime/**"
+      - "LICENSE"
+      - "LICENSES/**"
+      - ".github/workflows/publish-runtime.yml"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and check the package only; to publish, set it to false and run the workflow on a runtime-v tag"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  PACKAGE: "@rich-netlist/runtime"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # the tag's version without runtime-v; a pull request, or a run on a branch, builds a version
+      # that is never published
+      - name: The version
+        id: version
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          publish=false
+          if [ "$GITHUB_REF_TYPE" = tag ] && [[ "$GITHUB_REF_NAME" == runtime-v* ]]; then
+            version="${GITHUB_REF_NAME#runtime-v}"
+            if [ "$GITHUB_EVENT_NAME" = push ] || [ "$DRY_RUN" = false ]; then publish=true; fi
+          elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$DRY_RUN" = false ]; then
+            echo "::error::Publishing by hand needs the run to be on a runtime-v tag, not on $GITHUB_REF_NAME."
+            exit 1
+          else
+            version="0.0.0-check.$GITHUB_RUN_NUMBER"
+          fi
+          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::$version is not a version: major.minor.patch, with a pre-release suffix."
+            exit 1
+          fi
+          if [ -z "${BASH_REMATCH[4]}" ]; then
+            echo "::error::$version has no pre-release suffix. Only previews, such as 0.1.0-preview.7, are published for now, under next."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "$PACKAGE@$version, published: $publish"
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Build the package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --name "$PACKAGE" --version "$VERSION"
+
+      # the modules of the very files that are published
+      - name: Test the package's modules
+        run: node bindings/runtime-wasm/tests/core.mjs packages/runtime/dist
+
+      - name: Check what npm gets
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node bindings/runtime-wasm/tests/package.mjs packages/runtime/dist "$VERSION"
+
+      - name: Pack the package, and publish it without publishing
+        working-directory: packages/runtime/dist
+        run: |
+          npm pack --pack-destination "$GITHUB_WORKSPACE"
+          npm publish --dry-run --access public --tag next
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: runtime-${{ steps.version.outputs.version }}
+          path: rich-netlist-runtime-${{ steps.version.outputs.version }}.tgz
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    if: needs.package.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # trusted publishing, and the provenance statement
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: runtime-${{ needs.package.outputs.version }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # trusted publishing needs npm 11.5.1 or later
+      - name: Install npm 11
+        run: |
+          npm install --global npm@11
+          node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); if (a * 1e6 + b * 1e3 + c < 11005001) { console.error(`npm ${process.argv[1]} cannot publish by trusted publishing`); process.exit(1); } console.log(`npm ${process.argv[1]}`)' "$(npm --version)"
+
+      - name: Publish
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            export NODE_AUTH_TOKEN="$NPM_TOKEN"
+            echo "Publishing with the repository secret NPM_TOKEN."
+          else
+            echo "No NPM_TOKEN secret: publishing by trusted publishing."
+          fi
+          npm publish "rich-netlist-runtime-$VERSION.tgz" --access public --tag next --provenance

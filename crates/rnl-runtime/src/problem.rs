@@ -12,9 +12,10 @@
 //! problem. The indexes follow the order of the interpretation, so the same input gives the same
 //! problem, on every platform.
 //!
-//! [`sig1`] is the hash of chapter 17 over a problem: `sig1:` then two digests of 16 hexadecimal
+//! [`sig2`] is the hash of chapter 17 over a problem: `sig2:` then two digests of 16 hexadecimal
 //! digits joined by `.`, the first of the solver's input, the second of the solver's options. A
-//! viewer without a solver computes the first and compares only it ([`same_input`]).
+//! viewer without a solver computes the first and compares only it ([`same_input`]), also for a
+//! `sig1` hash that tools wrote before, over the problem without its nets.
 
 use crate::diag::Loc;
 use crate::geom::{fmt_num, Orient, Pt};
@@ -270,6 +271,33 @@ pub struct ProblemObject {
     /// For a virtual part: its entry in [`LevelProblem::usages`].
     pub usage: Option<usize>,
     pub text: Option<TextInfo>,
+    /// The nets it is on, by their indexes in [`LevelProblem::nets`], in that order: for a
+    /// virtual part, those of its terminals, a role filled by a net or by a terminal on one, as
+    /// for an unnamed `$GND`, `$SUPPLY` or `$IOPORT`; for a text, those of what it is attached
+    /// to, a net, a wire or a terminal (13.3). Empty for the others: the nets of an instance or a
+    /// bundle are those its pins are on ([`ProblemNet::pins`]).
+    pub nets: Vec<usize>,
+}
+
+/// A net of the level (6.3), with how a solver reaches it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProblemNet {
+    /// Its name as the problem names nets elsewhere ([`Filler::Net`], [`ProblemWire::nets`],
+    /// [`RouteIntent::net`]): as the netlist first writes it, `0` for the ground.
+    pub name: String,
+    /// `&name`, how the level's own text refers to it.
+    pub reference: Reference,
+    /// Every pin on it: each terminal with a pin of an instance, a bundle or a virtual part, the
+    /// terminals of `$GND`, `$SUPPLY` and `$IOPORT` and the like included, as a [`PointRef::Pin`];
+    /// the pin of a bus of a bundle on each net of its members. In the order of the objects, then
+    /// of the pins, each pin once. A terminal without a pin is not listed.
+    pub pins: Vec<PointRef>,
+    /// The wires that draw it, by their indexes in [`LevelProblem::wires`].
+    pub wires: Vec<usize>,
+    /// The ROUTEs that ask for it, by their indexes in [`LevelProblem::routes`].
+    pub routes: Vec<usize>,
+    /// For a net that is a port of the subcircuit, its place in the port list, from 0.
+    pub port: Option<usize>,
 }
 
 /// A symbol as a solver sees it: its box and its pins (9.2.3, 9.2.4).
@@ -425,7 +453,7 @@ pub struct UsageEntry {
     pub written_numbers: usize,
     /// Where it is written: its AS or ATTACH, or the generation rule that makes it (10.5), such as
     /// a statement in the body of a definition for a usage made there. Like every place, it is left
-    /// out of the input digest ([`sig1`]).
+    /// out of the input digest ([`sig2`]).
     pub source: Option<Loc>,
 }
 
@@ -469,6 +497,9 @@ pub struct LevelProblem {
     /// Every usage made in the level, in the order they were made, so a usage comes after the one
     /// whose expansion made it.
     pub usages: Vec<UsageEntry>,
+    /// The nets of the level, in the order the netlist first names them: the ports of the
+    /// subcircuit, then the nets of the instances, line by line.
+    pub nets: Vec<ProblemNet>,
 }
 
 /// A name as RNL writes it after a prefix, `:` or `::`: bare when it is ASCII letters, digits and
@@ -511,10 +542,19 @@ fn fnv1a(bytes: &[u8]) -> u64 {
     h
 }
 
+/// The tag of the algorithm that a solver writes now (17): that of [`SIG1`], with the nets.
+pub const SIG2: &str = "sig2";
+
 /// The digest of the solver's input: 16 hexadecimal digits over [`canonical`]. A viewer without
 /// a solver computes it from a problem built without the generated records ([`crate::Options::solver`]).
 pub fn input_digest(p: &LevelProblem) -> String {
     format!("{:016x}", fnv1a(canonical(p).as_bytes()))
+}
+
+/// The digest of the input that a `sig1` hash gives: over [`canonical_sig1`], without the nets.
+/// Tools read it and no longer write it.
+pub fn input_digest_sig1(p: &LevelProblem) -> String {
+    format!("{:016x}", fnv1a(canonical_sig1(p).as_bytes()))
 }
 
 /// The digest of the solver's options: 16 hexadecimal digits over the options as the solver
@@ -525,7 +565,7 @@ pub fn options_digest(options: &str) -> String {
 }
 
 /// The `hash` a solver writes in the head of its record for a level (2.8, 17):
-/// `sig1:<input digest>.<options digest>`.
+/// `sig2:<input digest>.<options digest>`.
 ///
 /// The input digest covers the level after inheritance, as the problem holds it: the rules that
 /// flow down and take effect, the symbols chosen, the packages and their versions, the objects,
@@ -538,25 +578,58 @@ pub fn options_digest(options: &str) -> String {
 /// [`LevelProblem::authored_numbers`], [`UsageEntry::written_numbers`]) are left out, the object
 /// counting as one without a reference: they follow from the text, which the check of the record
 /// of the solver covers (the draft 0.3, 5.9), and so the digest is the same in every version.
-pub fn sig1(p: &LevelProblem, solver_options: &str) -> String {
-    format!("{SIG1}:{}.{}", input_digest(p), options_digest(solver_options))
+///
+/// `sig2` is `sig1` with the nets of the level (6.3): each net, the pins on it, the wires and the
+/// ROUTEs on it, its place among the ports, and the nets of each object, so that connecting a
+/// terminal elsewhere changes it. A record with a `sig1` hash, written before, is still compared,
+/// over what that hash covers ([`same_input`]).
+pub fn sig2(p: &LevelProblem, solver_options: &str) -> String {
+    format!("{SIG2}:{}.{}", input_digest(p), options_digest(solver_options))
 }
 
 /// Does a `hash` written in a record head match the input of the level now? Only the input
-/// digest is compared: a viewer does not know the solver's options. None when the value is not
-/// a `sig1` hash, which a tool does not compare (17).
+/// digest is compared: a viewer does not know the solver's options. A `sig2` hash is compared
+/// with [`input_digest`]; a `sig1` hash, which tools wrote before and no longer write, with
+/// [`input_digest_sig1`], what it covers, so that a record written so reads as it did. None when
+/// the value is neither, which a tool does not compare (17).
 pub fn same_input(hash: &str, p: &LevelProblem) -> Option<bool> {
-    let rest = hash.strip_prefix(SIG1)?.strip_prefix(':')?;
+    let (digest, rest): (fn(&LevelProblem) -> String, &str) = match hash.split_once(':') {
+        Some((SIG2, rest)) => (input_digest, rest),
+        Some((SIG1, rest)) => (input_digest_sig1, rest),
+        _ => return None,
+    };
     let input = rest.split('.').next()?;
     if input.len() != 16 || !input.chars().all(|c| c.is_ascii_hexdigit()) {
         return None;
     }
-    Some(input.eq_ignore_ascii_case(&input_digest(p)))
+    Some(input.eq_ignore_ascii_case(&digest(p)))
 }
 
-/// The canonical text of a problem that [`input_digest`] hashes: every field but those that say
-/// where things are written, in a fixed order, numbers by [`fmt_num`] and strings quoted.
+/// The canonical text of a problem that [`input_digest`] hashes: that of [`canonical_sig1`], then
+/// the nets, each net's name, reference, pins, wires, ROUTEs and place among the ports, and the
+/// nets of each object.
 pub fn canonical(p: &LevelProblem) -> String {
+    let mut c = Canon(canonical_sig1(p));
+    c.word("nets");
+    for n in &p.nets {
+        c.str(&n.name);
+        c.reference(&n.reference);
+        c.points(&n.pins);
+        c.indexes(&n.wires);
+        c.indexes(&n.routes);
+        c.opt_index(n.port);
+    }
+    c.word("object-nets");
+    for o in &p.objects {
+        c.indexes(&o.nets);
+    }
+    c.0
+}
+
+/// The canonical text of a problem that a `sig1` hash covers ([`input_digest_sig1`]): every field
+/// but those that say where things are written and the nets, in a fixed order, numbers by
+/// [`fmt_num`] and strings quoted.
+pub fn canonical_sig1(p: &LevelProblem) -> String {
     let mut c = Canon(String::new());
     c.word("level");
     c.str(&p.title);
@@ -885,7 +958,7 @@ impl Canon {
                     self.str(s);
                 }
             }
-            // numbers are left out of the hash (`sig1`)
+            // numbers are left out of the hash (`sig2`, and `sig1` before it)
             Reference::Number { .. } | Reference::GeneratedNumber { .. } | Reference::Anonymous => {
                 self.word("anonymous")
             }
@@ -965,18 +1038,64 @@ mod tests {
             routes: Vec::new(),
             groups: Vec::new(),
             usages: Vec::new(),
+            nets: Vec::new(),
         };
-        let h = sig1(&p, "tolerance=0.000001");
-        assert!(h.starts_with("sig1:"));
-        assert_eq!(h.len(), "sig1:".len() + 16 + 1 + 16);
-        assert_ne!(h, sig1(&p, "tolerance=0.001"));
+        let h = sig2(&p, "tolerance=0.000001");
+        assert!(h.starts_with("sig2:"));
+        assert_eq!(h.len(), "sig2:".len() + 16 + 1 + 16);
+        assert_ne!(h, sig2(&p, "tolerance=0.001"));
         assert_eq!(same_input(&h, &p), Some(true));
-        assert_eq!(same_input(&sig1(&p, "other"), &p), Some(true));
+        assert_eq!(same_input(&sig2(&p, "other"), &p), Some(true));
         let moved = LevelProblem { line: 7, end_line: 9, file: "u.sp".into(), level: 3, ..p.clone() };
         assert_eq!(input_digest(&moved), input_digest(&p));
         let renamed = LevelProblem { title: "u.sp".into(), ..p.clone() };
         assert_eq!(same_input(&h, &renamed), Some(false));
         assert_eq!(same_input("sig2:00000000", &p), None);
+        assert_eq!(same_input("sig3:0000000000000000.0000000000000000", &p), None);
         assert_eq!(same_input("sig1:5be1c09a", &p), None);
+    }
+
+    #[test]
+    fn a_hash_of_sig1_is_compared_over_what_it_covers() {
+        // a record written before sig2 has a sig1 hash, over the problem without its nets: it is
+        // compared over that, so that it reads as it did; a sig2 hash covers the nets too
+        let net = |name: &str, port: Option<usize>| ProblemNet {
+            name: name.into(),
+            reference: Reference::Name(format!("&{name}")),
+            pins: Vec::new(),
+            wires: Vec::new(),
+            routes: Vec::new(),
+            port,
+        };
+        let p = LevelProblem {
+            level: 0,
+            title: "t.sp".into(),
+            kind: "file",
+            name: "t.sp".into(),
+            version: "0.3".into(),
+            authored_numbers: 0,
+            file: "t.sp".into(),
+            line: 1,
+            end_line: 3,
+            packages: Vec::new(),
+            names: Vec::new(),
+            objects: Vec::new(),
+            symbols: Vec::new(),
+            facts: Vec::new(),
+            wires: Vec::new(),
+            routes: Vec::new(),
+            groups: Vec::new(),
+            usages: Vec::new(),
+            nets: vec![net("a", None)],
+        };
+        let old = format!("{SIG1}:{}.{}", input_digest_sig1(&p), options_digest("o"));
+        assert_eq!(same_input(&old, &p), Some(true));
+        assert!(canonical(&p).starts_with(&canonical_sig1(&p)) && canonical(&p) != canonical_sig1(&p));
+        // the nets changed: the sig2 hash sees it, the sig1 hash does not cover them
+        let other = LevelProblem { nets: vec![net("a", Some(0))], ..p.clone() };
+        assert_eq!(same_input(&sig2(&p, "o"), &other), Some(false));
+        assert_eq!(same_input(&old, &other), Some(true));
+        let renamed = LevelProblem { title: "u.sp".into(), ..p.clone() };
+        assert_eq!(same_input(&old, &renamed), Some(false));
     }
 }

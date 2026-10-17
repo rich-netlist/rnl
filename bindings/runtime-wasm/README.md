@@ -22,7 +22,7 @@ A frontend that links the result as a package, such as Analog Canvas with pnpm's
 node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --packages DIR --name @rich-netlist/runtime --version 0.1.0-preview.1
 ```
 
-`--packages DIR` brings the `.rnl` files of DIR with the build: `packages.js` holds them under `/rnl-bundled/packages`, and the Worker gives them to every request, after the request's own files and package directories. A newer `rnl-std` among them is the standard package at the root (16.3). `--name` and `--version` go into the `package.json`, whose `exports` name `client.js` as the package and `core.js` as `./core`.
+`--packages DIR` brings the `.rnl` files of DIR with the build: `packages.js` holds them under `/rnl-bundled/packages`, and the Worker gives them to every request, after the request's own files and package directories. A newer `rnl-std` among them is the standard package at the root (16.3). `--name` and `--version` go into the `package.json`, whose `exports` name `client.js` as the package and `core.js` as `./core`. A named package is not private, and holds the README of [`packages/runtime`](../../packages/runtime/README.md) and the licenses of what it holds: MIT for the code, CC0-1.0 for the standard packages and `analog-canvas-extensions` that the module compiles in, and OFL-1.1 for the metrics of Noto Sans SC.
 
 A frontend built with Vite needs three settings for it, as Analog Canvas found:
 
@@ -124,6 +124,27 @@ const read = (path) => fetch(new URL(`.${path}`, base)).then((r) => (r.ok ? r.ar
 const { document, files } = await collect(core, { entry: "/top.sp" }, read);
 ```
 
+## Publishing
+
+[`publish-runtime.yml`](../../.github/workflows/publish-runtime.yml) publishes the package to npm as [`@rich-netlist/runtime`](https://www.npmjs.com/package/@rich-netlist/runtime). A pushed tag `runtime-v<version>`, such as `runtime-v0.1.0-preview.7`, builds it as above, its version the tag's and without `--packages`, as the core bundles the standard packages. The workflow then tests its modules with `tests/core.mjs`, checks with [`tests/package.mjs`](tests/package.mjs) what npm gets, and publishes it under the dist-tag `next`, with provenance:
+
+```bash
+git tag runtime-v0.1.0-preview.7
+git push origin runtime-v0.1.0-preview.7
+```
+
+Only versions with a pre-release suffix are published for now: a tag without one fails. A pull request that changes the package builds and checks it the same way, and so does the workflow run by hand, which publishes only with `dry_run` set to false on a `runtime-v` tag. The build runs in a job of its own, which cannot publish; the publishing job publishes the tarball the build packed.
+
+npm takes the publish by trusted publishing once the package's settings on npmjs.com name the repository `rich-netlist/rnl` and the workflow `publish-runtime.yml`. Until then a repository secret `NPM_TOKEN`, an npm access token that may publish to `@rich-netlist`, authenticates it, and the first publish can also be made by hand with two-factor authentication ([decision 0003](../../docs/decisions/0003-npm-scope.md)), from the tarball a run by hand leaves as its artifact. The workflow has no token written in it.
+
+A frontend installs the previews with
+
+```bash
+npm i @rich-netlist/runtime@next
+```
+
+and sets up Vite as above; installed into `node_modules`, the package needs no `server.fs.allow`.
+
 ## Tests
 
 ```bash
@@ -138,6 +159,7 @@ node bindings/runtime-wasm/tests/equality.mjs --snapshot
 
 - The Rust tests answer requests natively, builds and writes, the same request with the same answer every time, and call the exports as the module's caller does.
 - `tests/core.mjs` tests the modules in Node: an untitled entry built from memory, a missing include listed in `Document.missing`, an error, lone surrogates, the same Document from the same request every time, a panic and running out of memory each followed by a new instance, `collect`, the core in a worker thread, a write through the core and through the Worker, the packages a build brings given to every request (in a copy of the build with a `packages.js` of its own), and `decodeText`. Without the `test-panic` feature the tests that stop the core are skipped.
+- `tests/package.mjs DIR VERSION` checks a named build as npm gets it, before [`publish-runtime.yml`](../../.github/workflows/publish-runtime.yml) publishes it: the files `npm pack` puts into the tarball, and nothing else; the name, the version, not private, public, the license, the repository that npm's provenance checks, and exports whose files are there; and no packages of the build's own.
 - `tests/equality.mjs` requires that native and WebAssembly builds give identical Documents. For every file of [`tests/conformance`](../../tests/conformance/README.md)'s `cases`, `equivalence` and `cases-0.3`, the standard packages and a Latin-1 file it writes, the Document `rnl view` prints for the absolute path and the one `core.js` builds for the same entry, with the files `collect` reads from the disk as `rnl` reads them, must be deep-equal, numbers compared exactly (`Object.is`, so even 0 and -0 differ). `--rnl PATH` names the `rnl` command, `target/debug/rnl` by default, and `--dist DIR` the directory `build.mjs` wrote. `--view ARG` passes an argument on to `rnl view`, and `--request JSON` adds fields to every request, so that both sides get the same option: `--view --no-std --request '{"std": false}'`, or `--view --status --request '{"status": true}'`. With `--snapshot` it compares the editor interface's snapshots instead, with the host circuit and the model: the one `rnl snapshot` prints and the one the core gives for the files `collect` read, the revision included, so that the fingerprint is the same in both builds.
 
 The core takes its sines, cosines and arc tangents from `libm`, a math library in Rust, so that both builds compute the same bits; the rest of its arithmetic (`+`, `-`, `*`, `/`, square roots, rounding) is correctly rounded by IEEE 754 and gives the same bits everywhere. Nothing in a Document may follow the order of a hash map, whose keys change from one build to the next, even within one instance: the corpus case `16-ties` has a hint with names equally close and several overridden statements, whose order once did, and the Rust tests and `tests/core.mjs` build it again and again. CI runs these tests in the `wasm` job of [`rust.yml`](../../.github/workflows/rust.yml).
