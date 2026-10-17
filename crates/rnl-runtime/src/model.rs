@@ -312,11 +312,14 @@ pub struct ObjectInfo {
     pub symbol_view: Option<usize>,
 }
 
-/// What a role of a usage is attached to: an object, by its id, or a point.
+/// What a role of a usage is attached to: an object, by its id, or a point; for a set role (9.4),
+/// its members in order, each an object or a point, nested sets followed down, none when the role
+/// is left empty.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Attach {
     Object(String),
     At(Pt),
+    Set(Vec<Attach>),
 }
 
 /// A symbol an object is drawn with, as the snapshot names it.

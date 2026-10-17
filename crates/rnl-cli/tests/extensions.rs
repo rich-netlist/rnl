@@ -97,3 +97,24 @@ fn checked_on_its_own_it_gives_a_hint_for_those_pins_alone() {
     assert_eq!(d.len(), 24, "{d:?}");
     assert!(d.iter().all(|h| h.ends_with("pins are best placed on integer points (9.2.4)")), "{d:?}");
 }
+
+#[test]
+fn the_diamond_sources_have_their_terminals_box_and_labels() {
+    // $CANVAS_VCVS_DIAMOND and $CANVAS_CCVS_DIAMOND, the diamonds of E and H without their control
+    // leads: the output's two terminals, Analog Canvas's view box, and the name and the value at
+    // the right of the diamond, as the catalog gives a frontend the symbols
+    let options =
+        rnl_view::CatalogOptions { packages: Some(vec!["analog-canvas-extensions".into()]), ..Default::default() };
+    let c = serde_json::to_value(rnl_view::catalog(&FsProvider::new(&[]), &options)).unwrap();
+    let label = |key: &str, y: f64| serde_json::json!({"key": key, "text": format!("${{{key}}}"), "at": [1.65, y], "halign": "start", "valign": "baseline"});
+    for name in ["$CANVAS_VCVS_DIAMOND", "$CANVAS_CCVS_DIAMOND"] {
+        let s = c["symbols"].as_array().unwrap().iter().find(|s| s["symbol"] == name).unwrap();
+        assert_eq!(
+            s["pins"],
+            serde_json::json!([{"terminal": 1, "at": [0.0, 2.0], "direction": "up"}, {"terminal": 2, "at": [0.0, -2.0], "direction": "down"}]),
+            "{name}"
+        );
+        assert_eq!(s["box"], serde_json::json!([-2.4, -2.4, 1.5, 2.4]), "{name}");
+        assert_eq!(s["labels"], serde_json::json!([label("name", 0.25), label("value", -0.95)]), "{name}");
+    }
+}

@@ -109,11 +109,13 @@ pub enum TermKey {
     Name(String),
 }
 
-/// What a usage attaches to in one role: an object by its id, or a point.
+/// What a usage attaches to in one role: an object by its id, or a point; for a set role (9.4),
+/// the list of its members, each an id or a point, which may be empty.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attach {
     Id(String),
     At(Point),
+    Set(Vec<Attach>),
 }
 
 /// A vertex of a wire.
@@ -410,11 +412,17 @@ impl Reader<'_> {
                 if role.is_empty() || role.chars().any(char::is_control) {
                     return Err(self.fail("attach", &format!("role {role:?} is not a name")));
                 }
+                let not = || self.fail("attach", &format!("role `{role}` is not an id, a point or a list of them"));
+                let one = |m: &Value| match m {
+                    Value::String(s) => Some(Attach::Id(s.clone())),
+                    _ => as_point(m).map(Attach::At),
+                };
                 let given = match v {
-                    Value::String(s) => Attach::Id(s.clone()),
-                    _ => as_point(v)
-                        .map(Attach::At)
-                        .ok_or_else(|| self.fail("attach", &format!("role `{role}` is not an id or a point")))?,
+                    // a set role's members; two numbers are a point
+                    Value::Array(members) if as_point(v).is_none() => {
+                        Attach::Set(members.iter().map(one).collect::<Option<Vec<_>>>().ok_or_else(not)?)
+                    }
+                    _ => one(v).ok_or_else(not)?,
                 };
                 Ok((role.clone(), given))
             })

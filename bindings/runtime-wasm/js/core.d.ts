@@ -74,8 +74,11 @@ export type Op = { level?: string } & (
       op: "add-usage";
       name?: string;
       definition: string;
-      /** Each role by its name, with the id of the object or the point it fills; written `#M1(ref)`. */
-      attach: Record<string, string | Point>;
+      /**
+       * Each role by its name, with the id of the object or the point it fills, written `#M1(in_p)`;
+       * a set role (9.4) with the list of its members, written `{#M3 #M9}(ref)`, `{}` for none.
+       */
+      attach: Record<string, string | Point | (string | Point)[]>;
       symbol?: string;
       at?: Point;
       orient?: string;

@@ -374,7 +374,11 @@
             "host": [],
             "definition": "$ROW",
             "attach": {
-              "m": "@470"
+              "m": [
+                "#R1",
+                "#R2",
+                "#R3"
+              ]
             },
             "symbol": {
               "value": null,

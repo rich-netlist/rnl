@@ -276,8 +276,10 @@ pub struct ObjectView {
     pub host: Vec<String>,
     /// A usage's definition, such as `$GROUND`.
     pub definition: Option<String>,
-    /// A usage's roles, each with the id of what it is attached to, or a point.
-    #[cfg_attr(test, ts(type = "Record<string, string | [number, number]> | null"))]
+    /// A usage's roles, each with the id of what it is attached to, or a point; a set role (9.4)
+    /// with the list of its members, each an id or a point, nested sets followed down, empty when the
+    /// role is left empty.
+    #[cfg_attr(test, ts(type = "Record<string, string | [number, number] | (string | [number, number])[]> | null"))]
     pub attach: Option<Map<String, Value>>,
     /// The id of its symbol in `symbols`.
     pub symbol: Slot<String>,
@@ -635,6 +637,15 @@ fn params(pp: &PrimParams) -> Map<String, Value> {
     params
 }
 
+/// What a role is attached to, as the snapshot writes it: an id, a point, or a set role's members.
+fn attached(a: &Attach) -> Value {
+    match a {
+        Attach::Object(id) => Value::String(id.clone()),
+        Attach::At(p) => serde_json::json!([p.0, p.1]),
+        Attach::Set(members) => Value::Array(members.iter().map(attached).collect()),
+    }
+}
+
 fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
     let symbols = symbol_refs(doc, lv);
     let symbol_id = |s: &SymbolInfo| symbols.iter().find(|(info, _)| info == s).map(|(_, r)| r.id.clone());
@@ -647,18 +658,10 @@ fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
             kind: o.kind.to_string(),
             host: o.host.clone(),
             definition: o.definition.clone(),
-            attach: o.definition.as_ref().map(|_| {
-                o.attach
-                    .iter()
-                    .map(|(role, a)| {
-                        let v = match a {
-                            Attach::Object(id) => Value::String(id.clone()),
-                            Attach::At(p) => serde_json::json!([p.0, p.1]),
-                        };
-                        (role.clone(), v)
-                    })
-                    .collect()
-            }),
+            attach: o
+                .definition
+                .as_ref()
+                .map(|_| o.attach.iter().map(|(role, a)| (role.clone(), attached(a))).collect()),
             symbol: Slot::of(o.symbol.as_ref().and_then(symbol_id)),
             at: Slot::of(o.at.map(xy)),
             orient: Slot::of(Some(o.orient.as_str().to_string())),
@@ -790,6 +793,42 @@ R2 a vdd! 2k
         let files = MemoryProvider::new().with("/w/t.sp", NETLIST);
         let s = crate::snapshot("/w/t.sp", &files, &BuildOptions::default(), parts).unwrap();
         serde_json::to_value(s).unwrap()
+    }
+
+    #[test]
+    fn a_set_role_gives_its_members() {
+        // ref and out of $CURRENT_MIRROR and tail of $DIFFERENTIAL_PAIR are set roles (9.4): each
+        // gives its members, none, one or several, and each member is an object the model lists
+        let text = "* sets\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.model nch nmos level=1\n\
+                    M1 a g 0 0 nch\nM2 b g 0 0 nch\nM3 a g 0 0 nch\nM4 b g 0 0 nch\nM5 t c 0 0 nch\nM6 t c 0 0 nch\n\
+                    * @RNL {\n\
+                    *   %m1 = #M1(ref) #M2(out) @AS $CURRENT_MIRROR;\n\
+                    *   %m2 = {#M1 #M3}(ref) {#M2 #M4}(out) @AS $CURRENT_MIRROR;\n\
+                    *   %m3 = #M2(out) @AS $CURRENT_MIRROR;\n\
+                    *   %dp1 = #M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR;\n\
+                    *   %dp2 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;\n\
+                    *   %dp3 = #M1(in_p) #M2(in_n) {#M5 #M6}(tail) @AS $DIFFERENTIAL_PAIR\n\
+                    * }\n.end\n";
+        let files = MemoryProvider::new().with("/w/t.sp", text);
+        let parts = Parts { drawing: false, host: false, model: true };
+        let s =
+            serde_json::to_value(crate::snapshot("/w/t.sp", &files, &BuildOptions::default(), parts).unwrap()).unwrap();
+        let objects = s["levels"][0]["model"]["objects"].as_array().unwrap();
+        let attach = |id: &str| objects.iter().find(|o| o["id"] == id).unwrap()["attach"].clone();
+        assert_eq!(attach("%m1"), json!({"ref": ["#M1"], "out": ["#M2"]}));
+        assert_eq!(attach("%m2"), json!({"ref": ["#M1", "#M3"], "out": ["#M2", "#M4"]}));
+        assert_eq!(attach("%m3"), json!({"ref": [], "out": ["#M2"]}));
+        assert_eq!(attach("%dp1"), json!({"in_p": "#M1", "in_n": "#M2", "tail": []}));
+        assert_eq!(attach("%dp2"), json!({"in_p": "#M1", "in_n": "#M2", "tail": ["#M5"]}));
+        assert_eq!(attach("%dp3"), json!({"in_p": "#M1", "in_n": "#M2", "tail": ["#M5", "#M6"]}));
+        // no id is left that the snapshot does not define
+        let ids: Vec<&Value> = objects.iter().map(|o| &o["id"]).collect();
+        for usage in ["%m1", "%m2", "%m3", "%dp1", "%dp2", "%dp3"] {
+            for (_, given) in attach(usage).as_object().unwrap() {
+                let members = given.as_array().cloned().unwrap_or_else(|| vec![given.clone()]);
+                assert!(members.iter().all(|m| ids.contains(&m)), "{usage}: {given}");
+            }
+        }
     }
 
     #[test]
