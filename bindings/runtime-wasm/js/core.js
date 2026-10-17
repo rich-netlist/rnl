@@ -17,8 +17,6 @@
  *   files' language version, such as "0.2"; by the language version when not given.
  * @property {boolean} [svg] Write each level's SVG; true when not given.
  * @property {boolean} [primitives] Give each level's primitives; false when not given.
- * @property {boolean} [draft] Accepted, with no effect: the files of 0.3 are read without it. Kept
- *   for compatibility, to be removed later.
  * @property {{ drawing?: boolean, host?: boolean, model?: boolean }} [parts] The parts of the
  *   editor interface's snapshot to give: with them, the answer is a snapshot (snapshot.d.ts), with
  *   the Document as its `drawing` unless `drawing` is false.

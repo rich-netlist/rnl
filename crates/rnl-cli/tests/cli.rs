@@ -66,7 +66,7 @@ fn view_gives_the_primitives_and_the_svg_as_asked() {
 }
 
 #[test]
-fn files_of_0_3_are_read_and_draft_changes_nothing() {
+fn files_of_0_3_are_read() {
     let f = Path::new(env!("CARGO_TARGET_TMPDIR")).join("version-0.3.sp");
     let text =
         "* a file of 0.3\nR1 a b 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n* @RNL { #R1 @PLACE(3, 4)}\n.end\n";
@@ -84,13 +84,11 @@ fn files_of_0_3_are_read_and_draft_changes_nothing() {
         p["levels"][0]["facts"].as_array().unwrap().iter().filter(|f| f["kind"] == "PLACE-x").count()
     };
     assert_eq!(places(&["problem", &f]), 1);
-    // --draft, kept for compatibility, is accepted and changes nothing, the snapshot's revision
-    // included
-    for command in ["check", "problem", "view", "snapshot"] {
-        assert_eq!(rnl(&[command, &f, "--draft"]), rnl(&[command, &f]), "{command}");
-    }
+    // --draft, which once read them and then had no effect, is gone
+    let (code, out) = rnl(&["check", &f, "--draft"]);
+    assert_eq!(code, 2, "{out}");
     let help = Command::new(env!("CARGO_BIN_EXE_rnl")).arg("--help").output().unwrap();
-    assert!(String::from_utf8_lossy(&help.stderr).contains("--draft             no effect"));
+    assert!(!String::from_utf8_lossy(&help.stderr).contains("--draft"));
 }
 
 #[test]

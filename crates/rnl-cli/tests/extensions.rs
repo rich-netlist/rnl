@@ -87,7 +87,7 @@ fn checked_on_its_own_it_gives_a_hint_for_those_pins_alone() {
         .filter(|l| l.contains(" = @DEFINE-SYMBOL("))
         .map(|l| l.trim_start().split(' ').next().unwrap())
         .collect();
-    assert_eq!(defined.len(), 27, "{defined:?}");
+    assert_eq!(defined.len(), 29, "{defined:?}");
     assert!(defined.iter().all(|n| n.starts_with("$CANVAS_")), "{defined:?}");
     // written in the language 0.3, it is read without any switch; its only remarks are the four
     // inputs of each of the six gates, off the integer points (9.2.4)

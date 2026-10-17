@@ -502,6 +502,14 @@ pub struct LevelProblem {
     pub nets: Vec<ProblemNet>,
 }
 
+impl LevelProblem {
+    /// Does the level's file follow 0.3 ([`Self::version`])? Only there does the record of the
+    /// solver refer to objects by number (5.9) and rewrite wires (13.1).
+    pub fn follows_0_3(&self) -> bool {
+        self.version == "0.3"
+    }
+}
+
 /// A name as RNL writes it after a prefix, `:` or `::`: bare when it is ASCII letters, digits and
 /// `_`, otherwise in quotes, a `"` doubled (3.6, 3.7).
 pub fn written_name(name: &str) -> String {

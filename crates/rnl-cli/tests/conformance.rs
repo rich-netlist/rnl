@@ -121,17 +121,6 @@ fn the_corpus_of_0_2_declares_its_version() {
     }
 }
 
-#[test]
-fn the_draft_switch_changes_nothing() {
-    // kept for compatibility, it has no effect on either corpus
-    let draft = Options { draft: true, ..Options::default() };
-    for dir in ["cases", "equivalence", "cases-0.3"] {
-        for f in files(&corpus().join(dir), &["sp", "scs"]) {
-            assert_eq!(run_with(&f, &draft), run(&f), "{}", f.display());
-        }
-    }
-}
-
 /// Remove what names the file: the dialects' files differ only in that.
 fn without_files(v: &mut Value) {
     match v {

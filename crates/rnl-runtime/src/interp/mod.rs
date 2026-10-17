@@ -69,22 +69,11 @@ pub struct Options {
     /// written coordinates and conflicting coordinates are found (11.7). The standard leaves the
     /// tolerance to the tool; a viewer that does not solve uses [`crate::geom::TOL`].
     pub tolerance: f64,
-    /// No effect. Kept for compatibility, to be removed later: the files of 0.3, and a main file
-    /// without a header record, are read in 0.3 without any switch ([`unit::READ_VERSIONS`],
-    /// [`unit::DEFAULT_VERSION`]).
-    pub draft: bool,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options {
-            std: true,
-            std_version: None,
-            generated: true,
-            problems: false,
-            tolerance: crate::geom::TOL,
-            draft: false,
-        }
+        Options { std: true, std_version: None, generated: true, problems: false, tolerance: crate::geom::TOL }
     }
 }
 

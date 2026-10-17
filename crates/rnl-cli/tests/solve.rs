@@ -295,12 +295,12 @@ fn reaches(f: &FactKind, objects: &[usize]) -> bool {
 /// cannot hold (`Written::unsolved`, such as a point without a name in a file of 0.2), which
 /// cannot be checked; read as a solver reads it, each level has the same input as the hash of its
 /// record says (17). The cases written for the solver have nothing unsolved.
-fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, draft: bool, what: &str) {
-    let r = interpret_file(entry, None, files, &Options { draft, ..Options::default() }).unwrap();
+fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, what: &str) {
+    let r = interpret_file(entry, None, files, &Options::default()).unwrap();
     let errors: Vec<String> =
         r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
     assert!(errors.is_empty(), "{what}: {errors:?}");
-    let again = interpret_file(entry, None, files, &Options { draft, ..Options::solver() }).unwrap();
+    let again = interpret_file(entry, None, files, &Options::solver()).unwrap();
     for level in &run.levels {
         let p = &level.problem;
         let what = format!("{what} / {}", p.title);
@@ -395,7 +395,7 @@ fn every_case_solved_and_written_back_reads_back_whole() {
         assert!(writing.copied.is_empty() && writing.outside.is_empty(), "{name}: {writing:?}");
         let text = std::fs::read_to_string(&out).unwrap();
         assert_eq!(text, run.files[0].text);
-        check_read_back(&run, &out, &fs, false, name);
+        check_read_back(&run, &out, &fs, name);
         compare_or_bless(name, &text);
     }
 }
@@ -539,7 +539,7 @@ fn in_a_file_of_the_draft_the_record_reaches_every_object() {
         let text = text.replace("@VERSION(\"0.2\")", header).replace("%tc = #M1(a)", "#M1(a)");
         let mem = MemoryProvider::new().with(&path_str(&f), &text);
         let both = Layered { layers: vec![&mem, &fs] };
-        let run = solve(&f, &both, &SolveOptions { draft: true, ..unlimited() }).unwrap();
+        let run = solve(&f, &both, &unlimited()).unwrap();
         for level in &run.levels {
             assert!(level.written.unsolved.is_empty(), "{name}: {:?}", level.written.unsolved);
         }
@@ -547,7 +547,7 @@ fn in_a_file_of_the_draft_the_record_reaches_every_object() {
         assert!(with_mid.record.contains("numbering=\""), "{}", with_mid.record);
         assert!(!with_mid.record.contains("%tc"), "{}", with_mid.record);
         let solved = MemoryProvider::new().with(&path_str(&f), &run.files[0].text);
-        check_read_back(&run, &f, &Layered { layers: vec![&solved, &fs] }, true, name);
+        check_read_back(&run, &f, &Layered { layers: vec![&solved, &fs] }, name);
     }
 }
 
@@ -571,16 +571,14 @@ fn a_level_whose_rnl_is_not_interpreted_is_not_solved() {
     assert_eq!(writing, Default::default());
     assert!(!dir.join("out").exists());
 
-    // a file of 0.3 is read without any switch, and --draft, kept for compatibility, changes nothing
+    // a file of 0.3 is read without any switch
     let t1 = case("T1-rc-lowpass");
     let text = fs.read(&path_str(&t1)).unwrap().replace("@VERSION(\"0.2\")", "@VERSION(\"0.3\")");
     let mem = MemoryProvider::new().with(&path_str(&t1), &text);
     let both = Layered { layers: vec![&mem, &fs] };
-    for options in [unlimited(), SolveOptions { draft: true, ..unlimited() }] {
-        let run = solve(&t1, &both, &options).unwrap();
-        assert_eq!(run.levels.len(), 1);
-        assert!(run.not_solved.is_empty());
-    }
+    let run = solve(&t1, &both, &unlimited()).unwrap();
+    assert_eq!(run.levels.len(), 1);
+    assert!(run.not_solved.is_empty());
 
     // a subcircuit in an included file of an unsupported version, its file being read for its
     // netlist only; the main level is solved, and the order of the levels kept
@@ -738,14 +736,14 @@ fn the_levels_of_an_included_file_are_written_into_it() {
     assert_eq!(writing.error, None);
     assert_eq!(writing.written, [dir.join("04-hierarchy.sp"), dir.join("04-hierarchy-lib.inc")]);
     assert!(writing.copied.is_empty());
-    check_read_back(&run, &dir.join("04-hierarchy.sp"), &fs, false, "04-hierarchy");
+    check_read_back(&run, &dir.join("04-hierarchy.sp"), &fs, "04-hierarchy");
     // the level of the included file alone: the main file is copied beside it, so that it reads
     let only = solve(&f, &fs, &SolveOptions { level: Some("rdiv".into()), ..unlimited() }).unwrap();
     let dir = scratch("04-hierarchy-rdiv");
     let writing = write(&only, &Target::Dir(dir.clone()));
     assert_eq!(writing.written, [dir.join("04-hierarchy-lib.inc")]);
     assert_eq!(writing.copied, [dir.join("04-hierarchy.sp")]);
-    check_read_back(&only, &dir.join("04-hierarchy.sp"), &fs, false, "04-hierarchy rdiv");
+    check_read_back(&only, &dir.join("04-hierarchy.sp"), &fs, "04-hierarchy rdiv");
     // a file out of the directory of the file solved has no name under -o DIR
     let files = MemoryProvider::new()
         .with(
@@ -1072,7 +1070,7 @@ fn a_text_whose_offset_the_solver_discards_reads_back_where_the_solver_put_it() 
         assert!(level.written.unsolved.is_empty(), "{label}: {:?}", level.written.unsolved);
         check_facts(&run, label);
         let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
-        check_read_back(&run, Path::new("/w/t.sp"), &Layered { layers: vec![&solved, &files] }, false, label);
+        check_read_back(&run, Path::new("/w/t.sp"), &Layered { layers: vec![&solved, &files] }, label);
     }
 }
 
@@ -1113,7 +1111,7 @@ fn a_file_saved_without_a_header_gets_one() {
     assert_eq!(write(&run, &Target::Dir(out.clone())).error, None);
     let back = interpret_file(&out.join("plain.sp"), None, &fs, &Options::default()).unwrap();
     assert!(!messages(&back, Severity::Hint).iter().any(|m| m.starts_with(hint)), "{:?}", back.diagnostics());
-    check_read_back(&run, &out.join("plain.sp"), &fs, false, "plain");
+    check_read_back(&run, &out.join("plain.sp"), &fs, "plain");
     let again = solve(&out.join("plain.sp"), &fs, &unlimited()).unwrap();
     assert_eq!(again.files[0].text, run.files[0].text);
 
@@ -1138,7 +1136,7 @@ fn a_file_saved_without_a_header_gets_one() {
     assert!(div.text.starts_with("*\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt div p n\n"), "{}", div.text);
     let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
     let both = Layered { layers: vec![&solved, &files] };
-    check_read_back(&run, Path::new("/w/top.sp"), &both, false, "div.inc");
+    check_read_back(&run, Path::new("/w/top.sp"), &both, "div.inc");
     let again = solve(Path::new("/w/top.sp"), &both, &unlimited()).unwrap();
     assert_eq!(again.files, run.files);
 }
@@ -1164,7 +1162,7 @@ fn a_record_of_the_solver_written_with_scope_is_replaced_by_its_subcircuit() {
     let both = Layered { layers: vec![&solved, &files] };
     let r = interpret_file(entry, None, &both, &Options::default()).unwrap();
     assert!(dropped(&r).is_empty(), "{:?}", dropped(&r));
-    check_read_back(&run, entry, &both, false, "pair");
+    check_read_back(&run, entry, &both, "pair");
     // the file level alone keeps it
     let only = SolveOptions { level: Some("scoped.sp".into()), ..unlimited() };
     let run = solve(entry, &files, &only).unwrap();
@@ -1187,7 +1185,7 @@ fn a_record_of_the_solver_written_with_scope_is_replaced_by_its_subcircuit() {
     assert_eq!(paths, ["/w/pair.inc", "/w/top.sp"]);
     assert!(!run.files[1].text.contains("generated"), "{}", run.files[1].text);
     let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
-    check_read_back(&run, Path::new("/w/top.sp"), &Layered { layers: vec![&solved, &files] }, false, "pair.inc");
+    check_read_back(&run, Path::new("/w/top.sp"), &Layered { layers: vec![&solved, &files] }, "pair.inc");
 }
 
 #[test]
@@ -1217,7 +1215,7 @@ fn a_free_text_goes_beside_what_it_is_attached_to() {
     assert!(near(at("%u"), at("#C1")), "{:?} {:?}", at("%u"), at("#C1"));
     assert_eq!(at("%v"), at("%q"));
     let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
-    check_read_back(&run, Path::new("/w/t.sp"), &Layered { layers: vec![&solved, &files] }, false, "texts");
+    check_read_back(&run, Path::new("/w/t.sp"), &Layered { layers: vec![&solved, &files] }, "texts");
 }
 
 /// How far a point is from the line drawn through some points.
@@ -1322,7 +1320,7 @@ fn labels_on_a_wire_and_a_net_are_left_to_the_viewer_and_one_a_fact_reaches_is_w
     assert!(level.record.contains(&written), "{}", level.record);
     let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
     let layered = Layered { layers: vec![&solved, &files] };
-    check_read_back(&run, Path::new("/w/t.sp"), &layered, false, "labels");
+    check_read_back(&run, Path::new("/w/t.sp"), &layered, "labels");
     let back = interpret_file(Path::new("/w/t.sp"), None, &layered, &Options::default()).unwrap();
     let drawn = texts_on_wires(&back, p.level);
     let on_wire = drawn.iter().find(|(m, _, _)| m == "on the wire").unwrap();
@@ -1432,7 +1430,7 @@ fn a_header_after_a_subcircuit_solved_moves_to_line_2() {
         assert_eq!(lib.matches("type=\"header\"").count(), 1, "{lib}");
         let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
         let both = Layered { layers: vec![&solved, &files] };
-        check_read_back(&run, entry, &both, false, "lib4.inc");
+        check_read_back(&run, entry, &both, "lib4.inc");
         assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files, "{head}");
     }
 
@@ -1454,7 +1452,7 @@ fn a_header_after_a_subcircuit_solved_moves_to_line_2() {
         assert_eq!(text.matches("@VERSION").count(), 1, "{level}: {text}");
         let solved = MemoryProvider::new().with("/w/top.sp", text);
         let both = Layered { layers: vec![&solved, &files] };
-        check_read_back(&run, entry, &both, false, level);
+        check_read_back(&run, entry, &both, level);
         // the other level solved after it finds the header whole, on line 2 at the end
         let all = solve(entry, &both, &unlimited()).unwrap();
         let text = &all.files[0].text;
@@ -1462,7 +1460,7 @@ fn a_header_after_a_subcircuit_solved_moves_to_line_2() {
         assert_eq!(text.matches("type=\"header\"").count(), 1, "{level}: {text}");
         assert_eq!(text.matches("@VERSION").count(), 1, "{level}: {text}");
         let solved = MemoryProvider::new().with("/w/top.sp", &all.files[0].text);
-        check_read_back(&all, entry, &Layered { layers: vec![&solved, &files] }, false, level);
+        check_read_back(&all, entry, &Layered { layers: vec![&solved, &files] }, level);
     }
 }
 
@@ -1489,7 +1487,7 @@ fn an_included_file_that_switches_to_spectre_gets_its_header_after_the_switch() 
     assert!(div.contains("\n// @RNL(type=\"generated\""), "{div}");
     let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
     let both = Layered { layers: vec![&solved, &files] };
-    check_read_back(&run, entry, &both, false, "div.inc");
+    check_read_back(&run, entry, &both, "div.inc");
     assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files);
 }
 
@@ -1518,7 +1516,7 @@ fn above_the_switch_to_spectre_an_included_file_gets_its_header_in_stars() {
         assert!(div.contains("\n* @RNL(type=\"generated\"") && !div.contains("\n// @RNL(type="), "{head}: {div}");
         let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
         let both = Layered { layers: vec![&solved, &files] };
-        check_read_back(&run, entry, &both, false, head);
+        check_read_back(&run, entry, &both, head);
         let after = read_solved(&run, &files, entry);
         assert_eq!(messages(&after, Severity::Warning), messages(&before, Severity::Warning), "{head}");
         assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files, "{head}");
@@ -1547,7 +1545,7 @@ fn a_header_in_slashes_moved_into_spice_mode_carries_every_record_of_its_file() 
     assert!(!text.contains("// @RNL") && !alone(text), "{text}");
     let solved = MemoryProvider::new().with("/w/top.net", text);
     let both = Layered { layers: vec![&solved, &files] };
-    check_read_back(&run, entry, &both, false, "top.net");
+    check_read_back(&run, entry, &both, "top.net");
     assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files);
     // the file level solved alone keeps the header where it is, in `//`, and writes its record in
     // `//`; the next solve of every level moves the header, and its record in `//` is replaced by
@@ -1600,7 +1598,7 @@ fn a_file_read_only_through_a_library_section_gets_no_header_outside_it() {
         assert!(record < text.find("endsection tt").or(text.find(".endl tt")).unwrap(), "{text}");
         let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
         let both = Layered { layers: vec![&solved, &files] };
-        check_read_back(&run, entry, &both, false, lib_path);
+        check_read_back(&run, entry, &both, lib_path);
         let after = read_solved(&run, &files, entry);
         assert_eq!(messages(&after, Severity::Warning), messages(&before, Severity::Warning), "{lib_path}");
         assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files, "{lib_path}");
@@ -1656,7 +1654,7 @@ fn a_text_whose_offset_or_place_the_solver_discards_is_written_where_it_put_it()
         assert!(level.written.unsolved.is_empty(), "{name}: {:?}", level.written.unsolved);
         check_facts(&run, name);
         let solved = MemoryProvider::new().with(&path, &run.files[0].text);
-        check_read_back(&run, entry, &Layered { layers: vec![&solved, &files] }, false, name);
+        check_read_back(&run, entry, &Layered { layers: vec![&solved, &files] }, name);
         let r = read_solved(&run, &files, entry);
         assert_eq!(dropped(&r), dropped_back, "{name}");
         // the texts written read back where the solver put them
@@ -1702,7 +1700,7 @@ fn an_orientation_without_a_name_is_unsolved_only_where_the_file_does_not_fix_it
     let unsolved: Vec<Decision> = level.written.unsolved.iter().map(|u| u.decision).collect();
     assert_eq!(unsolved, [Decision::Orientation { object: free[0] }], "{:?}", level.written.unsolved);
     let solved = MemoryProvider::new().with("/w/an.sp", &run.files[0].text);
-    check_read_back(&run, entry, &Layered { layers: vec![&solved, &files] }, false, "an");
+    check_read_back(&run, entry, &Layered { layers: vec![&solved, &files] }, "an");
 }
 
 #[test]
@@ -2205,7 +2203,7 @@ fn in_a_spice_section_of_a_spectre_file_a_record_is_carried_by_a_star() {
     assert!(text.contains("\nX1 (p q) half\n// @RNL(type=\"generated\""), "{text}");
     let solved = MemoryProvider::new().with("/w/top.scs", text);
     let both = Layered { layers: vec![&solved, &files] };
-    check_read_back(&run, entry, &both, false, "top.scs");
+    check_read_back(&run, entry, &both, "top.scs");
     assert_eq!(solve(entry, &both, &unlimited()).unwrap().files, run.files);
 }
 
@@ -2237,7 +2235,7 @@ fn a_file_of_0_2_is_raised_to_0_3_when_its_record_needs_it() {
     let said = lines(&run, false);
     assert!(said[0].starts_with("raise.sp: raised from 0.2 to 0.3 for what its records"), "{said:?}");
     let files = MemoryProvider::new().with("/w/raise.sp", text);
-    check_read_back(&run, entry, &files, false, "raise.sp");
+    check_read_back(&run, entry, &files, "raise.sp");
     let again = solve(entry, &files, &unlimited()).unwrap();
     assert_eq!((&again.files, again.raised.is_empty()), (&run.files, true));
 
