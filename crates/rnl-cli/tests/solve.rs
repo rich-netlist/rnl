@@ -2250,6 +2250,7 @@ fn a_file_of_0_2_is_raised_to_0_3_when_it_is_written() {
         pinned: true,
         why: vec![],
         clashes,
+        followers: vec![],
     };
     assert_eq!(run.raised, [raised(vec![])]);
     let text = &run.files[0].text;
@@ -2307,6 +2308,66 @@ fn a_file_of_0_2_is_raised_to_0_3_when_it_is_written() {
 }
 
 #[test]
+fn a_raise_warns_of_the_aliases_imported_and_of_the_files_that_take_its_version() {
+    // raising a file to 0.3 (16.1) warns of each name in it spelled like `numbering`, a word that
+    // 0.3 adds: of an alias it imports from an alias package too (16.5), which, read back in 0.3,
+    // is an error as one it declares itself would be
+    let net = "* raise\n* @RNL(type=\"header\") { @VERSION(\"0.2\"); \
+               @USE-ALIASES(name=\"my-alias\", version=\"0.2\", path=\"aliases.rnl\") }\n\
+               R1 a b 1k\nR2 b c 1k\n* @RNL { $GND @ATTACH &b; &b @WIRE {#R1:2 (_, _) #R2:1} }\n.end\n";
+    let package = "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"my-alias\", version=\"0.2\"); \
+                   @ALIAS(\"numbering\", \"axis\") }\n";
+    let entry = Path::new("/w/raise.sp");
+    let files = MemoryProvider::new().with("/w/raise.sp", net).with("/w/aliases.rnl", package);
+    let run = solve(entry, &files, &unlimited()).unwrap();
+    assert_eq!(run.raised.len(), 1, "{:?}", run.raised);
+    assert_eq!(run.raised[0].clashes, ["an alias from an alias package, `numbering`, line 2"]);
+    let back = MemoryProvider::new().with("/w/raise.sp", &run.files[0].text).with("/w/aliases.rnl", package);
+    let errors = messages(&interpret_file(entry, None, &back, &Options::default()).unwrap(), Severity::Error);
+    let imported = "in alias package my-alias, the alias numbering is the name of a standard word";
+    assert!(errors.iter().any(|e| e.contains(imported)), "{errors:?}");
+
+    // the files it includes that write no VERSION take its version: raised, it has them read in
+    // 0.3 too, and each gets a warning, with one for each name in it spelled like `numbering`;
+    // their text stays as it is. A file that writes its VERSION keeps it, and is not told of
+    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.include child.inc\n.include kept.inc\n\
+               R1 a b 1k\nR2 b c 1k\n* @RNL { $GND @ATTACH &b; &b @WIRE {#R1:2 (_, _) #R2:1} }\n.end\n";
+    let child = "* child\n* @RNL(type=\"header\") { @ALIAS(\"numbering\", \"x\") }\n.include grand.inc\n\
+                 .subckt child p n\nR9 p n 1k\n* @RNL { #R9 @PLACE(numbering=10, y=0) }\n.ends\n";
+    let grand = "* grand\n.subckt grand p n\nR8 p n 1k\n.ends\n";
+    let kept = "* kept\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.subckt kept p n\nR7 p n 1k\n.ends\n";
+    let entry = Path::new("/w/top.sp");
+    let files = MemoryProvider::new()
+        .with("/w/top.sp", top)
+        .with("/w/child.inc", child)
+        .with("/w/grand.inc", grand)
+        .with("/w/kept.inc", kept);
+    let run = solve(entry, &files, &SolveOptions { level: Some("top.sp".into()), ..unlimited() }).unwrap();
+    assert_eq!(run.raised.len(), 1, "{:?}", run.raised);
+    let followers: Vec<(&str, Vec<&str>)> = run.raised[0]
+        .followers
+        .iter()
+        .map(|f| (f.path.as_str(), f.clashes.iter().map(String::as_str).collect()))
+        .collect();
+    let clashes = vec!["an alias, `numbering`, line 2", "a parameter name, `numbering`, line 6"];
+    assert_eq!(followers, [("/w/child.inc", clashes), ("/w/grand.inc", vec![])]);
+    let said = lines(&run, false);
+    let follows = |name: &str| {
+        format!(
+            "warning: {name}: it writes no VERSION and takes that of top.sp: it reads in 0.3 too, its text unchanged \
+             (16.1); @VERSION(\"0.2\") written in its header record keeps it at 0.2"
+        )
+    };
+    let alias = "warning: child.inc: an alias, `numbering`, line 2, has the spelling of a word that 0.3 adds (2.8): \
+                 read in 0.3, it may mean something else (16.1)";
+    for line in [follows("child.inc"), alias.to_string(), follows("grand.inc")] {
+        assert!(said.contains(&line), "{line}: {said:?}");
+    }
+    assert!(!said.iter().any(|l| l.contains("kept.inc")), "{said:?}");
+    assert_eq!(run.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["/w/top.sp"]);
+}
+
+#[test]
 fn a_library_section_is_raised_as_a_file_of_its_own() {
     // two sections of one library, both of 0.2, read by the main file: a section read is a file
     // (2.8), so only the one that a record is written into is raised (16.1), and the text of the
@@ -2333,6 +2394,7 @@ fn a_library_section_is_raised_as_a_file_of_its_own() {
         pinned: true,
         why: vec![],
         clashes: vec![],
+        followers: vec![],
     };
     let pin = "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
     let lib = format!("* lib\n{}{}", section("old", false), section("new", true));

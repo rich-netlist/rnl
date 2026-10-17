@@ -41,3 +41,33 @@ fn an_end_of_line_comment_of_a_subckt_holds_no_port() {
     let cell = r.doc.levels.iter().find(|l| l.name == "cell").unwrap();
     assert_eq!(cell.ports, ["a", "b"]);
 }
+
+#[test]
+fn a_comment_line_within_a_statement_is_said_in_both_adapters() {
+    // a comment line between a `.subckt` and the `+` line that continues it, or between an element
+    // and its own: read, with a warning, in a SPICE netlist and in the SPICE mode of a Spectre one
+    // (2.2); one after the last `+` line is a comment like any other
+    let body =
+        ".subckt cell a\n* between\n+ b\nR1 a b\n* again\n+ 1k\n* after\nR2 a b 1k\n.ends cell\nX1 in out cell\n";
+    for (main, text, first) in [
+        ("t.sp", format!("* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{body}.end\n"), 4),
+        (
+            "t.scs",
+            format!("// t\nsimulator lang=spice\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n{body}.end\n"),
+            5,
+        ),
+    ] {
+        let r = read(main, &text);
+        assert!(errors(&r).is_empty(), "{main}: {:?}", errors(&r));
+        let within = r
+            .diagnostics()
+            .into_iter()
+            .filter(|d| {
+                d.severity == Severity::Warning && d.message.contains("between a statement and its continuation")
+            })
+            .filter_map(|d| d.loc.as_ref().map(|l| l.line))
+            .collect::<Vec<_>>();
+        assert_eq!(within, [first, first + 3], "{main}");
+        assert_eq!(r.doc.levels.iter().find(|l| l.name == "cell").unwrap().ports, ["a", "b"], "{main}");
+    }
+}

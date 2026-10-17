@@ -348,6 +348,7 @@ impl<'a> Reader<'a> {
         let mut pending: Option<(u32, String)> = None;
         // a `.subckt` read in SPICE mode whose `+` lines add ports, until its parameters begin
         let mut subckt_more: Option<LevelId> = None;
+        let mut continued = rnl_host_spice::Continued::default();
         let mut in_section = section.is_none();
         let mut skip_section: Option<String> = None;
         // a region written to be encrypted, while in it: the line that opens it, and the warning
@@ -416,6 +417,11 @@ impl<'a> Reader<'a> {
             };
             if let Some((rest, col)) = carrier_rest {
                 if rest.trim().is_empty() || rest.starts_with(' ') {
+                    // in SPICE mode, a comment line within a statement, as the SPICE adapter says (2.2)
+                    let within = pending.is_some() || subckt_more.is_some();
+                    if st.mode == Mode::Spice && within && continued.after(&lines, idx - 1) {
+                        self.sink.warning(rnl_host_spice::COMMENT_IN_A_STATEMENT, Some(Loc::line(&fname, no)));
+                    }
                     if let Some((_, warning)) = protect.filter(|_| rest.contains("@RNL")) {
                         self.sink.warning(warning, Some(Loc::line(&fname, no)));
                     }
@@ -772,7 +778,7 @@ impl<'a> Reader<'a> {
             case_sensitive: true,
             ..Instance::default()
         };
-        self.add_instance(inst, st.circ, fname, no, None);
+        self.add_instance(inst, st, fname, no, None);
         None
     }
 
@@ -809,13 +815,16 @@ impl<'a> Reader<'a> {
         }
         let Some(el) = rnl_host_spice::parse_element(&body, fname, no, self.sink) else { return };
         let needs = matches!(el.inst.letter, Some('M') | Some('Q'));
-        self.add_instance(el.inst, st.circ, fname, no, if needs { Some(el.plain) } else { None });
+        self.add_instance(el.inst, st, fname, no, if needs { Some(el.plain) } else { None });
     }
 
-    fn add_instance(&mut self, mut inst: Instance, circ: LevelId, fname: &str, no: u32, plain: Option<Vec<String>>) {
+    /// Add an instance to the circuit `st.circ`, read through the file level of `st.cur` (2.8, 6.1).
+    fn add_instance(&mut self, mut inst: Instance, st: &State, fname: &str, no: u32, plain: Option<Vec<String>>) {
+        let circ = st.circ;
         if !self.doc.levels[circ].circuit {
             return;
         }
+        inst.file_level = Some(self.doc.file_level(st.cur));
         let lv = &mut self.doc.levels[circ];
         if !self.names.entry(circ).or_default().insert(lv.name_key(&inst.name)) {
             self.sink.error(format!("instance {} is defined twice", inst.name), Some(Loc::line(fname, no)));

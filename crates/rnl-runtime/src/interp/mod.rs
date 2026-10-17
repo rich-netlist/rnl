@@ -86,6 +86,22 @@ impl Options {
     }
 }
 
+/// An alias that the header record of a file imports from an alias package with @USE-ALIASES
+/// (16.5), as [`Interpretation::imported_aliases`] lists it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImportedAlias {
+    /// The file level whose header record imports it.
+    pub level: LevelId,
+    /// The alias: a keyword with `@`, a `$` name with `$`, another word bare.
+    pub alias: String,
+    /// Its original, written the same way.
+    pub original: String,
+    /// The name of the alias package.
+    pub package: String,
+    /// Where the @USE-ALIASES is.
+    pub loc: crate::diag::Loc,
+}
+
 /// The result of interpreting a document.
 pub struct Interpretation {
     pub model: Model,
@@ -114,6 +130,10 @@ pub struct Interpretation {
     /// as it is when saved (16.1): a tool writes no record into such a level. Empty when a package
     /// file is checked on its own (2.7).
     pub unsupported: Vec<Option<(LevelId, String)>>,
+    /// The aliases that the files import from alias packages and use, in the order the files are
+    /// read (16.5): a tool that raises a file to 0.3 warns of those spelled like a word that 0.3
+    /// adds, as of the aliases the file declares itself ([`crate::writeback::spelled_like_new_words`]).
+    pub imported_aliases: Vec<ImportedAlias>,
     /// The records of the solver to read again, differently (5.9).
     pub(crate) recheck: NumberRun,
     /// In a reading without the records of the solver that counts for another, the objects of the
@@ -193,6 +213,9 @@ pub struct Interp<'p> {
     pub(crate) tol: f64,
     /// The standard package used implicitly for the files of each language version (16.3).
     pub(crate) std_units: HashMap<String, Option<UnitId>>,
+    /// The version of the standard package that the reading asks for ([`Options::std_version`]),
+    /// when it cannot be found, and whether a chain that would use it has said so (16.3).
+    pub(crate) missing_std: Option<(String, bool)>,
     /// The packages in effect on each chain of levels, and the number of units they were found
     /// among (16.2).
     pub(crate) effs: HashMap<EffKey, Rc<Eff>>,
@@ -303,6 +326,7 @@ impl<'p> Interp<'p> {
             want_problems: options.problems,
             tol: options.tolerance,
             std_units: HashMap::new(),
+            missing_std: None,
             effs: HashMap::new(),
             effs_units: 0,
             expansions: HashMap::new(),
@@ -786,6 +810,7 @@ impl<'p> Interp<'p> {
         } else {
             (0..self.doc.levels.len()).map(|lv| self.unsupported_file(lv)).collect()
         };
+        let imported_aliases = self.units.iter().flat_map(|u| u.imported_aliases.iter().cloned()).collect();
         Interpretation {
             model,
             sink: std::mem::take(&mut self.sink),
@@ -796,6 +821,7 @@ impl<'p> Interp<'p> {
             problems,
             numbering,
             unsupported,
+            imported_aliases,
             recheck,
             counted,
             own,

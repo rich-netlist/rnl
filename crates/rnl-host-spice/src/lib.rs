@@ -351,10 +351,7 @@ impl<'a> Reader<'a> {
             if let Some(rest) = raw.strip_prefix('*') {
                 if rest.trim().is_empty() || rest.starts_with(' ') {
                     if (pending.is_some() || subckt_more.is_some()) && continued.after(&lines, idx) {
-                        self.sink.warning(
-                            "a comment line between a statement and its continuation: read, but hosts treat it differently (2.2)",
-                            Some(Loc::line(&fname, no)),
-                        );
+                        self.sink.warning(COMMENT_IN_A_STATEMENT, Some(Loc::line(&fname, no)));
                     }
                     if protect.is_some() && rest.contains("@RNL") {
                         self.sink.warning(PROTECTED, Some(Loc::line(&fname, no)));
@@ -572,12 +569,15 @@ impl<'a> Reader<'a> {
         if !self.doc.levels[circ].circuit {
             return;
         }
+        // the include or section the line was read through (2.8)
+        let file_level = self.doc.file_level(cur);
         let lv = &mut self.doc.levels[circ];
         if !self.names.entry(circ).or_default().insert(lv.name_key(&el.inst.name)) {
             self.sink.error(format!("element {} is defined twice", el.inst.name), Some(Loc::line(fname, no)));
             return;
         }
         let mut inst = el.inst;
+        inst.file_level = Some(file_level);
         inst.order = lv.instances.len();
         let needs = matches!(inst.letter, Some('M') | Some('Q'));
         lv.instances.push(inst);
@@ -592,10 +592,15 @@ fn unquote(s: &str) -> String {
     s.trim_matches(|c| c == '\'' || c == '"').to_string()
 }
 
+/// The warning for a comment line between a statement, a `.subckt` with its ports among them, and
+/// a `+` line that continues it (2.2). The Spectre adapter gives it in SPICE mode too.
+pub const COMMENT_IN_A_STATEMENT: &str =
+    "a comment line between a statement and its continuation: read, but hosts treat it differently (2.2)";
+
 /// The answer of [`Continued::after`] for one run of comment lines: it is the same for all the
 /// lines of the run, so each run is looked through once.
 #[derive(Default)]
-struct Continued {
+pub struct Continued {
     /// The answer holds for the lines from `from` up to the one before `next`, the first line after
     /// `from` that is not a comment line.
     from: usize,
@@ -605,7 +610,7 @@ struct Continued {
 
 impl Continued {
     /// Whether the first line after line `idx` that is not a comment line is a continuation line.
-    fn after(&mut self, lines: &[&str], idx: usize) -> bool {
+    pub fn after(&mut self, lines: &[&str], idx: usize) -> bool {
         if !(self.from..self.next).contains(&idx) {
             let next = (idx + 1..lines.len()).find(|&k| !lines[k].starts_with('*')).unwrap_or(lines.len());
             let answer = lines.get(next).is_some_and(|s| s.trim().starts_with('+'));

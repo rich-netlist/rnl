@@ -370,6 +370,28 @@ fn a_reading_can_ask_for_a_version_of_the_standard_package() {
     let e = errors(&r);
     assert!(e.len() == 1 && e[0].contains("rnl-std 9.9 that the reading asks for cannot be found"), "{e:?}");
     assert!(root(level(&r, "t.sp")).is_empty());
+    // a file that pins a version of it, or drops it with an inline package of its name, does not
+    // need the version asked for: nothing is said, and the version pinned is in effect (16.3)
+    for (header, series) in
+        [("@USE-PACKAGE(name=\"rnl-std\", version=\"0.3\")", true), ("@USE-PACKAGE(name=\"rnl-std\") {}", false)]
+    {
+        let files = MemoryProvider::new().with("t.sp", &netlist("0.3", header, ""));
+        let r = read(&files, "t.sp", &with("9.9"));
+        assert!(errors(&r).is_empty(), "{header}: {:?}", errors(&r));
+        // the series pinned, without the rule package of the other dialect, which a file of 0.3
+        // drops (16.3)
+        let at_root = root(level(&r, "t.sp"));
+        if series {
+            assert!(!at_root.is_empty() && at_root.iter().all(|(_, v)| *v == "0.3"), "{at_root:?}");
+        }
+    }
+    // one that does not pin it, which includes one that does, needs it: said once
+    let child = "* c\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.3\") }\n\
+                 .subckt cell a\nR1 a 0 1k\n.ends\n";
+    let files =
+        MemoryProvider::new().with("t.sp", &netlist("0.3", "", ".include c.inc\nX1 a cell\n")).with("c.inc", child);
+    let e = errors(&read(&files, "t.sp", &with("9.9")));
+    assert!(e.len() == 1 && e[0].contains("rnl-std 9.9 that the reading asks for cannot be found"), "{e:?}");
 }
 
 #[test]

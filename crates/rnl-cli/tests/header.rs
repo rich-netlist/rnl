@@ -118,6 +118,36 @@ fn an_alias_spelled_like_numbering_is_an_error_in_0_3_alone() {
 }
 
 #[test]
+fn an_imported_alias_spelled_like_numbering_is_an_error_in_0_3_alone() {
+    // an alias package of 0.2 reads in its own version, where `numbering` is no standard word; a
+    // file of 0.3 that imports its alias has it in error all the same, as one it declares itself,
+    // and does not use it (16.1, 16.5); a file of 0.2 uses it, and the reading lists it
+    let package =
+        "@RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"my-alias\", version=\"0.2\"); @ALIAS(\"numbering\", \"axis\") }\n";
+    for (version, error) in [("0.3", true), ("0.2", false)] {
+        let text = format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"); \
+             @USE-ALIASES(name=\"my-alias\", version=\"0.2\", path=\"aliases.rnl\") }}\nR1 a 0 1k\n.end\n"
+        );
+        let files = MemoryProvider::new().with("t.sp", &text).with("aliases.rnl", package);
+        let r = read(&files, &Options::default());
+        let errors = said(&r, Severity::Error);
+        let imported: Vec<(&str, &str, &str)> =
+            r.imported_aliases.iter().map(|a| (a.alias.as_str(), a.original.as_str(), a.package.as_str())).collect();
+        if error {
+            let message = "in alias package my-alias, the alias numbering is the name of a standard word in this \
+                           file's language version 0.3; the alias is not used (16.5)";
+            assert_eq!(errors, [("t.sp".to_string(), 2, message.to_string())], "{version}");
+            assert!(imported.is_empty(), "{version}: {imported:?}");
+        } else {
+            assert_eq!(errors, [], "{version}");
+            assert_eq!(imported, [("numbering", "axis", "my-alias")], "{version}");
+            assert_eq!(r.imported_aliases[0].level, 0);
+        }
+    }
+}
+
+#[test]
 fn an_included_file_without_a_version_takes_the_includers() {
     // the main file declares 0.3, 0.2 or nothing, which is the tool's default 0.3; the included
     // file declares none, and its subcircuit is read in the main file's version, while a file that
