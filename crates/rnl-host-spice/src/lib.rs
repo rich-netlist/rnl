@@ -321,6 +321,7 @@ impl<'a> Reader<'a> {
                 }
                 if is_lib && toks.len() == 2 && section.is_some_and(|s| s.eq_ignore_ascii_case(toks[1])) {
                     in_section = true;
+                    self.doc.levels[level].section_lines.get_or_insert((no, 0));
                 } else if raw.contains("@RNL") {
                     self.sink.warning(
                         "RNL outside the selected `.lib` section is not read (2.2)",
@@ -393,6 +394,7 @@ impl<'a> Reader<'a> {
             if first == ".endl" {
                 if section.is_some() {
                     in_section = false;
+                    self.doc.levels[level].close_section(no);
                 }
                 continue;
             }
@@ -456,6 +458,7 @@ impl<'a> Reader<'a> {
         if self.doc.levels[level].end_line == 0 {
             self.doc.levels[level].end_line = lines.len() as u32 + 1;
         }
+        self.doc.levels[level].close_section(lines.len() as u32 + 1);
     }
 
     fn flush_run(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {

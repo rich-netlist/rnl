@@ -5,7 +5,8 @@
 //! mode of its first line: in a Spectre netlist a `.scs` file or one that starts with
 //! `simulator lang=spectre` is in the Spectre dialect and any other file in the SPICE dialect, a
 //! `simulator lang=` further down changing nothing; every file of a SPICE netlist is in the SPICE
-//! dialect. A USE-PACKAGE of either package that the file, or a file that includes it, writes
+//! dialect. The subcircuits of the main file have its dialect, its title being no statement, and a
+//! library section read is a file of its own (2.8), with the mode of its own first statement. A USE-PACKAGE of either package that the file, or a file that includes it, writes
 //! takes effect instead. Nothing is dropped without a standard package, with a standard series
 //! that has no such packages (the toolkit's 0.2), or in a file of 0.2.
 //!
@@ -169,6 +170,44 @@ fn each_file_of_a_spectre_netlist_drops_by_the_mode_of_its_first_line() {
     // current source written there in SPICE is not drawn by the rules of SPICE
     assert_eq!(rules(&r, "mid"), SPECTRE_ONLY);
     assert_ne!(symbol(&r, "mid", "#I3"), "$ISRC");
+}
+
+#[test]
+fn a_subcircuit_of_the_main_file_has_the_dialect_of_the_main_file() {
+    // the first line of the main file is its title, which is no statement, also for the
+    // subcircuits written in it: after a bare title, a `simulator lang=spice` before the first
+    // statement makes the file and its subcircuits SPICE
+    for title in ["Bare title", "* a title"] {
+        let main = format!(
+            "{title}\nsimulator lang=spice\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\")}}\n.subckt cell a b\n\
+             R1 a b 1k\n* @RNL {{ #R1 @PLACE(0, 0) }}\n.ends cell\nX1 in 0 cell\n* @RNL {{ #X1 @PLACE(0, 0) }}\n.end\n"
+        );
+        let r = read("n.scs", &with_std(&[("n.scs", &main)]), &Options::default());
+        assert!(errors(&r).is_empty(), "{title}: {:?}", errors(&r));
+        assert_eq!(rules(&r, "n.scs"), SPICE_ONLY, "{title}");
+        assert_eq!(rules(&r, "cell"), SPICE_ONLY, "{title}");
+        assert_eq!(symbol(&r, "cell", "#R1"), "$RES", "{title}");
+    }
+}
+
+#[test]
+fn a_library_section_has_the_dialect_of_its_own_first_statement() {
+    // a section read is a file (2.8): its dialect is the mode of its first statement, from the mode
+    // it starts in, and what lies outside it does not count. Two sections of one library, one
+    // written in SPICE and one in Spectre
+    let lib = "// library\nsimulator lang=spectre\nlibrary models\nsection spicecorner\nsimulator lang=spice\n\
+               * @RNL(type=\"header\") { @VERSION(\"0.3\")}\n.subckt cell a b\nR1 a b 1k\n\
+               * @RNL { #R1 @PLACE(0, 0) }\n.ends cell\nsimulator lang=spectre\nendsection spicecorner\n\
+               section spectrecorner\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nsubckt cell2 (p n)\n\
+               I2 (p n) cell\n// @RNL { #I2 @PLACE(0, 0) }\nends cell2\nendsection spectrecorner\nendlibrary\n";
+    let main = "// t\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\ninclude \"lib.scs\" section=spicecorner\n\
+                include \"lib.scs\" section=spectrecorner\nX1 (in 0) cell\nX2 (in 0) cell2\n";
+    let r = read("n.scs", &with_std(&[("n.scs", main), ("lib.scs", lib)]), &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(rules(&r, "cell"), SPICE_ONLY);
+    assert_eq!(symbol(&r, "cell", "#R1"), "$RES");
+    assert_eq!(rules(&r, "cell2"), SPECTRE_ONLY);
+    assert_ne!(symbol(&r, "cell2", "#I2"), "$ISRC");
 }
 
 #[test]

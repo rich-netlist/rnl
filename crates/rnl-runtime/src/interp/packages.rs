@@ -40,13 +40,40 @@ pub const SPECTRE_RULES: &str = "rnl-std-spectre";
 /// without a statement is in the mode it ends in. A netlist of another host keeps its own dialect.
 ///
 /// This is the rule of the draft 0.3 for dropping the rule package of the other dialect, and the
-/// one place that decides it.
+/// one place that decides it, with [`section_dialect`] for a library section.
 pub fn file_dialect<'a>(netlist: &'a str, path: &str, text: &str, main: bool) -> &'a str {
     if netlist != "spectre" {
         return netlist;
     }
-    let mut spectre = path.to_lowercase().ends_with(".scs");
-    for (k, raw) in text.lines().enumerate() {
+    dialect_named(first_statement_mode(path.to_lowercase().ends_with(".scs"), text.lines().enumerate(), main))
+}
+
+/// The dialect of a library section, which is read as a file (2.8): [`file_dialect`] of the lines
+/// of `text` between those that open and close it, `lines` ([`crate::host::Level::section_lines`]),
+/// from the mode it starts in, as the Spectre adapter reads it: Spectre's after `section`, SPICE's
+/// after `.lib`. What lies outside the section is not read (2.2), and does not count.
+pub fn section_dialect<'a>(netlist: &'a str, text: &str, lines: (u32, u32)) -> &'a str {
+    if netlist != "spectre" {
+        return netlist;
+    }
+    let (open, close) = (lines.0 as usize, lines.1 as usize);
+    let spectre = !text.lines().nth(open.saturating_sub(1)).unwrap_or("").trim_start().starts_with('.');
+    let inside = text.lines().enumerate().skip(open).take(close.saturating_sub(open + 1));
+    dialect_named(first_statement_mode(spectre, inside, false))
+}
+
+fn dialect_named(spectre: bool) -> &'static str {
+    if spectre {
+        "spectre"
+    } else {
+        "spice"
+    }
+}
+
+/// Whether the first statement of the host among `lines`, each with its index in its file, is read
+/// in Spectre mode, from `spectre`, the mode they start in ([`file_dialect`]).
+fn first_statement_mode<'t>(mut spectre: bool, lines: impl Iterator<Item = (usize, &'t str)>, main: bool) -> bool {
+    for (k, raw) in lines {
         // the title of the main file; a comment line, `*` in both modes, `//` in Spectre's, and on
         // the first line of an included file either, as the adapter reads them
         let comment = raw.starts_with('*') || ((spectre || k == 0) && raw.starts_with("//"));
@@ -64,11 +91,7 @@ pub fn file_dialect<'a>(netlist: &'a str, path: &str, text: &str, main: bool) ->
         }
         break;
     }
-    if spectre {
-        "spectre"
-    } else {
-        "spice"
-    }
+    spectre
 }
 
 /// A reference, a USE-PACKAGE in the header record of a package file (16.2): the package and the
@@ -349,12 +372,18 @@ impl Interp<'_> {
         uses
     }
 
-    /// The dialect of the file a level's text is in (2.2, 16.3): [`file_dialect`] of that file, in
-    /// the dialect of the netlist.
+    /// The dialect of the file a level's text is in (2.2, 16.3), in the dialect of the netlist:
+    /// [`file_dialect`] of that file, whose first line is a title when it is the main file, the
+    /// subcircuits written in it included; or [`section_dialect`] of the library section it is
+    /// read through, which is read as a file (2.8).
     pub(crate) fn level_dialect(&self, level: LevelId) -> &str {
-        let lv = &self.doc.levels[level];
+        let file = self.doc.file_level(level);
+        let lv = &self.doc.levels[file];
         let text = self.doc.source(&lv.file).unwrap_or("");
-        file_dialect(&self.doc.dialect.name, &lv.path, text, level == 0)
+        match lv.section_lines {
+            Some(lines) => section_dialect(&self.doc.dialect.name, text, lines),
+            None => file_dialect(&self.doc.dialect.name, &lv.path, text, file == 0),
+        }
     }
 
     /// The rule package of the other dialect that a level of a file of the draft 0.3 drops
