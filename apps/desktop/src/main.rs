@@ -113,6 +113,8 @@ fn main() {
             initial_file,
             menu::set_view_check,
             solve::solve_preview,
+            solve::solver_defaults,
+            solve::check_solver_options,
             solve::cancel_solve,
             solve::save_solved_copy
         ])

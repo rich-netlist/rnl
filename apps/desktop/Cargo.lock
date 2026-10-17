@@ -2936,6 +2936,7 @@ name = "rnl-viewer"
 version = "0.1.0"
 dependencies = [
  "rnl-cli",
+ "rnl-solver",
  "rnl-view",
  "serde",
  "serde_json",

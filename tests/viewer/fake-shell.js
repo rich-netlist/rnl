@@ -8,8 +8,9 @@
 // `platform=desktop` offers the desktop's commands with the menu shown natively, as the desktop
 // shell does, and what Help > Check for Updates needs, the version that runs being the one
 // `version=VERSION` gives, 0.1.0 by default, and what the Solve menu needs: a solve gives the
-// fixture NAME-preview of the source, which `rnl preview` printed; otherwise it offers the web's
-// commands and the page shows its own menu bar.
+// fixture NAME-preview of the source, which `rnl preview` printed, and the solver's defaults, which
+// Solve > Settings shows, are DEFAULTS below; otherwise it offers the web's commands and the page
+// shows its own menu bar.
 
 const params = new URLSearchParams(location.search);
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";
@@ -18,6 +19,28 @@ const platform = params.get("platform") === "desktop" ? "desktop" : "web";
 const source = (s) => (s === null || s === undefined ? null : typeof s === "string" ? { name: s, fixture: s } : s);
 
 let handler = null; // the page's handler of the commands chosen in the platform's menu
+
+/**
+ * The solver's options without any setting, as the desktop's `solver_defaults` gives them from
+ * `SolverOptions::default()`: the page keeps none of them, so what the tests need is that they have
+ * the shape, not that they are the solver's present values.
+ */
+const DEFAULTS = {
+  tolerance: 0.000001,
+  grid: 1,
+  beam: 4,
+  budget: { candidates: 256, astar_expansions: 200000 },
+  time_limit: 5,
+  hints_for_low: false,
+  objectives: [
+    "current_direction", "turns", "ground_direction", "component_alignment", "distribution", "symmetry",
+    "terminal_wire_alignment", "area", "crossings", "wire_length", "aspect",
+  ].map((name) => ({ items: [{ name, weight: 1 }], tolerance: 0 })),
+  names: [
+    "current_direction", "ground_direction", "signal_flow", "component_alignment", "distribution", "symmetry",
+    "turns", "crossings", "wire_length", "area", "aspect", "terminal_wire_alignment", "labels", "bend_alignment",
+  ],
+};
 
 /** What the page asked of the shell, and what it should do next. */
 const fake = {
@@ -58,6 +81,8 @@ const fake = {
   /** What the next copy saved says, or a message it rejects with when `saveFail` is set. */
   saved: "Saved the solved copy as /copies/solved.sp.",
   saveFail: null,
+  /** What the solver says is wrong with the settings it is asked to check; null when they will do. */
+  optionsError: null,
 };
 window.fakeShell = fake;
 
@@ -65,13 +90,22 @@ let held = null; // the solve that waits: { resolve, reject }
 let progress = null; // the page's handler of each level a solve begins
 
 /**
- * The desktop's Solve menu: a solve records ["solve", name, timeLimit] and gives the fixture
+ * The desktop's Solve menu: a solve records ["solve", name, settings] and gives the fixture
  * NAME-preview; a cancel ["cancelSolve"], and rejects a solve that waits as the desktop does; a copy
- * ["saveSolved"].
+ * ["saveSolved"]; the solver's defaults ["solverDefaults"]; and whether it takes some options
+ * ["checkSolverOptions", options], which `optionsError` makes it refuse.
  */
 const solving = {
-  async solve(src, timeLimit) {
-    fake.calls.push(["solve", src.name, timeLimit]);
+  async solverDefaults() {
+    fake.calls.push(["solverDefaults"]);
+    return structuredClone(DEFAULTS);
+  },
+  async checkSolverOptions(options) {
+    fake.calls.push(["checkSolverOptions", options]);
+    return fake.optionsError;
+  },
+  async solve(src, settings) {
+    fake.calls.push(["solve", src.name, settings]);
     const fail = fake.solveFail;
     fake.solveFail = null;
     if (fail !== null) throw fail;

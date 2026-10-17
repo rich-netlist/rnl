@@ -3,15 +3,17 @@
 // progress and a Cancel button in the status bar; the result drawn as a preview over the file,
 // which stays as it is; a report of what became of each fact in the Solve view of the side panel,
 // every line of it shown in the netlist when clicked; and a copy of the files solved saved where
-// the user says. A shell without `solve`, such as the web's, offers none of it.
+// the user says. The solver's options are Solve > Settings (solve-settings.js). A shell without
+// `solve`, such as the web's, offers none of it.
 
-import { form, inform, modal } from "./dialog.js";
+import { inform, modal } from "./dialog.js";
 import { currentSource, isLoading, openSource, showBuilt } from "./open.js";
 import { setPane } from "./panels.js";
 import { shell } from "./shell.js";
+import { solverSettings } from "./solve-settings.js";
 import { doc } from "./state.js";
 import { revealLine } from "./text.js";
-import { $, load, save, span } from "./util.js";
+import { $, span } from "./util.js";
 
 /** What a shell rejects with when the solve was cancelled (rnl_cli::solve::CANCELLED). */
 export const CANCELLED = "the solve was cancelled";
@@ -42,7 +44,7 @@ export async function solve() {
   document.body.classList.add("solving");
   status(`Solving ${source.name}…`, true);
   try {
-    const solved = await shell.solve(source, load("solve-time-limit", null));
+    const solved = await shell.solve(source, solverSettings());
     shown = { source, report: solved.report };
     showBuilt(solved.document, true);
     renderReport(solved.report);
@@ -100,62 +102,6 @@ export async function saveSolved() {
   } catch (e) {
     await inform({ title, paragraphs: [`The copy was not saved: ${e instanceof Error ? e.message : String(e)}`] });
   }
-}
-
-/**
- * Solve > Time Limit: the seconds the resolution of each level may take to check its facts (8.5),
- * as `rnl solve` takes `time_limit`: its default, a number of seconds, or none.
- */
-export async function timeLimit() {
-  if (modal()) return;
-  const kept = load("solve-time-limit", null);
-  const choice = (value, label) => {
-    const input = document.createElement("input");
-    input.type = "radio";
-    input.name = "solve-limit";
-    input.value = value;
-    const row = document.createElement("label");
-    row.className = "dialog-choice";
-    row.append(input, label);
-    return { input, row };
-  };
-  const byDefault = choice("default", "The default of rnl solve");
-  const seconds = choice("seconds", "Seconds: ");
-  const none = choice("none", "No limit");
-  const box = document.createElement("input");
-  box.type = "number";
-  box.min = "0";
-  box.step = "any";
-  box.className = "solve-seconds";
-  box.setAttribute("aria-label", "Seconds");
-  box.value = typeof kept === "number" ? String(kept) : "5";
-  box.addEventListener("focus", () => (seconds.input.checked = true));
-  seconds.row.append(box);
-  (kept === "none" ? none : typeof kept === "number" ? seconds : byDefault).input.checked = true;
-  const error = document.createElement("p");
-  error.className = "dialog-error";
-  error.hidden = true;
-  const note = document.createElement("p");
-  note.className = "dialog-note";
-  note.textContent = "A fact whose check does not finish within it is discarded undecided, with a warning (8.5).";
-  const answer = form({
-    title: "Solver Time Limit",
-    text: "The time the solver may take to check the facts of each level:",
-    parts: [byDefault.row, seconds.row, none.row, error, note],
-    answer: () => {
-      if (byDefault.input.checked) return { value: null };
-      if (none.input.checked) return { value: "none" };
-      const v = Number(box.value);
-      if (box.value.trim() === "" || !Number.isFinite(v) || v < 0) {
-        error.textContent = "Give a number of seconds, 0 or more.";
-        error.hidden = false;
-        return undefined;
-      }
-      return { value: v };
-    },
-  });
-  const chosen = await answer;
-  if (chosen) save("solve-time-limit", chosen.value);
 }
 
 /** Show each level of the solve under way in the status bar, once the shell can say. */

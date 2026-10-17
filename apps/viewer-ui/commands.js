@@ -10,7 +10,8 @@ import { loadClipboard, pickAndOpen, reload } from "./open.js";
 import { setProblems, setSidebar } from "./panels.js";
 import { clearSelection } from "./selection.js";
 import { shell } from "./shell.js";
-import { closePreview, saveSolved, solve, timeLimit } from "./solve.js";
+import { closePreview, saveSolved, solve } from "./solve.js";
+import { settings } from "./solve-settings.js";
 import { selected } from "./state.js";
 import { ascend, descend, opens } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
@@ -55,7 +56,7 @@ export function command(id) {
     case "solve": solve(); break;
     case "solve-close": closePreview(); break;
     case "solve-save": saveSolved(); break;
-    case "solve-time-limit": timeLimit(); break;
+    case "solve-settings": settings(); break;
     case "check-updates": checkForUpdates(); break;
     case "about": about(); break;
     case "desktop-viewer": toolsPage(); break;

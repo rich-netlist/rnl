@@ -48,7 +48,7 @@
         "-",
         { "id": "solve-save", "label": "Save Solved &Copy As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"] },
         "-",
-        { "id": "solve-time-limit", "label": "&Time Limit...", "platforms": ["desktop"] }
+        { "id": "solve-settings", "label": "S&ettings...", "platforms": ["desktop"] }
       ]
     },
     {
