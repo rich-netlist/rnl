@@ -7,7 +7,12 @@
 //! facts do not allow is dropped, never a fact. The other relations are made for those
 //! orientations (`crate::search::relations`) and taken in after them, each dropped when it does
 //! not fit; the simplex of each axis then holds the facts kept, the literals at their values and
-//! the relations kept.
+//! the relations kept. The first LP keeps neighbouring rows apart as wholes, the lowest point of
+//! one row a gap above the highest of the next; then the rows are kept in the order of their
+//! origins, and only the pairs of elements of two rows whose parts that LP made neighbours on x
+//! are kept a gap apart on y, so that a row rises into the gaps of the one above, beside what is
+//! there (`crate::search::row_pairs`; quality review SE-4); placed again, at most twice more as
+//! new pairs come.
 //!
 //! **The LP** (each axis on its own, as the axes are independent once the orientations are
 //! decided, algorithm synthesis 3.2). Every pin and text the model has is first linked to its
@@ -20,7 +25,11 @@
 //!    of a net routed counts by the end of its lead, a unit its own way, as the router leaves it
 //!    (quality review LP-1);
 //! 2. compactness: the extent of the boxes of the components;
-//! 3. the L1 distance of each origin to where the resolution of the candidate put it: the
+//! 3. the nets that only stubs draw, the supply and the ground that no ROUTE draws: for each, the
+//!    extent of the pins of the elements on it, summed, so that elements that only stubs join, a
+//!    supply source and what it feeds, are not left far apart where the wires and the envelope
+//!    leave room (quality review LP-2); after the wires drawn, as it weighs less than they do;
+//! 4. the L1 distance of each origin to where the resolution of the candidate put it: the
 //!    tie-break that makes the result stable. A symbol's target is that place rounded to the grid;
 //!    a point's is the place itself, as it mostly follows a symbol. A text attached to a point or
 //!    to an object with a coordinate point has its target there instead, `x_text − x_anchor = c`,
@@ -59,13 +68,20 @@ use crate::model::{turned, Model, PointId};
 use crate::rational::{from_f64, int, Q};
 use crate::resolve::{Geometry, Resolver, Tag};
 use crate::route::CLEARANCE;
-use crate::search::{orientation_relations, relations, up, with_relations, Candidate, RelKind, Relation, Tagged};
+use crate::search::{
+    orientation_relations, relations, relations_by_pairs, row_pairs, up, with_relations, Candidate, RelKind, Relation,
+    RowPair, Tagged,
+};
 use crate::simplex::{LinExpr, Rel, Simplex, Var};
 use crate::structure::{Drawn, Role, Structure};
 use crate::{SolverOptions, Work};
 
 /// How many rounds of putting overlapping symbols apart.
 const REPAIR_ROUNDS: usize = 6;
+
+/// How many times, after the first LP, the rows are put apart pair by pair again with the pairs
+/// that the last LP made neighbours on x (quality review SE-4).
+const ROW_ROUNDS: usize = 2;
 
 /// Why two symbols still overlap.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -123,17 +139,48 @@ pub(crate) fn place(
     let mut separations: Vec<Tagged> = Vec::new();
     let mut separated: BTreeSet<(usize, usize)> = BTreeSet::new();
     let mut round = 0;
+    // the rows apart as wholes in the first LP, then pair by pair (quality review SE-4)
+    let mut pairs: Option<Vec<RowPair>> = None;
+    let mut row_rounds = 0;
     loop {
         let mut rels = orient.clone();
         rels.extend(separations.iter().cloned());
-        rels.extend(relations(s, c, &actual, options));
+        rels.extend(match &pairs {
+            None => relations(s, c, &actual, options),
+            Some(pairs) => relations_by_pairs(s, c, &actual, options, pairs),
+        });
         let (geometry, kept, undecided, optimised) = with_relations(s, &rels, work, |r, model, t| {
             let (g, optimised) = optimise(r, model, s, options);
             (g, t.kept.clone(), t.undecided, optimised)
         });
         let origins = s.origins(problem, &geometry);
+        // the pairs of the rows that this LP made neighbours on x, added to those before, each
+        // with the larger gap it asks; only for a candidate with rows to put apart, and while
+        // the LP was solved
+        let mut rows_again = false;
+        if c.rows.len() > 1 && optimised && row_rounds < ROW_ROUNDS {
+            let mut all: BTreeMap<(usize, usize), Q> =
+                pairs.iter().flatten().map(|p| ((p.upper, p.lower), p.least.clone())).collect();
+            let before = all.clone();
+            for p in row_pairs(s, c, &geometry.orient, &origins, options) {
+                let least = all.entry((p.upper, p.lower)).or_insert_with(|| p.least.clone());
+                if p.least > *least {
+                    *least = p.least;
+                }
+            }
+            if pairs.is_none() || all != before {
+                pairs = Some(all.into_iter().map(|((upper, lower), least)| RowPair { upper, lower, least }).collect());
+                row_rounds += 1;
+                rows_again = true;
+            }
+        }
         let overlaps = overlapping(s, &origins, &geometry.orient);
         let new: Vec<(usize, usize)> = overlaps.iter().copied().filter(|p| !separated.contains(p)).collect();
+        if rows_again && round < REPAIR_ROUNDS {
+            // placed again with the rows apart pair by pair before any overlap is repaired: the
+            // overlaps of this placement may not be those of the next
+            continue;
+        }
         if new.is_empty() || round >= REPAIR_ROUNDS {
             let dropped = rels.iter().zip(&kept).filter(|(_, k)| !**k).map(|(t, _)| t.kind).collect();
             let overlaps = overlaps
@@ -290,7 +337,7 @@ fn minimise_and_keep(sx: &mut Simplex<Tag>, objective: &LinExpr) -> Result<(), (
     sx.keep_optimum(objective, Tag::Def).map_err(|_| ())
 }
 
-/// Where layer 3 of the LP pulls an origin (see the module).
+/// Where layer 4 of the LP pulls an origin (see the module).
 enum Target {
     /// To a place.
     At(Q),
@@ -344,7 +391,34 @@ fn lead(s: &Structure, ori: &[Orient], d: &Drawn, p: PointId, axis: usize) -> Q 
     }
 }
 
-/// The three layers of the LP on one axis (see the module).
+/// The pins of the elements on each supply or ground net that no ROUTE draws, by the variable of
+/// the element's origin and the pin's offset from it on an axis: such a net is drawn by the stubs
+/// of its pins alone, and the wire length does not see it. Those with pins of two elements or
+/// more, in the order of the nets.
+fn stub_nets(model: &Model, s: &Structure, ori: &[Orient], axis: usize) -> Vec<BTreeSet<(Var, Q)>> {
+    let routed: BTreeSet<&str> = s.connections.drawn.iter().filter(|d| d.routed).map(|d| d.net.as_str()).collect();
+    let mut out = Vec::new();
+    for net in &s.connections.nets {
+        if !(net.supply || net.ground) || routed.contains(net.name.as_str()) {
+            continue;
+        }
+        let ends: BTreeSet<(Var, Q)> = net
+            .pins
+            .iter()
+            .filter(|(k, _)| s.objects[*k].role == Role::Element)
+            .filter_map(|&(k, pin)| {
+                let origin = model.origin_point.get(k).copied().flatten()?;
+                Some((model.points.get(&origin)?.var, s.pin_offset(k, pin, ori[k])?[axis].clone()))
+            })
+            .collect();
+        if ends.iter().map(|(v, _)| v).collect::<BTreeSet<_>>().len() >= 2 {
+            out.push(ends);
+        }
+    }
+    out
+}
+
+/// The four layers of the LP on one axis (see the module).
 fn layers(
     sx: &mut Simplex<Tag>,
     model: &Model,
@@ -384,7 +458,19 @@ fn layers(
         }
         minimise_and_keep(sx, &LinExpr::diff(hi, lo))?;
     }
-    // 3. the distance to where the resolution put each origin, or to a text's anchor:
+    // 3. the nets that only stubs draw: the extent of the pins of the elements on each
+    let mut objective = LinExpr::default();
+    for ends in stub_nets(model, s, ori, axis) {
+        let (hi, lo) = (sx.new_var(), sx.new_var());
+        for (v, c) in &ends {
+            sx.assert(&LinExpr::diff(hi, *v), Rel::Ge, c, Tag::Def).map_err(fail)?;
+            sx.assert(&LinExpr::diff(*v, lo), Rel::Ge, &-c.clone(), Tag::Def).map_err(fail)?;
+        }
+        objective.add_term(hi, &Q::one());
+        objective.add_term(lo, &-Q::one());
+    }
+    minimise_and_keep(sx, &objective)?;
+    // 4. the distance to where the resolution put each origin, or to a text's anchor:
     // d ≥ e − c and d ≥ c − e, for e = v or e = v − base
     let mut objective = LinExpr::default();
     for ((_, v), t) in own.iter().zip(targets) {
