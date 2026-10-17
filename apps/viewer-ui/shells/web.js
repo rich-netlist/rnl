@@ -464,7 +464,7 @@ export default {
       const dir = entry.path.slice(0, entry.path.lastIndexOf("/"));
       const files = { [entry.path]: entry.text };
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
-      const request = { entry: entry.path, files, svg: true, primitives: false };
+      const request = { entry: entry.path, files, svg: true, primitives: false, lazy_unplaced: true };
       const read = held ? async () => null : (path) => source.read(path, again);
       const { document: doc } = await collect(core, request, read);
       document.title = `${doc.name} - RNL Viewer`;
@@ -473,6 +473,8 @@ export default {
       throw e instanceof Error ? e.message : String(e);
     }
   },
+  /** The drawings of the objects the last Document lists without a position, which the core keeps. */
+  unplacedDrawings: (level, items, names) => core.drawings({ drawings: { level, items, names } }),
   /** Download the files: the web cannot write them where they were read from (decision 0011). */
   async save(source, files) {
     for (const f of files) download(f.name.split("/").pop(), f.text);

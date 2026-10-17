@@ -1,6 +1,7 @@
 // The core as WebAssembly: the module the binding builds (rnl_runtime_wasm.wasm), behind one call
 // that takes a request and returns the Document, for a write the netlist written and its Document,
-// or for a catalog request the catalog of the packages the core has. The call is synchronous, so
+// for a catalog request the catalog of the packages the core has, or for a drawings request the
+// drawings of objects an earlier build kept. The call is synchronous, so
 // the web viewer runs it in a Worker (worker.js); the tests run it in Node.
 
 /**
@@ -19,6 +20,10 @@
  * @property {boolean} [primitives] Give each level's primitives; false when not given.
  * @property {boolean} [status] Give each level its solve status, `solve`, what a frontend decides
  *   from whether to solve it: "fixed", "unsolved", "solved" or "stale"; false when not given.
+ * @property {boolean} [lazy_unplaced] Leave the drawings of the objects without a position,
+ *   `Level.unplaced[].svg` and `primitives`, out of the Document and keep them to give on request
+ *   (`drawings`), until the next build that asks for it; false, the Document carrying them, when
+ *   not given.
  * @property {{ drawing?: boolean, host?: boolean, model?: boolean }} [parts] The parts of the
  *   editor interface's snapshot to give: with them, the answer is a snapshot (snapshot.d.ts), with
  *   the Document as its `drawing` unless `drawing` is false.
@@ -60,6 +65,16 @@
  */
 
 /**
+ * What to draw: the objects at `items` of `levels[level].unplaced` of the Document that the last
+ * build with `lazy_unplaced` gave, which the core kept the drawings of.
+ *
+ * @typedef {object} DrawingsRequest
+ * @property {{ level: number, items: number[], names?: string[] }} drawings `names`, when given, are
+ *   the objects' names as the Document lists them, which the core checks, so that a request about
+ *   a Document that was built again is refused, not answered with other objects.
+ */
+
+/**
  * The core, loaded.
  *
  * @typedef {object} Core
@@ -73,9 +88,13 @@
  *   message when an op cannot be written.
  * @property {(request: CatalogRequest | string) => object} catalog List the symbols, definitions and
  *   sets of the packages the core has, as a catalog request asks.
- * @property {(request: Request | WriteRequest | CatalogRequest | string) => object} respond The core's
- *   answer as it gives it: `{ document }`, `{ snapshot }`, `{ written }`, `{ catalog }` or `{ error }`.
- *   Throws only when the core stops.
+ * @property {(request: DrawingsRequest | string) => object[]} drawings The drawings of the objects a
+ *   request names, `{ svg?, primitives? }` each, in order (`UnplacedDrawing` of document.d.ts).
+ *   Throws an Error with the core's message when no build kept drawings, when an object is not
+ *   there, or when `names` are not those of that build.
+ * @property {(request: Request | WriteRequest | CatalogRequest | DrawingsRequest | string) => object} respond
+ *   The core's answer as it gives it: `{ document }`, `{ snapshot }`, `{ written }`, `{ catalog }`,
+ *   `{ drawings }` or `{ error }`. Throws only when the core stops.
  */
 
 const encoder = new TextEncoder();
@@ -86,6 +105,7 @@ const ASKS = {
   snapshot: "a build with parts",
   written: "a write",
   catalog: "a catalog request",
+  drawings: "a drawings request",
 };
 const REPLACEMENT = String.fromCharCode(0xfffd);
 
@@ -160,6 +180,7 @@ export async function loadCore(wasm) {
     snapshot: (request) => part(request, "snapshot"),
     write: (request) => part(request, "written"),
     catalog: (request) => part(request, "catalog"),
+    drawings: (request) => part(request, "drawings"),
   };
 }
 

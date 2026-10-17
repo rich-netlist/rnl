@@ -19,6 +19,13 @@
  *   Document's types are generated from the core's Rust types into
  *   crates/rnl-view/types/document.d.ts, for checking the page; nothing is loaded from there at
  *   run time.
+ * @property {(level: number, items: number[], names: string[]) => Promise<{ svg?: string }[]>} [unplacedDrawings]
+ *   The drawings of the objects at `items` of `levels[level].unplaced` of the Document `build` gave
+ *   last, `{ svg }` each, in order: the Document leaves them out (`Level.unplaced[].svg`), a netlist
+ *   with no positions listing every object, and the list of them in the side panel asks for the
+ *   rows it shows (unplaced.js). `names` are the objects' names as the Document lists them, which the
+ *   shell's core checks, so that a request about a Document that was built since is refused. Rejects
+ *   with a message when it cannot. A shell whose Documents carry the drawings leaves it out.
  * @property {(id: string, checked: boolean) => void} setCheck Show a check-mark command's state, such as
  *   "toggle-netlist", in the platform's menu.
  * @property {(handler: (id: string) => void) => void} onCommand Call `handler` with the id of each command

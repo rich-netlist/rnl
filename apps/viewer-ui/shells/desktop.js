@@ -22,6 +22,8 @@ export default {
     source.text === undefined
       ? invoke("open_document", { path: source.path, edits: edits || null })
       : invoke("open_text", { name: source.name, text: held(source, edits) }),
+  // the drawings of the objects listed without a position, which the app keeps from the last build
+  unplacedDrawings: (level, items, names) => invoke("unplaced_drawings", { level, items, names }),
   setCheck(id, checked) {
     invoke("set_view_check", { id, checked }).catch(() => {});
   },

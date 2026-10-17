@@ -221,6 +221,41 @@ test("parts ask for a snapshot, through the core and through the Worker", async 
   }
 });
 
+test("the drawings of the objects without a position are kept for a request, through the core and through the Worker", async () => {
+  const text = "* some left\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+  const request = { entry: "/w/a.sp", files: { "/w/a.sp": text }, primitives: true };
+  const carried = core.build(request);
+  const listed = carried.levels[0].unplaced;
+  assert.ok(listed.length >= 2 && listed.every((u) => u.svg && u.primitives));
+  const asked = (items, names) => ({ drawings: { level: 0, items, names } });
+  const names = listed.map((u) => u.name);
+  const all = listed.map((_, k) => k);
+  // nothing is kept by a build that does not ask for it
+  assert.throws(() => core.drawings(asked(all, names)), /lazy_unplaced/);
+  // the Document without the drawings of the objects, and those on request, are the Document with them
+  const lazy = core.build({ ...request, lazy_unplaced: true });
+  assert.ok(lazy.levels[0].unplaced.every((u) => u.svg === undefined && u.primitives === undefined));
+  assert.deepEqual(lazy.levels[0].unplaced.map((u, k) => ({ ...u, svg: listed[k].svg, primitives: listed[k].primitives })), listed);
+  const drawn = core.drawings(asked(all, names));
+  assert.deepEqual(drawn, listed.map((u) => ({ svg: u.svg, primitives: u.primitives })));
+  assert.deepEqual(core.drawings(asked([1, 0])), [drawn[1], drawn[0]]);
+  // what is not there, or is of another build, is refused with the core's message
+  assert.throws(() => core.drawings(asked([99], [])), /99/);
+  assert.throws(() => core.drawings(asked([0], ["R9"])), { message: /built again/ });
+  assert.throws(() => core.build(asked(all, names)), /the request is not a build without parts/);
+  assert.ok("drawings" in core.respond(asked(all, names)));
+  const worker = startCore();
+  try {
+    await assert.rejects(worker.drawings(asked(all, names)), /lazy_unplaced/);
+    const built = await worker.build({ ...request, lazy_unplaced: true });
+    assert.deepEqual(built, lazy);
+    assert.deepEqual(await worker.drawings(asked(all, names)), drawn);
+    await assert.rejects(worker.drawings(asked([0], ["R9"])), { message: /built again/ });
+  } finally {
+    worker.terminate();
+  }
+});
+
 test("the Worker writes, and gives every request the packages its build brings", async () => {
   const plain = startCore();
   try {

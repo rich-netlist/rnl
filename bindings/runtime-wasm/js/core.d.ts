@@ -4,10 +4,10 @@
 // next to this file.
 
 import type { Catalog } from "./catalog.js";
-import type { Document } from "./document.js";
+import type { Document, UnplacedDrawing } from "./document.js";
 import type { Snapshot } from "./snapshot.js";
 
-export type { Catalog, Document, Snapshot };
+export type { Catalog, Document, Snapshot, UnplacedDrawing };
 
 /** What to build: the workspace and how. Fields the core does not know are ignored. */
 export interface Request {
@@ -36,6 +36,12 @@ export interface Request {
    * (decision 0008): "fixed", "unsolved", "solved" or "stale"; false when not given.
    */
   status?: boolean;
+  /**
+   * Leave the drawings of the objects without a position, `Level.unplaced[].svg` and `primitives`,
+   * out of the Document and keep them to give on request (`DrawingsRequest`), until the next build
+   * that asks for it; false, the Document carrying them, when not given.
+   */
+  lazy_unplaced?: boolean;
   /**
    * The parts of the editor interface's snapshot to give: with them, the answer is a Snapshot,
    * with the Document as its `drawing` unless `drawing` is false.
@@ -192,6 +198,16 @@ export interface CatalogRequest {
   std_version?: string;
 }
 
+/**
+ * What to draw: the objects at `items` of `levels[level].unplaced` of the Document that the last
+ * build with `lazy_unplaced` gave, which the core kept the drawings of. `names`, when given, are
+ * their names as the Document lists them, which the core checks: a request about a Document that
+ * was built again is refused, not answered with other objects.
+ */
+export interface DrawingsRequest {
+  drawings: { level: number; items: number[]; names?: string[] };
+}
+
 /** The core, loaded. */
 export interface Core {
   /** Build the Document of a request; throws an Error with the core's message when there is none. */
@@ -202,14 +218,17 @@ export interface Core {
   write(request: WriteRequest | string): Written;
   /** List the symbols, definitions and sets of the packages the core has. */
   catalog(request: CatalogRequest | string): Catalog;
+  /** The drawings of the objects a request names, from the last build that kept them; throws when none did. */
+  drawings(request: DrawingsRequest | string): UnplacedDrawing[];
   /** The core's answer as it gives it; throws only when the core stops. */
   respond(
-    request: Request | WriteRequest | CatalogRequest | string,
+    request: Request | WriteRequest | CatalogRequest | DrawingsRequest | string,
   ):
     | { document: Document }
     | { snapshot: Snapshot }
     | { written: Written }
     | { catalog: Catalog }
+    | { drawings: UnplacedDrawing[] }
     | { error: string };
 }
 
@@ -217,4 +236,4 @@ export interface Core {
 export function loadCore(wasm: string | URL | Response | BufferSource | WebAssembly.Module): Promise<Core>;
 
 /** A request as the JSON text the core reads. */
-export function requestText(request: Request | WriteRequest | CatalogRequest): string;
+export function requestText(request: Request | WriteRequest | CatalogRequest | DrawingsRequest): string;

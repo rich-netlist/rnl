@@ -4,6 +4,8 @@
 // name; picking an object shows its statement in the netlist; and the statements of these objects
 // are greyed in the netlist. The fixture "unplaced" has 60 resistors Rn01 to Rn60, a capacitor C1, a
 // transistor M1 and an instance X1 of a subcircuit without a position, and R1, which is placed.
+// The Documents of the fake shell do not carry the drawings of these objects, as those of the real
+// cores do not: the list asks the shell for the rows it adds (`unplacedDrawings`).
 
 import { expect, test } from "../viewer.js";
 
@@ -31,6 +33,16 @@ async function show(page) {
   await page.locator("#tab-unplaced").click();
   await expect(page.locator("#pane-unplaced")).toBeVisible();
 }
+
+/** The drawings the page has asked the shell for, in order: [level, items], the items being places in the level's list. */
+const asked = (viewer) => viewer.calls("unplacedDrawings");
+
+/** The places in the top level's list of the objects with these names. */
+const places = (page, wanted) =>
+  page.evaluate((wanted) => {
+    const names = window.viewer.doc.levels[0].unplaced.map((u) => u.name);
+    return wanted.map((name) => names.indexOf(name));
+  }, wanted);
 
 /** Scroll the list to its end. */
 const toEnd = (page) => page.locator("#unplaced-list").evaluate((el) => (el.scrollTop = el.scrollHeight));
@@ -189,6 +201,100 @@ test.describe("the objects not drawn", () => {
     await viewer.build(() => page.evaluate(() => window.viewer.command("reload")));
     await expect(page.locator("#unplaced-search")).toHaveValue("");
     await expect(rows(page)).toHaveCount(PART);
+  });
+});
+
+test.describe("the drawings of the objects not drawn", () => {
+  test.beforeEach(async ({ viewer }) => {
+    await viewer.open("unplaced");
+  });
+
+  test("the Document carries none, and the list asks for the part it adds, in one request", async ({ page, viewer }) => {
+    const carried = await page.evaluate(() => window.viewer.doc.levels[0].unplaced.some((u) => u.svg || u.primitives));
+    expect(carried).toBe(false);
+    // nothing is asked for while the list is hidden
+    expect(await asked(viewer)).toEqual([]);
+    await show(page);
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(PART);
+    const first = Array.from({ length: PART }, (_, k) => k);
+    expect(await asked(viewer)).toEqual([[0, first]]);
+    // the next part when the list is scrolled to its end
+    await toEnd(page);
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(2 * PART);
+    expect(await asked(viewer)).toEqual([[0, first], [0, first.map((k) => k + PART)]]);
+    // each is drawn with its own symbol and nets
+    const nets = (name) =>
+      rows(page).filter({ has: page.locator(".name", { hasText: new RegExp(`^${name}$`) }) }).locator(".thumb svg text").allTextContents();
+    expect((await nets("M1")).sort()).toEqual(["0", "d", "g", "s"]);
+    expect((await nets("C1")).sort()).toEqual(["0", "a"]);
+  });
+
+  test("a search asks for the rows it brings by their place in the level's list, and not again for those it has", async ({ page, viewer }) => {
+    await show(page);
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(PART);
+    await page.locator("#unplaced-search").fill("rn5");
+    await expect(rows(page)).toHaveCount(10);
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(10);
+    const rn5 = await places(page, Array.from({ length: 10 }, (_, k) => `Rn${50 + k}`));
+    expect(rn5[0]).toBeGreaterThan(PART);
+    expect((await asked(viewer)).at(-1)).toEqual([0, rn5]);
+    // the first part again: drawn as it was, from what came, without another request
+    await page.locator("#unplaced-search").press("Escape");
+    await expect(rows(page)).toHaveCount(PART);
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(PART);
+    expect((await asked(viewer)).length).toBe(2);
+    // Rn10 to Rn19: Rn18 and Rn19 are the only ones of them not drawn yet
+    await page.locator("#unplaced-search").fill("rn1");
+    await expect(rows(page)).toHaveCount(10);
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(10);
+    expect((await asked(viewer)).slice(2)).toEqual([[0, await places(page, ["Rn18", "Rn19"])]]);
+  });
+
+  test("a drawing the shell cannot give is told on its thumbnail, and its row still works", async ({ page, viewer }) => {
+    await page.evaluate(() => (window.fakeShell.drawingsFail = "the core stopped"));
+    await show(page);
+    await expect(rows(page)).toHaveCount(PART);
+    const thumb = rows(page).first().locator(".thumb");
+    await expect(thumb).toHaveAttribute("title", "The drawing could not be made: the core stopped");
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(0);
+    await rows(page).nth(1).click();
+    await viewer.selected("instance M1 in unplaced.sp");
+    // the next part is asked for as usual
+    await show(page);
+    await toEnd(page);
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(PART);
+    await expect(rows(page).nth(PART).locator(".thumb")).not.toHaveAttribute("title", /./);
+  });
+
+  test("drawings that are late come to the rows they were asked for, whatever the list shows by then", async ({ page, viewer }) => {
+    await page.evaluate(() => (window.fakeShell.holdDrawings = true));
+    await show(page);
+    await expect(rows(page)).toHaveCount(PART);
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(0);
+    // another list, while the first part is awaited: M1 is among that part, and is not asked for again
+    await page.locator("#unplaced-search").fill("rn5");
+    await expect(rows(page)).toHaveCount(10);
+    await page.locator("#unplaced-search").fill("m1");
+    await expect(rows(page)).toHaveCount(1);
+    await page.evaluate(() => {
+      window.fakeShell.holdDrawings = false;
+      window.fakeShell.releaseDrawings();
+    });
+    const m1 = rows(page).first().locator(".thumb svg text");
+    await expect(m1).toHaveCount(4);
+    expect((await m1.allTextContents()).sort()).toEqual(["0", "d", "g", "s"]);
+    expect((await asked(viewer)).length).toBe(2);
+    await page.locator("#unplaced-search").fill("rn5");
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(10);
+  });
+
+  test("a Document that carries the drawings is not asked for them", async ({ page, viewer }) => {
+    await page.evaluate(() => (window.fakeShell.carry = true));
+    await viewer.build(() => page.evaluate(() => window.viewer.command("reload")));
+    expect(await page.evaluate(() => window.viewer.doc.levels[0].unplaced.every((u) => u.svg))).toBe(true);
+    await show(page);
+    await expect(rows(page).locator(".thumb svg")).toHaveCount(PART);
+    expect(await asked(viewer)).toEqual([]);
   });
 });
 

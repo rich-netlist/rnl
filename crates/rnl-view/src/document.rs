@@ -113,15 +113,114 @@ pub struct Unplaced {
     pub objects: Vec<usize>,
     /// The symbol alone at the origin, as it would be drawn on the level with its orientation,
     /// and the name of the net at each of its pins beside the pin, as an SVG document; absent
-    /// unless `BuildOptions::svg` asks for it.
+    /// unless `BuildOptions::svg` asks for it, and absent from a Document built with
+    /// [`crate::build_drawn`], whose [`Drawings`] give it on request.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub svg: Option<String>,
     /// The same drawing as primitives in scene units, as `Level::primitives` has them; absent
-    /// unless `BuildOptions::primitives` asks for them.
+    /// unless `BuildOptions::primitives` asks for them, and from a Document of `build_drawn`.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub primitives: Option<Vec<Primitive>>,
+}
+
+/// The drawing of one object of [`Level::unplaced`], as [`Drawings::unplaced`] gives it: what
+/// `Unplaced::svg` and `Unplaced::primitives` hold when the Document carries them.
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct UnplacedDrawing {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub svg: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub primitives: Option<Vec<Primitive>>,
+}
+
+/// The drawings of the objects that a Document lists without a position, kept to give on request
+/// instead of carried in the Document: a netlist with no positions has every object in the list,
+/// and the page shows a few of them at a time. [`crate::build_drawn`] makes them with the Document.
+/// They hold the items of the runtime's model, which are not `Send`, so a frontend that builds on
+/// one thread keeps them there.
+pub struct Drawings {
+    levels: Vec<DrawnLevel>,
+    render: rnl_render::RenderOptions,
+    svg: bool,
+    primitives: bool,
+}
+
+/// The unplaced objects of a level: the items to draw, the symbols they are drawn with, and their
+/// names as the Document lists them.
+struct DrawnLevel {
+    items: Vec<ItemView>,
+    symbols: Vec<SymbolView>,
+    names: Vec<String>,
+}
+
+impl Drawings {
+    /// The drawings of the levels of `doc`, taken from `levels`, which are left without them.
+    pub(crate) fn take(levels: &mut [LevelView], doc: &Document, options: &BuildOptions) -> Drawings {
+        let levels = levels
+            .iter_mut()
+            .zip(&doc.levels)
+            .map(|(lv, level)| DrawnLevel {
+                items: std::mem::take(&mut lv.unplaced_items),
+                symbols: std::mem::take(&mut lv.unplaced_symbols),
+                names: level.unplaced.iter().map(|u| u.name.clone()).collect(),
+            })
+            .collect();
+        Drawings {
+            levels,
+            render: rnl_render::RenderOptions::default(),
+            svg: options.svg,
+            primitives: options.primitives,
+        }
+    }
+
+    /// The drawings of the objects at `items`, indexes into `Document::levels[level].unplaced`, in
+    /// that order. `names`, when given, are the names the caller has for them, which must be the
+    /// Document's: the drawings are of the Document that was built last, and a caller that
+    /// asks about another one is told so instead of given the drawings of other objects.
+    pub fn unplaced(&self, level: usize, items: &[usize], names: &[String]) -> Result<Vec<UnplacedDrawing>, String> {
+        let lv = self.levels.get(level).ok_or_else(|| format!("the document has no level {level}"))?;
+        if !names.is_empty() && names.len() != items.len() {
+            return Err("the objects and their names are not as many".to_string());
+        }
+        let mut alone = LevelView { symbols: lv.symbols.clone(), ..LevelView::default() };
+        let mut out = Vec::with_capacity(items.len());
+        for (k, &i) in items.iter().enumerate() {
+            let it = lv.items.get(i).ok_or_else(|| format!("level {level} lists no unplaced object {i}"))?;
+            if !names.is_empty() && lv.names[i] != names[k] {
+                return Err(format!(
+                    "unplaced object {i} of level {level} is {}, not {}: the document was built again",
+                    lv.names[i], names[k]
+                ));
+            }
+            out.push(draw_alone(&mut alone, it, &self.render, self.svg, self.primitives));
+        }
+        Ok(out)
+    }
+}
+
+/// An unplaced object drawn alone as the outputs ask: `alone` is a level of nothing but the symbols
+/// of the objects, with `it` put on it, at the origin, and the names of its nets beside its pins.
+fn draw_alone(
+    alone: &mut LevelView,
+    it: &ItemView,
+    render: &rnl_render::RenderOptions,
+    svg: bool,
+    primitives: bool,
+) -> UnplacedDrawing {
+    let sym = &alone.symbols[it.symbol];
+    let labels = net_labels(it, sym);
+    alone.items = vec![ItemView { id: "item-0".into(), at: (0.0, 0.0), ..it.clone() }];
+    alone.texts = labels;
+    let prims = rnl_render::primitives(alone, render);
+    UnplacedDrawing {
+        svg: svg.then(|| rnl_render::svg_document(&prims, render)),
+        primitives: primitives.then(|| primitive::primitives(&prims)),
+    }
 }
 
 /// A subcircuit instance, as a branch of the hierarchy.
@@ -224,7 +323,13 @@ pub struct Diagnostic {
 
 /// The Document of `entry` from its interpretation: draw every level as `options` ask and link the
 /// objects to their places. `missing` is [`Document::missing`].
-pub(crate) fn document(entry: &str, r: &Interpretation, missing: Vec<String>, options: &BuildOptions) -> Document {
+pub(crate) fn document(
+    entry: &str,
+    r: &Interpretation,
+    missing: Vec<String>,
+    options: &BuildOptions,
+    lazy: bool,
+) -> Document {
     let dir = dirname(entry);
     let shown_file = |file: &str| relative_to(file, &dir).unwrap_or(file).to_string();
 
@@ -248,7 +353,7 @@ pub(crate) fn document(entry: &str, r: &Interpretation, missing: Vec<String>, op
         };
         ix.spans.push(Span { object, file, line: h.loc.line, col: h.loc.col, len: h.len, kind: "ref" });
     }
-    let mut levels: Vec<Level> = r.model.levels.iter().map(|lv| ix.level(lv, options)).collect();
+    let mut levels: Vec<Level> = r.model.levels.iter().map(|lv| ix.level(lv, options, lazy)).collect();
     let drawn: HashMap<usize, usize> = r.model.levels.iter().enumerate().map(|(k, lv)| (lv.level, k)).collect();
     for (k, lv) in r.model.levels.iter().enumerate() {
         let host = &r.doc.levels[lv.level];
@@ -443,7 +548,7 @@ impl<'a> Index<'a> {
     }
 
     /// The drawing of a level, as `options` ask, and what on it can be clicked.
-    fn level(&mut self, lv: &LevelView, options: &BuildOptions) -> Level {
+    fn level(&mut self, lv: &LevelView, options: &BuildOptions, lazy: bool) -> Level {
         let lv = &with_page_ids(lv);
         let render = rnl_render::RenderOptions::default();
         let prims = rnl_render::primitives(lv, &render);
@@ -502,20 +607,27 @@ impl<'a> Index<'a> {
             solve: None,
             hits,
             children: Vec::new(),
-            unplaced: self.unplaced(lv, &render, options),
+            unplaced: self.unplaced(lv, &render, options, lazy),
         }
     }
 
-    /// The objects of a level without a position, each drawn alone.
-    fn unplaced(&self, lv: &LevelView, render: &rnl_render::RenderOptions, options: &BuildOptions) -> Vec<Unplaced> {
+    /// The objects of a level without a position, each drawn alone as `options` ask, or, when
+    /// `lazy`, not drawn: [`Drawings`] gives their drawings on request.
+    fn unplaced(
+        &self,
+        lv: &LevelView,
+        render: &rnl_render::RenderOptions,
+        options: &BuildOptions,
+        lazy: bool,
+    ) -> Vec<Unplaced> {
         // a level of nothing but the symbols of the objects, with one of them in turn on it
-        let mut alone = LevelView { symbols: lv.unplaced_symbols.clone(), ..LevelView::default() };
+        let draws = !lazy && (options.svg || options.primitives);
+        let mut alone =
+            LevelView { symbols: if draws { lv.unplaced_symbols.clone() } else { Vec::new() }, ..LevelView::default() };
         let mut out = Vec::new();
         for it in &lv.unplaced_items {
             let sym = &lv.unplaced_symbols[it.symbol];
-            alone.items = vec![ItemView { id: "item-0".into(), at: (0.0, 0.0), ..it.clone() }];
-            alone.texts = net_labels(it, sym);
-            let prims = rnl_render::primitives(&alone, render);
+            let drawn = draws.then(|| draw_alone(&mut alone, it, render, options.svg, options.primitives));
             let name = match it.host.as_slice() {
                 [i] => self.doc.levels[lv.level].instances.get(*i).map(|inst| inst.name.clone()),
                 _ => None,
@@ -525,8 +637,8 @@ impl<'a> Index<'a> {
                 name: name.unwrap_or_else(|| it.id.clone()),
                 symbol: sym.name.clone(),
                 objects: it.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect(),
-                svg: options.svg.then(|| rnl_render::svg_document(&prims, render)),
-                primitives: options.primitives.then(|| primitive::primitives(&prims)),
+                svg: drawn.as_ref().and_then(|d| d.svg.clone()),
+                primitives: drawn.and_then(|d| d.primitives),
             });
         }
         out
@@ -781,6 +893,44 @@ M1 d g s 0 nmos
             .hits
             .iter()
             .all(|h| h.objects.iter().all(|o| !["C1", "M1"].contains(&d.objects[*o].name.as_str()))));
+    }
+
+    #[test]
+    fn the_drawings_of_the_unplaced_can_be_asked_for_instead_of_carried() {
+        let text = "* some left\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\nR2 a d 2k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+        let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", text);
+        let options = BuildOptions { primitives: true, ..BuildOptions::default() };
+        let carried = crate::build("a.sp", &files, &options).unwrap();
+        let (kept, drawings) = crate::build_drawn("a.sp", &files, &options).unwrap();
+        // the Document is the same but for what the objects carry of their drawings
+        let mut v = serde_json::to_value(&carried).unwrap();
+        for level in v["levels"].as_array_mut().unwrap() {
+            for u in level["unplaced"].as_array_mut().unwrap() {
+                let u = u.as_object_mut().unwrap();
+                assert!(u.remove("svg").is_some() && u.remove("primitives").is_some());
+            }
+        }
+        assert_eq!(serde_json::to_value(&kept).unwrap(), v);
+        let listed = &carried.levels[0].unplaced;
+        assert!(listed.len() >= 3);
+        assert!(kept.levels[0].unplaced.iter().all(|u| u.svg.is_none() && u.primitives.is_none()));
+        // asked for, in any order, each is what the Document carries
+        let names: Vec<String> = listed.iter().map(|u| u.name.clone()).collect();
+        let all: Vec<usize> = (0..listed.len()).collect();
+        let got = drawings.unplaced(0, &all, &names).unwrap();
+        for (u, d) in listed.iter().zip(&got) {
+            assert_eq!((&u.svg, &u.primitives), (&d.svg, &d.primitives), "{}", u.name);
+        }
+        let some = drawings.unplaced(0, &[2, 0], &[names[2].clone(), names[0].clone()]).unwrap();
+        assert_eq!(some, [got[2].clone(), got[0].clone()]);
+        // the names are optional, and, given, must be those of the Document: a Document built again
+        // is not answered with the drawings of other objects
+        assert_eq!(drawings.unplaced(0, &[1], &[]).unwrap(), [got[1].clone()]);
+        let e = drawings.unplaced(0, &[1], &["R9".to_string()]).unwrap_err();
+        assert!(e.contains("built again"), "{e}");
+        assert!(drawings.unplaced(0, &[99], &[]).is_err());
+        assert!(drawings.unplaced(7, &[0], &[]).is_err());
+        assert!(drawings.unplaced(0, &[0, 1], &["R2".to_string()]).is_err());
     }
 
     #[test]

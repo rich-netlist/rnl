@@ -3,10 +3,13 @@
 // its terminals as the core drew them (`Level.unplaced`), and its name. The list loads a part at a
 // time, the next when it is scrolled to its end, and is searched by name; picking an object selects
 // it and shows its statement in the netlist. The lines of those statements are greyed in the
-// netlist (text.js, `markUnplaced`).
+// netlist (text.js, `markUnplaced`). The drawings are not all in the Document: a netlist with no
+// positions lists every object, so the shell's core draws the objects of a part when the list adds
+// it (`shell.unplacedDrawings`), and a Document that carries them is drawn from itself.
 
 import { setPane, setSidebar } from "./panels.js";
 import { select } from "./selection.js";
+import { shell } from "./shell.js";
 import { current, doc } from "./state.js";
 import { revealLine } from "./text.js";
 import { $, span } from "./util.js";
@@ -16,9 +19,10 @@ const NEAR_END = 60; // pixels from the end of the list at which the next part i
 
 const list = $("unplaced-list");
 const search = $("unplaced-search");
-let found = []; // the objects of the level shown that the search finds, in netlist order
+let found = []; // the objects of the level shown that the search finds, as indexes into its list, in netlist order
 let rows = 0; // how many of them have a row in the list
 let scroll = 0; // the list's scroll, which a pane that is hidden loses
+const drawn = new WeakMap(); // an object that its drawing was asked for -> the promise of { svg } or { error }
 
 /** The objects of the level shown that are not drawn. */
 function unplaced() {
@@ -44,7 +48,10 @@ export function renderUnplaced() {
 function rebuild() {
   const all = unplaced();
   const q = search.value.trim().toLowerCase();
-  found = all.filter((u) => !q || u.name.toLowerCase().includes(q));
+  found = [];
+  all.forEach((u, i) => {
+    if (!q || u.name.toLowerCase().includes(q)) found.push(i);
+  });
   rows = 0;
   scroll = 0;
   list.replaceChildren();
@@ -75,7 +82,9 @@ function fill() {
   if (more) more.remove();
   while (rows < found.length && (rows === 0 || list.scrollHeight - list.scrollTop - list.clientHeight < NEAR_END)) {
     const q = search.value.trim().toLowerCase();
-    for (const u of found.slice(rows, rows + BATCH)) list.append(row(u, q));
+    const part = found.slice(rows, rows + BATCH);
+    draw(part);
+    for (const i of part) list.append(row(i, q));
     rows = Math.min(rows + BATCH, found.length);
   }
   if (rows < found.length) {
@@ -86,8 +95,29 @@ function fill() {
   }
 }
 
+/**
+ * Ask the shell for the drawings of the objects at `items` of the level shown that the Document does
+ * not carry and nobody has asked for yet, all in one request. The answer is kept for the row, when
+ * it is made, to take; a failure is kept the same way, to be shown on the thumbnail.
+ */
+function draw(items) {
+  const all = unplaced();
+  const wanted = items.filter((i) => !all[i].svg && !drawn.has(all[i]));
+  if (wanted.length === 0 || !shell || !shell.unplacedDrawings) return;
+  const failed = (e) => ({ error: e instanceof Error ? e.message : String(e) });
+  let request;
+  try {
+    request = Promise.resolve(shell.unplacedDrawings(current, wanted, wanted.map((i) => all[i].name)));
+  } catch (e) {
+    request = Promise.reject(e);
+  }
+  const answered = request.then((got) => wanted.map((_, k) => got[k] ?? {}), (e) => wanted.map(() => failed(e)));
+  wanted.forEach((i, k) => drawn.set(all[i], answered.then((got) => got[k])));
+}
+
 /** A row: the object's symbol, its name, and what it is. */
-function row(u, q) {
+function row(i, q) {
+  const u = unplaced()[i];
   const el = document.createElement("div");
   el.className = "unplaced-row";
   el.setAttribute("role", "option");
@@ -119,16 +149,26 @@ function row(u, q) {
   return el;
 }
 
-/** The symbol drawn alone, as the core wrote it; nothing when the page was given no SVG. */
+/**
+ * The symbol drawn alone, as the core wrote it: from the Document, or, when it was asked for
+ * (`draw`), when it comes; nothing when the page has no SVG for it.
+ */
 function thumbnail(u) {
   const box = span("thumb", "");
-  if (!u.svg) return box;
-  const el = document.importNode(new DOMParser().parseFromString(u.svg, "image/svg+xml").documentElement, true);
+  if (u.svg) show(box, u);
+  else if (drawn.has(u)) drawn.get(u).then((d) => show(box, d));
+  return box;
+}
+
+/** Put a drawing, `{ svg }`, in the box; a failure, `{ error }`, is its tooltip. */
+function show(box, { svg, error }) {
+  if (error) box.title = `The drawing could not be made: ${error}`;
+  if (!svg) return;
+  const el = document.importNode(new DOMParser().parseFromString(svg, "image/svg+xml").documentElement, true);
   el.removeAttribute("width");
   el.removeAttribute("height");
   el.setAttribute("aria-hidden", "true");
   box.append(el);
-  return box;
 }
 
 /** Select the object and show its statement in the netlist. */
@@ -159,7 +199,7 @@ search.addEventListener("keydown", (e) => {
     rebuild();
     e.stopPropagation();
   } else if (e.key === "Enter") {
-    if (found.length > 0) pick(found[0]);
+    if (found.length > 0) pick(unplaced()[found[0]]);
   }
 });
 // the status bar says how many are not drawn: it opens the list

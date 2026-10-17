@@ -12,7 +12,8 @@ use crate::{
     Color, Diagnostic, Document, FileRef, HAlign, Hit, HostInstance, HostLevel, HostNet, HostTerminal, Join, Layer,
     Level, LevelModel, LevelSnapshot, Object, ObjectView, PackageUse, PinLabel, PinView, PointView, Primitive, Run,
     RunStyle, Segment, Shape, ShapeView, Slot, Snapshot, SourceFile, Span, Stroke, SymbolDefinition, SymbolPin,
-    SymbolPrim, SymbolRef, Terminal, Text, TextRun, TextView, Unit, Unplaced, VAlign, Vertex, WireView,
+    SymbolPrim, SymbolRef, Terminal, Text, TextRun, TextView, Unit, Unplaced, UnplacedDrawing, VAlign, Vertex,
+    WireView,
 };
 
 const CATALOG_HEADER: &str = "\
@@ -117,6 +118,7 @@ fn all() -> Vec<(String, String)> {
         one::<Hit>(&cfg),
         one::<Child>(&cfg),
         one::<Unplaced>(&cfg),
+        one::<UnplacedDrawing>(&cfg),
         one::<SourceFile>(&cfg),
         one::<Object>(&cfg),
         one::<Span>(&cfg),
