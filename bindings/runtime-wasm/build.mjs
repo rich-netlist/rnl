@@ -7,7 +7,9 @@
 // --features passes cargo features on, such as test-panic for the tests; --out puts the result into
 // DIR instead. The module is built with the workspace's `wasm` profile. --packages brings the .rnl
 // files of DIR with the build: packages.js lists them, and the Worker gives them to every request.
-// --name and --version go into the package.json, for a frontend that links the result as a package.
+// --name and --version go into the package.json, for a frontend that links the result as a package
+// or for npm (publish-runtime.yml publishes it as @rich-netlist/runtime): a named package is not
+// private, and has the README of packages/runtime and the licenses of what it holds.
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -49,7 +51,15 @@ for (const name of ["document.d.ts", "snapshot.d.ts"]) copyFileSync(join(here, "
 const lines = (...l) => l.join("\n") + "\n";
 if (Object.keys(manifest).length) {
   const pkg = JSON.parse(readFileSync(join(here, "js", "package.json"), "utf8"));
+  delete pkg.private;
   writeFileSync(join(out, "package.json"), lines(JSON.stringify({ ...pkg, ...manifest }, null, 2)));
+  // the code's license, MIT, and those of what the module compiles in: the standard packages and
+  // analog-canvas-extensions (CC0-1.0) and the metrics of Noto Sans SC (OFL-1.1)
+  const root = join(here, "..", "..");
+  copyFileSync(join(root, "packages", "runtime", "README.md"), join(out, "README.md"));
+  copyFileSync(join(root, "LICENSE"), join(out, "LICENSE"));
+  mkdirSync(join(out, "LICENSES"), { recursive: true });
+  for (const name of ["CC0-1.0.txt", "OFL-1.1.txt"]) copyFileSync(join(root, "LICENSES", name), join(out, "LICENSES", name));
 }
 // the packages the build brings, under a directory of their own, with LF line endings
 if (packages) {

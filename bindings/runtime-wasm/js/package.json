@@ -1,6 +1,16 @@
 {
   "name": "rnl-runtime-wasm",
   "private": true,
+  "description": "The RNL core as WebAssembly: SPICE and Spectre netlists with their RNL records read into the Documents a viewer draws, the editor interface's snapshots, and edits written back into the netlist.",
+  "license": "MIT AND CC0-1.0 AND OFL-1.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rich-netlist/rnl.git",
+    "directory": "bindings/runtime-wasm"
+  },
+  "homepage": "https://github.com/rich-netlist/rnl/tree/main/packages/runtime#readme",
+  "bugs": "https://github.com/rich-netlist/rnl/issues",
+  "keywords": ["rnl", "netlist", "schematic", "spice", "spectre", "webassembly"],
   "type": "module",
   "types": "./client.d.ts",
   "exports": {
@@ -8,5 +18,6 @@
     "./core": { "types": "./core.d.ts", "default": "./core.js" },
     "./worker": "./worker.js",
     "./package.json": "./package.json"
-  }
+  },
+  "publishConfig": { "access": "public", "tag": "next" }
 }
