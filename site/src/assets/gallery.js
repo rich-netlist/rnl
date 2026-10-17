@@ -94,7 +94,7 @@
     return map;
   }
 
-  /* The rule that gives the usages of a definition their symbol: `# @SELECT-USAGE $GND => @SET-SYMBOL $GROUND` */
+  /* The rule that gives the usages of a definition their symbol: `# @SELECT-USAGE $GROUND => @SET-SYMBOL $GROUND_SYMBOL` in 0.3 */
   function drawnAs(group, def) {
     var re = new RegExp('@SELECT-USAGE\\s+\\' + def + '(?![\\w])');
     var found = null;
