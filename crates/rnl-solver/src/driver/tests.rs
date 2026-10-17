@@ -1645,6 +1645,170 @@ R1 a b 1k
     }
 }
 
+/// The width and the height of a level as it is drawn: the boxes of its components and its wires
+/// routed (the extent of the metrics of the review, without the stubs' own short wires, which lie
+/// in their boxes' columns).
+fn extent(e: &Exact) -> [Q; 2] {
+    let s = &e.structure;
+    let (at, ori) = (&e.placed.origins, &e.placed.geometry.orient);
+    let mut points: Vec<[Q; 2]> = Vec::new();
+    for k in s.components() {
+        if let Some(b) = s.box_at(at, ori, k) {
+            points.push([b[0].clone(), b[1].clone()]);
+            points.push([b[2].clone(), b[3].clone()]);
+        }
+    }
+    points.extend(e.routing.paths.iter().flatten().cloned());
+    let span = |axis: usize| {
+        let lo = points.iter().map(|q| &q[axis]).min().cloned().unwrap_or_default();
+        let hi = points.iter().map(|q| &q[axis]).max().cloned().unwrap_or_default();
+        hi - lo
+    };
+    [span(0), span(1)]
+}
+
+/// The length of the wires routed for each net, by its name.
+fn length_by_net(p: &LevelProblem, solved: &Solved, e: &Exact) -> BTreeMap<String, Q> {
+    let mut out: BTreeMap<String, Q> = BTreeMap::new();
+    for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
+        let length: Q = path.windows(2).map(|s| (&s[1][0] - &s[0][0]).abs() + (&s[1][1] - &s[0][1]).abs()).sum();
+        *out.entry(p.routes[w.route].net.clone()).or_default() += length;
+    }
+    out
+}
+
+/// Whether the steps between the origins of some elements, left to right, are all the same.
+fn evenly_spaced(e: &Exact, ks: &[usize]) -> bool {
+    let mut xs: Vec<Q> = ks.iter().map(|&k| e.placed.origins[k][0].clone()).collect();
+    xs.sort();
+    xs.windows(3).all(|w| &w[2] - &w[1] == &w[1] - &w[0])
+}
+
+/// Phase 2 of the quality review, "stop stretching the drawing": nothing evenly spaces a row of
+/// elements in no group, the texts are as wide as they are drawn and on the outer side of a
+/// source, two rows are kept apart only where their elements are neighbours on x, and what only
+/// stubs join is drawn together (SE-3, ST-7, SE-8, SE-4, LP-2). The numbers of phase 1 in the
+/// comments.
+#[test]
+fn the_drawings_are_not_stretched() {
+    let num = |v: f64| from_f64(v).unwrap();
+    // T2: M1 risen towards RD, the wire between them 3 long (6), as the ground of VDD, left of
+    // M1, no longer sets the gap between the rows: a gap below RD would make it 2, but the wire
+    // from VIN to the gate of M1 runs under that ground, a unit clear of it; VIN nearer M1 (14),
+    // its value on its outer side
+    let (p, solved, e) = case_level("T2-common-source.sp", "T2-common-source.sp");
+    let what = summary(&p, &solved, &e);
+    assert!(length_by_net(&p, &solved, &e)["out"] <= int(3), "{what}");
+    let [vin, m1] = ["#VIN", "#M1"].map(|l| object(&p, l));
+    assert!(&e.placed.origins[m1][0] - &e.placed.origins[vin][0] < int(14), "{what}");
+    assert_eq!(e.placed.geometry.orient[vin], Orient::MY, "{what}");
+    // T3's testbench: the lower row not evenly spaced (16 apart), CL nearer the output (&out 33
+    // long), VDD beside XU1 (21 apart), narrower (50.5); the wires from the sources up to XU1
+    // still pass under the grounds of VDD and XU1, crossing nothing, as the rows keep their way
+    let (p, solved, e) = case_level("T3-ota5t.sp", "T3-ota5t.sp");
+    let what = summary(&p, &solved, &e);
+    let row = ["#VIP", "#VIN", "#VB", "#CL"].map(|l| object(&p, l));
+    assert!(!evenly_spaced(&e, &row), "{what}");
+    assert!(length_by_net(&p, &solved, &e)["out"] <= int(24), "{what}");
+    let [vdd, xu1] = ["#VDD", "#XU1"].map(|l| object(&p, l));
+    assert!(&e.placed.origins[xu1][0] - &e.placed.origins[vdd][0] <= int(12), "{what}");
+    assert!(extent(&e)[0] < num(50.5), "{what}");
+    let wires = crate::score::drawn(&p, &e.structure, &e.placed.geometry, &e.routing);
+    let view = crate::objectives::View { s: &e.structure, at: &e.placed.origins, orient: &e.placed.geometry.orient };
+    let crossings = crate::objectives::score(crate::objectives::Objective::Crossings, &view, Some(&wires));
+    assert!(crossings.is_zero(), "{what}");
+    // T4: M5 and M7 nearer the input pair (at -15), lower (44.3)
+    let (p, solved, e) = case_level("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
+    let what = summary(&p, &solved, &e);
+    for label in ["#M5", "#M7"] {
+        assert!(e.placed.origins[object(&p, label)][1] > int(-15), "{what}: {label}");
+    }
+    assert!(extent(&e)[1] < num(44.3), "{what}");
+    // T5: the row not evenly spaced (13 apart), narrower (80.5)
+    let (p, solved, e) = case_level("T5-inverting-amp-rlc.sp", "T5-inverting-amp-rlc.sp");
+    let what = summary(&p, &solved, &e);
+    let row = e.candidate.rows[0].clone();
+    assert!(row.len() >= 7 && !evenly_spaced(&e, &row), "{what}");
+    assert!(extent(&e)[0] < num(80.5), "{what}");
+    // T6: compact again (348 wide after phase 1, 302 before it)
+    let (p, solved, e) = case_level("T6-r2r-ladder.sp", "T6-r2r-ladder.sp");
+    let what = summary(&p, &solved, &e);
+    assert!(!e.candidate.even, "{what}");
+    assert!(extent(&e)[0] <= int(220), "{what}");
+}
+
+/// The structure of the level with a title of a case of the solver, not solved.
+fn case_structure(file: &str, title: &str) -> (LevelProblem, Structure) {
+    let ps = problems(&repo().join("tests/integration/solver").join(file));
+    let p = ps.into_iter().find(|p| p.title == title).unwrap_or_else(|| panic!("{file}: no level {title}"));
+    let options = SolverOptions::without_time_limit();
+    let resolved = crate::resolve(&p, &options);
+    let s = crate::structure::analyse(&p, &resolved, &options, CAPS, &mut crate::Work::default());
+    (p, s)
+}
+
+/// What a candidate with even rows spaces evenly (quality review SE-3): the members of a group,
+/// those that a DISTRIBUTE or a mirror pair joins, and those of one kind and one role, such as the
+/// legs of a ladder; never a row as such, a chain of a `$FLOW` or the elements in no group, which
+/// are no scope of the objectives measured within groups either.
+#[test]
+fn only_groups_pairs_and_elements_of_one_role_are_spaced_evenly() {
+    let labels = |p: &LevelProblem, set: &[usize]| -> Vec<String> {
+        let mut v: Vec<String> = set.iter().map(|&k| p.objects[k].label.clone()).collect();
+        v.sort();
+        v
+    };
+    let names = |prefix: &str, n: usize| -> Vec<String> {
+        let mut v: Vec<String> = (0..n).map(|i| format!("#{prefix}{i}")).collect();
+        v.sort();
+        v
+    };
+    // T6, no group: the legs of 2R, the sources and the series arm, each a set; not the row
+    let (p, s) = case_structure("T6-r2r-ladder.sp", "T6-r2r-ladder.sp");
+    let sets: Vec<Vec<String>> = s.even_sets.iter().map(|set| labels(&p, set)).collect();
+    assert_eq!(sets.len(), 3, "{sets:?}");
+    for want in [names("R2B", 8), names("VB", 8), names("RS", 7)] {
+        assert!(sets.contains(&want), "{want:?} in {sets:?}");
+    }
+    assert!(s.scopes.is_empty());
+    // T5: a chain of a $FLOW and a load of two elements hung from one net: nothing
+    let (_, s) = case_structure("T5-inverting-amp-rlc.sp", "T5-inverting-amp-rlc.sp");
+    assert!(s.even_sets.is_empty(), "{:?}", s.even_sets);
+    // T4: the two groups, and no set of the two halves of a mirror pair alone
+    let (p, s) = case_structure("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
+    let sets: Vec<Vec<String>> = s.even_sets.iter().map(|set| labels(&p, set)).collect();
+    assert_eq!(sets, vec![labels(&p, &p.groups[0].members), labels(&p, &p.groups[1].members)]);
+    assert_eq!(s.scopes.len(), 2);
+}
+
+/// The texts are as wide as the renderer lays them out, with a margin, not 0.6 of their size a
+/// character (quality review ST-7): the value of T2's source, 72.62 pixels at 14 a unit, 5.19
+/// wide, was taken 6.6 wide.
+#[test]
+fn a_text_is_as_wide_as_it_is_drawn() {
+    use rnl_runtime::problem::{Filler, TextInfo};
+    let text = |s: &str, halign: &str, rotate: f64| TextInfo {
+        attach: Filler::Other(String::new()),
+        key: None,
+        lines: rnl_runtime::markup::parse(s),
+        halign: halign.to_string(),
+        valign: "baseline".to_string(),
+        rotate,
+        style: Vec::new(),
+    };
+    let b = crate::structure::text_box(&text("DC 0.6 AC 1", "start", 0.0), (Q::zero(), Q::zero())).unwrap();
+    let w = &b[2] - &b[0];
+    assert!(w > from_f64(5.19).unwrap() && w < from_f64(5.5).unwrap(), "{b:?}");
+    // the baseline 0.8 of the size below the top, 0.4 above the bottom
+    assert_eq!((b[1].clone(), b[3].clone()), (from_f64(-0.4).unwrap(), from_f64(0.8).unwrap()));
+    // ending at the anchor, and turned a quarter about it: along y, below the anchor
+    let b = crate::structure::text_box(&text("DC 0.6 AC 1", "end", 90.0), (int(1), int(2))).unwrap();
+    let q = |v: f64| from_f64(v).unwrap();
+    assert_eq!([&b[0], &b[2], &b[3]], [&q(0.2), &q(1.4), &q(2.1)], "{b:?}");
+    assert_eq!(&b[3] - &b[1], w);
+    assert!(crate::structure::text_box(&text("", "start", 0.0), (Q::zero(), Q::zero())).is_none());
+}
+
 // -------------------------------------------------- what the solver places, and what it leaves free
 
 use rnl_runtime::problem::{Filler, Reference};
@@ -1687,12 +1851,12 @@ fn relation_points(r: &Relation) -> Vec<(usize, Vec<PointId>)> {
 }
 
 /// Whether the LP decides each object's coordinate on each axis, by object: false where it is
-/// left where the witness of the resolution happens to be. The LP's first two layers, the facts
+/// left where the witness of the resolution happens to be. The LP's first three layers, the facts
 /// kept, the links of pins and texts to their objects, the wires, the relations of the candidate
 /// `c` taken, with the orientations `ori`, and the anchors of texts all bound differences of
 /// coordinates only, so a set of objects that they join on an axis can move as one along it,
 /// unless it holds an element, which the search places in its rows, or a fact kept that fixes a
-/// coordinate (a PLACE, or a coordinate of a point, 11.1). Otherwise only layer 3, the distance
+/// coordinate (a PLACE, or a coordinate of a point, 11.1). Otherwise only layer 4, the distance
 /// to where the resolution put it, holds it, and its coordinates there are where the witness
 /// happens to be, such as 0 for what nothing reaches; the repair of overlaps only pushes it out of
 /// the way of the symbols placed, and is not counted. Such is a point `(_, _)` in no wire on an

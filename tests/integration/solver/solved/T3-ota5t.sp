@@ -106,23 +106,23 @@ CL out 0 1p
 *   %gnd_stub_CL_n = $GND_STUB @ATTACH(gap=2, priority="normal") #CL:n;
 *   %supply_stub_XU1_vdd = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #XU1:vdd;
 *   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #VDD:p;
-*   #XU1 @PLACE(12, 9) => @ORIENT("R0");
-*   #VDD @PLACE(-9, 9) => @ORIENT("R0");
-*   #VB @PLACE(23, -3) => @ORIENT("R0");
-*   #VIP @PLACE(-9, -3) => @ORIENT("R0");
-*   #VIN @PLACE(7, -3) => @ORIENT("R0");
-*   #CL @PLACE(39, -3) => @ORIENT("R0");
-*   %gnd_stub_XU1_vss::g @PLACE(12, 4) => @ORIENT("R0");
-*   %gnd_stub_VDD_n::g @PLACE(-9, 4) => @ORIENT("R0");
-*   %gnd_stub_VB_n::g @PLACE(23, -8) => @ORIENT("R0");
-*   %gnd_stub_VIP_n::g @PLACE(-9, -8) => @ORIENT("R0");
-*   %gnd_stub_VIN_n::g @PLACE(7, -8) => @ORIENT("R0");
-*   %gnd_stub_CL_n::g @PLACE(39, -7) => @ORIENT("R0");
-*   %supply_stub_XU1_vdd::s @PLACE(12, 14) => @ORIENT("R0");
-*   %supply_stub_VDD_p::s @PLACE(-9, 14) => @ORIENT("R0");
-*   &inp @WIRE(mode="straight") {#VIP:p (-9, 1) (6, 1) (6, 10) #XU1:inp};
-*   &inn @WIRE(mode="straight") {#VIN:p (7, 8) #XU1:inn};
-*   &out @WIRE(mode="straight") {#XU1:out (39, 9) #CL:p};
-*   &vb @WIRE(mode="straight") {#XU1:vbias (10, 1) (23, 1) #VB:p}
+*   #XU1 @PLACE(10, 1) => @ORIENT("R0");
+*   #VDD @PLACE(0, 1) => @ORIENT("R0");
+*   #VB @PLACE(19, -11) => @ORIENT("R0");
+*   #VIP @PLACE(-7, -11) => @ORIENT("R0");
+*   #VIN @PLACE(5, -11) => @ORIENT("R0");
+*   #CL @PLACE(26, -11) => @ORIENT("R0");
+*   %gnd_stub_XU1_vss::g @PLACE(10, -4) => @ORIENT("R0");
+*   %gnd_stub_VDD_n::g @PLACE(0, -4) => @ORIENT("R0");
+*   %gnd_stub_VB_n::g @PLACE(19, -16) => @ORIENT("R0");
+*   %gnd_stub_VIP_n::g @PLACE(-7, -16) => @ORIENT("R0");
+*   %gnd_stub_VIN_n::g @PLACE(5, -16) => @ORIENT("R0");
+*   %gnd_stub_CL_n::g @PLACE(26, -15) => @ORIENT("R0");
+*   %supply_stub_XU1_vdd::s @PLACE(10, 6) => @ORIENT("R0");
+*   %supply_stub_VDD_p::s @PLACE(0, 6) => @ORIENT("R0");
+*   &inp @WIRE(mode="straight") {#VIP:p (-7, -7) (4, -7) (4, 2) #XU1:inp};
+*   &inn @WIRE(mode="straight") {#VIN:p (5, 0) #XU1:inn};
+*   &out @WIRE(mode="straight") {#XU1:out (26, 1) #CL:p};
+*   &vb @WIRE(mode="straight") {#XU1:vbias (8, -7) (19, -7) #VB:p}
 * }
 .end

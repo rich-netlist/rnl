@@ -20,16 +20,16 @@ VIN in 0 DC 0.6 AC 1
 *   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VIN:n;
 *   %supply_stub_RD_p = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #RD:p;
 *   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #VDD:p;
-*   #M1 @PLACE(10, -11) => @ORIENT("R0");
-*   #RD @PLACE(10, 0) => @ORIENT("R0");
-*   #VDD @PLACE(0, 0) => @ORIENT("R0");
-*   #VIN @PLACE(-4, -15) => @ORIENT("R0");
-*   %gnd_stub_M1_s::g @PLACE(10, -15) => @ORIENT("R0");
-*   %gnd_stub_VDD_n::g @PLACE(0, -5) => @ORIENT("R0");
-*   %gnd_stub_VIN_n::g @PLACE(-4, -20) => @ORIENT("R0");
-*   %supply_stub_RD_p::s @PLACE(10, 5) => @ORIENT("R0");
-*   %supply_stub_VDD_p::s @PLACE(0, 5) => @ORIENT("R0");
+*   #M1 @PLACE(3, -8) => @ORIENT("R0");
+*   #RD @PLACE(3, 0) => @ORIENT("R0");
+*   #VDD @PLACE(-4, 0) => @ORIENT("R0");
+*   #VIN @PLACE(-4, -12) => @ORIENT("MY");
+*   %gnd_stub_M1_s::g @PLACE(3, -12) => @ORIENT("R0");
+*   %gnd_stub_VDD_n::g @PLACE(-4, -5) => @ORIENT("R0");
+*   %gnd_stub_VIN_n::g @PLACE(-4, -17) => @ORIENT("R0");
+*   %supply_stub_RD_p::s @PLACE(3, 5) => @ORIENT("R0");
+*   %supply_stub_VDD_p::s @PLACE(-4, 5) => @ORIENT("R0");
 *   &out @WIRE(mode="straight") {#M1:d #RD:n};
-*   &in @WIRE(mode="straight") {#VIN:p (-4, -11) #M1:g}
+*   &in @WIRE(mode="straight") {#VIN:p (-4, -8) #M1:g}
 * }
 .end
