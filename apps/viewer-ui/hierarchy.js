@@ -1,8 +1,14 @@
-// The hierarchy view: the subcircuit instances as a tree under the top level, and every
-// subcircuit by name under its initial, with a search box. Picking a row opens its level: a row of
-// the tree by the way to it from the top level, a subcircuit of the index as the root of the path.
+// The hierarchy view: the subcircuit instances as a tree under the top level, below it the
+// subcircuits that the top level does not call as trees of their own, and every subcircuit by name
+// under its initial, with a search box. Picking a row opens its level: a row of the tree by the way
+// to it from its root, a subcircuit of the index as the root of the path.
+//
+// The paths of the rows: "0" is the top level and "0/1/0" the first instance of the second instance
+// of the top level; "r3/0" is the first instance of the subcircuit 3 that the top level does not
+// call (roots.js).
 
 import { current, doc, expanded } from "./state.js";
+import { uncalledRoots } from "./roots.js";
 import { enterRoot, enterRow, pathRow } from "./subcircuits.js";
 import { $, span } from "./util.js";
 
@@ -13,7 +19,17 @@ export function renderHierarchy() {
   renderIndex();
 }
 
-/** The tree of subcircuit instances under the top level; only open branches are listed. */
+const ROOT = { root: true }; // the `child` of a row that starts a tree of an uncalled subcircuit
+
+/** The path of the row of an uncalled subcircuit's level. */
+export function rootPath(level) {
+  return `r${level}`;
+}
+
+/**
+ * The tree of subcircuit instances under the top level, and below it, in a group of their own, those
+ * under each subcircuit that the top level does not call; only open branches are listed.
+ */
 function renderTree() {
   const tree = $("tree");
   tree.replaceChildren();
@@ -32,6 +48,13 @@ function renderTree() {
     });
   };
   walk(0, "0", 0, null, []);
+  const roots = uncalledRoots();
+  if (roots.length === 0) return;
+  const heading = document.createElement("div");
+  heading.className = "tree-group";
+  heading.textContent = "Not called from the top level";
+  tree.append(heading);
+  for (const r of roots) walk(r, rootPath(r), 0, ROOT, []);
 }
 
 function treeRow({ level, path, depth, child, branches, open, cycle }) {
@@ -55,6 +78,9 @@ function treeRow({ level, path, depth, child, branches, open, cycle }) {
   row.append(twisty);
   if (child === null) {
     row.append(span("inst", doc.levels[0].title), span("badge", "top"));
+  } else if (child === ROOT) {
+    row.append(span("inst", doc.levels[level].title), span("badge", "not called"));
+    row.title = `No instance calls ${doc.levels[level].title}`;
   } else {
     row.append(span("inst", child.instance), span("master", child.master));
     if (level === null) row.append(span("badge", "not defined"));
@@ -79,7 +105,10 @@ function toggleBranch(path) {
   renderTree();
 }
 
-/** The first path in the tree that reaches `level`, opening the branches above it; or null. */
+/**
+ * The first path in the tree that reaches `level`, from the top level and else from the roots of the
+ * subcircuits it does not call; or null.
+ */
 export function pathTo(level) {
   const find = (l, path, above) => {
     if (l === level) return path;
@@ -92,7 +121,13 @@ export function pathTo(level) {
     }
     return null;
   };
-  return find(0, "0", []);
+  const top = find(0, "0", []);
+  if (top) return top;
+  for (const r of uncalledRoots()) {
+    const p = find(r, rootPath(r), []);
+    if (p) return p;
+  }
+  return null;
 }
 
 /** The subcircuits by name, under their initials; the top level always first. */

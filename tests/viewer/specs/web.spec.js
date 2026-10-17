@@ -9,7 +9,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { root } from "../fixtures.js";
+import { root, UNCALLED } from "../fixtures.js";
 
 // Playwright builds and serves the site when the run can include these tests (playwright.config.js)
 test.skip(!process.env.RNL_WEB_URL, "the site is not built: RNL_WEB=0");
@@ -320,6 +320,34 @@ test("a Latin-1 file is read as rnl reads it", async ({ page }) => {
   expect(doc.files[0].text.split("\n")[0]).toBe(`* 10${micro}s at 25${degree}C`);
   sameAsRnl(doc, path.join(folder({ "latin1.sp": bytes }), "latin1.sp"));
   await expect(page.locator("#source .ln").first()).toContainText(`10${micro}s at 25${degree}C`);
+});
+
+test("a netlist of subcircuits alone opens on the one nothing calls, as the core reads it", async ({ page }) => {
+  await start(page);
+  const open = (name, lines) => {
+    const text = lines.concat("").join(String.fromCharCode(10));
+    return { text, file: { name, mimeType: "text/plain", buffer: Buffer.from(text) } };
+  };
+  const [name, lines] = UNCALLED.uncalled;
+  const { text, file } = open(name, lines);
+  const doc = await opened(page, () => page.locator("#file-input").setInputFiles(file));
+  sameAsRnl(doc, path.join(folder({ [name]: text }), name));
+  expect(doc.levels.map((l) => l.title)).toEqual(["uncalled.sp", "ota_5t", "Testbench"]);
+  // the top level has no objects: the testbench opens, drawn, and the status bar says why
+  await expect(page.locator("#level-name")).toHaveText("Testbench");
+  await expect(page.locator("#notice")).toHaveText("The top level is empty; showing Testbench.");
+  await expect(page.locator("#canvas > svg g[data-id]")).not.toHaveCount(0);
+  await page.locator("#tab-hierarchy").click();
+  await expect(page.locator("#tree .tree-row")).toHaveText(["uncalled.sptop", "Testbenchnot called", "XDUTota_5t"]);
+  await page.locator('#tree .tree-row[data-path="r2/0"]').click();
+  await expect(page.locator("#level-name")).toHaveText("ota_5t");
+  await expect(page.locator("#notice")).toBeHidden();
+
+  // a file with no object at all says so, and has no hierarchy to point to
+  const empty = open(...UNCALLED.nothing);
+  await opened(page, () => page.locator("#file-input").setInputFiles(empty.file));
+  await expect(page.locator("#level-name")).toHaveText("nothing.sp");
+  await expect(page.locator("#empty")).toHaveText("This level has no objects, so nothing is drawn.");
 });
 
 test("an include that is not there is missing, and a problem at its line", async ({ page }) => {

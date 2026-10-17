@@ -577,6 +577,8 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 .statusbar .selection { color: var(--fg); flex-shrink: 0; }
 .statusbar .note { color: var(--accent); flex-shrink: 0; }
 .statusbar .note[hidden] { display: none; }
+.statusbar .notice { color: var(--accent); min-width: 0; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+.statusbar .notice[hidden] { display: none; }
 .statusbar .selection b { color: var(--select); font-weight: 600; }
 .statusbar .status { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
 .statusbar .pointer, .statusbar .zoom { font-variant-numeric: tabular-nums; flex-shrink: 0; }
@@ -620,6 +622,14 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 }
 .tree-row .twisty[aria-expanded="true"]::before { transform: rotate(90deg); }
 .tree-row .twisty.leaf::before { border: 0; }
+.tree-group {
+  margin-top: 6px;
+  padding: 4px 10px 2px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
 .tree-row .inst { font-weight: 600; }
 .tree-row .master { color: var(--muted); }
 .tree-row .badge {

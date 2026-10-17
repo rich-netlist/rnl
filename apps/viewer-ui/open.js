@@ -12,10 +12,11 @@ import { adoptBuffers, changes, resetBuffers } from "./edits.js";
 import { confirmLeave } from "./editor.js";
 import { shell } from "./shell.js";
 import { current, doc, expanded, selected, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
-import { clearDrawing, showLevel, view } from "./drawing.js";
-import { renderHierarchy } from "./hierarchy.js";
+import { clearDrawing, notice, showLevel, view } from "./drawing.js";
+import { renderHierarchy, rootPath } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
 import { markDiagnostics, renderDiagnostics } from "./problems.js";
+import { startLevel, uncalledRoots } from "./roots.js";
 import { select } from "./selection.js";
 import { endPreview, previewing, solve } from "./solve.js";
 import { namedPath, restorePath } from "./subcircuits.js";
@@ -224,6 +225,7 @@ function snapshot() {
     file: doc.files[fileShown] ? doc.files[fileShown].path : null,
     selected: sel && { kind: sel.kind, name: sel.name, level: sel.level },
     expanded,
+    roots: uncalledRoots().map(rootPath),
     path: namedPath(),
     viewCache,
   };
@@ -231,7 +233,11 @@ function snapshot() {
 
 function showDocument(before) {
   setSelected(null);
-  setExpanded(before ? before.expanded : new Set(["0"]));
+  // the trees of the subcircuits that the top level does not call start open, also those that a
+  // document read again gained
+  const roots = uncalledRoots().map(rootPath);
+  const gained = before ? roots.filter((r) => !before.roots.includes(r)) : roots;
+  setExpanded(new Set([...(before ? before.expanded : ["0"]), ...gained]));
   setViewCache(before ? before.viewCache : new Map());
   renderFiles();
   const diags = doc.diagnostics.slice();
@@ -254,10 +260,14 @@ function showDocument(before) {
     renderHierarchy();
     return;
   }
-  const level = before ? doc.levels.findIndex((l) => l.title === before.level) : -1;
+  const kept = before ? doc.levels.findIndex((l) => l.title === before.level) : -1;
+  // the level it was, else the top level, or, when that has no objects, the first subcircuit that
+  // nothing calls, with a line that says so
+  const start = kept >= 0 ? { level: kept, note: "" } : startLevel();
   // the path by the names of its levels and instances, or else one that starts at the level
-  restorePath(before ? before.path : [], level >= 0 ? level : 0);
-  showLevel(level >= 0 ? level : 0, level >= 0 ? before.view : null);
+  restorePath(before ? before.path : [], start.level);
+  showLevel(start.level, kept >= 0 ? before.view : null);
+  notice(start.note);
 
   if (before && before.selected) {
     const s = before.selected;

@@ -90,6 +90,8 @@ test("a clipboard that cannot be read, or holds no text, says so and opens nothi
     "The clipboard could not be read: Read permission denied.",
   );
   await dialog(page).getByRole("button", { name: "Close" }).click();
+  // the next command waits for this dialog to be gone: a modal dialog takes no command
+  await expect(dialog(page)).toHaveCount(0);
   await clipboard(page, " \n\t\n");
   await load(page);
   await expect(dialog(page).locator(".dialog-body p")).toHaveText("The clipboard holds no text to load.");

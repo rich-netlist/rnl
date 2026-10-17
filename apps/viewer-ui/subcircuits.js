@@ -9,6 +9,8 @@
 
 import { current, doc, path, setPath, viewCache } from "./state.js";
 import { showLevel, view } from "./drawing.js";
+import { rootPath } from "./hierarchy.js";
+import { uncalledRoots } from "./roots.js";
 import { clearSelection, select } from "./selection.js";
 import { revealDefinition } from "./text.js";
 import { $, span } from "./util.js";
@@ -89,10 +91,14 @@ export function goTo(level) {
   enter(cutTo(level));
 }
 
-/** Show the level of a row of the hierarchy tree, by the way to it from the top level. */
+/**
+ * Show the level of a row of the hierarchy tree, by the way to it from the root of its tree: the top
+ * level, "0/1", or a subcircuit that the top level does not call, "r3/0" (hierarchy.js).
+ */
 export function enterRow(row) {
-  const next = [{ level: 0, via: null }];
-  for (const k of row.split("/").slice(1).map(Number)) {
+  const [start, ...rest] = row.split("/");
+  const next = [{ level: start.startsWith("r") ? Number(start.slice(1)) : 0, via: null }];
+  for (const k of rest.map(Number)) {
     const child = doc.levels[next[next.length - 1].level].children[k];
     if (!child || child.level === null) return;
     next.push({ level: child.level, via: child.instance });
@@ -110,10 +116,15 @@ export function enterRoot(level) {
   revealDefinition(level);
 }
 
-/** The tree row of the path shown when it starts at the top level, as "0/1/0"; otherwise null. */
+/**
+ * The tree row of the path shown when it starts at the top level, as "0/1/0", or at a subcircuit
+ * that the top level does not call, as "r3/0"; otherwise null.
+ */
 export function pathRow() {
-  if (path.length === 0 || path[0].level !== 0) return null;
-  const row = ["0"];
+  if (path.length === 0) return null;
+  const first = path[0].level;
+  if (first !== 0 && !uncalledRoots().includes(first)) return null;
+  const row = [first === 0 ? "0" : rootPath(first)];
   for (let d = 1; d < path.length; d++) {
     const k = doc.levels[path[d - 1].level].children.findIndex((c) => c.instance === path[d].via);
     if (k < 0) return null;

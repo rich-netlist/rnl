@@ -36,6 +36,7 @@ let badgeAt = null; // the drawing point of the open badge: a selected subcircui
  */
 export function showLevel(i, keptView) {
   setCurrent(i);
+  notice("");
   const lv = doc.levels[i];
   $("level-kind").textContent = i === 0 ? "top level" : lv.kind === "subckt" ? "subcircuit" : "file level";
   $("status").textContent = lv.status ? `Not drawn without a solver: ${lv.status}` : "";
@@ -57,7 +58,7 @@ export function showLevel(i, keptView) {
     paintGrid(null);
     showPointer();
     $("zoom").textContent = "";
-    $("empty").textContent = "Nothing on this level has a position yet, so nothing is drawn.";
+    $("empty").textContent = emptyMessage(lv);
     $("empty").hidden = false;
     return;
   }
@@ -91,7 +92,25 @@ export function showLevel(i, keptView) {
   paintDrawingSelection();
 }
 
+/**
+ * Why a level shows nothing: its objects have no position yet, or it has no objects at all, when
+ * the netlist's other levels are in the Hierarchy.
+ */
+function emptyMessage(lv) {
+  if (lv.unplaced.length > 0) return "Nothing on this level has a position yet, so nothing is drawn.";
+  const none = "This level has no objects, so nothing is drawn.";
+  return doc.levels.length > 1 ? `${none} The subcircuits of this netlist are in the Hierarchy.` : none;
+}
+
+/** The line in the status bar that says why this level is shown; showing another level takes it away. */
+export function notice(text) {
+  const el = $("notice");
+  el.textContent = text;
+  el.hidden = text === "";
+}
+
 export function clearDrawing(message) {
+  notice("");
   if (svg) svg.remove();
   svg = null;
   overlay = null;

@@ -30,7 +30,8 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `edits.js` | The text the user edits (decision 0011): per file, what it was when read, what the editor holds and what the Document was built from; which files have changes not saved, and which not applied; the texts to build or solve over the files. |
 | `editor.js` | Editing the text: the netlist pane switched to edit, a text box and line numbers for each file, the state above the text, Apply Changes, Save and Save As, and asking before changes not saved are left (see [Editing the text](#editing-the-text)). |
 | `problems.js` | The problems list and the coloured line numbers. |
-| `hierarchy.js` | The hierarchy view: the instance tree, and the subcircuit index with its search and initials. |
+| `hierarchy.js` | The hierarchy view: the instance tree, with below it the subcircuits that the top level does not call as trees of their own, and the subcircuit index with its search and initials. |
+| `roots.js` | The subcircuits that the top level does not call, which start trees of their own, and the level a document opens on (see [Subcircuits that nothing calls](#subcircuits-that-nothing-calls)). |
 | `unplaced.js` | The Not drawn view: the objects of the level shown that have no position, each with its symbol and the nets at its terminals, in a list that loads a part at a time, with their drawings, and is searched by name (see [The objects not drawn](#the-objects-not-drawn)). |
 | `panels.js` | The side panel's views, what is folded, and the splitters. The layout is kept in `localStorage` under `sidebar-shown`, `sidebar-width`, `side-pane`, `problems-shown`, `problems-height`, `index-height` and `show-failed`. |
 | `commands.js` | Running a command by its id, and the keys. |
@@ -56,6 +57,14 @@ The bar above the drawing shows the path of the level shown, from its root down 
 - The views kept are by path, the root's title and the instances on it, so a subcircuit reached two ways keeps a view for each.
 
 The tree marks the row of the path when the path starts at the top level, and else the first row that reaches the level; the index marks the level shown. Where the bar is narrow, the level's kind gives way first, then the levels after the root, from the root's side, behind an ellipsis whose list goes back to them, then the root; the level shown always stays, its name cut short only when nothing else is left to give way.
+
+## Subcircuits that nothing calls
+
+A netlist of subcircuits alone, a library or a testbench that is defined and never instantiated, has a top level with nothing on it, and no instance leads from it to its subcircuits. The page does not leave them to the index:
+
+- **The tree** lists, below the top level, a group *Not called from the top level*. Its roots are the subcircuits that no chain of instances from the top level reaches and that no other such subcircuit calls, in the order of the netlist, each with the subcircuits it calls below it (`Testbench` with its instance `XDUT` of `ota_5t`); a subcircuit that a root calls hangs below it and is not a root too, and may be below several. Of subcircuits that call each other around a cycle nothing outside calls, the first starts the tree. The roots start open. Their rows have the paths `r3`, `r3/0`, ..., `r3` being the root's level, and open a level as a row of the first tree does, by the way to it from the root. The core says nothing of this: `roots.js` works it out from `Level.children`.
+- **A document opens on** the top level, also when its objects have no position yet. When the top level has no objects at all (`Level.empty` and no `Level.unplaced`) and the netlist has roots, it opens on the first root that has something to draw, or else the first, and the status bar says so, *The top level is empty; showing Testbench*, until another level is shown. A document read again keeps the level it was on.
+- **A level with nothing to draw** says why: *Nothing on this level has a position yet, so nothing is drawn.* when it has objects that have no position (they are in the Not drawn view), and *This level has no objects, so nothing is drawn.* when it has none, with *The subcircuits of this netlist are in the Hierarchy.* when the netlist has any.
 
 ## The solver's settings
 

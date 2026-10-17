@@ -5,8 +5,9 @@
 // outside the BMP, which JavaScript counts as two; a file of many lines; netlists of the solver's
 // tests that `rnl solve` solved, for a drawing that no PLACE fixes; what `rnl preview` prints of
 // a netlist, for the desktop's Solve menu; a netlist with many objects that have no position, for
-// the list of what is not drawn; and a small netlist before and after an edit, with its line
-// ends, for editing the text.
+// the list of what is not drawn; netlists of subcircuits that nothing calls, with a top level that
+// has no objects; and a small netlist before and after an edit, with its line ends, for editing the
+// text.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -107,6 +108,98 @@ export const UNPLACED = [
   ".end",
 ];
 
+/**
+ * Netlists whose top level has no objects, by the name of the fixture and the file it is built from,
+ * each file's lines, for the subcircuits that nothing calls (apps/viewer-ui/roots.js).
+ *
+ * - `uncalled.sp`: what Analog Canvas writes for a cell and its testbench, both placed: the
+ *   subcircuit `ota_5t`, which has the levels' index 1, and `Testbench`, 2, which instantiates it.
+ * - `uncalled-spectre.scs`: the same in Spectre, as `ota` (1) and `tb` (2).
+ * - `uncalled-lib.sp`: a library. `lone` (1) is not placed; `stage` (2) is, and calls `cell` (3);
+ *   `ping` (4) and `pong` (5) call each other and nothing else does.
+ * - `uncalled-unplaced.sp`: two subcircuits, `first` and `second`, with no position at all.
+ * - `uncalled-top.sp`: a resistor at the top level without a position, and a subcircuit `spare`.
+ * - `nothing.sp`: a title and no object at all.
+ */
+export const UNCALLED = {
+  uncalled: [
+    "uncalled.sp",
+    [
+      "* a cell and its testbench",
+      ".subckt ota_5t inp inn out vdd vss",
+      "M1 out inp tail vss nmos",
+      "M2 x inn tail vss nmos",
+      ".ends ota_5t",
+      ".subckt Testbench VSS",
+      "XDUT a b c d VSS ota_5t",
+      "R1 a VSS 1k",
+      ".ends Testbench",
+      '* @RNL(scope="ota_5t") { #M1 @PLACE(0, 0); #M2 @PLACE(8, 0) }',
+      '* @RNL(scope="Testbench") { #XDUT @PLACE(0, 0); #R1 @PLACE(10, 0) }',
+      ".end",
+    ],
+  ],
+  "uncalled-spectre": [
+    "uncalled-spectre.scs",
+    [
+      "// a cell and its testbench",
+      "simulator lang=spectre",
+      "subckt ota (inp inn out)",
+      "R1 (inp out) resistor r=1k",
+      "R2 (inn out) resistor r=2k",
+      "ends ota",
+      "subckt tb (vss)",
+      "XDUT (a b c) ota",
+      "R1 (a vss) resistor r=1k",
+      "ends tb",
+      '// @RNL(scope="ota") { #R1 @PLACE(0, 0); #R2 @PLACE(8, 0) }',
+      '// @RNL(scope="tb") { #XDUT @PLACE(0, 0); #R1 @PLACE(10, 0) }',
+    ],
+  ],
+  "uncalled-lib": [
+    "uncalled-lib.sp",
+    [
+      "* a library: no instance at the top level",
+      ".subckt lone a b",
+      "R1 a b 1k",
+      ".ends lone",
+      ".subckt stage a b",
+      "XL a m cell",
+      "R1 m b 1k",
+      ".ends stage",
+      ".subckt cell p q",
+      "R1 p q 1k",
+      ".ends cell",
+      ".subckt ping a",
+      "X1 a pong",
+      ".ends ping",
+      ".subckt pong a",
+      "X1 a ping",
+      ".ends pong",
+      '* @RNL(scope="stage") { #XL @PLACE(0, 0); #R1 @PLACE(8, 0) }',
+      ".end",
+    ],
+  ],
+  "uncalled-unplaced": [
+    "uncalled-unplaced.sp",
+    [
+      "* subcircuits with no position",
+      ".subckt first p q",
+      "R1 p q 1k",
+      ".ends first",
+      ".subckt second p q",
+      "R1 p q 2k",
+      ".ends second",
+      ".end",
+    ],
+  ],
+  "uncalled-top": [
+    "uncalled-top.sp",
+    ["* an object at the top level without a position", ".subckt spare p q", "R1 p q 1k", ".ends spare", "R1 a 0 1k", ".end"],
+  ],
+  nothing: ["nothing.sp", ["* nothing", ".end"]],
+};
+
 /** The statements over several lines: a SPICE netlist with `+` lines, and a Spectre one with `\`. */
 export const CONTINUED = {
   "continued.sp": [
@@ -186,7 +279,7 @@ function view(rnl, file, cwd) {
  * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3;
  * "continued" and "continued-spectre", the netlists of CONTINUED; "edit", "edit-changed", the
  * same file after the edit, and "edit-crlf", the same with CRLF line ends, from EDITED; "unicode",
- * the netlist of UNICODE; "unplaced", the netlist of UNPLACED; "long", a title, LONG lines of a bare
+ * the netlist of UNICODE; the netlists of UNCALLED; "unplaced", the netlist of UNPLACED; "long", a title, LONG lines of a bare
  * `*`, R1, a record that places it and `.end`; and those of SOLVED, from the files that `rnl solve`
  * writes under `solved` in `dir`; and those of PREVIEWS.
  */
@@ -234,6 +327,11 @@ export function writeFixtures(rnl, dir) {
 
   fs.writeFileSync(path.join(dir, "unicode.sp"), UNICODE.concat("").join("\n"));
   fs.writeFileSync(path.join(dir, "unicode.json"), view(rnl, "unicode.sp", dir));
+
+  for (const [name, [file, lines]] of Object.entries(UNCALLED)) {
+    fs.writeFileSync(path.join(dir, file), lines.concat("").join("\n"));
+    fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, dir));
+  }
 
   fs.writeFileSync(path.join(dir, "unplaced.sp"), UNPLACED.concat("").join("\n"));
   fs.writeFileSync(path.join(dir, "unplaced.json"), view(rnl, "unplaced.sp", dir));
