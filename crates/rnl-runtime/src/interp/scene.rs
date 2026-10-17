@@ -395,10 +395,10 @@ impl Interp<'_> {
 
     /// Is an instance written in a file that follows the draft 0.3? The file of its line: in an
     /// included file, an element outside a subcircuit belongs to the circuit that includes it
-    /// (6.1) and is still written in that file.
+    /// (6.1) and is still written in that file; in a library section, the section, which is read
+    /// as a file of its own (2.8).
     fn written_in_0_3(&self, s: SceneId, inst: &crate::host::Instance) -> bool {
-        let file = (0..self.doc.levels.len())
-            .find(|&l| self.doc.levels[l].kind == crate::host::LevelKind::File && self.doc.levels[l].file == inst.file);
+        let file = self.doc.file_level_at(&inst.file, inst.line);
         self.follows_0_3(self.level_unit[file.unwrap_or(self.scenes[s].level)])
     }
 

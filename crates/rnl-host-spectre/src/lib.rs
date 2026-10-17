@@ -395,6 +395,7 @@ impl<'a> Reader<'a> {
                     let opens = (first == "section" || first == ".lib") && words.len() == 2;
                     if opens && section.is_some_and(|s| s.eq_ignore_ascii_case(words[1])) {
                         in_section = true;
+                        self.doc.levels[level].section_lines.get_or_insert((no, 0));
                         // each section sets its own language; it starts in SPICE mode (S1 p498)
                         st.mode = if first == "section" { Mode::Spectre } else { Mode::Spice };
                     } else if raw.contains("@RNL") {
@@ -473,6 +474,7 @@ impl<'a> Reader<'a> {
                     ".endl" => {
                         if section.is_some() {
                             in_section = false;
+                            self.doc.levels[level].close_section(no);
                         }
                         continue;
                     }
@@ -559,6 +561,7 @@ impl<'a> Reader<'a> {
             }
             if self.spectre_statement(&stmt, no, &fname, path, &mut st, stack, section) == Some(true) {
                 in_section = false;
+                self.doc.levels[level].close_section(no);
             }
         }
         self.flush(&mut run, &fname, st.cur);
@@ -578,6 +581,7 @@ impl<'a> Reader<'a> {
         if self.doc.levels[level].end_line == 0 {
             self.doc.levels[level].end_line = n as u32 + 1;
         }
+        self.doc.levels[level].close_section(n as u32 + 1);
     }
 
     fn flush(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {
