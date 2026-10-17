@@ -8,7 +8,8 @@ import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens, updatePath } from "./subcircuits.js";
-import { scopeSource } from "./text.js";
+import { markUnplaced, scopeSource } from "./text.js";
+import { renderUnplaced } from "./unplaced.js";
 import { $, clamp, svgElement } from "./util.js";
 
 const canvas = $("canvas");
@@ -46,6 +47,8 @@ export function showLevel(i, keptView) {
   updateHierarchy();
   updatePath();
   scopeSource(i);
+  markUnplaced(i);
+  renderUnplaced();
   badgeAt = null;
   positionBadge();
   scale = lv.scale;
@@ -105,6 +108,7 @@ export function clearDrawing(message) {
   $("status").textContent = "";
   $("zoom").textContent = "";
   $("selection").textContent = "";
+  renderUnplaced();
 }
 
 function canvasSize() {

@@ -1,0 +1,325 @@
+// Editing the text (decision 0011): the netlist pane can be switched to edit, with a text box for
+// each file of the document, the tabs as they are. A change is shown as not applied until the user
+// applies it (Edit > Apply Changes), which builds the Document again from the texts in memory, as
+// opening the files would, and draws it; nothing applies itself, and nothing solves itself. Nothing is
+// written to a file until the user saves (File > Save, and Save As on the desktop; on the web, Save
+// downloads the file shown), and a document, or the window, is not left with changes unsaved without
+// asking. A solve (solve.js) is of the text applied.
+
+import { setCheck } from "./commands.js";
+import { decide, inform, modal } from "./dialog.js";
+import { applyEdits, currentSource, openSource } from "./open.js";
+import * as edits from "./edits.js";
+import { shell } from "./shell.js";
+import { previewing } from "./solve.js";
+import { doc } from "./state.js";
+import { fileShown, showFile } from "./text.js";
+import { $ } from "./util.js";
+
+const source = $("source");
+const pane = $("pane-netlist");
+const tabs = $("file-tabs");
+
+/** Whether the netlist pane is switched to edit. */
+export let editing = false;
+
+const editors = new Map(); // by the file's path: { el, area, gutter, lines, caret, scroll }
+let notified = false; // what the shell was last told about changes not saved
+let noteTimer = 0;
+
+/** The files shown in the pane, as their paths. */
+const paths = () => (doc ? doc.files.map((f) => f.path) : []);
+
+/** Make the text boxes of the files of the document, if the pane is in edit; those of a document read again start from the buffers. */
+export function renderEditors() {
+  const kept = new Map([...editors].map(([path, e]) => [path, { caret: e.area.selectionStart, scroll: e.area.scrollTop }]));
+  const focused = [...editors].find(([, e]) => e.area === document.activeElement);
+  for (const e of editors.values()) e.el.remove();
+  editors.clear();
+  source.classList.toggle("editing", editing);
+  if (editing && doc) {
+    for (const [k, path] of paths().entries()) {
+      const e = makeEditor(path, doc.files[k].name);
+      const was = kept.get(path) || { caret: 0, scroll: 0 };
+      editors.set(path, e);
+      source.append(e.el);
+      e.area.value = edits.textOf(path);
+      number(e);
+      const caret = Math.min(was.caret, e.area.value.length);
+      e.area.setSelectionRange(caret, caret);
+      e.area.scrollTop = e.scroll = was.scroll;
+      e.caret = caret;
+    }
+    // a text box that had the focus has it again, as the Document changed under it
+    if (focused && editors.has(focused[0])) editors.get(focused[0]).area.focus({ preventScroll: true });
+  }
+  showFile(fileShown); // the lines or the text box of the file shown, as the mode says
+  refreshEditing();
+}
+
+/** Take the text boxes away, as when no document is shown. */
+export function clearEditors() {
+  for (const e of editors.values()) e.el.remove();
+  editors.clear();
+  refreshEditing();
+}
+
+/** A file's text box with the numbers of its lines beside it. */
+function makeEditor(path, name) {
+  const el = document.createElement("div");
+  el.className = "editor";
+  el.hidden = true;
+  const gutter = document.createElement("div");
+  gutter.className = "gutter";
+  gutter.setAttribute("aria-hidden", "true");
+  const area = document.createElement("textarea");
+  area.className = "area";
+  area.spellcheck = false;
+  area.autocomplete = "off";
+  area.autocapitalize = "off";
+  area.wrap = "off";
+  area.setAttribute("aria-label", `Text of ${name}`);
+  el.append(gutter, area);
+  const e = { el, area, gutter, lines: 0, caret: 0, scroll: 0 };
+  area.addEventListener("input", () => {
+    edits.setText(path, area.value);
+    number(e);
+    refreshEditing();
+  });
+  area.addEventListener("scroll", () => {
+    gutter.scrollTop = area.scrollTop;
+    e.scroll = area.scrollTop;
+  });
+  area.addEventListener("blur", () => (e.caret = area.selectionStart));
+  return e;
+}
+
+/** The numbers beside a text box, as many as it has lines. */
+function number(e) {
+  const lines = e.area.value.split("\n").length;
+  if (lines === e.lines) return;
+  e.lines = lines;
+  e.gutter.textContent = Array.from({ length: lines }, (_, k) => k + 1).join("\n");
+}
+
+/** Show the text box of the file at index `f` when the pane is in edit, and no other. */
+export function showEditor(f) {
+  const path = doc && doc.files[f] ? doc.files[f].path : null;
+  for (const [p, e] of editors) e.el.hidden = !editing || p !== path;
+  const e = editors.get(path);
+  if (editing && e) e.gutter.scrollTop = e.area.scrollTop;
+}
+
+/** Give the focus to the text box of the file shown, as when the user chooses its tab or begins to edit. */
+export function focusEditor() {
+  const path = doc && doc.files[fileShown] ? doc.files[fileShown].path : null;
+  const e = editors.get(path);
+  if (editing && e && !modal()) e.area.focus({ preventScroll: true });
+}
+
+/** Show a line of a file in its text box, selected, in the middle of it; the text box is not given the focus. */
+export function revealInEditor(f, line) {
+  const path = doc && doc.files[f] ? doc.files[f].path : null;
+  const e = editors.get(path);
+  if (!e) return;
+  const text = e.area.value;
+  let from = 0;
+  for (let n = 1; n < line; n++) {
+    const next = text.indexOf("\n", from);
+    if (next < 0) break;
+    from = next + 1;
+  }
+  const end = text.indexOf("\n", from);
+  e.area.setSelectionRange(from, end < 0 ? text.length : end);
+  const height = parseFloat(getComputedStyle(e.area).lineHeight) || 19;
+  e.area.scrollTop = Math.max(0, (line - 1) * height - e.area.clientHeight / 2 + height / 2);
+}
+
+/** Show what the bar above the text says, the marks of the tabs, and tell the shell whether changes are not saved. */
+export function refreshEditing() {
+  const unapplied = edits.unappliedPaths();
+  const dirty = edits.dirtyPaths();
+  pane.classList.toggle("editing", editing);
+  const state = $("edit-state");
+  state.hidden = !editing;
+  state.dataset.state = unapplied.length > 0 ? "unapplied" : dirty.length > 0 ? "unsaved" : "clean";
+  state.textContent = unapplied.length > 0 ? "Changes not applied yet" : dirty.length > 0 ? "Applied, not saved" : "No changes";
+  $("apply-edits").hidden = !editing;
+  $("apply-edits").disabled = unapplied.length === 0;
+  [...tabs.children].forEach((tab, k) => {
+    const path = doc && doc.files[k] ? doc.files[k].path : "";
+    tab.dataset.unsaved = String(dirty.includes(path));
+    tab.dataset.unapplied = String(unapplied.includes(path));
+    tab.title = [path, unapplied.includes(path) ? "changes not applied" : "", dirty.includes(path) ? "not saved" : ""]
+      .filter(Boolean)
+      .join(", ");
+  });
+  const any = dirty.length > 0;
+  if (any !== notified) {
+    notified = any;
+    if (shell && shell.setDirty) shell.setDirty(any);
+  }
+}
+
+/** A line in the status bar that goes after a few seconds: what was done. */
+function note(text) {
+  const el = $("note");
+  el.textContent = text;
+  el.hidden = text === "";
+  clearTimeout(noteTimer);
+  if (text) noteTimer = setTimeout(() => note(""), 6000);
+}
+
+/** Edit > Edit Text: switch the netlist pane to edit, or back; changes not applied are asked about. */
+export async function toggleEdit() {
+  if (modal()) return;
+  if (!editing) {
+    if (!doc) {
+      await inform({ title: "Edit Text", paragraphs: ["Open a netlist first: File › Open (Ctrl+O)."] });
+      return;
+    }
+    if (previewing()) {
+      await inform({
+        title: "Edit Text",
+        paragraphs: ["A solve is shown as a preview, which is not edited. Solve › Close Preview shows the netlist again."],
+      });
+      return;
+    }
+    editing = true;
+    setCheck("toggle-edit", true);
+    renderEditors();
+    focusEditor();
+    return;
+  }
+  if (edits.unappliedPaths().length > 0) {
+    const choice = await decide({
+      title: "Changes Not Applied",
+      paragraphs: ["Some changes are not applied yet, so the drawing and the problems do not have them."],
+      action: "Apply Changes",
+      others: ["Discard Changes"],
+    });
+    if (choice === null) return;
+    if (choice === "Apply Changes") {
+      if (!(await applyChanges())) return;
+    } else {
+      for (const path of edits.unappliedPaths()) edits.discard(path);
+    }
+  }
+  stopEditing();
+}
+
+/** Switch the pane back to reading, keeping the text the editor holds. */
+export function stopEditing() {
+  if (!editing) return;
+  editing = false;
+  setCheck("toggle-edit", false);
+  renderEditors();
+}
+
+/** Edit > Apply Changes: build the Document again from the texts held, and draw it. True when it did. */
+export async function applyChanges() {
+  if (!doc || !editing) return false;
+  if (edits.unappliedPaths().length === 0) return true;
+  const ok = await applyEdits();
+  if (ok) note("Changes applied.");
+  return ok;
+}
+
+/** The files to write or download for File > Save: the files with changes not saved; on the web the file shown. */
+function filesToSave() {
+  if (shell.platform === "web") {
+    const f = doc.files[fileShown];
+    return f ? [{ path: f.path, name: f.name, text: edits.fileText(f.path) }] : [];
+  }
+  return edits.dirty();
+}
+
+/** File > Save: write the files with changes not saved where they were read, or download the file shown on the web. True when saved. */
+export async function save() {
+  if (!doc || modal()) return false;
+  const opened = currentSource();
+  if (shell.saveAs && opened && opened.text !== undefined) return saveAs();
+  const files = filesToSave();
+  if (files.length === 0) {
+    note(edits.dirtyPaths().length === 0 ? "No changes to save." : "");
+    return true;
+  }
+  try {
+    const said = await shell.save(opened, files);
+    edits.markSaved(files.map((f) => f.path));
+    refreshEditing();
+    note(said || "Saved.");
+    return true;
+  } catch (e) {
+    await inform({ title: "Save", paragraphs: [`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
+    return false;
+  }
+}
+
+/**
+ * File > Save As (desktop): write the netlist that was opened, the first file, where the user says,
+ * and open the file written as the document. Another file with changes not saved is saved first, with Save: it
+ * belongs to the directory of the netlist as it was. True when it was saved.
+ */
+export async function saveAs() {
+  if (!doc || !shell.saveAs || modal()) return false;
+  const entry = doc.files[0];
+  const title = "Save As";
+  if (!entry) return false;
+  if (fileShown !== 0) {
+    await inform({
+      title,
+      paragraphs: ["Save As saves the netlist that was opened, the first file. An included file is saved where it is with File › Save."],
+    });
+    return false;
+  }
+  const others = edits.dirty().filter((f) => f.path !== entry.path);
+  if (others.length > 0) {
+    await inform({
+      title,
+      paragraphs: [`Save the other files with changes first, with File › Save: ${others.map((f) => f.name).join(", ")}.`],
+    });
+    return false;
+  }
+  try {
+    const written = await shell.saveAs(currentSource(), { path: entry.path, name: entry.name, text: edits.fileText(entry.path) });
+    if (!written) return false;
+    edits.markSaved([entry.path]);
+    await openSource(written, false);
+    note(`Saved as ${written.name}.`);
+    return true;
+  } catch (e) {
+    await inform({ title, paragraphs: [`The netlist was not saved: ${e instanceof Error ? e.message : String(e)}`] });
+    return false;
+  }
+}
+
+/**
+ * Whether to go on with something that leaves the document, such as opening another file or
+ * closing the window, when files have changes that are not saved: asks to save them, to leave them
+ * unsaved, or not to go on. On the web, where saving is a download, it asks to leave them unsaved
+ * or not to go on. True to go on.
+ */
+export async function confirmLeave(what) {
+  const files = edits.dirtyPaths().map((path) => (doc && doc.files.find((f) => f.path === path)) || { name: path });
+  if (files.length === 0) return true;
+  if (modal()) return false;
+  const names = files.map((f) => f.name).join(", ");
+  const can = shell.platform !== "web" && shell.save;
+  const choice = await decide({
+    title: "Changes Not Saved",
+    paragraphs: [`${files.length === 1 ? "This file has" : "These files have"} changes that are not saved: ${names}.`, `Do you want to ${what}?`],
+    action: can ? "Save" : "Discard Changes",
+    others: can ? ["Don't Save"] : [],
+  });
+  if (choice === null) return false;
+  if (choice === "Save") return save();
+  return true;
+}
+
+/** The window is asked to close (desktop): when it may, the shell quits. */
+export async function closeRequested() {
+  if (await confirmLeave("close the window")) shell.quit();
+}
+
+$("apply-edits").addEventListener("click", () => applyChanges());

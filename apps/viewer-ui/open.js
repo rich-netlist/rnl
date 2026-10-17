@@ -3,9 +3,13 @@
 // still there, the view, the selection and the text's scroll. File > Load from Clipboard opens the
 // clipboard's text, once the user has seen it, as a source that holds its text. A solve shown as a
 // preview (solve.js) ends when a source is opened or read again, which shows it as written; while
-// one is shown, File > Reload solves again.
+// one is shown, File > Reload solves again. Text edited in the page (editor.js) is built over the
+// files with Apply Changes; opening another file or reading it again asks first about what is not
+// saved.
 
 import { form, inform, modal } from "./dialog.js";
+import { adoptBuffers, changes, resetBuffers } from "./edits.js";
+import { confirmLeave } from "./editor.js";
 import { shell } from "./shell.js";
 import { current, doc, expanded, selected, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
 import { clearDrawing, showLevel, view } from "./drawing.js";
@@ -21,17 +25,28 @@ import { $ } from "./util.js";
 let lastSource = null; // what was last opened, also when it failed to open, for reloading
 let loading = false;
 
-export async function openSource(source, keep) {
+/**
+ * Open a source, or read it again with `keep`. Opening another one asks first about changes not
+ * saved. `edited` are texts to build over the files, by the path the Document names them by (a
+ * preview closed shows the text applied); without them the files are read as they are, and the
+ * text edited is what they hold.
+ */
+export async function openSource(source, keep, edited) {
   if (!source || loading) return;
+  if (!keep && !edited && !(await confirmLeave("open another file"))) return;
+  if (loading) return;
   loading = true;
   document.body.classList.add("busy");
   try {
     lastSource = source;
-    const d = await shell.build(source);
+    const d = await shell.build(source, edited);
     endPreview();
+    if (edited) adoptBuffers(d);
+    else resetBuffers(d);
     showBuilt(d, keep);
   } catch (e) {
     endPreview();
+    resetBuffers(null);
     setDoc(null);
     clearDrawing(`Could not open ${source.name}`);
     clearSource("The file could not be read.");
@@ -50,9 +65,33 @@ export async function pickAndOpen(kind) {
   if (source) await openSource(source, false);
 }
 
-export function reload() {
+export async function reload() {
   if (previewing()) solve();
-  else if (lastSource) openSource(lastSource, true);
+  else if (lastSource && (await confirmLeave("read the file again"))) openSource(lastSource, true);
+}
+
+/**
+ * Edit > Apply Changes: build the Document again from the texts the editor holds (edits.js) over
+ * the files as they are, as opening them would, and show it, with the level, the view and the
+ * selection kept. True when it was shown; a message tells why not.
+ */
+export async function applyEdits() {
+  if (!lastSource || !doc || loading || previewing()) return false;
+  loading = true;
+  document.body.classList.add("busy");
+  let failed = null;
+  try {
+    const d = await shell.build(lastSource, changes(false));
+    adoptBuffers(d);
+    showBuilt(d, true);
+  } catch (e) {
+    failed = e instanceof Error ? e.message : String(e);
+  } finally {
+    loading = false;
+    document.body.classList.remove("busy");
+  }
+  if (failed !== null) await inform({ title: "Apply Changes", paragraphs: [`The changes could not be applied: ${failed}`] });
+  return failed === null;
 }
 
 /** What was last opened, also when it failed to open; null before anything was. */

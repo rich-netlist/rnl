@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
+use crate::files::{self, Edits};
+
 /// The solve under way, and the last one shown, whose files a copy saves.
 #[derive(Clone, Default)]
 pub struct Solves {
@@ -113,6 +115,7 @@ pub async fn solve_preview(
     name: Option<String>,
     text: Option<String>,
     settings: Option<Settings>,
+    edits: Option<Edits>,
 ) -> Result<Solved, String> {
     let options = SolveOptions { solver: settings.unwrap_or_default().solver()?, ..SolveOptions::default() };
     let stop = Arc::new(AtomicBool::new(false));
@@ -131,7 +134,11 @@ pub async fn solve_preview(
         match (path, name, text) {
             (Some(path), _, _) => {
                 let path = std::path::absolute(&path).map_err(|e| format!("{path}: {e}"))?;
-                preview(&path.to_string_lossy(), &FsProvider::new(&[]), &options, &clock, &watch)
+                let entry = path.to_string_lossy().into_owned();
+                // the text applied is what is solved, over the files on disk
+                let held = files::held(&entry, &edits.unwrap_or_default());
+                let disk = FsProvider::new(&[]);
+                preview(&entry, &files::layered(&held, &disk), &options, &clock, &watch)
             }
             (None, Some(name), Some(text)) => {
                 let entry = format!("/{name}");

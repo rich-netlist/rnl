@@ -5,6 +5,7 @@
 
 import { inform } from "./dialog.js";
 import { fit, zoomCenter } from "./drawing.js";
+import { applyChanges, save, saveAs, toggleEdit } from "./editor.js";
 import { gridCommand } from "./grid.js";
 import { loadClipboard, pickAndOpen, reload } from "./open.js";
 import { setProblems, setSidebar } from "./panels.js";
@@ -40,6 +41,10 @@ export function command(id) {
     case "open-url": pickAndOpen("url"); break;
     case "load-clipboard": loadClipboard(); break;
     case "reload": reload(); break;
+    case "save": save(); break;
+    case "save-as": saveAs(); break;
+    case "toggle-edit": toggleEdit(); break;
+    case "apply-edits": applyChanges(); break;
     case "fit": fit(); break;
     case "zoom-in": zoomCenter(1.25); break;
     case "zoom-out": zoomCenter(0.8); break;
@@ -71,7 +76,9 @@ export function command(id) {
 function about() {
   if (shell.about) shell.about();
   else if (!shell.nativeMenu) {
-    const text = "Draws netlists with Rich Netlist (RNL) records. It only reads: it neither edits nor solves.";
+    const text =
+      "Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; " +
+      "nothing is written to a file until you save.";
     inform({ title: "About RNL Viewer", paragraphs: [text] });
   }
 }

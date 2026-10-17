@@ -9,7 +9,17 @@
         { "id": "load-clipboard", "label": "Load from &Clipboard...", "keys": ["Ctrl+Shift+V"] },
         { "id": "reload", "label": "&Reload", "keys": ["F5", "Ctrl+R"] },
         "-",
+        { "id": "save", "label": "&Save", "keys": ["Ctrl+S"] },
+        { "id": "save-as", "label": "Save &As...", "platforms": ["desktop"] },
+        "-",
         { "id": "exit", "label": "E&xit", "platforms": ["desktop"] }
+      ]
+    },
+    {
+      "label": "&Edit",
+      "items": [
+        { "id": "toggle-edit", "label": "&Edit Text", "keys": ["Ctrl+E"], "check": true },
+        { "id": "apply-edits", "label": "&Apply Changes", "keys": ["Ctrl+Enter"] }
       ]
     },
     {

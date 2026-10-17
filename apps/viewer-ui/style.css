@@ -160,6 +160,11 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
 }
+.unplaced-pane {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+}
 
 .vsplit, .hsplit {
   background: var(--bg);
@@ -248,6 +253,47 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 }
 /* the file tabs ask for the room they take up, unlike other tabs (.tabs) */
 .file-bar .file-tabs { flex: 1 1 auto; margin-right: 8px; }
+
+/* editing the text (editor.js): the state and the Apply button take the place of the failed statements' box */
+.edit-state { flex: none; margin-right: 8px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.edit-state[data-state="unapplied"] { color: var(--warning); font-weight: 600; }
+.edit-state[hidden], .apply-edits[hidden] { display: none; }
+.apply-edits { flex: none; padding: 1px 10px; border-color: var(--line); background: var(--tab); white-space: nowrap; }
+.apply-edits:not(:disabled) { color: var(--panel); background: var(--accent); border-color: var(--accent); }
+.apply-edits:disabled { opacity: 0.5; }
+.netlist-pane.editing .failed-check, .netlist-pane.editing .failed-toggle { display: none; }
+.tabs button[data-unsaved="true"]::after { content: " \25CF"; color: var(--accent); }
+.tabs button[data-unsaved="true"][data-unapplied="true"]::after { color: var(--warning); }
+.source.editing { overflow: hidden; }
+.editor { position: absolute; inset: 0; display: flex; }
+.editor[hidden] { display: none; }
+.editor .gutter {
+  flex: none;
+  width: 4.5em;
+  padding: 4px 1em 24px 0;
+  overflow: hidden;
+  text-align: right;
+  white-space: pre;
+  color: var(--syn-marker);
+  user-select: none;
+  border-right: 1px solid var(--line);
+}
+.editor .area {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 2em 24px 0.8em;
+  overflow: auto;
+  font: inherit;
+  color: inherit;
+  white-space: pre;
+  tab-size: 8;
+  resize: none;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.editor .area:focus { box-shadow: inset 0 0 0 1px var(--accent); }
 
 /* the failed statements' checkbox, and its label, which gives way to the file tabs when they need
    the room, so that a tab of each file stays within reach: the label shrinks before them, and what
@@ -421,6 +467,10 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 .ln.hl-line { background: var(--select-line); }
 .ln.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { from { background: var(--flash); } to { background: transparent; } }
+/* the statements of the objects that have no position, which nothing draws (text.js, markUnplaced) */
+.ln.not-drawn { background: var(--out-of-scope); }
+.ln.not-drawn > * { opacity: 0.45; }
+.ln.hl-line.not-drawn { background: var(--select-line); }
 /* while a subcircuit is drawn, the text outside its definition (text.js, scopeSource) */
 .source.scoped .ln:not(.in-scope) { background: var(--out-of-scope); }
 .source.scoped .ln:not(.in-scope) > * { opacity: 0.45; }
@@ -525,6 +575,8 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
   min-width: 0;
 }
 .statusbar .selection { color: var(--fg); flex-shrink: 0; }
+.statusbar .note { color: var(--accent); flex-shrink: 0; }
+.statusbar .note[hidden] { display: none; }
 .statusbar .selection b { color: var(--select); font-weight: 600; }
 .statusbar .status { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
 .statusbar .pointer, .statusbar .zoom { font-variant-numeric: tabular-nums; flex-shrink: 0; }
@@ -647,6 +699,37 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 }
 .index-list .nothing { padding: 6px 10px; color: var(--muted); }
 mark { background: rgba(255, 196, 61, 0.55); color: inherit; border-radius: 2px; }
+
+/* ------------------------------------------------------------------ objects not drawn */
+
+.tab-count { font-variant-numeric: tabular-nums; }
+.statusbar .status.opens-unplaced { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+.unplaced-list { overflow: auto; min-height: 0; padding-bottom: 8px; }
+.unplaced-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.unplaced-row.located { cursor: pointer; }
+.unplaced-row:hover { background: var(--hover); }
+.unplaced-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* the symbol is drawn on white, as the drawing is, in both colour schemes */
+.unplaced-row .thumb {
+  flex: none;
+  display: grid;
+  width: 132px;
+  height: 96px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.unplaced-row .thumb svg { width: 100%; height: 100%; }
+.unplaced-row .info { display: flex; flex-direction: column; min-width: 0; }
+.unplaced-row .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unplaced-row .symbol { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unplaced-list .nothing, .unplaced-list .more { padding: 6px 10px; color: var(--muted); }
 
 /* ------------------------------------------------------------------ subcircuits */
 

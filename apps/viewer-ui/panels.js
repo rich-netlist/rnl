@@ -4,6 +4,7 @@
 import { setCheck } from "./commands.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { revealPending } from "./text.js";
+import { showUnplaced } from "./unplaced.js";
 import { $, clamp, load, save } from "./util.js";
 
 const app = $("app");
@@ -27,12 +28,14 @@ export function setSidebar(shown) {
 }
 
 /**
- * Show the "netlist", the "hierarchy" or the "solve" view of the side panel; the solve's only while
- * a solve is shown (solve.js), and the netlist's for any other name.
+ * Show the "netlist", the "hierarchy", the objects "unplaced" (not drawn) or the "solve" view of the
+ * side panel; the solve's only while a solve is shown (solve.js), and the netlist's for any other
+ * name.
  */
 export function setPane(name) {
-  const view = name === "hierarchy" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
-  const panes = { netlist: netlistPane, hierarchy: hierarchyPane, solve: $("pane-solve") };
+  const view =
+    name === "hierarchy" || name === "unplaced" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
+  const panes = { netlist: netlistPane, hierarchy: hierarchyPane, unplaced: $("pane-unplaced"), solve: $("pane-solve") };
   for (const [k, el] of Object.entries(panes)) {
     el.hidden = k !== view;
     $(`tab-${k}`).setAttribute("aria-selected", String(k === view));
@@ -45,6 +48,8 @@ export function setPane(name) {
   } else if (view === "hierarchy") {
     setIndexHeight(load("index-height", 260));
     updateHierarchy();
+  } else if (view === "unplaced") {
+    showUnplaced();
   }
 }
 
@@ -138,4 +143,5 @@ $("show-sidebar").addEventListener("click", () => setSidebar(true));
 $("problems-head").addEventListener("click", () => setProblems(netlistPane.classList.contains("problems-folded")));
 $("tab-netlist").addEventListener("click", () => setPane("netlist"));
 $("tab-hierarchy").addEventListener("click", () => setPane("hierarchy"));
+$("tab-unplaced").addEventListener("click", () => setPane("unplaced"));
 $("tab-solve").addEventListener("click", () => setPane("solve"));

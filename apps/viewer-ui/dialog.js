@@ -1,7 +1,8 @@
 // Dialogs in the page's style, for what a shell asks of the user: one of a list, such as the netlist
 // to open; a line of text, such as a URL; several values at once, such as the grid's settings; a
-// message, such as the About box; or a message with a button that acts, such as one that opens a
-// release's page. Each is modal and returns a promise of the answer, null when it is cancelled.
+// message, such as the About box; a message with a button that acts, such as one that opens a
+// release's page; or a message with several, such as the one that asks what to do with changes not
+// saved. Each is modal and returns a promise of the answer, null when it is cancelled.
 // While one is shown, the page's keys and its menu bar do nothing.
 
 const LIST_MAX = 500; // the items a list shows at most; the filter finds the others
@@ -176,6 +177,21 @@ export function offer({ title, paragraphs, action }) {
   return d.show(d.ok, () => true).then((acted) => acted === true);
 }
 
+/**
+ * Show a message with Cancel, a button that acts, labelled `action`, which Enter presses, and
+ * others between them, such as "Don't Save".
+ *
+ * @param {{ title: string, paragraphs: (string | Node)[], action: string, others?: string[] }} options
+ *   Each paragraph a text, or a node to show as it is; `others` are the labels of the other buttons.
+ * @returns {Promise<string | null>} The label of the button pressed, or null when the dialog is
+ *   cancelled by Escape or Cancel.
+ */
+export function decide({ title, paragraphs, action, others = [] }) {
+  const d = frame(title, "", action, true, others);
+  addParagraphs(d.body, paragraphs);
+  return d.show(d.ok, () => action);
+}
+
 /** Add paragraphs to a dialog's body: each a text, or a node to show as it is. */
 function addParagraphs(body, paragraphs) {
   for (const p of paragraphs) {
@@ -202,12 +218,13 @@ function textBox(type, placeholder) {
 
 /**
  * A modal dialog, not yet shown: its title, its text, the body that takes its parts, and its
- * buttons: Cancel, if `cancel`, and the default one labelled `action`, which Enter presses.
+ * buttons: Cancel, if `cancel`, the `others` between it and the default one, each labelled and
+ * answering with its label, and the default one labelled `action`, which Enter presses.
  * `show(focus, answer)` shows it with `focus` focused, and a text box's text selected. The default
  * button closes it with what `answer()` gives, awaited, unless that is undefined; the promise it
  * returns resolves with that, or with null when the dialog is cancelled by Escape or Cancel.
  */
-function frame(title, text, action, cancel = true) {
+function frame(title, text, action, cancel = true, others = []) {
   const id = `dialog-${++made}`;
   const el = document.createElement("dialog");
   el.className = "dialog";
@@ -236,10 +253,20 @@ function frame(title, text, action, cancel = true) {
     no.addEventListener("click", () => el.close());
     buttons.append(no);
   }
+  let result = null;
+  for (const label of others) {
+    const other = document.createElement("button");
+    other.type = "button";
+    other.textContent = label;
+    other.addEventListener("click", () => {
+      result = label;
+      el.close();
+    });
+    buttons.append(other);
+  }
   buttons.append(ok);
   el.append(head, body, buttons);
 
-  let result = null;
   function show(focus, answer) {
     let answering = false;
     ok.addEventListener("click", async () => {

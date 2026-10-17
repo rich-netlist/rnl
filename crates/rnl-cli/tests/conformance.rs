@@ -14,7 +14,6 @@
 use std::path::{Path, PathBuf};
 
 use rnl_cli::{dump, interpret_file, FsProvider};
-use rnl_runtime::interp::unit::scan_language_decl;
 use rnl_runtime::Options;
 use serde_json::Value;
 
@@ -112,11 +111,13 @@ fn cases_of_0_3_match_their_expected_snapshots() {
 #[test]
 fn the_corpus_of_0_2_declares_its_version() {
     // a main file without a header record is read in the tool's default version, 0.3 (16.1): each
-    // case of the corpus of 0.2 declares its version, so that it stays a corpus of 0.2
+    // case of the corpus of 0.2 declares its version, as reading it finds it, so that it stays a
+    // corpus of 0.2
+    let provider = FsProvider::new(&[]);
     for dir in ["cases", "equivalence"] {
         for f in files(&corpus().join(dir), &["sp", "scs"]) {
-            let declared = scan_language_decl(&std::fs::read_to_string(&f).unwrap());
-            assert!(declared.as_ref().is_some_and(|v| v != "0.3"), "{}: {declared:?}", f.display());
+            let declared = interpret_file(&f, None, &provider, &Options::default()).unwrap().model.language;
+            assert!(!declared.is_empty() && declared != "0.3", "{}: {declared:?}", f.display());
         }
     }
 }

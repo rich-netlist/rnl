@@ -30,3 +30,7 @@ Until now RNL Viewer, the desktop viewer ([`apps/desktop`](../../apps/desktop/RE
 ## Update, 2026-10-17
 
 Solve › Settings sets the options and the time limit that point 1 says are `rnl solve`'s: the solver's defaults until the user changes them, then the user's, kept by the page. Nothing is written into the files by it.
+
+## Note, 2026-10-17
+
+Point 2, that the viewer never writes into the files it opens, is changed by [decision 0011](0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md): it writes a file only when the user has edited it and saves it. Solving still only previews, and a solved copy is saved as point 3 says.

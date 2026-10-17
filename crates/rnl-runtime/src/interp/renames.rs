@@ -1,14 +1,15 @@
 //! The names of the standard series 0.2 that the series 0.3 renamed, moved or left out, the roles
 //! it renamed, and the packages it merged (16.3), for the diagnostics of a file that writes one
 //! where the series 0.3 is in effect: they name what the series 0.3 has instead, as the migration
-//! table of `libraries/standard` does. A hint is given only when the reading finds a name of the
-//! series 0.3, or, for a package, in a file read in 0.3 that does not pin the series 0.2, so a file
-//! of the series 0.2 is never told about 0.3.
+//! table of `libraries/standard` does. A hint is given only when the name the reading finds is the
+//! series 0.3's own, bound in one of its packages, or, for a package, in a file read in 0.3 that
+//! does not pin the series 0.2, so a file of the series 0.2 is never told about 0.3, nor a file
+//! that defines a name of the same spelling itself.
 
 use super::ctx::Ctx;
 use super::obj::UnitId;
 use super::packages::STD_NAME;
-use super::unit::UseDecl;
+use super::unit::{UnitKind, UseDecl};
 use super::Interp;
 
 /// A name of the series 0.2, without its `$`, and the name the series 0.3 gives the same thing.
@@ -73,25 +74,35 @@ const ROLE_RENAMED: [(&str, &str, &str); 1] = [("CHAIN", "series", "chain")];
 const MERGED: ([&str; 2], &str) = (["rnl-std-layout", "rnl-std-semantics"], "rnl-std-structures");
 
 impl Interp<'_> {
+    /// Whether `$name`, as the place of `ctx` finds it, is a name of the standard series 0.3: bound
+    /// in one of its packages, `rnl-std` or `rnl-std-*` of version 0.3, not in the file or another
+    /// package (16.2, 16.3).
+    fn of_series_0_3(&mut self, name: &str, ctx: &Ctx) -> bool {
+        let Some(b) = self.lookup_unit('$', name, ctx.unit, false, None) else { return false };
+        let unit = &self.units[b.owner];
+        let series = unit.pkg_name == "rnl-std" || unit.pkg_name.starts_with("rnl-std-");
+        unit.kind == UnitKind::Package && series && self.pkg_ver(b.owner) == "0.3"
+    }
+
     /// Why `$name` cannot be found, when it is a name of the series 0.2 and the series 0.3 is in
     /// effect here: the name the series 0.3 gives it, or the package that has it.
     pub(crate) fn renamed_in_0_3(&mut self, name: &str, ctx: &Ctx) -> Option<String> {
         if let Some(&(_, new)) = RENAMED.iter().find(|(old, _)| *old == name) {
-            if self.lookup('$', new, ctx).is_some() {
+            if self.of_series_0_3(new, ctx) {
                 return Some(format!(
                     "the standard series 0.3 calls it ${new}; write that, or pin the series 0.2 with @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") in the header record (16.3)"
                 ));
             }
         }
         if let Some(&(_, package)) = MOVED.iter().find(|(old, _)| *old == name) {
-            if self.lookup('$', ONLY_IN_0_3, ctx).is_some() {
+            if self.of_series_0_3(ONLY_IN_0_3, ctx) {
                 return Some(format!(
                     "the standard series 0.3 has it in {package}, which rnl-std does not bring in: name {package} or rnl-std-full with @USE-PACKAGE in the header record, or pin the series 0.2 (16.3)"
                 ));
             }
         }
         if let Some(&(_, instead)) = LEFT_OUT.iter().find(|(old, _)| *old == name) {
-            if self.lookup('$', "DIFFERENTIAL_PAIR", ctx).is_some() {
+            if self.of_series_0_3("DIFFERENTIAL_PAIR", ctx) {
                 return Some(format!(
                     "{instead}, or pin the series 0.2 with @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") in the header record (16.3)"
                 ));
@@ -101,11 +112,19 @@ impl Interp<'_> {
     }
 
     /// Why the ordinary definition `definition` has no role `role`, when the series 0.3 renamed
-    /// that role of the definition and the definition has the new name among its `roles`.
-    pub(crate) fn role_renamed_in_0_3(definition: &str, role: &str, roles: &[&str]) -> Option<String> {
-        let &(_, _, new) =
+    /// that role of the definition, the definition has the new name among its `roles`, and the
+    /// definition that the place of `ctx` finds is the series 0.3's.
+    pub(crate) fn role_renamed_in_0_3(
+        &mut self,
+        definition: &str,
+        role: &str,
+        roles: &[&str],
+        ctx: &Ctx,
+    ) -> Option<String> {
+        let &(d, _, new) =
             ROLE_RENAMED.iter().find(|(d, old, _)| definition.strip_prefix('$') == Some(*d) && *old == role)?;
-        roles.contains(&new).then(|| format!("; the standard series 0.3 calls it {new} (16.3)"))
+        (roles.contains(&new) && self.of_series_0_3(d, ctx))
+            .then(|| format!("; the standard series 0.3 calls it {new} (16.3)"))
     }
 
     /// Why a USE-PACKAGE, or a package's reference, that names a package the series 0.3 merged
@@ -152,7 +171,9 @@ impl Interp<'_> {
     /// here and gives that name to a definition.
     pub(crate) fn no_longer_a_symbol(&mut self, name: &str, ctx: &Ctx) -> Option<String> {
         let &(_, symbol) = SYMBOL_NOW_DEFINITION.iter().find(|(old, _)| *old == name)?;
-        self.lookup('$', symbol, ctx)?;
+        if !self.of_series_0_3(symbol, ctx) || !self.of_series_0_3(name, ctx) {
+            return None;
+        }
         Some(format!(
             "in the standard series 0.3 ${name} is a definition, and ${symbol} the symbol that the series 0.2 called ${name} (16.3)"
         ))

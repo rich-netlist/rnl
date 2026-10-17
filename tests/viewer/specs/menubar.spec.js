@@ -56,13 +56,18 @@ test.describe("on the web", () => {
     await expect(page.locator("#menubar .menu-title")).toHaveText(menus.map((m) => m.title));
     await expect(page.locator("#menubar .menu-title u")).toHaveText(menus.map((m) => m.letter));
     for (const m of menus) await expect(list(page, m.title).locator(".menu-item, .menu-separator")).toHaveText(m.items);
-    // File has the web's own items, and not the desktop's Exit nor the separator above it
-    expect(menus.slice(0, 2)).toEqual([
+    // File has the web's own items, and not the desktop's Save As and Exit nor the separators above
+    // them; Save downloads the file shown
+    expect(menus.slice(0, 3)).toEqual([
       {
         title: "File",
         letter: "F",
-        items: ["Open...Ctrl+O", "Open Folder...", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5"],
+        items: [
+          "Open...Ctrl+O", "Open Folder...", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
+          "", "SaveCtrl+S",
+        ],
       },
+      { title: "Edit", letter: "E", items: ["Edit TextCtrl+E", "Apply ChangesCtrl+Enter"] },
       {
         title: "View",
         letter: "V",
@@ -259,6 +264,8 @@ test.describe("on the web", () => {
     await expect(bar).toHaveClass(/\bkeys\b/);
     await expect(page.locator("#menubar .menu-list:visible")).toHaveCount(0);
     await page.keyboard.press("ArrowRight");
+    await expect(marked).toHaveText("Edit");
+    await page.keyboard.press("ArrowRight");
     await expect(marked).toHaveText("View");
     await page.keyboard.press("ArrowDown");
     await expect(list(page, "View")).toBeVisible();
@@ -280,7 +287,7 @@ test.describe("on the web", () => {
     await page.keyboard.press("F10");
     await expect(marked).toHaveText("File");
     await page.keyboard.press("ArrowUp");
-    await expect(viewer.menuItem("reload")).toHaveClass(/\bactive\b/);
+    await expect(viewer.menuItem("save")).toHaveClass(/\bactive\b/);
     // Escape closes the menu and keeps the title, then leaves the bar
     await page.keyboard.press("Escape");
     await expect(list(page, "File")).toBeHidden();
@@ -419,7 +426,7 @@ test.describe("with a native menu", () => {
   test("the page shows no menu bar, and tells the shell the check marks", async ({ page, viewer }) => {
     await expect(page.locator("#menubar")).toBeHidden();
     const marks = [
-      ["toggle-netlist", true], ["toggle-problems", true],
+      ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
     ];
     expect(await viewer.calls("setCheck")).toEqual(marks);

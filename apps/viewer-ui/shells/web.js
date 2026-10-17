@@ -62,6 +62,22 @@ function filesSource(files, entry) {
   };
 }
 
+/**
+ * The path in the workspace of a file the Document names `path`: relative to the directory `dir` of
+ * the netlist (`""` for the root) unless it is rooted, with `.` and `..` resolved as the core does,
+ * a `..` above the root kept.
+ */
+function joined(dir, path) {
+  const names = (path.startsWith("/") ? path : `${dir}/${path}`).split("/");
+  const out = [];
+  for (const name of names) {
+    if (name === "" || name === ".") continue;
+    if (name === ".." && out.length > 0 && out[out.length - 1] !== "..") out.pop();
+    else out.push(name);
+  }
+  return `/${out.join("/")}`;
+}
+
 /** A path relative to the directory `dir` when it is in it ("" for the root), else as it is. */
 function within(path, dir) {
   return path.startsWith(`${dir}/`) ? path.slice(dir.length + 1) : path;
@@ -375,6 +391,19 @@ async function walk(entry, files) {
   }
 }
 
+/** Hand the browser a text as a file to save under `name`, by a link it follows. */
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.hidden = true;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 /** The About box: what the viewer is, and the version and commit the site was built from. */
 async function about() {
   let site = {};
@@ -392,7 +421,8 @@ async function about() {
     title: "About RNL Viewer",
     paragraphs: [
       name,
-      "Draws netlists with Rich Netlist (RNL) records. It only reads: it neither edits nor solves.",
+      "Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; " +
+        "Save downloads the file shown, as no page can write a file where it was read from.",
       "The RNL core runs in this page as WebAssembly. Files opened from this computer are read here " +
         "and sent nowhere; a URL's files are fetched from its server.",
     ],
@@ -421,15 +451,20 @@ export default {
   },
   /**
    * Read the files the document needs, as SVG for the page to draw, and name the browser tab. A
-   * source that holds its text, such as the clipboard's, is the only file of its workspace.
+   * source that holds its text, such as the clipboard's, is the only file of its workspace. The
+   * texts of `edits`, by the paths the Document names the files by, are those of the files, not what
+   * is read.
    */
-  async build(source) {
+  async build(source, edits) {
     const again = built.has(source);
     built.add(source);
     try {
       const held = source.text !== undefined;
       const entry = held ? { path: `/${source.name}`, text: source.text } : await source.open(again);
-      const request = { entry: entry.path, files: { [entry.path]: entry.text }, svg: true, primitives: false };
+      const dir = entry.path.slice(0, entry.path.lastIndexOf("/"));
+      const files = { [entry.path]: entry.text };
+      for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
+      const request = { entry: entry.path, files, svg: true, primitives: false };
       const read = held ? async () => null : (path) => source.read(path, again);
       const { document: doc } = await collect(core, request, read);
       document.title = `${doc.name} - RNL Viewer`;
@@ -437,6 +472,20 @@ export default {
     } catch (e) {
       throw e instanceof Error ? e.message : String(e);
     }
+  },
+  /** Download the files: the web cannot write them where they were read from (decision 0011). */
+  async save(source, files) {
+    for (const f of files) download(f.name.split("/").pop(), f.text);
+    return files.length === 1 ? `Downloaded ${files[0].name.split("/").pop()}.` : `Downloaded ${files.length} files.`;
+  },
+  /** The browser asks before a page with changes not saved is left. */
+  setDirty(dirty) {
+    window.onbeforeunload = dirty
+      ? (e) => {
+          e.preventDefault();
+          e.returnValue = "";
+        }
+      : null;
   },
   setCheck() {}, // the page's own menu bar shows the check marks
   onCommand() {}, // and runs its commands itself

@@ -7,6 +7,8 @@
 // `solve`, such as the web's, offers none of it.
 
 import { inform, modal } from "./dialog.js";
+import { changes, unappliedPaths } from "./edits.js";
+import { stopEditing } from "./editor.js";
 import { currentSource, isLoading, openSource, showBuilt } from "./open.js";
 import { setPane } from "./panels.js";
 import { shell } from "./shell.js";
@@ -40,18 +42,20 @@ export async function solve() {
     return;
   }
   hookProgress();
+  stopEditing(); // a preview is not edited; the text the editor holds stays
   running = true;
   document.body.classList.add("solving");
   status(`Solving ${source.name}…`, true);
   try {
-    const solved = await shell.solve(source, solverSettings());
+    const solved = await shell.solve(source, solverSettings(), changes(true));
     shown = { source, report: solved.report };
     showBuilt(solved.document, true);
     renderReport(solved.report);
     showPreview(true);
     const r = solved.report;
     const discarded = r.levels.reduce((n, l) => n + l.facts.filter((f) => f.status !== "kept").length, 0);
-    status(`Solved: ${r.levels.length} ${r.levels.length === 1 ? "level" : "levels"}, ${discarded} ${discarded === 1 ? "fact" : "facts"} not kept. A preview: the files are unchanged.`, false);
+    const later = unappliedPaths().length > 0 ? " Changes not applied yet are not in it." : "";
+    status(`Solved: ${r.levels.length} ${r.levels.length === 1 ? "level" : "levels"}, ${discarded} ${discarded === 1 ? "fact" : "facts"} not kept. A preview: the files are unchanged.${later}`, false);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message === CANCELLED) status("The solve was cancelled; the netlist is shown as it was.", false);
@@ -70,11 +74,11 @@ export function cancelSolve() {
   if (running && shell.cancelSolve) shell.cancelSolve();
 }
 
-/** Solve > Close Preview: show the file as written again, read from the file. */
+/** Solve > Close Preview: show the netlist again, the files as read with the changes applied to them. */
 export function closePreview() {
   if (!shown) return;
   const source = shown.source;
-  openSource(source, true);
+  openSource(source, true, changes(true));
 }
 
 /**

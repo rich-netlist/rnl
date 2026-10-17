@@ -3,7 +3,9 @@
 // diagnostics and the subcircuit hierarchy, and follows a selected instance or net between the
 // drawing and the text. Each part is a module of its own (README.md); this one starts the page.
 
-import { command, isChecked, startCommands } from "./commands.js";
+import { command, isChecked, setCheck, startCommands } from "./commands.js";
+import { closeRequested } from "./editor.js";
+import { dirtyPaths, unappliedPaths } from "./edits.js";
 import { gridState, setGrid } from "./grid.js";
 import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
@@ -12,6 +14,7 @@ import {
 } from "./panels.js";
 import { loadShell } from "./shell.js";
 import { current, doc, path, selected } from "./state.js";
+import { renderUnplaced } from "./unplaced.js";
 import { $, load } from "./util.js";
 
 setSidebarWidth(load("sidebar-width", 420));
@@ -20,6 +23,8 @@ setSidebar(load("sidebar-shown", true));
 setProblems(load("problems-shown", true));
 setPane(load("side-pane", "netlist"));
 setShowFailed(load("show-failed", true));
+// the text is read, not edited, until the user says (editor.js); the native menu starts checked
+setCheck("toggle-edit", false);
 setIndexHeight(load("index-height", 260));
 // the grid: dots at the integer points, and no axes, since the origin means nothing in particular
 setGrid({
@@ -35,6 +40,7 @@ setGrid({
   li.textContent = "No file is open.";
   $("diags").append(li);
 }
+renderUnplaced();
 
 /** Load the shell and the command table, then open what the shell has for the start. */
 async function start() {
@@ -42,6 +48,7 @@ async function start() {
   await startCommands();
   if (!shell.nativeMenu) showMenuBar(true);
   if (shell.onOpen) shell.onOpen((source) => openSource(source, false));
+  if (shell.onCloseRequested) shell.onCloseRequested(closeRequested);
   openSource(await shell.initial(), false);
 }
 
@@ -81,4 +88,8 @@ window.viewer = {
   },
   /** Show or hide the page's own menu bar, whatever the shell says. */
   menuBar: showMenuBar,
+  /** The paths of the files whose text is not saved, and of those whose text is not applied. */
+  get edits() {
+    return { unsaved: dirtyPaths(), unapplied: unappliedPaths() };
+  },
 };

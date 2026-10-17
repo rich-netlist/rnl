@@ -431,7 +431,7 @@
         '<zh>同一输入、同一工作量预算，结果完全相同</zh><en>Same input and same work budget give exactly the same result</en>'
       ],
       form: '<zh>rnl-solver（纯 Rust，可编译到 WASM）；@rich-netlist/solver</zh><en>rnl-solver (pure Rust, compiles to WASM); @rich-netlist/solver</en>',
-      st: ['chip chip-warn', '<zh>规划中 · Python 原型</zh><en>Planned · Python prototype</en>']
+      st: ['chip chip-warn', '<zh>第一版 · 命令行和桌面版</zh><en>First version · CLI and desktop</en>']
     },
     render: {
       nm: '<zh>统一渲染器</zh><en>Renderer</en>', sub: 'Renderer',
@@ -451,10 +451,11 @@
         '<zh>缩放、平移、搜索器件</zh><en>Zoom, pan, search for devices</en>',
         '<zh>高亮一条网络，进入子电路</zh><en>Highlight a net, descend into subcircuits</en>',
         '<zh>文件里已有完整几何时，不需要求解器</zh><en>No solver needed when the file already has full geometry</en>',
+        '<zh>改文本，应用后重画；保存时才写文件，网页版是下载</zh><en>Edit the text and draw it again on Apply; a file is written only on Save, which on the web is a download</en>',
         '<zh>不自带元件库，符号来自标准包和 RNL 库</zh><en>No built-in component library; symbols come from the standard package and RNL libraries</en>'
       ],
       form: '<zh>apps/web、apps/desktop，共用页面 apps/viewer-ui</zh><en>apps/web and apps/desktop, sharing the page apps/viewer-ui</en>',
-      st: ['chip chip-ok', '<zh>0.1 已有 · 网页版和桌面版，只读</zh><en>In 0.1 · web and desktop, read-only</en>']
+      st: ['chip chip-ok', '<zh>0.1 起已有 · 可编辑，桌面版可求解</zh><en>Since 0.1 · edits; desktop solves</en>']
     },
     editor: {
       nm: '<zh>编辑器</zh><en>Editor</en>', sub: 'Editor',
@@ -477,7 +478,7 @@
         '<zh>把旧版本语法迁移到新版本</zh><en>Migrates old syntax versions to new ones</en>'
       ],
       form: '<zh>rnl-cli（Rust，各平台预编译）</zh><en>rnl-cli (Rust, prebuilt for each platform)</en>',
-      st: ['chip chip-ok', '<zh>0.1 已有 · 检查和出图，不含求解</zh><en>In 0.1 · checks and renders, without solving</en>']
+      st: ['chip chip-ok', '<zh>0.1 起已有 · 检查、出图、求解</zh><en>Since 0.1 · checks, renders, solves</en>']
     },
     stdlib: {
       nm: '<zh>标准库</zh><en>Standard library</en>', sub: 'Standard library',

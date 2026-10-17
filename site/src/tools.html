@@ -27,7 +27,9 @@
   <symbol id="i-netlist" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 11h6M9 14h6M9 17h3"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-git" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7v10"/><path d="M18 10a6 6 0 0 1-6 6H8"/></symbol>
-  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l1.2-4.4L16 4.8l3.2 3.2L8.4 18.8z"/><path d="M13.8 7l3.2 3.2"/></symbol>
+  <symbol id="i-solver" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M6.5 10v4.5a3 3 0 0 0 3 3H14"/><path d="M18 3v5M15.5 5.5h5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
   <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></symbol>
   <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
@@ -75,11 +77,11 @@
   <div class="wrap">
     <div class="hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow"><span>RICH NETLIST · TOOLKIT 0.1</span><span class="chip chip-warn"><zh>只读 · 还没有求解器</zh><en>Read-only · no solver yet</en></span></p>
+        <p class="eyebrow"><span>RICH NETLIST · TOOLKIT 0.1</span><span class="chip chip-ok"><zh>可编辑 · 桌面版可求解预览</zh><en>Edits text · solves on the desktop</en></span></p>
         <h1 id="tools-title" class="tour-h1"><zh>工具</zh><en>Tools</en></h1>
         <p class="thesis"><zh>在浏览器里打开网表，或者把查看器下载到 Windows。</zh><en>Open a netlist in your browser, or download the viewer for Windows.</en></p>
-        <p class="lead"><zh>第一版 RNL 工具链 0.1 带两个查看器：网页版不用安装，打开就能用；桌面版给 Windows 10 和 11。它们读带 RNL 记录的网表，画成原理图；只读，还没有求解器。</zh>
-          <en>The first RNL toolkit, 0.1, comes with two viewers: the web viewer, with nothing to install, and the desktop viewer for Windows 10 and 11. They read netlists with RNL records and draw them as schematics; they only read, and there is no solver yet.</en></p>
+        <p class="lead"><zh>第一版 RNL 工具链 0.1 带两个查看器：网页版不用安装，打开就能用；桌面版给 Windows 10 和 11。它们读带 RNL 记录的网表，画成原理图，也能改网表的文本，应用后重画。网页版保存时下载文件；桌面版把文件写回原处，还能求解，结果作为预览显示，不写进文件。</zh>
+          <en>The first RNL toolkit, 0.1, comes with two viewers: the web viewer, with nothing to install, and the desktop viewer for Windows 10 and 11. They read netlists with RNL records and draw them as schematics, and they edit the netlist’s text and draw it again when you apply the changes. The web viewer saves by downloading the file; the desktop viewer writes it back where it was read, and it also solves, showing the result as a preview that writes nothing into the files.</en></p>
         <div class="cta">
           <a class="btn btn-primary" href="<zh>viewer/</zh><en>../viewer/</en>"><svg class="ico"><use href="#i-globe"/></svg><zh>打开网页版</zh><en>Open the web viewer</en></a>
           <a class="btn" href="#desktop"><svg class="ico"><use href="#i-download"/></svg><zh>下载 Windows 版</zh><en>Download for Windows</en></a>
@@ -102,7 +104,7 @@
   <div class="wrap">
     <header class="sheet-head">
       <p class="sheet-no"><zh>01 · 查看器</zh><en>01 · Viewers</en></p>
-      <h2><zh>打开网表，看到原理图，<span class="mk">只读不改。</span></zh><en>Open a netlist, see the schematic. <span class="mk">Read-only.</span></en></h2>
+      <h2><zh>打开网表，看到原理图，<span class="mk">保存了才写。</span></zh><en>Open a netlist, see the schematic. <span class="mk">Nothing is written until you save.</span></en></h2>
       <p class="lead"><zh>查看器打开一份带 RNL 记录的 SPICE 或 Spectre 网表，连同它 include 的文件，画出电路的每一层，旁边是网表文本、问题列表和层次结构。剪贴板里的网表文本也能直接打开：File › Load from Clipboard 先显示要打开的内容，确认后再打开。</zh>
         <en>A viewer opens a SPICE or Spectre netlist with RNL records, with the files it includes, draws each level of the circuit, and shows the netlist text, the problems and the hierarchy beside it. A netlist’s text in the clipboard opens too: File › Load from Clipboard shows the text first, and opens it when you confirm.</en></p>
     </header>
@@ -134,9 +136,29 @@
           <en>Click an instance or a wire in the drawing, and the text marks its statement and every place that names it; click the text, and the drawing selects it.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-lock"/></svg><zh>只读</zh><en>Read-only</en></h3>
-        <p><zh>查看器不改文件，也还没有求解器，所以没写位置的对象不画；状态栏会说明这一层还缺什么。</zh>
-          <en>The viewers change no file, and there is no solver yet, so objects without a position are not drawn; the status bar says what the level lacks.</en></p>
+        <h3><svg class="ico"><use href="#i-list"/></svg><zh>没画出来的对象</zh><en>Objects not drawn</en></h3>
+        <p><zh>没写位置的对象画不出来，侧栏的 Not drawn 视图把它们列出来：每个都带着符号和各端子上的网络，可以按名字搜索；点一个，网表里就显示它的语句。状态栏说明这一层还缺什么，点它也会打开这个视图。</zh>
+          <en>Objects without a position are not drawn, and the Not drawn view of the side panel lists them, each with its symbol and the nets at its terminals, searchable by name; pick one to see its statement in the netlist. The status bar says what the level lacks, and a click on it opens the view.</en></p>
+      </div>
+    </div>
+    <h3 class="sub-h"><zh>改文本，应用，保存</zh><en>Edit, apply, save</en></h3>
+    <p class="sub-lead"><zh>两个查看器都能改网表的文本。改了不会自己生效：应用了才重画，保存了才写文件，也不会自己求解。</zh>
+      <en>Both viewers edit the netlist’s text. A change does nothing by itself: it is drawn when you apply it and written when you save it, and nothing solves by itself.</en></p>
+    <div class="facts tools-facts">
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-pencil"/></svg><zh>改文本</zh><en>Edit the text</en></h3>
+        <p><zh>Edit › Edit Text（Ctrl+E）把网表换成文本框，每个文件一个标签页，带行号。改过、还没保存的文件，标签上有一个点；还没应用的修改，文本上方会注明。</zh>
+          <en>Edit › Edit Text (Ctrl+E) turns the netlist into a text box per file, each in its tab, with line numbers. A file with changes not saved has a dot on its tab, and the bar above the text says when changes are not applied yet.</en></p>
+      </div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-eye"/></svg><zh>应用</zh><en>Apply</en></h3>
+        <p><zh>Edit › Apply Changes（Ctrl+Enter）按改过的文本重新构建网表、重画，问题列表和层次结构也跟着更新；层级、视图和选择保持不变。构建失败时修改还在，查看器会说明原因。</zh>
+          <en>Edit › Apply Changes (Ctrl+Enter) builds the netlist again from the edited text and draws it, with the problems and the hierarchy made again, keeping the level, the view and the selection. If the build fails, the changes stay and the viewer says why.</en></p>
+      </div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-download"/></svg><zh>保存</zh><en>Save</en></h3>
+        <p><zh>File › Save（Ctrl+S）：桌面版把改过的文件写回原处，编码和换行照旧，别的文件不动；网页版写不了它读进来的文件，保存就是下载当前显示的文件。有没保存的修改时，打开别的文件、重新读取或关闭窗口之前会先问。</zh>
+          <en>File › Save (Ctrl+S): the desktop viewer writes the edited files back where they were read, each in its encoding and with its line ends, and no other file; the web viewer cannot write a file it read, so Save downloads the file shown. With changes not saved, opening another file, reading it again or closing asks first.</en></p>
       </div>
     </div>
 
@@ -188,6 +210,8 @@
       </div>
     </div>
 
+    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>网页版也能改文本、应用后重画，见<a href="#viewers">上面</a>。网页写不了它读进来的文件，所以 File › Save 是下载：下载当前显示的文件，换行照旧，编码是 UTF-8。求解只有桌面版有，网页版没有 Solve 菜单。</zh>
+      <en>The web viewer edits the text and draws it again when the changes are applied, as <a href="#viewers">above</a>. A page cannot write the files it read, so File › Save is a download: of the file shown, with the line ends it had, in UTF-8. Only the desktop viewer solves; the web viewer has no Solve menu.</en></span></p>
     <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>网址里也可以带上要打开的网表，方便把链接发给别人：<a href="viewer/?url=https://raw.githubusercontent.com/rich-netlist/rnl/main/tests/conformance/cases/04-hierarchy.sp"><code>viewer/?url=https://raw.githubusercontent.com/…/04-hierarchy.sp</code></a> 打开 GitHub 上的一份网表，连同它 include 的文件。</zh>
       <en>The viewer’s address can name the netlist to open, so a link can be shared: <a href="../viewer/?url=https://raw.githubusercontent.com/rich-netlist/rnl/main/tests/conformance/cases/04-hierarchy.sp"><code>viewer/?url=https://raw.githubusercontent.com/…/04-hierarchy.sp</code></a> opens a netlist on GitHub with the file it includes.</en></span></p>
     <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>这里的网页版按 main 分支的最新提交构建，Help › About 显示它的版本和提交；Help › Desktop Viewer 回到这一页。</zh>
@@ -201,8 +225,8 @@
     <header class="sheet-head">
       <p class="sheet-no"><zh>03 · 桌面版</zh><en>03 · Desktop viewer</en></p>
       <h2><zh>桌面版：Windows 10 和 11。</zh><en>The desktop viewer for Windows 10 and 11.</en></h2>
-      <p class="lead"><zh>桌面版 RNL Viewer 按路径读取磁盘上的文件：网表 include 的文件放在哪里都能找到，文件改了按 F5 重新读取。窗口里的页面和网页版相同。</zh>
-        <en>The desktop RNL Viewer reads files from disk by their paths: the files a netlist includes are found wherever they are, and F5 reads a changed file again. Its window shows the same page as the web viewer.</en></p>
+      <p class="lead"><zh>桌面版 RNL Viewer 按路径读写磁盘上的文件：网表 include 的文件放在哪里都能找到，文件改了按 F5 重新读取，改过的文本保存时写回原处，File › Save As 把网表另存为新文件。窗口里的页面和网页版相同，另外多一个 Solve 菜单，能<a href="#solve">求解</a>。</zh>
+        <en>The desktop RNL Viewer reads and writes files on disk by their paths: the files a netlist includes are found wherever they are, F5 reads a changed file again, edited text is saved back where it was read, and File › Save As saves the netlist under a new name. Its window shows the same page as the web viewer, with a Solve menu besides, which <a href="#solve">solves</a>.</en></p>
     </header>
 
 <!--release-->
@@ -235,16 +259,38 @@
     </div>
 <!--/no-release-->
 
+    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>已发布的 0.1.0 版还只能看图：编辑、保存和求解是在它之后加进来的，下一个版本会带上。现在就要用，可以<a href="https://github.com/rich-netlist/rnl/blob/main/apps/desktop/README.md">从源代码构建</a>；只是改文本的话，网页版已经能用。</zh>
+      <en>The released 0.1.0 only reads: editing, saving and solving came after it, and the next release brings them. To use them now, <a href="https://github.com/rich-netlist/rnl/blob/main/apps/desktop/README.md">build the viewer from the source</a>; for editing alone, the web viewer has it already.</en></span></p>
     <ul class="rules dl-notes">
       <li><b>WebView2</b><span><zh>桌面版需要 Microsoft Edge WebView2 运行时，Windows 10 和 11 一般都自带。如果没有，可以从<a href="https://developer.microsoft.com/microsoft-edge/webview2/">微软的网站</a>下载。</zh><en>The desktop viewer needs the Microsoft Edge WebView2 runtime, which Windows 10 and 11 have. Where it is missing, it can be downloaded from <a href="https://developer.microsoft.com/microsoft-edge/webview2/">Microsoft</a>.</en></span></li>
       <li><b><zh>SmartScreen 提示</zh><en>SmartScreen</en></b><span><zh>这些文件还没有代码签名，运行时 Windows SmartScreen 可能提示“Windows 已保护你的电脑”：点“更多信息”，再点“仍要运行”。</zh><en>The files are not code-signed yet, so Windows SmartScreen may say that it protected your PC: choose More info, then Run anyway.</en></span></li>
       <li><b><zh>更新</zh><en>Updates</en></b><span><zh>菜单 Help › Check for Updates 检查有没有更新的版本。</zh><en>Help › Check for Updates looks for a newer release.</en></span></li>
       <li><b>macOS · Linux</b><span><zh>还没有现成的安装包，可以从源代码构建，见 <a href="https://github.com/rich-netlist/rnl/blob/main/apps/desktop/README.md"><code>apps/desktop/README.md</code></a>。</zh><en>No builds yet: build it from the source, as <a href="https://github.com/rich-netlist/rnl/blob/main/apps/desktop/README.md"><code>apps/desktop/README.md</code></a> describes.</en></span></li>
     </ul>
+    <h3 class="sub-h" id="solve"><zh>求解，先作为预览</zh><en>Solving, as a preview</en></h3>
+    <p class="sub-lead"><zh>桌面版的 Solve 菜单用 <code>rnl solve</code> 的求解器排出没写位置的对象。结果只在窗口里显示，文件不变。</zh>
+      <en>The desktop viewer’s Solve menu places the objects without a position with the solver of <code>rnl solve</code>. The result is shown in the window only, and the files stay as they are.</en></p>
+    <div class="facts tools-facts">
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-solver"/></svg><zh>求解预览</zh><en>A solved preview</en></h3>
+        <p><zh>Solve › Solve（F9）照 <code>rnl solve</code> 的做法求解当前的网表，连同它 include 的文件，用的是已经应用的文本。求解在后台进行，窗口照常能用；状态栏显示正在解哪一层，可以取消。图上方注明这是预览、文件没有改动，侧栏的 Solve 视图列出求解报告，点一行就显示它在网表里的位置。Solve › Close Preview 回到文件本来的样子。</zh>
+          <en>Solve › Solve (F9) solves the netlist shown, with the files it includes, as <code>rnl solve</code> does, from the text applied. It runs in the background, so the window stays usable, and the status bar shows the level being solved, with a Cancel button. The bar above the drawing says that this is a preview and the files are unchanged, and the Solve view of the side panel has the solve’s report, each line shown in the netlist when clicked. Solve › Close Preview shows the file as written.</en></p>
+      </div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-download"/></svg><zh>另存求解副本</zh><en>Save a solved copy</en></h3>
+        <p><zh>Solve › Save Solved Copy As（Ctrl+Shift+S）把求解结果另存到你选的地方：网表不 include 别的文件时存成一个文件，默认名是 <code>名字-solved.扩展名</code>；否则存成一个文件夹，放求解后的文件和其余读到的文件，和 <code>rnl solve -o DIR</code> 写的一样。会覆盖任何一个读进来的文件时，查看器拒绝保存。</zh>
+          <en>Solve › Save Solved Copy As (Ctrl+Shift+S) saves the result where you choose: one file, offered as <code>NAME-solved.EXT</code>, for a netlist that includes no other file; otherwise a folder with the files solved and the other files read, as <code>rnl solve -o DIR</code> writes them. A place that would replace any file that was read is refused.</en></p>
+      </div>
+      <div class="fact">
+        <h3><svg class="ico"><use href="#i-cpu"/></svg><zh>求解设置</zh><en>The solver’s settings</en></h3>
+        <p><zh>Solve › Settings 设定求解器的选项：每层的时限、容差、网格、束宽、搜索和布线的工作量，以及给布局排序的目标：哪些开着，谁先谁后，同一级里各占多少权重。约束的优先级（low、normal、high）写在网表里，不在这里设。Restore Defaults 恢复求解器的默认值；设定下次启动还在。</zh>
+          <en>Solve › Settings sets the solver’s options: the time limit of each level, the tolerance, the grid, the beam, the work of the search and the router, and the objectives that rank the placements: which are on, which counts first, and the weights of those that share a level. The priority of a constraint (low, normal, high) is written in the netlist, not set here. Restore Defaults brings back the solver’s defaults, and the settings stay for the next start.</en></p>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- ===================== 04 Licences ===================== -->
+<!-- ===================== 04 Licences =====================
 <section id="licences" class="sheet">
   <div class="wrap">
     <header class="sheet-head">

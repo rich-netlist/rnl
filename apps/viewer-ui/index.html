@@ -16,6 +16,7 @@
       <nav class="tabs view-tabs" role="tablist" aria-label="Side panel views">
         <button id="tab-netlist" type="button" role="tab" aria-controls="pane-netlist" aria-selected="true">Netlist</button>
         <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false">Hierarchy</button>
+        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" title="The objects of the level shown that have no position, so are not drawn">Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
         <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" hidden>Solve</button>
       </nav>
       <button id="hide-sidebar" class="icon" type="button" title="Hide the side panel (Ctrl+B)" aria-label="Hide the side panel">&#x2039;</button>
@@ -24,6 +25,8 @@
     <div id="pane-netlist" class="pane netlist-pane" role="tabpanel">
       <div id="file-bar" class="file-bar">
         <nav id="file-tabs" class="tabs file-tabs" aria-label="Files"></nav>
+        <span id="edit-state" class="edit-state" role="status" hidden></span>
+        <button id="apply-edits" class="apply-edits" type="button" hidden title="Build the netlist again from this text, draw it and check it (Ctrl+Enter)">Apply Changes</button>
         <input id="show-failed" class="failed-check" type="checkbox" checked title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
         <label for="show-failed" class="failed-toggle" title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
           <span class="caption">Failed statements</span>
@@ -61,6 +64,16 @@
         <div id="index" class="index-list" role="listbox" aria-label="Subcircuits by name"></div>
       </section>
     </div>
+    <div id="pane-unplaced" class="pane unplaced-pane" role="tabpanel" hidden>
+      <div class="sub-head">
+        <span class="pane-title">Not drawn</span>
+        <span id="unplaced-count" class="index-count"></span>
+      </div>
+      <div class="search-row">
+        <input id="unplaced-search" type="search" placeholder="Search by name" spellcheck="false" autocomplete="off" aria-label="Search the objects not drawn by name">
+      </div>
+      <div id="unplaced-list" class="unplaced-list" role="listbox" aria-label="Objects of the level shown that are not drawn"></div>
+    </div>
     <div id="pane-solve" class="pane solve-pane" role="tabpanel" hidden>
       <div class="sub-head">
         <span class="pane-title">Solve</span>
@@ -94,6 +107,7 @@
 </div>
 <footer class="statusbar">
   <span id="selection" class="selection"></span>
+  <span id="note" class="note" role="status" hidden></span>
   <span id="status" class="status"></span>
   <span id="solve-status" class="solve-status" hidden><span id="solve-step"></span><button id="solve-cancel" class="solve-cancel" type="button" hidden>Cancel</button></span>
   <span id="pointer" class="pointer" title="Where the pointer is on the drawing, in units with y up"></span>

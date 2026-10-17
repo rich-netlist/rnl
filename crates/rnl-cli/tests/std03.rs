@@ -846,3 +846,31 @@ fn the_chinese_aliases_of_the_series_0_3_name_its_symbols_definitions_and_roles(
     let e = errors(&read(&MemoryProvider::new().with("t.sp", &gone), "t.sp", &Options::default()));
     assert!(e.iter().any(|m| m.contains("带尾管差分对")), "{e:?}");
 }
+
+#[test]
+fn a_definition_of_the_files_own_gets_no_hint_of_the_series_0_3() {
+    // the hints name what the standard series 0.3 calls a name or a role only when the name the
+    // reading finds is the series' own: a file of 0.2 with no standard package that defines $CHAIN
+    // or $GROUND itself is told only what is wrong (9.4, 6.6)
+    let no_std = Options { std: false, ..Options::default() };
+    let own_chain = "* @RNL {\n*   $CHAIN = @DEFINE(roles=[\"chain\"]) {};\n*   #R1(series) @AS $CHAIN\n* }\n";
+    let e = errors(&read(&MemoryProvider::new().with("t.sp", &netlist("0.2", "", own_chain)), "t.sp", &no_std));
+    assert!(e.iter().any(|m| m.contains("the ordinary definition $CHAIN has no role series (9.4)")), "{e:?}");
+    assert!(!e.iter().any(|m| m.contains("series 0.3")), "{e:?}");
+    let own_ground = "* @RNL {\n*   $GROUND = @DEFINE(roles=[\"p\"]) {};\n*   $GND @ATTACH &a\n* }\n";
+    let e = errors(&read(&MemoryProvider::new().with("t.sp", &netlist("0.2", "", own_ground)), "t.sp", &no_std));
+    assert!(e.iter().any(|m| m.contains("$GND cannot be found")), "{e:?}");
+    assert!(!e.iter().any(|m| m.contains("series 0.3")), "{e:?}");
+    // and symbols of its own: $RESISTOR, and $GROUND_SYMBOL beside a definition $GROUND
+    let own_symbols = "* @RNL {\n\
+                       *   $RESISTOR = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1) };\n\
+                       *   $GROUND_SYMBOL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1) };\n\
+                       *   $GROUND = @DEFINE(roles=[\"p\"]) {};\n\
+                       *   #R1 @SET-SYMBOL $RES;\n\
+                       *   #R1 @SET-SYMBOL $GROUND\n\
+                       * }\n";
+    let e = errors(&read(&MemoryProvider::new().with("t.sp", &netlist("0.2", "", own_symbols)), "t.sp", &no_std));
+    assert!(e.iter().any(|m| m.contains("$RES cannot be found")), "{e:?}");
+    assert!(e.iter().any(|m| m.contains("must be a symbol, not $GROUND (11.3)")), "{e:?}");
+    assert!(!e.iter().any(|m| m.contains("series 0.3")), "{e:?}");
+}
