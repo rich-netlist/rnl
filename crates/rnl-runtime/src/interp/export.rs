@@ -972,6 +972,10 @@ impl Interp<'_> {
             let ms = if it.is_set(cd.args[0]) { it.items_of(s, cd.args[0], 7, None) } else { vec![cd.args[0]] };
             let mut out = Vec::new();
             for m in ms {
+                // a set without members is no member (14.1)
+                if it.is_set(m) && it.flatten(s, m, 7, None).is_empty() {
+                    continue;
+                }
                 out.push(it.point_ref(s, ix, m)?);
             }
             Some(out)

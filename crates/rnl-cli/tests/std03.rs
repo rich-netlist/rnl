@@ -12,7 +12,7 @@ use rnl_cli::{interpret_file, FsProvider};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::model::LevelView;
-use rnl_runtime::problem::{FactKind, LevelProblem, PointRef};
+use rnl_runtime::problem::{FactKind, LevelProblem, ObjectKind, PointRef};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::SolverOptions;
@@ -481,12 +481,14 @@ fn the_series_puts_the_tail_of_each_differential_pair_under_its_middle_as_a_low_
             let made = &p.usages[f.chain[0]];
             assert!(made.generated && made.priority == Some(Priority::Low), "{made:?}");
             let FactKind::Distribute { members, .. } = &f.kind else { panic!("{:?}", f.kind) };
-            // an empty set is no member (14.1), and two members hold by themselves (14.4)
-            members.iter().map(|m| written(p, m)).filter(|m| m != "{}").collect()
+            members.iter().map(|m| written(p, m)).collect()
         })
         .collect();
     low.sort();
+    // an empty set is no member (14.1): without a tail, two members, which hold by themselves (14.4)
     assert_eq!(low, [vec!["#M1", "#M2"], vec!["#M1", "{#M5 #M8}", "#M2"], vec!["#M1", "{#M5}", "#M2"]]);
+    // and no point of its own
+    assert!(p.objects.iter().all(|o| o.kind != ObjectKind::Point), "{:?}", p.objects);
     // in the order of resolution of 8.5, after every fact of the file's own
     let first = p.facts.iter().position(|f| from_layout(&f)).unwrap();
     assert!(p.facts[..first].iter().all(|f| f.priority == Priority::Normal), "{:?}", p.facts);
@@ -515,6 +517,34 @@ fn a_tail_placed_elsewhere_lets_go_of_the_low_middle() {
     }
     let all = report(&run.levels[0], true);
     assert!(all.iter().any(|l| l.contains("kept [") && l.contains("the x of #M5 = 20 (normal")), "{all:#?}");
+}
+
+#[test]
+fn a_solve_puts_the_tails_under_the_middle_and_leaves_nothing_unsolved() {
+    // three pairs, nothing placed: one with a tail, one without, one with two tails
+    let body = ".model nch nmos level=1\nM1 o1 g1 t 0 nch\nM2 o2 g2 t 0 nch\nM5 t b 0 0 nch\n\
+                M3 p1 h1 u 0 nch\nM4 p2 h2 u 0 nch\nM6 q1 k1 w 0 nch\nM7 q2 k2 w 0 nch\nM8 w c 0 0 nch\n\
+                M10 w c 0 0 nch\n* @RNL {\n*   #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;\n\
+                *   #M3(in_p) #M4(in_n) @AS $DIFFERENTIAL_PAIR;\n\
+                *   #M6(in_p) #M7(in_n) {#M8 #M10}(tail) @AS $DIFFERENTIAL_PAIR\n* }\n";
+    let files = MemoryProvider::new().with("/w/t.sp", &netlist("0.3", "", body));
+    let options = SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() };
+    let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
+    let level = &run.levels[0];
+    assert!(level.written.unsolved.is_empty(), "{:?}", level.written.unsolved);
+    let lines = report(level, true);
+    assert!(!lines.iter().any(|l| l.contains("discarded [") || l.contains("unsolved")), "{lines:#?}");
+    // read again: every constraint holds, the one of the pair without a tail among them
+    let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
+    let r = read(&solved, "/w/t.sp", &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let status = rnl_view::status_lines(&r);
+    assert!(status.iter().all(|l| !l.contains("unsolved") && !l.contains("dropped")), "{status:?}");
+    let x = |id: &str| level(&r, "t.sp").objects.iter().find(|o| o.id == id).and_then(|o| o.at).unwrap().0;
+    // the tail's origin in the middle of the pair's, and the centre of two tails
+    assert!((x("#M5") - (x("#M1") + x("#M2")) / 2.0).abs() < 1e-6, "{}", run.files[0].text);
+    let (lo, hi) = (x("#M8").min(x("#M10")), x("#M8").max(x("#M10")));
+    assert!(((lo + hi) / 2.0 - (x("#M6") + x("#M7")) / 2.0).abs() < 1e-6, "{}", run.files[0].text);
 }
 
 #[test]

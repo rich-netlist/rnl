@@ -1470,7 +1470,14 @@ impl Interp<'_> {
                 }
                 out
             } else if self.is_set(cd.args[0]) {
-                self.items_of(s, cd.args[0], 7, ctx)
+                let mut out = Vec::new();
+                for m in self.items_of(s, cd.args[0], 7, ctx) {
+                    // a set without members is no member (14.1)
+                    if !(self.is_set(m) && self.flatten(s, m, 7, ctx).is_empty()) {
+                        out.push(m);
+                    }
+                }
+                out
             } else {
                 vec![cd.args[0]]
             };
