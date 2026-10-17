@@ -255,10 +255,16 @@ test("a folder set on the folder input opens as with Open Folder", async ({ page
     "lib/parts.inc": ".subckt part p q\nR1 p q 1k\n.ends\n",
     "notes.txt": "notes\n",
   });
-  await page.locator("#folder-input").setInputFiles(dir);
+  // With a folder, Playwright's setInputFiles waits for the input's own input event, which it starts
+  // to listen for while it sets the files; in Firefox and WebKit the event can come first, and then
+  // it never returns, though the page has the files and shows the dialog (seen in CI, a trace of
+  // run 39023147223). So the dialog does not wait for it: it is started, the dialog checked, and then
+  // it is given a few seconds, and left if it hangs; its error, when the page closes, is dropped.
+  const setting = page.locator("#folder-input").setInputFiles(dir).catch(() => {});
   const name = path.basename(dir);
   const dialog = page.locator("dialog.dialog");
   await expect(dialog.locator(".dialog-title")).toHaveText("Open Folder");
+  await Promise.race([setting, new Promise((resolve) => setTimeout(resolve, 3000))]);
   await expect(dialog.locator(".dialog-body > p").first()).toHaveText(`The netlist to open in ${name}:`);
   // the netlists first, then the files mostly included, then the others; the filter narrows them
   await expect(dialog.locator(".dialog-option")).toHaveText(["top.sp", "lib/parts.inc", "notes.txt"]);
