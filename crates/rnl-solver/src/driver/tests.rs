@@ -1943,6 +1943,7 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
             ("09-buses-and-bundles.sp / reg4", 1),
             ("09-include-without-header.sp / divider", 2),
             ("12-diagnostics.sp / sub", 2),
+            ("19-header-and-lib-versions.sp / sub_02", 2),
             ("19-set-cycles.sp / cell", 2),
             ("inverter-chain.scs / inv", 1),
             ("inverter-chain.sp / inv", 1),
