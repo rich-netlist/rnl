@@ -55,7 +55,11 @@ export default {
     tauri.event.listen("solve-progress", (e) => handler(e.payload));
   },
   // decision 0011: the files changed, written where they were read, and the netlist saved as another file
-  save: (source, files) => invoke("save_files", { entry: source.path, files }),
+  // a file that is not what was read, because another program changed it, is not written: its name comes back
+  save: (source, files, overwrite) =>
+    invoke("save_files", { entry: source.path, files, overwrite: overwrite === true }).then((saved) =>
+      saved.changed.length > 0 ? { changed: saved.changed } : saved.said,
+    ),
   saveAs: (source, saved) =>
     invoke("save_file_as", { entry: source.path || null, name: saved.name, text: saved.text }).then(file),
   setDirty(dirty) {

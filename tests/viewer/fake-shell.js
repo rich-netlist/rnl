@@ -86,6 +86,10 @@ const fake = {
   writes: [],
   /** A message the next Save rejects with, as a shell does when it cannot write. */
   writeFail: null,
+  /** The names of files that another program changed since they were read: the next Save, unless it overwrites, writes nothing and says so. */
+  changedOnDisk: null,
+  /** Whether each Save, written or not, was to overwrite, in order. */
+  overwrites: [],
   /** What the next Save As gives: a source, a fixture's name or { name, fixture }; null when the user cancels. */
   savedAs: null,
   /** The files each Save As was asked to write, in order. */
@@ -193,8 +197,15 @@ export default {
     fake.calls.push(["browse", url]);
   },
   /** Decision 0011: Save writes the files and says so; on the desktop Save As asks where; the platform is told of changes not saved. */
-  async save(src, files) {
+  async save(src, files, overwrite) {
     fake.calls.push(["save", src.name]);
+    fake.overwrites.push(overwrite === true);
+    if (fake.changedOnDisk !== null && overwrite !== true) {
+      const changed = fake.changedOnDisk;
+      fake.changedOnDisk = null;
+      return { changed };
+    }
+    fake.changedOnDisk = null;
     fake.writes.push(files);
     const fail = fake.writeFail;
     fake.writeFail = null;

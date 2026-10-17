@@ -26,3 +26,7 @@ The desktop viewer reads files and can write them; the web viewer, a page, canno
 - The shells give the page more: building and solving over texts held (`build` and `solve` take `edits`), `save` and `saveAs`, whether changes are not saved (`setDirty`, for the window's title and the browser's question), and the window's request to close. The core is not changed: the desktop builds with its own files in memory over the disk, as decision 0008 has every frontend do.
 - Saving overwrites what is on disk; it does not look for a change made by another program since the file was read.
 - Left for later: highlighting the text while it is edited, editing a preview, writing a solve into the files themselves (decision 0010), and watching the files for changes made elsewhere.
+
+## Note, 2026-10-17
+
+Saving no longer overwrites without looking: the desktop compares each file on disk with the text the page read from it, as the core reads it (UTF-8 without its byte order mark, else Latin-1, line ends apart), before it writes. A file that differs, or is gone, is not written, nor are the others given with it, and the user chooses Overwrite, Reload (read the files again, dropping the changes made in the viewer) or Cancel. The web's Save, a download, has nothing to compare. Watching the files for changes while the viewer is open is still left for later.

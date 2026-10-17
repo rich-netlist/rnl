@@ -15,7 +15,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use files::{Edits, SavedFile};
+use files::{Edits, Saved, SavedFile};
 use rnl_cli::FsProvider;
 use rnl_view::{BuildOptions, Document, MemoryProvider};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
@@ -116,12 +116,14 @@ async fn open_text(
 }
 
 /// Write the files of the netlist at `entry` that the user chose to save where they were read from,
-/// each in its encoding, and say which: nothing else is written (decision 0011).
+/// each in its encoding, and say which: nothing else is written (decision 0011). Unless the user
+/// said to `overwrite`, a file that is not what it was when it was read is not written, nor are the
+/// others; the names of those files are given back.
 #[tauri::command]
-async fn save_files(entry: String, files: Vec<SavedFile>) -> Result<String, String> {
+async fn save_files(entry: String, files: Vec<SavedFile>, overwrite: Option<bool>) -> Result<Saved, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let entry = std::path::absolute(&entry).map_err(|e| format!("{entry}: {e}"))?;
-        files::save_all(&entry.to_string_lossy(), &files)
+        files::save_all(&entry.to_string_lossy(), &files, overwrite.unwrap_or(false))
     })
     .await
     .map_err(|e| e.to_string())?
