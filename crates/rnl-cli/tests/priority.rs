@@ -13,11 +13,13 @@
 use std::path::Path;
 
 use rnl_cli::interpret_file;
+use rnl_cli::solve::{solve as solve_file, SolveOptions};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::problem::LevelProblem;
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::Options;
+use rnl_solver::SolverOptions;
 
 /// `$PAIR` groups its two roles and aligns them; `$OUTER` applies `$PAIR` as `%in`, with what
 /// `inner` adds to that statement, followed by the statements of `body`.
@@ -318,4 +320,124 @@ fn a_priority_that_a_selection_reaches_is_one_of_its_targets_own() {
         "#,
     ));
     assert_eq!(kept(&p), (vec![("%o1", Priority::Low), ("a usage of $OUTER", Priority::Low)], vec![]));
+}
+
+/// `$MIXED` relates its two roles by three constraints of its body, one low, one high and one
+/// without a priority.
+const MIXED: &str = "$MIXED = @DEFINE(roles=[\"a\", \"b\"]) { %low = {?a ?b} @ALIGN(\"y\", priority=\"low\"); \
+                     %high = {?a ?b} @ORDER(\"left-to-right\", priority=\"high\"); \
+                     %plain = ?a ?b @DISTANCE(\"left-to-right\", min=2) }";
+
+/// The facts given to the solver of a file of `version` with R1 to R8, `$MIXED` and `statements` in
+/// a record whose head writes `head`, by label, with their priorities.
+fn in_record(version: &str, head: &str, statements: &str) -> Vec<(String, Priority)> {
+    let mut text = String::from("* priority of the record\n");
+    for k in 1..=8 {
+        text += &format!("R{k} n{k} n{} 1k\n", k + 1);
+    }
+    text += &format!("* @RNL(type=\"header\") {{ @VERSION(\"{version}\")}}\n* @RNL {{ {MIXED} }}\n");
+    text += &format!("* @RNL{head} {{\n*   {statements}\n* }}\n.end\n");
+    let files = MemoryProvider::new().with("p.sp", &text);
+    let r = interpret_file(Path::new("p.sp"), None, &files, &Options { std: false, ..Options::solver() }).unwrap();
+    let errors: Vec<String> =
+        r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    let p = r.problems.into_iter().next().unwrap();
+    let mut facts: Vec<(String, Priority)> = p.facts.iter().map(|f| (f.label.clone(), f.priority)).collect();
+    facts.sort();
+    facts
+}
+
+fn facts(of: &[(&str, Priority)]) -> Vec<(String, Priority)> {
+    of.iter().map(|(l, p)| (l.to_string(), *p)).collect()
+}
+
+#[test]
+fn in_0_3_the_head_of_a_record_gives_no_priority_to_a_usage() {
+    // the priority of a record head is the default of the statements of the record that take one,
+    // but not of AS and ATTACH, unless it is "disabled": a usage has a priority only when it writes
+    // one, or a PRIORITY statement gives it one, which overrides those of its body (14.8 of 0.3)
+    let high = "(priority=\"high\")";
+    let own = [("%high", Priority::High), ("%low", Priority::Low), ("%plain", Priority::Normal)];
+    assert_eq!(in_record("0.3", high, "#R1 #R2 @AS $MIXED"), facts(&own));
+    assert_eq!(in_record("0.3", high, "$MIXED @ATTACH #R1 #R2"), facts(&own));
+    // the record's own statements still take its priority
+    let mut with_own = facts(&own);
+    with_own.push(("%row".to_string(), Priority::High));
+    with_own.sort();
+    assert_eq!(in_record("0.3", high, "#R1 #R2 @AS $MIXED; %row = {#R3 #R4} @ALIGN(\"y\")"), with_own);
+    // a priority written on the usage, or given by PRIORITY, overrides its body as before
+    let all = |p: Priority| facts(&[("%high", p), ("%low", p), ("%plain", p)]);
+    assert_eq!(in_record("0.3", high, "#R1 #R2 @AS(priority=\"normal\") $MIXED"), all(Priority::Normal));
+    assert_eq!(in_record("0.3", "", "#R1 #R2 @AS(priority=\"high\") $MIXED"), all(Priority::High));
+    assert_eq!(in_record("0.3", high, "%m = #R1 #R2 @AS $MIXED; %m @PRIORITY(\"low\")"), all(Priority::Low));
+    // a record of priority "disabled" turns off everything in it, the bodies of its usages too
+    assert_eq!(in_record("0.3", "(priority=\"disabled\")", "#R1 #R2 @AS $MIXED"), []);
+    // a file of 0.2 keeps the rule of 0.2: the record's priority is the usage's too
+    assert_eq!(in_record("0.2", high, "#R1 #R2 @AS $MIXED"), all(Priority::High));
+}
+
+#[test]
+fn a_usage_that_a_rule_makes_keeps_the_priorities_of_its_body_through_a_solve() {
+    // a usage that a rule makes, with constraints of different priorities in its body: the solver
+    // writes it out, in its record of priority high, without a priority, so that each of them reads
+    // back with its own; or with the priority that the rule writes on it, as written, or that of
+    // the record of the rule when it is "disabled", which then overrides them all; the high of the
+    // record of the rule is no priority of the usage's (10.5, 14.8). $MARK hangs a point under an
+    // open pin and wires it, so that the pin is wired once it is written out and the rule does not
+    // make it again
+    let netlist = "* rule-made\nR1 n1 n2 1k\nR2 n2 n3 1k\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\n* @RNL {\n\
+                *   $MARK = @DEFINE(roles=[[\"t\", \"terminal\"]]) { %p = (_, _); ?t::net @WIRE {?t %p}; \
+                %low = {?t %p} @ALIGN(\"x\", priority=\"low\"); %high = %p ?t @DISTANCE(\"bottom-to-top\", min=2, priority=\"high\"); \
+                %plain = %p ?t @DISTANCE(\"bottom-to-top\", max=6) };\n\
+                *   $END_NETS = # @SELECT-NET(name=\"n3\");\n\
+                *   $OPEN = $END_NETS @SELECT-TERMINAL(wired=false)\n* }\n\
+                * @RNLHEAD {\n*   MAKE\n* }\n.end\n";
+    // the constraints of the level as a viewer reads it, with the record of the solver, by kind
+    // and priority
+    let constraints = |text: &str| -> Vec<(String, String)> {
+        let files = MemoryProvider::new().with("/w/t.sp", text);
+        let r = interpret_file(Path::new("/w/t.sp"), None, &files, &Options::default()).unwrap();
+        let errors: Vec<String> =
+            r.diagnostics().into_iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
+        assert!(errors.is_empty(), "{errors:?}");
+        let mut of: Vec<(String, String)> =
+            r.model.levels[0].constraints.iter().map(|c| (c.kind.clone(), c.priority.clone())).collect();
+        of.sort();
+        of
+    };
+    let mixed = ["low", "high", "normal"];
+    let (high, disabled) = ("(priority=\"high\")", "(priority=\"disabled\")");
+    for (head, make, written_as, priorities) in [
+        ("", "$MARK @ATTACH $OPEN", "= $MARK @ATTACH #R2:", &mixed[..]),
+        ("", "$MARK @ATTACH(priority=\"high\") $OPEN", "= $MARK @ATTACH(priority=\"high\") #R2:", &["high"][..]),
+        (high, "$MARK @ATTACH $OPEN", "= $MARK @ATTACH #R2:", &mixed[..]),
+        (disabled, "$MARK @ATTACH $OPEN", "= $MARK @ATTACH(priority=\"disabled\") #R2:", &["disabled"][..]),
+    ] {
+        let text = netlist.replace("HEAD", head).replace("MAKE", make);
+        let before = constraints(&text);
+        let mut given: Vec<&str> = before.iter().map(|(_, p)| p.as_str()).collect();
+        given.sort();
+        given.dedup();
+        let mut want = priorities.to_vec();
+        want.sort();
+        assert_eq!(given, want, "{make}");
+        let files = MemoryProvider::new().with("/w/t.sp", &text);
+        let p = &interpret_file(Path::new("/w/t.sp"), None, &files, &Options::solver()).unwrap().problems[0];
+        assert!(p.usages.iter().any(|u| u.definition == "$MARK" && u.rule_made), "{:?}", p.usages);
+        let options = SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() };
+        let run = solve_file(Path::new("/w/t.sp"), &files, &options).unwrap();
+        let written = &run.files[0].text;
+        assert!(written.contains(written_as), "{written}");
+        assert_eq!(constraints(written), before, "{written}");
+        // every object placed, by the usage written out: the rule did not make it again
+        let back = interpret_file(
+            Path::new("/w/t.sp"),
+            None,
+            &MemoryProvider::new().with("/w/t.sp", written),
+            &Options::default(),
+        )
+        .unwrap();
+        assert!(back.model.levels[0].unplaced.is_empty(), "{:?} {written}", back.model.levels[0].unplaced);
+    }
 }

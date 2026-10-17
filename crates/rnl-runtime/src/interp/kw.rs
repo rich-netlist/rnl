@@ -660,7 +660,15 @@ impl Interp<'_> {
         });
         let order: Vec<String> = d.params.iter().map(|(n, _)| n.clone()).collect();
         let p = self.params(kw, seg, ctx, &pspec, Some(&order), false, Some(&resolve))?;
-        let priority = get(&p, "priority").and_then(Lit::str).and_then(Priority::parse).or(ctx.header.priority);
+        // its own priority=; in a file of 0.3 the default of the record head gives an AS or ATTACH
+        // one only when it is "disabled", which turns off everything in the record, so that a usage
+        // without one keeps the priorities of the facts of its body, as a usage that a rule makes
+        // does; in a file of 0.2 the record's default is the usage's (14.8)
+        let own = get(&p, "priority").and_then(Lit::str).and_then(Priority::parse);
+        let follows_0_3 = self.statement_follows_0_3(ctx);
+        let head =
+            if follows_0_3 { ctx.header.priority.filter(|p| *p == Priority::Disabled) } else { ctx.header.priority };
+        let priority = own.or(head);
         // a string passed in remembers the file it is written in (16.5)
         let params: Vec<(String, Option<Lit>)> = d
             .params

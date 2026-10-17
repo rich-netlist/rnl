@@ -547,6 +547,22 @@ fn the_priority_of_a_usage_turns_the_drawing_of_its_body_off_or_up() {
     let r = with_record(&["%dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS(priority=\"high\") $DIFFERENTIAL_PAIR"]);
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     assert_eq!(centring(&r), [("%dp1".to_string(), Priority::High)]);
+    // a record of priority high gives the usage none, so its centring stays low (14.8), unless the
+    // usage writes one; a record of priority "disabled" turns it off with everything in it
+    let in_record = |head: &str, written: &str| {
+        let record = format!("* @RNL(priority=\"{head}\") {{\n*   %dp1 = #M1(in_p) #M2(in_n) #M5(tail) {written} $DIFFERENTIAL_PAIR\n* }}\n");
+        let r = read(
+            &MemoryProvider::new().with("t.sp", &netlist("0.3", "", &format!("{PARTS}{record}"))),
+            "t.sp",
+            &Options::solver(),
+        );
+        assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+        assert_eq!(fills(&r, "$DIFFERENTIAL_PAIR").len(), 1);
+        centring(&r)
+    };
+    assert_eq!(in_record("high", "@AS"), [("%dp1".to_string(), Priority::Low)]);
+    assert_eq!(in_record("high", "@AS(priority=\"normal\")"), [("%dp1".to_string(), Priority::Normal)]);
+    assert!(in_record("disabled", "@AS").is_empty());
 }
 
 #[test]
@@ -623,27 +639,24 @@ fn a_stub_is_drawn_by_low_facts_and_stands_upright() {
             "{stub}"
         );
     }
-    // written out by the solver, a stub keeps them low: its usage is written with the priority
-    // they all have, which overrides theirs, as the record's own high would (14.8)
-    let files = MemoryProvider::new().with(
-        "/w/t.sp",
-        &netlist(
-            "0.3",
-            "",
-            "V1 a 0 1
-",
-        ),
-    );
+    // written out by the solver, a stub keeps them low: its usage is written without a priority,
+    // which the record's own high does not give it (14.8)
+    let files = MemoryProvider::new().with("/w/t.sp", &netlist("0.3", "", "V1 a 0 1\n"));
     let options = SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() };
     let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
     let text = &run.files[0].text;
-    assert!(text.contains("= $GROUND_STUB @ATTACH(gap=2, priority=\"low\")"), "{text}");
+    assert!(text.contains("= $GROUND_STUB @ATTACH(gap=2) #"), "{text}");
     assert!(!text.contains("priority=\"normal\""), "{text}");
-    let back = read(&MemoryProvider::new().with("/w/t.sp", text), "/w/t.sp", &Options::solver());
-    let p = back.problems.iter().find(|p| p.title == "t.sp").unwrap();
-    let stubs: Vec<&ProblemFact> =
-        p.facts.iter().filter(|f| f.chain.iter().any(|&u| p.usages[u].definition == "$GROUND_STUB")).collect();
-    assert!(!stubs.is_empty() && stubs.iter().all(|f| f.priority == Priority::Low), "{stubs:?}");
+    // read again as a viewer reads it, with the record of the solver: the same low constraints
+    let low = |files: &MemoryProvider| -> Vec<String> {
+        let r = read(files, "/w/t.sp", &Options::default());
+        let mut of: Vec<String> =
+            level(&r, "t.sp").constraints.iter().filter(|c| c.priority == "low").map(|c| c.kind.clone()).collect();
+        of.sort();
+        of
+    };
+    assert!(!low(&files).is_empty());
+    assert_eq!(low(&MemoryProvider::new().with("/w/t.sp", text)), low(&files), "{text}");
 }
 
 #[test]
