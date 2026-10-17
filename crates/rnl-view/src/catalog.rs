@@ -420,13 +420,14 @@ mod tests {
         let c = default();
         let listed = packages(&c);
         assert!(listed.contains(&("rnl-std", "0.3")) && !listed.contains(&("rnl-std", "0.2")), "{listed:?}");
-        // one version of each name; a name only the series 0.2 has keeps its version
+        // one version of each name, rnl-zh's 0.3; a name only the series 0.2 has keeps its version
         let mut names: Vec<&str> = listed.iter().map(|p| p.0).collect();
         names.dedup();
         assert_eq!(names.len(), listed.len(), "{listed:?}");
-        assert!(listed.contains(&("rnl-zh", "0.2")) && listed.contains(&("rnl-std-virtual", "0.2")), "{listed:?}");
+        assert!(listed.contains(&("rnl-zh", "0.3")) && listed.contains(&("rnl-std-virtual", "0.2")), "{listed:?}");
         assert!(listed.contains(&("analog-canvas-extensions", "0.1")), "{listed:?}");
-        assert_eq!(listed.len(), 16 + 3 + 1);
+        // the 16 packages of the series 0.3 and rnl-zh, rnl-std-symbols and rnl-std-virtual, Analog Canvas's
+        assert_eq!(listed.len(), 17 + 2 + 1);
         // by name, then by version
         let mut sorted = listed.clone();
         sorted.sort();

@@ -641,10 +641,12 @@ fn the_chinese_aliases_of_the_series_0_3_name_its_symbols_definitions_and_roles(
     assert_eq!(fills(&r, "$CURRENT_MIRROR"), [["ref={#M3 #M9}", "out={#M4 #M6}"]]);
     assert_eq!(fills(&r, "$CHAIN"), [["source=#R1", "chain={#R2 #R3}", "load=#R4"]]);
     let lv = level(&r, "t.sp");
-    let symbol = |id: &str| lv.objects.iter().find(|o| o.id == id).and_then(|o| o.symbol.as_ref()).unwrap().name.clone();
+    let symbol =
+        |id: &str| lv.objects.iter().find(|o| o.id == id).and_then(|o| o.symbol.as_ref()).unwrap().name.clone();
     assert_eq!((symbol("#R2"), symbol("#M5")), ("$RESISTOR".to_string(), "$NMOS_4TERM".to_string()));
     // the aliases of the definitions that the series 0.3 left out are not in it
-    let gone = text_with_record("@USE-ALIASES(name=\"rnl-zh\", version=\"0.3\")", &["#M1 #M2 #M5 @视作 $\"带尾管差分对\""]);
+    let gone =
+        text_with_record("@USE-ALIASES(name=\"rnl-zh\", version=\"0.3\")", &["#M1 #M2 #M5 @视作 $\"带尾管差分对\""]);
     let e = errors(&read(&MemoryProvider::new().with("t.sp", &gone), "t.sp", &Options::default()));
     assert!(e.iter().any(|m| m.contains("带尾管差分对")), "{e:?}");
 }
