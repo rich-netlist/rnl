@@ -6,7 +6,9 @@
 //! neighbours in a row on heights that suit the way the pins they are drawn to each other by leave
 //! ([`RowLink`]), apart by their boxes and a gap, neighbouring rows apart likewise, neighbouring
 //! blocks of a group apart, ports beside the pins they connect to, and, for a candidate with even
-//! rows, equal steps in each row. Each relation is a unit of the solver's own, ranked after every
+//! rows, equal steps between the members of a row that are of one set to space evenly
+//! (`crate::structure::Structure::even_sets`): a group, a DISTRIBUTE or a mirror pair, or one kind
+//! and one role. Each relation is a unit of the solver's own, ranked after every
 //! fact (8.5): the resolution takes it in after the facts kept, and one that does not fit with
 //! them is dropped, never a fact.
 //!
@@ -35,7 +37,9 @@
 //!    the rest, so that different arrangements each keep a place.
 //!
 //! The root's variants are the complete candidates; P0 joins them, and with the even rows in force
-//! each has a twin with evenly spaced rows. The coordinates of each are then sought by the
+//! each has a twin with evenly spaced rows, where a row holds three or more of one set to space
+//! evenly at a regular interval ([`evenly`]); never for a row as such, a chain of a `$FLOW` or the
+//! elements in no group (quality review SE-3). The coordinates of each are then sought by the
 //! lexicographic LP (`crate::coords`). The search makes no more than `Budget::candidates`
 //! candidates; past that it keeps what it has.
 
@@ -97,7 +101,8 @@ pub(crate) struct Candidate {
     pub rows: Vec<Vec<usize>>,
     /// Blocks next to each other in a group: the elements of the left one and of the right one.
     pub apart: Vec<(Vec<usize>, Vec<usize>)>,
-    /// Rows of three or more members evenly spaced.
+    /// In each row, the members of each set to space evenly (`Structure::even_sets`), when three
+    /// or more at a regular interval, evenly spaced ([`evenly`]).
     pub even: bool,
     /// Elements in neighbouring rows connected pin to pin put in one column.
     pub columns: bool,
@@ -607,9 +612,30 @@ fn relations_within(
         out.extend(columns(s, &rows, ori));
     }
     if c.even {
-        for row in rows.iter().filter(|r| r.len() >= 3) {
-            let points: Vec<PointId> = row.iter().filter_map(|&k| o(k)).collect();
-            out.push(Tagged { kind: RelKind::Even, rel: Relation::Even { axis: 0, points } });
+        for members in evenly(s, &rows) {
+            let points: Vec<PointId> = members.into_iter().filter_map(o).collect();
+            if points.len() >= 3 {
+                out.push(Tagged { kind: RelKind::Even, rel: Relation::Even { axis: 0, points } });
+            }
+        }
+    }
+    out
+}
+
+/// What a candidate with even rows spaces evenly in `rows` (quality review SE-3): in each row, the
+/// members of each set to space evenly (`Structure::even_sets`), left to right, when there are
+/// three or more and they come at a regular interval in the row, each as many places after the one
+/// before: the legs of a ladder drawn rung by rung. Members in some other order, such as the
+/// sources of a ladder whose tail is out of order, are not, as no even steps of a row that keeps
+/// its order would be anything like as narrow.
+fn evenly(s: &Structure, rows: &[Vec<usize>]) -> Vec<Vec<usize>> {
+    let mut out = Vec::new();
+    for row in rows {
+        for set in &s.even_sets {
+            let at: Vec<usize> = (0..row.len()).filter(|&i| set.binary_search(&row[i]).is_ok()).collect();
+            if at.len() >= 3 && at.windows(2).all(|w| w[1] - w[0] == at[1] - at[0]) {
+                out.push(at.into_iter().map(|i| row[i]).collect());
+            }
         }
     }
     out
@@ -1736,7 +1762,8 @@ fn p0_plan(s: &Structure) -> Plan {
 }
 
 /// The candidates of a level (see the module): the root's variants best first, then P0, and with
-/// the even rows in force a twin with even rows after each, none twice.
+/// the even rows in force a twin with even rows after each that has members to space evenly
+/// ([`evenly`]), none twice.
 pub(crate) fn search(
     problem: &LevelProblem,
     s: &Structure,
@@ -1763,9 +1790,12 @@ pub(crate) fn search(
         }
     }
     out.push(p0);
-    if s.has(Source::EvenRows) && s.rows.iter().any(|r| r.len() >= 3) {
-        let twins: Vec<Candidate> = out.iter().map(|c| Candidate { even: true, ..c.clone() }).collect();
-        out = out.into_iter().zip(twins).flat_map(|(a, b)| [a, b]).collect();
+    if s.has(Source::EvenRows) {
+        let twins: Vec<Option<Candidate>> = out
+            .iter()
+            .map(|c| (!evenly(s, &c.rows).is_empty()).then(|| Candidate { even: true, ..c.clone() }))
+            .collect();
+        out = out.into_iter().zip(twins).flat_map(|(a, b)| std::iter::once(a).chain(b)).collect();
     }
     let mut seen: Vec<Vec<u32>> = Vec::new();
     out.retain(|c| {

@@ -186,6 +186,7 @@ dependencies = [
  "num-integer",
  "num-rational",
  "num-traits",
+ "rnl-render",
  "rnl-runtime",
  "rnl-view",
 ]

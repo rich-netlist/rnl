@@ -533,7 +533,8 @@ pub(crate) enum Source {
     /// and uncrossed: the barycentre of what each is connected to (component_alignment,
     /// crossings, wire_length).
     Barycentre,
-    /// Rows evenly spaced (distribution).
+    /// The members of a row of one set to space evenly ([`Structure::even_sets`]) evenly spaced
+    /// (distribution).
     EvenRows,
     /// Mirror pairs given mirrored orientations (symmetry).
     MirrorPairs,
@@ -571,9 +572,12 @@ pub(crate) struct Structure {
     /// of a net (13.3).
     pub anchors: BTreeMap<usize, Anchor>,
     pub tree: GroupTree,
-    /// The components of each scope of the objectives measured within groups: each group, then
-    /// those in no group (when any).
+    /// The components of each scope of the objectives measured within groups: each group; the
+    /// components in no group are no scope ([`scopes`]).
     pub scopes: Vec<Vec<usize>>,
+    /// The sets of elements that a candidate with even rows spaces evenly where three or more of
+    /// one are in a row ([`even_sets`]).
+    pub even_sets: Vec<Vec<usize>>,
     pub open: Open,
     /// The current depth of each object, when the current direction is in force: none for those
     /// not elements and those not reached.
@@ -798,6 +802,7 @@ pub(crate) fn analyse(
         anchors,
         tree,
         scopes,
+        even_sets: Vec::new(),
         open,
         depth: None,
         rows: Vec::new(),
@@ -816,6 +821,7 @@ pub(crate) fn analyse(
     }
     s.rows = rows(problem, &s, work);
     (s.precedence, s.reversible) = precedence(problem, &s);
+    s.even_sets = even_sets(problem, &s);
     s
 }
 
@@ -840,37 +846,80 @@ fn line_chars(runs: &[Run]) -> usize {
         .sum()
 }
 
-/// An estimate of the box of a text anchored at `at` (9.2.5): each character 0.6 of the size wide,
-/// each line 1.2 of it high, the box beside the anchor as `halign` and `valign` say (the baseline
-/// 0.8 of the size below the top of the first line), turned by `rotate`. The solver keeps the
-/// symbols' texts clear of their neighbours by it; the viewer lays the text out itself. None for a
-/// text without characters.
+/// How far the box of a text reaches past the advances of its runs at each end of its lines, in
+/// sizes of the text: a margin for glyphs that reach past their advances, and for the rounding of
+/// the advances that a frontend draws.
+const TEXT_MARGIN: (i64, i64) = (1, 10);
+
+/// How far above and below its baseline a run's glyphs reach, in sizes of the run: the capitals,
+/// digits and ascenders of the Latin letters, about 0.72 high in the shipped fonts, and their
+/// descenders, about 0.24 deep, with a margin; the ideographs, which fill the em box from 0.12
+/// below the baseline to 0.88 above it, nearly so.
+const RUN_ABOVE: (i64, i64) = (4, 5);
+const RUN_BELOW: (i64, i64) = (2, 5);
+
+/// The box of a text anchored at `at` (9.2.5), as the renderer lays it out (quality review
+/// ST-7): along its lines, from the start of the first run to the end of the last, each run as
+/// wide as the advances of its characters in the shipped fonts (`rnl_render::lay_out`, decision
+/// 0009), with the style's size, bold and italic (9.3; the font named is a hint that the layout
+/// does not follow), and `TEXT_MARGIN` more at each end; across them, each run from `RUN_BELOW`
+/// below its baseline to `RUN_ABOVE` above it, and the bars of fractions and overlines, the lines
+/// and the box beside the anchor where the renderer puts them as `halign` and `valign` say; the
+/// sides on a hundredth of a unit, outwards; turned by `rotate`. The solver keeps the symbols'
+/// texts clear of their neighbours by it. None for a text without characters.
 pub(crate) fn text_box(t: &TextInfo, at: (Q, Q)) -> Option<[Q; 4]> {
-    let size = t
-        .style
-        .iter()
-        .find(|(n, _)| n == "size")
-        .and_then(|(_, v)| v.num())
-        .and_then(from_f64)
-        .unwrap_or_else(|| int(1));
-    let chars = t.lines.iter().map(|l| line_chars(l)).max().unwrap_or(0);
-    if chars == 0 {
+    let style = |name: &str| t.style.iter().find(|(n, _)| n == name).map(|(_, v)| v);
+    let size = style("size").and_then(|v| v.num()).filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0);
+    let flag = |name: &str| style(name).and_then(|v| v.boolean()).unwrap_or(false);
+    if t.lines.iter().all(|l| line_chars(l) == 0) {
         return None;
     }
-    let w = int(chars as i64) * frac(3, 5) * &size;
-    let h = int(t.lines.len() as i64) * frac(6, 5) * &size;
-    let (x1, x2) = match t.halign.as_str() {
-        "middle" => (-(&w / int(2)), &w / int(2)),
-        "end" => (-w.clone(), Q::zero()),
-        _ => (Q::zero(), w.clone()),
+    let mut laid = rnl_render::TextPrim {
+        anchor: (0.0, 0.0),
+        lines: t.lines.clone(),
+        size,
+        color: String::new(),
+        font: String::new(),
+        bold: flag("bold"),
+        italic: flag("italic"),
+        halign: t.halign.clone(),
+        valign: t.valign.clone(),
+        vertical: false,
+        runs: Vec::new(),
+        bars: Vec::new(),
     };
-    let (y1, y2) = match t.valign.as_str() {
-        "top" => (-h.clone(), Q::zero()),
-        "middle" => (-(&h / int(2)), &h / int(2)),
-        "bottom" => (Q::zero(), h.clone()),
-        // the first line's baseline: the box from 0.8 of the size above it down
-        _ => (frac(4, 5) * &size - &h, frac(4, 5) * &size),
+    // the renderer's own scale, which decides only how thin a bar may be
+    let laid_box = rnl_render::lay_out(&mut laid, rnl_render::RenderOptions::default().scale);
+    let ratio = |(n, d): (i64, i64)| n as f64 / d as f64;
+    // across the lines, the glyphs of each run rather than the ascender and the descender of the
+    // face, which the renderer's box reaches and which go well past them
+    let (mut y1, mut y2) = (f64::MAX, f64::MIN);
+    for r in &laid.runs {
+        y1 = y1.min(r.at.1 - ratio(RUN_BELOW) * r.size);
+        y2 = y2.max(r.at.1 + ratio(RUN_ABOVE) * r.size);
+    }
+    for b in &laid.bars {
+        let half = b.stroke.width / 2.0;
+        y1 = y1.min(b.a.1.min(b.b.1) - half);
+        y2 = y2.max(b.a.1.max(b.b.1) + half);
+    }
+    if y1 > y2 {
+        return None;
+    }
+    let margin = ratio(TEXT_MARGIN) * size;
+    let hundredths = |v: f64, up: bool| {
+        // the noise of the floating point off first, so that a side on a hundredth stays there
+        let c = (v * 100.0 * 1e6).round() / 1e6;
+        let c = if up { c.ceil() } else { c.floor() };
+        // a box the size of a page, as no text drawn is wider than that
+        frac(c.clamp(-1e12, 1e12) as i64, 100)
     };
+    let b = [
+        hundredths(laid_box[0] - margin, false),
+        hundredths(y1, false),
+        hundredths(laid_box[2] + margin, true),
+        hundredths(y2, true),
+    ];
     // 0, 90, 180 or 270 (9.2.5), read exactly
     let r = from_f64(t.rotate).unwrap_or_default();
     let turn = int(360);
@@ -879,7 +928,7 @@ pub(crate) fn text_box(t: &TextInfo, at: (Q, Q)) -> Option<[Q; 4]> {
         .into_iter()
         .find(|(d, _)| r == int(*d))
         .map_or(Orient::R0, |(_, o)| o);
-    let b = turned_box(&[x1, y1, x2, y2], quarter)?;
+    let b = turned_box(&b, quarter)?;
     Some([&b[0] + &at.0, &b[1] + &at.1, &b[2] + &at.0, &b[3] + &at.1])
 }
 
@@ -1391,7 +1440,9 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
 }
 
 /// The components of each scope of the objectives measured within groups: each group with the
-/// stubs that hang from its members, then the components in no group.
+/// stubs that hang from its members. The components in no group are no scope: they are not a
+/// group, and no alignment or spacing is judged among them (algorithm synthesis 9.3, decided
+/// 2026-10-17; quality review SE-3).
 fn scopes(problem: &LevelProblem, objects: &[ObjectInfo]) -> Vec<Vec<usize>> {
     let component = |k: usize| {
         let o = &objects[k];
@@ -1399,20 +1450,124 @@ fn scopes(problem: &LevelProblem, objects: &[ObjectInfo]) -> Vec<Vec<usize>> {
     };
     let owner = |k: usize| objects[k].stub.as_ref().map_or(k, |s| s.host.0);
     let mut out = Vec::new();
-    let mut grouped = BTreeSet::new();
     for g in &problem.groups {
         let members: BTreeSet<usize> = g.members.iter().copied().collect();
         let scope: Vec<usize> = (0..objects.len()).filter(|&k| component(k) && members.contains(&owner(k))).collect();
-        grouped.extend(scope.iter().copied());
         if !scope.is_empty() {
             out.push(scope);
         }
     }
-    let rest: Vec<usize> = (0..objects.len()).filter(|&k| component(k) && !grouped.contains(&k)).collect();
-    if !rest.is_empty() {
-        out.push(rest);
-    }
     out
+}
+
+/// What a net is to the role of an element on it ([`even_sets`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum NetRole {
+    Supply,
+    Ground,
+    /// A signal joining two pins of elements and ports.
+    Link,
+    /// A signal joining three or more: a node that branches.
+    Node,
+    /// On no net that the problem shows.
+    Unknown,
+}
+
+/// The sets of elements whose spacing a candidate with even rows makes equal, in a row where three
+/// or more of one set are (`Source::EvenRows`; quality review SE-3): those that share a group,
+/// each node of the tree of groups but the whole level; those joined by a DISTRIBUTE on x kept or a
+/// mirror pair; and those of one kind and one role in the same group, or in none: the same symbol,
+/// and the same roles of the nets of their pins, in any order, such as the legs of a ladder,
+/// each from a node of the spine to a net of its own, or loads hung from one net to the ground; an
+/// element on no net that the problem shows has no role. A chain of a `$FLOW` is none of these,
+/// nor are the elements in no group as such. Each set sorted, none twice, those of fewer than three
+/// elements left out.
+fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
+    let mut out: BTreeSet<Vec<usize>> = BTreeSet::new();
+    for node in s.tree.nodes.iter().skip(1) {
+        out.insert(node.members.clone());
+    }
+    // the DISTRIBUTEs on x kept and the mirror pairs, joined
+    let mut joined = Joined::new(&s.elements);
+    let is_element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
+    for &f in &s.kept {
+        let FactKind::Distribute { axis: Axis::X, members } = &problem.facts[f].kind else { continue };
+        let mut ks = Vec::new();
+        for m in members {
+            elements_of(m, &mut ks);
+        }
+        ks.retain(|&k| is_element(k));
+        for w in ks.windows(2) {
+            joined.join(w[0], w[1]);
+        }
+    }
+    for pair in &s.pairs {
+        let ends: Vec<usize> =
+            [Some(pair.a), Some(pair.b), pair.axis].into_iter().flatten().filter(|&k| is_element(k)).collect();
+        for w in ends.windows(2) {
+            joined.join(w[0], w[1]);
+        }
+    }
+    let mut by_root: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for &k in &s.elements {
+        by_root.entry(joined.find(k)).or_default().push(k);
+    }
+    out.extend(by_root.into_values());
+    // one kind and one role, in the same node of the tree of groups
+    let net_role = |i: usize| {
+        let net = &s.connections.nets[i];
+        if net.supply {
+            return NetRole::Supply;
+        }
+        if net.ground {
+            return NetRole::Ground;
+        }
+        let ends = net
+            .pins
+            .iter()
+            .filter(|(k, _)| s.objects.get(*k).is_some_and(|o| matches!(o.role, Role::Element | Role::Port)))
+            .count();
+        if ends >= 3 {
+            NetRole::Node
+        } else {
+            NetRole::Link
+        }
+    };
+    let node_of = |k: usize| s.tree.nodes.iter().position(|n| n.own.contains(&k)).unwrap_or(0);
+    let mut by_role: BTreeMap<(usize, Option<usize>, Vec<NetRole>), Vec<usize>> = BTreeMap::new();
+    for &k in &s.elements {
+        let mut roles: Vec<NetRole> = (0..s.pins(k).len())
+            .map(|pin| {
+                if s.power.supply_pins.contains(&(k, pin)) {
+                    NetRole::Supply
+                } else if s.power.ground_pins.contains(&(k, pin)) {
+                    NetRole::Ground
+                } else {
+                    s.connections
+                        .nets_of
+                        .get(&(k, pin))
+                        .and_then(|nets| nets.first())
+                        .map_or(NetRole::Unknown, |&i| net_role(i))
+                }
+            })
+            .collect();
+        // an element on no net that the problem shows has no role to tell
+        if roles.iter().all(|r| *r == NetRole::Unknown) {
+            continue;
+        }
+        roles.sort_unstable();
+        by_role.entry((node_of(k), s.objects[k].symbol, roles)).or_default().push(k);
+    }
+    out.extend(by_role.into_values());
+    out.into_iter()
+        .map(|mut set| {
+            set.sort_unstable();
+            set
+        })
+        .filter(|set| set.len() >= 3)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 /// The sources the objectives in force call for, in the order of their layers, then those always

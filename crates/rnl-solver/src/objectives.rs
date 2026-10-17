@@ -64,9 +64,10 @@ pub(crate) enum Objective {
 /// Where an objective is measured by default (algorithm synthesis 3.5).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Scope {
-    /// Within each group (11.5), and once over the components in no group: a group is where
-    /// symmetry and even spacing are judged. Whether the components in no group count as one
-    /// group is open (algorithm synthesis 9.3); this version counts them so.
+    /// Within each group (11.5): a group is where symmetry and even spacing are judged. The
+    /// components in no group are not a group, and nothing is judged among them (algorithm
+    /// synthesis 9.3, decided 2026-10-17; quality review SE-3): the structural side of such an
+    /// objective still makes its candidates, its measure is 0 where there is no group.
     Group,
     /// Over the whole level.
     Level,
@@ -505,7 +506,8 @@ fn signal_flow(view: &View) -> Q {
 }
 
 /// A measure of the components' origins: summed over the scopes of the groups (`Structure::scopes`)
-/// for an objective measured within groups, over all of them for one measured over the level.
+/// for an objective measured within groups, none for the components in no group; over all of them
+/// for one measured over the level.
 fn scoped(view: &View, scope: Scope, measure: impl Fn(&[[Q; 2]]) -> Q) -> Q {
     let of = |ks: &mut dyn Iterator<Item = usize>| {
         let points: Vec<[Q; 2]> = ks.map(|k| view.at[k].clone()).collect();
