@@ -22,7 +22,7 @@ This is the central TODO list. A checked box means work present in this reposito
 - [x] Build the standard's web pages, PDFs and Markdown downloads from its chapters, with checks that keep the forms and the two languages in step ([decision 0007](decisions/0007-publishing-the-standard.md)).
 - [x] Publish revision 1 of standard 0.2 with the tag `spec-0.2-r1`: the [GitHub release](https://github.com/rich-netlist/rnl/releases/tag/spec-0.2-r1) and the [web pages](https://rich-netlist.github.io/rnl/en/spec/0.2/). The site is rebuilt after each release of a revision, so that its pages carry the new label.
 - [x] Publish the language standard 0.3, which replaces 0.2: English, normative, with a Chinese translation and the standard word list, consolidated in the research repository. Annex D lists what changed and how a file moves to 0.3. Tools still read files of 0.2 by its rules, and raise a file of 0.2 that they write into with a pin of the standard series 0.2.
-- [ ] Publish revision 1 of standard 0.3 with the tag `spec-0.3-r1`, once the release workflow has run on GitHub.
+- [x] Publish revision 1 of standard 0.3 with the tag `spec-0.3-r1`: the [GitHub release](https://github.com/rich-netlist/rnl/releases/tag/spec-0.3-r1) and the web pages, in [English](https://rich-netlist.github.io/rnl/en/spec/0.3/) and [Chinese](https://rich-netlist.github.io/rnl/zh/spec/0.3/), each with a page that compares it with 0.2.
 - [ ] Publish the standard package and the Chinese alias package under `libraries/` when their content is settled.
 
 ## Toolchain foundation
