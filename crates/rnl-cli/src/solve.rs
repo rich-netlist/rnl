@@ -72,7 +72,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use rnl_runtime::diag::Severity;
-use rnl_runtime::host::file_name;
+use rnl_runtime::host::{file_name, LevelKind};
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::interp::unit::DEFAULT_VERSION;
 use rnl_runtime::problem::{sig2, FactKind, LevelProblem, PointRef, Reference};
@@ -191,6 +191,9 @@ pub struct SolveRun {
 pub struct VersionRaise {
     /// The path of the file, `/`-separated.
     pub path: String,
+    /// The library section of the file that is raised, which is read as a file of its own (2.8);
+    /// None for the file read whole.
+    pub section: Option<String>,
     /// Whether it is raised to 0.3; when not, it stays at 0.2 and [`VersionRaise::why`] says why.
     pub raised: bool,
     /// Whether its header record got `@USE-PACKAGE(name="rnl-std", version="0.2")`, which keeps
@@ -279,7 +282,9 @@ pub fn solve(file: &Path, files: &dyn Provider, options: &SolveOptions) -> Resul
 /// `@USE-PACKAGE(name="rnl-std", version="0.2")` unless it or a file that includes it pins a
 /// version of the standard package, so that it keeps the series 0.2 it was read with (16.3). The
 /// levels are then solved again from the start, as they read with the files raised; a file whose
-/// name stands in the way stays at 0.2, and its record lists what it cannot hold as unsolved.
+/// name stands in the way stays at 0.2, and its record lists what it cannot hold as unsolved. A
+/// library section is read as a file (2.8): of two sections of one file, only the one whose record
+/// needs 0.3 is raised, and the text outside it stays as it is.
 pub fn solve_with_clock(
     file: &Path,
     files: &dyn Provider,
@@ -295,21 +300,50 @@ pub fn solve_with_clock(
     let original = rnl_view::interpret(&entry, options.dialect.as_deref(), files, &options.runtime())?;
     let mut raised = Vec::new();
     let mut texts: Vec<(String, String)> = Vec::new();
-    for (path, file) in wants {
-        let clashes = spelled_like_new_words(&original.doc, &file);
-        let pin = !pins_std(&original.doc, &file);
-        let text = text_of(&original, files, &file, &path)?;
-        let out = if clashes.is_empty() { raise_version(&original.doc, &file, &text, pin) } else { None };
-        let why = match &out {
-            Some(_) => Vec::new(),
-            None if clashes.is_empty() => vec!["its header record cannot say 0.3 so".to_string()],
-            None => clashes
-                .into_iter()
-                .map(|c| format!("{c}, has the spelling of a word that 0.3 adds (2.8), and would mean something else"))
-                .collect(),
-        };
-        raised.push(VersionRaise { path: path.clone(), raised: out.is_some(), pinned: out.is_some() && pin, why });
-        texts.extend(out.map(|t| (path, t)));
+    let mut paths: Vec<(&String, &String)> = Vec::new();
+    for (path, file, _) in &wants {
+        if !paths.contains(&(path, file)) {
+            paths.push((path, file));
+        }
+    }
+    for (path, file) in paths {
+        let text = text_of(&original, files, file, path)?;
+        // each file level of the file that needs 0.3, a library section read as a file (2.8),
+        // raised in one pass over the text
+        let mut asked = Vec::new();
+        for (_, _, section) in wants.iter().filter(|(p, f, _)| p == path && f == file) {
+            let doc = &original.doc;
+            let Some(level) = (0..doc.levels.len()).find(|&l| {
+                let lv = &doc.levels[l];
+                lv.kind == LevelKind::File && lv.file == *file && lv.section == *section
+            }) else {
+                continue;
+            };
+            asked.push((level, !pins_std(doc, level), section.clone(), spelled_like_new_words(doc, level)));
+        }
+        let ready: Vec<(usize, bool)> =
+            asked.iter().filter(|(_, _, _, clashes)| clashes.is_empty()).map(|(l, pin, _, _)| (*l, *pin)).collect();
+        let (out, mut done) = raise_version(&original.doc, &text, &ready);
+        let mut done = done.drain(..);
+        for (_, pin, section, clashes) in asked {
+            let ok = clashes.is_empty() && done.next() == Some(true);
+            let why = if ok {
+                Vec::new()
+            } else if clashes.is_empty() {
+                vec!["its header record cannot say 0.3 so".to_string()]
+            } else {
+                clashes
+                    .into_iter()
+                    .map(|c| {
+                        format!("{c}, has the spelling of a word that 0.3 adds (2.8), and would mean something else")
+                    })
+                    .collect()
+            };
+            raised.push(VersionRaise { path: path.clone(), section, raised: ok, pinned: ok && pin, why });
+        }
+        if out != text {
+            texts.push((path.clone(), out));
+        }
     }
     // the files read are those of the first pass: the second reads the files raised from memory
     let read = run.read.clone();
@@ -319,16 +353,21 @@ pub fn solve_with_clock(
     Ok(run)
 }
 
+/// A file level of 0.2 whose records need 0.3 (16.1): the path and the name of its file in the
+/// document, and its library section, which is read as a file (2.8).
+type Want = (String, String, Option<String>);
+
 /// One pass of [`solve_with_clock`] over the levels, with the texts of the files `raised` over
-/// the files: the run, and the files of 0.2, path and name in the document, whose records need
-/// 0.3; those only in the first pass, when nothing is raised.
+/// the files: the run, and the file levels of 0.2 whose records need 0.3, as the path and name of
+/// their file in the document and their library section; those only in the first pass, when
+/// nothing is raised.
 fn pass(
     file: &Path,
     files: &dyn Provider,
     options: &SolveOptions,
     clock: &dyn Clock,
     raised: &[(String, String)],
-) -> Result<(SolveRun, Vec<(String, String)>), String> {
+) -> Result<(SolveRun, Vec<Want>), String> {
     let entry = path_str(file);
     let runtime = options.runtime();
     let canonical = options.solver.canonical();
@@ -337,7 +376,7 @@ fn pass(
     for (path, text) in raised {
         memory.insert(path, text);
     }
-    let mut wants: Vec<(String, String)> = Vec::new();
+    let mut wants: Vec<Want> = Vec::new();
     let read = |memory: &MemoryProvider| -> Result<Interpretation, String> {
         let both = Layered { layers: vec![memory, &files] };
         rnl_view::interpret(&entry, options.dialect.as_deref(), &both, &runtime)
@@ -412,8 +451,9 @@ fn pass(
         let mut written = write_record(p, &solved.solution, AUTHOR, &hash);
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);
-        // a file of 0.2 whose record needs what only 0.3 writes (16.1)
-        let want = (path.clone(), host.file.clone());
+        // a file of 0.2 whose record needs what only 0.3 writes (16.1): the file level of the
+        // level, a library section read as a file (2.8)
+        let want = (path.clone(), host.file.clone(), r.doc.levels[r.doc.file_level(p.level)].section.clone());
         let needs = p.version == "0.2" && written.unsolved.iter().any(Unsolved::needs_0_3);
         if raised.is_empty() && needs && !wants.contains(&want) {
             wants.push(want);
@@ -792,7 +832,10 @@ pub fn lines(run: &SolveRun, all: bool) -> Vec<String> {
 /// The line of a file of 0.2 whose records of the solver need 0.3: raised, or kept at 0.2 with a
 /// warning (16.1).
 pub fn raised(v: &VersionRaise) -> String {
-    let name = file_name(&v.path);
+    let name = match &v.section {
+        Some(s) => format!("{} ({s})", file_name(&v.path)),
+        None => file_name(&v.path).to_string(),
+    };
     if v.raised {
         let series = if v.pinned {
             format!("its header record keeps the standard series 0.2 it was read with: {PIN_STD_0_2} (16.3)")

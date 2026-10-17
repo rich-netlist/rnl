@@ -26,6 +26,18 @@ pub fn quote(s: &str) -> String {
     format!("\"{}\"", body.replace('"', "\"\""))
 }
 
+/// A role in role parentheses: an ASCII name as it is, any other in quotes, which is the name
+/// itself and never an alias (3.6, 16.5).
+fn role_name(role: &str) -> String {
+    let plain = role.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && role.chars().next().is_some_and(|c| !c.is_ascii_digit());
+    if plain {
+        role.to_string()
+    } else {
+        quote(role)
+    }
+}
+
 /// Text markup (13.6) from lines of runs, which reads back as the same runs: each line's runs in
 /// turn, lines apart by `\\`.
 pub fn markup(lines: &[Vec<Run>]) -> String {
@@ -149,11 +161,13 @@ pub fn statements(op: &Op) -> Vec<String> {
             vec![format!("{object} {}", facts.join(" => "))]
         }
         Op::AddUsage { name, definition, attach, symbol, at, orient } => {
+            // each object with the role it fills, so that the roles are those of the request
+            // whatever order it writes them in, and a role the definition lacks fails (9.4)
             let roles: Vec<String> = attach
                 .iter()
-                .map(|a| match a {
-                    Attach::Id(id) => id.clone(),
-                    Attach::At(p) => point(*p),
+                .map(|(role, a)| match a {
+                    Attach::Id(id) => format!("{id}({})", role_name(role)),
+                    Attach::At(p) => format!("{}({})", point(*p), role_name(role)),
                 })
                 .collect();
             let mut parts = vec![format!("{definition} @ATTACH {}", roles.join(" "))];

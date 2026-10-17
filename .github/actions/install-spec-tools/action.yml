@@ -7,16 +7,22 @@ runs:
   using: composite
   steps:
     - shell: bash
+      # the SHA-256 of each download, as its GitHub release gives it, which the file must have
       env:
         PANDOC_VERSION: "3.8.3"
+        PANDOC_SHA256: d7fac78b58b8c8da39254955eff321233ab97d74e8b2d461c0f0719a1fb5f357
         TYPST_VERSION: "0.15.1"
+        TYPST_SHA256: a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c
       run: |
         sudo apt-get update -q
         curl -fsSL -o "$RUNNER_TEMP/pandoc.deb" \
           "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb"
+        echo "$PANDOC_SHA256  $RUNNER_TEMP/pandoc.deb" | sha256sum --check --strict
         sudo apt-get install -y -q "$RUNNER_TEMP/pandoc.deb" fonts-noto-cjk
-        curl -fsSL "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz" \
-          | tar -xJ -C "$RUNNER_TEMP"
+        curl -fsSL -o "$RUNNER_TEMP/typst.tar.xz" \
+          "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz"
+        echo "$TYPST_SHA256  $RUNNER_TEMP/typst.tar.xz" | sha256sum --check --strict
+        tar -xJ -C "$RUNNER_TEMP" -f "$RUNNER_TEMP/typst.tar.xz"
         sudo install "$RUNNER_TEMP/typst-x86_64-unknown-linux-musl/typst" /usr/local/bin/typst
         pandoc --version | head -n 1
         typst --version

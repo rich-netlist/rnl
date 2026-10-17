@@ -19,11 +19,12 @@ pub struct LevelOp {
 pub enum Op {
     /// Facts about a host object: its symbol, position and orientation.
     Set { object: String, symbol: Option<String>, at: Option<Point>, orient: Option<String> },
-    /// A usage of a definition (9.4), attached to objects or points, by role in order.
+    /// A usage of a definition (9.4), attached to objects or points: each role by its name, with
+    /// what it is given, in the order the request writes them.
     AddUsage {
         name: Option<String>,
         definition: String,
-        attach: Vec<Attach>,
+        attach: Vec<(String, Attach)>,
         symbol: Option<String>,
         at: Option<Point>,
         orient: Option<String>,
@@ -394,7 +395,7 @@ impl Reader<'_> {
         self.opt_point(f)?.ok_or_else(|| self.fail(f, "is missing"))
     }
 
-    fn attach(&self) -> Result<Vec<Attach>, String> {
+    fn attach(&self) -> Result<Vec<(String, Attach)>, String> {
         let map = self
             .obj
             .get("attach")
@@ -404,11 +405,18 @@ impl Reader<'_> {
             return Err(self.fail("attach", "has no roles"));
         }
         map.iter()
-            .map(|(role, v)| match v {
-                Value::String(s) => Ok(Attach::Id(s.clone())),
-                _ => as_point(v)
-                    .map(Attach::At)
-                    .ok_or_else(|| self.fail("attach", &format!("role `{role}` is not an id or a point"))),
+            .map(|(role, v)| {
+                // written as the role's name after what it is given, `#M1(ref)` (9.4)
+                if role.is_empty() || role.chars().any(char::is_control) {
+                    return Err(self.fail("attach", &format!("role {role:?} is not a name")));
+                }
+                let given = match v {
+                    Value::String(s) => Attach::Id(s.clone()),
+                    _ => as_point(v)
+                        .map(Attach::At)
+                        .ok_or_else(|| self.fail("attach", &format!("role `{role}` is not an id or a point")))?,
+                };
+                Ok((role.clone(), given))
             })
             .collect()
     }

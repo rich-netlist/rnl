@@ -346,6 +346,8 @@ impl<'a> Reader<'a> {
         let mut st = State { mode, cur: level, circ, stack: Vec::new() };
         let mut run: Vec<CarrierLine> = Vec::new();
         let mut pending: Option<(u32, String)> = None;
+        // a `.subckt` read in SPICE mode whose `+` lines add ports, until its parameters begin
+        let mut subckt_more: Option<LevelId> = None;
         let mut in_section = section.is_none();
         let mut skip_section: Option<String> = None;
         // a region written to be encrypted, while in it: the line that opens it, and the warning
@@ -393,6 +395,7 @@ impl<'a> Reader<'a> {
                     let opens = (first == "section" || first == ".lib") && words.len() == 2;
                     if opens && section.is_some_and(|s| s.eq_ignore_ascii_case(words[1])) {
                         in_section = true;
+                        self.doc.levels[level].section_lines.get_or_insert((no, 0));
                         // each section sets its own language; it starts in SPICE mode (S1 p498)
                         st.mode = if first == "section" { Mode::Spectre } else { Mode::Spice };
                     } else if raw.contains("@RNL") {
@@ -443,9 +446,18 @@ impl<'a> Reader<'a> {
                     if let Some(p) = pending.as_mut() {
                         p.1.push(' ');
                         p.1.push_str(cont);
+                    } else if let Some(sub) = subckt_more {
+                        let toks = rnl_host_spice::subckt_tokens(cont);
+                        let toks: Vec<&str> = toks.iter().map(String::as_str).collect();
+                        let (ports, params) = rnl_host_spice::subckt_ports(&toks);
+                        self.doc.levels[sub].ports.extend(ports);
+                        if params {
+                            subckt_more = None;
+                        }
                     }
                     continue;
                 }
+                subckt_more = None;
                 if let Some((pl, pt)) = pending.take() {
                     self.spice_statement(&pt, pl, &fname, path, &mut st, stack);
                 }
@@ -462,6 +474,7 @@ impl<'a> Reader<'a> {
                     ".endl" => {
                         if section.is_some() {
                             in_section = false;
+                            self.doc.levels[level].close_section(no);
                         }
                         continue;
                     }
@@ -475,10 +488,12 @@ impl<'a> Reader<'a> {
                         continue;
                     }
                     ".subckt" => {
-                        let toks: Vec<&str> = stripped.split_whitespace().collect();
+                        let toks = rnl_host_spice::subckt_tokens(stripped);
+                        let toks: Vec<&str> = toks.iter().map(String::as_str).collect();
                         let name = toks.get(1).copied().unwrap_or("?");
-                        let ports = rnl_host_spice::subckt_ports(&toks[2.min(toks.len())..]);
+                        let (ports, params) = rnl_host_spice::subckt_ports(&toks[2.min(toks.len())..]);
                         self.open_subckt(name, ports, &fname, path, no, &mut st, false);
+                        subckt_more = (!params).then_some(st.cur);
                         continue;
                     }
                     ".ends" => {
@@ -546,6 +561,7 @@ impl<'a> Reader<'a> {
             }
             if self.spectre_statement(&stmt, no, &fname, path, &mut st, stack, section) == Some(true) {
                 in_section = false;
+                self.doc.levels[level].close_section(no);
             }
         }
         self.flush(&mut run, &fname, st.cur);
@@ -565,6 +581,7 @@ impl<'a> Reader<'a> {
         if self.doc.levels[level].end_line == 0 {
             self.doc.levels[level].end_line = n as u32 + 1;
         }
+        self.doc.levels[level].close_section(n as u32 + 1);
     }
 
     fn flush(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {
@@ -1019,6 +1036,23 @@ mod tests {
         // the switches themselves: each is read in the mode before it
         let spice: Vec<u32> = (1..=9).filter(|&l| doc.in_spice_mode("a.scs", l)).collect();
         assert_eq!(spice, [3, 4, 7, 8, 9]);
+    }
+
+    #[test]
+    fn the_ports_of_a_subckt_read_in_spice_mode_on_its_continuation_lines() {
+        // as the SPICE adapter reads them: the `+` lines of a `.subckt` add ports, up to its
+        // parameters, and an end-of-line comment holds none
+        for (text, ports) in [
+            (".subckt cell a\n+ b\nR1 a b 1k\n.ends cell\n", vec!["a", "b"]),
+            (".subckt cell a b ; two ports\nR1 a b 1k\n.ends cell\n", vec!["a", "b"]),
+            (".subckt cell a\n+ b params: w=1\n+ c=2\n.ends cell\n", vec!["a", "b"]),
+        ] {
+            let p = MemoryProvider::new().with("t.scs", &format!("// t\nsimulator lang=spice\n{text}"));
+            let mut sink = Sink::new();
+            let doc = read("t.scs", &p, &mut sink).unwrap();
+            assert!(sink.all().is_empty(), "{text}: {:?}", sink.all());
+            assert_eq!(doc.levels[1].ports, ports, "{text}");
+        }
     }
 
     #[test]

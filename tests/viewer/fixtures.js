@@ -1,8 +1,9 @@
 // The Documents the fake shell serves: `rnl view` of a few files of the conformance corpus, built
 // natively before the tests run; a changed copy of one of them, for reading a file again; a netlist
 // with many subcircuits, for the subcircuit index; subcircuits nested four deep, for the hierarchy
-// path; statements over several lines in both dialects, which the corpus has none of; and netlists
-// of the solver's tests that `rnl solve` solved, for a drawing that no PLACE fixes.
+// path; statements over several lines in both dialects, which the corpus has none of; characters
+// outside the BMP, which JavaScript counts as two; a file of many lines; and netlists of the
+// solver's tests that `rnl solve` solved, for a drawing that no PLACE fixes.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -88,6 +89,27 @@ export const CONTINUED = {
   ],
 };
 
+/** An emoji and a CJK character of the extension planes, both outside the BMP. */
+export const EMOJI = String.fromCodePoint(0x1f600);
+export const CJK = String.fromCodePoint(0x20000);
+
+/**
+ * Characters outside the BMP, an emoji and a CJK character of the extension planes, which the
+ * Document counts as one character each and JavaScript as two UTF-16 units: before references of
+ * records, in a name, and before a statement that fails, R9's, as the netlist has no R9.
+ */
+export const UNICODE = [
+  "* characters outside the BMP",
+  "R1 a 0 1k",
+  `R${CJK}2 a b 2k`,
+  `* @RNL { /* ${EMOJI} */ #R1 @PLACE(0, 0) }`,
+  `* @RNL { /* ${EMOJI}${CJK} ${EMOJI} */ #"R${CJK}2" @PLACE(6, 0); /* ${CJK} */ #R9 @PLACE(0, 0) }`,
+  ".end",
+];
+
+/** The comment lines of the "long" fixture: more than one call takes as its arguments in Chrome. */
+export const LONG = 200000;
+
 /**
  * Build the rnl command and return its path, in the target directory that cargo builds into, which
  * CARGO_TARGET_DIR or cargo's configuration may move.
@@ -114,8 +136,9 @@ function view(rnl, file, cwd) {
  * changed, so that every statement below the title moved down a line, with the same file names;
  * "subcircuits", a netlist that instantiates each of SUBCIRCUITS once at the top level; "nested",
  * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3;
- * "continued" and "continued-spectre", the netlists of CONTINUED; and those of SOLVED, from the
- * files that `rnl solve` writes under `solved` in `dir`.
+ * "continued" and "continued-spectre", the netlists of CONTINUED; "unicode", the netlist of
+ * UNICODE; "long", a title, LONG lines of a bare `*`, R1, a record that places it and `.end`; and
+ * those of SOLVED, from the files that `rnl solve` writes under `solved` in `dir`.
  */
 export function writeFixtures(rnl, dir) {
   for (const [name, file] of Object.entries(FILES)) {
@@ -150,6 +173,13 @@ export function writeFixtures(rnl, dir) {
     const name = file.endsWith(".scs") ? "continued-spectre" : "continued";
     fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, dir));
   }
+
+  fs.writeFileSync(path.join(dir, "unicode.sp"), UNICODE.concat("").join("\n"));
+  fs.writeFileSync(path.join(dir, "unicode.json"), view(rnl, "unicode.sp", dir));
+
+  const long = ["* a long file"].concat(new Array(LONG).fill("*"), "R1 a 0 1k", "* @RNL { #R1 @PLACE(0, 0) }", ".end", "");
+  fs.writeFileSync(path.join(dir, "long.sp"), long.join("\n"));
+  fs.writeFileSync(path.join(dir, "long.json"), view(rnl, "long.sp", dir));
 
   const solved = path.join(dir, "solved");
   for (const [name, file] of Object.entries(SOLVED)) {

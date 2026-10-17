@@ -52,10 +52,10 @@ on:
     types: [completed]
   workflow_dispatch:
 
+# Each job gets only what it needs: the build reads the repository and the Pages site
+# (configure-pages); only the deploy job writes to Pages, with the OIDC token deploy-pages asks for.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -64,8 +64,11 @@ jobs:
   build:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # the tags give the revision label of the standard (decision 0007), and the desktop viewer's
           # newest release, whose files the page of the tools links to
@@ -94,7 +97,7 @@ jobs:
           rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
           echo "version=$(rustc --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
       # the crates the core depends on, and what was built of them for WebAssembly
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
@@ -104,18 +107,18 @@ jobs:
             target/wasm32-unknown-unknown/
           key: pages-wasm-${{ steps.rust.outputs.version }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: pages-wasm-${{ steps.rust.outputs.version }}-
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       # Writing the web fonts from the pinned fonts takes scripts/fonts.py a minute or two, and what it
       # writes changes only with the script, so it is kept between runs.
       - id: fonts
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/viewer-ui/fonts/
           key: web-fonts-${{ hashFiles('scripts/fonts.py') }}
       - if: steps.fonts.outputs.cache-hit != 'true'
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       # downloads the pinned fonts and writes apps/viewer-ui/fonts/, the drawing's web fonts
@@ -138,10 +141,10 @@ jobs:
           node site/gallery/build.mjs
 
       - if: github.event_name != 'pull_request'
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site/dist
 
@@ -149,6 +152,9 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     concurrency:
       group: pages
       cancel-in-progress: false
@@ -157,4 +163,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

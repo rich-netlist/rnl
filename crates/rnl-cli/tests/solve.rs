@@ -2223,7 +2223,7 @@ fn a_file_of_0_2_is_raised_to_0_3_when_its_record_needs_it() {
     let solved = |text: &str| solve(entry, &MemoryProvider::new().with("/w/raise.sp", text), &unlimited()).unwrap();
     let pin = "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
     let run = solved(&net("@VERSION(\"0.2\")", ""));
-    let raised = VersionRaise { path: "/w/raise.sp".into(), raised: true, pinned: true, why: vec![] };
+    let raised = VersionRaise { path: "/w/raise.sp".into(), section: None, raised: true, pinned: true, why: vec![] };
     assert_eq!(run.raised, [raised]);
     let text = &run.files[0].text;
     assert!(text.starts_with(&format!("* raise\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {pin}}}\n")), "{text}");
@@ -2251,7 +2251,8 @@ fn a_file_of_0_2_is_raised_to_0_3_when_its_record_needs_it() {
     let run = solved(&net("@VERSION(\"0.2\")", "; #R1 @TEXT(\"r\", key=\"numbering\")"));
     let why = "the key of a text, `numbering`, line 5, has the spelling of a word that 0.3 adds (2.8), and would mean \
                something else";
-    let kept = VersionRaise { path: "/w/raise.sp".into(), raised: false, pinned: false, why: vec![why.into()] };
+    let kept =
+        VersionRaise { path: "/w/raise.sp".into(), section: None, raised: false, pinned: false, why: vec![why.into()] };
     assert_eq!(run.raised, [kept]);
     assert!(run.files[0].text.contains("@VERSION(\"0.2\")") && !run.files[0].text.contains("%#"));
     assert!(run.levels[0].written.unsolved.iter().any(Unsolved::needs_0_3));
@@ -2262,4 +2263,80 @@ fn a_file_of_0_2_is_raised_to_0_3_when_its_record_needs_it() {
     let plain = "* plain\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\n.end\n";
     let run = solve(Path::new("/w/plain.sp"), &MemoryProvider::new().with("/w/plain.sp", plain), &unlimited()).unwrap();
     assert!(run.raised.is_empty() && run.files[0].text.contains("@VERSION(\"0.2\")"), "{}", run.files[0].text);
+}
+
+#[test]
+fn a_library_section_is_raised_as_a_file_of_its_own() {
+    // two sections of one library, both of 0.2, read by the main file: a section read is a file
+    // (2.8), so only the one whose record needs 0.3 is raised (16.1), and the text of the other
+    // stays as it was; solved alone or with the other, read back each in its version, and a
+    // second solve writes the same and raises nothing
+    let section = |name: &str, needs: bool| {
+        let wire = if needs { "; &b @WIRE {#R1:2 (_, _) #R2:1}" } else { "" };
+        format!(
+            ".lib {name}\n* @RNL(type=\"header\") {{ @VERSION(\"0.2\") }}\n.subckt {name} a c\nR1 a b 1k\nR2 b c 1k\n\
+             * @RNL {{ $GND @ATTACH &b{wire} }}\n.ends\n.endl {name}\n"
+        )
+    };
+    let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.lib lib.inc old\n.lib lib.inc new\n\
+               X1 a b old\nX2 c d new\n.end\n";
+    let entry = Path::new("/w/top.sp");
+    let read_back = |text: &str| {
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", text);
+        let r = interpret_file(entry, None, &files, &Options::solver()).unwrap();
+        r.problems.iter().map(|p| (p.title.clone(), p.version.clone())).collect::<Vec<_>>()
+    };
+    let raised = |name: &str| VersionRaise {
+        path: "/w/lib.inc".into(),
+        section: Some(name.into()),
+        raised: true,
+        pinned: true,
+        why: vec![],
+    };
+    let pin = "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
+    for level in [Some("new"), None] {
+        let lib = format!("* lib\n{}{}", section("old", false), section("new", true));
+        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", &lib);
+        let run = solve(entry, &files, &SolveOptions { level: level.map(String::from), ..unlimited() }).unwrap();
+        assert_eq!(run.raised, [raised("new")], "{level:?}");
+        let said = lines(&run, false);
+        assert!(said[0].starts_with("lib.inc (new): raised from 0.2 to 0.3"), "{said:?}");
+        let text = &run.files.iter().find(|f| f.path == "/w/lib.inc").unwrap().text;
+        // the section old as it was, or with its record alone when it is solved too; the header of
+        // new raised, and its record with numbers
+        let old = &text[..text.find(".lib new").unwrap()];
+        match level {
+            Some(_) => assert_eq!(old, format!("* lib\n{}", section("old", false))),
+            None => {
+                assert!(
+                    old.contains("{ @VERSION(\"0.2\") }\n.subckt old") && old.contains("type=\"generated\""),
+                    "{old}"
+                );
+                assert!(!old.contains("numbering=") && !old.contains("USE-PACKAGE"), "{old}");
+            }
+        }
+        let new = format!(".lib new\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {pin} }}\n.subckt new a c\n");
+        assert!(text.contains(&new) && text.contains("numbering=") && text.contains("%#"), "{text}");
+        let new_level = run.levels.iter().find(|l| l.problem.title == "new").unwrap();
+        assert!(!new_level.written.unsolved.iter().any(Unsolved::needs_0_3), "{:?}", new_level.written.unsolved);
+        let versions = read_back(text);
+        let of = |t: &str| versions.iter().find(|(title, _)| title == t).map(|(_, v)| v.as_str());
+        assert_eq!((of("old"), of("new"), of("top.sp")), (Some("0.2"), Some("0.3"), Some("0.2")), "{level:?}");
+        let solved = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", text);
+        let again = solve(entry, &solved, &SolveOptions { level: level.map(String::from), ..unlimited() }).unwrap();
+        assert!(again.raised.is_empty(), "{:?}", again.raised);
+        let again_text = &again.files.iter().find(|f| f.path == "/w/lib.inc").unwrap().text;
+        assert_eq!(again_text, text, "{level:?}");
+    }
+
+    // both sections need 0.3: each is raised, in one pass over the text of the library
+    let lib = format!("* lib\n{}{}", section("old", true), section("new", true));
+    let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", &lib);
+    let run = solve(entry, &files, &unlimited()).unwrap();
+    assert_eq!(run.raised, [raised("old"), raised("new")]);
+    let text = &run.files.iter().find(|f| f.path == "/w/lib.inc").unwrap().text;
+    assert_eq!(text.matches(&format!("@VERSION(\"0.3\"); {pin}")).count(), 2, "{text}");
+    assert_eq!(text.matches("numbering=").count(), 2, "{text}");
+    let versions = read_back(text);
+    assert!(versions.iter().filter(|(t, _)| t == "old" || t == "new").all(|(_, v)| v == "0.3"), "{versions:?}");
 }

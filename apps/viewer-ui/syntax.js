@@ -14,6 +14,19 @@ export function mark(cls, from, to, name) {
 }
 
 /**
+ * The end of the characters from `i`, before `to`, that `re` matches: whole characters, as a
+ * character outside the BMP, such as an emoji, takes two of JavaScript's UTF-16 units.
+ */
+function run(text, i, to, re) {
+  while (i < to) {
+    const c = String.fromCodePoint(text.codePointAt(i));
+    if (!re.test(c)) break;
+    i += c.length;
+  }
+  return i;
+}
+
+/**
  * Highlight a host line outside records: comments, the first word of a statement, parameter
  * names. Returns whether the line continues on the next (a Spectre `\`).
  */
@@ -109,8 +122,7 @@ export function rnlRange(text, from, to, first, cls, state) {
       continue;
     }
     if (c === "@") {
-      let j = i + 1;
-      while (j < to && KEYWORD_CHAR.test(text[j])) j++;
+      const j = run(text, i + 1, to, KEYWORD_CHAR);
       mark(cls, i, j, "keyword");
       i = j;
       continue;
@@ -122,7 +134,7 @@ export function rnlRange(text, from, to, first, cls, state) {
         while (j < to && text[j] !== '"') j++;
         j++;
       } else {
-        while (j < to && NAME_CHAR.test(text[j])) j++;
+        j = run(text, j, to, NAME_CHAR);
       }
       mark(cls, i, j, REF_CLASS[c]);
       i = j;
@@ -140,9 +152,8 @@ export function rnlRange(text, from, to, first, cls, state) {
       i += 2;
       continue;
     }
-    if (KEYWORD_CHAR.test(c)) {
-      let j = i;
-      while (j < to && KEYWORD_CHAR.test(text[j])) j++;
+    const j = run(text, i, to, KEYWORD_CHAR);
+    if (j > i) {
       let k = j;
       while (k < to && text[k] === " ") k++;
       if (text[k] === "=" && text[k + 1] !== ">") mark(cls, i, j, "param");

@@ -1,6 +1,7 @@
 use super::*;
 use rnl_runtime::diag::Severity;
 use rnl_runtime::markup;
+use rnl_runtime::model::Attach;
 use rnl_runtime::Options;
 use serde_json::json;
 
@@ -59,7 +60,7 @@ R1 in out 10k
 * @RNL(author="test") {
 *   #R1 @SET-SYMBOL $RES => @PLACE(19, -16) => @ORIENT("R90");
 *   #C1 @PLACE(29, -22);
-*   $GND @ATTACH &VSS => @SET-SYMBOL $GROUND => @PLACE(10, -25) => %gnd1;
+*   $GND @ATTACH &VSS(p) => @SET-SYMBOL $GROUND => @PLACE(10, -25) => %gnd1;
 *   %j1 = (11, 2);
 *   $JUNCTION @ATTACH %j1;
 *   &VSS @REMOVE-FROM $PORT_FILL_SET;
@@ -351,6 +352,54 @@ fn what_it_writes_interprets_without_errors() {
     let loud: Vec<String> =
         r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
     assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
+}
+
+#[test]
+fn a_usage_reads_back_with_the_roles_of_the_request() {
+    // by order alone the objects would fill the roles of $CURRENT_MIRROR in its own order, ref
+    // then out, whatever roles the request gave them (9.4); with its role, each fills its own
+    let net = "* mirror\nM1 a g 0 0 nch\nM2 b g 0 0 nch\n.end\n";
+    let mirror = |attach: Value| {
+        request(
+            "spice",
+            net,
+            json!([{"level": "file", "op": "add-usage", "name": "%m", "definition": "$CURRENT_MIRROR", "attach": attach}]),
+        )
+    };
+    let read = |out: &str| {
+        let files = MemoryProvider::new().with(entry("spice"), out);
+        rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: true, ..Options::default() })
+            .unwrap()
+    };
+    let errors = |r: &rnl_runtime::Interpretation| -> Vec<String> {
+        r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect()
+    };
+    for (attach, written) in [
+        (json!({"out": "#M2", "ref": "#M1"}), "$CURRENT_MIRROR @ATTACH #M2(out) #M1(ref) => %m"),
+        (json!({"ref": "#M1", "out": "#M2"}), "$CURRENT_MIRROR @ATTACH #M1(ref) #M2(out) => %m"),
+    ] {
+        let out = write(&mirror(attach)).unwrap();
+        assert!(out.contains(&format!("*   {written}\n")), "{out}");
+        let r = read(&out);
+        assert!(errors(&r).is_empty(), "{out}\n{}", errors(&r).join("\n"));
+        let m = r.model.levels.iter().flat_map(|lv| &lv.objects).find(|o| o.id == "%m").unwrap();
+        let filled = |role: &str| m.attach.iter().find(|(r, _)| r == role).map(|(_, a)| a.clone());
+        assert_eq!(filled("ref"), Some(Attach::Object("#M1".into())), "{out}");
+        assert_eq!(filled("out"), Some(Attach::Object("#M2".into())), "{out}");
+    }
+    // a role the definition lacks fails when the netlist is read, instead of filling another
+    let out = write(&mirror(json!({"in": "#M1", "out": "#M2"}))).unwrap();
+    assert!(out.contains("*   $CURRENT_MIRROR @ATTACH #M1(in) #M2(out) => %m\n"), "{out}");
+    let r = read(&out);
+    assert!(
+        errors(&r).iter().any(|e| e.contains("the ordinary definition $CURRENT_MIRROR has no role in (9.4)")),
+        "{out}"
+    );
+    // a role that is not an ASCII name is written in quotes, the name itself (16.5); one that no
+    // name can be is refused
+    let out = write(&mirror(json!({"1st": "#M1", "the out": "#M2"}))).unwrap();
+    assert!(out.contains(r#"*   $CURRENT_MIRROR @ATTACH #M1("1st") #M2("the out") => %m"#), "{out}");
+    assert_eq!(write(&mirror(json!({"": "#M1"}))).unwrap_err(), r#"op 0 (add-usage): `attach` role "" is not a name"#);
 }
 
 #[test]
