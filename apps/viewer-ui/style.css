@@ -155,6 +155,11 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
   grid-template-rows: auto minmax(0, 1fr) 5px var(--index-h);
   grid-template-columns: minmax(0, 1fr);
 }
+.solve-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+}
 
 .vsplit, .hsplit {
   background: var(--bg);
@@ -678,6 +683,47 @@ mark { background: rgba(255, 196, 61, 0.55); color: inherit; border-radius: 2px;
 .up-button[hidden] { display: none; }
 .up-button svg { width: 15px; height: 15px; flex-shrink: 0; }
 .up-button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ------------------------------------------------------------------ solve (desktop) */
+
+/* the drawing is a solve, not the file as written (solve.js) */
+.preview-badge {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.preview-badge[hidden], .preview-close[hidden] { display: none; }
+.preview-close { flex-shrink: 0; border-color: var(--line); background: var(--tab); }
+.preview-badge + .preview-close { margin-left: 4px; }
+.solve-status { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--fg); }
+.solve-status[hidden] { display: none; }
+.solve-status #solve-step { overflow: hidden; text-overflow: ellipsis; }
+.solve-cancel { padding: 0 8px; line-height: 18px; border-color: var(--line); background: var(--tab); }
+.solve-cancel[hidden] { display: none; }
+body.solving, body.solving canvas { cursor: progress; }
+
+.solve-report { overflow: auto; min-height: 0; padding: 4px 0 12px; }
+.solve-note { margin: 4px 10px 8px; color: var(--muted); }
+.solve-level { margin: 6px 0 10px; }
+.solve-level h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 10px; font-size: 13px; }
+.solve-level h3 .kind { color: var(--muted); font-weight: normal; font-size: 12px; }
+.solve-summary { margin: 2px 10px 4px; color: var(--muted); }
+.solve-group { margin: 2px 0; }
+.solve-group > summary { padding: 2px 10px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: 12px; }
+.solve-lines { list-style: none; margin: 0; padding: 0; }
+.solve-line { display: grid; grid-template-columns: 74px minmax(0, 1fr); column-gap: 8px; padding: 3px 10px; }
+.solve-line > .msg:first-child { grid-column: 1 / -1; }
+.solve-line.located { cursor: pointer; }
+.solve-line:hover { background: var(--hover); }
+.solve-line .st { font-weight: 600; }
+.solve-line .more { grid-column: 2; color: var(--muted); }
+.solve-line.failed .st, .solve-line.error .msg { color: var(--error); }
+.solve-line.discarded .st, .solve-line.undecided .st, .solve-line.warning .msg { color: var(--warning); }
+.solve-line.kept .st { color: var(--muted); }
 
 /* ------------------------------------------------------------------ menu bar */
 

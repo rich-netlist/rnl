@@ -1,7 +1,9 @@
 // Opening a document: the shell reads a source and builds its Document, and the page shows it.
 // Reading the same source again keeps the level, the hierarchy path to it while its instances are
 // still there, the view, the selection and the text's scroll. File > Load from Clipboard opens the
-// clipboard's text, once the user has seen it, as a source that holds its text.
+// clipboard's text, once the user has seen it, as a source that holds its text. A solve shown as a
+// preview (solve.js) ends when a source is opened or read again, which shows it as written; while
+// one is shown, File > Reload solves again.
 
 import { form, inform, modal } from "./dialog.js";
 import { shell } from "./shell.js";
@@ -11,6 +13,7 @@ import { renderHierarchy } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
 import { markDiagnostics, renderDiagnostics } from "./problems.js";
 import { select } from "./selection.js";
+import { endPreview, previewing, solve } from "./solve.js";
 import { namedPath, restorePath } from "./subcircuits.js";
 import { clearSource, fileShown, fileViews, renderFiles, showFile } from "./text.js";
 import { $ } from "./util.js";
@@ -25,10 +28,10 @@ export async function openSource(source, keep) {
   try {
     lastSource = source;
     const d = await shell.build(source);
-    const before = keep && doc ? snapshot() : null;
-    setDoc(d);
-    showDocument(before);
+    endPreview();
+    showBuilt(d, keep);
   } catch (e) {
+    endPreview();
     setDoc(null);
     clearDrawing(`Could not open ${source.name}`);
     clearSource("The file could not be read.");
@@ -48,7 +51,29 @@ export async function pickAndOpen(kind) {
 }
 
 export function reload() {
-  if (lastSource) openSource(lastSource, true);
+  if (previewing()) solve();
+  else if (lastSource) openSource(lastSource, true);
+}
+
+/** What was last opened, also when it failed to open; null before anything was. */
+export function currentSource() {
+  return lastSource;
+}
+
+/** Whether a source is being read. */
+export function isLoading() {
+  return loading;
+}
+
+/**
+ * Show a Document built for the source last opened, such as its solve (solve.js); with `keep`,
+ * with what reading the same source again keeps: the level, the view, the selection and the text's
+ * scroll.
+ */
+export function showBuilt(d, keep) {
+  const before = keep && doc ? snapshot() : null;
+  setDoc(d);
+  showDocument(before);
 }
 
 /** What a text from the clipboard can be read as, by the extension of the file it is opened as. */

@@ -4,7 +4,8 @@
 // an instance, Enter opens its subcircuit and Backspace comes back, the native menu has the items
 // of the command table, those of its submenus too, runs them, and follows the page's check marks,
 // Help > Check for Updates asks GitHub for the releases, answered by the test, and offers a newer
-// one, and File > Load from Clipboard draws the text the test gives the page as the clipboard's. The
+// one, Solve > Solve draws the netlist solved as a preview and leaves the file on disk as it was,
+// and File > Load from Clipboard draws the text the test gives the page as the clipboard's. The
 // app runs with a WebView2 profile of its own in a temporary directory, so that the user's layout
 // stays as it was, and is stopped by its process ID. The test fails at once when the app exits, and
 // a step fails when the page stops answering. Node 22 or later, with no dependencies.
@@ -423,6 +424,26 @@ async function drive(app, port, profile, t0, session) {
   await until("the dialog to close", async () => !(await page.evaluate(`!!document.querySelector("dialog.dialog")`)), 10_000);
   await page.send("Fetch.disable");
   console.log(`Help > Check for Updates offered the newer release GitHub was made to list, against ${version}`);
+
+  // Solve > Solve: the app solves the netlist natively, on a thread of its own, and the page draws
+  // it as a preview, with the report; the file on disk is as it was; Close Preview reads it again
+  const onDisk = fs.readFileSync(netlist);
+  chooseItem(app.pid, at("solve"));
+  await until("the solve's preview", () =>
+    page.evaluate(`document.body.classList.contains("preview") && !document.body.classList.contains("solving")`),
+  );
+  const solved = await page.evaluate(`({
+    record: window.viewer.doc.files[0].text.includes('@RNL(type="generated"'),
+    levels: document.querySelectorAll("#solve-report .solve-level").length,
+    badge: document.getElementById("preview-badge").hidden === false,
+  })`);
+  same(solved.record && solved.badge && solved.levels > 0, true, "the solve drawn as a preview, with its report");
+  same(fs.readFileSync(netlist).equals(onDisk), true, "the netlist on disk after the solve");
+  chooseItem(app.pid, at("solve-close"));
+  await until("the netlist as written", () =>
+    page.evaluate(`!document.body.classList.contains("preview") && !document.body.classList.contains("busy")`),
+  );
+  console.log("Solve > Solve drew the netlist solved as a preview, and the file on disk is as it was");
 
   // File > Load from Clipboard: the page reads the clipboard, whose text the test gives in the page,
   // shows it, and on Load the app draws it natively as clipboard.sp, alone, its include missing

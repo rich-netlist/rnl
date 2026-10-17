@@ -697,9 +697,12 @@ impl Interp<'_> {
                     } else {
                         String::new()
                     };
+                    // a role of the standard series 0.2 that the series 0.3 renamed
+                    let names: Vec<&str> = d.roles.iter().map(|x| x.name.as_str()).collect();
+                    let renamed = Self::role_renamed_in_0_3(&dlabel, &role, &names).unwrap_or_default();
                     return self.fail(
                         ctx,
-                        format!("the ordinary definition {dlabel} has no role {r}{more} (9.4){then}"),
+                        format!("the ordinary definition {dlabel} has no role {r}{more} (9.4){then}{renamed}"),
                         a.off,
                     );
                 }

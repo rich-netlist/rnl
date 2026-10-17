@@ -7,8 +7,9 @@
 // question of what to open at start with that plain message, as Tauri's invoke rejects; and
 // `platform=desktop` offers the desktop's commands with the menu shown natively, as the desktop
 // shell does, and what Help > Check for Updates needs, the version that runs being the one
-// `version=VERSION` gives, 0.1.0 by default; otherwise it offers the web's commands and the page
-// shows its own menu bar.
+// `version=VERSION` gives, 0.1.0 by default, and what the Solve menu needs: a solve gives the
+// fixture NAME-preview of the source, which `rnl preview` printed; otherwise it offers the web's
+// commands and the page shows its own menu bar.
 
 const params = new URLSearchParams(location.search);
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";
@@ -41,8 +42,61 @@ const fake = {
   menu(id) {
     if (handler) handler(id);
   },
+  /** A message the next solve rejects with. */
+  solveFail: null,
+  /** Whether a solve waits, once it has its fixture, until `release()` or a cancel. */
+  hold: false,
+  /** Let a solve that waits give its result. */
+  release() {
+    if (held) held.resolve();
+    held = null;
+  },
+  /** Tell the page that the solve under way begins a level. */
+  step(step) {
+    if (progress) progress(step);
+  },
+  /** What the next copy saved says, or a message it rejects with when `saveFail` is set. */
+  saved: "Saved the solved copy as /copies/solved.sp.",
+  saveFail: null,
 };
 window.fakeShell = fake;
+
+let held = null; // the solve that waits: { resolve, reject }
+let progress = null; // the page's handler of each level a solve begins
+
+/**
+ * The desktop's Solve menu: a solve records ["solve", name, timeLimit] and gives the fixture
+ * NAME-preview; a cancel ["cancelSolve"], and rejects a solve that waits as the desktop does; a copy
+ * ["saveSolved"].
+ */
+const solving = {
+  async solve(src, timeLimit) {
+    fake.calls.push(["solve", src.name, timeLimit]);
+    const fail = fake.solveFail;
+    fake.solveFail = null;
+    if (fail !== null) throw fail;
+    const response = await fetch(`/fixtures/${encodeURIComponent(src.fixture)}-preview.json`);
+    if (!response.ok) throw `${src.name}: there is no such preview`;
+    const solved = await response.json();
+    if (fake.hold) await new Promise((resolve, reject) => (held = { resolve, reject }));
+    return solved;
+  },
+  cancelSolve() {
+    fake.calls.push(["cancelSolve"]);
+    if (held) held.reject("the solve was cancelled");
+    held = null;
+  },
+  async saveSolved() {
+    fake.calls.push(["saveSolved"]);
+    const fail = fake.saveFail;
+    fake.saveFail = null;
+    if (fail !== null) throw fail;
+    return fake.saved;
+  },
+  onSolveProgress(h) {
+    progress = h;
+  },
+};
 
 /** The version that runs, which Help > Check for Updates asks of the desktop. */
 async function version() {
@@ -54,7 +108,7 @@ async function version() {
 export default {
   platform,
   nativeMenu: platform === "desktop",
-  ...(platform === "desktop" ? { version } : {}),
+  ...(platform === "desktop" ? { version, ...solving } : {}),
   async initial() {
     fake.calls.push(["initial"]);
     if (params.has("fail-start")) throw params.get("fail-start");

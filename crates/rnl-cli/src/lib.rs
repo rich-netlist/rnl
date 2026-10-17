@@ -3,6 +3,7 @@
 //! `rnl-view`; the solver is `rnl-solver`. The conformance tests use them too.
 
 pub mod dump;
+pub mod preview;
 pub mod problem;
 pub mod provider;
 pub mod solve;

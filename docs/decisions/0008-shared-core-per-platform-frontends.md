@@ -32,3 +32,7 @@ Measurements and facts that bear on the choice:
 - A frontend that does not suit a platform, for example where the system WebView is missing or too old, can be replaced by a native one without touching the core.
 - Identical pixels across drawing engines are still not promised, because anti-aliasing and glyph rasterization differ. Geometry and text placement are identical.
 - How a frontend presents editing, for example an explicit refresh after changing the text, is the frontend's decision and is not fixed here.
+
+## Update, 2026-10-17
+
+The desktop viewer now runs the solver as point 5 says, on a background thread, its results written into the workspace in memory and drawn as a preview. [Decision 0010](0010-desktop-viewer-solves-as-a-preview.md) adds that it never writes into the files it opens, and saves a solved copy only where the user says.

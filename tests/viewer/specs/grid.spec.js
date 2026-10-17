@@ -66,7 +66,7 @@ test("the grid is dots at the integer points by default, a pin and the origin on
   }
   const p = await viewer.where("X1");
   await viewer.drag(p, { x: p.x + 37, y: p.y - 23 });
-  expect(await pixel(page, await at(viewer, 10, 0))).toEqual(dot);
+  await expect.poll(async () => pixel(page, await at(viewer, 10, 0))).toEqual(dot);
   expect(await pixel(page, await at(viewer, 0, 0))).toEqual(dot);
 });
 

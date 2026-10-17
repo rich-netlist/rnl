@@ -28,4 +28,17 @@ export default {
   version: () => tauri.app.getVersion(),
   // the opener plugin, which the app's capability lets open the repository's pages on GitHub only
   browse: (url) => invoke("plugin:opener|open_url", { url }),
+  // the Solve menu (decision 0010): solved natively on a thread of the app's, nothing written
+  solve: (source, timeLimit) =>
+    invoke(
+      "solve_preview",
+      source.text === undefined ? { path: source.path, timeLimit } : { name: source.name, text: source.text, timeLimit },
+    ),
+  cancelSolve() {
+    invoke("cancel_solve").catch(() => {});
+  },
+  saveSolved: () => invoke("save_solved_copy"),
+  onSolveProgress(handler) {
+    tauri.event.listen("solve-progress", (e) => handler(e.payload));
+  },
 };
