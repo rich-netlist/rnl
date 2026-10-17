@@ -12,6 +12,7 @@ import {
 } from "./panels.js";
 import { loadShell } from "./shell.js";
 import { current, doc, path, selected } from "./state.js";
+import { renderUnplaced } from "./unplaced.js";
 import { $, load } from "./util.js";
 
 setSidebarWidth(load("sidebar-width", 420));
@@ -35,6 +36,7 @@ setGrid({
   li.textContent = "No file is open.";
   $("diags").append(li);
 }
+renderUnplaced();
 
 /** Load the shell and the command table, then open what the shell has for the start. */
 async function start() {

@@ -104,6 +104,11 @@ export type Level = {
    * The subcircuit instances of the level, in netlist order: the hierarchy below it.
    */
   children: Array<Child>,
+  /**
+   * The objects of the level that have no position and so are not drawn on it, each with its
+   * symbol drawn alone, in the order of the netlist. Their number is the one `status` gives.
+   */
+  unplaced: Array<Unplaced>,
 };
 
 /**
@@ -143,6 +148,43 @@ export type Child = {
    * netlist does not define it.
    */
   level: number | null,
+};
+
+/**
+ * An object of a level that has no position yet, so it is not drawn there: an instance, a bundle
+ * of instances or a usage such as a ground symbol, left to a solver. A viewer lists them, each
+ * with its symbol drawn alone and the nets at its terminals.
+ */
+export type Unplaced = {
+  /**
+   * "instance", "bundle" or "usage".
+   */
+  kind: string,
+  /**
+   * An instance's name; for a bundle or a usage, the label the diagnostics give it, such as
+   * "a usage of $GND".
+   */
+  name: string,
+  /**
+   * The name of the symbol it is drawn with.
+   */
+  symbol: string,
+  /**
+   * The instances it stands for, indexes into `Document::objects`: one for an instance, its
+   * members for a bundle, none for a usage. A viewer shows the first one's statement.
+   */
+  objects: Array<number>,
+  /**
+   * The symbol alone at the origin, as it would be drawn on the level with its orientation,
+   * and the name of the net at each of its pins beside the pin, as an SVG document; absent
+   * unless `BuildOptions::svg` asks for it.
+   */
+  svg?: string,
+  /**
+   * The same drawing as primitives in scene units, as `Level::primitives` has them; absent
+   * unless `BuildOptions::primitives` asks for them.
+   */
+  primitives?: Array<Primitive>,
 };
 
 export type SourceFile = {
