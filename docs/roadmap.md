@@ -80,7 +80,7 @@ One shared Rust core decides the drawing; the frontends are per platform ([decis
 - [ ] Add `rnl migrate`, which moves a whole file to 0.3: the header record to `@VERSION("0.3")`, the standard names renamed by the table of the series 0.3 (`notes/rnl-standard-0.3/rename-0.3.md` in rnl-dev fec4245), whole words only and not where the file defines a name of its own, `$GROUND` to `$GROUND_SYMBOL` before `$GND` to `$GROUND`, and the pin of the series 0.2 taken out. It lists what keeps its name but is drawn or means otherwise in 0.3, such as `$VCVS` and `$VCCS`, which draw two terminals only, and E, G and S, whose default is four terminals.
 - [x] Give each usage of the problem the place of its AS or ATTACH statement (`UsageEntry::source`), so that the solver's hints of a conflict name a usage by the line it is written on. Like every place, it is left out of the hash of the problem.
 - [ ] Add viewer integration that requests solving only when needed or requested.
-- [ ] Implement the framework independent editor core, transactions, and safe host writeback.
+- [ ] Implement the framework independent editor core, transactions, and safe host writeback. Set aside on 2026-10-17: Analog Canvas only stays compatible with RNL and is no RNL editor. It reads RNL into its own format and writes RNL anew when it exports, so [`rnl-edit`](../crates/rnl-edit/README.md) writes an edit only into a netlist without RNL records, and refuses one that has them. Merging into a netlist's records, replacing the author's own record, checking a snapshot's revision as the base, and the snapshot's sources wait until a frontend edits RNL.
 
 ## Release
 
