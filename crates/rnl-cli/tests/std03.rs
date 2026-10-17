@@ -12,7 +12,7 @@ use rnl_cli::{interpret_file, FsProvider};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::model::LevelView;
-use rnl_runtime::problem::{FactKind, Filler, LevelProblem};
+use rnl_runtime::problem::{FactKind, LevelProblem, PointRef};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::SolverOptions;
@@ -452,11 +452,12 @@ fn a_differential_pair_has_a_tail_that_may_be_left_empty() {
 #[test]
 fn the_series_puts_the_tail_of_each_differential_pair_under_its_middle_as_a_low_default() {
     // for each differential pair, a rule of rnl-std-layout makes a usage of its own %TAIL_CENTER,
-    // of priority low (14.8): the middle point distributed between the pair, and aligned with the
-    // tail, which holds by itself when the tail is left empty. The file's own facts come first
+    // of priority low (14.8): a DISTRIBUTE of in_p, the tails as one set counted by its centre
+    // (14.1), and in_n. The file's own facts come first
     let r = with_record(&[
         "#M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR",
         "#M1 #M2 @AS $DIFFERENTIAL_PAIR",
+        "#M1(in_p) #M2(in_n) {#M5 #M8}(tail) @AS $DIFFERENTIAL_PAIR",
         "#M5 @PLACE(20, -10)",
         "{#M1 #M2} @ALIGN(\"y\")",
     ]);
@@ -464,7 +465,14 @@ fn the_series_puts_the_tail_of_each_differential_pair_under_its_middle_as_a_low_
     let p = problem(&r);
     let from_layout =
         |f: &&rnl_runtime::problem::ProblemFact| f.source.as_ref().is_some_and(|s| s.file == "rnl-std-layout.rnl");
-    let mut low: Vec<(&str, usize, String)> = p
+    fn written(p: &LevelProblem, m: &PointRef) -> String {
+        match m {
+            PointRef::Origin(k) => p.objects[*k].label.clone(),
+            PointRef::Centre(ms) => format!("{{{}}}", ms.iter().map(|m| written(p, m)).collect::<Vec<_>>().join(" ")),
+            other => format!("{other:?}"),
+        }
+    }
+    let mut low: Vec<Vec<String>> = p
         .facts
         .iter()
         .filter(from_layout)
@@ -472,25 +480,13 @@ fn the_series_puts_the_tail_of_each_differential_pair_under_its_middle_as_a_low_
             assert_eq!(f.priority, Priority::Low, "{}", f.label);
             let made = &p.usages[f.chain[0]];
             assert!(made.generated && made.priority == Some(Priority::Low), "{made:?}");
-            let Some(Filler::Usage(pair)) = made.roles[0].members.first() else { panic!("{made:?}") };
-            let tail = p.usages[*pair].roles.iter().find(|x| x.role == "tail").unwrap().written.clone().unwrap();
-            let members = match &f.kind {
-                FactKind::Distribute { members, .. } | FactKind::Align { members, .. } => members.len(),
-                other => panic!("{other:?}"),
-            };
-            (f.kind.name(), members, tail)
+            let FactKind::Distribute { members, .. } = &f.kind else { panic!("{:?}", f.kind) };
+            // an empty set is no member (14.1), and two members hold by themselves (14.4)
+            members.iter().map(|m| written(p, m)).filter(|m| m != "{}").collect()
         })
         .collect();
     low.sort();
-    assert_eq!(
-        low,
-        [
-            ("ALIGN", 1, "{}".to_string()),
-            ("ALIGN", 2, "{#M5}".to_string()),
-            ("DISTRIBUTE", 3, "{#M5}".to_string()),
-            ("DISTRIBUTE", 3, "{}".to_string()),
-        ]
-    );
+    assert_eq!(low, [vec!["#M1", "#M2"], vec!["#M1", "{#M5 #M8}", "#M2"], vec!["#M1", "{#M5}", "#M2"]]);
     // in the order of resolution of 8.5, after every fact of the file's own
     let first = p.facts.iter().position(|f| from_layout(&f)).unwrap();
     assert!(p.facts[..first].iter().all(|f| f.priority == Priority::Normal), "{:?}", p.facts);
