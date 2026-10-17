@@ -719,6 +719,19 @@ mod tests {
     }
 
     #[test]
+    fn included_files_of_one_name_in_two_directories_are_two_sources() {
+        // a/x.inc and b/x.inc: each is a source, by its name relative to the main file, with its text
+        let top = "* top\n.include \"a/x.inc\"\n.include \"b/x.inc\"\nX1 n1 0 ca\nX2 n2 0 cb\n.end\n";
+        let (a, b) = ("* a\n.subckt ca p n\nR1 p n 1k\n.ends\n", "* b\n.subckt cb p n\nR1 p n 2k\n.ends\n");
+        let p = MemoryProvider::new().with("/w/top.sp", top).with("/w/a/x.inc", a).with("/w/b/x.inc", b);
+        let mut sink = Sink::new();
+        let doc = read("/w/top.sp", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        let sources: Vec<(&str, &str)> = doc.sources.iter().map(|(f, t)| (f.as_str(), t.as_str())).collect();
+        assert_eq!(sources, [("top.sp", top), ("a/x.inc", a), ("b/x.inc", b)]);
+    }
+
+    #[test]
     fn inline_comments() {
         assert_eq!(strip_inline_comment("R1 a b 1k ; x"), "R1 a b 1k");
         assert_eq!(strip_inline_comment("R1 a b 1k$x"), "R1 a b 1k$x");
