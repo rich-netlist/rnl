@@ -2,7 +2,8 @@
 //! most one. One written after a record of the file, also after a record in a subcircuit above
 //! it, or inside a subcircuit, or a second one, is an error and is ignored as a whole, VERSION
 //! included; the file then reads as one without a header record. A file without a version takes
-//! the version of the file that includes it, and the main file the tool's default.
+//! the version of the file that includes it, and the main file the tool's default. A file declares
+//! its version once: a second VERSION is an error and ignored (16.1).
 
 use std::path::Path;
 
@@ -72,6 +73,47 @@ fn only_the_first_record_of_the_file_level_and_only_one() {
     for (text, line, message) in cases {
         let r = read(&MemoryProvider::new().with("t.sp", &text), &Options::default());
         assert_eq!(said(&r, Severity::Error), [("t.sp".to_string(), line, message.to_string())], "{text}");
+    }
+}
+
+#[test]
+fn a_second_version_is_an_error_and_the_first_stands() {
+    // a file never has two version values (16.1): the second VERSION of its header record is an
+    // error and ignored, so the file reads in the first, with the terminal names of T in 0.3 alone
+    // (6.12)
+    for (first, second, names) in [("0.2", "0.3", false), ("0.3", "0.2", true)] {
+        let text = format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{first}\"); @VERSION(\"{second}\") }}\n\
+             T1 a b c d z0=50 td=1n\n* @RNL {{ #T1:p1 @TEXT(\"first port\") }}\n.end\n"
+        );
+        let r = read(&MemoryProvider::new().with("t.sp", &text), &Options::default());
+        let errors: Vec<String> = said(&r, Severity::Error).into_iter().map(|(_, _, m)| m).collect();
+        let second = rnl_runtime::interp::unit::SECOND_VERSION.to_string();
+        if names {
+            assert_eq!(errors, std::slice::from_ref(&second), "{first}");
+        } else {
+            // in 0.2, T1 has no terminal p1
+            assert_eq!(errors.len(), 2, "{first}: {errors:?}");
+            assert_eq!(errors.iter().filter(|e| **e == second).count(), 1, "{first}: {errors:?}");
+            assert!(errors.iter().any(|e| e.contains("p1")), "{first}: {errors:?}");
+        }
+        assert_eq!(said(&r, Severity::Error).iter().find(|d| d.2 == second).map(|d| d.1), Some(2), "{first}");
+    }
+}
+
+#[test]
+fn an_alias_spelled_like_numbering_is_an_error_in_0_3_alone() {
+    // `numbering`, a word that 0.3 adds (2.8), is a standard word in a file of 0.3, and an alias
+    // cannot have the spelling of one (16.5); in a file of 0.2 it is no standard word (16.1)
+    for (version, error) in [("0.3", true), ("0.2", false)] {
+        let text = format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"); @ALIAS(\"numbering\", \"axis\") }}\nR1 a 0 1k\n.end\n"
+        );
+        let r = read(&MemoryProvider::new().with("t.sp", &text), &Options::default());
+        let errors: Vec<String> = said(&r, Severity::Error).into_iter().map(|(_, _, m)| m).collect();
+        let want =
+            if error { vec!["the alias numbering is the name of a standard word (16.5)".to_string()] } else { vec![] };
+        assert_eq!(errors, want, "{version}");
     }
 }
 

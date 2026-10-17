@@ -1,5 +1,5 @@
 * T3 Five-transistor OTA in a testbench
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="rnl-std", version="0.2")}
 .model nch nmos level=1
 .model pch pmos level=1
 .subckt ota5t inp inn out vdd vss vbias

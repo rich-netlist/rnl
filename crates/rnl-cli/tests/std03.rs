@@ -7,12 +7,15 @@
 
 use std::path::{Path, PathBuf};
 
+use rnl_cli::solve::{report, solve, SolveOptions};
 use rnl_cli::{interpret_file, FsProvider};
 use rnl_runtime::diag::Severity;
+use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::model::LevelView;
-use rnl_runtime::problem::FactKind;
+use rnl_runtime::problem::{FactKind, LevelProblem, ObjectKind, PointRef};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
+use rnl_solver::SolverOptions;
 
 /// The packages of the series 0.2 at the root, as rnl-std 0.2 brings them in.
 const SERIES_02: [&str; 8] = [
@@ -394,4 +397,226 @@ fn a_name_of_the_series_0_2_is_told_its_name_in_the_series_0_3() {
     let e = errors(&read(&files, "t.sp", &Options { std: false, ..Options::default() }));
     assert!(e.iter().any(|m| m.contains("$GND cannot be found (6.6)")), "{e:?}");
     assert!(!e.iter().any(|m| m.contains("series 0.3")), "{e:?}");
+}
+
+/// The transistors of the tests of the semantic definitions: a pair, two tails, and the four of a
+/// mirror; and R2 to R4 of a chain.
+const PARTS: &str = ".model nch nmos level=1\n.model pch pmos level=1\nM1 o1 g1 t 0 nch\nM2 o2 g2 t 0 nch\n\
+                     M5 t b 0 0 nch\nM8 t b 0 0 nch\nM3 d3 d3 vdd vdd pch\nM4 d4 d3 vdd vdd pch\n\
+                     M6 d6 d3 vdd vdd pch\nM9 d3 d3 vdd vdd pch\nR2 a m 1k\nR3 m n 1k\nR4 n 0 1k\n";
+
+/// A netlist of 0.3 whose header record writes `header` after its version, with PARTS and a
+/// record of `statements`.
+fn text_with_record(header: &str, statements: &[&str]) -> String {
+    let lines: Vec<String> = statements.iter().map(|s| format!("*   {s}")).collect();
+    netlist("0.3", header, &format!("{PARTS}* @RNL {{\n{}\n* }}\n", lines.join(";\n")))
+}
+
+/// That netlist, without a header beyond its version, read with the problems of a solver.
+fn with_record(statements: &[&str]) -> Interpretation {
+    read(&MemoryProvider::new().with("t.sp", &text_with_record("", statements)), "t.sp", &Options::solver())
+}
+
+/// The usages of `definition` in the problem of t.sp, each as what fills its roles, as the text
+/// writes it, role by role in the definition's order; "" for a set role left empty.
+fn fills(r: &Interpretation, definition: &str) -> Vec<Vec<String>> {
+    let p = r.problems.iter().find(|p| p.title == "t.sp").unwrap();
+    p.usages
+        .iter()
+        .filter(|u| u.definition == definition)
+        .map(|u| u.roles.iter().map(|f| format!("{}={}", f.role, f.written.clone().unwrap_or_default())).collect())
+        .collect()
+}
+
+fn problem(r: &Interpretation) -> &LevelProblem {
+    r.problems.iter().find(|p| p.title == "t.sp").unwrap()
+}
+
+#[test]
+fn a_differential_pair_has_a_tail_that_may_be_left_empty() {
+    // tail is a set role, so it may be left empty and takes several tails (9.4)
+    let r = with_record(&[
+        "#M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR",
+        "#M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR",
+        "#M1 #M2 @AS $DIFFERENTIAL_PAIR",
+        "#M1 #M2 #M5 @AS $DIFFERENTIAL_PAIR",
+        "#M1(in_p) #M2(in_n) {#M5 #M8}(tail) @AS $DIFFERENTIAL_PAIR",
+    ]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let pairs = fills(&r, "$DIFFERENTIAL_PAIR");
+    assert!(pairs.iter().all(|u| u[..2] == ["in_p=#M1", "in_n=#M2"]), "{pairs:?}");
+    let tails: Vec<&str> = pairs.iter().map(|u| u[2].as_str()).collect();
+    assert_eq!(tails, ["tail={}", "tail={#M5}", "tail={}", "tail={#M5}", "tail={#M5 #M8}"]);
+}
+
+#[test]
+fn the_series_puts_the_tail_of_each_differential_pair_under_its_middle_as_a_low_default() {
+    // for each differential pair, a rule of rnl-std-layout makes a usage of its own %TAIL_CENTER,
+    // of priority low (14.8): a DISTRIBUTE of in_p, the tails as one set counted by its centre
+    // (14.1), and in_n. The file's own facts come first
+    let r = with_record(&[
+        "#M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR",
+        "#M1 #M2 @AS $DIFFERENTIAL_PAIR",
+        "#M1(in_p) #M2(in_n) {#M5 #M8}(tail) @AS $DIFFERENTIAL_PAIR",
+        "#M5 @PLACE(20, -10)",
+        "{#M1 #M2} @ALIGN(\"y\")",
+    ]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let p = problem(&r);
+    let from_layout =
+        |f: &&rnl_runtime::problem::ProblemFact| f.source.as_ref().is_some_and(|s| s.file == "rnl-std-layout.rnl");
+    fn written(p: &LevelProblem, m: &PointRef) -> String {
+        match m {
+            PointRef::Origin(k) => p.objects[*k].label.clone(),
+            PointRef::Centre(ms) => format!("{{{}}}", ms.iter().map(|m| written(p, m)).collect::<Vec<_>>().join(" ")),
+            other => format!("{other:?}"),
+        }
+    }
+    let mut low: Vec<Vec<String>> = p
+        .facts
+        .iter()
+        .filter(from_layout)
+        .map(|f| {
+            assert_eq!(f.priority, Priority::Low, "{}", f.label);
+            let made = &p.usages[f.chain[0]];
+            assert!(made.generated && made.priority == Some(Priority::Low), "{made:?}");
+            let FactKind::Distribute { members, .. } = &f.kind else { panic!("{:?}", f.kind) };
+            members.iter().map(|m| written(p, m)).collect()
+        })
+        .collect();
+    low.sort();
+    // an empty set is no member (14.1): without a tail, two members, which hold by themselves (14.4)
+    assert_eq!(low, [vec!["#M1", "#M2"], vec!["#M1", "{#M5 #M8}", "#M2"], vec!["#M1", "{#M5}", "#M2"]]);
+    // and no point of its own
+    assert!(p.objects.iter().all(|o| o.kind != ObjectKind::Point), "{:?}", p.objects);
+    // in the order of resolution of 8.5, after every fact of the file's own
+    let first = p.facts.iter().position(|f| from_layout(&f)).unwrap();
+    assert!(p.facts[..first].iter().all(|f| f.priority == Priority::Normal), "{:?}", p.facts);
+    assert!(p.facts[first..].iter().all(|f| from_layout(&f)), "{:?}", p.facts);
+}
+
+#[test]
+fn a_tail_placed_elsewhere_lets_go_of_the_low_middle() {
+    // the pair and its tail placed so that the tail is not under the middle: the solver discards
+    // a fact of the low centering, and lists what it conflicts with only with --report (8.5)
+    let text = text_with_record(
+        "",
+        &[
+            "#M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR",
+            "#M1 @PLACE(0, 0); #M2 @PLACE(10, 0); #M5 @PLACE(20, -10)",
+        ],
+    );
+    let files = MemoryProvider::new().with("/w/t.sp", &text);
+    let options = SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() };
+    let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
+    let lines = report(&run.levels[0], false);
+    let discarded: Vec<&String> = lines.iter().filter(|l| l.trim_start().starts_with("discarded [")).collect();
+    assert!(!discarded.is_empty(), "{lines:#?}");
+    for l in &discarded {
+        assert!(l.contains("(low, rnl-std-layout.rnl:") && l.contains("--report lists what it conflicts with"), "{l}");
+    }
+    let all = report(&run.levels[0], true);
+    assert!(all.iter().any(|l| l.contains("kept [") && l.contains("the x of #M5 = 20 (normal")), "{all:#?}");
+}
+
+#[test]
+fn a_solve_puts_the_tails_under_the_middle_and_leaves_nothing_unsolved() {
+    // three pairs, nothing placed: one with a tail, one without, one with two tails
+    let body = ".model nch nmos level=1\nM1 o1 g1 t 0 nch\nM2 o2 g2 t 0 nch\nM5 t b 0 0 nch\n\
+                M3 p1 h1 u 0 nch\nM4 p2 h2 u 0 nch\nM6 q1 k1 w 0 nch\nM7 q2 k2 w 0 nch\nM8 w c 0 0 nch\n\
+                M10 w c 0 0 nch\n* @RNL {\n*   #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;\n\
+                *   #M3(in_p) #M4(in_n) @AS $DIFFERENTIAL_PAIR;\n\
+                *   #M6(in_p) #M7(in_n) {#M8 #M10}(tail) @AS $DIFFERENTIAL_PAIR\n* }\n";
+    let files = MemoryProvider::new().with("/w/t.sp", &netlist("0.3", "", body));
+    let options = SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() };
+    let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
+    let lv = &run.levels[0];
+    assert!(lv.written.unsolved.is_empty(), "{:?}", lv.written.unsolved);
+    let lines = report(lv, true);
+    assert!(!lines.iter().any(|l| l.contains("discarded [") || l.contains("unsolved")), "{lines:#?}");
+    // read again: every constraint holds, the one of the pair without a tail among them
+    let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
+    let r = read(&solved, "/w/t.sp", &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let status = rnl_view::status_lines(&r);
+    assert!(status.iter().all(|l| !l.contains("unsolved") && !l.contains("dropped")), "{status:?}");
+    let x = |id: &str| level(&r, "t.sp").objects.iter().find(|o| o.id == id).and_then(|o| o.at).unwrap().0;
+    // the tail's origin in the middle of the pair's, and the centre of two tails
+    assert!((x("#M5") - (x("#M1") + x("#M2")) / 2.0).abs() < 1e-6, "{}", run.files[0].text);
+    let (lo, hi) = (x("#M8").min(x("#M10")), x("#M8").max(x("#M10")));
+    assert!(((lo + hi) / 2.0 - (x("#M6") + x("#M7")) / 2.0).abs() < 1e-6, "{}", run.files[0].text);
+}
+
+#[test]
+fn a_current_mirror_is_one_usage_whatever_its_transistors() {
+    // ref and out are set roles: one usage of each mirror (9.4)
+    let r = with_record(&[
+        "#M3 #M4 @AS $CURRENT_MIRROR",
+        "{#M3 #M9}(ref) {#M4 #M6}(out) @AS $CURRENT_MIRROR",
+        "{#M3 #M9} {#M4 #M6} @AS $CURRENT_MIRROR",
+        "#M4(out) @AS $CURRENT_MIRROR",
+    ]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(
+        fills(&r, "$CURRENT_MIRROR"),
+        [
+            ["ref={#M3}", "out={#M4}"],
+            ["ref={#M3 #M9}", "out={#M4 #M6}"],
+            ["ref={#M3 #M9}", "out={#M4 #M6}"],
+            ["ref={}", "out={#M4}"],
+        ]
+    );
+    let e = errors(&with_record(&["#M3 #M4 #M6 @AS $CURRENT_MIRROR"]));
+    assert!(e.iter().any(|m| m.contains("$CURRENT_MIRROR has 2 roles, 3 objects are written (9.4)")), "{e:?}");
+    let e = errors(&with_record(&["#M3(ref) #M4(out) #M6(out) @AS $CURRENT_MIRROR"]));
+    assert!(e.iter().any(|m| m.contains("a role is labelled only once (4.2 rule 6)")), "{e:?}");
+}
+
+#[test]
+fn a_chain_takes_its_chain_as_a_set() {
+    let r = with_record(&["#R1 {#R2 #R3} #R4 @AS $CHAIN"]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(fills(&r, "$CHAIN"), [["source=#R1", "chain={#R2 #R3}", "load=#R4"]]);
+    // the role of the series 0.2 is told its name in the series 0.3
+    let e = errors(&with_record(&["#R1(source) #R2(series) #R4(load) @AS $CHAIN"]));
+    assert!(
+        e.iter().any(|m| m.contains(
+            "the ordinary definition $CHAIN has no role series (9.4); the standard series 0.3 calls it chain (16.3)"
+        )),
+        "{e:?}"
+    );
+}
+
+#[test]
+fn a_definition_that_the_series_0_3_left_out_is_told_what_to_write() {
+    let e = errors(&with_record(&[
+        "#M1 #M2 #M5 @AS $DIFFPAIR_TAIL",
+        "#M1 #M5 @AS $INPUT_STAGE",
+        "#M1 #M2 #M5 @AS $TAIL_CENTER",
+    ]));
+    let has = |s: &str| e.iter().any(|m| m.contains(s));
+    assert!(
+        has("$DIFFPAIR_TAIL cannot be found: the tail is the role tail of $DIFFERENTIAL_PAIR in the standard series 0.3, which may be left empty; write that, or pin the series 0.2"),
+        "{e:?}"
+    );
+    assert!(
+        has("$INPUT_STAGE cannot be found: the standard series 0.3 has no input stage; write the tail into the role tail of the differential pair, as in #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR"),
+        "{e:?}"
+    );
+    assert!(
+        has("$TAIL_CENTER cannot be found: the standard series 0.3 puts the tail of each differential pair under the middle of the pair itself, as a low default (14.8)"),
+        "{e:?}"
+    );
+    // pinning the series 0.2 makes them definitions that are found
+    let pinned = text_with_record(
+        "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")",
+        &[
+            "#M1 #M2 #M5 @AS $DIFFPAIR_TAIL",
+            "%dp = #M1 #M2 @AS $DIFFPAIR",
+            "%dp #M5 @AS $INPUT_STAGE",
+            "#M1 #M2 #M5 @AS $TAIL_CENTER",
+        ],
+    );
+    let e = errors(&read(&MemoryProvider::new().with("t.sp", &pinned), "t.sp", &Options::default()));
+    assert!(e.is_empty(), "{e:?}");
 }

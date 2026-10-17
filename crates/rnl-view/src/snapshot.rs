@@ -387,7 +387,8 @@ pub struct TextView {
     pub style: Map<String, Value>,
 }
 
-fn lit(v: &Lit) -> Value {
+/// A literal (3.7) as JSON.
+pub(crate) fn lit(v: &Lit) -> Value {
     match v {
         Lit::Num(n) => serde_json::json!(n),
         Lit::Str(s) => Value::String(s.as_str().to_string()),

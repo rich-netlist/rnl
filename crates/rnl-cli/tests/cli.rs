@@ -1,5 +1,5 @@
-//! The `rnl` command itself: exit codes, the status lines of `check`, `view` and its outputs, and
-//! `strip-generated`.
+//! The `rnl` command itself: exit codes, the status lines of `check`, `view` and its outputs,
+//! `strip-generated` and `catalog`.
 
 use std::path::Path;
 use std::process::Command;
@@ -132,4 +132,47 @@ fn std_version_reads_a_file_with_another_standard_series() {
     let (code, out) = rnl(&["check", &path, "--std-version", "0.2"]);
     assert_eq!(code, 0, "{out}");
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn catalog_prints_the_packages_the_core_has() {
+    let json = |out: &str| -> serde_json::Value { serde_json::from_str(out).unwrap() };
+    let (code, out) = rnl(&["catalog"]);
+    assert_eq!(code, 0, "{out}");
+    let c = json(&out);
+    let symbols = c["symbols"].as_array().unwrap();
+    let resistor = symbols.iter().find(|s| s["symbol"] == "$RESISTOR").unwrap();
+    assert_eq!((resistor["package"].as_str(), resistor["version"].as_str()), (Some("rnl-std-basic"), Some("0.3")));
+    // what rnl-view lists, read back from the same text
+    let native = rnl_view::catalog(&rnl_cli::FsProvider::new(&[]), &rnl_view::CatalogOptions::default());
+    assert_eq!(c, json(&serde_json::to_string_pretty(&native).unwrap()));
+
+    // the names asked for, every version of each
+    let (code, out) = rnl(&["catalog", "--package", "rnl-std", "--package", "rnl-zh", "--all-versions"]);
+    assert_eq!(code, 0, "{out}");
+    let listed: Vec<(String, String)> = json(&out)["packages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| (p["name"].as_str().unwrap().to_string(), p["version"].as_str().unwrap().to_string()))
+        .collect();
+    let want = [("rnl-std", "0.2"), ("rnl-std", "0.3"), ("rnl-zh", "0.2")].map(|(n, v)| (n.to_string(), v.to_string()));
+    assert_eq!(listed, want);
+
+    // a package of a package directory
+    let dir = std::env::temp_dir().join(format!("rnl-cli-catalog-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let acme = "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"acme\", version=\"1.0\")}\n\
+                @RNL { $ACME = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1, direction=\"up\") } }\n";
+    std::fs::write(dir.join("acme.rnl"), acme).unwrap();
+    let (code, out) = rnl(&["catalog", "--package-dir", &dir.to_string_lossy(), "--package", "acme"]);
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(code, 0, "{out}");
+    let c = json(&out);
+    assert_eq!(c["packages"][0]["file"], "acme.rnl");
+    assert_eq!(c["symbols"][0]["symbol"], "$ACME");
+    assert_eq!(c["symbols"][0]["pins"], serde_json::json!([{"terminal": 1, "at": [0.0, 0.0], "direction": "up"}]));
+
+    // the catalog takes no FILE
+    assert_eq!(rnl(&["catalog", &case("01-rc-lowpass.sp")]).0, 2);
 }

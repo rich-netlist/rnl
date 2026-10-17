@@ -1,5 +1,5 @@
 * T6 Eight-bit R-2R ladder
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="rnl-std", version="0.2")}
 VB0 b0 0 DC 1
 VB1 b1 0 DC 1
 VB2 b2 0 DC 1

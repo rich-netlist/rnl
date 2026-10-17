@@ -44,6 +44,7 @@ const expected = [
   "LICENSES/CC0-1.0.txt",
   "LICENSES/OFL-1.1.txt",
   "README.md",
+  "catalog.d.ts",
   "client.d.ts",
   "client.js",
   "core.d.ts",

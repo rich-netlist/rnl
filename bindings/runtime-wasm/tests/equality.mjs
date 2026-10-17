@@ -5,6 +5,8 @@
 // the core the files it asks for, read from the disk as `rnl` reads them. With --snapshot, the
 // editor interface's snapshots are compared instead, with the host circuit and the model: the one
 // `rnl snapshot` prints and the one the core gives for the files collect read, revision included.
+// Then, in either case, the catalog of every version of the packages the core has: the one
+// `rnl catalog --all-versions` prints and the one the core lists for a catalog request.
 //
 //   node bindings/runtime-wasm/tests/equality.mjs [--snapshot] [--rnl PATH] [--dist DIR] [--view ARG]... [--request JSON]
 //
@@ -73,6 +75,7 @@ for (const dir of extra.package_dirs ?? []) {
   }
 }
 
+const count = (n, what) => `${n} ${what}${n === 1 ? "" : "s"}`;
 let differ = 0;
 let builds = 0;
 for (const entry of entries) {
@@ -84,15 +87,34 @@ for (const entry of entries) {
     differ++;
     console.log(`DIFF ${name}: ${d}`);
   } else {
-    const count = (n, what) => `${n} ${what}${n === 1 ? "" : "s"}`;
     const what = want.error ? `the same error: ${want.error}` : `${count(read, "file")}, ${count(got.value.levels.length, "level")}`;
     console.log(`ok   ${name} (${what})`);
   }
 }
-const all = `${entries.length} files, ${builds} WebAssembly builds`;
+// and the catalog, with the same packages and options on both sides
+const catalogs = (() => {
+  const want = nativeCatalog();
+  let got;
+  try {
+    got = { value: core.catalog({ ...extra, catalog: { all_versions: true }, files: packages }) };
+  } catch (e) {
+    got = { error: e.message };
+  }
+  const d = difference(want, got, "");
+  if (d) {
+    console.log(`DIFF rnl catalog --all-versions: ${d}`);
+  } else {
+    const c = got.value;
+    const what = want.error ? `the same error: ${want.error}` : `${count(c.packages.length, "package")}, ${count(c.symbols.length, "symbol")}`;
+    console.log(`ok   rnl catalog --all-versions (${what})`);
+  }
+  return d === null;
+})();
+const all = `${entries.length} files and the catalog, ${builds} WebAssembly builds`;
 const outputs = snapshot ? "snapshots" : "Documents";
-if (differ) fail(`${all}: ${differ} ${outputs} differ between the native and the WebAssembly build`);
-console.log(`${all}: the native and the WebAssembly ${outputs} are identical`);
+const differing = [differ && `${differ} ${outputs}`, !catalogs && "the catalogs"].filter(Boolean);
+if (differing.length) fail(`${all}: ${differing.join(" and ")} differ between the native and the WebAssembly build`);
+console.log(`${all}: the native and the WebAssembly ${outputs} and catalogs are identical`);
 
 /**
  * The files in a directory and in its subdirectories, such as the version directories of the
@@ -113,6 +135,17 @@ function native(entry) {
   const command = snapshot ? ["snapshot", entry, "--parts", "host,model"] : ["view", entry];
   try {
     const out = execFileSync(rnl, [...command, ...view], { encoding: "utf8", maxBuffer: 1 << 30, stdio: "pipe" });
+    return { value: JSON.parse(out) };
+  } catch (e) {
+    if (typeof e.status !== "number") throw e;
+    return { error: e.stderr.trim().replace(/^rnl: /, "") };
+  }
+}
+
+/** The catalog `rnl catalog --all-versions` prints, with the arguments of --view; or its error. */
+function nativeCatalog() {
+  try {
+    const out = execFileSync(rnl, ["catalog", "--all-versions", ...view], { encoding: "utf8", maxBuffer: 1 << 30, stdio: "pipe" });
     return { value: JSON.parse(out) };
   } catch (e) {
     if (typeof e.status !== "number") throw e;

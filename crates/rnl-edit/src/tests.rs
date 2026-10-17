@@ -356,14 +356,14 @@ fn what_it_writes_interprets_without_errors() {
 
 #[test]
 fn a_usage_reads_back_with_the_roles_of_the_request() {
-    // by order alone the objects would fill the roles of $CURRENT_MIRROR in its own order, ref
-    // then out, whatever roles the request gave them (9.4); with its role, each fills its own
-    let net = "* mirror\nM1 a g 0 0 nch\nM2 b g 0 0 nch\n.end\n";
-    let mirror = |attach: Value| {
+    // by order alone the objects would fill the roles of $DIFFERENTIAL_PAIR in its own order, in_p
+    // then in_n, whatever roles the request gave them (9.4); with its role, each fills its own
+    let net = "* pair\nM1 a g 0 0 nch\nM2 b g 0 0 nch\n.end\n";
+    let pair = |attach: Value| {
         request(
             "spice",
             net,
-            json!([{"level": "file", "op": "add-usage", "name": "%m", "definition": "$CURRENT_MIRROR", "attach": attach}]),
+            json!([{"level": "file", "op": "add-usage", "name": "%m", "definition": "$DIFFERENTIAL_PAIR", "attach": attach}]),
         )
     };
     let read = |out: &str| {
@@ -375,31 +375,31 @@ fn a_usage_reads_back_with_the_roles_of_the_request() {
         r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect()
     };
     for (attach, written) in [
-        (json!({"out": "#M2", "ref": "#M1"}), "$CURRENT_MIRROR @ATTACH #M2(out) #M1(ref) => %m"),
-        (json!({"ref": "#M1", "out": "#M2"}), "$CURRENT_MIRROR @ATTACH #M1(ref) #M2(out) => %m"),
+        (json!({"in_n": "#M2", "in_p": "#M1"}), "$DIFFERENTIAL_PAIR @ATTACH #M2(in_n) #M1(in_p) => %m"),
+        (json!({"in_p": "#M1", "in_n": "#M2"}), "$DIFFERENTIAL_PAIR @ATTACH #M1(in_p) #M2(in_n) => %m"),
     ] {
-        let out = write(&mirror(attach)).unwrap();
+        let out = write(&pair(attach)).unwrap();
         assert!(out.contains(&format!("*   {written}\n")), "{out}");
         let r = read(&out);
         assert!(errors(&r).is_empty(), "{out}\n{}", errors(&r).join("\n"));
         let m = r.model.levels.iter().flat_map(|lv| &lv.objects).find(|o| o.id == "%m").unwrap();
         let filled = |role: &str| m.attach.iter().find(|(r, _)| r == role).map(|(_, a)| a.clone());
-        assert_eq!(filled("ref"), Some(Attach::Object("#M1".into())), "{out}");
-        assert_eq!(filled("out"), Some(Attach::Object("#M2".into())), "{out}");
+        assert_eq!(filled("in_p"), Some(Attach::Object("#M1".into())), "{out}");
+        assert_eq!(filled("in_n"), Some(Attach::Object("#M2".into())), "{out}");
     }
     // a role the definition lacks fails when the netlist is read, instead of filling another
-    let out = write(&mirror(json!({"in": "#M1", "out": "#M2"}))).unwrap();
-    assert!(out.contains("*   $CURRENT_MIRROR @ATTACH #M1(in) #M2(out) => %m\n"), "{out}");
+    let out = write(&pair(json!({"in": "#M1", "in_n": "#M2"}))).unwrap();
+    assert!(out.contains("*   $DIFFERENTIAL_PAIR @ATTACH #M1(in) #M2(in_n) => %m\n"), "{out}");
     let r = read(&out);
     assert!(
-        errors(&r).iter().any(|e| e.contains("the ordinary definition $CURRENT_MIRROR has no role in (9.4)")),
+        errors(&r).iter().any(|e| e.contains("the ordinary definition $DIFFERENTIAL_PAIR has no role in (9.4)")),
         "{out}"
     );
     // a role that is not an ASCII name is written in quotes, the name itself (16.5); one that no
     // name can be is refused
-    let out = write(&mirror(json!({"1st": "#M1", "the out": "#M2"}))).unwrap();
-    assert!(out.contains(r#"*   $CURRENT_MIRROR @ATTACH #M1("1st") #M2("the out") => %m"#), "{out}");
-    assert_eq!(write(&mirror(json!({"": "#M1"}))).unwrap_err(), r#"op 0 (add-usage): `attach` role "" is not a name"#);
+    let out = write(&pair(json!({"1st": "#M1", "the out": "#M2"}))).unwrap();
+    assert!(out.contains(r#"*   $DIFFERENTIAL_PAIR @ATTACH #M1("1st") #M2("the out") => %m"#), "{out}");
+    assert_eq!(write(&pair(json!({"": "#M1"}))).unwrap_err(), r#"op 0 (add-usage): `attach` role "" is not a name"#);
 }
 
 #[test]

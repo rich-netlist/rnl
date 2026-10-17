@@ -18,10 +18,11 @@ const USAGE: &str = "usage:
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
+  rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
-FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
+FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl); catalog takes none.
 options:
   --package-dir DIR   look for packages in DIR as well (16.2); repeatable
   --no-std            do not use the standard package at the root (16.3)
@@ -60,6 +61,10 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   them, or one of the solver
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
+catalog options (the packages are those of --package-dir and the bundled ones, each read as rnl
+check reads a package file, with --no-std and --std-version):
+  --package NAME      only the packages of this name; repeatable
+  --all-versions      every version of each package, not only the newest
 write:
   REQUEST.json is {\"dialect\", \"netlist\", \"author\", \"ops\"}, the ops as the editor interface
   draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out";
@@ -84,6 +89,9 @@ struct Args {
     previous: bool,
     author: Option<String>,
     parts: Option<String>,
+    /// `--package`: the names `catalog` lists; every name when there are none.
+    packages: Vec<String>,
+    all_versions: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -106,6 +114,8 @@ fn parse_args() -> Result<Args, String> {
     let (mut in_place, mut report) = (false, false);
     let mut author = None;
     let mut parts = None;
+    let mut packages = Vec::new();
+    let mut all_versions = false;
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
@@ -124,11 +134,18 @@ fn parse_args() -> Result<Args, String> {
             "--report" => report = true,
             "--author" => author = Some(it.next().ok_or("--author needs a name")?),
             "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
+            "--package" => packages.push(it.next().ok_or("--package needs a name, such as rnl-std-basic")?),
+            "--all-versions" => all_versions = true,
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
     }
-    let file = file.ok_or(USAGE)?;
+    // the catalog reads the package directories and the bundled packages, not a file
+    let file = match (command.as_str(), file) {
+        ("catalog", None) => PathBuf::new(),
+        ("catalog", Some(f)) => return Err(format!("rnl catalog takes no FILE, not {}\n{USAGE}", f.display())),
+        (_, file) => file.ok_or(USAGE)?,
+    };
     Ok(Args {
         command,
         file,
@@ -148,6 +165,8 @@ fn parse_args() -> Result<Args, String> {
         previous,
         author,
         parts,
+        packages,
+        all_versions,
     })
 }
 
@@ -266,6 +285,15 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             };
             let snapshot = rnl_view::snapshot(&args.file.to_string_lossy(), &provider, &options, parts)?;
             println!("{}", serde_json::to_string_pretty(&snapshot).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
+        "catalog" => {
+            let options = rnl_view::CatalogOptions {
+                packages: (!args.packages.is_empty()).then(|| args.packages.clone()),
+                all_versions: args.all_versions,
+                runtime: options(args),
+            };
+            println!("{}", serde_json::to_string_pretty(&rnl_view::catalog(&provider, &options)).unwrap());
             Ok(ExitCode::SUCCESS)
         }
         "render" => {

@@ -314,6 +314,8 @@ pub struct Role {
     pub name: String,
     pub kinds: Option<Vec<String>>,
     pub is_set: bool,
+    /// As `roles=` writes it (9.4): a name, `"{name}"` for a set role, or `[name, kinds]`.
+    pub written: Lit,
 }
 
 #[derive(Clone, Debug)]

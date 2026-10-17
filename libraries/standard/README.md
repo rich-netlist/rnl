@@ -41,8 +41,8 @@ The series 0.3 is written in the language 0.3, whose text is still a draft; the 
 | 5 | [`rnl-std-spectre`](0.3/rnl-std-spectre.rnl) | 2, 3 | The symbols of Spectre's instances: by master, then by model type; never by name, which says nothing in Spectre. |
 | 6 | [`rnl-std-core`](0.3/rnl-std-core.rnl) | 1 to 5 | The smallest collection: it draws the netlist and adds nothing. |
 | 7 | [`rnl-std-fill`](0.3/rnl-std-fill.rnl) | 2 | The sets that decide where grounds, supplies and port tags are filled in, and the rules that fill them in. |
-| 8 | [`rnl-std-semantics`](0.3/rnl-std-semantics.rnl) | | The semantic definitions, such as `$DIFFERENTIAL_PAIR`: roles only. |
-| 9 | [`rnl-std-layout`](0.3/rnl-std-layout.rnl) | | The layout definitions `$MIRROR_PAIR`, `$TAIL_CENTER` and `$FLOW`. |
+| 8 | [`rnl-std-semantics`](0.3/rnl-std-semantics.rnl) | | The semantic definitions, roles only: `$DIFFERENTIAL_PAIR` (`in_p`, `in_n` and the set `tail`, which may be left empty), `$CURRENT_MIRROR` (the sets `ref` and `out`), `$MATCHED`, `$BRANCH`, `$CHAIN` (`source`, the set `chain`, `load`), `$CASCADE`, `$SUPPLY_HIGH` and `$SUPPLY_LOW`. |
+| 9 | [`rnl-std-layout`](0.3/rnl-std-layout.rnl) | 8 | The layout definitions `$MIRROR_PAIR` and `$FLOW`, and a rule that puts the tail of each differential pair under the middle of the pair, as a low default (14.8), with a definition of the package's own, `%TAIL_CENTER`, which no file sees. |
 | 10 | [`rnl-std`](0.3/rnl-std.rnl) | 6 to 9 | Used implicitly at the root of every file of 0.3. |
 
 And outside `rnl-std`, for a file that names them in its header record:
@@ -56,15 +56,18 @@ And outside `rnl-std`, for a file that names them in its header record:
 | [`rnl-std-full`](0.3/rnl-std-full.rnl) | `rnl-std` and the four above | The fuller collection (16.3). Written in a header record beside the implicit `rnl-std`, it adds the four packages of fields, and nothing twice. |
 | [`rnl-std-no-labels`](0.3/rnl-std-no-labels.rnl) | | Optional, in no collection: it empties the default labels of the standard symbols (name, value, model), for a file that writes all its labels itself, such as one an editor writes. A label the file writes with the same key comes later and shows again (13.3). |
 
-A package references what it names of the others and sees nothing else (16.2): the rule packages name the symbols of `rnl-std-basic` and `rnl-std-semiconductors`, and the fill the virtual parts and stubs of `rnl-std-basic`; nothing else names another package. The names do not repeat across the series.
+A package references what it names of the others and sees nothing else (16.2): the rule packages name the symbols of `rnl-std-basic` and `rnl-std-semiconductors`, the fill the virtual parts and stubs of `rnl-std-basic`, and the layout `$DIFFERENTIAL_PAIR` of `rnl-std-semantics`; nothing else names another package. The names do not repeat across the series.
 
 What the series 0.3 does otherwise than 0.2, beyond its names and drawings:
 
 - E, G and S are drawn with all four terminals (`$VCVS_4TERM`, `$VCCS_4TERM`, `$VOLTAGE_CONTROLLED_SWITCH`), W with `$SWITCH`; B, Spectre's `bsource`, is one symbol, `$BEHAVIORAL_SOURCE`, whether it writes `V=` or `I=`.
 - A stub of ground or supply gives only its least distance from its pin, so that a solver may draw it longer, as when it lines up the grounds of parts of different lengths.
 - The fill puts no port tag on a ground or supply net, where the stubs stand already; the grounds of a ground net other than 0, such as `vss` added to `$GROUND_NET_SET`, are drawn with `$NAMED_GROUND_SYMBOL`, which shows the net's name under the ground.
+- A differential pair has the role `tail`, a set, which may be left empty: `#M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR`. The series puts the tail under the middle of each pair, as a low default (14.8), so a fact of the file's own about the tail comes first. `$DIFFPAIR_TAIL`, `$INPUT_STAGE` and `$TAIL_CENTER` of 0.2 have no counterpart.
+- The roles `ref` and `out` of `$CURRENT_MIRROR` are sets: a mirror is one usage, however many transistors it has, as `{#M3 #M9}(ref) {#M4 #M6}(out) @AS $CURRENT_MIRROR`.
+- The role `series` of `$CHAIN` is called `chain`.
 
-The names of 0.3 are those of the symbol list of the series, such as `$RESISTOR` and `$GROUND` where 0.2 has `$RES` and `$GND`; how a file moves from one to the other comes with the release of 0.3.
+The names of 0.3 are those of the symbol list of the series, such as `$RESISTOR` and `$GROUND` where 0.2 has `$RES` and `$GND`; how a file moves from one to the other is in Annex D of the text of 0.3.
 
 Every symbol writes its box, Analog Canvas's view box of it, and binds its pins by terminal number, so it fits any dialect. The drawings are converted from Analog Canvas's component definitions, whose copyright holder publishes them here under CC0-1.0, as the drawings of 0.2; the few that Analog Canvas has none of, such as the JFET, the transmission lines and the marks, are drawn by hand in its manner.
 

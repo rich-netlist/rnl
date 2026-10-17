@@ -1,5 +1,5 @@
 * T2 Common-source stage
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="rnl-std", version="0.2")}
 .model nch nmos level=1
 M1 out in 0 0 nch W=4u L=1u
 RD vdd out 5k

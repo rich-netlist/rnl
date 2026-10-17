@@ -390,7 +390,12 @@ impl Interp<'_> {
         }
     }
 
-    fn symbol_view(&mut self, sym: ObjId, table: &mut HashMap<ObjId, usize>, out: &mut Vec<SymbolView>) -> usize {
+    pub(crate) fn symbol_view(
+        &mut self,
+        sym: ObjId,
+        table: &mut HashMap<ObjId, usize>,
+        out: &mut Vec<SymbolView>,
+    ) -> usize {
         if let Some(&k) = table.get(&sym) {
             return k;
         }

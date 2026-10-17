@@ -1,17 +1,51 @@
-//! The TypeScript declarations of the Document in `types/document.d.ts`, generated from the Rust
-//! types by ts-rs, which the types derive in the tests only. The test fails when the file is not
-//! what the types give; run it with `RNL_BLESS=1` to write the file after a change that is meant.
+//! The TypeScript declarations of the Document in `types/document.d.ts`, of the snapshot in
+//! `types/snapshot.d.ts` and of the catalog in `types/catalog.d.ts`, generated from the Rust types
+//! by ts-rs, which the types derive in the tests only. The test fails when a file is not what the
+//! types give; run it with `RNL_BLESS=1` to write the files after a change that is meant.
 
 use std::path::Path;
 
 use ts_rs::{Config, TS};
 
 use crate::{
-    Bar, Cap, Child, Color, Diagnostic, Document, FileRef, HAlign, Hit, HostInstance, HostLevel, HostNet, HostTerminal,
-    Join, Layer, Level, LevelModel, LevelSnapshot, Object, ObjectView, PackageUse, PinLabel, PinView, PointView,
-    Primitive, Run, RunStyle, Segment, Shape, ShapeView, Slot, Snapshot, SourceFile, Span, Stroke, SymbolDefinition,
-    SymbolPin, SymbolPrim, SymbolRef, Text, TextRun, TextView, Unit, VAlign, Vertex, WireView,
+    Bar, Cap, Catalog, CatalogDefinition, CatalogLabel, CatalogPackage, CatalogPin, CatalogSet, CatalogSymbol, Child,
+    Color, Diagnostic, Document, FileRef, HAlign, Hit, HostInstance, HostLevel, HostNet, HostTerminal, Join, Layer,
+    Level, LevelModel, LevelSnapshot, Object, ObjectView, PackageUse, PinLabel, PinView, PointView, Primitive, Run,
+    RunStyle, Segment, Shape, ShapeView, Slot, Snapshot, SourceFile, Span, Stroke, SymbolDefinition, SymbolPin,
+    SymbolPrim, SymbolRef, Terminal, Text, TextRun, TextView, Unit, VAlign, Vertex, WireView,
 };
+
+const CATALOG_HEADER: &str = "\
+// The catalog of the packages the core has (crates/rnl-view/src/catalog.rs) as TypeScript
+// declarations, generated from its Rust types by ts-rs. Do not edit: after changing the types, run
+//   RNL_BLESS=1 cargo test -p rnl-view types
+// The catalog is plain JSON; these are its shapes, with nothing to load at run time.
+";
+
+/// The documentation and the declaration of the catalog and of everything in it.
+fn catalog_all() -> Vec<(String, String)> {
+    fn one<T: TS>(cfg: &Config) -> (String, String) {
+        (T::docs().unwrap_or_default(), T::decl(cfg))
+    }
+    let cfg = Config::new();
+    vec![
+        one::<Catalog>(&cfg),
+        one::<CatalogPackage>(&cfg),
+        one::<CatalogSymbol>(&cfg),
+        one::<CatalogPin>(&cfg),
+        one::<Terminal>(&cfg),
+        one::<CatalogLabel>(&cfg),
+        one::<CatalogDefinition>(&cfg),
+        one::<CatalogSet>(&cfg),
+    ]
+}
+
+/// The text of `types/catalog.d.ts`.
+fn catalog_declarations() -> String {
+    let all: Vec<String> =
+        catalog_all().iter().map(|(docs, decl)| format!("{docs}export {}\n", layout(decl))).collect();
+    format!("{CATALOG_HEADER}\n{}", all.join("\n"))
+}
 
 const SNAPSHOT_HEADER: &str = "\
 // The snapshot of the editor interface (crates/rnl-view/src/snapshot.rs) as TypeScript
@@ -262,6 +296,18 @@ fn the_snapshot_declarations_are_those_of_the_rust_types() {
 }
 
 #[test]
+fn the_catalog_declarations_are_those_of_the_rust_types() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("types/catalog.d.ts");
+    let text = catalog_declarations();
+    if std::env::var("RNL_BLESS").is_ok() {
+        std::fs::write(&path, &text).unwrap();
+        return;
+    }
+    let want = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(want.replace("\r\n", "\n") == text, "types/catalog.d.ts is out of date; run with RNL_BLESS=1");
+}
+
+#[test]
 fn the_layout_changes_only_the_spacing() {
     // and the comma after the last member of an object on one line, and the `|` before the first
     // alternative of a union on several lines
@@ -279,7 +325,7 @@ fn the_layout_changes_only_the_spacing() {
         out
     };
     let all = all();
-    for (_, decl) in &all {
+    for (_, decl) in all.iter().chain(&catalog_all()) {
         assert_eq!(words(&layout(decl)), words(decl), "{decl}");
     }
     // a primitive's shape is named, not written in place

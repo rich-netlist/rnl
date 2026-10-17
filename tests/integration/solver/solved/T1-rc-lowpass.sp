@@ -1,5 +1,5 @@
 * T1 RC low-pass filter
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="rnl-std", version="0.2")}
 VIN in 0 DC 0 AC 1
 R1 in out 1k
 C1 out 0 1n

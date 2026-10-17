@@ -1,8 +1,22 @@
 // client.js as TypeScript declarations, written by hand; keep them with the JSDoc in client.js.
 
-import type { Document, Request, Snapshot, WriteRequest, Written } from "./core.js";
+import type { Catalog, CatalogRequest, Document, Request, Snapshot, WriteRequest, Written } from "./core.js";
 
-export type { Document, Literal, Op, Point, Request, Run, RunStyle, Snapshot, Vertex, WriteRequest, Written } from "./core.js";
+export type {
+  Catalog,
+  CatalogRequest,
+  Document,
+  Literal,
+  Op,
+  Point,
+  Request,
+  Run,
+  RunStyle,
+  Snapshot,
+  Vertex,
+  WriteRequest,
+  Written,
+} from "./core.js";
 
 /** The core, running in a Worker. */
 export interface CoreWorker {
@@ -12,6 +26,8 @@ export interface CoreWorker {
   snapshot(request: Request): Promise<Snapshot>;
   /** Write the ops into the netlist and build what was written; rejects when an op cannot be written. */
   write(request: WriteRequest): Promise<Written>;
+  /** List the symbols, definitions and sets of the packages the core has. */
+  catalog(request: CatalogRequest): Promise<Catalog>;
   /** Stop the Worker; calls still waiting, and later ones, reject. */
   terminate(): void;
 }

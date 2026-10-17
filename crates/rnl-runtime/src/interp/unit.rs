@@ -24,6 +24,9 @@ pub const READ_VERSIONS: [&str; 2] = ["0.2", "0.3"];
 /// default (16.1). An included file without one follows the file that includes it.
 pub const DEFAULT_VERSION: &str = "0.3";
 const HEADER_KW: [&str; 5] = ["VERSION", "PACKAGE", "ALIAS", "DEVICE", "USE-ALIASES"];
+/// A second VERSION in a header record (16.1).
+pub const SECOND_VERSION: &str =
+    "a file declares its version once (16.1): this VERSION is ignored, and the first one stands";
 
 /// The fields of a record header that affect interpretation (2.8).
 #[derive(Clone, Debug, PartialEq)]
@@ -799,6 +802,11 @@ impl Interp<'_> {
                 continue;
             }
             match kw.as_str() {
+                // a file declares its version once (16.1): the first VERSION of its header
+                // record stands, as the scan of the package directories takes it for a package file
+                "VERSION" if self.units[u].header_kws.iter().filter(|k| *k == "VERSION").count() > 1 => {
+                    self.diag_in(Severity::Error, SECOND_VERSION, Some(loc), &pkg);
+                }
                 "VERSION" => {
                     let Some(Value::Str(v)) = p.get("version") else {
                         self.diag_in(Severity::Error, "@VERSION takes a string (16.1)", Some(loc), &pkg);
@@ -1001,7 +1009,7 @@ impl Interp<'_> {
         loc: &Loc,
         pkg: &str,
         check_original: bool,
-        _version: &str,
+        version: &str,
     ) -> Option<(String, String, Option<String>)> {
         let bad = |s: &mut Self, msg: String| {
             s.diag_in(Severity::Error, msg, Some(loc.clone()), pkg);
@@ -1063,7 +1071,10 @@ impl Interp<'_> {
             if check_original && !standard_original(orig) {
                 return bad(self, format!("the original {orig} is not a standard word (16.5)"));
             }
-            if words().all_words().contains(alias) {
+            // a word that 0.3 adds, `numbering`, is a standard word in a file of 0.3 (16.1): a file
+            // of 0.2 raised to 0.3 with such an alias, with a warning, has it in error here
+            let added = version == "0.3" && crate::words::draft_header_fields().iter().any(|f| f.name == alias);
+            if words().all_words().contains(alias) || added {
                 return bad(self, format!("the alias {alias} is the name of a standard word (16.5)"));
             }
         }
@@ -1479,7 +1490,9 @@ impl Interp<'_> {
                         cand = Some((*c).clone());
                     }
                 }
-            } else if let Some(c) = same.iter().max_by_key(|c| version_key(&c.1)) {
+            } else if let Some(c) = same.iter().min_by_key(|c| std::cmp::Reverse(version_key(&c.1))) {
+                // the newest found, and of its copies the one of the first package directory, as
+                // for a version named (16.2)
                 let this = if what == "reference" { "the reference to".to_string() } else { what.to_string() };
                 self.diag_in(
                     Severity::Hint,
