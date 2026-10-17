@@ -564,9 +564,13 @@ pub(crate) struct Structure {
     pub pairs: Vec<Pair>,
     /// The stubs that hang from each object, by the object.
     pub hanging: BTreeMap<usize, Vec<usize>>,
-    /// The box of the texts each object's symbol places (13.3), estimated, in the symbol's own
-    /// coordinates, by the object ([`text_box`]).
-    pub labels: BTreeMap<usize, [Q; 4]>,
+    /// The box of the texts each object's symbol places (13.3), about the object's origin, for
+    /// each orientation of the object in the order of `Orient::ALL`, by the object ([`text_box`]).
+    pub labels: BTreeMap<usize, Vec<[Q; 4]>>,
+    /// The boxes of the texts that offsets kept place from an element's origin on both axes, such
+    /// as `#R1 @TEXT("R0", dx=-1, dy=3.5)`, about its origin, by the element: they move with it
+    /// but do not turn (13.3; review of phase 2 of the quality review).
+    pub offset_labels: BTreeMap<usize, Vec<[Q; 4]>>,
     /// Where each text with a position of its own goes when nothing decides it, by the text: at
     /// the point it is attached to, or beside the object; above the middle of a wire, at the start
     /// of a net (13.3).
@@ -671,10 +675,11 @@ impl Structure {
         turned_box(&self.symbols.get(self.objects[k].symbol?)?.bbox, o)
     }
 
-    /// The box of the texts an object's symbol places, turned by `o` with the object, as the
-    /// text boxes of a symbol turn and mirror with it (9.2.5).
+    /// The box of the texts an object's symbol places, about its origin, with the object turned by
+    /// `o`: each text's anchor turned with it, the text laid out upright as the renderer keeps it
+    /// (9.2.5; [`text_box`]).
     pub(crate) fn label_offset(&self, k: usize, o: Orient) -> Option<[Q; 4]> {
-        turned_box(self.labels.get(&k)?, o)
+        self.labels.get(&k)?.get(usize::from(crate::orient::index(o))).cloned()
     }
 
     /// Where a pin is, with every object's origin at `at` and orientation `orient`.
@@ -755,25 +760,45 @@ pub(crate) fn analyse(
             hanging.entry(stub.host.0).or_default().push(k);
         }
     }
-    let mut labels: BTreeMap<usize, [Q; 4]> = BTreeMap::new();
+    let mut labels: BTreeMap<usize, Vec<[Q; 4]>> = BTreeMap::new();
     for o in &problem.objects {
         // the texts that move with their owner on both axes; one that the scene places on an axis
         // does not (13.3)
         let (Position::InSymbol { owner, local, replaced: None }, Some(t)) = (&o.position, &o.text) else { continue };
-        let Some(b) = text_box(t, (number(local.0), number(local.1))) else { continue };
-        labels
-            .entry(*owner)
-            .and_modify(|a| {
-                for i in 0..2 {
-                    if b[i] < a[i] {
-                        a[i] = b[i].clone();
-                    }
-                    if b[i + 2] > a[i + 2] {
-                        a[i + 2] = b[i + 2].clone();
-                    }
-                }
-            })
-            .or_insert(b);
+        let local = (number(local.0), number(local.1));
+        let Some(boxes) = Orient::ALL.into_iter().map(|turn| text_box(t, &local, turn)).collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        add_labels(&mut labels, *owner, boxes);
+    }
+    // the texts that offsets kept place from an element's origin on both axes: at the offsets,
+    // unturned
+    let mut offset_labels: BTreeMap<usize, Vec<[Q; 4]>> = BTreeMap::new();
+    let mut offsets: BTreeMap<usize, [Option<(usize, Q)>; 2]> = BTreeMap::new();
+    for &i in &kept {
+        let Some(FactKind::Offset { text, from: PointRef::Origin(owner), axis, value }) =
+            problem.facts.get(i).map(|f| &f.kind)
+        else {
+            continue;
+        };
+        let (Some(o), Some(value)) = (objects.get(*owner), from_f64(*value)) else { continue };
+        if o.role == Role::Element {
+            offsets.entry(*text).or_default()[usize::from(*axis == Axis::Y)] = Some((*owner, value));
+        }
+    }
+    for (text, [x, y]) in offsets {
+        let (Some((owner, dx)), Some((other, dy)), Some(t)) =
+            (x, y, problem.objects.get(text).and_then(|o| o.text.as_ref()))
+        else {
+            continue;
+        };
+        if owner != other || !matches!(problem.objects[text].position, Position::Own { .. }) {
+            continue;
+        }
+        if let Some(b) = text_box(t, &(dx, dy), Orient::R0) {
+            offset_labels.entry(owner).or_default().push(b);
+        }
     }
     // the symbols that the solution leaves free first, as no text is anchored on their pins, then
     // the texts
@@ -799,6 +824,7 @@ pub(crate) fn analyse(
         pairs,
         hanging,
         labels,
+        offset_labels,
         anchors,
         tree,
         scopes,
@@ -823,6 +849,27 @@ pub(crate) fn analyse(
     (s.precedence, s.reversible) = precedence(problem, &s);
     s.even_sets = even_sets(problem, &s);
     s
+}
+
+/// The boxes of some texts of an object, one for each orientation, added to those of `labels`.
+fn add_labels(labels: &mut BTreeMap<usize, Vec<[Q; 4]>>, owner: usize, boxes: Vec<[Q; 4]>) {
+    match labels.get_mut(&owner) {
+        Some(all) => {
+            for (a, b) in all.iter_mut().zip(&boxes) {
+                for i in 0..2 {
+                    if b[i] < a[i] {
+                        a[i] = b[i].clone();
+                    }
+                    if b[i + 2] > a[i + 2] {
+                        a[i + 2] = b[i + 2].clone();
+                    }
+                }
+            }
+        }
+        None => {
+            labels.insert(owner, boxes);
+        }
+    }
 }
 
 /// A box turned by an orientation about the origin (11.2).
@@ -858,22 +905,54 @@ const TEXT_MARGIN: (i64, i64) = (1, 10);
 const RUN_ABOVE: (i64, i64) = (4, 5);
 const RUN_BELOW: (i64, i64) = (2, 5);
 
-/// The box of a text anchored at `at` (9.2.5), as the renderer lays it out (quality review
+/// The box of a text of a symbol anchored at `at` in the symbol's coordinates (9.2.5), about the
+/// owner's origin with the owner turned by `turn`, as the renderer lays it out (quality review
 /// ST-7): along its lines, from the start of the first run to the end of the last, each run as
 /// wide as the advances of its characters in the shipped fonts (`rnl_render::lay_out`, decision
 /// 0009), with the style's size, bold and italic (9.3; the font named is a hint that the layout
 /// does not follow), and `TEXT_MARGIN` more at each end; across them, each run from `RUN_BELOW`
 /// below its baseline to `RUN_ABOVE` above it, and the bars of fractions and overlines, the lines
 /// and the box beside the anchor where the renderer puts them as `halign` and `valign` say; the
-/// sides on a hundredth of a unit, outwards; turned by `rotate`. The solver keeps the symbols'
-/// texts clear of their neighbours by it. None for a text without characters.
-pub(crate) fn text_box(t: &TextInfo, at: (Q, Q)) -> Option<[Q; 4]> {
+/// sides on a hundredth of a unit, outwards. The anchor turns with the owner, but the glyphs read
+/// upright, as the renderer draws them: the text runs across or up by `rotate` and `turn`, with
+/// `halign` reversed where they would read backwards and a `valign` of top or bottom swapped
+/// where they would stand upside down, a baseline staying a baseline (the review of phase 2 of
+/// the quality review: a value at the baseline of a symbol turned R270 lay mirrored across its
+/// baseline). The solver keeps the symbols' texts clear of their neighbours by it. None for a
+/// text without characters.
+pub(crate) fn text_box(t: &TextInfo, at: &(Q, Q), turn: Orient) -> Option<[Q; 4]> {
     let style = |name: &str| t.style.iter().find(|(n, _)| n == name).map(|(_, v)| v);
     let size = style("size").and_then(|v| v.num()).filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0);
     let flag = |name: &str| style(name).and_then(|v| v.boolean()).unwrap_or(false);
     if t.lines.iter().all(|l| line_chars(l) == 0) {
         return None;
     }
+    // 0, 90, 180 or 270 (9.2.5), read exactly
+    let r = from_f64(t.rotate).unwrap_or_default();
+    let full = int(360);
+    let r = &r - (&r / &full).floor() * &full;
+    let quarter = [(90, Orient::R90), (180, Orient::R180), (270, Orient::R270)]
+        .into_iter()
+        .find(|(d, _)| r == int(*d))
+        .map_or(Orient::R0, |(_, o)| o);
+    // which way the text reads, `u`, and its glyphs stand, `v`, turned by its rotate and then
+    // with its owner, as rnl_render's text() has them: a text that would read down reads up, one
+    // that would read leftwards reads rightwards, each from the other end of its box
+    let (u0, v0, u1, v1) = quarter.then(turn).matrix();
+    let (u, v) = ((u0, u1), (v0, v1));
+    let vertical = u.0 == 0;
+    let backwards = if vertical { u.1 < 0 } else { u.0 < 0 };
+    let upside_down = if vertical { v.0 > 0 } else { v.1 < 0 };
+    let halign = match (backwards, t.halign.as_str()) {
+        (true, "start") => "end".to_string(),
+        (true, "end") => "start".to_string(),
+        (_, h) => h.to_string(),
+    };
+    let valign = match (upside_down, t.valign.as_str()) {
+        (true, "top") => "bottom".to_string(),
+        (true, "bottom") => "top".to_string(),
+        (_, h) => h.to_string(),
+    };
     let mut laid = rnl_render::TextPrim {
         anchor: (0.0, 0.0),
         lines: t.lines.clone(),
@@ -882,8 +961,8 @@ pub(crate) fn text_box(t: &TextInfo, at: (Q, Q)) -> Option<[Q; 4]> {
         font: String::new(),
         bold: flag("bold"),
         italic: flag("italic"),
-        halign: t.halign.clone(),
-        valign: t.valign.clone(),
+        halign,
+        valign,
         vertical: false,
         runs: Vec::new(),
         bars: Vec::new(),
@@ -920,16 +999,10 @@ pub(crate) fn text_box(t: &TextInfo, at: (Q, Q)) -> Option<[Q; 4]> {
         hundredths(laid_box[2] + margin, true),
         hundredths(y2, true),
     ];
-    // 0, 90, 180 or 270 (9.2.5), read exactly
-    let r = from_f64(t.rotate).unwrap_or_default();
-    let turn = int(360);
-    let r = &r - (&r / &turn).floor() * &turn;
-    let quarter = [(90, Orient::R90), (180, Orient::R180), (270, Orient::R270)]
-        .into_iter()
-        .find(|(d, _)| r == int(*d))
-        .map_or(Orient::R0, |(_, o)| o);
-    let b = turned_box(&b, quarter)?;
-    Some([&b[0] + &at.0, &b[1] + &at.1, &b[2] + &at.0, &b[3] + &at.1])
+    // a text that reads up has the tops of its glyphs to the left
+    let b = if vertical { turned_box(&b, Orient::R90)? } else { b };
+    let at = [turned(turn, at, 0), turned(turn, at, 1)];
+    Some([&b[0] + &at[0], &b[1] + &at[1], &b[2] + &at[0], &b[3] + &at[1]])
 }
 
 fn number(v: f64) -> Q {

@@ -466,14 +466,16 @@ fn dressed_box(s: &Structure, k: usize, o: Orient) -> Option<[Q; 4]> {
 }
 
 /// The parts of the box of an element with what hangs from it ([`effective_box`]), each about the
-/// element's origin: its symbol's box, the box of its texts, each of its stubs with its texts where
-/// their facts put them, and each object attached to it with its texts; a port in the gap between
-/// two rows only as wide as it is, and no higher than the parts before it.
+/// element's origin: its symbol's box, the box of its texts, each text that offsets place from its
+/// origin (`Structure::offset_labels`), each of its stubs with its texts where their facts put
+/// them, and each object attached to it with its texts; a port in the gap between two rows only as
+/// wide as it is, and no higher than the parts before it.
 fn parts(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usize, Attach>) -> Vec<[Q; 4]> {
-    let mut out = match s.box_offset(k, ori[k]) {
+    let mut out: Vec<[Q; 4]> = match s.box_offset(k, ori[k]) {
         Some(body) => [Some(body), s.label_offset(k, ori[k])].into_iter().flatten().collect(),
         None => vec![empty_box()],
     };
+    out.extend(s.offset_labels.get(&k).into_iter().flatten().cloned());
     for &j in s.hanging.get(&k).map_or(&[][..], |v| v) {
         let Some(stub) = &s.objects[j].stub else { continue };
         let (Some(hp), Some(sp), Some(sb)) =

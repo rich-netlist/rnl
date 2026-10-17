@@ -1856,7 +1856,10 @@ fn only_groups_pairs_and_elements_of_one_role_are_spaced_evenly() {
 
 /// The texts are as wide as the renderer lays them out, with a margin, not 0.6 of their size a
 /// character (quality review ST-7): the value of T2's source, 72.62 pixels at 14 a unit, 5.19
-/// wide, was taken 6.6 wide.
+/// wide, was taken 6.6 wide. A text of a symbol turned with its owner reads upright, as the
+/// renderer keeps it: its anchor turns, and a baseline stays below the glyphs, where a box turned
+/// whole lay mirrored across it (review of phase 2 of the quality review: the names and values of
+/// T6's legs and RS6, turned R270).
 #[test]
 fn a_text_is_as_wide_as_it_is_drawn() {
     use rnl_runtime::problem::{Filler, TextInfo};
@@ -1869,17 +1872,61 @@ fn a_text_is_as_wide_as_it_is_drawn() {
         rotate,
         style: Vec::new(),
     };
-    let b = crate::structure::text_box(&text("DC 0.6 AC 1", "start", 0.0), (Q::zero(), Q::zero())).unwrap();
+    let text_box =
+        |t: &TextInfo, at: (i64, i64), turn: Orient| crate::structure::text_box(t, &(int(at.0), int(at.1)), turn);
+    let b = text_box(&text("DC 0.6 AC 1", "start", 0.0), (0, 0), Orient::R0).unwrap();
     let w = &b[2] - &b[0];
     assert!(w > from_f64(5.19).unwrap() && w < from_f64(5.5).unwrap(), "{b:?}");
     // the baseline 0.8 of the size below the top, 0.4 above the bottom
     assert_eq!((b[1].clone(), b[3].clone()), (from_f64(-0.4).unwrap(), from_f64(0.8).unwrap()));
     // ending at the anchor, and turned a quarter about it: along y, below the anchor
-    let b = crate::structure::text_box(&text("DC 0.6 AC 1", "end", 90.0), (int(1), int(2))).unwrap();
+    let b = text_box(&text("DC 0.6 AC 1", "end", 90.0), (1, 2), Orient::R0).unwrap();
     let q = |v: f64| from_f64(v).unwrap();
     assert_eq!([&b[0], &b[2], &b[3]], [&q(0.2), &q(1.4), &q(2.1)], "{b:?}");
     assert_eq!(&b[3] - &b[1], w);
-    assert!(crate::structure::text_box(&text("", "start", 0.0), (Q::zero(), Q::zero())).is_none());
+    // its owner turned R270: the anchor at (2, -1), the text reading up to it from below, as it
+    // would read down, the tops of its glyphs on the left, 0.8 left of the anchor and 0.4 right of
+    // it (a box turned whole had them 0.4 left and 0.8 right)
+    let b = text_box(&text("DC 0.6 AC 1", "start", 0.0), (1, 2), Orient::R270).unwrap();
+    assert_eq!([&b[0], &b[2], &b[3]], [&q(1.2), &q(2.4), &q(-0.9)], "{b:?}");
+    assert_eq!(&b[3] - &b[1], w);
+    // mirrored upside down: the anchor at (1, -2), the glyphs still above their baseline
+    let b = text_box(&text("DC 0.6 AC 1", "start", 0.0), (1, 2), Orient::MX).unwrap();
+    assert_eq!([&b[0], &b[1], &b[3]], [&q(0.9), &q(-2.4), &q(-1.2)], "{b:?}");
+    assert_eq!(&b[2] - &b[0], w);
+    // a text hanging from its anchor by its top stands on it by its bottom, mirrored so
+    let mut top = text("DC 0.6 AC 1", "start", 0.0);
+    top.valign = "top".to_string();
+    let (upright, mirrored) =
+        (text_box(&top, (0, 0), Orient::R0).unwrap(), text_box(&top, (0, 0), Orient::MX).unwrap());
+    let middle = |b: &[Q; 4]| &b[1] + &b[3];
+    assert!(middle(&upright) < Q::zero() && middle(&mirrored) > Q::zero(), "{upright:?} {mirrored:?}");
+    assert!(text_box(&text("", "start", 0.0), (0, 0), Orient::R0).is_none());
+}
+
+/// A text that offsets place from an element's origin on both axes is part of the element's box
+/// (`Structure::offset_labels`): corpus 06's codes, `@TEXT(..., dx, dy)` on each instance, clear
+/// of each other and of the symbols. Compacted without them, the code of R8 lay over that of D1
+/// (review of phase 2 of the quality review).
+#[test]
+fn texts_that_offsets_place_are_kept_clear() {
+    let (p, solved, e) = level_in("tests/conformance/cases", "06-symbols.sp", "06-symbols.sp");
+    let what = summary(&p, &solved, &e);
+    let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
+    let placed = |k: usize, b: &[Q; 4]| [&at[k][0] + &b[0], &at[k][1] + &b[1], &at[k][0] + &b[2], &at[k][1] + &b[3]];
+    let texts: Vec<(usize, [Q; 4])> =
+        s.offset_labels.iter().flat_map(|(&k, boxes)| boxes.iter().map(move |b| (k, placed(k, b)))).collect();
+    assert!(texts.len() >= 10, "{what}");
+    let meet = |a: &[Q; 4], b: &[Q; 4]| a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+    for (i, (k, a)) in texts.iter().enumerate() {
+        for (j, b) in &texts[i + 1..] {
+            assert!(k == j || !meet(a, b), "{} {}: {what}", p.objects[*k].label, p.objects[*j].label);
+        }
+        for j in s.components().filter(|j| j != k) {
+            let Some(b) = s.box_at(at, ori, j) else { continue };
+            assert!(!meet(a, &b), "{} {}: {what}", p.objects[*k].label, p.objects[j].label);
+        }
+    }
 }
 
 // -------------------------------------------------- what the solver places, and what it leaves free
