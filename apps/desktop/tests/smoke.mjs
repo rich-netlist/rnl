@@ -540,6 +540,9 @@ async function drive(app, port, profile, t0, session) {
   same(fs.readFileSync(netlist, "utf8"), `${saved}* changed by another program${eol}`, "the file on disk while the question is asked");
   await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Overwrite").click()`);
   await until("the file overwritten", () => fs.readFileSync(netlist, "utf8") === `${saved}* and in the viewer${eol}`, 20_000);
+  // what was saved is not applied yet, and leaving the text boxes with a line not applied asks about it
+  chooseItem(app.pid, at("apply-edits"));
+  await until("the line applied", () => page.evaluate(`document.getElementById("apply-edits").disabled`), 20_000);
   chooseItem(app.pid, at("toggle-edit"));
   await until("the text read again", () => page.evaluate(`document.querySelectorAll("#source .editor").length === 0`));
   console.log("Edit > Edit Text, Apply Changes and File > Save built the edited text natively and saved the one file, as it was written");
