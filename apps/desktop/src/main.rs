@@ -1,21 +1,54 @@
 //! RNL Viewer: open a netlist, draw its levels, show its text and diagnostics, and follow an
-//! instance or a net between the drawing and the text. It can solve the netlist as a preview, and
-//! save a solved copy where the user says (decision 0010); it never changes the files it opens,
-//! and as opened, objects without a position are not drawn.
+//! instance or a net between the drawing and the text. It can edit the text, build it again from the
+//! texts in memory, and write the files the user changed when the user saves them (decision 0011);
+//! it can solve the netlist as a preview, and save a solved copy where the user says (decision
+//! 0010). It writes no file otherwise, and as opened, objects without a position are not drawn.
 
 // no console window behind the app in release builds on Windows
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod files;
 mod menu;
 mod solve;
 
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::Mutex;
 
+use files::{Edits, SavedFile};
 use rnl_cli::FsProvider;
 use rnl_view::{BuildOptions, Document, MemoryProvider};
-use tauri::{Emitter, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
+
+/// The name of the document shown, and whether its files have changes that are not saved: for the
+/// window's title, and for asking before the window closes (decision 0011).
+#[derive(Default)]
+struct Unsaved(Mutex<(String, bool)>);
+
+impl Unsaved {
+    /// Change the name or the flag, and name the window by them: `● name - RNL Viewer` while changes are not saved.
+    fn set(&self, window: &WebviewWindow, change: impl FnOnce(&mut (String, bool))) {
+        if let Ok(mut state) = self.0.lock() {
+            change(&mut state);
+            let mark = if state.1 { "\u{25cf} " } else { "" };
+            let _ = window.set_title(&format!("{mark}{} - RNL Viewer", state.0));
+        }
+    }
+
+    fn unsaved(&self) -> bool {
+        self.0.lock().map(|state| state.1).unwrap_or(false)
+    }
+}
+
+/// Close the app, or, with changes not saved, ask the page, which asks the user: it quits when they say.
+fn request_exit(app: &AppHandle) {
+    if app.state::<Unsaved>().unsaved() {
+        let _ = app.emit_to("main", "close-requested", ());
+    } else {
+        app.exit(0);
+    }
+}
 
 /// The switch that opens the WebView's DevTools port on 127.0.0.1, as in Chromium and Electron:
 /// `--remote-debugging-port=PORT`, through which the smoke test drives the page. The app gives it to
@@ -41,31 +74,100 @@ fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
 /// The extensions offered first in the open dialog.
 const NETLISTS: [&str; 10] = ["sp", "spi", "spice", "cir", "ckt", "net", "inc", "lib", "scs", "rnl"];
 
-/// Read and draw a file, and name the window after it.
+/// Read and draw a file, and name the window after it. With `edits`, the texts of some of its
+/// files are those, over what is on disk.
 #[tauri::command]
-async fn open_document(window: WebviewWindow, path: String) -> Result<Document, String> {
+async fn open_document(
+    window: WebviewWindow,
+    unsaved: State<'_, Unsaved>,
+    path: String,
+    edits: Option<Edits>,
+) -> Result<Document, String> {
     let doc = tauri::async_runtime::spawn_blocking(move || {
         let path = std::path::absolute(&path).map_err(|e| format!("{path}: {e}"))?;
-        rnl_view::build(&path.to_string_lossy(), &FsProvider::new(&[]), &BuildOptions::default())
+        let entry = path.to_string_lossy().into_owned();
+        let held = files::held(&entry, &edits.unwrap_or_default());
+        let disk = FsProvider::new(&[]);
+        rnl_view::build(&entry, &files::layered(&held, &disk), &BuildOptions::default())
     })
     .await
     .map_err(|e| e.to_string())??;
-    let _ = window.set_title(&format!("{} - RNL Viewer", doc.name));
+    unsaved.set(&window, |state| state.0 = doc.name.clone());
     Ok(doc)
 }
 
 /// Draw a netlist held in memory, such as one from the clipboard, as the file `name`, whose
 /// extension says how it is read, alone in a workspace of its own: what it includes is missing.
 #[tauri::command]
-async fn open_text(window: WebviewWindow, name: String, text: String) -> Result<Document, String> {
+async fn open_text(
+    window: WebviewWindow,
+    unsaved: State<'_, Unsaved>,
+    name: String,
+    text: String,
+) -> Result<Document, String> {
     let doc = tauri::async_runtime::spawn_blocking(move || {
         let entry = format!("/{name}");
         rnl_view::build(&entry, &MemoryProvider::new().with(&entry, &text), &BuildOptions::default())
     })
     .await
     .map_err(|e| e.to_string())??;
-    let _ = window.set_title(&format!("{} - RNL Viewer", doc.name));
+    unsaved.set(&window, |state| state.0 = doc.name.clone());
     Ok(doc)
+}
+
+/// Write the files of the netlist at `entry` that the user chose to save where they were read from,
+/// each in its encoding, and say which: nothing else is written (decision 0011).
+#[tauri::command]
+async fn save_files(entry: String, files: Vec<SavedFile>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let entry = std::path::absolute(&entry).map_err(|e| format!("{entry}: {e}"))?;
+        files::save_all(&entry.to_string_lossy(), &files)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Ask where to save the text of the netlist, write it there, and give its path; None when the
+/// dialog is cancelled. `entry` is the file the netlist was opened from, if it was, for the folder
+/// the dialog starts in.
+#[tauri::command]
+async fn save_file_as(
+    window: WebviewWindow,
+    entry: Option<String>,
+    name: String,
+    text: String,
+) -> Result<Option<String>, String> {
+    let name = name.rsplit(['/', '\\']).next().unwrap_or("netlist.sp").to_string();
+    let mut dialog = window
+        .dialog()
+        .file()
+        .set_parent(&window)
+        .set_title("Save As")
+        .set_file_name(name)
+        .add_filter("Netlists and packages", &NETLISTS);
+    if let Some(dir) = entry.map(PathBuf::from).and_then(|p| p.parent().map(PathBuf::from)).filter(|d| d.is_dir()) {
+        dialog = dialog.set_directory(dir);
+    }
+    let chosen =
+        tauri::async_runtime::spawn_blocking(move || dialog.blocking_save_file()).await.map_err(|e| e.to_string())?;
+    let Some(chosen) = chosen else { return Ok(None) };
+    let to = chosen.into_path().map_err(|e| e.to_string())?;
+    let bytes = files::encode(std::fs::read(&to).ok().as_deref(), &text)?;
+    std::fs::write(&to, bytes).map_err(|e| format!("{}: {e}", to.display()))?;
+    Ok(Some(to.to_string_lossy().into_owned()))
+}
+
+/// The page says whether files have changes that are not saved: the window's title shows it, and
+/// closing the window asks the page first.
+#[tauri::command]
+fn set_dirty(window: WebviewWindow, unsaved: State<'_, Unsaved>, dirty: bool) {
+    unsaved.set(&window, |state| state.1 = dirty);
+}
+
+/// Close the app, which the page asked the user about.
+#[tauri::command]
+fn quit(app: AppHandle) {
+    app.exit(0);
 }
 
 /// Ask for a file to open; None when the dialog is cancelled.
@@ -99,16 +201,30 @@ fn main() {
         // opens a release's page for Help > Check for Updates; the capability limits it to the repository's
         .plugin(tauri_plugin_opener::init())
         .manage(solve::Solves::default())
+        .manage(Unsaved::default())
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
-            "exit" => app.exit(0),
+            "exit" => request_exit(app),
             id => {
                 let _ = app.emit_to("main", "menu", id);
+            }
+        })
+        // the window that is asked to close with changes not saved stays, and the page asks the user
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.state::<Unsaved>().unsaved() {
+                    api.prevent_close();
+                    let _ = window.emit("close-requested", ());
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
             open_document,
             open_text,
+            save_files,
+            save_file_as,
+            set_dirty,
+            quit,
             pick_file,
             initial_file,
             menu::set_view_check,

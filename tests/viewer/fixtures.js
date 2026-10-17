@@ -3,8 +3,9 @@
 // with many subcircuits, for the subcircuit index; subcircuits nested four deep, for the hierarchy
 // path; statements over several lines in both dialects, which the corpus has none of; characters
 // outside the BMP, which JavaScript counts as two; a file of many lines; netlists of the solver's
-// tests that `rnl solve` solved, for a drawing that no PLACE fixes; and what `rnl preview` prints of
-// a netlist, for the desktop's Solve menu.
+// tests that `rnl solve` solved, for a drawing that no PLACE fixes; what `rnl preview` prints of
+// a netlist, for the desktop's Solve menu; and a small netlist before and after an edit, with
+// its line ends, for editing the text.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -67,6 +68,28 @@ export const NESTED = [
   '* @RNL(scope="leaf") {', "*   #R1 @PLACE(0, 0)", "* }",
   ".end",
 ];
+
+/**
+ * A small netlist, `edit`, and the same file after an edit that renames C1, `changed`: for editing
+ * the text, whose Apply Changes the fake shell answers with the second, and, with the line ends of
+ * Windows, for writing a file with the line ends it had.
+ */
+export const EDITED = {
+  edit: [
+    "* a netlist to edit",
+    "R1 a b 1k",
+    "C1 b 0 1p",
+    "* @RNL { #R1 @PLACE(0, 0); #C1 @PLACE(6, 0) }",
+    ".end",
+  ],
+  changed: [
+    "* a netlist to edit",
+    "R1 a b 1k",
+    "C2 b 0 1p",
+    "* @RNL { #R1 @PLACE(0, 0); #C2 @PLACE(6, 0) }",
+    ".end",
+  ],
+};
 
 /** The statements over several lines: a SPICE netlist with `+` lines, and a Spectre one with `\`. */
 export const CONTINUED = {
@@ -145,9 +168,10 @@ function view(rnl, file, cwd) {
  * changed, so that every statement below the title moved down a line, with the same file names;
  * "subcircuits", a netlist that instantiates each of SUBCIRCUITS once at the top level; "nested",
  * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3;
- * "continued" and "continued-spectre", the netlists of CONTINUED; "unicode", the netlist of
- * UNICODE; "long", a title, LONG lines of a bare `*`, R1, a record that places it and `.end`; and
- * those of SOLVED, from the files that `rnl solve` writes under `solved` in `dir`; and those of
+ * "continued" and "continued-spectre", the netlists of CONTINUED; "edit", "edit-changed", the
+ * same file after the edit, and "edit-crlf", the same with CRLF line ends, from EDITED; "unicode",
+ * the netlist of UNICODE; "long", a title, LONG lines of a bare `*`, R1, a record that places it and
+ * `.end`; and those of SOLVED, from the files that `rnl solve` writes under `solved` in `dir`; and those of
  * PREVIEWS.
  */
 export function writeFixtures(rnl, dir) {
@@ -183,6 +207,14 @@ export function writeFixtures(rnl, dir) {
     const name = file.endsWith(".scs") ? "continued-spectre" : "continued";
     fs.writeFileSync(path.join(dir, `${name}.json`), view(rnl, file, dir));
   }
+
+  // the edited file has the same name, in a directory of its own, as 04-hierarchy-changed has
+  fs.writeFileSync(path.join(dir, "edit.sp"), EDITED.edit.concat("").join("\n"));
+  fs.writeFileSync(path.join(dir, "edit.json"), view(rnl, "edit.sp", dir));
+  fs.writeFileSync(path.join(changed, "edit.sp"), EDITED.changed.concat("").join("\n"));
+  fs.writeFileSync(path.join(dir, "edit-changed.json"), view(rnl, "edit.sp", changed));
+  fs.writeFileSync(path.join(dir, "edit-crlf.sp"), EDITED.edit.concat("").join("\r\n"));
+  fs.writeFileSync(path.join(dir, "edit-crlf.json"), view(rnl, "edit-crlf.sp", dir));
 
   fs.writeFileSync(path.join(dir, "unicode.sp"), UNICODE.concat("").join("\n"));
   fs.writeFileSync(path.join(dir, "unicode.json"), view(rnl, "unicode.sp", dir));

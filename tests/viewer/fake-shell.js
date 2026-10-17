@@ -78,6 +78,22 @@ const fake = {
   step(step) {
     if (progress) progress(step);
   },
+  /** The edits each build was given, in order: undefined for a build of the files as they are. */
+  buildEdits: [],
+  /** The edits each solve was given, in order. */
+  solveEdits: [],
+  /** The files each Save was asked to write, in order: [{ path, name, text }, ...]. */
+  writes: [],
+  /** A message the next Save rejects with, as a shell does when it cannot write. */
+  writeFail: null,
+  /** What the next Save As gives: a source, a fixture's name or { name, fixture }; null when the user cancels. */
+  savedAs: null,
+  /** The files each Save As was asked to write, in order. */
+  writesAs: [],
+  /** Ask the page to close the window, as the platform does while changes are not saved. */
+  requestClose() {
+    if (closing) closing();
+  },
   /** What the next copy saved says, or a message it rejects with when `saveFail` is set. */
   saved: "Saved the solved copy as /copies/solved.sp.",
   saveFail: null,
@@ -87,6 +103,7 @@ const fake = {
 window.fakeShell = fake;
 
 let held = null; // the solve that waits: { resolve, reject }
+let closing = null; // the page's handler of a request to close the window
 let progress = null; // the page's handler of each level a solve begins
 
 /**
@@ -104,8 +121,9 @@ const solving = {
     fake.calls.push(["checkSolverOptions", options]);
     return fake.optionsError;
   },
-  async solve(src, settings) {
+  async solve(src, settings, edits) {
     fake.calls.push(["solve", src.name, settings]);
+    fake.solveEdits.push(edits);
     const fail = fake.solveFail;
     fake.solveFail = null;
     if (fail !== null) throw fail;
@@ -152,8 +170,9 @@ export default {
     fake.calls.push(["pick", kind]);
     return source(fake.picks.shift());
   },
-  async build(src) {
+  async build(src, edits) {
     fake.calls.push(src.text === undefined ? ["build", src.name] : ["build", src.name, src.text]);
+    fake.buildEdits.push(edits);
     const [fail, name] = [fake.fail, fake.next || src.fixture];
     fake.fail = null;
     fake.next = null;
@@ -172,5 +191,37 @@ export default {
   },
   browse(url) {
     fake.calls.push(["browse", url]);
+  },
+  /** Decision 0011: Save writes the files and says so; on the desktop Save As asks where; the platform is told of changes not saved. */
+  async save(src, files) {
+    fake.calls.push(["save", src.name]);
+    fake.writes.push(files);
+    const fail = fake.writeFail;
+    fake.writeFail = null;
+    if (fail !== null) throw fail;
+    return `Saved ${files.map((f) => f.name).join(", ")}.`;
+  },
+  ...(platform === "desktop"
+    ? {
+        async saveAs(src, file) {
+          fake.calls.push(["saveAs", src.name]);
+          fake.writesAs.push(file);
+          const fail = fake.writeFail;
+          fake.writeFail = null;
+          if (fail !== null) throw fail;
+          const next = fake.savedAs;
+          fake.savedAs = null;
+          return source(next);
+        },
+        onCloseRequested(h) {
+          closing = h;
+        },
+        quit() {
+          fake.calls.push(["quit"]);
+        },
+      }
+    : {}),
+  setDirty(dirty) {
+    fake.calls.push(["setDirty", dirty]);
   },
 };

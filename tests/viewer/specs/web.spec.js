@@ -419,3 +419,35 @@ test("File > Load from Clipboard opens the text alone, as rnl view reads it in a
   sameAsRnl(doc, path.join(folder({ "clipboard.sp": text }), "clipboard.sp"));
   await showsDocument(page, doc);
 });
+
+test("the text edited and applied is built by the core as rnl view builds the same files, and Save downloads the file shown", async ({ page }) => {
+  const top = "* top\n.include \"parts.inc\"\nR1 a 0 1k\nX1 a 0 part\n* @RNL {#R1 @PLACE(0, 0)}\n.end\n";
+  const parts = ".subckt part p q\nR2 p q 1k\n.ends\n";
+  const dir = folder({ "top.sp": top, "parts.inc": parts }, site);
+  await start(page, `?url=${path.basename(dir)}/top.sp`);
+  await shown(page);
+  // edit the netlist and its include, each in the text box of its own tab
+  await page.keyboard.press("Control+e");
+  const area = page.locator("#source .editor:not([hidden]) textarea");
+  const editedTop = top.replace("R1 a 0 1k", "R1 a 0 2k");
+  const editedParts = parts.replace("R2", "R7");
+  await area.fill(editedTop);
+  await page.locator("#file-tabs button", { hasText: "parts.inc" }).click();
+  await area.fill(editedParts);
+  await expect(page.locator("#edit-state")).toHaveText("Changes not applied yet");
+  // applied, the core builds the files with the texts in place of what is read, as it builds the same texts from disk
+  const doc = await opened(page, () => page.locator("#apply-edits").click());
+  expect(doc.files.map((f) => [f.path, f.text])).toEqual([["top.sp", editedTop], ["parts.inc", editedParts]]);
+  expect(doc.objects.some((o) => o.kind === "instance" && o.name === "R7")).toBe(true);
+  sameAsRnl(doc, path.join(folder({ "top.sp": editedTop, "parts.inc": editedParts }), "top.sp"));
+  await expect(page.locator("#edit-state")).toHaveText("Applied, not saved");
+  // the server's files are as they were: nothing was written
+  expect(fs.readFileSync(path.join(dir, "parts.inc"), "utf8")).toBe(parts);
+  // Save downloads the file shown, as the text box holds it
+  const [download] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("Control+s")]);
+  expect(download.suggestedFilename()).toBe("parts.inc");
+  expect(fs.readFileSync(await download.path(), "utf8")).toBe(editedParts);
+  await expect(page.locator("#note")).toHaveText("Downloaded parts.inc.");
+  // the file downloaded is what was read from now on; the netlist's change is still not saved
+  await expect(page.locator("#file-tabs button[data-unsaved='true']")).toHaveText(["top.sp"]);
+});

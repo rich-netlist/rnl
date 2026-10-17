@@ -13,10 +13,12 @@
  *   the file named on the command line.
  * @property {(kind: string) => Promise<Source | null>} pick Ask for something to open: kind "file", and on
  *   the web also "folder" or "url". Null when nothing is chosen.
- * @property {(source: Source) => Promise<import("../../crates/rnl-view/types/document.js").Document>} build
- *   Read a source and build its Document; rejects with a message when it cannot. The Document's
- *   types are generated from the core's Rust types into crates/rnl-view/types/document.d.ts, for
- *   checking the page; nothing is loaded from there at run time.
+ * @property {(source: Source, edits?: Edits) => Promise<import("../../crates/rnl-view/types/document.js").Document>} build
+ *   Read a source and build its Document; rejects with a message when it cannot. With `edits`, the
+ *   texts of some of its files are those, not what is read: Edit > Apply Changes (editor.js). The
+ *   Document's types are generated from the core's Rust types into
+ *   crates/rnl-view/types/document.d.ts, for checking the page; nothing is loaded from there at
+ *   run time.
  * @property {(id: string, checked: boolean) => void} setCheck Show a check-mark command's state, such as
  *   "toggle-netlist", in the platform's menu.
  * @property {(handler: (id: string) => void) => void} onCommand Call `handler` with the id of each command
@@ -33,10 +35,11 @@
  * @property {() => Promise<string>} [version] The version of the app that runs, such as "0.1.0", for
  *   Help > Check for Updates (updates.js), which only the desktop offers; without it, that command
  *   does nothing.
- * @property {(source: Source, settings: SolverSettings) => Promise<Solved>} [solve] Solve a
+ * @property {(source: Source, settings: SolverSettings, edits?: Edits) => Promise<Solved>} [solve] Solve a
  *   source as `rnl solve` solves it, without its records of the solver, and give it drawn as
  *   solved, nothing written (solve.js, decision 0010), with the solver's options set to
- *   `settings`. Rejects with a message when it cannot, and with CANCELLED when `cancelSolve`
+ *   `settings`, over the texts of `edits` where it has any, as `build` takes them: the text applied
+ *   (decision 0011). Rejects with a message when it cannot, and with CANCELLED when `cancelSolve`
  *   stopped it. Only the desktop offers it; without it, the Solve menu is not shown and its
  *   commands do nothing.
  * @property {() => Promise<SolverDefaults>} [solverDefaults] The solver's options as it has them
@@ -51,6 +54,32 @@
  *   user cancelled. Rejects with a message when it cannot.
  * @property {(handler: (step: SolveStep) => void) => void} [onSolveProgress] Call `handler` with each
  *   level as the solve under way begins it.
+ * @property {(source: Source, files: SavedFile[]) => Promise<string>} [save] Write the text of the files
+ *   where they were read from, which the user has asked for with File > Save (decision 0011): a
+ *   sentence that says what was saved. On the web, which cannot write files, download them. Rejects
+ *   with a message when it cannot. A shell that offers neither does not save.
+ * @property {(source: Source, file: SavedFile) => Promise<Source | null>} [saveAs] Ask where to save the
+ *   text of the netlist that was opened, write it there, and give the source of the file written; null
+ *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.
+ * @property {(dirty: boolean) => void} [setDirty] Tell the platform that files have changes that are not
+ *   saved, or have none, for the window's title and for closing it.
+ * @property {(handler: () => void) => void} [onCloseRequested] Call `handler` when the user asks to
+ *   close the window while `setDirty(true)` was the last word: the window stays until `quit`.
+ * @property {() => void} [quit] Close the window, as `onCloseRequested` asked.
+ */
+
+/**
+ * Texts to build over the files of a source, by the path the Document names each file by
+ * (`SourceFile.path`): what the user edited and applied. The shell finds the file in its workspace as
+ * the core does, relative to the directory of the netlist.
+ *
+ * @typedef {Record<string, string>} Edits
+ */
+
+/**
+ * A file to save: its path as the Document names it, its name as shown, and its text as the file has it.
+ *
+ * @typedef {{ path: string, name: string, text: string }} SavedFile
  */
 
 /**

@@ -5,7 +5,10 @@
 // of the command table, those of its submenus too, runs them, and follows the page's check marks,
 // Help > Check for Updates asks GitHub for the releases, answered by the test, and offers a newer
 // one, Solve > Solve draws the netlist solved as a preview and leaves the file on disk as it was,
-// and File > Load from Clipboard draws the text the test gives the page as the clipboard's. The
+// Edit > Edit Text and Apply Changes build the text edited natively and leave the file as it was, a
+// window asked to close with the change not saved asks, File > Save writes the one file, and File >
+// Load from Clipboard draws the text the test gives the page as the clipboard's. The netlist is
+// a copy of one of the corpus, in a directory of the test's own, which it may save over. The
 // app runs with a WebView2 profile of its own in a temporary directory, so that the user's layout
 // stays as it was, and is stopped by its process ID. The test fails at once when the app exits, and
 // a step fails when the page stops answering. Node 22 or later, with no dependencies.
@@ -26,7 +29,10 @@ import { runtimeVersion } from "./webview2.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const manifest = path.join(root, "apps", "desktop", "Cargo.toml");
-const netlist = path.join(root, "tests", "conformance", "cases", "04-hierarchy.sp");
+const cases = path.join(root, "tests", "conformance", "cases");
+/** Copies of the netlist and its include, in a directory of the test's own so that it may save over them; made in main. */
+let netlist = null;
+let netlistInclude = null;
 const TOP = "04-hierarchy.sp";
 /** The command table, which the native menu is built from. */
 const table = JSON.parse(fs.readFileSync(path.join(root, "apps", "viewer-ui", "commands.json"), "utf8"));
@@ -428,6 +434,7 @@ async function drive(app, port, profile, t0, session) {
   // Solve > Solve: the app solves the netlist natively, on a thread of its own, and the page draws
   // it as a preview, with the report; the file on disk is as it was; Close Preview reads it again
   const onDisk = fs.readFileSync(netlist);
+  const includeOnDisk = fs.readFileSync(netlistInclude);
   chooseItem(app.pid, at("solve"));
   await until("the solve's preview", () =>
     page.evaluate(`document.body.classList.contains("preview") && !document.body.classList.contains("solving")`),
@@ -474,6 +481,48 @@ async function drive(app, port, profile, t0, session) {
   await until("the dialog to close", async () => !(await page.evaluate(`!!document.querySelector("dialog.dialog")`)), 10_000);
   same(await page.evaluate(`localStorage.getItem("solve-options")`), null, "the settings kept after Cancel");
   console.log("Solve > Settings showed the solver's defaults, and the solver refused a beam of 0 in its own words");
+  // Edit > Edit Text, Apply Changes and File > Save (decision 0011), on a copy of the netlist: the
+  // text boxes appear and the menu's check mark follows; a change is not applied until Apply Changes
+  // builds the netlist natively from the text in memory, over the files, and the file on disk is as
+  // it was; a window asked to close with the change not saved stays, and the page asks; Save writes
+  // the file, in the line ends it had, and nothing else
+  chooseItem(app.pid, at("toggle-edit"));
+  await until("the text boxes of the two files", () => page.evaluate(`document.querySelectorAll("#source .editor").length === 2`));
+  await until("Edit Text's check mark", () => checked("toggle-edit"), 10_000);
+  const edit = `(() => {
+    const area = document.querySelector("#source .editor:not([hidden]) textarea");
+    area.value = area.value.replace(/\\bX3\\b/g, "X9");
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  })()`;
+  await page.evaluate(edit);
+  const named = (name) => page.evaluate(`window.viewer.doc.objects.some((o) => o.kind === "instance" && o.name === ${JSON.stringify(name)})`);
+  same(await named("X3"), true, "the instance before the change is applied");
+  chooseItem(app.pid, at("apply-edits"));
+  await until("the netlist built from the text held", async () => (await named("X9")) && !(await named("X3")), 20_000);
+  same(fs.readFileSync(netlist).equals(onDisk), true, "the netlist on disk after the change was applied");
+  // closing the window asks, as the text has changes not saved: WM_CLOSE, as taskkill sends it
+  execFileSync("taskkill", ["/PID", String(app.pid)], { stdio: "ignore" });
+  const asked = await until("the question of the window that is asked to close", () =>
+    page.evaluate(`(() => {
+      const d = document.querySelector("dialog.dialog .dialog-title");
+      return d && d.textContent;
+    })()`),
+  );
+  same(asked, "Changes Not Saved", "the dialog of the window asked to close");
+  await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Cancel").click()`);
+  await until("the dialog to close", async () => !(await page.evaluate(`!!document.querySelector("dialog.dialog")`)), 10_000);
+  same(app.exitCode === null && app.signalCode === null, true, "the app still running after the window was asked to close");
+  // Save writes the file, as the text box holds it, with the line ends it had
+  chooseItem(app.pid, at("save"));
+  const saved = onDisk.toString("utf8").replace(/\bX3\b/g, "X9");
+  await until("the file saved", () => fs.readFileSync(netlist, "utf8") === saved, 20_000);
+  await until("no file with changes not saved", () =>
+    page.evaluate(`document.querySelectorAll("#file-tabs button[data-unsaved='true']").length === 0`),
+  );
+  same(fs.readFileSync(netlistInclude).equals(includeOnDisk), true, "the include after the netlist was saved");
+  chooseItem(app.pid, at("toggle-edit"));
+  await until("the text read again", () => page.evaluate(`document.querySelectorAll("#source .editor").length === 0`));
+  console.log("Edit > Edit Text, Apply Changes and File > Save built the edited text natively and saved the one file, as it was written");
 
   // File > Load from Clipboard: the page reads the clipboard, whose text the test gives in the page,
   // shows it, and on Load the app draws it natively as clipboard.sp, alone, its include missing
@@ -538,6 +587,10 @@ async function main() {
   console.log(`starting ${exe}, on the WebView2 Runtime ${runtimeVersion() || "that the registry does not name"}`);
   const port = Number(option("--port")) || (await freePort());
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-smoke-"));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-smoke-files-"));
+  for (const name of ["04-hierarchy.sp", "04-hierarchy-lib.inc"]) fs.copyFileSync(path.join(cases, name), path.join(work, name));
+  netlist = path.join(work, "04-hierarchy.sp");
+  netlistInclude = path.join(work, "04-hierarchy-lib.inc");
   const t0 = Date.now();
   // the app gives the port to WebView2 itself: WebView2 ignores WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
   // where the app runs elevated, as on GitHub's runners, but takes the profile from the environment
@@ -581,6 +634,7 @@ async function main() {
       }
     }
     await exited;
+    fs.rmSync(work, { recursive: true, force: true });
     // the WebView's own processes let go of the profile a little after the app is gone
     try {
       await until("the WebView to let go of its profile", () => {

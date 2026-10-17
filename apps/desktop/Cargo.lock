@@ -2916,6 +2916,7 @@ dependencies = [
  "num-integer",
  "num-rational",
  "num-traits",
+ "rnl-render",
  "rnl-runtime",
 ]
 
@@ -2936,6 +2937,7 @@ name = "rnl-viewer"
 version = "0.1.0"
 dependencies = [
  "rnl-cli",
+ "rnl-runtime",
  "rnl-solver",
  "rnl-view",
  "serde",

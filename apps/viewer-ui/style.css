@@ -249,6 +249,47 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 /* the file tabs ask for the room they take up, unlike other tabs (.tabs) */
 .file-bar .file-tabs { flex: 1 1 auto; margin-right: 8px; }
 
+/* editing the text (editor.js): the state and the Apply button take the place of the failed statements' box */
+.edit-state { flex: none; margin-right: 8px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.edit-state[data-state="unapplied"] { color: var(--warning); font-weight: 600; }
+.edit-state[hidden], .apply-edits[hidden] { display: none; }
+.apply-edits { flex: none; padding: 1px 10px; border-color: var(--line); background: var(--tab); white-space: nowrap; }
+.apply-edits:not(:disabled) { color: var(--panel); background: var(--accent); border-color: var(--accent); }
+.apply-edits:disabled { opacity: 0.5; }
+.netlist-pane.editing .failed-check, .netlist-pane.editing .failed-toggle { display: none; }
+.tabs button[data-unsaved="true"]::after { content: " \25CF"; color: var(--accent); }
+.tabs button[data-unsaved="true"][data-unapplied="true"]::after { color: var(--warning); }
+.source.editing { overflow: hidden; }
+.editor { position: absolute; inset: 0; display: flex; }
+.editor[hidden] { display: none; }
+.editor .gutter {
+  flex: none;
+  width: 4.5em;
+  padding: 4px 1em 24px 0;
+  overflow: hidden;
+  text-align: right;
+  white-space: pre;
+  color: var(--syn-marker);
+  user-select: none;
+  border-right: 1px solid var(--line);
+}
+.editor .area {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 2em 24px 0.8em;
+  overflow: auto;
+  font: inherit;
+  color: inherit;
+  white-space: pre;
+  tab-size: 8;
+  resize: none;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.editor .area:focus { box-shadow: inset 0 0 0 1px var(--accent); }
+
 /* the failed statements' checkbox, and its label, which gives way to the file tabs when they need
    the room, so that a tab of each file stays within reach: the label shrinks before them, and what
    of it no longer fits on its line wraps out of sight, first its legend, then its caption; the
@@ -525,6 +566,8 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
   min-width: 0;
 }
 .statusbar .selection { color: var(--fg); flex-shrink: 0; }
+.statusbar .note { color: var(--accent); flex-shrink: 0; }
+.statusbar .note[hidden] { display: none; }
 .statusbar .selection b { color: var(--select); font-weight: 600; }
 .statusbar .status { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
 .statusbar .pointer, .statusbar .zoom { font-variant-numeric: tabular-nums; flex-shrink: 0; }

@@ -24,6 +24,8 @@
     <div id="pane-netlist" class="pane netlist-pane" role="tabpanel">
       <div id="file-bar" class="file-bar">
         <nav id="file-tabs" class="tabs file-tabs" aria-label="Files"></nav>
+        <span id="edit-state" class="edit-state" role="status" hidden></span>
+        <button id="apply-edits" class="apply-edits" type="button" hidden title="Build the netlist again from this text, draw it and check it (Ctrl+Enter)">Apply Changes</button>
         <input id="show-failed" class="failed-check" type="checkbox" checked title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
         <label for="show-failed" class="failed-toggle" title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
           <span class="caption">Failed statements</span>
@@ -94,6 +96,7 @@
 </div>
 <footer class="statusbar">
   <span id="selection" class="selection"></span>
+  <span id="note" class="note" role="status" hidden></span>
   <span id="status" class="status"></span>
   <span id="solve-status" class="solve-status" hidden><span id="solve-step"></span><button id="solve-cancel" class="solve-cancel" type="button" hidden>Cancel</button></span>
   <span id="pointer" class="pointer" title="Where the pointer is on the drawing, in units with y up"></span>

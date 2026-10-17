@@ -192,8 +192,8 @@ fn about() -> AboutMetadata<'static> {
         name: Some("RNL Viewer".into()),
         version: Some(env!("CARGO_PKG_VERSION").into()),
         comments: Some(
-            "Draws netlists with Rich Netlist (RNL) records. It can solve a netlist as a preview and save a solved \
-             copy; it never changes the files it opens."
+            "Draws netlists with Rich Netlist (RNL) records. It can edit a netlist, solve it as a preview and save \
+             a solved copy; it writes a file only when you have edited it and choose Save."
                 .into(),
         ),
         copyright: Some(
@@ -251,6 +251,20 @@ mod tests {
         )
     }
 
+    /// The Edit menu (decision 0011): switching the text to edit, a check item, and applying its
+    /// changes, with their keys shown after a tab on Windows (`tabbed`) and as accelerators elsewhere.
+    fn edit(tabbed: bool) -> (String, Vec<Shown>) {
+        let (switch, apply) = if tabbed {
+            (check("toggle-edit", "&Edit Text\tCtrl+E", None), item("apply-edits", "&Apply Changes\tCtrl+Enter", None))
+        } else {
+            (
+                check("toggle-edit", "&Edit Text", Some("CmdOrCtrl+E")),
+                item("apply-edits", "&Apply Changes", Some("CmdOrCtrl+Enter")),
+            )
+        };
+        ("&Edit".to_string(), vec![switch, apply])
+    }
+
     /// The Solve menu, which only the desktop offers (decision 0010): Solve, with its key shown after
     /// a tab on Windows (`tabbed`) and as the accelerator elsewhere, Close Preview, Save Solved Copy
     /// As and Settings.
@@ -294,9 +308,13 @@ mod tests {
                     item("load-clipboard", "Load from &Clipboard...\tCtrl+Shift+V", None),
                     item("reload", "&Reload\tF5", None),
                     Shown::Separator,
+                    item("save", "&Save\tCtrl+S", None),
+                    item("save-as", "Save &As...", None),
+                    Shown::Separator,
                     item("exit", "E&xit", None),
                 ],
             ),
+            edit(true),
             (
                 "&View".to_string(),
                 vec![
@@ -331,9 +349,13 @@ mod tests {
                     item("load-clipboard", "Load from &Clipboard...", Some("CmdOrCtrl+Shift+V")),
                     item("reload", "&Reload", Some("F5")),
                     Shown::Separator,
+                    item("save", "&Save", Some("CmdOrCtrl+S")),
+                    item("save-as", "Save &As...", None),
+                    Shown::Separator,
                     item("exit", "E&xit", None),
                 ],
             ),
+            edit(false),
             (
                 "&View".to_string(),
                 vec![

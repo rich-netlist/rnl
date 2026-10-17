@@ -4,6 +4,7 @@
 // is drawn, the text outside its definition is dimmed.
 
 import { doc, selected } from "./state.js";
+import { clearEditors, editing, focusEditor, renderEditors, revealInEditor, showEditor } from "./editor.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens } from "./subcircuits.js";
 import { hostLine, mark, rnlRange } from "./syntax.js";
@@ -39,6 +40,7 @@ export function paintSourceSelection(reveal) {
 }
 
 export function clearSource(message) {
+  clearEditors();
   scope = null;
   source.classList.remove("scoped");
   fileViews = [];
@@ -76,18 +78,23 @@ export function renderFiles() {
     b.type = "button";
     b.textContent = file.name.split(/[\\/]/).pop();
     b.title = file.path;
-    b.addEventListener("click", () => showFile(f));
+    b.addEventListener("click", () => {
+      showFile(f);
+      focusEditor();
+    });
     tabs.append(b);
   });
+  renderEditors();
   if (doc.files.length === 0) clearSource("This document has no host file to show.");
 }
 
 export function showFile(f) {
   if (!fileViews[f]) return;
   if (fileViews[fileShown] && fileShown !== f) fileViews[fileShown].scroll = source.scrollTop;
-  fileViews.forEach((v, k) => { v.el.hidden = k !== f; });
+  fileViews.forEach((v, k) => { v.el.hidden = k !== f || editing; });
   [...tabs.children].forEach((b, k) => b.setAttribute("aria-selected", String(k === f)));
   fileShown = f;
+  showEditor(f);
   source.scrollTop = fileViews[f].scroll;
   tabInView(tabs.children[f]);
 }
@@ -133,6 +140,10 @@ export function revealLine(f, line, flash, atTop = false) {
   }
   pendingReveal = null;
   showFile(f);
+  if (editing) {
+    revealInEditor(f, line);
+    return;
+  }
   const el = fileViews[f].lines[line - 1];
   if (!el) return;
   const top = atTop ? el.offsetTop - TOP_GAP : el.offsetTop - source.clientHeight / 2 + el.offsetHeight / 2;
