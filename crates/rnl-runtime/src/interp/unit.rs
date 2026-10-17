@@ -1479,7 +1479,9 @@ impl Interp<'_> {
                         cand = Some((*c).clone());
                     }
                 }
-            } else if let Some(c) = same.iter().max_by_key(|c| version_key(&c.1)) {
+            } else if let Some(c) = same.iter().min_by_key(|c| std::cmp::Reverse(version_key(&c.1))) {
+                // the newest found, and of its copies the one of the first package directory, as
+                // for a version named (16.2)
                 let this = if what == "reference" { "the reference to".to_string() } else { what.to_string() };
                 self.diag_in(
                     Severity::Hint,
