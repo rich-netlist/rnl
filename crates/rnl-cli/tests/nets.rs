@@ -100,7 +100,8 @@ fn the_nets_of_a_virtual_part_and_of_a_text() {
         .filter(|o| o.text.is_some())
         .map(|o| (o.text.as_ref().unwrap().lines.iter().map(|l| format!("{l:?}")).collect(), o.nets.clone()))
         .collect();
-    let of = |content: &str| texts.iter().find(|(lines, _)| lines.iter().any(|l| l.contains(content))).unwrap().1.clone();
+    let of =
+        |content: &str| texts.iter().find(|(lines, _)| lines.iter().any(|l| l.contains(content))).unwrap().1.clone();
     assert_eq!(of("vout"), [index("out")]);
     assert_eq!(of("\"v\""), [index("vdd")]);
     assert_eq!(of("ground wire"), [index("vss")]);
