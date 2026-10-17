@@ -386,6 +386,23 @@ fn use_package(name: &str) -> String {
 }
 
 #[test]
+fn a_use_package_without_a_version_takes_the_first_directory_of_the_newest() {
+    // two package directories hold q 1.0, each its own: a USE-PACKAGE that names no version takes
+    // the newest found, and of its copies the one of the first directory, as one that names the
+    // version does (16.2)
+    let q = |def: &str| pk("q", "1.0", &[], &format!("{def} = @DEFINE(roles=[\"a\"]) {{}}"));
+    for header in ["@USE-PACKAGE(name=\"q\")", "@USE-PACKAGE(name=\"q\", version=\"1.0\")"] {
+        let main = doc(header, "%u = #R1 @AS $Q_A", NETLIST);
+        let mut files =
+            MemoryProvider::new().with("a/q.rnl", &q("$Q_A")).with("b/q.rnl", &q("$Q_B")).with("t.sp", &main);
+        files.package_dirs = vec!["a".into(), "b".into()];
+        let r = read(&files, "t.sp");
+        assert_eq!(errors(&r), "", "{header}");
+        assert_eq!(usages(level(&r, "t.sp")), ["$Q_A"], "{header}");
+    }
+}
+
+#[test]
 fn references_take_the_newest_version_of_one_major_version() {
     // brought in only by references: the newest version within the major version of the
     // reference expanded first, with a hint at the USE-PACKAGE written in the file (16.2)
