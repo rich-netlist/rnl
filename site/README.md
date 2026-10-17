@@ -9,7 +9,7 @@ Four static pages, in Chinese and English, for circuit designers who have not wo
 
 The site also publishes the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of both languages link to, with the conformance corpus as its samples; the pages of the language standard, at `spec/0.2/`; and the gallery's data, at `gallery/`. [`pages.yml`](../.github/workflows/pages.yml) adds them to what `build.py` writes.
 
-**Status:** an explainer, not a specification. The RNL snippets follow language draft 0.2 (2026-10-12), which has since been consolidated into the language standard 0.2 in [`spec/`](../spec/README.md); the pages say so and link to it. The snippets have been checked with the RNL interpreter prototype, which lives in a research repository that is not public yet. Layouts in the drawings are placed by hand, not produced by a solver; the symbols of the gallery are drawn by the core.
+**Status:** an explainer, not a specification. The RNL snippets follow the language standard 0.3 and the standard series 0.3 ([`spec/`](../spec/README.md), [`libraries/standard/0.3`](../libraries/standard/README.md)); the pages say so and link to the standard. Every file the pages show reads with `rnl check` in 0.3 without errors, but for the ones that show errors on purpose, and every statement they show reads within a netlist that has its objects. Layouts in the drawings are placed by hand, not produced by a solver, with the pins where the series 0.3 puts them; the symbols of the gallery are drawn by the core.
 
 ## One source, two languages
 

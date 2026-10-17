@@ -144,8 +144,8 @@
       params: { hl: DEV, cls: 'show-values', cap: '<zh><b>参数</b>：W、L 等数值留在网表里。RNL 可以引用它们来显示文字（<code>${w}</code>），但不保存第二份。</zh><en><b>Parameters</b>: values such as W and L stay in the netlist. RNL can reference them in text (<code>${w}</code>), but never keeps a second copy.</en>' },
       nets: { cls: 'color-nets show-nets', cap: '<zh><b>连接关系</b>：每种颜色是一个网络。哪些端子接在一起完全来自网表；导线怎么画可以变，连接不会变。</zh><en><b>Connectivity</b>: each color is one net. Which terminals are joined comes entirely from the netlist; how the wires are drawn can change, the connections cannot.</en>' },
       ports: { hl: PORTS, cap: '<zh><b>子电路接口</b>：inp、inn、out、vbias 这些端口由 .subckt 那一行定义。图上的端口符号是标准包按端口补上的。</zh><en><b>Subcircuit interface</b>: the ports inp, inn, out and vbias are defined by the .subckt line. The port tags in the drawing are added for them by the standard package.</en>' },
-      semantic: { mode: 'semantic', cap: '<zh><b>结构</b>：M1、M2 是差分对，M3、M4 是电流镜，它们和 M5 一起组成输入级。这是写在 RNL 里的三句语义，只说“是什么”，不规定怎么画。</zh><en><b>Structure</b>: M1 and M2 are a differential pair, M3 and M4 a current mirror, and together with M5 they form the input stage. These are three semantic statements in RNL; they say what things are, not how to draw them.</en>' },
-      intent: { mode: 'intent', cap: '<zh><b>意图</b>：关于中轴对称、尾管居中（两段一样长）、M5、M1、M3 从下到上排（标号 1、2、3），以及 M5 的电流方向。</zh><en><b>Intent</b>: symmetry about the center line, a centered tail (two equal segments), M5, M1 and M3 in order from bottom to top (badges 1, 2, 3), and M5’s current direction.</en>' },
+      semantic: { mode: 'semantic', cap: '<zh><b>结构</b>：M1、M2 是差分对，M5 是它的尾管；M3、M4 是电流镜。这是写在 RNL 里的两句语义，只说“是什么”，不规定怎么画。</zh><en><b>Structure</b>: M1 and M2 are a differential pair with M5 as its tail, and M3 and M4 a current mirror. These are two semantic statements in RNL; they say what things are, not how to draw them.</en>' },
+      intent: { mode: 'intent', cap: '<zh><b>意图</b>：关于中轴对称、尾管居中（两段一样长，差分对自带）、M5、M1、M3 从下到上排（标号 1、2、3），以及 M5 的电流方向。</zh><en><b>Intent</b>: symmetry about the center line, a centered tail (two equal segments, which the differential pair carries), M5, M1 and M3 in order from bottom to top (badges 1, 2, 3), and M5’s current direction.</en>' },
       geometry: { mode: 'geometry', cls: 'color-none', cap: '<zh><b>画法</b>：每个器件的位置和朝向、每段导线的路径。可以自己写，也可以交给求解器写回。坐标是网格坐标，x 向右、y 向上。</zh><en><b>Drawing</b>: each device’s position and orientation, each wire’s path. You can write them yourself or let the solver write them back. Coordinates are grid units, x to the right and y up.</en>' },
       virtual: { hl: ['VDD1', 'VDD2', 'GND'].concat(PORTS), cap: '<zh><b>显示元素</b>：电源、地和端口符号只为显示而存在，电气上并不是元件。它们附着在网络或端子上，不产生连接，多数由标准包自动补上。</zh><en><b>Display elements</b>: supply, ground and port symbols exist only for display and are not electrical elements. They attach to nets or terminals, create no connections, and are mostly added by the standard package.</en>' }
     };
@@ -188,9 +188,11 @@
     var hub = $('#hub'), svg = $('#hub-wires'), core = $('#hub-core');
     if (!hub) return;
     $('#hub-lines').innerHTML = C.hlFile([
+      '* 5T OTA',
       'M1 x inp tail vss nch W=2u L=0.5u',
+      'M2 out inn tail vss nch W=2u L=0.5u',
       '* @RNL {',
-      '*   %dp1 = #M1 #M2 @AS $DIFFPAIR;',
+      '*   %dp1 = #M1 #M2 @AS $DIFFERENTIAL_PAIR;',
       '*   #M2 @ORIENT("MY")',
       '* }'
     ]).map(function (h) { return '<div>' + h.html + '</div>'; }).join('');
@@ -226,8 +228,8 @@
 
   var JR = [
     { cap: '<zh><b>只有网表</b>：网表里只有器件和连接。标准包按元件字母配上默认符号（四端 MOS），给子电路的每个端口补一个端口符号，再用飞线连上。它不知道哪两个管子是一对，也不知道该怎么摆。</zh><en><b>Netlist only</b>: the netlist holds only devices and connections. The standard package gives each instance a default symbol by its letter (four-terminal MOS), adds a port tag for each port of the subcircuit and joins everything with airwires. It cannot tell which two transistors form a pair, or how to arrange them.</en>' },
-    { cap: '<zh><b>写下结构</b>：加三句语义：M1、M2 是差分对，M3、M4 是电流镜，它们和尾管 M5 组成输入级。语义只说“是什么”，不规定怎么画，所以位置没变；查看器可以把它们框出来，编辑器可以把差分对当成一组来选。</zh><en><b>Add structure</b>: three semantic statements: M1 and M2 are a differential pair, M3 and M4 a current mirror, and with the tail transistor M5 they form the input stage. Semantics say what things are, not how to draw them, so nothing moves; a viewer can outline them, and an editor can select the pair as one.</en>' },
-    { cap: '<zh><b>写下意图</b>：选三端 MOS 符号；把 vdd、vss 当作电源和地，不画端口符号；再加对称（两组镜像对共用一根轴 %ax）、尾管居中、从下到上的次序和 M5 的电流方向。一个坐标都没写，求解器按这些约束排出教科书式的布局。</zh><en><b>Add intent</b>: pick three-terminal MOS symbols; treat vdd and vss as supply and ground, with no port tags; then add symmetry (two mirror pairs sharing one axis %ax), a centered tail, a bottom-to-top order and M5’s current direction. Not a single coordinate is written, and the solver lays out the textbook drawing from these constraints.</en>' },
+    { cap: '<zh><b>写下结构</b>：加两句语义：M1、M2 是差分对，尾管是 M5；M3、M4 是电流镜。语义只说“是什么”，不规定怎么画，所以位置没变；查看器可以把它们框出来，编辑器可以把差分对当成一组来选。</zh><en><b>Add structure</b>: two semantic statements: M1 and M2 are a differential pair with the tail transistor M5, and M3 and M4 a current mirror. Semantics say what things are, not how to draw them, so nothing moves; a viewer can outline them, and an editor can select the pair as one.</en>' },
+    { cap: '<zh><b>写下意图</b>：选三端 MOS 符号；把 vdd、vss 当作电源和地，它们就不再画端口符号，vss 上的地写上网络名；再加对称（两组镜像对称共用一根轴 %ax）、从下到上的次序和 M5 的电流方向。尾管居中不用写：差分对自带（low）。一个坐标都没写，求解器按这些约束排出教科书式的布局。</zh><en><b>Add intent</b>: pick three-terminal MOS symbols; treat vdd and vss as supply and ground, so they get no port tags and the ground on vss shows its net; then add symmetry (two mirrored pairs sharing one axis %ax), a bottom-to-top order and M5’s current direction. The centered tail needs no line: the differential pair carries it (low). Not a single coordinate is written, and the solver lays out the textbook drawing from these constraints.</en>' },
     { cap: '<zh><b>求解器写回</b>：求解器把结果写成一条 <code>type="generated"</code> 的记录，优先级 high：坐标、朝向、导线。以后打开文件直接显示，不用再求解；<code>hash</code> 是求解时输入的散列。工具写的记录不带自由文本。</zh><en><b>Solver writes back</b>: the solver writes its result as a record with <code>type="generated"</code> and priority high: coordinates, orientations, wires. From then on the file opens and displays without solving again; <code>hash</code> is a hash of what the solver was given. Records written by tools carry no free text.</en>' },
     { cap: '<zh><b>手动微调</b>：在编辑器里把 M2 往右拖两格。编辑器不动求解器那一段，只在后面追加一条自己的记录，也是 high：同一档里后写的生效，所以它盖过求解结果。对称和尾管居中与这些 high 坐标冲突，按优先级让步。</zh><en><b>Tweak by hand</b>: drag M2 two units right in the editor. The editor leaves the solver’s record alone and appends a record of its own, also high: within one priority the later statement wins, so it overrides the solver. The symmetry and the centered tail conflict with these high coordinates and give way by priority.</en>', notice: ['warn', 'warn', '<zh>输入在求解后改过（hash 不符）。旧结果照常显示，建议重新求解。</zh><en>The input changed after solving (hash mismatch). The old result still displays; solving again is suggested.</en>'] },
     { cap: '<zh><b>重新求解</b>：求解器整段换掉自己的记录。编辑器的那一句是 high，求解器把它当作固定的位置：M2 留在 x = 30，其余器件跟着调整，重新对称，尾管重新居中。</zh><en><b>Solve again</b>: the solver replaces its own record as a whole. The editor’s statement is high, so the solver treats it as a fixed position: M2 stays at x = 30, the other devices adjust, the symmetry returns and the tail is centered again.</en>', notice: ['ok', 'check', '<zh>已重新求解，结果与当前输入一致。</zh><en>Solved again; the result matches the current input.</en>'] }
@@ -620,7 +622,7 @@
     if (!p3) return;
     var p3code = $('#p3-code');
     var P3 = {
-      sem: '%dp1 = #M1 #M2 @AS $DIFFPAIR',
+      sem: '%dp1 = #M1 #M2 @AS $DIFFERENTIAL_PAIR',
       con: '{#M1 #M2} @ALIGN("y")',
       geo: '#M1 @PLACE(10, 20);  #M2 @PLACE(30, 20)'
     };
@@ -660,7 +662,7 @@
     inst: ['<zh>#M1、#M2</zh><en>#M1, #M2</en>', '<zh>引用网表里的元件。# 开头的都是网表对象，RNL 只引用，不创建。</zh><en>References instances in the netlist. Everything starting with # is a netlist object; RNL references it and never creates it.</en>'],
     role: ['<zh>(in_p)、(in_n)</zh><en>(in_p), (in_n)</en>', '<zh>角色：紧贴对象的括号，说明它填定义的哪个角色。一句里要么全标、要么全不标，不标就按角色表的次序填。</zh><en>Roles: parentheses right after an object say which role of the definition it fills. A statement marks every role or none; without marks, objects fill the roles in order.</en>'],
     kw: ['@AS', '<zh>关键字：AS 把前面的对象套进后面的定义，表示它们合起来构成一个差分对。一条语句至多一个关键字。</zh><en>Keyword: AS applies the definition after it to the objects before it, meaning they form a differential pair together. A statement has at most one keyword.</en>'],
-    def: ['$DIFFPAIR', '<zh>定义：$DIFFPAIR 来自标准包，只有角色、没有画法：它说的是“是什么”，不是“怎么画”。</zh><en>Definition: $DIFFPAIR comes from the standard package and has roles but no drawing: it says what something is, not how to draw it.</en>'],
+    def: ['$DIFFERENTIAL_PAIR', '<zh>定义：$DIFFERENTIAL_PAIR 来自标准包，只有角色、没有画法：它说的是“是什么”，不是“怎么画”。</zh><en>Definition: $DIFFERENTIAL_PAIR comes from the standard package and has roles but no drawing: it says what something is, not how to draw it.</en>'],
     semi: [';', '<zh>分号结束这条语句。每条语句独立生效，也独立失效。</zh><en>A semicolon ends the statement. Each statement takes effect, or fails, on its own.</en>']
   };
 
@@ -704,23 +706,23 @@
     'ROUTE': ['<zh>把整个网络画成导线，分叉、走法和交汇点由求解器定。</zh><en>Draws a whole net as wires; the solver decides branches, paths and junction dots.</en>', 'nets {&a &b} are fully @ROUTE'],
     'BUNDLE': ['<zh>叠画：几个元件画成一个符号，如 XI<3:0> 这样的一组；它的引脚代表各成员的同名端子。</zh><en>A bundle: several instances drawn as one symbol, such as a group XI<3:0>; each of its pins stands for the members’ terminals of that name.</en>', '#XI<3:0> is drawn as a @BUNDLE => named %xi'],
     'DEFINE': ['<zh>普通定义：角色表、参数表和定义体，用 AS、ATTACH 套用。体是空的就只记“是什么”。</zh><en>A definition: roles, parameters and a body, applied with AS or ATTACH. With an empty body it only records what something is.</en>', '$PAIR = a definition, @DEFINE(roles=["a", "b"], parameters=[["gap", 2]]) {…}'],
-    'AS': ['<zh>套用：前面的对象合起来构成这个定义，如差分对、镜像对。产生一个用例，可以起名、被选择。</zh><en>Applies a definition to objects that together form it, such as a differential pair or a mirror pair. Makes a usage, which can be named and selected.</en>', '#M1(in_p) and #M2(in_n) are treated @AS $DIFFPAIR'],
-    'ATTACH': ['<zh>套用，定义写在前面：把它添在对象上，如地、端口、交汇点、无连接标记。</zh><en>Applies a definition written first, adding it onto objects, such as a ground, a port tag, a junction dot or a no-connect mark.</en>', '$GND is @ATTACH to &vss => it is at @PLACE(24, 38) => named %g0'],
+    'AS': ['<zh>套用：前面的对象合起来构成这个定义，如差分对、镜像对称。产生一个用例，可以起名、被选择。</zh><en>Applies a definition to objects that together form it, such as a differential pair or a mirrored pair. Makes a usage, which can be named and selected.</en>', '#M1(in_p) and #M2(in_n) are treated @AS $DIFFERENTIAL_PAIR'],
+    'ATTACH': ['<zh>套用，定义写在前面：把它添在对象上，如地、端口、交汇点、无连接标记。</zh><en>Applies a definition written first, adding it onto objects, such as a ground, a port tag, a junction dot or a no-connect mark.</en>', '$GROUND is @ATTACH to &vss => it is at @PLACE(24, 38) => named %g0'],
     'CURRENT': ['<zh>端子上的电流方向：in、out、unspecified；只影响画法，不做电路分析。</zh><en>The current direction at a terminal: in, out or unspecified; it affects only the drawing, with no circuit analysis.</en>', '#M5:1 has @CURRENT("in")'],
     'SELECT-INSTANCE': ['<zh>选出元件：按名字、模型、类型；范围给网络时，选在网络上有引脚的元件。</zh><en>Selects instances by name, model or type; from a net, it selects the instances with a pin on it.</en>', 'among the instances at each level in # and below, @SELECT-INSTANCE(model="nch") => they @SET-SYMBOL to $NMOS'],
-    'SELECT-TERMINAL': ['<zh>选出端子：按端子名、网络、是否已接线。</zh><en>Selects terminals by name, by net, or by whether they are wired.</en>', 'among the terminals connected to $GROUND_NET_SET, @SELECT-TERMINAL(wired=false) => $GND_STUB is @ATTACH to them'],
+    'SELECT-TERMINAL': ['<zh>选出端子：按端子名、网络、是否已接线。</zh><en>Selects terminals by name, by net, or by whether they are wired.</en>', 'among the terminals connected to $GROUND_NET_SET, @SELECT-TERMINAL(wired=false) => $GROUND_STUB is @ATTACH to them'],
     'SELECT-NET': ['<zh>选出网络：按名字、是否端口、是否已接线；范围给元件或端子时，选它们所在的网络。</zh><en>Selects nets by name, port, or whether they are wired; from instances or terminals, it selects their nets.</en>', 'among the nets connected to #M1:g, @SELECT-NET => they are fully @ROUTE'],
     'SELECT-WIRE': ['<zh>选出导线；bus=true 只选总线。</zh><en>Selects wires; bus=true picks only buses.</en>', 'among the wires at each level in # and below, @SELECT-WIRE(bus=true) => they @SET-STYLE to $bus'],
     'SELECT-LABEL': ['<zh>选出标签，可以按引用名。</zh><en>Selects labels, optionally by key.</en>', 'among the labels attached to #M1, @SELECT-LABEL => they @SET-STYLE to $grey'],
     'SELECT-ANNOTATION': ['<zh>选出标注：点上的文字和场景里的图形。</zh><en>Selects annotations: text on points and graphics in the drawing.</en>', 'among the annotations at each level in # and below, @SELECT-ANNOTATION => they @SET-STYLE to $base'],
-    'SELECT-USAGE': ['<zh>选出某个定义的用例（往里找）；不写定义就是全部用例。</zh><en>Selects the usages of a definition, looking inward; without a definition, all usages.</en>', 'among the usages at each level in # and below, @SELECT-USAGE of $DIFFPAIR => they have @PRIORITY("disabled")'],
-    'SELECT-ANCESTOR-USAGE': ['<zh>选出把这些对象当成员的用例（往外找）。</zh><en>Selects the usages that have these objects as members, looking outward.</en>', 'among the usages containing #M1, @SELECT-ANCESTOR-USAGE of $DIFFPAIR => named %dp_set'],
+    'SELECT-USAGE': ['<zh>选出某个定义的用例（往里找）；不写定义就是全部用例。</zh><en>Selects the usages of a definition, looking inward; without a definition, all usages.</en>', 'among the usages at each level in # and below, @SELECT-USAGE of $DIFFERENTIAL_PAIR => they have @PRIORITY("disabled")'],
+    'SELECT-ANCESTOR-USAGE': ['<zh>选出把这些对象当成员的用例（往外找）。</zh><en>Selects the usages that have these objects as members, looking outward.</en>', 'among the usages containing #M1, @SELECT-ANCESTOR-USAGE of $DIFFERENTIAL_PAIR => named %dp_set'],
     'ADD-TO': ['<zh>给命名的集合加成员，如把 vdd 加进电源网络集，标准包就给它补电源符号。</zh><en>Adds members to a named set, such as vdd to the supply nets, so the standard package adds supply symbols for it.</en>', '&vdd @ADD-TO $SUPPLY_NET_SET'],
-    'REMOVE-FROM': ['<zh>从命名的集合去掉成员，如不给 vdd、vss 补端口符号。</zh><en>Removes members from a named set, such as keeping vdd and vss out of the port tags.</en>', '{&vdd &vss} @REMOVE-FROM $PORT_FILL_SET'],
+    'REMOVE-FROM': ['<zh>从命名的集合去掉成员，如 vss 上的地不写网络名。</zh><en>Removes members from a named set, such as no net name under the grounds on vss.</en>', '&vss @REMOVE-FROM $NAMED_GROUND_NET_SET'],
     'UNION': ['<zh>去重的并集。</zh><en>A union without duplicates.</en>', '%u_set = %a_set and %b_set @UNION'],
-    'VERSION': ['<zh>文件使用的语言版本。只写在头段记录里；不写就按工具默认的版本读。</zh><en>The language version of the file. Only in the header record; without it, the tool’s default version applies.</en>', '* @RNL(type="header") { @VERSION("0.2")}'],
+    'VERSION': ['<zh>文件使用的语言版本。只写在头段记录里；不写就按工具默认的版本读。</zh><en>The language version of the file. Only in the header record; without it, the tool’s default version applies.</en>', '* @RNL(type="header") { @VERSION("0.3")}'],
     'ALIAS': ['<zh>给标准词或 $ 名字另起写法（代称），代称在前。只写在头段记录里。</zh><en>Declares another spelling (an alias) for a standard word or a $ name, alias first. Only in the header record.</en>', /*zh-CN*/'@ALIAS("@位于", "@PLACE")'/*/zh-CN*/],
-    'USE-ALIASES': ['<zh>加载代称包，如中文代称包 rnl-zh。只写在头段记录里。</zh><en>Loads an alias package, such as the Chinese package rnl-zh. Only in the header record.</en>', '@USE-ALIASES(name="rnl-zh")'],
+    'USE-ALIASES': ['<zh>加载代称包，如中文代称包 rnl-zh。只写在头段记录里。</zh><en>Loads an alias package, such as the Chinese package rnl-zh. Only in the header record.</en>', '@USE-ALIASES(name="rnl-zh", version="0.3")'],
     'DEVICE': ['<zh>给网表里没有定义的器件（如 PDK 器件）起端子名，之后就能写 #XM1:d。只写在头段记录里。</zh><en>Names the terminals of devices the netlist does not define, such as PDK devices, so #XM1:d works. Only in the header record.</en>', '@DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])'],
     'USE-PACKAGE': ['<zh>使用一个包：一组符号、样式、定义和规则，如某家公司的画图风格。</zh><en>Uses a package: a set of symbols, styles, definitions and rules, such as a company’s drawing style.</en>', '@USE-PACKAGE(name="acme-style", version="1.2")'],
     'PACKAGE': ['<zh>包文件在头段记录里声明自己的名字和版本；写电路时用不到。</zh><en>A package file declares its name and version in its header record; not needed when describing a circuit.</en>', '@PACKAGE(name="acme-style", version="1.2")']
@@ -768,7 +770,7 @@
     'SELECT-USAGE': ['从本层 # 及以下每一层的用例中 @选出用例 $"差分对" => 其 @优先级("停用")', '@选出用例'],
     'SELECT-ANCESTOR-USAGE': ['从包含 #M1 的用例中 @选出所处用例 $"差分对" => 记作 %dp_set', '@选出所处用例'],
     'ADD-TO': ['&vdd @加入 $"电源网络集"', '@加入'],
-    'REMOVE-FROM': ['{&vdd &vss} @移出 $"端口补位集"', '@移出'],
+    'REMOVE-FROM': ['&vss @移出 $"带标签地网络集"', '@移出'],
     'UNION': ['%u_set = %a_set 和 %b_set 的 @并集', '@并集'],
     'USE-PACKAGE': ['@使用包(名字="acme-style", 版本="1.2")', '@使用包']
   };
@@ -939,7 +941,7 @@
           setStyle(s);
           m.view.setScene(SC.rlcScene(s), { animate: true, duration: 700 });
         });
-        cap.innerHTML = '<zh>两句话分开写：<code>$CHAIN</code> 说“是什么”，V1 → {R1 L1} → C1 是一条从源到负载的链，串联的位置上放的是一个集合；<code>$FLOW</code> 说“怎么排”，从左到右。地符号由标准包补，每个接地端子一个；右上角换成“合并成一个”，看文件里要多写哪三句。</zh><en>Two statements, kept apart: <code>$CHAIN</code> says what it is, a chain V1 → {R1 L1} → C1 from source to load with a set in the series position; <code>$FLOW</code> says how to lay it out, left to right. The standard package adds the grounds, one per grounded terminal; switch to “merged” at the top right to see the three lines the file needs for a single ground.</en>';
+        cap.innerHTML = '<zh>一句话：<code>$CHAIN</code> 说“是什么”，V1 → {R1 L1} → C1 是一条从源到负载的链，中间的角色 chain 收的是一个集合；它还自带默认画法，source、chain、load 从左到右排，是 low，作者另写的先走。地符号由标准包补，每个接地端子一个；右上角换成“合并成一个”，看文件里要多写哪三句。</zh><en>One statement: <code>$CHAIN</code> says what it is, a chain V1 → {R1 L1} → C1 from source to load, whose middle role, chain, takes a set; it also carries a default drawing, source, chain and load from left to right, of priority low, so what the author writes comes first. The standard package adds the grounds, one per grounded terminal; switch to “merged” at the top right to see the three lines the file needs for a single ground.</en>';
       },
       e2: function () {
         file.textContent = 'ota5t_tb.sp';
@@ -999,7 +1001,7 @@
           timers.push(setTimeout(function () { rows.forEach(function (r) { r.classList.remove('is-hot'); }); }, 900 + 2 * 1300 + 900));
         }
         $('#ex-replay').addEventListener('click', replay);
-        cap.innerHTML = '<zh>文件里没有一句是关于地的：网络 0 上没接导线的端子，标准包各补一个接着短导线的地（灰色）。V1 的负端已经写了 <code>$GND @ATTACH #V1:2</code>，地直接画在引脚上，补位就跳过它。没接线的栅极由文件里的一条规则补端口：<code>$PORT_STUB</code> 是自己写的普通定义，带着导线和两条约束。</zh><en>Not one line of the file is about grounds: for every unwired terminal on net 0, the standard package adds a ground on a short wire (gray). V1’s negative terminal already has <code>$GND @ATTACH #V1:2</code>, a ground drawn right on the pin, so the fill skips it. The unwired gate gets a port from a rule in the file: <code>$PORT_STUB</code> is a definition written here, with a wire and two constraints.</en>';
+        cap.innerHTML = '<zh>文件里没有一句是关于地的：网络 0 上没接导线的端子，标准包各补一个接着短导线的地（灰色）。V1 的负端已经写了 <code>$GROUND @ATTACH #V1:2</code>，地直接画在引脚上，补位就跳过它。没接线的栅极由文件里的一条规则补端口：<code>$PORT_STUB</code> 是自己写的普通定义，带着导线和两条约束。</zh><en>Not one line of the file is about grounds: for every unwired terminal on net 0, the standard package adds a ground on a short wire (gray). V1’s negative terminal already has <code>$GROUND @ATTACH #V1:2</code>, a ground drawn right on the pin, so the fill skips it. The unwired gate gets a port from a rule in the file: <code>$PORT_STUB</code> is a definition written here, with a wire and two constraints.</en>';
       },
       e5: function () {
         file.textContent = 'ota5t.sp';

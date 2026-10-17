@@ -1,7 +1,8 @@
 /* RNL language tour · interactions
  *
- * Every RNL statement shown here has been checked with the RNL prototype (language 0.2). The
- * drawings are laid out by hand in RNL coordinates (x right, y up), as on the introduction page.
+ * Every RNL statement shown here reads without errors with rnl check, in language 0.3 with the
+ * standard series 0.3. The drawings are laid out by hand in RNL coordinates (x right, y up), as on
+ * the introduction page, with the pins where the series 0.3 puts them.
  */
 (function () {
   'use strict';
@@ -42,9 +43,9 @@
       fact: '<zh>M1、M2、M3 从左到右严格排开。写 "x" 就只定轴，倒过来也成立。</zh><en>M1, M2 and M3 run strictly from left to right. With "x" only the axis is fixed, and the reverse holds too.</en>' },
     { k: 'DISTANCE', bare: '#M1 #M2 @DISTANCE("bottom-to-top", min=4)', en: 'from #M1 to #M2, they have @DISTANCE("bottom-to-top", min=4)',
       fact: '<zh>从 M1 往上到 M2 至少 4 格：M2 的 y 比 M1 大 4 以上。</zh><en>From M1 up to M2 is at least 4 units: M2’s y exceeds M1’s by 4 or more.</en>' },
-    { k: 'AS', bare: '%dp = #M1(in_p) #M2(in_n) @AS $DIFFPAIR', en: '%dp = #M1(in_p) and #M2(in_n) treated @AS $DIFFPAIR',
+    { k: 'AS', bare: '%dp = #M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR', en: '%dp = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR',
       fact: '<zh>M1（in_p）和 M2（in_n）合起来是一个差分对。这次套用是一个用例，名字叫 %dp。</zh><en>M1 (in_p) and M2 (in_n) together form a differential pair. This application is a usage, named %dp.</en>' },
-    { k: 'ATTACH', bare: '$GND @ATTACH &c => @PLACE(24, 38) => %g0', en: '$GND is @ATTACH to &c => it is at @PLACE(24, 38) => named %g0',
+    { k: 'ATTACH', bare: '$GROUND @ATTACH &c => @PLACE(24, 38) => %g0', en: '$GROUND is @ATTACH to &c => it is at @PLACE(24, 38) => named %g0',
       fact: '<zh>网络 c 上添了一个地，位于 (24, 38)，名字叫 %g0。=&gt; 把前一段的结果交给后一段。</zh><en>A ground is added on net c, at (24, 38), and named %g0. =&gt; hands each part’s result to the next.</en>' },
     { k: 'SELECT-INSTANCE', bare: '# @SELECT-INSTANCE(model="nch") => @SET-SYMBOL $NMOS', en: 'among the instances at each level in # and below, @SELECT-INSTANCE(model="nch") => they @SET-SYMBOL to $NMOS',
       fact: '<zh>这一层和下面每一层里，模型为 nch 的元件都用 $NMOS 画。这是一条规则，每一层各求一次。</zh><en>On this level and on every level below, instances of model nch are drawn with $NMOS. This is a rule, evaluated once per level.</en>' },
@@ -122,7 +123,7 @@
       route: function () { return { wires: [], dots: [] }; },
       overlays: function (P, S) {
         if (!on) {
-          return [{ id: 'dp', kind: 'box', layer: 'back', ids: ['M1', 'M2'], pad: 0.8, label: '%dp · $DIFFPAIR', labelAt: [0.5, 1], anchor: 'middle' }];
+          return [{ id: 'dp', kind: 'box', layer: 'back', ids: ['M1', 'M2'], pad: 0.8, label: '%dp · $DIFFERENTIAL_PAIR', labelAt: [0.5, 1], anchor: 'middle' }];
         }
         var a = S('M1').x, b = S('M2').x, m = (a + b) / 2;
         return [
@@ -144,15 +145,16 @@
     var on = false, prev = null;
     function file() {
       var L = [
+        { t: '* Differential pair' },
         { t: '.model nch nmos level=1' },
         { t: 'M1 a b c c nch', r: 'M1' },
         { t: 'M2 d e c c nch', r: 'M2' },
         { t: '* @RNL {' },
-        { t: '*   %dp = #M1(in_p) and #M2(in_n) treated @AS $DIFFPAIR' + (on ? ';' : ''), r: 'M1 M2 ov:dp' }
+        { t: '*   %dp = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR' + (on ? ';' : ''), r: 'M1 M2 ov:dp' }
       ];
       if (on) {
         L.push({ t: '*   %ax = (_, _);', r: 'ov:di' });
-        L.push({ t: '*   %sym = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRROR_PAIR', r: 'M1 M2 ov:al ov:di ov:or' });
+        L.push({ t: '*   %sym = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRRORED', r: 'M1 M2 ov:al ov:di ov:or' });
       }
       L.push({ t: '* }' });
       return L;
@@ -169,11 +171,12 @@
       view.setScene(mpScene(on), { animate: animate, duration: 900 });
       if (on) {
         var X = [
-          ['{#M1 #M2} @ALIGN("y");', 'M1 M2 ov:al', '<zh>同一行</zh><en>same row</en>'],
-          ['{#M1 %ax #M2} @DISTRIBUTE("x");', 'M1 M2 ov:di', '<zh>到轴等距</zh><en>equal steps around the axis</en>'],
-          ['#M1 #M2 @ORIENT-RELATION("MY")', 'M1 M2 ov:or', '<zh>互为镜像</zh><en>mirror images</en>']
+          ['{#M1 #M2} @ALIGN("y", priority="low");', 'M1 M2 ov:al', '<zh>同一行</zh><en>same row</en>'],
+          ['{#M1 %ax #M2} @DISTRIBUTE("x", priority="low");', 'M1 M2 ov:di', '<zh>到轴等距</zh><en>equal steps around the axis</en>'],
+          ['{#M1 #M2} @ORDER("left-to-right", priority="low");', 'M1 M2', '<zh>M1 在左</zh><en>M1 on the left</en>'],
+          ['#M1 #M2 @ORIENT-RELATION("MY", priority="low")', 'M1 M2 ov:or', '<zh>互为镜像</zh><en>mirror images</en>']
         ];
-        exp.innerHTML = '<p class="exp-k"><zh>$MIRROR_PAIR 展开后，相当于这一层多了三句（不写进文件）：</zh><en>Expanded, $MIRROR_PAIR adds three statements to this level (not written in the file):</en></p>' +
+        exp.innerHTML = '<p class="exp-k"><zh>$MIRRORED 展开后，相当于这一层多了四句（不写进文件），都是 low：</zh><en>Expanded, $MIRRORED adds four statements to this level (not written in the file), all of priority low:</en></p>' +
           X.map(function (x) { return '<div class="exp-l" data-refs="' + x[1] + '" tabindex="0"><code>' + C.hlSnippet(x[0]) + '</code><span>' + x[2] + '</span></div>'; }).join('');
         $$('.exp-l', exp).forEach(function (row) {
           function hl() { view.highlight(row.getAttribute('data-refs').split(' ')); }
@@ -182,10 +185,10 @@
           row.addEventListener('mouseleave', function () { view.highlight(null); });
           row.addEventListener('blur', function () { view.highlight(null); });
         });
-        cap.innerHTML = '<zh>角色 a、b、axis 换成 M1、M2、%ax，体里的三条约束就展开到这一层：同一行、到轴等距、互为镜像。轴 %ax 是自由点，由求解器定。</zh><en>With the roles a, b and axis replaced by M1, M2 and %ax, the three constraints in the body expand into this level: same row, equal steps around the axis, mirror images. The axis %ax is a free point that the solver places.</en>';
+        cap.innerHTML = '<zh>角色 a、b、axis 换成 M1、M2、%ax，体里的四条约束就展开到这一层：同一行、到轴等距、M1 在左、互为镜像。它们都是 low，作者另写的事实先走。轴 %ax 是自由点，由求解器定。</zh><en>With the roles a, b and axis replaced by M1, M2 and %ax, the four constraints in the body expand into this level: same row, equal steps around the axis, M1 on the left, mirror images. They are all of priority low, so what the author writes comes first. The axis %ax is a free point that the solver places.</en>';
       } else {
         exp.innerHTML = '';
-        cap.innerHTML = '<zh>只套用了 $DIFFPAIR：它记下“M1、M2 是差分对”，查看器可以把它们框出来，图上的位置却没有变。</zh><en>Only $DIFFPAIR is applied: it records that M1 and M2 are a differential pair, and a viewer may outline them, but nothing moves.</en>';
+        cap.innerHTML = '<zh>只套用了 $DIFFERENTIAL_PAIR：它记下“M1、M2 是差分对”，查看器可以把它们框出来，图上的位置却没有变。</zh><en>Only $DIFFERENTIAL_PAIR is applied: it records that M1 and M2 are a differential pair, and a viewer may outline them, but nothing moves.</en>';
       }
     }
     PG.initSeg($('#mp-seg'), 'data-v', function (v) { on = v === '1'; show(true); });
@@ -218,6 +221,7 @@
     function show(g, animate) {
       out.textContent = g;
       var L = lines([
+        '* Two resistors',
         'R1 a b 1k',
         'R2 b c 1k',
         '* @RNL {',
@@ -228,7 +232,7 @@
         g === 2 ? '*   #R1(a) #R2(b) @AS $PAIR   /* gap = 2 */' : '*   #R1(a) #R2(b) @AS(gap=' + g + ') $PAIR',
         '* }'
       ]);
-      if (prev) L[7].mark = 'is-chg';
+      if (prev) L[8].mark = 'is-chg';
       prev = L;
       C.render(codeEl, L);
       view.setScene(scene(g), { animate: animate, duration: 350 });
@@ -237,33 +241,31 @@
     show(+range.value, false);
   }
 
+  /* The definitions of the standard series 0.3, as its package files write them (libraries/standard/0.3) */
   var STD = [
-    ['sem', '$DIFFPAIR', '@DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"]]) {}'],
-    ['sem', '$DIFFPAIR_TAIL', '@DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"], ["tail", "instance"]]) {}'],
-    ['sem', '$CURRENT_MIRROR', '@DEFINE(roles=[["ref", "instance"], ["out", "instance"]]) {}'],
-    ['sem', '$INPUT_STAGE', '@DEFINE(roles=[["pair", "usage"], ["tail", "instance"]]) {}'],
+    ['sem', '$CURRENT_MIRROR', '@DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {}'],
     ['sem', '$MATCHED', '@DEFINE(roles=["{members}"]) {}'],
-    ['sem', '$BRANCH', '@DEFINE(roles=["{members}"]) {}'],
-    ['sem', '$CHAIN', '@DEFINE(roles=["source", "{series}", "load"]) {}'],
-    ['sem', '$CASCADE', '@DEFINE(roles=["first", "second", "feedback", "load"]) {}'],
+    ['sem', '$CASCADE', '@DEFINE(roles=["{first}", "{second}", "{feedback}", "{load}"]) {}'],
     ['sem', '$SUPPLY_HIGH', '@DEFINE(roles=[["pin", "terminal"]]) {}'],
     ['sem', '$SUPPLY_LOW', '@DEFINE(roles=[["pin", "terminal"]]) {}'],
-    ['lay', '$MIRROR_PAIR', '@DEFINE(roles=["a", "b", "axis"]) {\n  {?a ?b} @ALIGN("y");\n  {?a ?axis ?b} @DISTRIBUTE("x");\n  ?a ?b @ORIENT-RELATION("MY")\n}'],
-    ['lay', '$TAIL_CENTER', '@DEFINE(roles=["a", "b", "t"]) {\n  %mid = (_, _);\n  {?a %mid ?b} @DISTRIBUTE("x");\n  {%mid ?t} @ALIGN("x")\n}'],
+    ['lay', '$DIFFERENTIAL_PAIR', '@DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"], ["{tail}", "instance"]]) {\n  {?in_p {?tail} ?in_n} @DISTRIBUTE("x", priority="low")\n}'],
+    ['lay', '$BRANCH', '@DEFINE(roles=["{members}"]) {\n  ?members @ALIGN("x", priority="low")\n}'],
+    ['lay', '$CHAIN', '@DEFINE(roles=["source", "{chain}", "load"]) {\n  {?source ?chain ?load} @ORDER("left-to-right", priority="low")\n}'],
+    ['lay', '$MIRRORED', '@DEFINE(roles=["a", "b", "axis"]) {\n  {?a ?b} @ALIGN("y", priority="low");\n  {?a ?axis ?b} @DISTRIBUTE("x", priority="low");\n  {?a ?b} @ORDER("left-to-right", priority="low");\n  ?a ?b @ORIENT-RELATION("MY", priority="low")\n}'],
     ['lay', '$FLOW', '@DEFINE(roles=["{path}"], parameters=[["direction", "left-to-right"]]) {\n  ?path @ORDER(?direction, priority="low")\n}'],
-    ['lay', '$GND_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %g = $GND @ATTACH ?t::net;\n  ?t::net @WIRE {?t %g:p};\n  {?t %g:p} @ALIGN("x");\n  %g:p ?t @DISTANCE("bottom-to-top", min=?gap, max=?gap)\n}'],
-    ['lay', '$SUPPLY_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %s = $SUPPLY @ATTACH ?t::net;\n  ?t::net @WIRE {?t %s:p};\n  {?t %s:p} @ALIGN("x");\n  ?t %s:p @DISTANCE("bottom-to-top", min=?gap, max=?gap)\n}'],
-    ['vir', '$GND', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
+    ['vir', '$GROUND_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %g = $GROUND @ATTACH ?t::net;\n  ?t::net @WIRE {?t %g:p};\n  {?t %g:p} @ALIGN("x", priority="low");\n  %g:p ?t @DISTANCE("bottom-to-top", min=?gap, priority="low");\n  %g @ORIENT("R0", priority="low")\n}'],
+    ['vir', '$SUPPLY_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %s = $SUPPLY @ATTACH ?t::net;\n  ?t::net @WIRE {?t %s:p};\n  {?t %s:p} @ALIGN("x", priority="low");\n  ?t %s:p @DISTANCE("bottom-to-top", min=?gap, priority="low");\n  %s @ORIENT("R0", priority="low")\n}'],
+    ['vir', '$GROUND', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
     ['vir', '$SUPPLY', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
-    ['vir', '$IOPORT', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
-    ['vir', '$NC', '@DEFINE(roles=[["t", "terminal"]]) {}'],
+    ['vir', '$IO_PORT', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
+    ['vir', '$NO_CONNECT', '@DEFINE(roles=[["t", "terminal"]]) {}'],
     ['vir', '$JUNCTION', '@DEFINE(roles=[["p", ["point", "terminal"]]]) {}'],
     ['vir', '$CURRENT_ARROW', '@DEFINE(roles=[["p", ["terminal", "point"]]]) {}']
   ];
   var STD_GROUPS = [
-    ['sem', '<zh>语义：只有角色，用 AS 套用</zh><en>Semantics: roles only, applied with AS</en>'],
-    ['lay', '<zh>布局：体里写约束</zh><en>Layout: constraints in the body</en>'],
-    ['vir', '<zh>显示元素：用 ATTACH 添上，由规则配符号</zh><en>Display elements: added with ATTACH, given symbols by rules</en>']
+    ['sem', '<zh>结构，只有角色：用 AS 套用</zh><en>Structures with roles only, applied with AS</en>'],
+    ['lay', '<zh>结构，体里带默认画法：约束都是 low，作者写的先走</zh><en>Structures with a default drawing in the body: all of priority low, so what the author writes comes first</en>'],
+    ['vir', '<zh>显示元素和桩：用 ATTACH 添上，由规则配符号；桩的约束也是 low</zh><en>Display elements and stubs: added with ATTACH, given symbols by rules; the stubs’ constraints are low too</en>']
   ];
 
   function initStd() {
@@ -282,7 +284,7 @@
       show.innerHTML = C.hlSnippet(d[1] + ' = ' + d[2]);
     }
     btns.forEach(function (b) { b.addEventListener('click', function () { pick(b); }); });
-    pick(btns.filter(function (b) { return b.textContent === '$MIRROR_PAIR'; })[0]);
+    pick(btns.filter(function (b) { return b.textContent === '$MIRRORED'; })[0]);
   }
 
   /* ================= T3 Defaults ================= */
@@ -291,19 +293,21 @@
     var gen = 'is-gen';
     var dev = {
       Q1: { sym: 'npn', x: 10, y: 0, label: 'Q1', value: 'npn1' },
-      RC: { sym: 'res', x: 10, y: 8, label: 'RC', value: '5k' },
+      RC: { sym: 'res', x: 10, y: 9, label: 'RC', value: '5k' },
       CL: { sym: 'cap', x: 16, y: 1, label: 'CL', value: '1p' },
       P_in: { sym: 'port', x: 3, y: 0, label: 'in', virtual: true, cls: gen },
       P_out: { sym: 'port', x: 21, y: 4, o: 'MY', label: 'out', virtual: true, cls: gen }
     };
-    if (p < 2) {
+    if (p === 0) {
       dev.P_vdd = { sym: 'port', x: 3, y: 13, label: 'vdd', virtual: true, cls: gen };
       dev.P_vss = { sym: 'port', x: 3, y: -4, label: 'vss', virtual: true, cls: gen };
     }
     if (p >= 1) {
+      /* vss is a ground net not named 0: until the file takes it out of $NAMED_GROUND_NET_SET, its
+         grounds show its name */
       dev.SUP = { sym: 'supply', x: 10, y: 13, label: 'vdd', virtual: true, cls: gen };
-      dev.G1 = { sym: 'gnd', x: 10, y: -4, virtual: true, cls: gen };
-      dev.G2 = { sym: 'gnd', x: 16, y: -3, virtual: true, cls: gen };
+      dev.G1 = { sym: 'gnd', x: 10, y: -4, label: p === 1 ? 'vss' : undefined, virtual: true, cls: gen };
+      dev.G2 = { sym: 'gnd', x: 16, y: -3, label: p === 1 ? 'vss' : undefined, virtual: true, cls: gen };
     }
     return {
       rk: 'ce' + p,
@@ -326,10 +330,6 @@
           w.push({ net: 'vdd', pts: [P('RC.p'), P('SUP.p')], cls: gen });
           w.push({ net: 'vss', pts: [P('Q1.e'), P('G1.p')], cls: gen });
           w.push({ net: 'vss', pts: [P('CL.n'), P('G2.p')], cls: gen });
-          if (p === 1) {
-            w.push({ net: 'vdd', pts: [P('P_vdd.p'), P('SUP.p')] });
-            w.push({ net: 'vss', pts: [P('P_vss.p'), P('G1.p')] });
-          }
         }
         return { wires: w, dots: dots };
       }
@@ -338,17 +338,17 @@
 
   var CE_GEN = [
     [
-      ['check', '<zh>符号按名字的首字母：Q1 → $NPN，RC → $RES，CL → $CAP。</zh><en>Symbols by first letter: Q1 → $NPN, RC → $RES, CL → $CAP.</en>'],
+      ['check', '<zh>符号按名字的首字母：Q1 → $NPN，RC → $RESISTOR，CL → $CAPACITOR。</zh><en>Symbols by first letter: Q1 → $NPN, RC → $RESISTOR, CL → $CAPACITOR.</en>'],
       ['plus', '<zh>端口符号 in、out、vdd、vss：$PORT_FILL_SET 起初是子电路的全部端口。</zh><en>Port tags in, out, vdd and vss: $PORT_FILL_SET starts with every port of the subcircuit.</en>'],
       ['info', '<zh>vdd、vss 只是两个普通的端口：不在电源、地网络集里，不补电源和地。</zh><en>vdd and vss are just two ports: they are not in the supply or ground sets, so no supply or ground is added.</en>']
     ],
     [
-      ['plus', '<zh>电源桩：RC 接 vdd 的端子没有导线，$SUPPLY_STUB 在它上方 2 格补一个电源。</zh><en>Supply stub: RC’s vdd terminal has no wire, so $SUPPLY_STUB adds a supply 2 units above it.</en>'],
-      ['plus', '<zh>地桩：Q1:e、CL:n 没有导线，$GND_STUB 各补一个地。</zh><en>Ground stubs: Q1:e and CL:n have no wires, so $GND_STUB adds a ground to each.</en>'],
-      ['info', '<zh>vdd、vss 仍是端口，端口符号还在。</zh><en>vdd and vss are still ports, so their tags stay.</en>']
+      ['plus', '<zh>电源桩：RC 接 vdd 的端子没有导线，$SUPPLY_STUB 在它上方补一个电源，至少隔 2 格。</zh><en>Supply stub: RC’s vdd terminal has no wire, so $SUPPLY_STUB adds a supply above it, at least 2 units away.</en>'],
+      ['plus', '<zh>地桩：Q1:e、CL:n 没有导线，$GROUND_STUB 各补一个地。vss 不叫 0，地下面写上网络名。</zh><en>Ground stubs: Q1:e and CL:n have no wires, so $GROUND_STUB adds a ground to each. vss is not named 0, so the grounds show its name.</en>'],
+      ['minus', '<zh>vdd、vss 的端口符号去掉了：电源、地网络上已经有电源和地，不再补端口符号。</zh><en>The port tags of vdd and vss are gone: supply and ground nets have their supplies and grounds, and get no port tags.</en>']
     ],
     [
-      ['minus', '<zh>vdd、vss 的端口符号去掉了：它们已经不在 $PORT_FILL_SET 里。</zh><en>The port tags of vdd and vss are gone: they are no longer in $PORT_FILL_SET.</en>'],
+      ['minus', '<zh>地下面的网络名去掉了：vss 已经不在 $NAMED_GROUND_NET_SET 里。</zh><en>The net name under the grounds is gone: vss is no longer in $NAMED_GROUND_NET_SET.</en>'],
       ['check', '<zh>电源和地照旧：这就是教科书上的样子，文件里只写了三句。</zh><en>The supply and grounds stay: the textbook look, from three lines in the file.</en>']
     ]
   ];
@@ -365,7 +365,7 @@
         L.push({ t: '* @RNL {' });
         L.push({ t: '*   &vdd @ADD-TO $SUPPLY_NET_SET;' });
         L.push({ t: '*   &vss @ADD-TO $GROUND_NET_SET' + (p >= 2 ? ';' : '') });
-        if (p >= 2) L.push({ t: '*   {&vdd &vss} @REMOVE-FROM $PORT_FILL_SET' });
+        if (p >= 2) L.push({ t: '*   &vss @REMOVE-FROM $NAMED_GROUND_NET_SET' });
         L.push({ t: '* }' });
       }
       L.push({ t: '.ends ce' });
@@ -381,17 +381,23 @@
     show(0, false);
 
     snippetRows($('#fill-code'), [
-      { t: '/* <zh>三个给文件用的集合</zh><en>three sets for files to edit</en> */', cls: 'is-cmt' },
+      { t: '/* <zh>给文件用的集合</zh><en>sets for files to edit</en> */', cls: 'is-cmt' },
       '$GROUND_NET_SET = # @SELECT-NET(name="0");',
       '$SUPPLY_NET_SET = {};',
       '$PORT_FILL_SET = # @SELECT-NET(port=true);',
       { t: '/* <zh>地网络、电源网络上没接线的端子，各补一个桩</zh><en>a stub for each unwired terminal on ground and supply nets</en> */', cls: 'is-cmt' },
-      '$GND_FILL_SET = $GROUND_NET_SET @SELECT-TERMINAL(wired=false);',
-      '$GND_STUB @ATTACH $GND_FILL_SET;',
+      '$GROUND_FILL_SET = $GROUND_NET_SET @SELECT-TERMINAL(wired=false);',
+      '$GROUND_STUB @ATTACH $GROUND_FILL_SET;',
       '$SUPPLY_FILL_SET = $SUPPLY_NET_SET @SELECT-TERMINAL(wired=false);',
       '$SUPPLY_STUB @ATTACH $SUPPLY_FILL_SET;',
-      { t: '/* <zh>子电路的每个端口一个端口符号</zh><en>one port tag for each port of a subcircuit</en> */', cls: 'is-cmt' },
-      '$IOPORT @ATTACH $PORT_FILL_SET'
+      { t: '/* <zh>子电路的每个端口一个端口符号，电源、地网络除外</zh><en>one port tag for each port of a subcircuit, but not on supply and ground nets</en> */', cls: 'is-cmt' },
+      '$SUPPLY_NET_SET @REMOVE-FROM $PORT_FILL_SET;',
+      '$GROUND_NET_SET @REMOVE-FROM $PORT_FILL_SET;',
+      '$IO_PORT @ATTACH $PORT_FILL_SET;',
+      { t: '/* <zh>不叫 0 的地网络，地下面写网络名</zh><en>on a ground net other than 0, the grounds show the net’s name</en> */', cls: 'is-cmt' },
+      '$NAMED_GROUND_NET_SET = {$GROUND_NET_SET};',
+      '# @SELECT-NET(name="0") => @REMOVE-FROM $NAMED_GROUND_NET_SET;',
+      '$NAMED_GROUND_NET_SET @SELECT-ANCESTOR-USAGE $GROUND => @SET-SYMBOL $NAMED_GROUND_SYMBOL'
     ]);
   }
 
@@ -577,9 +583,9 @@
         RA: { sym: 'res', x: -1, y: 0, o: 'R270', label: 'RA', value: '1k', lab: [0, 1.2, 'middle'], val: [0, -1.25, 'middle'] },
         RB: { sym: 'res', x: 13, y: 0, o: 'R90', label: 'RB', value: '1k', lab: [0, 1.2, 'middle'], val: [0, -1.25, 'middle'] },
         RC: { sym: 'res', x: 6, y: -5, label: 'RC', value: '1k' },
-        GA: { sym: 'gnd', x: -4, y: -2, virtual: true, cls: gen },
-        GB: { sym: 'gnd', x: 16, y: -2, virtual: true, cls: gen },
-        GC: { sym: 'gnd', x: 6, y: -10, virtual: true, cls: gen }
+        GA: { sym: 'gnd', x: -3, y: -2, virtual: true, cls: gen },
+        GB: { sym: 'gnd', x: 15, y: -2, virtual: true, cls: gen },
+        GC: { sym: 'gnd', x: 6, y: -9, virtual: true, cls: gen }
       },
       route: function (P) {
         return {
@@ -609,7 +615,7 @@
     var codeEl = $('#tee-code'), cap = $('#tee-cap');
     var view = new S.View(svg, { box: [-9, -12.6, 21, 4] });
     function show(shared, animate) {
-      var L = lines(['RA n1 0 1k', 'RB n1 0 1k', 'RC n1 0 1k', '* @RNL {']);
+      var L = lines(['* Three resistors', 'RA n1 0 1k', 'RB n1 0 1k', 'RC n1 0 1k', '* @RNL {']);
       if (shared) {
         L.push({ t: '*   %j = (6, 0);' }, { t: '*   &n1 @WIRE {#RA:1 %j #RB:1};', r: 'RA RB net:n1' }, { t: '*   &n1 @WIRE {%j #RC:1};', r: 'RC net:n1' }, { t: '*   $JUNCTION @ATTACH %j', r: 'net:n1' });
       } else {
@@ -706,6 +712,7 @@
     if (!svg) return;
     var gen = 'is-gen';
     var L = [
+      { t: '* Two inverters on a bus' },
       { t: '.subckt inv a y vdd vss' },
       { t: 'M1 y a vdd vdd pch' },
       { t: 'M2 y a vss vss nch' },
@@ -734,8 +741,8 @@
         XI: { sym: 'inv', x: 16, y: 6, label: 'XI<1:0>' },
         R1: { sym: 'res', x: 4, y: 1, label: 'R1', value: '1k' },
         R0: { sym: 'res', x: 8, y: 1, label: 'R0', value: '1k' },
-        G1: { sym: 'gnd', x: 4, y: -4, virtual: true, cls: gen },
-        G0: { sym: 'gnd', x: 8, y: -4, virtual: true, cls: gen }
+        G1: { sym: 'gnd', x: 4, y: -3, virtual: true, cls: gen },
+        G0: { sym: 'gnd', x: 8, y: -3, virtual: true, cls: gen }
       },
       route: function (P) {
         return {
@@ -781,6 +788,7 @@
     }
     function show(animate, what) {
       var L = [
+        { t: '* Label and annotation' },
         { t: '.model nch nmos level=1' },
         { t: 'M1 d g s s nch W=2u L=0.5u', r: 'M1' },
         { t: '* @RNL {' },
@@ -791,7 +799,7 @@
       if (keyed) L.push({ t: '*   #M1 @TEXT("${w}/${l}", key="wl", dy=-3)', r: 'M1 ov:wl' });
       L.push({ t: '* }' });
       L = marks(prev, L);
-      if (prev && what === 'move') L[3].mark = 'is-chg';
+      if (prev && what === 'move') L[4].mark = 'is-chg';
       prev = L;
       C.render(codeEl, L);
       if (!linker) linker = C.link(codeEl, L, view); else linker.setLines(L);
@@ -809,7 +817,7 @@
     show(false, '');
   }
 
-  /* A small renderer for the text markup of standard 0.2 (13.6), for the playground */
+  /* A small renderer for the text markup of standard 0.3 (13.6), for the playground */
   var GREEK = {
     alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ϵ', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', vartheta: 'ϑ',
     iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', varpi: 'ϖ', rho: 'ρ', varrho: 'ϱ', sigma: 'σ', varsigma: 'ς',
@@ -1129,15 +1137,15 @@
 
   var HDR = [
     [['* ', ''], ['@RNL(type="header")', 'rec'], [' {', '']],
-    [['*   ', ''], ['@VERSION("0.2")', 'ver'], [';', '']],
-    [['*   ', ''], ['@USE-ALIASES(name="rnl-zh")', 'ali'], [';', '']],
+    [['*   ', ''], ['@VERSION("0.3")', 'ver'], [';', '']],
+    [['*   ', ''], ['@USE-ALIASES(name="rnl-zh", version="0.3")', 'ali'], [';', '']],
     [['*   ', ''], ['@DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])', 'dev']],
     [['* ', ''], ['}', '']]
   ];
   var HDR_TIP = {
     rec: ['type="header"', '<zh>这是头段记录：文件的第一条记录，在子电路之外，至多一条。它总按标准写法读，里面不认代称。</zh><en>This is the header record: the file’s first record, outside any subcircuit, at most one. It is always read in standard spelling, without aliases.</en>'],
     ver: ['@VERSION', '<zh>文件使用的语言版本。不写时按工具默认的版本读，工具保存文件时会补上。</zh><en>The language version of the file. Without it the tool’s default version applies, and tools add it when they save the file.</en>'],
-    ali: ['@USE-ALIASES', '<zh>加载代称包。rnl-zh 给关键字、参数名和标准包里的名字起了中文代称，之后的记录里中英文写法可以混用；可以加 version= 钉住它的版本。</zh><en>Loads an alias package. rnl-zh gives Chinese spellings to keywords, parameter names and the names in the standard package, so later records may mix both; version= pins its version.</en>'],
+    ali: ['@USE-ALIASES', '<zh>加载代称包。rnl-zh 给关键字、参数名和标准包里的名字起了中文代称，之后的记录里中英文写法可以混用。version= 写明用哪一版：不写就用找到的最新一版，以后出了新版，读法可能跟着变。</zh><en>Loads an alias package. rnl-zh gives Chinese spellings to keywords, parameter names and the names in the standard package, so later records may mix both. version= says which version: without it the newest found is used, and a later version could change how the file reads.</en>'],
     dev: ['@DEVICE', '<zh>给网表里没有定义的器件起端子名：名字匹配 XM*、模型匹配 sky130_fd_pr__nfet_* 的元件，端子依次叫 d、g、s、b。</zh><en>Names the terminals of devices the netlist does not define: instances whose name matches XM* and model matches sky130_fd_pr__nfet_* get the terminals d, g, s and b, in order.</en>']
   };
 
@@ -1180,7 +1188,7 @@
     function show(on) {
       var L = [
         { t: '* PDK example' },
-        { t: on ? '* @RNL(type="header") { @VERSION("0.2"); @DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])}' : '* @RNL(type="header") { @VERSION("0.2")}', mark: 'is-chg' },
+        { t: on ? '* @RNL(type="header") { @VERSION("0.3"); @DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])}' : '* @RNL(type="header") { @VERSION("0.3")}', mark: 'is-chg' },
         { t: 'XM1 out in 0 0 sky130_fd_pr__nfet_01v8 w=1 l=0.15' },
         { t: '* @RNL {' },
         { t: '*   #XM1:d @CURRENT("in")', cls: on ? '' : 'is-err' },

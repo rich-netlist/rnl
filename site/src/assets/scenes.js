@@ -3,7 +3,7 @@
  * The circuits come from examples used in the RNL language discussion (5T OTA, RC/RLC, the fill
  * example). Coordinates are RNL coordinates (x right, y up) and match the solver and editor records
  * shown in the files; they are placed by hand for this page, not computed by a solver. The RNL follows
- * language standard 0.2 for illustration.
+ * language standard 0.3 and the standard series 0.3, and reads with the rnl command.
  */
 (function (global) {
   'use strict';
@@ -17,7 +17,7 @@
 
   /* ================= Five-transistor OTA ================= */
 
-  var OTA_BOX = [-4.5, -6.5, 43, 23.5];
+  var OTA_BOX = [-4.5, -7.5, 43, 23.5];
 
   var OTA_SPEC = {
     M1: { sym: 'nmos', label: 'M1', value: 'W/L 2u/0.5u', valueOpt: true },
@@ -33,7 +33,8 @@
     P_vss: { sym: 'port', label: 'vss', virtual: true },
     VDD1: { sym: 'supply', label: 'vdd', virtual: true },
     VDD2: { sym: 'supply', label: 'vdd', virtual: true },
-    GND: { sym: 'gnd', virtual: true }
+    /* vss is a ground net not named 0, so the standard series 0.3 writes its name under the ground */
+    GND: { sym: 'gnd', label: 'vss', virtual: true }
   };
 
   /* four: the standard package's default four-terminal MOS symbols, before the file picks its own */
@@ -122,8 +123,7 @@
   function boxes() {
     return [
       { id: 'cm1', kind: 'box', layer: 'back', ids: ['M3', 'M4'], pad: 1, label: '<zh>%cm1 · 电流镜</zh><en>%cm1 · current mirror</en>', labelAt: [0.5, 1], anchor: 'middle' },
-      { id: 'dp1', kind: 'box', layer: 'back', ids: ['M1', 'M2'], pad: 1, label: '<zh>%dp1 · 差分对</zh><en>%dp1 · diff pair</en>', labelAt: [0.5, 1], anchor: 'middle' },
-      { id: 'stage1', kind: 'box', layer: 'back', ids: ['M1', 'M2', 'M5'], pad: 2.4, label: '<zh>%st1 · 输入级</zh><en>%st1 · input stage</en>', labelAt: [0.03, 0], anchor: 'start' }
+      { id: 'dp1', kind: 'box', layer: 'back', ids: ['M1', 'M2', 'M5'], pad: 1.4, label: '<zh>%dp1 · 差分对，尾管 M5</zh><en>%dp1 · diff pair, tail M5</en>', labelAt: [0.03, 0], anchor: 'start' }
     ];
   }
 
@@ -176,36 +176,30 @@
   /* Step-by-step refinement: the full file at each step, in one of three writing styles.
      bare: the formal notation only; en: the standard sentences. */
   var U = {
-    u1: ['%dp1 = #M1(in_p) #M2(in_n) @AS $DIFFPAIR;', '%dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFPAIR;'],
-    u2: ['%cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR;', '%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR;'],
-    u3: ['%st1 = %dp1(pair) #M5(tail) @AS $INPUT_STAGE', '%st1 = %dp1(pair) and #M5(tail) treated @AS $INPUT_STAGE'],
+    u1: ['%dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;', '%dp1 = #M1(in_p), #M2(in_n) and #M5(tail) treated @AS $DIFFERENTIAL_PAIR;'],
+    u2: ['%cm1 = #M3(ref) #M4(out) @AS $CURRENT_MIRROR', '%cm1 = #M3(ref) and #M4(out) treated @AS $CURRENT_MIRROR'],
     u4: ['{#M1 #M2 #M5} @SET-SYMBOL $NMOS;', '{#M1 #M2 #M5} @SET-SYMBOL to $NMOS;'],
     u5: ['{#M3 #M4} @SET-SYMBOL $PMOS;', '{#M3 #M4} @SET-SYMBOL to $PMOS;'],
     u6: ['&vdd @ADD-TO $SUPPLY_NET_SET;', '&vdd @ADD-TO $SUPPLY_NET_SET;'],
     u7: ['&vss @ADD-TO $GROUND_NET_SET;', '&vss @ADD-TO $GROUND_NET_SET;'],
-    u8: ['{&vdd &vss} @REMOVE-FROM $PORT_FILL_SET;', '{&vdd &vss} @REMOVE-FROM $PORT_FILL_SET;'],
     u9: ['%ax = (_, _);', '%ax = (_, _);'],
-    u10: ['%sym12 = #M1 #M2 %ax @AS $MIRROR_PAIR;', '%sym12 = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRROR_PAIR;'],
-    u11: ['%sym34 = #M3 #M4 %ax @AS $MIRROR_PAIR;', '%sym34 = #M3(a), #M4(b) and %ax(axis) treated @AS $MIRROR_PAIR;'],
-    u12: ['%c1 = #M1 #M2 #M5 @AS $TAIL_CENTER;', '%c1 = #M1(a), #M2(b) and #M5(t) treated @AS $TAIL_CENTER;'],
+    u10: ['%sym12 = #M1 #M2 %ax @AS $MIRRORED;', '%sym12 = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRRORED;'],
+    u11: ['%sym34 = #M3 #M4 %ax @AS $MIRRORED;', '%sym34 = #M3(a), #M4(b) and %ax(axis) treated @AS $MIRRORED;'],
     u13: ['{#M5 #M1 #M3} @ORDER("bottom-to-top");', '{#M5 #M1 #M3} are in @ORDER("bottom-to-top");'],
     u14: ['#M5:d @CURRENT("in")', '#M5:d has @CURRENT("in")']
   };
   /* zh: the Chinese standard sentences, written with the alias package rnl-zh; shown on every page */
   /*zh-CN*/
   var UZ = {
-    u1: '%dp1 = #M1(正输入) 和 #M2(负输入) @视作 $"差分对";',
-    u2: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"电流镜";',
-    u3: '%st1 = %dp1(输入对) 和 #M5(尾管) @视作 $"输入级"',
+    u1: '%dp1 = #M1(正输入)、#M2(负输入) 和 #M5(尾管) @视作 $"差分对";',
+    u2: '%cm1 = #M3(参考管) 和 #M4(输出管) @视作 $"电流镜"',
     u4: '{#M1 #M2 #M5} @使用符号 $NMOS;',
     u5: '{#M3 #M4} @使用符号 $PMOS;',
     u6: '&vdd @加入 $"电源网络集";',
     u7: '&vss @加入 $"地网络集";',
-    u8: '{&vdd &vss} @移出 $"端口补位集";',
     u9: '%ax = (_, _);',
-    u10: '%sym12 = #M1(甲)、#M2(乙) 和 %ax(轴) @视作 $"镜像对";',
-    u11: '%sym34 = #M3(甲)、#M4(乙) 和 %ax(轴) @视作 $"镜像对";',
-    u12: '%c1 = #M1(甲)、#M2(乙) 和 #M5(尾端) @视作 $"尾管居中";',
+    u10: '%sym12 = #M1(甲)、#M2(乙) 和 %ax(轴) @视作 $"镜像对称";',
+    u11: '%sym34 = #M3(甲)、#M4(乙) 和 %ax(轴) @视作 $"镜像对称";',
     u13: '{#M5 #M1 #M3} 按 @顺序("从下到上") 排列;',
     u14: '#M5:d 有 @电流("流入")'
   };
@@ -222,13 +216,13 @@
     }
     function u(id, r) {
       var t = k === 2 ? UZ[id] : U[id][k];
-      if (id === 'u3' && stage >= 2) t += ';';
+      if (id === 'u2' && stage >= 2) t += ';';
       add(id, '*   ' + t, r);
     }
     add('h0', '* 5T OTA');
     add('h1', '.model nch nmos level=1 vto=0.5');
     add('h2', '.model pch pmos level=1 vto=-0.5');
-    if (k === 2 && stage >= 1) add('hz', '* @RNL(type="header") { @VERSION("0.2"); @USE-ALIASES(name="rnl-zh")}');
+    if (k === 2 && stage >= 1) add('hz', '* @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh", version="0.3")}');
     add('h3', '.subckt ota5t inp inn out vdd vss vbias', stage <= 1 ? 'P_inp P_inn P_out P_vb P_vdd P_vss' : 'P_inp P_inn P_out P_vb');
     add('m1', 'M1 x    inp   tail vss nch W=2u L=0.5u', 'M1');
     add('m2', 'M2 out  inn   tail vss nch W=2u L=0.5u', 'M2');
@@ -237,19 +231,16 @@
     add('m5', 'M5 tail vbias vss  vss nch W=4u L=1u', 'M5');
     if (stage >= 1) {
       add('u0', '* @RNL {');
-      u('u1', 'M1 M2 ov:dp1');
+      u('u1', stage >= 2 ? 'M1 M2 M5 ov:dp1 ov:c1' : 'M1 M2 M5 ov:dp1');
       u('u2', 'M3 M4 ov:cm1');
-      u('u3', 'M1 M2 M5 ov:stage1');
       if (stage >= 2) {
         u('u4', 'M1 M2 M5');
         u('u5', 'M3 M4');
         u('u6', 'VDD1 VDD2');
         u('u7', 'GND');
-        u('u8', 'VDD1 VDD2 GND');
         u('u9', 'ov:ax');
         u('u10', 'M1 M2 ov:ax');
         u('u11', 'M3 M4 ov:ax');
-        u('u12', 'M1 M2 M5 ov:c1');
         u('u13', 'M5 M1 M3 ov:ord');
         u('u14', 'M5 ov:cur');
       }
@@ -302,6 +293,7 @@
   }
 
   var E5_LINES = [
+    { t: '* 5T OTA' },
     { t: '.subckt ota5t inp inn out vdd vss vbias' },
     { t: 'M1 x    inp   tail vss nch W=2u L=0.5u', r: 'M1' },
     { t: 'M2 out  inn   tail vss nch W=2u L=0.5u', r: 'M2' },
@@ -309,10 +301,9 @@
     { t: 'M4 out  x     vdd  vdd pch W=4u L=0.5u', r: 'M4' },
     { t: 'M5 tail vbias vss  vss nch W=4u L=1u', r: 'M5' },
     { t: '* @RNL {' },
-    { t: '*   %dp1 = #M1(in_p) #M2(in_n) @AS $DIFFPAIR;', r: 'M1 M2', d: 'ok' },
+    { t: '*   %dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;', r: 'M1 M2 M5 ov:c1', d: 'conflict' },
     { t: '*   %ax = (_, _);', r: 'ov:ax', d: 'ok' },
-    { t: '*   %sym12 = #M1 #M2 %ax @AS $MIRROR_PAIR;', r: 'M1 M2 ov:ax', d: 'ok' },
-    { t: '*   %c1 = #M1 #M2 #M5 @AS $TAIL_CENTER;', r: 'M1 M2 M5 ov:c1', d: 'conflict' },
+    { t: '*   %sym12 = #M1 #M2 %ax @AS $MIRRORED;', r: 'M1 M2 ov:ax', d: 'ok' },
     { t: '*   {#M1 #M2 #M9} @ALIGN("y")', cls: 'is-err', d: 'm9' },
     { t: '* }' },
     { t: '* @RNL(type="generated", priority="high", author="rnl-solver", hash="sig1:4c1f") {', d: 'fp' },
@@ -330,9 +321,9 @@
   var E5_DIAG = [
     { k: 'err', id: 'm9', icon: 'cross', html: '<zh><code>{#M1 #M2 #M9} @ALIGN("y")</code>：本层没有元件 M9。ALIGN 对成员是严格的，整句失效，不会退化成“只对齐 M1、M2”。</zh><en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9. ALIGN is strict about its members, so the whole statement fails; it does not fall back to “align only M1 and M2”.</en>', refs: [] },
     { k: 'err', id: 'bad', icon: 'cross', html: '<zh><code>#M4 @PLACE(2O, 16, …)</code>：数后面不能带字母，“2O” 里是字母 O。只有这一句失效，M4 保留求解器给的 (28, 16)。</zh><en><code>#M4 @PLACE(2O, 16, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (28, 16).</en>', refs: ['M4'] },
-    { k: 'warn', id: 'conflict', icon: 'warn', html: '<zh>编辑器的 <code>#M2 @PLACE(x=30, …)</code> 是 high，后写，盖过求解器给的 x = 28。两个源极的中点因此到了 x = 21，而 M5 留在 20：<code>%c1</code> 展开的等距约束是 normal，与这些 high 坐标冲突，被丢弃，尾管不再居中。</zh><en>The editor’s <code>#M2 @PLACE(x=30, …)</code> is high and written later, so it overrides the solver’s x = 28. The midpoint of the two sources moves to x = 21 while M5 stays at 20: the equal-spacing constraint expanded from <code>%c1</code> is normal, conflicts with these high coordinates and is dropped, so the tail is no longer centered.</en>', refs: ['M2', 'M5', 'ov:c1'] },
+    { k: 'warn', id: 'conflict', icon: 'warn', html: '<zh>编辑器的 <code>#M2 @PLACE(x=30, …)</code> 是 high，后写，盖过求解器给的 x = 28。求解器的那条被丢弃。两个源极的中点因此到了 x = 21，而 M5 留在 20：<code>%dp1</code> 自带的尾管居中是 low，与这些 high 坐标冲突，让步了，尾管不再居中。low 的约束让步是预料之中的，不另提示。</zh><en>The editor’s <code>#M2 @PLACE(x=30, …)</code> is high and written later, so it overrides the solver’s x = 28, which is discarded. The midpoint of the two sources moves to x = 21 while M5 stays at 20: the tail centering that <code>%dp1</code> carries is low, conflicts with these high coordinates and gives way, so the tail is no longer centered. A low constraint giving way is expected and noted no further.</en>', refs: ['M2', 'M5', 'ov:c1'] },
     { k: 'info', id: 'fp', icon: 'info', html: '<zh>求解记录的 <code>hash</code> 与当前输入不符：求解之后，编辑器加了一条记录。查看器建议重新求解，旧结果照常显示。</zh><en>The solver record’s <code>hash</code> no longer matches the current input: the editor added a record after solving. The viewer suggests solving again; the old result still displays.</en>', refs: [] },
-    { k: 'ok', id: 'ok', icon: 'check', html: '<zh>其余照常生效：差分对的语义；对称（对称轴是自由点，跟着移到 x = 21）；其他坐标。</zh><en>Everything else takes effect: the differential pair; the symmetry (the axis is a free point and moves to x = 21); the other coordinates.</en>', refs: ['M1', 'M2', 'ov:ax'] }
+    { k: 'ok', id: 'ok', icon: 'check', html: '<zh>其余照常生效：差分对和它的尾管；对称（也是 low，但对称轴是自由点，跟着移到 x = 21，照样成立）；其他坐标。</zh><en>Everything else takes effect: the differential pair and its tail; the symmetry (low as well, but the axis is a free point that moves to x = 21, so it still holds); the other coordinates.</en>', refs: ['M1', 'M2', 'ov:ax'] }
   ];
 
   /* ================= Hero: RC low-pass ================= */
@@ -344,7 +335,7 @@
       V1: { sym: 'vac', x: 4, y: 6, label: 'V1', value: 'AC 1' },
       R1: { sym: 'res', x: 11, y: 12, o: 'R90', label: 'R1', value: '10k', lab: [-0.25, 1.35, 'end'], val: [0.25, 1.35, 'start'] },
       C1: { sym: 'cap', x: 18, y: 6, label: 'C1', value: '10n' },
-      G1: { sym: 'gnd', x: 4, y: 1, virtual: true },
+      G1: { sym: 'gnd', x: 4, y: 2, virtual: true },
       G2: { sym: 'gnd', x: 18, y: 2, virtual: true }
     },
     route: function (P) {
@@ -390,14 +381,14 @@
       C1: { sym: 'cap', x: 23, y: 6, label: 'C1', value: '100n' }
     };
     if (style === 'split') {
-      dev.G1 = { sym: 'gnd', x: 3, y: 1, virtual: true };
+      dev.G1 = { sym: 'gnd', x: 3, y: 2, virtual: true };
       dev.G2 = { sym: 'gnd', x: 23, y: 2, virtual: true };
     } else {
       dev.G = { sym: 'gnd', x: 13, y: 1, virtual: true };
     }
     return {
       rk: 'rlc-' + style,
-      box: [-1, -2, 28.5, 16.2],
+      box: [-1, -2, 28.5, 17.6],
       devices: dev,
       route: function (P) {
         var v1p = P('V1.p'), r1p = P('R1.p'), c1p = P('C1.p'), v1n = P('V1.n'), c1n = P('C1.n');
@@ -420,12 +411,12 @@
       overlays: function (P, S, B, mode) {
         if (mode === 'chain') {
           return [
+            { id: 'flow', kind: 'arrow', pts: [[1.5, 16.6], [25.5, 16.6]], label: '$CHAIN · left-to-right, low', labelAt: [13.5, 16.6], anchor: 'middle', mono: true },
             { id: 'r-src', ref: 'roles', kind: 'tag', at: [3, -0.4], anchor: 'middle', text: 'source' },
-            { id: 'r-ser', ref: 'roles', kind: 'tag', at: [12, 15.1], anchor: 'middle', text: '{series}' },
+            { id: 'r-ser', ref: 'roles', kind: 'tag', at: [12, 15.1], anchor: 'middle', text: '{chain}' },
             { id: 'r-load', ref: 'roles', kind: 'tag', at: [23, -0.4], anchor: 'middle', text: 'load' }
           ];
         }
-        if (mode === 'flow') return [{ id: 'flow', kind: 'arrow', pts: [[1.5, 15.1], [25.5, 15.1]], label: '$FLOW · left-to-right', labelAt: [13.5, 15.1], anchor: 'middle', mono: true }];
         return [];
       }
     };
@@ -440,13 +431,12 @@
       { t: 'L1 mid out 1m', r: 'L1' },
       { t: 'C1 out 0 100n', r: 'C1' },
       { t: '* @RNL {' },
-      { t: '*   #V1, {#R1 #L1} and #C1 are treated @AS $CHAIN;', r: 'V1 R1 L1 C1 ov:roles', mode: 'chain' },
-      { t: '*   {#V1 #R1 #L1 #C1} are treated @AS $FLOW;', r: 'V1 R1 L1 C1 ov:flow', mode: 'flow' },
+      { t: '*   #V1, {#R1 #L1} and #C1 are treated @AS $CHAIN;', r: 'V1 R1 L1 C1 ov:roles ov:flow', mode: 'chain' },
       { t: '*   {#R1 #L1} @ORIENT("R90")' + (merged ? ';' : ''), r: 'R1 L1' }
     ];
     if (merged) {
       L.push({ t: '*   &0 @REMOVE-FROM $GROUND_NET_SET;', r: 'G', mark: 'is-add' });
-      L.push({ t: '*   $GND is @ATTACH to &0 => named %g;', r: 'G', mark: 'is-add' });
+      L.push({ t: '*   $GROUND is @ATTACH to &0 => named %g;', r: 'G', mark: 'is-add' });
       L.push({ t: '*   net &0 is fully @ROUTE', r: 'G net:0', mark: 'is-add' });
     }
     L.push({ t: '* }' }, { t: '.end' });
@@ -461,15 +451,15 @@
     devices: {
       XU1: { sym: 'block', x: 20, y: 14, label: 'XU1' },
       VIP: { sym: 'vsrc', x: 4, y: 13, label: 'VIP', value: 'DC 0.9', lab: [-2.1, 0.6, 'end'], val: [-2.1, -0.8, 'end'] },
-      VIN: { sym: 'vsrc', x: 9, y: 9, label: 'VIN', value: 'DC 0.9' },
+      VIN: { sym: 'vsrc', x: 9, y: 10, label: 'VIN', value: 'DC 0.9' },
       VB: { sym: 'vsrc', x: 17, y: 4, label: 'VB', value: '0.6', lab: [-2.1, 0.6, 'end'], val: [-2.1, -0.8, 'end'] },
       VDD: { sym: 'vsrc', x: 35, y: 17, label: 'VDD', value: '1.8' },
       CL: { sym: 'cap', x: 29, y: 12, label: 'CL', value: '1p' },
-      G1: { sym: 'gnd', x: 4, y: 8, virtual: true },
-      G2: { sym: 'gnd', x: 9, y: 4, virtual: true },
-      G3: { sym: 'gnd', x: 17, y: -1, virtual: true },
+      G1: { sym: 'gnd', x: 4, y: 9, virtual: true },
+      G2: { sym: 'gnd', x: 9, y: 6, virtual: true },
+      G3: { sym: 'gnd', x: 17, y: 0, virtual: true },
       G4: { sym: 'gnd', x: 21, y: 10, virtual: true },
-      G5: { sym: 'gnd', x: 35, y: 12, virtual: true },
+      G5: { sym: 'gnd', x: 35, y: 13, virtual: true },
       G6: { sym: 'gnd', x: 29, y: 8, virtual: true }
     },
     route: function (P) {
@@ -491,7 +481,7 @@
         dots: [],
         labels: [
           { text: 'inp', at: [9.5, 16.75], net: 'inp' }, { text: 'inn', at: [12, 12.75], net: 'inn' },
-          { text: 'vdd', at: [27, 20.75], net: 'vdd' }, { text: 'out', at: [27, 14.75], net: 'out' }
+          { text: 'vdd', at: [27, 19.75], net: 'vdd' }, { text: 'out', at: [27, 14.75], net: 'out' }
         ]
       };
     },
@@ -576,7 +566,7 @@
       R1: { sym: 'res', x: 10, y: 14, label: 'R1', value: '10k' },
       M1: { sym: 'nmos', x: 10, y: 6, label: 'M1' },
       C1: { sym: 'cap', x: 18, y: 6, label: 'C1', value: '1p' },
-      Gv: { sym: 'gnd', x: -3, y: 7, virtual: true }
+      Gv: { sym: 'gnd', x: -3, y: 8, virtual: true }
     };
     if (n >= 1) {
       dev.Gm = { sym: 'gnd', x: 10, y: 2, virtual: true, cls: 'is-gen' };
@@ -589,7 +579,7 @@
       devices: dev,
       route: function (P) {
         var w = [
-          { net: 'vdd', pts: [P('V1.p'), [-3, 17], P('R1.p')] },
+          { net: 'vdd', pts: [P('V1.p'), [-3, 16], P('R1.p')] },
           { net: 'out', pts: [P('R1.n'), P('M1.d')] },
           { net: 'out', pts: [[10, 10], [18, 10], P('C1.p')] }
         ];
@@ -598,10 +588,10 @@
           w.push({ net: '0', pts: [P('C1.n'), P('Gc.p')], cls: 'is-gen' });
         }
         if (n >= 2) w.push({ net: 'in', pts: [P('M1.g'), P('Pin.p')], cls: 'is-gen' });
-        return { wires: w, dots: [[10, 10, 'out']], labels: [{ text: 'vdd', at: [5, 17.75], net: 'vdd' }, { text: 'out', at: [14, 10.75], net: 'out' }] };
+        return { wires: w, dots: [[10, 10, 'out']], labels: [{ text: 'vdd', at: [5, 16.75], net: 'vdd' }, { text: 'out', at: [14, 10.75], net: 'out' }] };
       },
       overlays: function () {
-        return [{ id: 'own', ref: 'Gv', kind: 'text', at: [-3, 4.4], text: '<zh>写在引脚上</zh><en>on the pin</en>', anchor: 'middle', tone: 'mute' }];
+        return [{ id: 'own', ref: 'Gv', kind: 'text', at: [-3, 5.4], text: '<zh>写在引脚上</zh><en>on the pin</en>', anchor: 'middle', tone: 'mute' }];
       }
     };
   }
@@ -615,14 +605,14 @@
     { t: 'C1 out 0 1p', r: 'C1 Gc', gen: 'gnd' },
     { t: '* @RNL {' },
     { t: '*   $PORT_STUB = @DEFINE(roles=[["t", "terminal"]]) {', r: 'Pin' },
-    { t: '*     %p = $IOPORT @ATTACH ?t::net;', r: 'Pin' },
+    { t: '*     %p = $IO_PORT @ATTACH ?t::net;', r: 'Pin' },
     { t: '*     ?t::net @WIRE {%p:p ?t};', r: 'Pin net:in' },
     { t: '*     {?t %p:p} @ALIGN("y");', r: 'Pin' },
     { t: '*     %p:p ?t @DISTANCE("left-to-right", exact=2)', r: 'Pin' },
     { t: '*   };', r: 'Pin' },
     { t: '*   # @SELECT-TERMINAL(terminal="g", wired=false) => $PORT_STUB @ATTACH;', r: 'Pin net:in', gen: 'port' },
     { t: '*   #M1 @SET-SYMBOL $NMOS;', r: 'M1' },
-    { t: '*   $GND @ATTACH #V1:2', r: 'Gv ov:own' },
+    { t: '*   $GROUND @ATTACH #V1:2', r: 'Gv ov:own' },
     { t: '* }' },
     { t: '* @RNL(author="rnl-editor") {' },
     { t: '*   #V1 @PLACE(-3, 10);  #R1 @PLACE(10, 14);  #M1 @PLACE(10, 6);  #C1 @PLACE(18, 6);', r: 'V1 R1 M1 C1' },
