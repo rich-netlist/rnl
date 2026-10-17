@@ -264,6 +264,27 @@ fn a_subcircuit_instance_named_i0_is_no_current_source() {
 }
 
 #[test]
+fn a_relay_of_a_model_card_goes_by_its_type() {
+    // the Spectre adapter reads switch, relay and transformer natively: an instance of a relay's
+    // model card goes by its model type, sw, as S of SPICE does; a switch of three throws is still
+    // drawn as $SWITCH, its pins on t0 and t1 (Annex C)
+    let text = "// t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nmodel rl relay\n\
+                K1 (a b c d) rl\nS1 (a b c d) switch position=3\nT1 (a b c d) transformer\n\
+                // @RNL { #K1 @PLACE(0, 0); #S1 @PLACE(10, 0); #T1 @PLACE(20, 0) }\n";
+    let files = MemoryProvider::new().with("t.scs", text);
+    let r = read(&files, "t.scs", &Options::default());
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let lv = &r.model.levels[0];
+    let got: Vec<(&str, &str)> = lv
+        .items
+        .iter()
+        .filter(|i| i.kind == "instance")
+        .map(|i| (i.id.as_str(), lv.symbols[i.symbol].name.as_str()))
+        .collect();
+    assert_eq!(got, [("#K1", "$VOLTAGE_CONTROLLED_SWITCH"), ("#S1", "$SWITCH"), ("#T1", "$TRANSFORMER")]);
+}
+
+#[test]
 fn every_package_of_the_series_names_what_it_uses_through_its_references() {
     // without any standard package in effect, each package of the series checked on its own sees
     // only itself and what it references (16.2), and finds every name it uses
