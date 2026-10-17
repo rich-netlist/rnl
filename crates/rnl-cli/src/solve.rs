@@ -83,7 +83,7 @@ use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{
     generated_files, move_header_for, pins_std, raise_version, record_line, remove_generated_with_header,
-    replace_generated_with_header, spelled_like_new_words, PIN_STD_0_2,
+    replace_generated_with_header, spelled_like_new_words, takes_version_of, PIN_STD_0_2,
 };
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::{Clock, Discarded, Solved, SolverOptions, Statement, AUTHOR};
@@ -206,6 +206,22 @@ pub struct VersionRaise {
     pub why: Vec<String>,
     /// The names in it spelled like a word that 0.3 adds, whose meaning the raise may change
     /// (16.1, 16.5): a warning for each, and the file is raised all the same.
+    pub clashes: Vec<String>,
+    /// The files it includes that write no VERSION and take its version (16.1): raised, it has
+    /// them read in 0.3 too, and each gets a warning, with one for each name in it spelled like a
+    /// word that 0.3 adds. Their text is not changed.
+    pub followers: Vec<Follower>,
+}
+
+/// A file level that writes no VERSION and takes the version of a file raised to 0.3, which
+/// includes it (16.1): it reads in 0.3 with it ([`VersionRaise::followers`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Follower {
+    /// The path of its file, `/`-separated.
+    pub path: String,
+    /// Its library section, which is read as a file of its own (2.8); None for the file read whole.
+    pub section: Option<String>,
+    /// The names in it spelled like a word that 0.3 adds, as [`VersionRaise::clashes`].
     pub clashes: Vec<String>,
 }
 
@@ -353,13 +369,16 @@ pub fn solve_watched(
             }) else {
                 continue;
             };
-            asked.push((level, !pins_std(doc, level), section.clone(), spelled_like_new_words(doc, level)));
+            let clashes = spelled_like_new_words(doc, level, &original.imported_aliases);
+            asked.push((level, !pins_std(doc, level), section.clone(), clashes));
         }
         let all: Vec<(usize, bool)> = asked.iter().map(|(l, pin, _, _)| (*l, *pin)).collect();
         let (out, done) = raise_version(&original.doc, &text, &all);
         for ((level, pin, section, clashes), ok) in asked.into_iter().zip(done) {
             let why = if ok { Vec::new() } else { vec!["its header record cannot say 0.3 so".to_string()] };
-            let v = VersionRaise { path: path.clone(), section, raised: ok, pinned: ok && pin, why, clashes };
+            let followers = Vec::new();
+            let v =
+                VersionRaise { path: path.clone(), section, raised: ok, pinned: ok && pin, why, clashes, followers };
             raised.push((level, v));
         }
         if out != text {
@@ -378,6 +397,17 @@ pub fn solve_watched(
         let of = |l: usize| doc.file_level(l) == level;
         run.levels.iter().any(|l| of(l.problem.level) && l.problem.version == "0.3")
     };
+    // the files without a VERSION that take the version of one raised read in 0.3 with it (16.1)
+    let apart: Vec<usize> = raised.iter().filter(|(_, v)| v.raised).map(|(level, _)| *level).collect();
+    for (level, v) in raised.iter_mut().filter(|(_, v)| v.raised) {
+        let doc = &original.doc;
+        let follower = |l: usize| Follower {
+            path: normalize(&doc.levels[l].path),
+            section: doc.levels[l].section.clone(),
+            clashes: spelled_like_new_words(doc, l, &original.imported_aliases),
+        };
+        v.followers = takes_version_of(doc, *level, &apart).into_iter().map(follower).collect();
+    }
     run.raised = raised.into_iter().filter(|(level, v)| v.raised || !reads_0_3(*level)).map(|(_, v)| v).collect();
     Ok(run)
 }
@@ -867,10 +897,11 @@ pub fn lines(run: &SolveRun, all: bool) -> Vec<String> {
 /// The lines of a file of 0.2 that a record is written into: raised, with a warning for each name in it spelled like
 /// a word that 0.3 adds, or kept at 0.2 with a warning (16.1).
 pub fn raised(v: &VersionRaise) -> Vec<String> {
-    let name = match &v.section {
-        Some(s) => format!("{} ({s})", file_name(&v.path)),
-        None => file_name(&v.path).to_string(),
+    let named = |path: &str, section: &Option<String>| match section {
+        Some(s) => format!("{} ({s})", file_name(path)),
+        None => file_name(path).to_string(),
     };
+    let name = named(&v.path, &v.section);
     if v.raised {
         let series = if v.pinned {
             format!("its header record keeps the standard series 0.2 it was read with: {PIN_STD_0_2} (16.3)")
@@ -881,6 +912,15 @@ pub fn raised(v: &VersionRaise) -> Vec<String> {
         out.extend(v.clashes.iter().map(|c| {
             format!("warning: {name}: {c}, has the spelling of a word that 0.3 adds (2.8): raised to 0.3, it may mean something else (16.1)")
         }));
+        for f in &v.followers {
+            let child = named(&f.path, &f.section);
+            out.push(format!(
+                "warning: {child}: it writes no VERSION and takes that of {name}: it reads in 0.3 too, its text unchanged (16.1); @VERSION(\"0.2\") written in its header record keeps it at 0.2"
+            ));
+            out.extend(f.clashes.iter().map(|c| {
+                format!("warning: {child}: {c}, has the spelling of a word that 0.3 adds (2.8): read in 0.3, it may mean something else (16.1)")
+            }));
+        }
         out
     } else {
         vec![format!(

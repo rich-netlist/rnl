@@ -29,10 +29,17 @@ export default {
   // the opener plugin, which the app's capability lets open the repository's pages on GitHub only
   browse: (url) => invoke("plugin:opener|open_url", { url }),
   // the Solve menu (decision 0010): solved natively on a thread of the app's, nothing written
-  solve: (source, timeLimit) =>
+  solve: (source, settings) =>
     invoke(
       "solve_preview",
-      source.text === undefined ? { path: source.path, timeLimit } : { name: source.name, text: source.text, timeLimit },
+      source.text === undefined ? { path: source.path, settings } : { name: source.name, text: source.text, settings },
+    ),
+  // the solver's own defaults and options, which Solve > Settings shows and checks
+  solverDefaults: () => invoke("solver_defaults"),
+  checkSolverOptions: (options) =>
+    invoke("check_solver_options", { options }).then(
+      () => null,
+      (e) => (e instanceof Error ? e.message : String(e)),
     ),
   cancelSolve() {
     invoke("cancel_solve").catch(() => {});

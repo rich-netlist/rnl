@@ -1,14 +1,18 @@
-//! The names of the standard series 0.2 that the series 0.3 renamed, moved or left out, and the
-//! roles it renamed (16.3), for the diagnostics of a file that writes one where the series 0.3 is
-//! in effect: they name what the series 0.3 has instead, as the migration table of
-//! `libraries/standard` does. A hint is given only when the reading finds a name of the series 0.3,
-//! so a file of the series 0.2 is never told about 0.3.
+//! The names of the standard series 0.2 that the series 0.3 renamed, moved or left out, the roles
+//! it renamed, and the packages it merged (16.3), for the diagnostics of a file that writes one
+//! where the series 0.3 is in effect: they name what the series 0.3 has instead, as the migration
+//! table of `libraries/standard` does. A hint is given only when the reading finds a name of the
+//! series 0.3, or, for a package, in a file read in 0.3 that does not pin the series 0.2, so a file
+//! of the series 0.2 is never told about 0.3.
 
 use super::ctx::Ctx;
+use super::obj::UnitId;
+use super::packages::STD_NAME;
+use super::unit::UseDecl;
 use super::Interp;
 
 /// A name of the series 0.2, without its `$`, and the name the series 0.3 gives the same thing.
-const RENAMED: [(&str, &str); 20] = [
+const RENAMED: [(&str, &str); 21] = [
     // symbols
     ("RES", "RESISTOR"),
     ("CAP", "CAPACITOR"),
@@ -31,6 +35,7 @@ const RENAMED: [(&str, &str); 20] = [
     ("GND_STUB", "GROUND_STUB"),
     ("GND_FILL_SET", "GROUND_FILL_SET"),
     ("LABEL_TERM_SET", "LABEL_TERMINAL_SET"),
+    ("MIRROR_PAIR", "MIRRORED"),
 ];
 
 /// A symbol of the series 0.2 whose name the series 0.3 gives to a definition, and the name the
@@ -63,6 +68,9 @@ const LEFT_OUT: [(&str, &str); 3] = [
 /// A role of a definition of the series 0.2 that the series 0.3 renamed: the definition, without
 /// its `$`, the role in the series 0.2 and the role in the series 0.3.
 const ROLE_RENAMED: [(&str, &str, &str); 1] = [("CHAIN", "series", "chain")];
+
+/// The packages of the series 0.2 that the series 0.3 merged into one, and that one.
+const MERGED: ([&str; 2], &str) = (["rnl-std-layout", "rnl-std-semantics"], "rnl-std-structures");
 
 impl Interp<'_> {
     /// Why `$name` cannot be found, when it is a name of the series 0.2 and the series 0.3 is in
@@ -98,6 +106,46 @@ impl Interp<'_> {
         let &(_, _, new) =
             ROLE_RENAMED.iter().find(|(d, old, _)| definition.strip_prefix('$') == Some(*d) && *old == role)?;
         roles.contains(&new).then(|| format!("; the standard series 0.3 calls it {new} (16.3)"))
+    }
+
+    /// Why a USE-PACKAGE, or a package's reference, that names a package the series 0.3 merged
+    /// into another does not bring in what it did in the series 0.2: given in a file read in 0.3
+    /// that does not pin another version of the standard package, unless it asks for a version
+    /// other than 0.3, the series 0.2's, or finds a package of that name of the version 0.3. An
+    /// inline package of that name, such as the empty one that dropped the package in the series
+    /// 0.2, gets it too: in the series 0.3 it stands for no package (16.2, 16.3).
+    pub(crate) fn merged_in_0_3(&self, decl: &UseDecl) -> Option<String> {
+        let (merged, into) = MERGED;
+        let name = decl.name.as_str();
+        if !merged.contains(&name) || !self.follows_0_3(decl.unit) || self.pins_another_series(decl.unit) {
+            return None;
+        }
+        if decl.version.as_deref().is_some_and(|v| v != "0.3") {
+            return None;
+        }
+        if decl.body.is_none() && decl.pkg.is_some_and(|p| self.pkg_ver(p) == "0.3") {
+            return None;
+        }
+        Some(format!(
+            "{name} is no package of the standard series 0.3, which merged {} and {} into {into}: to turn the default drawing of a definition off, write a rule such as # @SELECT-USAGE $DIFFERENTIAL_PAIR => @PRIORITY(\"disabled\"); to do without the package and its definitions, write @USE-PACKAGE(name=\"{into}\") {{}}",
+            merged[0], merged[1]
+        ))
+    }
+
+    /// Whether a header record of the file of `u`, or of a file that includes it, pins the
+    /// standard package to a version other than 0.3, which puts that series in effect (16.3).
+    fn pins_another_series(&self, u: UnitId) -> bool {
+        let mut file = self.file_unit(u);
+        while let Some(f) = file {
+            let pins =
+                |d: &UseDecl| d.in_header && d.name == STD_NAME && d.version.as_deref().is_some_and(|v| v != "0.3");
+            if self.units[f].uses.iter().any(pins) {
+                return true;
+            }
+            let above = self.units[f].level.and_then(|l| self.doc.levels[l].parent);
+            file = above.and_then(|p| self.file_unit(self.level_unit[p]));
+        }
+        false
     }
 
     /// Why `$name` is not the symbol it was in the series 0.2, when the series 0.3 is in effect

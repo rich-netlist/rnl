@@ -6,7 +6,9 @@
 //! neighbours in a row on heights that suit the way the pins they are drawn to each other by leave
 //! ([`RowLink`]), apart by their boxes and a gap, neighbouring rows apart likewise, neighbouring
 //! blocks of a group apart, ports beside the pins they connect to, and, for a candidate with even
-//! rows, equal steps in each row. Each relation is a unit of the solver's own, ranked after every
+//! rows, equal steps between the members of a row that are of one set to space evenly
+//! (`crate::structure::Structure::even_sets`): a group, a DISTRIBUTE or a mirror pair, or one kind
+//! and one role. Each relation is a unit of the solver's own, ranked after every
 //! fact (8.5): the resolution takes it in after the facts kept, and one that does not fit with
 //! them is dropped, never a fact.
 //!
@@ -22,8 +24,11 @@
 //! 1. the variants of the children are combined, a beam of `beam` combinations kept;
 //! 2. the order of the items is made by the barycentre of what each is connected to, over a few
 //!    rounds, keeping the left-to-right precedences the facts give, then varied by swapping
-//!    neighbours, and by reversing each ORDER or DISTANCE on x whose side the facts leave open
-//!    (`crate::structure::Reversible`), which the resolution then turns;
+//!    neighbours, an element with the next item of its own row, and by reversing each ORDER or
+//!    DISTANCE on x whose side the facts leave open and each DISTRIBUTE on x of three members or
+//!    more (`crate::structure::Reversible`), which the resolution then turns: a swap that breaks the
+//!    order of a DISTRIBUTE's members, one way or the other, is not made, as its even steps would
+//!    leave the gaps between them out;
 //! 3. each free class whose members lie in the node takes the orientation that turns most of its
 //!    pins towards what they connect to, among those its sources allow (sources towards the
 //!    ground, an end on the ground and grounds below their pins), and is varied to its second
@@ -35,7 +40,9 @@
 //!    the rest, so that different arrangements each keep a place.
 //!
 //! The root's variants are the complete candidates; P0 joins them, and with the even rows in force
-//! each has a twin with evenly spaced rows. The coordinates of each are then sought by the
+//! each has a twin with evenly spaced rows, where a row holds three or more of one set to space
+//! evenly at a regular interval ([`evenly`]); never for a row as such, a chain of a `$FLOW` or the
+//! elements in no group (quality review SE-3). The coordinates of each are then sought by the
 //! lexicographic LP (`crate::coords`). The search makes no more than `Budget::candidates`
 //! candidates; past that it keeps what it has.
 
@@ -97,7 +104,8 @@ pub(crate) struct Candidate {
     pub rows: Vec<Vec<usize>>,
     /// Blocks next to each other in a group: the elements of the left one and of the right one.
     pub apart: Vec<(Vec<usize>, Vec<usize>)>,
-    /// Rows of three or more members evenly spaced.
+    /// In each row, the members of each set to space evenly (`Structure::even_sets`), when three
+    /// or more at a regular interval, evenly spaced ([`evenly`]).
     pub even: bool,
     /// Elements in neighbouring rows connected pin to pin put in one column.
     pub columns: bool,
@@ -459,10 +467,17 @@ fn dressed_box(s: &Structure, k: usize, o: Orient) -> Option<[Q; 4]> {
     Some(b)
 }
 
-/// The box of an element with what hangs from it, the texts of each symbol included: its stubs
-/// where their facts put them, and what is attached to it.
-fn effective_box(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usize, Attach>) -> [Q; 4] {
-    let mut b = dressed_box(s, k, ori[k]).unwrap_or_else(empty_box);
+/// The parts of the box of an element with what hangs from it ([`effective_box`]), each about the
+/// element's origin: its symbol's box, the box of its texts, each text that offsets place from its
+/// origin (`Structure::offset_labels`), each of its stubs with its texts where their facts put
+/// them, and each object attached to it with its texts; a port in the gap between two rows only as
+/// wide as it is, and no higher than the parts before it.
+fn parts(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usize, Attach>) -> Vec<[Q; 4]> {
+    let mut out: Vec<[Q; 4]> = match s.box_offset(k, ori[k]) {
+        Some(body) => [Some(body), s.label_offset(k, ori[k])].into_iter().flatten().collect(),
+        None => vec![empty_box()],
+    };
+    out.extend(s.offset_labels.get(&k).into_iter().flatten().cloned());
     for &j in s.hanging.get(&k).map_or(&[][..], |v| v) {
         let Some(stub) = &s.objects[j].stub else { continue };
         let (Some(hp), Some(sp), Some(sb)) =
@@ -471,36 +486,323 @@ fn effective_box(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usiz
             continue;
         };
         let at = [&hp[0] - &sp[0], &hp[1] + &stub.rise - &sp[1]];
-        union(&mut b, &shifted(&sb, &at));
+        out.push(shifted(&sb, &at));
     }
     for (&j, a) in attach.iter().filter(|(_, a)| a.host.0 == k) {
         if let (Some(at), Some(sb)) = (attach_offset(s, j, a, ori), dressed_box(s, j, ori[j])) {
             let mut sb = shifted(&sb, &at);
             if a.facing.is_some() {
                 // a port in the gap between two rows widens its host, and leaves its height alone
+                let mut b = out[0].clone();
+                for p in &out[1..] {
+                    union(&mut b, p);
+                }
                 sb[1] = b[1].clone();
                 sb[3] = b[3].clone();
             }
-            union(&mut b, &sb);
+            out.push(sb);
         }
     }
+    out
+}
+
+/// The box of an element with what hangs from it, the texts of each symbol included: its stubs
+/// where their facts put them, and what is attached to it; the union of its [`parts`].
+fn effective_box(s: &Structure, k: usize, ori: &[Orient], attach: &BTreeMap<usize, Attach>) -> [Q; 4] {
+    let parts = parts(s, k, ori, attach);
+    let mut b = parts[0].clone();
+    for p in &parts[1..] {
+        union(&mut b, p);
+    }
     b
+}
+
+/// The gap between two rows for one pair of elements, one in each (quality review SE-4): the
+/// origin of `upper` at least `least` above that of `lower`.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct RowPair {
+    pub upper: usize,
+    pub lower: usize,
+    pub least: Q,
+}
+
+/// The wires that the router draws along the rows, placed at `origins`, each a part of an element
+/// that moves with it on y, about its origin, by the element (see [`row_pairs`]):
+///
+/// - the wire of each L between neighbours of a row, a pin that leaves sideways towards one that
+///   leaves up or down (a [`RowLink`] of rank 2): at the height of the sideways pin, from the other
+///   pin's x to it, a part of the element with the sideways pin;
+/// - the wire from a pin to a pin of its net in another row that it leaves towards: from a pin that
+///   leaves up to one in a row above, or down to one in a row below, a unit beyond the pin's lead,
+///   where the wire can turn along the row at the latest; from a pin that leaves sideways towards
+///   the other's x, at its height; from its x to the other's, a part of the element of the pin.
+fn wire_parts(
+    s: &Structure,
+    c: &Candidate,
+    ori: &[Orient],
+    origins: &[[Q; 2]],
+    grid: &Option<Q>,
+) -> Vec<(usize, [Q; 4])> {
+    let mut out = Vec::new();
+    let span = |at: &[Q; 2], x: Q, y: Q| {
+        let (x1, x2) = if x < at[0] { (x, at[0].clone()) } else { (at[0].clone(), x) };
+        [x1, y.clone(), x2, y]
+    };
+    for row in &c.rows {
+        for w in row.windows(2) {
+            let Some(RowLink { rank: 2, pins: Some((pa, pb)), .. }) = row_link(s, w[0], w[1], ori, grid) else {
+                continue;
+            };
+            let (side, other) = if s.exit(w[0], pa, ori[w[0]]) == Some((1, 0)) {
+                ((w[0], pa), (w[1], pb))
+            } else {
+                ((w[1], pb), (w[0], pa))
+            };
+            let (Some(sp), Some(op)) =
+                (s.pin_offset(side.0, side.1, ori[side.0]), s.pin_offset(other.0, other.1, ori[other.0]))
+            else {
+                continue;
+            };
+            let x = &origins[other.0][0] + &op[0] - &origins[side.0][0];
+            out.push((side.0, span(&sp, x, sp[1].clone())));
+        }
+    }
+    let row_of: BTreeMap<usize, usize> =
+        c.rows.iter().enumerate().flat_map(|(r, row)| row.iter().map(move |&k| (k, r))).collect();
+    for (&b, &rb) in &row_of {
+        for q in 0..s.pins(b).len() {
+            let (Some((ex, ey)), Some(qo)) = (s.exit(b, q, ori[b]), s.pin_offset(b, q, ori[b])) else { continue };
+            for &t in s.connections.targets.get(&(b, q)).map_or(&[][..], |v| v) {
+                let Some(&rt) = row_of.get(&t.0) else { continue };
+                if rt == rb || !s.connections.routed((b, q), t) {
+                    continue;
+                }
+                let Some(to) = s.pin_offset(t.0, t.1, ori[t.0]) else { continue };
+                let x = &origins[t.0][0] + &to[0] - &origins[b][0];
+                // the rows are listed from the top down
+                let y = match (ex, ey) {
+                    (0, 1) if rt < rb => &qo[1] + int(CLEARANCE),
+                    (0, -1) if rt > rb => &qo[1] - int(CLEARANCE),
+                    (ex, 0) if ex != 0 && (&x - &qo[0]).signum() == int(ex) => qo[1].clone(),
+                    _ => continue,
+                };
+                out.push((b, span(&qo, x, y)));
+            }
+        }
+    }
+    out
+}
+
+/// The wires that the router draws between rows, with the elements placed at some origins (see
+/// [`corridors`] and [`row_pairs`]).
+#[derive(Clone, Debug, Default)]
+struct Corridors {
+    /// For each two pins of elements in different rows that the router joins, but those of which
+    /// one leaves sideways towards the other: the span on x from one to the other, once for each
+    /// gap between neighbouring rows that the wire passes, by the upper of those two rows.
+    spans: BTreeSet<(usize, Q, Q)>,
+    /// For each gap between neighbouring rows, the stretch on x that each net runs along it, one
+    /// track: the shortest of its spans there, when the pins of the net above the gap and those
+    /// below it do not overlap on x; where they overlap, a wire straight down joins the two sides.
+    runs: BTreeMap<usize, Vec<(Q, Q)>>,
+}
+
+impl Corridors {
+    /// How many nets run along the gap `band` somewhere over a span, at most, and one at least:
+    /// the runs over a point of it, at its start or at the start of a run. Each needs a track.
+    fn tracks(&self, band: usize, x0: &Q, x1: &Q) -> usize {
+        let runs = self.runs.get(&band).map_or(&[][..], |v| v);
+        let points = std::iter::once(x0).chain(runs.iter().map(|(a, _)| a).filter(|a| *a > x0 && *a <= x1));
+        points.map(|x| runs.iter().filter(|(a, b)| a <= x && x <= b).count()).max().unwrap_or(0).max(1)
+    }
+}
+
+/// The wires that the router draws between rows ([`Corridors`]), with the elements placed at
+/// `origins`.
+fn corridors(s: &Structure, c: &Candidate, ori: &[Orient], origins: &[[Q; 2]]) -> Corridors {
+    let row_of: BTreeMap<usize, usize> =
+        c.rows.iter().enumerate().flat_map(|(r, row)| row.iter().map(move |&k| (k, r))).collect();
+    let mut out = Corridors::default();
+    // the x of the pins of each net routed, with their rows, and the spans of each net by gap
+    let mut pins: BTreeMap<usize, Vec<(usize, Q)>> = BTreeMap::new();
+    let mut spans: BTreeMap<(usize, usize), Vec<(Q, Q)>> = BTreeMap::new();
+    for (&b, &rb) in &row_of {
+        for q in 0..s.pins(b).len() {
+            let (Some(qo), Some(&net)) = (s.pin_offset(b, q, ori[b]), s.connections.route_of.get(&(b, q))) else {
+                continue;
+            };
+            let xb = &origins[b][0] + &qo[0];
+            pins.entry(net).or_default().push((rb, xb.clone()));
+            for &t in s.connections.targets.get(&(b, q)).map_or(&[][..], |v| v) {
+                // each two pins once, from the upper; the rows are listed from the top down
+                let Some(&rt) = row_of.get(&t.0) else { continue };
+                if rt <= rb || !s.connections.routed((b, q), t) {
+                    continue;
+                }
+                let Some(to) = s.pin_offset(t.0, t.1, ori[t.0]) else { continue };
+                let xt = &origins[t.0][0] + &to[0];
+                // a pin that leaves sideways towards the other's x has the wire along its own
+                // height, which its wire part keeps clear ([`wire_parts`]), not along the gap
+                let towards = |k: usize, pin: usize, from: &Q, to: &Q| match s.exit(k, pin, ori[k]) {
+                    Some((ex, 0)) => ex != 0 && (to - from).signum() == int(ex),
+                    _ => false,
+                };
+                if towards(b, q, &xb, &xt) || towards(t.0, t.1, &xt, &xb) {
+                    continue;
+                }
+                let (x0, x1) = if xb <= xt { (xb.clone(), xt) } else { (xt, xb.clone()) };
+                for band in rb..rt {
+                    out.spans.insert((band, x0.clone(), x1.clone()));
+                    spans.entry((band, net)).or_default().push((x0.clone(), x1.clone()));
+                }
+            }
+        }
+    }
+    let range = |xs: &mut dyn Iterator<Item = &Q>| -> Option<(Q, Q)> {
+        xs.fold(None, |r: Option<(Q, Q)>, x| match r {
+            None => Some((x.clone(), x.clone())),
+            Some((a, b)) => Some((if *x < a { x.clone() } else { a }, if *x > b { x.clone() } else { b })),
+        })
+    };
+    for ((band, net), list) in spans {
+        let at = &pins[&net];
+        let above = range(&mut at.iter().filter(|(r, _)| *r <= band).map(|(_, x)| x));
+        let below = range(&mut at.iter().filter(|(r, _)| *r > band).map(|(_, x)| x));
+        let (Some((a0, a1)), Some((b0, b1))) = (above, below) else { continue };
+        if a0 <= b1 && b0 <= a1 {
+            continue;
+        }
+        if let Some(run) = list.into_iter().min_by(|p, q| (&p.1 - &p.0).cmp(&(&q.1 - &q.0)).then_with(|| p.cmp(q))) {
+            out.runs.entry(band).or_default().push(run);
+        }
+    }
+    out
+}
+
+/// The pairs of elements of a candidate in two rows, one in the upper and one in a lower row, that
+/// two of their [`parts`] make neighbours on x where the elements are placed at `origins`: parts
+/// that overlap on x, or are less than `HGAP` apart. Each pair with the least height of the upper
+/// one's origin above the lower one's that keeps every such two parts `VGAP` apart on y, on the
+/// grid. The others need no gap: one row may rise into a gap of the other, beside what is there
+/// (quality review SE-4). The wires along the rows ([`wire_parts`]) are parts too, kept `CLEARANCE`
+/// from the parts of the other row, outside the boxes that the router widens by it, so that a row
+/// risen into a gap does not shut the way of a wire: VIN's to the gate of M1 under the ground of
+/// VDD in T2, those from the sources of T3's testbench up to XU1 under the grounds of VDD and XU1,
+/// which they would otherwise cross.
+///
+/// Over the span of each wire that the router draws between two rows ([`corridors`]), the rows
+/// stay apart as wholes: every part of an element of the upper row and every part of one of the
+/// lower that come within `CLEARANCE` of the span on x are kept `VGAP` apart, and a unit more for
+/// each other net that runs along the gap there ([`Corridors::tracks`]), so that the wire has a
+/// way along the gap whichever way its pins leave, and does not cross the lead of a stub hanging
+/// from the upper row beside an element risen into its gap (review of phase 2 of the quality
+/// review): T4's &vb, from VB on the left of the upper row, which leaves up, to the gates of M5
+/// and M7, which leave towards each other, past the ground of VIP; corpus 14's &in and &out, side
+/// by side under the ground of R2.
+pub(crate) fn row_pairs(
+    s: &Structure,
+    c: &Candidate,
+    ori: &[Orient],
+    origins: &[[Q; 2]],
+    options: &SolverOptions,
+) -> Vec<RowPair> {
+    let grid = grid_of(options);
+    let attach = attachments(s, &c.rows, ori);
+    // each part with whether it is a wire
+    let mut parts: BTreeMap<usize, Vec<([Q; 4], bool)>> = c
+        .rows
+        .iter()
+        .flatten()
+        .map(|&k| (k, parts(s, k, ori, &attach).into_iter().map(|p| (p, false)).collect()))
+        .collect();
+    for (k, wire) in wire_parts(s, c, ori, origins, &grid) {
+        parts.entry(k).or_default().push((wire, true));
+    }
+    // the least height of each pair, the larger of what it asks
+    let mut least: BTreeMap<(usize, usize), Q> = BTreeMap::new();
+    let mut ask = |a: usize, b: usize, need: Q| {
+        let l = least.entry((a, b)).or_insert_with(|| need.clone());
+        if need > *l {
+            *l = need;
+        }
+    };
+    let near = int(HGAP);
+    for (i, upper) in c.rows.iter().enumerate() {
+        for lower in &c.rows[i + 1..] {
+            for &a in upper {
+                for &b in lower {
+                    let (xa, xb) = (&origins[a][0], &origins[b][0]);
+                    for (pa, wa) in &parts[&a] {
+                        for (pb, wb) in &parts[&b] {
+                            let apart = (xb + &pb[0]) - (xa + &pa[2]) >= near || (xa + &pa[0]) - (xb + &pb[2]) >= near;
+                            if apart || (*wa && *wb) {
+                                continue;
+                            }
+                            // y_a + the bottom of pa >= y_b + the top of pb + the gap
+                            let gap = if *wa || *wb { CLEARANCE } else { VGAP };
+                            ask(a, b, &pb[3] - &pa[1] + int(gap));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // the parts of the elements of a row within CLEARANCE of a span on x, each with its element
+    let margin = int(CLEARANCE);
+    let within = |row: &[usize], x0: &Q, x1: &Q| -> Vec<(usize, [Q; 4])> {
+        row.iter()
+            .flat_map(|&k| parts[&k].iter().filter(|(_, wire)| !*wire).map(move |(p, _)| (k, p)))
+            .filter(|(k, p)| {
+                let x = &origins[*k][0];
+                x + &p[0] < x1 + &margin && x + &p[2] > x0 - &margin
+            })
+            .map(|(k, p)| (k, p.clone()))
+            .collect()
+    };
+    let corridors = corridors(s, c, ori, origins);
+    for (band, x0, x1) in &corridors.spans {
+        let (Some(upper), Some(lower)) = (c.rows.get(*band), c.rows.get(band + 1)) else { continue };
+        // a unit more for each other net along the gap there
+        let more = i64::try_from(corridors.tracks(*band, x0, x1)).unwrap_or(1) - 1;
+        let (high, low) = (within(upper, x0, x1), within(lower, x0, x1));
+        for (a, pa) in &high {
+            for (b, pb) in &low {
+                ask(*a, *b, &pb[3] - &pa[1] + int(VGAP + more));
+            }
+        }
+    }
+    least.into_iter().map(|((upper, lower), least)| RowPair { upper, lower, least: up(least, &grid) }).collect()
 }
 
 /// The relations of a candidate (see the module), with the orientations `ori` of the objects:
 /// the attachments, the rows, the gaps in the rows, the gaps between rows, the blocks apart, and
 /// the even rows. The orientations themselves are [`orientation_relations`].
 pub(crate) fn relations(s: &Structure, c: &Candidate, ori: &[Orient], options: &SolverOptions) -> Vec<Tagged> {
-    relations_within(s, c, ori, options, None)
+    relations_within(s, c, ori, options, None, None)
 }
 
-/// The relations of a candidate among the elements of `within` only, when given.
+/// The relations of a candidate (see [`relations`]), its rows apart pair by pair rather than
+/// whole: the order of the rows on the origins of their elements, and each pair of `pairs` its
+/// gap ([`row_pairs`]; quality review SE-4).
+pub(crate) fn relations_by_pairs(
+    s: &Structure,
+    c: &Candidate,
+    ori: &[Orient],
+    options: &SolverOptions,
+    pairs: &[RowPair],
+) -> Vec<Tagged> {
+    relations_within(s, c, ori, options, None, Some(pairs))
+}
+
+/// The relations of a candidate among the elements of `within` only, when given; neighbouring rows
+/// apart as wholes, or by `pairs` when given.
 fn relations_within(
     s: &Structure,
     c: &Candidate,
     ori: &[Orient],
     options: &SolverOptions,
     within: Option<&BTreeSet<usize>>,
+    pairs: Option<&[RowPair]>,
 ) -> Vec<Tagged> {
     let grid = grid_of(options);
     let inside = |k: &usize| within.is_none_or(|w| w.contains(k));
@@ -583,11 +885,47 @@ fn relations_within(
             });
         }
     }
-    for w in rows.windows(2) {
-        let low: Vec<Term> = w[1].iter().filter_map(|&k| Some((o(k)?, up(eff[&k][3].clone(), &grid)))).collect();
-        let high: Vec<Term> = w[0].iter().filter_map(|&k| Some((o(k)?, -up(-eff[&k][1].clone(), &grid)))).collect();
-        if !low.is_empty() && !high.is_empty() {
-            out.push(Tagged { kind: RelKind::RowsApart, rel: Relation::Apart { axis: 1, low, high, gap: int(VGAP) } });
+    match pairs {
+        None => {
+            for w in rows.windows(2) {
+                let low: Vec<Term> =
+                    w[1].iter().filter_map(|&k| Some((o(k)?, up(eff[&k][3].clone(), &grid)))).collect();
+                let high: Vec<Term> =
+                    w[0].iter().filter_map(|&k| Some((o(k)?, -up(-eff[&k][1].clone(), &grid)))).collect();
+                if !low.is_empty() && !high.is_empty() {
+                    out.push(Tagged {
+                        kind: RelKind::RowsApart,
+                        rel: Relation::Apart { axis: 1, low, high, gap: int(VGAP) },
+                    });
+                }
+            }
+        }
+        Some(pairs) => {
+            // the rows in their order: every origin of a row a step of the grid above every
+            // origin of the next
+            let step = up(Q::one(), &grid);
+            for w in rows.windows(2) {
+                let low: Vec<Term> = w[1].iter().filter_map(|&k| Some((o(k)?, Q::zero()))).collect();
+                let high: Vec<Term> = w[0].iter().filter_map(|&k| Some((o(k)?, Q::zero()))).collect();
+                if !low.is_empty() && !high.is_empty() {
+                    out.push(Tagged {
+                        kind: RelKind::RowsApart,
+                        rel: Relation::Apart { axis: 1, low, high, gap: step.clone() },
+                    });
+                }
+            }
+            for pair in pairs.iter().filter(|p| inside(&p.upper) && inside(&p.lower)) {
+                let (Some(a), Some(b)) = (o(pair.upper), o(pair.lower)) else { continue };
+                out.push(Tagged {
+                    kind: RelKind::RowsApart,
+                    rel: Relation::Linear {
+                        axis: 1,
+                        terms: vec![(a, one()), (b, -one())],
+                        lo: Some(pair.least.clone()),
+                        hi: None,
+                    },
+                });
+            }
         }
     }
     for (left, right) in &c.apart {
@@ -607,9 +945,30 @@ fn relations_within(
         out.extend(columns(s, &rows, ori));
     }
     if c.even {
-        for row in rows.iter().filter(|r| r.len() >= 3) {
-            let points: Vec<PointId> = row.iter().filter_map(|&k| o(k)).collect();
-            out.push(Tagged { kind: RelKind::Even, rel: Relation::Even { axis: 0, points } });
+        for members in evenly(s, &rows) {
+            let points: Vec<PointId> = members.into_iter().filter_map(o).collect();
+            if points.len() >= 3 {
+                out.push(Tagged { kind: RelKind::Even, rel: Relation::Even { axis: 0, points } });
+            }
+        }
+    }
+    out
+}
+
+/// What a candidate with even rows spaces evenly in `rows` (quality review SE-3): in each row, the
+/// members of each set to space evenly (`Structure::even_sets`), left to right, when there are
+/// three or more and they come at a regular interval in the row, each as many places after the one
+/// before: the legs of a ladder drawn rung by rung. Members in some other order, such as the
+/// sources of a ladder whose tail is out of order, are not, as no even steps of a row that keeps
+/// its order would be anything like as narrow.
+fn evenly(s: &Structure, rows: &[Vec<usize>]) -> Vec<Vec<usize>> {
+    let mut out = Vec::new();
+    for row in rows {
+        for set in &s.even_sets {
+            let at: Vec<usize> = (0..row.len()).filter(|&i| set.binary_search(&row[i]).is_ok()).collect();
+            if at.len() >= 3 && at.windows(2).all(|w| w[1] - w[0] == at[1] - at[0]) {
+                out.push(at.into_iter().map(|i| row[i]).collect());
+            }
         }
     }
     out
@@ -686,13 +1045,15 @@ pub(crate) struct RowLink {
     pub rank: u8,
     pub lo: Option<Q>,
     pub hi: Option<Q>,
+    /// The pins that link them, `a`'s and `b`'s, by their index in their symbols.
+    pub pins: Option<(usize, usize)>,
 }
 
 impl RowLink {
     /// Neighbours drawn to each other through none of their pins so linked: their origins on one
     /// height.
     fn origins() -> RowLink {
-        RowLink { rank: u8::MAX, lo: Some(Q::zero()), hi: Some(Q::zero()) }
+        RowLink { rank: u8::MAX, lo: Some(Q::zero()), hi: Some(Q::zero()), pins: None }
     }
 
     /// The height of `b` above `a` that a sketch takes: the bound, tight.
@@ -739,10 +1100,11 @@ fn row_link(s: &Structure, a: usize, b: usize, ori: &[Orient], grid: &Option<Q>)
                     "horizontal-vertical" => from_a == to_b,
                     _ => false,
                 });
+            let pins = Some((p, t.1));
             let link = if to_b && to_a {
-                RowLink { rank: 0, lo: Some(c.clone()), hi: Some(c) }
+                RowLink { rank: 0, lo: Some(c.clone()), hi: Some(c), pins }
             } else if routed && ((to_b && eb.is_none()) || (to_a && ea.is_none())) {
-                RowLink { rank: 1, lo: Some(c.clone()), hi: Some(c) }
+                RowLink { rank: 1, lo: Some(c.clone()), hi: Some(c), pins }
             } else if let (Some(ey), true) = (
                 if to_b {
                     vertical(eb)
@@ -757,14 +1119,14 @@ fn row_link(s: &Structure, a: usize, b: usize, ori: &[Orient], grid: &Option<Q>)
                 // y_b − y_a − c when the sideways pin is b's, and its opposite when it is a's
                 let clearance = int(CLEARANCE);
                 if (to_a && ey > 0) || (to_b && ey < 0) {
-                    RowLink { rank: 2, lo: Some(up(c + clearance, grid)), hi: None }
+                    RowLink { rank: 2, lo: Some(up(c + clearance, grid)), hi: None, pins }
                 } else {
-                    RowLink { rank: 2, lo: None, hi: Some(-up(clearance - c, grid)) }
+                    RowLink { rank: 2, lo: None, hi: Some(-up(clearance - c, grid)), pins }
                 }
             } else if routed && vertical(ea).is_some() && vertical(ea) == vertical(eb) {
-                RowLink { rank: 3, lo: Some(c.clone()), hi: Some(c) }
+                RowLink { rank: 3, lo: Some(c.clone()), hi: Some(c), pins }
             } else if !routed && (sideways(ea) || sideways(eb)) {
-                RowLink { rank: 1, lo: Some(c.clone()), hi: Some(c) }
+                RowLink { rank: 1, lo: Some(c.clone()), hi: Some(c), pins }
             } else {
                 continue;
             };
@@ -1054,12 +1416,81 @@ fn facing(s: &Structure, at: &[[Q; 2]], ori: &[Orient], class: &FreeClass, value
     score
 }
 
-/// The values of a class best first: the most pins facing, then by [`preference`].
-fn ranked_values(s: &Structure, at: &[[Q; 2]], ori: &[Orient], class: &FreeClass) -> Vec<Orient> {
-    let mut values: Vec<(i64, u8, Orient)> =
-        domain(s, class).into_iter().map(|v| (-facing(s, at, ori, class, v), preference(v), v)).collect();
-    values.sort_by_key(|(f, i, _)| (*f, *i));
-    values.into_iter().map(|(_, _, v)| v).collect()
+/// How many pins of elements in the rows of a class's members, that the members' pins are drawn
+/// to, lie on the side of their member that its texts are on, at the class value `value`: one for
+/// each such pin, by its x on the sketch `at` against the member's origin and the middle of the
+/// box of the member's texts (`Structure::label_offset`). A text between two neighbours drawn to
+/// each other widens the gap that the wire between them crosses (quality review SE-8).
+fn texts_inwards(
+    s: &Structure,
+    at: &[[Q; 2]],
+    ori: &[Orient],
+    rows: &[Vec<usize>],
+    class: &FreeClass,
+    value: Orient,
+) -> i64 {
+    let row_of = |k: usize| rows.iter().position(|r| r.contains(&k));
+    let mut count = 0;
+    for &(m, label) in &class.members {
+        let Some(row) = row_of(m) else { continue };
+        let o = value.then(label);
+        let Some(l) = s.label_offset(m, o) else { continue };
+        // twice the middle of the texts' box, from the origin
+        let side = (&l[0] + &l[2]).signum();
+        if side.is_zero() {
+            continue;
+        }
+        for pin in 0..s.pins(m).len() {
+            for &t in s.connections.targets.get(&(m, pin)).map_or(&[][..], |v| v) {
+                if s.objects[t.0].role != Role::Element || t.0 == m || row_of(t.0) != Some(row) {
+                    continue;
+                }
+                let Some(q) = s.pin_at(at, ori, t.0, t.1) else { continue };
+                count += i64::from((&q[0] - &at[m][0]).signum() == side);
+            }
+        }
+    }
+    count
+}
+
+/// Where a pin is about its object's origin and which way it leaves.
+type PinPlace = (Option<[Q; 2]>, Option<(i64, i64)>);
+
+/// Where the pins of a class's members are and which way they leave, at the class value `value`:
+/// two values with the same differ only in where the members' texts go.
+fn pin_places(s: &Structure, class: &FreeClass, value: Orient) -> Vec<PinPlace> {
+    class
+        .members
+        .iter()
+        .flat_map(|&(m, label)| {
+            let o = value.then(label);
+            (0..s.pins(m).len()).map(move |pin| (s.pin_offset(m, pin, o), s.exit(m, pin, o)))
+        })
+        .collect()
+}
+
+/// The values of a class best first: the most pins facing, then by [`preference`]; but of values
+/// that put every pin of the members in the same place, leaving the same way, such as a source
+/// upright and mirrored, the one with the fewest pins of neighbours on the side of the texts first
+/// ([`texts_inwards`]), so that the texts go on the outer side (quality review SE-8). Between
+/// values that move the pins, such as the gate of a transistor, the texts decide nothing.
+fn ranked_values(s: &Structure, at: &[[Q; 2]], ori: &[Orient], rows: &[Vec<usize>], class: &FreeClass) -> Vec<Orient> {
+    let domain = domain(s, class);
+    let places: Vec<_> = domain.iter().map(|&v| pin_places(s, class, v)).collect();
+    // each value by the most preferred of the values that put the pins where it does
+    let first: Vec<u8> = places
+        .iter()
+        .map(|p| domain.iter().zip(&places).filter(|(_, q)| *q == p).map(|(v, _)| preference(*v)).min().unwrap_or(0))
+        .collect();
+    let mut values: Vec<(i64, u8, i64, u8, Orient)> = domain
+        .iter()
+        .zip(first)
+        .map(|(&v, first)| {
+            (-facing(s, at, ori, class, v), first, texts_inwards(s, at, ori, rows, class, v), preference(v), v)
+        })
+        .collect();
+    values.sort_by_key(|(f, first, t, i, _)| (*f, *first, *t, *i));
+    values.into_iter().map(|(_, _, _, _, v)| v).collect()
 }
 
 /// An item of a group node: a child block, or one of its own elements.
@@ -1078,7 +1509,8 @@ struct Plan {
     values: Vec<Orient>,
     /// The order of the items of each node decided.
     items: BTreeMap<usize, Vec<Item>>,
-    /// The facts whose side is open that the plan reverses, by index in `Structure::reversible`.
+    /// The facts whose side is open and the DISTRIBUTEs that the plan reverses, by index in
+    /// `Structure::reversible`.
     flipped: BTreeSet<usize>,
 }
 
@@ -1087,7 +1519,7 @@ type Scored = (Vec<Q>, Vec<u32>, Plan);
 
 /// A variant of a node: its elements in order, the values of the classes decided in it and below,
 /// the orders of its items and of those below, and whether it reverses each fact whose side is open
-/// decided in it and below.
+/// and each DISTRIBUTE decided in it and below (`Structure::reversible`).
 #[derive(Clone, Debug, PartialEq)]
 struct Variant {
     order: Vec<usize>,
@@ -1143,8 +1575,8 @@ impl Search<'_> {
         p
     }
 
-    /// The node at which a fact whose side is open is decided: the lowest that holds every
-    /// element it orders.
+    /// The node at which a fact whose side is open or a DISTRIBUTE (`Structure::reversible`) is
+    /// decided: the lowest that holds every element it orders.
     fn reversible_node(&self, r: usize) -> usize {
         let elements: BTreeSet<usize> = self.s.reversible[r].pairs.iter().flat_map(|&(a, b)| [a, b]).collect();
         self.s.tree.lowest_common(&elements.into_iter().collect::<Vec<usize>>())
@@ -1354,7 +1786,7 @@ impl Search<'_> {
         let at = sketch(self.problem, s, &cand, &ori, self.options);
         for &c in classes {
             let class = &s.open.classes[c];
-            let ranked = ranked_values(s, &at, &ori, class);
+            let ranked = ranked_values(s, &at, &ori, &cand.rows, class);
             if let Some(&best) = ranked.first() {
                 p.values[c] = best;
                 for (m, label) in &class.members {
@@ -1451,17 +1883,29 @@ impl Search<'_> {
                 tried.push((e, code, p));
                 seconds.push(second);
             }
-            // 3. the neighbourhood of the best: neighbours swapped, a class at its second best
+            // 3. the neighbourhood of the best: neighbours swapped, a class at its second best. An
+            // element is swapped with the next item that is a block or an element of its own row:
+            // two items next to each other in the order but in different rows change no row
             let Some(&b) = rank_of(s, &tried).first() else { continue };
             let (bp, second) = (tried.swap_remove(b).2, seconds.swap_remove(b));
             let border = bp.items.get(&node).cloned().unwrap_or_default();
             let before = precedences(s, &bp.flipped);
-            for i in 1..border.len() {
+            let row_of = |it: Item| match it {
+                Item::Element(k) => s.rows.iter().position(|r| r.contains(&k)),
+                Item::Block(_) => None,
+            };
+            for i in 0..border.len() {
                 if self.out_of_budget() {
                     break;
                 }
+                let next = match row_of(border[i]) {
+                    Some(r) => (i + 1..border.len())
+                        .find(|&j| matches!(border[j], Item::Block(_)) || row_of(border[j]) == Some(r)),
+                    None => (i + 1 < border.len()).then_some(i + 1),
+                };
+                let Some(j) = next else { continue };
                 let mut o = border.clone();
-                o.swap(i - 1, i);
+                o.swap(i, j);
                 let place = |it: Item| (Q::zero(), o.iter().position(|x| *x == it).unwrap_or(0));
                 if self.order_items(node, &o, &place, &before) != o {
                     continue;
@@ -1491,7 +1935,7 @@ impl Search<'_> {
                 let (e, cand) = self.estimate(&p);
                 found.push((e, cand.code(s), p));
             }
-            // and each fact whose side is open decided here reversed
+            // and each fact whose side is open and each DISTRIBUTE decided here reversed
             let reversed = self.reversed(node, &bp, &border);
             found.extend(reversed);
         }
@@ -1580,9 +2024,9 @@ impl Search<'_> {
             .collect()
     }
 
-    /// The plan `bp` with each fact whose side is open decided at `node` reversed in turn
-    /// (`Structure::reversible`), its items in the order nearest to `border` that the reversed
-    /// precedences allow, each with its estimate.
+    /// The plan `bp` with each fact whose side is open and each DISTRIBUTE decided at `node`
+    /// reversed in turn (`Structure::reversible`), its items in the order nearest to `border` that
+    /// the reversed precedences allow, each with its estimate.
     fn reversed(&mut self, node: usize, bp: &Plan, border: &[Item]) -> Vec<Scored> {
         let s = self.s;
         let mut out = Vec::new();
@@ -1689,7 +2133,7 @@ impl Search<'_> {
         let s = self.s;
         let ori = c.orientations(s);
         let mut rels = orientation_relations(s, c);
-        rels.extend(relations_within(s, c, &ori, self.options, Some(within)));
+        rels.extend(relations_within(s, c, &ori, self.options, Some(within), None));
         with_relations(s, &rels, &mut *self.work, |_, _, t| t.kept.iter().filter(|k| !**k).count())
     }
 }
@@ -1708,7 +2152,8 @@ fn ranked(s: &Structure, list: Vec<Scored>) -> Vec<Scored> {
 }
 
 /// The left-to-right precedences between elements: those of the facts with a side, and those of
-/// the facts whose side is open, reversed for the facts of `flipped` (`Structure::reversible`).
+/// the facts whose side is open and of the DISTRIBUTEs, reversed for those of `flipped`
+/// (`Structure::reversible`).
 fn precedences(s: &Structure, flipped: &BTreeSet<usize>) -> BTreeSet<(usize, usize)> {
     let mut out = s.precedence.clone();
     for (r, rev) in s.reversible.iter().enumerate() {
@@ -1736,7 +2181,8 @@ fn p0_plan(s: &Structure) -> Plan {
 }
 
 /// The candidates of a level (see the module): the root's variants best first, then P0, and with
-/// the even rows in force a twin with even rows after each, none twice.
+/// the even rows in force a twin with even rows after each that has members to space evenly
+/// ([`evenly`]), none twice.
 pub(crate) fn search(
     problem: &LevelProblem,
     s: &Structure,
@@ -1763,9 +2209,12 @@ pub(crate) fn search(
         }
     }
     out.push(p0);
-    if s.has(Source::EvenRows) && s.rows.iter().any(|r| r.len() >= 3) {
-        let twins: Vec<Candidate> = out.iter().map(|c| Candidate { even: true, ..c.clone() }).collect();
-        out = out.into_iter().zip(twins).flat_map(|(a, b)| [a, b]).collect();
+    if s.has(Source::EvenRows) {
+        let twins: Vec<Option<Candidate>> = out
+            .iter()
+            .map(|c| (!evenly(s, &c.rows).is_empty()).then(|| Candidate { even: true, ..c.clone() }))
+            .collect();
+        out = out.into_iter().zip(twins).flat_map(|(a, b)| std::iter::once(a).chain(b)).collect();
     }
     let mut seen: Vec<Vec<u32>> = Vec::new();
     out.retain(|c| {

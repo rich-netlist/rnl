@@ -10,9 +10,10 @@ use std::path::{Path, PathBuf};
 use rnl_cli::solve::{report, solve, SolveOptions};
 use rnl_cli::{interpret_file, FsProvider};
 use rnl_runtime::diag::Severity;
+use rnl_runtime::geom::Orient;
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::model::LevelView;
-use rnl_runtime::problem::{FactKind, LevelProblem, ObjectKind, PointRef};
+use rnl_runtime::problem::{Axis, FactKind, LevelProblem, ObjectKind, PointRef, ProblemFact};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::SolverOptions;
@@ -31,7 +32,7 @@ const SERIES_02: [&str; 8] = [
 
 /// The packages of the series 0.3 at the root, as rnl-std 0.3 brings them in: rnl-std-core's
 /// first, the rule packages of SPICE before Spectre's (16.3).
-const SERIES_03: [&str; 10] = [
+const SERIES_03: [&str; 9] = [
     "rnl-std-style",
     "rnl-std-basic",
     "rnl-std-semiconductors",
@@ -39,8 +40,7 @@ const SERIES_03: [&str; 10] = [
     "rnl-std-spectre",
     "rnl-std-core",
     "rnl-std-fill",
-    "rnl-std-semantics",
-    "rnl-std-layout",
+    "rnl-std-structures",
     "rnl-std",
 ];
 
@@ -299,7 +299,7 @@ fn every_package_of_the_series_names_what_it_uses_through_its_references() {
         assert!(errors(&r).is_empty(), "{}: {:?}", f.display(), errors(&r));
         checked += 1;
     }
-    assert_eq!(checked, 17);
+    assert_eq!(checked, 16);
 }
 
 #[test]
@@ -370,6 +370,28 @@ fn a_reading_can_ask_for_a_version_of_the_standard_package() {
     let e = errors(&r);
     assert!(e.len() == 1 && e[0].contains("rnl-std 9.9 that the reading asks for cannot be found"), "{e:?}");
     assert!(root(level(&r, "t.sp")).is_empty());
+    // a file that pins a version of it, or drops it with an inline package of its name, does not
+    // need the version asked for: nothing is said, and the version pinned is in effect (16.3)
+    for (header, series) in
+        [("@USE-PACKAGE(name=\"rnl-std\", version=\"0.3\")", true), ("@USE-PACKAGE(name=\"rnl-std\") {}", false)]
+    {
+        let files = MemoryProvider::new().with("t.sp", &netlist("0.3", header, ""));
+        let r = read(&files, "t.sp", &with("9.9"));
+        assert!(errors(&r).is_empty(), "{header}: {:?}", errors(&r));
+        // the series pinned, without the rule package of the other dialect, which a file of 0.3
+        // drops (16.3)
+        let at_root = root(level(&r, "t.sp"));
+        if series {
+            assert!(!at_root.is_empty() && at_root.iter().all(|(_, v)| *v == "0.3"), "{at_root:?}");
+        }
+    }
+    // one that does not pin it, which includes one that does, needs it: said once
+    let child = "* c\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.3\") }\n\
+                 .subckt cell a\nR1 a 0 1k\n.ends\n";
+    let files =
+        MemoryProvider::new().with("t.sp", &netlist("0.3", "", ".include c.inc\nX1 a cell\n")).with("c.inc", child);
+    let e = errors(&read(&files, "t.sp", &with("9.9")));
+    assert!(e.len() == 1 && e[0].contains("rnl-std 9.9 that the reading asks for cannot be found"), "{e:?}");
 }
 
 #[test]
@@ -449,11 +471,24 @@ fn a_differential_pair_has_a_tail_that_may_be_left_empty() {
     assert_eq!(tails, ["tail={}", "tail={#M5}", "tail={}", "tail={#M5}", "tail={#M5 #M8}"]);
 }
 
+/// Whether a fact of the problem comes from the body of a definition of rnl-std-structures.
+fn from_structures(f: &&ProblemFact) -> bool {
+    f.source.as_ref().is_some_and(|s| s.file == "rnl-std-structures.rnl")
+}
+
+/// A member of a fact as the text writes it: an object by its label, a set by its members.
+fn written(p: &LevelProblem, m: &PointRef) -> String {
+    match m {
+        PointRef::Origin(k) => p.objects[*k].label.clone(),
+        PointRef::Centre(ms) => format!("{{{}}}", ms.iter().map(|m| written(p, m)).collect::<Vec<_>>().join(" ")),
+        other => format!("{other:?}"),
+    }
+}
+
 #[test]
-fn the_series_puts_the_tail_of_each_differential_pair_under_its_middle_as_a_low_default() {
-    // for each differential pair, a rule of rnl-std-layout makes a usage of its own %TAIL_CENTER,
-    // of priority low (14.8): a DISTRIBUTE of in_p, the tails as one set counted by its centre
-    // (14.1), and in_n. The file's own facts come first
+fn a_differential_pair_puts_its_tail_under_its_middle_as_a_low_default() {
+    // the body of $DIFFERENTIAL_PAIR distributes in_p, the tails as one set counted by its centre
+    // (14.1), and in_n, of priority low (14.8): the file's own facts come first
     let r = with_record(&[
         "#M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR",
         "#M1 #M2 @AS $DIFFERENTIAL_PAIR",
@@ -463,24 +498,16 @@ fn the_series_puts_the_tail_of_each_differential_pair_under_its_middle_as_a_low_
     ]);
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
     let p = problem(&r);
-    let from_layout =
-        |f: &&rnl_runtime::problem::ProblemFact| f.source.as_ref().is_some_and(|s| s.file == "rnl-std-layout.rnl");
-    fn written(p: &LevelProblem, m: &PointRef) -> String {
-        match m {
-            PointRef::Origin(k) => p.objects[*k].label.clone(),
-            PointRef::Centre(ms) => format!("{{{}}}", ms.iter().map(|m| written(p, m)).collect::<Vec<_>>().join(" ")),
-            other => format!("{other:?}"),
-        }
-    }
     let mut low: Vec<Vec<String>> = p
         .facts
         .iter()
-        .filter(from_layout)
+        .filter(from_structures)
         .map(|f| {
             assert_eq!(f.priority, Priority::Low, "{}", f.label);
-            let made = &p.usages[f.chain[0]];
-            assert!(made.generated && made.priority == Some(Priority::Low), "{made:?}");
-            let FactKind::Distribute { members, .. } = &f.kind else { panic!("{:?}", f.kind) };
+            // the usage written, no usage that a rule makes
+            let pair = &p.usages[f.chain[0]];
+            assert!(pair.definition == "$DIFFERENTIAL_PAIR" && !pair.generated, "{pair:?}");
+            let FactKind::Distribute { axis: Axis::X, members } = &f.kind else { panic!("{:?}", f.kind) };
             members.iter().map(|m| written(p, m)).collect()
         })
         .collect();
@@ -490,9 +517,175 @@ fn the_series_puts_the_tail_of_each_differential_pair_under_its_middle_as_a_low_
     // and no point of its own
     assert!(p.objects.iter().all(|o| o.kind != ObjectKind::Point), "{:?}", p.objects);
     // in the order of resolution of 8.5, after every fact of the file's own
-    let first = p.facts.iter().position(|f| from_layout(&f)).unwrap();
-    assert!(p.facts[..first].iter().all(|f| f.priority == Priority::Normal), "{:?}", p.facts);
-    assert!(p.facts[first..].iter().all(|f| from_layout(&f)), "{:?}", p.facts);
+    let first = p.facts.iter().position(|f| from_structures(&f)).unwrap();
+    let last_normal = p.facts.iter().rposition(|f| f.priority == Priority::Normal).unwrap();
+    assert!(last_normal < first, "{:?}", p.facts);
+}
+
+#[test]
+fn the_priority_of_a_usage_turns_the_drawing_of_its_body_off_or_up() {
+    // the priority of a usage applies to the facts of its body and overrides theirs (14.8)
+    let centring = |r: &Interpretation| -> Vec<(String, Priority)> {
+        let p = problem(r);
+        p.facts.iter().filter(from_structures).map(|f| (p.usages[f.chain[0]].label.clone(), f.priority)).collect()
+    };
+    let pairs = [
+        "%dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR",
+        "%dp2 = #M1(in_p) #M2(in_n) #M8(tail) @AS $DIFFERENTIAL_PAIR",
+    ];
+    // one usage turned off: it is still there, and only the other's centring is left
+    let r = with_record(&[pairs[0], pairs[1], "%dp1 @PRIORITY(\"disabled\")"]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(fills(&r, "$DIFFERENTIAL_PAIR").len(), 2);
+    assert_eq!(centring(&r), [("%dp2".to_string(), Priority::Low)]);
+    // a rule turns every usage of the definition off, and selects them all
+    let r = with_record(&[pairs[0], pairs[1], "# @SELECT-USAGE $DIFFERENTIAL_PAIR => @PRIORITY(\"disabled\")"]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(fills(&r, "$DIFFERENTIAL_PAIR").len(), 2);
+    assert!(centring(&r).is_empty(), "{:?}", centring(&r));
+    // a usage of priority high keeps its drawing before the file's own facts
+    let r = with_record(&["%dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS(priority=\"high\") $DIFFERENTIAL_PAIR"]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(centring(&r), [("%dp1".to_string(), Priority::High)]);
+}
+
+#[test]
+fn mirrored_is_drawn_by_low_facts_with_a_on_the_left() {
+    // a and b at one height, mirror images about the axis point, a on the left: four facts, each
+    // low (14.7, 14.8, 14.9)
+    let r = with_record(&["%ax = (_, _)", "#M1(a) #M2(b) %ax(axis) @AS $MIRRORED"]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let p = problem(&r);
+    let facts: Vec<&ProblemFact> = p.facts.iter().filter(from_structures).collect();
+    let mut kinds: Vec<&str> = facts.iter().map(|f| f.kind.name()).collect();
+    kinds.sort();
+    assert_eq!(kinds, ["ALIGN", "DISTRIBUTE", "ORDER", "ORIENT-RELATION"]);
+    assert!(facts.iter().all(|f| f.priority == Priority::Low), "{facts:?}");
+    let order = facts.iter().find(|f| f.kind.name() == "ORDER").unwrap();
+    let FactKind::Order { axis: Axis::X, members, .. } = &order.kind else { panic!("{:?}", order.kind) };
+    assert_eq!(members.iter().map(|m| written(p, m)).collect::<Vec<_>>(), ["#M1", "#M2"]);
+    // the name of the series 0.2 is told the new one
+    let e = errors(&with_record(&["%ax = (_, _)", "#M1(a) #M2(b) %ax(axis) @AS $MIRROR_PAIR"]));
+    assert!(
+        e.iter().any(|m| m.contains("$MIRROR_PAIR cannot be found: the standard series 0.3 calls it $MIRRORED")),
+        "{e:?}"
+    );
+}
+
+#[test]
+fn a_branch_stands_in_a_column_and_a_chain_runs_from_left_to_right() {
+    // the members of a branch, each aligned on x; the source, the members of the chain in the
+    // order written and the load, in order on x; each low (14.2, 14.3, 14.8)
+    let r = with_record(&["{#M3 #M1 #M5} @AS $BRANCH", "#R1 {#R2 #R3} #R4 @AS $CHAIN"]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let p = problem(&r);
+    let facts: Vec<&ProblemFact> = p.facts.iter().filter(from_structures).collect();
+    assert!(facts.iter().all(|f| f.priority == Priority::Low), "{facts:?}");
+    let of = |definition: &str| -> Vec<&FactKind> {
+        facts.iter().filter(|f| p.usages[f.chain[0]].definition == definition).map(|f| &f.kind).collect()
+    };
+    let names = |members: &[PointRef]| members.iter().map(|m| written(p, m)).collect::<Vec<_>>();
+    let (branch, chain) = (of("$BRANCH"), of("$CHAIN"));
+    let [FactKind::Align { axis: Axis::X, members }] = branch[..] else { panic!("{branch:?}") };
+    assert_eq!(names(members), ["#M3", "#M1", "#M5"]);
+    let [FactKind::Order { axis: Axis::X, members, .. }] = chain[..] else { panic!("{chain:?}") };
+    assert_eq!(names(members), ["#R1", "#R2", "#R3", "#R4"]);
+}
+
+#[test]
+fn a_cascade_takes_its_roles_as_sets() {
+    // the four roles of $CASCADE are sets (9.4): one usage, whatever each holds
+    let r = with_record(&[
+        "%dp = #M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR",
+        "%dp(first) {#M3 #M4}(second) {#R2 #R3}(feedback) #R4(load) @AS $CASCADE",
+    ]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    assert_eq!(fills(&r, "$CASCADE"), [["first={%dp}", "second={#M3 #M4}", "feedback={#R2 #R3}", "load={#R4}"]]);
+}
+
+#[test]
+fn a_stub_is_drawn_by_low_facts_and_stands_upright() {
+    // the ALIGN and the DISTANCE of a stub, and the ORIENT R0 of its ground or supply: low (14.8);
+    // the fill grounds the pins on 0 and supplies those on a net of $SUPPLY_NET_SET
+    let r = with_record(&["&vdd @ADD-TO $SUPPLY_NET_SET"]);
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let p = problem(&r);
+    for stub in ["$GROUND_STUB", "$SUPPLY_STUB"] {
+        let facts: Vec<&ProblemFact> =
+            p.facts.iter().filter(|f| f.chain.iter().any(|&u| p.usages[u].definition == stub)).collect();
+        assert!(!facts.is_empty(), "{stub}");
+        assert!(facts.iter().all(|f| f.priority == Priority::Low), "{stub}: {facts:?}");
+        let count = |name: &str| facts.iter().filter(|f| f.kind.name() == name).count();
+        let stubs = p.usages.iter().filter(|u| u.definition == stub).count();
+        assert_eq!((count("ALIGN"), count("DISTANCE"), count("ORIENT")), (stubs, stubs, stubs), "{stub}: {facts:?}");
+        assert!(
+            facts.iter().all(|f| !matches!(&f.kind, FactKind::Orient { code, .. } if *code != Orient::R0)),
+            "{stub}"
+        );
+    }
+    // written out by the solver, a stub keeps them low: its usage is written with the priority
+    // they all have, which overrides theirs, as the record's own high would (14.8)
+    let files = MemoryProvider::new().with(
+        "/w/t.sp",
+        &netlist(
+            "0.3",
+            "",
+            "V1 a 0 1
+",
+        ),
+    );
+    let options = SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() };
+    let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
+    let text = &run.files[0].text;
+    assert!(text.contains("= $GROUND_STUB @ATTACH(gap=2, priority=\"low\")"), "{text}");
+    assert!(!text.contains("priority=\"normal\""), "{text}");
+    let back = read(&MemoryProvider::new().with("/w/t.sp", text), "/w/t.sp", &Options::solver());
+    let p = back.problems.iter().find(|p| p.title == "t.sp").unwrap();
+    let stubs: Vec<&ProblemFact> =
+        p.facts.iter().filter(|f| f.chain.iter().any(|&u| p.usages[u].definition == "$GROUND_STUB")).collect();
+    assert!(!stubs.is_empty() && stubs.iter().all(|f| f.priority == Priority::Low), "{stubs:?}");
+}
+
+#[test]
+fn a_package_that_the_series_0_3_merged_is_told_what_it_became() {
+    // rnl-std-layout and rnl-std-semantics are one package in the series 0.3, rnl-std-structures (16.3)
+    let merged = |name: &str| {
+        format!("{name} is no package of the standard series 0.3, which merged rnl-std-layout and rnl-std-semantics into rnl-std-structures: to turn the default drawing of a definition off, write a rule such as # @SELECT-USAGE $DIFFERENTIAL_PAIR => @PRIORITY(\"disabled\"); to do without the package and its definitions, write @USE-PACKAGE(name=\"rnl-std-structures\") {{}}")
+    };
+    let diagnostics = |text: &str, severity: Severity| -> Vec<String> {
+        let r = read(&MemoryProvider::new().with("t.sp", text), "t.sp", &Options::default());
+        r.diagnostics().iter().filter(|d| d.severity == severity).map(|d| r.sink.render(d)).collect()
+    };
+    // the empty inline package that dropped the layouts in the series 0.2 stands for no package
+    let empty = text_with_record("@USE-PACKAGE(name=\"rnl-std-layout\") {}", &["#R2 @PLACE(0, 0)"]);
+    let w = diagnostics(&empty, Severity::Warning);
+    assert!(w.iter().any(|m| m.contains(&merged("rnl-std-layout"))), "{w:?}");
+    assert!(diagnostics(&empty, Severity::Error).is_empty());
+    // one of the version 0.3 is not found
+    let named = text_with_record("@USE-PACKAGE(name=\"rnl-std-semantics\", version=\"0.3\")", &["#R2 @PLACE(0, 0)"]);
+    let e = diagnostics(&named, Severity::Error);
+    let not_found = format!(
+        "package rnl-std-semantics 0.3 cannot be found: this USE-PACKAGE fails; {}",
+        merged("rnl-std-semantics")
+    );
+    assert!(e.iter().any(|m| m.contains(&not_found)), "{e:?}");
+    // one without a version finds the series 0.2's, which is no package of the series 0.3
+    let any = text_with_record("@USE-PACKAGE(name=\"rnl-std-layout\")", &["#R2 @PLACE(0, 0)"]);
+    let w = diagnostics(&any, Severity::Warning);
+    assert!(w.iter().any(|m| m.contains(&merged("rnl-std-layout"))), "{w:?}");
+    // where the series 0.2 is in effect, both packages are there: nothing is said
+    let body = "* @RNL {\n*   #R1 @PLACE(0, 0)\n* }\n";
+    for text in [
+        netlist("0.2", "@USE-PACKAGE(name=\"rnl-std-layout\") {}", body),
+        netlist(
+            "0.3",
+            "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\"); @USE-PACKAGE(name=\"rnl-std-layout\") {}",
+            body,
+        ),
+    ] {
+        let all = [Severity::Error, Severity::Warning].map(|s| diagnostics(&text, s)).concat();
+        assert!(!all.iter().any(|m| m.contains("series 0.3")), "{all:?}");
+    }
 }
 
 #[test]
@@ -513,7 +706,10 @@ fn a_tail_placed_elsewhere_lets_go_of_the_low_middle() {
     let discarded: Vec<&String> = lines.iter().filter(|l| l.trim_start().starts_with("discarded [")).collect();
     assert!(!discarded.is_empty(), "{lines:#?}");
     for l in &discarded {
-        assert!(l.contains("(low, rnl-std-layout.rnl:") && l.contains("--report lists what it conflicts with"), "{l}");
+        assert!(
+            l.contains("(low, rnl-std-structures.rnl:") && l.contains("--report lists what it conflicts with"),
+            "{l}"
+        );
     }
     let all = report(&run.levels[0], true);
     assert!(all.iter().any(|l| l.contains("kept [") && l.contains("the x of #M5 = 20 (normal")), "{all:#?}");

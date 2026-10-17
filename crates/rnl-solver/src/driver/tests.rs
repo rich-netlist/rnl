@@ -1647,6 +1647,290 @@ R1 a b 1k
     }
 }
 
+/// The width and the height of a level as it is drawn: the boxes of its components and its wires
+/// routed (the extent of the metrics of the review, without the stubs' own short wires, which lie
+/// in their boxes' columns).
+fn extent(e: &Exact) -> [Q; 2] {
+    let s = &e.structure;
+    let (at, ori) = (&e.placed.origins, &e.placed.geometry.orient);
+    let mut points: Vec<[Q; 2]> = Vec::new();
+    for k in s.components() {
+        if let Some(b) = s.box_at(at, ori, k) {
+            points.push([b[0].clone(), b[1].clone()]);
+            points.push([b[2].clone(), b[3].clone()]);
+        }
+    }
+    points.extend(e.routing.paths.iter().flatten().cloned());
+    let span = |axis: usize| {
+        let lo = points.iter().map(|q| &q[axis]).min().cloned().unwrap_or_default();
+        let hi = points.iter().map(|q| &q[axis]).max().cloned().unwrap_or_default();
+        hi - lo
+    };
+    [span(0), span(1)]
+}
+
+/// The length of the wires routed for each net, by its name.
+fn length_by_net(p: &LevelProblem, solved: &Solved, e: &Exact) -> BTreeMap<String, Q> {
+    let mut out: BTreeMap<String, Q> = BTreeMap::new();
+    for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
+        let length: Q = path.windows(2).map(|s| (&s[1][0] - &s[0][0]).abs() + (&s[1][1] - &s[0][1]).abs()).sum();
+        *out.entry(p.routes[w.route].net.clone()).or_default() += length;
+    }
+    out
+}
+
+/// Whether the steps between the origins of some elements, left to right, are all the same.
+fn evenly_spaced(e: &Exact, ks: &[usize]) -> bool {
+    let mut xs: Vec<Q> = ks.iter().map(|&k| e.placed.origins[k][0].clone()).collect();
+    xs.sort();
+    xs.windows(3).all(|w| &w[2] - &w[1] == &w[1] - &w[0])
+}
+
+/// Phase 2 of the quality review, "stop stretching the drawing": nothing evenly spaces a row of
+/// elements in no group, the texts are as wide as they are drawn and on the outer side of a
+/// source, two rows are kept apart only where their elements are neighbours on x, and what only
+/// stubs join is drawn together (SE-3, ST-7, SE-8, SE-4, LP-2). The numbers of phase 1 in the
+/// comments.
+#[test]
+fn the_drawings_are_not_stretched() {
+    let num = |v: f64| from_f64(v).unwrap();
+    // T2: M1 risen towards RD, the wire between them 3 long (6), as the ground of VDD, left of
+    // M1, no longer sets the gap between the rows: a gap below RD would make it 2, but the wire
+    // from VIN to the gate of M1 runs under that ground, a unit clear of it; VIN nearer M1 (14),
+    // its value on its outer side
+    let (p, solved, e) = case_level("T2-common-source.sp", "T2-common-source.sp");
+    let what = summary(&p, &solved, &e);
+    assert!(length_by_net(&p, &solved, &e)["out"] <= int(3), "{what}");
+    let [vin, m1] = ["#VIN", "#M1"].map(|l| object(&p, l));
+    assert!(&e.placed.origins[m1][0] - &e.placed.origins[vin][0] < int(14), "{what}");
+    assert_eq!(e.placed.geometry.orient[vin], Orient::MY, "{what}");
+    // T3's testbench: the lower row not evenly spaced (16 apart), CL nearer the output (&out 33
+    // long), VDD beside XU1 (21 apart), narrower (50.5); the wires from the sources up to XU1
+    // still pass under the grounds of VDD and XU1, crossing nothing, as the rows keep their way
+    let (p, solved, e) = case_level("T3-ota5t.sp", "T3-ota5t.sp");
+    let what = summary(&p, &solved, &e);
+    let row = ["#VIP", "#VIN", "#VB", "#CL"].map(|l| object(&p, l));
+    assert!(!evenly_spaced(&e, &row), "{what}");
+    assert!(length_by_net(&p, &solved, &e)["out"] <= int(24), "{what}");
+    let [vdd, xu1] = ["#VDD", "#XU1"].map(|l| object(&p, l));
+    assert!(&e.placed.origins[xu1][0] - &e.placed.origins[vdd][0] <= int(12), "{what}");
+    assert!(extent(&e)[0] < num(50.5), "{what}");
+    let wires = crate::score::drawn(&p, &e.structure, &e.placed.geometry, &e.routing);
+    let view = crate::objectives::View { s: &e.structure, at: &e.placed.origins, orient: &e.placed.geometry.orient };
+    let crossings = crate::objectives::score(crate::objectives::Objective::Crossings, &view, Some(&wires));
+    assert!(crossings.is_zero(), "{what}");
+    // T4: lower (44.3), the rows of the PMOS and of the input pair nearer each other; M5 and M7
+    // where they were (-15), not lower: &vb runs from VB, which leaves up on the left of the row
+    // of the pair, to their gates, under the ground of VIP, and the rows stay apart as wholes over
+    // its span (a_wire_between_two_rows_crosses_no_lead_of_a_stub); risen to -12, M5 and M7 had it
+    // cross that ground's lead. Until VB hangs by the gates (quality review ST-3)
+    let (p, solved, e) = case_level("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
+    let what = summary(&p, &solved, &e);
+    for label in ["#M5", "#M7"] {
+        assert!(e.placed.origins[object(&p, label)][1] >= int(-15), "{what}: {label}");
+    }
+    assert!(extent(&e)[1] < num(44.3), "{what}");
+    // T5: the row not evenly spaced (13 apart), narrower (80.5)
+    let (p, solved, e) = case_level("T5-inverting-amp-rlc.sp", "T5-inverting-amp-rlc.sp");
+    let what = summary(&p, &solved, &e);
+    let row = e.candidate.rows[0].clone();
+    assert!(row.len() >= 7 && !evenly_spaced(&e, &row), "{what}");
+    assert!(extent(&e)[0] < num(80.5), "{what}");
+    // T6: compact again (348 wide after phase 1, 302 before it), in the order of the bits: the
+    // legs of 2R from b0 to b5 and the series arm from RS0 to RS4 left to right, the tail after
+    // them SE-10's; each source next to its leg joined to it by an L
+    // (t6_joins_each_source_to_its_leg_by_an_l)
+    let (p, solved, e) = case_level("T6-r2r-ladder.sp", "T6-r2r-ladder.sp");
+    let what = summary(&p, &solved, &e);
+    assert!(!e.candidate.even, "{what}");
+    assert!(extent(&e)[0] <= int(220), "{what}");
+    let x = |label: String| e.placed.origins[object(&p, &label)][0].clone();
+    let legs: Vec<Q> = (0..6).map(|i| x(format!("#R2B{i}"))).collect();
+    let arm: Vec<Q> = (0..5).map(|i| x(format!("#RS{i}"))).collect();
+    for xs in [&legs, &arm] {
+        assert!(xs.windows(2).all(|w| w[0] < w[1]), "{xs:?}: {what}");
+    }
+}
+
+/// The places where a wire routed crosses the lead of a stub of another net, from the pin it hangs
+/// from to its symbol's pin, strictly inside both, each said with the nets and the stub's host.
+fn stub_leads_crossed(p: &LevelProblem, solved: &Solved, e: &Exact) -> Vec<String> {
+    let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
+    let net_names = |k: usize| -> Vec<&str> {
+        s.connections
+            .nets_of
+            .get(&(k, 0))
+            .map_or(Vec::new(), |v| v.iter().map(|&n| s.connections.nets[n].name.as_str()).collect())
+    };
+    let inside = |v: &Q, a: &Q, b: &Q| (v > a && v < b) || (v > b && v < a);
+    let mut out = Vec::new();
+    for (j, info) in s.objects.iter().enumerate() {
+        let Some(stub) = &info.stub else { continue };
+        let (Some(top), Some(end)) = (s.pin_at(at, ori, stub.host.0, stub.host.1), s.pin_at(at, ori, j, 0)) else {
+            continue;
+        };
+        // a lead runs up or down from its pin
+        if top[0] != end[0] {
+            continue;
+        }
+        let nets = net_names(j);
+        for (w, path) in solved.solution.wires.iter().zip(&e.routing.paths) {
+            let net = &p.routes[w.route].net;
+            if nets.contains(&net.as_str()) {
+                continue;
+            }
+            for seg in path.windows(2) {
+                let (a, b) = (&seg[0], &seg[1]);
+                if a[1] == b[1] && inside(&top[0], &a[0], &b[0]) && inside(&a[1], &top[1], &end[1]) {
+                    let host = &p.objects[stub.host.0].label;
+                    out.push(format!("{net} over the lead of {nets:?} from {host} at ({}, {})", top[0], a[1]));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// A wire routed between two rows crosses no lead of a stub hanging from the upper one: the rows
+/// stay apart as wholes over its span (`crate::search::row_pairs`). Pair by pair alone, M5 and M7
+/// rose beside the ground of VIP in T4, and &vb, which leaves VB upwards on the left of the upper
+/// row, ran across that ground's lead to their gates (review of phase 2 of the quality review).
+/// T6 is left out: &b5 crosses the lead of a leg's ground, as the order of the row puts its source
+/// far from its leg (quality review SE-10).
+#[test]
+fn a_wire_between_two_rows_crosses_no_lead_of_a_stub() {
+    let files = netlists("tests/integration/solver", "T").into_iter().chain(netlists("tests/conformance/cases", ""));
+    for file in files {
+        if file.ends_with("T6-r2r-ladder.sp") {
+            continue;
+        }
+        for p in problems(&file) {
+            let (solved, e) = check_level(&file.to_string_lossy(), &p);
+            let crossed = stub_leads_crossed(&p, &solved, &e);
+            assert!(crossed.is_empty(), "{}: {crossed:#?}\n{}", p.title, summary(&p, &solved, &e));
+        }
+    }
+}
+
+/// The structure of the level with a title of a case of the solver, not solved.
+fn case_structure(file: &str, title: &str) -> (LevelProblem, Structure) {
+    let ps = problems(&repo().join("tests/integration/solver").join(file));
+    let p = ps.into_iter().find(|p| p.title == title).unwrap_or_else(|| panic!("{file}: no level {title}"));
+    let options = SolverOptions::without_time_limit();
+    let resolved = crate::resolve(&p, &options);
+    let s = crate::structure::analyse(&p, &resolved, &options, CAPS, &mut crate::Work::default());
+    (p, s)
+}
+
+/// What a candidate with even rows spaces evenly (quality review SE-3): the members of a group,
+/// those that a DISTRIBUTE or a mirror pair joins, and those of one kind and one role, such as the
+/// legs of a ladder; never a row as such, a chain of a `$FLOW` or the elements in no group, which
+/// are no scope of the objectives measured within groups either.
+#[test]
+fn only_groups_pairs_and_elements_of_one_role_are_spaced_evenly() {
+    let labels = |p: &LevelProblem, set: &[usize]| -> Vec<String> {
+        let mut v: Vec<String> = set.iter().map(|&k| p.objects[k].label.clone()).collect();
+        v.sort();
+        v
+    };
+    let names = |prefix: &str, n: usize| -> Vec<String> {
+        let mut v: Vec<String> = (0..n).map(|i| format!("#{prefix}{i}")).collect();
+        v.sort();
+        v
+    };
+    // T6, no group: the legs of 2R, the sources and the series arm, each a set; not the row
+    let (p, s) = case_structure("T6-r2r-ladder.sp", "T6-r2r-ladder.sp");
+    let sets: Vec<Vec<String>> = s.even_sets.iter().map(|set| labels(&p, set)).collect();
+    assert_eq!(sets.len(), 3, "{sets:?}");
+    for want in [names("R2B", 8), names("VB", 8), names("RS", 7)] {
+        assert!(sets.contains(&want), "{want:?} in {sets:?}");
+    }
+    assert!(s.scopes.is_empty());
+    // T5: a chain of a $FLOW and a load of two elements hung from one net: nothing
+    let (_, s) = case_structure("T5-inverting-amp-rlc.sp", "T5-inverting-amp-rlc.sp");
+    assert!(s.even_sets.is_empty(), "{:?}", s.even_sets);
+    // T4: the two groups, and no set of the two halves of a mirror pair alone
+    let (p, s) = case_structure("T4-miller-conflicts.sp", "T4-miller-conflicts.sp");
+    let sets: Vec<Vec<String>> = s.even_sets.iter().map(|set| labels(&p, set)).collect();
+    assert_eq!(sets, vec![labels(&p, &p.groups[0].members), labels(&p, &p.groups[1].members)]);
+    assert_eq!(s.scopes.len(), 2);
+}
+
+/// The texts are as wide as the renderer lays them out, with a margin, not 0.6 of their size a
+/// character (quality review ST-7): the value of T2's source, 72.62 pixels at 14 a unit, 5.19
+/// wide, was taken 6.6 wide. A text of a symbol turned with its owner reads upright, as the
+/// renderer keeps it: its anchor turns, and a baseline stays below the glyphs, where a box turned
+/// whole lay mirrored across it (review of phase 2 of the quality review: the names and values of
+/// T6's legs and RS6, turned R270).
+#[test]
+fn a_text_is_as_wide_as_it_is_drawn() {
+    use rnl_runtime::problem::{Filler, TextInfo};
+    let text = |s: &str, halign: &str, rotate: f64| TextInfo {
+        attach: Filler::Other(String::new()),
+        key: None,
+        lines: rnl_runtime::markup::parse(s),
+        halign: halign.to_string(),
+        valign: "baseline".to_string(),
+        rotate,
+        style: Vec::new(),
+    };
+    let text_box =
+        |t: &TextInfo, at: (i64, i64), turn: Orient| crate::structure::text_box(t, &(int(at.0), int(at.1)), turn);
+    let b = text_box(&text("DC 0.6 AC 1", "start", 0.0), (0, 0), Orient::R0).unwrap();
+    let w = &b[2] - &b[0];
+    assert!(w > from_f64(5.19).unwrap() && w < from_f64(5.5).unwrap(), "{b:?}");
+    // the baseline 0.8 of the size below the top, 0.4 above the bottom
+    assert_eq!((b[1].clone(), b[3].clone()), (from_f64(-0.4).unwrap(), from_f64(0.8).unwrap()));
+    // ending at the anchor, and turned a quarter about it: along y, below the anchor
+    let b = text_box(&text("DC 0.6 AC 1", "end", 90.0), (1, 2), Orient::R0).unwrap();
+    let q = |v: f64| from_f64(v).unwrap();
+    assert_eq!([&b[0], &b[2], &b[3]], [&q(0.2), &q(1.4), &q(2.1)], "{b:?}");
+    assert_eq!(&b[3] - &b[1], w);
+    // its owner turned R270: the anchor at (2, -1), the text reading up to it from below, as it
+    // would read down, the tops of its glyphs on the left, 0.8 left of the anchor and 0.4 right of
+    // it (a box turned whole had them 0.4 left and 0.8 right)
+    let b = text_box(&text("DC 0.6 AC 1", "start", 0.0), (1, 2), Orient::R270).unwrap();
+    assert_eq!([&b[0], &b[2], &b[3]], [&q(1.2), &q(2.4), &q(-0.9)], "{b:?}");
+    assert_eq!(&b[3] - &b[1], w);
+    // mirrored upside down: the anchor at (1, -2), the glyphs still above their baseline
+    let b = text_box(&text("DC 0.6 AC 1", "start", 0.0), (1, 2), Orient::MX).unwrap();
+    assert_eq!([&b[0], &b[1], &b[3]], [&q(0.9), &q(-2.4), &q(-1.2)], "{b:?}");
+    assert_eq!(&b[2] - &b[0], w);
+    // a text hanging from its anchor by its top stands on it by its bottom, mirrored so
+    let mut top = text("DC 0.6 AC 1", "start", 0.0);
+    top.valign = "top".to_string();
+    let (upright, mirrored) =
+        (text_box(&top, (0, 0), Orient::R0).unwrap(), text_box(&top, (0, 0), Orient::MX).unwrap());
+    let middle = |b: &[Q; 4]| &b[1] + &b[3];
+    assert!(middle(&upright) < Q::zero() && middle(&mirrored) > Q::zero(), "{upright:?} {mirrored:?}");
+    assert!(text_box(&text("", "start", 0.0), (0, 0), Orient::R0).is_none());
+}
+
+/// A text that offsets place from an element's origin on both axes is part of the element's box
+/// (`Structure::offset_labels`): corpus 06's codes, `@TEXT(..., dx, dy)` on each instance, clear
+/// of each other and of the symbols. Compacted without them, the code of R8 lay over that of D1
+/// (review of phase 2 of the quality review).
+#[test]
+fn texts_that_offsets_place_are_kept_clear() {
+    let (p, solved, e) = level_in("tests/conformance/cases", "06-symbols.sp", "06-symbols.sp");
+    let what = summary(&p, &solved, &e);
+    let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
+    let placed = |k: usize, b: &[Q; 4]| [&at[k][0] + &b[0], &at[k][1] + &b[1], &at[k][0] + &b[2], &at[k][1] + &b[3]];
+    let texts: Vec<(usize, [Q; 4])> =
+        s.offset_labels.iter().flat_map(|(&k, boxes)| boxes.iter().map(move |b| (k, placed(k, b)))).collect();
+    assert!(texts.len() >= 10, "{what}");
+    let meet = |a: &[Q; 4], b: &[Q; 4]| a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+    for (i, (k, a)) in texts.iter().enumerate() {
+        for (j, b) in &texts[i + 1..] {
+            assert!(k == j || !meet(a, b), "{} {}: {what}", p.objects[*k].label, p.objects[*j].label);
+        }
+        for j in s.components().filter(|j| j != k) {
+            let Some(b) = s.box_at(at, ori, j) else { continue };
+            assert!(!meet(a, &b), "{} {}: {what}", p.objects[*k].label, p.objects[j].label);
+        }
+    }
+}
+
 // -------------------------------------------------- what the solver places, and what it leaves free
 
 use rnl_runtime::problem::{Filler, Reference};
@@ -1689,12 +1973,12 @@ fn relation_points(r: &Relation) -> Vec<(usize, Vec<PointId>)> {
 }
 
 /// Whether the LP decides each object's coordinate on each axis, by object: false where it is
-/// left where the witness of the resolution happens to be. The LP's first two layers, the facts
+/// left where the witness of the resolution happens to be. The LP's first three layers, the facts
 /// kept, the links of pins and texts to their objects, the wires, the relations of the candidate
 /// `c` taken, with the orientations `ori`, and the anchors of texts all bound differences of
 /// coordinates only, so a set of objects that they join on an axis can move as one along it,
 /// unless it holds an element, which the search places in its rows, or a fact kept that fixes a
-/// coordinate (a PLACE, or a coordinate of a point, 11.1). Otherwise only layer 3, the distance
+/// coordinate (a PLACE, or a coordinate of a point, 11.1). Otherwise only layer 4, the distance
 /// to where the resolution put it, holds it, and its coordinates there are where the witness
 /// happens to be, such as 0 for what nothing reaches; the repair of overlaps only pushes it out of
 /// the way of the symbols placed, and is not counted. Such is a point `(_, _)` in no wire on an
@@ -1943,6 +2227,7 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
             ("09-buses-and-bundles.sp / reg4", 1),
             ("09-include-without-header.sp / divider", 2),
             ("12-diagnostics.sp / sub", 2),
+            ("19-header-and-lib-versions.sp / sub_02", 2),
             ("19-set-cycles.sp / cell", 2),
             ("inverter-chain.scs / inv", 1),
             ("inverter-chain.sp / inv", 1),
@@ -1955,4 +2240,122 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
             "09-include-without-header.sp / divider: a usage of $GND",
         ]
     );
+}
+
+/// Where the texts of the symbols are drawn (13.3): each text that its owner's symbol places, its
+/// box as wide as it is laid out (`crate::structure::text_box`) about the owner's origin and turned
+/// with it, with its owner.
+fn symbol_texts(p: &LevelProblem, e: &Exact) -> Vec<(usize, [Q; 4])> {
+    let (at, ori) = (&e.placed.origins, &e.placed.geometry.orient);
+    let mut out = Vec::new();
+    for o in &p.objects {
+        let (Position::InSymbol { owner, local, replaced: None }, Some(t)) = (&o.position, &o.text) else { continue };
+        let local = (from_f64(local.0).unwrap(), from_f64(local.1).unwrap());
+        let Some(b) = crate::structure::text_box(t, &local, ori[*owner]) else { continue };
+        let a = &at[*owner];
+        out.push((*owner, [&a[0] + &b[0], &a[1] + &b[1], &a[0] + &b[2], &a[1] + &b[3]]));
+    }
+    out
+}
+
+/// The members of a DISTRIBUTE on x stay in its order, one way or the other, so that its even
+/// steps keep the gaps between neighbours, and no text is drawn over another symbol (review of
+/// phase 2 of the quality review). Without groups, area picks the candidate; a swap of neighbours
+/// broke the order of the DISTRIBUTE, its row taken as [C4 R2 R3 R1 VIN], and the resolution
+/// dropped a gap: R1, R2, R3 and C4 two apart, R2's `100meg` over R1's body (S2). A random sweep
+/// found the same of `{#R1 #V2 #R0} @DISTRIBUTE("x")`, V2's `SIN(0 1 1meg)` over R0's body.
+#[test]
+fn the_members_of_a_distribute_keep_its_order_and_their_texts_clear() {
+    let s2 = "VIN in 0 DC 1\nR1 in 0 1\nR2 in 0 100meg\nR3 in 0 4.7k\nC4 in 0 10p\n\
+              * @RNL { {#R1 #R2 #R3 #C4} @DISTRIBUTE(\"x\"); {#R1 #R2 #R3 #C4} @ALIGN(\"y\"); $WIRE_NET_SET @ROUTE }\n";
+    let sweep = "R0 a 0 1k\nR1 a b 1k\nV2 b 0 SIN(0 1 1meg)\n\
+                 * @RNL { {#R1 #V2 #R0} @DISTRIBUTE(\"x\"); $WIRE_NET_SET @ROUTE }\n";
+    for (body, members) in [(s2, &["#R1", "#R2", "#R3", "#C4"][..]), (sweep, &["#R1", "#V2", "#R0"][..])] {
+        let (p, solved, e) = solve_text(&netlist(body));
+        let what = summary(&p, &solved, &e);
+        assert!(!e.placed.dropped.contains(&crate::search::RelKind::Gap), "{:?}\n{what}", e.placed.dropped);
+        // in the order of the DISTRIBUTE, one way or the other, apart
+        let xs: Vec<&Q> = members.iter().map(|m| &e.placed.origins[object(&p, m)][0]).collect();
+        let (up, down) = (xs.windows(2).all(|w| w[0] < w[1]), xs.windows(2).all(|w| w[0] > w[1]));
+        assert!(up || down, "{xs:?}\n{what}");
+        let ks: Vec<usize> = members.iter().map(|m| object(&p, m)).collect();
+        let row = e.candidate.rows.iter().find(|r| r.contains(&ks[0])).unwrap();
+        let places: Vec<usize> = ks.iter().filter_map(|k| row.iter().position(|j| j == k)).collect();
+        assert_eq!(places.len(), ks.len(), "{:?}\n{what}", e.candidate.rows);
+        assert!(
+            places.windows(2).all(|w| w[0] < w[1]) || places.windows(2).all(|w| w[0] > w[1]),
+            "{:?}\n{what}",
+            e.candidate.rows
+        );
+        // no text over another symbol: as the solver counts them, and each text as it is drawn
+        let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
+        assert_eq!(crate::score::texts_over(s, at, ori), 0, "{what}");
+        let texts = symbol_texts(&p, &e);
+        assert!(texts.len() >= 2 * members.len(), "{texts:?}\n{what}");
+        let meet = |a: &[Q; 4], b: &[Q; 4]| a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+        // a stub and its host go together
+        let host = |k: usize| s.objects[k].stub.as_ref().map(|stub| stub.host.0);
+        for &(k, ref t) in &texts {
+            for j in s.components().filter(|&j| j != k && host(j) != Some(k) && host(k) != Some(j)) {
+                let Some(b) = s.box_at(at, ori, j) else { continue };
+                assert!(!meet(t, &b), "{} over {}: {what}", p.objects[k].label, p.objects[j].label);
+            }
+        }
+    }
+}
+
+/// Where every pin of every component is drawn, by the component and the pin.
+fn component_pins(e: &Exact) -> Vec<((usize, usize), [Q; 2])> {
+    let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
+    let mut out = Vec::new();
+    for k in s.components() {
+        out.extend((0..s.pins(k).len()).filter_map(|pin| Some(((k, pin), s.pin_at(at, ori, k, pin)?))));
+    }
+    out
+}
+
+/// Whether two solves of one netlist draw every pin of every component at the same place, up to a
+/// shift and, with `mirror`, a mirror about an upright line.
+fn pins_alike(a: &Exact, b: &Exact, mirror: bool) -> bool {
+    let (pa, pb) = (component_pins(a), component_pins(b));
+    if pa.len() != pb.len() || pa.iter().zip(&pb).any(|(x, y)| x.0 != y.0) {
+        return false;
+    }
+    let x = |p: &[Q; 2], q: &[Q; 2]| if mirror { &p[0] + &q[0] } else { &q[0] - &p[0] };
+    let Some(((_, p0), (_, q0))) = pa.first().zip(pb.first()) else { return true };
+    let (dx, dy) = (x(p0, q0), &q0[1] - &p0[1]);
+    pa.iter().zip(&pb).all(|((_, p), (_, q))| x(p, q) == dx && &q[1] - &p[1] == dy)
+}
+
+/// A DISTRIBUTE has no direction (14.4): its members written the other way round mean the same,
+/// and give the same drawing, or its mirror (review of the fix of phase 2: where the witness puts
+/// all the members at one x, their order was taken as written, and drove the first plan, the
+/// barycentre rounds and the swaps; S2 written `{#C4 #R3 #R2 #R1}` was drawn with its parts
+/// turned, two crossings and wires half as long again, and a sweep case's step grew from 8 to 19).
+/// A DISTRIBUTE of two members holds wherever they are, and orders nothing.
+#[test]
+fn a_distribute_written_the_other_way_round_is_drawn_alike() {
+    let s2 = "VIN in 0 DC 1\nR1 in 0 1\nR2 in 0 100meg\nR3 in 0 4.7k\nC4 in 0 10p\n\
+              * @RNL { {#R1 #R2 #R3 #C4} @DISTRIBUTE(\"x\"); {#R1 #R2 #R3 #C4} @ALIGN(\"y\"); $WIRE_NET_SET @ROUTE }\n";
+    let sweep = "R0 a 0 1k\nR1 a b 1k\nV2 b 0 SIN(0 1 1meg)\n\
+                 * @RNL { {#R1 #V2 #R0} @DISTRIBUTE(\"x\"); $WIRE_NET_SET @ROUTE }\n";
+    let grouped = "V0 n1 n2 DC 0 AC 1\nR1 n2 n1 4.7k\nV2 n1 0 DC 1\nV3 n2 0 PULSE(0 1 0 1n 1n 5n 10n)\n\
+                   * @RNL { %g1 = {#V0 #V3 #R1} @GROUP; {#V3 #R1 #V0} @DISTRIBUTE(\"x\"); {#V2 #R1} @ALIGN(\"y\"); \
+                   $WIRE_NET_SET @ROUTE }\n";
+    let two = "VIN a 0 DC 1\nR1 a b 1k\nR2 b 0 100meg\nC3 b 0 10p\n\
+               * @RNL { {#R1 #R2} @DISTRIBUTE(\"x\"); {#VIN #R1 #R2 #C3} @ALIGN(\"y\"); $WIRE_NET_SET @ROUTE }\n";
+    let cases = [
+        (s2, "{#R1 #R2 #R3 #C4}", "{#C4 #R3 #R2 #R1}"),
+        (sweep, "{#R1 #V2 #R0}", "{#R0 #V2 #R1}"),
+        (grouped, "{#V3 #R1 #V0}", "{#V0 #R1 #V3}"),
+        (two, "{#R1 #R2} @DISTRIBUTE", "{#R2 #R1} @DISTRIBUTE"),
+    ];
+    for (body, written, reversed) in cases {
+        assert!(body.contains(written), "{body}");
+        let (p, solved, e) = solve_text(&netlist(body));
+        let (q, again, f) = solve_text(&netlist(&body.replacen(written, reversed, 1)));
+        let (what, other) = (summary(&p, &solved, &e), summary(&q, &again, &f));
+        assert!(pins_alike(&e, &f, false) || pins_alike(&e, &f, true), "{written}:\n{what}\n{reversed}:\n{other}");
+        assert_eq!(e.placed.dropped, f.placed.dropped, "{what}\n{other}");
+    }
 }

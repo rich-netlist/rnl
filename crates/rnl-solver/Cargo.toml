@@ -10,6 +10,9 @@ publish.workspace = true
 
 [dependencies]
 rnl-runtime.workspace = true
+# the widths of the texts, laid out with the renderer's own metrics of the shipped fonts, so that
+# the boxes the solver keeps texts clear by are those drawn (quality review ST-7)
+rnl-render.workspace = true
 num-bigint.workspace = true
 num-integer.workspace = true
 num-rational.workspace = true

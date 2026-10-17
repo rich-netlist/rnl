@@ -450,20 +450,23 @@
      SET-SYMBOL; there is no default. Its pins have no terminals, as $SPDT_SWITCH's */
   $FIGURE = @DEFINE(roles=[["p", "point"]]) {};
 
-  /* ground and supply with their own wire, at least gap below or above a pin; rnl-std-fill attaches
-     them. Only the least distance is given, so that a solver may draw a stub longer, as when it
-     lines up the grounds of parts of different lengths */
+  /* ground and supply with their own wire, at least gap below or above a pin, pointing away from it;
+     rnl-std-fill attaches them. Only the least distance is given, so that a solver may draw a stub
+     longer, as when it lines up the grounds of parts of different lengths; the constraints are low,
+     a default that gives way first (14.8) */
   $GROUND_STUB = @DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {
     %g = $GROUND @ATTACH ?t::net;
     ?t::net @WIRE {?t %g:p};
-    {?t %g:p} @ALIGN("x");
-    %g:p ?t @DISTANCE("bottom-to-top", min=?gap)
+    {?t %g:p} @ALIGN("x", priority="low");
+    %g:p ?t @DISTANCE("bottom-to-top", min=?gap, priority="low");
+    %g @ORIENT("R0", priority="low")
   };
   $SUPPLY_STUB = @DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {
     %s = $SUPPLY @ATTACH ?t::net;
     ?t::net @WIRE {?t %s:p};
-    {?t %s:p} @ALIGN("x");
-    ?t %s:p @DISTANCE("bottom-to-top", min=?gap)
+    {?t %s:p} @ALIGN("x", priority="low");
+    ?t %s:p @DISTANCE("bottom-to-top", min=?gap, priority="low");
+    %s @ORIENT("R0", priority="low")
   };
 
   /* each definition with its own symbol: the definition's name plus _SYMBOL */

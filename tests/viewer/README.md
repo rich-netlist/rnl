@@ -37,7 +37,7 @@ In CI, [`viewer.yml`](../../.github/workflows/viewer.yml) installs Rust with the
 | `server.js` | The test server, Node with no dependencies: `apps/viewer-ui` as it is, the fake shell as `shells/fake.js`, and the fixtures under `fixtures/`. Nothing of the tests goes into the page. |
 | `fake-shell.js` | The fake shell. |
 | `viewer.js` | What the tests share: opening the page, waiting for a build, the page's state, and where an object of the drawing is on the screen. |
-| `specs/` | The tests, one file per part of the page: opening, selection, subcircuits, the hierarchy path, the hierarchy view, the text pane, the view, the grid, the keys, reading again, the menu bar and its submenus, the panels, checking for updates, with GitHub's answer faked by `page.route`, loading from the clipboard, whose text the test gives the page, the text dimmed outside the subcircuit drawn, a file of 200 004 lines, which `long.spec.js` opens in the project `long` and without Playwright's trace, as the trace's snapshot of so many lines at each step takes seconds, the desktop's Solve menu, `solve.spec.js`, with the fake shell's solve, which gives the fixture `NAME-preview` and can wait, so that the test shows progress and cancels, and the netlists the solver drew, of which `solved.spec.js` saves screenshots as `test-results/solved-T2.png`, `solved-T3-top.png` and `solved-T3.png`; and `web.spec.js`, the web viewer's smoke tests. The grid's tests read the pixels of its canvas where the scene's points are drawn. |
+| `specs/` | The tests, one file per part of the page: opening, selection, subcircuits, the hierarchy path, the hierarchy view, the text pane, the view, the grid, the keys, reading again, the menu bar and its submenus, the panels, checking for updates, with GitHub's answer faked by `page.route`, loading from the clipboard, whose text the test gives the page, the text dimmed outside the subcircuit drawn, a file of 200 004 lines, which `long.spec.js` opens in the project `long` and without Playwright's trace, as the trace's snapshot of so many lines at each step takes seconds, the desktop's Solve menu, `solve.spec.js`, and its settings dialog, `solve-settings.spec.js`, with the fake shell's solve, which gives the fixture `NAME-preview` and can wait, so that the test shows progress and cancels, and the netlists the solver drew, of which `solved.spec.js` saves screenshots as `test-results/solved-T2.png`, `solved-T3-top.png` and `solved-T3.png`; and `web.spec.js`, the web viewer's smoke tests. The grid's tests read the pixels of its canvas where the scene's points are drawn. |
 
 ## The fake shell
 
@@ -60,6 +60,7 @@ It implements the Shell of [`shell.js`](../../apps/viewer-ui/shell.js). A source
 | `fail` | A message the next build rejects with. |
 | `next` | A fixture the next build returns instead of its source's, as if the file had changed. |
 | `menu(id)` | Choose a command in the platform's menu. |
+| `optionsError` | On the desktop: what the solver says is wrong with the settings it is asked to check (`checkSolverOptions`), null when they will do. |
 
 ## The web viewer
 

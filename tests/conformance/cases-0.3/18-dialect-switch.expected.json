@@ -1,0 +1,1309 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "18-dialect-switch.scs",
+      "kind": "file",
+      "file": "18-dialect-switch.scs",
+      "symbols": [
+        {
+          "name": "$RESISTOR",
+          "box": [
+            -1.0,
+            -2.4,
+            1.0,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#Rtop",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#Rtop::name",
+          "anchor": [
+            0.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "Rtop",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Rtop::value",
+          "anchor": [
+            0.95,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    },
+    {
+      "title": "sub_dropped",
+      "kind": "subckt",
+      "file": "18-dialect-switch.scs",
+      "symbols": [
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -1.0,
+            3.0,
+            1.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "p",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "n",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#X1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#X1::name",
+          "anchor": [
+            0.0,
+            1.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "X1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
+    },
+    {
+      "title": "sub_kept",
+      "kind": "subckt",
+      "file": "18-dialect-switch.scs",
+      "symbols": [
+        {
+          "name": "$RESISTOR",
+          "box": [
+            -1.0,
+            -2.4,
+            1.0,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#X2",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#X2::name",
+          "anchor": [
+            0.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "X2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#X2::value",
+          "anchor": [
+            0.95,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
+    },
+    {
+      "title": "box_cell",
+      "kind": "subckt",
+      "file": "18-dialect-switch-sp.inc",
+      "symbols": [],
+      "items": [],
+      "wires": [],
+      "shapes": [],
+      "texts": [],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
+    },
+    {
+      "title": "sub_inc",
+      "kind": "subckt",
+      "file": "18-dialect-switch-sp.inc",
+      "symbols": [
+        {
+          "name": "$RESISTOR",
+          "box": [
+            -1.0,
+            -2.4,
+            1.0,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "(viewer default)",
+          "box": [
+            -3.0,
+            -1.0,
+            3.0,
+            1.0
+          ],
+          "box_written": false,
+          "default": true,
+          "pins": [
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": "p",
+              "dir": 180
+            },
+            {
+              "pos": [
+                3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": "n",
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {
+                "linestyle": "dashed"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  3.0,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#X3",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#I0",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#X3::name",
+          "anchor": [
+            0.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "X3",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#X3::value",
+          "anchor": [
+            0.95,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#I0::name",
+          "anchor": [
+            10.0,
+            1.3
+          ],
+          "lines": [
+            [
+              {
+                "text": "I0",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "bottom",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
+    },
+    {
+      "title": "sub_sec_sp",
+      "kind": "subckt",
+      "file": "18-dialect-switch-sec.inc",
+      "symbols": [
+        {
+          "name": "$RESISTOR",
+          "box": [
+            -1.0,
+            -2.4,
+            1.0,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#Rsec",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#Rsec::name",
+          "anchor": [
+            0.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "Rsec",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Rsec::value",
+          "anchor": [
+            0.95,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
+    },
+    {
+      "title": "sub_sec_scs",
+      "kind": "subckt",
+      "file": "18-dialect-switch-sec.inc",
+      "symbols": [
+        {
+          "name": "$RESISTOR",
+          "box": [
+            -1.0,
+            -2.4,
+            1.0,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#Xsec",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#Xsec::name",
+          "anchor": [
+            0.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "Xsec",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#Xsec::value",
+          "anchor": [
+            0.95,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": [
+        "a usage of $IO_PORT",
+        "a usage of $IO_PORT"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "file": "18-dialect-switch-sec.inc",
+      "line": 19,
+      "col": 0
+    },
+    {
+      "severity": "warning",
+      "file": "18-dialect-switch-sec.inc",
+      "line": 24,
+      "col": 0
+    },
+    {
+      "severity": "warning",
+      "file": "18-dialect-switch-sec.inc",
+      "line": 6,
+      "col": 0
+    },
+    {
+      "severity": "warning",
+      "file": "18-dialect-switch-sec.inc",
+      "line": 11,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "18-dialect-switch.scs",
+      "line": 22,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "18-dialect-switch.scs",
+      "line": 29,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "18-dialect-switch-sp.inc",
+      "line": 6,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "18-dialect-switch-sp.inc",
+      "line": 9,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "18-dialect-switch-sec.inc",
+      "line": 9,
+      "col": 0
+    },
+    {
+      "severity": "hint",
+      "file": "18-dialect-switch-sec.inc",
+      "line": 22,
+      "col": 0
+    }
+  ]
+}

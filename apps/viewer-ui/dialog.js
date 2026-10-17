@@ -129,13 +129,14 @@ export function ask({ title, text, value = "", placeholder = "", action = "OK", 
 /**
  * Ask for several values at once, such as settings, in the fields of a form that the caller builds
  * and reads. `answer` reads them when the default button is pressed: it gives the answer, or
- * undefined to keep the dialog, as when a value will not do and it says so. Enter in a field presses
- * the default button.
+ * undefined to keep the dialog, as when a value will not do and it says so; it may be async, as when
+ * something outside the page says whether a value will do, and the button waits for it. Enter in a
+ * field presses the default button.
  *
  * @param {{ title: string, text?: string, parts: Node[], answer: () => any, focus?: HTMLElement,
  *   action?: string, wide?: boolean }} options `parts` are shown in order; `focus` has the focus at
  *   first, the default button when not given, which `action` labels, "OK" by default; `wide` makes
- *   the dialog wider, for a text to read.
+ *   the dialog wider, for a text to read, and lets its body scroll.
  * @returns {Promise<any>} What `answer` gave, or null when the dialog is cancelled.
  */
 export function form({ title, text, parts, answer, focus, action = "OK", wide = false }) {
@@ -203,8 +204,8 @@ function textBox(type, placeholder) {
  * A modal dialog, not yet shown: its title, its text, the body that takes its parts, and its
  * buttons: Cancel, if `cancel`, and the default one labelled `action`, which Enter presses.
  * `show(focus, answer)` shows it with `focus` focused, and a text box's text selected. The default
- * button closes it with what `answer()` gives, unless that is undefined; the promise it returns
- * resolves with that, or with null when the dialog is cancelled by Escape or Cancel.
+ * button closes it with what `answer()` gives, awaited, unless that is undefined; the promise it
+ * returns resolves with that, or with null when the dialog is cancelled by Escape or Cancel.
  */
 function frame(title, text, action, cancel = true) {
   const id = `dialog-${++made}`;
@@ -240,11 +241,20 @@ function frame(title, text, action, cancel = true) {
 
   let result = null;
   function show(focus, answer) {
-    ok.addEventListener("click", () => {
-      const a = answer();
-      if (a === undefined) return;
-      result = a;
-      el.close();
+    let answering = false;
+    ok.addEventListener("click", async () => {
+      if (answering) return;
+      answering = true;
+      ok.disabled = true;
+      try {
+        const a = await answer();
+        if (a === undefined) return;
+        result = a;
+        el.close();
+      } finally {
+        answering = false;
+        ok.disabled = false;
+      }
     });
     // the page's keys wait; those the browser has too, F5, Ctrl+R and Ctrl+O, do nothing; Enter
     // presses the default button, or the button or the link that has the focus

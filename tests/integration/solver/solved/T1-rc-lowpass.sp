@@ -12,10 +12,10 @@ C1 out 0 1n
 *   %gnd_stub_C1_n = $GND_STUB @ATTACH(gap=2, priority="normal") #C1:n;
 *   #VIN @PLACE(-7, 3) => @ORIENT("MY");
 *   #R1 @PLACE(0, 7) => @ORIENT("R90");
-*   #C1 @PLACE(7, 4) => @ORIENT("R0");
+*   #C1 @PLACE(6, 4) => @ORIENT("R0");
 *   %gnd_stub_VIN_n::g @PLACE(-7, -2) => @ORIENT("R0");
-*   %gnd_stub_C1_n::g @PLACE(7, 0) => @ORIENT("R0");
+*   %gnd_stub_C1_n::g @PLACE(6, 0) => @ORIENT("R0");
 *   &in @WIRE(mode="straight") {#VIN:p (-7, 7) #R1:p};
-*   &out @WIRE(mode="straight") {#R1:n (7, 7) #C1:p}
+*   &out @WIRE(mode="straight") {#R1:n (6, 7) #C1:p}
 * }
 .end

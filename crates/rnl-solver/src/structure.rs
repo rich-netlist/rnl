@@ -36,8 +36,10 @@
 //!   without the current depth, does an ORDER or a DISTRIBUTE on x, as far as the facts kept let
 //!   its elements share a height; an ALIGN on x is a column, its elements in rows of their own.
 //!   The left-to-right precedences are those that the facts on x with a side give the elements
-//!   they join; an ORDER or a DISTANCE whose side is left open gives its own as the witness has
-//!   them, and the search may reverse them ([`Reversible`]).
+//!   they join; an ORDER or a DISTANCE whose side is left open, and a DISTRIBUTE of three members
+//!   or more, whose members come in its order one way or the other (14.4), give their own as the
+//!   witness has them (a DISTRIBUTE all at one x the way of the netlist), and the search may
+//!   reverse them ([`Reversible`]).
 //! - **The sources of candidates** ([`Source`]), instantiated from the configured objectives in
 //!   the order of their layers, each objective with a structural side adding its own, and the
 //!   objectives configured but inert recorded with the reason ([`crate::objectives::Active`]).
@@ -505,12 +507,16 @@ pub(crate) struct Open {
     pub sides: Vec<usize>,
 }
 
-/// A fact kept on x whose direction or side the facts leave open ([`Open::orders`],
-/// [`Open::sides`]): the pairs of elements `(a, b)` it puts `a` left of `b`, as the witness has
-/// them. The search may reverse them all, and the resolution then turns the fact's literal.
+/// Facts kept on x whose direction or side the facts leave open ([`Open::orders`],
+/// [`Open::sides`]), or a DISTRIBUTE, which runs either way (14.4): the pairs of elements `(a, b)`
+/// they put `a` left of `b`, as the witness has them (a DISTRIBUTE that it puts all at one x the
+/// way of the netlist, `netlist_way`). The search may reverse them all, and the
+/// resolution then turns the facts' literals. Facts that order the same two elements are one, as
+/// they turn together.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Reversible {
-    pub fact: usize,
+    /// The facts, in order.
+    pub facts: Vec<usize>,
     pub pairs: Vec<(usize, usize)>,
 }
 
@@ -533,7 +539,8 @@ pub(crate) enum Source {
     /// and uncrossed: the barycentre of what each is connected to (component_alignment,
     /// crossings, wire_length).
     Barycentre,
-    /// Rows evenly spaced (distribution).
+    /// The members of a row of one set to space evenly ([`Structure::even_sets`]) evenly spaced
+    /// (distribution).
     EvenRows,
     /// Mirror pairs given mirrored orientations (symmetry).
     MirrorPairs,
@@ -563,17 +570,24 @@ pub(crate) struct Structure {
     pub pairs: Vec<Pair>,
     /// The stubs that hang from each object, by the object.
     pub hanging: BTreeMap<usize, Vec<usize>>,
-    /// The box of the texts each object's symbol places (13.3), estimated, in the symbol's own
-    /// coordinates, by the object ([`text_box`]).
-    pub labels: BTreeMap<usize, [Q; 4]>,
+    /// The box of the texts each object's symbol places (13.3), about the object's origin, for
+    /// each orientation of the object in the order of `Orient::ALL`, by the object ([`text_box`]).
+    pub labels: BTreeMap<usize, Vec<[Q; 4]>>,
+    /// The boxes of the texts that offsets kept place from an element's origin on both axes, such
+    /// as `#R1 @TEXT("R0", dx=-1, dy=3.5)`, about its origin, by the element: they move with it
+    /// but do not turn (13.3; review of phase 2 of the quality review).
+    pub offset_labels: BTreeMap<usize, Vec<[Q; 4]>>,
     /// Where each text with a position of its own goes when nothing decides it, by the text: at
     /// the point it is attached to, or beside the object; above the middle of a wire, at the start
     /// of a net (13.3).
     pub anchors: BTreeMap<usize, Anchor>,
     pub tree: GroupTree,
-    /// The components of each scope of the objectives measured within groups: each group, then
-    /// those in no group (when any).
+    /// The components of each scope of the objectives measured within groups: each group; the
+    /// components in no group are no scope ([`scopes`]).
     pub scopes: Vec<Vec<usize>>,
+    /// The sets of elements that a candidate with even rows spaces evenly where three or more of
+    /// one are in a row ([`even_sets`]).
+    pub even_sets: Vec<Vec<usize>>,
     pub open: Open,
     /// The current depth of each object, when the current direction is in force: none for those
     /// not elements and those not reached.
@@ -584,7 +598,8 @@ pub(crate) struct Structure {
     /// witness has them: an ORDER with a direction, a DISTANCE with a direction and a gap not
     /// below 0.
     pub precedence: BTreeSet<(usize, usize)>,
-    /// The facts kept on x whose side is open, with the pairs they order.
+    /// The facts kept on x whose side is open, and the DISTRIBUTEs on x of three members or more,
+    /// with the pairs they order.
     pub reversible: Vec<Reversible>,
     pub active: Active,
     pub sources: Vec<Source>,
@@ -667,10 +682,11 @@ impl Structure {
         turned_box(&self.symbols.get(self.objects[k].symbol?)?.bbox, o)
     }
 
-    /// The box of the texts an object's symbol places, turned by `o` with the object, as the
-    /// text boxes of a symbol turn and mirror with it (9.2.5).
+    /// The box of the texts an object's symbol places, about its origin, with the object turned by
+    /// `o`: each text's anchor turned with it, the text laid out upright as the renderer keeps it
+    /// (9.2.5; [`text_box`]).
     pub(crate) fn label_offset(&self, k: usize, o: Orient) -> Option<[Q; 4]> {
-        turned_box(self.labels.get(&k)?, o)
+        self.labels.get(&k)?.get(usize::from(crate::orient::index(o))).cloned()
     }
 
     /// Where a pin is, with every object's origin at `at` and orientation `orient`.
@@ -751,25 +767,45 @@ pub(crate) fn analyse(
             hanging.entry(stub.host.0).or_default().push(k);
         }
     }
-    let mut labels: BTreeMap<usize, [Q; 4]> = BTreeMap::new();
+    let mut labels: BTreeMap<usize, Vec<[Q; 4]>> = BTreeMap::new();
     for o in &problem.objects {
         // the texts that move with their owner on both axes; one that the scene places on an axis
         // does not (13.3)
         let (Position::InSymbol { owner, local, replaced: None }, Some(t)) = (&o.position, &o.text) else { continue };
-        let Some(b) = text_box(t, (number(local.0), number(local.1))) else { continue };
-        labels
-            .entry(*owner)
-            .and_modify(|a| {
-                for i in 0..2 {
-                    if b[i] < a[i] {
-                        a[i] = b[i].clone();
-                    }
-                    if b[i + 2] > a[i + 2] {
-                        a[i + 2] = b[i + 2].clone();
-                    }
-                }
-            })
-            .or_insert(b);
+        let local = (number(local.0), number(local.1));
+        let Some(boxes) = Orient::ALL.into_iter().map(|turn| text_box(t, &local, turn)).collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        add_labels(&mut labels, *owner, boxes);
+    }
+    // the texts that offsets kept place from an element's origin on both axes: at the offsets,
+    // unturned
+    let mut offset_labels: BTreeMap<usize, Vec<[Q; 4]>> = BTreeMap::new();
+    let mut offsets: BTreeMap<usize, [Option<(usize, Q)>; 2]> = BTreeMap::new();
+    for &i in &kept {
+        let Some(FactKind::Offset { text, from: PointRef::Origin(owner), axis, value }) =
+            problem.facts.get(i).map(|f| &f.kind)
+        else {
+            continue;
+        };
+        let (Some(o), Some(value)) = (objects.get(*owner), from_f64(*value)) else { continue };
+        if o.role == Role::Element {
+            offsets.entry(*text).or_default()[usize::from(*axis == Axis::Y)] = Some((*owner, value));
+        }
+    }
+    for (text, [x, y]) in offsets {
+        let (Some((owner, dx)), Some((other, dy)), Some(t)) =
+            (x, y, problem.objects.get(text).and_then(|o| o.text.as_ref()))
+        else {
+            continue;
+        };
+        if owner != other || !matches!(problem.objects[text].position, Position::Own { .. }) {
+            continue;
+        }
+        if let Some(b) = text_box(t, &(dx, dy), Orient::R0) {
+            offset_labels.entry(owner).or_default().push(b);
+        }
     }
     // the symbols that the solution leaves free first, as no text is anchored on their pins, then
     // the texts
@@ -795,9 +831,11 @@ pub(crate) fn analyse(
         pairs,
         hanging,
         labels,
+        offset_labels,
         anchors,
         tree,
         scopes,
+        even_sets: Vec::new(),
         open,
         depth: None,
         rows: Vec::new(),
@@ -816,7 +854,29 @@ pub(crate) fn analyse(
     }
     s.rows = rows(problem, &s, work);
     (s.precedence, s.reversible) = precedence(problem, &s);
+    s.even_sets = even_sets(problem, &s);
     s
+}
+
+/// The boxes of some texts of an object, one for each orientation, added to those of `labels`.
+fn add_labels(labels: &mut BTreeMap<usize, Vec<[Q; 4]>>, owner: usize, boxes: Vec<[Q; 4]>) {
+    match labels.get_mut(&owner) {
+        Some(all) => {
+            for (a, b) in all.iter_mut().zip(&boxes) {
+                for i in 0..2 {
+                    if b[i] < a[i] {
+                        a[i] = b[i].clone();
+                    }
+                    if b[i + 2] > a[i + 2] {
+                        a[i + 2] = b[i + 2].clone();
+                    }
+                }
+            }
+        }
+        None => {
+            labels.insert(owner, boxes);
+        }
+    }
 }
 
 /// A box turned by an orientation about the origin (11.2).
@@ -840,47 +900,116 @@ fn line_chars(runs: &[Run]) -> usize {
         .sum()
 }
 
-/// An estimate of the box of a text anchored at `at` (9.2.5): each character 0.6 of the size wide,
-/// each line 1.2 of it high, the box beside the anchor as `halign` and `valign` say (the baseline
-/// 0.8 of the size below the top of the first line), turned by `rotate`. The solver keeps the
-/// symbols' texts clear of their neighbours by it; the viewer lays the text out itself. None for a
+/// How far the box of a text reaches past the advances of its runs at each end of its lines, in
+/// sizes of the text: a margin for glyphs that reach past their advances, and for the rounding of
+/// the advances that a frontend draws.
+const TEXT_MARGIN: (i64, i64) = (1, 10);
+
+/// How far above and below its baseline a run's glyphs reach, in sizes of the run: the capitals,
+/// digits and ascenders of the Latin letters, about 0.72 high in the shipped fonts, and their
+/// descenders, about 0.24 deep, with a margin; the ideographs, which fill the em box from 0.12
+/// below the baseline to 0.88 above it, nearly so.
+const RUN_ABOVE: (i64, i64) = (4, 5);
+const RUN_BELOW: (i64, i64) = (2, 5);
+
+/// The box of a text of a symbol anchored at `at` in the symbol's coordinates (9.2.5), about the
+/// owner's origin with the owner turned by `turn`, as the renderer lays it out (quality review
+/// ST-7): along its lines, from the start of the first run to the end of the last, each run as
+/// wide as the advances of its characters in the shipped fonts (`rnl_render::lay_out`, decision
+/// 0009), with the style's size, bold and italic (9.3; the font named is a hint that the layout
+/// does not follow), and `TEXT_MARGIN` more at each end; across them, each run from `RUN_BELOW`
+/// below its baseline to `RUN_ABOVE` above it, and the bars of fractions and overlines, the lines
+/// and the box beside the anchor where the renderer puts them as `halign` and `valign` say; the
+/// sides on a hundredth of a unit, outwards. The anchor turns with the owner, but the glyphs read
+/// upright, as the renderer draws them: the text runs across or up by `rotate` and `turn`, with
+/// `halign` reversed where they would read backwards and a `valign` of top or bottom swapped
+/// where they would stand upside down, a baseline staying a baseline (the review of phase 2 of
+/// the quality review: a value at the baseline of a symbol turned R270 lay mirrored across its
+/// baseline). The solver keeps the symbols' texts clear of their neighbours by it. None for a
 /// text without characters.
-pub(crate) fn text_box(t: &TextInfo, at: (Q, Q)) -> Option<[Q; 4]> {
-    let size = t
-        .style
-        .iter()
-        .find(|(n, _)| n == "size")
-        .and_then(|(_, v)| v.num())
-        .and_then(from_f64)
-        .unwrap_or_else(|| int(1));
-    let chars = t.lines.iter().map(|l| line_chars(l)).max().unwrap_or(0);
-    if chars == 0 {
+pub(crate) fn text_box(t: &TextInfo, at: &(Q, Q), turn: Orient) -> Option<[Q; 4]> {
+    let style = |name: &str| t.style.iter().find(|(n, _)| n == name).map(|(_, v)| v);
+    let size = style("size").and_then(|v| v.num()).filter(|s| s.is_finite() && *s > 0.0).unwrap_or(1.0);
+    let flag = |name: &str| style(name).and_then(|v| v.boolean()).unwrap_or(false);
+    if t.lines.iter().all(|l| line_chars(l) == 0) {
         return None;
     }
-    let w = int(chars as i64) * frac(3, 5) * &size;
-    let h = int(t.lines.len() as i64) * frac(6, 5) * &size;
-    let (x1, x2) = match t.halign.as_str() {
-        "middle" => (-(&w / int(2)), &w / int(2)),
-        "end" => (-w.clone(), Q::zero()),
-        _ => (Q::zero(), w.clone()),
-    };
-    let (y1, y2) = match t.valign.as_str() {
-        "top" => (-h.clone(), Q::zero()),
-        "middle" => (-(&h / int(2)), &h / int(2)),
-        "bottom" => (Q::zero(), h.clone()),
-        // the first line's baseline: the box from 0.8 of the size above it down
-        _ => (frac(4, 5) * &size - &h, frac(4, 5) * &size),
-    };
     // 0, 90, 180 or 270 (9.2.5), read exactly
     let r = from_f64(t.rotate).unwrap_or_default();
-    let turn = int(360);
-    let r = &r - (&r / &turn).floor() * &turn;
+    let full = int(360);
+    let r = &r - (&r / &full).floor() * &full;
     let quarter = [(90, Orient::R90), (180, Orient::R180), (270, Orient::R270)]
         .into_iter()
         .find(|(d, _)| r == int(*d))
         .map_or(Orient::R0, |(_, o)| o);
-    let b = turned_box(&[x1, y1, x2, y2], quarter)?;
-    Some([&b[0] + &at.0, &b[1] + &at.1, &b[2] + &at.0, &b[3] + &at.1])
+    // which way the text reads, `u`, and its glyphs stand, `v`, turned by its rotate and then
+    // with its owner, as rnl_render's text() has them: a text that would read down reads up, one
+    // that would read leftwards reads rightwards, each from the other end of its box
+    let (u0, v0, u1, v1) = quarter.then(turn).matrix();
+    let (u, v) = ((u0, u1), (v0, v1));
+    let vertical = u.0 == 0;
+    let backwards = if vertical { u.1 < 0 } else { u.0 < 0 };
+    let upside_down = if vertical { v.0 > 0 } else { v.1 < 0 };
+    let halign = match (backwards, t.halign.as_str()) {
+        (true, "start") => "end".to_string(),
+        (true, "end") => "start".to_string(),
+        (_, h) => h.to_string(),
+    };
+    let valign = match (upside_down, t.valign.as_str()) {
+        (true, "top") => "bottom".to_string(),
+        (true, "bottom") => "top".to_string(),
+        (_, h) => h.to_string(),
+    };
+    let mut laid = rnl_render::TextPrim {
+        anchor: (0.0, 0.0),
+        lines: t.lines.clone(),
+        size,
+        color: String::new(),
+        font: String::new(),
+        bold: flag("bold"),
+        italic: flag("italic"),
+        halign,
+        valign,
+        vertical: false,
+        runs: Vec::new(),
+        bars: Vec::new(),
+    };
+    // the renderer's own scale, which decides only how thin a bar may be
+    let laid_box = rnl_render::lay_out(&mut laid, rnl_render::RenderOptions::default().scale);
+    let ratio = |(n, d): (i64, i64)| n as f64 / d as f64;
+    // across the lines, the glyphs of each run rather than the ascender and the descender of the
+    // face, which the renderer's box reaches and which go well past them
+    let (mut y1, mut y2) = (f64::MAX, f64::MIN);
+    for r in &laid.runs {
+        y1 = y1.min(r.at.1 - ratio(RUN_BELOW) * r.size);
+        y2 = y2.max(r.at.1 + ratio(RUN_ABOVE) * r.size);
+    }
+    for b in &laid.bars {
+        let half = b.stroke.width / 2.0;
+        y1 = y1.min(b.a.1.min(b.b.1) - half);
+        y2 = y2.max(b.a.1.max(b.b.1) + half);
+    }
+    if y1 > y2 {
+        return None;
+    }
+    let margin = ratio(TEXT_MARGIN) * size;
+    let hundredths = |v: f64, up: bool| {
+        // the noise of the floating point off first, so that a side on a hundredth stays there
+        let c = (v * 100.0 * 1e6).round() / 1e6;
+        let c = if up { c.ceil() } else { c.floor() };
+        // a box the size of a page, as no text drawn is wider than that
+        frac(c.clamp(-1e12, 1e12) as i64, 100)
+    };
+    let b = [
+        hundredths(laid_box[0] - margin, false),
+        hundredths(y1, false),
+        hundredths(laid_box[2] + margin, true),
+        hundredths(y2, true),
+    ];
+    // a text that reads up has the tops of its glyphs to the left
+    let b = if vertical { turned_box(&b, Orient::R90)? } else { b };
+    let at = [turned(turn, at, 0), turned(turn, at, 1)];
+    Some([&b[0] + &at[0], &b[1] + &at[1], &b[2] + &at[0], &b[3] + &at[1]])
 }
 
 fn number(v: f64) -> Q {
@@ -1391,7 +1520,9 @@ fn group_tree(problem: &LevelProblem, objects: &[ObjectInfo], elements: &[usize]
 }
 
 /// The components of each scope of the objectives measured within groups: each group with the
-/// stubs that hang from its members, then the components in no group.
+/// stubs that hang from its members. The components in no group are no scope: they are not a
+/// group, and no alignment or spacing is judged among them (algorithm synthesis 9.3, decided
+/// 2026-10-17; quality review SE-3).
 fn scopes(problem: &LevelProblem, objects: &[ObjectInfo]) -> Vec<Vec<usize>> {
     let component = |k: usize| {
         let o = &objects[k];
@@ -1399,20 +1530,124 @@ fn scopes(problem: &LevelProblem, objects: &[ObjectInfo]) -> Vec<Vec<usize>> {
     };
     let owner = |k: usize| objects[k].stub.as_ref().map_or(k, |s| s.host.0);
     let mut out = Vec::new();
-    let mut grouped = BTreeSet::new();
     for g in &problem.groups {
         let members: BTreeSet<usize> = g.members.iter().copied().collect();
         let scope: Vec<usize> = (0..objects.len()).filter(|&k| component(k) && members.contains(&owner(k))).collect();
-        grouped.extend(scope.iter().copied());
         if !scope.is_empty() {
             out.push(scope);
         }
     }
-    let rest: Vec<usize> = (0..objects.len()).filter(|&k| component(k) && !grouped.contains(&k)).collect();
-    if !rest.is_empty() {
-        out.push(rest);
-    }
     out
+}
+
+/// What a net is to the role of an element on it ([`even_sets`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum NetRole {
+    Supply,
+    Ground,
+    /// A signal joining two pins of elements and ports.
+    Link,
+    /// A signal joining three or more: a node that branches.
+    Node,
+    /// On no net that the problem shows.
+    Unknown,
+}
+
+/// The sets of elements whose spacing a candidate with even rows makes equal, in a row where three
+/// or more of one set are (`Source::EvenRows`; quality review SE-3): those that share a group,
+/// each node of the tree of groups but the whole level; those joined by a DISTRIBUTE on x kept or a
+/// mirror pair; and those of one kind and one role in the same group, or in none: the same symbol,
+/// and the same roles of the nets of their pins, in any order, such as the legs of a ladder,
+/// each from a node of the spine to a net of its own, or loads hung from one net to the ground; an
+/// element on no net that the problem shows has no role. A chain of a `$FLOW` is none of these,
+/// nor are the elements in no group as such. Each set sorted, none twice, those of fewer than three
+/// elements left out.
+fn even_sets(problem: &LevelProblem, s: &Structure) -> Vec<Vec<usize>> {
+    let mut out: BTreeSet<Vec<usize>> = BTreeSet::new();
+    for node in s.tree.nodes.iter().skip(1) {
+        out.insert(node.members.clone());
+    }
+    // the DISTRIBUTEs on x kept and the mirror pairs, joined
+    let mut joined = Joined::new(&s.elements);
+    let is_element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
+    for &f in &s.kept {
+        let FactKind::Distribute { axis: Axis::X, members } = &problem.facts[f].kind else { continue };
+        let mut ks = Vec::new();
+        for m in members {
+            elements_of(m, &mut ks);
+        }
+        ks.retain(|&k| is_element(k));
+        for w in ks.windows(2) {
+            joined.join(w[0], w[1]);
+        }
+    }
+    for pair in &s.pairs {
+        let ends: Vec<usize> =
+            [Some(pair.a), Some(pair.b), pair.axis].into_iter().flatten().filter(|&k| is_element(k)).collect();
+        for w in ends.windows(2) {
+            joined.join(w[0], w[1]);
+        }
+    }
+    let mut by_root: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for &k in &s.elements {
+        by_root.entry(joined.find(k)).or_default().push(k);
+    }
+    out.extend(by_root.into_values());
+    // one kind and one role, in the same node of the tree of groups
+    let net_role = |i: usize| {
+        let net = &s.connections.nets[i];
+        if net.supply {
+            return NetRole::Supply;
+        }
+        if net.ground {
+            return NetRole::Ground;
+        }
+        let ends = net
+            .pins
+            .iter()
+            .filter(|(k, _)| s.objects.get(*k).is_some_and(|o| matches!(o.role, Role::Element | Role::Port)))
+            .count();
+        if ends >= 3 {
+            NetRole::Node
+        } else {
+            NetRole::Link
+        }
+    };
+    let node_of = |k: usize| s.tree.nodes.iter().position(|n| n.own.contains(&k)).unwrap_or(0);
+    let mut by_role: BTreeMap<(usize, Option<usize>, Vec<NetRole>), Vec<usize>> = BTreeMap::new();
+    for &k in &s.elements {
+        let mut roles: Vec<NetRole> = (0..s.pins(k).len())
+            .map(|pin| {
+                if s.power.supply_pins.contains(&(k, pin)) {
+                    NetRole::Supply
+                } else if s.power.ground_pins.contains(&(k, pin)) {
+                    NetRole::Ground
+                } else {
+                    s.connections
+                        .nets_of
+                        .get(&(k, pin))
+                        .and_then(|nets| nets.first())
+                        .map_or(NetRole::Unknown, |&i| net_role(i))
+                }
+            })
+            .collect();
+        // an element on no net that the problem shows has no role to tell
+        if roles.iter().all(|r| *r == NetRole::Unknown) {
+            continue;
+        }
+        roles.sort_unstable();
+        by_role.entry((node_of(k), s.objects[k].symbol, roles)).or_default().push(k);
+    }
+    out.extend(by_role.into_values());
+    out.into_iter()
+        .map(|mut set| {
+            set.sort_unstable();
+            set
+        })
+        .filter(|set| set.len() >= 3)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 /// The sources the objectives in force call for, in the order of their layers, then those always
@@ -1734,16 +1969,35 @@ fn touched_elements(s: &Structure, f: usize, axis: usize) -> Vec<usize> {
 /// point the fact takes it by, the elements of a set (a centre, 6.5) all at the centre's, and an
 /// element before another when it is further left. An ORDER puts every member before the next; a
 /// DISTANCE puts one side before the other only when its gap is not below 0, and leaves the
-/// members of one side unordered; an ALIGN and a DISTRIBUTE fix no side (14.2, 14.4).
+/// members of one side unordered; an ALIGN fixes no side (14.2). A DISTRIBUTE fixes no side
+/// either, but its members come in its order one way or the other, each a step further than the
+/// one before (14.4), so it orders them as an ORDER given only an axis does: the way the witness
+/// has them, or, where the witness puts them all at one x, the way of the netlist
+/// ([`netlist_way`]), however it is written, and the search may reverse it. With fewer than three
+/// members it holds wherever they are (14.4), and orders nothing. Its members that are no
+/// elements, such as the axis of a `$MIRROR_PAIR` or the middle point of a `$TAIL_CENTER`, keep
+/// their places in the order and order nothing themselves (review of phase 2 of the quality
+/// review: a swap of neighbours broke the order of a DISTRIBUTE, the resolution then dropped the
+/// gaps between them, and a text lay over the next symbol).
+///
+/// Two facts whose side is open that order the same two elements turn together, as one, since one
+/// turned without the other leaves the search no order of them, the earlier turned the way of the
+/// later where they run against each other (two DISTRIBUTEs at one x, each the way of the
+/// netlist); and one that orders two elements that a fact with a side orders is not open at all,
+/// its precedences fixed the way that fact has them.
 fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)>, Vec<Reversible>) {
     let element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
+    let elements = |m: &PointRef| -> Vec<usize> {
+        let mut ks = Vec::new();
+        elements_of(m, &mut ks);
+        ks.retain(|&k| element(k));
+        ks
+    };
     let at = |ms: &[PointRef]| -> Vec<(usize, Q)> {
         let mut out = Vec::new();
         for m in ms {
             let Some(v) = point_value(problem, &s.witness, m, 0, 0) else { continue };
-            let mut ks = Vec::new();
-            elements_of(m, &mut ks);
-            out.extend(ks.into_iter().filter(|&k| element(k)).map(|k| (k, v.clone())));
+            out.extend(elements(m).into_iter().map(|k| (k, v.clone())));
         }
         out
     };
@@ -1755,7 +2009,7 @@ fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)
         out
     };
     let mut fixed = BTreeSet::new();
-    let mut open = Vec::new();
+    let mut open: Vec<Reversible> = Vec::new();
     for &f in &s.kept {
         let (sense, mut pairs) = match &problem.facts[f].kind {
             FactKind::Order { axis: Axis::X, sense, members } => {
@@ -1771,21 +2025,105 @@ fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)
                 pairs.extend(before(&b, &a));
                 (*sense, pairs)
             }
+            FactKind::Distribute { axis: Axis::X, members } => {
+                // with fewer than three members it holds wherever they are (14.4)
+                if members.len() < 3 {
+                    continue;
+                }
+                // the members with a place at the witness, in order: they run the way its first
+                // and last are; all at one x, the way of the netlist, read from either end
+                let chain: Vec<(Q, Vec<usize>)> = members
+                    .iter()
+                    .filter_map(|m| Some((point_value(problem, &s.witness, m, 0, 0)?, elements(m))))
+                    .collect();
+                let forward = match (chain.first(), chain.last()) {
+                    (Some((first, _)), Some((last, _))) if first != last => first < last,
+                    _ => netlist_way(chain.iter().map(|(_, ks)| ks.as_slice())),
+                };
+                let mut pairs = Vec::new();
+                for (i, (_, a)) in chain.iter().enumerate() {
+                    for (_, b) in &chain[i + 1..] {
+                        for &x in a {
+                            pairs.extend(b.iter().filter(|&&y| x != y).map(|&y| if forward { (x, y) } else { (y, x) }));
+                        }
+                    }
+                }
+                // an element in two members, such as `{#R1 #R2 #R1}`, at one x with all between:
+                // no order of them
+                let both: BTreeSet<(usize, usize)> = pairs.iter().copied().collect();
+                pairs.retain(|&(a, b)| !both.contains(&(b, a)));
+                (Sense::Either, pairs)
+            }
             _ => continue,
         };
         pairs.sort_unstable();
         pairs.dedup();
         match sense {
-            Sense::Either if s.open.orders.contains(&f) || s.open.sides.contains(&f) => {
+            Sense::Either
+                if s.open.orders.contains(&f)
+                    || s.open.sides.contains(&f)
+                    || matches!(problem.facts[f].kind, FactKind::Distribute { .. }) =>
+            {
                 if !pairs.is_empty() {
-                    open.push(Reversible { fact: f, pairs });
+                    open.push(Reversible { facts: vec![f], pairs });
                 }
             }
             Sense::Either => {}
             Sense::Increasing | Sense::Decreasing => fixed.extend(pairs),
         }
     }
-    (fixed, open)
+    // the facts whose side is open that order the same two elements, one after the other, as one
+    let unordered =
+        |r: &Reversible| -> BTreeSet<(usize, usize)> { r.pairs.iter().map(|&(a, b)| (a.min(b), a.max(b))).collect() };
+    let turned = |pairs: &[(usize, usize)]| -> Vec<(usize, usize)> { pairs.iter().map(|&(a, b)| (b, a)).collect() };
+    let mut merged: Vec<Reversible> = Vec::new();
+    for mut r in open {
+        loop {
+            let shared = unordered(&r);
+            let Some(i) = merged.iter().position(|m| !unordered(m).is_disjoint(&shared)) else { break };
+            let mut m = merged.remove(i);
+            // the way of `r`, where they run against each other
+            if m.pairs.iter().any(|&(a, b)| r.pairs.contains(&(b, a))) {
+                m.pairs = turned(&m.pairs);
+            }
+            r.facts.extend(m.facts);
+            r.pairs.extend(m.pairs);
+        }
+        r.facts.sort_unstable();
+        r.pairs.sort_unstable();
+        r.pairs.dedup();
+        merged.push(r);
+    }
+    merged.sort_by(|a, b| a.facts.cmp(&b.facts));
+    // and those that a fact with a side turns already, fixed, the way it turns them
+    let mut reversible = Vec::new();
+    for r in merged {
+        if r.pairs.iter().any(|p| fixed.contains(p)) {
+            fixed.extend(r.pairs);
+        } else if r.pairs.iter().any(|&(a, b)| fixed.contains(&(b, a))) {
+            fixed.extend(turned(&r.pairs));
+        } else {
+            reversible.push(r);
+        }
+    }
+    (fixed, reversible)
+}
+
+/// Whether a DISTRIBUTE whose members the witness puts all at one x runs as written, by the
+/// elements of its members in order (`members`): a DISTRIBUTE has no direction (14.4), so the
+/// members written the other way round must run the same way, which is the way of the netlist.
+/// The members with elements, each by its elements in the order of the netlist, are read from
+/// both ends, and the end that comes first in the netlist, compared as words are, goes left; the
+/// members without elements, such as the axis of a `$MIRROR_PAIR`, order nothing and do not
+/// count. Read the same from both ends, the way does not matter (review of the fix of phase 2:
+/// the members ran as written, which drove the first plan, the barycentre rounds and the swaps).
+fn netlist_way<'a>(members: impl DoubleEndedIterator<Item = &'a [usize]> + Clone) -> bool {
+    let keyed = |ks: &[usize]| -> Option<Vec<usize>> {
+        let mut ks = ks.to_vec();
+        ks.sort_unstable();
+        (!ks.is_empty()).then_some(ks)
+    };
+    members.clone().filter_map(keyed).le(members.rev().filter_map(keyed))
 }
 
 /// The objects a point refers to: its object, or the members of a set followed down.
@@ -1804,7 +2142,7 @@ fn elements_of(r: &PointRef, out: &mut Vec<usize>) {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::resolve::tests::{fact, instance, problem_of};
+    use crate::resolve::tests::{fact, instance, point, problem_of};
     use rnl_runtime::problem::ProblemGroup;
 
     fn structure_of(p: &LevelProblem) -> Structure {
@@ -2069,10 +2407,114 @@ pub(crate) mod tests {
         let s = structure_of(&p);
         assert_eq!(s.precedence.iter().copied().collect::<Vec<_>>(), vec![(0, 1)]);
         assert_eq!(s.open.orders, vec![4]);
-        assert_eq!(s.reversible.len(), 1, "{:?}", s.reversible);
-        assert_eq!(s.reversible[0].fact, 4);
-        let [(a, b)] = s.reversible[0].pairs[..] else { panic!("{:?}", s.reversible) };
+        assert_eq!(s.reversible.len(), 2, "{:?}", s.reversible);
+        // the DISTRIBUTE fixes no side, but its members come in its order, one way or the other
+        assert_eq!(s.reversible[0].facts, vec![2]);
+        assert!(monotone(&s.reversible[0].pairs, &[2, 3, 4]), "{:?}", s.reversible);
+        assert_eq!(s.reversible[1].facts, vec![4]);
+        let [(a, b)] = s.reversible[1].pairs[..] else { panic!("{:?}", s.reversible) };
         assert_eq!((a.min(b), a.max(b)), (6, 7));
+    }
+
+    /// Whether `pairs` puts every element of `chain` before each later one, or every one after
+    /// each later one, and nothing else.
+    fn monotone(pairs: &[(usize, usize)], chain: &[usize]) -> bool {
+        let way = |forward: bool| -> Vec<(usize, usize)> {
+            let mut out = Vec::new();
+            for (i, &a) in chain.iter().enumerate() {
+                out.extend(chain[i + 1..].iter().map(|&b| if forward { (a, b) } else { (b, a) }));
+            }
+            out.sort_unstable();
+            out
+        };
+        let mut pairs = pairs.to_vec();
+        pairs.sort_unstable();
+        pairs == way(true) || pairs == way(false)
+    }
+
+    /// A DISTRIBUTE on x orders its elements as an ORDER given only an axis does (review of phase
+    /// 2 of the quality review): those of a `$MIRROR_PAIR`'s, its axis a point between them, one
+    /// before the other; with an ORDER given only an axis on two of its elements, both turn
+    /// together; with an ORDER with a direction on two of them, it runs that way, not reversible.
+    #[test]
+    fn a_distribute_orders_its_elements_either_way() {
+        let o = |k| PointRef::Origin(k);
+        let distribute = |members: Vec<PointRef>| fact(FactKind::Distribute { axis: Axis::X, members });
+        let order = |sense, members: Vec<PointRef>| fact(FactKind::Order { axis: Axis::X, sense, members });
+        use rnl_runtime::problem::Sense::{Either, Increasing};
+        let mut objects: Vec<_> = (0..9).map(|_| instance()).collect();
+        objects.push(point());
+        let p = problem_of(
+            objects,
+            vec![
+                distribute(vec![o(0), o(1), o(2)]),
+                order(Either, vec![o(2), o(0)]),
+                distribute(vec![o(3), o(4), o(5)]),
+                order(Increasing, vec![o(5), o(3)]),
+                distribute(vec![o(6), o(9), o(7)]),
+            ],
+        );
+        let s = structure_of(&p);
+        assert_eq!(s.reversible.len(), 2, "{:?}", s.reversible);
+        assert_eq!(s.reversible[0].facts, vec![0, 1]);
+        assert!(monotone(&s.reversible[0].pairs, &[0, 1, 2]), "{:?}", s.reversible);
+        // the ORDER puts 5 first, so the DISTRIBUTE runs from 5 to 3
+        for pair in [(5, 4), (4, 3), (5, 3)] {
+            assert!(s.precedence.contains(&pair), "{:?}", s.precedence);
+        }
+        assert_eq!(s.precedence.len(), 3, "{:?}", s.precedence);
+        // the point orders nothing, and keeps its place between 6 and 7
+        assert_eq!(s.reversible[1].facts, vec![4]);
+        assert!(monotone(&s.reversible[1].pairs, &[6, 7]), "{:?}", s.reversible);
+    }
+
+    /// A DISTRIBUTE has no direction (14.4): where the witness puts all its members at one x, it
+    /// runs the way the netlist has them, however it is written, and the same way written the other
+    /// way round (review of the fix of phase 2: it ran as written). A DISTRIBUTE of two members
+    /// holds wherever they are, and orders nothing.
+    #[test]
+    fn a_distribute_at_one_x_runs_the_way_of_the_netlist() {
+        let distribute = |members: &[usize]| {
+            let members = members.iter().map(|&k| PointRef::Origin(k)).collect();
+            fact(FactKind::Distribute { axis: Axis::X, members })
+        };
+        // the pairs of the reversible facts, and the precedences, of some DISTRIBUTEs on 0..6 and a
+        // point 6, all at x 0 at the witness
+        type Orders = (Vec<Vec<(usize, usize)>>, BTreeSet<(usize, usize)>);
+        let pairs = |written: &[&[usize]]| -> Orders {
+            let mut objects: Vec<_> = (0..6).map(|_| instance()).collect();
+            objects.push(point());
+            let p = problem_of(objects, written.iter().map(|m| distribute(m)).collect());
+            let s = structure_of(&p);
+            assert!(s.witness.origin.iter().all(|o| o[0].is_zero()), "{:?}", s.witness.origin);
+            (s.reversible.into_iter().map(|r| r.pairs).collect(), s.precedence)
+        };
+        // the netlist puts the first before the last: written so, or the other way round
+        for written in [[0, 1, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0], [1, 0, 2], [2, 0, 1]] {
+            let [a, b, c] = written;
+            let mut way = vec![(a, b), (a, c), (b, c)];
+            if a > c {
+                way = way.into_iter().map(|(x, y)| (y, x)).collect();
+            }
+            way.sort_unstable();
+            assert_eq!(pairs(&[&written]), (vec![way], BTreeSet::new()), "{written:?}");
+        }
+        // written the other way round, the same pairs
+        for (written, reversed) in
+            [(&[3, 6, 4][..], &[4, 6, 3][..]), (&[0, 1, 2, 0], &[0, 2, 1, 0]), (&[5, 1, 3, 2], &[2, 3, 1, 5])]
+        {
+            assert_eq!(pairs(&[written]), pairs(&[reversed]), "{written:?} and {reversed:?}");
+        }
+        // the point between orders nothing
+        assert_eq!(pairs(&[&[4, 6, 3]]).0, vec![vec![(3, 4)]]);
+        // two that run against each other the way of the netlist turn together, one the other's
+        // way: 2, 1, 0 and 1, 0, 3 both hold in 2, 1, 0, 3
+        assert_eq!(
+            pairs(&[&[0, 1, 2], &[1, 0, 3]]),
+            (vec![vec![(0, 3), (1, 0), (1, 3), (2, 0), (2, 1)]], BTreeSet::new())
+        );
+        // two members, nothing
+        assert_eq!(pairs(&[&[4, 3], &[1, 5]]), (Vec::new(), BTreeSet::new()));
     }
 
     #[test]

@@ -849,7 +849,11 @@
             "definition": "$CHAIN",
             "attach": {
               "source": "#V1",
-              "series": "@493",
+              "series": [
+                "%s1",
+                "%s2",
+                "%s3"
+              ],
               "load": "#RL"
             },
             "symbol": {

@@ -402,6 +402,70 @@ fn a_usage_reads_back_with_the_roles_of_the_request() {
     assert_eq!(write(&pair(json!({"": "#M1"}))).unwrap_err(), r#"op 0 (add-usage): `attach` role "" is not a name"#);
 }
 
+/// The netlist of the tests of roles: four transistors and nothing of RNL.
+const FOUR: &str = "* roles\nM1 a g 0 0 nch\nM2 b g 0 0 nch\nM3 a g 0 0 nch\nM4 b g 0 0 nch\n.end\n";
+
+/// Read a netlist written into FOUR, with `record` put before what was written; what the usage %m
+/// is attached to, role by role.
+fn read_roles(out: &str, record: &str) -> (Vec<String>, Vec<(String, Attach)>) {
+    let text = out.replacen("\n* @RNL(author=", &format!("\n{record}\n* @RNL(author="), 1);
+    let files = MemoryProvider::new().with(entry("spice"), &text);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: true, ..Options::default() })
+        .unwrap();
+    let errors = r.diagnostics().iter().filter(|d| d.severity == Severity::Error).map(|d| r.sink.render(d)).collect();
+    let m = r.model.levels.iter().flat_map(|lv| &lv.objects).find(|o| o.id == "%m").unwrap();
+    (errors, m.attach.clone())
+}
+
+#[test]
+fn a_set_role_is_written_with_its_members_in_braces() {
+    // ref and out of $CURRENT_MIRROR are set roles (9.4): a list of members, none, one or several
+    let mirror = |attach: Value| {
+        request(
+            "spice",
+            FOUR,
+            json!([{"level": "file", "op": "add-usage", "name": "%m", "definition": "$CURRENT_MIRROR", "attach": attach}]),
+        )
+    };
+    let out = write(&mirror(json!({"ref": ["#M1", "#M3"], "out": ["#M2"]}))).unwrap();
+    assert!(out.contains("*   $CURRENT_MIRROR @ATTACH {#M1 #M3}(ref) {#M2}(out) => %m\n"), "{out}");
+    let (errors, attach) = read_roles(&out, "");
+    assert!(errors.is_empty(), "{out}\n{errors:?}");
+    let set = |ids: &[&str]| Attach::Set(ids.iter().map(|id| Attach::Object(id.to_string())).collect());
+    assert_eq!(attach, [("ref".to_string(), set(&["#M1", "#M3"])), ("out".to_string(), set(&["#M2"]))]);
+    // none, written as an empty set; a single id stays a role of one
+    let out = write(&mirror(json!({"ref": [], "out": "#M2"}))).unwrap();
+    assert!(out.contains("*   $CURRENT_MIRROR @ATTACH {}(ref) #M2(out) => %m\n"), "{out}");
+    let (errors, attach) = read_roles(&out, "");
+    assert!(errors.is_empty(), "{out}\n{errors:?}");
+    assert_eq!(attach, [("ref".to_string(), set(&[])), ("out".to_string(), set(&["#M2"]))]);
+    // a list holds ids or points only
+    assert_eq!(
+        write(&mirror(json!({"ref": ["#M1", 3]}))).unwrap_err(),
+        "op 0 (add-usage): `attach` role `ref` is not an id, a point or a list of them"
+    );
+}
+
+#[test]
+fn roles_of_any_name_read_back_as_written() {
+    // a role in Chinese, with a dot, with a quote and with a comma: each written in quotes, the
+    // name itself (16.5), a quote in it doubled, and read back as the definition names it
+    let roles = ["参考管", "a.b", "x\"y", "p,q"];
+    let attach: serde_json::Map<String, Value> =
+        roles.iter().zip(["#M1", "#M2", "#M3", "#M4"]).map(|(r, id)| (r.to_string(), json!(id))).collect();
+    let ops = json!([{"level": "file", "op": "add-usage", "name": "%m", "definition": "$T", "attach": attach}]);
+    let out = write(&request("spice", FOUR, ops)).unwrap();
+    assert!(out.contains(r#"*   $T @ATTACH #M1("参考管") #M2("a.b") #M3("x""y") #M4("p,q") => %m"#), "{out}");
+    let (errors, attach) = read_roles(&out, r#"* @RNL { $T = @DEFINE(roles=["参考管", "a.b", "x""y", "p,q"]) {} }"#);
+    assert!(errors.is_empty(), "{out}\n{errors:?}");
+    let want: Vec<(String, Attach)> = roles
+        .iter()
+        .zip(["#M1", "#M2", "#M3", "#M4"])
+        .map(|(r, id)| (r.to_string(), Attach::Object(id.into())))
+        .collect();
+    assert_eq!(attach, want);
+}
+
 #[test]
 fn the_nets_of_a_wire_on_several_nets_are_one_set() {
     // written loose, two nets and the points would be three objects for the two slots of WIRE

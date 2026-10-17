@@ -426,8 +426,9 @@ mod tests {
         assert_eq!(names.len(), listed.len(), "{listed:?}");
         assert!(listed.contains(&("rnl-zh", "0.3")) && listed.contains(&("rnl-std-virtual", "0.2")), "{listed:?}");
         assert!(listed.contains(&("analog-canvas-extensions", "0.1")), "{listed:?}");
-        // the 16 packages of the series 0.3 and rnl-zh, rnl-std-symbols and rnl-std-virtual, Analog Canvas's
-        assert_eq!(listed.len(), 17 + 2 + 1);
+        // the 15 packages of the series 0.3 and rnl-zh; the four that only the series 0.2 has,
+        // rnl-std-symbols, rnl-std-virtual, rnl-std-semantics and rnl-std-layout; Analog Canvas's
+        assert_eq!(listed.len(), 16 + 4 + 1);
         // by name, then by version
         let mut sorted = listed.clone();
         sorted.sort();
@@ -438,9 +439,7 @@ mod tests {
             version: "0.3".into(),
             language: "0.3".into(),
             file: "rnl-std.rnl".into(),
-            references: ["rnl-std-core", "rnl-std-fill", "rnl-std-semantics", "rnl-std-layout"]
-                .map(String::from)
-                .to_vec(),
+            references: ["rnl-std-core", "rnl-std-fill", "rnl-std-structures"].map(String::from).to_vec(),
             series: true,
             implicit: true,
         };

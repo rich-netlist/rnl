@@ -1,0 +1,39 @@
+// File and section dialects, simulator lang=, and explicit USE-PACKAGE (16.3)
+//! 16.3: A .scs file starts in Spectre mode and any other file in SPICE mode.
+//! A `simulator lang=` before the first host statement changes the file's dialect;
+//! one after the first host statement switches syntax mode without changing the
+//! file's dialect. Each `include ... section=` section determines its dialect from
+//! its own first host statement. A 0.3 file implicitly drops the other dialect's
+//! rule package unless kept by an explicit USE-PACKAGE.
+simulator lang=spice
+* @RNL(type="header") {
+*   @VERSION("0.3")
+* }
+
+* First host statement in SPICE mode fixes this .scs file's dialect to SPICE (drops rnl-std-spectre)
+Rtop a b 1k
+* @RNL {
+*   #Rtop @PLACE(0, 0)
+* }
+
+* Switching to Spectre mode after the first statement does NOT change the file's dialect
+simulator lang=spectre
+
+subckt sub_dropped (a b)
+  X1 (a b) resistor r=1k
+// @RNL {
+//   #X1 @PLACE(0, 0)
+// }
+ends sub_dropped
+
+subckt sub_kept (a b)
+  X2 (a b) resistor r=1k
+// @RNL {
+//   @USE-PACKAGE(name="rnl-std-spectre", version="0.3");
+//   #X2 @PLACE(0, 0)
+// }
+ends sub_kept
+
+include "18-dialect-switch-sp.inc"
+include "18-dialect-switch-sec.inc" section=sec_sp
+include "18-dialect-switch-sec.inc" section=sec_scs

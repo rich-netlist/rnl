@@ -157,6 +157,8 @@ pub struct Unit {
     pub alias_decls: Vec<AliasDecl>,
     pub alias_pending: Vec<(String, String, Loc)>,
     pub alias_rejected: HashMap<String, String>,
+    /// The aliases its header record imports from alias packages with @USE-ALIASES (16.5).
+    pub imported_aliases: Vec<super::ImportedAlias>,
     /// Definition-scoped aliases as declared: (definition, alias, original, loc, source package).
     pub scoped_raw: Vec<(String, String, String, Loc, String)>,
     /// "$NAME" -> [(alias, (original, loc))].
@@ -200,6 +202,7 @@ impl Unit {
             alias_decls: Vec::new(),
             alias_pending: Vec::new(),
             alias_rejected: HashMap::new(),
+            imported_aliases: Vec::new(),
             scoped_raw: Vec::new(),
             scoped: HashMap::new(),
             header_kws: Vec::new(),
@@ -1073,8 +1076,7 @@ impl Interp<'_> {
             }
             // a word that 0.3 adds, `numbering`, is a standard word in a file of 0.3 (16.1): a file
             // of 0.2 raised to 0.3 with such an alias, with a warning, has it in error here
-            let added = version == "0.3" && crate::words::draft_header_fields().iter().any(|f| f.name == alias);
-            if words().all_words().contains(alias) || added {
+            if words().all_words().contains(alias) || added_word(alias, version) {
                 return bad(self, format!("the alias {alias} is the name of a standard word (16.5)"));
             }
         }
@@ -1217,6 +1219,7 @@ impl Interp<'_> {
         }
         let version = self.version_of(Some(u));
         let decls = self.units[pk].alias_decls.clone();
+        let level = self.units[u].level;
         for d in decls {
             if d.definition.is_none() && !d.original.starts_with('$') && !standard_original(&d.original) {
                 let what = if d.original.starts_with('@') { "standard keyword" } else { "standard word" };
@@ -1231,6 +1234,34 @@ impl Interp<'_> {
                 );
                 self.units[u].alias_rejected.entry(d.alias.clone()).or_insert(name.clone());
                 continue;
+            }
+            // the package is read in its own version, and the alias is checked in it; but a word
+            // that the version of this file adds is a standard word here, which no alias may be, as
+            // for an alias declared in this file (16.1, 16.5): a file of 0.2 raised to 0.3 has it
+            // in error, as the raise warned
+            if d.definition.is_none() && added_word(&d.alias, &version) {
+                self.diag_in(
+                    Severity::Error,
+                    format!(
+                        "in alias package {name}, the alias {} is the name of a standard word in this file's language version {version}; the alias is not used (16.5)",
+                        d.alias
+                    ),
+                    Some(loc.clone()),
+                    &pkg,
+                );
+                continue;
+            }
+            if let Some(level) = level {
+                let imported = super::ImportedAlias {
+                    level,
+                    alias: d.alias.clone(),
+                    original: d.original.clone(),
+                    package: name.clone(),
+                    loc: loc.clone(),
+                };
+                if !self.units[u].imported_aliases.contains(&imported) {
+                    self.units[u].imported_aliases.push(imported);
+                }
             }
             self.add_alias(u, (d.alias, d.original, d.definition), loc, &name);
         }
@@ -1374,6 +1405,14 @@ impl Interp<'_> {
         };
         let what = if reference { "reference" } else { "USE-PACKAGE" };
         decl.pkg = self.resolve_package(&decl, loc.clone(), None, what);
+        // a package of the series 0.2 that the series 0.3 merged into another: found among the
+        // series 0.2's, or written inline, it brings in nothing of the series 0.3 (16.3); one not
+        // found says so in its error
+        if decl.pkg.is_some() {
+            if let Some(merged) = self.merged_in_0_3(&decl) {
+                self.diag_in(Severity::Warning, format!("{merged} (16.3)"), Some(loc.clone()), &pkg);
+            }
+        }
         if let (Some(pk), None) = (decl.pkg, &body) {
             if is_alias_package(&self.units[pk]) && self.units[pk].header_kws.iter().any(|k| k == "ALIAS") {
                 self.diag_in(
@@ -1504,11 +1543,15 @@ impl Interp<'_> {
             }
         }
         let Some((n, v, path)) = cand else {
-            let then = match what {
+            let mut then = match what {
                 "USE-ALIASES" => "; statements using its aliases fail".to_string(),
                 "reference" => format!(", and the statements of package {pkg} that use its names fail with it"),
                 _ => String::new(),
             };
+            // a package of the series 0.2 that the series 0.3 merged into another (16.3)
+            if let Some(merged) = (what != "USE-ALIASES").then(|| self.merged_in_0_3(decl)).flatten() {
+                then.push_str(&format!("; {merged}"));
+            }
             let ver = decl.version.as_ref().map(|v| format!(" {v}")).unwrap_or_default();
             self.diag_in(
                 Severity::Error,
@@ -1695,6 +1738,12 @@ impl Interp<'_> {
             self.units[u].name_order.push(key);
         }
     }
+}
+
+/// Is a word one that the language version `version` adds, `numbering` in 0.3 (16.1)? It is a
+/// standard word in a file of that version, which no alias may be spelled as (16.5).
+pub fn added_word(word: &str, version: &str) -> bool {
+    version == "0.3" && crate::words::draft_header_fields().iter().any(|f| f.name == word)
 }
 
 /// Is an alias original a standard keyword (written with `@`) or a standard word (16.1, 16.5)?

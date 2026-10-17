@@ -307,9 +307,11 @@ export type ObjectView = {
    */
   definition: string | null,
   /**
-   * A usage's roles, each with the id of what it is attached to, or a point.
+   * A usage's roles, each with the id of what it is attached to, or a point; a set role (9.4)
+   * with the list of its members, each an id or a point, nested sets followed down, empty when the
+   * role is left empty.
    */
-  attach: Record<string, string | [number, number]> | null,
+  attach: Record<string, string | [number, number] | (string | [number, number])[]> | null,
   /**
    * The id of its symbol in `symbols`.
    */

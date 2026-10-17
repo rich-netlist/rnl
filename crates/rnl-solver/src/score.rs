@@ -7,22 +7,24 @@
 //! (13.1), drawn by their mode. Before routing, the routing objectives measure the straight
 //! connections of each net; that is the estimate the driver picks the candidates to route by.
 //!
-//! **The order of candidates** ([`order`]) has three counts ahead of the objectives, as the
+//! **The order of candidates** ([`order`]) has four counts ahead of the objectives, as the
 //! solver's own rules rank after every fact and before every objective (8.5, 11.7): first the
-//! pairs of symbols that overlap; then the places where the wires mislead ([`misleading`]): lines
-//! that touch or overlap make no connection (13.2), so wires of different nets that do, a pin on a
-//! wire of another net, or a wire through a symbol read as what they are not; then the joins that
-//! routing left undone, a ROUTE (13.7) being a request of the file and the objectives only
-//! preferences of the solver. The wires routed avoid all of it by themselves; the count is there
-//! for the wires written (13.1), which the placement moves and their mode draws. Among candidates
-//! equal in the three, the layers decide as `crate::objectives::Active::rank` does: layer by
-//! layer, the candidates within the layer's tolerance of its least value kept, the canonical code
-//! breaking what is left tied. An objective that is off has no layer, so it neither ranks nor
-//! breaks ties.
+//! pairs of symbols that overlap; then what crowds the drawing ([`crowding`]): the gaps between
+//! neighbours in a row that the facts kept left out of the candidate, and the texts drawn over
+//! another symbol; then the places where the wires mislead ([`misleading`]): lines that touch or
+//! overlap make no connection (13.2), so wires of different nets that do, a pin on a wire of
+//! another net, or a wire through a symbol read as what they are not; then the joins that routing
+//! left undone, a ROUTE (13.7) being a request of the file and the objectives only preferences of
+//! the solver. The wires routed avoid all of it by themselves; the count is there for the wires
+//! written (13.1), which the placement moves and their mode draws. Among candidates equal in the
+//! four, the layers decide as `crate::objectives::Active::rank` does: layer by layer, the
+//! candidates within the layer's tolerance of its least value kept, the canonical code breaking
+//! what is left tied. An objective that is off has no layer, so it neither ranks nor breaks ties.
 
 use std::collections::BTreeSet;
 
 use num_traits::{One, Zero};
+use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::LevelProblem;
 
 use crate::coords::solid;
@@ -30,6 +32,7 @@ use crate::objectives::{Active, Routed, View};
 use crate::rational::Q;
 use crate::resolve::Geometry;
 use crate::route::{written_path, Routing};
+use crate::search::RelKind;
 use crate::structure::Structure;
 
 /// A candidate as the order of candidates sees it.
@@ -37,6 +40,9 @@ use crate::structure::Structure;
 pub(crate) struct Entry {
     /// The pairs of symbols that overlap.
     pub overlaps: usize,
+    /// What crowds the drawing ([`crowding`]): the gaps between neighbours left out, and the texts
+    /// over another symbol.
+    pub crowding: usize,
     /// The places where the wires mislead ([`misleading`]); before routing, those of the wires
     /// written.
     pub misleading: usize,
@@ -150,6 +156,55 @@ pub(crate) fn misleading(
     count
 }
 
+/// What crowds a placed candidate, in the order of candidates after the symbols that overlap and
+/// before everything else (review of phase 2 of the quality review): each gap between neighbours
+/// in a row that the facts kept left out of it (`RelKind::Gap`, of `dropped`, the relations its
+/// resolution dropped), as its neighbours may then lie on each other's texts; and each text drawn
+/// over another symbol ([`texts_over`]). A DISTRIBUTE whose members a candidate puts in another
+/// order drops such gaps, its even steps then as short as the facts allow.
+pub(crate) fn crowding(s: &Structure, origins: &[[Q; 2]], ori: &[Orient], dropped: &[RelKind]) -> usize {
+    dropped.iter().filter(|k| **k == RelKind::Gap).count() + texts_over(s, origins, ori)
+}
+
+/// The texts drawn over the box of another symbol, with some area (13.3): for each object drawn
+/// with texts of its symbol, the box of those texts, as the solver keeps them clear of its
+/// neighbours (`Structure::labels`), and of each text that offsets place from its origin
+/// (`Structure::offset_labels`), against the box of every symbol drawn (`crate::coords::solid`)
+/// but its own, a stub that hangs from it and its host when it is a stub, each pair of a box of
+/// texts and a symbol counted once. What the solution leaves free is not drawn, and counts
+/// neither way. A known gap of the measure: a stub's own texts drawn over its host's body, such
+/// as the `vdd` of a `$SUPPLY_STUB` turned MX, are not counted, as the pair of the stub and its
+/// host is left out whole (review of the fix of phase 2: 5 of 20 levels of a transistor sweep).
+pub(crate) fn texts_over(s: &Structure, origins: &[[Q; 2]], ori: &[Orient]) -> usize {
+    let bodies: Vec<(usize, [Q; 4])> =
+        (0..s.objects.len()).filter(|&k| solid(s, k)).filter_map(|k| Some((k, s.box_at(origins, ori, k)?))).collect();
+    let host = |k: usize| s.objects[k].stub.as_ref().map(|stub| stub.host.0);
+    let owners: BTreeSet<usize> = s.labels.keys().chain(s.offset_labels.keys()).copied().collect();
+    let mut count = 0;
+    for k in owners.into_iter().filter(|&k| !s.objects[k].left_free) {
+        let (Some(at), Some(&o)) = (origins.get(k), ori.get(k)) else { continue };
+        let placed = |b: &[Q; 4]| [&at[0] + &b[0], &at[1] + &b[1], &at[0] + &b[2], &at[1] + &b[3]];
+        let texts: Vec<[Q; 4]> = s
+            .label_offset(k, o)
+            .into_iter()
+            .chain(s.offset_labels.get(&k).into_iter().flatten().cloned())
+            .map(|b| placed(&b))
+            .collect();
+        for (j, body) in &bodies {
+            if *j == k || host(*j) == Some(k) || host(k) == Some(*j) {
+                continue;
+            }
+            count += texts.iter().filter(|t| meet(t, body)).count();
+        }
+    }
+    count
+}
+
+/// Whether two boxes overlap with some area.
+fn meet(a: &[Q; 4], b: &[Q; 4]) -> bool {
+    a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
+}
+
 /// `(p - o) x (q - o)`: 0 when the three points are on one line.
 fn cross(o: &[Q; 2], p: &[Q; 2], q: &[Q; 2]) -> Q {
     (&p[0] - &o[0]) * (&q[1] - &o[1]) - (&p[1] - &o[1]) * (&q[0] - &o[0])
@@ -215,12 +270,12 @@ fn through(bx: &[Q; 4], a: &[Q; 2], b: &[Q; 2]) -> bool {
     lo < hi
 }
 
-/// The order of some candidates, best first (see the module): the fewest overlaps, then the fewest
-/// places where the wires mislead, then the fewest joins left undone, then the layers within
-/// their tolerances, then the code.
+/// The order of some candidates, best first (see the module): the fewest overlaps, then the least
+/// crowding, then the fewest places where the wires mislead, then the fewest joins left undone,
+/// then the layers within their tolerances, then the code.
 pub(crate) fn order(active: &Active, entries: &[Entry]) -> Vec<usize> {
-    let key = |e: &Entry| (e.overlaps, e.misleading, e.joins_left);
-    let mut keys: Vec<(usize, usize, usize)> = entries.iter().map(key).collect();
+    let key = |e: &Entry| (e.overlaps, e.crowding, e.misleading, e.joins_left);
+    let mut keys: Vec<(usize, usize, usize, usize)> = entries.iter().map(key).collect();
     keys.sort_unstable();
     keys.dedup();
     let mut out = Vec::with_capacity(entries.len());
@@ -243,6 +298,7 @@ mod tests {
     fn entry(overlaps: usize, joins_left: usize, layers: &[i64], code: u32) -> Entry {
         Entry {
             overlaps,
+            crowding: 0,
             misleading: 0,
             joins_left,
             layers: layers.iter().map(|v| int(*v)).collect(),
@@ -280,6 +336,26 @@ mod tests {
         entries[0].misleading = 1;
         // the overlaps first, then what misleads, then the joins left, then the layers
         assert_eq!(order(&active, &entries), vec![3, 0, 1, 2]);
+    }
+
+    /// What crowds the drawing ranks after the overlaps and before what misleads (review of phase
+    /// 2 of the quality review): a candidate that left a gap out, or draws a text over a symbol,
+    /// comes after one that did not, whatever its wires and its layers.
+    #[test]
+    fn what_crowds_ranks_after_the_overlaps_and_before_what_misleads() {
+        let active = Active::new(&Objectives { layers: vec![Layer::single("area")] }, &Inputs::default());
+        let mut entries = [
+            entry(0, 0, &[1], 0),
+            entry(0, 1, &[9], 1),
+            entry(1, 0, &[0], 2),
+            entry(0, 0, &[0], 3),
+            entry(0, 0, &[2], 4),
+        ];
+        entries[0].crowding = 1;
+        entries[3].crowding = 2;
+        entries[1].misleading = 3;
+        // 4 and 1 crowd nothing, 1 misleading more; then 0, then 3, crowding more; 2 overlaps
+        assert_eq!(order(&active, &entries), vec![4, 1, 0, 3, 2]);
     }
 
     #[test]

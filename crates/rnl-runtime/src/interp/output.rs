@@ -226,8 +226,12 @@ impl Interp<'_> {
         }
     }
 
-    /// What a role of a usage is attached to.
+    /// What a role of a usage is attached to: for a set, its members, as a set role holds them (9.4).
     fn attached(&mut self, s: SceneId, o: ObjId, ids: &HashMap<ObjId, String>) -> Attach {
+        if self.is_set(o) {
+            let members = self.flatten(s, o, 7, None);
+            return Attach::Set(members.into_iter().map(|m| self.attached(s, m, ids)).collect());
+        }
         match self.o(o) {
             ObjData::Point { .. } if !ids.contains_key(&o) => match self.point_of(s, o) {
                 Some(p) => Attach::At(p),

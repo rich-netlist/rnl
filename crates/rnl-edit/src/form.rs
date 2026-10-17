@@ -26,6 +26,16 @@ pub fn quote(s: &str) -> String {
     format!("\"{}\"", body.replace('"', "\"\""))
 }
 
+/// What fills a role: an id, a point, or a set role's members in braces, `{#M3 #M9}`, `{}` when
+/// it is left empty.
+fn given(a: &Attach) -> String {
+    match a {
+        Attach::Id(id) => id.clone(),
+        Attach::At(p) => point(*p),
+        Attach::Set(members) => format!("{{{}}}", members.iter().map(given).collect::<Vec<_>>().join(" ")),
+    }
+}
+
 /// A role in role parentheses: an ASCII name as it is, any other in quotes, which is the name
 /// itself and never an alias (3.6, 16.5).
 fn role_name(role: &str) -> String {
@@ -163,13 +173,8 @@ pub fn statements(op: &Op) -> Vec<String> {
         Op::AddUsage { name, definition, attach, symbol, at, orient } => {
             // each object with the role it fills, so that the roles are those of the request
             // whatever order it writes them in, and a role the definition lacks fails (9.4)
-            let roles: Vec<String> = attach
-                .iter()
-                .map(|(role, a)| match a {
-                    Attach::Id(id) => format!("{id}({})", role_name(role)),
-                    Attach::At(p) => format!("{}({})", point(*p), role_name(role)),
-                })
-                .collect();
+            let roles: Vec<String> =
+                attach.iter().map(|(role, a)| format!("{}({})", given(a), role_name(role))).collect();
             let mut parts = vec![format!("{definition} @ATTACH {}", roles.join(" "))];
             parts.extend(symbol.iter().map(|s| format!("@SET-SYMBOL {s}")));
             parts.extend(placed(at, orient));

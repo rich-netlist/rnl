@@ -26,3 +26,7 @@ Until now RNL Viewer, the desktop viewer ([`apps/desktop`](../../apps/desktop/RE
 - The work is in the core, as decision 0008 says: [`rnl_cli::preview`](../../crates/rnl-cli/src/preview.rs) solves in memory, builds the Document of the texts solved and the report, and saves a copy, refusing a place over a file that was read. `rnl preview FILE` prints the same as JSON. The app only runs it on a thread and asks for the place of a copy.
 - A solve cancelled stops before the next level, and the level it is in stops checking its facts, as the time limit stops them (8.5). With no time limit, it stops at the next level.
 - Writing the solve into the files themselves, and editing RNL in the viewer, remain open, as in decision 0008.
+
+## Update, 2026-10-17
+
+Solve › Settings sets the options and the time limit that point 1 says are `rnl solve`'s: the solver's defaults until the user changes them, then the user's, kept by the page. Nothing is written into the files by it.

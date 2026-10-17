@@ -1,8 +1,8 @@
 // The desktop's Solve menu (apps/viewer-ui/solve.js, decision 0010): a solve drawn as a preview,
 // the files unchanged; its report in the Solve view, each line shown in the netlist when clicked;
 // its progress in the status bar and a Cancel button; File > Reload solving again and Close
-// Preview showing the file as written; the time limit; and a copy saved through the shell. The web
-// shows none of it.
+// Preview showing the file as written; and a copy saved through the shell. The web shows none of it.
+// The solver's options, Solve > Settings, are in solve-settings.spec.js.
 
 import { expect, test } from "../viewer.js";
 
@@ -18,7 +18,7 @@ async function solve(page, how = () => page.evaluate(() => window.viewer.command
   await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
 }
 
-/** The solves the shell was asked for: [name, timeLimit] each. */
+/** The solves the shell was asked for: [name, settings] each. */
 const solves = (viewer) => viewer.calls("solve");
 
 test("the web has no Solve menu, and its commands do nothing", async ({ page, viewer }) => {
@@ -39,8 +39,8 @@ test.describe("on the desktop", () => {
   test("F9 solves the netlist and draws it as a preview, the files unchanged", async ({ page, viewer }) => {
     const builds = await viewer.builds();
     await solve(page, () => page.keyboard.press("F9"));
-    // the default time limit of rnl solve, and nothing read again for the drawing
-    expect(await solves(viewer)).toEqual([[T4, null]]);
+    // the default options of rnl solve, and nothing read again for the drawing
+    expect(await solves(viewer)).toEqual([[T4, { options: "", hintsForLow: false }]]);
     expect(await viewer.builds()).toBe(builds);
     await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the files are unchanged");
     await expect(page.locator("#preview-close")).toBeVisible();
@@ -108,32 +108,6 @@ test.describe("on the desktop", () => {
     // and Reload reads the file again, as before any solve
     await viewer.build(() => page.keyboard.press("F5"));
     expect(await solves(viewer)).toHaveLength(2);
-  });
-
-  test("the time limit is the default of rnl solve until it is set", async ({ page, viewer }) => {
-    const set = async (choose) => {
-      await page.evaluate(() => window.viewer.command("solve-time-limit"));
-      await expect(dialog(page).locator(".dialog-title")).toHaveText("Solver Time Limit");
-      await choose();
-      await dialog(page).getByRole("button", { name: "OK" }).click();
-      await expect(dialog(page)).toHaveCount(0);
-    };
-    await set(async () => {
-      await dialog(page).locator("input.solve-seconds").fill("2.5");
-    });
-    expect(await viewer.stored("solve-time-limit")).toBe(2.5);
-    await solve(page);
-    // a number that will not do keeps the dialog, and says so
-    await page.evaluate(() => window.viewer.command("solve-time-limit"));
-    await dialog(page).locator("input.solve-seconds").fill("-1");
-    await dialog(page).getByRole("button", { name: "OK" }).click();
-    await expect(dialog(page).locator(".dialog-error")).toHaveText("Give a number of seconds, 0 or more.");
-    await dialog(page).getByRole("button", { name: "Cancel" }).click();
-    await set(() => dialog(page).getByLabel("No limit").check());
-    await solve(page);
-    await set(() => dialog(page).getByLabel("The default of rnl solve").check());
-    await solve(page);
-    expect((await solves(viewer)).map((c) => c[1])).toEqual([2.5, "none", null]);
   });
 
   test("a copy is saved through the shell, of a solve shown alone", async ({ page, viewer }) => {

@@ -29,7 +29,8 @@ options:
   --no-std            do not use the standard package at the root (16.3)
   --std-version V     use rnl-std V at the root, whatever the files' language version, such as 0.2
                       to read a file of 0.3 with the series 0.2; a version pinned in a header
-                      record still comes first (16.3). rnl solve does not take it
+                      record still comes first (16.3), and V not found is an error only for the
+                      files that do not pin one. rnl solve does not take it
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      spice or spectre, instead of guessing from the file
 view options:

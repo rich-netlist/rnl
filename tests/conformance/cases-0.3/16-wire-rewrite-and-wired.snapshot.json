@@ -1,0 +1,612 @@
+{
+  "schema": "rnl-snapshot/1",
+  "failed": null,
+  "language": "0.3",
+  "levels": [
+    {
+      "id": "file:16-wire-rewrite-and-wired.sp",
+      "kind": "file",
+      "name": "16-wire-rewrite-and-wired.sp",
+      "file": 0,
+      "line": 0,
+      "status": null,
+      "host": {
+        "ports": [],
+        "instances": [
+          {
+            "id": "#R1",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b"
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b"
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "subckt": false,
+            "master": null,
+            "terminals": [
+              {
+                "n": 1,
+                "name": "p",
+                "net": "&a"
+              },
+              {
+                "n": 2,
+                "name": "n",
+                "net": "&b"
+              }
+            ]
+          }
+        ],
+        "nets": [
+          {
+            "id": "&a",
+            "global": false,
+            "port": false
+          },
+          {
+            "id": "&b",
+            "global": false,
+            "port": false
+          }
+        ]
+      },
+      "model": {
+        "symbols": [
+          {
+            "id": "$RESISTOR",
+            "name": "$RESISTOR",
+            "package": "rnl-std-basic",
+            "level": null,
+            "default": false,
+            "definition": null
+          },
+          {
+            "id": "$ONE_PIN",
+            "name": "$ONE_PIN",
+            "package": null,
+            "level": "file:16-wire-rewrite-and-wired.sp",
+            "default": false,
+            "definition": {
+              "box": [
+                0.0,
+                0.0,
+                2.0,
+                2.0
+              ],
+              "box_written": false,
+              "pins": [
+                {
+                  "terminals": [
+                    "1"
+                  ],
+                  "at": [
+                    0.0,
+                    1.0
+                  ],
+                  "dir": null,
+                  "label": null
+                }
+              ],
+              "prims": [
+                {
+                  "shape": "rectangle",
+                  "points": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      2.0,
+                      2.0
+                    ]
+                  ],
+                  "params": {},
+                  "style": {}
+                }
+              ]
+            }
+          }
+        ],
+        "symbol": {
+          "value": null,
+          "source": null
+        },
+        "objects": [
+          {
+            "id": "#R1",
+            "kind": "instance",
+            "host": [
+              "#R1"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                0.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R1:1"
+                ],
+                "at": [
+                  0.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R1:2"
+                ],
+                "at": [
+                  0.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R2",
+            "kind": "instance",
+            "host": [
+              "#R2"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$RESISTOR",
+              "source": null
+            },
+            "at": {
+              "value": [
+                10.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R2:1"
+                ],
+                "at": [
+                  10.0,
+                  2.0
+                ],
+                "dir": 90,
+                "nets": [
+                  "&a"
+                ]
+              },
+              {
+                "terminals": [
+                  "#R2:2"
+                ],
+                "at": [
+                  10.0,
+                  -2.0
+                ],
+                "dir": 270,
+                "nets": [
+                  "&b"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "#R3",
+            "kind": "instance",
+            "host": [
+              "#R3"
+            ],
+            "definition": null,
+            "attach": null,
+            "symbol": {
+              "value": "$ONE_PIN",
+              "source": null
+            },
+            "at": {
+              "value": [
+                20.0,
+                0.0
+              ],
+              "source": null
+            },
+            "orient": {
+              "value": "R0",
+              "source": null
+            },
+            "pins": [
+              {
+                "terminals": [
+                  "#R3:1"
+                ],
+                "at": [
+                  20.0,
+                  1.0
+                ],
+                "dir": null,
+                "nets": [
+                  "&a"
+                ]
+              }
+            ]
+          }
+        ],
+        "points": [],
+        "wires": [
+          {
+            "id": "%w1",
+            "nets": [
+              "&a"
+            ],
+            "via": [
+              {
+                "terminal": "#R1:1"
+              },
+              {
+                "at": [
+                  5.0,
+                  3.0
+                ]
+              },
+              {
+                "terminal": "#R3:1"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                2.0
+              ],
+              [
+                5.0,
+                3.0
+              ],
+              [
+                20.0,
+                1.0
+              ]
+            ],
+            "mode": "straight",
+            "style": {
+              "linecolor": "#00AA00",
+              "linewidth": 0.3
+            }
+          },
+          {
+            "id": "%w2",
+            "nets": [
+              "&b"
+            ],
+            "via": [
+              {
+                "terminal": "#R1:2"
+              },
+              {
+                "at": [
+                  5.0,
+                  -2.0
+                ]
+              },
+              {
+                "terminal": "#R2:2"
+              }
+            ],
+            "points": [
+              [
+                0.0,
+                -2.0
+              ],
+              [
+                5.0,
+                -2.0
+              ],
+              [
+                10.0,
+                -2.0
+              ]
+            ],
+            "mode": "manhattan",
+            "style": {
+              "linecolor": "#445566"
+            }
+          }
+        ],
+        "texts": [
+          {
+            "id": "@16-wire-rewrite-and-wired.sp:17:3#1",
+            "attach": "#R1:1",
+            "key": null,
+            "markup": {
+              "value": "w1",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "w1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              1.2,
+              3.2
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "@16-wire-rewrite-and-wired.sp:17:3#2",
+            "attach": "#R3:1",
+            "key": null,
+            "markup": {
+              "value": "w1",
+              "source": null
+            },
+            "written": true,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "w1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              21.2,
+              2.2
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::name",
+            "attach": "#R1",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R1",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.95,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R1::value",
+            "attach": "#R1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "1k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              0.95,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R2::name",
+            "attach": "#R2",
+            "key": "name",
+            "markup": {
+              "value": "${name}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "R2",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.95,
+              0.25
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
+            "id": "#R2::value",
+            "attach": "#R2",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "2k",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              10.95,
+              -0.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          }
+        ],
+        "shapes": []
+      }
+    }
+  ],
+  "dialect": "spice",
+  "packages": [
+    {
+      "name": "rnl-std-style",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-basic",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-semiconductors",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-spice",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-core",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-fill",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std-structures",
+      "version": "0.3"
+    },
+    {
+      "name": "rnl-std",
+      "version": "0.3"
+    }
+  ],
+  "files": [
+    {
+      "path": "16-wire-rewrite-and-wired.sp",
+      "name": "16-wire-rewrite-and-wired.sp"
+    }
+  ]
+}

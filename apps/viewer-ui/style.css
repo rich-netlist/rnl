@@ -809,6 +809,7 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 }
 .dialog[open] { display: flex; flex-direction: column; }
 .dialog.wide { width: min(760px, calc(100vw - 32px)); }
+.dialog.wide .dialog-body { overflow-y: auto; }
 .dialog::backdrop { background: rgba(0, 0, 0, 0.25); }
 .dialog-title { margin: 0; padding: 14px 16px 6px; font-size: 14px; font-weight: 600; }
 .dialog-body {
@@ -873,6 +874,36 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .dialog-body .dialog-form input[type="number"] { width: 6em; padding: 2px 6px; }
 .dialog-body .dialog-form input:disabled { opacity: 0.5; }
 .dialog-error { color: var(--error); font-size: 12px; }
+/* the solver's settings (solve-settings.js) */
+.settings { display: flex; flex-direction: column; gap: 10px; }
+.settings fieldset { display: flex; flex-direction: column; gap: 2px; }
+.settings-line { flex-wrap: wrap; column-gap: 12px; }
+.settings-label { display: flex; align-items: center; gap: 8px; }
+.settings-label .name { min-width: 8em; }
+.dialog-body .dialog-form .settings-label input[type="number"] { width: 9em; }
+.settings-hint { color: var(--muted); font-size: 12px; }
+.settings-text { color: var(--muted); font-size: 12px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.settings-restore { padding: 3px 12px; border-color: var(--line); background: var(--tab); }
+.dialog-body hr { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid var(--line); }
+.objective-list { display: flex; flex-direction: column; margin: 4px 0 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 4px; }
+.objective { padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.objective:last-child { border-bottom: 0; }
+.objective.off { color: var(--muted); }
+.objective-top { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.objective-level { flex: none; min-width: 2.4em; text-align: center; font-size: 11px; font-weight: 600; color: var(--accent); }
+.objective.off .objective-level { color: var(--muted); font-weight: normal; }
+.objective-on { display: flex; align-items: center; gap: 6px; font-weight: 600; flex: none; cursor: pointer; }
+.objective.off .objective-on { font-weight: normal; }
+.dialog-body .objective-on input { width: auto; margin: 0; accent-color: var(--accent); }
+.objective-what { flex: 1; min-width: 0; color: var(--muted); font-size: 12px; }
+.objective-moves { display: flex; gap: 2px; flex: none; }
+.objective-moves button { min-width: 26px; padding: 0 6px; border-color: var(--line); background: var(--tab); }
+.objective-moves button:disabled { opacity: 0.4; }
+.objective-more { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding-left: calc(2.4em + 8px); }
+.objective-more[hidden], .objective-more > [hidden] { display: none; }
+.objective-number { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.dialog-body .dialog-form .objective-number input[type="number"] { width: 5em; }
+.objective-together { font-size: 12px; min-height: 20px; }
 .dialog-name { font-weight: 600; }
 .dialog-body a { color: var(--accent); }
 .dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 16px 14px; }

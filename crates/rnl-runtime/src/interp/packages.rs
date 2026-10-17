@@ -227,11 +227,10 @@ impl Interp<'_> {
             // a reading that asks for a version takes that one, whatever the language version of
             // the file (16.3: the version of the standard package is the tool's default)
             let c = found.iter().find(|c| c.1 == v).cloned();
-            if c.is_none() && !self.std_units.values().any(Option::is_none) {
-                self.sink.error(
-                    format!("the standard package rnl-std {v} that the reading asks for cannot be found, in the package directories or among the bundled packages: the files are read without a standard package (16.3)"),
-                    None,
-                );
+            if c.is_none() && self.missing_std.is_none() {
+                // said on the first chain that would use it ([`Self::tell_missing_std`]): a version
+                // that a header record pins, or an inline package of its name, stands in its place
+                self.missing_std = Some((v, false));
             }
             c
         } else {
@@ -369,7 +368,31 @@ impl Interp<'_> {
                 uses.push(Use { decl: None, unit: Some(u), at: At::Root, name });
             }
         }
+        self.tell_missing_std(key, &uses);
         uses
+    }
+
+    /// Say that the version of the standard package that the reading asks for cannot be found,
+    /// once, on the first chain that would use it (16.3): one whose files are read, or the package
+    /// checked on its own, where no use names the standard package but the implicit one. On a
+    /// chain where a header record pins a version of it, or an inline package of its name drops or
+    /// freezes it, that use stands in its place, and the version asked for is not needed; nor is it
+    /// for a package in effect nowhere, such as the rule package of the other dialect that the
+    /// series pinned references and a file drops.
+    fn tell_missing_std(&mut self, key: EffKey, uses: &[Use]) {
+        let Some((v, false)) = self.missing_std.clone() else { return };
+        let read = match key {
+            EffKey::Level(level) => self.file_ok(level),
+            EffKey::Alone(u) => self.package_main == Some(u) && self.units[u].ok,
+        };
+        if !read || uses.iter().any(|u| u.name == STD_NAME) {
+            return;
+        }
+        self.missing_std = Some((v.clone(), true));
+        self.sink.error(
+            format!("the standard package rnl-std {v} that the reading asks for cannot be found, in the package directories or among the bundled packages: the files that do not pin a version of it are read without a standard package (16.3)"),
+            None,
+        );
     }
 
     /// The dialect of the file a level's text is in (2.2, 16.3), in the dialect of the netlist:

@@ -1032,7 +1032,11 @@
             "host": [],
             "definition": "$FLOW",
             "attach": {
-              "path": "@487"
+              "path": [
+                "#M1",
+                "#M2",
+                "#CL"
+              ]
             },
             "symbol": {
               "value": null,
@@ -1054,7 +1058,11 @@
             "host": [],
             "definition": "$偏置链",
             "attach": {
-              "电阻": "@503"
+              "电阻": [
+                "#R1",
+                "#R2",
+                "#R3"
+              ]
             },
             "symbol": {
               "value": null,

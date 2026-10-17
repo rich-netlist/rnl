@@ -445,6 +445,36 @@ async function drive(app, port, profile, t0, session) {
   );
   console.log("Solve > Solve drew the netlist solved as a preview, and the file on disk is as it was");
 
+  // Solve > Settings: the dialog shows the solver's own defaults, which the app gives it, and what
+  // the solver does not take is refused in its words (the app checks the options with the solver);
+  // Cancel keeps nothing
+  chooseItem(app.pid, at("solve-settings"));
+  const beam = await until("the settings dialog with the solver's beam", () =>
+    page.evaluate(`(() => {
+      const label = [...document.querySelectorAll("dialog.dialog .settings-label")].find((l) => l.textContent.startsWith("Beam"));
+      return label ? label.querySelector("input").value : null;
+    })()`),
+  );
+  same(/^[1-9][0-9]*$/.test(beam), true, "the beam of the solver's defaults in the dialog");
+  await page.evaluate(`(() => {
+    const label = [...document.querySelectorAll("dialog.dialog .settings-label")].find((l) => l.textContent.startsWith("Beam"));
+    const input = label.querySelector("input");
+    input.value = "0";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    [...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "OK").click();
+  })()`);
+  const refused = await until("the solver's refusal in the dialog", () =>
+    page.evaluate(`(() => {
+      const error = document.querySelector("dialog.dialog .dialog-error");
+      return error && !error.hidden ? error.textContent : null;
+    })()`),
+  );
+  same(refused, "the beam must be at least 1", "what the solver says of a beam of 0");
+  await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Cancel").click()`);
+  await until("the dialog to close", async () => !(await page.evaluate(`!!document.querySelector("dialog.dialog")`)), 10_000);
+  same(await page.evaluate(`localStorage.getItem("solve-options")`), null, "the settings kept after Cancel");
+  console.log("Solve > Settings showed the solver's defaults, and the solver refused a beam of 0 in its own words");
+
   // File > Load from Clipboard: the page reads the clipboard, whose text the test gives in the page,
   // shows it, and on Load the app draws it natively as clipboard.sp, alone, its include missing
   const text = fs.readFileSync(netlist, "utf8");

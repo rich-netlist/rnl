@@ -33,12 +33,18 @@
  * @property {() => Promise<string>} [version] The version of the app that runs, such as "0.1.0", for
  *   Help > Check for Updates (updates.js), which only the desktop offers; without it, that command
  *   does nothing.
- * @property {(source: Source, timeLimit: number | "none" | null) => Promise<Solved>} [solve] Solve a
+ * @property {(source: Source, settings: SolverSettings) => Promise<Solved>} [solve] Solve a
  *   source as `rnl solve` solves it, without its records of the solver, and give it drawn as
- *   solved, nothing written (solve.js, decision 0010): `timeLimit` is the seconds of the
- *   resolution of each level, "none" for no limit, null for the default of `rnl solve`. Rejects
- *   with a message when it cannot, and with CANCELLED when `cancelSolve` stopped it. Only the
- *   desktop offers it; without it, the Solve menu is not shown and its commands do nothing.
+ *   solved, nothing written (solve.js, decision 0010), with the solver's options set to
+ *   `settings`. Rejects with a message when it cannot, and with CANCELLED when `cancelSolve`
+ *   stopped it. Only the desktop offers it; without it, the Solve menu is not shown and its
+ *   commands do nothing.
+ * @property {() => Promise<SolverDefaults>} [solverDefaults] The solver's options as it has them
+ *   without any setting, and the names of its objectives, for Solve > Settings to show
+ *   (solve-settings.js); the page keeps none of them itself. Offered with `solve`.
+ * @property {(options: string) => Promise<string | null>} [checkSolverOptions] Whether the solver takes
+ *   `options`, written as `rnl solve --solver-options` takes them: null when it does, else what is
+ *   wrong, in the solver's words. Offered with `solve`.
  * @property {() => void} [cancelSolve] Stop the solve under way.
  * @property {() => Promise<string | null>} [saveSolved] Save a copy of the last solve shown where the
  *   user says, never over a file that was read: what was saved, in a sentence, or null when the
@@ -54,6 +60,33 @@
  * @typedef {object} Solved
  * @property {import("../../crates/rnl-view/types/document.js").Document} document
  * @property {object} report
+ */
+
+/**
+ * The settings of a solve: `options` are the options that differ from the solver's defaults,
+ * written as `rnl solve --solver-options` takes them, such as "beam=8;time_limit=none", empty for
+ * the defaults; `hintsForLow` asks for every conflict group of the facts of priority low, which
+ * that text cannot say (`rnl solve --report` does).
+ *
+ * @typedef {{ options: string, hintsForLow: boolean }} SolverSettings
+ */
+
+/**
+ * The solver's options as it has them by default: the `tolerance`, the `grid` (null for none), the
+ * `beam`, the `budget` of the search (`candidates`) and the router (`astar_expansions`), the
+ * `time_limit` in seconds (null for none), `hints_for_low`; its `objectives`, the layers in order,
+ * each with its `items`, objectives with their weights, and its `tolerance`; and the `names` of
+ * every objective it knows, on or off.
+ *
+ * @typedef {object} SolverDefaults
+ * @property {number} tolerance
+ * @property {number | null} grid
+ * @property {number} beam
+ * @property {{ candidates: number, astar_expansions: number }} budget
+ * @property {number | null} time_limit
+ * @property {boolean} hints_for_low
+ * @property {{ items: { name: string, weight: number }[], tolerance: number }[]} objectives
+ * @property {string[]} names
  */
 
 /**

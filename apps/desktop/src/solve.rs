@@ -1,18 +1,21 @@
 //! The Solve menu (decision 0010): the netlist solved as `rnl solve` solves it, without its records
-//! of the solver, in memory on a thread of its own, its progress sent to the page, and cancelled
-//! at the user's word; the result drawn as a preview; and a copy of the files solved saved where
-//! the user says. The core does the work (`rnl_cli::preview`); nothing here writes a file the
-//! viewer opened.
+//! of the solver, with the options the user set in Solve > Settings, in memory on a thread of its
+//! own, its progress sent to the page, and cancelled at the user's word; the result drawn as a
+//! preview; and a copy of the files solved saved where the user says. The core does the work
+//! (`rnl_cli::preview`); nothing here writes a file the viewer opened.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+use serde_json::json;
+
 use rnl_cli::preview::{one_file, preview, save_copy, Copy, Report, StoppableClock};
 use rnl_cli::solve::{Progress, SolveOptions};
 use rnl_cli::FsProvider;
+use rnl_solver::{SolverOptions, OBJECTIVES};
 use rnl_view::{Document, MemoryProvider};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
@@ -41,19 +44,62 @@ struct Step {
     again: bool,
 }
 
-/// The time limit of the resolution of each level, in seconds, as the page gives it: null for the
-/// default of `rnl solve`, "none" for no limit, or a number.
-fn time_limit(given: Option<serde_json::Value>) -> Result<Option<f64>, String> {
-    let default = rnl_cli::solve::SolveOptions::default().solver.time_limit;
-    match given {
-        None | Some(serde_json::Value::Null) => Ok(default),
-        Some(serde_json::Value::String(s)) if s == "none" => Ok(None),
-        Some(serde_json::Value::Number(n)) => match n.as_f64() {
-            Some(s) if s >= 0.0 && s.is_finite() => Ok(Some(s)),
-            _ => Err(format!("{n} is no time limit: give a number of seconds, 0 or more, or none")),
-        },
-        Some(v) => Err(format!("{v} is no time limit: give a number of seconds, 0 or more, or none")),
+/// The solver's settings as the page gives them (Solve > Settings): `options` are the settings that
+/// differ from the defaults, written as `rnl solve --solver-options` takes them, such as
+/// `beam=8;time_limit=none`, and `hints_for_low` asks for every conflict group of the facts of
+/// priority low, which no such text sets. None given, or an empty text, are the defaults of
+/// `rnl solve`.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Settings {
+    #[serde(default)]
+    options: String,
+    #[serde(default)]
+    hints_for_low: bool,
+}
+
+impl Settings {
+    /// The defaults with these settings over them, as `rnl solve` reads `--solver-options`: an
+    /// unknown option, or a value that does not do, is an error that says why.
+    fn solver(&self) -> Result<SolverOptions, String> {
+        let options = SolverOptions::default().with_overrides(&self.options)?;
+        Ok(SolverOptions { hints_for_low: self.hints_for_low, ..options })
     }
+}
+
+/// The solver's defaults and the objectives it knows, for the settings dialog to show: the options
+/// as the page edits them, `grid` and `time_limit` null for none, and the layers of the objectives,
+/// the first first, each with its objectives and their weights and its tolerance.
+#[tauri::command]
+pub fn solver_defaults() -> serde_json::Value {
+    let d = SolverOptions::default();
+    let layers: Vec<_> = d
+        .objectives
+        .layers
+        .iter()
+        .map(|layer| {
+            let items: Vec<_> =
+                layer.items.iter().map(|(name, weight)| json!({ "name": name, "weight": weight })).collect();
+            json!({ "items": items, "tolerance": layer.tolerance })
+        })
+        .collect();
+    json!({
+        "tolerance": d.tolerance,
+        "grid": d.grid,
+        "beam": d.beam,
+        "budget": { "candidates": d.budget.candidates, "astar_expansions": d.budget.astar_expansions },
+        "time_limit": d.time_limit,
+        "hints_for_low": d.hints_for_low,
+        "objectives": layers,
+        "names": OBJECTIVES,
+    })
+}
+
+/// Whether the solver takes settings written as `--solver-options` takes them: nothing when it does,
+/// else what is wrong, in its own words.
+#[tauri::command]
+pub fn check_solver_options(options: String) -> Result<(), String> {
+    SolverOptions::default().with_overrides(&options).map(|_| ())
 }
 
 /// Solve the netlist the page shows, a file by its path or a text held in memory as the file
@@ -66,10 +112,9 @@ pub async fn solve_preview(
     path: Option<String>,
     name: Option<String>,
     text: Option<String>,
-    time_limit: Option<serde_json::Value>,
+    settings: Option<Settings>,
 ) -> Result<Solved, String> {
-    let mut options = SolveOptions::default();
-    options.solver.time_limit = self::time_limit(time_limit)?;
+    let options = SolveOptions { solver: settings.unwrap_or_default().solver()?, ..SolveOptions::default() };
     let stop = Arc::new(AtomicBool::new(false));
     if let Some(before) = solves.running.lock().map_err(|e| e.to_string())?.replace(stop.clone()) {
         before.store(true, Ordering::Relaxed);
@@ -178,18 +223,64 @@ fn said(w: &rnl_cli::solve::Writing, to: &Path) -> String {
 mod tests {
     use std::path::Path;
 
-    use super::{copy_name, time_limit};
+    use rnl_solver::{SolverOptions, DEFAULT_LAYERS, OBJECTIVES};
+    use serde_json::json;
 
-    /// The page gives the time limit as null for the default of `rnl solve`, "none" or seconds.
+    use super::{check_solver_options, copy_name, solver_defaults, Settings};
+
+    /// The settings the page gives: none, or an empty text, are the defaults of `rnl solve`; a text
+    /// is read over them as `--solver-options` reads it; `hintsForLow` is not part of that text.
     #[test]
-    fn the_time_limit_the_page_gives() {
-        let default = rnl_cli::solve::SolveOptions::default().solver.time_limit;
-        assert_eq!(time_limit(None), Ok(default));
-        assert_eq!(time_limit(Some(serde_json::Value::Null)), Ok(default));
-        assert_eq!(time_limit(Some(serde_json::json!("none"))), Ok(None));
-        assert_eq!(time_limit(Some(serde_json::json!(2.5))), Ok(Some(2.5)));
-        assert!(time_limit(Some(serde_json::json!(-1))).is_err());
-        assert!(time_limit(Some(serde_json::json!("soon"))).is_err());
+    fn the_settings_the_page_gives() {
+        let given = |v: serde_json::Value| serde_json::from_value::<Settings>(v).unwrap().solver();
+        assert_eq!(Settings::default().solver(), Ok(SolverOptions::default()));
+        assert_eq!(given(json!({})), Ok(SolverOptions::default()));
+        assert_eq!(given(json!({ "options": "", "hintsForLow": false })), Ok(SolverOptions::default()));
+        let text = "beam=8;time_limit=none;grid=none;budget=candidates:7";
+        let set = given(json!({ "options": text, "hintsForLow": true })).unwrap();
+        let default = SolverOptions::default();
+        assert_eq!((set.beam, set.time_limit, set.grid), (8, None, None));
+        assert_eq!((set.budget.candidates, set.budget.astar_expansions), (7, default.budget.astar_expansions));
+        assert!(set.hints_for_low);
+        assert_eq!(set.objectives, default.objectives);
+        // the objectives replace the whole list, as `--solver-options` has them
+        let set = given(json!({ "options": "objectives=area+wire_length*2~0.5,turns" })).unwrap();
+        assert_eq!(set.canonical().split(';').nth(2), Some("objectives=area+wire_length*2~0.5,turns"));
+        // what does not read says why, in the solver's words, and so does the check
+        for (text, why) in [
+            ("beam=0", "the beam must be at least 1"),
+            ("time_limit=-1", "the time limit must be a number of seconds not below 0"),
+            ("tolerance=x", "the tolerance is not a number"),
+            ("objectives=beauty", "no objective is called `beauty`"),
+            ("budget=pivots:1", "the budget has no `pivots`"),
+            ("speed=3", "the solver has no option `speed`"),
+        ] {
+            let e = given(json!({ "options": text })).unwrap_err();
+            assert!(e.contains(why), "{text}: {e}");
+            assert_eq!(check_solver_options(text.to_string()), Err(e));
+        }
+        assert_eq!(check_solver_options(String::new()), Ok(()));
+        assert_eq!(check_solver_options("beam=2;time_limit=none".to_string()), Ok(()));
+    }
+
+    /// The dialog shows what the solver's defaults are, and which objectives there are, as the
+    /// solver says; the page keeps nothing of them itself.
+    #[test]
+    fn the_defaults_the_dialog_shows_are_the_solvers() {
+        let d = solver_defaults();
+        let o = SolverOptions::default();
+        assert_eq!(d["tolerance"], json!(o.tolerance));
+        assert_eq!(d["grid"], json!(o.grid));
+        assert_eq!(d["beam"], json!(o.beam));
+        assert_eq!(d["time_limit"], json!(o.time_limit));
+        assert_eq!(d["hints_for_low"], json!(false));
+        let budget = json!({ "candidates": o.budget.candidates, "astar_expansions": o.budget.astar_expansions });
+        assert_eq!(d["budget"], budget);
+        assert_eq!(d["names"], json!(OBJECTIVES));
+        let layers = d["objectives"].as_array().unwrap();
+        let first: Vec<&str> = layers.iter().map(|l| l["items"][0]["name"].as_str().unwrap()).collect();
+        assert_eq!(first, DEFAULT_LAYERS);
+        assert!(layers.iter().all(|l| l["items"].as_array().unwrap().len() == 1 && l["tolerance"] == 0.0));
     }
 
     #[test]
