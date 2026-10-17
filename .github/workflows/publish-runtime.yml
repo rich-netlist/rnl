@@ -5,13 +5,11 @@
 # Only versions with a pre-release suffix, such as 0.1.0-preview.7, are published for now: a version
 # without one fails.
 #
-# npm takes the publish by trusted publishing (OIDC) once the package's settings on npmjs.com name
-# this repository and this workflow file; until then a repository secret NPM_TOKEN, if there is one,
-# authenticates it. The first publish can also be made by hand with two-factor authentication
-# (decision 0003). The build runs in a job of its own, which cannot publish: the publishing job only
-# publishes the tarball the build packed. Run by hand, it builds and checks the package, and publishes
-# it only with dry_run set to false on a runtime-v tag; on a pull request that changes the package, it
-# builds and checks it only.
+# npm takes the publish by trusted publishing (OIDC): the package's settings on npmjs.com name this
+# repository and this workflow file, so no token is used or stored (decision 0003). The build runs in
+# a job of its own, which cannot publish: the publishing job only publishes the tarball the build
+# packed. Run by hand, it builds and checks the package, and publishes it only with dry_run set to
+# false on a runtime-v tag; on a pull request that changes the package, it builds and checks it only.
 name: Publish runtime
 
 on:
@@ -136,15 +134,7 @@ jobs:
           npm install --global npm@11
           node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); if (a * 1e6 + b * 1e3 + c < 11005001) { console.error(`npm ${process.argv[1]} cannot publish by trusted publishing`); process.exit(1); } console.log(`npm ${process.argv[1]}`)' "$(npm --version)"
 
-      - name: Publish
+      - name: Publish by trusted publishing
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           VERSION: ${{ needs.package.outputs.version }}
-        run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            export NODE_AUTH_TOKEN="$NPM_TOKEN"
-            echo "Publishing with the repository secret NPM_TOKEN."
-          else
-            echo "No NPM_TOKEN secret: publishing by trusted publishing."
-          fi
-          npm publish "rich-netlist-runtime-$VERSION.tgz" --access public --tag next --provenance
+        run: npm publish "rich-netlist-runtime-$VERSION.tgz" --access public --tag next --provenance

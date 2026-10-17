@@ -134,7 +134,7 @@ git push origin runtime-v0.1.0-preview.7
 
 Only versions with a pre-release suffix are published for now: a tag without one fails. A pull request that changes the package builds and checks it the same way, and so does the workflow run by hand, which publishes only with `dry_run` set to false on a `runtime-v` tag. The build runs in a job of its own, which cannot publish; the publishing job publishes the tarball the build packed.
 
-npm takes the publish by trusted publishing once the package's settings on npmjs.com name the repository `rich-netlist/rnl` and the workflow `publish-runtime.yml`. Until then a repository secret `NPM_TOKEN`, an npm access token that may publish to `@rich-netlist`, authenticates it, and the first publish can also be made by hand with two-factor authentication ([decision 0003](../../docs/decisions/0003-npm-scope.md)), from the tarball a run by hand leaves as its artifact. The workflow has no token written in it.
+npm takes the publish by trusted publishing: the package's settings on npmjs.com name the repository `rich-netlist/rnl` and the workflow `publish-runtime.yml`, so the workflow uses and stores no token ([decision 0003](../../docs/decisions/0003-npm-scope.md)). The first two previews, 0.1.0-preview.8 and 0.1.0-preview.9, were published with a one-off token, revoked since.
 
 A frontend installs the previews with
 

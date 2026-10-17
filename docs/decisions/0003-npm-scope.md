@@ -18,3 +18,4 @@ The architecture proposal used `@rnl/*` as placeholder package names. The unscop
 
 - Scoped packages are private by default, so each package sets `"publishConfig": {"access": "public"}`.
 - The first publish of each package is made manually with two-factor authentication. Later releases use npm trusted publishing from GitHub Actions. npm generates provenance statements only for packages published from a public repository.
+- Note, 2026-10-17: `@rich-netlist/runtime` was first published by its workflow, `publish-runtime.yml`, with a one-off npm token instead, so that its first previews carry provenance too. The token was revoked once the package's trusted publisher named the workflow, which publishes with no token since.
