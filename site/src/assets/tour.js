@@ -252,7 +252,7 @@
     ['sem', '$SUPPLY_LOW', '@DEFINE(roles=[["pin", "terminal"]]) {}'],
     ['lay', '$MIRROR_PAIR', '@DEFINE(roles=["a", "b", "axis"]) {\n  {?a ?b} @ALIGN("y");\n  {?a ?axis ?b} @DISTRIBUTE("x");\n  ?a ?b @ORIENT-RELATION("MY")\n}'],
     ['lay', '$FLOW', '@DEFINE(roles=["{path}"], parameters=[["direction", "left-to-right"]]) {\n  ?path @ORDER(?direction, priority="low")\n}'],
-    ['lay', '%TAIL_CENTER', '@DEFINE(roles=[["pair", "usage"]]) {\n  %mid = (_, _);\n  {?pair::in_p %mid ?pair::in_n} @DISTRIBUTE("x");\n  {%mid ?pair::tail} @ALIGN("x")\n};\n/* private to the package: a rule applies it, low, to every differential pair */\n# @SELECT-USAGE $DIFFERENTIAL_PAIR => @AS(priority="low") %TAIL_CENTER'],
+    ['lay', '%TAIL_CENTER', '@DEFINE(roles=[["pair", "usage"]]) {\n  {?pair::in_p {?pair::tail} ?pair::in_n} @DISTRIBUTE("x")\n};\n/* private to the package: a rule applies it, low, to every differential pair */\n# @SELECT-USAGE $DIFFERENTIAL_PAIR => @AS(priority="low") %TAIL_CENTER'],
     ['lay', '$GROUND_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %g = $GROUND @ATTACH ?t::net;\n  ?t::net @WIRE {?t %g:p};\n  {?t %g:p} @ALIGN("x");\n  %g:p ?t @DISTANCE("bottom-to-top", min=?gap)\n}'],
     ['lay', '$SUPPLY_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %s = $SUPPLY @ATTACH ?t::net;\n  ?t::net @WIRE {?t %s:p};\n  {?t %s:p} @ALIGN("x");\n  ?t %s:p @DISTANCE("bottom-to-top", min=?gap)\n}'],
     ['vir', '$GROUND', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
