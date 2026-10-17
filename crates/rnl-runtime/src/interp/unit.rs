@@ -1405,6 +1405,14 @@ impl Interp<'_> {
         };
         let what = if reference { "reference" } else { "USE-PACKAGE" };
         decl.pkg = self.resolve_package(&decl, loc.clone(), None, what);
+        // a package of the series 0.2 that the series 0.3 merged into another: found among the
+        // series 0.2's, or written inline, it brings in nothing of the series 0.3 (16.3); one not
+        // found says so in its error
+        if decl.pkg.is_some() {
+            if let Some(merged) = self.merged_in_0_3(&decl) {
+                self.diag_in(Severity::Warning, format!("{merged} (16.3)"), Some(loc.clone()), &pkg);
+            }
+        }
         if let (Some(pk), None) = (decl.pkg, &body) {
             if is_alias_package(&self.units[pk]) && self.units[pk].header_kws.iter().any(|k| k == "ALIAS") {
                 self.diag_in(
@@ -1535,11 +1543,15 @@ impl Interp<'_> {
             }
         }
         let Some((n, v, path)) = cand else {
-            let then = match what {
+            let mut then = match what {
                 "USE-ALIASES" => "; statements using its aliases fail".to_string(),
                 "reference" => format!(", and the statements of package {pkg} that use its names fail with it"),
                 _ => String::new(),
             };
+            // a package of the series 0.2 that the series 0.3 merged into another (16.3)
+            if let Some(merged) = (what != "USE-ALIASES").then(|| self.merged_in_0_3(decl)).flatten() {
+                then.push_str(&format!("; {merged}"));
+            }
             let ver = decl.version.as_ref().map(|v| format!(" {v}")).unwrap_or_default();
             self.diag_in(
                 Severity::Error,

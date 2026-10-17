@@ -384,7 +384,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std-basic.rnl:457:9",
+            "id": "@rnl-std-basic.rnl:458:9",
             "kind": "usage",
             "host": [],
             "definition": "$GROUND",
@@ -924,7 +924,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std-basic.rnl:457:9#1",
+            "id": "@rnl-std-basic.rnl:458:9#1",
             "kind": "usage",
             "host": [],
             "definition": "$GROUND",
@@ -971,7 +971,7 @@
             "pins": []
           },
           {
-            "id": "@rnl-std-basic.rnl:457:9#2",
+            "id": "@rnl-std-basic.rnl:458:9#2",
             "kind": "usage",
             "host": [],
             "definition": "$GROUND",
@@ -1204,11 +1204,7 @@
       "version": "0.3"
     },
     {
-      "name": "rnl-std-semantics",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std-layout",
+      "name": "rnl-std-structures",
       "version": "0.3"
     },
     {

@@ -237,7 +237,7 @@
   @ALIAS("$级联", "$CASCADE");
   @ALIAS("$高压侧电源", "$SUPPLY_HIGH");
   @ALIAS("$低压侧电源", "$SUPPLY_LOW");
-  @ALIAS("$镜像对", "$MIRROR_PAIR");
+  @ALIAS("$镜像对称", "$MIRRORED");
   @ALIAS("$信号流向", "$FLOW");
   @ALIAS("$运放", "$OPAMP");
   @ALIAS("$五端子运放", "$OPAMP_5TERM");
@@ -317,9 +317,9 @@
   @ALIAS("负载", "load", definition="$CASCADE");
   @ALIAS("端子", "pin", definition="$SUPPLY_HIGH");
   @ALIAS("端子", "pin", definition="$SUPPLY_LOW");
-  @ALIAS("甲", "a", definition="$MIRROR_PAIR");
-  @ALIAS("乙", "b", definition="$MIRROR_PAIR");
-  @ALIAS("轴", "axis", definition="$MIRROR_PAIR");
+  @ALIAS("甲", "a", definition="$MIRRORED");
+  @ALIAS("乙", "b", definition="$MIRRORED");
+  @ALIAS("轴", "axis", definition="$MIRRORED");
   @ALIAS("路径", "path", definition="$FLOW");
   @ALIAS("方向", "direction", definition="$FLOW");
   @ALIAS("挂点", "p", definition="$DELAY_CELL");

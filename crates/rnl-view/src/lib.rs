@@ -611,14 +611,14 @@ R1 p q 1k
             ]
         );
         // the series 0.3: the packages of 16.3 of the language 0.3, and rnl-zh 0.3
-        assert_eq!(series("0.3"), 17);
+        assert_eq!(series("0.3"), 16);
         for name in
             ["rnl-std", "rnl-std-core", "rnl-std-basic", "rnl-std-spice", "rnl-std-spectre", "rnl-std-full", "rnl-zh"]
         {
             assert!(names.contains(&format!("0.3/{name}.rnl").as_str()), "{name}");
         }
         assert_eq!(names.last(), Some(&"analog-canvas-extensions/analog-canvas-extensions.rnl"));
-        assert_eq!(names.len(), 9 + 17 + 1);
+        assert_eq!(names.len(), 9 + 16 + 1);
         let p = bundled();
         let dirs = ["0.2", "0.3", "analog-canvas-extensions"].map(|d| format!("{BUNDLED_DIR}/{d}"));
         assert_eq!(p.package_dirs, dirs);

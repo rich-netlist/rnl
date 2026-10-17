@@ -402,11 +402,10 @@ fn keeps_points(wire: &ProblemWire, points: &[WirePoint]) -> bool {
 }
 
 /// The statement that writes out a usage made by a rule (10.5): its definition, its roles in
-/// order, its parameters and its own priority, so that what it expands to keeps the priority it
-/// had in place of the record's `"high"` (14.8).
-fn usage_statement(u: &UsageEntry, name: &str) -> String {
+/// order, its parameters and `priority`, as [`written_priority`] gives it.
+fn usage_statement(u: &UsageEntry, name: &str, priority: Priority) -> String {
     let mut params: Vec<String> = u.params.iter().map(|(k, v)| format!("{}={}", k, written_lit(v))).collect();
-    params.push(format!("priority=\"{}\"", u.priority.unwrap_or(Priority::Normal).as_str()));
+    params.push(format!("priority=\"{}\"", priority.as_str()));
     let roles: Vec<&str> = u.roles.iter().filter_map(|r| r.written.as_deref()).collect();
     format!(
         "%{} = ${} @ATTACH({}) {}",
@@ -415,6 +414,23 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
         params.join(", "),
         roles.join(" ")
     )
+}
+
+/// The priority that the usage `k` of `p`, made by a rule, is written out with, so that what it
+/// expands to keeps the priority it had in place of the record's `"high"`: a priority written on a
+/// usage overrides those of the facts of its body (14.8). Its own, when it has one; else the one
+/// that every fact of its expansion has, such as the low of the constraints of a stub of the
+/// standard series 0.3; else `"normal"`, the priority of a fact that writes none, though facts of
+/// different priorities cannot all keep theirs.
+fn written_priority(p: &LevelProblem, k: usize) -> Priority {
+    if let Some(own) = p.usages[k].priority {
+        return own;
+    }
+    let mut expanded = p.facts.iter().filter(|f| f.chain.contains(&k)).map(|f| f.priority);
+    match expanded.next() {
+        Some(first) if expanded.all(|q| q == first) => first,
+        _ => Priority::Normal,
+    }
 }
 
 /// The solver's record for a level (14.8, 17): the usages made by rules that the result reaches,
@@ -638,7 +654,7 @@ pub fn write_record(p: &LevelProblem, solution: &Solution, author: &str, hash: &
     let mut statements = Vec::new();
     for (k, u) in p.usages.iter().enumerate() {
         if let (true, Some(name)) = (needed[k], &refs.names[k]) {
-            statements.push(usage_statement(u, name));
+            statements.push(usage_statement(u, name, written_priority(p, k)));
         }
     }
     for (b, name) in solution.branches.iter().zip(&branch_names) {

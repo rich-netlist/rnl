@@ -33,6 +33,7 @@
     'rnl-std-fill 0.3': '<zh>自动补全：给没连线的引脚补地或电源；给端口网络补端口标签，地和电源网络除外，那里已经有地和电源；不叫 0 的地网络（比如 vss）上的地，下面写上网络名。还有文件可以增删的集合。</zh><en>The automatic fill: a ground or supply for every unwired pin on such a net; a port tag for every port net but the ground and supply nets, which have their grounds and supplies already; and the grounds of a ground net other than 0, such as vss, drawn with the name of the net under them. And the sets a file edits.</en>',
     'rnl-std-semantics': '<zh>语义定义，比如差分对、电流镜：只有角色，什么都不画。</zh><en>Semantic definitions, such as a differential pair or a current mirror: roles only, nothing drawn.</en>',
     'rnl-std-layout': '<zh>布局定义：镜像对、居中的尾管、信号流的方向。</zh><en>Layout definitions: a mirrored pair, a tail centred under a pair, the direction of signal flow.</en>',
+    'rnl-std-structures': '<zh>结构定义：差分对、电流镜、支路、链条、级联、镜像对称、信号流向等。有的自带默认画法，约束都是 low：作者写的优先，用例的 PRIORITY 能关掉。</zh><en>Structures: differential pair, current mirror, branch, chain, cascade, mirrored, flow and more. Some carry a default drawing, all of priority low: what the author writes comes first, and PRIORITY on a usage turns it off.</en>',
     'rnl-std-full': '<zh>rnl-std 再加上四个领域包：functional、rf、logic、signal-flow。</zh><en>rnl-std with the four domain packages: functional, rf, logic and signal-flow.</en>',
     'rnl-std-functional': '<zh>功能块：运放、比较器、放大器、跨导、ADC、DAC。</zh><en>Function blocks: op-amps, comparators, amplifiers, transconductors, ADC, DAC.</en>',
     'rnl-std-rf': '<zh>射频元件：中心抽头电感、T-coil。</zh><en>RF parts: the centre-tapped inductor and the T-coil.</en>',

@@ -236,13 +236,13 @@
           "label": "ALIGN",
           "kind": "ALIGN",
           "status": "unsolved",
-          "priority": "normal"
+          "priority": "low"
         },
         {
           "label": "DISTANCE",
           "kind": "DISTANCE",
           "status": "unsolved",
-          "priority": "normal"
+          "priority": "low"
         }
       ],
       "unplaced": [
@@ -469,13 +469,13 @@
           "label": "ALIGN",
           "kind": "ALIGN",
           "status": "unsolved",
-          "priority": "normal"
+          "priority": "low"
         },
         {
           "label": "DISTANCE",
           "kind": "DISTANCE",
           "status": "unsolved",
-          "priority": "normal"
+          "priority": "low"
         }
       ],
       "unplaced": [

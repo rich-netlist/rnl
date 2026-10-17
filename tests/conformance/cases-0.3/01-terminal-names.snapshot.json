@@ -969,11 +969,7 @@
       "version": "0.3"
     },
     {
-      "name": "rnl-std-semantics",
-      "version": "0.3"
-    },
-    {
-      "name": "rnl-std-layout",
+      "name": "rnl-std-structures",
       "version": "0.3"
     },
     {
