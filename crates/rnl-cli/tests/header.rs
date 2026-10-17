@@ -102,6 +102,22 @@ fn a_second_version_is_an_error_and_the_first_stands() {
 }
 
 #[test]
+fn an_alias_spelled_like_numbering_is_an_error_in_0_3_alone() {
+    // `numbering`, a word that 0.3 adds (2.8), is a standard word in a file of 0.3, and an alias
+    // cannot have the spelling of one (16.5); in a file of 0.2 it is no standard word (16.1)
+    for (version, error) in [("0.3", true), ("0.2", false)] {
+        let text = format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\"); @ALIAS(\"numbering\", \"axis\") }}\nR1 a 0 1k\n.end\n"
+        );
+        let r = read(&MemoryProvider::new().with("t.sp", &text), &Options::default());
+        let errors: Vec<String> = said(&r, Severity::Error).into_iter().map(|(_, _, m)| m).collect();
+        let want =
+            if error { vec!["the alias numbering is the name of a standard word (16.5)".to_string()] } else { vec![] };
+        assert_eq!(errors, want, "{version}");
+    }
+}
+
+#[test]
 fn an_included_file_without_a_version_takes_the_includers() {
     // the main file declares 0.3, 0.2 or nothing, which is the tool's default 0.3; the included
     // file declares none, and its subcircuit is read in the main file's version, while a file that

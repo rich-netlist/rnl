@@ -695,3 +695,19 @@ fn a_record_of_the_solver_that_uses_no_number_needs_no_numbering() {
     assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
     assert!(diagnostics(&r, Severity::Hint).iter().all(|(_, m)| !m.contains("out of date")));
 }
+
+#[test]
+fn the_example_of_5_9_names_a_member_by_the_name_bound_first() {
+    // the example of 5.9: after `%p = (0, 0); %q = %p; %s = {%q}`, the annotation that
+    // `%s @TEXT("x")` makes is numbered, and its line is `%s @TEXT ( "x" )`, a tab and `%p`, the
+    // name the level binds to the member first (2.6), whatever name the set was written with
+    let r = read(&netlist("0.3", &record("", "%p = (0, 0); %q = %p; %s = {%q}; %s @TEXT(\"x\")")), &Options::default());
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    assert_eq!(check(&["%s @TEXT ( \"x\" )\t%p".to_string()]), "675df5171032726d");
+    assert_eq!(level_check(&r, 0), Some("675df5171032726d"));
+    // the two bindings the other way round: %q is bound first, and the line ends with it
+    let r = read(&netlist("0.3", &record("", "%q = %p; %p = (0, 0); %s = {%q}; %s @TEXT(\"x\")")), &Options::default());
+    assert!(diagnostics(&r, Severity::Error).is_empty(), "{:?}", diagnostics(&r, Severity::Error));
+    assert_eq!(check(&["%s @TEXT ( \"x\" )\t%q".to_string()]), "951bfe5c096e483e");
+    assert_eq!(level_check(&r, 0), Some("951bfe5c096e483e"));
+}

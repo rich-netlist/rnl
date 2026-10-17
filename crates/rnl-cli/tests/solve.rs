@@ -19,9 +19,9 @@ use rnl_cli::{interpret_file, path_str, FsProvider};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::geom::{Orient, Pt};
 use rnl_runtime::problem::{
-    same_input, Axis, FactKind, Filler, LevelProblem, OrientSlot, PointRef, Position, Reference, Sense, Slot,
+    same_input, sig2, Axis, FactKind, Filler, LevelProblem, OrientSlot, PointRef, Position, Reference, Sense, Slot,
 };
-use rnl_runtime::solution::{Decision, Solution, Unsolved};
+use rnl_runtime::solution::{write_record, Decision, Solution, Unsolved};
 use rnl_runtime::source::{normalize, Layered, MemoryProvider, Provider};
 use rnl_runtime::Options;
 use rnl_solver::SolverOptions;
@@ -1091,7 +1091,8 @@ fn a_statement_written_after_the_record_that_conflicts_with_it_is_dropped() {
     let statuses: Vec<(&str, &str)> =
         r.model.levels[0].constraints.iter().map(|c| (c.kind.as_str(), c.status.as_str())).collect();
     assert_eq!(statuses, vec![("ALIGN", "dropped")]);
-    assert!(dropped(&r).iter().any(|m| m.starts_with("ALIGN conflicts with fixed coordinates")), "{:?}", dropped(&r));
+    // the file was raised to 0.3 when the solver wrote it (16.1): the hint is that of 8.5
+    assert!(dropped(&r).iter().any(|m| m.starts_with("ALIGN is discarded in the order of 8.5")), "{:?}", dropped(&r));
 }
 
 #[test]
@@ -1133,7 +1134,8 @@ fn a_file_saved_without_a_header_gets_one() {
         .with("/w/div.inc", ".subckt div p n\nR1 p m 1k\nR2 m n 1k\n.ends div\n");
     let run = solve(Path::new("/w/top.sp"), &files, &unlimited()).unwrap();
     let div = run.files.iter().find(|f| f.path == "/w/div.inc").unwrap();
-    assert!(div.text.starts_with("*\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.subckt div p n\n"), "{}", div.text);
+    // read in the 0.2 of the file that includes it, and written: raised (16.1)
+    assert!(div.text.starts_with("*\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n.subckt div p n\n"), "{}", div.text);
     let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
     let both = Layered { layers: vec![&solved, &files] };
     check_read_back(&run, Path::new("/w/top.sp"), &both, "div.inc");
@@ -1281,11 +1283,11 @@ fn a_label_on_a_bus_that_no_fact_reaches_reads_back_on_the_bus() {
 #[test]
 fn labels_on_a_wire_and_a_net_are_left_to_the_viewer_and_one_a_fact_reaches_is_written() {
     // a text attached to a wire or to a net, which have no coordinate point (13.3), and that no
-    // fact reaches, has no decision in the record, which needs no number for it: the file stays
-    // 0.2, and read back the viewer draws the label of the wire above its middle and that of the
+    // fact reaches, has no decision in the record, which needs no number for it, and read back the
+    // viewer draws the label of the wire above its middle and that of the
     // net at the start of its wire. A label of the wire whose y an ALIGN gives is the solver's: the
     // record writes it, its x in the middle of the wire, where the viewer puts such a label, not at
-    // the origin
+    // the origin. The file is raised to 0.3, as every file of 0.2 the solver writes into (16.1)
     let body = concat!(
         "* labels\n",
         "* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n",
@@ -1303,7 +1305,7 @@ fn labels_on_a_wire_and_a_net_are_left_to_the_viewer_and_one_a_fact_reaches_is_w
     );
     let files = MemoryProvider::new().with("/w/t.sp", body);
     let run = solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap();
-    assert!(run.raised.is_empty(), "{:?}", run.raised);
+    assert!(!run.raised.is_empty() && run.raised.iter().all(|v| v.raised), "{:?}", run.raised);
     let level = &run.levels[0];
     assert!(level.written.unsolved.is_empty(), "{:?}", level.written.unsolved);
     assert!(!level.record.contains("%#"), "{}", level.record);
@@ -1336,14 +1338,14 @@ fn a_ground_without_a_name_on_a_net_that_nothing_draws_is_left_unplaced() {
     // &bot` without a name, on a net that no ROUTE or wire written draws, so that the solver knows
     // no pin of R2 on it and has nothing to put the ground beside. Placed where the witness and the
     // repair of overlaps put it, (3, 0), it was drawn beside the wire of &mid, as if that net were
-    // grounded, and the record needed its number, which raised the included file to 0.3. The
-    // solver leaves it free: the record has no decision for it, nothing is raised, and read back it
-    // is unplaced, as it is unsolved (11.1); the ports that the rules make there are placed, and
-    // the record names them (10.5)
+    // grounded, and the record needed its number. The solver leaves it free: the record has no
+    // decision for it and needs no number, and read back it is unplaced, as it is unsolved (11.1);
+    // the ports that the rules make there are placed, and the record names them (10.5). The files
+    // written are raised to 0.3 (16.1)
     let fs = FsProvider::new(&[]);
     let f = corpus_03("09-include-without-header.sp");
     let run = solve(&f, &fs, &unlimited()).unwrap();
-    assert!(run.raised.is_empty(), "{:?}", run.raised);
+    assert!(!run.raised.is_empty() && run.raised.iter().all(|v| v.raised), "{:?}", run.raised);
     let level = run.levels.iter().find(|l| l.problem.title == "divider").unwrap();
     let p = &level.problem;
     let ground = p.objects.iter().position(|o| o.label == "a usage of $GND").unwrap();
@@ -1356,7 +1358,7 @@ fn a_ground_without_a_name_on_a_net_that_nothing_draws_is_left_unplaced() {
     let note = "1 symbol without a name that no fact kept reaches is left free";
     assert!(notes.iter().any(|n| n.starts_with(note)), "{notes:#?}");
     let lib = run.files.iter().find(|f| f.path.ends_with("09-include-without-header-lib.inc")).unwrap();
-    assert!(lib.text.contains("@VERSION(\"0.2\")") && !lib.text.contains("numbering="), "{}", lib.text);
+    assert!(lib.text.contains("@VERSION(\"0.3\")") && !lib.text.contains("numbering="), "{}", lib.text);
     let back = read_solved(&run, &fs, &f);
     let lv = back.model.levels.iter().find(|l| l.level == p.level).unwrap();
     assert_eq!(lv.unplaced, ["a usage of $GND"]);
@@ -1411,7 +1413,9 @@ fn a_header_after_a_subcircuit_solved_moves_to_line_2() {
     // the header moves where a new header goes, to line 2 after the first line (the draft 0.3,
     // 16.3 and 2.2), after a bare marker put first when that line is a statement, and VERSION goes
     // into it, not into that record (16.1, 17)
-    let header = "* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n";
+    // the included file, read in the 0.2 of the file that includes it, is raised as it is written
+    // (16.1), and the header takes the VERSION of the raise with it
+    let header = "* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\") }\n";
     let body = ".subckt pair a b\nR1 a m 1k\nR2 m b 1k\n.ends\n* @RNL(type=\"header\") { }\n";
     let model = ".model nch nmos level=1\n";
     for (head, want) in
@@ -1482,7 +1486,7 @@ fn an_included_file_that_switches_to_spectre_gets_its_header_after_the_switch() 
     let run = solve(entry, &files, &unlimited()).unwrap();
     assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.scs", "div"]);
     let div = &run.files.iter().find(|f| f.path == "/w/div.inc").unwrap().text;
-    let head = "simulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsubckt div (p n)\n";
+    let head = "simulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\nsubckt div (p n)\n";
     assert!(div.starts_with(head), "{div}");
     assert!(div.contains("\n// @RNL(type=\"generated\""), "{div}");
     let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
@@ -1501,7 +1505,7 @@ fn above_the_switch_to_spectre_an_included_file_gets_its_header_in_stars() {
     let top = "// top\n// @RNL(type=\"header\") { @VERSION(\"0.2\")}\nsimulator lang=spectre\ninclude \"div.inc\"\n\
                X1 (p 0) div\n";
     let body = "simulator lang=spectre\nsubckt div (p n)\nR1 (p m) resistor r=1k\nR2 (m n) resistor r=1k\nends div\n";
-    let star = "* @RNL(type=\"header\") { @VERSION(\"0.2\")}";
+    let star = "* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}";
     for (head, want) in [
         ("* lib\n.param rr=1k\n", format!("* lib\n{star}\n.param rr=1k\n")),
         ("simulator lang=spice\n.param rr=1k\n", format!("*\n{star}\nsimulator lang=spice\n.param rr=1k\n")),
@@ -1582,7 +1586,7 @@ fn a_file_read_only_through_a_library_section_gets_no_header_outside_it() {
             spice,
             "/w/models.lib",
             format!("{inside}{ff}"),
-            Some(".lib tt\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n"),
+            Some(".lib tt\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n"),
         ),
     ] {
         let files = MemoryProvider::new().with(entry, top).with(lib_path, &lib);
@@ -1628,7 +1632,11 @@ fn a_text_whose_offset_or_place_the_solver_discards_is_written_where_it_put_it()
              {#R1::name #C1} @ALIGN(\"x\", priority=\"high\")",
             vec!["the x of #R1::name = -30"],
             vec!["#R1::name @PLACE(x=40)"],
-            vec!["the x of #R1::name = -30 conflicts with the x of #R1::name = 40 and is dropped in the order of 8.5 (8.5)"],
+            vec![
+                "facts discarded in the order of 8.5 because of this statement: the x of #R1::name = -30 at <place> (8.5)",
+                "the x of #R1::name = -30 is discarded in the order of 8.5: it has no solution with the x of #R1::name = \
+                 40 at <place> (8.5)",
+            ],
         ),
     ];
     for (name, body, discarded, lines, dropped_back) in cases {
@@ -1671,20 +1679,22 @@ fn a_text_whose_offset_or_place_the_solver_discards_is_written_where_it_put_it()
 
 #[test]
 fn an_orientation_without_a_name_is_unsolved_only_where_the_file_does_not_fix_it() {
-    // two grounds without a name in a file of 0.2, which the record cannot refer to (5.9): the one
-    // whose ORIENT the solver keeps is drawn so all the same, and its orientation is not unsolved;
-    // the other's the solver chooses, and it is (14.8). The key of a text spelled like `numbering`,
-    // a word that 0.3 adds, keeps the file at 0.2 (16.1)
+    // two grounds without a name in a file of 0.2, which a record of 0.2 cannot refer to (5.9): the
+    // one whose ORIENT the solver keeps is drawn so all the same, and its orientation is not
+    // unsolved; the other's the solver chooses, and it is (14.8). `rnl solve` raises the file, as
+    // a tool writes only 0.3 (16.1), and in 0.3 its record holds both
     let files = MemoryProvider::new().with(
         "/w/an.sp",
         "* anonymous\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a 0 1k\nR2 b 0 1k\n\
-         * @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); $GND @ATTACH #R1:n => @ORIENT(\"R90\"); $GND @ATTACH #R2:n; \
-         #R1 @TEXT(\"r\", key=\"numbering\") }\n.end\n",
+         * @RNL { #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); $GND @ATTACH #R1:n => @ORIENT(\"R90\"); $GND @ATTACH #R2:n }\n\
+         .end\n",
     );
     let entry = Path::new("/w/an.sp");
-    let run = solve(entry, &files, &unlimited()).unwrap();
-    let level = &run.levels[0];
-    let p = &level.problem;
+    let r = interpret_file(entry, None, &files, &Options::solver()).unwrap();
+    let p = &r.problems[0];
+    assert_eq!(p.version, "0.2");
+    let solved = rnl_solver::solve(p, &SolverOptions::without_time_limit());
+    let written = write_record(p, &solved.solution, rnl_solver::AUTHOR, &sig2(p, ""));
     let grounds: Vec<usize> = (0..p.objects.len()).filter(|&k| p.objects[k].label == "a usage of $GND").collect();
     let fixed: Vec<usize> = grounds
         .iter()
@@ -1694,11 +1704,16 @@ fn an_orientation_without_a_name_is_unsolved_only_where_the_file_does_not_fix_it
     let free: Vec<usize> =
         grounds.iter().copied().filter(|&k| matches!(p.objects[k].orient, Some(OrientSlot::Free))).collect();
     assert_eq!((grounds.len(), fixed.len(), free.len()), (2, 1, 1), "{:?}", p.objects);
-    let turned = |k: usize| level.solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.orient);
+    let turned = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.orient);
     assert_eq!(turned(fixed[0]), Some(Orient::R90));
     assert!(turned(free[0]).is_some());
-    let unsolved: Vec<Decision> = level.written.unsolved.iter().map(|u| u.decision).collect();
-    assert_eq!(unsolved, [Decision::Orientation { object: free[0] }], "{:?}", level.written.unsolved);
+    let unsolved: Vec<Decision> = written.unsolved.iter().map(|u| u.decision).collect();
+    assert!(unsolved.contains(&Decision::Orientation { object: free[0] }), "{:?}", written.unsolved);
+    assert!(!unsolved.contains(&Decision::Orientation { object: fixed[0] }), "{:?}", written.unsolved);
+    // raised, the record holds it
+    let run = solve(entry, &files, &unlimited()).unwrap();
+    assert!(run.raised.iter().all(|v| v.raised) && run.levels[0].problem.version == "0.3", "{:?}", run.raised);
+    assert!(run.levels[0].written.unsolved.is_empty(), "{:?}", run.levels[0].written.unsolved);
     let solved = MemoryProvider::new().with("/w/an.sp", &run.files[0].text);
     check_read_back(&run, entry, &Layered { layers: vec![&solved, &files] }, "an");
 }
@@ -1730,7 +1745,10 @@ fn within_its_tolerance_the_record_writes_the_constants_of_the_facts_that_rank_f
     let r = read_solved(&run, &files, entry);
     assert_eq!(
         dropped(&r),
-        ["the x of #R1 = 0 conflicts with the x of #R1 = 0.4 and is dropped in the order of 8.5 (8.5)"]
+        [
+            "facts discarded in the order of 8.5 because of this statement: the x of #R1 = 0 at <place> (8.5)",
+            "the x of #R1 = 0 is discarded in the order of 8.5: it has no solution with the x of #R1 = 0.4 at <place> (8.5)"
+        ]
     );
     // with the default tolerance the first conflict is the solver's to resolve: nothing changes there
     let run = solve(entry, &files, &unlimited()).unwrap();
@@ -2157,14 +2175,16 @@ fn no_record_is_written_in_a_region_written_to_be_encrypted() {
     let entry = Path::new("/w/top.sp");
     let run = solve(entry, &files, &unlimited()).unwrap();
     assert_eq!(run.levels.iter().map(|l| l.problem.title.as_str()).collect::<Vec<_>>(), ["top.sp", "enc", "half"]);
-    let note = "the record is not written: enc lies in a region written to be encrypted, lines 2 to 7 of lib.inc, \
+    // lib.inc, read in the 0.2 of the file that includes it, is written and raised (16.1): its new
+    // header on line 2 puts the region on lines 3 to 8
+    let note = "the record is not written: enc lies in a region written to be encrypted, lines 3 to 8 of lib.inc, \
                 where a record is gone once the region is encrypted (2.2)";
     assert_eq!(run.levels[1].written.notes, [note]);
     assert!(lines(&run, false).contains(&format!("    {note}")));
     let text = &run.files.iter().find(|f| f.path == "/w/lib.inc").unwrap().text;
     let head =
-        "* lib\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n.prot\n.subckt enc a b\nR1 a m 1k\nR2 m b 1k\n.ends\n\
-                .unprot\n.subckt half a b\nR1 a m 1k\n* @RNL(type=\"generated\"";
+        "* lib\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); @USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")}\n.prot\n\
+         .subckt enc a b\nR1 a m 1k\nR2 m b 1k\n.ends\n.unprot\n.subckt half a b\nR1 a m 1k\n* @RNL(type=\"generated\"";
     assert!(text.starts_with(head) && text.ends_with("* }\n.prot\nR2 m b 1k\n.ends\n.unprot\n"), "{text}");
     assert_eq!(text.matches("type=\"generated\"").count(), 1, "{text}");
     let solved = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
@@ -2208,11 +2228,11 @@ fn in_a_spice_section_of_a_spectre_file_a_record_is_carried_by_a_star() {
 }
 
 #[test]
-fn a_file_of_0_2_is_raised_to_0_3_when_its_record_needs_it() {
-    // the numbers of the objects without a name are only in 0.3 (5.9): a file of 0.2 whose record
-    // needs them is raised (16.1), its header pinning the standard series 0.2 it was read with
-    // (16.3), and solved again in 0.3, so that its record holds every decision; read back, it is
-    // placed whole, and a second solve writes the same and raises nothing
+fn a_file_of_0_2_is_raised_to_0_3_when_it_is_written() {
+    // a tool writes only 0.3 (16.1): a file of 0.2 that the solver writes into is raised, its
+    // header pinning the standard series 0.2 it was read with (16.3), and solved again in 0.3, so
+    // that its record holds every decision, here the numbers of the objects without a name (5.9);
+    // read back, it is placed whole, and a second solve writes the same and raises nothing
     let net = |header: &str, more: &str| {
         format!(
             "* raise\n* @RNL(type=\"header\") {{ {header}}}\nR1 a b 1k\nR2 b c 1k\n\
@@ -2223,8 +2243,15 @@ fn a_file_of_0_2_is_raised_to_0_3_when_its_record_needs_it() {
     let solved = |text: &str| solve(entry, &MemoryProvider::new().with("/w/raise.sp", text), &unlimited()).unwrap();
     let pin = "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
     let run = solved(&net("@VERSION(\"0.2\")", ""));
-    let raised = VersionRaise { path: "/w/raise.sp".into(), section: None, raised: true, pinned: true, why: vec![] };
-    assert_eq!(run.raised, [raised]);
+    let raised = |clashes: Vec<String>| VersionRaise {
+        path: "/w/raise.sp".into(),
+        section: None,
+        raised: true,
+        pinned: true,
+        why: vec![],
+        clashes,
+    };
+    assert_eq!(run.raised, [raised(vec![])]);
     let text = &run.files[0].text;
     assert!(text.starts_with(&format!("* raise\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {pin}}}\n")), "{text}");
     assert!(text.contains("numbering=") && text.contains("%#"), "{text}");
@@ -2233,7 +2260,7 @@ fn a_file_of_0_2_is_raised_to_0_3_when_its_record_needs_it() {
         assert!(!level.written.unsolved.iter().any(Unsolved::needs_0_3), "{:?}", level.written.unsolved);
     }
     let said = lines(&run, false);
-    assert!(said[0].starts_with("raise.sp: raised from 0.2 to 0.3 for what its records"), "{said:?}");
+    assert!(said[0].starts_with("raise.sp: raised from 0.2 to 0.3, as a tool writes only 0.3 (16.1)"), "{said:?}");
     let files = MemoryProvider::new().with("/w/raise.sp", text);
     check_read_back(&run, entry, &files, "raise.sp");
     let again = solve(entry, &files, &unlimited()).unwrap();
@@ -2246,31 +2273,45 @@ fn a_file_of_0_2_is_raised_to_0_3_when_its_record_needs_it() {
     assert!(text.starts_with(&format!("* raise\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {pin}}}\n")), "{text}");
     assert_eq!(text.matches("@USE-PACKAGE").count(), 1, "{text}");
 
-    // a name spelled like `numbering`, the key of a text, would mean something else in 0.3: the
-    // file stays at 0.2, with a warning, and what only 0.3 can write is unsolved
+    // a name spelled like `numbering`, the key of a text, may mean something else in 0.3: a
+    // warning, and the file is raised all the same (16.1)
     let run = solved(&net("@VERSION(\"0.2\")", "; #R1 @TEXT(\"r\", key=\"numbering\")"));
-    let why = "the key of a text, `numbering`, line 5, has the spelling of a word that 0.3 adds (2.8), and would mean \
-               something else";
-    let kept =
-        VersionRaise { path: "/w/raise.sp".into(), section: None, raised: false, pinned: false, why: vec![why.into()] };
-    assert_eq!(run.raised, [kept]);
-    assert!(run.files[0].text.contains("@VERSION(\"0.2\")") && !run.files[0].text.contains("%#"));
-    assert!(run.levels[0].written.unsolved.iter().any(Unsolved::needs_0_3));
-    let warning = format!("warning: raise.sp stays at 0.2, so what only 0.3 can write is unsolved (16.1): {why}");
-    assert_eq!(lines(&run, false)[0], warning);
+    let clash = "the key of a text, `numbering`, line 5";
+    assert_eq!(run.raised, [raised(vec![clash.into()])]);
+    assert!(run.files[0].text.contains("@VERSION(\"0.3\")") && run.files[0].text.contains("%#"));
+    assert!(!run.levels[0].written.unsolved.iter().any(Unsolved::needs_0_3));
+    let warning = format!(
+        "warning: raise.sp: {clash}, has the spelling of a word that 0.3 adds (2.8): raised to 0.3, it may mean \
+         something else (16.1)"
+    );
+    assert_eq!(lines(&run, false)[1], warning);
 
-    // a record that needs nothing of 0.3 leaves the version as it is
+    // an alias spelled like `numbering` (16.5): a warning, and the file is raised all the same; in
+    // 0.3 `numbering` is a standard word, so read back the alias is an error
+    let run = solved(&net("@VERSION(\"0.2\"); @ALIAS(\"numbering\", \"axis\")", ""));
+    assert_eq!(run.raised, [raised(vec!["an alias, `numbering`, line 2".into()])]);
+    let back = MemoryProvider::new().with("/w/raise.sp", &run.files[0].text);
+    let r = interpret_file(entry, None, &back, &Options::default()).unwrap();
+    let errors = messages(&r, Severity::Error);
+    assert!(
+        errors.iter().any(|e| e.contains("the alias numbering is the name of a standard word (16.5)")),
+        "{errors:?}"
+    );
+
+    // a record that needs nothing of 0.3 raises the file too: the solver writes into it
     let plain = "* plain\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\nR1 a b 1k\n.end\n";
     let run = solve(Path::new("/w/plain.sp"), &MemoryProvider::new().with("/w/plain.sp", plain), &unlimited()).unwrap();
-    assert!(run.raised.is_empty() && run.files[0].text.contains("@VERSION(\"0.2\")"), "{}", run.files[0].text);
+    assert_eq!(run.raised.len(), 1, "{:?}", run.raised);
+    let header = format!("* plain\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {pin}}}\n");
+    assert!(run.files[0].text.starts_with(&header), "{}", run.files[0].text);
 }
 
 #[test]
 fn a_library_section_is_raised_as_a_file_of_its_own() {
     // two sections of one library, both of 0.2, read by the main file: a section read is a file
-    // (2.8), so only the one whose record needs 0.3 is raised (16.1), and the text of the other
-    // stays as it was; solved alone or with the other, read back each in its version, and a
-    // second solve writes the same and raises nothing
+    // (2.8), so only the one that a record is written into is raised (16.1), and the text of the
+    // other stays as it was; solving every level raises every file written. Read back, each is in
+    // its version, and a second solve writes the same and raises nothing
     let section = |name: &str, needs: bool| {
         let wire = if needs { "; &b @WIRE {#R1:2 (_, _) #R2:1}" } else { "" };
         format!(
@@ -2281,62 +2322,56 @@ fn a_library_section_is_raised_as_a_file_of_its_own() {
     let top = "* top\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.lib lib.inc old\n.lib lib.inc new\n\
                X1 a b old\nX2 c d new\n.end\n";
     let entry = Path::new("/w/top.sp");
-    let read_back = |text: &str| {
-        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", text);
-        let r = interpret_file(entry, None, &files, &Options::solver()).unwrap();
+    let read_back = |files: &MemoryProvider| {
+        let r = interpret_file(entry, None, files, &Options::solver()).unwrap();
         r.problems.iter().map(|p| (p.title.clone(), p.version.clone())).collect::<Vec<_>>()
     };
-    let raised = |name: &str| VersionRaise {
-        path: "/w/lib.inc".into(),
-        section: Some(name.into()),
+    let raised = |path: &str, name: Option<&str>| VersionRaise {
+        path: path.into(),
+        section: name.map(String::from),
         raised: true,
         pinned: true,
         why: vec![],
+        clashes: vec![],
     };
     let pin = "@USE-PACKAGE(name=\"rnl-std\", version=\"0.2\")";
+    let lib = format!("* lib\n{}{}", section("old", false), section("new", true));
+    let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", &lib);
     for level in [Some("new"), None] {
-        let lib = format!("* lib\n{}{}", section("old", false), section("new", true));
-        let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", &lib);
-        let run = solve(entry, &files, &SolveOptions { level: level.map(String::from), ..unlimited() }).unwrap();
-        assert_eq!(run.raised, [raised("new")], "{level:?}");
-        let said = lines(&run, false);
-        assert!(said[0].starts_with("lib.inc (new): raised from 0.2 to 0.3"), "{said:?}");
+        let options = SolveOptions { level: level.map(String::from), ..unlimited() };
+        let run = solve(entry, &files, &options).unwrap();
+        let written = run.files.iter().fold(MemoryProvider::new(), |m, f| m.with(&f.path, &f.text));
+        let solved = Layered { layers: vec![&written, &files] };
         let text = &run.files.iter().find(|f| f.path == "/w/lib.inc").unwrap().text;
-        // the section old as it was, or with its record alone when it is solved too; the header of
-        // new raised, and its record with numbers
         let old = &text[..text.find(".lib new").unwrap()];
-        match level {
-            Some(_) => assert_eq!(old, format!("* lib\n{}", section("old", false))),
-            None => {
-                assert!(
-                    old.contains("{ @VERSION(\"0.2\") }\n.subckt old") && old.contains("type=\"generated\""),
-                    "{old}"
-                );
-                assert!(!old.contains("numbering=") && !old.contains("USE-PACKAGE"), "{old}");
-            }
-        }
         let new = format!(".lib new\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); {pin} }}\n.subckt new a c\n");
         assert!(text.contains(&new) && text.contains("numbering=") && text.contains("%#"), "{text}");
         let new_level = run.levels.iter().find(|l| l.problem.title == "new").unwrap();
         assert!(!new_level.written.unsolved.iter().any(Unsolved::needs_0_3), "{:?}", new_level.written.unsolved);
-        let versions = read_back(text);
+        let versions = read_back(&run.files.iter().fold(files.clone(), |m, f| m.with(&f.path, &f.text)));
         let of = |t: &str| versions.iter().find(|(title, _)| title == t).map(|(_, v)| v.as_str());
-        assert_eq!((of("old"), of("new"), of("top.sp")), (Some("0.2"), Some("0.3"), Some("0.2")), "{level:?}");
-        let solved = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", text);
-        let again = solve(entry, &solved, &SolveOptions { level: level.map(String::from), ..unlimited() }).unwrap();
+        match level {
+            // only new is written: the section old and the main file as they were
+            Some(_) => {
+                assert_eq!(run.raised, [raised("/w/lib.inc", Some("new"))]);
+                let said = lines(&run, false);
+                assert!(said[0].starts_with("lib.inc (new): raised from 0.2 to 0.3"), "{said:?}");
+                assert_eq!(old, format!("* lib\n{}", section("old", false)));
+                assert_eq!((of("old"), of("new"), of("top.sp")), (Some("0.2"), Some("0.3"), Some("0.2")));
+            }
+            // every level is written: each file raised, old with its record, which needs no number
+            None => {
+                let all =
+                    [raised("/w/top.sp", None), raised("/w/lib.inc", Some("old")), raised("/w/lib.inc", Some("new"))];
+                assert_eq!(run.raised, all);
+                let header = format!("{{ @VERSION(\"0.3\"); {pin} }}\n.subckt old");
+                assert!(old.contains(&header) && old.contains("type=\"generated\""), "{old}");
+                assert!(!old.contains("numbering="), "{old}");
+                assert_eq!((of("old"), of("new"), of("top.sp")), (Some("0.3"), Some("0.3"), Some("0.3")));
+            }
+        }
+        let again = solve(entry, &solved, &options).unwrap();
         assert!(again.raised.is_empty(), "{:?}", again.raised);
-        let again_text = &again.files.iter().find(|f| f.path == "/w/lib.inc").unwrap().text;
-        assert_eq!(again_text, text, "{level:?}");
+        assert_eq!(again.files, run.files, "{level:?}");
     }
-
-    // both sections need 0.3: each is raised, in one pass over the text of the library
-    let lib = format!("* lib\n{}{}", section("old", true), section("new", true));
-    let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/lib.inc", &lib);
-    let run = solve(entry, &files, &unlimited()).unwrap();
-    assert_eq!(run.raised, [raised("old"), raised("new")]);
-    let text = &run.files.iter().find(|f| f.path == "/w/lib.inc").unwrap().text;
-    assert_eq!(text.matches(&format!("@VERSION(\"0.3\"); {pin}")).count(), 2, "{text}");
-    assert_eq!(text.matches("numbering=").count(), 2, "{text}");
-    let versions = read_back(text);
-    assert!(versions.iter().filter(|(t, _)| t == "old" || t == "new").all(|(_, v)| v == "0.3"), "{versions:?}");
 }

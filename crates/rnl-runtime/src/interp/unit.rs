@@ -1009,7 +1009,7 @@ impl Interp<'_> {
         loc: &Loc,
         pkg: &str,
         check_original: bool,
-        _version: &str,
+        version: &str,
     ) -> Option<(String, String, Option<String>)> {
         let bad = |s: &mut Self, msg: String| {
             s.diag_in(Severity::Error, msg, Some(loc.clone()), pkg);
@@ -1071,7 +1071,10 @@ impl Interp<'_> {
             if check_original && !standard_original(orig) {
                 return bad(self, format!("the original {orig} is not a standard word (16.5)"));
             }
-            if words().all_words().contains(alias) {
+            // a word that 0.3 adds, `numbering`, is a standard word in a file of 0.3 (16.1): a file
+            // of 0.2 raised to 0.3 with such an alias, with a warning, has it in error here
+            let added = version == "0.3" && crate::words::draft_header_fields().iter().any(|f| f.name == alias);
+            if words().all_words().contains(alias) || added {
                 return bad(self, format!("the alias {alias} is the name of a standard word (16.5)"));
             }
         }
