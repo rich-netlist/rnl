@@ -68,7 +68,8 @@ export function renderFiles() {
     el.className = "file";
     el.hidden = true;
     const lines = renderLines(file, f);
-    el.append(...lines);
+    // one by one: as the arguments of one call, the lines of a long file pass the engine's limit
+    for (const line of lines) el.append(line);
     source.append(el);
     fileViews.push({ el, lines, scroll: 0 });
     const b = document.createElement("button");
@@ -203,12 +204,18 @@ source.addEventListener("dblclick", (e) => {
 function renderLines(file, f) {
   const lines = file.text.split(/\r?\n/);
   if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
-  // which characters belong to a record, per line: [from, to) in 0-based characters
+  // the Document's columns count characters; where the character at 0-based column c of line n starts
+  const starts = [];
+  const unit = (n, c) => {
+    if (!starts[n]) starts[n] = characterStarts(lines[n - 1]);
+    return starts[n](c);
+  };
+  // which characters belong to a record, per line: [from, to) in the line's text
   const rnl = lines.map(() => []);
   for (const [l0, c0, l1, c1] of file.records) {
     for (let n = l0; n <= l1 && n <= lines.length; n++) {
-      const from = n === l0 ? c0 - 1 : 0;
-      const to = n === l1 ? c1 : lines[n - 1].length;
+      const from = n === l0 ? unit(n, c0 - 1) : 0;
+      const to = n === l1 ? unit(n, c1) : lines[n - 1].length;
       rnl[n - 1].push({ from, to, first: n === l0 });
     }
   }
@@ -218,8 +225,8 @@ function renderLines(file, f) {
   const failedOn = lines.map(() => []);
   for (const [l0, c0, l1, c1, overridden] of file.failed) {
     for (let n = l0; n <= l1 && n <= lines.length; n++) {
-      const from = n === l0 ? c0 - 1 : leadingCarrier(lines[n - 1]);
-      const to = n === l1 ? c1 : lines[n - 1].length;
+      const from = n === l0 ? unit(n, c0 - 1) : leadingCarrier(lines[n - 1]);
+      const to = n === l1 ? unit(n, c1) : lines[n - 1].length;
       failedOn[n - 1].push({ from, to, kind: overridden ? "overridden" : "failed" });
     }
   }
@@ -252,7 +259,8 @@ function renderLines(file, f) {
     // the objects named at each character, the most narrowly named first
     const objs = new Array(text.length).fill(null);
     for (const s of spans[i].slice().sort((a, b) => a.len - b.len)) {
-      for (let c = s.col - 1; c < s.col - 1 + s.len && c < text.length; c++) {
+      const [from, to] = [unit(i + 1, s.col - 1), unit(i + 1, s.col - 1 + s.len)];
+      for (let c = from; c < to; c++) {
         if (!objs[c]) objs[c] = [];
         if (!objs[c].includes(s.object)) objs[c].push(s.object);
       }
@@ -260,6 +268,18 @@ function renderLines(file, f) {
     out.push(lineElement(text, i + 1, cls, objs.map((o) => (o ? o.join(" ") : "")), fail));
   });
   return out;
+}
+
+/**
+ * Where each character of a line starts in its text, by 0-based column: JavaScript indexes a string
+ * in UTF-16 units, two for a character outside the BMP, such as an emoji. A column past the last
+ * character is the text's end.
+ */
+function characterStarts(text) {
+  const at = [];
+  for (let u = 0; u < text.length; u += text.codePointAt(u) > 0xffff ? 2 : 1) at.push(u);
+  if (at.length === text.length) return (c) => Math.min(c, text.length);
+  return (c) => (c < at.length ? at[c] : text.length);
 }
 
 /** Where a later line of a record starts: after its comment marker and the blanks around it. */
