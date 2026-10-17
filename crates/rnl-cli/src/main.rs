@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use rnl_cli::solve::{SolveOptions, Target};
+use rnl_cli::solve::{SolveOptions, Target, WallClock};
 use rnl_cli::{dump, FsProvider};
 use rnl_runtime::diag::{Severity, Sink};
 use rnl_runtime::{Interpretation, Options};
@@ -17,6 +17,7 @@ const USAGE: &str = "usage:
   rnl view FILE [options]           print the Document a viewer shows, as JSON
   rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
   rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
+  rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
@@ -314,6 +315,20 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             Ok(ExitCode::SUCCESS)
         }
         "solve" => solve(args, &provider),
+        "preview" => {
+            // as `rnl solve` solves, and nothing written: the Document of the files as solved and the
+            // report, which the desktop viewer shows (decision 0010)
+            let solver = SolverOptions::default()
+                .with_overrides(args.solver_options.as_deref().unwrap_or(""))
+                .map_err(|e| format!("--solver-options: {e}"))?;
+            let options =
+                SolveOptions { dialect: args.dialect.clone(), std: args.std, level: args.level.clone(), solver };
+            let entry = rnl_cli::path_str(&args.file);
+            let shown = rnl_cli::preview::preview(&entry, &provider, &options, &WallClock::new(), &|_| true)?;
+            let out = serde_json::json!({ "document": shown.document, "report": shown.report });
+            println!("{}", serde_json::to_string_pretty(&out).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
         "strip-generated" => {
             let out = args.out.clone().ok_or("strip-generated needs -o OUT")?;
             let mut sink = Sink::new();

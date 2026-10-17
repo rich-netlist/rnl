@@ -1,4 +1,5 @@
-// A file of more lines than one call takes as its arguments in Chrome: it opens whole. Playwright's
+// A file of more lines than one call takes as its arguments in Chrome: it opens whole. It runs in
+// the project long, in Chromium only and after the other projects (playwright.config.js). Playwright's
 // trace takes a snapshot of the DOM at each step, which with 200 000 lines takes seconds, so this
 // file runs without it.
 

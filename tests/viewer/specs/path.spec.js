@@ -299,7 +299,8 @@ test("a long path keeps the level shown in a narrow bar, and leaves the levels b
   await viewer.drag(split, { x: 1199, y: split.y });
   await expect(more).toBeVisible();
   await expect(page.locator("#level-kind")).toBeHidden();
-  expect(await fits()).toBe(true);
+  // once the bar is laid out at its new width
+  await expect.poll(fits).toBe(true);
   const shown = await segments(page);
   expect(shown[0]).toBe(TOP);
   expect(shown[shown.length - 1]).toBe("leaf XL2");
@@ -355,7 +356,7 @@ test("a long path keeps the level shown in a narrow bar, and leaves the levels b
   // narrower still, the root gives way too, and the level shown stays
   await page.setViewportSize({ width: 400, height: 800 });
   await expect.poll(() => segments(page)).toEqual(["leaf XL2"]);
-  expect(await fits()).toBe(true);
+  await expect.poll(fits).toBe(true);
   await more.click();
   await expect(menu.locator(".path-menu-item")).toHaveText([TOP, "bankXK1", "blockXB2", "cellXC1"]);
   await page.keyboard.press("Escape");

@@ -120,6 +120,7 @@ dependencies = [
  "rnl-runtime",
  "rnl-solver",
  "rnl-view",
+ "serde",
  "serde_json",
 ]
 

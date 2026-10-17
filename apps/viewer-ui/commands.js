@@ -10,6 +10,7 @@ import { loadClipboard, pickAndOpen, reload } from "./open.js";
 import { setProblems, setSidebar } from "./panels.js";
 import { clearSelection } from "./selection.js";
 import { shell } from "./shell.js";
+import { closePreview, saveSolved, solve, timeLimit } from "./solve.js";
 import { selected } from "./state.js";
 import { ascend, descend, opens } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
@@ -51,6 +52,10 @@ export function command(id) {
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "descend": descend(selected); break;
     case "ascend": ascend(); break;
+    case "solve": solve(); break;
+    case "solve-close": closePreview(); break;
+    case "solve-save": saveSolved(); break;
+    case "solve-time-limit": timeLimit(); break;
     case "check-updates": checkForUpdates(); break;
     case "about": about(); break;
     case "desktop-viewer": toolsPage(); break;

@@ -156,7 +156,8 @@ fn catalog_prints_the_packages_the_core_has() {
         .iter()
         .map(|p| (p["name"].as_str().unwrap().to_string(), p["version"].as_str().unwrap().to_string()))
         .collect();
-    let want = [("rnl-std", "0.2"), ("rnl-std", "0.3"), ("rnl-zh", "0.2")].map(|(n, v)| (n.to_string(), v.to_string()));
+    let want = [("rnl-std", "0.2"), ("rnl-std", "0.3"), ("rnl-zh", "0.2"), ("rnl-zh", "0.3")]
+        .map(|(n, v)| (n.to_string(), v.to_string()));
     assert_eq!(listed, want);
 
     // a package of a package directory

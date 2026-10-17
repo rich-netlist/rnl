@@ -41,6 +41,17 @@
       ]
     },
     {
+      "label": "&Solve",
+      "items": [
+        { "id": "solve", "label": "&Solve", "keys": ["F9"], "platforms": ["desktop"] },
+        { "id": "solve-close", "label": "&Close Preview", "platforms": ["desktop"] },
+        "-",
+        { "id": "solve-save", "label": "Save Solved &Copy As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"] },
+        "-",
+        { "id": "solve-time-limit", "label": "&Time Limit...", "platforms": ["desktop"] }
+      ]
+    },
+    {
       "label": "&Help",
       "items": [
         { "id": "desktop-viewer", "label": "&Desktop Viewer...", "platforms": ["web"] },

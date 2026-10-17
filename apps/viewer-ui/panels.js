@@ -26,18 +26,23 @@ export function setSidebar(shown) {
   if (shown) revealPending();
 }
 
-/** Show the "netlist" or the "hierarchy" view of the side panel. */
+/**
+ * Show the "netlist", the "hierarchy" or the "solve" view of the side panel; the solve's only while
+ * a solve is shown (solve.js), and the netlist's for any other name.
+ */
 export function setPane(name) {
-  const netlist = name !== "hierarchy";
-  netlistPane.hidden = !netlist;
-  hierarchyPane.hidden = netlist;
-  $("tab-netlist").setAttribute("aria-selected", String(netlist));
-  $("tab-hierarchy").setAttribute("aria-selected", String(!netlist));
-  save("side-pane", netlist ? "netlist" : "hierarchy");
-  if (netlist) {
+  const view = name === "hierarchy" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
+  const panes = { netlist: netlistPane, hierarchy: hierarchyPane, solve: $("pane-solve") };
+  for (const [k, el] of Object.entries(panes)) {
+    el.hidden = k !== view;
+    $(`tab-${k}`).setAttribute("aria-selected", String(k === view));
+  }
+  // a solve shown at the next start is not: the netlist's view then
+  save("side-pane", view === "solve" ? "netlist" : view);
+  if (view === "netlist") {
     setProblemsHeight(load("problems-height", 180));
     revealPending();
-  } else {
+  } else if (view === "hierarchy") {
     setIndexHeight(load("index-height", 260));
     updateHierarchy();
   }
@@ -133,3 +138,4 @@ $("show-sidebar").addEventListener("click", () => setSidebar(true));
 $("problems-head").addEventListener("click", () => setProblems(netlistPane.classList.contains("problems-folded")));
 $("tab-netlist").addEventListener("click", () => setPane("netlist"));
 $("tab-hierarchy").addEventListener("click", () => setPane("hierarchy"));
+$("tab-solve").addEventListener("click", () => setPane("solve"));

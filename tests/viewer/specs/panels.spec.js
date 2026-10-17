@@ -38,7 +38,7 @@ test("the side panel's splitter stays within its limits, and the width is kept",
   // a narrower window leaves the drawing its 280 pixels
   await page.setViewportSize({ width: 800, height: 800 });
   await expect.poll(() => size(page, "#sidebar", "width")).toBe(520);
-  expect(await size(page, "#canvas", "width")).toBe(275);
+  await expect.poll(() => size(page, "#canvas", "width")).toBe(275);
 });
 
 test("the problems' splitter stays within its limits, and the height is kept", async ({ page, viewer }) => {
