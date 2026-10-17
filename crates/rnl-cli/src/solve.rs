@@ -3,7 +3,7 @@
 //!
 //! The document is read as a solver reads it, `Options::solver()`, without the records with
 //! `type="generated"` (2.8). Each level is solved by `rnl-solver`; its record is written with
-//! `solution::write_record`, the hash `sig1` of its problem and of the solver's canonical options in
+//! `solution::write_record`, the hash `sig2` of its problem and of the solver's canonical options in
 //! the head, finished with `rnl_view::finish_record`, which adds the check of its numbers in a file
 //! of the draft 0.3 (5.9), and put in place of the level's records of the solver with
 //! `writeback::replace_generated_with_header`, at the end of the level's own text (17). A record of
@@ -75,7 +75,7 @@ use rnl_runtime::diag::Severity;
 use rnl_runtime::host::file_name;
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::interp::unit::SUPPORTED_VERSION;
-use rnl_runtime::problem::{sig1, FactKind, LevelProblem, PointRef, Reference};
+use rnl_runtime::problem::{sig2, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Unsolved, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{
@@ -410,7 +410,7 @@ fn pass(
         let start = Instant::now();
         let solved = rnl_solver::solve_with_clock(p, &options.solver, clock);
         let time = start.elapsed();
-        let hash = sig1(p, &canonical);
+        let hash = sig2(p, &canonical);
         let mut written = write_record(p, &solved.solution, AUTHOR, &hash);
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);

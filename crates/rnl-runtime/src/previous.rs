@@ -45,7 +45,7 @@ pub struct Previous {
     /// The `hash` in the record head, as written (2.8, 17).
     pub hash: Option<String>,
     /// Whether the input digest of `hash` is the problem's ([`same_input`]); None for a record
-    /// without a `sig1` hash, which is not compared (17).
+    /// without a `sig2` or a `sig1` hash, which is not compared (17).
     pub same_input: Option<bool>,
     /// Whether its numbers hold (5.9); None when it uses no number. False when its `numbering` is
     /// missing or not the check of the level: then its statements that use a number take no
@@ -89,7 +89,7 @@ pub enum SolveStatus {
     /// Something for a solver to decide, and no record of the solver.
     Unsolved,
     /// A record of the solver that is up to date: the input digest of its `hash` is that of the
-    /// level now, or it has no `sig1` hash to compare (17), and its numbers hold when it uses
+    /// level now, or it has no `sig2` or `sig1` hash to compare (17), and its numbers hold when it uses
     /// numbers (5.9).
     Solved,
     /// A record of the solver whose `hash` is of another input, or whose `numbering` is missing or

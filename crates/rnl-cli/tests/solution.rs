@@ -149,7 +149,7 @@ fn solved(text: &str, title: &str) -> Solved {
     let r = interpret_file(Path::new("t.sp"), None, &files, &Options::solver()).unwrap();
     let p = problem(&r, title).clone();
     let solution = solve(&p);
-    let written = write_record(&p, &solution, "rnl-solver test", &sig1(&p, OPTIONS));
+    let written = write_record(&p, &solution, "rnl-solver test", &sig2(&p, OPTIONS));
     let record = rnl_view::finish_record(&r.doc, &files, &Options::default(), &p, &written.record);
     let text = replace_generated(&r.doc, p.level, text, &record);
     Solved { p, solution, written, record, text }
@@ -216,7 +216,7 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
     }
     assert!(s
         .record
-        .starts_with("@RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver test\", hash=\"sig1:"));
+        .starts_with("@RNL(type=\"generated\", priority=\"high\", author=\"rnl-solver test\", hash=\"sig2:"));
     let check = numbering(&s.record).unwrap();
 
     // read back with the switch: no error, and the check of the level is the record's
@@ -451,7 +451,7 @@ fn a_record_that_uses_no_number_has_no_numbering() {
     };
     let solution =
         Solution { placements: vec![place("#R1", (0.0, 0.0)), place("#C1", (10.0, 0.0))], ..Solution::default() };
-    let written = write_record(p, &solution, "rnl-solver test", &sig1(p, OPTIONS));
+    let written = write_record(p, &solution, "rnl-solver test", &sig2(p, OPTIONS));
     assert!(written.unsolved.is_empty() && !written.record.contains("%#"), "{}", written.record);
     let record = rnl_view::finish_record(&r.doc, &files, &Options::default(), p, &written.record);
     assert_eq!(record, written.record);

@@ -140,7 +140,7 @@ fn fact(f: &ProblemFact, numbers: bool) -> Value {
     v
 }
 
-/// One level's problem, with its `sig1` hash for the solver options given. The references are
+/// One level's problem, with its `sig2` hash for the solver options given. The references are
 /// numbers, `{"number": 3, "path": "::mid"}` and `{"generated_by": 2, "number": 1, "path": ""}`,
 /// only in a level of a file of the draft 0.3, which alone has `authored_numbers` and the
 /// `written_numbers` of each usage as well.
@@ -154,7 +154,7 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
         "file": p.file,
         "line": p.line,
         "end_line": p.end_line,
-        "hash": sig1(p, solver_options),
+        "hash": sig2(p, solver_options),
         "packages": p.packages.iter().map(|(n, v)| json!([n, v])).collect::<Vec<_>>(),
         "names": p.names,
         "objects": p.objects.iter().enumerate().map(|(k, o)| {
@@ -176,6 +176,9 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             if let Some(u) = o.usage {
                 m.insert("usage".into(), json!(u));
             }
+            if !o.nets.is_empty() {
+                m.insert("nets".into(), json!(o.nets));
+            }
             if let Some(t) = &o.text {
                 m.insert("text".into(), json!({
                     "attach": filler(&t.attach), "key": t.key,
@@ -194,6 +197,10 @@ pub fn level(p: &LevelProblem, solver_options: &str) -> Value {
             "pins": s.pins.iter().map(|q| json!({"pos": [q.pos.0, q.pos.1], "dir": q.dir, "terminals": q.terminals, "label": q.label})).collect::<Vec<_>>(),
         })).collect::<Vec<_>>(),
         "facts": p.facts.iter().map(|f| fact(f, numbers)).collect::<Vec<_>>(),
+        "nets": p.nets.iter().map(|n| json!({
+            "name": n.name, "reference": reference(&n.reference, numbers), "pins": points(&n.pins),
+            "wires": n.wires, "routes": n.routes, "port": n.port,
+        })).collect::<Vec<_>>(),
         "wires": p.wires.iter().map(|w| json!({
             "label": w.label, "reference": reference(&w.reference, numbers), "nets": w.nets, "bus": w.bus,
             "anchors": points(&w.anchors), "mode": w.mode, "generated": w.generated,

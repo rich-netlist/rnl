@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! let solved = rnl_solver::solve(problem, &options);
-//! let hash = rnl_runtime::problem::sig1(problem, &options.canonical());
+//! let hash = rnl_runtime::problem::sig2(problem, &options.canonical());
 //! let written = rnl_runtime::solution::write_record(problem, &solved.solution, rnl_solver::AUTHOR, &hash);
 //! ```
 //!

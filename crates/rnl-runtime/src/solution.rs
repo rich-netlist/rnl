@@ -400,7 +400,7 @@ fn usage_statement(u: &UsageEntry, name: &str) -> String {
 /// written out; the branch points of routed wires; the positions and orientations; the wires
 /// routed for ROUTE; the routes of the wires written in RNL; the junctions. `p` is the problem the
 /// solver read, without the records of the solver ([`crate::Options::solver`]). `author` and
-/// `hash` go in the record head, the hash being what [`sig1`] gives for the problem and the
+/// `hash` go in the record head, the hash being what [`crate::problem::sig2`] gives for the problem and the
 /// solver's options.
 ///
 /// Every decision of the solution is in the record, or in [`Written::unsolved`] with the reason

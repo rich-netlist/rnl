@@ -9,7 +9,7 @@ use std::path::Path;
 
 use rnl_cli::{interpret_file, read_host};
 use rnl_runtime::diag::{Severity, Sink};
-use rnl_runtime::problem::{sig1, LevelProblem, PointRef, Position, Reference, Slot};
+use rnl_runtime::problem::{sig2, LevelProblem, PointRef, Position, Reference, Slot};
 use rnl_runtime::solution::{write_record, Placement, Solution};
 use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::writeback::replace_generated;
@@ -126,7 +126,7 @@ fn the_solver_writes_such_a_point_back_by_its_name() {
         placements: vec![Placement { object: q, at: Some((3.0, 4.0)), orient: None }],
         ..Solution::default()
     };
-    let written = write_record(p, &solution, "rnl-solver test", &sig1(p, "tolerance=0.000001"));
+    let written = write_record(p, &solution, "rnl-solver test", &sig2(p, "tolerance=0.000001"));
     assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
     assert!(written.record.contains("%q @PLACE(3, 4)"), "{}", written.record);
     let doc = read_host(Path::new("t.sp"), None, &files, &mut Sink::new()).unwrap();

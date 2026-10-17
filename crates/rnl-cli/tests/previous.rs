@@ -140,7 +140,7 @@ fn solved_with(text: &str, title: &str, solver: impl Fn(&LevelProblem) -> Soluti
     let r = rnl_view::interpret("t.sp", None, &files, &Options::solver()).unwrap();
     let p = r.problems.iter().find(|p| p.title == title).unwrap().clone();
     let solution = solver(&p);
-    let written = write_record(&p, &solution, "rnl-solver test", &sig1(&p, OPTIONS));
+    let written = write_record(&p, &solution, "rnl-solver test", &sig2(&p, OPTIONS));
     let record = rnl_view::finish_record(&r.doc, &files, &Options::default(), &p, &written.record);
     let text = replace_generated(&r.doc, p.level, text, &record);
     Solved { p, solution, written, text }
@@ -204,7 +204,7 @@ fn the_hints_of_a_level_of_the_draft_map_by_name_and_by_number() {
     let (p, previous) = hints(&s.text, "amp");
     assert_eq!(p, LevelProblem { end_line: p.end_line, ..s.p.clone() });
     let previous = previous.unwrap();
-    assert_eq!(previous.hash, Some(sig1(&p, OPTIONS)));
+    assert_eq!(previous.hash, Some(sig2(&p, OPTIONS)));
     assert_eq!((previous.same_input, previous.numbering), (Some(true), Some(true)));
     // every position and orientation of the record, on the objects of the problem
     let placements = s.placements();
@@ -308,7 +308,7 @@ fn a_change_to_the_authored_text_is_another_input_and_keeps_the_hints() {
     let (p, previous) = hints(&changed, "amp");
     let previous = previous.unwrap();
     assert_eq!((previous.same_input, previous.numbering), (Some(false), Some(true)));
-    assert_ne!(sig1(&p, OPTIONS), sig1(&s.p, OPTIONS));
+    assert_ne!(sig2(&p, OPTIONS), sig2(&s.p, OPTIONS));
     assert_eq!(previous.placements, s.placements());
     assert_eq!(previous.wire_routes, s.routes());
     assert_eq!(status(&s.text, "amp"), "solved");
@@ -356,7 +356,7 @@ fn each_level_has_its_solve_status_when_asked() {
     // with a record of the solver, as one writes it with nothing to decide: solved, and stale once
     // R2 moves
     let r = rnl_view::interpret("t.sp", None, &MemoryProvider::new().with("t.sp", &fixed), &Options::solver());
-    let hash = sig1(&r.unwrap().problems[0], OPTIONS);
+    let hash = sig2(&r.unwrap().problems[0], OPTIONS);
     let recorded = one(&format!("{authored}* @RNL(type=\"generated\", priority=\"high\", hash=\"{hash}\") {{}}\n"));
     assert_eq!(statuses(&recorded), [("t.sp".to_string(), Some("solved"))]);
     let moved = recorded.replace("#R2 @PLACE(10, 0)", "#R2 @PLACE(12, 0)");

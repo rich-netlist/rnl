@@ -407,7 +407,7 @@ fn a_solution_written_back_reads_back() {
         ],
         ..Solution::default()
     };
-    let hash = sig1(p, OPTIONS);
+    let hash = sig2(p, OPTIONS);
     let written = write_record(p, &solution, "rnl-solver test", &hash);
     // neither is left out silently (the draft 0.3, 14.8)
     let unsolved: Vec<String> = written.unsolved.iter().map(|u| u.to_string()).collect();
@@ -496,7 +496,7 @@ fn a_routed_net_written_back_reads_back() {
         ],
         ..Solution::default()
     };
-    let written = write_record(p, &solution, "rnl-solver test", &sig1(p, OPTIONS));
+    let written = write_record(p, &solution, "rnl-solver test", &sig2(p, OPTIONS));
     assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
     assert!(written.record.contains("&in @WIRE(mode=\"straight\") {#VIN:p (0, 6) #R1:p}"), "{}", written.record);
     assert!(written.record.contains("%rt1 = (12, 6)") && written.record.contains("$JUNCTION @ATTACH %rt1"));
@@ -557,8 +557,8 @@ fn the_hash_follows_the_input_and_nothing_else() {
 
     // the options are a segment of their own, which a viewer does not compare
     let p = &problems(&f, &FsProvider::new(&[]))[0];
-    let (a, b) = (sig1(p, OPTIONS), sig1(p, "tolerance=0.01"));
-    assert_eq!(a.len(), "sig1:".len() + 33);
+    let (a, b) = (sig2(p, OPTIONS), sig2(p, "tolerance=0.01"));
+    assert_eq!(a.len(), "sig2:".len() + 33);
     assert_eq!(a[..21], b[..21]);
     assert_ne!(a[22..], b[22..]);
     assert_eq!(same_input(&b, p), Some(true));
