@@ -35,6 +35,10 @@ pub struct Instance {
     pub params: Vec<(String, String)>,
     pub file: String,
     pub line: u32,
+    /// The file level that read the line of the instance: the include, or the library section,
+    /// through which it was read (2.8, 6.1). A file, or one section of it, included twice is read
+    /// twice, by two file levels, each of its own version; None for an instance no adapter read.
+    pub file_level: Option<LevelId>,
     /// Netlist order within the drawing level (11.6).
     pub order: usize,
     /// The model type, lower case, such as "nmos" (10.1).
@@ -281,9 +285,15 @@ impl HostDocument {
         at
     }
 
+    /// The file level that read an instance: the one the adapter read it through
+    /// ([`Instance::file_level`]), else the one whose text holds its line ([`Self::file_level_at`]).
+    pub fn file_level_of(&self, inst: &Instance) -> Option<LevelId> {
+        inst.file_level.or_else(|| self.file_level_at(&inst.file, inst.line))
+    }
+
     /// The file level whose text holds the line `line` of `file`: the one that reads the library
     /// section that holds it, else the first that reads the file whole. None when no file level
-    /// reads that line.
+    /// reads that line. A file read twice has two; [`Self::file_level_of`] tells an instance's.
     pub fn file_level_at(&self, file: &str, line: u32) -> Option<LevelId> {
         let of_file = || {
             (0..self.levels.len()).filter(|&l| self.levels[l].kind == LevelKind::File && self.levels[l].file == file)

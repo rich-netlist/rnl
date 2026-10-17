@@ -813,6 +813,34 @@ fn headers_of(doc: &HostDocument, file: &str, at: Option<LevelId>) -> bool {
     }
 }
 
+/// The file levels that take their language version from the file level `level` (16.1): the files
+/// it includes, and those they include in turn, whose header records write no VERSION, a library
+/// section read as a file among them (2.8), in the order of the document. Raising `level` to 0.3
+/// has them read in 0.3 with it. The file levels `apart`, raised on their own, are left out, and so
+/// are those that take their version from one of them.
+pub fn takes_version_of(doc: &HostDocument, level: LevelId, apart: &[LevelId]) -> Vec<LevelId> {
+    let mut out = Vec::new();
+    let mut todo: Vec<LevelId> = doc.levels[level].children.iter().rev().copied().collect();
+    while let Some(l) = todo.pop() {
+        let lv = &doc.levels[l];
+        if lv.kind == LevelKind::File {
+            if apart.contains(&l) || writes_version(doc, l) {
+                continue;
+            }
+            out.push(l);
+        }
+        todo.extend(lv.children.iter().rev().copied());
+    }
+    out
+}
+
+/// Whether the header record of the file level `level` writes a VERSION (16.1).
+fn writes_version(doc: &HostDocument, level: LevelId) -> bool {
+    let Some(header) = first_header(doc, &doc.levels[level].file, Some(level)) else { return false };
+    let Some(body) = parse_record(&header.text).body else { return false };
+    body.members.iter().filter_map(|m| m.segments.first().and_then(|s| s.call.as_ref())).any(|c| c.kw == "VERSION")
+}
+
 /// Whether the header record of the file level `level`, a library section read as a file (2.8),
 /// or that of a file level above it, which includes it, pins a version of the standard package,
 /// `@USE-PACKAGE(name="rnl-std", version="…")`, which then comes before the series that the
@@ -838,10 +866,11 @@ pub fn pins_std(doc: &HostDocument, level: LevelId) -> bool {
 /// The names in the text of the file level `level`, a library section read as a file (2.8), that
 /// have the spelling of a standard word that the version 0.3 adds, `numbering`, a field of the
 /// record head (2.8): keys of texts, role names, parameter names of definitions and of usages,
-/// sub-object names, aliases, fields of record heads, and the parameters of the host's instances,
-/// each as what it is and where. Raising the file level to 0.3 would change their meaning, so a
-/// tool gives a warning for each and does not raise it (16.1, 16.5).
-pub fn spelled_like_new_words(doc: &HostDocument, level: LevelId) -> Vec<String> {
+/// sub-object names, aliases, those it imports from alias packages among `imported`
+/// ([`crate::Interpretation::imported_aliases`]), fields of record heads, and the parameters of
+/// the host's instances, each as what it is and where. Raising the file level to 0.3 may change
+/// their meaning, so a tool that raises it gives a warning for each (16.1, 16.5).
+pub fn spelled_like_new_words(doc: &HostDocument, level: LevelId, imported: &[crate::ImportedAlias]) -> Vec<String> {
     let file = doc.levels[level].file.as_str();
     let words: Vec<&str> = crate::words::draft_header_fields().iter().map(|f| f.name.as_str()).collect();
     let mut found: Vec<(&'static str, String, crate::diag::Loc)> = Vec::new();
@@ -858,8 +887,11 @@ pub fn spelled_like_new_words(doc: &HostDocument, level: LevelId) -> Vec<String>
             names.into_iter().filter(|(_, n, _)| words.contains(&n.as_str())).map(|(w, n, o)| (w, n, rec.loc(o))),
         );
     }
+    for a in imported.iter().filter(|a| a.level == level && words.contains(&a.alias.as_str())) {
+        found.push(("an alias from an alias package", a.alias.clone(), a.loc.clone()));
+    }
     for lv in &doc.levels {
-        for inst in lv.instances.iter().filter(|i| i.file == file && doc.file_level_at(file, i.line) == Some(level)) {
+        for inst in lv.instances.iter().filter(|i| i.file == file && doc.file_level_of(i) == Some(level)) {
             for (name, _) in inst.params.iter().filter(|(n, _)| words.contains(&n.as_str())) {
                 found.push(("a parameter of an instance", name.clone(), crate::diag::Loc::line(file, inst.line)));
             }
@@ -1591,7 +1623,7 @@ mod tests {
                    * @RNL(numbering=\"x\") { #R1 @TEXT(\"a\", key=\"numbering\"); \
                    $D = @DEFINE(roles=[\"numbering\"], parameters=[[\"numbering\", 1]]) {} }\n.end\n";
         let d = doc(net, "a.sp", "*");
-        let mut found = spelled_like_new_words(&d, 0);
+        let mut found = spelled_like_new_words(&d, 0, &[]);
         found.sort();
         assert_eq!(
             found,
@@ -1604,6 +1636,6 @@ mod tests {
             ]
         );
         let plain = "* t\n* @RNL { #R1 @TEXT(\"numbering\", key=\"name\") }\n.end\n";
-        assert!(spelled_like_new_words(&doc(plain, "a.sp", "*"), 0).is_empty());
+        assert!(spelled_like_new_words(&doc(plain, "a.sp", "*"), 0, &[]).is_empty());
     }
 }

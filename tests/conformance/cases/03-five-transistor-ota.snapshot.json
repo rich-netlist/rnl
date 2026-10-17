@@ -977,7 +977,10 @@
             "host": [],
             "definition": "$MATCHED",
             "attach": {
-              "members": "@465"
+              "members": [
+                "#M1",
+                "#M2"
+              ]
             },
             "symbol": {
               "value": null,
@@ -1080,7 +1083,11 @@
             "host": [],
             "definition": "$FLOW",
             "attach": {
-              "path": "@488"
+              "path": [
+                "#M1",
+                "#M2",
+                "#CL"
+              ]
             },
             "symbol": {
               "value": null,

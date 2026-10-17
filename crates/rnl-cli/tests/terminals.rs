@@ -137,6 +137,60 @@ fn the_names_follow_the_library_section_the_instance_is_written_in() {
 }
 
 #[test]
+fn the_names_follow_the_include_a_section_is_read_through() {
+    // one library section without a header record, read by a subcircuit of a file of 0.2 and by
+    // one of a file of 0.3: read twice, it is two file levels, each in the version of the file that
+    // reads it (2.8, 16.1), and its instances have the names of that version, whichever is read
+    // first; in a SPICE netlist, and in a Spectre one whose section is in SPICE mode
+    let tl = named(&["p1", "n1", "p2", "n2"]);
+    let shared = "* shared\n.lib shared\nT1 a b c d z0=50 td=1n\n.endl shared\n";
+    let spice = |version: &str, name: &str, records: &str| {
+        format!(
+            "* {name}\n* @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\n.subckt {name} a b c d\n\
+             .lib \"shared.lib\" shared\n{records}.ends {name}\n"
+        )
+    };
+    let spectre = |version: &str, name: &str, records: &str| {
+        format!(
+            "// {name}\n// @RNL(type=\"header\") {{ @VERSION(\"{version}\") }}\nsubckt {name} a b c d\n\
+             include \"shared.lib\" section=shared\n{records}ends {name}\n"
+        )
+    };
+    let first_port = "* @RNL { #T1:p1 @TEXT(\"first port\") }\n";
+    for order in [["old", "new"], ["new", "old"]] {
+        let sp = format!(
+            "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\n.include \"{}.inc\"\n.include \"{}.inc\"\n\
+             X1 a b c d old\nX2 a b c d new\n.end\n",
+            order[0], order[1]
+        );
+        let scs = format!(
+            "// t\nsimulator lang=spectre\n// @RNL(type=\"header\") {{ @VERSION(\"0.3\") }}\ninclude \"{}.scs\"\n\
+             include \"{}.scs\"\nX1 (a b c d) old\nX2 (a b c d) new\n",
+            order[0], order[1]
+        );
+        let spice_files = MemoryProvider::new()
+            .with("t.sp", &sp)
+            .with("old.inc", &spice("0.2", "old", ""))
+            .with("new.inc", &spice("0.3", "new", first_port))
+            .with("shared.lib", shared);
+        let spectre_files = MemoryProvider::new()
+            .with("t.scs", &scs)
+            .with("old.scs", &spectre("0.2", "old", ""))
+            .with("new.scs", &spectre("0.3", "new", &first_port.replacen('*', "//", 1)))
+            .with("shared.lib", shared);
+        for (main, files) in [("t.sp", spice_files), ("t.scs", spectre_files)] {
+            let r = read(main, &files, &options());
+            assert!(errors(&r).is_empty(), "{main} {order:?}: {:?}", errors(&r));
+            let of = |title: &str| {
+                let lv = r.model.levels.iter().find(|l| l.title == title).unwrap();
+                lv.terminal_names[0].clone()
+            };
+            assert_eq!((of("old"), of("new")), (vec![None; 4], tl.clone()), "{main} {order:?}");
+        }
+    }
+}
+
+#[test]
 fn the_spice_mode_of_a_spectre_netlist_has_them_too() {
     let net = "// t\nsimulator lang=spectre\n// @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR0 (a 0) resistor r=1k\n\
                simulator lang=spice\nT1 a 0 b 0 z0=50 td=1n\nsimulator lang=spectre\n";
