@@ -25,8 +25,10 @@
 //! 2. the order of the items is made by the barycentre of what each is connected to, over a few
 //!    rounds, keeping the left-to-right precedences the facts give, then varied by swapping
 //!    neighbours, an element with the next item of its own row, and by reversing each ORDER or
-//!    DISTANCE on x whose side the facts leave open (`crate::structure::Reversible`), which the
-//!    resolution then turns;
+//!    DISTANCE on x whose side the facts leave open and each DISTRIBUTE on x
+//!    (`crate::structure::Reversible`), which the resolution then turns: a swap that breaks the
+//!    order of a DISTRIBUTE's members, one way or the other, is not made, as its even steps would
+//!    leave the gaps between them out;
 //! 3. each free class whose members lie in the node takes the orientation that turns most of its
 //!    pins towards what they connect to, among those its sources allow (sources towards the
 //!    ground, an end on the ground and grounds below their pins), and is varied to its second
@@ -1507,7 +1509,8 @@ struct Plan {
     values: Vec<Orient>,
     /// The order of the items of each node decided.
     items: BTreeMap<usize, Vec<Item>>,
-    /// The facts whose side is open that the plan reverses, by index in `Structure::reversible`.
+    /// The facts whose side is open and the DISTRIBUTEs that the plan reverses, by index in
+    /// `Structure::reversible`.
     flipped: BTreeSet<usize>,
 }
 
@@ -2149,7 +2152,8 @@ fn ranked(s: &Structure, list: Vec<Scored>) -> Vec<Scored> {
 }
 
 /// The left-to-right precedences between elements: those of the facts with a side, and those of
-/// the facts whose side is open, reversed for the facts of `flipped` (`Structure::reversible`).
+/// the facts whose side is open and of the DISTRIBUTEs, reversed for those of `flipped`
+/// (`Structure::reversible`).
 fn precedences(s: &Structure, flipped: &BTreeSet<usize>) -> BTreeSet<(usize, usize)> {
     let mut out = s.precedence.clone();
     for (r, rev) in s.reversible.iter().enumerate() {

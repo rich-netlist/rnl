@@ -36,8 +36,9 @@
 //!   without the current depth, does an ORDER or a DISTRIBUTE on x, as far as the facts kept let
 //!   its elements share a height; an ALIGN on x is a column, its elements in rows of their own.
 //!   The left-to-right precedences are those that the facts on x with a side give the elements
-//!   they join; an ORDER or a DISTANCE whose side is left open gives its own as the witness has
-//!   them, and the search may reverse them ([`Reversible`]).
+//!   they join; an ORDER or a DISTANCE whose side is left open, and a DISTRIBUTE, whose members
+//!   come in its order one way or the other (14.4), give their own as the witness has them, and
+//!   the search may reverse them ([`Reversible`]).
 //! - **The sources of candidates** ([`Source`]), instantiated from the configured objectives in
 //!   the order of their layers, each objective with a structural side adding its own, and the
 //!   objectives configured but inert recorded with the reason ([`crate::objectives::Active`]).
@@ -505,12 +506,15 @@ pub(crate) struct Open {
     pub sides: Vec<usize>,
 }
 
-/// A fact kept on x whose direction or side the facts leave open ([`Open::orders`],
-/// [`Open::sides`]): the pairs of elements `(a, b)` it puts `a` left of `b`, as the witness has
-/// them. The search may reverse them all, and the resolution then turns the fact's literal.
+/// Facts kept on x whose direction or side the facts leave open ([`Open::orders`],
+/// [`Open::sides`]), or a DISTRIBUTE, which runs either way (14.4): the pairs of elements `(a, b)`
+/// they put `a` left of `b`, as the witness has them. The search may reverse them all, and the
+/// resolution then turns the facts' literals. Facts that order the same two elements are one, as
+/// they turn together.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Reversible {
-    pub fact: usize,
+    /// The facts, in order.
+    pub facts: Vec<usize>,
     pub pairs: Vec<(usize, usize)>,
 }
 
@@ -592,7 +596,8 @@ pub(crate) struct Structure {
     /// witness has them: an ORDER with a direction, a DISTANCE with a direction and a gap not
     /// below 0.
     pub precedence: BTreeSet<(usize, usize)>,
-    /// The facts kept on x whose side is open, with the pairs they order.
+    /// The facts kept on x whose side is open, and the DISTRIBUTEs on x, with the pairs they
+    /// order.
     pub reversible: Vec<Reversible>,
     pub active: Active,
     pub sources: Vec<Source>,
@@ -1962,16 +1967,32 @@ fn touched_elements(s: &Structure, f: usize, axis: usize) -> Vec<usize> {
 /// point the fact takes it by, the elements of a set (a centre, 6.5) all at the centre's, and an
 /// element before another when it is further left. An ORDER puts every member before the next; a
 /// DISTANCE puts one side before the other only when its gap is not below 0, and leaves the
-/// members of one side unordered; an ALIGN and a DISTRIBUTE fix no side (14.2, 14.4).
+/// members of one side unordered; an ALIGN fixes no side (14.2). A DISTRIBUTE fixes no side
+/// either, but its members come in its order one way or the other, each a step further than the
+/// one before (14.4), so it orders them as an ORDER given only an axis does: the way the witness
+/// has them, or as written where the witness puts them all at one x, and the search may reverse
+/// it. Its members that are no elements, such as the axis of a `$MIRROR_PAIR` or the middle point
+/// of a `$TAIL_CENTER`, keep their places in the order and order nothing themselves (review of
+/// phase 2 of the quality review: a swap of neighbours broke the order of a DISTRIBUTE, the
+/// resolution then dropped the gaps between them, and a text lay over the next symbol).
+///
+/// Two facts whose side is open that order the same two elements turn together, as one, since one
+/// turned without the other leaves the search no order of them; and one that orders two elements
+/// that a fact with a side orders is not open at all, its precedences fixed as the witness has
+/// them.
 fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)>, Vec<Reversible>) {
     let element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
+    let elements = |m: &PointRef| -> Vec<usize> {
+        let mut ks = Vec::new();
+        elements_of(m, &mut ks);
+        ks.retain(|&k| element(k));
+        ks
+    };
     let at = |ms: &[PointRef]| -> Vec<(usize, Q)> {
         let mut out = Vec::new();
         for m in ms {
             let Some(v) = point_value(problem, &s.witness, m, 0, 0) else { continue };
-            let mut ks = Vec::new();
-            elements_of(m, &mut ks);
-            out.extend(ks.into_iter().filter(|&k| element(k)).map(|k| (k, v.clone())));
+            out.extend(elements(m).into_iter().map(|k| (k, v.clone())));
         }
         out
     };
@@ -1983,7 +2004,7 @@ fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)
         out
     };
     let mut fixed = BTreeSet::new();
-    let mut open = Vec::new();
+    let mut open: Vec<Reversible> = Vec::new();
     for &f in &s.kept {
         let (sense, mut pairs) = match &problem.facts[f].kind {
             FactKind::Order { axis: Axis::X, sense, members } => {
@@ -1999,21 +2020,77 @@ fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)
                 pairs.extend(before(&b, &a));
                 (*sense, pairs)
             }
+            FactKind::Distribute { axis: Axis::X, members } => {
+                // the members with a place at the witness, in order: they run the way its first
+                // and last are, all at one x read as written
+                let chain: Vec<(Q, Vec<usize>)> = members
+                    .iter()
+                    .filter_map(|m| Some((point_value(problem, &s.witness, m, 0, 0)?, elements(m))))
+                    .collect();
+                let forward = match (chain.first(), chain.last()) {
+                    (Some((first, _)), Some((last, _))) => first <= last,
+                    _ => true,
+                };
+                let mut pairs = Vec::new();
+                for (i, (_, a)) in chain.iter().enumerate() {
+                    for (_, b) in &chain[i + 1..] {
+                        for &x in a {
+                            pairs.extend(b.iter().filter(|&&y| x != y).map(|&y| if forward { (x, y) } else { (y, x) }));
+                        }
+                    }
+                }
+                // an element in two members, such as `{#R1 #R2 #R1}`, at one x with all between:
+                // no order of them
+                let both: BTreeSet<(usize, usize)> = pairs.iter().copied().collect();
+                pairs.retain(|&(a, b)| !both.contains(&(b, a)));
+                (Sense::Either, pairs)
+            }
             _ => continue,
         };
         pairs.sort_unstable();
         pairs.dedup();
         match sense {
-            Sense::Either if s.open.orders.contains(&f) || s.open.sides.contains(&f) => {
+            Sense::Either
+                if s.open.orders.contains(&f)
+                    || s.open.sides.contains(&f)
+                    || matches!(problem.facts[f].kind, FactKind::Distribute { .. }) =>
+            {
                 if !pairs.is_empty() {
-                    open.push(Reversible { fact: f, pairs });
+                    open.push(Reversible { facts: vec![f], pairs });
                 }
             }
             Sense::Either => {}
             Sense::Increasing | Sense::Decreasing => fixed.extend(pairs),
         }
     }
-    (fixed, open)
+    // the facts whose side is open that order the same two elements, one after the other, as one
+    let unordered =
+        |r: &Reversible| -> BTreeSet<(usize, usize)> { r.pairs.iter().map(|&(a, b)| (a.min(b), a.max(b))).collect() };
+    let mut merged: Vec<Reversible> = Vec::new();
+    for mut r in open {
+        loop {
+            let shared = unordered(&r);
+            let Some(i) = merged.iter().position(|m| !unordered(m).is_disjoint(&shared)) else { break };
+            let m = merged.remove(i);
+            r.facts.extend(m.facts);
+            r.pairs.extend(m.pairs);
+        }
+        r.facts.sort_unstable();
+        r.pairs.sort_unstable();
+        r.pairs.dedup();
+        merged.push(r);
+    }
+    merged.sort_by(|a, b| a.facts.cmp(&b.facts));
+    // and those that a fact with a side turns already, fixed
+    let mut reversible = Vec::new();
+    for r in merged {
+        if r.pairs.iter().any(|p| fixed.contains(p)) {
+            fixed.extend(r.pairs);
+        } else {
+            reversible.push(r);
+        }
+    }
+    (fixed, reversible)
 }
 
 /// The objects a point refers to: its object, or the members of a set followed down.
@@ -2032,7 +2109,7 @@ fn elements_of(r: &PointRef, out: &mut Vec<usize>) {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::resolve::tests::{fact, instance, problem_of};
+    use crate::resolve::tests::{fact, instance, point, problem_of};
     use rnl_runtime::problem::ProblemGroup;
 
     fn structure_of(p: &LevelProblem) -> Structure {
@@ -2297,10 +2374,65 @@ pub(crate) mod tests {
         let s = structure_of(&p);
         assert_eq!(s.precedence.iter().copied().collect::<Vec<_>>(), vec![(0, 1)]);
         assert_eq!(s.open.orders, vec![4]);
-        assert_eq!(s.reversible.len(), 1, "{:?}", s.reversible);
-        assert_eq!(s.reversible[0].fact, 4);
-        let [(a, b)] = s.reversible[0].pairs[..] else { panic!("{:?}", s.reversible) };
+        assert_eq!(s.reversible.len(), 2, "{:?}", s.reversible);
+        // the DISTRIBUTE fixes no side, but its members come in its order, one way or the other
+        assert_eq!(s.reversible[0].facts, vec![2]);
+        assert!(monotone(&s.reversible[0].pairs, &[2, 3, 4]), "{:?}", s.reversible);
+        assert_eq!(s.reversible[1].facts, vec![4]);
+        let [(a, b)] = s.reversible[1].pairs[..] else { panic!("{:?}", s.reversible) };
         assert_eq!((a.min(b), a.max(b)), (6, 7));
+    }
+
+    /// Whether `pairs` puts every element of `chain` before each later one, or every one after
+    /// each later one, and nothing else.
+    fn monotone(pairs: &[(usize, usize)], chain: &[usize]) -> bool {
+        let way = |forward: bool| -> Vec<(usize, usize)> {
+            let mut out = Vec::new();
+            for (i, &a) in chain.iter().enumerate() {
+                out.extend(chain[i + 1..].iter().map(|&b| if forward { (a, b) } else { (b, a) }));
+            }
+            out.sort_unstable();
+            out
+        };
+        let mut pairs = pairs.to_vec();
+        pairs.sort_unstable();
+        pairs == way(true) || pairs == way(false)
+    }
+
+    /// A DISTRIBUTE on x orders its elements as an ORDER given only an axis does (review of phase
+    /// 2 of the quality review): those of a `$MIRROR_PAIR`'s, its axis a point between them, one
+    /// before the other; with an ORDER given only an axis on two of its elements, both turn
+    /// together; with an ORDER with a direction on two of them, it runs that way, not reversible.
+    #[test]
+    fn a_distribute_orders_its_elements_either_way() {
+        let o = |k| PointRef::Origin(k);
+        let distribute = |members: Vec<PointRef>| fact(FactKind::Distribute { axis: Axis::X, members });
+        let order = |sense, members: Vec<PointRef>| fact(FactKind::Order { axis: Axis::X, sense, members });
+        use rnl_runtime::problem::Sense::{Either, Increasing};
+        let mut objects: Vec<_> = (0..9).map(|_| instance()).collect();
+        objects.push(point());
+        let p = problem_of(
+            objects,
+            vec![
+                distribute(vec![o(0), o(1), o(2)]),
+                order(Either, vec![o(2), o(0)]),
+                distribute(vec![o(3), o(4), o(5)]),
+                order(Increasing, vec![o(5), o(3)]),
+                distribute(vec![o(6), o(9), o(7)]),
+            ],
+        );
+        let s = structure_of(&p);
+        assert_eq!(s.reversible.len(), 2, "{:?}", s.reversible);
+        assert_eq!(s.reversible[0].facts, vec![0, 1]);
+        assert!(monotone(&s.reversible[0].pairs, &[0, 1, 2]), "{:?}", s.reversible);
+        // the ORDER puts 5 first, so the DISTRIBUTE runs from 5 to 3
+        for pair in [(5, 4), (4, 3), (5, 3)] {
+            assert!(s.precedence.contains(&pair), "{:?}", s.precedence);
+        }
+        assert_eq!(s.precedence.len(), 3, "{:?}", s.precedence);
+        // the point orders nothing, and keeps its place between 6 and 7
+        assert_eq!(s.reversible[1].facts, vec![4]);
+        assert!(monotone(&s.reversible[1].pairs, &[6, 7]), "{:?}", s.reversible);
     }
 
     #[test]

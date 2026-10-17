@@ -10,9 +10,10 @@
 //! ranked by the estimate of the objectives, the routing objectives measuring the straight
 //! connections of each net; the best `beam` of them are routed (`crate::route`) and scored on
 //! their wires (`crate::score`), and the best of those is the solution. Overlapping symbols rank
-//! first, then wires that mislead (wires of different nets that touch, a pin on a wire of another
-//! net, a wire through a symbol, 13.2) and then joins left undone, as the solver's own rules rank
-//! after every fact and before every objective (8.5, 11.7).
+//! first, then what crowds the drawing (gaps between neighbours in a row that the facts kept left
+//! out, texts over another symbol), then wires that mislead (wires of different nets that touch, a
+//! pin on a wire of another net, a wire through a symbol, 13.2) and then joins left undone, as the
+//! solver's own rules rank after every fact and before every objective (8.5, 11.7).
 //!
 //! **The solution** gives every object with a position of its own its position, a position the
 //! file fixes included (plan 3.2), and every object with an orientation its orientation. A text
@@ -51,7 +52,7 @@ use crate::options::{Caps, CAPS};
 use crate::rational::{to_f64, Q};
 use crate::resolve::Resolved;
 use crate::route::{route, style_notes, Failure, Routing};
-use crate::score::{drawn, layers, misleading, order, Entry};
+use crate::score::{crowding, drawn, layers, misleading, order, Entry};
 use crate::search::{search, Candidate, RelKind};
 use crate::structure::{analyse, Role, Structure};
 use crate::{Clock, SolveReport, Solved, SolverOptions, StoppedClock, Unrouted};
@@ -138,6 +139,7 @@ pub(crate) fn solve_exact_with(
         let written = drawn(problem, &structure, &placed.geometry, &Routing::default());
         let entry = Entry {
             overlaps: placed.overlaps.len(),
+            crowding: crowding(&structure, &placed.origins, &placed.geometry.orient, &placed.dropped),
             misleading: misleading(problem, &structure, &placed.origins, &placed.geometry, &written),
             joins_left: 0,
             layers: estimate,

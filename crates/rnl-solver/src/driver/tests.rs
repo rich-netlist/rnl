@@ -2240,3 +2240,65 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
         ]
     );
 }
+
+/// Where the texts of the symbols are drawn (13.3): each text that its owner's symbol places, its
+/// box as wide as it is laid out (`crate::structure::text_box`) about the owner's origin and turned
+/// with it, with its owner.
+fn symbol_texts(p: &LevelProblem, e: &Exact) -> Vec<(usize, [Q; 4])> {
+    let (at, ori) = (&e.placed.origins, &e.placed.geometry.orient);
+    let mut out = Vec::new();
+    for o in &p.objects {
+        let (Position::InSymbol { owner, local, replaced: None }, Some(t)) = (&o.position, &o.text) else { continue };
+        let local = (from_f64(local.0).unwrap(), from_f64(local.1).unwrap());
+        let Some(b) = crate::structure::text_box(t, &local, ori[*owner]) else { continue };
+        let a = &at[*owner];
+        out.push((*owner, [&a[0] + &b[0], &a[1] + &b[1], &a[0] + &b[2], &a[1] + &b[3]]));
+    }
+    out
+}
+
+/// The members of a DISTRIBUTE on x stay in its order, one way or the other, so that its even
+/// steps keep the gaps between neighbours, and no text is drawn over another symbol (review of
+/// phase 2 of the quality review). Without groups, area picks the candidate; a swap of neighbours
+/// broke the order of the DISTRIBUTE, its row taken as [C4 R2 R3 R1 VIN], and the resolution
+/// dropped a gap: R1, R2, R3 and C4 two apart, R2's `100meg` over R1's body (S2). A random sweep
+/// found the same of `{#R1 #V2 #R0} @DISTRIBUTE("x")`, V2's `SIN(0 1 1meg)` over R0's body.
+#[test]
+fn the_members_of_a_distribute_keep_its_order_and_their_texts_clear() {
+    let s2 = "VIN in 0 DC 1\nR1 in 0 1\nR2 in 0 100meg\nR3 in 0 4.7k\nC4 in 0 10p\n\
+              * @RNL { {#R1 #R2 #R3 #C4} @DISTRIBUTE(\"x\"); {#R1 #R2 #R3 #C4} @ALIGN(\"y\"); $WIRE_NET_SET @ROUTE }\n";
+    let sweep = "R0 a 0 1k\nR1 a b 1k\nV2 b 0 SIN(0 1 1meg)\n\
+                 * @RNL { {#R1 #V2 #R0} @DISTRIBUTE(\"x\"); $WIRE_NET_SET @ROUTE }\n";
+    for (body, members) in [(s2, &["#R1", "#R2", "#R3", "#C4"][..]), (sweep, &["#R1", "#V2", "#R0"][..])] {
+        let (p, solved, e) = solve_text(&netlist(body));
+        let what = summary(&p, &solved, &e);
+        assert!(!e.placed.dropped.contains(&crate::search::RelKind::Gap), "{:?}\n{what}", e.placed.dropped);
+        // in the order of the DISTRIBUTE, one way or the other, apart
+        let xs: Vec<&Q> = members.iter().map(|m| &e.placed.origins[object(&p, m)][0]).collect();
+        let (up, down) = (xs.windows(2).all(|w| w[0] < w[1]), xs.windows(2).all(|w| w[0] > w[1]));
+        assert!(up || down, "{xs:?}\n{what}");
+        let ks: Vec<usize> = members.iter().map(|m| object(&p, m)).collect();
+        let row = e.candidate.rows.iter().find(|r| r.contains(&ks[0])).unwrap();
+        let places: Vec<usize> = ks.iter().filter_map(|k| row.iter().position(|j| j == k)).collect();
+        assert_eq!(places.len(), ks.len(), "{:?}\n{what}", e.candidate.rows);
+        assert!(
+            places.windows(2).all(|w| w[0] < w[1]) || places.windows(2).all(|w| w[0] > w[1]),
+            "{:?}\n{what}",
+            e.candidate.rows
+        );
+        // no text over another symbol: as the solver counts them, and each text as it is drawn
+        let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
+        assert_eq!(crate::score::texts_over(s, at, ori), 0, "{what}");
+        let texts = symbol_texts(&p, &e);
+        assert!(texts.len() >= 2 * members.len(), "{texts:?}\n{what}");
+        let meet = |a: &[Q; 4], b: &[Q; 4]| a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+        // a stub and its host go together
+        let host = |k: usize| s.objects[k].stub.as_ref().map(|stub| stub.host.0);
+        for &(k, ref t) in &texts {
+            for j in s.components().filter(|&j| j != k && host(j) != Some(k) && host(k) != Some(j)) {
+                let Some(b) = s.box_at(at, ori, j) else { continue };
+                assert!(!meet(t, &b), "{} over {}: {what}", p.objects[k].label, p.objects[j].label);
+            }
+        }
+    }
+}
