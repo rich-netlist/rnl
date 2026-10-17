@@ -20,7 +20,8 @@
 //!   characters long, broken only at spaces outside strings and brackets.
 //!
 //! Merging with records already in the file, `replace_own`, `base` and the refusal of ops that do
-//! not take effect come later; until then a netlist that has RNL records is refused.
+//! not take effect are set aside, as Analog Canvas, which writes with this crate, reads RNL into its
+//! own format and writes it anew: a netlist that has RNL records is refused.
 
 pub mod form;
 pub mod ops;

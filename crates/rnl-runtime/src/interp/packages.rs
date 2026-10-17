@@ -181,8 +181,9 @@ impl Interp<'_> {
     /// The standard package used implicitly for the files of the language version `language`
     /// (16.3): the newest version in the package directories of the standard series written in
     /// that version, as the header record of its `rnl-std` declares, so that a file of 0.2 uses
-    /// the series 0.2 and a file of 0.3 the series 0.3. Reading it reads the packages it
-    /// references.
+    /// the series 0.2 and a file of 0.3 the series 0.3; or the version that the reading asks for
+    /// ([`crate::Options::std_version`]), whatever the language version. Reading it reads the
+    /// packages it references.
     pub(crate) fn std_package(&mut self, language: &str) -> Option<UnitId> {
         if !self.std_enabled {
             return None;
@@ -199,30 +200,44 @@ impl Interp<'_> {
                 found.push(c.clone());
             }
         }
-        let written_in = |c: &(String, String, String)| version_key(&self.pkg_languages[&c.2]);
-        let want = version_key(language);
-        // the series written in the file's language version; without one, the one written in the
-        // nearest older version, which the tool reads too, else in the nearest newer one
-        let nearest = |older: bool| {
-            let side = found.iter().map(written_in).filter(|v| if older { *v < want } else { *v > want });
-            if older {
-                side.max()
-            } else {
-                side.min()
+        let chosen = if let Some(v) = self.std_version.clone() {
+            // a reading that asks for a version takes that one, whatever the language version of
+            // the file (16.3: the version of the standard package is the tool's default)
+            let c = found.iter().find(|c| c.1 == v).cloned();
+            if c.is_none() && !self.std_units.values().any(Option::is_none) {
+                self.sink.error(
+                    format!("the standard package rnl-std {v} that the reading asks for cannot be found, in the package directories or among the bundled packages: the files are read without a standard package (16.3)"),
+                    None,
+                );
             }
+            c
+        } else {
+            let written_in = |c: &(String, String, String)| version_key(&self.pkg_languages[&c.2]);
+            let want = version_key(language);
+            // the series written in the file's language version; without one, the one written in
+            // the nearest older version, which the tool reads too, else in the nearest newer one
+            let nearest = |older: bool| {
+                let side = found.iter().map(written_in).filter(|v| if older { *v < want } else { *v > want });
+                if older {
+                    side.max()
+                } else {
+                    side.min()
+                }
+            };
+            let series = [Some(want), nearest(true), nearest(false)].into_iter().flatten().find(|v| {
+                // a language version with a standard series in it
+                found.iter().any(|c| written_in(c) == *v)
+            });
+            // of that series the newest version
+            let mut best: Option<&(String, String, String)> = None;
+            for c in found.iter().filter(|c| Some(written_in(c)) == series) {
+                if best.is_none_or(|b| version_key(&c.1) > version_key(&b.1)) {
+                    best = Some(c);
+                }
+            }
+            best.cloned()
         };
-        let series = [Some(want), nearest(true), nearest(false)].into_iter().flatten().find(|v| {
-            // a language version with a standard series in it
-            found.iter().any(|c| written_in(c) == *v)
-        });
-        // of that series the newest version
-        let mut best: Option<&(String, String, String)> = None;
-        for c in found.iter().filter(|c| Some(written_in(c)) == series) {
-            if best.is_none_or(|b| version_key(&c.1) > version_key(&b.1)) {
-                best = Some(c);
-            }
-        }
-        let out = best.cloned().map(|(n, v, path)| {
+        let out = chosen.map(|(n, v, path)| {
             let key = (n, v);
             match self.packages.get(&key) {
                 Some(&u) => u,

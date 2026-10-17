@@ -48,6 +48,10 @@ pub struct Request {
     /// Use the standard package at the root (16.3); true when not given.
     #[serde(default = "yes")]
     pub std: bool,
+    /// The version of the standard package at the root, whatever the files' language version, such
+    /// as "0.2" ([`rnl_runtime::Options::std_version`]); by the language version when not given.
+    #[serde(default)]
+    pub std_version: Option<String>,
     /// Write each level's SVG; true when not given.
     #[serde(default = "yes")]
     pub svg: bool,
@@ -99,6 +103,8 @@ pub struct WriteRequest {
     pub package_dirs: Vec<String>,
     #[serde(default = "yes")]
     pub std: bool,
+    #[serde(default)]
+    pub std_version: Option<String>,
     #[serde(default = "yes")]
     pub svg: bool,
     #[serde(default)]
@@ -164,7 +170,7 @@ pub fn respond(request: &[u8]) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: request.dialect,
-        runtime: Options { std: request.std, ..Options::default() },
+        runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
@@ -196,7 +202,7 @@ fn write(request: WriteRequest) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: Some(request.write.dialect),
-        runtime: Options { std: request.std, ..Options::default() },
+        runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
@@ -349,6 +355,19 @@ C1 a 0 1p
 
     fn answer(request: Value) -> Value {
         serde_json::from_str(&respond_json(request.to_string().as_bytes())).unwrap()
+    }
+
+    #[test]
+    fn a_request_can_ask_for_a_version_of_the_standard_package() {
+        // a file of 0.3 that writes $GND of the series 0.2: an error, unless the request asks for it
+        let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { $GND @ATTACH &a }\n.end\n";
+        let errors = |request: Value| {
+            let v = answer(request);
+            let d = v["document"]["diagnostics"].as_array().unwrap().clone();
+            d.into_iter().filter(|d| d["severity"] == "error").count()
+        };
+        assert_eq!(errors(json!({ "entry": "t.sp", "files": { "t.sp": text } })), 1);
+        assert_eq!(errors(json!({ "entry": "t.sp", "files": { "t.sp": text }, "std_version": "0.2" })), 0);
     }
 
     #[test]

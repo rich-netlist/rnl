@@ -115,3 +115,21 @@ fn strip_generated_reads_the_bundled_packages_too() {
     let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/standard/0.2/rnl-std-symbols.rnl");
     assert_eq!(std::fs::read_to_string(out).unwrap(), std::fs::read_to_string(std).unwrap());
 }
+
+#[test]
+fn std_version_reads_a_file_with_another_standard_series() {
+    // a file of 0.3 that writes $GND of the series 0.2: an error that names $GROUND, and none when
+    // the series 0.2 is asked for
+    let dir = std::env::temp_dir().join(format!("rnl-cli-std-version-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("t.sp");
+    let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { $GND @ATTACH &a }\n.end\n";
+    std::fs::write(&file, text).unwrap();
+    let path = file.to_string_lossy();
+    let (code, out) = rnl(&["check", &path]);
+    assert_eq!(code, 1, "{out}");
+    assert!(out.contains("the standard series 0.3 calls it $GROUND"), "{out}");
+    let (code, out) = rnl(&["check", &path, "--std-version", "0.2"]);
+    assert_eq!(code, 0, "{out}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}

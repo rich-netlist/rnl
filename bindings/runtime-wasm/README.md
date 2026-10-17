@@ -75,6 +75,7 @@ A call writes the request as UTF-8 JSON, calls `rnl_build`, and reads the answer
 | `package_dirs` | The directories, among the paths of `files`, whose `.rnl` files are packages found by name (16.2). |
 | `dialect` | `"spice"` or `"spectre"`, instead of guessing from the entry. |
 | `std` | Whether the standard package is used at the root (16.3); true when not given. |
+| `std_version` | The version of the standard package at the root, whatever the files' language version, such as `"0.2"` to read a file of 0.3 with the series 0.2; a version pinned in a header record still comes first (16.3). By the language version when not given. |
 | `svg` | Whether each level's SVG is written; true when not given. |
 | `primitives` | Whether each level's primitives are given; false when not given. |
 | `status` | Whether each level gets its solve status, `solve`, what a frontend decides from whether to solve it ([`rnl-view`](../../crates/rnl-view/README.md)); false when not given. |
@@ -98,7 +99,7 @@ A request with a `write` field writes an edit transaction's ops into a netlist (
 }
 ```
 
-The netlist is the entry, under `/rnl-edit/netlist.sp`, or `.scs` for Spectre; a `file` in `write`, the name the netlist is saved under, such as `"file": "top.net"`, puts it under that name instead, so that a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to its `simulator lang=spectre`, and its header and records go where that reading keeps them (2.2). A request without it writes as before; `files`, `package_dirs`, `std`, `svg` and `primitives` are a build's. The answer is `{"written": {"text": "...", "document": ...}}`: the netlist with the records written, and its Document, whose `diagnostics` say how the records read. An op that cannot be written is `{"error": "op 3 (set): ..."}`.
+The netlist is the entry, under `/rnl-edit/netlist.sp`, or `.scs` for Spectre; a `file` in `write`, the name the netlist is saved under, such as `"file": "top.net"`, puts it under that name instead, so that a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to its `simulator lang=spectre`, and its header and records go where that reading keeps them (2.2). A request without it writes as before; `files`, `package_dirs`, `std`, `std_version`, `svg` and `primitives` are a build's. The answer is `{"written": {"text": "...", "document": ...}}`: the netlist with the records written, and its Document, whose `diagnostics` say how the records read. An op that cannot be written is `{"error": "op 3 (set): ..."}`.
 
 ## JavaScript modules
 
@@ -134,7 +135,7 @@ git push origin runtime-v0.1.0-preview.7
 
 Only versions with a pre-release suffix are published for now: a tag without one fails. A pull request that changes the package builds and checks it the same way, and so does the workflow run by hand, which publishes only with `dry_run` set to false on a `runtime-v` tag. The build runs in a job of its own, which cannot publish; the publishing job publishes the tarball the build packed.
 
-npm takes the publish by trusted publishing once the package's settings on npmjs.com name the repository `rich-netlist/rnl` and the workflow `publish-runtime.yml`. Until then a repository secret `NPM_TOKEN`, an npm access token that may publish to `@rich-netlist`, authenticates it, and the first publish can also be made by hand with two-factor authentication ([decision 0003](../../docs/decisions/0003-npm-scope.md)), from the tarball a run by hand leaves as its artifact. The workflow has no token written in it.
+npm takes the publish by trusted publishing: the package's settings on npmjs.com name the repository `rich-netlist/rnl` and the workflow `publish-runtime.yml`, so the workflow uses and stores no token ([decision 0003](../../docs/decisions/0003-npm-scope.md)). The first two previews, 0.1.0-preview.8 and 0.1.0-preview.9, were published with a one-off token, revoked since.
 
 A frontend installs the previews with
 

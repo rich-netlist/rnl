@@ -2,7 +2,7 @@
 
 The standard packages of RNL, one directory for each version of the standard series: [`0.2/`](0.2/) holds those of RNL 0.2, [`0.3/`](0.3/) those of the series 0.3. They are drafts: the language standard leaves the content of the standard package open, and names may change with it. Packages are found by the name and version their header record declares, not by file name (16.2), so the files of two versions can have the same names.
 
-A file uses the standard package `rnl-std` implicitly, the newest version the tool has of the series written in the language version of the file (16.3 of the language 0.3): a file of 0.2 uses the series 0.2 and a file of 0.3 the series 0.3. A version pinned in the header record of the file, or of a file that includes it, comes first, such as `@USE-PACKAGE(name="rnl-std", version="0.2")` in a file of 0.3 that keeps the names of 0.2.
+A file uses the standard package `rnl-std` implicitly, the newest version the tool has of the series written in the language version of the file (16.3 of the language 0.3): a file of 0.2 uses the series 0.2 and a file of 0.3 the series 0.3. A version pinned in the header record of the file, or of a file that includes it, comes first, such as `@USE-PACKAGE(name="rnl-std", version="0.2")` in a file of 0.3 that keeps the names of 0.2. A reading can also ask for a version, whatever the language version: `rnl --std-version 0.2`, or `std_version` in a request to the WebAssembly core. Where the series 0.3 is in effect, a name that only the series 0.2 has, such as `$GND`, cannot be found, and the error says the name of the series 0.3, `$GROUND`, or the package that has it now.
 
 ## 0.2
 

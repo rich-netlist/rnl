@@ -25,6 +25,9 @@ FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
 options:
   --package-dir DIR   look for packages in DIR as well (16.2); repeatable
   --no-std            do not use the standard package at the root (16.3)
+  --std-version V     use rnl-std V at the root, whatever the files' language version, such as 0.2
+                      to read a file of 0.3 with the series 0.2; a version pinned in a header
+                      record still comes first (16.3). rnl solve does not take it
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      spice or spectre, instead of guessing from the file
 view options:
@@ -67,6 +70,7 @@ struct Args {
     out: Option<PathBuf>,
     package_dirs: Vec<PathBuf>,
     std: bool,
+    std_version: Option<String>,
     generated: bool,
     dialect: Option<String>,
     svg: bool,
@@ -92,6 +96,7 @@ fn parse_args() -> Result<Args, String> {
     let mut out = None;
     let mut package_dirs = Vec::new();
     let mut std = true;
+    let mut std_version = None;
     let mut generated = true;
     let mut dialect = None;
     let (mut svg, mut primitives, mut status) = (true, false, false);
@@ -106,6 +111,7 @@ fn parse_args() -> Result<Args, String> {
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
             "--package-dir" => package_dirs.push(PathBuf::from(it.next().ok_or("--package-dir needs a directory")?)),
             "--no-std" => std = false,
+            "--std-version" => std_version = Some(it.next().ok_or("--std-version needs a version, such as 0.2")?),
             "--no-generated" => generated = false,
             "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
             "--no-svg" => svg = false,
@@ -129,6 +135,7 @@ fn parse_args() -> Result<Args, String> {
         out,
         package_dirs,
         std,
+        std_version,
         generated,
         dialect,
         svg,
@@ -163,7 +170,7 @@ fn main() -> ExitCode {
 
 /// The runtime's options the command line gives.
 fn options(args: &Args) -> Options {
-    Options { std: args.std, generated: args.generated, ..Options::default() }
+    Options { std: args.std, std_version: args.std_version.clone(), generated: args.generated, ..Options::default() }
 }
 
 fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, String> {
@@ -199,7 +206,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 .with_overrides(args.solver_options.as_deref().unwrap_or(""))
                 .map_err(|e| format!("--solver-options: {e}"))?
                 .canonical();
-            let options = Options { std: args.std, ..Options::solver() };
+            let options = Options { std: args.std, std_version: args.std_version.clone(), ..Options::solver() };
             let (r, previous) = if args.previous {
                 rnl_view::read_previous(&args.file.to_string_lossy(), args.dialect.as_deref(), &provider, &options)?
             } else {
