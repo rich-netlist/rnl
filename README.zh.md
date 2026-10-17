@@ -4,9 +4,9 @@
 
 RNL 写在电路网表的注释里，描述电路怎样画成原理图、各部分是什么意思；电路本身只由网表定义。本仓库存放这门语言的标准，今后会逐步加入可移植的 RNL 运行时、求解器、查看器、编辑器和标准符号库。
 
-**网站：[rich-netlist.github.io/rnl/zh](https://rich-netlist.github.io/rnl/zh/)**，有[写给电路设计者的介绍](https://rich-netlist.github.io/rnl/zh/)、[语言导览](https://rich-netlist.github.io/rnl/zh/language.html)、[语言标准 0.2](https://rich-netlist.github.io/rnl/zh/spec/0.2/)、画出每个符号的[标准包图库](https://rich-netlist.github.io/rnl/zh/packages.html)和[查看器](https://rich-netlist.github.io/rnl/zh/tools.html)：一个[在浏览器里用](https://rich-netlist.github.io/rnl/viewer/)，一个供 Windows 下载。每页都有英文版。
+**网站：[rich-netlist.github.io/rnl/zh](https://rich-netlist.github.io/rnl/zh/)**，有[写给电路设计者的介绍](https://rich-netlist.github.io/rnl/zh/)、[语言导览](https://rich-netlist.github.io/rnl/zh/language.html)、[语言标准 0.3](https://rich-netlist.github.io/rnl/zh/spec/0.3/)、画出每个符号的[标准包图库](https://rich-netlist.github.io/rnl/zh/packages.html)和[查看器](https://rich-netlist.github.io/rnl/zh/tools.html)：一个[在浏览器里用](https://rich-netlist.github.io/rnl/viewer/)，一个供 Windows 下载。每页都有英文版。
 
-**状态：** 本仓库存放 RNL 语言标准 0.2 版及其原则、项目文档，以及 RNL 工具链：从第一版 0.1 起，现在有了求解器的第一版（[`crates/rnl-solver`](crates/rnl-solver/README.md)）。工具链读取带 RNL 记录的 SPICE 和 Spectre 网表，报告诊断，生成有效模型，画出有坐标的部分，并能把记录写回网表；附带 `rnl` 命令（其中 `rnl solve` 把求解器的记录写进文件的副本或原文件），以及标准包和符号的草稿。原理图由一个共享核心决定（[决定 0008](docs/decisions/0008-shared-core-per-platform-frontends.md)）：它用随附的字体排字（[决定 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)），原生运行和编译成 WebAssembly 运行得到的结果完全相同（[`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)）。两个查看器共用一个页面（[`apps/viewer-ui`](apps/viewer-ui/README.md)）：Windows 桌面版（[`apps/desktop`](apps/desktop/README.md)）和网页版（[`apps/web`](apps/web/README.md)）；它们打开网表，画出各层，显示网表文本、诊断和层次结构，在原理图和文本之间跟随选中的实例或网络，列出没画出来的对象，还能改文本、应用后重画：桌面版保存时写回文件，网页版保存时下载（[决定 0011](docs/decisions/0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md)）。桌面版还能求解，结果作为预览，可以另存求解副本（[决定 0010](docs/decisions/0010-desktop-viewer-solves-as-a-preview.md)）；已发布的 0.1.0 版早于编辑和求解。还没有拖动器件的编辑器。语言的 0.x 各版本之间不承诺兼容。
+**状态：** 本仓库存放 RNL 语言标准 0.3 版（取代 0.2 版，工具仍能读 0.2 版的文件）及其原则、项目文档，以及 RNL 工具链：从第一版 0.1 起，现在有了求解器的第一版（[`crates/rnl-solver`](crates/rnl-solver/README.md)）。工具链读取带 RNL 记录的 SPICE 和 Spectre 网表，报告诊断，生成有效模型，画出有坐标的部分，并能把记录写回网表；附带 `rnl` 命令（其中 `rnl solve` 把求解器的记录写进文件的副本或原文件），以及标准包和符号的草稿。原理图由一个共享核心决定（[决定 0008](docs/decisions/0008-shared-core-per-platform-frontends.md)）：它用随附的字体排字（[决定 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)），原生运行和编译成 WebAssembly 运行得到的结果完全相同（[`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)）。两个查看器共用一个页面（[`apps/viewer-ui`](apps/viewer-ui/README.md)）：Windows 桌面版（[`apps/desktop`](apps/desktop/README.md)）和网页版（[`apps/web`](apps/web/README.md)）；它们打开网表，画出各层，显示网表文本、诊断和层次结构，在原理图和文本之间跟随选中的实例或网络，列出没画出来的对象，还能改文本、应用后重画：桌面版保存时写回文件，网页版保存时下载（[决定 0011](docs/decisions/0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md)）。桌面版还能求解，结果作为预览，可以另存求解副本（[决定 0010](docs/decisions/0010-desktop-viewer-solves-as-a-preview.md)）；已发布的 0.1.0 版早于编辑和求解。还没有拖动器件的编辑器。语言的 0.x 各版本之间不承诺兼容。
 
 本文是 [README.md](README.md) 的中文版，两者不一致时以英文版为准。仓库里的文档大多只有英文；有中文的是语言标准、原则、工具链架构提案和网站。
 
@@ -14,32 +14,32 @@ RNL 写在电路网表的注释里，描述电路怎样画成原理图、各部�
 
 ```spice
 * Five-transistor OTA, input stage
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.3")}
 .subckt ota5t inp inn out vdd vss vbias
 M1 x    inp   tail vss nch W=2u L=0.5u
 M2 out  inn   tail vss nch W=2u L=0.5u
 M5 tail vbias vss  vss nch W=4u L=1u
 * @RNL {
-*   %dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFPAIR;
+*   %dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR;
 *   {#M1 #M2} @ALIGN("y"), i.e., same y;
 *   #M5 is at @PLACE(20, 6) => it @ORIENT("R0");
-*   %g0 = $GND is @ATTACH to &vss;
+*   %g0 = $GROUND is @ATTACH to &vss;
 *   net &vss has a @WIRE connecting {#M5:3 %g0:p}
 * }
 .ends ota5t
 .end
 ```
 
-网表本身不变。注释里的这条记录说：M1 和 M2 是一个差分对（M1 担任角色 `in_p`，M2 担任 `in_n`），两者 y 相同；M5 放在哪里、朝向如何；网络 `vss` 加一个地符号，并有导线连到 M5。记号之间的 `and`、`treated`、`is at` 等词是自由文本：标准例句加上它们，让语句读起来像句子，它们不改变含义。标准的 [1.3 节](https://rich-netlist.github.io/rnl/zh/spec/0.2/#1.3)逐个解释了这些记号。
+网表本身不变。注释里的这条记录说：M1 和 M2 是一个差分对（M1 担任角色 `in_p`，M2 担任 `in_n`），两者 y 相同；M5 放在哪里、朝向如何；网络 `vss` 加一个地符号，并有导线连到 M5。记号之间的 `and`、`treated`、`is at` 等词是自由文本：标准例句加上它们，让语句读起来像句子，它们不改变含义。标准的 [1.3 节](https://rich-netlist.github.io/rnl/zh/spec/0.3/#1.3)逐个解释了这些记号。
 
 ## 语言标准
 
 | 内容 | 位置 |
 | --- | --- |
-| 网页 | [中文版](https://rich-netlist.github.io/rnl/zh/spec/0.2/)和[英文版](https://rich-netlist.github.io/rnl/en/spec/0.2/)（正式文本），各附 PDF 和 Markdown 下载 |
-| 每个修订的全部发布形式 | 标签为 `spec-0.2-r1`、`spec-0.2-r2`……的 [GitHub Releases](https://github.com/rich-netlist/rnl/releases)：PDF、单文件网页、Markdown、按章打包的 zip，以及 `SHA256SUMS` |
-| 仓库里的 Markdown | [`spec/rnl-0.2.zh.md`](spec/rnl-0.2.zh.md)（中文版）和 [`spec/rnl-0.2.md`](spec/rnl-0.2.md)（英文版，正式文本），由 [`spec/0.2/`](spec/README.md) 里的各章合成 |
-| 标准词表 | [`spec/rnl-words-0.2.json`](spec/rnl-words-0.2.json) 及其 [schema](spec/rnl-words.schema.json)，是标准的一部分 |
+| 网页 | [中文版](https://rich-netlist.github.io/rnl/zh/spec/0.3/)和[英文版](https://rich-netlist.github.io/rnl/en/spec/0.3/)（正式文本），各附 PDF 和 Markdown 下载；0.2 版仍在[中文版](https://rich-netlist.github.io/rnl/zh/spec/0.2/)和[英文版](https://rich-netlist.github.io/rnl/en/spec/0.2/) |
+| 每个修订的全部发布形式 | 标签为 `spec-0.3-r1`、`spec-0.2-r1`……的 [GitHub Releases](https://github.com/rich-netlist/rnl/releases)：PDF、单文件网页、Markdown、按章打包的 zip，以及 `SHA256SUMS` |
+| 仓库里的 Markdown | [`spec/rnl-0.3.zh.md`](spec/rnl-0.3.zh.md)（中文版）和 [`spec/rnl-0.3.md`](spec/rnl-0.3.md)（英文版，正式文本），由 [`spec/0.3/`](spec/README.md) 里的各章合成；0.2 版也留在旁边 |
+| 标准词表 | [`spec/rnl-words-0.3.json`](spec/rnl-words-0.3.json) 及其 [schema](spec/rnl-words.schema.json)，是标准的一部分 |
 | 原则 | [`spec/rich-netlist.zh.md`](spec/rich-netlist.zh.md)（中文版）和 [`spec/rich-netlist.md`](spec/rich-netlist.md)（英文版，以它为准） |
 
 所有形式都由同一个提交的各章生成，并标明各自的修订（[决定 0007](docs/decisions/0007-publishing-the-standard.md)）。语言各版本在研究仓库里讨论成形，再发布到这里（[决定 0006](docs/decisions/0006-language-versions-from-research-repository.md)）。
@@ -88,7 +88,7 @@ node apps/web/serve.mjs
 
 ## 下一步
 
-对照已发布的标准 0.2 正文核对工具链，记下它支持的范围；补充往返测试语料；让查看器能编辑 RNL 文本并重新绘制；定义求解器的输入和输出。[路线图](docs/roadmap.md)跟踪这些工作，不会把未完成的写成已完成。
+对照已发布的标准 0.3 正文核对工具链，记下它支持的范围；补充往返测试语料；让查看器能编辑 RNL 文本并重新绘制；定义求解器的输入和输出。[路线图](docs/roadmap.md)跟踪这些工作，不会把未完成的写成已完成。
 
 ## 许可证
 

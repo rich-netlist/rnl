@@ -4,40 +4,40 @@ English | [中文](README.zh.md)
 
 RNL is written in the comments of a circuit netlist. It describes how the circuit is drawn as a schematic and what its parts mean, while the netlist alone defines the circuit. This repository holds the language standard, and is intended to grow into a portable RNL runtime, solver, viewer, editor, and standard symbol library.
 
-**Website: [rich-netlist.github.io/rnl](https://rich-netlist.github.io/rnl/en/)**, with an [introduction for circuit designers](https://rich-netlist.github.io/rnl/en/), a [tour of the language](https://rich-netlist.github.io/rnl/en/language.html), the [language standard 0.2](https://rich-netlist.github.io/rnl/en/spec/0.2/), the [standard packages](https://rich-netlist.github.io/rnl/en/packages.html) with every symbol drawn, and the [viewers](https://rich-netlist.github.io/rnl/en/tools.html): one [in the browser](https://rich-netlist.github.io/rnl/viewer/) and one to download for Windows. Every page is also in Chinese.
+**Website: [rich-netlist.github.io/rnl](https://rich-netlist.github.io/rnl/en/)**, with an [introduction for circuit designers](https://rich-netlist.github.io/rnl/en/), a [tour of the language](https://rich-netlist.github.io/rnl/en/language.html), the [language standard 0.3](https://rich-netlist.github.io/rnl/en/spec/0.3/), the [standard packages](https://rich-netlist.github.io/rnl/en/packages.html) with every symbol drawn, and the [viewers](https://rich-netlist.github.io/rnl/en/tools.html): one [in the browser](https://rich-netlist.github.io/rnl/viewer/) and one to download for Windows. Every page is also in Chinese.
 
-**Status:** This repository holds the RNL language standard, version 0.2, with its principles and the project documents, and the RNL toolkit, from its first version, 0.1, with a first version of the solver ([`crates/rnl-solver`](crates/rnl-solver/README.md)). The toolkit reads SPICE and Spectre netlists with RNL records, reports diagnostics, builds the effective model, draws what has coordinates, and writes records back; it ships the `rnl` command, whose `rnl solve` writes the solver's records into a copy of the files or in place, and drafts of the standard package and its symbols. One shared core decides the drawing ([decision 0008](docs/decisions/0008-shared-core-per-platform-frontends.md)): it lays out text with the fonts it ships ([decision 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)) and gives the same Documents natively and as WebAssembly ([`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)). Two viewers show them with one page ([`apps/viewer-ui`](apps/viewer-ui/README.md)): a desktop viewer for Windows ([`apps/desktop`](apps/desktop/README.md)) and a web viewer ([`apps/web`](apps/web/README.md)); they open a netlist, draw its levels, show its text, diagnostics and hierarchy, follow an instance or a net between the drawing and the text, list the objects not drawn, and edit the text and apply it, saving into the files on the desktop and by a download on the web ([decision 0011](docs/decisions/0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md)). The desktop viewer also solves as a preview and saves a solved copy ([decision 0010](docs/decisions/0010-desktop-viewer-solves-as-a-preview.md)); its release 0.1.0 came before editing and solving. There is no editor yet that moves devices by dragging. Versions 0.x of the language make no promise of compatibility with each other.
+**Status:** This repository holds the RNL language standard, version 0.3, which replaces 0.2 (tools still read files of 0.2), with its principles and the project documents, and the RNL toolkit, from its first version, 0.1, with a first version of the solver ([`crates/rnl-solver`](crates/rnl-solver/README.md)). The toolkit reads SPICE and Spectre netlists with RNL records, reports diagnostics, builds the effective model, draws what has coordinates, and writes records back; it ships the `rnl` command, whose `rnl solve` writes the solver's records into a copy of the files or in place, and drafts of the standard package and its symbols. One shared core decides the drawing ([decision 0008](docs/decisions/0008-shared-core-per-platform-frontends.md)): it lays out text with the fonts it ships ([decision 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)) and gives the same Documents natively and as WebAssembly ([`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)). Two viewers show them with one page ([`apps/viewer-ui`](apps/viewer-ui/README.md)): a desktop viewer for Windows ([`apps/desktop`](apps/desktop/README.md)) and a web viewer ([`apps/web`](apps/web/README.md)); they open a netlist, draw its levels, show its text, diagnostics and hierarchy, follow an instance or a net between the drawing and the text, list the objects not drawn, and edit the text and apply it, saving into the files on the desktop and by a download on the web ([decision 0011](docs/decisions/0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md)). The desktop viewer also solves as a preview and saves a solved copy ([decision 0010](docs/decisions/0010-desktop-viewer-solves-as-a-preview.md)); its release 0.1.0 came before editing and solving. There is no editor yet that moves devices by dragging. Versions 0.x of the language make no promise of compatibility with each other.
 
 ## At a glance
 
 ```spice
 * Five-transistor OTA, input stage
-* @RNL(type="header") { @VERSION("0.2")}
+* @RNL(type="header") { @VERSION("0.3")}
 .subckt ota5t inp inn out vdd vss vbias
 M1 x    inp   tail vss nch W=2u L=0.5u
 M2 out  inn   tail vss nch W=2u L=0.5u
 M5 tail vbias vss  vss nch W=4u L=1u
 * @RNL {
-*   %dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFPAIR;
+*   %dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR;
 *   {#M1 #M2} @ALIGN("y"), i.e., same y;
 *   #M5 is at @PLACE(20, 6) => it @ORIENT("R0");
-*   %g0 = $GND is @ATTACH to &vss;
+*   %g0 = $GROUND is @ATTACH to &vss;
 *   net &vss has a @WIRE connecting {#M5:3 %g0:p}
 * }
 .ends ota5t
 .end
 ```
 
-The netlist is unchanged; the record in its comments says that M1 and M2 are a differential pair (M1 in the role `in_p`, M2 in `in_n`) and share one y, where M5 goes and how it is turned, and that the net `vss` gets a ground symbol wired to M5. Words between the tokens, such as `and`, `treated` and `is at`, are free text: the standard sentences add them so that statements read like sentences, and they do not change the meaning. Section [1.3 of the standard](https://rich-netlist.github.io/rnl/en/spec/0.2/#1.3) explains every token.
+The netlist is unchanged; the record in its comments says that M1 and M2 are a differential pair (M1 in the role `in_p`, M2 in `in_n`) and share one y, where M5 goes and how it is turned, and that the net `vss` gets a ground symbol wired to M5. Words between the tokens, such as `and`, `treated` and `is at`, are free text: the standard sentences add them so that statements read like sentences, and they do not change the meaning. Section [1.3 of the standard](https://rich-netlist.github.io/rnl/en/spec/0.3/#1.3) explains every token.
 
 ## The language standard
 
 | What | Where |
 | --- | --- |
-| Web page | [English](https://rich-netlist.github.io/rnl/en/spec/0.2/) (normative) and [Chinese](https://rich-netlist.github.io/rnl/zh/spec/0.2/), each with its PDF and Markdown downloads |
-| Every published form of a revision | The [GitHub releases](https://github.com/rich-netlist/rnl/releases) tagged `spec-0.2-r1`, `spec-0.2-r2`, …: PDF, single-file web page, Markdown, the chapters as a zip, and `SHA256SUMS` |
-| Markdown in this repository | [`spec/rnl-0.2.md`](spec/rnl-0.2.md) (English, normative) and [`spec/rnl-0.2.zh.md`](spec/rnl-0.2.zh.md) (Chinese), assembled from the chapters in [`spec/0.2/`](spec/README.md) |
-| Standard word list | [`spec/rnl-words-0.2.json`](spec/rnl-words-0.2.json) and its [schema](spec/rnl-words.schema.json), part of the standard |
+| Web page | [English](https://rich-netlist.github.io/rnl/en/spec/0.3/) (normative) and [Chinese](https://rich-netlist.github.io/rnl/zh/spec/0.3/), each with its PDF and Markdown downloads; version 0.2 stays at [English](https://rich-netlist.github.io/rnl/en/spec/0.2/) and [Chinese](https://rich-netlist.github.io/rnl/zh/spec/0.2/) |
+| Every published form of a revision | The [GitHub releases](https://github.com/rich-netlist/rnl/releases) tagged `spec-0.3-r1`, `spec-0.2-r1`, …: PDF, single-file web page, Markdown, the chapters as a zip, and `SHA256SUMS` |
+| Markdown in this repository | [`spec/rnl-0.3.md`](spec/rnl-0.3.md) (English, normative) and [`spec/rnl-0.3.zh.md`](spec/rnl-0.3.zh.md) (Chinese), assembled from the chapters in [`spec/0.3/`](spec/README.md); 0.2 is kept beside them |
+| Standard word list | [`spec/rnl-words-0.3.json`](spec/rnl-words-0.3.json) and its [schema](spec/rnl-words.schema.json), part of the standard |
 | Principles | [`spec/rich-netlist.md`](spec/rich-netlist.md) (English, authoritative) and [`spec/rich-netlist.zh.md`](spec/rich-netlist.zh.md) (Chinese) |
 
 Every form is built from the chapters of one commit and names its revision ([decision 0007](docs/decisions/0007-publishing-the-standard.md)). Language versions are worked out in a research repository and published here ([decision 0006](docs/decisions/0006-language-versions-from-research-repository.md)).
@@ -86,7 +86,7 @@ node apps/web/serve.mjs
 
 ## Next step
 
-Check the toolkit against the published text of standard 0.2 and record the profile it supports, add roundtrip corpora, let the viewers edit RNL text and redraw it, and define the solver's input and output. The [roadmap](docs/roadmap.md) tracks this work without presenting it as complete.
+Check the toolkit against the published text of standard 0.3 and record the profile it supports, add roundtrip corpora, let the viewers edit RNL text and redraw it, and define the solver's input and output. The [roadmap](docs/roadmap.md) tracks this work without presenting it as complete.
 
 ## License
 

@@ -425,6 +425,10 @@
     "output_kind": {
      "type": "string"
     },
+    "rewrites": {
+     "type": "string",
+     "description": "The kind of object that, given alone in the first slot, the statement rewrites instead of making a new object; the rewrite overrides by key, the object (5.8, 13.1). The slot takes it only alone, never in a set, besides the kinds it lists."
+    },
     "selects": {
      "type": "string",
      "description": "Selections: the kind of the members of the resulting set."
