@@ -721,7 +721,7 @@
     'UNION': ['<zh>去重的并集。</zh><en>A union without duplicates.</en>', '%u_set = %a_set and %b_set @UNION'],
     'VERSION': ['<zh>文件使用的语言版本。只写在头段记录里；不写就按工具默认的版本读。</zh><en>The language version of the file. Only in the header record; without it, the tool’s default version applies.</en>', '* @RNL(type="header") { @VERSION("0.3")}'],
     'ALIAS': ['<zh>给标准词或 $ 名字另起写法（代称），代称在前。只写在头段记录里。</zh><en>Declares another spelling (an alias) for a standard word or a $ name, alias first. Only in the header record.</en>', /*zh-CN*/'@ALIAS("@位于", "@PLACE")'/*/zh-CN*/],
-    'USE-ALIASES': ['<zh>加载代称包，如中文代称包 rnl-zh。只写在头段记录里。</zh><en>Loads an alias package, such as the Chinese package rnl-zh. Only in the header record.</en>', '@USE-ALIASES(name="rnl-zh")'],
+    'USE-ALIASES': ['<zh>加载代称包，如中文代称包 rnl-zh。只写在头段记录里。</zh><en>Loads an alias package, such as the Chinese package rnl-zh. Only in the header record.</en>', '@USE-ALIASES(name="rnl-zh", version="0.3")'],
     'DEVICE': ['<zh>给网表里没有定义的器件（如 PDK 器件）起端子名，之后就能写 #XM1:d。只写在头段记录里。</zh><en>Names the terminals of devices the netlist does not define, such as PDK devices, so #XM1:d works. Only in the header record.</en>', '@DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])'],
     'USE-PACKAGE': ['<zh>使用一个包：一组符号、样式、定义和规则，如某家公司的画图风格。</zh><en>Uses a package: a set of symbols, styles, definitions and rules, such as a company’s drawing style.</en>', '@USE-PACKAGE(name="acme-style", version="1.2")'],
     'PACKAGE': ['<zh>包文件在头段记录里声明自己的名字和版本；写电路时用不到。</zh><en>A package file declares its name and version in its header record; not needed when describing a circuit.</en>', '@PACKAGE(name="acme-style", version="1.2")']

@@ -222,7 +222,7 @@
     add('h0', '* 5T OTA');
     add('h1', '.model nch nmos level=1 vto=0.5');
     add('h2', '.model pch pmos level=1 vto=-0.5');
-    if (k === 2 && stage >= 1) add('hz', '* @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh")}');
+    if (k === 2 && stage >= 1) add('hz', '* @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh", version="0.3")}');
     add('h3', '.subckt ota5t inp inn out vdd vss vbias', stage <= 1 ? 'P_inp P_inn P_out P_vb P_vdd P_vss' : 'P_inp P_inn P_out P_vb');
     add('m1', 'M1 x    inp   tail vss nch W=2u L=0.5u', 'M1');
     add('m2', 'M2 out  inn   tail vss nch W=2u L=0.5u', 'M2');

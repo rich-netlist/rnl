@@ -926,7 +926,7 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
       <div class="way"><span class="k"><zh>只写记号</zh><en>Notation</en></span><code data-hl="%dp1 = #M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR;"></code></div>
       <div class="way"><span class="k"><zh>英文例句</zh><en>English</en></span><code data-hl="%dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR;"></code></div>
       <div class="way"><span class="k"><zh>中文例句</zh><en>Chinese</en></span><code lang="zh-CN" data-hl='%dp1 = #M1(正输入) 和 #M2(负输入) @视作 $"差分对";'></code></div>
-      <p class="way-note"><svg class="ico"><use href="#i-info"/></svg><span><zh>中文写法要在文件开头的头段记录里加载代称包 rnl-zh：</zh><en>For Chinese, load the alias package rnl-zh in the header record at the top of the file: </en><code data-hl='* @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh")}'></code></span></p>
+      <p class="way-note"><svg class="ico"><use href="#i-info"/></svg><span><zh>中文写法要在文件开头的头段记录里加载代称包 rnl-zh：</zh><en>For Chinese, load the alias package rnl-zh in the header record at the top of the file: </en><code data-hl='* @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh", version="0.3")}'></code></span></p>
     </div>
 
     <h3 class="sub-h"><zh>引用记号</zh><en>Reference sigils</en></h3>
@@ -1157,8 +1157,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
         </details>
         <details>
           <summary><zh>可以用中文写 RNL 吗？</zh><en>Can RNL be written in Chinese?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>可以。关键字和标准包里的名字都有中文代称，在文件头段记录里写 <code>@USE-ALIASES(name="rnl-zh")</code> 就能用，比如 <code lang="zh-CN">#M1 @位于(10, 20)</code>。代称只是另一种拼写：中英文写法可以混用，机器读到的完全相同；头段记录本身总按标准写法读。</zh>
-            <en>Yes. Keywords and the names in the standard package have Chinese aliases; write <code>@USE-ALIASES(name="rnl-zh")</code> in the file’s header record and use them, as in <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is only another spelling: the two can be mixed, and machines read exactly the same thing; the header record itself is always read in standard spelling.</en></p>
+          <p><zh>可以。关键字和标准包里的名字都有中文代称，在文件头段记录里写 <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> 就能用，比如 <code lang="zh-CN">#M1 @位于(10, 20)</code>。代称只是另一种拼写：中英文写法可以混用，机器读到的完全相同；头段记录本身总按标准写法读。</zh>
+            <en>Yes. Keywords and the names in the standard package have Chinese aliases; write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the file’s header record and use them, as in <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is only another spelling: the two can be mixed, and machines read exactly the same thing; the header record itself is always read in standard spelling.</en></p>
         </details>
         <details>
           <summary><zh>现在能用吗？</zh><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>

@@ -1138,14 +1138,14 @@
   var HDR = [
     [['* ', ''], ['@RNL(type="header")', 'rec'], [' {', '']],
     [['*   ', ''], ['@VERSION("0.3")', 'ver'], [';', '']],
-    [['*   ', ''], ['@USE-ALIASES(name="rnl-zh")', 'ali'], [';', '']],
+    [['*   ', ''], ['@USE-ALIASES(name="rnl-zh", version="0.3")', 'ali'], [';', '']],
     [['*   ', ''], ['@DEVICE(name="XM*", model="sky130_fd_pr__nfet_*", terminals=["d", "g", "s", "b"])', 'dev']],
     [['* ', ''], ['}', '']]
   ];
   var HDR_TIP = {
     rec: ['type="header"', '<zh>这是头段记录：文件的第一条记录，在子电路之外，至多一条。它总按标准写法读，里面不认代称。</zh><en>This is the header record: the file’s first record, outside any subcircuit, at most one. It is always read in standard spelling, without aliases.</en>'],
     ver: ['@VERSION', '<zh>文件使用的语言版本。不写时按工具默认的版本读，工具保存文件时会补上。</zh><en>The language version of the file. Without it the tool’s default version applies, and tools add it when they save the file.</en>'],
-    ali: ['@USE-ALIASES', '<zh>加载代称包。rnl-zh 给关键字、参数名和标准包里的名字起了中文代称，之后的记录里中英文写法可以混用；可以加 version= 钉住它的版本。</zh><en>Loads an alias package. rnl-zh gives Chinese spellings to keywords, parameter names and the names in the standard package, so later records may mix both; version= pins its version.</en>'],
+    ali: ['@USE-ALIASES', '<zh>加载代称包。rnl-zh 给关键字、参数名和标准包里的名字起了中文代称，之后的记录里中英文写法可以混用。version= 写明用哪一版：不写就用找到的最新一版，以后出了新版，读法可能跟着变。</zh><en>Loads an alias package. rnl-zh gives Chinese spellings to keywords, parameter names and the names in the standard package, so later records may mix both. version= says which version: without it the newest found is used, and a later version could change how the file reads.</en>'],
     dev: ['@DEVICE', '<zh>给网表里没有定义的器件起端子名：名字匹配 XM*、模型匹配 sky130_fd_pr__nfet_* 的元件，端子依次叫 d、g、s、b。</zh><en>Names the terminals of devices the netlist does not define: instances whose name matches XM* and model matches sky130_fd_pr__nfet_* get the terminals d, g, s and b, in order.</en>']
   };
 
