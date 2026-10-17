@@ -959,8 +959,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
         <en>Names the object the statement makes, so %g0 can be used later, for example to place it; =&gt; %g0 at the end does the same.</en></p></div>
       <div class="shape"><span class="k"><zh>管道</zh><en>Pipe</en></span><code data-hl='#M2 @PLACE(30, 20) =&gt; @ORIENT("MY")'></code><p><zh>前一段的结果交给后一段：先放好位置，再左右镜像。</zh>
         <en>Each part passes its result to the next: place it first, then mirror it left to right.</en></p></div>
-      <div class="shape"><span class="k"><zh>记录</zh><en>Record</en></span><code data-hl='* @RNL(author="rnl-solver", priority="high") { #M1 @PLACE(12, 20); #M2 @PLACE(28, 20)}'></code><p><zh>一段记录，语句用分号分开。记录头作用于里面每一句：author 说明谁写的，priority 是它们的优先级。</zh>
-        <en>One record, statements separated by semicolons. The header applies to every statement inside: author says who wrote it, priority gives their priority.</en></p></div>
+      <div class="shape"><span class="k"><zh>记录</zh><en>Record</en></span><code data-hl='* @RNL(author="rnl-solver", priority="high") { #M1 @PLACE(12, 20); #M2 @PLACE(28, 20)}'></code><p><zh>一段记录，语句用分号分开。记录头作用于里面每一句：author 说明谁写的，priority 是它们默认的优先级；只有 AS 和 ATTACH 例外，它们只随 disabled 一起关掉。</zh>
+        <en>One record, statements separated by semicolons. The header applies to every statement inside: author says who wrote it, priority gives their default priority, except to AS and ATTACH, which follow it only when it is disabled.</en></p></div>
     </div>
 
     <h3 class="sub-h"><zh>关键字家族</zh><en>Keyword families</en></h3>
