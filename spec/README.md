@@ -13,6 +13,6 @@ The RNL language standard and principles.
 
 Language versions are worked out in the maintainer's research repository and published here as consolidated texts ([decision 0006](../docs/decisions/0006-language-versions-from-research-repository.md)).
 
-Each revision of the standard is published by a tag such as `spec-0.2-r1`. Its GitHub release carries, for English and Chinese, the combined Markdown, the chapters as a zip, a single-file web page and a PDF; the project site shows the web pages, in [English](https://rich-netlist.github.io/rnl/en/spec/0.2/) and [Chinese](https://rich-netlist.github.io/rnl/spec/0.2/). All of them are built from the chapters of the same commit, and each names its revision ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). The earlier syntax draft 0.1-draft.2 is superseded by 0.2; it remains in the Git history.
+Each revision of the standard is published by a tag such as `spec-0.2-r1`. Its GitHub release carries, for English and Chinese, the combined Markdown, the chapters as a zip, a single-file web page and a PDF; the project site shows the web pages, in [English](https://rich-netlist.github.io/rnl/en/spec/0.2/) and [Chinese](https://rich-netlist.github.io/rnl/zh/spec/0.2/). All of them are built from the chapters of the same commit, and each names its revision ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). The earlier syntax draft 0.1-draft.2 is superseded by 0.2; it remains in the Git history.
 
 See the [roadmap](../docs/roadmap.md) for planned work.

@@ -15,8 +15,10 @@ Input, the spec/ folder of the repository (or --spec DIR), with a folder for eac
 
 Output, for each version, in English and Chinese, all from the same chapters and with the same revision
 label: the combined Markdown, the chapters as a zip, one web page, a PDF, and SHA256SUMS. With --site, the
-Chinese page of version V goes to DIR/spec/V/ and the English one to DIR/en/spec/V/, each with its
-downloads; DIR/spec/ and DIR/en/spec/ lead to the newest version, and each page links to the others.
+Chinese page of version V goes to DIR/zh/spec/V/ and the English one to DIR/en/spec/V/, each with its
+downloads; DIR/zh/spec/ and DIR/en/spec/ lead to the newest version, and each page links to the others.
+The Chinese pages of the versions in MOVED_ZH were at DIR/spec/V/ until the Chinese pages of the site
+moved to zh/; their old addresses, and DIR/spec/, lead to the new ones, and their downloads are copied there.
 Next to the page of V go the pages that compare it with each earlier version W, compare-W.html, which
 mark what was added and what was removed (specdiff.py).
 
@@ -77,7 +79,7 @@ LANGS = {
            "files": "Files", "file": "File", "content": "Content", "versions": "Versions: ",
            "label": "Version {v} · {state} ({date}, {commit})", "released": "revision {n}",
            "after": "revision {n} + later changes", "draft": "not released", "dirty": " + uncommitted changes",
-           "site_dir": "en/spec/{v}", "site_other": "../../../spec/{v}/",
+           "site_dir": "en/spec/{v}", "site_other": "../../../zh/spec/{v}/",
            "compare": "compare with {w}", "compare_title": "RNL {v} compared with {w}",
            "compared": "Compared with {label}:", "added": "added", "removed": "removed",
            "list_changed": "Changed", "list_added": "Added", "list_removed": "Removed", "front": "beginning",
@@ -86,19 +88,22 @@ LANGS = {
     "zh": {"suffix": ".zh", "html_lang": "zh-CN", "other": "en", "other_label": "EN", "contents": "目录",
            "zip_label": "Markdown 分章包", "md_label": "Markdown 合订本", "sums_label": "SHA-256 校验值",
            "intro": "介绍", "tour": "语言导览", "spec": "标准", "packages": "标准包", "tools": "工具", "pages": "页面",
-           "kicker": "Rich Netlist 语言标准", "theme_dark": "切换到深色", "theme_light": "切换到浅色", "site_home": "",
+           "kicker": "Rich Netlist 语言标准", "theme_dark": "切换到深色", "theme_light": "切换到浅色", "site_home": "zh/",
            "body_font": "Noto+Sans+SC:wght@400;500;700;900",
            "foot": "标准文本按 CC-BY-4.0 许可发布。本文是中文译本，以英文版为准。",
            "files": "文件", "file": "文件", "content": "内容", "versions": "版本：",
            "label": "{v} 版 · {state}（{date}，{commit}）", "released": "修订 {n}",
            "after": "修订 {n} 之后的修改", "draft": "未发布", "dirty": " + 未提交的修改",
-           "site_dir": "spec/{v}", "site_other": "../../en/spec/{v}/",
+           "site_dir": "zh/spec/{v}", "site_other": "../../../en/spec/{v}/",
            "compare": "与 {w} 对比", "compare_title": "RNL {v} 与 {w} 对比",
            "compared": "与 {label}对比：", "added": "新增", "removed": "删除",
            "list_changed": "改动", "list_added": "新增", "list_removed": "删掉", "front": "开头",
            "annex": "附录 {a}", "changes": "改动", "prev": "上一处改动", "next": "下一处改动",
            "only": "只看改动"},
 }
+# The versions whose Chinese pages were published at spec/V/, at the root of the site, until the Chinese
+# pages moved to zh/ on 2026-10-18 (site/build.py); later versions have only the addresses under zh/.
+MOVED_ZH = ("0.2",)
 VERSION_DIR = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)")  # a version folder of spec/, such as 0.2 (16.1)
 STAMP = re.compile(r"^<!-- translated from en/(\S+) sha256:([0-9a-f]{12}) -->\n")
 FENCE = re.compile(r"^([ \t]*)```([\w-]+)((?:[ \t]+\S+)+)[ \t]*$", re.M)
@@ -458,16 +463,37 @@ def write_sums(d: Path) -> None:
     (d / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
-def write_redirect(d: Path, lang: str, newest: str) -> None:
-    """d/index.html, which leads to the page of the newest version and keeps the section of the address."""
+def redirect(path: Path, lang: str, v: str, target: str) -> None:
+    """A page of version v at path that leads to target, relative to it, and keeps the query and the section
+    of the address."""
     L = LANGS[lang]
     html = (f'<!doctype html>\n<html lang="{L["html_lang"]}">\n<head>\n<meta charset="utf-8">\n'
-            f'<title>RNL {newest} · {L["kicker"]}</title>\n<link rel="canonical" href="{newest}/">\n'
-            f'<meta http-equiv="refresh" content="0; url={newest}/">\n'
-            f'<script>location.replace("{newest}/" + location.hash)</script>\n</head>\n'
-            f'<body><p><a href="{newest}/">RNL {newest}</a></p></body>\n</html>\n')
-    d.mkdir(parents=True, exist_ok=True)
-    (d / "index.html").write_text(html, encoding="utf-8", newline="\n")
+            f'<title>RNL {v} · {L["kicker"]}</title>\n<link rel="canonical" href="{target}">\n'
+            f'<meta http-equiv="refresh" content="0; url={target}">\n'
+            f'<script>location.replace("{target}" + location.search + location.hash)</script>\n</head>\n'
+            f'<body><p><a href="{target}">RNL {v}</a></p></body>\n</html>\n')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8", newline="\n")
+
+
+def write_redirect(d: Path, lang: str, newest: str, base: str = "") -> None:
+    """d/index.html, which leads to the page of the newest version, under base, and keeps the section of
+    the address."""
+    redirect(d / "index.html", lang, newest, f"{base}{newest}/")
+
+
+def write_moved(site: Path, v: str) -> None:
+    """The old addresses of the Chinese pages of version v, site/spec/v/: each page leads to the same page
+    under zh/ and keeps the section of the address, so that spec/0.2/#1.3 opens zh/spec/0.2/#1.3; the
+    downloads, which no page can stand in for, are copied."""
+    new = LANGS["zh"]["site_dir"].format(v=v)
+    old = site / "spec" / v
+    old.mkdir(parents=True, exist_ok=True)
+    for f in sorted((site / new).iterdir()):
+        if f.suffix == ".html":
+            redirect(old / f.name, "zh", v, f"../../{new}/" + ("" if f.name == "index.html" else f.name))
+        else:
+            shutil.copyfile(f, old / f.name)
 
 
 # --- main ----------------------------------------------------------------------------------------
@@ -563,10 +589,14 @@ def main(argv: list[str]) -> int:
                         print(f"built {v} compared with {w}, {lang}: " +
                               ", ".join(f"{len(found[k])} sections {k}" for k in ("changed", "added", "removed")))
                     write_sums(d)
+                    if lang == "zh" and v in MOVED_ZH:
+                        write_moved(args.site, v)
                 print(f"built {v} {lang}: {revision_label(lang, v, rev)}")
         if args.site:
             for lang in LANGS:
                 write_redirect(args.site / Path(LANGS[lang]["site_dir"].format(v="")), lang, all_versions[-1])
+            # spec/, which led to the newest Chinese page before it moved
+            write_redirect(args.site / "spec", "zh", all_versions[-1], "../" + LANGS["zh"]["site_dir"].format(v=""))
     except Failed as e:
         print(e)
         return 1

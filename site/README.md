@@ -7,7 +7,7 @@ Four static pages, in Chinese and English, for circuit designers who have not wo
 - `tools.html`, the page of the tools: what the viewers of the first toolkit, 0.1, do; the web viewer, with a few samples to open in it; the desktop viewer for Windows, with the files of its newest release; and their licences.
 - `packages.html`, the gallery of the standard packages: every package in [`libraries/`](../libraries/README.md), with what it is for, what it references and its text, every symbol as the core draws it, with its pins and box, and the rules that give elements their symbols ([The gallery](#the-gallery-of-the-standard-packages)).
 
-The site also publishes the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of both languages link to, with the conformance corpus as its samples; the pages of the language standard, at `spec/0.2/`; and the gallery's data, at `gallery/`. [`pages.yml`](../.github/workflows/pages.yml) adds them to what `build.py` writes.
+The site also publishes the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of both languages link to, with the conformance corpus as its samples; the pages of the language standard, at `zh/spec/0.2/` and `en/spec/0.2/`; and the gallery's data, at `gallery/`. [`pages.yml`](../.github/workflows/pages.yml) adds them to what `build.py` writes.
 
 **Status:** an explainer, not a specification. The RNL snippets follow language draft 0.2 (2026-10-12), which has since been consolidated into the language standard 0.2 in [`spec/`](../spec/README.md); the pages say so and link to it. The snippets have been checked with the RNL interpreter prototype, which lives in a research repository that is not public yet. Layouts in the drawings are placed by hand, not produced by a solver; the symbols of the gallery are drawn by the core.
 
@@ -72,7 +72,7 @@ python site/build.py --zip rnl-intro.zip   # also pack the built site
 python site/build.py --viewer-version 0.1.0   # link the files of the desktop viewer 0.1.0
 ```
 
-Then open `site/dist/index.html` (Chinese) or `site/dist/en/index.html` (English) in a browser, or serve `site/dist/` with any static server; `language.html` and `tools.html` sit next to each `index.html`. Fonts load from Google Fonts and fall back to system fonts offline.
+Then open `site/dist/zh/index.html` (Chinese) or `site/dist/en/index.html` (English) in a browser, or serve `site/dist/` with any static server, where the root leads to the pages in the browser's language; `language.html` and `tools.html` sit next to each `index.html`. Fonts load from Google Fonts and fall back to system fonts offline.
 
 The web viewer is not written by `build.py`. To look at the pages with it, build it as `pages.yml` does and copy it in, then serve `site/dist/` with a server that sends `.wasm` as `application/wasm` and `.js` as JavaScript, such as Python's; the viewer only runs when served, not from the disk:
 
@@ -94,14 +94,29 @@ node --test site/gallery/package-file.test.mjs   # the tests of reading package 
 
 | Output in `site/dist/` | Content |
 | --- | --- |
-| `index.html`, `language.html`, `tools.html`, `packages.html`, `assets/` | Chinese pages, at the site root |
+| `zh/index.html`, `zh/language.html`, `zh/tools.html`, `zh/packages.html`, `zh/assets/` | Chinese pages |
 | `en/index.html`, `en/language.html`, `en/tools.html`, `en/packages.html`, `en/assets/` | English pages |
+| `index.html` | The root of the site: it leads to `zh/` when the browser's first language is Chinese, and to `en/` otherwise or without scripts ([Addresses](#addresses)). |
+| `language.html`, `tools.html`, `packages.html`, `rnl-*-standalone.html` | The old addresses of the Chinese pages, which were at the root until 2026-10-18 ([Addresses](#addresses)): each leads to the same page under `zh/`. |
 | `gallery/` | The gallery's data, for both languages: `index.js`, the groups, and one script per group, such as `standard-0.2.js`. Not written by `build.py`: `pages.yml` writes it with `node site/gallery/build.mjs`, after building the web viewer and so the core. |
-| `spec/<version>/`, `en/spec/<version>/`, and `spec/`, `en/spec/` | The language standard: for each version in `spec/`, one page per language with its PDF and Markdown downloads, and next to it the pages that compare it with each earlier version, such as `compare-0.2.html`; `spec/` and `en/spec/` lead to the newest version, which the top bar links to. Not written by `build.py`: [`pages.yml`](../.github/workflows/pages.yml) adds them with `python scripts/spec/build.py --site site/dist` ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). |
+| `zh/spec/<version>/`, `en/spec/<version>/`, and `zh/spec/`, `en/spec/` | The language standard: for each version in `spec/`, one page per language with its PDF and Markdown downloads, and next to it the pages that compare it with each earlier version, such as `compare-0.2.html`; `zh/spec/` and `en/spec/` lead to the newest version, which the top bar links to. The old addresses of the Chinese pages of 0.2, `spec/0.2/` and `spec/`, lead to them, and the downloads are copied there. Not written by `build.py`: [`pages.yml`](../.github/workflows/pages.yml) adds them with `python scripts/spec/build.py --site site/dist` ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). |
 | `viewer/` | The web viewer with its samples, one copy for both languages, its interface in English. Not written by `build.py`: `pages.yml` builds it with `node apps/web/build.mjs --samples` and copies `apps/web/dist/` here. |
-| `rnl-intro-standalone.html`, `rnl-language-standalone.html`, `rnl-tools-standalone.html`, and the same under `en/` | Single-file pages with the styles and scripts inlined; their links to the other pages, the languages and the web viewer point to the published site |
+| `zh/rnl-intro-standalone.html`, `zh/rnl-language-standalone.html`, `zh/rnl-tools-standalone.html`, and the same under `en/` | Single-file pages with the styles and scripts inlined; their links to the other pages, the languages and the web viewer point to the published site |
 
-[`pages.yml`](../.github/workflows/pages.yml) publishes `site/dist/` to GitHub Pages, at <https://rich-netlist.github.io/rnl/>, whenever `site/`, `spec/` or `scripts/spec/` changes on `main`, or what the web viewer is built from, the package files in `libraries/` among it; after a revision of the standard is released; and after a release of the desktop viewer. The web viewer is at <https://rich-netlist.github.io/rnl/viewer/>. The language switch keeps the reader on the same section.
+[`pages.yml`](../.github/workflows/pages.yml) publishes `site/dist/` to GitHub Pages, at <https://rich-netlist.github.io/rnl/>, which leads to the Chinese pages at <https://rich-netlist.github.io/rnl/zh/> or the English ones at <https://rich-netlist.github.io/rnl/en/> by the browser's language, whenever `site/`, `spec/` or `scripts/spec/` changes on `main`, or what the web viewer is built from, the package files in `libraries/` among it; after a revision of the standard is released; and after a release of the desktop viewer. The web viewer is at <https://rich-netlist.github.io/rnl/viewer/>. The language switch keeps the reader on the same section.
+
+### Addresses
+
+Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `index.html`, leads to `zh/` when the browser's first language (`navigator.languages[0]`, else `navigator.language`) is Chinese, `zh` or `zh-…` such as `zh-CN`, `zh-TW` or `zh-Hans`, and to `en/` otherwise, keeping the query and the section of the address; without scripts, a refresh in `<noscript>` leads to `en/`, and the page links both. It names `zh/` and `en/` as its alternates (`hreflang`), `en/` as the default (`x-default`). Until 2026-10-18 the Chinese pages were at the root; their old addresses still work, since GitHub Pages has no redirects of its own: each is a page that leads to the new address with the query and the section of the old one, at once by a script, or by a refresh where scripts do not run. The pages of the standard keep theirs the same way ([`scripts/spec`](../scripts/spec/README.md)), and the downloads of 0.2 are copies at their old addresses, since no page can stand in for a PDF.
+
+| Old address | New address |
+| --- | --- |
+| `/rnl/` | `/rnl/zh/` when the browser's first language is Chinese, else `/rnl/en/` |
+| `/rnl/language.html`, `tools.html`, `packages.html` | `/rnl/zh/language.html`, `tools.html`, `packages.html` |
+| `/rnl/rnl-intro-standalone.html` and the other two | `/rnl/zh/rnl-intro-standalone.html` and the other two |
+| `/rnl/spec/` | `/rnl/zh/spec/0.2/`, the newest version |
+| `/rnl/spec/0.2/`, such as `/rnl/spec/0.2/#1.3` | `/rnl/zh/spec/0.2/`, such as `/rnl/zh/spec/0.2/#1.3` |
+| `/rnl/spec/0.2/rnl-0.2.zh.pdf`, `.zh.md`, `.zh-chapters.zip`, `SHA256SUMS` | copies of `/rnl/zh/spec/0.2/…` |
 
 ## Files
 

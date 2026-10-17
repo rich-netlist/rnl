@@ -150,7 +150,7 @@ The web shell builds with the core as WebAssembly in a module Worker, one for th
 
 | Field | |
 | --- | --- |
-| `id` | What `command(id)` runs. `exit` and `about` are the platform's own: the desktop app quits, or shows its About box; the page runs `about` through the shell's `about()`, which the web shell has, or shows a plain About box when the shell has none and the page shows the menu bar. `desktop-viewer`, which only the web offers, shows the project site's page of the tools, where the desktop viewer is downloaded, with the shell's `browse(url)`: [the English page](https://rich-netlist.github.io/rnl/en/tools.html) when the browser's languages put English before Chinese, else [the Chinese one](https://rich-netlist.github.io/rnl/tools.html). |
+| `id` | What `command(id)` runs. `exit` and `about` are the platform's own: the desktop app quits, or shows its About box; the page runs `about` through the shell's `about()`, which the web shell has, or shows a plain About box when the shell has none and the page shows the menu bar. `desktop-viewer`, which only the web offers, shows the project site's page of the tools, where the desktop viewer is downloaded, with the shell's `browse(url)`: [the Chinese page](https://rich-netlist.github.io/rnl/zh/tools.html) when the browser's languages put Chinese before English, else [the English one](https://rich-netlist.github.io/rnl/en/tools.html), the site's default. |
 | `label` | The text, with `&` before the underlined letter. |
 | `keys` | The keys that run it, written like `Ctrl+Shift+M`, `F5` or `Enter`; Ctrl stands for Cmd on macOS. The first is the native menu's accelerator. |
 | `shown` | How menus show the keys, when not as the first of them. |

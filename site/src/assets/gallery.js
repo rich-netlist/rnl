@@ -13,7 +13,7 @@
   var $ = P.$, $$ = P.$$, esc = C.esc, fill = P.fill;
 
   /* Where the data is, from a page of either language */
-  var DATA = '<zh>gallery/</zh><en>../gallery/</en>';
+  var DATA = '../gallery/';
   var REPO = 'https://github.com/rich-netlist/rnl/blob/main/';
 
   /* What each package is for, in both languages; a package without a line here shows the comment
