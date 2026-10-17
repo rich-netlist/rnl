@@ -376,7 +376,10 @@ fn a_name_of_the_series_0_2_is_told_its_name_in_the_series_0_3() {
     let files = MemoryProvider::new().with("t.sp", &netlist("0.3", "", record));
     let e = errors(&read(&files, "t.sp", &Options::default()));
     let has = |s: &str| e.iter().any(|m| m.contains(s));
-    assert!(has("$GND cannot be found: the standard series 0.3 calls it $GROUND; write that, or pin the series 0.2"), "{e:?}");
+    assert!(
+        has("$GND cannot be found: the standard series 0.3 calls it $GROUND; write that, or pin the series 0.2"),
+        "{e:?}"
+    );
     assert!(has("$RES cannot be found: the standard series 0.3 calls it $RESISTOR"), "{e:?}");
     assert!(has("$OPAMP cannot be found: the standard series 0.3 has it in rnl-std-functional"), "{e:?}");
     assert!(

@@ -219,8 +219,12 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 .with_overrides(args.solver_options.as_deref().unwrap_or(""))
                 .map_err(|e| format!("--solver-options: {e}"))?
                 .canonical();
-            let options =
-                Options { std: args.std, std_version: args.std_version.clone(), draft: args.draft, ..Options::solver() };
+            let options = Options {
+                std: args.std,
+                std_version: args.std_version.clone(),
+                draft: args.draft,
+                ..Options::solver()
+            };
             let (r, previous) = if args.previous {
                 rnl_view::read_previous(&args.file.to_string_lossy(), args.dialect.as_deref(), &provider, &options)?
             } else {
