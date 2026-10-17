@@ -530,9 +530,9 @@ fn a_solve_puts_the_tails_under_the_middle_and_leaves_nothing_unsolved() {
     let files = MemoryProvider::new().with("/w/t.sp", &netlist("0.3", "", body));
     let options = SolveOptions { solver: SolverOptions::without_time_limit(), ..SolveOptions::default() };
     let run = solve(Path::new("/w/t.sp"), &files, &options).unwrap();
-    let level = &run.levels[0];
-    assert!(level.written.unsolved.is_empty(), "{:?}", level.written.unsolved);
-    let lines = report(level, true);
+    let lv = &run.levels[0];
+    assert!(lv.written.unsolved.is_empty(), "{:?}", lv.written.unsolved);
+    let lines = report(lv, true);
     assert!(!lines.iter().any(|l| l.contains("discarded [") || l.contains("unsolved")), "{lines:#?}");
     // read again: every constraint holds, the one of the pair without a tail among them
     let solved = MemoryProvider::new().with("/w/t.sp", &run.files[0].text);
