@@ -12,6 +12,10 @@
 # publishes the tarball the build packed. Run by hand, it builds and checks the package, and publishes
 # it only with dry_run set to false on a runtime-v tag; on a pull request that changes the package, it
 # builds and checks it only.
+#
+# The package job also installs the tarball into a minimal frontend built with Vite
+# (packages/runtime/smoke) and runs it in Chromium, from the build and from the dev server, before
+# anything is published; after a publish, the smoke job does the same with the version from npm.
 name: Publish runtime
 
 on:
@@ -106,6 +110,16 @@ jobs:
           npm pack --pack-destination "$GITHUB_WORKSPACE"
           npm publish --dry-run --access public --tag next
 
+      # the package in a frontend built with Vite, installed from the tarball as npm installs it
+      - name: Smoke-test the package with Vite
+        working-directory: packages/runtime/smoke
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node smoke.mjs "$GITHUB_WORKSPACE/rich-netlist-runtime-$VERSION.tgz"
+
       - uses: actions/upload-artifact@v7
         with:
           name: runtime-${{ steps.version.outputs.version }}
@@ -148,3 +162,21 @@ jobs:
             echo "No NPM_TOKEN secret: publishing by trusted publishing."
           fi
           npm publish "rich-netlist-runtime-$VERSION.tgz" --access public --tag next --provenance
+
+  # the version just published, installed from npm, in the same frontend
+  smoke:
+    needs: [package, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Smoke-test the published package with Vite
+        working-directory: packages/runtime/smoke
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node smoke.mjs "@rich-netlist/runtime@$VERSION"
