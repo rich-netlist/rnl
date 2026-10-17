@@ -154,7 +154,7 @@
       ];
       if (on) {
         L.push({ t: '*   %ax = (_, _);', r: 'ov:di' });
-        L.push({ t: '*   %sym = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRROR_PAIR', r: 'M1 M2 ov:al ov:di ov:or' });
+        L.push({ t: '*   %sym = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRRORED', r: 'M1 M2 ov:al ov:di ov:or' });
       }
       L.push({ t: '* }' });
       return L;
@@ -171,11 +171,12 @@
       view.setScene(mpScene(on), { animate: animate, duration: 900 });
       if (on) {
         var X = [
-          ['{#M1 #M2} @ALIGN("y");', 'M1 M2 ov:al', '<zh>同一行</zh><en>same row</en>'],
-          ['{#M1 %ax #M2} @DISTRIBUTE("x");', 'M1 M2 ov:di', '<zh>到轴等距</zh><en>equal steps around the axis</en>'],
-          ['#M1 #M2 @ORIENT-RELATION("MY")', 'M1 M2 ov:or', '<zh>互为镜像</zh><en>mirror images</en>']
+          ['{#M1 #M2} @ALIGN("y", priority="low");', 'M1 M2 ov:al', '<zh>同一行</zh><en>same row</en>'],
+          ['{#M1 %ax #M2} @DISTRIBUTE("x", priority="low");', 'M1 M2 ov:di', '<zh>到轴等距</zh><en>equal steps around the axis</en>'],
+          ['{#M1 #M2} @ORDER("left-to-right", priority="low");', 'M1 M2', '<zh>M1 在左</zh><en>M1 on the left</en>'],
+          ['#M1 #M2 @ORIENT-RELATION("MY", priority="low")', 'M1 M2 ov:or', '<zh>互为镜像</zh><en>mirror images</en>']
         ];
-        exp.innerHTML = '<p class="exp-k"><zh>$MIRROR_PAIR 展开后，相当于这一层多了三句（不写进文件）：</zh><en>Expanded, $MIRROR_PAIR adds three statements to this level (not written in the file):</en></p>' +
+        exp.innerHTML = '<p class="exp-k"><zh>$MIRRORED 展开后，相当于这一层多了四句（不写进文件），都是 low：</zh><en>Expanded, $MIRRORED adds four statements to this level (not written in the file), all of priority low:</en></p>' +
           X.map(function (x) { return '<div class="exp-l" data-refs="' + x[1] + '" tabindex="0"><code>' + C.hlSnippet(x[0]) + '</code><span>' + x[2] + '</span></div>'; }).join('');
         $$('.exp-l', exp).forEach(function (row) {
           function hl() { view.highlight(row.getAttribute('data-refs').split(' ')); }
@@ -184,7 +185,7 @@
           row.addEventListener('mouseleave', function () { view.highlight(null); });
           row.addEventListener('blur', function () { view.highlight(null); });
         });
-        cap.innerHTML = '<zh>角色 a、b、axis 换成 M1、M2、%ax，体里的三条约束就展开到这一层：同一行、到轴等距、互为镜像。轴 %ax 是自由点，由求解器定。</zh><en>With the roles a, b and axis replaced by M1, M2 and %ax, the three constraints in the body expand into this level: same row, equal steps around the axis, mirror images. The axis %ax is a free point that the solver places.</en>';
+        cap.innerHTML = '<zh>角色 a、b、axis 换成 M1、M2、%ax，体里的四条约束就展开到这一层：同一行、到轴等距、M1 在左、互为镜像。它们都是 low，作者另写的事实先走。轴 %ax 是自由点，由求解器定。</zh><en>With the roles a, b and axis replaced by M1, M2 and %ax, the four constraints in the body expand into this level: same row, equal steps around the axis, M1 on the left, mirror images. They are all of priority low, so what the author writes comes first. The axis %ax is a free point that the solver places.</en>';
       } else {
         exp.innerHTML = '';
         cap.innerHTML = '<zh>只套用了 $DIFFERENTIAL_PAIR：它记下“M1、M2 是差分对”，查看器可以把它们框出来，图上的位置却没有变。</zh><en>Only $DIFFERENTIAL_PAIR is applied: it records that M1 and M2 are a differential pair, and a viewer may outline them, but nothing moves.</en>';
@@ -242,19 +243,18 @@
 
   /* The definitions of the standard series 0.3, as its package files write them (libraries/standard/0.3) */
   var STD = [
-    ['sem', '$DIFFERENTIAL_PAIR', '@DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"], ["{tail}", "instance"]]) {}'],
     ['sem', '$CURRENT_MIRROR', '@DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {}'],
     ['sem', '$MATCHED', '@DEFINE(roles=["{members}"]) {}'],
-    ['sem', '$BRANCH', '@DEFINE(roles=["{members}"]) {}'],
-    ['sem', '$CHAIN', '@DEFINE(roles=["source", "{chain}", "load"]) {}'],
-    ['sem', '$CASCADE', '@DEFINE(roles=["first", "second", "feedback", "load"]) {}'],
+    ['sem', '$CASCADE', '@DEFINE(roles=["{first}", "{second}", "{feedback}", "{load}"]) {}'],
     ['sem', '$SUPPLY_HIGH', '@DEFINE(roles=[["pin", "terminal"]]) {}'],
     ['sem', '$SUPPLY_LOW', '@DEFINE(roles=[["pin", "terminal"]]) {}'],
-    ['lay', '$MIRROR_PAIR', '@DEFINE(roles=["a", "b", "axis"]) {\n  {?a ?b} @ALIGN("y");\n  {?a ?axis ?b} @DISTRIBUTE("x");\n  ?a ?b @ORIENT-RELATION("MY")\n}'],
+    ['lay', '$DIFFERENTIAL_PAIR', '@DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"], ["{tail}", "instance"]]) {\n  {?in_p {?tail} ?in_n} @DISTRIBUTE("x", priority="low")\n}'],
+    ['lay', '$BRANCH', '@DEFINE(roles=["{members}"]) {\n  ?members @ALIGN("x", priority="low")\n}'],
+    ['lay', '$CHAIN', '@DEFINE(roles=["source", "{chain}", "load"]) {\n  {?source ?chain ?load} @ORDER("left-to-right", priority="low")\n}'],
+    ['lay', '$MIRRORED', '@DEFINE(roles=["a", "b", "axis"]) {\n  {?a ?b} @ALIGN("y", priority="low");\n  {?a ?axis ?b} @DISTRIBUTE("x", priority="low");\n  {?a ?b} @ORDER("left-to-right", priority="low");\n  ?a ?b @ORIENT-RELATION("MY", priority="low")\n}'],
     ['lay', '$FLOW', '@DEFINE(roles=["{path}"], parameters=[["direction", "left-to-right"]]) {\n  ?path @ORDER(?direction, priority="low")\n}'],
-    ['lay', '%TAIL_CENTER', '@DEFINE(roles=[["pair", "usage"]]) {\n  {?pair::in_p {?pair::tail} ?pair::in_n} @DISTRIBUTE("x")\n};\n/* private to the package: a rule applies it, low, to every differential pair */\n# @SELECT-USAGE $DIFFERENTIAL_PAIR => @AS(priority="low") %TAIL_CENTER'],
-    ['lay', '$GROUND_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %g = $GROUND @ATTACH ?t::net;\n  ?t::net @WIRE {?t %g:p};\n  {?t %g:p} @ALIGN("x");\n  %g:p ?t @DISTANCE("bottom-to-top", min=?gap)\n}'],
-    ['lay', '$SUPPLY_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %s = $SUPPLY @ATTACH ?t::net;\n  ?t::net @WIRE {?t %s:p};\n  {?t %s:p} @ALIGN("x");\n  ?t %s:p @DISTANCE("bottom-to-top", min=?gap)\n}'],
+    ['vir', '$GROUND_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %g = $GROUND @ATTACH ?t::net;\n  ?t::net @WIRE {?t %g:p};\n  {?t %g:p} @ALIGN("x", priority="low");\n  %g:p ?t @DISTANCE("bottom-to-top", min=?gap, priority="low");\n  %g @ORIENT("R0", priority="low")\n}'],
+    ['vir', '$SUPPLY_STUB', '@DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {\n  %s = $SUPPLY @ATTACH ?t::net;\n  ?t::net @WIRE {?t %s:p};\n  {?t %s:p} @ALIGN("x", priority="low");\n  ?t %s:p @DISTANCE("bottom-to-top", min=?gap, priority="low");\n  %s @ORIENT("R0", priority="low")\n}'],
     ['vir', '$GROUND', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
     ['vir', '$SUPPLY', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
     ['vir', '$IO_PORT', '@DEFINE(roles=[["p", ["net", "terminal"]]]) {}'],
@@ -263,9 +263,9 @@
     ['vir', '$CURRENT_ARROW', '@DEFINE(roles=[["p", ["terminal", "point"]]]) {}']
   ];
   var STD_GROUPS = [
-    ['sem', '<zh>语义：只有角色，用 AS 套用</zh><en>Semantics: roles only, applied with AS</en>'],
-    ['lay', '<zh>布局：体里写约束</zh><en>Layout: constraints in the body</en>'],
-    ['vir', '<zh>显示元素：用 ATTACH 添上，由规则配符号</zh><en>Display elements: added with ATTACH, given symbols by rules</en>']
+    ['sem', '<zh>结构，只有角色：用 AS 套用</zh><en>Structures with roles only, applied with AS</en>'],
+    ['lay', '<zh>结构，体里带默认画法：约束都是 low，作者写的先走</zh><en>Structures with a default drawing in the body: all of priority low, so what the author writes comes first</en>'],
+    ['vir', '<zh>显示元素和桩：用 ATTACH 添上，由规则配符号；桩的约束也是 low</zh><en>Display elements and stubs: added with ATTACH, given symbols by rules; the stubs’ constraints are low too</en>']
   ];
 
   function initStd() {
@@ -284,7 +284,7 @@
       show.innerHTML = C.hlSnippet(d[1] + ' = ' + d[2]);
     }
     btns.forEach(function (b) { b.addEventListener('click', function () { pick(b); }); });
-    pick(btns.filter(function (b) { return b.textContent === '$MIRROR_PAIR'; })[0]);
+    pick(btns.filter(function (b) { return b.textContent === '$MIRRORED'; })[0]);
   }
 
   /* ================= T3 Defaults ================= */

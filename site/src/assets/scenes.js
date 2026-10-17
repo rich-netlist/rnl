@@ -183,8 +183,8 @@
     u6: ['&vdd @ADD-TO $SUPPLY_NET_SET;', '&vdd @ADD-TO $SUPPLY_NET_SET;'],
     u7: ['&vss @ADD-TO $GROUND_NET_SET;', '&vss @ADD-TO $GROUND_NET_SET;'],
     u9: ['%ax = (_, _);', '%ax = (_, _);'],
-    u10: ['%sym12 = #M1 #M2 %ax @AS $MIRROR_PAIR;', '%sym12 = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRROR_PAIR;'],
-    u11: ['%sym34 = #M3 #M4 %ax @AS $MIRROR_PAIR;', '%sym34 = #M3(a), #M4(b) and %ax(axis) treated @AS $MIRROR_PAIR;'],
+    u10: ['%sym12 = #M1 #M2 %ax @AS $MIRRORED;', '%sym12 = #M1(a), #M2(b) and %ax(axis) treated @AS $MIRRORED;'],
+    u11: ['%sym34 = #M3 #M4 %ax @AS $MIRRORED;', '%sym34 = #M3(a), #M4(b) and %ax(axis) treated @AS $MIRRORED;'],
     u13: ['{#M5 #M1 #M3} @ORDER("bottom-to-top");', '{#M5 #M1 #M3} are in @ORDER("bottom-to-top");'],
     u14: ['#M5:d @CURRENT("in")', '#M5:d has @CURRENT("in")']
   };
@@ -198,8 +198,8 @@
     u6: '&vdd @加入 $"电源网络集";',
     u7: '&vss @加入 $"地网络集";',
     u9: '%ax = (_, _);',
-    u10: '%sym12 = #M1(甲)、#M2(乙) 和 %ax(轴) @视作 $"镜像对";',
-    u11: '%sym34 = #M3(甲)、#M4(乙) 和 %ax(轴) @视作 $"镜像对";',
+    u10: '%sym12 = #M1(甲)、#M2(乙) 和 %ax(轴) @视作 $"镜像对称";',
+    u11: '%sym34 = #M3(甲)、#M4(乙) 和 %ax(轴) @视作 $"镜像对称";',
     u13: '{#M5 #M1 #M3} 按 @顺序("从下到上") 排列;',
     u14: '#M5:d 有 @电流("流入")'
   };
@@ -301,10 +301,9 @@
     { t: 'M4 out  x     vdd  vdd pch W=4u L=0.5u', r: 'M4' },
     { t: 'M5 tail vbias vss  vss nch W=4u L=1u', r: 'M5' },
     { t: '* @RNL {' },
-    { t: '*   %dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;', r: 'M1 M2 M5', d: 'ok' },
+    { t: '*   %dp1 = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;', r: 'M1 M2 M5 ov:c1', d: 'conflict' },
     { t: '*   %ax = (_, _);', r: 'ov:ax', d: 'ok' },
-    { t: '*   %c1 = {%ax #M5} @ALIGN("x");', r: 'M5 ov:ax ov:c1', d: 'conflict' },
-    { t: '*   %sym12 = #M1 #M2 %ax @AS $MIRROR_PAIR;', r: 'M1 M2 ov:ax', d: 'ok' },
+    { t: '*   %sym12 = #M1 #M2 %ax @AS $MIRRORED;', r: 'M1 M2 ov:ax', d: 'ok' },
     { t: '*   {#M1 #M2 #M9} @ALIGN("y")', cls: 'is-err', d: 'm9' },
     { t: '* }' },
     { t: '* @RNL(type="generated", priority="high", author="rnl-solver", hash="sig1:4c1f") {', d: 'fp' },
@@ -322,9 +321,9 @@
   var E5_DIAG = [
     { k: 'err', id: 'm9', icon: 'cross', html: '<zh><code>{#M1 #M2 #M9} @ALIGN("y")</code>：本层没有元件 M9。ALIGN 对成员是严格的，整句失效，不会退化成“只对齐 M1、M2”。</zh><en><code>{#M1 #M2 #M9} @ALIGN("y")</code>: this level has no instance M9. ALIGN is strict about its members, so the whole statement fails; it does not fall back to “align only M1 and M2”.</en>', refs: [] },
     { k: 'err', id: 'bad', icon: 'cross', html: '<zh><code>#M4 @PLACE(2O, 16, …)</code>：数后面不能带字母，“2O” 里是字母 O。只有这一句失效，M4 保留求解器给的 (28, 16)。</zh><en><code>#M4 @PLACE(2O, 16, …)</code>: a number cannot be followed by a letter, and “2O” contains the letter O. Only this statement fails; M4 keeps the solver’s (28, 16).</en>', refs: ['M4'] },
-    { k: 'warn', id: 'conflict', icon: 'warn', html: '<zh>编辑器的 <code>#M2 @PLACE(x=30, …)</code> 是 high，后写，盖过求解器给的 x = 28。对称轴因此跟着到了 x = 21，而 M5 留在 20：<code>%c1</code> 让尾管对准对称轴，它是 normal，与这些 high 坐标冲突，被丢弃，尾管不再居中。标准包给差分对把尾管放在中间的那条约束是 low，也让步了；low 的约束让步是预料之中的，不另提示。</zh><en>The editor’s <code>#M2 @PLACE(x=30, …)</code> is high and written later, so it overrides the solver’s x = 28. The symmetry axis follows to x = 21 while M5 stays at 20: <code>%c1</code>, which puts the tail on the axis, is normal, conflicts with these high coordinates and is dropped, so the tail is no longer centered. The standard package’s own constraint that centers a pair’s tail is low and gives way too; a low constraint giving way is expected and noted no further.</en>', refs: ['M2', 'M5', 'ov:c1'] },
+    { k: 'warn', id: 'conflict', icon: 'warn', html: '<zh>编辑器的 <code>#M2 @PLACE(x=30, …)</code> 是 high，后写，盖过求解器给的 x = 28。求解器的那条被丢弃。两个源极的中点因此到了 x = 21，而 M5 留在 20：<code>%dp1</code> 自带的尾管居中是 low，与这些 high 坐标冲突，让步了，尾管不再居中。low 的约束让步是预料之中的，不另提示。</zh><en>The editor’s <code>#M2 @PLACE(x=30, …)</code> is high and written later, so it overrides the solver’s x = 28, which is discarded. The midpoint of the two sources moves to x = 21 while M5 stays at 20: the tail centering that <code>%dp1</code> carries is low, conflicts with these high coordinates and gives way, so the tail is no longer centered. A low constraint giving way is expected and noted no further.</en>', refs: ['M2', 'M5', 'ov:c1'] },
     { k: 'info', id: 'fp', icon: 'info', html: '<zh>求解记录的 <code>hash</code> 与当前输入不符：求解之后，编辑器加了一条记录。查看器建议重新求解，旧结果照常显示。</zh><en>The solver record’s <code>hash</code> no longer matches the current input: the editor added a record after solving. The viewer suggests solving again; the old result still displays.</en>', refs: [] },
-    { k: 'ok', id: 'ok', icon: 'check', html: '<zh>其余照常生效：差分对和它的尾管；对称（对称轴是自由点，跟着移到 x = 21）；其他坐标。</zh><en>Everything else takes effect: the differential pair and its tail; the symmetry (the axis is a free point and moves to x = 21); the other coordinates.</en>', refs: ['M1', 'M2', 'ov:ax'] }
+    { k: 'ok', id: 'ok', icon: 'check', html: '<zh>其余照常生效：差分对和它的尾管；对称（也是 low，但对称轴是自由点，跟着移到 x = 21，照样成立）；其他坐标。</zh><en>Everything else takes effect: the differential pair and its tail; the symmetry (low as well, but the axis is a free point that moves to x = 21, so it still holds); the other coordinates.</en>', refs: ['M1', 'M2', 'ov:ax'] }
   ];
 
   /* ================= Hero: RC low-pass ================= */
@@ -389,7 +388,7 @@
     }
     return {
       rk: 'rlc-' + style,
-      box: [-1, -2, 28.5, 16.2],
+      box: [-1, -2, 28.5, 17.6],
       devices: dev,
       route: function (P) {
         var v1p = P('V1.p'), r1p = P('R1.p'), c1p = P('C1.p'), v1n = P('V1.n'), c1n = P('C1.n');
@@ -412,12 +411,12 @@
       overlays: function (P, S, B, mode) {
         if (mode === 'chain') {
           return [
+            { id: 'flow', kind: 'arrow', pts: [[1.5, 16.6], [25.5, 16.6]], label: '$CHAIN · left-to-right, low', labelAt: [13.5, 16.6], anchor: 'middle', mono: true },
             { id: 'r-src', ref: 'roles', kind: 'tag', at: [3, -0.4], anchor: 'middle', text: 'source' },
             { id: 'r-ser', ref: 'roles', kind: 'tag', at: [12, 15.1], anchor: 'middle', text: '{chain}' },
             { id: 'r-load', ref: 'roles', kind: 'tag', at: [23, -0.4], anchor: 'middle', text: 'load' }
           ];
         }
-        if (mode === 'flow') return [{ id: 'flow', kind: 'arrow', pts: [[1.5, 15.1], [25.5, 15.1]], label: '$FLOW · left-to-right', labelAt: [13.5, 15.1], anchor: 'middle', mono: true }];
         return [];
       }
     };
@@ -432,8 +431,7 @@
       { t: 'L1 mid out 1m', r: 'L1' },
       { t: 'C1 out 0 100n', r: 'C1' },
       { t: '* @RNL {' },
-      { t: '*   #V1, {#R1 #L1} and #C1 are treated @AS $CHAIN;', r: 'V1 R1 L1 C1 ov:roles', mode: 'chain' },
-      { t: '*   {#V1 #R1 #L1 #C1} are treated @AS $FLOW;', r: 'V1 R1 L1 C1 ov:flow', mode: 'flow' },
+      { t: '*   #V1, {#R1 #L1} and #C1 are treated @AS $CHAIN;', r: 'V1 R1 L1 C1 ov:roles ov:flow', mode: 'chain' },
       { t: '*   {#R1 #L1} @ORIENT("R90")' + (merged ? ';' : ''), r: 'R1 L1' }
     ];
     if (merged) {
