@@ -7,13 +7,11 @@
 
 /* ---------------------------------------------------------------- rnl-std-semantics: roles only (15.1) */
 @RNL {
-  $DIFFERENTIAL_PAIR = @DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"]]) {};
-  $DIFFERENTIAL_PAIR_WITH_TAIL = @DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"], ["tail", "instance"]]) {};
-  $CURRENT_MIRROR = @DEFINE(roles=[["ref", "instance"], ["out", "instance"]]) {};
-  $INPUT_STAGE = @DEFINE(roles=[["pair", "usage"], ["tail", "instance"]]) {};
+  $DIFFERENTIAL_PAIR = @DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"], ["{tail}", "instance"]]) {};
+  $CURRENT_MIRROR = @DEFINE(roles=[["{ref}", "instance"], ["{out}", "instance"]]) {};
   $MATCHED = @DEFINE(roles=["{members}"]) {};
   $BRANCH = @DEFINE(roles=["{members}"]) {};
-  $CHAIN = @DEFINE(roles=["source", "{series}", "load"]) {};
+  $CHAIN = @DEFINE(roles=["source", "{chain}", "load"]) {};
   $CASCADE = @DEFINE(roles=["first", "second", "feedback", "load"]) {};
   $SUPPLY_HIGH = @DEFINE(roles=[["pin", "terminal"]]) {};
   $SUPPLY_LOW = @DEFINE(roles=[["pin", "terminal"]]) {}
