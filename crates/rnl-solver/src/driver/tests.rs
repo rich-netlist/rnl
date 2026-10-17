@@ -2302,3 +2302,59 @@ fn the_members_of_a_distribute_keep_its_order_and_their_texts_clear() {
         }
     }
 }
+
+/// Where every pin of every component is drawn, by the component and the pin.
+fn component_pins(e: &Exact) -> Vec<((usize, usize), [Q; 2])> {
+    let (s, at, ori) = (&e.structure, &e.placed.origins, &e.placed.geometry.orient);
+    let mut out = Vec::new();
+    for k in s.components() {
+        out.extend((0..s.pins(k).len()).filter_map(|pin| Some(((k, pin), s.pin_at(at, ori, k, pin)?))));
+    }
+    out
+}
+
+/// Whether two solves of one netlist draw every pin of every component at the same place, up to a
+/// shift and, with `mirror`, a mirror about an upright line.
+fn pins_alike(a: &Exact, b: &Exact, mirror: bool) -> bool {
+    let (pa, pb) = (component_pins(a), component_pins(b));
+    if pa.len() != pb.len() || pa.iter().zip(&pb).any(|(x, y)| x.0 != y.0) {
+        return false;
+    }
+    let x = |p: &[Q; 2], q: &[Q; 2]| if mirror { &p[0] + &q[0] } else { &q[0] - &p[0] };
+    let Some(((_, p0), (_, q0))) = pa.first().zip(pb.first()) else { return true };
+    let (dx, dy) = (x(p0, q0), &q0[1] - &p0[1]);
+    pa.iter().zip(&pb).all(|((_, p), (_, q))| x(p, q) == dx && &q[1] - &p[1] == dy)
+}
+
+/// A DISTRIBUTE has no direction (14.4): its members written the other way round mean the same,
+/// and give the same drawing, or its mirror (review of the fix of phase 2: where the witness puts
+/// all the members at one x, their order was taken as written, and drove the first plan, the
+/// barycentre rounds and the swaps; S2 written `{#C4 #R3 #R2 #R1}` was drawn with its parts
+/// turned, two crossings and wires half as long again, and a sweep case's step grew from 8 to 19).
+/// A DISTRIBUTE of two members holds wherever they are, and orders nothing.
+#[test]
+fn a_distribute_written_the_other_way_round_is_drawn_alike() {
+    let s2 = "VIN in 0 DC 1\nR1 in 0 1\nR2 in 0 100meg\nR3 in 0 4.7k\nC4 in 0 10p\n\
+              * @RNL { {#R1 #R2 #R3 #C4} @DISTRIBUTE(\"x\"); {#R1 #R2 #R3 #C4} @ALIGN(\"y\"); $WIRE_NET_SET @ROUTE }\n";
+    let sweep = "R0 a 0 1k\nR1 a b 1k\nV2 b 0 SIN(0 1 1meg)\n\
+                 * @RNL { {#R1 #V2 #R0} @DISTRIBUTE(\"x\"); $WIRE_NET_SET @ROUTE }\n";
+    let grouped = "V0 n1 n2 DC 0 AC 1\nR1 n2 n1 4.7k\nV2 n1 0 DC 1\nV3 n2 0 PULSE(0 1 0 1n 1n 5n 10n)\n\
+                   * @RNL { %g1 = {#V0 #V3 #R1} @GROUP; {#V3 #R1 #V0} @DISTRIBUTE(\"x\"); {#V2 #R1} @ALIGN(\"y\"); \
+                   $WIRE_NET_SET @ROUTE }\n";
+    let two = "VIN a 0 DC 1\nR1 a b 1k\nR2 b 0 100meg\nC3 b 0 10p\n\
+               * @RNL { {#R1 #R2} @DISTRIBUTE(\"x\"); {#VIN #R1 #R2 #C3} @ALIGN(\"y\"); $WIRE_NET_SET @ROUTE }\n";
+    let cases = [
+        (s2, "{#R1 #R2 #R3 #C4}", "{#C4 #R3 #R2 #R1}"),
+        (sweep, "{#R1 #V2 #R0}", "{#R0 #V2 #R1}"),
+        (grouped, "{#V3 #R1 #V0}", "{#V0 #R1 #V3}"),
+        (two, "{#R1 #R2} @DISTRIBUTE", "{#R2 #R1} @DISTRIBUTE"),
+    ];
+    for (body, written, reversed) in cases {
+        assert!(body.contains(written), "{body}");
+        let (p, solved, e) = solve_text(&netlist(body));
+        let (q, again, f) = solve_text(&netlist(&body.replacen(written, reversed, 1)));
+        let (what, other) = (summary(&p, &solved, &e), summary(&q, &again, &f));
+        assert!(pins_alike(&e, &f, false) || pins_alike(&e, &f, true), "{written}:\n{what}\n{reversed}:\n{other}");
+        assert_eq!(e.placed.dropped, f.placed.dropped, "{what}\n{other}");
+    }
+}

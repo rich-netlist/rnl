@@ -172,7 +172,9 @@ pub(crate) fn crowding(s: &Structure, origins: &[[Q; 2]], ori: &[Orient], droppe
 /// (`Structure::offset_labels`), against the box of every symbol drawn (`crate::coords::solid`)
 /// but its own, a stub that hangs from it and its host when it is a stub, each pair of a box of
 /// texts and a symbol counted once. What the solution leaves free is not drawn, and counts
-/// neither way.
+/// neither way. A known gap of the measure: a stub's own texts drawn over its host's body, such
+/// as the `vdd` of a `$SUPPLY_STUB` turned MX, are not counted, as the pair of the stub and its
+/// host is left out whole (review of the fix of phase 2: 5 of 20 levels of a transistor sweep).
 pub(crate) fn texts_over(s: &Structure, origins: &[[Q; 2]], ori: &[Orient]) -> usize {
     let bodies: Vec<(usize, [Q; 4])> =
         (0..s.objects.len()).filter(|&k| solid(s, k)).filter_map(|k| Some((k, s.box_at(origins, ori, k)?))).collect();

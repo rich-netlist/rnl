@@ -36,9 +36,10 @@
 //!   without the current depth, does an ORDER or a DISTRIBUTE on x, as far as the facts kept let
 //!   its elements share a height; an ALIGN on x is a column, its elements in rows of their own.
 //!   The left-to-right precedences are those that the facts on x with a side give the elements
-//!   they join; an ORDER or a DISTANCE whose side is left open, and a DISTRIBUTE, whose members
-//!   come in its order one way or the other (14.4), give their own as the witness has them, and
-//!   the search may reverse them ([`Reversible`]).
+//!   they join; an ORDER or a DISTANCE whose side is left open, and a DISTRIBUTE of three members
+//!   or more, whose members come in its order one way or the other (14.4), give their own as the
+//!   witness has them (a DISTRIBUTE all at one x the way of the netlist), and the search may
+//!   reverse them ([`Reversible`]).
 //! - **The sources of candidates** ([`Source`]), instantiated from the configured objectives in
 //!   the order of their layers, each objective with a structural side adding its own, and the
 //!   objectives configured but inert recorded with the reason ([`crate::objectives::Active`]).
@@ -508,7 +509,8 @@ pub(crate) struct Open {
 
 /// Facts kept on x whose direction or side the facts leave open ([`Open::orders`],
 /// [`Open::sides`]), or a DISTRIBUTE, which runs either way (14.4): the pairs of elements `(a, b)`
-/// they put `a` left of `b`, as the witness has them. The search may reverse them all, and the
+/// they put `a` left of `b`, as the witness has them (a DISTRIBUTE that it puts all at one x the
+/// way of the netlist, `netlist_way`). The search may reverse them all, and the
 /// resolution then turns the facts' literals. Facts that order the same two elements are one, as
 /// they turn together.
 #[derive(Clone, Debug, PartialEq)]
@@ -596,8 +598,8 @@ pub(crate) struct Structure {
     /// witness has them: an ORDER with a direction, a DISTANCE with a direction and a gap not
     /// below 0.
     pub precedence: BTreeSet<(usize, usize)>,
-    /// The facts kept on x whose side is open, and the DISTRIBUTEs on x, with the pairs they
-    /// order.
+    /// The facts kept on x whose side is open, and the DISTRIBUTEs on x of three members or more,
+    /// with the pairs they order.
     pub reversible: Vec<Reversible>,
     pub active: Active,
     pub sources: Vec<Source>,
@@ -1970,16 +1972,19 @@ fn touched_elements(s: &Structure, f: usize, axis: usize) -> Vec<usize> {
 /// members of one side unordered; an ALIGN fixes no side (14.2). A DISTRIBUTE fixes no side
 /// either, but its members come in its order one way or the other, each a step further than the
 /// one before (14.4), so it orders them as an ORDER given only an axis does: the way the witness
-/// has them, or as written where the witness puts them all at one x, and the search may reverse
-/// it. Its members that are no elements, such as the axis of a `$MIRROR_PAIR` or the middle point
-/// of a `$TAIL_CENTER`, keep their places in the order and order nothing themselves (review of
-/// phase 2 of the quality review: a swap of neighbours broke the order of a DISTRIBUTE, the
-/// resolution then dropped the gaps between them, and a text lay over the next symbol).
+/// has them, or, where the witness puts them all at one x, the way of the netlist
+/// ([`netlist_way`]), however it is written, and the search may reverse it. With fewer than three
+/// members it holds wherever they are (14.4), and orders nothing. Its members that are no
+/// elements, such as the axis of a `$MIRROR_PAIR` or the middle point of a `$TAIL_CENTER`, keep
+/// their places in the order and order nothing themselves (review of phase 2 of the quality
+/// review: a swap of neighbours broke the order of a DISTRIBUTE, the resolution then dropped the
+/// gaps between them, and a text lay over the next symbol).
 ///
 /// Two facts whose side is open that order the same two elements turn together, as one, since one
-/// turned without the other leaves the search no order of them; and one that orders two elements
-/// that a fact with a side orders is not open at all, its precedences fixed as the witness has
-/// them.
+/// turned without the other leaves the search no order of them, the earlier turned the way of the
+/// later where they run against each other (two DISTRIBUTEs at one x, each the way of the
+/// netlist); and one that orders two elements that a fact with a side orders is not open at all,
+/// its precedences fixed the way that fact has them.
 fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)>, Vec<Reversible>) {
     let element = |k: usize| s.objects.get(k).is_some_and(|o| o.role == Role::Element);
     let elements = |m: &PointRef| -> Vec<usize> {
@@ -2021,15 +2026,19 @@ fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)
                 (*sense, pairs)
             }
             FactKind::Distribute { axis: Axis::X, members } => {
+                // with fewer than three members it holds wherever they are (14.4)
+                if members.len() < 3 {
+                    continue;
+                }
                 // the members with a place at the witness, in order: they run the way its first
-                // and last are, all at one x read as written
+                // and last are; all at one x, the way of the netlist, read from either end
                 let chain: Vec<(Q, Vec<usize>)> = members
                     .iter()
                     .filter_map(|m| Some((point_value(problem, &s.witness, m, 0, 0)?, elements(m))))
                     .collect();
                 let forward = match (chain.first(), chain.last()) {
-                    (Some((first, _)), Some((last, _))) => first <= last,
-                    _ => true,
+                    (Some((first, _)), Some((last, _))) if first != last => first < last,
+                    _ => netlist_way(chain.iter().map(|(_, ks)| ks.as_slice())),
                 };
                 let mut pairs = Vec::new();
                 for (i, (_, a)) in chain.iter().enumerate() {
@@ -2066,12 +2075,17 @@ fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)
     // the facts whose side is open that order the same two elements, one after the other, as one
     let unordered =
         |r: &Reversible| -> BTreeSet<(usize, usize)> { r.pairs.iter().map(|&(a, b)| (a.min(b), a.max(b))).collect() };
+    let turned = |pairs: &[(usize, usize)]| -> Vec<(usize, usize)> { pairs.iter().map(|&(a, b)| (b, a)).collect() };
     let mut merged: Vec<Reversible> = Vec::new();
     for mut r in open {
         loop {
             let shared = unordered(&r);
             let Some(i) = merged.iter().position(|m| !unordered(m).is_disjoint(&shared)) else { break };
-            let m = merged.remove(i);
+            let mut m = merged.remove(i);
+            // the way of `r`, where they run against each other
+            if m.pairs.iter().any(|&(a, b)| r.pairs.contains(&(b, a))) {
+                m.pairs = turned(&m.pairs);
+            }
             r.facts.extend(m.facts);
             r.pairs.extend(m.pairs);
         }
@@ -2081,16 +2095,35 @@ fn precedence(problem: &LevelProblem, s: &Structure) -> (BTreeSet<(usize, usize)
         merged.push(r);
     }
     merged.sort_by(|a, b| a.facts.cmp(&b.facts));
-    // and those that a fact with a side turns already, fixed
+    // and those that a fact with a side turns already, fixed, the way it turns them
     let mut reversible = Vec::new();
     for r in merged {
         if r.pairs.iter().any(|p| fixed.contains(p)) {
             fixed.extend(r.pairs);
+        } else if r.pairs.iter().any(|&(a, b)| fixed.contains(&(b, a))) {
+            fixed.extend(turned(&r.pairs));
         } else {
             reversible.push(r);
         }
     }
     (fixed, reversible)
+}
+
+/// Whether a DISTRIBUTE whose members the witness puts all at one x runs as written, by the
+/// elements of its members in order (`members`): a DISTRIBUTE has no direction (14.4), so the
+/// members written the other way round must run the same way, which is the way of the netlist.
+/// The members with elements, each by its elements in the order of the netlist, are read from
+/// both ends, and the end that comes first in the netlist, compared as words are, goes left; the
+/// members without elements, such as the axis of a `$MIRROR_PAIR`, order nothing and do not
+/// count. Read the same from both ends, the way does not matter (review of the fix of phase 2:
+/// the members ran as written, which drove the first plan, the barycentre rounds and the swaps).
+fn netlist_way<'a>(members: impl DoubleEndedIterator<Item = &'a [usize]> + Clone) -> bool {
+    let keyed = |ks: &[usize]| -> Option<Vec<usize>> {
+        let mut ks = ks.to_vec();
+        ks.sort_unstable();
+        (!ks.is_empty()).then_some(ks)
+    };
+    members.clone().filter_map(keyed).le(members.rev().filter_map(keyed))
 }
 
 /// The objects a point refers to: its object, or the members of a set followed down.
@@ -2433,6 +2466,55 @@ pub(crate) mod tests {
         // the point orders nothing, and keeps its place between 6 and 7
         assert_eq!(s.reversible[1].facts, vec![4]);
         assert!(monotone(&s.reversible[1].pairs, &[6, 7]), "{:?}", s.reversible);
+    }
+
+    /// A DISTRIBUTE has no direction (14.4): where the witness puts all its members at one x, it
+    /// runs the way the netlist has them, however it is written, and the same way written the other
+    /// way round (review of the fix of phase 2: it ran as written). A DISTRIBUTE of two members
+    /// holds wherever they are, and orders nothing.
+    #[test]
+    fn a_distribute_at_one_x_runs_the_way_of_the_netlist() {
+        let distribute = |members: &[usize]| {
+            let members = members.iter().map(|&k| PointRef::Origin(k)).collect();
+            fact(FactKind::Distribute { axis: Axis::X, members })
+        };
+        // the pairs of the reversible facts, and the precedences, of some DISTRIBUTEs on 0..6 and a
+        // point 6, all at x 0 at the witness
+        type Orders = (Vec<Vec<(usize, usize)>>, BTreeSet<(usize, usize)>);
+        let pairs = |written: &[&[usize]]| -> Orders {
+            let mut objects: Vec<_> = (0..6).map(|_| instance()).collect();
+            objects.push(point());
+            let p = problem_of(objects, written.iter().map(|m| distribute(m)).collect());
+            let s = structure_of(&p);
+            assert!(s.witness.origin.iter().all(|o| o[0].is_zero()), "{:?}", s.witness.origin);
+            (s.reversible.into_iter().map(|r| r.pairs).collect(), s.precedence)
+        };
+        // the netlist puts the first before the last: written so, or the other way round
+        for written in [[0, 1, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0], [1, 0, 2], [2, 0, 1]] {
+            let [a, b, c] = written;
+            let mut way = vec![(a, b), (a, c), (b, c)];
+            if a > c {
+                way = way.into_iter().map(|(x, y)| (y, x)).collect();
+            }
+            way.sort_unstable();
+            assert_eq!(pairs(&[&written]), (vec![way], BTreeSet::new()), "{written:?}");
+        }
+        // written the other way round, the same pairs
+        for (written, reversed) in
+            [(&[3, 6, 4][..], &[4, 6, 3][..]), (&[0, 1, 2, 0], &[0, 2, 1, 0]), (&[5, 1, 3, 2], &[2, 3, 1, 5])]
+        {
+            assert_eq!(pairs(&[written]), pairs(&[reversed]), "{written:?} and {reversed:?}");
+        }
+        // the point between orders nothing
+        assert_eq!(pairs(&[&[4, 6, 3]]).0, vec![vec![(3, 4)]]);
+        // two that run against each other the way of the netlist turn together, one the other's
+        // way: 2, 1, 0 and 1, 0, 3 both hold in 2, 1, 0, 3
+        assert_eq!(
+            pairs(&[&[0, 1, 2], &[1, 0, 3]]),
+            (vec![vec![(0, 3), (1, 0), (1, 3), (2, 0), (2, 1)]], BTreeSet::new())
+        );
+        // two members, nothing
+        assert_eq!(pairs(&[&[4, 3], &[1, 5]]), (Vec::new(), BTreeSet::new()));
     }
 
     #[test]

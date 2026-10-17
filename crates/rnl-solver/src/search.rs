@@ -25,8 +25,8 @@
 //! 2. the order of the items is made by the barycentre of what each is connected to, over a few
 //!    rounds, keeping the left-to-right precedences the facts give, then varied by swapping
 //!    neighbours, an element with the next item of its own row, and by reversing each ORDER or
-//!    DISTANCE on x whose side the facts leave open and each DISTRIBUTE on x
-//!    (`crate::structure::Reversible`), which the resolution then turns: a swap that breaks the
+//!    DISTANCE on x whose side the facts leave open and each DISTRIBUTE on x of three members or
+//!    more (`crate::structure::Reversible`), which the resolution then turns: a swap that breaks the
 //!    order of a DISTRIBUTE's members, one way or the other, is not made, as its even steps would
 //!    leave the gaps between them out;
 //! 3. each free class whose members lie in the node takes the orientation that turns most of its
@@ -1519,7 +1519,7 @@ type Scored = (Vec<Q>, Vec<u32>, Plan);
 
 /// A variant of a node: its elements in order, the values of the classes decided in it and below,
 /// the orders of its items and of those below, and whether it reverses each fact whose side is open
-/// decided in it and below.
+/// and each DISTRIBUTE decided in it and below (`Structure::reversible`).
 #[derive(Clone, Debug, PartialEq)]
 struct Variant {
     order: Vec<usize>,
@@ -1575,8 +1575,8 @@ impl Search<'_> {
         p
     }
 
-    /// The node at which a fact whose side is open is decided: the lowest that holds every
-    /// element it orders.
+    /// The node at which a fact whose side is open or a DISTRIBUTE (`Structure::reversible`) is
+    /// decided: the lowest that holds every element it orders.
     fn reversible_node(&self, r: usize) -> usize {
         let elements: BTreeSet<usize> = self.s.reversible[r].pairs.iter().flat_map(|&(a, b)| [a, b]).collect();
         self.s.tree.lowest_common(&elements.into_iter().collect::<Vec<usize>>())
@@ -1935,7 +1935,7 @@ impl Search<'_> {
                 let (e, cand) = self.estimate(&p);
                 found.push((e, cand.code(s), p));
             }
-            // and each fact whose side is open decided here reversed
+            // and each fact whose side is open and each DISTRIBUTE decided here reversed
             let reversed = self.reversed(node, &bp, &border);
             found.extend(reversed);
         }
@@ -2024,9 +2024,9 @@ impl Search<'_> {
             .collect()
     }
 
-    /// The plan `bp` with each fact whose side is open decided at `node` reversed in turn
-    /// (`Structure::reversible`), its items in the order nearest to `border` that the reversed
-    /// precedences allow, each with its estimate.
+    /// The plan `bp` with each fact whose side is open and each DISTRIBUTE decided at `node`
+    /// reversed in turn (`Structure::reversible`), its items in the order nearest to `border` that
+    /// the reversed precedences allow, each with its estimate.
     fn reversed(&mut self, node: usize, bp: &Plan, border: &[Item]) -> Vec<Scored> {
         let s = self.s;
         let mut out = Vec::new();
