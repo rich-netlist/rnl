@@ -27,7 +27,9 @@ pub use catalog::{
     Catalog, CatalogDefinition, CatalogLabel, CatalogOptions, CatalogPackage, CatalogPin, CatalogSet, CatalogSymbol,
     Terminal,
 };
-pub use document::{Child, Diagnostic, Document, Hit, Level, Object, SourceFile, Span, Unplaced};
+pub use document::{
+    Child, Diagnostic, Document, Drawings, Hit, Level, Object, SourceFile, Span, Unplaced, UnplacedDrawing,
+};
 pub use primitive::{
     Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
 };
@@ -91,6 +93,26 @@ impl Default for BuildOptions {
 /// Name the files of a workspace by rooted paths, such as `/w/top.sp`, as the desktop names them
 /// by absolute ones: see [`SourceFile::path`] for what a relative entry in a directory loses.
 pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<Document, String> {
+    Ok(build_with(entry, files, options, false)?.0)
+}
+
+/// [`build`], with the drawings of the objects that each level lists without a position kept apart
+/// from the Document: a netlist with no positions lists every object, and each drawing is a few
+/// hundred bytes of SVG, which the frontend asks for as it shows them ([`Drawings::unplaced`])
+/// instead of carrying them all. The Document is the one `build` gives but for the `svg` and
+/// `primitives` of `Level::unplaced`, which it has none of.
+pub fn build_drawn(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Result<(Document, Drawings), String> {
+    let (document, drawings) = build_with(entry, files, options, true)?;
+    Ok((document, drawings.expect("drawings were asked for")))
+}
+
+/// The Document of `entry`, and when `lazy` the drawings of the objects without a position.
+fn build_with(
+    entry: &str,
+    files: &dyn Provider,
+    options: &BuildOptions,
+    lazy: bool,
+) -> Result<(Document, Option<Drawings>), String> {
     let ws = Workspace::new(files);
     if ws.read(&slashed(entry)).is_none() {
         return Err(format!("cannot read {entry}"));
@@ -98,13 +120,14 @@ pub fn build(entry: &str, files: &dyn Provider, options: &BuildOptions) -> Resul
     let dialect = options.dialect.as_deref();
     // the solve status takes the problems; built in this reading too, they change nothing else
     let runtime = Options { problems: options.runtime.problems || options.status, ..options.runtime.clone() };
-    let r = interpret_in(entry, dialect, &ws, &runtime)?;
+    let mut r = interpret_in(entry, dialect, &ws, &runtime)?;
     let solve = if options.status { solve_statuses(entry, dialect, &ws, &runtime, &r)? } else { HashMap::new() };
-    let mut d = document::document(entry, &r, ws.missing.into_inner(), options);
+    let mut d = document::document(entry, &r, ws.missing.into_inner(), options, lazy);
     for level in &mut d.levels {
         level.solve = solve.get(&level.host).map(|s| s.as_str());
     }
-    Ok(d)
+    let drawings = lazy.then(|| Drawings::take(&mut r.model.levels, &d, options));
+    Ok((d, drawings))
 }
 
 /// The solve status of each drawing level of `r`, by host level ([`solve_status`]): its problem
@@ -151,7 +174,7 @@ pub fn snapshot(entry: &str, files: &dyn Provider, options: &BuildOptions, parts
     // without the drawing, the Document is built only for its files, levels and diagnostics
     let draw =
         if parts.drawing { options.clone() } else { BuildOptions { svg: false, primitives: false, ..options.clone() } };
-    let document = document::document(entry, &r, ws.missing.into_inner(), &draw);
+    let document = document::document(entry, &r, ws.missing.into_inner(), &draw, false);
     Ok(snapshot::snapshot(&r, document, parts, &options.runtime))
 }
 

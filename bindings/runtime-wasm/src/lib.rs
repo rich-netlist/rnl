@@ -1,5 +1,6 @@
 //! The core for WebAssembly (decision 0008): [`rnl_view::build`], [`rnl_edit::write`] with a build
-//! of what it wrote, and [`rnl_view::catalog`], behind a small C-style interface over linear memory,
+//! of what it wrote, [`rnl_view::catalog`], and the drawings of the objects a build lists without a
+//! position, on request, behind a small C-style interface over linear memory,
 //! a JSON request in and a JSON response out. It needs no generated glue: the module imports
 //! nothing, and a page or a Worker calls its exports as `js/core.js` does.
 //!
@@ -21,6 +22,7 @@
 //! allocations on to the system allocator, to note one that fails.
 
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -28,7 +30,7 @@ use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
 use rnl_runtime::source::{normalize, MemoryProvider};
 use rnl_runtime::Options;
-use rnl_view::{BuildOptions, Catalog, CatalogOptions, Document, Parts, Snapshot};
+use rnl_view::{BuildOptions, Catalog, CatalogOptions, Document, Drawings, Parts, Snapshot, UnplacedDrawing};
 use serde::{Deserialize, Serialize};
 
 /// What to build: the workspace and how. Fields the core does not know are ignored, so that a
@@ -62,6 +64,11 @@ pub struct Request {
     /// (decision 0008); false when not given.
     #[serde(default)]
     pub status: bool,
+    /// Leave the drawings of the objects without a position out of the Document and keep them to
+    /// give on request ([`DrawingsRequest`]), until the next build that asks for it; false, the
+    /// Document carrying them, when not given.
+    #[serde(default)]
+    pub lazy_unplaced: bool,
     /// The parts of the editor interface's snapshot to give: with them, the answer is a
     /// [`rnl_view::Snapshot`] instead of a Document.
     pub parts: Option<PartsRequest>,
@@ -150,8 +157,25 @@ pub struct CatalogQuery {
     pub all_versions: bool,
 }
 
+/// What to draw: the objects at `items` of `levels[level].unplaced` of the Document that the last
+/// build with `lazy_unplaced` gave, whose drawings the core kept.
+#[derive(Deserialize, Debug)]
+pub struct DrawingsRequest {
+    pub drawings: DrawingsQuery,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct DrawingsQuery {
+    pub level: usize,
+    pub items: Vec<usize>,
+    /// The names of the objects as the caller has them, which must be those of the build, so that
+    /// a request about a Document that was built again is refused, not answered with other objects.
+    #[serde(default)]
+    pub names: Vec<String>,
+}
+
 /// The answer to a request: `{"document": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
-/// `{"catalog": ...}` or `{"error": "..."}`.
+/// `{"catalog": ...}`, `{"drawings": ...}` or `{"error": "..."}`.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Response {
@@ -163,13 +187,22 @@ pub enum Response {
     Written(Box<Written>),
     /// The catalog a [`CatalogRequest`] asks for.
     Catalog(Box<Catalog>),
-    /// Why there is none: the request is not a [`Request`], a [`WriteRequest`] or a
-    /// [`CatalogRequest`], the entry cannot be read, or an op cannot be written.
+    /// The drawings a [`DrawingsRequest`] asks for, one for each object it names, in order.
+    Drawings(Vec<UnplacedDrawing>),
+    /// Why there is none: the request is not a [`Request`], a [`WriteRequest`], a
+    /// [`CatalogRequest`] or a [`DrawingsRequest`], the entry cannot be read, an op cannot be
+    /// written, or no build kept the drawings asked for.
     Error(String),
 }
 
+thread_local! {
+    /// The drawings of the last build with `lazy_unplaced`. They hold what the model does, which is
+    /// not `Send`, so they stay in the thread that built them; a module is one thread.
+    static DRAWN: RefCell<Option<Drawings>> = const { RefCell::new(None) };
+}
+
 /// Answer a request given as JSON: a write when it has a `write` field, a catalog when it has a
-/// `catalog` field, else a build.
+/// `catalog` field, drawings when it has a `drawings` field, else a build.
 pub fn respond(request: &[u8]) -> Response {
     let invalid = |e: serde_json::Error| Response::Error(format!("the request is not valid: {e}"));
     let value: serde_json::Value = match serde_json::from_slice(request) {
@@ -185,6 +218,12 @@ pub fn respond(request: &[u8]) -> Response {
     if value.get("catalog").is_some() {
         return match serde_json::from_value(value) {
             Ok(c) => catalog(c),
+            Err(e) => invalid(e),
+        };
+    }
+    if value.get("drawings").is_some() {
+        return match serde_json::from_value::<DrawingsRequest>(value) {
+            Ok(d) => drawings(d.drawings),
             Err(e) => invalid(e),
         };
     }
@@ -220,10 +259,30 @@ pub fn respond(request: &[u8]) -> Response {
             Err(e) => Response::Error(e),
         };
     }
+    if request.lazy_unplaced {
+        return match rnl_view::build_drawn(&request.entry, &files, &options) {
+            Ok((d, drawn)) => {
+                DRAWN.with(|slot| *slot.borrow_mut() = Some(drawn));
+                Response::Document(Box::new(d))
+            }
+            Err(e) => Response::Error(e),
+        };
+    }
     match rnl_view::build(&request.entry, &files, &options) {
         Ok(d) => Response::Document(Box::new(d)),
         Err(e) => Response::Error(e),
     }
+}
+
+/// The drawings of the objects a request names, from the last build that kept them.
+fn drawings(query: DrawingsQuery) -> Response {
+    DRAWN.with(|slot| match slot.borrow().as_ref() {
+        None => Response::Error("no build has kept drawings: build with lazy_unplaced first".to_string()),
+        Some(d) => match d.unplaced(query.level, &query.items, &query.names) {
+            Ok(drawn) => Response::Drawings(drawn),
+            Err(e) => Response::Error(e),
+        },
+    })
 }
 
 /// Write, then build what was written as the entry, among the request's files.
@@ -640,6 +699,53 @@ R1 a 0 1k
         // a catalog request of another shape is not valid
         let v = answer(json!({ "catalog": { "all_versions": "yes" } }));
         assert!(v["error"].as_str().unwrap().starts_with("the request is not valid: "), "{v}");
+    }
+
+    #[test]
+    fn the_drawings_of_the_unplaced_are_kept_for_a_request() {
+        let text = "* some left\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+        let files = json!({ "a.sp": text });
+        let carried = answer(json!({ "entry": "a.sp", "files": files, "primitives": true }));
+        // nothing was kept by a build that did not ask for it
+        let ask =
+            |items: Value, names: Value| answer(json!({ "drawings": { "level": 0, "items": items, "names": names } }));
+        assert!(ask(json!([0]), json!([]))["error"].as_str().unwrap().contains("lazy_unplaced"));
+        let lazy = answer(json!({ "entry": "a.sp", "files": files, "primitives": true, "lazy_unplaced": true }));
+        let listed = carried["document"]["levels"][0]["unplaced"].as_array().unwrap().clone();
+        assert!(listed.len() >= 2);
+        // the Document without the objects' drawings, and the drawings as the Document carries them
+        let mut without = carried.clone();
+        for u in without["document"]["levels"][0]["unplaced"].as_array_mut().unwrap() {
+            let u = u.as_object_mut().unwrap();
+            assert!(u.remove("svg").is_some() && u.remove("primitives").is_some());
+        }
+        assert_eq!(lazy, without);
+        let names: Vec<Value> = listed.iter().map(|u| u["name"].clone()).collect();
+        let all: Vec<usize> = (0..listed.len()).collect();
+        let v = ask(json!(all), json!(names));
+        let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(keys, ["drawings"]);
+        for (u, d) in listed.iter().zip(v["drawings"].as_array().unwrap()) {
+            assert_eq!((&u["svg"], &u["primitives"]), (&d["svg"], &d["primitives"]), "{u}");
+        }
+        // some, in the order asked
+        let v = ask(json!([1, 0]), json!([names[1], names[0]]));
+        assert_eq!(v["drawings"][0]["svg"], listed[1]["svg"]);
+        assert_eq!(v["drawings"][1]["svg"], listed[0]["svg"]);
+        // an object that is not there, and names of another build, are refused
+        assert!(ask(json!([99]), json!([]))["error"].as_str().unwrap().contains("99"));
+        assert!(ask(json!([0]), json!(["R9"]))["error"].as_str().unwrap().contains("built again"));
+        assert!(answer(json!({ "drawings": { "level": 5, "items": [0] } }))["error"].is_string());
+        assert!(answer(json!({ "drawings": { "level": 0 } }))["error"]
+            .as_str()
+            .unwrap()
+            .starts_with("the request is not valid: "));
+        // a build that does not ask for it leaves what was kept, and one that does replaces it
+        answer(json!({ "entry": "a.sp", "files": files }));
+        assert!(ask(json!([0]), json!([]))["drawings"].is_array());
+        let other = json!({ "a.sp": "* one\nQ1 c b e npn\n.end\n" });
+        answer(json!({ "entry": "a.sp", "files": other, "lazy_unplaced": true }));
+        assert!(ask(json!([0]), json!([names[0]]))["error"].as_str().unwrap().contains("built again"));
     }
 
     #[test]

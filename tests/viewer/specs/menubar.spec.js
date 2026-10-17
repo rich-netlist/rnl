@@ -88,7 +88,7 @@ test.describe("on the web", () => {
     expect(menus.at(-1)).toEqual({ title: "Help", letter: "H", items: ["Desktop Viewer...", "", "About RNL Viewer"] });
   });
 
-  test("Help > Desktop Viewer shows the site's page of the tools, in English if the browser puts English first", async ({ page, viewer }) => {
+  test("Help > Desktop Viewer shows the site's page of the tools, in Chinese if the browser puts Chinese first", async ({ page, viewer }) => {
     /** The pages the shell is asked to show when the browser's languages are `languages`. */
     const shown = async (languages) => {
       await page.addInitScript((list) => {
@@ -100,13 +100,13 @@ test.describe("on the web", () => {
       await expect(page.locator("#menubar .menu-list:visible")).toHaveCount(0);
       return viewer.calls("browse");
     };
-    const zh = "https://rich-netlist.github.io/rnl/tools.html";
+    const zh = "https://rich-netlist.github.io/rnl/zh/tools.html";
     const en = "https://rich-netlist.github.io/rnl/en/tools.html";
     expect(await shown(["en-US", "zh-CN"])).toEqual([[en]]);
     expect(await shown(["zh-CN", "en-US"])).toEqual([[zh]]);
     expect(await shown(["de-DE", "en-GB", "zh-TW"])).toEqual([[en]]);
-    // without either, the site's first language
-    expect(await shown(["fr-FR"])).toEqual([[zh]]);
+    // without either, English, the site's default
+    expect(await shown(["fr-FR"])).toEqual([[en]]);
   });
 
   test("a click opens a menu, pointing switches it, and Escape or a click on its title closes it", async ({ page, viewer }) => {

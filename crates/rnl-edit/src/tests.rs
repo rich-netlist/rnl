@@ -65,7 +65,7 @@ R1 in out 10k
 *   $JUNCTION @ATTACH %j1;
 *   &VSS @REMOVE-FROM $PORT_FILL_SET;
 *   &in @WIRE(mode="straight") {#R1:1 (10, -16) %j1 %gnd1:p};
-*   #R1 @TEXT("\textit{R}_{1}", key="name", dx=1, dy=-0.5, size=1.5116);
+*   #R1 @TEXT("\textit{R}_{1}", key="name", dx=1, dy=-0.5, halign="start", size=1.5116);
 *   (4.5, -5) @TEXT("\textbf{a\_b \{c\} \$x\% \& \# \^ \textbackslash{} ""q""}", size=1.5116);
 *   &out @TEXT("\textit{out}", size=1.5116) => @PLACE(26, -15)
 * }
@@ -352,6 +352,75 @@ fn what_it_writes_interprets_without_errors() {
     let loud: Vec<String> =
         r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
     assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
+}
+
+/// How the model draws the label `name` of the usage `%p1`, a port, after the ops are written and
+/// read: its alignments and rotation, and the statement that wrote it.
+fn port_label(label: Option<Value>) -> (String, String, f64, String) {
+    let net = "* port\nR1 a 0 1k\n.end\n";
+    let mut ops = vec![
+        json!({"level": "file", "op": "add-usage", "name": "%p1", "definition": "$IO_PORT", "attach": {"p": "&a"}, "at": [0, 0]}),
+    ];
+    ops.extend(label);
+    let out = write(&request("spice", net, Value::Array(ops))).unwrap();
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options { std: true, ..Options::default() })
+        .unwrap();
+    let loud: Vec<String> =
+        r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
+    assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
+    let texts = r.model.levels.iter().flat_map(|l| &l.texts);
+    let name = texts.into_iter().find(|t| t.attach.as_deref() == Some("%p1") && t.key.as_deref() == Some("name"));
+    let t = name.unwrap_or_else(|| panic!("the port has no label `name`:\n{out}"));
+    let written = out.lines().find(|l| l.contains("@TEXT")).unwrap_or_default().trim_start_matches('*').trim();
+    (t.halign.clone(), t.valign.clone(), t.rotate, written.to_string())
+}
+
+#[test]
+fn a_text_with_a_key_keeps_the_alignment_and_rotation_it_was_given() {
+    // the label `name` of a port is the symbol's: right-aligned and centred vertically. A statement
+    // with the key overrides it parameter by parameter, and a parameter it leaves out stays the
+    // symbol's (13.3, 8.4), so a request that gives start, baseline and no rotation, which are the
+    // defaults of a text without a key, has to have them written
+    let label = |extra: Value| {
+        let mut op = json!({"level": "file", "op": "add-text", "attach": "%p1", "key": "name", "markup": "a"});
+        op.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        Some(op)
+    };
+    // nothing given: the symbol's
+    let (h, v, r, _) = port_label(label(json!({})));
+    assert_eq!((h.as_str(), v.as_str(), r), ("end", "middle", 0.0));
+    let (h, v, r, written) = port_label(label(json!({"halign": "start", "valign": "baseline", "rotate": 0})));
+    assert_eq!((h.as_str(), v.as_str(), r), ("start", "baseline", 0.0), "{written}");
+    assert!(written.contains(r#"key="name", halign="start", valign="baseline", rotate=0)"#), "{written}");
+    // each on its own: the others stay the symbol's
+    let (h, v, r, _) = port_label(label(json!({"halign": "start"})));
+    assert_eq!((h.as_str(), v.as_str(), r), ("start", "middle", 0.0));
+    let (h, v, r, _) = port_label(label(json!({"valign": "baseline"})));
+    assert_eq!((h.as_str(), v.as_str(), r), ("end", "baseline", 0.0));
+    let (h, v, r, _) = port_label(label(json!({"rotate": 0})));
+    assert_eq!((h.as_str(), v.as_str(), r), ("end", "middle", 0.0));
+    // other values, as before
+    let (h, v, r, _) = port_label(label(json!({"halign": "middle", "valign": "top", "rotate": 90})));
+    assert_eq!((h.as_str(), v.as_str(), r), ("middle", "top", 90.0));
+}
+
+#[test]
+fn a_text_without_a_key_leaves_out_what_is_the_default() {
+    // a text without a key starts from the defaults and has nothing to inherit: start, baseline and no
+    // rotation are what it is without them, so they are left out; another value is written
+    let net = "* t\nR1 a 0 1k\n.end\n";
+    let text = |extra: Value| {
+        let mut op = json!({"level": "file", "op": "add-text", "at": [1, 2], "markup": "x"});
+        op.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        let out = write(&request("spice", net, json!([op]))).unwrap();
+        out.lines().find(|l| l.contains("@TEXT")).unwrap_or_default().trim_start_matches('*').trim().to_string()
+    };
+    assert_eq!(text(json!({"halign": "start", "valign": "baseline", "rotate": 0})), r#"(1, 2) @TEXT("x")"#);
+    assert_eq!(
+        text(json!({"halign": "end", "valign": "top", "rotate": 90})),
+        r#"(1, 2) @TEXT("x", halign="end", valign="top", rotate=90)"#
+    );
 }
 
 #[test]

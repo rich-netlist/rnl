@@ -1,11 +1,22 @@
 // client.js as TypeScript declarations, written by hand; keep them with the JSDoc in client.js.
 
-import type { Catalog, CatalogRequest, Document, Request, Snapshot, WriteRequest, Written } from "./core.js";
+import type {
+  Catalog,
+  CatalogRequest,
+  Document,
+  DrawingsRequest,
+  Request,
+  Snapshot,
+  UnplacedDrawing,
+  WriteRequest,
+  Written,
+} from "./core.js";
 
 export type {
   Catalog,
   CatalogRequest,
   Document,
+  DrawingsRequest,
   Literal,
   Op,
   Point,
@@ -13,6 +24,7 @@ export type {
   Run,
   RunStyle,
   Snapshot,
+  UnplacedDrawing,
   Vertex,
   WriteRequest,
   Written,
@@ -28,6 +40,8 @@ export interface CoreWorker {
   write(request: WriteRequest): Promise<Written>;
   /** List the symbols, definitions and sets of the packages the core has. */
   catalog(request: CatalogRequest): Promise<Catalog>;
+  /** The drawings of the objects without a position that the last build with `lazy_unplaced` listed, as the request names them. */
+  drawings(request: DrawingsRequest): Promise<UnplacedDrawing[]>;
   /** Stop the Worker; calls still waiting, and later ones, reject. */
   terminate(): void;
 }

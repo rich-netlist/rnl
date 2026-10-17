@@ -2,9 +2,12 @@
 // conformance corpus and the packages of libraries/, the Document that `rnl view` prints and the one the
 // WebAssembly core builds must be deep-equal, numbers compared exactly. Both get the same entry, an
 // absolute path; natively `rnl view` reads the disk, and in WebAssembly client.js's collect gives
-// the core the files it asks for, read from the disk as `rnl` reads them. With --snapshot, the
-// editor interface's snapshots are compared instead, with the host circuit and the model: the one
-// `rnl snapshot` prints and the one the core gives for the files collect read, revision included.
+// the core the files it asks for, read from the disk as `rnl` reads them. The Documents are built
+// as the web viewer builds them, without the drawings of the objects that have no position
+// (`lazy_unplaced`), and given them again by asking the core for the objects of each level, so that
+// what is compared is what the page ends up with. With --snapshot, the editor interface's
+// snapshots are compared instead, with the host circuit and the model: the one `rnl snapshot`
+// prints and the one the core gives for the files collect read, revision included.
 // Then, in either case, the catalog of every version of the packages the core has: the one
 // `rnl catalog --all-versions` prints and the one the core lists for a catalog request.
 //
@@ -160,15 +163,31 @@ function nativeCatalog() {
 async function webAssembly(entry) {
   const counted = { build: (request) => (builds++, core.build(request)) };
   try {
-    const { document, files } = await collect(counted, { ...extra, entry, files: packages }, readText);
+    const lazy = snapshot ? {} : { lazy_unplaced: true };
+    const { document, files } = await collect(counted, { ...extra, ...lazy, entry, files: packages }, readText);
     const read = Object.keys(files).length - Object.keys(packages).length;
-    if (!snapshot) return [{ value: document }, read];
+    if (!snapshot) return [{ value: withDrawings(document) }, read];
     builds++;
     const parts = { drawing: false, host: true, model: true };
     return [{ value: core.snapshot({ ...extra, entry, files, parts }) }, read];
   } catch (e) {
     return [{ error: e.message }, 0];
   }
+}
+
+/**
+ * The Document of the last build with the drawings of its unplaced objects, as the core gives them
+ * on request, put where a Document that carries them has them.
+ */
+function withDrawings(document) {
+  document.levels.forEach((level, k) => {
+    if (level.unplaced.length === 0) return;
+    const items = level.unplaced.map((_, i) => i);
+    const names = level.unplaced.map((u) => u.name);
+    const drawn = core.drawings({ drawings: { level: k, items, names } });
+    level.unplaced.forEach((u, i) => Object.assign(u, drawn[i]));
+  });
+  return document;
 }
 
 /** A file's text as `rnl` reads it, decoded by client.js's decodeText; null when it cannot be read. */

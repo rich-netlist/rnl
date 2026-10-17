@@ -84,16 +84,16 @@ function about() {
 }
 
 /** The project site's page of the tools, which offers the desktop viewer, in each of its languages. */
-const TOOLS = { zh: "https://rich-netlist.github.io/rnl/tools.html", en: "https://rich-netlist.github.io/rnl/en/tools.html" };
+const TOOLS = { zh: "https://rich-netlist.github.io/rnl/zh/tools.html", en: "https://rich-netlist.github.io/rnl/en/tools.html" };
 
 /**
  * Show the site's page of the tools through the shell (Help > Desktop Viewer, on the web): in
- * English when the browser's languages put English before Chinese, else in Chinese, the site's
- * first language.
+ * Chinese when the browser's languages put Chinese before English, else in English, the site's
+ * default.
  */
 function toolsPage() {
   const first = navigator.languages.find((language) => /^(en|zh)\b/i.test(language)) || "";
-  if (shell.browse) shell.browse(/^en/i.test(first) ? TOOLS.en : TOOLS.zh);
+  if (shell.browse) shell.browse(/^zh/i.test(first) ? TOOLS.zh : TOOLS.en);
 }
 
 /** Set the state of a check-mark command, such as "toggle-netlist", in the menus that show it. */

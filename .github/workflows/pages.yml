@@ -74,17 +74,19 @@ jobs:
           # newest release, whose files the page of the tools links to
           fetch-depth: 0
 
-      # Writes site/dist/: the Chinese pages at the root and the English pages under en/, the page of
-      # the tools with the files of the newest tag viewer-vX.Y.Z. site/README.md, site/build.py and
-      # site/src/ stay out of the published site.
+      # Writes site/dist/: the Chinese pages under zh/ and the English pages under en/, index.html, which
+      # leads to either by the browser's language, and the old addresses of the Chinese pages, which lead
+      # to zh/; the page of the tools has the files of the newest tag viewer-vX.Y.Z. site/README.md,
+      # site/build.py and site/src/ stay out of the published site.
       - name: Build the site
         run: python3 site/build.py
 
       - uses: ./.github/actions/install-spec-tools
 
       # Checks every version of the standard in spec/, then writes the pages and downloads of each:
-      # site/dist/spec/<version>/ (Chinese) and site/dist/en/spec/<version>/ (English), with the pages
-      # that compare it with each earlier version; site/dist/spec/ and site/dist/en/spec/ lead to the
+      # site/dist/zh/spec/<version>/ (Chinese) and site/dist/en/spec/<version>/ (English), with the pages
+      # that compare it with each earlier version, and the old addresses of the Chinese pages of 0.2,
+      # under site/dist/spec/; site/dist/zh/spec/ and site/dist/en/spec/ lead to the
       # newest version.
       - name: Build the pages of the standard
         run: python3 scripts/spec/build.py --site site/dist

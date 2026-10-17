@@ -440,7 +440,8 @@ pub struct UsageEntry {
     pub roles: Vec<RoleFill>,
     /// The parameters it has a value for, passed or by default (9.4).
     pub params: Vec<(String, Lit)>,
-    /// Its own `priority=`, or the default of its record (14.8).
+    /// Its own `priority=`, or the default of its record, which in a file of 0.3 is only ever
+    /// `"disabled"` (14.8). Writing the usage out keeps it (10.5).
     pub priority: Option<Priority>,
     /// The usage whose expansion made it.
     pub parent: Option<usize>,

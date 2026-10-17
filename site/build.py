@@ -22,11 +22,20 @@ as 0.1.0) and {{viewer-tag}} (viewer-v0.1.0) filled in; the parts between <!--no
 nest, and that the fields are only used in <!--release--> blocks.
 
 Output (site/dist/ by default, ignored by Git), for each page in PAGES:
-    index.html, language.html, tools.html, packages.html, assets/, *-standalone.html   Chinese, at the site root
+    zh/index.html, zh/language.html, zh/tools.html, zh/packages.html, zh/assets/, zh/*-standalone.html   Chinese
     en/index.html, en/language.html, en/tools.html, en/packages.html, en/assets/, en/*-standalone.html   English
+    index.html                                     leads to zh/ or en/, by the browser's first language
+    language.html, tools.html, packages.html, *-standalone.html   lead to the same pages under zh/
 The standalone files have the styles and scripts inlined and link the other pages to the published
-site; packages.html, the gallery of the standard packages, has none. The pages of the standard (spec/, one folder for each version), the web viewer (viewer/) and the gallery's data (gallery/), which the pages link to and load,
-are added by .github/workflows/pages.yml.
+site; packages.html, the gallery of the standard packages, has none. The pages of the standard (zh/spec/
+and en/spec/, one folder for each version), the web viewer (viewer/) and the gallery's data (gallery/),
+which the pages link to and load, are added by .github/workflows/pages.yml.
+
+Until 2026-10-18 the Chinese pages were at the root of the site, where their addresses still lead: the
+pages at the root that lead elsewhere keep the query and the section of the address, so that an old
+link such as tools.html#desktop opens zh/tools.html#desktop. The root itself leads to zh/ when the
+browser's first language is Chinese, and to en/ otherwise, or without scripts.
+The old addresses of the pages of the standard are kept by scripts/spec/build.py.
 
 Usage, from the repository root (standard library only, and git for the tags):
     python site/build.py              build into site/dist/
@@ -50,9 +59,14 @@ SRC = HERE / "src"
 DEFAULT_OUT = HERE / "dist"
 SITE_URL = "https://rich-netlist.github.io/rnl/"
 
-# (language code, output directory); the first language sits at the site root.
-LANGS = [("zh", ""), ("en", "en/")]
+# (language code, output directory). The root of the site leads to the Chinese pages when the browser's
+# first language is Chinese, and otherwise to HOME; the Chinese pages, which were at the root until
+# 2026-10-18, keep their old addresses there, which lead to MOVED.
+LANGS = [("zh", "zh/"), ("en", "en/")]
 CODES = [code for code, _ in LANGS]
+DIRS = dict(LANGS)
+HOME = DIRS["en"]
+MOVED = DIRS["zh"]
 
 # Each page and the name of its single-file version; None for a page that has none, such as the
 # gallery of the standard packages, which loads its data from gallery/ (site/gallery/build.mjs).
@@ -222,9 +236,51 @@ def standalone(page, out, page_url):
     return re.sub(r'(\shref=")([^"]*)"', absolute, html)
 
 
+def redirect(target, lang, text):
+    """A page that leads to `target`, an address relative to the root of the site, where the page is,
+    with the query and the section of its own address. GitHub Pages has no redirects of its own: the
+    script leads there at once, and the refresh where scripts do not run."""
+    return ('<!doctype html>\n<html lang="%s">\n<head>\n<meta charset="utf-8">\n<title>Rich Netlist (RNL)</title>\n'
+            '<link rel="canonical" href="%s%s">\n<meta http-equiv="refresh" content="0; url=%s">\n'
+            '<script>var to = "%s"; if (location.protocol === "file:" && /\\/$/.test(to)) to += "index.html";\n'
+            'location.replace(to + location.search + location.hash);</script>\n</head>\n'
+            '<body><p><a href="%s">%s</a></p></body>\n</html>\n') % (lang, SITE_URL, target, target, target, target, text)
+
+
+def home():
+    """index.html at the root of the site. It leads to the Chinese pages when the browser's first language
+    is Chinese, zh or zh-CN, zh-TW, zh-Hans and so on, and to the English ones otherwise, HOME, keeping the
+    query and the section of the address; without scripts, to HOME. It names both languages as its
+    alternates, HOME as the default, and links them."""
+    zh, en = DIRS["zh"], DIRS["en"]
+    return ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>Rich Netlist (RNL)</title>\n'
+            '<link rel="alternate" hreflang="zh" href="%s%s">\n<link rel="alternate" hreflang="en" href="%s%s">\n'
+            '<link rel="alternate" hreflang="x-default" href="%s%s">\n'
+            '<script>var first = (navigator.languages && navigator.languages[0]) || navigator.language || "";\n'
+            'var to = /^zh(-|$)/i.test(first) ? "%s" : "%s";\n'
+            'if (location.protocol === "file:") to += "index.html";\n'
+            'location.replace(to + location.search + location.hash);</script>\n'
+            '<noscript><meta http-equiv="refresh" content="0; url=%s"></noscript>\n</head>\n'
+            '<body><p><a href="%s" hreflang="zh" lang="zh-CN">中文</a> · <a href="%s" hreflang="en">English</a></p></body>\n'
+            '</html>\n') % (SITE_URL, zh, SITE_URL, en, SITE_URL, HOME, zh, HOME, HOME, zh, en)
+
+
+def redirects():
+    """The pages at the root of the site: index.html, which leads to the pages in the browser's language,
+    and the old addresses of the Chinese pages, which lead to the same pages under zh/ whatever the
+    browser's language."""
+    out = {"index.html": home()}
+    for page, single in PAGES.items():
+        for name in (page, single):
+            if name and name != "index.html":
+                out[name] = redirect(MOVED + name, "zh-CN", "这一页已移到 " + MOVED + name)
+    return out
+
+
 def build(version=None):
     """Build every page in every language, with the files of the desktop viewer's release `version`,
-    or None for no release yet."""
+    or None for no release yet, and the pages at the root that lead to them."""
     files = sources()
     errors = []
     for path, text in files.items():
@@ -235,6 +291,7 @@ def build(version=None):
     for index, (code, prefix) in enumerate(LANGS):
         for path, text in build_language(files, index, version).items():
             result[prefix + path] = text
+    result.update(redirects())
     return result
 
 
@@ -255,16 +312,18 @@ def write(result, out):
 
 GUIDE = """RNL introduction pages / RNL 介绍页
 
-rnl-intro/ is the complete site: open rnl-intro/index.html (Chinese) or rnl-intro/en/index.html
-(English), or upload the folder to any static host. .nojekyll makes GitHub Pages publish it as is.
+rnl-intro/ is the complete site: open rnl-intro/zh/index.html (Chinese) or rnl-intro/en/index.html
+(English), or upload the folder to any static host, where its root leads to the pages in the
+browser's language.
+.nojekyll makes GitHub Pages publish it as is.
 language.html next to each index.html is the language tour, tools.html the page of the viewers, and
 packages.html the gallery of the standard packages; the web viewer itself, the pages of the standard
 and the gallery's data are published with the site, not packed here.
 The *-standalone.html files in each language folder are single files with everything inlined.
 Fonts load from Google Fonts; offline, system fonts are used and the pages still work.
 
-rnl-intro/ 是完整站点：打开 rnl-intro/index.html（中文）或 rnl-intro/en/index.html（英文），
-或把整个目录上传到任意静态主机；.nojekyll 让 GitHub Pages 原样发布。每个 index.html 旁边的
+rnl-intro/ 是完整站点：打开 rnl-intro/zh/index.html（中文）或 rnl-intro/en/index.html（英文），
+或把整个目录上传到任意静态主机，根目录按浏览器语言跳到中文页或英文页；.nojekyll 让 GitHub Pages 原样发布。每个 index.html 旁边的
 language.html 是语言导览，tools.html 是查看器的介绍页，packages.html 是标准包图库；网页版查看器本身、
 语言标准的网页和图库的数据随网站发布，不在这个包里。各语言目录里的 *-standalone.html 是内联了全部样式和脚本的单文件版。
 字体从 Google Fonts 加载，离线时退回系统字体，页面照常可用。
@@ -272,8 +331,12 @@ language.html 是语言导览，tools.html 是查看器的介绍页，packages.h
 
 
 def pack(result, zip_path):
+    """The site in a zip, without the old addresses of the Chinese pages, which only the published site has."""
+    old = set(redirects()) - {"index.html"}
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for path, text in sorted(result.items()):
+            if path in old:
+                continue
             zf.writestr("rnl-intro/" + path, text)
         zf.writestr("rnl-intro/.nojekyll", "")
         zf.writestr("README.txt", GUIDE)
@@ -314,6 +377,8 @@ def main():
     for code, prefix in LANGS:
         for page in PAGES:
             print("  %s: %s" % (code, out / prefix / page))
+    print("  the root leads to %s in a browser whose first language is Chinese, else to %s; the old addresses"
+          " of the Chinese pages lead to %s" % (DIRS["zh"], HOME, MOVED))
     if version:
         print("the page of the tools links to the desktop viewer %s (tag viewer-v%s)" % (version, version))
     else:

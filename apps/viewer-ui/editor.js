@@ -234,8 +234,13 @@ function filesToSave() {
   return edits.dirty();
 }
 
-/** File > Save: write the files with changes not saved where they were read, or download the file shown on the web. True when saved. */
-export async function save() {
+/**
+ * File > Save: write the files with changes not saved where they were read from, or download the
+ * file shown on the web. A file that is no longer what was read, because another program changed
+ * it, is not written, nor are the others: the user is asked, and with `overwrite` they have said.
+ * True when saved.
+ */
+export async function save(overwrite = false) {
   if (!doc || modal()) return false;
   const opened = currentSource();
   if (shell.saveAs && opened && opened.text !== undefined) return saveAs();
@@ -245,15 +250,40 @@ export async function save() {
     return true;
   }
   try {
-    const said = await shell.save(opened, files);
+    const result = await shell.save(opened, files, overwrite);
+    if (result !== null && typeof result === "object") return changedOnDisk(result.changed);
     edits.markSaved(files.map((f) => f.path));
     refreshEditing();
-    note(said || "Saved.");
+    note(result || "Saved.");
     return true;
   } catch (e) {
     await inform({ title: "Save", paragraphs: [`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
     return false;
   }
+}
+
+/**
+ * The files that changed on disk since they were read, which saving would overwrite: nothing was
+ * written. The user says: Overwrite them, Reload the files, which drops the changes made here, or
+ * Cancel and look at what is on disk first.
+ */
+async function changedOnDisk(names) {
+  const many = names.length > 1;
+  const choice = await decide({
+    title: "File Changed on Disk",
+    paragraphs: [
+      `${many ? "These files were" : "This file was"} changed by another program since the viewer read ${many ? "them" : "it"}: ${names.join(", ")}.`,
+      "Nothing was saved. Overwrite writes the text in the viewer over what is on disk; Reload reads the files again and drops the changes made here.",
+    ],
+    action: "Overwrite",
+    others: ["Reload"],
+  });
+  if (choice === "Overwrite") return save(true);
+  if (choice === "Reload") {
+    const opened = currentSource();
+    if (opened) await openSource(opened, true);
+  }
+  return false;
 }
 
 /**

@@ -203,7 +203,7 @@ fn a_solution_of_the_draft_reads_back_as_it_was_solved() {
     // by name, by number, and the routes as WIRE given the wire
     for written in [
         "#M1 @PLACE(10, 0) => @ORIENT(\"R0\")",
-        "%ioport_in = $IOPORT @ATTACH(priority=\"normal\") &in",
+        "%ioport_in = $IOPORT @ATTACH &in",
         "%ioport_in @PLACE(",
         "%#1 @PLACE(",
         "%#3 @PLACE(",
@@ -357,8 +357,8 @@ fn the_wire_of_a_ground_that_a_rule_makes_is_routed_by_its_number() {
     // the stubs are written out first, and their wires are the record's own 3 and 4
     assert!(s.written.unsolved.is_empty(), "{:?}", s.written.unsolved);
     for written in [
-        "%gnd_stub_V1_n = $GND_STUB @ATTACH(gap=2, priority=\"normal\") #V1:n",
-        "%gnd_stub_R1_n = $GND_STUB @ATTACH(gap=2, priority=\"normal\") #R1:n",
+        "%gnd_stub_V1_n = $GND_STUB @ATTACH(gap=2) #V1:n",
+        "%gnd_stub_R1_n = $GND_STUB @ATTACH(gap=2) #R1:n",
         "%gnd_stub_V1_n::g @PLACE(",
         "%#2 @PLACE(",
         "%#3 @WIRE(mode=\"straight\") {#V1:n (",

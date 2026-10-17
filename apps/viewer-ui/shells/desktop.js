@@ -22,6 +22,8 @@ export default {
     source.text === undefined
       ? invoke("open_document", { path: source.path, edits: edits || null })
       : invoke("open_text", { name: source.name, text: held(source, edits) }),
+  // the drawings of the objects listed without a position, which the app keeps from the last build
+  unplacedDrawings: (level, items, names) => invoke("unplaced_drawings", { level, items, names }),
   setCheck(id, checked) {
     invoke("set_view_check", { id, checked }).catch(() => {});
   },
@@ -55,7 +57,11 @@ export default {
     tauri.event.listen("solve-progress", (e) => handler(e.payload));
   },
   // decision 0011: the files changed, written where they were read, and the netlist saved as another file
-  save: (source, files) => invoke("save_files", { entry: source.path, files }),
+  // a file that is not what was read, because another program changed it, is not written: its name comes back
+  save: (source, files, overwrite) =>
+    invoke("save_files", { entry: source.path, files, overwrite: overwrite === true }).then((saved) =>
+      saved.changed.length > 0 ? { changed: saved.changed } : saved.said,
+    ),
   saveAs: (source, saved) =>
     invoke("save_file_as", { entry: source.path || null, name: saved.name, text: saved.text }).then(file),
   setDirty(dirty) {

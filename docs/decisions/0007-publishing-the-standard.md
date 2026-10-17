@@ -37,3 +37,7 @@ The standard is read in several ways: on GitHub, downloaded to read offline or p
 - Version numbers in the text are written as code (`"1.2"`), so that they are not taken for section numbers and linked.
 - Building the site now needs pandoc and Typst, not only Python; CI installs them, and local builds need them installed.
 - The first publication of 0.2 is revision 1, tag `spec-0.2-r1`.
+
+## Note, 2026-10-18
+
+The Chinese pages of the site moved from its root to `zh/`, beside `en/`, and the root leads to the pages in the browser's language, Chinese or else English ([`site`](../../site/README.md#addresses)). Following the site, the Chinese web page of a version is now under `zh/spec/<version>/`. The old addresses of 0.2, `spec/0.2/` and `spec/`, lead there with the section of the address, and its downloads are copied there.

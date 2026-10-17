@@ -4,7 +4,7 @@
 
 RNL 写在电路网表的注释里，描述电路怎样画成原理图、各部分是什么意思；电路本身只由网表定义。本仓库存放这门语言的标准，今后会逐步加入可移植的 RNL 运行时、求解器、查看器、编辑器和标准符号库。
 
-**网站：[rich-netlist.github.io/rnl](https://rich-netlist.github.io/rnl/)**，有[写给电路设计者的介绍](https://rich-netlist.github.io/rnl/)、[语言导览](https://rich-netlist.github.io/rnl/language.html)、[语言标准 0.2](https://rich-netlist.github.io/rnl/spec/0.2/)、画出每个符号的[标准包图库](https://rich-netlist.github.io/rnl/packages.html)和[查看器](https://rich-netlist.github.io/rnl/tools.html)：一个[在浏览器里用](https://rich-netlist.github.io/rnl/viewer/)，一个供 Windows 下载。每页都有英文版。
+**网站：[rich-netlist.github.io/rnl/zh](https://rich-netlist.github.io/rnl/zh/)**，有[写给电路设计者的介绍](https://rich-netlist.github.io/rnl/zh/)、[语言导览](https://rich-netlist.github.io/rnl/zh/language.html)、[语言标准 0.2](https://rich-netlist.github.io/rnl/zh/spec/0.2/)、画出每个符号的[标准包图库](https://rich-netlist.github.io/rnl/zh/packages.html)和[查看器](https://rich-netlist.github.io/rnl/zh/tools.html)：一个[在浏览器里用](https://rich-netlist.github.io/rnl/viewer/)，一个供 Windows 下载。每页都有英文版。
 
 **状态：** 本仓库存放 RNL 语言标准 0.2 版及其原则、项目文档，以及 RNL 工具链：从第一版 0.1 起，现在有了求解器的第一版（[`crates/rnl-solver`](crates/rnl-solver/README.md)）。工具链读取带 RNL 记录的 SPICE 和 Spectre 网表，报告诊断，生成有效模型，画出有坐标的部分，并能把记录写回网表；附带 `rnl` 命令（其中 `rnl solve` 把求解器的记录写进文件的副本或原文件），以及标准包和符号的草稿。原理图由一个共享核心决定（[决定 0008](docs/decisions/0008-shared-core-per-platform-frontends.md)）：它用随附的字体排字（[决定 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)），原生运行和编译成 WebAssembly 运行得到的结果完全相同（[`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)）。两个查看器共用一个页面（[`apps/viewer-ui`](apps/viewer-ui/README.md)）：Windows 桌面版（[`apps/desktop`](apps/desktop/README.md)）和网页版（[`apps/web`](apps/web/README.md)）；它们打开网表，画出各层，显示网表文本、诊断和层次结构，在原理图和文本之间跟随选中的实例或网络，列出没画出来的对象，还能改文本、应用后重画：桌面版保存时写回文件，网页版保存时下载（[决定 0011](docs/decisions/0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md)）。桌面版还能求解，结果作为预览，可以另存求解副本（[决定 0010](docs/decisions/0010-desktop-viewer-solves-as-a-preview.md)）；已发布的 0.1.0 版早于编辑和求解。还没有拖动器件的编辑器。语言的 0.x 各版本之间不承诺兼容。
 
@@ -30,13 +30,13 @@ M5 tail vbias vss  vss nch W=4u L=1u
 .end
 ```
 
-网表本身不变。注释里的这条记录说：M1 和 M2 是一个差分对（M1 担任角色 `in_p`，M2 担任 `in_n`），两者 y 相同；M5 放在哪里、朝向如何；网络 `vss` 加一个地符号，并有导线连到 M5。记号之间的 `and`、`treated`、`is at` 等词是自由文本：标准例句加上它们，让语句读起来像句子，它们不改变含义。标准的 [1.3 节](https://rich-netlist.github.io/rnl/spec/0.2/#1.3)逐个解释了这些记号。
+网表本身不变。注释里的这条记录说：M1 和 M2 是一个差分对（M1 担任角色 `in_p`，M2 担任 `in_n`），两者 y 相同；M5 放在哪里、朝向如何；网络 `vss` 加一个地符号，并有导线连到 M5。记号之间的 `and`、`treated`、`is at` 等词是自由文本：标准例句加上它们，让语句读起来像句子，它们不改变含义。标准的 [1.3 节](https://rich-netlist.github.io/rnl/zh/spec/0.2/#1.3)逐个解释了这些记号。
 
 ## 语言标准
 
 | 内容 | 位置 |
 | --- | --- |
-| 网页 | [中文版](https://rich-netlist.github.io/rnl/spec/0.2/)和[英文版](https://rich-netlist.github.io/rnl/en/spec/0.2/)（正式文本），各附 PDF 和 Markdown 下载 |
+| 网页 | [中文版](https://rich-netlist.github.io/rnl/zh/spec/0.2/)和[英文版](https://rich-netlist.github.io/rnl/en/spec/0.2/)（正式文本），各附 PDF 和 Markdown 下载 |
 | 每个修订的全部发布形式 | 标签为 `spec-0.2-r1`、`spec-0.2-r2`……的 [GitHub Releases](https://github.com/rich-netlist/rnl/releases)：PDF、单文件网页、Markdown、按章打包的 zip，以及 `SHA256SUMS` |
 | 仓库里的 Markdown | [`spec/rnl-0.2.zh.md`](spec/rnl-0.2.zh.md)（中文版）和 [`spec/rnl-0.2.md`](spec/rnl-0.2.md)（英文版，正式文本），由 [`spec/0.2/`](spec/README.md) 里的各章合成 |
 | 标准词表 | [`spec/rnl-words-0.2.json`](spec/rnl-words-0.2.json) 及其 [schema](spec/rnl-words.schema.json)，是标准的一部分 |
@@ -59,7 +59,7 @@ M5 tail vbias vss  vss nch W=4u L=1u
 | [`scripts/`](scripts/README.md) | 项目维护脚本：生成标准的各种发布形式，以及随核心附带的字体。 |
 | [`.github/workflows/`](.github/workflows/README.md) | CI 工作流：项目网站、标准和桌面版查看器的发布、Rust 工作区、查看器及其浏览器测试。 |
 | [`docs/`](docs/README.md) | 工具链架构提案、路线图和决定记录。 |
-| [`site/`](site/README.md) | [项目网站](https://rich-netlist.github.io/rnl/)：写给电路设计者的介绍页、语言导览和工具页，中英文两版由 `site/build.py` 从同一份双语源生成；[`pages.yml`](.github/workflows/pages.yml) 再加上语言标准的网页和网页版查看器。 |
+| [`site/`](site/README.md) | [项目网站](https://rich-netlist.github.io/rnl/zh/)：写给电路设计者的介绍页、语言导览和工具页，中英文两版由 `site/build.py` 从同一份双语源生成；[`pages.yml`](.github/workflows/pages.yml) 再加上语言标准的网页和网页版查看器。 |
 
 建议从[文档地图](docs/README.md)、[工具链架构提案](docs/rnl-toolchain-architecture.md)（中文）和[路线图](docs/roadmap.md)读起。每个组件目录里都有一份简短的 README，说明它计划承担的职责。
 

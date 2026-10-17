@@ -4,10 +4,10 @@
 E1 out 0 inp inn 1e5
 * @RNL { # @SET-SYMBOL $OPAMP }
 * @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:46efefa0b801448d.1f3b310f8bee492a") {
-*   %gnd_stub_E1_n = $GND_STUB @ATTACH(gap=2, priority="normal") #E1:n;
-*   %ioport_inp = $IOPORT @ATTACH(priority="normal") &inp;
-*   %ioport_inn = $IOPORT @ATTACH(priority="normal") &inn;
-*   %ioport_out = $IOPORT @ATTACH(priority="normal") &out;
+*   %gnd_stub_E1_n = $GND_STUB @ATTACH(gap=2) #E1:n;
+*   %ioport_inp = $IOPORT @ATTACH &inp;
+*   %ioport_inn = $IOPORT @ATTACH &inn;
+*   %ioport_out = $IOPORT @ATTACH &out;
 *   #E1 @PLACE(0, 3) => @ORIENT("R0");
 *   %gnd_stub_E1_n::g @PLACE(0, -2) => @ORIENT("R0");
 *   %ioport_inp @PLACE(-6, 4) => @ORIENT("R0");
@@ -31,10 +31,10 @@ VIN vin 0 AC 1
 *   $WIRE_NET_SET @ROUTE
 * }
 * @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:8f668cec2918eb11.1f3b310f8bee492a") {
-*   %gnd_stub_XA_inp = $GND_STUB @ATTACH(gap=2, priority="normal") #XA:inp;
-*   %gnd_stub_C1_n = $GND_STUB @ATTACH(gap=2, priority="normal") #C1:n;
-*   %gnd_stub_RL_n = $GND_STUB @ATTACH(gap=2, priority="normal") #RL:n;
-*   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VIN:n;
+*   %gnd_stub_XA_inp = $GND_STUB @ATTACH(gap=2) #XA:inp;
+*   %gnd_stub_C1_n = $GND_STUB @ATTACH(gap=2) #C1:n;
+*   %gnd_stub_RL_n = $GND_STUB @ATTACH(gap=2) #RL:n;
+*   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2) #VIN:n;
 *   %rt1 = (11, 7);
 *   %rt2 = (30, 7);
 *   %rt3 = (38, 7);

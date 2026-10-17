@@ -65,9 +65,19 @@ function unnamed(doc) {
   return { ...doc, path: null, missing: doc.missing.map(fromDir) };
 }
 
-/** The same Document as `rnl view` builds for `file`, but for the paths that name the files. */
+/**
+ * The Document without the drawings of the objects that have no position, as the web viewer asks
+ * the core for it (`lazy_unplaced`) and then asks for those of the rows its list shows. The
+ * equality test (bindings/runtime-wasm/tests/equality.mjs) compares them with `rnl view`'s.
+ */
+function lazily(doc) {
+  const levels = doc.levels.map((l) => ({ ...l, unplaced: l.unplaced.map(({ svg, primitives, ...u }) => u) }));
+  return { ...doc, levels };
+}
+
+/** The same Document as `rnl view` builds for `file`, but for the paths that name the files and the drawings of the objects without a position. */
 function sameAsRnl(doc, file) {
-  expect(unnamed(doc)).toEqual(unnamed(rnlView(file)));
+  expect(unnamed(doc)).toEqual(unnamed(lazily(rnlView(file))));
 }
 
 /** The directories the test made, removed after it, and the servers it started, stopped after it. */
@@ -418,6 +428,29 @@ test("File > Load from Clipboard opens the text alone, as rnl view reads it in a
   expect([doc.name, doc.files.length, doc.missing]).toEqual(["clipboard.sp", 1, ["/04-hierarchy-lib.inc"]]);
   sameAsRnl(doc, path.join(folder({ "clipboard.sp": text }), "clipboard.sp"));
   await showsDocument(page, doc);
+});
+
+test("the Not drawn list asks the core for the drawings of its rows, which the Document does not carry", async ({ page }) => {
+  const text = "* none placed\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n.end\n";
+  await start(page);
+  await page.evaluate((t) => {
+    navigator.clipboard.readText = async () => t;
+  }, text);
+  const doc = await opened(page, async () => {
+    await page.locator("#menubar .menu-title", { hasText: "File" }).click();
+    await page.locator('#menubar .menu-item[data-id="load-clipboard"]').click();
+    await page.locator("dialog.dialog").getByRole("button", { name: "Load" }).click();
+  });
+  const listed = doc.levels[0].unplaced;
+  expect(listed.length).toBeGreaterThanOrEqual(3);
+  expect(listed.some((u) => u.svg || u.primitives)).toBe(false);
+  await page.locator("#tab-unplaced").click();
+  const rows = page.locator("#unplaced-list .unplaced-row");
+  await expect(rows).toHaveCount(listed.length);
+  await expect(rows.locator(".thumb svg")).toHaveCount(listed.length);
+  // each is drawn with its own symbol and the nets at its pins
+  const nets = rows.filter({ has: page.locator(".name", { hasText: /^M1$/ }) }).locator(".thumb svg text");
+  expect((await nets.allTextContents()).sort()).toEqual(["0", "d", "g", "s"]);
 });
 
 test("the text edited and applied is built by the core as rnl view builds the same files, and Save downloads the file shown", async ({ page }) => {

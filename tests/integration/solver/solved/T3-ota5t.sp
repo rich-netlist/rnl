@@ -37,15 +37,15 @@ M5 tail vbias vss vss nch W=4u L=1u
 *   $WIRE_NET_SET @ROUTE
 * }
 * @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:ab3e7987ac2f925c.1f3b310f8bee492a") {
-*   %gnd_stub_M5_s = $GND_STUB @ATTACH(gap=2, priority="normal") #M5:s;
-*   %supply_stub_M3_s = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #M3:s;
-*   %supply_stub_M4_s = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #M4:s;
-*   %ioport_inp = $IOPORT @ATTACH(priority="normal") &inp;
-*   %ioport_inn = $IOPORT @ATTACH(priority="normal") &inn;
-*   %ioport_out = $IOPORT @ATTACH(priority="normal") &out;
-*   %ioport_vdd = $IOPORT @ATTACH(priority="normal") &vdd;
-*   %ioport_vss = $IOPORT @ATTACH(priority="normal") &vss;
-*   %ioport_vbias = $IOPORT @ATTACH(priority="normal") &vbias;
+*   %gnd_stub_M5_s = $GND_STUB @ATTACH(gap=2) #M5:s;
+*   %supply_stub_M3_s = $SUPPLY_STUB @ATTACH(gap=2) #M3:s;
+*   %supply_stub_M4_s = $SUPPLY_STUB @ATTACH(gap=2) #M4:s;
+*   %ioport_inp = $IOPORT @ATTACH &inp;
+*   %ioport_inn = $IOPORT @ATTACH &inn;
+*   %ioport_out = $IOPORT @ATTACH &out;
+*   %ioport_vdd = $IOPORT @ATTACH &vdd;
+*   %ioport_vss = $IOPORT @ATTACH &vss;
+*   %ioport_vbias = $IOPORT @ATTACH &vbias;
 *   %rt1 = (0, -2);
 *   %rt2 = (-4, 2);
 *   %rt3 = (-8, -1);
@@ -98,14 +98,14 @@ CL out 0 1p
 *   $WIRE_NET_SET @ROUTE
 * }
 * @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:cff169f7ae0ac311.1f3b310f8bee492a") {
-*   %gnd_stub_XU1_vss = $GND_STUB @ATTACH(gap=2, priority="normal") #XU1:vss;
-*   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VDD:n;
-*   %gnd_stub_VB_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VB:n;
-*   %gnd_stub_VIP_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VIP:n;
-*   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VIN:n;
-*   %gnd_stub_CL_n = $GND_STUB @ATTACH(gap=2, priority="normal") #CL:n;
-*   %supply_stub_XU1_vdd = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #XU1:vdd;
-*   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #VDD:p;
+*   %gnd_stub_XU1_vss = $GND_STUB @ATTACH(gap=2) #XU1:vss;
+*   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2) #VDD:n;
+*   %gnd_stub_VB_n = $GND_STUB @ATTACH(gap=2) #VB:n;
+*   %gnd_stub_VIP_n = $GND_STUB @ATTACH(gap=2) #VIP:n;
+*   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2) #VIN:n;
+*   %gnd_stub_CL_n = $GND_STUB @ATTACH(gap=2) #CL:n;
+*   %supply_stub_XU1_vdd = $SUPPLY_STUB @ATTACH(gap=2) #XU1:vdd;
+*   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=2) #VDD:p;
 *   #XU1 @PLACE(10, 1) => @ORIENT("R0");
 *   #VDD @PLACE(0, 1) => @ORIENT("R0");
 *   #VB @PLACE(19, -11) => @ORIENT("R0");

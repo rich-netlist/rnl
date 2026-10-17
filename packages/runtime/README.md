@@ -46,6 +46,22 @@ const resistor = catalog.symbols.find((s) => s.symbol === "$RESISTOR");
 
 Of each name only the newest version is listed; `{ catalog: { packages: ["rnl-std-basic"], all_versions: true } }` keeps the packages of these names, every version of each. A symbol's `definition` names the definition whose usages a rule of the packages draws with it, such as `$GROUND` for `$GROUND_SYMBOL`.
 
+## Objects without a position
+
+A netlist that has no positions yet lists every object in `Level.unplaced`, each with its symbol drawn alone as `svg`, about 1.3 KB each. A frontend that shows a few of them at a time builds with `lazy_unplaced: true`, which leaves those drawings out of the Document and keeps them in the core, and asks for the drawings of the objects it shows, by their places in the level's list and their names, which the core checks against the build it kept:
+
+```js
+const document = await core.build({ entry: "/top.sp", files, lazy_unplaced: true });
+const level = 0;
+const unplaced = document.levels[level].unplaced.slice(0, 20);
+const drawings = await core.drawings({
+  drawings: { level, items: unplaced.map((_, i) => i), names: unplaced.map((u) => u.name) },
+});
+// drawings[0].svg draws unplaced[0]
+```
+
+The request is about the last build that had `lazy_unplaced`, and is refused, with a message, when no build did, when an object is not there, or when the names are those of another build.
+
 ## Vite
 
 A frontend built with Vite needs three settings:

@@ -34,7 +34,7 @@ The netlist is unchanged; the record in its comments says that M1 and M2 are a d
 
 | What | Where |
 | --- | --- |
-| Web page | [English](https://rich-netlist.github.io/rnl/en/spec/0.2/) (normative) and [Chinese](https://rich-netlist.github.io/rnl/spec/0.2/), each with its PDF and Markdown downloads |
+| Web page | [English](https://rich-netlist.github.io/rnl/en/spec/0.2/) (normative) and [Chinese](https://rich-netlist.github.io/rnl/zh/spec/0.2/), each with its PDF and Markdown downloads |
 | Every published form of a revision | The [GitHub releases](https://github.com/rich-netlist/rnl/releases) tagged `spec-0.2-r1`, `spec-0.2-r2`, …: PDF, single-file web page, Markdown, the chapters as a zip, and `SHA256SUMS` |
 | Markdown in this repository | [`spec/rnl-0.2.md`](spec/rnl-0.2.md) (English, normative) and [`spec/rnl-0.2.zh.md`](spec/rnl-0.2.zh.md) (Chinese), assembled from the chapters in [`spec/0.2/`](spec/README.md) |
 | Standard word list | [`spec/rnl-words-0.2.json`](spec/rnl-words-0.2.json) and its [schema](spec/rnl-words.schema.json), part of the standard |

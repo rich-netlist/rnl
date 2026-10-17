@@ -20,6 +20,10 @@ import { requestText } from "./core.js";
  * @property {(request: import("./core.js").CatalogRequest) => Promise<object>} catalog List the
  *   symbols, definitions and sets of the packages the core has, the bundled ones and those of the
  *   request's package directories (catalog.d.ts).
+ * @property {(request: import("./core.js").DrawingsRequest) => Promise<object[]>} drawings The
+ *   drawings, `{ svg?, primitives? }` each, of the objects without a position that the last build
+ *   with `lazy_unplaced` listed, as the request names them; rejects when none was built, an object
+ *   is not there, or `names` are not those of the build.
  * @property {() => void} terminate Stop the Worker; calls still waiting, and later ones, reject.
  */
 
@@ -84,6 +88,7 @@ export function startCore(options = {}) {
     snapshot: (request) => send(request, "snapshot"),
     write: (request) => send(request, "written"),
     catalog: (request) => send(request, "catalog"),
+    drawings: (request) => send(request, "drawings"),
     terminate() {
       stop(new Error("The core was stopped."));
       worker.then((w) => w.terminate(), () => {});

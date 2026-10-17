@@ -306,6 +306,17 @@ def where_note(where, lang="en") -> str:
     return ""
 
 
+def priority_default(words, lang="en") -> str:
+    """What applies when `priority` is not written (14.8): from 0.3 on, the record head gives AS and
+    ATTACH only "disabled"."""
+    zh = lang == "zh"
+    if tuple(int(n) for n in words["version"].split(".")) < (0, 3):
+        return "不写时用记录头的优先级（14.8）。" if zh else "without it the priority of the record head applies (14.8)."
+    if zh:
+        return "不写时用记录头的优先级，只是 AS、ATTACH 从记录头只取 `\"disabled\"`（14.8）。"
+    return "without it the priority of the record head applies, except that AS and ATTACH take only `\"disabled\"` from it (14.8)."
+
+
 def annex_a(words, lang="en") -> str:
     zh = lang == "zh"
     if zh:
@@ -317,7 +328,7 @@ def annex_a(words, lang="en") -> str:
              "- **种类**是种类名（" + "、".join(f"`{k['name']}`" for k in words["kinds"]) + "）或："
              + "；".join(f"*{k['name']}*，{PSEUDO_KINDS_ZH[k['name']]}" for k in words["pseudo_kinds"]) + "。",
              "- **参数**标了*位置 1*、*位置 2*的可以按位置写，按这个次序；其余只能写名字（4.2）。"
-             "`priority` 的取值总是 `\"disabled\"`、`\"low\"`、`\"normal\"`、`\"high\"`；不写时用记录头的优先级（14.8）。",
+             "`priority` 的取值总是 `\"disabled\"`、`\"low\"`、`\"normal\"`、`\"high\"`；" + priority_default(words, lang),
              "- **结果**：语句给出的对象（5.5），以及它的事实怎样覆盖（5.8）。没写覆盖方式的，事实累加。",
              "- 没有注明的，关键字可以写在层的任何记录里；注明*也可写在符号体里*的，还可以写在 DEFINE-SYMBOL 的体里。",
              "",
@@ -333,7 +344,7 @@ def annex_a(words, lang="en") -> str:
              "- **Kinds** of slots are kind names (" + ", ".join(f"`{k['name']}`" for k in words["kinds"]) + ") or: "
              + "; ".join(f"*{k['name']}*, {k['meaning']}" for k in words["pseudo_kinds"]) + ".",
              "- **Parameters** marked *position 1*, *position 2* can be given by position, in that order; all others only by name (4.2). "
-             "`priority` always takes `\"disabled\"`, `\"low\"`, `\"normal\"` or `\"high\"`; without it the priority of the record head applies (14.8).",
+             "`priority` always takes `\"disabled\"`, `\"low\"`, `\"normal\"` or `\"high\"`; " + priority_default(words, lang),
              "- **Result**: the object the statement gives (5.5) and how its facts override (5.8). Without an override, facts accumulate.",
              "- Unless noted, a keyword can be written in any record of a level; *symbol bodies* means it can also be written in a DEFINE-SYMBOL body.",
              "",

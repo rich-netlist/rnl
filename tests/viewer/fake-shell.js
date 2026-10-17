@@ -11,6 +11,10 @@
 // fixture NAME-preview of the source, which `rnl preview` printed, and the solver's defaults, which
 // Solve > Settings shows, are DEFAULTS below; otherwise it offers the web's commands and the page
 // shows its own menu bar.
+//
+// A build gives the Document as the real shells' cores do: without the drawings of the objects that
+// have no position, which it keeps and gives on request (`unplacedDrawings`), the fixture having
+// them; a solve's Document carries them, as the desktop's does.
 
 const params = new URLSearchParams(location.search);
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";
@@ -86,6 +90,10 @@ const fake = {
   writes: [],
   /** A message the next Save rejects with, as a shell does when it cannot write. */
   writeFail: null,
+  /** The names of files that another program changed since they were read: the next Save, unless it overwrites, writes nothing and says so. */
+  changedOnDisk: null,
+  /** Whether each Save, written or not, was to overwrite, in order. */
+  overwrites: [],
   /** What the next Save As gives: a source, a fixture's name or { name, fixture }; null when the user cancels. */
   savedAs: null,
   /** The files each Save As was asked to write, in order. */
@@ -99,10 +107,26 @@ const fake = {
   saveFail: null,
   /** What the solver says is wrong with the settings it is asked to check; null when they will do. */
   optionsError: null,
+  /**
+   * Whether the next builds carry the drawings of the objects without a position in their
+   * Documents, as the Documents of a core that was not asked to leave them out do; then no build
+   * keeps them to give on request.
+   */
+  carry: false,
+  /** A message the next request for drawings rejects with. */
+  drawingsFail: null,
+  /** Whether requests for drawings wait, once the shell has them, until `releaseDrawings()`. */
+  holdDrawings: false,
+  /** Let the requests for drawings that wait give them. */
+  releaseDrawings() {
+    for (const resolve of heldDrawings.splice(0)) resolve();
+  },
 };
 window.fakeShell = fake;
 
 let held = null; // the solve that waits: { resolve, reject }
+let heldDrawings = []; // the requests for drawings that wait: their resolve
+let kept = null; // the drawings of the last build that left them out of its Document, by level: { names, drawings }
 let closing = null; // the page's handler of a request to close the window
 let progress = null; // the page's handler of each level a solve begins
 
@@ -180,7 +204,34 @@ export default {
     if (fail !== null) throw fail;
     const response = await fetch(`/fixtures/${encodeURIComponent(name)}.json`);
     if (!response.ok) throw `${src.name}: there is no such fixture`;
-    return response.json();
+    const document = await response.json();
+    if (!fake.carry) {
+      kept = document.levels.map((level) => ({
+        names: level.unplaced.map((u) => u.name),
+        drawings: level.unplaced.map(({ svg, primitives }) => ({ svg, primitives })),
+      }));
+      for (const u of document.levels.flatMap((level) => level.unplaced)) {
+        delete u.svg;
+        delete u.primitives;
+      }
+    }
+    return document;
+  },
+  /**
+   * The drawings the last build kept, of the objects at `items` of a level, which must be those of
+   * `names`: the core refuses a request about a Document that was built since.
+   */
+  async unplacedDrawings(level, items, names) {
+    fake.calls.push(["unplacedDrawings", level, items]);
+    if (fake.holdDrawings) await new Promise((resolve) => heldDrawings.push(resolve));
+    const fail = fake.drawingsFail;
+    fake.drawingsFail = null;
+    if (fail !== null) throw fail;
+    if (kept === null) throw "no document has kept drawings";
+    const there = kept[level];
+    if (!there || items.some((i) => !(i in there.drawings))) throw `level ${level} lists no unplaced object in ${items}`;
+    if (items.some((i, k) => there.names[i] !== names[k])) throw "the document was built again";
+    return items.map((i) => there.drawings[i]);
   },
   setCheck(id, checked) {
     fake.calls.push(["setCheck", id, checked]);
@@ -193,8 +244,15 @@ export default {
     fake.calls.push(["browse", url]);
   },
   /** Decision 0011: Save writes the files and says so; on the desktop Save As asks where; the platform is told of changes not saved. */
-  async save(src, files) {
+  async save(src, files, overwrite) {
     fake.calls.push(["save", src.name]);
+    fake.overwrites.push(overwrite === true);
+    if (fake.changedOnDisk !== null && overwrite !== true) {
+      const changed = fake.changedOnDisk;
+      fake.changedOnDisk = null;
+      return { changed };
+    }
+    fake.changedOnDisk = null;
     fake.writes.push(files);
     const fail = fake.writeFail;
     fake.writeFail = null;

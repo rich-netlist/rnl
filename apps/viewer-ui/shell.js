@@ -19,6 +19,13 @@
  *   Document's types are generated from the core's Rust types into
  *   crates/rnl-view/types/document.d.ts, for checking the page; nothing is loaded from there at
  *   run time.
+ * @property {(level: number, items: number[], names: string[]) => Promise<{ svg?: string }[]>} [unplacedDrawings]
+ *   The drawings of the objects at `items` of `levels[level].unplaced` of the Document `build` gave
+ *   last, `{ svg }` each, in order: the Document leaves them out (`Level.unplaced[].svg`), a netlist
+ *   with no positions listing every object, and the list of them in the side panel asks for the
+ *   rows it shows (unplaced.js). `names` are the objects' names as the Document lists them, which the
+ *   shell's core checks, so that a request about a Document that was built since is refused. Rejects
+ *   with a message when it cannot. A shell whose Documents carry the drawings leaves it out.
  * @property {(id: string, checked: boolean) => void} setCheck Show a check-mark command's state, such as
  *   "toggle-netlist", in the platform's menu.
  * @property {(handler: (id: string) => void) => void} onCommand Call `handler` with the id of each command
@@ -54,10 +61,13 @@
  *   user cancelled. Rejects with a message when it cannot.
  * @property {(handler: (step: SolveStep) => void) => void} [onSolveProgress] Call `handler` with each
  *   level as the solve under way begins it.
- * @property {(source: Source, files: SavedFile[]) => Promise<string>} [save] Write the text of the files
- *   where they were read from, which the user has asked for with File > Save (decision 0011): a
- *   sentence that says what was saved. On the web, which cannot write files, download them. Rejects
- *   with a message when it cannot. A shell that offers neither does not save.
+ * @property {(source: Source, files: SavedFile[], overwrite?: boolean) => Promise<string | { changed: string[] }>} [save]
+ *   Write the text of the files where they were read from, which the user has asked for with File >
+ *   Save (decision 0011): a sentence that says what was saved. Unless `overwrite`, a file that is no
+ *   longer what it was when it was read (`SavedFile.read`), because another program changed it or
+ *   took it away, is not written, nor are the others: `{ changed }`, the names of those files, for
+ *   the user to say. On the web, which cannot write files, download them. Rejects with a message when
+ *   it cannot. A shell that offers neither does not save.
  * @property {(source: Source, file: SavedFile) => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.
@@ -77,9 +87,11 @@
  */
 
 /**
- * A file to save: its path as the Document names it, its name as shown, and its text as the file has it.
+ * A file to save: its path as the Document names it, its name as shown, its text as the file has it,
+ * and its text as it was read, with `\n` line ends, which a shell that can look at the file on disk
+ * checks it for.
  *
- * @typedef {{ path: string, name: string, text: string }} SavedFile
+ * @typedef {{ path: string, name: string, text: string, read?: string }} SavedFile
  */
 
 /**

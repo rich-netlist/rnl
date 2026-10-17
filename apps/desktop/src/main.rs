@@ -7,6 +7,7 @@
 // no console window behind the app in release builds on Windows
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod core_thread;
 mod files;
 mod menu;
 mod solve;
@@ -15,9 +16,10 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use files::{Edits, SavedFile};
+use core_thread::Core;
+use files::{Edits, Saved, SavedFile};
 use rnl_cli::FsProvider;
-use rnl_view::{BuildOptions, Document, MemoryProvider};
+use rnl_view::{BuildOptions, Document, MemoryProvider, UnplacedDrawing};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
@@ -75,23 +77,30 @@ fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
 const NETLISTS: [&str; 10] = ["sp", "spi", "spice", "cir", "ckt", "net", "inc", "lib", "scs", "rnl"];
 
 /// Read and draw a file, and name the window after it. With `edits`, the texts of some of its
-/// files are those, over what is on disk.
+/// files are those, over what is on disk. The drawings of the objects it lists without a position
+/// are kept for `unplaced_drawings`, in place of those of the last document.
 #[tauri::command]
 async fn open_document(
     window: WebviewWindow,
     unsaved: State<'_, Unsaved>,
+    core: State<'_, Core>,
     path: String,
     edits: Option<Edits>,
 ) -> Result<Document, String> {
+    let core = core.inner().clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
-        let path = std::path::absolute(&path).map_err(|e| format!("{path}: {e}"))?;
-        let entry = path.to_string_lossy().into_owned();
-        let held = files::held(&entry, &edits.unwrap_or_default());
-        let disk = FsProvider::new(&[]);
-        rnl_view::build(&entry, &files::layered(&held, &disk), &BuildOptions::default())
+        core.run(move |drawn| {
+            let path = std::path::absolute(&path).map_err(|e| format!("{path}: {e}"))?;
+            let entry = path.to_string_lossy().into_owned();
+            let held = files::held(&entry, &edits.unwrap_or_default());
+            let disk = FsProvider::new(&[]);
+            let (doc, kept) = rnl_view::build_drawn(&entry, &files::layered(&held, &disk), &BuildOptions::default())?;
+            *drawn = Some(kept);
+            Ok::<_, String>(doc)
+        })
     })
     .await
-    .map_err(|e| e.to_string())??;
+    .map_err(|e| e.to_string())???;
     unsaved.set(&window, |state| state.0 = doc.name.clone());
     Ok(doc)
 }
@@ -102,26 +111,56 @@ async fn open_document(
 async fn open_text(
     window: WebviewWindow,
     unsaved: State<'_, Unsaved>,
+    core: State<'_, Core>,
     name: String,
     text: String,
 ) -> Result<Document, String> {
+    let core = core.inner().clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
-        let entry = format!("/{name}");
-        rnl_view::build(&entry, &MemoryProvider::new().with(&entry, &text), &BuildOptions::default())
+        core.run(move |drawn| {
+            let entry = format!("/{name}");
+            let files = MemoryProvider::new().with(&entry, &text);
+            let (doc, kept) = rnl_view::build_drawn(&entry, &files, &BuildOptions::default())?;
+            *drawn = Some(kept);
+            Ok::<_, String>(doc)
+        })
     })
     .await
-    .map_err(|e| e.to_string())??;
+    .map_err(|e| e.to_string())???;
     unsaved.set(&window, |state| state.0 = doc.name.clone());
     Ok(doc)
 }
 
-/// Write the files of the netlist at `entry` that the user chose to save where they were read from,
-/// each in its encoding, and say which: nothing else is written (decision 0011).
+/// The drawings of the objects at `items` of `levels[level].unplaced` of the document opened last:
+/// `{ svg }` each, in order. The page asks for the rows it shows, with their `names`, which must
+/// be those of that document: a request about one that was opened since is refused.
 #[tauri::command]
-async fn save_files(entry: String, files: Vec<SavedFile>) -> Result<String, String> {
+async fn unplaced_drawings(
+    core: State<'_, Core>,
+    level: usize,
+    items: Vec<usize>,
+    names: Vec<String>,
+) -> Result<Vec<UnplacedDrawing>, String> {
+    let core = core.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        core.run(move |drawn| match drawn {
+            Some(d) => d.unplaced(level, &items, &names),
+            None => Err("no document has kept drawings".to_string()),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())??
+}
+
+/// Write the files of the netlist at `entry` that the user chose to save where they were read from,
+/// each in its encoding, and say which: nothing else is written (decision 0011). Unless the user
+/// said to `overwrite`, a file that is not what it was when it was read is not written, nor are the
+/// others; the names of those files are given back.
+#[tauri::command]
+async fn save_files(entry: String, files: Vec<SavedFile>, overwrite: Option<bool>) -> Result<Saved, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let entry = std::path::absolute(&entry).map_err(|e| format!("{entry}: {e}"))?;
-        files::save_all(&entry.to_string_lossy(), &files)
+        files::save_all(&entry.to_string_lossy(), &files, overwrite.unwrap_or(false))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -202,6 +241,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .manage(solve::Solves::default())
         .manage(Unsaved::default())
+        .manage(Core::new())
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "exit" => request_exit(app),
@@ -221,6 +261,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             open_document,
             open_text,
+            unplaced_drawings,
             save_files,
             save_file_as,
             set_dirty,

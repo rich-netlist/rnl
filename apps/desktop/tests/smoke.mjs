@@ -520,6 +520,29 @@ async function drive(app, port, profile, t0, session) {
     page.evaluate(`document.querySelectorAll("#file-tabs button[data-unsaved='true']").length === 0`),
   );
   same(fs.readFileSync(netlistInclude).equals(includeOnDisk), true, "the include after the netlist was saved");
+  // another program changes the file after the viewer read it: Save does not write over it, and asks;
+  // Overwrite writes the text of the viewer
+  const eol = saved.includes("\r\n") ? "\r\n" : "\n";
+  fs.appendFileSync(netlist, `* changed by another program${eol}`);
+  await page.evaluate(`(() => {
+    const area = document.querySelector("#source .editor:not([hidden]) textarea");
+    area.value += "* and in the viewer\\n";
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  })()`);
+  chooseItem(app.pid, at("save"));
+  const changedOnDisk = await until("the question about the file changed on disk", () =>
+    page.evaluate(`(() => {
+      const d = document.querySelector("dialog.dialog .dialog-title");
+      return d && d.textContent;
+    })()`),
+  );
+  same(changedOnDisk, "File Changed on Disk", "the dialog of the file changed by another program");
+  same(fs.readFileSync(netlist, "utf8"), `${saved}* changed by another program${eol}`, "the file on disk while the question is asked");
+  await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Overwrite").click()`);
+  await until("the file overwritten", () => fs.readFileSync(netlist, "utf8") === `${saved}* and in the viewer${eol}`, 20_000);
+  // what was saved is not applied yet, and leaving the text boxes with a line not applied asks about it
+  chooseItem(app.pid, at("apply-edits"));
+  await until("the line applied", () => page.evaluate(`document.getElementById("apply-edits").disabled`), 20_000);
   chooseItem(app.pid, at("toggle-edit"));
   await until("the text read again", () => page.evaluate(`document.querySelectorAll("#source .editor").length === 0`));
   console.log("Edit > Edit Text, Apply Changes and File > Save built the edited text natively and saved the one file, as it was written");
@@ -545,6 +568,31 @@ async function drive(app, port, profile, t0, session) {
   const pasted = await page.evaluate(`({ files: window.viewer.doc.files.length, missing: window.viewer.doc.missing })`);
   same(pasted, { files: 1, missing: ["/04-hierarchy-lib.inc"] }, "the clipboard's netlist, alone");
   console.log("File > Load from Clipboard drew the netlist that the clipboard held, alone");
+
+  // a netlist with nothing placed: its Document carries no drawing of the objects that have no
+  // position, the app keeps them from the build, and the Not drawn list asks for those of its rows
+  const bare = "* none placed\nR1 a b 1k\nC1 b 0 1p\n.end\n";
+  await page.evaluate(`navigator.clipboard.readText = async () => ${JSON.stringify(bare)}`);
+  chooseItem(app.pid, at("load-clipboard"));
+  await until("the second clipboard text in its preview", () =>
+    page.evaluate(`(() => {
+      const box = document.querySelector("dialog.dialog .clip-preview");
+      return box !== null && box.textContent.startsWith("* none placed");
+    })()`),
+  );
+  await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Load").click()`);
+  await until("the netlist with nothing placed", () =>
+    page.evaluate(`window.viewer.doc.files[0].text.startsWith("* none placed") && !document.body.classList.contains("busy")`),
+  );
+  same(await page.evaluate(`window.viewer.doc.levels[0].unplaced.some((u) => u.svg || u.primitives)`), false, "drawings in the Document");
+  await page.evaluate(`document.getElementById("tab-unplaced").click()`);
+  const thumbs = await until("the drawings of the objects not drawn", () =>
+    page.evaluate(`(() => {
+      const rows = [...document.querySelectorAll("#unplaced-list .unplaced-row")];
+      return rows.length >= 2 && rows.every((r) => r.querySelector(".thumb svg")) ? rows.length : 0;
+    })()`),
+  );
+  console.log(`The Not drawn list asked the app for the drawings of its ${thumbs} rows, which the Document did not carry`);
 
   same(page.errors, [], "the page's errors");
 }

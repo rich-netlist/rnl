@@ -296,6 +296,88 @@ test.describe("saving", () => {
     expect(file.text.split("\r\n")).toHaveLength(6);
   });
 
+  test("the shell is given what was read of each file, to look for on disk", async ({ page, viewer }) => {
+    await open(viewer, page, "04-hierarchy");
+    await tab(page, "lib.inc").click();
+    const lib = await text(page);
+    await type(page, `* a comment\n${lib}`);
+    await page.keyboard.press("Control+s");
+    await expect(page.locator("#note")).toHaveText("Saved 04-hierarchy-lib.inc.");
+    const [file] = (await page.evaluate(() => window.fakeShell.writes))[0];
+    // what was read, with `\n` line ends, and the text written, with the line ends the file had
+    expect(file.read).toBe(lib);
+    expect(file.text.replace(/\r\n/g, "\n")).toBe(`* a comment\n${lib}`);
+    // once saved, what was saved is what was read: the next save is checked against it
+    await type(page, `${await text(page)}* more\n`);
+    await page.keyboard.press("Control+s");
+    await expect.poll(async () => (await page.evaluate(() => window.fakeShell.writes)).length).toBe(2);
+    const [again] = (await page.evaluate(() => window.fakeShell.writes))[1];
+    expect(again.read).toBe(`* a comment\n${lib}`);
+  });
+
+  test("a file changed on disk since it was read is not written over: Cancel, Overwrite or Reload", async ({ page, viewer }) => {
+    await open(viewer, page);
+    await rename(page);
+    const edited = await text(page);
+    // the shell says that another program changed the file: nothing is written, and the user is asked
+    await page.evaluate(() => (window.fakeShell.changedOnDisk = ["edit.sp"]));
+    await page.keyboard.press("Control+s");
+    await expect(dialog(page).locator(".dialog-title")).toHaveText("File Changed on Disk");
+    await expect(dialog(page)).toContainText("changed by another program since the viewer read it: edit.sp.");
+    await expect(dialog(page)).toContainText("Nothing was saved.");
+    // Cancel keeps everything as it was: the changes are still not saved
+    await answer(page, "Cancel");
+    expect(await page.evaluate(() => window.fakeShell.writes)).toEqual([]);
+    expect(await page.evaluate(() => window.viewer.edits.unsaved)).toEqual(["edit.sp"]);
+    expect(await text(page)).toBe(edited);
+    // Overwrite saves again, saying so, and the text is written
+    await page.evaluate(() => (window.fakeShell.changedOnDisk = ["edit.sp"]));
+    await page.keyboard.press("Control+s");
+    await dialog(page).getByRole("button", { name: "Overwrite" }).click();
+    await expect(dialog(page)).toHaveCount(0);
+    await expect(page.locator("#note")).toHaveText("Saved edit.sp.");
+    expect(await page.evaluate(() => window.fakeShell.overwrites)).toEqual([false, false, true]);
+    expect((await page.evaluate(() => window.fakeShell.writes))[0][0].text).toBe(edited);
+    expect(await page.evaluate(() => window.viewer.edits.unsaved)).toEqual([]);
+    // Reload reads the file again and drops the changes made here, without asking about them again
+    await type(page, `${edited}* more\n`);
+    await page.evaluate(() => (window.fakeShell.changedOnDisk = ["edit.sp"]));
+    await page.keyboard.press("Control+s");
+    const builds = await viewer.builds();
+    await viewer.build(() => dialog(page).getByRole("button", { name: "Reload" }).click());
+    expect(await viewer.builds()).toBe(builds + 1);
+    await expect(dialog(page)).toHaveCount(0);
+    expect(await page.evaluate(() => window.viewer.edits)).toEqual({ unsaved: [], unapplied: [] });
+    expect(await text(page)).toContain("C1");
+    expect(await page.evaluate(() => window.fakeShell.writes)).toHaveLength(1);
+  });
+
+  test("several files changed on disk are named together, and the files are not written one by one", async ({ page, viewer }) => {
+    await open(viewer, page, "04-hierarchy");
+    await type(page, `${await text(page)}* a\n`);
+    await tab(page, "lib.inc").click();
+    await type(page, `${await text(page)}* b\n`);
+    await page.evaluate(() => (window.fakeShell.changedOnDisk = ["04-hierarchy.sp", "04-hierarchy-lib.inc"]));
+    await page.keyboard.press("Control+s");
+    await expect(dialog(page)).toContainText("These files were changed by another program since the viewer read them: 04-hierarchy.sp, 04-hierarchy-lib.inc.");
+    await answer(page, "Cancel");
+    expect(await page.evaluate(() => window.fakeShell.writes)).toEqual([]);
+    expect(await page.evaluate(() => window.viewer.edits.unsaved)).toHaveLength(2);
+  });
+
+  test("leaving asks to save, and a file changed on disk keeps the document", async ({ page, viewer }) => {
+    await open(viewer, page);
+    await rename(page);
+    await page.evaluate(() => (window.fakeShell.changedOnDisk = ["edit.sp"]));
+    await page.evaluate(() => window.fakeShell.requestClose());
+    await dialog(page).getByRole("button", { name: "Save", exact: true }).click();
+    await expect(dialog(page).locator(".dialog-title")).toHaveText("File Changed on Disk");
+    await answer(page, "Cancel");
+    // the window is not closed, and the changes are still there
+    expect(await viewer.calls("quit")).toEqual([]);
+    expect(await page.evaluate(() => window.viewer.edits.unsaved)).toEqual(["edit.sp"]);
+  });
+
   test("Save As writes the netlist that was opened, and opens the file written", async ({ page, viewer }) => {
     await open(viewer, page);
     await rename(page);

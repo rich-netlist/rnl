@@ -177,15 +177,22 @@ export type Unplaced = {
   /**
    * The symbol alone at the origin, as it would be drawn on the level with its orientation,
    * and the name of the net at each of its pins beside the pin, as an SVG document; absent
-   * unless `BuildOptions::svg` asks for it.
+   * unless `BuildOptions::svg` asks for it, and absent from a Document built with
+   * [`crate::build_drawn`], whose [`Drawings`] give it on request.
    */
   svg?: string,
   /**
    * The same drawing as primitives in scene units, as `Level::primitives` has them; absent
-   * unless `BuildOptions::primitives` asks for them.
+   * unless `BuildOptions::primitives` asks for them, and from a Document of `build_drawn`.
    */
   primitives?: Array<Primitive>,
 };
+
+/**
+ * The drawing of one object of [`Level::unplaced`], as [`Drawings::unplaced`] gives it: what
+ * `Unplaced::svg` and `Unplaced::primitives` hold when the Document carries them.
+ */
+export type UnplacedDrawing = { svg?: string, primitives?: Array<Primitive> };
 
 export type SourceFile = {
   /**
