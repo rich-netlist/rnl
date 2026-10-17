@@ -1,0 +1,2646 @@
+{
+  "failed": false,
+  "levels": [
+    {
+      "title": "20-spectre-terminals.scs",
+      "kind": "file",
+      "file": "20-spectre-terminals.scs",
+      "symbols": [
+        {
+          "name": "$RESISTOR",
+          "box": [
+            -1.0,
+            -2.4,
+            1.0,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.0,
+                  0.8721
+                ],
+                [
+                  0.5372,
+                  0.6395
+                ],
+                [
+                  -0.4605,
+                  0.407
+                ],
+                [
+                  0.5372,
+                  0.1163
+                ],
+                [
+                  -0.4988,
+                  -0.1744
+                ],
+                [
+                  0.5372,
+                  -0.4651
+                ],
+                [
+                  -0.4605,
+                  -0.7558
+                ],
+                [
+                  0.0,
+                  -0.8721
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$DIODE",
+          "box": [
+            -2.4,
+            -1.0,
+            2.4,
+            1.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -2.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                2.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  0.0
+                ],
+                [
+                  -0.8333,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.8333,
+                  0.675
+                ],
+                [
+                  -0.8333,
+                  -0.675
+                ],
+                [
+                  0.5833,
+                  0.0
+                ],
+                [
+                  -0.8333,
+                  0.675
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.6667,
+                  0.7333
+                ],
+                [
+                  0.6667,
+                  -0.7333
+                ]
+              ],
+              "style": {
+                "linewidth": 0.24
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.6667,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$VCVS_4TERM",
+          "box": [
+            -4.4,
+            -2.4,
+            1.65,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 270
+            },
+            {
+              "pos": [
+                -4.0,
+                1.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                -4.0,
+                -1.0
+              ],
+              "terminals": [
+                "4"
+              ],
+              "label": null,
+              "dir": 180
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  2.0
+                ],
+                [
+                  0.0,
+                  1.25
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.25
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  1.25
+                ],
+                [
+                  1.25,
+                  0.0
+                ],
+                [
+                  0.0,
+                  -1.25
+                ],
+                [
+                  -1.25,
+                  0.0
+                ],
+                [
+                  0.0,
+                  1.25
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -4.0,
+                  1.0
+                ],
+                [
+                  -3.0,
+                  1.0
+                ],
+                [
+                  -0.75,
+                  0.5
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -4.0,
+                  -1.0
+                ],
+                [
+                  -3.0,
+                  -1.0
+                ],
+                [
+                  -0.75,
+                  -0.5
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "TEXT",
+              "points": [
+                [
+                  -2.5,
+                  0.4
+                ]
+              ],
+              "style": {
+                "size": 0.8
+              }
+            },
+            {
+              "shape": "TEXT",
+              "points": [
+                [
+                  -2.5,
+                  -0.4
+                ]
+              ],
+              "style": {
+                "size": 0.8
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.35,
+                  0.55
+                ],
+                [
+                  0.35,
+                  0.55
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  0.2
+                ],
+                [
+                  0.0,
+                  0.9
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.35,
+                  -0.55
+                ],
+                [
+                  0.35,
+                  -0.55
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$VOLTAGE_CONTROLLED_SWITCH",
+          "box": [
+            -3.4,
+            -3.8,
+            3.4,
+            1.7
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -2.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                2.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 0
+            },
+            {
+              "pos": [
+                -2.0,
+                -3.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                2.0,
+                -3.0
+              ],
+              "terminals": [
+                "4"
+              ],
+              "label": null,
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  0.0
+                ],
+                [
+                  -1.3,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  -1.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.7,
+                  0.24
+                ],
+                [
+                  0.64,
+                  1.28
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  1.1,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  1.4,
+                  0.0
+                ],
+                [
+                  2.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  -3.0
+                ],
+                [
+                  -1.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  1.0,
+                  -3.0
+                ],
+                [
+                  2.0,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.0,
+                  -2.4
+                ],
+                [
+                  1.0,
+                  -2.4
+                ],
+                [
+                  1.0,
+                  -3.6
+                ],
+                [
+                  -1.0,
+                  -3.6
+                ],
+                [
+                  -1.0,
+                  -2.4
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.8,
+                  -3.0
+                ],
+                [
+                  -0.2,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.5,
+                  -2.7
+                ],
+                [
+                  -0.5,
+                  -3.3
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.2,
+                  -3.0
+                ],
+                [
+                  0.8,
+                  -3.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -2.4
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -1.6
+                ],
+                [
+                  0.0,
+                  -1.2
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  0.0,
+                  -0.8
+                ],
+                [
+                  0.0,
+                  -0.6
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$TRANSFORMER",
+          "box": [
+            -2.4,
+            -2.4,
+            2.4,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -2.0,
+                1.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                2.0,
+                1.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 0
+            },
+            {
+              "pos": [
+                -2.0,
+                -1.0
+              ],
+              "terminals": [
+                "4"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                2.0,
+                -1.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  1.0
+                ],
+                [
+                  -1.2,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  -1.2,
+                  1.0
+                ],
+                [
+                  -1.1121,
+                  0.7879
+                ],
+                [
+                  -0.9,
+                  0.7
+                ]
+              ],
+              "style": {
+                "cap": "round"
+              }
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  -0.9,
+                  0.7
+                ],
+                [
+                  -0.6879,
+                  0.7879
+                ],
+                [
+                  -0.6,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  -0.6,
+                  1.0
+                ],
+                [
+                  -0.3,
+                  0.7
+                ],
+                [
+                  0.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.3,
+                  0.7
+                ],
+                [
+                  0.6,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  0.6,
+                  1.0
+                ],
+                [
+                  0.6879,
+                  0.7879
+                ],
+                [
+                  0.9,
+                  0.7
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  0.9,
+                  0.7
+                ],
+                [
+                  1.1121,
+                  0.7879
+                ],
+                [
+                  1.2,
+                  1.0
+                ]
+              ],
+              "style": {
+                "cap": "round"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  1.2,
+                  1.0
+                ],
+                [
+                  2.0,
+                  1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0,
+                  -1.0
+                ],
+                [
+                  -1.2,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  -1.2,
+                  -1.0
+                ],
+                [
+                  -1.1121,
+                  -0.7879
+                ],
+                [
+                  -0.9,
+                  -0.7
+                ]
+              ],
+              "style": {
+                "cap": "round"
+              }
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  -0.9,
+                  -0.7
+                ],
+                [
+                  -0.6879,
+                  -0.7879
+                ],
+                [
+                  -0.6,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  -0.6,
+                  -1.0
+                ],
+                [
+                  -0.3,
+                  -0.7
+                ],
+                [
+                  0.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  0.0,
+                  -1.0
+                ],
+                [
+                  0.3,
+                  -0.7
+                ],
+                [
+                  0.6,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  0.6,
+                  -1.0
+                ],
+                [
+                  0.6879,
+                  -0.7879
+                ],
+                [
+                  0.9,
+                  -0.7
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "ARC",
+              "points": [
+                [
+                  0.9,
+                  -0.7
+                ],
+                [
+                  1.1121,
+                  -0.7879
+                ],
+                [
+                  1.2,
+                  -1.0
+                ]
+              ],
+              "style": {
+                "cap": "round"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  1.2,
+                  -1.0
+                ],
+                [
+                  2.0,
+                  -1.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  1.6,
+                  1.45
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "CIRCLE",
+              "points": [
+                [
+                  1.6,
+                  -1.45
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$SP3T",
+          "box": [
+            -2.0,
+            -2.0,
+            2.0,
+            2.0
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                -2.0,
+                0.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                2.0,
+                1.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 0
+            },
+            {
+              "pos": [
+                2.0,
+                0.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 0
+            },
+            {
+              "pos": [
+                2.0,
+                -1.0
+              ],
+              "terminals": [
+                "4"
+              ],
+              "label": null,
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "RECTANGLE",
+              "points": [
+                [
+                  -2.0,
+                  -2.0
+                ],
+                [
+                  2.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$PMOS_4TERM",
+          "box": [
+            -3.4,
+            -2.4,
+            1.4,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 270
+            },
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                1.0,
+                0.0
+              ],
+              "terminals": [
+                "4"
+              ],
+              "label": null,
+              "dir": 0
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.1802,
+                  0.9593
+                ],
+                [
+                  -2.1802,
+                  -0.9593
+                ],
+                [
+                  -1.8895,
+                  -0.9593
+                ],
+                [
+                  -1.8895,
+                  0.9593
+                ],
+                [
+                  -2.1802,
+                  0.9593
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.657,
+                  1.25
+                ],
+                [
+                  -1.657,
+                  -1.25
+                ],
+                [
+                  -1.3663,
+                  -1.25
+                ],
+                [
+                  -1.3663,
+                  1.25
+                ],
+                [
+                  -1.657,
+                  1.25
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.0349,
+                  0.0
+                ],
+                [
+                  -3.0,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.5116,
+                  0.0
+                ],
+                [
+                  0.3605,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  1.0,
+                  0.0
+                ],
+                [
+                  0.3605,
+                  0.3779
+                ],
+                [
+                  0.3605,
+                  -0.3779
+                ],
+                [
+                  1.0,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$NPN",
+          "box": [
+            -3.4,
+            -2.4,
+            0.8,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -1.6869,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.6869,
+                  1.3346
+                ],
+                [
+                  -1.6869,
+                  -1.333
+                ]
+              ],
+              "style": {
+                "linewidth": 0.24
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.6869,
+                  0.6402
+                ],
+                [
+                  0.0,
+                  1.338
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.6869,
+                  -0.6404
+                ],
+                [
+                  -0.7301,
+                  -1.0359
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.0936,
+                  -1.2991
+                ],
+                [
+                  0.0,
+                  -1.3378
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -0.6635,
+                  -0.6792
+                ],
+                [
+                  -0.9953,
+                  -1.3378
+                ],
+                [
+                  0.0,
+                  -1.3378
+                ],
+                [
+                  -0.6635,
+                  -0.6792
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        },
+        {
+          "name": "$PJFET",
+          "box": [
+            -3.4,
+            -2.4,
+            0.8,
+            2.4
+          ],
+          "box_written": true,
+          "default": false,
+          "pins": [
+            {
+              "pos": [
+                0.0,
+                2.0
+              ],
+              "terminals": [
+                "1"
+              ],
+              "label": null,
+              "dir": 90
+            },
+            {
+              "pos": [
+                -3.0,
+                0.0
+              ],
+              "terminals": [
+                "2"
+              ],
+              "label": null,
+              "dir": 180
+            },
+            {
+              "pos": [
+                0.0,
+                -2.0
+              ],
+              "terminals": [
+                "3"
+              ],
+              "label": null,
+              "dir": 270
+            }
+          ],
+          "prims": [
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.657,
+                  -1.25
+                ],
+                [
+                  -1.657,
+                  1.25
+                ],
+                [
+                  -1.366,
+                  1.25
+                ],
+                [
+                  -1.366,
+                  -1.25
+                ],
+                [
+                  -1.657,
+                  -1.25
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  0.6977
+                ],
+                [
+                  0.0,
+                  2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -1.4244,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -0.6977
+                ],
+                [
+                  0.0,
+                  -2.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -3.0,
+                  0.0
+                ],
+                [
+                  -1.5116,
+                  0.0
+                ]
+              ],
+              "style": {}
+            },
+            {
+              "shape": "LINE",
+              "points": [
+                [
+                  -2.4,
+                  0.0
+                ],
+                [
+                  -1.76,
+                  0.35
+                ],
+                [
+                  -1.76,
+                  -0.35
+                ],
+                [
+                  -2.4,
+                  0.0
+                ]
+              ],
+              "style": {
+                "linestyle": "none"
+              }
+            }
+          ],
+          "nested": []
+        }
+      ],
+      "items": [
+        {
+          "id": "#r1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            0.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#r_custom",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            10.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#d1",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            20.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#e1",
+          "kind": "instance",
+          "symbol": 2,
+          "at": [
+            30.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {
+            "5": [
+              [
+                {
+                  "text": "+",
+                  "level": 0,
+                  "bold": false,
+                  "italic": false,
+                  "overline": false
+                }
+              ]
+            ],
+            "6": [
+              [
+                {
+                  "text": "−",
+                  "level": 0,
+                  "bold": false,
+                  "italic": false,
+                  "overline": false
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "id": "#rel1",
+          "kind": "instance",
+          "symbol": 3,
+          "at": [
+            40.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#xf1",
+          "kind": "instance",
+          "symbol": 4,
+          "at": [
+            50.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#sw3",
+          "kind": "instance",
+          "symbol": 5,
+          "at": [
+            60.0,
+            0.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#mp1",
+          "kind": "instance",
+          "symbol": 6,
+          "at": [
+            0.0,
+            -15.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#qb1",
+          "kind": "instance",
+          "symbol": 7,
+          "at": [
+            10.0,
+            -15.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#dj1",
+          "kind": "instance",
+          "symbol": 1,
+          "at": [
+            20.0,
+            -15.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#jp1",
+          "kind": "instance",
+          "symbol": 8,
+          "at": [
+            30.0,
+            -15.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        },
+        {
+          "id": "#rd1",
+          "kind": "instance",
+          "symbol": 0,
+          "at": [
+            40.0,
+            -15.0
+          ],
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle",
+          "texts": {}
+        }
+      ],
+      "wires": [
+        {
+          "id": "a wire",
+          "nets": [
+            "n_rp"
+          ],
+          "points": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              10.0,
+              2.0
+            ],
+            [
+              40.0,
+              -13.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "n_rn"
+          ],
+          "points": [
+            [
+              0.0,
+              -2.0
+            ],
+            [
+              10.0,
+              -2.0
+            ],
+            [
+              40.0,
+              -17.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "n_da"
+          ],
+          "points": [
+            [
+              18.0,
+              0.0
+            ],
+            [
+              18.0,
+              -15.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "n_dk"
+          ],
+          "points": [
+            [
+              22.0,
+              0.0
+            ],
+            [
+              22.0,
+              -15.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "n_ecp"
+          ],
+          "points": [
+            [
+              26.0,
+              1.0
+            ],
+            [
+              38.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "a wire",
+          "nets": [
+            "n_ecn"
+          ],
+          "points": [
+            [
+              26.0,
+              -1.0
+            ],
+            [
+              42.0,
+              -3.0
+            ]
+          ],
+          "mode": "auto",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "shapes": [],
+      "texts": [
+        {
+          "id": "#r1::name",
+          "anchor": [
+            0.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "r1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#r1::value",
+          "anchor": [
+            0.95,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#r_custom::name",
+          "anchor": [
+            10.95,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "r_custom",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#r_custom::value",
+          "anchor": [
+            10.95,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "2k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#d1::name",
+          "anchor": [
+            20.0,
+            1.1
+          ],
+          "lines": [
+            [
+              {
+                "text": "d1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#e1::name",
+          "anchor": [
+            31.65,
+            0.25
+          ],
+          "lines": [
+            [
+              {
+                "text": "e1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#e1::value",
+          "anchor": [
+            31.65,
+            -0.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "2",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#rel1::name",
+          "anchor": [
+            40.0,
+            1.65
+          ],
+          "lines": [
+            [
+              {
+                "text": "rel1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#xf1::name",
+          "anchor": [
+            50.0,
+            2.05
+          ],
+          "lines": [
+            [
+              {
+                "text": "xf1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#mp1::name",
+          "anchor": [
+            0.5,
+            -13.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "mp1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#mp1::model",
+          "anchor": [
+            0.5,
+            -16.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "psp_pmos",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#qb1::name",
+          "anchor": [
+            10.5,
+            -13.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "qb1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#qb1::model",
+          "anchor": [
+            10.5,
+            -16.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "vbic_npn",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#dj1::name",
+          "anchor": [
+            20.0,
+            -13.9
+          ],
+          "lines": [
+            [
+              {
+                "text": "dj1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "middle",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#jp1::name",
+          "anchor": [
+            30.5,
+            -13.95
+          ],
+          "lines": [
+            [
+              {
+                "text": "jp1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#jp1::model",
+          "anchor": [
+            30.5,
+            -16.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "jfet_p",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#rd1::name",
+          "anchor": [
+            40.95,
+            -14.75
+          ],
+          "lines": [
+            [
+              {
+                "text": "rd1",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        },
+        {
+          "id": "#rd1::value",
+          "anchor": [
+            40.95,
+            -15.95
+          ],
+          "lines": [
+            []
+          ],
+          "halign": "start",
+          "valign": "baseline",
+          "rotate": 0.0,
+          "orient": "R0",
+          "style": {
+            "cap": "butt",
+            "fillcolor": "#ffffff",
+            "join": "miter",
+            "linecolor": "#1d1d1f",
+            "linewidth": 0.16,
+            "size": 1.0,
+            "textcolor": "#1d1d1f"
+          },
+          "layer": "middle"
+        }
+      ],
+      "flylines": [],
+      "constraints": [],
+      "unplaced": []
+    }
+  ],
+  "diagnostics": []
+}

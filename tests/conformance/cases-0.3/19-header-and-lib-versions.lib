@@ -1,0 +1,43 @@
+* Library sections with different versions and header record placement (2.8, 16.1, 16.5)
+
+.lib sec_02
+* @RNL(type="header") {
+*   @VERSION("0.2");
+*   @ALIAS("numbering", "axis")
+* }
+.subckt sub_02 a b
+R1 a b 1k
+R2 a b 2k
+* @RNL {
+*   #R1 @SET-SYMBOL $RES => @PLACE(0, 0);
+*   #R2 @SET-SYMBOL $RES => @PLACE(10, 0);
+*   {#R1 #R2} @ALIGN(numbering="y")
+* }
+.ends sub_02
+.endl sec_02
+
+.lib sec_03
+* @RNL(type="header") {
+*   @VERSION("0.3");
+*   @ALIAS("numbering", "axis")
+* }
+.subckt sub_03 a b
+R3 a b 1k
+* @RNL {
+*   #R3 @SET-SYMBOL $RESISTOR => @PLACE(0, 0)
+* }
+.ends sub_03
+.endl sec_03
+
+.lib sec_late_header
+.subckt sub_late a b
+R4 a b 1k
+* @RNL {
+*   #R4 @PLACE(0, 0)
+* }
+.ends sub_late
+* Header record after a subcircuit's record in the same section is an error and is ignored (2.8)
+* @RNL(type="header") {
+*   @VERSION("0.2")
+* }
+.endl sec_late_header

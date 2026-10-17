@@ -1,0 +1,69 @@
+// Spectre default terminal names: primitives, multi-throw switch, model families, and DEVICE override (6.12)
+//! 6.12: Spectre primitives take default terminal names by master (resistor: p n;
+//!   diode: a k; vcvs and relay: p n cp cn; transformer: p_plus p_minus s_plus s_minus).
+//!   A `switch` has terminals t0 .. tn matching its node count.
+//!   An instance of a model card takes the terminal names and `type` of its model's
+//!   device family (psp103 -> d g s b / pmos; vbic -> c b e s / npn; juncap200 -> a k / d;
+//!   jfet -> d g s / pjf; rdiff -> p n / r).
+//!   A DEVICE in the header record overrides the adapter defaults.
+simulator lang=spectre
+// @RNL(type="header") {
+//   @VERSION("0.3");
+//   @DEVICE(name="r_custom", model="resistor", terminals=["pos", "neg"])
+// }
+
+r1 (n_rp n_rn) resistor r=1k
+r_custom (n_rp n_rn) resistor r=2k
+d1 (n_da n_dk) diode
+e1 (n_ep n_en n_ecp n_ecn) vcvs gain=2
+rel1 (n_relp n_reln n_ecp n_ecn) relay
+xf1 (n_pp n_pm n_sp n_sm) transformer n1=1 n2=2
+sw3 (n_com n_t1 n_t2 n_t3) switch dc_position=2
+
+mp1 (n_md n_mg n_ms n_mb) psp_pmos w=2u l=100n
+qb1 (n_qc n_qb n_qe 0) vbic_npn
+dj1 (n_da n_dk) jcap_d
+jp1 (n_jd n_jg n_js) jfet_p
+rd1 (n_rp n_rn) rdiff_r r=500
+
+model psp_pmos psp103 type=pmos
+model vbic_npn vbic type=npn
+model jcap_d juncap200
+model jfet_p jfet type=pjf
+model rdiff_r rdiff
+
+// @RNL {
+//   $SP3T = @DEFINE-SYMBOL(box=[-2, -2, 2, 2]) {
+//     (-2, 0) @PIN(terminal=1, direction="left");
+//     (2, 1) @PIN(terminal=2, direction="right");
+//     (2, 0) @PIN(terminal=3, direction="right");
+//     (2, -1) @PIN(terminal=4, direction="right");
+//     (-2, -2) (2, 2) @RECTANGLE
+//   };
+//   #sw3 @SET-SYMBOL $SP3T;
+//   #r1 @PLACE(0, 0);
+//   #r_custom @PLACE(10, 0);
+//   #d1 @PLACE(20, 0);
+//   #e1 @PLACE(30, 0);
+//   #rel1 @PLACE(40, 0);
+//   #xf1 @PLACE(50, 0);
+//   #sw3 @PLACE(60, 0);
+//   #mp1 @PLACE(0, -15);
+//   #qb1 @PLACE(10, -15);
+//   #dj1 @PLACE(20, -15);
+//   #jp1 @PLACE(30, -15);
+//   #rd1 @PLACE(40, -15);
+//
+//   &n_rp @WIRE {#r1:p #r_custom:pos #rd1:p};
+//   &n_rn @WIRE {#r1:n #r_custom:neg #rd1:n};
+//   &n_da @WIRE {#d1:a #dj1:a};
+//   &n_dk @WIRE {#d1:k #dj1:k};
+//   &n_ecp @WIRE {#e1:cp #rel1:cp};
+//   &n_ecn @WIRE {#e1:cn #rel1:cn};
+//   {#e1:p #e1:n #rel1:p #rel1:n} @CURRENT("in");
+//   {#xf1:p_plus #xf1:p_minus #xf1:s_plus #xf1:s_minus} @CURRENT("in");
+//   {#sw3:t0 #sw3:t1 #sw3:t2 #sw3:t3} @CURRENT("in");
+//   {#mp1:d #mp1:g #mp1:s #mp1:b} @CURRENT("in");
+//   {#qb1:c #qb1:b #qb1:e #qb1:s} @CURRENT("in");
+//   {#jp1:d #jp1:g #jp1:s} @CURRENT("in")
+// }
