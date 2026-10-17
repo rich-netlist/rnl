@@ -189,16 +189,23 @@ pub fn resolve_nodes(inst: &mut Instance, plain: &[String], models: &HashMap<Str
     }
 }
 
-/// Ports of a `.subckt` line: the tokens after the name up to the first parameter.
-pub fn subckt_ports(tokens: &[&str]) -> Vec<String> {
+/// The ports among the tokens of a `.subckt` statement after its name, or of a `+` line that
+/// continues it, and whether its parameters begin among them, `params:` or a `name=value`, after
+/// which no token is a port.
+pub fn subckt_ports(tokens: &[&str]) -> (Vec<String>, bool) {
     let mut ports = Vec::new();
     for t in tokens {
         if t.contains('=') || t.eq_ignore_ascii_case("params:") {
-            break;
+            return (ports, true);
         }
         ports.push(t.to_string());
     }
-    ports
+    (ports, false)
+}
+
+/// The tokens of a line of a `.subckt` statement, without its end-of-line comment.
+pub fn subckt_tokens(line: &str) -> Vec<String> {
+    strip_inline_comment(line).split_whitespace().map(String::from).collect()
 }
 
 struct Pending {
@@ -275,6 +282,8 @@ impl<'a> Reader<'a> {
         let mut protect: Option<u32> = None;
         let mut ended = false;
         let mut pending: Option<Pending> = None;
+        // a `.subckt` whose `+` lines add ports, until its parameters begin
+        let mut subckt_more: Option<LevelId> = None;
         let mut continued = Continued::default();
         // `.lib` sections: inside the selected one when reading a section; skipping an unselected one
         let mut in_section = section.is_none();
@@ -340,7 +349,7 @@ impl<'a> Reader<'a> {
             }
             if let Some(rest) = raw.strip_prefix('*') {
                 if rest.trim().is_empty() || rest.starts_with(' ') {
-                    if pending.is_some() && continued.after(&lines, idx) {
+                    if (pending.is_some() || subckt_more.is_some()) && continued.after(&lines, idx) {
                         self.sink.warning(
                             "a comment line between a statement and its continuation: read, but hosts treat it differently (2.2)",
                             Some(Loc::line(&fname, no)),
@@ -376,9 +385,17 @@ impl<'a> Reader<'a> {
                 if let Some(p) = pending.as_mut() {
                     p.text.push(' ');
                     p.text.push_str(cont);
+                } else if let Some(sub) = subckt_more {
+                    let toks = subckt_tokens(cont);
+                    let (ports, params) = subckt_ports(&toks.iter().map(String::as_str).collect::<Vec<_>>());
+                    self.doc.levels[sub].ports.extend(ports);
+                    if params {
+                        subckt_more = None;
+                    }
                 }
                 continue;
             }
+            subckt_more = None;
             if let Some(p) = pending.take() {
                 self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
             }
@@ -422,10 +439,13 @@ impl<'a> Reader<'a> {
                 continue;
             }
             if first == ".subckt" {
-                let toks: Vec<&str> = stripped.split_whitespace().collect();
+                let toks = subckt_tokens(stripped);
+                let toks: Vec<&str> = toks.iter().map(String::as_str).collect();
                 let name = toks.get(1).copied().unwrap_or("?");
                 let sub = self.new_level(LevelKind::Subckt, name, &fname, path, cur, true, no);
-                self.doc.levels[sub].ports = subckt_ports(&toks[2.min(toks.len())..]);
+                let (ports, params) = subckt_ports(&toks[2.min(toks.len())..]);
+                self.doc.levels[sub].ports = ports;
+                subckt_more = (!params).then_some(sub);
                 let key = self.doc.key(name);
                 self.doc.subckts.insert(key, sub);
                 sub_stack.push((cur, circ));
@@ -729,6 +749,37 @@ mod tests {
         assert!(sink.all().is_empty(), "{:?}", sink.all());
         let sources: Vec<(&str, &str)> = doc.sources.iter().map(|(f, t)| (f.as_str(), t.as_str())).collect();
         assert_eq!(sources, [("top.sp", top), ("a/x.inc", a), ("b/x.inc", b)]);
+    }
+
+    #[test]
+    fn the_ports_of_a_subckt_on_its_continuation_lines_and_without_its_comment() {
+        // the `+` lines of a `.subckt` add ports, up to its parameters; an end-of-line comment
+        // holds none; the `+` line of an element after it is the element's
+        for (text, ports) in [
+            (".subckt cell a\n+ b\nR1 a b 1k\n.ends cell\n", vec!["a", "b"]),
+            (".subckt cell a b ; two ports\nR1 a b 1k\n.ends cell\n", vec!["a", "b"]),
+            (".subckt cell a $ the first\n+ b $ the second\n.ends cell\n", vec!["a", "b"]),
+            (".subckt cell a\n+ b params: w=1\n+ c=2\n.ends cell\n", vec!["a", "b"]),
+            (".subckt cell a\n\n+ b\nR1 a b\n+ 1k\n.ends cell\n", vec!["a", "b"]),
+        ] {
+            let p = MemoryProvider::new().with("t.sp", &format!("* t\n{text}.end\n"));
+            let mut sink = Sink::new();
+            let doc = read("t.sp", &p, &mut sink).unwrap();
+            assert!(sink.all().is_empty(), "{text}: {:?}", sink.all());
+            assert_eq!(doc.levels[1].ports, ports, "{text}");
+            if let Some(r1) = doc.levels[1].instances.first() {
+                assert_eq!(
+                    (r1.nodes.as_slice(), r1.value.as_deref()),
+                    (&["a".to_string(), "b".into()][..], Some("1k"))
+                );
+            }
+        }
+        // a comment line between it and its continuation is read, with a warning, as for an element
+        let p = MemoryProvider::new().with("t.sp", "* t\n.subckt cell a\n* between\n+ b\n.ends cell\n.end\n");
+        let mut sink = Sink::new();
+        let doc = read("t.sp", &p, &mut sink).unwrap();
+        assert_eq!(doc.levels[1].ports, ["a", "b"]);
+        assert_eq!(sink.all().len(), 1, "{:?}", sink.all());
     }
 
     #[test]
