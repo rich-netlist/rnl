@@ -520,6 +520,29 @@ async function drive(app, port, profile, t0, session) {
     page.evaluate(`document.querySelectorAll("#file-tabs button[data-unsaved='true']").length === 0`),
   );
   same(fs.readFileSync(netlistInclude).equals(includeOnDisk), true, "the include after the netlist was saved");
+  // another program changes the file after the viewer read it: Save does not write over it, and asks;
+  // Overwrite writes the text of the viewer
+  const eol = saved.includes("\r\n") ? "\r\n" : "\n";
+  fs.appendFileSync(netlist, `* changed by another program${eol}`);
+  await page.evaluate(`(() => {
+    const area = document.querySelector("#source .editor:not([hidden]) textarea");
+    area.value += "* and in the viewer\\n";
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  })()`);
+  chooseItem(app.pid, at("save"));
+  const changedOnDisk = await until("the question about the file changed on disk", () =>
+    page.evaluate(`(() => {
+      const d = document.querySelector("dialog.dialog .dialog-title");
+      return d && d.textContent;
+    })()`),
+  );
+  same(changedOnDisk, "File Changed on Disk", "the dialog of the file changed by another program");
+  same(fs.readFileSync(netlist, "utf8"), `${saved}* changed by another program${eol}`, "the file on disk while the question is asked");
+  await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Overwrite").click()`);
+  await until("the file overwritten", () => fs.readFileSync(netlist, "utf8") === `${saved}* and in the viewer${eol}`, 20_000);
+  // what was saved is not applied yet, and leaving the text boxes with a line not applied asks about it
+  chooseItem(app.pid, at("apply-edits"));
+  await until("the line applied", () => page.evaluate(`document.getElementById("apply-edits").disabled`), 20_000);
   chooseItem(app.pid, at("toggle-edit"));
   await until("the text read again", () => page.evaluate(`document.querySelectorAll("#source .editor").length === 0`));
   console.log("Edit > Edit Text, Apply Changes and File > Save built the edited text natively and saved the one file, as it was written");

@@ -62,6 +62,7 @@ It implements the Shell of [`shell.js`](../../apps/viewer-ui/shell.js). A source
 | `menu(id)` | Choose a command in the platform's menu. |
 | `optionsError` | On the desktop: what the solver says is wrong with the settings it is asked to check (`checkSolverOptions`), null when they will do. |
 | `buildEdits`, `solveEdits` | The edits each build and each solve was given, in order; undefined for a build of the files as they are. |
+| `changedOnDisk`, `overwrites` | The names of files that another program changed since they were read, which the next Save, unless it overwrites, reports instead of writing; and whether each Save was to overwrite. |
 | `writes`, `writesAs`, `writeFail`, `savedAs` | The files each Save and each Save As (desktop) was asked to write, a message the next one rejects with, and what the next Save As gives: a source, or null when the user cancels. |
 | `requestClose()` | Ask the page to close the window, as the desktop does while changes are not saved. |
 | `carry`, `drawingsFail`, `holdDrawings`, `releaseDrawings()` | A build gives its Document as the real cores do, without the drawings of the objects that have no position, and keeps them for `unplacedDrawings(level, items, names)`, which records `["unplacedDrawings", level, items]` and refuses names that are not the last build's. `carry` makes the next builds carry them in the Document, as a solve's does; `drawingsFail` is a message the next request rejects with; `holdDrawings` makes requests wait until `releaseDrawings()`. |

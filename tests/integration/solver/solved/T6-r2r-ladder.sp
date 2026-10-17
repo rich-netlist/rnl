@@ -29,15 +29,15 @@ RS6 n6 n7 1k
 *   $WIRE_NET_SET @ROUTE
 * }
 * @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:69b3dd72d03b1950.1f3b310f8bee492a") {
-*   %gnd_stub_VB0_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VB0:n;
-*   %gnd_stub_VB1_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VB1:n;
-*   %gnd_stub_VB2_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VB2:n;
-*   %gnd_stub_VB3_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VB3:n;
-*   %gnd_stub_VB4_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VB4:n;
-*   %gnd_stub_VB5_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VB5:n;
-*   %gnd_stub_VB6_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VB6:n;
-*   %gnd_stub_VB7_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VB7:n;
-*   %gnd_stub_RT_n = $GND_STUB @ATTACH(gap=2, priority="normal") #RT:n;
+*   %gnd_stub_VB0_n = $GND_STUB @ATTACH(gap=2) #VB0:n;
+*   %gnd_stub_VB1_n = $GND_STUB @ATTACH(gap=2) #VB1:n;
+*   %gnd_stub_VB2_n = $GND_STUB @ATTACH(gap=2) #VB2:n;
+*   %gnd_stub_VB3_n = $GND_STUB @ATTACH(gap=2) #VB3:n;
+*   %gnd_stub_VB4_n = $GND_STUB @ATTACH(gap=2) #VB4:n;
+*   %gnd_stub_VB5_n = $GND_STUB @ATTACH(gap=2) #VB5:n;
+*   %gnd_stub_VB6_n = $GND_STUB @ATTACH(gap=2) #VB6:n;
+*   %gnd_stub_VB7_n = $GND_STUB @ATTACH(gap=2) #VB7:n;
+*   %gnd_stub_RT_n = $GND_STUB @ATTACH(gap=2) #RT:n;
 *   %rt1 = (13, 4);
 *   %rt2 = (25, 4);
 *   %rt3 = (67, 4);

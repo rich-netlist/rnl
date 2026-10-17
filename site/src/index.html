@@ -114,7 +114,7 @@
         <div class="tb-main"><dt><zh>项目</zh><en>Project</en></dt><dd>Rich Netlist (RNL)</dd></div>
         <div><dt><zh>是什么</zh><en>What</en></dt><dd><zh>附着在网表上的元数据扩展</zh><en>A metadata extension attached to netlists</en></dd></div>
         <div><dt><zh>宿主</zh><en>Hosts</en></dt><dd><zh>SPICE、Spectre 等网表，写在注释里</zh><en>SPICE, Spectre and other netlists, inside comments</en></dd></div>
-        <div><dt><zh>阶段</zh><en>Stage</en></dt><dd><zh>语言标准 0.2；<a href="tools.html">工具链 0.1</a>，还没有求解器</zh><en>Language standard 0.2; <a href="tools.html">toolkit 0.1</a>, no solver yet</en></dd></div>
+        <div><dt><zh>阶段</zh><en>Stage</en></dt><dd><zh>语言标准 0.2；<a href="tools.html">工具链 0.1</a>；求解器第一版</zh><en>Language standard 0.2; <a href="tools.html">toolkit 0.1</a>; a first solver</en></dd></div>
         <div><dt><zh>语言</zh><en>Language</en></dt><dd><span class="mono"><zh>0.2 · 2026-10-14</zh><en>0.2 · 2026-10-14</en></span></dd></div>
         <div><dt><zh>许可</zh><en>License</en></dt><dd><zh>代码 MIT · 规范 CC-BY-4.0 · 数据 CC0</zh><en>Code MIT · spec CC-BY-4.0 · data CC0</en></dd></div>
       </dl>
@@ -187,8 +187,8 @@
       </li>
       <li>
         <span class="brief-k"><svg class="ico"><use href="#i-flask"/></svg><zh>现状</zh><en>Status</en></span>
-        <p><zh>语言已经整理成标准 0.2。第一版工具链 0.1 能读网表、画出有坐标的部分，有网页版和桌面版查看器；求解器还只有原型。</zh>
-          <en>The language has been consolidated into standard 0.2. The first toolkit, 0.1, reads netlists and draws what has coordinates, in a web viewer and a desktop viewer; the solver exists only as a prototype.</en></p>
+        <p><zh>语言已经整理成标准 0.2。第一版工具链 0.1 能读网表、画出有坐标的部分，有网页版和桌面版查看器，现在都能改文本；求解器有了第一版，桌面版查看器能用它求解，先作为预览。</zh>
+          <en>The language has been consolidated into standard 0.2. The first toolkit, 0.1, reads netlists and draws what has coordinates, in a web viewer and a desktop viewer, which now edit the text too; the solver has a first version, and the desktop viewer solves with it, as a preview.</en></p>
         <a href="#status"><zh>进度 →</zh><en>Progress →</en></a>
       </li>
     </ol>
@@ -676,8 +676,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
     <header class="sheet-head">
       <p class="sheet-no"><zh>05 · 工具链</zh><en>05 · Toolchain</en></p>
       <h2><zh>RNL 工具链：读、解、画、改。</zh><en>The RNL toolchain: read, solve, draw, edit.</en></h2>
-      <p class="lead"><zh>规划中的工具链把“读懂 RNL”和“把意图变成坐标”分成独立模块：没有求解器也能看图，需要时再求解。第一版工具链 0.1 已经做好了读和画这一半：运行库、宿主适配器、渲染器，以及<a href="tools.html">网页版和桌面版查看器</a>。选一条路径看数据怎么流动，点一个模块看它做什么。</zh>
-        <en>The planned toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. The first toolkit, 0.1, has the reading and drawing half: the runtime, the host adapters, the renderer, and <a href="tools.html">the web and desktop viewers</a>. Pick a path to see how data flows; click a module to see what it does.</en></p>
+      <p class="lead"><zh>规划中的工具链把“读懂 RNL”和“把意图变成坐标”分成独立模块：没有求解器也能看图，需要时再求解。第一版工具链 0.1 已经做好了读和画这一半：运行库、宿主适配器、渲染器，以及<a href="tools.html">网页版和桌面版查看器</a>；求解这一半也有了第一版，在 <code>rnl solve</code> 和桌面版查看器里。选一条路径看数据怎么流动，点一个模块看它做什么。</zh>
+        <en>The planned toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. The first toolkit, 0.1, has the reading and drawing half: the runtime, the host adapters, the renderer, and <a href="tools.html">the web and desktop viewers</a>; the solving half has a first version too, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.</en></p>
     </header>
 
     <div class="flows">
@@ -1084,8 +1084,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
     <header class="sheet-head">
       <p class="sheet-no"><zh>09 · 现状</zh><en>09 · Status</en></p>
       <h2><zh>现在走到哪一步。</zh><en>Where things stand.</en></h2>
-      <p class="lead"><zh>原则已经定下，语言已经整理成标准 0.2；第一版工具链 0.1 能读网表、画出有坐标的部分，<a href="tools.html">网页版和桌面版查看器</a>都能用。求解器还只有原型，编辑器还没开始。</zh>
-        <en>The principles are settled and the language has been consolidated into standard 0.2; the first toolkit, 0.1, reads netlists and draws what has coordinates, in <a href="tools.html">a web viewer and a desktop viewer</a> you can use now. The solver exists only as a prototype, and the editor has not been started.</en></p>
+      <p class="lead"><zh>原则已经定下，语言已经整理成标准 0.2；第一版工具链 0.1 能读网表、画出有坐标的部分，<a href="tools.html">网页版和桌面版查看器</a>都能用，也能改文本。求解器有了第一版，在 <code>rnl solve</code> 和桌面版查看器里；拖动器件的编辑器还没开始。</zh>
+        <en>The principles are settled and the language has been consolidated into standard 0.2; the first toolkit, 0.1, reads netlists and draws what has coordinates, in <a href="tools.html">a web viewer and a desktop viewer</a> you can use now, and they edit the text too. The solver has a first version, in <code>rnl solve</code> and the desktop viewer; the editor, which moves devices by dragging, has not been started.</en></p>
     </header>
     <div class="status-grid">
       <ol class="tl">
@@ -1115,12 +1115,14 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
           <en>46 keywords; statements read as facts, and written as standard sentences they read as prose; the Chinese alias package rnl-zh; ATTACH puts the definition first, and the standard package’s set names end in _SET.</en></p></li>
         <li><time>2026-10-14</time><b><zh>语言标准 0.2</zh><en>Language standard 0.2</en></b><p><zh>草稿整理成<a href="spec/0.2/">正式标准</a>：英文为准，附中文版和标准词表；网页、PDF 和 Markdown 都从同一份源生成。</zh>
           <en>The draft consolidated into a <a href="spec/0.2/">formal standard</a>: English normative, with a Chinese version and the standard word list; the web pages, PDFs and Markdown are all built from one source.</en></p></li>
-        <li class="now"><time>2026-10-14</time><b><zh>第一版工具链 0.1</zh><en>First toolkit, 0.1</en></b><p><zh>运行库、SPICE 与 Spectre 适配器、统一渲染器和 <code>rnl</code> 命令，加上<a href="tools.html">网页版和桌面版查看器</a>：打开带 RNL 的网表，画出有坐标的部分。只读，还没有求解器。</zh>
+        <li><time>2026-10-14</time><b><zh>第一版工具链 0.1</zh><en>First toolkit, 0.1</en></b><p><zh>运行库、SPICE 与 Spectre 适配器、统一渲染器和 <code>rnl</code> 命令，加上<a href="tools.html">网页版和桌面版查看器</a>：打开带 RNL 的网表，画出有坐标的部分。只读，还没有求解器。</zh>
           <en>The runtime, the SPICE and Spectre adapters, the shared renderer and the <code>rnl</code> command, with <a href="tools.html">the web and desktop viewers</a>: they open a netlist with RNL and draw what has coordinates. Read-only, with no solver yet.</en></p></li>
+        <li class="now"><time>2026-10-17</time><b><zh>查看器能编辑，桌面版能求解</zh><en>Viewers that edit, and solve on the desktop</en></b><p><zh>求解器第一版接进 <code>rnl solve</code> 和桌面版查看器：查看器里的求解结果先作为预览，可以另存副本。两个查看器都能改网表文本、应用后重画；桌面版保存时写回原文件，网页版保存时下载。</zh>
+          <en>The first version of the solver, in <code>rnl solve</code> and in the desktop viewer, which shows a solve as a preview and saves a solved copy. Both viewers edit the netlist’s text and draw it again when the changes are applied; the desktop viewer saves into the files, the web viewer by a download.</en></p></li>
         <li class="tl-sep"><zh>接下来</zh><en>Next</en></li>
         <li class="next"><b><zh>求解闭环</zh><en>Solving loop</en></b><p><zh>求解器把结果写成 type="generated" 的记录，带输入的 hash，边算边刷新。</zh>
           <en>The solver writes its result as a record with type="generated" and a hash of its input, refreshing as it computes.</en></p></li>
-        <li class="next"><b><zh>编辑闭环</zh><en>Editing loop</en></b><p><zh>在查看器里改 RNL 文本并重画，追加式编辑、撤销重做、重新求解。</zh><en>Editing RNL text in the viewers and drawing it again, append-only edits, undo and redo, solving again.</en></p></li>
+        <li class="next"><b><zh>编辑闭环</zh><en>Editing loop</en></b><p><zh>在查看器里追加式编辑、撤销重做，改完重新求解。</zh><en>Append-only edits in the viewers, undo and redo, and solving again after an edit.</en></p></li>
         <li class="next"><b><zh>发行闭环</zh><en>Release loop</en></b><p><zh>npm 包和命令行的发行版。</zh><en>npm packages and released builds of the CLI.</en></p></li>
       </ol>
       <div class="faq">
@@ -1162,8 +1164,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
         </details>
         <details>
           <summary><zh>现在能用吗？</zh><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><zh>看图可以：第一版工具链 0.1 的<a href="tools.html">查看器</a>能在浏览器里或 Windows 上打开带 RNL 的网表，画出写了坐标的部分。自动排版还不行：还没有求解器和编辑器，只写了意图、没写坐标的部分画不出来。</zh>
-            <en>For looking at drawings, yes: the <a href="tools.html">viewers</a> of the first toolkit, 0.1, open a netlist with RNL in the browser or on Windows and draw the parts that have coordinates. Not for laying them out yet: there is no solver or editor, so parts that give intent without coordinates are not drawn.</en></p>
+          <p><zh>看图和改文本可以：第一版工具链 0.1 的<a href="tools.html">查看器</a>能在浏览器里或 Windows 上打开带 RNL 的网表，画出写了坐标的部分，也能改文本、应用后重画。自动排版刚起步：求解器有了第一版，<code>rnl solve</code> 和桌面版查看器能用它排出只写了意图、没写坐标的部分，桌面版先作为预览显示。网页版还不能求解，这些部分它画不出来，只在 Not drawn 视图里列出。拖动器件的编辑器还没有。</zh>
+            <en>For looking at drawings and editing the text, yes: the <a href="tools.html">viewers</a> of the first toolkit, 0.1, open a netlist with RNL in the browser or on Windows, draw the parts that have coordinates, and edit the text and draw it again. Laying out has just begun: the solver has a first version, with which <code>rnl solve</code> and the desktop viewer place the parts that give intent without coordinates, the desktop viewer as a preview. The web viewer does not solve yet, so it does not draw those parts and lists them in its Not drawn view. There is no editor for dragging devices yet.</en></p>
         </details>
       </div>
     </div>

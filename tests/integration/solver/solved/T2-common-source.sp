@@ -14,11 +14,11 @@ VIN in 0 DC 0.6 AC 1
 *   $WIRE_NET_SET @ROUTE
 * }
 * @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:df472807084943cf.1f3b310f8bee492a") {
-*   %gnd_stub_M1_s = $GND_STUB @ATTACH(gap=2, priority="normal") #M1:s;
-*   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VDD:n;
-*   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2, priority="normal") #VIN:n;
-*   %supply_stub_RD_p = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #RD:p;
-*   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=2, priority="normal") #VDD:p;
+*   %gnd_stub_M1_s = $GND_STUB @ATTACH(gap=2) #M1:s;
+*   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2) #VDD:n;
+*   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2) #VIN:n;
+*   %supply_stub_RD_p = $SUPPLY_STUB @ATTACH(gap=2) #RD:p;
+*   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=2) #VDD:p;
 *   #M1 @PLACE(7, -8) => @ORIENT("R0");
 *   #RD @PLACE(7, 0) => @ORIENT("R0");
 *   #VDD @PLACE(0, 0) => @ORIENT("R0");

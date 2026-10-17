@@ -63,10 +63,16 @@ export function discard(path) {
   if (b) b.text = b.applied;
 }
 
-/** The files whose text differs from what was read, and so is not saved: `{ path, name, text }`, the text as the file has it. */
+/**
+ * The files whose text differs from what was read, and so is not saved: `{ path, name, text, read }`,
+ * the text as the file has it, and the text as it was read, with `\n` line ends, which a shell
+ * that writes the file can look for on disk.
+ */
 export function dirty() {
   const out = [];
-  for (const [path, b] of buffers) if (b.text !== b.original) out.push({ path, name: b.name, text: written(b, b.text) });
+  for (const [path, b] of buffers) {
+    if (b.text !== b.original) out.push({ path, name: b.name, text: written(b, b.text), read: b.original });
+  }
   return out;
 }
 
