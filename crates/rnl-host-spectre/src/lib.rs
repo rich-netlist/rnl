@@ -1075,4 +1075,19 @@ mod tests {
             assert_eq!(places, [Some(Loc::line("x.scs", 3)), Some(Loc::line("sub/y.scs", 3))], "{dir}");
         }
     }
+
+    #[test]
+    fn included_files_of_one_name_in_two_directories_are_two_sources() {
+        // a/x.scs and b/x.scs: each is a source, by its name relative to the main file, with its text
+        let top =
+            "// top\nsimulator lang=spectre\ninclude \"a/x.scs\"\ninclude \"b/x.scs\"\nX1 (n1 0) ca\nX2 (n2 0) cb\n";
+        let a = "// a\nsubckt ca (p n)\nR1 (p n) resistor r=1k\nends ca\n";
+        let b = "// b\nsubckt cb (p n)\nR1 (p n) resistor r=2k\nends cb\n";
+        let p = MemoryProvider::new().with("/w/top.scs", top).with("/w/a/x.scs", a).with("/w/b/x.scs", b);
+        let mut sink = Sink::new();
+        let doc = read("/w/top.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        let sources: Vec<(&str, &str)> = doc.sources.iter().map(|(f, t)| (f.as_str(), t.as_str())).collect();
+        assert_eq!(sources, [("top.scs", top), ("a/x.scs", a), ("b/x.scs", b)]);
+    }
 }

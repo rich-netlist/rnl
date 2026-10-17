@@ -967,6 +967,36 @@ R2 a vdd! 2k
     }
 
     #[test]
+    fn the_revision_counts_included_files_of_one_name_in_two_directories() {
+        // a/x and b/x, both included by the main file, in SPICE and in Spectre: the text of each
+        // counts
+        let spice = (
+            "/w/t.sp",
+            "* t\n.include \"a/x.inc\"\n.include \"b/x.inc\"\nX1 n1 0 ca\nX2 n2 0 cb\n.end\n",
+            ["/w/a/x.inc", "/w/b/x.inc"],
+            ["* a\n.subckt ca p n\nR1 p n 1k\n.ends\n", "* b\n.subckt cb p n\nR1 p n 2k\n.ends\n"],
+        );
+        let spectre = (
+            "/w/t.scs",
+            "// t\nsimulator lang=spectre\ninclude \"a/x.scs\"\ninclude \"b/x.scs\"\nX1 (n1 0) ca\nX2 (n2 0) cb\n",
+            ["/w/a/x.scs", "/w/b/x.scs"],
+            [
+                "// a\nsubckt ca (p n)\nR1 (p n) resistor r=1k\nends ca\n",
+                "// b\nsubckt cb (p n)\nR1 (p n) resistor r=2k\nends cb\n",
+            ],
+        );
+        for (entry, main, paths, texts) in [spice, spectre] {
+            let revision = |first: &str, second: &str| {
+                let files = MemoryProvider::new().with(entry, main).with(paths[0], first).with(paths[1], second);
+                crate::snapshot(entry, &files, &BuildOptions::default(), Parts::default()).unwrap().revision
+            };
+            let r = revision(texts[0], texts[1]);
+            assert_ne!(revision(texts[0], &texts[1].replace("2k", "3k")), r, "{entry}");
+            assert_ne!(revision(&texts[0].replace("1k", "3k"), texts[1]), r, "{entry}");
+        }
+    }
+
+    #[test]
     fn only_the_parts_asked_for() {
         let s = snap(Parts::default());
         assert!(s["drawing"]["levels"].is_array());
