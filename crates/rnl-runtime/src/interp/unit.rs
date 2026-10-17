@@ -1525,7 +1525,9 @@ impl Interp<'_> {
         lv.records = recs.clone();
         let pl = self.pkg_levels.len();
         self.pkg_levels.push(lv);
-        if !self.pkg_sources.iter().any(|(f, _)| *f == fname) {
+        // files of one name in two package directories, such as rnl-std.rnl of two standard series,
+        // are two sources: the revision of a snapshot counts the text of every file read
+        if !self.pkg_sources.iter().any(|(f, t)| *f == fname && *t == text) {
             self.pkg_sources.push((fname.clone(), text));
         }
         let mut u = Unit::new(UnitKind::Package, &fname);

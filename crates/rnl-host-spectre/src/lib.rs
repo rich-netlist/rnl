@@ -32,8 +32,9 @@ pub fn dialect() -> Dialect {
     Dialect { name: "spectre".into(), case_sensitive: true, ground_aliases: Vec::new() }
 }
 
-/// Built-in primitives: (master, default terminal names, the parameter shown as `${value}`).
-const PRIMITIVES: [(&str, &[&str], Option<&str>); 13] = [
+/// Built-in primitives: (master, default terminal names, the parameter shown as `${value}`). The
+/// `switch` is not among them: its terminals depend on its nodes ([`SWITCH`]).
+const PRIMITIVES: [(&str, &[&str], Option<&str>); 14] = [
     ("resistor", &["p", "n"], Some("r")),
     ("capacitor", &["p", "n"], Some("c")),
     ("inductor", &["p", "n"], Some("l")),
@@ -45,9 +46,17 @@ const PRIMITIVES: [(&str, &[&str], Option<&str>); 13] = [
     ("ccvs", &["p", "n"], Some("rm")),
     ("cccs", &["p", "n"], Some("gain")),
     ("bsource", &["p", "n"], None),
-    ("switch", &["p", "n", "cp", "cn"], None),
+    // a switch between p and n, controlled by the voltage between cp and cn, as S of SPICE
+    ("relay", &["p", "n", "cp", "cn"], None),
+    // its first winding between p_plus and p_minus, its second between s_plus and s_minus
+    ("transformer", &["p_plus", "p_minus", "s_plus", "s_minus"], None),
     ("port", &["p", "n"], Some("r")),
 ];
+
+/// The master of Spectre's switch, `Name (t0 t1 … tn) switch`: a common terminal, t0, and its
+/// throws, t1 to tn. It has as many terminals as nodes, named as Spectre numbers them, so that its
+/// `position` is the number of a terminal.
+const SWITCH: &str = "switch";
 
 /// Device families of model masters (6.12): the default terminal names and the model type.
 fn family(master: &str) -> Option<&'static str> {
@@ -104,6 +113,8 @@ fn family(master: &str) -> Option<&'static str> {
         Some("capacitor")
     } else if m == "inductor" {
         Some("inductor")
+    } else if m == "relay" {
+        Some("relay")
     } else {
         None
     }
@@ -116,12 +127,13 @@ fn family_terminals(f: &str) -> Option<Vec<String>> {
         "diode" => &["a", "k"],
         "jfet" => &["d", "g", "s"],
         "resistor" | "capacitor" | "inductor" => &["p", "n"],
+        "relay" => &["p", "n", "cp", "cn"],
         _ => return None,
     };
     Some(t.iter().map(|s| s.to_string()).collect())
 }
 
-/// The model type in the words SPICE uses (10.1): nmos, pmos, npn, pnp, d, r, c, l.
+/// The model type in the words SPICE uses (10.1): nmos, pmos, npn, pnp, d, r, c, l, sw.
 fn family_type(f: &str, params: &[(String, String)]) -> Option<String> {
     let ty = params.iter().find(|(k, _)| k.eq_ignore_ascii_case("type")).map(|(_, v)| v.to_lowercase());
     Some(match f {
@@ -141,6 +153,8 @@ fn family_type(f: &str, params: &[(String, String)]) -> Option<String> {
         "resistor" => "r".into(),
         "capacitor" => "c".into(),
         "inductor" => "l".into(),
+        // a relay, a switch controlled by a voltage: S of SPICE, whose model type is sw
+        "relay" => "sw".into(),
         _ => return None,
     })
 }
@@ -817,20 +831,21 @@ impl<'a> Reader<'a> {
                     continue;
                 }
                 let master = inst.model.clone().unwrap_or_default();
-                let (terms, value_param, mtype, is_subckt) =
-                    if let Some((_, t, v)) = PRIMITIVES.iter().find(|(m, _, _)| *m == master) {
-                        (Some(t.iter().map(|s| s.to_string()).collect::<Vec<_>>()), v.map(String::from), None, false)
-                    } else if let Some(m) = self.models.get(&master) {
-                        match family(&m.master) {
-                            Some(f) => (family_terminals(f), None, family_type(f, &m.params), false),
-                            None => (None, None, None, false),
-                        }
-                    } else if self.doc.subckts.contains_key(&master) {
-                        (None, None, None, true)
-                    } else {
-                        // neither a primitive nor a model card: a subcircuit defined elsewhere, such as a PDK device (6.4)
-                        (None, None, None, true)
-                    };
+                let (terms, value_param, mtype, is_subckt) = if master == SWITCH {
+                    (Some((0..inst.nodes.len()).map(|k| format!("t{k}")).collect()), None, None, false)
+                } else if let Some((_, t, v)) = PRIMITIVES.iter().find(|(m, _, _)| *m == master) {
+                    (Some(t.iter().map(|s| s.to_string()).collect::<Vec<_>>()), v.map(String::from), None, false)
+                } else if let Some(m) = self.models.get(&master) {
+                    match family(&m.master) {
+                        Some(f) => (family_terminals(f), None, family_type(f, &m.params), false),
+                        None => (None, None, None, false),
+                    }
+                } else if self.doc.subckts.contains_key(&master) {
+                    (None, None, None, true)
+                } else {
+                    // neither a primitive nor a model card: a subcircuit defined elsewhere, such as a PDK device (6.4)
+                    (None, None, None, true)
+                };
                 let inst = &mut self.doc.levels[lv].instances[k];
                 inst.default_terminals = terms;
                 inst.mtype = mtype;
@@ -921,6 +936,33 @@ mod tests {
         assert_eq!(inv.instances[1].default_terminals.as_ref().unwrap()[0], "d");
         assert_eq!(inv.records.len(), 1);
         assert!(doc.globals.contains("vdd!"));
+    }
+
+    #[test]
+    fn switches_relays_and_transformers() {
+        // a switch has a terminal for each node, t0 its common one; a relay is S of SPICE, as a
+        // primitive or a model card of type sw; a transformer has two windings
+        let net = "// t\nsimulator lang=spectre\nmodel rl relay ropen=1G\nS1 (a b) switch\n\
+                   S2 (a b c d) switch position=2\nK1 (a b c d) relay\nK2 (a b c d) rl\n\
+                   T1 (a b c d) transformer n1=1 n2=2\n";
+        let p = MemoryProvider::new().with("a.scs", net);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        let seen: Vec<(Vec<String>, Option<&str>)> =
+            doc.main().instances.iter().map(|i| (i.default_terminals.clone().unwrap(), i.mtype.as_deref())).collect();
+        let t = |n: &[&str]| n.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            seen,
+            [
+                (t(&["t0", "t1"]), None),
+                (t(&["t0", "t1", "t2", "t3"]), None),
+                (t(&["p", "n", "cp", "cn"]), None),
+                (t(&["p", "n", "cp", "cn"]), Some("sw")),
+                (t(&["p_plus", "p_minus", "s_plus", "s_minus"]), None),
+            ]
+        );
+        assert!(doc.main().instances.iter().all(|i| !i.is_subckt));
     }
 
     #[test]

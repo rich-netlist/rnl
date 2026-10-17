@@ -946,6 +946,30 @@ R2 a vdd! 2k
     }
 
     #[test]
+    fn the_revision_counts_files_of_one_name_in_two_package_directories() {
+        // two packages whose files are both pk.rnl, in two package directories, as the files of two
+        // standard series are: the text of each counts
+        let netlist = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\"); \
+                       @USE-PACKAGE(name=\"pa\", version=\"1.0\"); @USE-PACKAGE(name=\"pb\", version=\"1.0\")}\n\
+                       R1 a 0 1k\n.end\n";
+        let package = |name: &str, comment: &str| {
+            format!("/* {comment} */\n@RNL(type=\"header\") {{ @VERSION(\"0.3\"); @PACKAGE(name=\"{name}\", version=\"1.0\")}}\n")
+        };
+        let snapshot = |second: &str| {
+            let mut files = MemoryProvider::new()
+                .with("/w/t.sp", netlist)
+                .with("/p1/pk.rnl", &package("pa", "the first"))
+                .with("/p2/pk.rnl", &package("pb", second));
+            files.package_dirs = vec!["/p1".into(), "/p2".into()];
+            crate::snapshot("/w/t.sp", &files, &BuildOptions::default(), Parts::default()).unwrap()
+        };
+        let s = snapshot("the second");
+        let names: Vec<&str> = s.packages.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"pa") && names.contains(&"pb"), "{names:?}");
+        assert_ne!(snapshot("the second, changed").revision, s.revision);
+    }
+
+    #[test]
     fn only_the_parts_asked_for() {
         let s = snap(Parts::default());
         assert!(s["drawing"]["levels"].is_array());
