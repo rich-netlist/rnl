@@ -54,10 +54,6 @@ pub struct Request {
     /// Give each level's primitives; false when not given.
     #[serde(default)]
     pub primitives: bool,
-    /// Accepted, with no effect, as [`rnl_runtime::Options::draft`] has none: the files of 0.3
-    /// are read without it. Kept for compatibility, to be removed later.
-    #[serde(default)]
-    pub draft: bool,
     /// Give each level its solve status, what a frontend decides from whether to solve it
     /// (decision 0008); false when not given.
     #[serde(default)]
@@ -107,8 +103,6 @@ pub struct WriteRequest {
     pub svg: bool,
     #[serde(default)]
     pub primitives: bool,
-    #[serde(default)]
-    pub draft: bool,
     #[serde(default)]
     pub status: bool,
 }
@@ -170,7 +164,7 @@ pub fn respond(request: &[u8]) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: request.dialect,
-        runtime: Options { std: request.std, draft: request.draft, ..Options::default() },
+        runtime: Options { std: request.std, ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
@@ -202,7 +196,7 @@ fn write(request: WriteRequest) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: Some(request.write.dialect),
-        runtime: Options { std: request.std, draft: request.draft, ..Options::default() },
+        runtime: Options { std: request.std, ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
         status: request.status,
@@ -406,7 +400,8 @@ C1 a 0 1p
         let native = BuildOptions { status: true, ..BuildOptions::default() };
         let native = rnl_view::build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &native).unwrap();
         assert_eq!(status["document"], serde_json::to_value(native).unwrap());
-        // `draft`, kept for compatibility, changes nothing: a file of 0.3 is read without it
+        // a file of 0.3 is read without any switch; `draft`, which the core once accepted with no
+        // effect, is ignored as every field it does not know
         let text = "* t\n* @RNL(type=\"header\") { @VERSION(\"0.3\")}\nR1 a 0 1k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
         let files = json!({ "t.sp": text });
         let plain = answer(json!({ "entry": "t.sp", "files": files }));

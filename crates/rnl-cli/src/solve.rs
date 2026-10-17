@@ -74,7 +74,7 @@ use std::time::{Duration, Instant};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::host::file_name;
 use rnl_runtime::interp::obj::Priority;
-use rnl_runtime::interp::unit::SUPPORTED_VERSION;
+use rnl_runtime::interp::unit::DEFAULT_VERSION;
 use rnl_runtime::problem::{sig2, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Unsolved, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
@@ -94,8 +94,6 @@ pub struct SolveOptions {
     pub dialect: Option<String>,
     /// Use the standard package implicitly at the root (16.3).
     pub std: bool,
-    /// No effect, kept for compatibility: the files of 0.3 are read without a switch.
-    pub draft: bool,
     /// Only the level with this title: a subcircuit name, or the file name.
     pub level: Option<String>,
     /// The solver's options; their canonical text is the second segment of the hash (17). Its
@@ -105,14 +103,14 @@ pub struct SolveOptions {
 
 impl Default for SolveOptions {
     fn default() -> SolveOptions {
-        SolveOptions { dialect: None, std: true, draft: false, level: None, solver: SolverOptions::default() }
+        SolveOptions { dialect: None, std: true, level: None, solver: SolverOptions::default() }
     }
 }
 
 impl SolveOptions {
     /// The runtime's options the levels are read with: as a solver reads them (2.8).
     pub fn runtime(&self) -> Options {
-        Options { std: self.std, draft: self.draft, ..Options::solver() }
+        Options { std: self.std, ..Options::solver() }
     }
 }
 
@@ -482,7 +480,7 @@ fn version_of(r: &Interpretation, file: &str) -> String {
     r.problems
         .iter()
         .find(|q| r.doc.levels.get(q.level).is_some_and(|l| l.file == file))
-        .map_or_else(|| SUPPORTED_VERSION.to_string(), |q| q.version.clone())
+        .map_or_else(|| DEFAULT_VERSION.to_string(), |q| q.version.clone())
 }
 
 /// Where each file of a run goes: under `-o DIR` by its name relative to the directory of the

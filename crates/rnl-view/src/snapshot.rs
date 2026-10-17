@@ -938,9 +938,6 @@ R2 a vdd! 2k
         assert_ne!(rev(&NETLIST.replace("R1 in out 1k", "R1 in out  1k"), &options), r);
         let no_std = BuildOptions { runtime: Options { std: false, ..Options::default() }, ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &no_std), r);
-        // the draft switch has no effect, and so does not change the revision
-        let draft = BuildOptions { runtime: Options { draft: true, ..Options::default() }, ..BuildOptions::default() };
-        assert_eq!(rev(NETLIST, &draft), r);
         let spectre = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &spectre), r);
     }

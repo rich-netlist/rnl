@@ -670,12 +670,10 @@ fn rnl_problem_gives_a_file_of_0_2_no_numbers() {
             let r = interpret_file(&f, None, &fs, options).unwrap();
             r.problems.iter().map(|p| rnl_cli::problem::level(p, OPTIONS)).collect()
         };
-        let levels = json(&Options::solver());
-        for level in &levels {
+        for level in &json(&Options::solver()) {
             assert!(level.get("authored_numbers").is_none(), "{}", f.display());
             assert!(!has_key(level, "number"), "{}", f.display());
         }
-        assert_eq!(json(&Options { draft: true, ..Options::solver() }), levels, "{}", f.display());
     }
 }
 

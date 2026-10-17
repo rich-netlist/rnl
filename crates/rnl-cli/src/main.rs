@@ -27,7 +27,6 @@ options:
   --no-std            do not use the standard package at the root (16.3)
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      spice or spectre, instead of guessing from the file
-  --draft             no effect, kept for compatibility: the files of 0.3 are read without it
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -70,9 +69,6 @@ struct Args {
     std: bool,
     generated: bool,
     dialect: Option<String>,
-    /// `--draft`: accepted, with no effect, as [`Options::draft`] has none; kept for
-    /// compatibility, to be removed later.
-    draft: bool,
     svg: bool,
     primitives: bool,
     status: bool,
@@ -98,7 +94,6 @@ fn parse_args() -> Result<Args, String> {
     let mut std = true;
     let mut generated = true;
     let mut dialect = None;
-    let mut draft = false;
     let (mut svg, mut primitives, mut status) = (true, false, false);
     let mut level = None;
     let mut previous = false;
@@ -113,7 +108,6 @@ fn parse_args() -> Result<Args, String> {
             "--no-std" => std = false,
             "--no-generated" => generated = false,
             "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
-            "--draft" => draft = true,
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--status" => status = true,
@@ -137,7 +131,6 @@ fn parse_args() -> Result<Args, String> {
         std,
         generated,
         dialect,
-        draft,
         svg,
         primitives,
         status,
@@ -170,7 +163,7 @@ fn main() -> ExitCode {
 
 /// The runtime's options the command line gives.
 fn options(args: &Args) -> Options {
-    Options { std: args.std, generated: args.generated, draft: args.draft, ..Options::default() }
+    Options { std: args.std, generated: args.generated, ..Options::default() }
 }
 
 fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, String> {
@@ -206,7 +199,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 .with_overrides(args.solver_options.as_deref().unwrap_or(""))
                 .map_err(|e| format!("--solver-options: {e}"))?
                 .canonical();
-            let options = Options { std: args.std, draft: args.draft, ..Options::solver() };
+            let options = Options { std: args.std, ..Options::solver() };
             let (r, previous) = if args.previous {
                 rnl_view::read_previous(&args.file.to_string_lossy(), args.dialect.as_deref(), &provider, &options)?
             } else {
@@ -344,13 +337,7 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
         .map_err(|e| format!("--solver-options: {e}"))?;
     // the groups of the facts of priority low are sought only for their hints (8.5, 7.6)
     let solver = SolverOptions { hints_for_low: args.report, ..solver };
-    let options = SolveOptions {
-        dialect: args.dialect.clone(),
-        std: args.std,
-        draft: args.draft,
-        level: args.level.clone(),
-        solver,
-    };
+    let options = SolveOptions { dialect: args.dialect.clone(), std: args.std, level: args.level.clone(), solver };
     let run = rnl_cli::solve::solve(&args.file, provider, &options)?;
     // nothing is written when a file has no place to go
     rnl_cli::solve::destinations(&run, &target)?;
