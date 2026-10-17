@@ -462,9 +462,9 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, opt
 /// The fingerprint of what a snapshot is made from (3.7): every file read, the host files and the
 /// packages, by name and text with its line endings made "\n"; the dialect; the options that change
 /// what the texts give: the standard package at the root, the generated records and the tolerance.
-/// Each part has its length before it, so that no two inputs give the same bytes. The draft switch,
-/// which has no effect, is written as off, as the revisions made before it lost its effect have
-/// it, so that the same texts keep their revisions.
+/// Each part has its length before it, so that no two inputs give the same bytes. `draft=false`
+/// stays in the text, as the revisions made while there was a switch for the draft 0.3 have it, so
+/// that the same texts keep their revisions.
 fn revision(r: &Interpretation, options: &Options) -> String {
     let mut files: Vec<(&str, String)> =
         r.sources.iter().map(|(name, text)| (name.as_str(), text.replace("\r\n", "\n").replace('\r', "\n"))).collect();
