@@ -17,6 +17,7 @@ pub mod obj;
 mod output;
 mod packages;
 pub mod phases;
+mod renames;
 pub mod scene;
 mod selfcheck;
 pub mod unit;
@@ -54,6 +55,11 @@ pub(crate) type RuleMembers = ((usize, usize), Rc<Vec<unit::UnitMember>>);
 pub struct Options {
     /// Use the standard package implicitly at the root (16.3).
     pub std: bool,
+    /// The version of the standard package at the root, instead of the newest of the series written
+    /// in the file's language version (16.3: its version is the tool's default), such as "0.2" to
+    /// read a file of 0.3 with the series 0.2. A version pinned in a header record still comes
+    /// first. None: by the language version.
+    pub std_version: Option<String>,
     /// Read the records with `type="generated"`, the solver's results. A solver interprets a level
     /// without them (2.8, 14.8): every file of the document is read as if they were not written.
     pub generated: bool,
@@ -71,7 +77,14 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Options {
-        Options { std: true, generated: true, problems: false, tolerance: crate::geom::TOL, draft: false }
+        Options {
+            std: true,
+            std_version: None,
+            generated: true,
+            problems: false,
+            tolerance: crate::geom::TOL,
+            draft: false,
+        }
     }
 }
 
@@ -180,6 +193,8 @@ pub struct Interp<'p> {
     /// evaluated: the run stops, and the interpretation is run again with it in `closing`.
     pub(crate) restart: Option<(cycles::StmtKey, String)>,
     pub(crate) std_enabled: bool,
+    /// [`Options::std_version`].
+    pub(crate) std_version: Option<String>,
     /// Read the records with `type="generated"` (`Options::generated`).
     pub(crate) read_generated: bool,
     /// Build the problems (`Options::problems`).
@@ -293,6 +308,7 @@ impl<'p> Interp<'p> {
             closing: HashMap::new(),
             restart: None,
             std_enabled: options.std,
+            std_version: options.std_version.clone(),
             read_generated: options.generated,
             want_problems: options.problems,
             tol: options.tolerance,

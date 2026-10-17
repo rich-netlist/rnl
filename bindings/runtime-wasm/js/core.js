@@ -13,6 +13,8 @@
  *   found by name.
  * @property {"spice" | "spectre"} [dialect] The dialect, instead of guessing it from the entry.
  * @property {boolean} [std] Use the standard package at the root; true when not given.
+ * @property {string} [std_version] The version of the standard package at the root, whatever the
+ *   files' language version, such as "0.2"; by the language version when not given.
  * @property {boolean} [svg] Write each level's SVG; true when not given.
  * @property {boolean} [primitives] Give each level's primitives; false when not given.
  * @property {boolean} [draft] Accepted, with no effect: the files of 0.3 are read without it. Kept
@@ -35,6 +37,7 @@
  * @property {Record<string, string>} [files] Further files, such as packages.
  * @property {string[]} [package_dirs]
  * @property {boolean} [std]
+ * @property {string} [std_version]
  * @property {boolean} [svg]
  * @property {boolean} [primitives]
  */

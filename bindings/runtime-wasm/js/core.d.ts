@@ -19,6 +19,12 @@ export interface Request {
   dialect?: "spice" | "spectre";
   /** Use the standard package at the root (16.3); true when not given. */
   std?: boolean;
+  /**
+   * The version of the standard package at the root, whatever the files' language version, such
+   * as "0.2" to read a file of 0.3 with the series 0.2; a version pinned in a header record still
+   * comes first (16.3). By the language version when not given.
+   */
+  std_version?: string;
   /** Write each level's SVG; true when not given. */
   svg?: boolean;
   /** Give each level's primitives; false when not given. */
@@ -142,6 +148,7 @@ export interface WriteRequest {
   files?: Record<string, string>;
   package_dirs?: string[];
   std?: boolean;
+  std_version?: string;
   svg?: boolean;
   primitives?: boolean;
 }

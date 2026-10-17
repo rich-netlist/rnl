@@ -461,7 +461,8 @@ pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, opt
 
 /// The fingerprint of what a snapshot is made from (3.7): every file read, the host files and the
 /// packages, by name and text with its line endings made "\n"; the dialect; the options that change
-/// what the texts give: the standard package at the root, the generated records and the tolerance.
+/// what the texts give: the standard package at the root and the version asked for, if any, the
+/// generated records and the tolerance.
 /// Each part has its length before it, so that no two inputs give the same bytes. The draft switch,
 /// which has no effect, is written as off, as the revisions made before it lost its effect have
 /// it, so that the same texts keep their revisions.
@@ -470,8 +471,12 @@ fn revision(r: &Interpretation, options: &Options) -> String {
         r.sources.iter().map(|(name, text)| (name.as_str(), text.replace("\r\n", "\n").replace('\r', "\n"))).collect();
     files.sort();
     files.dedup();
-    let reading =
+    let mut reading =
         format!("std={} generated={} draft=false tolerance={}", options.std, options.generated, options.tolerance);
+    // only when asked for, so that the revisions made before the option keep their values
+    if let Some(v) = &options.std_version {
+        reading.push_str(&format!(" std_version={v}"));
+    }
     let mut bytes = Vec::new();
     let mut field = |part: &[u8]| {
         bytes.extend_from_slice(&(part.len() as u64).to_le_bytes());
@@ -941,6 +946,9 @@ R2 a vdd! 2k
         // the draft switch has no effect, and so does not change the revision
         let draft = BuildOptions { runtime: Options { draft: true, ..Options::default() }, ..BuildOptions::default() };
         assert_eq!(rev(NETLIST, &draft), r);
+        // a version of the standard package asked for does
+        let v02 = Options { std_version: Some("0.2".into()), ..Options::default() };
+        assert_ne!(rev(NETLIST, &BuildOptions { runtime: v02, ..BuildOptions::default() }), r);
         let spectre = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
         assert_ne!(rev(NETLIST, &spectre), r);
     }

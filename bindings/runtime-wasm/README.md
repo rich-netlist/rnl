@@ -75,6 +75,7 @@ A call writes the request as UTF-8 JSON, calls `rnl_build`, and reads the answer
 | `package_dirs` | The directories, among the paths of `files`, whose `.rnl` files are packages found by name (16.2). |
 | `dialect` | `"spice"` or `"spectre"`, instead of guessing from the entry. |
 | `std` | Whether the standard package is used at the root (16.3); true when not given. |
+| `std_version` | The version of the standard package at the root, whatever the files' language version, such as `"0.2"` to read a file of 0.3 with the series 0.2; a version pinned in a header record still comes first (16.3). By the language version when not given. |
 | `svg` | Whether each level's SVG is written; true when not given. |
 | `primitives` | Whether each level's primitives are given; false when not given. |
 | `draft` | Accepted, with no effect: the files that declare 0.3, and a main file without a header record, are read in 0.3 without it (16.1). Kept for compatibility, to be removed later. |
@@ -99,7 +100,7 @@ A request with a `write` field writes an edit transaction's ops into a netlist (
 }
 ```
 
-The netlist is the entry, under `/rnl-edit/netlist.sp`, or `.scs` for Spectre; a `file` in `write`, the name the netlist is saved under, such as `"file": "top.net"`, puts it under that name instead, so that a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to its `simulator lang=spectre`, and its header and records go where that reading keeps them (2.2). A request without it writes as before; `files`, `package_dirs`, `std`, `svg` and `primitives` are a build's. The answer is `{"written": {"text": "...", "document": ...}}`: the netlist with the records written, and its Document, whose `diagnostics` say how the records read. An op that cannot be written is `{"error": "op 3 (set): ..."}`.
+The netlist is the entry, under `/rnl-edit/netlist.sp`, or `.scs` for Spectre; a `file` in `write`, the name the netlist is saved under, such as `"file": "top.net"`, puts it under that name instead, so that a Spectre netlist that is not a `.scs` file is read in the SPICE mode up to its `simulator lang=spectre`, and its header and records go where that reading keeps them (2.2). A request without it writes as before; `files`, `package_dirs`, `std`, `std_version`, `svg` and `primitives` are a build's. The answer is `{"written": {"text": "...", "document": ...}}`: the netlist with the records written, and its Document, whose `diagnostics` say how the records read. An op that cannot be written is `{"error": "op 3 (set): ..."}`.
 
 ## JavaScript modules
 
