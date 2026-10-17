@@ -10,10 +10,11 @@ rnl view FILE [options]           print the Document a viewer shows, as JSON
 rnl problem FILE [options]        print what a solver reads of each level, with its hash, as JSON
 rnl solve FILE -o DIR [options]   solve each drawing level and write its record of the solver back
 rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
+rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
 rnl strip-generated FILE -o OUT   write FILE without its type="generated" records
 rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
-FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl).
+FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl); catalog takes none.
 options:
   --package-dir DIR   look for packages in DIR as well (16.2); repeatable
   --no-std            do not use the standard package at the root (16.3)
@@ -52,12 +53,16 @@ solve options (the levels are read without their type="generated" records; -o or
   them, or one of the solver
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
+catalog options (the packages are those of --package-dir and the bundled ones, each read as rnl
+check reads a package file, with --no-std and --std-version):
+  --package NAME      only the packages of this name; repeatable
+  --all-versions      every version of each package, not only the newest
 write:
   REQUEST.json is {"dialect", "netlist", "author", "ops"}, the ops as the editor interface
   draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out
 ```
 
-`snapshot` prints the snapshot of [`rnl-view`](../rnl-view/README.md#snapshots): the host circuit and the model of each drawing level, by ids a transaction can write back. `write` writes the ops into the netlist with [`rnl-edit`](../rnl-edit/README.md) and saves the result as OUT, reading the netlist under the name of OUT when the request names no `file`, so that a Spectre netlist saved without the `.scs` suffix gets its header where Spectre reads it (2.2); `rnl check OUT` then says how it reads.
+`snapshot` prints the snapshot of [`rnl-view`](../rnl-view/README.md#snapshots): the host circuit and the model of each drawing level, by ids a transaction can write back. `catalog` prints the catalog of [`rnl-view`](../rnl-view/README.md#catalog): the symbols, with their pins, boxes and labels, the ordinary definitions and the sets of the bundled packages and of those in the directories `--package-dir` gives, each package file read as `rnl check PACKAGE.rnl` reads it; of each name the newest version, every version with `--all-versions`, and only the names `--package` gives, when it gives any. It is the catalog the WebAssembly core gives for a catalog request. `write` writes the ops into the netlist with [`rnl-edit`](../rnl-edit/README.md) and saves the result as OUT, reading the netlist under the name of OUT when the request names no `file`, so that a Spectre netlist saved without the `.scs` suffix gets its header where Spectre reads it (2.2); `rnl check OUT` then says how it reads.
 
 Without a solver, `render` draws only what has coordinates. `check` says what is missing: after the diagnostics it prints, for each drawing level, how many objects have no position and how many constraints hold, need a solver to move something, or could not be checked. `view` prints the Document of [`rnl-view`](../rnl-view/README.md), what the desktop viewer shows, for tools and for comparing builds; with `--primitives` each level has its primitives as well, with `--no-svg` no SVG, and with `--status` its solve status, `solve`: `fixed`, `unsolved`, `solved` or `stale`. The standard packages in [`libraries/standard`](../../libraries/standard/README.md) are built into the command through `rnl-view`; this crate adds the files and package directories on disk (`FsProvider`).
 

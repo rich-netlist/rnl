@@ -440,7 +440,7 @@ impl Interp<'_> {
                     );
                 }
                 seen.push(name.clone());
-                roles.push(Role { name, kinds, is_set });
+                roles.push(Role { name, kinds, is_set, written: r });
             }
         }
         let mut params: Vec<(String, Option<Lit>)> = Vec::new();

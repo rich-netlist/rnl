@@ -6,6 +6,7 @@
 //! written above it are evaluated again in it (10.3).
 
 pub mod attrs;
+pub mod catalog;
 mod conflicts;
 pub mod ctx;
 pub mod cycles;
@@ -462,7 +463,12 @@ impl<'p> Interp<'p> {
     /// Run, and run again from the start as long as a run finds a statement that closes a cycle of
     /// sets after a statement placed before it was evaluated (5.2.2): each run has the statements
     /// found so far fail from the start. `again` makes a new interpreter from the one that stopped.
-    fn run_settled(mut self, again: impl Fn(Interp<'p>) -> Interp<'p>) -> Interpretation {
+    fn run_settled(self, again: impl Fn(Interp<'p>) -> Interp<'p>) -> Interpretation {
+        self.settled(again).finish()
+    }
+
+    /// [`Self::run_settled`] without the output: the interpreter of the last run.
+    fn settled(mut self, again: impl Fn(Interp<'p>) -> Interp<'p>) -> Interp<'p> {
         self.run();
         while let Some((key, msg)) = self.restart.take() {
             let mut closing = std::mem::take(&mut self.closing);
@@ -471,7 +477,7 @@ impl<'p> Interp<'p> {
             self.closing = closing;
             self.run();
         }
-        self.finish()
+        self
     }
 
     /// Evaluate the statements of a unit without a circuit once: definitions, rules, errors.

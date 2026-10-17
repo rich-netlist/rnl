@@ -1,9 +1,9 @@
 // The core in a module Worker: it loads core.js and the module next to it, and answers each message
-// { id, request } with { id, document } for a build, { id, written } for a write, or { id, error },
-// in the order they came. The request is an object or, as client.js sends it, its JSON text. Every
-// request gets the packages this build brings (packages.js): their files under the request's own,
-// their directories after the request's. It runs in browsers and, for the tests, as a Node worker
-// thread.
+// { id, request } with { id, document } for a build, { id, snapshot } for a build with parts,
+// { id, written } for a write, { id, catalog } for a catalog request, or { id, error }, in the order
+// they came. The request is an object or, as client.js sends it, its JSON text. Every request gets
+// the packages this build brings (packages.js): their files under the request's own, their
+// directories after the request's. It runs in browsers and, for the tests, as a Node worker thread.
 
 import { loadCore } from "./core.js";
 import { files as packageFiles, packageDirs } from "./packages.js";

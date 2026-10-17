@@ -24,12 +24,27 @@ npm i @rich-netlist/runtime@next
 import { startCore } from "@rich-netlist/runtime";
 
 const core = startCore();
-const document = await core.build({ entry: "/top.sp", files: { "/top.sp": netlistText } });
-const snapshot = await core.snapshot({ entry: "/top.sp", files: { "/top.sp": netlistText } });
+const files = { "/top.sp": netlistText };
+const document = await core.build({ entry: "/top.sp", files });
+// the snapshot takes the parts to give: the host circuit and the model of each level here
+const snapshot = await core.snapshot({ entry: "/top.sp", files, parts: { host: true, model: true } });
 core.terminate();
 ```
 
-`@rich-netlist/runtime/core` loads the module in the calling thread instead, and `@rich-netlist/runtime/worker` is the Worker itself. The requests, the Document and the snapshot are declared in the package's TypeScript files. The [binding's README](https://github.com/rich-netlist/rnl/tree/main/bindings/runtime-wasm#readme) describes the requests, `collect` for a frontend's own file access, and `decodeText`.
+`@rich-netlist/runtime/core` loads the module in the calling thread instead, and `@rich-netlist/runtime/worker` is the Worker itself. The requests, the Document, the snapshot and the catalog are declared in the package's TypeScript files. The [binding's README](https://github.com/rich-netlist/rnl/tree/main/bindings/runtime-wasm#readme) describes the requests, `collect` for a frontend's own file access, and `decodeText`.
+
+## Catalog
+
+`catalog` lists the symbols, definitions and sets of the packages the core has: the bundled ones and a request's own, those of its `package_dirs` among its `files`. Each package is read as the core reads it, so a symbol's pins and box are those of the drawings:
+
+```js
+const catalog = await core.catalog({ catalog: {} });
+const resistor = catalog.symbols.find((s) => s.symbol === "$RESISTOR");
+// resistor.package is "rnl-std-basic", resistor.version "0.3", resistor.box [-1, -2.4, 1, 2.4], and
+// resistor.pins [{ terminal: 1, at: [0, 2], direction: "up" }, { terminal: 2, at: [0, -2], direction: "down" }]
+```
+
+Of each name only the newest version is listed; `{ catalog: { packages: ["rnl-std-basic"], all_versions: true } }` keeps the packages of these names, every version of each. A symbol's `definition` names the definition whose usages a rule of the packages draws with it, such as `$GROUND` for `$GROUND_SYMBOL`.
 
 ## Vite
 

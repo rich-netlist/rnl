@@ -44,6 +44,24 @@ gives the editor interface's view of a document (`notes/rnl-editor-interface/spe
 
 `rnl snapshot FILE` prints it, with the host circuit and the model by default.
 
+## Catalog
+
+```rust
+pub fn catalog(files: &dyn Provider, options: &CatalogOptions) -> Catalog
+```
+
+lists the symbols, ordinary definitions and sets of the packages the core has: the bundled ones, the standard series 0.2 and 0.3 and `analog-canvas-extensions`, and those of the package directories of `files` (`Provider::package_files`), for a frontend that maps its own parts onto them, as Analog Canvas does. Each package file is read through the runtime as `rnl check PACKAGE.rnl` reads it, checked on its own (2.7) with `options.runtime` (`rnl_runtime::interp::catalog::package_contents`), so a symbol's pins and box are the ones the drawings have: its box is the model's, the one it writes or the extent of its graphics (9.2.3).
+
+- Of each name and version the first file the package directories have is listed, the frontend's before the bundled ones, as the runtime finds a package by name (16.2); of each name the newest version, by the runtime's order of versions, or every version with `all_versions`; and only the names `packages` gives, when it gives them.
+- `packages`: name, version, `language` (the language version the file declares, or 0.3 when it declares none), `file` (its file name), `references` (the packages its header record names with USE-PACKAGE), `series` (`rnl-std` or `rnl-std-*`) and `implicit` (`rnl-std`), by name and then by version.
+- `symbols`: `symbol`, `package`, `version`, `file`, `definition`, `pins` (one for each terminal, in terminal order: `terminal` as the symbol writes it, a number or a name, `at`, and `direction`: `"right"`, `"up"`, `"left"`, `"down"` or null), `box` and `labels` (the texts it writes with a key, with `key`, `text` as written, `at`, `halign` and `valign`, `"start"` and `"baseline"` when it writes none, as the model draws them).
+- `definitions`: `definition`, `package`, `version`, `file`, `roles` as `roles=` writes them, `parameters` as `[name, default]`, the default null when there is none, and `symbol`.
+- `sets`: `set`, `package`, `version` and `file`.
+- A symbol's `definition` and a definition's `symbol` come from the rules of the packages listed written `# @SELECT-USAGE $DEF => @SET-SYMBOL $SYM`, which draw every usage of the definition with the symbol, each name found as the runtime finds it where the rule is written (16.2): `$GROUND_SYMBOL` draws `$GROUND`. A rule of another form, such as the fill's `$NAMED_GROUND_NET_SET @SELECT-ANCESTOR-USAGE $GROUND => @SET-SYMBOL $NAMED_GROUND_SYMBOL`, links nothing.
+- The symbols, definitions and sets go package by package as `packages` lists them, each in the order of its file.
+
+`rnl catalog` prints it; the WebAssembly core gives it for a catalog request.
+
 ## Drawings
 
 A level's drawing comes in the outputs the frontend asks for. A level has an `svg` field only when the SVG was asked for, and a `primitives` field only when the primitives were; its `scale` is always there.
@@ -54,7 +72,7 @@ A level's drawing comes in the outputs the frontend asks for. A level has an `sv
 
 ## Type definitions
 
-[`types/document.d.ts`](types/document.d.ts) declares the Document and everything in it in TypeScript, for frontends and their checks; the page in [`apps/viewer-ui`](../../apps/viewer-ui/README.md) refers to it. [`types/snapshot.d.ts`](types/snapshot.d.ts) declares the snapshot. They are generated from the Rust types by [ts-rs](https://crates.io/crates/ts-rs), which the types derive in the tests only, and laid out by the test to be read. The test fails when the file is not what the types give; after a change to them that is meant, write it with:
+[`types/document.d.ts`](types/document.d.ts) declares the Document and everything in it in TypeScript, for frontends and their checks; the page in [`apps/viewer-ui`](../../apps/viewer-ui/README.md) refers to it. [`types/snapshot.d.ts`](types/snapshot.d.ts) declares the snapshot, and [`types/catalog.d.ts`](types/catalog.d.ts) the catalog. They are generated from the Rust types by [ts-rs](https://crates.io/crates/ts-rs), which the types derive in the tests only, and laid out by the test to be read. The test fails when the file is not what the types give; after a change to them that is meant, write it with:
 
 ```bash
 RNL_BLESS=1 cargo test -p rnl-view types
