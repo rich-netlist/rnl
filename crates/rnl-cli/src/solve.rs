@@ -294,7 +294,38 @@ pub fn solve_with_clock(
     options: &SolveOptions,
     clock: &dyn Clock,
 ) -> Result<SolveRun, String> {
-    let (run, wants) = pass(file, files, options, clock, &[])?;
+    solve_watched(file, files, options, clock, &|_| true)
+}
+
+/// Where a solve is: the level about to be solved, by its place among the levels solved and its
+/// title, for a frontend to show while it works.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Progress {
+    /// The level about to be solved, counted from 0 among those the run solves.
+    pub level: usize,
+    /// How many levels the run solves.
+    pub levels: usize,
+    /// Its title: a subcircuit name, or the file name.
+    pub title: String,
+    /// Whether this is the second pass, after files were raised to 0.3 (16.1).
+    pub again: bool,
+}
+
+/// What [`solve_watched`] fails with when its watcher stops it.
+pub const CANCELLED: &str = "the solve was cancelled";
+
+/// [`solve_with_clock`], with `watch` told of each level before it is solved: when it says false,
+/// the solve stops there, nothing is given back but [`CANCELLED`], and the levels solved so far
+/// are dropped. A frontend runs it on a thread of its own, shows where it is, and stops it at the
+/// user's word; a level stops sooner when the clock reaches the time limit of its resolution.
+pub fn solve_watched(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    clock: &dyn Clock,
+    watch: &dyn Fn(&Progress) -> bool,
+) -> Result<SolveRun, String> {
+    let (run, wants) = pass(file, files, options, clock, &[], watch)?;
     if wants.is_empty() {
         return Ok(run);
     }
@@ -337,7 +368,7 @@ pub fn solve_with_clock(
     }
     // the files read are those of the first pass: the second reads the files raised from memory
     let read = run.read.clone();
-    let mut run = if texts.is_empty() { run } else { pass(file, files, options, clock, &texts)?.0 };
+    let mut run = if texts.is_empty() { run } else { pass(file, files, options, clock, &texts, watch)?.0 };
     run.read = read;
     // a file level that cannot say 0.3 itself, such as a library section without a header record,
     // takes the version of the file that includes it (16.1): when that one is raised, it reads in
@@ -365,6 +396,7 @@ fn pass(
     options: &SolveOptions,
     clock: &dyn Clock,
     raised: &[(String, String)],
+    watch: &dyn Fn(&Progress) -> bool,
 ) -> Result<(SolveRun, Vec<Want>), String> {
     let entry = path_str(file);
     let runtime = options.runtime();
@@ -430,7 +462,12 @@ fn pass(
     let mut solved_files: Vec<SolvedFile> = Vec::new();
     // the document read again when a header moved
     let mut current = if moved.is_empty() { Some(first) } else { None };
-    for (level, title) in targets {
+    let count = targets.len();
+    for (k, (level, title)) in targets.into_iter().enumerate() {
+        let progress = Progress { level: k, levels: count, title: title.clone(), again: !raised.is_empty() };
+        if !watch(&progress) {
+            return Err(CANCELLED.to_string());
+        }
         // the document as written so far: the lines of this level have moved if one before it in
         // its file was written back
         let r = match current.take() {
@@ -691,7 +728,7 @@ pub fn describe_fact(p: &LevelProblem, k: usize) -> String {
 }
 
 /// A fact by its rank and what it says, without its context, such as `[9] ALIGN y {#M1 #M2}`.
-fn fact_what(p: &LevelProblem, k: usize) -> String {
+pub(crate) fn fact_what(p: &LevelProblem, k: usize) -> String {
     let Some(f) = p.facts.get(k) else { return format!("[{k}]") };
     let list = |ms: &[PointRef]| format!("{{{}}}", ms.iter().map(|m| point(p, m)).collect::<Vec<_>>().join(" "));
     let objects = |ks: &[usize]| list(&ks.iter().map(|k| PointRef::Origin(*k)).collect::<Vec<_>>());
@@ -750,7 +787,7 @@ fn fact_what(p: &LevelProblem, k: usize) -> String {
 /// and every definition of the chain is named, outermost first, as for a fact: `%o1, the usage of
 /// $OUTER at p.sp:8 with #R1(a) #R2(b) (p.sp:6 of $PAIR, from $OUTER in $PAIR)`. For the coordinates of a
 /// point, which have no statement of their own, the point.
-fn statement_name(p: &LevelProblem, s: &Statement) -> String {
+pub(crate) fn statement_name(p: &LevelProblem, s: &Statement) -> String {
     if let Some(k) = s.point {
         return format!("the coordinates of {}", point(p, &PointRef::Origin(k)));
     }
@@ -788,7 +825,7 @@ fn ranks(ks: &[usize], last: &str) -> String {
 /// What the hint of a fact discarded says of it (the draft 0.3, 8.5): every minimal group of facts
 /// kept before it that it conflicts with, such as `it conflicts with [3]; or with [0] and [4]`,
 /// and that the list is not complete when the time limit cut it.
-fn conflicts(d: &Discarded) -> String {
+pub(crate) fn conflicts(d: &Discarded) -> String {
     let mut why = if d.groups.is_empty() {
         "no group of facts it conflicts with was found within the time limit of the solver".to_string()
     } else {

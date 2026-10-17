@@ -33,6 +33,34 @@
  * @property {() => Promise<string>} [version] The version of the app that runs, such as "0.1.0", for
  *   Help > Check for Updates (updates.js), which only the desktop offers; without it, that command
  *   does nothing.
+ * @property {(source: Source, timeLimit: number | "none" | null) => Promise<Solved>} [solve] Solve a
+ *   source as `rnl solve` solves it, without its records of the solver, and give it drawn as
+ *   solved, nothing written (solve.js, decision 0010): `timeLimit` is the seconds of the
+ *   resolution of each level, "none" for no limit, null for the default of `rnl solve`. Rejects
+ *   with a message when it cannot, and with CANCELLED when `cancelSolve` stopped it. Only the
+ *   desktop offers it; without it, the Solve menu is not shown and its commands do nothing.
+ * @property {() => void} [cancelSolve] Stop the solve under way.
+ * @property {() => Promise<string | null>} [saveSolved] Save a copy of the last solve shown where the
+ *   user says, never over a file that was read: what was saved, in a sentence, or null when the
+ *   user cancelled. Rejects with a message when it cannot.
+ * @property {(handler: (step: SolveStep) => void) => void} [onSolveProgress] Call `handler` with each
+ *   level as the solve under way begins it.
+ */
+
+/**
+ * A solve drawn: the Document of the files as solved, and the report of what became of each fact
+ * (crates/rnl-cli/src/preview.rs).
+ *
+ * @typedef {object} Solved
+ * @property {import("../../crates/rnl-view/types/document.js").Document} document
+ * @property {object} report
+ */
+
+/**
+ * Where a solve is: the level it begins, counted from 0 among the `levels` it solves, its title,
+ * and whether it is the second pass, after files were raised to 0.3.
+ *
+ * @typedef {{ level: number, levels: number, title: string, again: boolean }} SolveStep
  */
 
 /**

@@ -1,11 +1,13 @@
 //! RNL Viewer: open a netlist, draw its levels, show its text and diagnostics, and follow an
-//! instance or a net between the drawing and the text. It only reads; it neither edits nor
-//! solves, so objects without a position are not drawn.
+//! instance or a net between the drawing and the text. It can solve the netlist as a preview, and
+//! save a solved copy where the user says (decision 0010); it never changes the files it opens,
+//! and as opened, objects without a position are not drawn.
 
 // no console window behind the app in release builds on Windows
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod menu;
+mod solve;
 
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -96,6 +98,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         // opens a release's page for Help > Check for Updates; the capability limits it to the repository's
         .plugin(tauri_plugin_opener::init())
+        .manage(solve::Solves::default())
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "exit" => app.exit(0),
@@ -108,7 +111,10 @@ fn main() {
             open_text,
             pick_file,
             initial_file,
-            menu::set_view_check
+            menu::set_view_check,
+            solve::solve_preview,
+            solve::cancel_solve,
+            solve::save_solved_copy
         ])
         .run(context)
         .expect("the viewer window could not be started");

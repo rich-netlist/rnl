@@ -192,7 +192,9 @@ fn about() -> AboutMetadata<'static> {
         name: Some("RNL Viewer".into()),
         version: Some(env!("CARGO_PKG_VERSION").into()),
         comments: Some(
-            "Draws netlists with Rich Netlist (RNL) records. It only reads: it neither edits nor solves.".into(),
+            "Draws netlists with Rich Netlist (RNL) records. It can solve a netlist as a preview and save a solved \
+             copy; it never changes the files it opens."
+                .into(),
         ),
         copyright: Some(
             "Texts are drawn in Noto Sans SC, copyright 2014-2021 Adobe (http://www.adobe.com/), under the SIL Open \
@@ -249,6 +251,30 @@ mod tests {
         )
     }
 
+    /// The Solve menu, which only the desktop offers (decision 0010): Solve, with its key shown after
+    /// a tab on Windows (`tabbed`) and as the accelerator elsewhere, Close Preview, Save Solved Copy
+    /// As and Time Limit.
+    fn solve(tabbed: bool) -> (String, Vec<Shown>) {
+        let keyed = |id: &str, text: &str, shown: &str, accelerator: &str| {
+            if tabbed {
+                item(id, &format!("{text}\t{shown}"), None)
+            } else {
+                item(id, text, Some(accelerator))
+            }
+        };
+        (
+            "&Solve".to_string(),
+            vec![
+                keyed("solve", "&Solve", "F9", "F9"),
+                item("solve-close", "&Close Preview", None),
+                Shown::Separator,
+                keyed("solve-save", "Save Solved &Copy As...", "Ctrl+Shift+S", "CmdOrCtrl+Shift+S"),
+                Shown::Separator,
+                item("solve-time-limit", "&Time Limit...", None),
+            ],
+        )
+    }
+
     /// The Help menu, alike on every platform: Check for Updates, which only the desktop offers and
     /// which has no keys, then About.
     fn help() -> (String, Vec<Shown>) {
@@ -286,6 +312,7 @@ mod tests {
                     check("toggle-problems", "&Problems\tCtrl+Shift+M", None),
                 ],
             ),
+            solve(true),
             help(),
         ];
         assert_eq!(menus, expected);
@@ -322,6 +349,7 @@ mod tests {
                     check("toggle-problems", "&Problems", Some("CmdOrCtrl+Shift+M")),
                 ],
             ),
+            solve(false),
             help(),
         ];
         assert_eq!(menus, expected);

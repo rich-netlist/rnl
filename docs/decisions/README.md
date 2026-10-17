@@ -17,3 +17,4 @@ Decisions made before this log started, including those from the first architect
 | [0007](0007-publishing-the-standard.md) | The standard is published in several forms built from one Markdown source | accepted |
 | [0008](0008-shared-core-per-platform-frontends.md) | One shared Rust core decides the drawing; frontends are per platform | accepted |
 | [0009](0009-fonts-shipped-with-the-core.md) | The core ships Noto Sans SC and lays out text with its metrics | accepted |
+| [0010](0010-desktop-viewer-solves-as-a-preview.md) | The desktop viewer solves as a preview and saves a solved copy; it never changes the files it opens | accepted |

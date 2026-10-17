@@ -2,8 +2,9 @@
 // natively before the tests run; a changed copy of one of them, for reading a file again; a netlist
 // with many subcircuits, for the subcircuit index; subcircuits nested four deep, for the hierarchy
 // path; statements over several lines in both dialects, which the corpus has none of; characters
-// outside the BMP, which JavaScript counts as two; a file of many lines; and netlists of the
-// solver's tests that `rnl solve` solved, for a drawing that no PLACE fixes.
+// outside the BMP, which JavaScript counts as two; a file of many lines; netlists of the solver's
+// tests that `rnl solve` solved, for a drawing that no PLACE fixes; and what `rnl preview` prints of
+// a netlist, for the desktop's Solve menu.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -21,7 +22,15 @@ export const FILES = {
   "12-diagnostics": "tests/conformance/cases/12-diagnostics.sp",
   "17-line-styles": "tests/conformance/cases/17-line-styles.sp",
   "inverter-chain": "tests/conformance/equivalence/inverter-chain.scs",
+  "T4-miller-conflicts": "tests/integration/solver/T4-miller-conflicts.sp",
 };
+
+/**
+ * The previews of a solve, as the desktop's Solve menu shows them, each NAME-preview.json, the
+ * Document of the files solved and the report, which `rnl preview` prints of the fixture NAME's
+ * file: one with facts discarded, conflict groups and hints by statement.
+ */
+export const PREVIEWS = ["T4-miller-conflicts"];
 
 /**
  * The fixtures of netlists that only a solver draws, and the files of tests/integration/solver they
@@ -138,7 +147,8 @@ function view(rnl, file, cwd) {
  * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3;
  * "continued" and "continued-spectre", the netlists of CONTINUED; "unicode", the netlist of
  * UNICODE; "long", a title, LONG lines of a bare `*`, R1, a record that places it and `.end`; and
- * those of SOLVED, from the files that `rnl solve` writes under `solved` in `dir`.
+ * those of SOLVED, from the files that `rnl solve` writes under `solved` in `dir`; and those of
+ * PREVIEWS.
  */
 export function writeFixtures(rnl, dir) {
   for (const [name, file] of Object.entries(FILES)) {
@@ -180,6 +190,15 @@ export function writeFixtures(rnl, dir) {
   const long = ["* a long file"].concat(new Array(LONG).fill("*"), "R1 a 0 1k", "* @RNL { #R1 @PLACE(0, 0) }", ".end", "");
   fs.writeFileSync(path.join(dir, "long.sp"), long.join("\n"));
   fs.writeFileSync(path.join(dir, "long.json"), view(rnl, "long.sp", dir));
+
+  for (const name of PREVIEWS) {
+    const out = execFileSync(rnl, ["preview", FILES[name], "--solver-options", "time_limit=none"], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 1 << 28,
+    });
+    fs.writeFileSync(path.join(dir, `${name}-preview.json`), out);
+  }
 
   const solved = path.join(dir, "solved");
   for (const [name, file] of Object.entries(SOLVED)) {
