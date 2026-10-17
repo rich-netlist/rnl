@@ -115,7 +115,7 @@
         <div><dt><zh>是什么</zh><en>What</en></dt><dd><zh>附着在网表上的元数据扩展</zh><en>A metadata extension attached to netlists</en></dd></div>
         <div><dt><zh>宿主</zh><en>Hosts</en></dt><dd><zh>SPICE、Spectre 等网表，写在注释里</zh><en>SPICE, Spectre and other netlists, inside comments</en></dd></div>
         <div><dt><zh>阶段</zh><en>Stage</en></dt><dd><zh>语言标准 0.3；<a href="tools.html">工具链 0.1</a>；求解器第一版</zh><en>Language standard 0.3; <a href="tools.html">toolkit 0.1</a>; a first solver</en></dd></div>
-        <div><dt><zh>语言</zh><en>Language</en></dt><dd><span class="mono">0.3</span></dd></div>
+        <div><dt><zh>语言</zh><en>Language</en></dt><dd><span class="mono">0.3 · 2026-10-18</span></dd></div>
         <div><dt><zh>许可</zh><en>License</en></dt><dd><zh>代码 MIT · 规范 CC-BY-4.0 · 数据 CC0</zh><en>Code MIT · spec CC-BY-4.0 · data CC0</en></dd></div>
       </dl>
     </div>
@@ -1117,8 +1117,10 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><zh>网表写�
           <en>The draft consolidated into a <a href="spec/0.2/">formal standard</a>: English normative, with a Chinese version and the standard word list; the web pages, PDFs and Markdown are all built from one source.</en></p></li>
         <li><time>2026-10-14</time><b><zh>第一版工具链 0.1</zh><en>First toolkit, 0.1</en></b><p><zh>运行库、SPICE 与 Spectre 适配器、统一渲染器和 <code>rnl</code> 命令，加上<a href="tools.html">网页版和桌面版查看器</a>：打开带 RNL 的网表，画出有坐标的部分。只读，还没有求解器。</zh>
           <en>The runtime, the SPICE and Spectre adapters, the shared renderer and the <code>rnl</code> command, with <a href="tools.html">the web and desktop viewers</a>: they open a netlist with RNL and draw what has coordinates. Read-only, with no solver yet.</en></p></li>
-        <li class="now"><time>2026-10-17</time><b><zh>查看器能编辑，桌面版能求解</zh><en>Viewers that edit, and solve on the desktop</en></b><p><zh>求解器第一版接进 <code>rnl solve</code> 和桌面版查看器：查看器里的求解结果先作为预览，可以另存副本。两个查看器都能改网表文本、应用后重画；桌面版保存时写回原文件，网页版保存时下载。</zh>
+        <li><time>2026-10-17</time><b><zh>查看器能编辑，桌面版能求解</zh><en>Viewers that edit, and solve on the desktop</en></b><p><zh>求解器第一版接进 <code>rnl solve</code> 和桌面版查看器：查看器里的求解结果先作为预览，可以另存副本。两个查看器都能改网表文本、应用后重画；桌面版保存时写回原文件，网页版保存时下载。</zh>
           <en>The first version of the solver, in <code>rnl solve</code> and in the desktop viewer, which shows a solve as a preview and saves a solved copy. Both viewers edit the netlist’s text and draw it again when the changes are applied; the desktop viewer saves into the files, the web viewer by a download.</en></p></li>
+        <li class="now"><time>2026-10-18</time><b><zh>语言标准 0.3</zh><en>Language standard 0.3</en></b><p><zh>求解器要把每个决定都写回文件，让不求解的查看器也能画出同样的图：没有名字可指的对象有编号，自动导线的走法也写回。标准包的 0.3 系列把名字写全；<a href="spec/0.3/">正式标准</a>附中文版，0.2 的文件照样能读。</zh>
+          <en>The solver must write back every decision it makes, so that a viewer that does not solve draws what it drew: objects that no name reaches have numbers, and the routes of automatic wires are written back. The standard series 0.3 spells its names out in full; the <a href="spec/0.3/">formal standard</a> comes with a Chinese version, and files of 0.2 still read.</en></p></li>
         <li class="tl-sep"><zh>接下来</zh><en>Next</en></li>
         <li class="next"><b><zh>求解闭环</zh><en>Solving loop</en></b><p><zh>求解器把结果写成 type="generated" 的记录，带输入的 hash，边算边刷新。</zh>
           <en>The solver writes its result as a record with type="generated" and a hash of its input, refreshing as it computes.</en></p></li>
