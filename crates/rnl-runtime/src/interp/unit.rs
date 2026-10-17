@@ -333,36 +333,124 @@ fn version_ok(want: Option<&str>, have: &str) -> bool {
     }
 }
 
-/// "@PACKAGE(name="…", version="…")" in a package file's text.
-pub fn scan_package_decl(text: &str) -> Option<(String, String)> {
-    let at = text.find("@PACKAGE(")?;
-    let rest = &text[at + "@PACKAGE(".len()..];
-    let end = rest.find(')')?;
-    let inner = &rest[..end];
-    let field = |name: &str| -> Option<String> {
-        let k = inner.find(name)?;
-        let after = inner[k + name.len()..].trim_start();
-        let after = after.strip_prefix('=')?.trim_start();
-        let after = after.strip_prefix('"')?;
-        let q = after.find('"')?;
-        Some(after[..q].to_string())
+/// What a package file's header record declares (2.7, 2.8): its PACKAGE, by name and version, and
+/// its VERSION, the language version it is written in (16.1). The header record is the file's
+/// first record, and its statements count as reading the file counts them (`Interp::read_header`):
+/// a PACKAGE or a VERSION written in a comment or a string, such as an example in the file's header
+/// comment, declares nothing; the first VERSION stands; and a PACKAGE takes the place of one before
+/// it.
+fn header_decls(text: &str) -> (Option<(String, String)>, Option<String>) {
+    let recs = scan_run(&package_lines(text), "", &mut crate::diag::Sink::new());
+    let Some(first) = recs.first() else { return (None, None) };
+    let ast = syntax::parse_record(&first.text);
+    let header = ast.header.as_ref().and_then(|h| h.get("type"));
+    let (None, Some(Value::Str(kind)), Some(body)) = (&ast.error, header, &ast.body) else { return (None, None) };
+    if kind.as_str() != "header" {
+        return (None, None);
+    }
+    let text_of = |v: Option<&Value>| match v {
+        Some(Value::Str(s)) => Some(s.clone()),
+        _ => None,
     };
-    Some((field("name")?, field("version")?))
+    let (mut package, mut version, mut versions) = (None, None, 0);
+    for m in &body.members {
+        if m.error.is_some() || m.segments.len() != 1 || m.bind().is_some() {
+            continue;
+        }
+        let seg = &m.segments[0];
+        let Some(call) = &seg.call else { continue };
+        let kw = call.kw.as_str();
+        if kw == "VERSION" {
+            versions += 1;
+        }
+        if !(kw == "PACKAGE" || (kw == "VERSION" && versions == 1)) {
+            continue;
+        }
+        let Ok(p) = params_by_name(kw, call.params.as_ref(), true, str::to_string) else { continue };
+        if !seg.args.is_empty() {
+            continue;
+        }
+        if kw == "VERSION" {
+            version = text_of(p.get("version"));
+        } else {
+            package = text_of(p.get("name")).zip(text_of(p.get("version")));
+        }
+    }
+    (package, version)
 }
 
-/// The language version a package file declares, "@VERSION(…)" in its text, read as the version
-/// of the file is (16.1); None when it declares none. The standard series a package is of is
-/// written in this version (16.3).
+/// "@PACKAGE(name="…", version="…")" in a package file's header record (2.7).
+pub fn scan_package_decl(text: &str) -> Option<(String, String)> {
+    header_decls(text).0
+}
+
+/// The language version a package file declares, "@VERSION(…)" in its header record, read as the
+/// version of the file is (16.1); None when it declares none. The standard series a package is of
+/// is written in this version (16.3).
 pub fn scan_language_decl(text: &str) -> Option<String> {
-    let at = text.find("@VERSION(")?;
-    let rest = text[at + "@VERSION(".len()..].trim_start();
-    // given by position or by name
-    let rest = match rest.strip_prefix("version") {
-        Some(named) => named.trim_start().strip_prefix('=')?.trim_start(),
-        None => rest,
-    };
-    let rest = rest.strip_prefix('"')?;
-    Some(rest[..rest.find('"')?].to_string())
+    header_decls(text).1
+}
+
+/// The parameters of `@kw` by name, those written by position named in its signature's order;
+/// nothing twice, none it does not have, and none it requires left out (4.2 rule 9, 5.3); or why
+/// they cannot be read. A header record is in the standard form (`std_form`); elsewhere `word` gives
+/// the standard form of a name written unquoted, which may be an alias (16.5).
+pub(crate) fn params_by_name(
+    kw: &str,
+    p: Option<&Params>,
+    std_form: bool,
+    word: impl Fn(&str) -> String,
+) -> Result<HashMap<String, Value>, String> {
+    let spec = words().keyword(kw).unwrap();
+    let names: Vec<&str> = spec.param_list().iter().map(|q| q.name.as_str()).collect();
+    let order = &spec.positional;
+    let mut out = HashMap::new();
+    if let Some(p) = p {
+        if !p.positional.is_empty() {
+            if order.is_empty() {
+                return Err(format!("the parameters of @{kw} cannot be written by position; write each by name, such as {}=… (4.2 rule 9)", names[0]));
+            }
+            if p.positional.len() > order.len() {
+                return Err(format!(
+                    "@{kw} takes at most {} parameters by position ({}), {} are written (4.2 rule 9)",
+                    order.len(),
+                    order.join(", "),
+                    p.positional.len()
+                ));
+            }
+            for (name, v) in order.iter().zip(&p.positional) {
+                out.insert(name.clone(), v.clone());
+            }
+        }
+        for n in &p.named {
+            let std = if std_form || n.quoted { n.name.clone() } else { word(&n.name) };
+            if !names.contains(&std.as_str()) {
+                let mut msg = format!("@{kw} has no parameter {}", n.name);
+                if let Some(c) = closest(&std, names.iter().copied()) {
+                    msg.push_str(&format!(", did you mean {c}?"));
+                }
+                if !n.name.is_ascii() && !n.quoted {
+                    if std_form {
+                        msg.push_str("; a header record is read in the standard form, without aliases (16.5)");
+                    } else {
+                        msg.push_str("; is an alias package not loaded?");
+                    }
+                }
+                msg.push_str(" (16.4)");
+                return Err(msg);
+            }
+            if out.contains_key(&std) {
+                return Err(format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"));
+            }
+            out.insert(std, n.value.clone());
+        }
+    }
+    for q in spec.param_list() {
+        if q.required && !out.contains_key(&q.name) {
+            return Err(format!("@{kw} lacks the parameter {} (5.3)", q.name));
+        }
+    }
+    Ok(out)
 }
 
 /// A record whose head writes `type="generated"`: the solver's result (2.8).
@@ -910,9 +998,8 @@ impl Interp<'_> {
         }
     }
 
-    /// Parameters of a statement read when the file is read (header statements, USE-PACKAGE):
-    /// positional ones first in the signature's order, then names; nothing twice (4.2 rule 9).
-    /// The header is in the standard form; elsewhere an unquoted name may be an alias (16.5).
+    /// Parameters of a statement read when the file is read (header statements, USE-PACKAGE), as
+    /// `params_by_name` reads them, each error reported at `loc`.
     pub(crate) fn header_params(
         &mut self,
         kw: &str,
@@ -921,83 +1008,14 @@ impl Interp<'_> {
         loc: &Loc,
         std_form: bool,
     ) -> Option<HashMap<String, Value>> {
-        let pkg = self.units[u].pkg().to_string();
-        let spec = words().keyword(kw).unwrap();
-        let names: Vec<&str> = spec.param_list().iter().map(|q| q.name.as_str()).collect();
-        let order = &spec.positional;
-        let mut out = HashMap::new();
-        if let Some(p) = p {
-            if !p.positional.is_empty() {
-                if order.is_empty() {
-                    self.diag_in(
-                        Severity::Error,
-                        format!("the parameters of @{kw} cannot be written by position; write each by name, such as {}=… (4.2 rule 9)", names[0]),
-                        Some(loc.clone()),
-                        &pkg,
-                    );
-                    return None;
-                }
-                if p.positional.len() > order.len() {
-                    self.diag_in(
-                        Severity::Error,
-                        format!(
-                            "@{kw} takes at most {} parameters by position ({}), {} are written (4.2 rule 9)",
-                            order.len(),
-                            order.join(", "),
-                            p.positional.len()
-                        ),
-                        Some(loc.clone()),
-                        &pkg,
-                    );
-                    return None;
-                }
-                for (name, v) in order.iter().zip(&p.positional) {
-                    out.insert(name.clone(), v.clone());
-                }
-            }
-            for n in &p.named {
-                let std = if std_form || n.quoted { n.name.clone() } else { self.word(&n.name, u) };
-                if !names.contains(&std.as_str()) {
-                    let close = closest(&std, names.iter().copied());
-                    let mut msg = format!("@{kw} has no parameter {}", n.name);
-                    if let Some(c) = close {
-                        msg.push_str(&format!(", did you mean {c}?"));
-                    }
-                    if !n.name.is_ascii() && !n.quoted {
-                        if std_form {
-                            msg.push_str("; a header record is read in the standard form, without aliases (16.5)");
-                        } else {
-                            msg.push_str("; is an alias package not loaded?");
-                        }
-                    }
-                    msg.push_str(" (16.4)");
-                    self.diag_in(Severity::Error, msg, Some(loc.clone()), &pkg);
-                    return None;
-                }
-                if out.contains_key(&std) {
-                    self.diag_in(
-                        Severity::Error,
-                        format!("parameter {std} of @{kw} is written twice (4.2 rule 9)"),
-                        Some(loc.clone()),
-                        &pkg,
-                    );
-                    return None;
-                }
-                out.insert(std, n.value.clone());
+        match params_by_name(kw, p, std_form, |n| self.word(n, u)) {
+            Ok(out) => Some(out),
+            Err(msg) => {
+                let pkg = self.units[u].pkg().to_string();
+                self.diag_in(Severity::Error, msg, Some(loc.clone()), &pkg);
+                None
             }
         }
-        for q in spec.param_list() {
-            if q.required && !out.contains_key(&q.name) {
-                self.diag_in(
-                    Severity::Error,
-                    format!("@{kw} lacks the parameter {} (5.3)", q.name),
-                    Some(loc.clone()),
-                    &pkg,
-                );
-                return None;
-            }
-        }
-        Some(out)
     }
 
     // ------------------------------------------------------------------ aliases (16.5)

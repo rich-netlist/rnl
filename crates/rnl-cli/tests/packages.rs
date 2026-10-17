@@ -602,3 +602,28 @@ fn a_referenced_package_gives_its_terminal_names_first() {
     assert_eq!(errors(&r), "");
     assert_eq!(&level(&r, "t.sp").terminal_names[0], &[Some("p".to_string()), Some("q".to_string())]);
 }
+
+/// A package file whose header comment shows a header record as an example, with another name and
+/// a version of the language that this tool cannot read.
+const COMMENTED: &str =
+    "/* an example: @RNL(type=\"header\") { @VERSION(\"0.9\"); @PACKAGE(name=\"example\", version=\"9.9\") } */\n\
+                         @RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"real\", version=\"1.0\") }\n\
+                         @RNL { $REAL_SYMBOL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1) } }\n";
+
+#[test]
+fn a_package_is_found_by_what_its_header_record_declares() {
+    // what a comment writes declares nothing: the package is the one its header record declares
+    // (2.7, 2.8, 16.2), and is read in the version that record gives (16.1)
+    for (wanted, found) in [("real", true), ("example", false)] {
+        let text = doc(&format!("@USE-PACKAGE(name=\"{wanted}\")"), "#R1 @SET-SYMBOL $REAL_SYMBOL", NETLIST);
+        let mut files = MemoryProvider::new().with("t.sp", &text).with("p/real.rnl", COMMENTED);
+        files.package_dirs.push("p".into());
+        let r = read(&files, "t.sp");
+        if found {
+            assert_eq!(errors(&r), "");
+        } else {
+            let e = errors(&r);
+            assert!(e.contains("example") && e.contains("cannot be found"), "{e}");
+        }
+    }
+}
