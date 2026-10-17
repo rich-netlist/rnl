@@ -589,4 +589,55 @@ mod tests {
         assert!(c.symbols.iter().flat_map(|s| &s.labels).all(|l| l.at.is_some() && l.text.is_some()));
         assert!(c.symbols.iter().flat_map(|s| &s.pins).all(|p| p.direction.is_some()));
     }
+
+    #[test]
+    fn a_package_is_what_its_header_record_declares() {
+        // a header record written as an example in the file's header comment declares nothing: the
+        // catalog lists the package by the name, the version and the language of its own (2.7, 16.1)
+        let real = concat!(
+            "/* an example: @RNL(type=\"header\") { @VERSION(\"0.2\"); @PACKAGE(name=\"example\", version=\"9.9\") } */\n",
+            "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"real\", version=\"1.0\") }\n",
+            "@RNL { $REAL_SYMBOL = @DEFINE-SYMBOL { (0, 0) @PIN(terminal=1) } }\n"
+        );
+        let mut files = MemoryProvider::new().with("/p/real.rnl", real);
+        files.package_dirs.push("/p".into());
+        let only = |name: &str| CatalogOptions { packages: Some(vec![name.into()]), ..CatalogOptions::default() };
+        let c = crate::catalog(&files, &only("real"));
+        assert_eq!(packages(&c), [("real", "1.0")]);
+        assert_eq!(c.packages[0].language, "0.3");
+        assert_eq!(c.symbols.iter().map(|s| s.symbol.as_str()).collect::<Vec<_>>(), ["$REAL_SYMBOL"]);
+        assert_eq!(crate::catalog(&files, &only("example")), Catalog::default());
+    }
+
+    #[test]
+    fn packages_with_the_same_example_are_told_apart_by_their_header_records() {
+        // every file shows the same example, in its header comment and in a string of its header
+        // record: the catalog filters, compares and tells the packages apart by what each header
+        // record declares (2.7, 16.2)
+        let file = |name: &str, version: &str| {
+            format!(
+                "/* from a template: @PACKAGE(name=\"template\", version=\"9.9\") */\n\
+                 @RNL(type=\"header\", author=\"see @PACKAGE(name=\"\"template\"\", version=\"\"9.9\"\")\") {{ @VERSION(\"0.3\"); @PACKAGE(name=\"{name}\", version=\"{version}\") }}\n\
+                 @RNL {{ $ONE = @DEFINE-SYMBOL {{ (0, 0) @PIN(terminal=1) }} }}\n"
+            )
+        };
+        let mut files = MemoryProvider::new()
+            .with("/p/alpha-1.rnl", &file("alpha", "1.0"))
+            .with("/p/alpha-2.rnl", &file("alpha", "1.1"))
+            .with("/p/beta.rnl", &file("beta", "2.0"));
+        files.package_dirs.push("/p".into());
+        let only = |names: &[&str], all_versions: bool| CatalogOptions {
+            packages: Some(names.iter().map(|n| n.to_string()).collect()),
+            all_versions,
+            ..CatalogOptions::default()
+        };
+        let c = crate::catalog(&files, &only(&["alpha", "beta"], false));
+        assert_eq!(packages(&c), [("alpha", "1.1"), ("beta", "2.0")]);
+        let symbols: Vec<(&str, &str, &str)> =
+            c.symbols.iter().map(|s| (s.symbol.as_str(), s.package.as_str(), s.version.as_str())).collect();
+        assert_eq!(symbols, [("$ONE", "alpha", "1.1"), ("$ONE", "beta", "2.0")]);
+        let c = crate::catalog(&files, &only(&["alpha", "beta"], true));
+        assert_eq!(packages(&c), [("alpha", "1.0"), ("alpha", "1.1"), ("beta", "2.0")]);
+        assert_eq!(crate::catalog(&files, &only(&["template"], true)), Catalog::default());
+    }
 }

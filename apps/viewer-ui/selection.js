@@ -10,8 +10,9 @@ const canvas = $("canvas");
 const source = $("source");
 
 /**
- * Select an object. `from` is "drawing", "source", "reload" or "ascend"; the text shows where the
- * object is named when it is selected on the drawing, or is the instance a level was left through.
+ * Select an object. `from` is "drawing", "source", "reload", "ascend" or "list" (an object not
+ * drawn, picked in the side panel); the text shows where the object is named when it is selected on
+ * the drawing, or is the instance a level was left through.
  */
 export function select(o, from) {
   if (!doc || o === undefined || o === null || !doc.objects[o]) return;

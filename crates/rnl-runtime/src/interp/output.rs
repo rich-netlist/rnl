@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::geom::Orient;
+use crate::geom::{Orient, Pt};
 use crate::host::LevelKind;
 use crate::markup;
 use crate::model::*;
@@ -553,6 +553,62 @@ impl Interp<'_> {
         }
     }
 
+    /// An object drawn with the symbol `sym` at `at`: the item of a level, with the nets at the pins
+    /// of its symbol. `table` and `symbols` hold the symbols of the items made so far.
+    #[allow(clippy::too_many_arguments)]
+    fn item_view(
+        &mut self,
+        s: SceneId,
+        o: ObjId,
+        sym: ObjId,
+        at: Pt,
+        table: &mut HashMap<ObjId, usize>,
+        symbols: &mut Vec<SymbolView>,
+        last_symbol: &HashMap<ObjId, Pos>,
+    ) -> ItemView {
+        let si = self.symbol_view(sym, table, symbols);
+        let mut texts = BTreeMap::new();
+        self.symbol_texts(s, sym, o, "", &mut texts, 0);
+        let (kind, host) = match self.o(o).clone() {
+            ObjData::Inst { idx, .. } => ("instance", vec![idx]),
+            ObjData::Bundle { members, .. } => (
+                "bundle",
+                members
+                    .iter()
+                    .filter_map(|m| match self.o(*m) {
+                        ObjData::Inst { idx, .. } => Some(*idx),
+                        _ => None,
+                    })
+                    .collect(),
+            ),
+            _ => ("usage", Vec::new()),
+        };
+        let mut pin_nets = vec![Vec::new(); self.symbol(sym).pins.len()];
+        for t in self.terms_of(s, o) {
+            if let Some(k) = self.pin_for(s, o, t) {
+                for n in self.term_nets(s, t) {
+                    let d = self.net_display(n);
+                    if !pin_nets[k].contains(&d) {
+                        pin_nets[k].push(d);
+                    }
+                }
+            }
+        }
+        ItemView {
+            id: self.label(o),
+            kind,
+            symbol: si,
+            at,
+            orient: self.orientation(s, o),
+            style: self.style_of(s, o),
+            layer: self.layer_of(s, o),
+            order: self.key_of(s, o, last_symbol),
+            texts,
+            host,
+            pin_nets,
+        }
+    }
+
     fn level_view(&mut self, s: SceneId) -> LevelView {
         let lv = self.scenes[s].level;
         let level = self.doc.levels[lv].clone();
@@ -591,50 +647,24 @@ impl Interp<'_> {
                 drawn.push(a);
             }
         }
+        // an object without a position is not drawn: it is listed with its symbol at the origin
+        let mut unplaced_table: HashMap<ObjId, usize> = HashMap::new();
+        let mut unplaced_symbols: Vec<SymbolView> = Vec::new();
+        let mut unplaced_items = Vec::new();
         for o in drawn {
             let Some(&sym) = self.scenes[s].symbol.get(&o) else { continue };
-            let Some(at) = self.xy(s, o) else { continue };
-            let si = self.symbol_view(sym, &mut table, &mut symbols);
-            let mut texts = BTreeMap::new();
-            self.symbol_texts(s, sym, o, "", &mut texts, 0);
-            let (kind, host) = match self.o(o).clone() {
-                ObjData::Inst { idx, .. } => ("instance", vec![idx]),
-                ObjData::Bundle { members, .. } => (
-                    "bundle",
-                    members
-                        .iter()
-                        .filter_map(|m| match self.o(*m) {
-                            ObjData::Inst { idx, .. } => Some(*idx),
-                            _ => None,
-                        })
-                        .collect(),
-                ),
-                _ => ("usage", Vec::new()),
-            };
-            let mut pin_nets = vec![Vec::new(); self.symbol(sym).pins.len()];
-            for t in self.terms_of(s, o) {
-                if let Some(k) = self.pin_for(s, o, t) {
-                    for n in self.term_nets(s, t) {
-                        let d = self.net_display(n);
-                        if !pin_nets[k].contains(&d) {
-                            pin_nets[k].push(d);
-                        }
-                    }
-                }
+            match self.xy(s, o) {
+                Some(at) => items.push(self.item_view(s, o, sym, at, &mut table, &mut symbols, &last_symbol)),
+                None => unplaced_items.push(self.item_view(
+                    s,
+                    o,
+                    sym,
+                    (0.0, 0.0),
+                    &mut unplaced_table,
+                    &mut unplaced_symbols,
+                    &last_symbol,
+                )),
             }
-            items.push(ItemView {
-                id: self.label(o),
-                kind,
-                symbol: si,
-                at,
-                orient: self.orientation(s, o),
-                style: self.style_of(s, o),
-                layer: self.layer_of(s, o),
-                order: self.key_of(s, o, &last_symbol),
-                texts,
-                host,
-                pin_nets,
-            });
         }
         // the symbols of the drawn objects, as the items have them
         let mut objects = objects;
@@ -791,6 +821,8 @@ impl Interp<'_> {
             flylines,
             constraints,
             unplaced: self.scenes[s].unplaced.clone(),
+            unplaced_items,
+            unplaced_symbols,
             objects,
             points,
             terminal_names,

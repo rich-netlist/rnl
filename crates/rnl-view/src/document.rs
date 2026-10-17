@@ -11,7 +11,9 @@ use std::collections::HashMap;
 use rnl_runtime::diag::{Diag, Sink};
 use rnl_runtime::geom::{Orient, Pt};
 use rnl_runtime::host::{file_name, HostDocument, LevelKind};
-use rnl_runtime::model::{LevelView, RefTarget};
+use rnl_runtime::interp::obj::{Lit, WStr};
+use rnl_runtime::markup;
+use rnl_runtime::model::{ItemView, Layer, LevelView, RefTarget, Style, SymbolView, TextView};
 use rnl_runtime::source::{dirname, relative_to};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
@@ -88,6 +90,38 @@ pub struct Level {
     pub hits: Vec<Hit>,
     /// The subcircuit instances of the level, in netlist order: the hierarchy below it.
     pub children: Vec<Child>,
+    /// The objects of the level that have no position and so are not drawn on it, each with its
+    /// symbol drawn alone, in the order of the netlist. Their number is the one `status` gives.
+    pub unplaced: Vec<Unplaced>,
+}
+
+/// An object of a level that has no position yet, so it is not drawn there: an instance, a bundle
+/// of instances or a usage such as a ground symbol, left to a solver. A viewer lists them, each
+/// with its symbol drawn alone and the nets at its terminals.
+#[derive(Serialize, Debug)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct Unplaced {
+    /// "instance", "bundle" or "usage".
+    pub kind: &'static str,
+    /// An instance's name; for a bundle or a usage, the label the diagnostics give it, such as
+    /// "a usage of $GND".
+    pub name: String,
+    /// The name of the symbol it is drawn with.
+    pub symbol: String,
+    /// The instances it stands for, indexes into `Document::objects`: one for an instance, its
+    /// members for a bundle, none for a usage. A viewer shows the first one's statement.
+    pub objects: Vec<usize>,
+    /// The symbol alone at the origin, as it would be drawn on the level with its orientation,
+    /// and the name of the net at each of its pins beside the pin, as an SVG document; absent
+    /// unless `BuildOptions::svg` asks for it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub svg: Option<String>,
+    /// The same drawing as primitives in scene units, as `Level::primitives` has them; absent
+    /// unless `BuildOptions::primitives` asks for them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub primitives: Option<Vec<Primitive>>,
 }
 
 /// A subcircuit instance, as a branch of the hierarchy.
@@ -468,8 +502,97 @@ impl<'a> Index<'a> {
             solve: None,
             hits,
             children: Vec::new(),
+            unplaced: self.unplaced(lv, &render, options),
         }
     }
+
+    /// The objects of a level without a position, each drawn alone.
+    fn unplaced(&self, lv: &LevelView, render: &rnl_render::RenderOptions, options: &BuildOptions) -> Vec<Unplaced> {
+        // a level of nothing but the symbols of the objects, with one of them in turn on it
+        let mut alone = LevelView { symbols: lv.unplaced_symbols.clone(), ..LevelView::default() };
+        let mut out = Vec::new();
+        for it in &lv.unplaced_items {
+            let sym = &lv.unplaced_symbols[it.symbol];
+            alone.items = vec![ItemView { id: "item-0".into(), at: (0.0, 0.0), ..it.clone() }];
+            alone.texts = net_labels(it, sym);
+            let prims = rnl_render::primitives(&alone, render);
+            let name = match it.host.as_slice() {
+                [i] => self.doc.levels[lv.level].instances.get(*i).map(|inst| inst.name.clone()),
+                _ => None,
+            };
+            out.push(Unplaced {
+                kind: it.kind,
+                name: name.unwrap_or_else(|| it.id.clone()),
+                symbol: sym.name.clone(),
+                objects: it.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect(),
+                svg: options.svg.then(|| rnl_render::svg_document(&prims, render)),
+                primitives: options.primitives.then(|| primitive::primitives(&prims)),
+            });
+        }
+        out
+    }
+}
+
+/// How far a net's name stands from its pin, in scene units, and the size of its text.
+const LABEL_GAP: f64 = 0.35;
+const LABEL_SIZE: f64 = 1.0;
+
+/// The names of the nets at the pins of an unplaced object's symbol, each beside its pin on the
+/// side the pin points to; a pin with no net has none.
+fn net_labels(it: &ItemView, sym: &SymbolView) -> Vec<TextView> {
+    let mut style = Style::new();
+    style.insert("size".into(), Lit::Num(LABEL_SIZE));
+    style.insert("textcolor".into(), Lit::Str(WStr::new("#1f4fd8", None)));
+    let centre = ((sym.bbox[0] + sym.bbox[2]) / 2.0, (sym.bbox[1] + sym.bbox[3]) / 2.0);
+    let mut out = Vec::new();
+    for (k, (pin, nets)) in sym.pins.iter().zip(&it.pin_nets).enumerate() {
+        if nets.is_empty() {
+            continue;
+        }
+        // the way out of the pin: its own, else away from the middle of the symbol
+        let outward = (pin.pos.0 - centre.0, pin.pos.1 - centre.1);
+        let away = match pin.dir {
+            Some(0) => (1.0, 0.0),
+            Some(90) => (0.0, 1.0),
+            Some(180) => (-1.0, 0.0),
+            Some(270) => (0.0, -1.0),
+            _ => outward,
+        };
+        let (dx, dy) = it.orient.apply(away);
+        let (halign, valign, off) = if dx.abs() >= dy.abs() {
+            if dx >= 0.0 {
+                ("start", "middle", (LABEL_GAP, 0.0))
+            } else {
+                ("end", "middle", (-LABEL_GAP, 0.0))
+            }
+        } else if dy >= 0.0 {
+            ("middle", "bottom", (0.0, LABEL_GAP))
+        } else {
+            ("middle", "top", (0.0, -LABEL_GAP))
+        };
+        let p = it.orient.apply(pin.pos);
+        let text =
+            nets.iter().map(|n| format!("{}{n}{}", markup::LITERAL, markup::LITERAL)).collect::<Vec<_>>().join(", ");
+        out.push(TextView {
+            id: format!("net-{k}"),
+            object_id: format!("net-{k}"),
+            attach: None,
+            key: None,
+            markup: text.clone(),
+            written: false,
+            anchor: (it.at.0 + p.0 + off.0, it.at.1 + p.1 + off.1),
+            lines: markup::parse(&text),
+            halign: halign.into(),
+            valign: valign.into(),
+            rotate: 0.0,
+            orient: Orient::R0,
+            style: style.clone(),
+            own_style: Style::new(),
+            layer: Layer::Top,
+            order: vec![1.0, k as f64],
+        });
+    }
+    out
 }
 
 /// A level with its items and wires named for the page, "item-K" and "wire-K" by their index. The
@@ -613,6 +736,77 @@ mod tests {
             .levels
             .iter()
             .any(|l| l.empty && l.status.as_deref().is_some_and(|s| s.contains("without a position"))));
+    }
+
+    #[test]
+    fn the_objects_without_a_position_are_listed_with_their_symbols_and_nets() {
+        let text = "* two of three are left to a solver
+R1 a b 1k
+C1 b 0 1p
+M1 d g s 0 nmos
+* @RNL { #R1 @PLACE(0, 0) }
+.end
+";
+        let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", text);
+        let d = crate::build("a.sp", &files, &BuildOptions::default()).unwrap();
+        let level = &d.levels[0];
+        // the two instances, and the grounds of the net 0 that nothing places either
+        let status = level.status.as_deref().unwrap();
+        assert!(status.starts_with(&format!("{} without a position", level.unplaced.len())), "{status}");
+        let instances: Vec<&str> =
+            level.unplaced.iter().filter(|u| u.kind == "instance").map(|u| u.name.as_str()).collect();
+        assert_eq!(instances, ["C1", "M1"]);
+        assert!(level.unplaced.iter().filter(|u| u.kind == "usage").all(|u| u.objects.is_empty()));
+        // each stands for its instance in the Document's objects
+        let objects: Vec<(&str, usize)> = level
+            .unplaced
+            .iter()
+            .filter(|u| u.kind == "instance")
+            .map(|u| (d.objects[u.objects[0]].name.as_str(), u.objects.len()))
+            .collect();
+        assert_eq!(objects, [("C1", 1), ("M1", 1)]);
+        assert!(level.unplaced.iter().all(|u| !u.symbol.is_empty()));
+        // the SVG draws the symbol and the name of the net at each of its pins, as texts
+        let svg = |k: usize| level.unplaced[k].svg.as_deref().unwrap();
+        let at = |name: &str| level.unplaced.iter().position(|u| u.name == name).unwrap();
+        for (k, nets) in [(at("C1"), vec!["b", "0"]), (at("M1"), vec!["d", "g", "s", "0"])] {
+            assert!(svg(k).starts_with("<svg"), "{}", svg(k));
+            for net in nets {
+                assert!(svg(k).contains(&format!(">{net}</text>")), "{net} is not in {}", svg(k));
+            }
+        }
+        // the drawing of the level has neither of them
+        assert!(!level.svg.as_ref().unwrap().contains("fill=\"#1f4fd8\""));
+        assert!(level
+            .hits
+            .iter()
+            .all(|h| h.objects.iter().all(|o| !["C1", "M1"].contains(&d.objects[*o].name.as_str()))));
+    }
+
+    #[test]
+    fn the_unplaced_follow_the_outputs_the_frontend_asks_for() {
+        let text = "* one left
+R1 a b 1k
+.end
+";
+        let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", text);
+        let build = |svg: bool, primitives: bool| {
+            let options = BuildOptions { svg, primitives, ..BuildOptions::default() };
+            crate::build("a.sp", &files, &options).unwrap().levels.remove(0).unplaced.remove(0)
+        };
+        let u = build(true, false);
+        assert!(u.svg.is_some() && u.primitives.is_none());
+        let u = build(false, true);
+        assert!(
+            u.svg.is_none()
+                && u.primitives.is_some_and(|p| p.iter().any(|p| matches!(p.shape, primitive::Shape::Text(_))))
+        );
+    }
+
+    #[test]
+    fn a_level_with_everything_placed_lists_nothing() {
+        let d = load(&case("04-hierarchy.sp")).unwrap();
+        assert!(d.levels.iter().all(|l| l.unplaced.is_empty()));
     }
 
     #[test]

@@ -222,7 +222,7 @@ pub struct ConstraintView {
     pub priority: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct LevelView {
     /// The host level drawn: its index in the host document's levels.
     pub level: usize,
@@ -244,6 +244,11 @@ pub struct LevelView {
     pub constraints: Vec<ConstraintView>,
     /// Drawn objects without a position, left to a solver.
     pub unplaced: Vec<String>,
+    /// The objects of `unplaced` that have a symbol, in the same order, each as an item at the
+    /// origin with the nets at its pins, for a viewer to list what is not drawn. Their symbols
+    /// are `unplaced_symbols`, not `symbols`: nothing here is drawn on the level.
+    pub unplaced_items: Vec<ItemView>,
+    pub unplaced_symbols: Vec<SymbolView>,
     /// The instances, bundles and usages of the level, drawn or not, as the editor interface
     /// sees them.
     pub objects: Vec<ObjectInfo>,

@@ -4,8 +4,9 @@
 // path; statements over several lines in both dialects, which the corpus has none of; characters
 // outside the BMP, which JavaScript counts as two; a file of many lines; netlists of the solver's
 // tests that `rnl solve` solved, for a drawing that no PLACE fixes; what `rnl preview` prints of
-// a netlist, for the desktop's Solve menu; and a small netlist before and after an edit, with
-// its line ends, for editing the text.
+// a netlist, for the desktop's Solve menu; a netlist with many objects that have no position, for
+// the list of what is not drawn; and a small netlist before and after an edit, with its line
+// ends, for editing the text.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -91,6 +92,21 @@ export const EDITED = {
   ],
 };
 
+/**
+ * Objects without a position, and enough of them for the list of what is not drawn to load in
+ * parts: a resistor, R1, is placed, as is the one in the subcircuit; a capacitor, a transistor, an
+ * instance of the subcircuit and 60 resistors, Rn01 to Rn60, are not.
+ */
+export const UNPLACED = [
+  "* objects without a position",
+  ".subckt cell p q", "R1 p q 1k", ".ends",
+  "R1 in a 1k", "C1 a 0 1p", "M1 d g s 0 nmos", "X1 a b cell",
+  ...Array.from({ length: 60 }, (_, k) => `Rn${String(k + 1).padStart(2, "0")} n${k + 1} 0 2k`),
+  "* @RNL {", "*   #R1 @PLACE(0, 0)", "* }",
+  '* @RNL(scope="cell") {', "*   #R1 @PLACE(0, 0)", "* }",
+  ".end",
+];
+
 /** The statements over several lines: a SPICE netlist with `+` lines, and a Spectre one with `\`. */
 export const CONTINUED = {
   "continued.sp": [
@@ -170,9 +186,9 @@ function view(rnl, file, cwd) {
  * the netlist of NESTED, and "nested-changed", the same file after XB2 was named XB3;
  * "continued" and "continued-spectre", the netlists of CONTINUED; "edit", "edit-changed", the
  * same file after the edit, and "edit-crlf", the same with CRLF line ends, from EDITED; "unicode",
- * the netlist of UNICODE; "long", a title, LONG lines of a bare `*`, R1, a record that places it and
- * `.end`; and those of SOLVED, from the files that `rnl solve` writes under `solved` in `dir`; and those of
- * PREVIEWS.
+ * the netlist of UNICODE; "unplaced", the netlist of UNPLACED; "long", a title, LONG lines of a bare
+ * `*`, R1, a record that places it and `.end`; and those of SOLVED, from the files that `rnl solve`
+ * writes under `solved` in `dir`; and those of PREVIEWS.
  */
 export function writeFixtures(rnl, dir) {
   for (const [name, file] of Object.entries(FILES)) {
@@ -218,6 +234,9 @@ export function writeFixtures(rnl, dir) {
 
   fs.writeFileSync(path.join(dir, "unicode.sp"), UNICODE.concat("").join("\n"));
   fs.writeFileSync(path.join(dir, "unicode.json"), view(rnl, "unicode.sp", dir));
+
+  fs.writeFileSync(path.join(dir, "unplaced.sp"), UNPLACED.concat("").join("\n"));
+  fs.writeFileSync(path.join(dir, "unplaced.json"), view(rnl, "unplaced.sp", dir));
 
   const long = ["* a long file"].concat(new Array(LONG).fill("*"), "R1 a 0 1k", "* @RNL { #R1 @PLACE(0, 0) }", ".end", "");
   fs.writeFileSync(path.join(dir, "long.sp"), long.join("\n"));

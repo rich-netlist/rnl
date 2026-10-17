@@ -21,6 +21,7 @@ export let fileViews = []; // per file: { el, lines: [line elements], scroll }
 let lineOwners = []; // per file: line number -> the instance whose statement it is
 let pendingReveal = null; // a line to bring into view once the text pane is shown
 let scope = null; // the definition of the subcircuit drawn: { f, from, to }, its file and lines
+let notDrawn = []; // the line elements greyed as statements of objects without a position
 
 /** Mark the selected object's places in the text; with `reveal`, scroll to where it is named. */
 export function paintSourceSelection(reveal) {
@@ -42,6 +43,7 @@ export function paintSourceSelection(reveal) {
 export function clearSource(message) {
   clearEditors();
   scope = null;
+  notDrawn = [];
   source.classList.remove("scoped");
   fileViews = [];
   lineOwners = [];
@@ -56,6 +58,7 @@ export function clearSource(message) {
 export function renderFiles() {
   source.replaceChildren();
   scope = null;
+  notDrawn = [];
   source.classList.remove("scoped");
   fileViews = [];
   lineOwners = doc.files.map(() => new Map());
@@ -177,6 +180,35 @@ export function scopeSource(i) {
   scope = lines ? { f: lines[0], from: lines[1], to: lines[2] } : null;
   mark(true);
   source.classList.toggle("scoped", scope !== null);
+}
+
+/**
+ * Grey the statements of the objects of level `i` that have no position and so are not drawn, the
+ * way the text outside the subcircuit drawn is dimmed; the statements of the level drawn before
+ * are no longer greyed.
+ */
+export function markUnplaced(i) {
+  for (const el of notDrawn) {
+    el.classList.remove("not-drawn");
+    el.removeAttribute("title");
+  }
+  notDrawn = [];
+  const level = doc && doc.levels[i];
+  if (!level) return;
+  for (const u of level.unplaced) {
+    for (const o of u.objects) {
+      const lines = doc.objects[o].lines;
+      if (!lines) continue;
+      const [f, from, to] = lines;
+      for (let n = from; n <= to; n++) {
+        const el = fileViews[f] && fileViews[f].lines[n - 1];
+        if (!el) continue;
+        el.classList.add("not-drawn");
+        el.title = "Not drawn: it has no position yet";
+        notDrawn.push(el);
+      }
+    }
+  }
 }
 
 /** Bring the start of the definition of the subcircuit that level `i` draws to the top of the text. */
