@@ -219,9 +219,15 @@ pub fn statements(op: &Op) -> Vec<String> {
             if let Some([dx, dy]) = offset {
                 params.push(format!("dx={}, dy={}", num(*dx), num(*dy)));
             }
-            params.extend(halign.iter().filter(|h| *h != "start").map(|h| format!("halign={}", quote(h))));
-            params.extend(valign.iter().filter(|v| *v != "baseline").map(|v| format!("valign={}", quote(v))));
-            params.extend(rotate.iter().filter(|r| **r != 0.0).map(|r| format!("rotate={}", num(*r))));
+            // What a text without a key starts from is the default alignment and no rotation, so a
+            // value equal to it is left out. A text with a key is the sub-object `object::key`, which
+            // starts from what the symbol of the object writes for that key and which later
+            // statements override parameter by parameter (13.3, 8.4): a value left out there is the
+            // symbol's, not the default, so it is written as given.
+            let keyed = key.is_some();
+            params.extend(halign.iter().filter(|h| keyed || *h != "start").map(|h| format!("halign={}", quote(h))));
+            params.extend(valign.iter().filter(|v| keyed || *v != "baseline").map(|v| format!("valign={}", quote(v))));
+            params.extend(rotate.iter().filter(|r| keyed || **r != 0.0).map(|r| format!("rotate={}", num(*r))));
             params.extend(size.iter().map(|s| format!("size={}", num(*s))));
             params.extend(style.iter().map(|(k, v)| format!("{k}={}", literal(v))));
             let text = format!("@TEXT({})", params.join(", "));

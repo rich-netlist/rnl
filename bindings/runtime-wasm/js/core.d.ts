@@ -100,6 +100,11 @@ export type Op = { level?: string } & (
       lines?: Run[][];
       at?: Point;
       offset?: Point;
+      /**
+       * `halign`, `valign` and `rotate` are written as given for a text with a `key`, whose value
+       * left out is the one its symbol gives that key (13.3). For a text without a key, a value
+       * equal to the default (`"start"`, `"baseline"`, 0) is left out.
+       */
       halign?: string;
       valign?: string;
       rotate?: number;
