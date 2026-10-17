@@ -388,10 +388,7 @@ mod tests {
         // the roles as written
         assert_eq!(serde_json::to_value(&ground.roles).unwrap(), json!([["p", ["net", "terminal"]]]));
         assert_eq!(serde_json::to_value(&definition(&c, "$NO_CONNECT").roles).unwrap(), json!([["t", "terminal"]]));
-        assert_eq!(
-            serde_json::to_value(&definition(&c, "$CHAIN").roles).unwrap(),
-            json!(["source", "{series}", "load"])
-        );
+        assert_eq!(serde_json::to_value(&definition(&c, "$MATCHED").roles).unwrap(), json!(["{members}"]));
         // the parameters with their defaults; no rule draws a stub
         let stub = definition(&c, "$GROUND_STUB");
         assert_eq!(serde_json::to_value(&stub.parameters).unwrap(), json!([["gap", 2.0]]));
