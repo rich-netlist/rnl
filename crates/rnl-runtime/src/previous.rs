@@ -52,7 +52,9 @@ pub struct Previous {
     /// effect, and give nothing here.
     pub numbering: Option<bool>,
     /// The objects of the problem that the record places or turns, in the order of the objects:
-    /// the position, when the record gives both coordinates, and the orientation it gives.
+    /// the coordinates it gives, on both axes or on one alone, as by `@PLACE(x=…)` or of a text
+    /// that its owner's symbol or an offset places on the other axis (13.3), and the orientation it
+    /// gives. An axis that the record does not write is not given.
     pub placements: Vec<Placement>,
     /// The wires of the problem that the record rewrites with WIRE given the wire (13.1), in the
     /// order of the wires, with the routes it gives them.
@@ -235,10 +237,9 @@ pub fn previous(p: &LevelProblem, with: &Interpretation) -> Option<Previous> {
     }
     for given in &result.placed {
         let Some(&object) = objects.get(&given.key) else { continue };
-        let at = given.x.zip(given.y);
         let orient = given.orient.filter(|_| p.objects[object].orient.is_some());
-        if at.is_some() || orient.is_some() {
-            out.placements.push(Placement { object, at, orient });
+        if given.x.is_some() || given.y.is_some() || orient.is_some() {
+            out.placements.push(Placement { object, x: given.x, y: given.y, orient });
         }
     }
     out.placements.sort_by_key(|pl| pl.object);

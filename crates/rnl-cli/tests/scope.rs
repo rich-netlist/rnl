@@ -123,7 +123,7 @@ fn the_solver_writes_such_a_point_back_by_its_name() {
     let p = ota(&r);
     let (q, _) = named(p, "%q");
     let solution = Solution {
-        placements: vec![Placement { object: q, at: Some((3.0, 4.0)), orient: None }],
+        placements: vec![Placement { object: q, x: Some(3.0), y: Some(4.0), orient: None }],
         ..Solution::default()
     };
     let written = write_record(p, &solution, "rnl-solver test", &sig1(p, "tolerance=0.000001"));

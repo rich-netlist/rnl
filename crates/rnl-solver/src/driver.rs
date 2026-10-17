@@ -256,16 +256,16 @@ pub(crate) fn solve_exact_with(
             // every position of its own, those the file fixes too (plan 3.2)
             Position::Own { .. } => {
                 let [x, y] = &placed.geometry.origin[k];
-                placements.push(Placement { object: k, at: Some((to_f64(x), to_f64(y))), orient })
+                placements.push(Placement { object: k, x: Some(to_f64(x)), y: Some(to_f64(y)), orient })
             }
             // drawn at the point of its main object: only its orientation is the solver's (12.1)
-            Position::At(_) if orient.is_some() => placements.push(Placement { object: k, at: None, orient }),
+            Position::At(_) if orient.is_some() => placements.push(Placement { object: k, x: None, y: None, orient }),
             // a text that its owner's symbol places has a coordinate of its own on the axis that
             // the scene gives it (13.3): where it is, which the record writes on that axis unless
             // its offset still places it there
             Position::InSymbol { replaced: Some(_), .. } => {
                 let [x, y] = &placed.origins[k];
-                placements.push(Placement { object: k, at: Some((to_f64(x), to_f64(y))), orient: None })
+                placements.push(Placement { object: k, x: Some(to_f64(x)), y: Some(to_f64(y)), orient: None })
             }
             // a text placed by its symbol alone goes with its owner (13.3)
             Position::At(_) | Position::InSymbol { .. } => {}

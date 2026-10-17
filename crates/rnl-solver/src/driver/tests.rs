@@ -41,8 +41,8 @@ fn every_object_is_placed_where_the_facts_put_it() {
     assert_eq!(
         solved.solution.placements,
         vec![
-            Placement { object: 0, at: Some((4.0, 2.5)), orient: Some(Orient::MY) },
-            Placement { object: 1, at: Some((0.0, 2.5)), orient: None },
+            Placement { object: 0, x: Some(4.0), y: Some(2.5), orient: Some(Orient::MY) },
+            Placement { object: 1, x: Some(0.0), y: Some(2.5), orient: None },
         ]
     );
     assert!(solved.report.work.resolve_nodes > 0);
@@ -92,7 +92,8 @@ fn a_position_the_file_fixes_is_given_and_written_where_the_record_reaches_it() 
     );
     let solved = crate::solve(&p, &SolverOptions::without_time_limit());
     assert_eq!(solved.report.kept, vec![0, 1, 2, 3, 4, 5, 7, 9]);
-    let at: Vec<(usize, Option<(f64, f64)>)> = solved.solution.placements.iter().map(|pl| (pl.object, pl.at)).collect();
+    let at: Vec<(usize, Option<(f64, f64)>)> =
+        solved.solution.placements.iter().map(|pl| (pl.object, pl.at())).collect();
     assert_eq!(
         at,
         vec![(0, Some((-10.0, 2.0))), (1, Some((3.0, 4.0))), (2, Some((3.0, -10.0))), (3, Some((-10.0, 8.0)))]
@@ -101,7 +102,8 @@ fn a_position_the_file_fixes_is_given_and_written_where_the_record_reaches_it() 
     let written = rnl_runtime::solution::write_record(&p, &solved.solution, "t", "h");
     let unsolved: Vec<String> = written.unsolved.iter().map(|u| u.to_string()).collect();
     assert_eq!(unsolved.len(), 1, "{unsolved:?}");
-    assert!(unsolved[0].starts_with("the position of (7, 8): "), "{unsolved:?}");
+    // its y is where the file fixes it, so only its x is unsolved
+    assert!(unsolved[0].starts_with("the x of (7, 8): "), "{unsolved:?}");
     assert!(written.record.contains("#M @PLACE(-10, 2) => @ORIENT("), "{}", written.record);
     assert!(written.record.contains("#N @PLACE(3, -10) => @ORIENT("), "{}", written.record);
 }
@@ -132,7 +134,7 @@ fn a_text_that_an_offset_places_on_one_axis_follows_its_owner_there_only() {
     // the symbol, which still place it there (13.3)
     let text: Vec<&Placement> = solved.solution.placements.iter().filter(|pl| pl.object == 1).collect();
     assert_eq!(text.len(), 1, "{:?}", solved.solution.placements);
-    assert_eq!(text[0].at.map(|(x, _)| x), Some(13.0));
+    assert_eq!(text[0].x, Some(13.0));
     let written = rnl_runtime::solution::write_record(&p, &solved.solution, "t", "h");
     assert!(written.unsolved.is_empty(), "{:?}", written.unsolved);
     assert!(written.record.contains("#M @PLACE(10, ") && !written.record.contains("#M::name"), "{}", written.record);
@@ -348,7 +350,7 @@ fn summary(p: &LevelProblem, solved: &Solved, e: &Exact) -> String {
         if matches!(o.kind, ObjectKind::Text) {
             continue;
         }
-        lines.push(format!("  {:>24} {:?} {:?}", o.label, pl.at, pl.orient.map(|x| x.as_str())));
+        lines.push(format!("  {:>24} {:?} {:?}", o.label, pl.at(), pl.orient.map(|x| x.as_str())));
     }
     for n in &solved.report.notes[1..] {
         lines.push(format!("  note: {n}"));
@@ -622,7 +624,7 @@ fn check_capped(
     // the same again, and nothing that RNL cannot write
     assert_eq!(solved, solve_exact_with(p, &options, clock, caps).0, "{what}: not deterministic");
     for pl in &solved.solution.placements {
-        if let Some((x, y)) = pl.at {
+        if let Some((x, y)) = pl.at() {
             assert!(x.is_finite() && y.is_finite(), "{what}: {pl:?}");
         }
     }
@@ -632,7 +634,7 @@ fn check_capped(
     for (k, o) in p.objects.iter().enumerate() {
         let pl: Vec<&Placement> = solved.solution.placements.iter().filter(|pl| pl.object == k).collect();
         assert!(pl.len() <= 1, "{what}: {pl:?}");
-        let at = pl.first().and_then(|pl| pl.at);
+        let at = pl.first().and_then(|pl| pl.at());
         let orient = pl.first().and_then(|pl| pl.orient);
         let own = match o.position {
             Position::Own { .. } => !left_free(&e.structure, k),
@@ -1817,7 +1819,7 @@ fn a_text_on_a_wire_or_a_net_that_no_fact_reaches_is_left_to_the_viewer() {
         });
         found.unwrap()
     };
-    let placed = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.at);
+    let placed = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.at());
     let on_wire = attached(|f| matches!(f, Filler::Wire(_)));
     let on_net = attached(|f| matches!(f, Filler::Net(n) if n == "b"));
     for k in [on_wire, on_net] {
@@ -1874,7 +1876,7 @@ fn a_symbol_without_a_name_on_no_net_drawn_is_left_free() {
     let note = "1 symbol without a name that no fact kept reaches is left free";
     assert!(solved.report.notes.iter().any(|n| n.starts_with(note)), "{:#?}", solved.report.notes);
     // the one with a name is placed, though nothing places it either
-    let placed = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.at);
+    let placed = |k: usize| solved.solution.placements.iter().find(|pl| pl.object == k).and_then(|pl| pl.at());
     assert!(!left_free(&e.structure, named) && placed(named).is_some());
     // the one on the net drawn goes below the first pin of an element on it, R1's
     let ori = &e.placed.geometry.orient;
@@ -1910,7 +1912,7 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
             let (solved, e) = solve_exact(&p, &SolverOptions::without_time_limit());
             let ori = &e.placed.geometry.orient;
             let g = grounded(&p, &e.structure, &e.candidate, ori);
-            for pl in solved.solution.placements.iter().filter(|pl| pl.at.is_some()) {
+            for pl in solved.solution.placements.iter().filter(|pl| pl.at().is_some()) {
                 let o = &p.objects[pl.object];
                 let free: Vec<usize> = (0..2).filter(|&a| !g[pl.object][a]).collect();
                 if free.is_empty() || o.kind == ObjectKind::Point {

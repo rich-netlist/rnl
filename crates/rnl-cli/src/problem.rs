@@ -244,7 +244,8 @@ pub fn previous(p: Option<&Previous>) -> Value {
         "numbering": p.numbering,
         "placements": p.placements.iter().map(|pl| json!({
             "object": pl.object,
-            "at": pl.at.map(|(x, y)| [x, y]),
+            "x": pl.x,
+            "y": pl.y,
             "orient": pl.orient.map(|o| o.as_str()),
         })).collect::<Vec<_>>(),
         "wire_routes": p.wire_routes.iter().map(|r| json!({"wire": r.wire, "points": path(&r.points)})).collect::<Vec<_>>(),

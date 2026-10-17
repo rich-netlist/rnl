@@ -393,7 +393,8 @@ fn write_back(f: &Path, p: &LevelProblem, written: &Written) -> (String, rnl_run
 fn a_solution_written_back_reads_back() {
     let f = case("01-rc-lowpass.sp");
     let p = &problems(&f, &FsProvider::new(&[]))[0];
-    let place = |object: usize, x: f64, y: f64, orient: Option<Orient>| Placement { object, at: Some((x, y)), orient };
+    let place =
+        |object: usize, x: f64, y: f64, orient: Option<Orient>| Placement { object, x: Some(x), y: Some(y), orient };
     let solution = Solution {
         placements: vec![
             place(object(p, "#C1"), 12.0, 3.0, None),
@@ -468,7 +469,8 @@ fn a_routed_net_written_back_reads_back() {
         (g1, (0.0, -5.0), Orient::R0),
         (g2, (12.0, -1.0), Orient::R0),
     ];
-    let placements = at.iter().map(|(o, xy, r)| Placement { object: *o, at: Some(*xy), orient: Some(*r) }).collect();
+    let placements =
+        at.iter().map(|(o, xy, r)| Placement { object: *o, x: Some(xy.0), y: Some(xy.1), orient: Some(*r) }).collect();
     let route = |net: &str| p.routes.iter().position(|r| r.net == net).unwrap();
     // the pins each ROUTE joins
     let pin = |object: usize, terminal: &str| -> PointRef {
