@@ -24,6 +24,9 @@ pub const READ_VERSIONS: [&str; 2] = ["0.2", "0.3"];
 /// default (16.1). An included file without one follows the file that includes it.
 pub const DEFAULT_VERSION: &str = "0.3";
 const HEADER_KW: [&str; 5] = ["VERSION", "PACKAGE", "ALIAS", "DEVICE", "USE-ALIASES"];
+/// A second VERSION in a header record (16.1).
+pub const SECOND_VERSION: &str =
+    "a file declares its version once (16.1): this VERSION is ignored, and the first one stands";
 
 /// The fields of a record header that affect interpretation (2.8).
 #[derive(Clone, Debug, PartialEq)]
@@ -799,6 +802,11 @@ impl Interp<'_> {
                 continue;
             }
             match kw.as_str() {
+                // a file declares its version once (16.1): the first VERSION of its header
+                // record stands, as the scan of the package directories takes it for a package file
+                "VERSION" if self.units[u].header_kws.iter().filter(|k| *k == "VERSION").count() > 1 => {
+                    self.diag_in(Severity::Error, SECOND_VERSION, Some(loc), &pkg);
+                }
                 "VERSION" => {
                     let Some(Value::Str(v)) = p.get("version") else {
                         self.diag_in(Severity::Error, "@VERSION takes a string (16.1)", Some(loc), &pkg);
