@@ -229,7 +229,7 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$NPN` | 1:up 2:left 3:down | name, model | – |
 | `$PDMOS` | 1:down 2:left 3:up | name, model | – |
 | `$PDMOS_4TERM` | 1:down 2:left 3:up 4:right | name, model | – |
-| `$PJFET` | 1:up 2:left 3:down | name, model | – |
+| `$PJFET` | 1:down 2:left 3:up | name, model | – |
 | `$PMOS` | 1:down 2:left 3:up | name, model | – |
 | `$PMOS_4TERM` | 1:down 2:left 3:up 4:right | name, model | – |
 | `$PNP` | 1:down 2:left 3:up | name, model | – |
