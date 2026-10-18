@@ -710,16 +710,19 @@ impl<'a> Reader<'a> {
                 if toks.len() >= 3 {
                     let name = toks[1].clone();
                     let master = toks[2].clone();
-                    let params = toks[3..]
+                    let params: Vec<(String, String)> = toks[3..]
                         .iter()
                         .filter_map(|t| t.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
                         .collect();
-                    // binned models `nch.1`, `nch.2` stand for `nch`
-                    let base = match name.rsplit_once('.') {
-                        Some((b, k)) if k.chars().all(|c| c.is_ascii_digit()) => b.to_string(),
-                        _ => name.clone(),
-                    };
-                    self.models.entry(base).or_insert(Model { master, params });
+                    // binned models `nch.1`, `nch.2` stand for `nch`, and an instance may write either
+                    if let Some((b, k)) = name.rsplit_once('.') {
+                        if !b.is_empty() && !k.is_empty() && k.chars().all(|c| c.is_ascii_digit()) {
+                            self.models
+                                .entry(b.to_string())
+                                .or_insert_with(|| Model { master: master.clone(), params: params.clone() });
+                        }
+                    }
+                    self.models.entry(name).or_insert(Model { master, params });
                 }
                 return None;
             }
@@ -796,11 +799,7 @@ impl<'a> Reader<'a> {
             return;
         }
         if first == ".model" {
-            let toks: Vec<&str> =
-                body.split(|c: char| c.is_whitespace() || c == '(').filter(|t| !t.is_empty()).collect();
-            if toks.len() >= 3 {
-                self.spice_models.insert(toks[1].to_lowercase(), toks[2].to_lowercase());
-            }
+            rnl_host_spice::register_model(&mut self.spice_models, &body);
             return;
         }
         if first == ".global" {
@@ -814,7 +813,7 @@ impl<'a> Reader<'a> {
             return;
         }
         let Some(el) = rnl_host_spice::parse_element(&body, fname, no, self.sink) else { return };
-        let needs = matches!(el.inst.letter, Some('M') | Some('Q'));
+        let needs = rnl_host_spice::needs_models(el.inst.letter);
         self.add_instance(el.inst, st, fname, no, if needs { Some(el.plain) } else { None });
     }
 
@@ -849,10 +848,9 @@ impl<'a> Reader<'a> {
                 let inst = &self.doc.levels[lv].instances[k];
                 if inst.letter.is_some() {
                     // an element read in SPICE mode
-                    let (model, is_x) = (inst.model.clone(), inst.is_subckt);
                     let inst = &mut self.doc.levels[lv].instances[k];
-                    if let (Some(m), false) = (model, is_x) {
-                        inst.mtype = spice_models.get(&m.to_lowercase()).cloned();
+                    if !inst.is_subckt && inst.mtype.is_none() {
+                        inst.mtype = inst.model.as_ref().and_then(|m| spice_models.get(&m.to_lowercase()).cloned());
                     }
                     continue;
                 }

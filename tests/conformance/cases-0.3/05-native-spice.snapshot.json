@@ -529,7 +529,7 @@
           {
             "id": "#R2",
             "subckt": false,
-            "master": null,
+            "master": "rmod",
             "terminals": [
               {
                 "n": 1,
@@ -3338,6 +3338,39 @@
             "style": {}
           },
           {
+            "id": "#B1::value",
+            "attach": "#B1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "2*V(a1)",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              41.5,
+              -10.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
+          },
+          {
             "id": "#S1::name",
             "attach": "#S1",
             "key": "name",
@@ -4089,39 +4122,6 @@
             "anchor": [
               40.95,
               -39.75
-            ],
-            "halign": "start",
-            "valign": "baseline",
-            "rotate": 0.0,
-            "size": 1.0,
-            "style": {}
-          },
-          {
-            "id": "#R2::value",
-            "attach": "#R2",
-            "key": "value",
-            "markup": {
-              "value": "${value}",
-              "source": null
-            },
-            "written": false,
-            "lines": [
-              [
-                {
-                  "kind": "text",
-                  "text": "rmod",
-                  "style": {
-                    "level": 0,
-                    "bold": false,
-                    "italic": false,
-                    "overline": false
-                  }
-                }
-              ]
-            ],
-            "anchor": [
-              40.95,
-              -40.95
             ],
             "halign": "start",
             "valign": "baseline",

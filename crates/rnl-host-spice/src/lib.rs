@@ -62,17 +62,120 @@ pub fn strip_inline_comment(text: &str) -> String {
     padded.trim().to_string()
 }
 
-/// Split the tokens of an element line into plain tokens and `name=value` parameters.
-pub fn split_params(tokens: &[&str]) -> (Vec<String>, Vec<(String, String)>) {
+/// The tokens of an element line: its words, with a quoted text (`'2 * V(in)'`, `"..."`) or a
+/// braced expression (`{ 2*V(in) }`) one token whatever spaces it holds, and a `name = value` with
+/// spaces about the `=` one token `name=value`. The `=` of a `TABLE {V(in)} = (0, 0) (1, 1m)` after a
+/// braced expression is no assignment, and joins nothing.
+pub fn element_tokens(body: &str) -> Vec<String> {
+    let mut words: Vec<String> = Vec::new();
+    let (mut word, mut quote, mut braces) = (String::new(), None::<char>, 0usize);
+    for c in body.chars() {
+        match quote {
+            Some(q) => {
+                word.push(c);
+                if c == q {
+                    quote = None;
+                }
+                continue;
+            }
+            None if braces > 0 => {
+                word.push(c);
+                match c {
+                    '{' => braces += 1,
+                    '}' => braces -= 1,
+                    _ => {}
+                }
+                continue;
+            }
+            None => {}
+        }
+        match c {
+            '\'' | '"' => {
+                quote = Some(c);
+                word.push(c);
+            }
+            '{' => {
+                braces = 1;
+                word.push(c);
+            }
+            c if c.is_whitespace() => {
+                if !word.is_empty() {
+                    words.push(std::mem::take(&mut word));
+                }
+            }
+            c => word.push(c),
+        }
+    }
+    if !word.is_empty() {
+        words.push(word);
+    }
+    // `name = value`, `name= value` and `name =value` are `name=value`
+    let mut out: Vec<String> = Vec::new();
+    let mut k = 0;
+    while k < words.len() {
+        let w = &words[k];
+        let after_brace = out.last().is_some_and(|p| p.starts_with('{') || p.ends_with('}'));
+        if w == "=" && !out.is_empty() && !after_brace && k + 1 < words.len() {
+            let last = out.pop().unwrap();
+            out.push(format!("{last}={}", words[k + 1]));
+            k += 2;
+        } else if w.starts_with('=') && w.len() > 1 && !out.is_empty() && !after_brace {
+            let last = out.pop().unwrap();
+            out.push(format!("{last}{w}"));
+            k += 1;
+        } else if w.ends_with('=') && w.len() > 1 && !w.starts_with(['\'', '"', '{']) && k + 1 < words.len() {
+            out.push(format!("{w}{}", words[k + 1]));
+            k += 2;
+        } else {
+            out.push(w.clone());
+            k += 1;
+        }
+    }
+    out
+}
+
+/// Split the tokens of an element line into plain tokens and `name=value` parameters. A token that
+/// starts with a quote or a brace is a text or an expression, plain whatever it holds.
+pub fn split_params<S: AsRef<str>>(tokens: &[S]) -> (Vec<String>, Vec<(String, String)>) {
     let mut plain = Vec::new();
     let mut params = Vec::new();
     for t in tokens {
+        let t = t.as_ref();
         match t.find('=') {
-            Some(k) if k > 0 => params.push((t[..k].to_string(), t[k + 1..].to_string())),
+            Some(k) if k > 0 && !t.starts_with(['\'', '"', '{']) => {
+                params.push((t[..k].to_string(), t[k + 1..].to_string()))
+            }
             _ => plain.push(t.to_string()),
         }
     }
     (plain, params)
+}
+
+/// The length in bytes of the number a token starts with, digits with an optional fraction and
+/// exponent and a sign: `2.0`, `-1e-3u` start with one; `2n3904` and `V(in)` do not (it is `2`
+/// and then letters and digits), `n3904` has none.
+fn number_len(t: &str) -> Option<usize> {
+    let unsigned = t.strip_prefix(['+', '-']).unwrap_or(t);
+    let sign = t.len() - unsigned.len();
+    let mantissa = unsigned.chars().take_while(|c| c.is_ascii_digit() || *c == '.').count();
+    if !unsigned[..mantissa].chars().any(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let mut end = mantissa;
+    if let Some(e) = unsigned[end..].strip_prefix(['e', 'E']) {
+        let signed = usize::from(e.starts_with(['+', '-']));
+        let digits = e[signed..].chars().take_while(|c| c.is_ascii_digit()).count();
+        if digits > 0 {
+            end += 1 + signed + digits;
+        }
+    }
+    Some(sign + end)
+}
+
+/// Whether a token is a number as SPICE writes one: digits with an optional fraction and exponent,
+/// then letters for a scale and a unit, such as `2.0`, `1u` or `10meg`; `2n3904` is a name.
+pub fn is_number(t: &str) -> bool {
+    number_len(t).is_some_and(|n| t[n..].chars().all(|c| c.is_ascii_alphabetic()))
 }
 
 /// An element line before the model names are all known: M and Q need them to tell nodes from
@@ -86,7 +189,7 @@ pub struct Element {
 /// Parse one SPICE element statement (continuations joined, inline comment removed).
 /// Returns None for lines that are not drawn elements (`K` couplings) or unknown letters.
 pub fn parse_element(body: &str, file: &str, line: u32, sink: &mut Sink) -> Option<Element> {
-    let toks: Vec<&str> = body.split_whitespace().collect();
+    let toks = element_tokens(body);
     let name = toks.first()?.to_string();
     let letter = name.chars().next()?.to_ascii_uppercase();
     let (plain, params) = split_params(&toks[1..]);
@@ -110,18 +213,33 @@ pub fn parse_element(body: &str, file: &str, line: u32, sink: &mut Sink) -> Opti
     };
     match letter {
         'X' => {
-            let (last, nodes) = plain.split_last()?;
-            inst.model = Some(last.clone());
-            inst.nodes = nodes.to_vec();
+            // `PARAMS:` ends the nodes and the subcircuit's name, and a lone `/` only separates the
+            // nodes from the name (CDL): neither is a node, and neither is the name
+            let end = plain.iter().position(|t| t.eq_ignore_ascii_case("params:")).unwrap_or(plain.len());
+            let mut head: Vec<String> = plain[..end].iter().filter(|t| t.as_str() != "/").cloned().collect();
+            let last = head.pop()?;
+            inst.model = Some(last);
+            inst.nodes = head;
             inst.is_subckt = true;
         }
-        // nodes and model are told apart once every `.model` is known (resolve_models)
+        // nodes and model are told apart once every `.model` is known (resolve_nodes)
         'M' | 'Q' => {}
         'D' => {
             inst.nodes = take(2);
             inst.model = plain.get(2).cloned();
         }
-        'J' | 'Z' | 'U' => {
+        'J' | 'Z' => {
+            inst.nodes = take(3);
+            inst.model = plain.get(3).cloned();
+        }
+        'U' if plain.len() >= 5 => {
+            // HSPICE's lossy transmission line, `U in1 ref1 out1 ref2 model`, not SPICE3's RC line
+            let (last, nodes) = plain.split_last()?;
+            inst.nodes = nodes.to_vec();
+            inst.model = Some(last.clone());
+            line_of_transmission(&mut inst);
+        }
+        'U' => {
             inst.nodes = take(3);
             inst.model = plain.get(3).cloned();
         }
@@ -133,6 +251,14 @@ pub fn parse_element(body: &str, file: &str, line: u32, sink: &mut Sink) -> Opti
             inst.nodes = take(2);
             inst.value = rest(2);
         }
+        'W' if is_transmission_line(&inst.params, &plain) => {
+            // HSPICE's transmission line, `W in1 ref1 out1 ref2 RLGCMODEL=name N=1 L=10m`, not SPICE3's
+            // current-controlled switch, `W n+ n- Vname model`
+            inst.nodes = plain.clone();
+            inst.model =
+                ["rlgcmodel", "tablemodel", "fsmodel", "umodel"].iter().find_map(|k| inst.param(k)).map(String::from);
+            line_of_transmission(&mut inst);
+        }
         'W' => {
             inst.nodes = take(2);
             inst.model = plain.get(3).cloned();
@@ -143,7 +269,14 @@ pub fn parse_element(body: &str, file: &str, line: u32, sink: &mut Sink) -> Opti
         }
         'R' | 'C' | 'L' | 'V' | 'I' | 'B' => {
             inst.nodes = take(2);
-            inst.value = rest(2);
+            inst.value = rest(2).or_else(|| named_value(letter, &inst));
+        }
+        'E' | 'G' if behavioural(&toks[1..]).is_some() => {
+            // a nonlinear source: its value is an expression or a table, and POLY(k) has the k
+            // pairs of nodes it reads after its two
+            let (nodes, value) = behavioural(&toks[1..])?;
+            inst.nodes = nodes;
+            inst.value = value;
         }
         'E' | 'G' | 'T' => {
             inst.nodes = take(4);
@@ -158,31 +291,155 @@ pub fn parse_element(body: &str, file: &str, line: u32, sink: &mut Sink) -> Opti
             return None;
         }
     }
+    if matches!(letter, 'R' | 'C' | 'L' | 'V' | 'I') {
+        if let Some(v) = &inst.value {
+            note_milli(v, file, line, sink);
+        }
+    }
     Some(Element { inst, plain })
 }
 
-/// Tell nodes from the model name for M and Q once all model names are known: the first token
-/// after the minimum node count that names a model ends the nodes.
+/// Whether a W line is a transmission line of HSPICE, not a current-controlled switch: it has a
+/// parameter only a transmission line has, or more words than the switch's `n+ n- Vname model`,
+/// not counting the `on` or `off` that ends a switch.
+fn is_transmission_line(params: &[(String, String)], plain: &[String]) -> bool {
+    const OF_A_LINE: [&str; 8] = ["n", "l", "rlgcmodel", "tablemodel", "fsmodel", "umodel", "delay", "td"];
+    let words = plain.iter().filter(|t| !t.eq_ignore_ascii_case("on") && !t.eq_ignore_ascii_case("off")).count();
+    words > 4 || params.iter().any(|(k, _)| OF_A_LINE.iter().any(|p| k.eq_ignore_ascii_case(p)))
+}
+
+/// Make the instance a transmission line (a W or U of HSPICE): its type, and the names of its
+/// terminals when it has the four of a single line, as T and O have them (6.12).
+fn line_of_transmission(inst: &mut Instance) {
+    inst.mtype = Some("tline".to_string());
+    inst.default_terminals = Some(if inst.nodes.len() == 4 {
+        ["p1", "n1", "p2", "n2"].iter().map(|s| s.to_string()).collect()
+    } else {
+        Vec::new()
+    });
+}
+
+/// The parameters of an element line that stand for the value that other writings give by
+/// position: `R1 a b r=10k`, `C1 a b c=1p`, `L1 a b l=2n`, `V1 a b dc=1.8`, `B1 a b v=2*V(in)`.
+fn named_value(letter: char, inst: &Instance) -> Option<String> {
+    let names: &[&str] = match letter {
+        'R' => &["r", "resistance"],
+        'C' => &["c", "capacitance"],
+        'L' => &["l", "inductance"],
+        'V' | 'I' => &["dc"],
+        'B' => &["v", "i"],
+        _ => return None,
+    };
+    names.iter().find_map(|n| inst.param(n)).map(String::from)
+}
+
+/// For an E or G whose value is an expression or a table, not the gain of four nodes: its nodes and
+/// its value, from the words after its name. It is told by the word where the control nodes would
+/// be: `VALUE`, `VOL`, `CUR`, `TABLE`, `LAPLACE`, `FREQ`, `CHEBYSHEV`, `VALUE={...}`, `VOL='...'`,
+/// or `POLY(k)`, which reads k pairs of control nodes after the keyword. The value is the text
+/// from the keyword on, but for the control nodes of a POLY.
+fn behavioural(tail: &[String]) -> Option<(Vec<String>, Option<String>)> {
+    let word = tail.get(2)?.to_ascii_lowercase();
+    let key = word.split(['=', '(']).next().unwrap_or("");
+    if key == "poly" {
+        // POLY(k) or POLY (k)
+        let (count, from) = match word.strip_prefix("poly(") {
+            Some(inner) => (inner.trim_end_matches(')'), 3),
+            None => (tail.get(3)?.trim_matches(['(', ')']), 4),
+        };
+        let pairs: usize = count.parse().ok()?;
+        let controls = tail.get(from..from + 2 * pairs)?;
+        let mut nodes = tail[..2].to_vec();
+        nodes.extend(controls.iter().cloned());
+        let coefficients = &tail[from + 2 * pairs..];
+        let value = tail[2..from].iter().chain(coefficients).cloned().collect::<Vec<_>>().join(" ");
+        return Some((nodes, Some(value)));
+    }
+    let keyword = word == key || word.starts_with(&format!("{key}="));
+    (keyword && matches!(key, "value" | "vol" | "cur" | "table" | "laplace" | "freq" | "chebyshev"))
+        .then(|| (tail[..2].to_vec(), Some(tail[2..].join(" "))))
+}
+
+/// A hint for a value that SPICE reads as milli though it may be written as mega: `10M` is
+/// 10 milli, as `10m` is, and mega is `meg` (ngspice, HSPICE and LTspice alike).
+fn note_milli(value: &str, file: &str, line: u32, sink: &mut Sink) {
+    for t in value.split_whitespace() {
+        let Some(n) = number_len(t) else { continue };
+        let suffix = &t[n..];
+        let lower = suffix.to_ascii_lowercase();
+        if suffix.starts_with('M')
+            && suffix.chars().all(|c| c.is_ascii_alphabetic())
+            && !lower.starts_with("meg")
+            && !lower.starts_with("mil")
+        {
+            sink.hint(
+                format!(
+                    "{t} is milli in SPICE, as {} is: M is milli in either case, and mega is meg",
+                    t.to_ascii_lowercase()
+                ),
+                Some(Loc::line(file, line)),
+            );
+        }
+    }
+}
+
+/// Register what a `.model` card says in `models`, by lower case name: the type, which is the word
+/// after the name. A binned model such as `pch.1` is registered under its full name and under its
+/// base name `pch`, since an instance may write either. The type of LTspice's `vdmos` is its
+/// polarity: `pmos` with the word `pchan`, else `nmos`.
+pub fn register_model(models: &mut HashMap<String, String>, card: &str) {
+    let toks: Vec<&str> = card.split(|c: char| c.is_whitespace() || c == '(').filter(|t| !t.is_empty()).collect();
+    if toks.len() < 3 {
+        return;
+    }
+    let name = toks[1].to_lowercase();
+    let mut kind = toks[2].to_lowercase();
+    if kind == "vdmos" {
+        kind = if toks[3..].iter().any(|t| t.eq_ignore_ascii_case("pchan")) { "pmos" } else { "nmos" }.to_string();
+    }
+    if let Some((base, bin)) = name.rsplit_once('.') {
+        if !base.is_empty() && !bin.is_empty() && bin.chars().all(|c| c.is_ascii_digit()) {
+            models.entry(base.to_string()).or_insert_with(|| kind.clone());
+        }
+    }
+    models.insert(name, kind);
+}
+
+/// Whether the model of an element is among the words after its nodes: the elements that read a
+/// `.model` card to tell its nodes from its model and its value.
+pub fn needs_models(letter: Option<char>) -> bool {
+    matches!(letter, Some('M') | Some('Q') | Some('R') | Some('C') | Some('L'))
+}
+
+/// Where the model name of an M or a Q stands in its words, once all `.model` names are known: the
+/// first word after the three nodes that every such device has that names a model; else the last
+/// word that is no number and no `off`, since values by position, such as an area, come after it.
+fn model_position(plain: &[String], is_model: impl Fn(&str) -> bool) -> Option<usize> {
+    if plain.len() < 4 {
+        return None;
+    }
+    (3..plain.len())
+        .find(|&k| is_model(&plain[k]))
+        .or_else(|| (3..plain.len()).rev().find(|&k| !is_number(&plain[k]) && !plain[k].eq_ignore_ascii_case("off")))
+}
+
+/// Tell nodes from the model name for M and Q once all model names are known, and a resistor,
+/// capacitor or inductor of a `.model` card, `R1 a b rpoly 10k`, from a value.
 pub fn resolve_nodes(inst: &mut Instance, plain: &[String], models: &HashMap<String, String>) {
     let is_model = |t: &str| models.contains_key(&t.to_lowercase());
     match inst.letter {
-        Some('M') => {
-            let k = (4..plain.len()).find(|&k| is_model(&plain[k])).or(if plain.len() > 4 { Some(4) } else { None });
-            match k {
-                Some(k) => {
-                    inst.nodes = plain[..k].to_vec();
-                    inst.model = Some(plain[k].clone());
-                }
-                None => inst.nodes = plain.to_vec(),
+        Some('M') | Some('Q') => match model_position(plain, is_model) {
+            Some(k) => {
+                inst.nodes = plain[..k].to_vec();
+                inst.model = Some(plain[k].clone());
             }
-        }
-        Some('Q') => {
-            if plain.len() >= 5 && !is_model(&plain[3]) {
-                inst.nodes = plain[..4].to_vec();
-                inst.model = Some(plain[4].clone());
-            } else {
-                inst.nodes = plain.iter().take(3).cloned().collect();
-                inst.model = plain.get(3).cloned();
+            None => inst.nodes = plain.to_vec(),
+        },
+        Some(letter @ ('R' | 'C' | 'L')) => {
+            if let Some(m) = plain.get(2).filter(|m| is_model(m)) {
+                inst.model = Some(m.clone());
+                let value: Vec<&str> = plain[3..].iter().map(String::as_str).collect();
+                inst.value = if value.is_empty() { named_value(letter, inst) } else { Some(value.join(" ")) };
             }
         }
         _ => {}
@@ -546,11 +803,7 @@ impl<'a> Reader<'a> {
             return;
         }
         if first == ".model" {
-            let toks: Vec<&str> =
-                body.split(|c: char| c.is_whitespace() || c == '(').filter(|t| !t.is_empty()).collect();
-            if toks.len() >= 3 {
-                self.models.insert(toks[1].to_lowercase(), toks[2].to_lowercase());
-            }
+            register_model(&mut self.models, &body);
             return;
         }
         if first == ".global" {
@@ -579,7 +832,7 @@ impl<'a> Reader<'a> {
         let mut inst = el.inst;
         inst.file_level = Some(file_level);
         inst.order = lv.instances.len();
-        let needs = matches!(inst.letter, Some('M') | Some('Q'));
+        let needs = needs_models(inst.letter);
         lv.instances.push(inst);
         if needs {
             let k = lv.instances.len() - 1;
@@ -643,8 +896,9 @@ fn finish(doc: &mut HostDocument, models: &HashMap<String, String>, unresolved: 
     }
     for lv in &mut doc.levels {
         for inst in &mut lv.instances {
-            if let (Some(m), false) = (&inst.model, inst.is_subckt) {
-                inst.mtype = models.get(&m.to_lowercase()).cloned();
+            // a type the adapter gave (a transmission line) stands; else the model card's
+            if !inst.is_subckt && inst.mtype.is_none() {
+                inst.mtype = inst.model.as_ref().and_then(|m| models.get(&m.to_lowercase()).cloned());
             }
         }
     }
@@ -795,5 +1049,198 @@ mod tests {
         assert_eq!(strip_inline_comment("R1 a b 1k ; x"), "R1 a b 1k");
         assert_eq!(strip_inline_comment("R1 a b 1k$x"), "R1 a b 1k$x");
         assert_eq!(strip_inline_comment("R1 a b 1k $ x"), "R1 a b 1k");
+    }
+
+    /// The instances of a netlist of one level, read, and the messages of the reading.
+    fn read_all(net: &str) -> (Vec<Instance>, Vec<String>) {
+        let p = MemoryProvider::new().with("t.sp", net);
+        let mut sink = Sink::new();
+        let doc = read("t.sp", &p, &mut sink).unwrap();
+        let messages = sink.all().iter().map(|d| d.message.clone()).collect();
+        (doc.main().instances.clone(), messages)
+    }
+
+    fn find<'a>(instances: &'a [Instance], name: &str) -> &'a Instance {
+        instances.iter().find(|i| i.name == name).unwrap_or_else(|| panic!("no {name}"))
+    }
+
+    fn nodes(i: &Instance) -> String {
+        i.nodes.join(" ")
+    }
+
+    #[test]
+    fn tokens_keep_quotes_and_braces_whole_and_join_spaced_assignments() {
+        let t = |s: &str| element_tokens(s);
+        assert_eq!(t("M1 d g s b nch w = 1u l= 2u m =3"), ["M1", "d", "g", "s", "b", "nch", "w=1u", "l=2u", "m=3"]);
+        assert_eq!(t("E1 out 0 VOL='2 * V(in)'"), ["E1", "out", "0", "VOL='2 * V(in)'"]);
+        assert_eq!(t("E1 out 0 VALUE = { 2 * V(in) }"), ["E1", "out", "0", "VALUE={ 2 * V(in) }"]);
+        // the = after a braced expression belongs to the table
+        assert_eq!(
+            t("G1 o 0 TABLE {V(in)} = (0, 0) (1, 1m)"),
+            ["G1", "o", "0", "TABLE", "{V(in)}", "=", "(0,", "0)", "(1,", "1m)"]
+        );
+        let (plain, params) = split_params(&t("X1 a b sub w = 1u"));
+        assert_eq!(plain, ["X1", "a", "b", "sub"]);
+        assert_eq!(params, [("w".to_string(), "1u".to_string())]);
+        for number in ["2.0", "1u", "-1e-3", "10meg", "1.5M"] {
+            assert!(is_number(number), "{number}");
+        }
+        for name in ["2n3904", "pmod", "V(in)", ".", "dt"] {
+            assert!(!is_number(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn m_and_q_find_their_model_among_three_to_six_nodes_and_values() {
+        let net = "* t\n.model pmod pmos\n.model nsoi nmos\n.model pnpm pnp\n\
+                   M3 d g s pmod w=1u\nM4 d g s b nsoi\nM5 d g s e b nsoi\nM5x d g s e b ext_soi\nM4x d g s b ext\nM3x d g s ext\n\
+                   M3s d g s pmod w = 1u\nMn 2 1 0 0 ext_n\nQ3 c b e pnpm\nQ4 c b e s pnpm\nQ5 c b e s dt pnpm\n\
+                   Qarea c b e ext_pnp 2.0\nQoff c b e ext_pnp off\nQ4ext c b e s 2n3904\nQ3num c b e 2n3904 1.5\n.end\n";
+        let (i, _) = read_all(net);
+        let cases = [
+            ("M3", "d g s", "pmod", "pmos"),
+            ("M4", "d g s b", "nsoi", "nmos"),
+            ("M5", "d g s e b", "nsoi", "nmos"),
+            // models the file does not have: the last word that is no number
+            ("M5x", "d g s e b", "ext_soi", ""),
+            ("M4x", "d g s b", "ext", ""),
+            ("M3x", "d g s", "ext", ""),
+            ("M3s", "d g s", "pmod", "pmos"),
+            ("Mn", "2 1 0 0", "ext_n", ""),
+            ("Q3", "c b e", "pnpm", "pnp"),
+            ("Q4", "c b e s", "pnpm", "pnp"),
+            ("Q5", "c b e s dt", "pnpm", "pnp"),
+            ("Qarea", "c b e", "ext_pnp", ""),
+            ("Qoff", "c b e", "ext_pnp", ""),
+            ("Q4ext", "c b e s", "2n3904", ""),
+            ("Q3num", "c b e", "2n3904", ""),
+        ];
+        for (name, want_nodes, model, mtype) in cases {
+            let inst = find(&i, name);
+            assert_eq!(
+                (nodes(inst), inst.model.as_deref(), inst.mtype.as_deref().unwrap_or("")),
+                (want_nodes.to_string(), Some(model), mtype),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_binned_model_is_known_by_its_name_and_its_base_and_vdmos_by_its_polarity() {
+        let net = "* t\n.model pch.1 pmos level=54\n.model pch.2 pmos\n.model nch.10 nmos\n.model qlat lpnp\n\
+                   .model mp vdmos pchan Vto=-1.5\n.model mn VDMOS(Vto=3)\n.model d1 d\n\
+                   M1 d g s b pch\nM2 d g s b pch.1\nM3 d g s b pch.2\nM4 d g s b nch\nMp d g s mp\nMn d g s mn\nQl c b e qlat\n.end\n";
+        let (i, _) = read_all(net);
+        let types: Vec<(&str, &str)> = ["M1", "M2", "M3", "M4", "Mp", "Mn", "Ql"]
+            .iter()
+            .map(|n| (*n, find(&i, n).mtype.as_deref().unwrap_or("-")))
+            .collect();
+        assert_eq!(
+            types,
+            [
+                ("M1", "pmos"),
+                ("M2", "pmos"),
+                ("M3", "pmos"),
+                ("M4", "nmos"),
+                ("Mp", "pmos"),
+                ("Mn", "nmos"),
+                ("Ql", "lpnp")
+            ]
+        );
+        assert_eq!(nodes(find(&i, "M1")), "d g s b");
+        assert_eq!(nodes(find(&i, "Mp")), "d g s");
+    }
+
+    #[test]
+    fn behavioural_sources_keep_their_nodes_and_show_their_expression() {
+        let net = "* t\nE1 o1 0 VOL='2*V(in)'\nE2 o2 0 VALUE = { 2*V(in) }\nG1 o3 0 TABLE {V(in)} = (0, 0) (1, 1m)\n\
+                   E3 o4 0 POLY(2) a 0 b 0 0 1.0 1.0\nE4 o5 0 LAPLACE {V(in)} = {1/(1+s)}\nE5 o6 0 CUR='I(v1)'\n\
+                   E6 o7 0 c 0 2.5\nG2 o8 0 vol_in 0 1m\nE7 o9 0 POLY (1) c 0 0 1\n.end\n";
+        let (i, _) = read_all(net);
+        let got = |n: &str| (nodes(find(&i, n)), find(&i, n).value.clone().unwrap_or_default());
+        assert_eq!(got("E1"), ("o1 0".into(), "VOL='2*V(in)'".into()));
+        assert_eq!(got("E2"), ("o2 0".into(), "VALUE={ 2*V(in) }".into()));
+        assert_eq!(got("G1"), ("o3 0".into(), "TABLE {V(in)} = (0, 0) (1, 1m)".into()));
+        assert_eq!(got("E3"), ("o4 0 a 0 b 0".into(), "POLY(2) 0 1.0 1.0".into()));
+        assert_eq!(got("E4"), ("o5 0".into(), "LAPLACE {V(in)} = {1/(1+s)}".into()));
+        assert_eq!(got("E5"), ("o6 0".into(), "CUR='I(v1)'".into()));
+        // a gain of four nodes, whatever the names of the nodes
+        assert_eq!(got("E6"), ("o7 0 c 0".into(), "2.5".into()));
+        assert_eq!(got("G2"), ("o8 0 vol_in 0".into(), "1m".into()));
+        assert_eq!(got("E7"), ("o9 0 c 0".into(), "POLY (1) 0 1".into()));
+    }
+
+    #[test]
+    fn a_subcircuit_call_ends_its_nodes_at_params_and_at_a_slash() {
+        let net = "* t\nX1 a b vdd vss inv PARAMS: wp=2u wn=1u\nX2 a b vdd vss / inv wp=2u\nX3 a b inv w = 1u\nX4 a b inv\n.end\n";
+        let (i, _) = read_all(net);
+        for n in ["X1", "X2"] {
+            assert_eq!(
+                (nodes(find(&i, n)), find(&i, n).model.as_deref()),
+                ("a b vdd vss".to_string(), Some("inv")),
+                "{n}"
+            );
+        }
+        for n in ["X3", "X4"] {
+            assert_eq!((nodes(find(&i, n)), find(&i, n).model.as_deref()), ("a b".to_string(), Some("inv")), "{n}");
+        }
+    }
+
+    #[test]
+    fn w_and_u_are_transmission_lines_of_hspice_or_the_switch_and_rc_line_of_spice3() {
+        let net =
+            "* t\nW1 a b Vc swm\nW2 in1 ref1 out1 ref2 RLGCMODEL=wmod N=1 L=10m\nW3 i1 r1 o1 r2 wm\nWs a b Vc swm on\n\
+                   U1 a b ref urc L=1u\nU2 in1 ref1 out1 ref2 umod L=10m\n.end\n";
+        let (i, _) = read_all(net);
+        let kind = |n: &str| {
+            let x = find(&i, n);
+            (nodes(x), x.model.clone().unwrap_or_default(), x.mtype.clone().unwrap_or_default())
+        };
+        assert_eq!(kind("W1"), ("a b".into(), "swm".into(), "".into()));
+        assert_eq!(kind("Ws"), ("a b".into(), "swm".into(), "".into()));
+        assert_eq!(kind("W2"), ("in1 ref1 out1 ref2".into(), "wmod".into(), "tline".into()));
+        assert_eq!(kind("W3").2, "tline");
+        assert_eq!(kind("U1"), ("a b ref".into(), "urc".into(), "".into()));
+        assert_eq!(kind("U2"), ("in1 ref1 out1 ref2".into(), "umod".into(), "tline".into()));
+        // the four nodes of a line are named as those of T and O are
+        let names = |n: &str| find(&i, n).default_terminals.clone().unwrap_or_default().join(" ");
+        assert_eq!(names("U2"), "p1 n1 p2 n2");
+        assert_eq!(names("W1"), "p n");
+    }
+
+    #[test]
+    fn values_given_by_name_and_models_of_resistors_and_capacitors() {
+        let net = "* t\n.model rpoly r rsh=500\n.model cmim c\nR1 a b r=10k\nC1 a b c=1p\nL1 a b l=2n\nV1 a b dc=1.8\n\
+                   B1 a b V=2*V(in)\nB2 a b I = V(in)/1k\nR2 a b rpoly 10k\nR3 a b rpoly r=10k w=2u l=20u\nC2 a b cmim 2p\n\
+                   R4 a b 5k tc1 = 1e-3\n.end\n";
+        let (i, _) = read_all(net);
+        let got = |n: &str| {
+            let x = find(&i, n);
+            (
+                x.value.clone().unwrap_or_default(),
+                x.model.clone().unwrap_or_default(),
+                x.mtype.clone().unwrap_or_default(),
+            )
+        };
+        assert_eq!(got("R1").0, "10k");
+        assert_eq!(got("C1").0, "1p");
+        assert_eq!(got("L1").0, "2n");
+        assert_eq!(got("V1").0, "1.8");
+        assert_eq!(got("B1").0, "2*V(in)");
+        assert_eq!(got("B2").0, "V(in)/1k");
+        assert_eq!(got("R2"), ("10k".into(), "rpoly".into(), "r".into()));
+        assert_eq!(got("R3"), ("10k".into(), "rpoly".into(), "r".into()));
+        assert_eq!(got("C2"), ("2p".into(), "cmim".into(), "c".into()));
+        assert_eq!(got("R4").0, "5k");
+        assert_eq!(find(&i, "R4").param("tc1"), Some("1e-3"));
+    }
+
+    #[test]
+    fn a_capital_m_after_a_number_is_milli_and_gets_a_hint() {
+        let net = "* t\nR1 a b 10M\nR2 a b 10m\nR3 a b 10meg\nR4 a b 10Meg\nC1 a b 1.5M\nV1 a b dc 1e3M\nR5 a b {2*M}\nR6 a b 10MIL\n.end\n";
+        let (_, hints) = read_all(net);
+        let hinted: Vec<&str> = hints.iter().filter_map(|m| m.split_whitespace().next()).collect();
+        assert_eq!(hinted, ["10M", "1.5M", "1e3M"], "{hints:?}");
+        assert!(hints[0].contains("milli") && hints[0].contains("meg"), "{}", hints[0]);
     }
 }
