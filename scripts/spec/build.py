@@ -71,10 +71,14 @@ LANGS = {
     "en": {"suffix": "", "html_lang": "en", "other": "zh", "other_label": "中文", "contents": "Contents",
            "zip_label": "Markdown, chapters", "md_label": "Markdown", "sums_label": "SHA-256 checksums",
            "intro": "Introduction", "tour": "Language tour", "spec": "Standard", "packages": "Packages",
-           "tools": "Tools", "agents": "For agents", "pages": "Pages",
+           "tools": "Tools", "agents": "Agents", "pages": "Pages",
            "guide_note": "This is the short version of the standard: what it takes to read and write RNL files. It is not "
                          "normative; where it differs from the text below, the text below prevails. The same guide is "
                          "part of the [skill package for AI agents]({agents}).",
+           "principles_note": "These are the principles of RNL, the text of [`spec/rich-netlist.md`]"
+                              "(https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md), shown here to be read "
+                              "with the standard. They are not a part of the standard and are not tied to a version of it; "
+                              "the standard refers to them as “Principles”. The English text is authoritative.",
            "kicker": "Rich Netlist language standard", "theme_dark": "Switch to dark theme",
            "theme_light": "Switch to light theme", "site_home": "en/",
            "body_font": "IBM+Plex+Sans:wght@400;500;600;700",
@@ -94,6 +98,9 @@ LANGS = {
            "pages": "页面",
            "guide_note": "这是标准的简版：读写 RNL 文件需要知道的东西。它不是正式文本，与下面的正文不一致时，以正文为准。"
                          "同一份指南也在[给 AI agent 的 skill 包]({agents})里。",
+           "principles_note": "这是 RNL 的设计原则，即 [`spec/rich-netlist.zh.md`]"
+                              "(https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.zh.md) 的原文，放在这里方便和标准一起读。"
+                              "它们不是标准的一部分，也不随标准编版本；标准引用它们时写作“原则”。以英文版为准。",
            "kicker": "Rich Netlist 语言标准", "theme_dark": "切换到深色", "theme_light": "切换到浅色", "site_home": "zh/",
            "body_font": "Noto+Sans+SC:wght@400;500;700;900",
            "foot": "标准文本按 CC-BY-4.0 许可发布。本文是中文译本，以英文版为准。",
@@ -354,14 +361,60 @@ def guide_section(spec: Path, v: str, lang: str, agents: str) -> str:
     return "\n".join(out) + "\n"
 
 
+def principles_path(spec: Path, lang: str) -> Path:
+    """The principles of RNL, which are not a part of the standard and not tied to a version: spec/rich-netlist.md
+    and spec/rich-netlist.zh.md. The web page of each version shows them, after the annexes."""
+    return spec / ("rich-netlist.md" if lang == "en" else "rich-netlist.zh.md")
+
+
+NUMBERED_HEADING = re.compile(r"^#{2,4} (\d+(?:\.\d+)*)\.? ")
+
+
+def principles_section(spec: Path, lang: str) -> str:
+    """The principles as the last section of the page, from their own file and in its words: the title one
+    level down, with the id `principles` and a note that they are not the standard, then their sections from
+    the first one on (what stands before it, the status, language, source and licence of the file, is left
+    out), every heading one level down too. The numbered headings, which would take the ids of the standard's
+    own sections, get the ids principles-1, principles-2.1 and so on (rnl.lua leaves those alone), and the
+    section is a div of the class principles, in which rnl.lua does not link the numbers of the principles
+    (such as the 2.1 of "(2.1)") to the standard's sections. Not the lines of code blocks, which may start
+    with #."""
+    out, in_code, state = [], False, "before"
+    for line in read(principles_path(spec, lang)).strip().split("\n"):
+        if re.match(r"^[ \t]*```", line):
+            in_code = not in_code
+        elif not in_code and re.match(r"^#{1,4} ", line):
+            if state == "before":
+                state = "skipping"
+                out += ["::: {.principles}", "", f"#{line} {{#principles}}", "", LANGS[lang]["principles_note"], ""]
+                continue
+            if state == "skipping":
+                if not line.startswith("## "):
+                    continue
+                state = "body"
+            n = NUMBERED_HEADING.match(line)
+            line = "#" + line + (f" {{#principles-{n.group(1)}}}" if n else "")
+        elif state == "skipping" and not in_code:
+            continue
+        if state != "skipping":
+            out.append(line)
+    assert state == "body", f"{principles_path(spec, lang)}: no sections after the title"
+    return "\n".join(out) + "\n\n:::\n"
+
+
 def html_input(spec: Path, v: str, lang: str, work: Path, site_root: str) -> Path:
     """The input of the web page of a version: that of the other forms, with the short guide before chapter 1
-    when the version has one. site_root is where the links of the page lead, such as the page for agents."""
-    if not guide_path(spec, v, lang).exists():
+    when the version has one, and the principles after the annexes when the repository has them. site_root is
+    where the links of the page lead, such as the page for agents."""
+    guide, principles = guide_path(spec, v, lang).exists(), principles_path(spec, lang).exists()
+    if not guide and not principles:
         return pandoc_input(spec, v, lang, work)
-    texts = [STAMP.sub("", read(spec / v / lang / "front.md")).strip() + "\n",
-             guide_section(spec, v, lang, site_root + "agents.html")]
+    texts = [STAMP.sub("", read(spec / v / lang / "front.md")).strip() + "\n"]
+    if guide:
+        texts.append(guide_section(spec, v, lang, site_root + "agents.html"))
     texts += [STAMP.sub("", read(spec / v / lang / p)).strip() + "\n" for p in parts(spec, v)]
+    if principles:
+        texts.append(principles_section(spec, lang))
     p = work / f"{v}-{lang}-web.md"
     p.write_text(FENCE.sub(fence_attrs, "\n".join(texts)), encoding="utf-8", newline="\n")
     return p

@@ -115,16 +115,23 @@
         a.setAttribute('href', base + (on ? on.getAttribute('href') : ''));
       });
     });
-    /* A top bar whose links do not fit beside the brand draws them closer together, and when they
-       still do not fit, folds them into the menu, as on narrow screens */
+    /* A top bar whose links do not fit beside the brand draws them closer together, then writes the links
+       that have a short form (a span with the class s) in it, and when they still do not fit, folds them into
+       the menu, as on narrow screens */
     var topbar = $('.topbar'), row = $('.topbar-in');
     function fit() {
       if (!topbar || !row) return;
       var over = function () { return row.scrollWidth > row.clientWidth + 1; };
-      topbar.classList.remove('is-tight', 'is-compact');
+      topbar.classList.remove('is-tight', 'is-short', 'is-compact');
       if (!over()) return;
       topbar.classList.add('is-tight');
-      if (over()) topbar.classList.replace('is-tight', 'is-compact');
+      if (!over()) return;
+      if ($('.toc a .s', topbar)) {
+        topbar.classList.add('is-short');
+        if (!over()) return;
+        topbar.classList.remove('is-short');
+      }
+      topbar.classList.replace('is-tight', 'is-compact');
     }
     window.addEventListener('resize', debounce(fit, 100));
     fit();

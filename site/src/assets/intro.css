@@ -246,7 +246,12 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
   .toc-btn { display: inline-grid; margin-left: auto; }
 }
 .topbar.is-tight .topbar-in { gap: 12px; }
-.topbar.is-tight .toc a { padding-inline: 4px; }
+.topbar.is-tight .toc a { padding-inline: 3px; }
+/* a link with a short form, such as T1 for the first section of the tour: the short form stands in for it
+   while the links do not fit (common.js marks the top bar is-short) */
+.toc a .s { display: none; }
+.topbar.is-short .toc a .s { display: inline; }
+.topbar.is-short .toc a .t { display: none; }
 .topbar.is-compact .toc {
   display: none; position: absolute; top: 57px; right: 16px; left: 16px; flex-direction: column;
   padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);

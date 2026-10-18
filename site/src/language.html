@@ -48,19 +48,21 @@
   <div class="wrap topbar-in">
     <a class="brand" href="./"><span class="brand-mark">RNL</span><span class="brand-sub">Rich Netlist</span></a>
     <nav class="toc" id="toc" aria-label="<zh>小节</zh><en>Sections</en>">
-      <a href="#sentences"><zh>句子</zh><en>Sentences</en></a>
-      <a href="#definitions"><zh>定义</zh><en>Definitions</en></a>
-      <a href="#defaults"><zh>标准包</zh><en>Defaults</en></a>
-      <a href="#sets"><zh>集合</zh><en>Sets</en></a>
-      <a href="#wires"><zh>导线</zh><en>Wires</en></a>
-      <a href="#text"><zh>文字</zh><en>Text</en></a>
-      <a href="#orientation"><zh>朝向</zh><en>Orientation</en></a>
-      <a href="#priority"><zh>优先级</zh><en>Priority</en></a>
-      <a href="#header"><zh>文件头</zh><en>Header</en></a>
+      <a href="#glance"><zh>一览</zh><en>Glance</en></a>
+      <a href="#sentences" title="<zh>句子</zh><en>Sentences</en>" aria-label="<zh>句子</zh><en>Sentences</en>"><span class="t"><zh>句子</zh><en>Sentences</en></span><span class="s">T1</span></a>
+      <a href="#definitions" title="<zh>定义</zh><en>Definitions</en>" aria-label="<zh>定义</zh><en>Definitions</en>"><span class="t"><zh>定义</zh><en>Definitions</en></span><span class="s">T2</span></a>
+      <a href="#defaults" title="<zh>标准包</zh><en>Defaults</en>" aria-label="<zh>标准包</zh><en>Defaults</en>"><span class="t"><zh>标准包</zh><en>Defaults</en></span><span class="s">T3</span></a>
+      <a href="#sets" title="<zh>集合</zh><en>Sets</en>" aria-label="<zh>集合</zh><en>Sets</en>"><span class="t"><zh>集合</zh><en>Sets</en></span><span class="s">T4</span></a>
+      <a href="#wires" title="<zh>导线</zh><en>Wires</en>" aria-label="<zh>导线</zh><en>Wires</en>"><span class="t"><zh>导线</zh><en>Wires</en></span><span class="s">T5</span></a>
+      <a href="#text" title="<zh>文字</zh><en>Text</en>" aria-label="<zh>文字</zh><en>Text</en>"><span class="t"><zh>文字</zh><en>Text</en></span><span class="s">T6</span></a>
+      <a href="#orientation" title="<zh>朝向</zh><en>Orientation</en>" aria-label="<zh>朝向</zh><en>Orientation</en>"><span class="t"><zh>朝向</zh><en>Orientation</en></span><span class="s">T7</span></a>
+      <a href="#priority" title="<zh>优先级</zh><en>Priority</en>" aria-label="<zh>优先级</zh><en>Priority</en>"><span class="t"><zh>优先级</zh><en>Priority</en></span><span class="s">T8</span></a>
+      <a href="#header" title="<zh>文件头</zh><en>Header</en>" aria-label="<zh>文件头</zh><en>Header</en>"><span class="t"><zh>文件头</zh><en>Header</en></span><span class="s">T9</span></a>
+      <a href="#examples"><zh>例子</zh><en>Examples</en></a>
       <a class="toc-page" href="spec/"><zh>语言标准</zh><en>Standard</en><svg class="ico"><use href="#i-arrow"/></svg></a>
       <a class="toc-page" href="packages.html"><zh>标准包</zh><en>Packages</en><svg class="ico"><use href="#i-arrow"/></svg></a>
       <a class="toc-page" href="tools.html"><zh>工具</zh><en>Tools</en><svg class="ico"><use href="#i-arrow"/></svg></a>
-      <a class="toc-page" href="agents.html"><zh>给 agent</zh><en>For agents</en><svg class="ico"><use href="#i-arrow"/></svg></a>
+      <a class="toc-page" href="agents.html"><zh>给 agent</zh><en>Agents</en><svg class="ico"><use href="#i-arrow"/></svg></a>
       <a class="toc-page" href="./"><svg class="ico"><use href="#i-back"/></svg><zh>介绍页</zh><en>Introduction</en></a>
     </nav>
     <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>打开目录</zh><en>Open the section list</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
@@ -77,10 +79,11 @@
   <div class="wrap">
     <p class="eyebrow"><span>RICH NETLIST · LANGUAGE 0.3</span><span class="chip"><zh>标准系列 0.3</zh><en>Standard series 0.3</en></span></p>
     <h1 id="tour-title" class="tour-h1"><zh>语言导览</zh><en>Language tour</en></h1>
-    <p class="thesis"><zh>九个小节，每节讲一件事，都可以动手试。</zh><en>Nine sections, one idea each, all hands-on.</en></p>
-    <p class="lead"><zh>介绍页讲了 RNL 为什么存在、长什么样；这里讲<a href="spec/0.3/">语言标准 0.3</a> 里那些介绍页没有展开的规则。例子都用工具包的 <code>rnl check</code> 检查过，除了故意写错的，都能读通；图是本页手工排的。</zh>
-      <en>The introduction covers why RNL exists and what it looks like; this tour covers the rules of <a href="spec/0.3/">language standard 0.3</a> that the introduction does not unpack. Every example has been checked with the toolkit’s <code>rnl check</code> and reads cleanly, except those written wrong on purpose; the drawings are laid out by hand for this page.</en></p>
+    <p class="thesis"><zh>先一览语言的样子，再用九个小节各讲一件事，最后看几个例子，都可以动手试。</zh><en>The language at a glance, then nine sections, one idea each, and a few examples, all hands-on.</en></p>
+    <p class="lead"><zh>介绍页讲了 RNL 为什么存在；这里先看语言长什么样，再讲<a href="spec/0.3/">语言标准 0.3</a> 里那些介绍页没有展开的规则。例子都用工具包的 <code>rnl check</code> 检查过，除了故意写错的，都能读通；图是本页手工排的。</zh>
+      <en>The introduction covers why RNL exists; this tour shows what the language looks like, then covers the rules of <a href="spec/0.3/">language standard 0.3</a> that the introduction does not unpack. Every example has been checked with the toolkit’s <code>rnl check</code> and reads cleanly, except those written wrong on purpose; the drawings are laid out by hand for this page.</en></p>
     <ol class="tour-map">
+      <li><a href="#glance"><span class="n">T0</span><b><zh>一览</zh><en>At a glance</en></b><span><zh>语句的解剖、关键字家族、一层电路怎样生效</zh><en>Anatomy of a statement, keyword families, how a level takes effect</en></span></a></li>
       <li><a href="#sentences"><span class="n">T1</span><b><zh>句子</zh><en>Sentences</en></b><span><zh>记号、标准例句和中文写法</zh><en>Notation, standard sentences and Chinese</en></span></a></li>
       <li><a href="#definitions"><span class="n">T2</span><b><zh>定义</zh><en>Definitions</en></b><span><zh>AS 与 ATTACH，自己写一个定义</zh><en>AS and ATTACH; write your own</en></span></a></li>
       <li><a href="#defaults"><span class="n">T3</span><b><zh>标准包</zh><en>Defaults</en></b><span><zh>什么都不写时的样子</zh><en>What you get by writing nothing</en></span></a></li>
@@ -90,7 +93,167 @@
       <li><a href="#orientation"><span class="n">T7</span><b><zh>朝向</zh><en>Orientation</en></b><span><zh>y 向上，八个朝向码，朝向关系</zh><en>y up, eight codes, orientation relations</en></span></a></li>
       <li><a href="#priority"><span class="n">T8</span><b><zh>优先级</zh><en>Priority</en></b><span><zh>冲突怎样取舍，三条记录怎样相处</zh><en>How conflicts resolve; three records</en></span></a></li>
       <li><a href="#header"><span class="n">T9</span><b><zh>文件头</zh><en>Header</en></b><span><zh>版本、代称包、PDK 器件的端子名</zh><en>Version, alias packages, PDK terminals</en></span></a></li>
+      <li><a href="#examples"><span class="n">E</span><b><zh>例子</zh><en>Examples</en></b><span><zh>层次、自定义符号、规则与补位、修改与冲突</zh><en>Hierarchy, custom symbols, rules and fill-ins, edits and conflicts</en></span></a></li>
     </ol>
+  </div>
+</section>
+
+<!-- ===================== T0 At a glance ===================== -->
+<section id="glance" class="sheet">
+  <div class="wrap">
+    <header class="sheet-head">
+      <p class="sheet-no"><zh>T0 · 一览</zh><en>T0 · At a glance</en></p>
+      <h2><zh>RNL 语言长什么样。</zh><en>What the RNL language looks like.</en></h2>
+      <p class="lead"><zh>以下是<a href="spec/0.3/">语言标准 0.3</a> 的写法：46 个关键字；照标准例句写，语句读起来就是一句话，也可以用中文写。工具包的运行库实现了全部关键字。0.x 各版本之间不承诺兼容，工具仍能读 0.2 的文件。</zh>
+        <en>The notation below is that of <a href="spec/0.3/">language standard 0.3</a>: 46 keywords; written as standard sentences, statements read as prose, and they can be written in Chinese too. The toolkit’s runtime implements every keyword. Versions 0.x promise no compatibility with each other; tools still read files of 0.2.</en></p>
+    </header>
+
+    <h3 class="sub-h"><zh>一条语句的解剖</zh><en>Anatomy of a statement</en></h3>
+    <div class="panel anatomy">
+      <div class="an-bar">
+        <div class="an-legend">
+          <span><i style="background: var(--t-kw)"></i><zh>关键字</zh><en>Keyword</en></span>
+          <span><i style="background: var(--t-inst)"></i><zh>网表对象</zh><en>Netlist object</en></span>
+          <span><i style="background: var(--t-obj)"></i><zh>本层名字</zh><en>Local name</en></span>
+          <span><i style="background: var(--t-def)"></i><zh>定义</zh><en>Definition</en></span>
+          <span><i style="background: var(--t-free)"></i><zh>自由文本</zh><en>Free text</en></span>
+        </div>
+        <span class="seg" id="an-seg" role="group" aria-label="<zh>视角</zh><en>Point of view</en>">
+          <button type="button" data-m="human" aria-pressed="true"><zh>人看到的</zh><en>What people see</en></button>
+          <button type="button" data-m="machine" aria-pressed="false"><zh>机器读到的</zh><en>What machines read</en></button>
+        </span>
+      </div>
+      <div class="an-line" id="an-line"><span class="tok t-pref" data-k="pref" tabindex="0">*</span> <span class="tok t-rec" data-k="rec" tabindex="0">@RNL</span><span class="tok" data-k="src" tabindex="0"><span class="t-punct">(</span><span class="t-pn">author</span><span class="t-punct">=</span><span class="t-str">"designer"</span><span class="t-punct">)</span></span> <span class="tok t-punct" data-k="brace" tabindex="0">{</span>
+<span class="t-pref">*</span>   <span class="tok t-free" data-k="free" tabindex="0">Input pair:</span> <span class="tok" data-k="name" tabindex="0"><span class="t-obj">%dp1</span> <span class="t-punct">=</span></span> <span class="tok t-inst" data-k="inst" tabindex="0">#M1</span><span class="tok t-role" data-k="role" tabindex="0">(in_p)</span> <span class="tok t-free" data-k="free" tabindex="0">and</span> <span class="tok t-inst" data-k="inst" tabindex="0">#M2</span><span class="tok t-role" data-k="role" tabindex="0">(in_n)</span> <span class="tok t-free" data-k="free" tabindex="0">treated</span> <span class="tok t-kw" data-k="kw" tabindex="0">@AS</span> <span class="tok t-def" data-k="def" tabindex="0">$DIFFERENTIAL_PAIR</span><span class="tok t-punct" data-k="semi" tabindex="0">;</span>
+<span class="t-pref">*</span> <span class="tok t-punct" data-k="brace" tabindex="0">}</span></div>
+      <div class="an-tip" id="an-tip"><span class="k"><zh>提示</zh><en>Tip</en></span><span><zh>把鼠标放到任意一段上，或用 Tab 键逐个查看。</zh><en>Hover over any part, or press Tab to step through them.</en></span></div>
+    </div>
+
+    <h3 class="sub-h"><zh>三种写法，同一句话</zh><en>Three ways to write one statement</en></h3>
+    <p class="sub-lead"><zh>自由文本只给人看，所以同一句可以只写记号，也可以照标准例句写成英文或中文。机器读到的完全相同，工具也可以在几种写法之间来回转换。</zh>
+      <en>Free text is only for people, so one statement can be bare notation, or a standard sentence in English or in Chinese. Machines read exactly the same thing, and tools can convert between the styles either way.</en></p>
+    <div class="ways">
+      <div class="way"><span class="k"><zh>只写记号</zh><en>Notation</en></span><code data-hl="%dp1 = #M1(in_p) #M2(in_n) @AS $DIFFERENTIAL_PAIR;"></code></div>
+      <div class="way"><span class="k"><zh>英文例句</zh><en>English</en></span><code data-hl="%dp1 = #M1(in_p) and #M2(in_n) treated @AS $DIFFERENTIAL_PAIR;"></code></div>
+      <div class="way"><span class="k"><zh>中文例句</zh><en>Chinese</en></span><code lang="zh-CN" data-hl='%dp1 = #M1(正输入) 和 #M2(负输入) @视作 $"差分对";'></code></div>
+      <p class="way-note"><svg class="ico"><use href="#i-info"/></svg><span><zh>中文写法要在文件开头的头段记录里加载代称包 rnl-zh：</zh><en>For Chinese, load the alias package rnl-zh in the header record at the top of the file: </en><code data-hl='* @RNL(type="header") { @VERSION("0.3"); @USE-ALIASES(name="rnl-zh", version="0.3")}'></code></span></p>
+    </div>
+
+    <h3 class="sub-h"><zh>引用记号</zh><en>Reference sigils</en></h3>
+    <p class="sub-lead"><zh>一眼就能分清谁是网表里的东西、谁是 RNL 自己的东西。</zh>
+      <en>Tell at a glance what belongs to the netlist and what belongs to RNL.</en></p>
+    <div class="sigils">
+      <div class="sg"><code data-hl="#M1"></code><b><zh>网表里的元件</zh><en>Instance in the netlist</en></b><span><zh>只引用，不创建</zh><en>referenced, never created</en></span></div>
+      <div class="sg"><code data-hl="&amp;vdd"></code><b><zh>网络</zh><en>Net</en></b><span><zh>网表里的节点</zh><en>a node in the netlist</en></span></div>
+      <div class="sg"><code data-hl="#M1:d"></code><b><zh>端子</zh><en>Terminal</en></b><span><zh>按端子名，或按序号，如 #M1:1（从 1 起）</zh><en>by name, or by position such as #M1:1 (from 1)</en></span></div>
+      <div class="sg"><code data-hl="#:inp"></code><b><zh>本层子电路的端口</zh><en>Port of this subcircuit</en></b><span><zh>由 .subckt 定义；单独一个 # 指这个子电路本身</zh><en>defined by .subckt; a lone # is the subcircuit itself</en></span></div>
+      <div class="sg"><code data-hl="%dp1"></code><b><zh>本层的名字</zh><en>Name on this level</en></b><span><zh>一层里只绑定一次，只在这一层可见</zh><en>bound once per level, visible only there</en></span></div>
+      <div class="sg"><code data-hl="$GROUND"></code><b><zh>定义</zh><en>Definition</en></b><span><zh>符号、样式、普通定义或集合；向下继承</zh><en>a symbol, style, definition or set; inherited downward</en></span></div>
+      <div class="sg"><code data-hl="?t"></code><b><zh>定义里的角色</zh><en>Role in a definition</en></b><span><zh>套用时由对象填入；符号里单独一个 ? 指用它画的元件</zh><en>filled by objects when applied; in a symbol, a lone ? is the instance drawn with it</en></span></div>
+      <div class="sg"><code data-hl="(10, _)"></code><b><zh>点</zh><en>Point</en></b><span><zh>“_” 表示这一轴留给求解器；%j = (10, 10) 是有名字的点</zh><en>“_” leaves that axis to the solver; %j = (10, 10) is a named point</en></span></div>
+      <div class="sg"><code data-hl="{#M1 #M2}"></code><b><zh>集合</zh><en>Set</en></b><span><zh>有序；放进另一个集合时展开一层，{{…}} 保持为一个成员</zh><en>ordered; spreads one level inside another set, while {{…}} stays one member</en></span></div>
+      <div class="sg"><code data-hl="&amp;D&lt;3:0&gt;"></code><b><zh>总线</zh><en>Bus</en></b><span><zh>带下标的一组网络或元件，如 #XI&lt;3:0&gt;</zh><en>a group of nets or instances with indices, such as #XI&lt;3:0&gt;</en></span></div>
+      <div class="sg"><code data-hl="#M1::wl"></code><b><zh>子对象</zh><en>Child object</en></b><span><zh>比如用 key 命名的标签</zh><en>such as a label named with key</en></span></div>
+      <div class="sg"><code data-hl="=&gt; %x"></code><b><zh>管道</zh><en>Pipe</en></b><span><zh>把前一段的结果交给后一段；=&gt; %x 给它起名</zh><en>passes a result on to the next part; =&gt; %x names it</en></span></div>
+    </div>
+
+    <h3 class="sub-h"><zh>语句的几种形态</zh><en>Statement shapes</en></h3>
+    <div class="shapes">
+      <div class="shape"><span class="k"><zh>对象 + 关键字</zh><en>Object + keyword</en></span><code data-hl="#M1 @PLACE(10, 20)"></code><p><zh>把 M1 放在 (10, 20)。也可以只写一轴，如 @PLACE(x=10)，另一轴留给求解器。</zh>
+        <en>Puts M1 at (10, 20). One axis is fine too, as in @PLACE(x=10); the other is left to the solver.</en></p></div>
+      <div class="shape"><span class="k"><zh>集合</zh><en>Set</en></span><code data-hl='{#M1 #M2} @ALIGN("y")'></code><p><zh>花括号是有序的一组对象：M1、M2 的 y 坐标相同。</zh>
+        <en>Braces hold an ordered group of objects: M1 and M2 share the same y.</en></p></div>
+      <div class="shape"><span class="k"><zh>角色</zh><en>Roles</en></span><code data-hl="#M1(in_p) and #M2(in_n) are treated @AS $DIFFERENTIAL_PAIR"></code><p><zh>括号紧跟对象，说明它填定义的哪个角色；and、are treated 是自由文本。</zh>
+        <en>Parentheses right after an object say which role of the definition it fills; “and” and “are treated” are free text.</en></p></div>
+      <div class="shape"><span class="k"><zh>命名</zh><en>Naming</en></span><code data-hl="%g0 = $GROUND @ATTACH &amp;vss"></code><p><zh>给语句产生的对象起名，之后就能引用 %g0，比如给它定位置；写在末尾的 =&gt; %g0 也一样。</zh>
+        <en>Names the object the statement makes, so %g0 can be used later, for example to place it; =&gt; %g0 at the end does the same.</en></p></div>
+      <div class="shape"><span class="k"><zh>管道</zh><en>Pipe</en></span><code data-hl='#M2 @PLACE(30, 20) =&gt; @ORIENT("MY")'></code><p><zh>前一段的结果交给后一段：先放好位置，再左右镜像。</zh>
+        <en>Each part passes its result to the next: place it first, then mirror it left to right.</en></p></div>
+      <div class="shape"><span class="k"><zh>记录</zh><en>Record</en></span><code data-hl='* @RNL(author="rnl-solver", priority="high") { #M1 @PLACE(12, 20); #M2 @PLACE(28, 20)}'></code><p><zh>一段记录，语句用分号分开。记录头作用于里面每一句：author 说明谁写的，priority 是它们默认的优先级；只有 AS 和 ATTACH 例外，它们只随 disabled 一起关掉。</zh>
+        <en>One record, statements separated by semicolons. The header applies to every statement inside: author says who wrote it, priority gives their default priority, except to AS and ATTACH, which follow it only when it is disabled.</en></p></div>
+    </div>
+
+    <h3 class="sub-h"><zh>关键字家族</zh><en>Keyword families</en></h3>
+    <p class="sub-lead"><zh><span id="kw-count">46</span> 个关键字分成九组。点一个，看它的用途、标准例句和中文写法。</zh>
+      <en>The <span id="kw-count">46</span> keywords fall into nine families. Click one to see what it does, its standard sentence and its Chinese form.</en></p>
+    <div class="kwfam">
+      <div class="fams" id="fams"></div>
+      <div class="panel kw-card" id="kw-card" aria-live="polite"></div>
+    </div>
+
+    <h3 class="sub-h"><zh>五种布局约束</zh><en>Five layout constraints</en></h3>
+    <p class="sub-lead"><zh>布局意图最终都落到这几种关系上：前四种作用于 x 或 y 坐标，第五种作用于朝向。只写轴的约束不定方向，写了 "left-to-right" 这样的方向才定先后。</zh>
+      <en>All layout intent comes down to these relations: the first four act on x or y coordinates, the fifth on orientations. A constraint that names only an axis fixes no direction; a direction such as "left-to-right" fixes which comes first.</en></p>
+    <div class="atoms">
+      <div class="atom">
+        <div class="atom-fig">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <line class="guide at-guide" x1="10" y1="72" x2="210" y2="72"/>
+            <g class="ab al-a"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>A</text></g>
+            <g class="ab al-b"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>B</text></g>
+            <g class="ab al-c"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>C</text></g>
+          </svg>
+        </div>
+        <div class="atom-body"><code data-hl='{#A #B #C} @ALIGN("y")'></code><p><zh>对齐：y 坐标相同，排成一行。</zh><en>Align: same y, in one row.</en></p></div>
+      </div>
+      <div class="atom">
+        <div class="atom-fig">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <g class="ab or-a"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>A</text></g>
+            <g class="ab or-b"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>B</text></g>
+            <g class="ab or-c"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>C</text></g>
+            <text class="gtext or-t1" x="110" y="112" text-anchor="middle">A → B → C ✓</text>
+            <text class="gtext or-t2" x="110" y="112" text-anchor="middle"><zh>C ← B ← A 也 ✓</zh><en>C ← B ← A also ✓</en></text>
+          </svg>
+        </div>
+        <div class="atom-body"><code data-hl='{#A #B #C} @ORDER("x")'></code><p><zh>顺序：沿 x 严格排开。只写轴，正序倒序都满足；写 "left-to-right" 才定方向。</zh><en>Order: strictly along x. With only the axis, forward and reverse both satisfy it; "left-to-right" fixes the direction.</en></p></div>
+      </div>
+      <div class="atom">
+        <div class="atom-fig">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <g class="ab di-a"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>A</text></g>
+            <g class="ab di-b"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>B</text></g>
+            <g class="ab di-c"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>C</text></g>
+            <g class="di-dims"><path class="guide" d="M40 98h70M110 98h70M40 92v12M110 92v12M180 92v12"/><text class="gtext" x="75" y="116" text-anchor="middle">d</text><text class="gtext" x="145" y="116" text-anchor="middle">d</text></g>
+          </svg>
+        </div>
+        <div class="atom-body"><code data-hl='{#A #B #C} @DISTRIBUTE("x")'></code><p><zh>等距：相邻间距相等，比如让尾管居中。</zh><en>Distribute: equal steps between neighbors, for example to center the tail.</en></p></div>
+      </div>
+      <div class="atom">
+        <div class="atom-fig">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <g class="ab ds-a"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>A</text></g>
+            <g class="ab ds-b"><rect x="-13" y="-13" width="26" height="26" rx="4"/><text>B</text></g>
+            <g class="ds-dims"><path class="guide" d="M50 100h90M50 94v12M140 94v12"/><text class="gtext" x="95" y="119" text-anchor="middle"><zh>≥ 3 格</zh><en>≥ 3 units</en></text></g>
+          </svg>
+        </div>
+        <div class="atom-body"><code data-hl='#A #B @DISTANCE("left-to-right", min=3)'></code><p><zh>距离：B 在 A 右边至少 3 格；方向写成 "x" 就不分先后。</zh><en>Distance: B at least 3 units right of A; with "x" as the direction, either may come first.</en></p></div>
+      </div>
+      <div class="atom">
+        <div class="atom-fig">
+          <svg viewBox="0 0 220 130" aria-hidden="true">
+            <g transform="translate(72 60)"><g class="orr orr-a"><path class="orr-p" d="M-18 0H-7M-7 -11V11M0 -9H11V-20M0 9H11V20"/><path class="orr-ch" d="M-2 -15V15"/><path class="orr-f" d="M10 9l-6 -3.5v7z"/></g></g>
+            <g transform="translate(148 60)"><g class="orr orr-b"><path class="orr-p" d="M-18 0H-7M-7 -11V11M0 -9H11V-20M0 9H11V20"/><path class="orr-ch" d="M-2 -15V15"/><path class="orr-f" d="M10 9l-6 -3.5v7z"/></g></g>
+            <text class="orr-l" x="72" y="104" text-anchor="middle">A</text>
+            <text class="orr-l" x="148" y="104" text-anchor="middle">B</text>
+            <text class="gtext" x="110" y="64" text-anchor="middle">MY</text>
+          </svg>
+        </div>
+        <div class="atom-body"><code data-hl='#A #B @ORIENT-RELATION("MY")'></code><p><zh>朝向关系：B 的朝向是 A 的左右镜像；两个各朝哪边，由求解器定。</zh><en>Orientation relation: B is A mirrored left to right; which way each one faces is up to the solver.</en></p></div>
+      </div>
+    </div>
+
+    <h3 class="sub-h"><zh>一层电路是怎样生效的</zh><en>How one level of a circuit takes effect</en></h3>
+    <p class="sub-lead"><zh>整层读完以后，按九个固定阶段处理。所以名字可以先用后定义，出错的语句只影响自己；规则生成的对象，比如标准包补上的地，也照样定符号、排位置。</zh>
+      <en>Once a whole level is read, it is processed in nine fixed phases. That is why a name can be used before it is defined and a bad statement affects only itself; objects generated by rules, such as the grounds the standard package adds, still get symbols and positions.</en></p>
+    <div class="pipe" id="pipe" role="group" aria-label="<zh>生效阶段</zh><en>Phases</en>"></div>
+    <p class="pipe-cap" id="pipe-cap"></p>
+
+    <a class="tour-cta" href="language.html">
+      <span class="tour-cta-ico"><svg class="ico"><use href="#i-book"/></svg></span>
+      <span class="tour-cta-body"><b><zh>语言导览</zh><en>Language tour</en></b><span><zh>九个可以动手试的小节：句子和中文写法、定义、标准包的默认行为、集合与选择、导线、文字、朝向、优先级、文件头。</zh><en>Nine hands-on sections: sentences and Chinese, definitions, the standard package’s defaults, sets and selections, wires, text, orientation, priority and the header.</en></span></span>
+      <svg class="ico tour-cta-arrow"><use href="#i-arrow"/></svg>
+    </a>
   </div>
 </section>
 
@@ -537,6 +700,37 @@
   </div>
 </section>
 
+<!-- ===================== E Examples ===================== -->
+<section id="examples" class="sheet">
+  <div class="wrap">
+    <header class="sheet-head">
+      <p class="sheet-no"><zh>E · 例子</zh><en>E · Examples</en></p>
+      <h2><zh>几个小例子。</zh><en>A few small examples.</en></h2>
+      <p class="lead"><zh>左边是文件，右边是画出来的样子。把鼠标放到某一行上，看它管图里的哪一部分；反过来悬停图里的元件，也会标出相关的行。</zh>
+        <en>The file is on the left, the drawing on the right. Hover over a line to see which part of the drawing it controls; hover over a part of the drawing to mark the lines that refer to it.</en></p>
+    </header>
+    <div class="tabs" role="tablist" id="ex-tabs" aria-label="<zh>例子</zh><en>Examples</en>">
+      <button type="button" role="tab" data-ex="e1" aria-selected="true"><zh>RLC · 是什么与怎么排</zh><en>RLC · what and how</en></button>
+      <button type="button" role="tab" data-ex="e2" aria-selected="false"><zh>测试平台 · 层次</zh><en>Testbench · hierarchy</en></button>
+      <button type="button" role="tab" data-ex="e3" aria-selected="false"><zh>自定义符号</zh><en>Custom symbol</en></button>
+      <button type="button" role="tab" data-ex="e4" aria-selected="false"><zh>规则与补位</zh><en>Rules & fill-ins</en></button>
+      <button type="button" role="tab" data-ex="e5" aria-selected="false"><zh>修改、冲突与容错</zh><en>Edits, conflicts, errors</en></button>
+    </div>
+    <div class="ex" id="ex-body" role="tabpanel">
+      <div class="panel">
+        <div class="ph"><svg class="ico"><use href="#i-file"/></svg><span class="ph-title" id="ex-file"></span></div>
+        <div class="code" id="ex-code"></div>
+      </div>
+      <div class="panel ex-fig">
+        <div class="ph"><svg class="ico"><use href="#i-eye"/></svg><span class="ph-title"><zh>RNL 查看器</zh><en>RNL viewer</en></span><span class="ph-right" id="ex-top"></span></div>
+        <div class="fig" id="ex-fig"></div>
+        <div id="ex-extra"></div>
+        <p class="ex-cap" id="ex-cap"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
 </main>
 
 <footer class="foot">
@@ -565,5 +759,6 @@
 <script src="assets/scenes.js"></script>
 <script src="assets/common.js"></script>
 <script src="assets/tour.js"></script>
+<script src="assets/glance.js"></script>
 </body>
 </html>

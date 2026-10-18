@@ -32,6 +32,8 @@
   <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
   <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></symbol>
   <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12.5 15H17"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
   <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.3"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.6v.3"/></symbol>
@@ -57,11 +59,12 @@
       <a href="#viewers"><zh>查看器</zh><en>Viewers</en></a>
       <a href="#web"><zh>网页版</zh><en>Web</en></a>
       <a href="#desktop"><zh>桌面版</zh><en>Desktop</en></a>
+      <a href="#toolchain"><zh>工具链</zh><en>Toolchain</en></a>
       <a href="#licences"><zh>许可</zh><en>Licences</en></a>
       <a class="toc-page" href="language.html"><zh>语言导览</zh><en>Language tour</en><svg class="ico"><use href="#i-arrow"/></svg></a>
       <a class="toc-page" href="spec/"><zh>语言标准</zh><en>Standard</en><svg class="ico"><use href="#i-arrow"/></svg></a>
       <a class="toc-page" href="packages.html"><zh>标准包</zh><en>Packages</en><svg class="ico"><use href="#i-arrow"/></svg></a>
-      <a class="toc-page" href="agents.html"><zh>给 agent</zh><en>For agents</en><svg class="ico"><use href="#i-arrow"/></svg></a>
+      <a class="toc-page" href="agents.html"><zh>给 agent</zh><en>Agents</en><svg class="ico"><use href="#i-arrow"/></svg></a>
       <a class="toc-page" href="./"><svg class="ico"><use href="#i-back"/></svg><zh>介绍页</zh><en>Introduction</en></a>
     </nav>
     <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>打开目录</zh><en>Open the section list</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
@@ -291,11 +294,59 @@
   </div>
 </section>
 
-<!-- ===================== 04 Licences ===================== -->
+<!-- ===================== 04 Toolchain ===================== -->
+<section id="toolchain" class="sheet">
+  <div class="wrap">
+    <header class="sheet-head">
+      <p class="sheet-no"><zh>04 · 工具链</zh><en>04 · Toolchain</en></p>
+      <h2><zh>RNL 工具链：读、解、画、改。</zh><en>The RNL toolchain: read, solve, draw, edit.</en></h2>
+      <p class="lead"><zh>工具链把“读懂 RNL”和“把意图变成坐标”分成独立模块：没有求解器也能看图，需要时再求解。已经有的有：运行库、宿主适配器、渲染器和命令行，上面的两个查看器，还有求解器的第一版，在 <code>rnl solve</code> 和桌面版查看器里。选一条路径看数据怎么流动，点一个模块看它做什么。</zh>
+        <en>The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.</en></p>
+    </header>
+
+    <div class="flows">
+      <span class="seg" id="flow-seg" role="group" aria-label="<zh>使用路径</zh><en>Usage path</en>">
+        <button type="button" data-flow="open" aria-pressed="false"><zh>打开即看</zh><en>Open and view</en></button>
+        <button type="button" data-flow="solve" aria-pressed="true"><zh>自动出图</zh><en>Auto-draw</en></button>
+        <button type="button" data-flow="edit" aria-pressed="false"><zh>编辑联动</zh><en>Edit live</en></button>
+      </span>
+      <p class="flow-cap" id="flow-cap" aria-live="polite"></p>
+    </div>
+
+    <div class="tools">
+      <div class="tgraph" id="tgraph">
+        <svg class="twires" id="twires" aria-hidden="true"></svg>
+        <div class="tgrid">
+          <button type="button" class="tmod is-file tm-file" data-mod="file"><svg class="ico"><use href="#i-netlist"/></svg><span class="nm"><zh>网表 + RNL</zh><en>Netlist + RNL</en></span><span class="sub">.sp / .scs</span></button>
+          <button type="button" class="tmod tm-adapter" data-mod="adapter"><svg class="ico"><use href="#i-layers"/></svg><span class="nm"><zh>宿主适配器</zh><en>Host adapter</en></span><span class="sub"><zh>Host adapter</zh><en></en></span></button>
+          <button type="button" class="tmod tm-runtime" data-mod="runtime"><svg class="ico"><use href="#i-cpu"/></svg><span class="nm"><zh>运行库</zh><en>Runtime</en></span><span class="sub"><zh>Runtime</zh><en></en></span></button>
+          <button type="button" class="tmod tm-render" data-mod="render"><svg class="ico"><use href="#i-pencil"/></svg><span class="nm"><zh>统一渲染器</zh><en>Renderer</en></span><span class="sub"><zh>Renderer</zh><en></en></span></button>
+          <button type="button" class="tmod tm-viewer" data-mod="viewer"><svg class="ico"><use href="#i-eye"/></svg><span class="nm"><zh>查看器</zh><en>Viewer</en></span><span class="sub"><zh>Viewer</zh><en></en></span></button>
+          <button type="button" class="tmod tm-stdlib" data-mod="stdlib"><svg class="ico"><use href="#i-book"/></svg><span class="nm"><zh>标准库</zh><en>Standard library</en></span><span class="sub"><zh>Standard library</zh><en></en></span></button>
+          <button type="button" class="tmod tm-solver" data-mod="solver"><svg class="ico"><use href="#i-solver"/></svg><span class="nm"><zh>求解器</zh><en>Solver</en></span><span class="sub"><zh>Solver</zh><en></en></span></button>
+          <button type="button" class="tmod tm-cli" data-mod="cli"><svg class="ico"><use href="#i-term"/></svg><span class="nm"><zh>命令行</zh><en>CLI</en></span><span class="sub"><zh>CLI</zh><en></en></span></button>
+          <button type="button" class="tmod tm-editor" data-mod="editor"><svg class="ico"><use href="#i-pencil"/></svg><span class="nm"><zh>编辑器</zh><en>Editor</en></span><span class="sub"><zh>Editor</zh><en></en></span></button>
+        </div>
+      </div>
+      <div class="panel tdetail" id="tdetail" aria-live="polite"></div>
+    </div>
+
+    <div class="apps">
+      <span class="lbl"><zh>前端外壳</zh><en>App shells</en></span>
+      <a class="chip" href="#web"><svg class="ico"><use href="#i-globe"/></svg><zh>网页版 · WebAssembly</zh><en>Web viewer · WebAssembly</en></a>
+      <a class="chip" href="#desktop"><svg class="ico"><use href="#i-monitor"/></svg><zh>桌面版 · Tauri 2</zh><en>Desktop viewer · Tauri 2</en></a>
+      <span class="chip"><svg class="ico"><use href="#i-phone"/></svg><zh>手机浏览器</zh><en>Mobile browsers</en></span>
+      <span class="lbl"><zh>两个查看器共用一个页面；核心用 Rust 编写，在桌面上直接运行，在浏览器里编译成 WebAssembly 运行。核心的 WebAssembly 版本已在 npm 上发布预览，包名 @rich-netlist/runtime。</zh>
+        <en>The two viewers share one page; the core is written in Rust and runs natively on the desktop and as WebAssembly in the browser. Previews of the core as WebAssembly are on npm as @rich-netlist/runtime.</en></span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 05 Licences ===================== -->
 <section id="licences" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>04 · 许可</zh><en>04 · Licences</en></p>
+      <p class="sheet-no"><zh>05 · 许可</zh><en>05 · Licences</en></p>
       <h2><zh>开源，可以自由使用。</zh><en>Open source, free to use.</en></h2>
       <p class="lead"><zh>查看器和整个 RNL 工具链的源代码都在 GitHub 上公开。</zh>
         <en>The source of the viewers and of the whole RNL toolkit is public on GitHub.</en></p>
@@ -342,6 +393,8 @@
   </div>
 </footer>
 
+<script src="assets/schem.js"></script>
 <script src="assets/common.js"></script>
+<script src="assets/toolchain.js"></script>
 </body>
 </html>

@@ -1,7 +1,9 @@
 --[[
 Pandoc filter for the RNL standard, the same for the web page (html5) and the PDF (typst):
 
-- headings get their section number as identifier: "9.4", "A", "A.1";
+- headings get their section number as identifier: "9.4", "A", "A.1" (not those of the principles, which the
+  web page shows after the annexes, in a div of the class principles: their ids start with principles, and in
+  it the numbers 1 to 4 are not linked to the standard's sections);
 - section references in the text, such as "(9.4)", "chapter 7", "Annex A", "第 7 章", "附录 A",
   become links; "Principles 2.4" and "原则 2.4" refer to the principles and stay text;
 - code blocks marked rnl, spice, spectre or rnl-file are coloured by one tokenizer for both outputs;
@@ -16,6 +18,7 @@ Metadata read: rnl-lang ("en" or "zh"). Linked references are listed on stderr w
 local is_typst = FORMAT:match("typst") ~= nil
 local lang = "en"
 local ids = {}
+local in_principles = false  -- inside the principles, whose own numbers, 1 to 4, are not those of the standard's sections
 local verbose = os.getenv("RNL_LINKS_LOG")
 local log = verbose and io.open(verbose, "a") or nil
 
@@ -45,6 +48,7 @@ local function read_meta(meta)
 end
 
 local function set_header_id(h)
+  if h.identifier:match("^principles") then return h end
   local id = section_id(pandoc.utils.stringify(h.content))
   if id then
     h.identifier = anchor(id)
@@ -115,6 +119,7 @@ local function link_str(s, prev, nxt, chain)
     local before = a > 1 and s:sub(a - 1, a - 1) or ""
     local after = s:sub(a + #trimmed, a + #trimmed)
     local ok = ids[trimmed] and not chain and not before:match("[%w%.]") and not after:match("[%w]")
+    if ok and in_principles and tonumber(trimmed:match("^%d+")) <= 4 then ok = false end
     if ok then
       emit(a - 1)
       table.insert(out, link(trimmed, trimmed))
@@ -439,14 +444,36 @@ local function place_outline(doc)
   return nil
 end
 
+local links = {
+  traverse = "topdown",
+  Header = function(h) return h, false end,
+  Link = function(l) return l, false end,
+  Code = function(c) return c, false end,
+  CodeBlock = code_block,
+  Inlines = link_inlines,
+}
+
+-- The principles are walked with the same filter, apart from the rule about their own numbers.
+local in_principles_div = {
+  traverse = "topdown",
+  Header = links.Header, Link = links.Link, Code = links.Code, CodeBlock = code_block, Inlines = link_inlines,
+}
+
 return {
   { Meta = read_meta },
   { Header = set_header_id },
   {
     traverse = "topdown",
-    Header = function(h) return h, false end,
-    Link = function(l) return l, false end,
-    Code = function(c) return c, false end,
+    Div = function(d)
+      if not d.classes:includes("principles") then return nil end
+      in_principles = true
+      local walked = pandoc.walk_block(d, in_principles_div)
+      in_principles = false
+      return walked, false
+    end,
+    Header = links.Header,
+    Link = links.Link,
+    Code = links.Code,
     CodeBlock = code_block,
     Inlines = link_inlines,
   },

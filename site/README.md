@@ -2,13 +2,13 @@
 
 Five static pages, in Chinese and English, for circuit designers who have not worked on EDA tooling:
 
-- `index.html`, the introduction: what RNL is, the problem it addresses, the goal, before/after scenarios, the toolchain, the settled principles, the language at a glance, and a few examples.
-- `language.html`, the language tour: nine hands-on sections on the parts of the language the introduction does not unpack (standard sentences and Chinese, definitions, the standard package's defaults, sets and selections, wires, text, orientation, priority, the header record).
-- `tools.html`, the page of the tools: what the viewers of the first toolkit, 0.1, do; the web viewer, with a few samples to open in it; the desktop viewer for Windows, with the files of its newest release; and their licences.
+- `index.html`, the introduction: what RNL is, the problem it addresses, the goal, before/after scenarios, where things stand (the released milestones and what comes next, with an FAQ), and the ways on to the other pages. It is short on purpose; what it once held has moved ([Sections that moved](#sections-that-moved)).
+- `language.html`, the language tour: the language at a glance (the anatomy of a statement, the keyword families, how a level takes effect), nine hands-on sections on the parts of the language the introduction does not unpack (standard sentences and Chinese, definitions, the standard package's defaults, sets and selections, wires, text, orientation, priority, the header record), and a few examples.
+- `tools.html`, the page of the tools: what the viewers of the first toolkit, 0.1, do; the web viewer, with a few samples to open in it; the desktop viewer for Windows, with the files of its newest release; the toolchain, its modules and how data flows through them; and the licences.
 - `agents.html`, the entry for AI agents: how to get the RNL skill package and install it, what is in it, and how to check and draw the files an agent writes ([For agents](#for-agents)).
 - `packages.html`, the gallery of the standard packages: every package in [`libraries/`](../libraries/README.md), with what it is for, what it references and its text, every symbol as the core draws it, with its pins and box, and the rules that give elements their symbols ([The gallery](#the-gallery-of-the-standard-packages)).
 
-The site also publishes the skill package for agents, at `skill/`, and `llms.txt`, at `llms.txt` and `zh/llms.txt`; the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of both languages link to, with the conformance corpus as its samples; the pages of the language standard, at `zh/spec/<version>/` and `en/spec/<version>/` for each version, such as `zh/spec/0.3/`, with the short guide to the language as their first section; and the gallery's data, at `gallery/`. [`pages.yml`](../.github/workflows/pages.yml) adds them to what `build.py` writes.
+The site also publishes the skill package for agents, at `skill/`, and `llms.txt`, at `llms.txt` and `zh/llms.txt`; the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of both languages link to, with the conformance corpus as its samples; the pages of the language standard, at `zh/spec/<version>/` and `en/spec/<version>/` for each version, such as `zh/spec/0.3/`, with the short guide to the language as their first section and the principles of RNL as their last; and the gallery's data, at `gallery/`. [`pages.yml`](../.github/workflows/pages.yml) adds them to what `build.py` writes.
 
 **Status:** an explainer, not a specification. The RNL snippets follow the language standard 0.3 and the standard series 0.3 ([`spec/`](../spec/README.md), [`libraries/standard/0.3`](../libraries/standard/README.md)); the pages say so and link to the standard. Every file the pages show reads with `rnl check` in 0.3 without errors, but for the ones that show errors on purpose, and every statement they show reads within a netlist that has its objects. Layouts in the drawings are placed by hand, not produced by a solver, with the pins where the series 0.3 puts them; the symbols of the gallery are drawn by the core.
 
@@ -118,6 +118,19 @@ node --test site/gallery/package-file.test.mjs   # the tests of reading package 
 
 [`pages.yml`](../.github/workflows/pages.yml) publishes `site/dist/` to GitHub Pages, at <https://rich-netlist.github.io/rnl/>, which leads to the Chinese pages at <https://rich-netlist.github.io/rnl/zh/> or the English ones at <https://rich-netlist.github.io/rnl/en/> by the browser's language, whenever `site/`, `spec/` or `scripts/spec/` changes on `main`, or what the web viewer is built from, the package files in `libraries/` among it; after a revision of the standard is released; and after a release of the desktop viewer. The web viewer is at <https://rich-netlist.github.io/rnl/viewer/>. The language switch keeps the reader on the same section.
 
+### Sections that moved
+
+The introduction once held more sections. They are now where the pages they belong to are, and their old addresses, the sections of the introduction, lead there ([`index.html`](src/index.html) has a small script in its head for it):
+
+| Old address | New address |
+| --- | --- |
+| `/rnl/zh/#tools` (the toolchain), also `#toolchain` | `/rnl/zh/tools.html#toolchain` |
+| `/rnl/zh/#principles` (the design principles) | `/rnl/zh/spec/#principles`, the section of the principles on the standard's page, last of the page |
+| `/rnl/zh/#language` (the language) | `/rnl/zh/language.html#glance` |
+| `/rnl/zh/#examples` (the examples) | `/rnl/zh/language.html#examples` |
+
+The same under `/rnl/en/`. The section of the principles is made by [`scripts/spec`](../scripts/spec/README.md#the-principles) from the files that are the principles, [`spec/rich-netlist.md`](../spec/rich-netlist.md) and its Chinese version, and is not written on the site. The old addresses of the Chinese pages, and the root, are in [Addresses](#addresses) below.
+
 ### Addresses
 
 Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `index.html`, leads to `zh/` when the browser's first language (`navigator.languages[0]`, else `navigator.language`) is Chinese, `zh` or `zh-…` such as `zh-CN`, `zh-TW` or `zh-Hans`, and to `en/` otherwise, keeping the query and the section of the address; without scripts, a refresh in `<noscript>` leads to `en/`, and the page links both. It names `zh/` and `en/` as its alternates (`hreflang`), `en/` as the default (`x-default`). Until 2026-10-18 the Chinese pages were at the root; their old addresses still work, since GitHub Pages has no redirects of its own: each is a page that leads to the new address with the query and the section of the old one, at once by a script, or by a refresh where scripts do not run. The pages of the standard keep theirs the same way ([`scripts/spec`](../scripts/spec/README.md)), and the downloads of 0.2 are copies at their old addresses, since no page can stand in for a PDF.
@@ -151,9 +164,11 @@ Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `
 | `src/assets/schem.js` | Small schematic renderer in RNL coordinates (x right, y up): self-drawn textbook symbols with the standard package's pin positions, the eight orientation codes, pin-based wiring, animated layout transitions, annotation layer |
 | `src/assets/rnl-code.js` | Display-only highlighting of SPICE lines, `@RNL` records (keywords, aliases, references, free text) and whole package files, and code-line/drawing cross-highlighting |
 | `src/assets/scenes.js` | Circuits, layouts, wiring, annotations, and example files for the introduction's demos |
-| `src/assets/common.js` | Shared by all pages: theme, navigation, tabs, segmented controls, highlighting of static snippets |
-| `src/assets/intro.js` | Introduction interactions, including the 46-keyword reference |
-| `src/assets/tour.js` | Language tour interactions |
+| `src/assets/common.js` | Shared by all pages: theme, navigation (a top bar whose links do not fit draws them closer, then writes the short forms, such as T1 to T9 in the tour, and then folds them into a menu), tabs, segmented controls, highlighting of static snippets |
+| `src/assets/intro.js` | Introduction interactions: the hero, the scenarios and the journey |
+| `src/assets/toolchain.js` | The toolchain diagram of the page of the tools |
+| `src/assets/glance.js` | The language at a glance, with the 46-keyword reference, and the examples, of the language tour |
+| `src/assets/tour.js` | The interactions of the nine sections of the language tour |
 | `build.py` | Builds every page in both languages, the single-file pages (the gallery has none), and the optional zip; checks the language pairs and the release blocks, and finds the desktop viewer's newest release |
 
 The symbols are drawn for this page and contain no Analog Canvas material. Like other paths outside `spec/`, `docs/`, and the data directories, this directory is licensed under [MIT](../LICENSE).

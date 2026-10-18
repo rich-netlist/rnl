@@ -41,6 +41,10 @@ The standard is read in several ways: on GitHub, downloaded to read offline or p
 - Building the site now needs pandoc and Typst, not only Python; CI installs them, and local builds need them installed.
 - The first publication of 0.2 is revision 1, tag `spec-0.2-r1`.
 
+## Note, 2026-10-18: the principles
+
+The web page of each version shows the principles of RNL, `spec/rich-netlist.md` and `.zh.md`, as its last section, after the annexes, made from those files and in no other form of the standard. They are not a part of the standard, so, like the short guide, they leave the revision label as it is, and the introduction of the site no longer has a section of its own on them ([`site`](../../site/README.md#sections-that-moved)).
+
 ## Note, 2026-10-18
 
 The Chinese pages of the site moved from its root to `zh/`, beside `en/`, and the root leads to the pages in the browser's language, Chinese or else English ([`site`](../../site/README.md#addresses)). Following the site, the Chinese web page of a version is now under `zh/spec/<version>/`. The old addresses of 0.2, `spec/0.2/` and `spec/`, lead there with the section of the address, and its downloads are copied there.
