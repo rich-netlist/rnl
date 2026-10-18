@@ -61,6 +61,7 @@ A package references what it names of the others and sees nothing else (16.2): t
 What the series 0.3 does otherwise than 0.2, beyond its names and drawings:
 
 - E, G and S are drawn with all four terminals (`$VCVS_4TERM`, `$VCCS_4TERM`, `$VOLTAGE_CONTROLLED_SWITCH`), W with `$SWITCH`; B, Spectre's `bsource`, is one symbol, `$BEHAVIORAL_SOURCE`, whether it writes `V=` or `I=`.
+- The controlled sources of two terminals, `$VCVS`, `$VCCS`, `$CCVS` and `$CCCS`, are Analog Canvas's diamonds, as the body of the four-terminal ones is; and the P type JFET, `$PJFET`, has its source up and its drain down, as `$PMOS` and `$PNP` have.
 - The definitions of circuit structures and of layouts are one package, `rnl-std-structures`, where 0.2 has `rnl-std-semantics` and `rnl-std-layout`. A definition's default drawing is in its body, and every constraint in the body of a definition of the series is of priority low (14.8): the file's own facts come first, `@PRIORITY("disabled")` on a usage turns the drawing off for that usage, a rule `# @SELECT-USAGE $X => @PRIORITY("disabled")` for every usage of `$X`, and `@AS(priority="high")` puts it before the file's own facts.
 - `$MIRRORED`, `$MIRROR_PAIR` in 0.2, puts `a` on the left of `b`.
 - The members of a `$BRANCH` stand in one column; which is on top is the solver's, by the direction of the current. A `$CHAIN` runs from left to right: its source, the members of its chain in the order written, its load.
