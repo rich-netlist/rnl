@@ -11,6 +11,7 @@ the `rnl` command, which is built with `cargo build -p rnl-cli`."""
 from __future__ import annotations
 
 import argparse
+import difflib
 import hashlib
 import json
 import os
@@ -391,7 +392,10 @@ def check(rnl: Path) -> list[str]:
     for path, text in generated(rnl).items():
         target = SKILL / path
         if not target.exists() or read(target) != text:
-            errors.append(f"skills/rnl/{path}: not what its sources give; run python scripts/skill/build.py")
+            diff = list(difflib.unified_diff(read(target).splitlines() if target.exists() else [], text.splitlines(),
+                                             "on disk", "generated", lineterm="", n=0))[:20]
+            errors.append(f"skills/rnl/{path}: not what its sources give; run python scripts/skill/build.py\n"
+                          + "\n".join(d[:300] for d in diff))
     extra = set(skill_files()) - {"SKILL.md", "LICENSE.md"} - set(generated(rnl)) - {
         f for f in skill_files() if f.startswith(("references/", "examples/"))}
     errors += [f"skills/rnl/{f}: not a file the package knows" for f in sorted(extra)]
