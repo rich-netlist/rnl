@@ -7,7 +7,7 @@ Four ways, from the one an agent can run itself to the ones a person uses. Pick 
 | a shell and a Rust toolchain (1.85 or later) | the `rnl` command, built from source | diagnostics with line numbers, SVG drawings, JSON of the model; the most complete |
 | Node 18 or later and a network | the npm package `@rich-netlist/runtime` | the same core as WebAssembly: a Document with diagnostics and an SVG for each level |
 | a person with a browser | the web viewer <https://rich-netlist.github.io/rnl/viewer/> | the drawing, the text and the problems list, with nothing to install |
-| a person on Windows | the desktop viewer | the same page in an app that reads files where they are; the newest release only reads and draws, editing and solving need a build from source |
+| a person on Windows | the desktop viewer | the same page in an app that reads files where they are, and edits, saves and solves as a preview |
 
 All four are the same core, so they read a file the same way. The language is a draft that changes between versions (0.x makes no promise of compatibility), and so does the toolkit: the npm package is published as previews under the dist-tag `next`.
 
@@ -89,7 +89,7 @@ An agent that cannot drive a browser should ask the person to open the file ther
 
 ## The desktop viewer
 
-For Windows 10 and 11 (x64): the same page as the web viewer in an app that reads the files on disk by their paths, so the files a netlist includes are found wherever they are. Its newest release, 0.1.0, only reads: it draws, lists the problems and shows the text. Editing, saving and a Solve menu, which shows what a solver would place as a preview that writes nothing into the files, came after it; to use them, build the app from source (`apps/desktop/README.md` in the repository). Download it from the release `viewer-v0.1.0` and check the file against `SHA256SUMS.txt`: <https://github.com/rich-netlist/rnl/releases/tag/viewer-v0.1.0> has `RNL-Viewer-0.1.0-windows-x64-setup.exe` (installer for the current user), `RNL-Viewer-0.1.0-windows-x64.msi` (installer for the machine) and `RNL-Viewer-0.1.0-windows-x64.exe` (the app alone). The files are not signed, so Windows SmartScreen may warn before they run. A newer release appears on the same page, <https://github.com/rich-netlist/rnl/releases>, as `viewer-vX.Y.Z`. Open a netlist with File › Open, or start the app with the file as its argument.
+For Windows 10 and 11 (x64): the same page as the web viewer in an app that reads the files on disk by their paths, so the files a netlist includes are found wherever they are. It draws, lists the problems and shows the text; it edits the text, applies the changes and saves only the files you changed (the web viewer downloads the file instead); and its Solve menu shows what a solver would place as a preview that writes nothing into the files, unless you save a solved copy (release 0.1.0 only reads). Download the newest release, `viewer-vX.Y.Z`, from <https://github.com/rich-netlist/rnl/releases> and check the file against `SHA256SUMS.txt`: it has `RNL-Viewer-X.Y.Z-windows-x64-setup.exe` (installer for the current user), `RNL-Viewer-X.Y.Z-windows-x64.msi` (installer for the machine) and `RNL-Viewer-X.Y.Z-windows-x64.exe` (the app alone). The files are not signed, so Windows SmartScreen may warn before they run. Open a netlist with File › Open, or start the app with the file as its argument.
 
 ## Licences
 
