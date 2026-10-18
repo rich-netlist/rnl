@@ -1,7 +1,8 @@
 //! The symbols that the devices of a SPICE netlist get through the rule package of SPICE (16.3),
 //! once the adapter has told their nodes from their models: a device of the P type is drawn as
 //! one, whatever its model card is called and however many nodes the line has, and the lines of
-//! HSPICE that are transmission lines are drawn as such.
+//! HSPICE that are transmission lines are drawn as such. The same for a Spectre netlist and the
+//! rule package of Spectre, also where it holds lines of SPICE.
 
 use std::path::Path;
 
@@ -11,13 +12,17 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
 fn read(net: &str) -> Interpretation {
-    let files = MemoryProvider::new().with("/w/t.sp", net);
-    interpret_file(Path::new("/w/t.sp"), None, &files, &Options::default()).unwrap()
+    read_as("/w/t.sp", net)
+}
+
+fn read_as(path: &str, net: &str) -> Interpretation {
+    let files = MemoryProvider::new().with(path, net);
+    interpret_file(Path::new(path), None, &files, &Options::default()).unwrap()
 }
 
 /// The symbol of each instance of the main level, by the name of the instance.
 fn symbols(r: &Interpretation) -> Vec<(String, String)> {
-    let level = r.model.levels.iter().find(|l| l.title == "t.sp").unwrap();
+    let level = r.model.levels.iter().find(|l| l.title == "t.sp" || l.title == "t.scs").unwrap();
     level
         .objects
         .iter()
@@ -93,4 +98,54 @@ fn a_value_written_with_a_capital_m_is_hinted_as_milli() {
     let milli: Vec<&String> = hints.iter().filter(|m| m.contains("10M")).collect();
     assert_eq!(milli.len(), 1, "{hints:?}");
     assert!(milli[0].contains("t.sp:2") && milli[0].contains("milli in SPICE"), "{}", milli[0]);
+}
+
+#[test]
+fn the_devices_of_a_spectre_netlist_are_drawn_by_their_model_whatever_its_family_or_spelling() {
+    // `type = p` with spaces, a binned model by its full name and its base name, models of
+    // families the table of 6.12 does not list yet, a transmission line, and a coupling of two
+    // inductors, which is no instance
+    let net = "// t\nsimulator lang=spectre\n\
+        model pch_spaced bsim4 type = p\nmodel pch_bin.1 bsim4 type=p\nmodel n_utsoi utsoi type=n\n\
+        model p_hisim hisim_hv type=p\nmodel d_500 dio500\nmodel z_n gaas type=n\nmodel z_p angelov type=p\n\
+        MP1 (d g s b) pch_spaced w=1u\nMP2 (d g s b) pch_bin.1\nMP3 (d g s b) pch_bin\nMN1 (d g s b) n_utsoi\n\
+        MP4 (d g s b) p_hisim\nD1 (a c) d_500\nZ1 (d g s) z_n\nZ2 (d g s) z_p\n\
+        L1 (a b) inductor l=1n\nL2 (c d) inductor l=2n\nK1 mutual_inductor ind1=L1 ind2=L2 coupling=0.99\n\
+        TL1 (a b c d) tline z0=50 td=500p\n";
+    let r = read_as("/w/t.scs", net);
+    let want = [
+        ("MP1", "$PMOS_4TERM"),
+        ("MP2", "$PMOS_4TERM"),
+        ("MP3", "$PMOS_4TERM"),
+        ("MN1", "$NMOS_4TERM"),
+        ("MP4", "$PMOS_4TERM"),
+        ("D1", "$DIODE"),
+        ("Z1", "$NJFET"),
+        ("Z2", "$PJFET"),
+        ("L1", "$INDUCTOR"),
+        ("TL1", "$TRANSMISSION_LINE"),
+    ];
+    for (name, symbol_name) in want {
+        assert_eq!(symbol(&r, name), symbol_name, "{name}");
+    }
+    assert!(symbols(&r).iter().all(|(n, _)| n != "K1"), "{:?}", symbols(&r));
+}
+
+#[test]
+fn the_spice_parts_of_a_spectre_file_are_drawn_and_share_their_model_cards_with_its_spectre_parts() {
+    let net = "// t\nsimulator lang=spectre\nmodel pch_scs bsim4 type=p\n\
+        simulator lang=spice\n.model pch_sp pmos level=54\n\
+        R_sp a b 10k\nC_sp b ref 1p\nMP_sp_scs d1 g1 s1 b1 pch_scs w=1u\nMP_sp_sp d2 g2 s2 b2 pch_sp\n\
+        simulator lang=spectre\nMP_scs_sp (d3 g3 s3 b3) pch_sp\n";
+    let r = read_as("/w/t.scs", net);
+    let want = [
+        ("R_sp", "$RESISTOR"),
+        ("C_sp", "$CAPACITOR"),
+        ("MP_sp_scs", "$PMOS_4TERM"),
+        ("MP_sp_sp", "$PMOS_4TERM"),
+        ("MP_scs_sp", "$PMOS_4TERM"),
+    ];
+    for (name, symbol_name) in want {
+        assert_eq!(symbol(&r, name), symbol_name, "{name}");
+    }
 }

@@ -34,7 +34,7 @@ pub fn dialect() -> Dialect {
 
 /// Built-in primitives: (master, default terminal names, the parameter shown as `${value}`). The
 /// `switch` is not among them: its terminals depend on its nodes ([`SWITCH`]).
-const PRIMITIVES: [(&str, &[&str], Option<&str>); 14] = [
+const PRIMITIVES: [(&str, &[&str], Option<&str>); 15] = [
     ("resistor", &["p", "n"], Some("r")),
     ("capacitor", &["p", "n"], Some("c")),
     ("inductor", &["p", "n"], Some("l")),
@@ -45,12 +45,15 @@ const PRIMITIVES: [(&str, &[&str], Option<&str>); 14] = [
     ("vccs", &["p", "n", "cp", "cn"], Some("gm")),
     ("ccvs", &["p", "n"], Some("rm")),
     ("cccs", &["p", "n"], Some("gain")),
+    // its value is its voltage or its current, `v` or `i` (see finish)
     ("bsource", &["p", "n"], None),
     // a switch between p and n, controlled by the voltage between cp and cn, as S of SPICE
     ("relay", &["p", "n", "cp", "cn"], None),
     // its first winding between p_plus and p_minus, its second between s_plus and s_minus
     ("transformer", &["p_plus", "p_minus", "s_plus", "s_minus"], None),
     ("port", &["p", "n"], Some("r")),
+    // a transmission line has four nodes and no terminal names yet (6.12)
+    ("tline", &[], Some("z0")),
 ];
 
 /// The master of Spectre's switch, `Name (t0 t1 … tn) switch`: a common terminal, t0, and its
@@ -94,6 +97,11 @@ fn family(master: &str) -> Option<&'static str> {
         "hvmos",
         "bta_soi",
         "ucsd_hvmos",
+        // also in use, and not in the table of 6.12 yet
+        "hisim_hv",
+        "utsoi",
+        "letisoi",
+        "bsimcmg_va",
     ];
     let bjt = [
         "bjt", "bjt500", "bjt503", "bjt504", "bjt504t", "bjt3500", "bjt301", "vbic", "hicum", "hicum0", "hicum2",
@@ -103,10 +111,13 @@ fn family(master: &str) -> Option<&'static str> {
         Some("mos")
     } else if bjt.contains(&m.as_str()) {
         Some("bjt")
-    } else if m == "diode" || m == "juncap" || m == "juncap200" {
+    } else if matches!(m.as_str(), "diode" | "juncap" | "juncap200" | "dio500" | "junb") {
         Some("diode")
     } else if m == "jfet" {
         Some("jfet")
+    } else if matches!(m.as_str(), "gaas" | "angelov" | "tom2" | "tom3") {
+        // MESFETs and HEMTs: Z of SPICE
+        Some("mesfet")
     } else if m == "resistor" || m == "rdiff" || m == "r3" {
         Some("resistor")
     } else if m == "capacitor" {
@@ -125,7 +136,7 @@ fn family_terminals(f: &str) -> Option<Vec<String>> {
         "mos" => &["d", "g", "s", "b"],
         "bjt" => &["c", "b", "e", "s"],
         "diode" => &["a", "k"],
-        "jfet" => &["d", "g", "s"],
+        "jfet" | "mesfet" => &["d", "g", "s"],
         "resistor" | "capacitor" | "inductor" => &["p", "n"],
         "relay" => &["p", "n", "cp", "cn"],
         _ => return None,
@@ -148,6 +159,10 @@ fn family_type(f: &str, params: &[(String, String)]) -> Option<String> {
         "jfet" => match ty.as_deref() {
             Some("p") | Some("pjf") => "pjf".into(),
             _ => "njf".into(),
+        },
+        "mesfet" => match ty.as_deref() {
+            Some("p") | Some("pmf") => "pmf".into(),
+            _ => "nmf".into(),
         },
         "diode" => "d".into(),
         "resistor" => "r".into(),
@@ -231,10 +246,13 @@ enum Mode {
     Spice,
 }
 
-/// Split a Spectre statement into tokens: parentheses are tokens of their own, quoted strings stay
-/// whole, a backslash escapes the next character.
+/// Split a Spectre statement into tokens: the parentheses of a node list are tokens of their own,
+/// quoted strings stay whole, a backslash escapes the next character, and a value of a parameter
+/// that holds parentheses or brackets, `r=(1k + 2k)`, `v=2*v(a)` or `table=[1 2 3]`, is one token
+/// with the name before it.
+/// A `name = value`, `name= value` and `name =value` are `name=value`.
 fn tokens(s: &str) -> Vec<String> {
-    let mut out = Vec::new();
+    let mut out: Vec<String> = Vec::new();
     let mut cur = String::new();
     let mut chars = s.chars().peekable();
     let push = |cur: &mut String, out: &mut Vec<String>| {
@@ -242,7 +260,28 @@ fn tokens(s: &str) -> Vec<String> {
             out.push(std::mem::take(cur));
         }
     };
+    // a group in parentheses or brackets, with what is nested in it, to the end of the group
+    let group = |open: char, close: char, cur: &mut String, chars: &mut std::iter::Peekable<std::str::Chars>| {
+        // the opening one is read already
+        let mut depth = 1usize;
+        let mut quoted = false;
+        for n in chars.by_ref() {
+            cur.push(n);
+            if n == '"' {
+                quoted = !quoted;
+            } else if !quoted && n == open {
+                depth += 1;
+            } else if !quoted && n == close {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+        }
+    };
     while let Some(c) = chars.next() {
+        // in the value of a parameter: the token being read has its `=`, or the token before is one
+        let in_value = cur.contains('=') || out.last().is_some_and(|t| t == "=");
         match c {
             '\\' => {
                 if let Some(n) = chars.next() {
@@ -258,6 +297,14 @@ fn tokens(s: &str) -> Vec<String> {
                     }
                 }
             }
+            '(' if in_value => {
+                cur.push('(');
+                group('(', ')', &mut cur, &mut chars);
+            }
+            '[' => {
+                cur.push('[');
+                group('[', ']', &mut cur, &mut chars);
+            }
             '(' | ')' => {
                 push(&mut cur, &mut out);
                 out.push(c.to_string());
@@ -267,7 +314,28 @@ fn tokens(s: &str) -> Vec<String> {
         }
     }
     push(&mut cur, &mut out);
-    out
+    // `name = value`, `name= value`, `name =value`
+    let mut joined: Vec<String> = Vec::new();
+    let mut k = 0;
+    while k < out.len() {
+        let t = &out[k];
+        if t == "=" && !joined.is_empty() && k + 1 < out.len() {
+            let last = joined.pop().unwrap();
+            joined.push(format!("{last}={}", out[k + 1]));
+            k += 2;
+        } else if t.starts_with('=') && t.len() > 1 && !joined.is_empty() {
+            let last = joined.pop().unwrap();
+            joined.push(format!("{last}{t}"));
+            k += 1;
+        } else if t.ends_with('=') && t.len() > 1 && k + 1 < out.len() && out[k + 1] != "(" && out[k + 1] != ")" {
+            joined.push(format!("{t}{}", out[k + 1]));
+            k += 2;
+        } else {
+            joined.push(t.clone());
+            k += 1;
+        }
+    }
+    joined
 }
 
 /// Remove an end-of-line comment: `//` after whitespace.
@@ -767,6 +835,11 @@ impl<'a> Reader<'a> {
         if ANALYSES.contains(&master.to_lowercase().as_str()) {
             return None;
         }
+        // a coupling of two inductors by their names, `K1 mutual_inductor ind1=L1 ind2=L2`, has no
+        // nodes and no symbol, as K of SPICE has none: it is no instance
+        if master == "mutual_inductor" {
+            return None;
+        }
         let params: Vec<(String, String)> =
             rest.iter().filter_map(|t| t.split_once('=').map(|(k, v)| (k.to_string(), v.to_string()))).collect();
         let inst = Instance {
@@ -839,18 +912,32 @@ impl<'a> Reader<'a> {
 
     /// After every file is read: what each master is (6.12, 10.1, 13.6).
     fn finish(&mut self) {
-        let spice_models: HashMap<String, String> = self.spice_models.clone();
+        // The model cards of both languages, by lower case name, with the type of each: a `.model`
+        // card of SPICE and a `model` statement of Spectre are the same to an instance of either
+        // language, since a file may hold both (`simulator lang=`).
+        let mut cards: HashMap<String, String> = self.spice_models.clone();
+        for (name, m) in &self.models {
+            if let Some(ty) = family(&m.master).and_then(|f| family_type(f, &m.params)) {
+                cards.entry(name.to_lowercase()).or_insert(ty);
+            }
+        }
         for (lv, k, plain) in std::mem::take(&mut self.pending_spice) {
-            rnl_host_spice::resolve_nodes(&mut self.doc.levels[lv].instances[k], &plain, &spice_models);
+            rnl_host_spice::resolve_nodes(&mut self.doc.levels[lv].instances[k], &plain, &cards);
         }
         for lv in 0..self.doc.levels.len() {
             for k in 0..self.doc.levels[lv].instances.len() {
                 let inst = &self.doc.levels[lv].instances[k];
                 if inst.letter.is_some() {
                     // an element read in SPICE mode
+                    let letter = inst.letter;
                     let inst = &mut self.doc.levels[lv].instances[k];
                     if !inst.is_subckt && inst.mtype.is_none() {
-                        inst.mtype = inst.model.as_ref().and_then(|m| spice_models.get(&m.to_lowercase()).cloned());
+                        inst.mtype = inst.model.as_ref().and_then(|m| cards.get(&m.to_lowercase()).cloned());
+                    }
+                    // one that names no model card is the primitive of Spectre it equals, which the
+                    // rule package of Spectre, the only one of a Spectre file, draws
+                    if inst.model.is_none() {
+                        inst.model = letter.and_then(spectre_master).map(String::from);
                     }
                     continue;
                 }
@@ -858,12 +945,17 @@ impl<'a> Reader<'a> {
                 let (terms, value_param, mtype, is_subckt) = if master == SWITCH {
                     (Some((0..inst.nodes.len()).map(|k| format!("t{k}")).collect()), None, None, false)
                 } else if let Some((_, t, v)) = PRIMITIVES.iter().find(|(m, _, _)| *m == master) {
-                    (Some(t.iter().map(|s| s.to_string()).collect::<Vec<_>>()), v.map(String::from), None, false)
+                    // one without terminal names, a transmission line, has none to give
+                    let names = (!t.is_empty()).then(|| t.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+                    (names, v.map(String::from), None, false)
                 } else if let Some(m) = self.models.get(&master) {
                     match family(&m.master) {
-                        Some(f) => (family_terminals(f), None, family_type(f, &m.params), false),
+                        Some(f) => (family_terminals(f), family_value(f), family_type(f, &m.params), false),
                         None => (None, None, None, false),
                     }
+                } else if let Some(ty) = cards.get(&master.to_lowercase()) {
+                    // a card of SPICE's, `.model pch_spice pmos`, named by an instance of Spectre's
+                    (type_terminals(ty), type_value(ty), Some(ty.clone()), false)
                 } else if self.doc.subckts.contains_key(&master) {
                     (None, None, None, true)
                 } else {
@@ -874,11 +966,67 @@ impl<'a> Reader<'a> {
                 inst.default_terminals = terms;
                 inst.mtype = mtype;
                 inst.is_subckt = is_subckt;
+                let param =
+                    |inst: &Instance, name: &str| inst.params.iter().find(|(p, _)| p == name).map(|(_, v)| v.clone());
                 if let Some(vp) = value_param {
-                    inst.value = inst.params.iter().find(|(p, _)| *p == vp).map(|(_, v)| v.clone());
+                    inst.value = param(inst, &vp);
+                } else if master == "bsource" {
+                    // the value of a behavioural source is its voltage or its current
+                    inst.value = param(inst, "v").or_else(|| param(inst, "i"));
                 }
             }
         }
+    }
+}
+
+/// The primitive of Spectre that an element of SPICE equals, by its letter, for the elements of a
+/// SPICE part of a Spectre file that name no model card.
+fn spectre_master(letter: char) -> Option<&'static str> {
+    Some(match letter {
+        'R' => "resistor",
+        'C' => "capacitor",
+        'L' => "inductor",
+        'V' => "vsource",
+        'I' => "isource",
+        'E' => "vcvs",
+        'G' => "vccs",
+        'F' => "cccs",
+        'H' => "ccvs",
+        'B' => "bsource",
+        'T' => "tline",
+        _ => return None,
+    })
+}
+
+/// The default terminal names of an instance of a model card of SPICE's, by the type of the card.
+fn type_terminals(ty: &str) -> Option<Vec<String>> {
+    let f = match ty {
+        "nmos" | "pmos" => "mos",
+        "npn" | "pnp" | "lpnp" => "bjt",
+        "njf" | "pjf" => "jfet",
+        "nmf" | "pmf" => "mesfet",
+        "d" => "diode",
+        "r" => "resistor",
+        "c" => "capacitor",
+        "l" => "inductor",
+        "sw" => "relay",
+        _ => return None,
+    };
+    family_terminals(f)
+}
+
+/// The parameter an instance of a model card of the type shows as its value.
+fn type_value(ty: &str) -> Option<String> {
+    matches!(ty, "r" | "c" | "l").then(|| ty.to_string())
+}
+
+/// The parameter an instance of a model card of the family shows as its value.
+fn family_value(f: &str) -> Option<String> {
+    match f {
+        "resistor" => Some("r".into()),
+        "capacitor" => Some("c".into()),
+        "inductor" => Some("l".into()),
+        _ => None,
     }
 }
 
@@ -1130,5 +1278,146 @@ mod tests {
         assert!(sink.all().is_empty(), "{:?}", sink.all());
         let sources: Vec<(&str, &str)> = doc.sources.iter().map(|(f, t)| (f.as_str(), t.as_str())).collect();
         assert_eq!(sources, [("top.scs", top), ("a/x.scs", a), ("b/x.scs", b)]);
+    }
+
+    fn read_one(net: &str) -> HostDocument {
+        let p = MemoryProvider::new().with("a.scs", net);
+        let mut sink = Sink::new();
+        let doc = read("a.scs", &p, &mut sink).unwrap();
+        assert!(sink.all().is_empty(), "{:?}", sink.all());
+        doc
+    }
+
+    fn named<'a>(doc: &'a HostDocument, name: &str) -> &'a Instance {
+        doc.main().instances.iter().find(|i| i.name == name).unwrap_or_else(|| panic!("no {name}"))
+    }
+
+    fn words(n: &[&str]) -> Vec<String> {
+        n.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn the_words_of_a_statement() {
+        // `name = value`, `name= value` and `name =value` are `name=value`; a value in parentheses
+        // or brackets after an `=` is whole, with the spaces it holds; the parentheses of a node
+        // list stay tokens of their own
+        let t = tokens;
+        assert_eq!(t("model pch bsim4 type = p"), ["model", "pch", "bsim4", "type=p"]);
+        assert_eq!(t("m (a b) nch w= 1u l =100n"), ["m", "(", "a", "b", ")", "nch", "w=1u", "l=100n"]);
+        assert_eq!(
+            t("R1 (a b) resistor r=(1k + 2k) tc1=0"),
+            ["R1", "(", "a", "b", ")", "resistor", "r=(1k + 2k)", "tc1=0"]
+        );
+        assert_eq!(t("R1 (a b) resistor r = (1k+(2k*3))"), ["R1", "(", "a", "b", ")", "resistor", "r=(1k+(2k*3))"]);
+        assert_eq!(
+            t("S1 (a b) switch table=[1 2 3] x=1"),
+            ["S1", "(", "a", "b", ")", "switch", "table=[1 2 3]", "x=1"]
+        );
+        assert_eq!(t("B1 (a b) bsource v=\"2 * v(a)\""), ["B1", "(", "a", "b", ")", "bsource", "v=\"2 * v(a)\""]);
+    }
+
+    #[test]
+    fn the_type_of_a_model_card_written_with_spaces_around_its_equals_sign() {
+        let doc = read_one(
+            "// t\nsimulator lang=spectre\nmodel pch_spaced bsim4 type = p\nmodel pch_after bsim4 type= p\n\
+             model pch_before bsim4 type =p\nMP1 (d g s b) pch_spaced w=1u\nMP2 (d g s b) pch_after\nMP3 (d g s b) pch_before\n",
+        );
+        for n in ["MP1", "MP2", "MP3"] {
+            assert_eq!(named(&doc, n).mtype.as_deref(), Some("pmos"), "{n}");
+        }
+    }
+
+    #[test]
+    fn a_binned_model_is_known_by_its_full_name_and_by_its_base_name() {
+        let doc = read_one(
+            "// t\nsimulator lang=spectre\nmodel pch_bin.1 bsim4 type=p\nmodel nch_bin.2 bsim4 type=n\n\
+             MP_base (d g s b) pch_bin w=1u\nMP_full (d g s b) pch_bin.1 w=1u\nMN_base (d g s b) nch_bin\nMN_full (d g s b) nch_bin.2\n",
+        );
+        let seen: Vec<(Option<&str>, bool)> = ["MP_base", "MP_full", "MN_base", "MN_full"]
+            .iter()
+            .map(|n| (named(&doc, n).mtype.as_deref(), named(&doc, n).is_subckt))
+            .collect();
+        assert_eq!(seen, [(Some("pmos"), false), (Some("pmos"), false), (Some("nmos"), false), (Some("nmos"), false)]);
+        assert_eq!(named(&doc, "MP_full").default_terminals, Some(words(&["d", "g", "s", "b"])));
+    }
+
+    #[test]
+    fn the_model_families_that_are_no_subcircuit() {
+        // utsoi, hisim_hv, dio500 and the MESFETs are models of a family, as the others are
+        let doc = read_one(
+            "// t\nsimulator lang=spectre\nmodel n_utsoi utsoi type=n\nmodel p_hisim hisim_hv type=p\nmodel d_500 dio500\n\
+             model z_gaas gaas type=n\nmodel z_ang angelov type=p\nmodel j_n jfet type=n\n\
+             M_utsoi (d g s b) n_utsoi\nM_hisim (d g s b) p_hisim\nD_jun (a c) d_500\nZ_mes (d g s) z_gaas\nZ_ang (d g s) z_ang\nJ1 (d g s) j_n\n",
+        );
+        let seen: Vec<(Option<&str>, Option<Vec<String>>)> = ["M_utsoi", "M_hisim", "D_jun", "Z_mes", "Z_ang", "J1"]
+            .iter()
+            .map(|n| (named(&doc, n).mtype.as_deref(), named(&doc, n).default_terminals.clone()))
+            .collect();
+        let mos = Some(words(&["d", "g", "s", "b"]));
+        let fet = Some(words(&["d", "g", "s"]));
+        assert_eq!(
+            seen,
+            [
+                (Some("nmos"), mos.clone()),
+                (Some("pmos"), mos),
+                (Some("d"), Some(words(&["a", "k"]))),
+                (Some("nmf"), fet.clone()),
+                (Some("pmf"), fet.clone()),
+                (Some("njf"), fet),
+            ]
+        );
+        assert!(doc.main().instances.iter().all(|i| !i.is_subckt));
+    }
+
+    #[test]
+    fn a_coupling_of_inductors_is_no_instance_and_a_tline_is_one() {
+        let doc = read_one(
+            "// t\nsimulator lang=spectre\nL1 (p1 n1) inductor l=1n\nL2 (p2 n2) inductor l=2n\n\
+             K1 mutual_inductor ind1=L1 ind2=L2 coupling=0.99\nTL1 (in_p in_n out_p out_n) tline z0=50 td=500p\n",
+        );
+        let names: Vec<&str> = doc.main().instances.iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, ["L1", "L2", "TL1"]);
+        let tl = named(&doc, "TL1");
+        assert_eq!((tl.is_subckt, tl.model.as_deref(), tl.value.as_deref()), (false, Some("tline"), Some("50")));
+        assert_eq!((tl.nodes.len(), tl.default_terminals.clone()), (4, None));
+    }
+
+    #[test]
+    fn the_value_of_a_passive_of_a_model_card_a_source_and_an_expression() {
+        let doc = read_one(
+            "// t\nsimulator lang=spectre\nmodel rpoly resistor rsh=500\nmodel cmim capacitor\nmodel lind inductor\n\
+             R_mod (a1 b1) rpoly r=2k\nC_mod (a2 b2) cmim c=1p\nL_mod (a7 b7) lind l=3n\n\
+             B_v (a3 b3) bsource v=2*v(a1)\nB_i (a8 b8) bsource i = v(a1)/1k\n\
+             R_expr (a4 b4) resistor r=(1k+2k)\nR_milli (a5 b5) resistor r=10m\nR_mega (a6 b6) resistor r=10M\n",
+        );
+        let value = |n: &str| named(&doc, n).value.clone().unwrap_or_default();
+        assert_eq!(
+            ["R_mod", "C_mod", "L_mod", "B_v", "B_i", "R_expr", "R_milli", "R_mega"].map(value),
+            ["2k", "1p", "3n", "2*v(a1)", "v(a1)/1k", "(1k+2k)", "10m", "10M"]
+        );
+        // the model card gives the type of a passive, and its terminal names
+        assert_eq!(named(&doc, "R_mod").mtype.as_deref(), Some("r"));
+        assert_eq!(named(&doc, "C_mod").default_terminals, Some(words(&["p", "n"])));
+    }
+
+    #[test]
+    fn the_two_languages_share_their_model_cards_and_name_their_elements_alike() {
+        // a SPICE element in a .scs file is drawn by the rule package of Spectre, so it gets the
+        // master of Spectre it equals; a card of one language names the instance of the other
+        let doc = read_one(
+            "// t\nsimulator lang=spectre\nmodel pch_scs bsim4 type=p\nsimulator lang=spice\n.model pch_sp pmos level=54\n\
+             R_sp a b 10k\nC_sp b ref 1p\nMP_sp_scs d1 g1 s1 b1 pch_scs w=1u\nMP_sp_sp d2 g2 s2 b2 pch_sp w=1u\n\
+             simulator lang=spectre\nMP_scs_sp (d3 g3 s3 b3) pch_sp w=1u\nQ_scs (c b e) npn_sp\n",
+        );
+        let (r, c) = (named(&doc, "R_sp"), named(&doc, "C_sp"));
+        assert_eq!((r.model.as_deref(), r.value.as_deref()), (Some("resistor"), Some("10k")));
+        assert_eq!((c.model.as_deref(), c.value.as_deref()), (Some("capacitor"), Some("1p")));
+        for n in ["MP_sp_scs", "MP_sp_sp", "MP_scs_sp"] {
+            let i = named(&doc, n);
+            assert_eq!((i.mtype.as_deref(), i.is_subckt), (Some("pmos"), false), "{n}");
+        }
+        assert_eq!(named(&doc, "MP_scs_sp").default_terminals, Some(words(&["d", "g", "s", "b"])));
+        // a model that no card names is still a subcircuit of the file's own
+        assert!(named(&doc, "Q_scs").is_subckt);
     }
 }
