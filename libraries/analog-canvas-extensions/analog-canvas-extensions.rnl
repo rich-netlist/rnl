@@ -338,6 +338,61 @@
     ? @TEXT("${value}", key="value") => @PLACE(1.65, -0.95)
   };
 
+  /* p n (cp) (cn); from Analog Canvas vcvs (circle): the drawing that the standard series 0.3 had
+     before it drew the diamond, which the standard symbol $VCVS draws now */
+  $CANVAS_VCVS_CIRCLE = @DEFINE-SYMBOL(box=[-2.4, -2.4, 1.5, 2.4]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(-2.0058, 1.4535) (-1.1919, 1.4535)};
+    @LINE {(-1.5988, 1.8605) (-1.5988, 1.0465)};
+    @LINE {(-2.0058, -1.3372) (-1.1919, -1.3372)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+  };
+
+  /* p n (cp) (cn); from Analog Canvas vccs (circle) */
+  $CANVAS_VCCS_CIRCLE = @DEFINE-SYMBOL(box=[-1.5, -2.4, 1.5, 2.4]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(0, 0.6977) (0, 0.2326)};
+    @LINE(fill="linecolor", linestyle="none") {(0, -0.6977) (-0.4651, 0.2326) (0.4651, 0.2326) (0, -0.6977)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+  };
+
+  /* p n; from Analog Canvas ccvs (circle) */
+  $CANVAS_CCVS_CIRCLE = @DEFINE-SYMBOL(box=[-2.4, -2.4, 1.5, 2.4]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(-2.0058, 1.4535) (-1.1919, 1.4535)};
+    @LINE {(-1.5988, 1.8605) (-1.5988, 1.0465)};
+    @LINE {(-2.0058, -1.3372) (-1.1919, -1.3372)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+  };
+
+  /* p n; from Analog Canvas cccs (circle) */
+  $CANVAS_CCCS_CIRCLE = @DEFINE-SYMBOL(box=[-1.5, -2.4, 1.5, 2.4]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(0, 0.6977) (0, 0.2326)};
+    @LINE(fill="linecolor", linestyle="none") {(0, -0.6977) (-0.4651, 0.2326) (0.4651, 0.2326) (0, -0.6977)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+  };
+
   /* p n; from Analog Canvas pulse-voltage-source */
   $CANVAS_PULSE_VOLTAGE_SOURCE = @DEFINE-SYMBOL(box=[-2.4, -2.4, 1.5, 2.4]) {
     (0, 2) @PIN(terminal=1, direction="up");

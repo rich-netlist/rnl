@@ -94,7 +94,9 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | Symbol | Pins | Labels | Definition |
 | --- | --- | --- | --- |
 | `$CANVAS_AND_4INPUT` | 1:left 2:left 3:left 4:left 5:right | name | – |
+| `$CANVAS_CCCS_CIRCLE` | 1:up 2:down | name, value | – |
 | `$CANVAS_CCCS_DIAMOND` | 1:up 2:down | name, value | – |
+| `$CANVAS_CCVS_CIRCLE` | 1:up 2:down | name, value | – |
 | `$CANVAS_CCVS_DIAMOND` | 1:up 2:down | name, value | – |
 | `$CANVAS_CHOPPER` | 1:left 2:left 3:right 4:right | name | – |
 | `$CANVAS_COMPARATOR_UNMARKED` | 1:left 2:left 3:right | name | – |
@@ -117,7 +119,9 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$CANVAS_PULSE_VOLTAGE_SOURCE` | 1:up 2:down | name, value | – |
 | `$CANVAS_SIMPLE_SPDT_SWITCH` | 1:left 2:right 3:right | – | – |
 | `$CANVAS_SIMPLE_SWITCH` | 1:left 2:right | name | – |
+| `$CANVAS_VCCS_CIRCLE` | 1:up 2:down | name, value | – |
 | `$CANVAS_VCCS_DIAMOND` | 1:up 2:down | name, value | – |
+| `$CANVAS_VCVS_CIRCLE` | 1:up 2:down | name, value | – |
 | `$CANVAS_VCVS_DIAMOND` | 1:up 2:down | name, value | – |
 | `$CANVAS_VOLTAGE_AMPLIFIER_LETTERED` | 1:left 2:right | formula, name | – |
 | `$CANVAS_XNOR_4INPUT` | 1:left 2:left 3:left 4:left 5:right | name | – |

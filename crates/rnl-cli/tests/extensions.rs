@@ -87,7 +87,7 @@ fn checked_on_its_own_it_gives_a_hint_for_those_pins_alone() {
         .filter(|l| l.contains(" = @DEFINE-SYMBOL("))
         .map(|l| l.trim_start().split(' ').next().unwrap())
         .collect();
-    assert_eq!(defined.len(), 29, "{defined:?}");
+    assert_eq!(defined.len(), 33, "{defined:?}");
     assert!(defined.iter().all(|n| n.starts_with("$CANVAS_")), "{defined:?}");
     // written in the language 0.3, it is read without any switch; its only remarks are the four
     // inputs of each of the six gates, off the integer points (9.2.4)
@@ -116,5 +116,133 @@ fn the_diamond_sources_have_their_terminals_box_and_labels() {
         );
         assert_eq!(s["box"], serde_json::json!([-2.4, -2.4, 1.5, 2.4]), "{name}");
         assert_eq!(s["labels"], serde_json::json!([label("name", 0.25), label("value", -0.95)]), "{name}");
+    }
+}
+
+/// The four controlled sources of two terminals as the standard series 0.3 drew them until it drew
+/// the diamonds (rnl 0d8e1d9), written as a package of their own, under other names.
+const BEFORE_THE_DIAMONDS: &str = r#"@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="before-the-diamonds", version="0.1")}
+@RNL {
+  $BEFORE_VCVS = @DEFINE-SYMBOL(box=[-2.4, -2.4, 1.5, 2.4]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(-2.0058, 1.4535) (-1.1919, 1.4535)};
+    @LINE {(-1.5988, 1.8605) (-1.5988, 1.0465)};
+    @LINE {(-2.0058, -1.3372) (-1.1919, -1.3372)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+  };
+  $BEFORE_VCCS = @DEFINE-SYMBOL(box=[-1.5, -2.4, 1.5, 2.4]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(0, 0.6977) (0, 0.2326)};
+    @LINE(fill="linecolor", linestyle="none") {(0, -0.6977) (-0.4651, 0.2326) (0.4651, 0.2326) (0, -0.6977)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+  };
+  $BEFORE_CCVS = @DEFINE-SYMBOL(box=[-2.4, -2.4, 1.5, 2.4]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(-2.0058, 1.4535) (-1.1919, 1.4535)};
+    @LINE {(-1.5988, 1.8605) (-1.5988, 1.0465)};
+    @LINE {(-2.0058, -1.3372) (-1.1919, -1.3372)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+  };
+  $BEFORE_CCCS = @DEFINE-SYMBOL(box=[-1.5, -2.4, 1.5, 2.4]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (0, -2) @PIN(terminal=2, direction="down");
+    (0, 0) @CIRCLE(radius=1.0756);
+    @LINE {(0, 0.6977) (0, 0.2326)};
+    @LINE(fill="linecolor", linestyle="none") {(0, -0.6977) (-0.4651, 0.2326) (0.4651, 0.2326) (0, -0.6977)};
+    @LINE {(0, 1.0756) (0, 2)};
+    @LINE {(0, -1.0756) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+  }
+}
+"#;
+
+#[test]
+fn the_circle_sources_draw_what_the_standard_series_drew_before_its_diamonds() {
+    // Analog Canvas's own drawing of the four controlled sources, kept for the files it exports: the
+    // same graphics, pins and box as the standard symbols had, beside the diamonds of the package
+    let pairs = [
+        ("$BEFORE_VCVS", "$CANVAS_VCVS_CIRCLE"),
+        ("$BEFORE_VCCS", "$CANVAS_VCCS_CIRCLE"),
+        ("$BEFORE_CCVS", "$CANVAS_CCVS_CIRCLE"),
+        ("$BEFORE_CCCS", "$CANVAS_CCCS_CIRCLE"),
+    ];
+    let instances: String = (0..2 * pairs.len()).map(|k| format!("R{k} a{k} b{k} 1k\n")).collect();
+    let mut record = Vec::new();
+    for (k, (before, circle)) in pairs.iter().enumerate() {
+        record.push(format!("*   #R{} @SET-SYMBOL {before} => @PLACE({}, 0)", 2 * k, 20 * k));
+        record.push(format!("*   #R{} @SET-SYMBOL {circle} => @PLACE({}, 10)", 2 * k + 1, 20 * k));
+    }
+    let text = format!(
+        "* t\n* @RNL(type=\"header\") {{ @VERSION(\"0.3\"); \
+         @USE-PACKAGE(name=\"analog-canvas-extensions\", version=\"0.1\"); \
+         @USE-PACKAGE(name=\"before-the-diamonds\", version=\"0.1\")}}\n{instances}* @RNL {{\n{}\n* }}\n.end\n",
+        record.join(";\n")
+    );
+    let mut files = MemoryProvider::new().with("t.sp", &text).with("pkgs/before-the-diamonds.rnl", BEFORE_THE_DIAMONDS);
+    files.package_dirs.push("pkgs".into());
+    let r = interpret_file(Path::new("t.sp"), None, &files, &Options::default()).unwrap();
+    assert!(errors(&r).is_empty(), "{:?}", errors(&r));
+    let lv = top(&r);
+    for (before, circle) in pairs {
+        let (a, b) = (
+            lv.symbols.iter().find(|s| s.name == before).unwrap(),
+            lv.symbols.iter().find(|s| s.name == circle).unwrap(),
+        );
+        assert_eq!(
+            format!("{:?}", (&a.prims, &a.pins, a.bbox)),
+            format!("{:?}", (&b.prims, &b.pins, b.bbox)),
+            "{circle}"
+        );
+        // a circle, two pins
+        assert_eq!(b.pins.len(), 2, "{circle}");
+        assert!(b.prims.iter().any(|p| format!("{:?}", p.shape) == "Circle"), "{circle}");
+    }
+}
+
+#[test]
+fn the_circle_sources_are_in_the_catalog_with_their_terminals_box_and_labels() {
+    let options =
+        rnl_view::CatalogOptions { packages: Some(vec!["analog-canvas-extensions".into()]), ..Default::default() };
+    let c = serde_json::to_value(rnl_view::catalog(&FsProvider::new(&[]), &options)).unwrap();
+    let label = |key: &str, y: f64| serde_json::json!({"key": key, "text": format!("${{{key}}}"), "at": [1.5, y], "halign": "start", "valign": "baseline"});
+    for (name, bbox) in [
+        ("$CANVAS_VCVS_CIRCLE", [-2.4, -2.4, 1.5, 2.4]),
+        ("$CANVAS_CCVS_CIRCLE", [-2.4, -2.4, 1.5, 2.4]),
+        ("$CANVAS_VCCS_CIRCLE", [-1.5, -2.4, 1.5, 2.4]),
+        ("$CANVAS_CCCS_CIRCLE", [-1.5, -2.4, 1.5, 2.4]),
+    ] {
+        let s = c["symbols"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["symbol"] == name)
+            .unwrap_or_else(|| panic!("{name} is not in the catalog"));
+        assert_eq!(
+            s["pins"],
+            serde_json::json!([{"terminal": 1, "at": [0.0, 2.0], "direction": "up"}, {"terminal": 2, "at": [0.0, -2.0], "direction": "down"}]),
+            "{name}"
+        );
+        assert_eq!(s["box"], serde_json::json!(bbox), "{name}");
+        assert_eq!(s["labels"], serde_json::json!([label("name", 0.25), label("value", -0.95)]), "{name}");
+    }
+    // the diamonds are still there, for the files that were exported with them
+    for name in ["$CANVAS_VCVS_DIAMOND", "$CANVAS_VCCS_DIAMOND", "$CANVAS_CCVS_DIAMOND", "$CANVAS_CCCS_DIAMOND"] {
+        assert!(c["symbols"].as_array().unwrap().iter().any(|s| s["symbol"] == name), "{name}");
     }
 }

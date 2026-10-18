@@ -475,7 +475,7 @@ mod tests {
         let c = crate::catalog(&MemoryProvider::new(), &options);
         assert_eq!(packages(&c), [("analog-canvas-extensions", "0.1"), ("rnl-std", "0.3")]);
         assert!(c.symbols.iter().all(|s| s.package == "analog-canvas-extensions"));
-        assert_eq!(c.symbols.len(), 29);
+        assert_eq!(c.symbols.len(), 33);
         assert!(c.definitions.is_empty() && c.sets.is_empty());
         let none = CatalogOptions { packages: Some(vec!["no-such-package".into()]), ..CatalogOptions::default() };
         assert_eq!(crate::catalog(&MemoryProvider::new(), &none), Catalog::default());
