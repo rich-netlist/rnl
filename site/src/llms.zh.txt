@@ -1,0 +1,51 @@
+# RNL（Rich Netlist）
+
+> RNL 把原理图的画法写进 SPICE 或 Spectre 网表的注释里（`@RNL` 记录），网表本身就是原理图的源文件。这个文件告诉 AI agent 怎样安装 RNL skill（一个教会 agent 读、写、检查和绘制 RNL 0.3 的文件夹），以及别的东西在哪里。English: {{site}}llms.txt
+
+## 安装 skill
+
+skill 是文件夹 `rnl/`（Agent Skills 格式：`rnl/SKILL.md` 和它指向的文件）。下载 {{site}}skill/rnl-skill.zip 并解压到你的 agent 存放 skill 的目录，使 `rnl/SKILL.md` 落在那里。Claude Code 是 `~/.claude/skills/`（所有项目）或项目里的 `.claude/skills/`；别的能读 Agent Skills 文件夹的 agent 有各自的 skills 目录。
+
+macOS、Linux、Git Bash：
+
+    mkdir -p ~/.claude/skills && curl -fL {{site}}skill/rnl-skill.zip -o /tmp/rnl-skill.zip && unzip -o /tmp/rnl-skill.zip -d ~/.claude/skills
+
+Windows PowerShell：
+
+    New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null; Invoke-WebRequest {{site}}skill/rnl-skill.zip -OutFile "$env:TEMP\rnl-skill.zip"; Expand-Archive -Force "$env:TEMP\rnl-skill.zip" "$HOME\.claude\skills"
+
+也可以克隆仓库，复制 `skills/rnl/`：{{github}}
+
+如果不能解压或写文件，直接读下面的文件就行，它们都是纯文本。先读 SKILL.md。{{site}}skill/manifest.json 列出每个文件的大小和 SHA-256，{{site}}skill/SHA256SUMS.txt 有 zip 和各个文件的校验和。
+
+## skill 里的文件
+
+- [SKILL.md]({{site}}skill/rnl/SKILL.md)：从这里开始：RNL 是什么、一个完整的例子、怎么做、省时间的规则（英文）
+- [references/language.md]({{site}}skill/rnl/references/language.md)：RNL 0.3 语言简明指南，英文
+- [references/language.zh.md]({{site}}skill/rnl/references/language.zh.md)：同一份指南，中文
+- [references/packages.md]({{site}}skill/rnl/references/packages.md)：标准系列 0.3 的标准包：定义和它们的角色、符号和引脚、元件默认配哪个符号、集合、中文代称（由包文件生成，英文）
+- [references/tools.md]({{site}}skill/rnl/references/tools.md)：怎样检查和绘制文件：`rnl` 命令、npm 包 `@rich-netlist/runtime`、网页版和桌面版查看器（英文）
+- [examples/ota5t.sp]({{site}}skill/rnl/examples/ota5t.sp)：五管运放，SPICE，写了结构，没放位置
+- [examples/ota5t.scs]({{site}}skill/rnl/examples/ota5t.scs)：同一个电路，Spectre
+- [examples/ota5t-placed.sp]({{site}}skill/rnl/examples/ota5t-placed.sp)：同一个电路，放好位置、连好线，能完整画出来
+- [LICENSE.md]({{site}}skill/rnl/LICENSE.md)：包里内容的许可（MIT、CC-BY-4.0、CC0-1.0）
+
+## 检查和绘制你写的文件
+
+- `rnl` 命令，从源码构建（Rust 1.85 或更新）：`git clone {{github}}`，然后 `cargo build --release -p rnl-cli`；`rnl check FILE` 打印诊断，有错误时退出码为 1，`rnl render FILE -o DIR` 为每个绘制层级写一张 SVG。
+- npm 包 `@rich-netlist/runtime`（dist-tag `next`，Node 18 或更新）：同一个核心，编译成 WebAssembly；完整的检查脚本在 references/tools.md。
+- 网页版查看器，给有浏览器的人：{{site}}viewer/
+- Windows 桌面版查看器：{{github}}/releases
+
+## 语言和标准包
+
+- [语言标准 0.3，英文（正式文本）]({{site}}en/spec/0.3/)：附 PDF 和 Markdown 下载
+- [语言标准 0.3，中文]({{site}}zh/spec/0.3/)
+- [标准包图库，每个符号都画出来]({{site}}zh/packages.html)
+- [语言导览]({{site}}zh/language.html)
+- [给 agent，这个文件的详细版]({{site}}zh/agents.html)
+
+## 可选
+
+- [给电路设计者的介绍]({{site}}zh/)
+- [代码仓库]({{github}})：工具包、标准、标准包、查看器

@@ -1,0 +1,51 @@
+# RNL (Rich Netlist)
+
+> RNL writes the drawing of a schematic into a SPICE or Spectre netlist as comment records (`@RNL`), so the netlist alone is the source of the schematic. This file tells an AI agent how to install the RNL skill, a folder that teaches reading, writing, checking and drawing RNL 0.3, and where the rest is. 中文版: {{site}}zh/llms.txt
+
+## Install the skill
+
+The skill is the folder `rnl/` (Agent Skills format: `rnl/SKILL.md` and the files it points to). Download {{site}}skill/rnl-skill.zip and unpack it where your agent keeps skills, so that `rnl/SKILL.md` ends up there. For Claude Code that is `~/.claude/skills/` (all projects) or `.claude/skills/` in a project; other agents that read Agent Skills folders have a skills directory of their own.
+
+macOS, Linux, Git Bash:
+
+    mkdir -p ~/.claude/skills && curl -fL {{site}}skill/rnl-skill.zip -o /tmp/rnl-skill.zip && unzip -o /tmp/rnl-skill.zip -d ~/.claude/skills
+
+Windows PowerShell:
+
+    New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null; Invoke-WebRequest {{site}}skill/rnl-skill.zip -OutFile "$env:TEMP\rnl-skill.zip"; Expand-Archive -Force "$env:TEMP\rnl-skill.zip" "$HOME\.claude\skills"
+
+Or clone the repository and copy `skills/rnl/`: {{github}}
+
+If you cannot unpack or write files, read the files below as they are; they are plain text. Start with SKILL.md. {{site}}skill/manifest.json lists every file with its size and SHA-256, and {{site}}skill/SHA256SUMS.txt has the sums of the zip and the files.
+
+## The files of the skill
+
+- [SKILL.md]({{site}}skill/rnl/SKILL.md): start here: what RNL is, a complete example, how to work, the rules that save time
+- [references/language.md]({{site}}skill/rnl/references/language.md): the short guide to the language RNL 0.3, in English
+- [references/language.zh.md]({{site}}skill/rnl/references/language.zh.md): the same guide, in Chinese
+- [references/packages.md]({{site}}skill/rnl/references/packages.md): the standard packages of series 0.3: definitions and their roles, symbols and pins, which symbol an instance gets, sets, Chinese aliases (generated from the package files)
+- [references/tools.md]({{site}}skill/rnl/references/tools.md): how to check and draw files: the `rnl` command, the npm package `@rich-netlist/runtime`, the web viewer, the desktop viewer
+- [examples/ota5t.sp]({{site}}skill/rnl/examples/ota5t.sp): a five-transistor OTA in SPICE, structure written, nothing placed
+- [examples/ota5t.scs]({{site}}skill/rnl/examples/ota5t.scs): the same circuit in Spectre
+- [examples/ota5t-placed.sp]({{site}}skill/rnl/examples/ota5t-placed.sp): the same circuit placed and wired, so that it draws completely
+- [LICENSE.md]({{site}}skill/rnl/LICENSE.md): the licences of what the package holds (MIT, CC-BY-4.0, CC0-1.0)
+
+## Check and draw what you write
+
+- The `rnl` command, built from source (Rust 1.85 or later): `git clone {{github}}`, then `cargo build --release -p rnl-cli`; `rnl check FILE` prints the diagnostics and exits 1 on errors, `rnl render FILE -o DIR` writes an SVG for each drawing level.
+- The npm package `@rich-netlist/runtime` (dist-tag `next`, Node 18 or later): the same core as WebAssembly; a complete checker script is in references/tools.md.
+- The web viewer, for a person with a browser: {{site}}viewer/
+- The desktop viewer for Windows: {{github}}/releases
+
+## The language and the packages
+
+- [Language standard 0.3, English (normative)]({{site}}en/spec/0.3/): with PDF and Markdown downloads
+- [Language standard 0.3, Chinese]({{site}}zh/spec/0.3/)
+- [The standard packages, with every symbol drawn]({{site}}en/packages.html)
+- [A tour of the language]({{site}}en/language.html)
+- [For agents, this page's longer form]({{site}}en/agents.html)
+
+## Optional
+
+- [Introduction for circuit designers]({{site}}en/)
+- [The repository]({{github}}): the toolkit, the standard, the packages, the viewers

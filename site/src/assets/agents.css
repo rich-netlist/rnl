@@ -1,0 +1,29 @@
+/* The page for agents (agents.html): the sentence to give an agent, and the commands, each with a copy button.
+   On top of intro.css. */
+
+.agent-box {
+  display: flex; align-items: flex-start; gap: 16px; padding: 18px 20px; border-radius: var(--radius);
+  border: 1px solid var(--markup-line); background: var(--markup-2);
+}
+.agent-prompt { flex: 1 1 auto; min-width: 0; margin: 0; font: 15.5px/1.75 var(--f-mono); color: var(--ink); overflow-wrap: anywhere; }
+.copy-btn { flex: none; gap: 6px; }
+.copy-btn .ico { width: 16px; height: 16px; }
+.copy-btn.is-done { border-color: var(--ok); color: var(--ok); }
+
+.cmd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 44px; }
+.cmd { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.cmd-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cmd-head h3 { margin: 0; display: flex; align-items: center; gap: 10px; font: 700 16px var(--f-body); }
+.cmd-head h3 .ico { color: var(--markup); }
+.cmd .minicode { font-size: 13px; line-height: 1.8; }
+
+.agents-page .tools-four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.agents-page .dl-list p a code { color: var(--signal); }
+
+@media (max-width: 860px) {
+  .cmd-grid, .agents-page .tools-four { grid-template-columns: 1fr; }
+  .agent-box { flex-direction: column; }
+}
+
+/* long commands wrap instead of scrolling */
+.cmd .minicode.term > div { white-space: pre-wrap; overflow-wrap: anywhere; }

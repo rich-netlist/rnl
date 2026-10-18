@@ -62,10 +62,12 @@ def excerpt(words: dict) -> str:
 
 # --- comparing the Chinese with the English ---------------------------------------------------------------
 
-def sections(text: str) -> dict:
-    """Split a chapter into sections keyed by heading number ('9.4', or 'A' style for annexes)."""
+def sections(text: str, by_position: bool = False) -> dict:
+    """Split a chapter into sections keyed by heading number ('9.4', or 'A' style for annexes); a text whose
+    headings are not numbered, such as the short guide, by the level and the place of each heading."""
     out = {}
     key = "(top)"
+    seen = 0
     cur = {"code": [], "inline": Counter(), "items": 0, "rows": 0, "paras": 0, "heading": ""}
     out[key] = cur
     in_code = False
@@ -86,9 +88,10 @@ def sections(text: str) -> dict:
             continue
         if line.startswith("<!--"):  # the stamp of the English text a part was translated from
             continue
-        m = re.match(r"^(#{2,4}) (?:Annex |附录 )?(\S+)", line)
+        m = re.match(r"^(#{1,4}) (?:Annex |附录 )?(\S+)" if by_position else r"^(#{2,4}) (?:Annex |附录 )?(\S+)", line)
         if m:
-            key = m.group(2)
+            seen += 1
+            key = f"h{len(m.group(1))}.{seen}" if by_position else m.group(2)
             cur = {"code": [], "inline": Counter(), "items": 0, "rows": 0, "paras": 0, "heading": line}
             out[key] = cur
             continue
@@ -104,9 +107,9 @@ def sections(text: str) -> dict:
 
 
 
-def compare(en_text: str, zh_text: str, part: str) -> list[str]:
+def compare(en_text: str, zh_text: str, part: str, by_position: bool = False) -> list[str]:
     """Differences of structure and code between an English part and its Chinese version."""
-    en, zh = sections(en_text), sections(zh_text)
+    en, zh = sections(en_text, by_position), sections(zh_text, by_position)
     msgs = []
     if list(en) != list(zh):
         msgs.append(f"{part}: headings differ\n    en: {' '.join(en)}\n    zh: {' '.join(zh)}")

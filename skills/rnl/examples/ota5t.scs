@@ -1,0 +1,18 @@
+// Five-transistor OTA, with its structure written and nothing placed
+model nch bsim4 type=n
+model pch bsim4 type=p
+M1 (x inp tail 0) nch w=4u l=0.5u
+M2 (out inn tail 0) nch w=4u l=0.5u
+M3 (x x vdd vdd) pch w=8u l=0.5u
+M4 (out x vdd vdd) pch w=8u l=0.5u
+M5 (tail bias 0 0) nch w=8u l=1u
+M6 (bias bias 0 0) nch w=8u l=1u
+Ib (vdd bias) isource dc=20u
+CL (out 0) capacitor c=1p
+Vdd (vdd 0) vsource dc=1.8
+// @RNL(type="header") { @VERSION("0.3")}
+// @RNL {
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   %dp = #M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR;
+//   %cm = {#M3}(ref) {#M4}(out) @AS $CURRENT_MIRROR
+// }

@@ -1,7 +1,8 @@
 # Builds the project site and publishes it to GitHub Pages: the pages in site/ (the introduction, the
-# language tour, the page of the tools and the gallery of the standard packages), the pages of the
-# language standard (scripts/spec/), the web viewer with its samples (apps/web) under viewer/, and the
-# gallery's data, from libraries/, under gallery/. It publishes on a push to main; after a revision
+# language tour, the page of the tools, the gallery of the standard packages and the page for agents),
+# the pages of the language standard (scripts/spec/), the RNL skill package for agents, as a zip and as
+# plain text, with llms.txt (scripts/skill/), the web viewer with its samples (apps/web) under viewer/,
+# and the gallery's data, from libraries/, under gallery/. It publishes on a push to main; after a revision
 # of the standard is released, so that its pages carry the new revision label; and after a release of
 # the desktop viewer, so that the page of the tools links to its files.
 # Pull requests only run the build, which fails when a text is missing one of its languages, when a
@@ -17,6 +18,8 @@ on:
       - "site/**"
       - "spec/**"
       - "scripts/spec/**"
+      - "scripts/skill/**"
+      - "skills/**"
       - ".github/actions/install-spec-tools/**"
       - "apps/web/**"
       - "apps/viewer-ui/**"
@@ -33,6 +36,8 @@ on:
       - "site/**"
       - "spec/**"
       - "scripts/spec/**"
+      - "scripts/skill/**"
+      - "skills/**"
       - ".github/actions/install-spec-tools/**"
       - "apps/web/**"
       - "apps/viewer-ui/**"
@@ -90,6 +95,13 @@ jobs:
       # newest version.
       - name: Build the pages of the standard
         run: python3 scripts/spec/build.py --site site/dist
+
+      # The RNL skill package, for agents: site/dist/skill/rnl-skill.zip, the files of the package as plain
+      # text under site/dist/skill/rnl/, a manifest and the hashes, and the plain-text entry that agents look
+      # for, site/dist/llms.txt (English) and site/dist/zh/llms.txt (Chinese), which the page for agents,
+      # agents.html, links. The package is checked by skill.yml.
+      - name: Build the skill package for agents
+        run: python3 scripts/skill/build.py --site site/dist
 
       # The web viewer, one copy for both languages: the core as WebAssembly, the page of
       # apps/viewer-ui with its web fonts, and the conformance corpus as samples.

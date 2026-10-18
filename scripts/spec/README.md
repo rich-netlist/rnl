@@ -22,6 +22,7 @@ Needs Python 3.10 or later (standard library only), [pandoc](https://pandoc.org/
 | `0.2/en/`, `0.2/zh/` | `front.md`, the chapters `ch01.md`, `ch02.md`, … and the annexes `annex-a.md`, `annex-b.md`, …: the source, the only text that is edited. The parts of a version are the files there, chapters by number, then annexes by letter; both languages have the same parts |
 | `rnl-0.2.md`, `rnl-0.2.zh.md` | the combined texts, assembled from the chapters and committed |
 | `rnl-words-0.2.json` | the word list of the version |
+| `rnl-0.3-guide.md`, `rnl-0.3-guide.zh.md` | the short guide to the language of a version that has one, as the web page shows it ([The short guide](#the-short-guide)) |
 | `rnl-words.schema.json` | the schema of the word lists, shared by all versions; a new version may add optional properties to it, so that it still describes the lists of the earlier ones |
 
 The chapters come from the research repository where the language is worked out ([decision 0006](../../docs/decisions/0006-language-versions-from-research-repository.md)).
@@ -50,6 +51,12 @@ The page has the contents, anchors and colours of the version's own page. Its he
 
 Each version has its own revision label, from git: "revision 2" at the tag `spec-0.2-r2`, "revision 2 + later changes" once the chapters or the word list of 0.2 have changed since that tag, "not released" before its first tag; with the date and short hash of the tagged commit, or of the last commit that changed those files, and a note when they have uncommitted changes. Commits that change other files, such as the toolkit or another version, leave the label as it is.
 
+## The short guide
+
+A version may have a short guide to its language, `rnl-0.3-guide.md` (English) and `rnl-0.3-guide.zh.md` (Chinese) next to its combined texts: what it takes to read and write RNL files, in about four thousand words, with examples that read with `rnl check`. It is a section of the web page of that version, the first one, after the front matter and before chapter 1, with a note that it is not normative and where the standard differs the standard prevails, and a link to the page for agents. It is in no other form: not in the PDF, the combined text or the chapters zip, and since it is not in the chapters, it leaves the revision label as it is. The same files are copied into the skill package ([`skills/`](../../skills/README.md)).
+
+The files start with one title, `# …`, which becomes the heading of the section, with the id `guide`; their other headings are not numbered, and go one level down on the page. Code blocks are marked `spice` or `spectre` for a whole netlist, which `scripts/skill/build.py --check` reads with `rnl check`, `rnl` for lines out of context, and `error` after the language for an error example. The build checks that the two languages have the same headings, list items, table rows, inline code and code blocks, and that every section the guide cites exists.
+
 ## How the forms are kept in step
 
 - **One source.** Only the chapters are edited. Everything else is built from them in one run; of the built files, only the combined texts are committed, and the build checks them.
@@ -59,7 +66,8 @@ Each version has its own revision label, from git: "revision 2" at the tag `spec
   2. each Chinese part starts with `<!-- translated from en/ch09.md sha256:… -->`, the hash of the English part it was translated from; when the English changes, the build stops until the Chinese is brought in line and `--stamp` is run;
   3. Annex A in both languages, and the JSON excerpt in 5.3, are what the word list gives;
   4. every section number cited in the text exists;
-  5. the combined texts are what the chapters give.
+  5. the combined texts are what the chapters give;
+  6. the short guide, when there is one: both languages, one title, the same structure and code in both, and every section it cites exists.
 - **No warnings.** pandoc runs with `--fail-if-warnings`, and any output of Typst fails the build. Fonts are passed only when Typst finds them, so the same build runs on Windows, macOS and CI.
 
 ## Writing for the build

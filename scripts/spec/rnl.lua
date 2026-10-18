@@ -4,7 +4,7 @@ Pandoc filter for the RNL standard, the same for the web page (html5) and the PD
 - headings get their section number as identifier: "9.4", "A", "A.1";
 - section references in the text, such as "(9.4)", "chapter 7", "Annex A", "第 7 章", "附录 A",
   become links; "Principles 2.4" and "原则 2.4" refer to the principles and stay text;
-- code blocks marked rnl, spice or rnl-file are coloured by one tokenizer for both outputs;
+- code blocks marked rnl, spice, spectre or rnl-file are coloured by one tokenizer for both outputs;
   blocks marked error get the label of an error example;
 - on a page that compares two versions (specdiff.py), a code block with data-diff holds the lines of
   both, each coloured as it reads in its own version and marked as kept, removed or added;
@@ -369,7 +369,7 @@ local function code_lines(kind, text)
     local toks = {}
     tokenize_rnl(text, toks)
     return lines_of(toks)
-  elseif kind == "spice" or kind == "rnl-file" then
+  elseif kind == "spice" or kind == "spectre" or kind == "rnl-file" then
     return lines_of(tokenize_host(text, false))
   end
   return lines_of({ { "", text } })
@@ -415,8 +415,8 @@ local function code_block(cb)
       tokenize_rnl(cb.text, toks)
     end
     return render(lines_of(toks), "rnl", is_error)
-  elseif kind == "spice" or kind == "rnl-file" then
-    return render(lines_of(tokenize_host(cb.text, false)), kind, is_error)
+  elseif kind == "spice" or kind == "spectre" or kind == "rnl-file" then
+    return render(lines_of(tokenize_host(cb.text, false)), kind == "spectre" and "spice" or kind, is_error)
   end
   if is_error then
     return render(lines_of({ { "", cb.text } }), kind or "text", true)
