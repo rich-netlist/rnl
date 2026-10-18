@@ -59,7 +59,7 @@ Every form is built from the chapters of one commit and names its revision ([dec
 | [`scripts/`](scripts/README.md) | Maintenance scripts: the build of the standard's published forms, the build and check of the skill package, and the fonts shipped with the core. |
 | [`.github/workflows/`](.github/workflows/README.md) | CI workflows: the project site, the releases of the standard, of the desktop viewer and of the npm package, the Rust workspace, the skill package, the viewers and their browser tests. |
 | [`docs/`](docs/README.md) | Toolchain architecture proposal, roadmap, and decision records. |
-| [`site/`](site/README.md) | The [project site](https://rich-netlist.github.io/rnl/en/): introduction page, language tour and the page of the tools for circuit designers, in Chinese and English, built from one bilingual source by `site/build.py`; [`pages.yml`](.github/workflows/pages.yml) adds the pages of the standard and the web viewer. |
+| [`site/`](site/README.md) | The [project site](https://rich-netlist.github.io/rnl/en/), in Chinese and English, built from one bilingual source by `site/build.py`: the introduction, the language tour (with the language at a glance and examples), the gallery of the standard packages, the tools (with the toolchain) and the page for agents; [`pages.yml`](.github/workflows/pages.yml) adds the pages of the standard (with their short guide and the principles), the web viewer and the skill package. |
 
 Start with the [documentation map](docs/README.md), the [toolchain architecture proposal](docs/rnl-toolchain-architecture.md) (in Chinese), and the [roadmap](docs/roadmap.md). Each component directory has a README that says what it holds and what is still to do.
 
