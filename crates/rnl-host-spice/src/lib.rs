@@ -406,9 +406,10 @@ pub fn register_model(models: &mut HashMap<String, String>, card: &str) {
 }
 
 /// Whether the model of an element is among the words after its nodes: the elements that read a
-/// `.model` card to tell its nodes from its model and its value.
+/// `.model` card to tell its nodes from its model and its value, or its polarity from the card
+/// (`J` and `Z`, whose nodes are known without it).
 pub fn needs_models(letter: Option<char>) -> bool {
-    matches!(letter, Some('M') | Some('Q') | Some('R') | Some('C') | Some('L'))
+    matches!(letter, Some('M') | Some('Q') | Some('J') | Some('Z') | Some('R') | Some('C') | Some('L'))
 }
 
 /// Where the model name of an M or a Q stands in its words, once all `.model` names are known: the
@@ -424,17 +425,22 @@ fn model_position(plain: &[String], is_model: impl Fn(&str) -> bool) -> Option<u
 }
 
 /// Tell nodes from the model name for M and Q once all model names are known, and a resistor,
-/// capacitor or inductor of a `.model` card, `R1 a b rpoly 10k`, from a value.
+/// capacitor or inductor of a `.model` card, `R1 a b rpoly 10k`, from a value. A transistor whose
+/// model has no card, or names none, is marked: its polarity is not known (`Instance::model_missing`).
 pub fn resolve_nodes(inst: &mut Instance, plain: &[String], models: &HashMap<String, String>) {
     let is_model = |t: &str| models.contains_key(&t.to_lowercase());
     match inst.letter {
-        Some('M') | Some('Q') => match model_position(plain, is_model) {
-            Some(k) => {
-                inst.nodes = plain[..k].to_vec();
-                inst.model = Some(plain[k].clone());
+        Some('M') | Some('Q') => {
+            match model_position(plain, is_model) {
+                Some(k) => {
+                    inst.nodes = plain[..k].to_vec();
+                    inst.model = Some(plain[k].clone());
+                }
+                None => inst.nodes = plain.to_vec(),
             }
-            None => inst.nodes = plain.to_vec(),
-        },
+            inst.model_missing = !inst.model.as_deref().is_some_and(is_model);
+        }
+        Some('J') | Some('Z') => inst.model_missing = !inst.model.as_deref().is_some_and(is_model),
         Some(letter @ ('R' | 'C' | 'L')) => {
             if let Some(m) = plain.get(2).filter(|m| is_model(m)) {
                 inst.model = Some(m.clone());
@@ -1242,5 +1248,24 @@ mod tests {
         let hinted: Vec<&str> = hints.iter().filter_map(|m| m.split_whitespace().next()).collect();
         assert_eq!(hinted, ["10M", "1.5M", "1e3M"], "{hints:?}");
         assert!(hints[0].contains("milli") && hints[0].contains("meg"), "{}", hints[0]);
+    }
+
+    #[test]
+    fn a_transistor_whose_model_card_is_not_found_is_marked() {
+        // M, Q, J and Z: the polarity is told by the card alone, so a model that no card names, or
+        // none at all, leaves it unknown; the other elements are not marked
+        let net = "* t\n.model nch nmos\n.model qn npn\n.model jn njf\n\
+                   M1 d g s b nch\nM2 d g s b pch\nM3 d g s\nM4 d g s s nch w=1u\n\
+                   Q1 c b e qn\nQ2 c b e 2n3904\nQ3 c b e s dt qn 2.0\n\
+                   J1 d g s jn\nJ2 d g s jp\nZ1 d g s zm\n\
+                   D1 a k dm\nR1 a b rm 1k\nC1 a b 1p\nX1 a b sub\n.end\n";
+        let (insts, _) = read_all(net);
+        let marked: Vec<&str> = insts.iter().filter(|i| i.model_missing).map(|i| i.name.as_str()).collect();
+        assert_eq!(marked, ["M2", "M3", "Q2", "J2", "Z1"]);
+        assert_eq!(find(&insts, "M2").model.as_deref(), Some("pch"));
+        assert_eq!(find(&insts, "M3").model, None);
+        // a card named in a different case, and one defined after the element, are found
+        let (insts, _) = read_all("* t\nM1 d g s b NCH\nJ1 d g s Jn\n.model nch nmos\n.model JN njf\n.end\n");
+        assert!(insts.iter().all(|i| !i.model_missing), "{:?}", insts.iter().map(|i| &i.name).collect::<Vec<_>>());
     }
 }

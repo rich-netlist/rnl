@@ -265,14 +265,12 @@
 }
 
 /* rnl-std-semiconductors, drawn by hand: the JFET, which Analog Canvas does not have. Terminals
-   d g s = 1 2 3 (SPICE order); laid out like Analog Canvas's MOS and BJT, gate on the left, drain up,
-   with the MOS channel bar. J draws by the model type njf or pjf; Z (ngspice's MESFET) by nmf or pmf.
+   d g s = 1 2 3 (SPICE order); laid out like Analog Canvas's MOS and BJT, gate on the left, with the
+   MOS channel bar: the N type has its drain up, and the P type, as $PMOS and $PNP, its source up and
+   its drain down. J draws by the model type njf or pjf; Z (ngspice's MESFET) by nmf or pmf.
    The lines start inside the bar, as Analog Canvas's MOS lines do, so that no cap sticks out. */
 @RNL {
   %JFET_CHANNEL = @DEFINE-SYMBOL {
-    (0, 2) @PIN(terminal=1, direction="up");
-    (-3, 0) @PIN(terminal=2, direction="left");
-    (0, -2) @PIN(terminal=3, direction="down");
     @LINE(fill="linecolor", linestyle="none") {(-1.657, -1.25) (-1.657, 1.25) (-1.366, 1.25) (-1.366, -1.25) (-1.657, -1.25)};
     @LINE {(-1.4244, 0.6977) (0, 0.6977) (0, 2)};
     @LINE {(-1.4244, -0.6977) (0, -0.6977) (0, -2)};
@@ -282,11 +280,17 @@
   };
   /* the arrow on the gate points at the channel */
   $NJFET = @DEFINE-SYMBOL(box=[-3.4, -2.4, 0.8, 2.4]) {
+    (0, 2) @PIN(terminal=1, direction="up");
+    (-3, 0) @PIN(terminal=2, direction="left");
+    (0, -2) @PIN(terminal=3, direction="down");
     %JFET_CHANNEL;
     @LINE(fill="linecolor", linestyle="none") {(-1.66, 0) (-2.3, 0.35) (-2.3, -0.35) (-1.66, 0)}
   };
-  /* and away from it */
+  /* and away from it; the source is up and the drain down, as in $PMOS */
   $PJFET = @DEFINE-SYMBOL(box=[-3.4, -2.4, 0.8, 2.4]) {
+    (0, -2) @PIN(terminal=1, direction="down");
+    (-3, 0) @PIN(terminal=2, direction="left");
+    (0, 2) @PIN(terminal=3, direction="up");
     %JFET_CHANNEL;
     @LINE(fill="linecolor", linestyle="none") {(-2.4, 0) (-1.76, 0.35) (-1.76, -0.35) (-2.4, 0)}
   }

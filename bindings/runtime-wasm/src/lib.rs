@@ -703,7 +703,8 @@ R1 a 0 1k
 
     #[test]
     fn the_drawings_of_the_unplaced_are_kept_for_a_request() {
-        let text = "* some left\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+        let text =
+            "* some left\n.model nmos nmos\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
         let files = json!({ "a.sp": text });
         let carried = answer(json!({ "entry": "a.sp", "files": files, "primitives": true }));
         // nothing was kept by a build that did not ask for it
@@ -743,7 +744,7 @@ R1 a 0 1k
         // a build that does not ask for it leaves what was kept, and one that does replaces it
         answer(json!({ "entry": "a.sp", "files": files }));
         assert!(ask(json!([0]), json!([]))["drawings"].is_array());
-        let other = json!({ "a.sp": "* one\nQ1 c b e npn\n.end\n" });
+        let other = json!({ "a.sp": "* one\n.model npn npn\nQ1 c b e npn\n.end\n" });
         answer(json!({ "entry": "a.sp", "files": other, "lazy_unplaced": true }));
         assert!(ask(json!([0]), json!([names[0]]))["error"].as_str().unwrap().contains("built again"));
     }

@@ -13,6 +13,7 @@ RNL is written in the comments of a circuit netlist. It describes how the circui
 ```spice
 * Five-transistor OTA, input stage
 * @RNL(type="header") { @VERSION("0.3")}
+.model nch nmos
 .subckt ota5t inp inn out vdd vss vbias
 M1 x    inp   tail vss nch W=2u L=0.5u
 M2 out  inn   tail vss nch W=2u L=0.5u

@@ -459,7 +459,7 @@ test("File > Load from Clipboard opens the text alone, as rnl view reads it in a
 });
 
 test("the Not drawn list asks the core for the drawings of its rows, which the Document does not carry", async ({ page }) => {
-  const text = "* none placed\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n.end\n";
+  const text = "* none placed\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n.model nmos nmos\n.end\n";
   await start(page);
   await page.evaluate((t) => {
     navigator.clipboard.readText = async () => t;

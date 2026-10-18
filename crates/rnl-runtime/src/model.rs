@@ -78,6 +78,17 @@ pub struct NestedView {
     pub orient: Orient,
 }
 
+/// A device that is not drawn since no symbol can be chosen for it, with the reason.
+#[derive(Clone, Debug)]
+pub struct UndrawnView {
+    /// As `ItemView::id`.
+    pub id: String,
+    /// The host instances: the index of each in its level's instances.
+    pub host: Vec<usize>,
+    /// Why, such as "model card not found".
+    pub reason: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct SymbolView {
     pub name: String,
@@ -267,6 +278,10 @@ pub struct LevelView {
     /// are `unplaced_symbols`, not `symbols`: nothing here is drawn on the level.
     pub unplaced_items: Vec<ItemView>,
     pub unplaced_symbols: Vec<SymbolView>,
+    /// The devices the level does not draw whatever their position, since no symbol can be chosen
+    /// for them, such as a transistor whose model card is not found; a viewer lists them with the
+    /// objects that are not drawn, each with its reason.
+    pub undrawn: Vec<UndrawnView>,
     /// The instances, bundles and usages of the level, drawn or not, as the editor interface
     /// sees them.
     pub objects: Vec<ObjectInfo>,

@@ -160,58 +160,58 @@
     ? @TEXT("${value}", key="value") => @PLACE(2, -0.95)
   };
 
-  /* p n (cp) (cn); from Analog Canvas vcvs */
+  /* p n (cp) (cn); from Analog Canvas vcvs (diamond) */
   $VCVS = @DEFINE-SYMBOL(box=[-2.4, -2.4, 1.5, 2.4]) {
     (0, 2) @PIN(terminal=1, direction="up");
     (0, -2) @PIN(terminal=2, direction="down");
-    (0, 0) @CIRCLE(radius=1.0756);
     @LINE {(-2.0058, 1.4535) (-1.1919, 1.4535)};
     @LINE {(-1.5988, 1.8605) (-1.5988, 1.0465)};
     @LINE {(-2.0058, -1.3372) (-1.1919, -1.3372)};
-    @LINE {(0, 1.0756) (0, 2)};
-    @LINE {(0, -1.0756) (0, -2)};
-    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
-    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+    @LINE {(0, 1.25) (1.25, 0) (0, -1.25) (-1.25, 0) (0, 1.25)};
+    @LINE {(0, 1.25) (0, 2)};
+    @LINE {(0, -1.25) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.65, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.65, -0.95)
   };
 
-  /* p n (cp) (cn); from Analog Canvas vccs */
+  /* p n (cp) (cn); from Analog Canvas vccs (diamond) */
   $VCCS = @DEFINE-SYMBOL(box=[-1.5, -2.4, 1.5, 2.4]) {
     (0, 2) @PIN(terminal=1, direction="up");
     (0, -2) @PIN(terminal=2, direction="down");
-    (0, 0) @CIRCLE(radius=1.0756);
     @LINE {(0, 0.6977) (0, 0.2326)};
     @LINE(fill="linecolor", linestyle="none") {(0, -0.6977) (-0.4651, 0.2326) (0.4651, 0.2326) (0, -0.6977)};
-    @LINE {(0, 1.0756) (0, 2)};
-    @LINE {(0, -1.0756) (0, -2)};
-    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
-    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+    @LINE {(0, 1.25) (1.25, 0) (0, -1.25) (-1.25, 0) (0, 1.25)};
+    @LINE {(0, 1.25) (0, 2)};
+    @LINE {(0, -1.25) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.65, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.65, -0.95)
   };
 
-  /* p n; from Analog Canvas cccs */
+  /* p n; from Analog Canvas cccs (diamond) */
   $CCCS = @DEFINE-SYMBOL(box=[-1.5, -2.4, 1.5, 2.4]) {
     (0, 2) @PIN(terminal=1, direction="up");
     (0, -2) @PIN(terminal=2, direction="down");
-    (0, 0) @CIRCLE(radius=1.0756);
     @LINE {(0, 0.6977) (0, 0.2326)};
     @LINE(fill="linecolor", linestyle="none") {(0, -0.6977) (-0.4651, 0.2326) (0.4651, 0.2326) (0, -0.6977)};
-    @LINE {(0, 1.0756) (0, 2)};
-    @LINE {(0, -1.0756) (0, -2)};
-    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
-    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+    @LINE {(0, 1.25) (1.25, 0) (0, -1.25) (-1.25, 0) (0, 1.25)};
+    @LINE {(0, 1.25) (0, 2)};
+    @LINE {(0, -1.25) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.65, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.65, -0.95)
   };
 
-  /* p n; from Analog Canvas ccvs */
+  /* p n; from Analog Canvas ccvs (diamond) */
   $CCVS = @DEFINE-SYMBOL(box=[-2.4, -2.4, 1.5, 2.4]) {
     (0, 2) @PIN(terminal=1, direction="up");
     (0, -2) @PIN(terminal=2, direction="down");
-    (0, 0) @CIRCLE(radius=1.0756);
     @LINE {(-2.0058, 1.4535) (-1.1919, 1.4535)};
     @LINE {(-1.5988, 1.8605) (-1.5988, 1.0465)};
     @LINE {(-2.0058, -1.3372) (-1.1919, -1.3372)};
-    @LINE {(0, 1.0756) (0, 2)};
-    @LINE {(0, -1.0756) (0, -2)};
-    ? @TEXT("${name}", key="name") => @PLACE(1.5, 0.25);
-    ? @TEXT("${value}", key="value") => @PLACE(1.5, -0.95)
+    @LINE {(0, 1.25) (1.25, 0) (0, -1.25) (-1.25, 0) (0, 1.25)};
+    @LINE {(0, 1.25) (0, 2)};
+    @LINE {(0, -1.25) (0, -2)};
+    ? @TEXT("${name}", key="name") => @PLACE(1.65, 0.25);
+    ? @TEXT("${value}", key="value") => @PLACE(1.65, -0.95)
   };
 
   /* p n (cp) (cn); from Analog Canvas ideal-switch */

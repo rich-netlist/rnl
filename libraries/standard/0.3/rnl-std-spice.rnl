@@ -12,7 +12,9 @@
 
 /* ---------------------------------------------------------------- rnl-std-spice: symbols for SPICE netlists
    Every element the SPICE adapter reads natively, all but subcircuit calls (16.3): broad (element letter,
-   the first letter of the name) first, narrow (model type) later. As a package it references
+   the first letter of the name) first, narrow (model type) later. A transistor (M, Q, J, Z) is drawn by
+   the type of its model card alone, below: its polarity is not told by its name, so one whose card is not
+   found is not drawn. As a package it references
    rnl-std-basic and rnl-std-semiconductors, whose symbols it names. */
 @RNL {
   # @SELECT-INSTANCE(name="R*") => @SET-SYMBOL $RESISTOR;
@@ -23,15 +25,11 @@
   # @SELECT-INSTANCE(name="D*") => @SET-SYMBOL $DIODE;
   # @SELECT-INSTANCE(name="E*") => @SET-SYMBOL $VCVS_4TERM;
   # @SELECT-INSTANCE(name="G*") => @SET-SYMBOL $VCCS_4TERM;
-  # @SELECT-INSTANCE(name="M*") => @SET-SYMBOL $NMOS_4TERM;
-  # @SELECT-INSTANCE(name="Q*") => @SET-SYMBOL $NPN;
   # @SELECT-INSTANCE(name="F*") => @SET-SYMBOL $CCCS;
   # @SELECT-INSTANCE(name="H*") => @SET-SYMBOL $CCVS;
   # @SELECT-INSTANCE(name="B*") => @SET-SYMBOL $BEHAVIORAL_SOURCE;
   # @SELECT-INSTANCE(name="S*") => @SET-SYMBOL $VOLTAGE_CONTROLLED_SWITCH;
   # @SELECT-INSTANCE(name="W*") => @SET-SYMBOL $SWITCH;
-  # @SELECT-INSTANCE(name="J*") => @SET-SYMBOL $NJFET;
-  # @SELECT-INSTANCE(name="Z*") => @SET-SYMBOL $NJFET;
   # @SELECT-INSTANCE(name="T*") => @SET-SYMBOL $TRANSMISSION_LINE;
   # @SELECT-INSTANCE(name="O*") => @SET-SYMBOL $TRANSMISSION_LINE;
   # @SELECT-INSTANCE(name="U*") => @SET-SYMBOL $RC_LINE;

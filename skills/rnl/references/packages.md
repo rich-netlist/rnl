@@ -229,7 +229,7 @@ A symbol is chosen by the rules of the next section, or by `@SET-SYMBOL $NAME` o
 | `$NPN` | 1:up 2:left 3:down | name, model | – |
 | `$PDMOS` | 1:down 2:left 3:up | name, model | – |
 | `$PDMOS_4TERM` | 1:down 2:left 3:up 4:right | name, model | – |
-| `$PJFET` | 1:up 2:left 3:down | name, model | – |
+| `$PJFET` | 1:down 2:left 3:up | name, model | – |
 | `$PMOS` | 1:down 2:left 3:up | name, model | – |
 | `$PMOS_4TERM` | 1:down 2:left 3:up 4:right | name, model | – |
 | `$PNP` | 1:down 2:left 3:up | name, model | – |
@@ -262,15 +262,11 @@ The rules of `rnl-std-spice` and `rnl-std-spectre` give an instance its symbol; 
 | `name="D*"` | `$DIODE` |
 | `name="E*"` | `$VCVS_4TERM` |
 | `name="G*"` | `$VCCS_4TERM` |
-| `name="M*"` | `$NMOS_4TERM` |
-| `name="Q*"` | `$NPN` |
 | `name="F*"` | `$CCCS` |
 | `name="H*"` | `$CCVS` |
 | `name="B*"` | `$BEHAVIORAL_SOURCE` |
 | `name="S*"` | `$VOLTAGE_CONTROLLED_SWITCH` |
 | `name="W*"` | `$SWITCH` |
-| `name="J*"` | `$NJFET` |
-| `name="Z*"` | `$NJFET` |
 | `name="T*"` | `$TRANSMISSION_LINE` |
 | `name="O*"` | `$TRANSMISSION_LINE` |
 | `name="U*"` | `$RC_LINE` |
