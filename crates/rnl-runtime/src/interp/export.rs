@@ -446,6 +446,37 @@ impl Interp<'_> {
             });
         }
 
+        // Resolve CURRENT on original host terminals before mapping bundle members to pins.
+        // nets.pins intentionally deduplicates physical pins and cannot supply these identities.
+        let mut currents = Vec::new();
+        let mut hosts = self.scenes[s].insts.clone();
+        hosts.push(self.scenes[s].levelobj);
+        for host in hosts {
+            for t in self.terms_of(s, host) {
+                let direction = match self.current_of(s, t).as_str() {
+                    "in" => CurrentDirection::In,
+                    "out" => CurrentDirection::Out,
+                    _ => continue,
+                };
+                let ObjData::Term { index, name, .. } = self.o(t).clone() else { continue };
+                let terminal = name.unwrap_or_else(|| index.to_string());
+                let terminal = match self.o(host) {
+                    ObjData::Inst { idx, .. } => CurrentTerminal::Instance { instance: *idx, terminal },
+                    ObjData::LevelObj { .. } => CurrentTerminal::Port { terminal },
+                    _ => continue,
+                };
+                let display = self.point_ref(s, &ix, t);
+                for net in self.tnets(s, t) {
+                    currents.push(ProblemCurrent {
+                        terminal: terminal.clone(),
+                        net: self.net_display(net),
+                        direction,
+                        display: display.clone(),
+                    });
+                }
+            }
+        }
+
         let version = self.version_of(Some(self.level_unit[lv]));
         let authored_numbers = self.level_numbers(s).authored.len();
         let result = if self.read_generated {
@@ -475,6 +506,7 @@ impl Interp<'_> {
             groups,
             usages: entries,
             nets,
+            currents,
         };
         (problem, result)
     }
@@ -766,6 +798,7 @@ impl Interp<'_> {
                     pos: p.pos,
                     label: p.label.clone(),
                     dir: p.dir,
+                    direction_written: p.direction_written,
                     terminals: p
                         .terms
                         .iter()

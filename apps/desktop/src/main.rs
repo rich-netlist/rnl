@@ -298,6 +298,7 @@ fn main() {
             solve::solve_preview,
             solve::solver_defaults,
             solve::check_solver_options,
+            solve::pick_solver_config,
             solve::cancel_solve,
             solve::save_solved_copy
         ])

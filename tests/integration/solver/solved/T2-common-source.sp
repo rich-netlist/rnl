@@ -13,22 +13,22 @@ VIN in 0 DC 0.6 AC 1
 *   {#VIN #M1} @AS $FLOW;
 *   $WIRE_NET_SET @ROUTE
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:df472807084943cf.1f3b310f8bee492a") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig3:7408b2c908dab5f4.22233424deb2d8ec") {
 *   %gnd_stub_M1_s = $GND_STUB @ATTACH(gap=2) #M1:s;
 *   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2) #VDD:n;
 *   %gnd_stub_VIN_n = $GND_STUB @ATTACH(gap=2) #VIN:n;
 *   %supply_stub_RD_p = $SUPPLY_STUB @ATTACH(gap=2) #RD:p;
 *   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=2) #VDD:p;
-*   #M1 @PLACE(7, -8) => @ORIENT("R0");
-*   #RD @PLACE(7, 0) => @ORIENT("R0");
-*   #VDD @PLACE(0, 0) => @ORIENT("R0");
-*   #VIN @PLACE(0, -12) => @ORIENT("MY");
-*   %gnd_stub_M1_s::g @PLACE(7, -12) => @ORIENT("R0");
-*   %gnd_stub_VDD_n::g @PLACE(0, -5) => @ORIENT("R0");
-*   %gnd_stub_VIN_n::g @PLACE(0, -17) => @ORIENT("R0");
-*   %supply_stub_RD_p::s @PLACE(7, 5) => @ORIENT("R0");
-*   %supply_stub_VDD_p::s @PLACE(0, 5) => @ORIENT("R0");
-*   &out @WIRE(mode="straight") {#M1:d #RD:n};
-*   &in @WIRE(mode="straight") {#VIN:p (0, -8) #M1:g}
+*   #M1 @PLACE(3, -3) => @ORIENT("R0");
+*   #RD @PLACE(3, 2) => @ORIENT("R90");
+*   #VDD @PLACE(-14, -3) => @ORIENT("R0");
+*   #VIN @PLACE(-5, -3) => @ORIENT("R270");
+*   %gnd_stub_M1_s::g @PLACE(3, -7) => @ORIENT("R270");
+*   %gnd_stub_VDD_n::g @PLACE(-14, -8) => @ORIENT("R270");
+*   %gnd_stub_VIN_n::g @PLACE(-8, -5) => @ORIENT("R270");
+*   %supply_stub_RD_p::s @PLACE(0, 4) => @ORIENT("R0");
+*   %supply_stub_VDD_p::s @PLACE(-14, 2) => @ORIENT("R0");
+*   &out @WIRE(mode="straight") {#M1:d (6, -1) #RD:n};
+*   &in @WIRE(mode="straight") {#VIN:p #M1:g}
 * }
 .end

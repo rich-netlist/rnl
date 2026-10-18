@@ -386,6 +386,7 @@ impl Interp<'_> {
                     pos: (x0, y),
                     label: name.clone(),
                     dir: Some(dir),
+                    direction_written: false,
                 });
                 sym.prims.push(SymPrim {
                     shape: Shape::Line,

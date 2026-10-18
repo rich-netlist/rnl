@@ -52,9 +52,10 @@ export default {
     );
   },
   // the solver's own defaults and options, which Solve > Settings shows and checks
-  solverDefaults: () => invoke("solver_defaults"),
-  checkSolverOptions: (options) =>
-    invoke("check_solver_options", { options }).then(
+  solverDefaults: (solverConfig = null) => invoke("solver_defaults", { solverConfig }),
+  pickSolverConfig: () => invoke("pick_solver_config"),
+  checkSolverOptions: (options, solverConfig = null) =>
+    invoke("check_solver_options", { options, solverConfig }).then(
       () => null,
       (e) => (e instanceof Error ? e.message : String(e)),
     ),

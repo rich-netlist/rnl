@@ -38,12 +38,26 @@ function compute(d) {
   const seen = new Set();
   reach(0, seen);
   const rest = levels.map((_, k) => k).filter((k) => !seen.has(k));
-  const called = new Set();
-  for (const l of rest) for (const k of callees(l)) if (k !== l) called.add(k);
-  const roots = rest.filter((l) => !called.has(l));
-  for (const r of roots) reach(r, seen);
-  // what is left is called only around cycles that nothing outside calls
+  // Decreasing DFS finish order visits a source component before anything it calls, including
+  // callees declared before a cycle. The first walk into a source cycle starts at its earliest
+  // declared level, which finishes last within that cycle and represents it below.
+  const finished = [];
+  const visited = new Set(seen);
   for (const l of rest) {
+    const stack = [[l, false]];
+    while (stack.length > 0) {
+      const [from, exiting] = stack.pop();
+      if (exiting) {
+        finished.push(from);
+      } else if (!visited.has(from)) {
+        visited.add(from);
+        stack.push([from, true]);
+        for (const k of callees(from)) if (!visited.has(k)) stack.push([k, false]);
+      }
+    }
+  }
+  const roots = [];
+  for (const l of finished.reverse()) {
     if (seen.has(l)) continue;
     roots.push(l);
     reach(l, seen);

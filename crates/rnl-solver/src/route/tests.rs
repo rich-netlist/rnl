@@ -475,3 +475,542 @@ fn symbols_placed_far_apart_make_a_small_lattice() {
         assert!(Lattice::index(&lat.xs, &int(x)).is_some(), "{x}");
     }
 }
+
+// Configured routing is deliberately tested separately from `check`: its soft and final phases
+// may cross obstacles, but may never leave a ROUTE disconnected or connect by coordinate alone.
+fn soft_context(l: &Layout) -> SoftContext {
+    let nets: Vec<String> = (0..l.nets.len()).map(|index| format!("net{index}")).collect();
+    let pins = l
+        .nets
+        .iter()
+        .enumerate()
+        .flat_map(|(index, net)| {
+            let name = nets[index].clone();
+            net.anchors.iter().map(move |_| [name.clone()].into_iter().collect())
+        })
+        .collect();
+    SoftContext { nets, pins, written: vec![BTreeSet::new(); l.written.len()] }
+}
+
+fn completed(l: &Layout, hard: u64, soft: u64) -> (Vec<NetOut>, u64, Vec<PhaseUse>) {
+    let context = soft_context(l);
+    let result = configured_layout(l, hard, soft, &int(1), &RoutingWeights::default(), &context);
+    let again = configured_layout(l, hard, soft, &int(1), &RoutingWeights::default(), &context);
+    assert_eq!(result, again, "configured routing must be deterministic");
+    for (net, out) in l.nets.iter().zip(&result.0) {
+        assert_eq!(out.parts, usize::from(!net.anchors.is_empty()));
+        assert_eq!(out.failure, None);
+        let mut components =
+            Components { roots: (0..net.anchors.len() + out.branches.len()).collect(), anchors: net.anchors.len() };
+        for &(a, b) in &net.joined {
+            components.join(a, b);
+        }
+        for wire in &out.wires {
+            assert!(wire.vertices.len() >= 2);
+            assert_eq!(wire.vertices[0], end_at(net, out, wire.start));
+            assert_eq!(wire.vertices.last(), Some(&end_at(net, out, wire.end)));
+            let (a, b) = (components.index(wire.start), components.index(wire.end));
+            assert_ne!(components.root(a), components.root(b), "generated wires must not introduce a cycle: {out:?}");
+            components.join(a, b);
+        }
+        assert_eq!(components.count(), usize::from(!net.anchors.is_empty()));
+    }
+    result
+}
+
+#[test]
+fn later_phases_preserve_every_successful_legacy_hard_output() {
+    let cases = [
+        layout(&[], vec![net(vec![anchor(0, 0, EAST), anchor(10, 0, WEST), anchor(5, -6, NORTH)])]),
+        layout(&[[4, -3, 6, 3]], vec![net(vec![anchor(0, 0, EAST), anchor(10, 0, WEST)])]),
+        layout(&[], vec![net(vec![anchor(2, 3, NORTH), anchor(2, 3, WEST)])]),
+        layout(
+            &[],
+            vec![
+                net(vec![anchor(0, 0, EAST), anchor(20, 0, WEST)]),
+                net(vec![anchor(10, -4, NORTH), anchor(10, 4, Some((0, -1)))]),
+            ],
+        ),
+    ];
+    for l in cases {
+        let legacy = route_layout(&l, 100_000);
+        assert!(legacy.0.iter().all(|out| out.failure.is_none()));
+        let context = soft_context(&l);
+        let (outs, expansions, phases) =
+            phased_layout(&l, 100_000, 0, &int(1), &RoutingWeights::default(), &context, None);
+        assert_eq!((outs, expansions), legacy, "A02 protects NetOut, branch order, paths, and work");
+        assert!(phases.is_empty());
+    }
+}
+
+#[test]
+fn configured_hard_search_reverses_short_many_turns_and_long_few_turns() {
+    let l = layout(&[[2, -2, 4, 10], [6, -10, 8, 2]], vec![net(vec![anchor(0, 0, None), anchor(10, 0, None)])]);
+    let context = soft_context(&l);
+    let length_weights = RoutingWeights { wire_length: int(1), ..RoutingWeights::default() };
+    // Smaller than an f64 can preserve: the configured hard decision must retain its exact,
+    // nonzero priority over the raw-length tie, rather than round this objective away.
+    let turns_weights =
+        RoutingWeights { wire_turns: Q::new(BigInt::one(), BigInt::one() << 1100usize), ..RoutingWeights::default() };
+    let short = configured_layout(&l, 100_000, 0, &int(1), &length_weights, &context);
+    let few_turns = configured_layout(&l, 100_000, 0, &int(1), &turns_weights, &context);
+    assert!(short.2.is_empty() && few_turns.2.is_empty(), "both decisions must occur in the production hard phase");
+    let length = |out: &NetOut| {
+        out.wires.iter().flat_map(|wire| wire.vertices.windows(2)).map(|pair| distance(&pair[0], &pair[1])).sum::<Q>()
+    };
+    let turns = |out: &NetOut| out.wires.iter().map(|wire| wire.vertices.len().saturating_sub(2)).sum::<usize>();
+    assert!(length(&short.0[0]) < length(&few_turns.0[0]), "{short:?}\n{few_turns:?}");
+    assert!(turns(&short.0[0]) > turns(&few_turns.0[0]), "{short:?}\n{few_turns:?}");
+    assert_eq!(configured_layout(&l, 100_000, 0, &int(1), &turns_weights, &context), few_turns);
+}
+
+#[test]
+fn earlier_soft_and_fallback_output_changes_later_hard_search_in_historical_net_order() {
+    let first = net(vec![anchor(0, 0, None), anchor(6, 0, None)]);
+    let later = net(vec![anchor(3, -5, None), anchor(3, 5, None)]);
+    let l = layout(&[[-1, -1, 1, 1]], vec![first.clone(), later.clone()]);
+    let weights = RoutingWeights { wire_length: int(1), wire_crossings: int(100), ..RoutingWeights::default() };
+    let alone = layout(&[[-1, -1, 1, 1]], vec![later.clone()]);
+    let baseline = configured_layout(&alone, 100_000, 0, &int(1), &weights, &soft_context(&alone));
+    assert_eq!(baseline.0[0].wires[0].vertices, vec![p(3, -5), p(3, 5)]);
+    for soft_budget in [0, 10_000] {
+        let routed = configured_layout(&l, 100_000, soft_budget, &int(1), &weights, &soft_context(&l));
+        assert_eq!(routed.0[0].wires[0].vertices, vec![p(0, 0), p(6, 0)]);
+        assert!(routed
+            .2
+            .iter()
+            .any(|phase| phase.net == 0 && phase.phase == if soft_budget == 0 { "fallback" } else { "soft" }));
+        assert!(!routed.2.iter().any(|phase| phase.net == 1), "the later net should still finish in hard routing");
+        assert_ne!(
+            routed.0[1].wires, baseline.0[0].wires,
+            "earlier soft/fallback geometry must affect later hard routing"
+        );
+        assert!(routed.0[1].wires.iter().all(|wire| wire.vertices.windows(2).all(|pair| !crosses(
+            &pair[0],
+            &pair[1],
+            &p(0, 0),
+            &p(6, 0)
+        ))));
+        let reversed = layout(&[[-1, -1, 1, 1]], vec![later.clone(), first.clone()]);
+        let reordered = configured_layout(&reversed, 100_000, soft_budget, &int(1), &weights, &soft_context(&reversed));
+        assert_eq!(routed.0[0], reordered.0[1]);
+        assert_eq!(
+            routed.0[1], reordered.0[0],
+            "half-perimeter order, not problem storage order, schedules all three phases"
+        );
+        assert_eq!(routed.1, reordered.1);
+    }
+}
+
+#[test]
+fn fractional_fallback_segments_are_visible_to_later_hard_edges() {
+    let l = layout(&[], vec![net(vec![anchor(0, 0, None), anchor(4, 4, None)])]);
+    let mut grid = Grid::new(&l).unwrap();
+    let half = crate::rational::frac(1, 2);
+    grid.mark(&[[int(0), half.clone()], [int(4), half.clone()]]);
+    let interior = grid.lat.at(&p(2, 0)).unwrap();
+    assert_eq!(grid.edge_flags(interior, 1) & CROSSED, CROSSED);
+    let endpoint = grid.lat.at(&p(0, 0)).unwrap();
+    assert_eq!(grid.edge_flags(endpoint, 1) & TAKEN, TAKEN, "touching an off-grid endpoint is not a proper crossing");
+    grid.mark(&[[half.clone(), int(2)], [int(2), int(2)]]);
+    let occupied = grid.lat.at(&p(0, 2)).unwrap();
+    assert_eq!(grid.edge_flags(occupied, 0) & TAKEN, TAKEN, "partial collinear occupancy blocks the whole hard edge");
+}
+
+#[test]
+fn a_pin_walled_in_is_connected_by_the_independently_budgeted_soft_search() {
+    let walls = [[-5, 1, 5, 5], [-5, -5, 5, -1], [-5, -5, -1, 5], [1, -5, 5, 5]];
+    let l = layout(&walls, vec![net(vec![anchor(0, 0, None), anchor(12, 0, WEST)])]);
+    let (outs, expansions, phases) = completed(&l, 0, 20_000);
+    assert!(!outs[0].wires.is_empty());
+    assert!(expansions > 0, "hard budget zero must not consume soft's budget");
+    assert_eq!(phases.iter().map(|phase| phase.phase).collect::<Vec<_>>(), vec!["soft"]);
+    assert!(outs[0]
+        .wires
+        .iter()
+        .flat_map(|wire| wire.vertices.windows(2))
+        .any(|pair| l.boxes.iter().any(|(_, box_)| meets_inside(box_, &pair[0], &pair[1]))));
+}
+
+#[test]
+fn no_search_budget_still_connects_distinct_coincident_pins_and_preserves_authored_cycles() {
+    let mut n =
+        net(vec![anchor(0, 0, None), anchor(4, 0, None), anchor(4, 4, None), anchor(0, 0, None), anchor(9, 3, EAST)]);
+    n.joined = vec![(0, 1), (1, 2), (2, 0)];
+    let mut l = layout(&[], vec![n]);
+    l.written = vec![vec![p(0, 0), p(4, 0), p(4, 4), p(0, 0)]];
+    let written = l.written.clone();
+    let (outs, expansions, phases) = completed(&l, 0, 0);
+    assert_eq!(expansions, 0);
+    assert_eq!(l.written, written);
+    assert_eq!(phases.iter().map(|phase| phase.phase).collect::<Vec<_>>(), vec!["fallback"]);
+    assert!(
+        outs[0].wires.iter().any(|wire| wire.vertices == vec![p(0, 0), p(0, 0)]),
+        "coincident distinct anchors need a real zero length link"
+    );
+}
+
+#[test]
+fn hard_coincident_distinct_pins_inside_a_third_body_keep_their_zero_length_identity_edge() {
+    let mut l = layout(&[[1, 1, 5, 5]], vec![net(vec![anchor(3, 3, None), anchor(3, 3, None)])]);
+    l.nets[0].anchors[0].owner = Some(0);
+    l.nets[0].anchors[1].owner = Some(1);
+    assert!(inside(&l.boxes[0].1, &l.nets[0].anchors[0].at));
+    assert!(l.nets[0].anchors.iter().all(|a| a.owner != Some(l.boxes[0].0)));
+    let (outs, _, phases) = completed(&l, 12, 0);
+    assert!(phases.is_empty(), "the coincident identity edge succeeds in hard routing");
+    assert_eq!(outs[0].wires.len(), 1);
+    let wire = &outs[0].wires[0];
+    let (End::Anchor(a), End::Anchor(b)) = (wire.start, wire.end) else {
+        panic!("both distinct physical anchors must remain explicit: {wire:?}");
+    };
+    let mut identities = [a, b];
+    identities.sort();
+    assert_eq!(identities, [0, 1]);
+    assert_eq!(wire.vertices, vec![p(3, 3), p(3, 3)]);
+    assert_eq!(outs[0].parts, 1);
+    assert_eq!(outs[0].failure, None);
+}
+
+#[test]
+fn an_unrepresentable_lattice_uses_exact_geometry_fallback() {
+    let fine = Q::new(1.into(), (MAX_UNIT + 1).into());
+    let mut l = layout(&[], vec![net(vec![anchor(0, 0, NORTH), anchor(8, 4, WEST), anchor(20, 1, None)])]);
+    l.nets[0].anchors[0].at[0] = fine.clone();
+    l.pins[0][0] = fine;
+    let (outs, expansions, phases) = completed(&l, 100, 100);
+    assert_eq!(expansions, 0);
+    assert_eq!(phases, vec![PhaseUse { net: 0, phase: "fallback", failure: Failure::Lattice }]);
+    assert!(!outs[0].wires.is_empty());
+}
+
+#[test]
+fn fallback_branches_only_on_generated_segments_and_counts_only_real_identity_connections() {
+    let l =
+        layout(&[], vec![net(vec![anchor(0, 0, None), anchor(10, 0, None), anchor(5, 6, None), anchor(10, 10, None)])]);
+    let (outs, _, _) = completed(&l, 0, 0);
+    assert!(!outs[0].branches.is_empty(), "nearest tree attachment should split a generated segment");
+    let mut authored = l.clone();
+    authored.nets[0].joined = vec![(0, 1)];
+    authored.written = vec![vec![p(0, 0), p(10, 0)]];
+    let (outs, _, _) = completed(&authored, 0, 0);
+    assert!(!outs[0].branches.contains(&p(5, 0)), "an author's segment has no implicit interior connection point");
+}
+
+#[test]
+fn soft_cost_counts_identity_violations_once_and_disabled_items_add_nothing() {
+    let l = layout(
+        &[[1, -1, 4, 1]],
+        vec![net(vec![anchor(0, 0, None), anchor(8, 0, None)]), net(vec![anchor(2, 0, None)])],
+    );
+    let context = soft_context(&l);
+    let weights = RoutingWeights { wire_overlaps: int(3), wire_shorts: int(5), ..RoutingWeights::default() };
+    let zero = Q::zero();
+    let search =
+        SoftSearch { layout: &l, context: &context, net: 0, clearance: &zero, weights: &weights, wires: Vec::new() };
+    let initial = SoftBest { cost: SoftCost::default(), seen: BTreeSet::new(), previous: None, source: 0 };
+    let entered = search.edge(&p(0, 0), &p(3, 0), &initial);
+    assert_eq!(entered.cost.weighted, int(8));
+    let left = search.edge(&p(3, 0), &p(6, 0), &entered);
+    let reentered = search.edge(&p(6, 0), &p(2, 0), &left);
+    assert_eq!(
+        reentered.cost.weighted,
+        int(8),
+        "a second visit to the same box and physical pin is not a second violation"
+    );
+    let weights = RoutingWeights::default();
+    let search = SoftSearch { weights: &weights, ..search };
+    assert_eq!(search.edge(&p(0, 0), &p(3, 0), &initial).cost.weighted, Q::zero());
+}
+
+#[test]
+fn fallback_keeps_pin_exits_when_possible_and_truncates_impossible_close_leads() {
+    for (a, b) in [(EAST, EAST), (WEST, EAST), (NORTH, NORTH), (EAST, NORTH)] {
+        let n = net(vec![anchor(0, 0, a), anchor(6, 0, b)]);
+        let ends = attachments(&n, &NetOut::default());
+        let path = fallback_path(&n, &ends[0], &ends[1]);
+        let step = |a: &[Q; 2], b: &[Q; 2]| ((&b[0] - &a[0]).signum(), (&b[1] - &a[1]).signum());
+        let source_exit = a.unwrap();
+        let target_exit = b.unwrap();
+        assert_eq!(step(&path[0], &path[1]), (int(source_exit.0), int(source_exit.1)), "{path:?}");
+        let last = path.len() - 1;
+        assert_eq!(step(&path[last], &path[last - 1]), (int(target_exit.0), int(target_exit.1)), "{path:?}");
+        assert_eq!(erase_loops(path.clone()), path);
+    }
+    // Both eastward one-unit leads overlap for pins half a unit apart. A legal connection
+    // terminates on the other pin before completing that impossible pair of unit leads.
+    for exits in [(EAST, EAST), (EAST, WEST), (WEST, EAST)] {
+        let mut l = layout(&[], vec![net(vec![anchor(0, 0, exits.0), anchor(1, 0, exits.1)])]);
+        l.nets[0].anchors[1].at[0] = crate::rational::frac(1, 2);
+        l.pins[1] = l.nets[0].anchors[1].at.clone();
+        let (outs, _, _) = completed(&l, 0, 0);
+        for wire in &outs[0].wires {
+            assert_eq!(erase_loops(wire.vertices.clone()), wire.vertices);
+        }
+    }
+}
+
+fn configured_hard_reference(l: &Layout, weights: &RoutingWeights, rational: bool) -> (Vec<NetOut>, u64) {
+    let mut grid = Grid::new(l).unwrap();
+    grid.hard_weights = Some(weights.clone());
+    grid.rational_hard = rational;
+    let mut expansions = 0;
+    let mut outs = vec![NetOut::default(); l.nets.len()];
+    for i in net_order(l) {
+        outs[i] = grid.route_net(i, 200_000, &mut expansions);
+        release_kept(&mut grid, i);
+    }
+    (outs, expansions)
+}
+
+#[test]
+fn integer_scaled_hard_costs_match_exact_rationals_in_paths_and_work() {
+    let mut fractional =
+        layout(&[[2, -2, 4, 10], [6, -10, 8, 2]], vec![net(vec![anchor(0, 0, EAST), anchor(10, 0, WEST)])]);
+    for a in &mut fractional.nets[0].anchors {
+        a.at[0] += crate::rational::frac(1, 2);
+    }
+    fractional.pins = fractional.nets[0].anchors.iter().map(|a| a.at.clone()).collect();
+    let crossing = layout(
+        &[],
+        vec![net(vec![anchor(0, 3, EAST), anchor(12, 3, WEST)]), net(vec![anchor(6, -5, NORTH), anchor(6, 11, None)])],
+    );
+    let weights = [
+        RoutingWeights::default(),
+        SolverOptions::without_time_limit().routing_weights(),
+        RoutingWeights {
+            wire_turns: Q::new(BigInt::one(), BigInt::one() << 1100usize),
+            wire_length: crate::rational::frac(5, 11),
+            wire_crossings: crate::rational::frac(2, 7),
+            ..Default::default()
+        },
+    ];
+    for l in [fractional, crossing] {
+        for weights in &weights {
+            assert_eq!(
+                configured_hard_reference(&l, weights, false),
+                configured_hard_reference(&l, weights, true),
+                "wire geometry, branch order and exact expansion count must be identical"
+            );
+        }
+    }
+}
+
+/// A test-only copy of the production input assembly, shared by fixed-frame diagnostics.
+fn fixed_record_layout(file: &str, title: &str) -> (Layout, SoftContext, Vec<Job>, Vec<Vec<Point>>) {
+    struct Files;
+    impl rnl_runtime::source::Provider for Files {
+        fn read(&self, path: &str) -> Option<String> {
+            std::fs::read_to_string(path).ok()
+        }
+    }
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/data/legacy-layout")
+        .join(file)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let without = rnl_view::interpret(&path, None, &Files, &rnl_runtime::Options::solver()).unwrap();
+    let with = rnl_view::interpret(&path, None, &Files, &rnl_runtime::Options { problems: true, ..Default::default() })
+        .unwrap();
+    let problem = without.problems.iter().find(|p| p.title == title).unwrap();
+    let previous = rnl_runtime::previous::previous(problem, &with).unwrap();
+    let options = SolverOptions::without_time_limit();
+    let resolved = crate::resolve(problem, &options);
+    let s = crate::structure::analyse(problem, &resolved, &options, crate::options::CAPS, &mut Work::default());
+    let mut g = resolved.witness.geometry.clone();
+    for pl in previous.placements {
+        if let Some(x) = pl.x {
+            g.origin[pl.object][0] = crate::rational::from_f64(x).unwrap();
+        }
+        if let Some(y) = pl.y {
+            g.origin[pl.object][1] = crate::rational::from_f64(y).unwrap();
+        }
+        if let Some(o) = pl.orient {
+            g.orient[pl.object] = o;
+        }
+    }
+    let origins_storage = s.origins(problem, &g);
+    let origins = origins_storage.as_slice();
+    let jobs = jobs(problem);
+    let geometry =
+        RoutingGeometry { wires: (0..problem.wires.len()).map(|i| authored_wire(problem, &g, i).unwrap()).collect() };
+    let mut layout = Layout::default();
+    let mut context = SoftContext { nets: jobs.iter().map(|job| job.net.clone()).collect(), ..SoftContext::default() };
+    for k in s.components() {
+        if let Some(b) = s.box_at(origins, &g.orient, k) {
+            layout.boxes.push((k, b));
+        }
+    }
+    // the pins of what is drawn: a symbol that the solution leaves free is not
+    for k in (0..problem.objects.len()).filter(|&k| !s.objects[k].left_free) {
+        for pin in 0..s.pins(k).len() {
+            if let Some(at) = s.pin_at(origins, &g.orient, k, pin) {
+                layout.pins.push(at);
+                context.pins.push(
+                    s.connections
+                        .nets_of
+                        .get(&(k, pin))
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|&net| s.connections.nets.get(net))
+                        .map(|net| net.name.clone())
+                        .collect(),
+                );
+            }
+        }
+    }
+    for wire in &geometry.wires {
+        layout.written.push(wire.vertices.iter().map(|vertex| vertex.at.clone()).collect());
+        context.written.push(wire.nets.clone());
+    }
+    let mut points: Vec<Vec<Point>> = Vec::new();
+    for job in &jobs {
+        let mut net = NetIn::default();
+        let mut pts: Vec<Point> = Vec::new();
+        let mut add = |p: Point, net: &mut NetIn| -> Option<usize> {
+            if let Some(i) = pts.iter().position(|q| q.key == p.key) {
+                return Some(i);
+            }
+            let at = [point_value(problem, &g, &p.reference, 0, 0)?, point_value(problem, &g, &p.reference, 1, 0)?];
+            let exit = match p.key {
+                (k, Some(pin)) => s.exit(k, pin, g.orient[k]),
+                _ => None,
+            };
+            let owner = p.key.1.map(|_| p.key.0);
+            net.anchors.push(AnchorIn { at, exit, owner });
+            pts.push(p);
+            Some(pts.len() - 1)
+        };
+        for p in &job.points {
+            add(p.clone(), &mut net);
+        }
+        for &w in &job.wires {
+            let Some(wire) = problem.wires.get(w) else { continue };
+            let ends: Vec<usize> =
+                wire.anchors.iter().filter_map(|r| wire_point(problem, r)).filter_map(|p| add(p, &mut net)).collect();
+            for pair in ends.windows(2) {
+                net.joined.push((pair[0], pair[1]));
+            }
+        }
+        layout.nets.push(net);
+        points.push(pts);
+    }
+    (layout, context, jobs, points)
+}
+
+#[test]
+fn fixed_t3_configured_and_legacy_exits_stay_outside_own_symbol_interior() {
+    let (l, _context, jobs, points) = fixed_record_layout("T3-ota5t.sp", "T3-ota5t.sp");
+    for (label, (outs, expanded)) in [
+        ("legacy", route_layout(&l, 200_000)),
+        ("configured", configured_hard_reference(&l, &SolverOptions::without_time_limit().routing_weights(), false)),
+    ] {
+        let mut violations = Vec::new();
+        for (i, out) in outs.iter().enumerate() {
+            assert!(out.failure.is_none(), "{label} &{}: {:?}", jobs[i].net, out.failure);
+            for wire in &out.wires {
+                for (end, reverse) in [(wire.start, false), (wire.end, true)] {
+                    let End::Anchor(a) = end else { continue };
+                    let anchor = &l.nets[i].anchors[a];
+                    let Some(exit) = anchor.exit else { continue };
+                    let path: Vec<_> =
+                        if reverse { wire.vertices.iter().rev().collect() } else { wire.vertices.iter().collect() };
+                    let Some(next) = path.iter().find(|p| ***p != anchor.at) else { continue };
+                    let step = ((&next[0] - &anchor.at[0]).signum(), (&next[1] - &anchor.at[1]).signum());
+                    if step == (int(exit.0), int(exit.1)) {
+                        continue;
+                    }
+                    violations.push(points[i][a].key);
+                    let owner = anchor.owner.unwrap();
+                    let body = &l.boxes.iter().find(|(k, _)| *k == owner).unwrap().1;
+                    let within = inside(body, &anchor.at);
+                    let crosses_body = meets_inside(body, &anchor.at, next);
+                    eprintln!("{label} &{} anchor={:?} exit={exit:?} start={:?} next={next:?} body={body:?} inside={within} through={crosses_body}",jobs[i].net,points[i][a].reference,anchor.at);
+                    assert!(
+                        !within && !crosses_body && runs_along(body, &anchor.at, next),
+                        "the declared Step1 exception must run along the body's edge, never through it"
+                    );
+                }
+            }
+        }
+        violations.sort_unstable();
+        let expected = if label == "legacy" { Vec::new() } else { vec![(0, Some(0)), (2, Some(0))] };
+        assert_eq!(violations, expected);
+        eprintln!("{label}: expanded={expanded} exit_hint_violations={violations:?}");
+    }
+}
+
+#[test]
+#[ignore = "controlled serialized timing; run without other native workload"]
+fn fixed_t6_exact_cost_representation_profile() {
+    let (l, _, _, _) = fixed_record_layout("T6-r2r-ladder.sp", "T6-r2r-ladder.sp");
+    let weights = SolverOptions::without_time_limit().routing_weights();
+    let started = std::time::Instant::now();
+    let rational = configured_hard_reference(&l, &weights, true);
+    let rational_seconds = started.elapsed().as_secs_f64();
+    let started = std::time::Instant::now();
+    let integer = configured_hard_reference(&l, &weights, false);
+    let integer_seconds = started.elapsed().as_secs_f64();
+    assert_eq!(integer, rational, "fixed same-layout routing output and work cannot change");
+    eprintln!("exact-cost-profile rational_seconds={rational_seconds:.6} integer_seconds={integer_seconds:.6} expansions={} ratio={:.3}",integer.1,rational_seconds/integer_seconds);
+}
+
+/// This fixed OTA sublevel leaves two source corners outwards. Keep the physical identity and
+/// geometry distinct from the main level's positive-length along-edge approximation.
+#[test]
+fn fixed_t3_ota_corner_exits_preserve_identities_and_stay_outside_bodies() {
+    let (l, _, jobs, points) = fixed_record_layout("T3-ota5t.sp", "ota5t");
+    for (label, (outs, expanded)) in [
+        ("legacy", route_layout(&l, 200_000)),
+        ("configured", configured_hard_reference(&l, &SolverOptions::without_time_limit().routing_weights(), false)),
+    ] {
+        let mut violations = Vec::new();
+        for (i, out) in outs.iter().enumerate() {
+            assert!(out.failure.is_none(), "{label} &{}: {:?}", jobs[i].net, out.failure);
+            for wire in &out.wires {
+                for (end, reverse) in [(wire.start, false), (wire.end, true)] {
+                    let End::Anchor(a) = end else { continue };
+                    let anchor = &l.nets[i].anchors[a];
+                    let path: Vec<_> =
+                        if reverse { wire.vertices.iter().rev().collect() } else { wire.vertices.iter().collect() };
+                    let next = path.iter().find(|p| ***p != anchor.at);
+                    let body = anchor.owner.and_then(|owner| l.boxes.iter().find(|(k, _)| *k == owner).map(|(_, b)| b));
+                    let follows = match (next, anchor.exit) {
+                        (Some(next), Some(exit)) => {
+                            ((&next[0] - &anchor.at[0]).signum(), (&next[1] - &anchor.at[1]).signum())
+                                == (int(exit.0), int(exit.1))
+                        }
+                        _ => true,
+                    };
+                    let within = body.is_some_and(|body| inside(body, &anchor.at));
+                    let through = body.zip(next).is_some_and(|(body, next)| meets_inside(body, &anchor.at, next));
+                    let along = body.zip(next).is_some_and(|(body, next)| runs_along(body, &anchor.at, next));
+                    eprintln!("ota5t {label} &{} key={:?} reference={:?} exit={:?} start={:?} next={next:?} body={body:?} follows={follows} inside={within} through={through} along={along}",jobs[i].net,points[i][a].key,points[i][a].reference,anchor.exit,anchor.at);
+                    if !follows {
+                        violations.push(points[i][a].key);
+                        assert_eq!(jobs[i].net, "tail");
+                        assert!(
+                            matches!(&points[i][a].reference,PointRef::Pin{object:0|1,pin:2,terminal} if terminal=="s")
+                        );
+                        let body = body.expect("physical source has its own symbol box");
+                        let next = next.unwrap();
+                        let corner = (anchor.at[0] == body[0] || anchor.at[0] == body[2])
+                            && (anchor.at[1] == body[1] || anchor.at[1] == body[3]);
+                        let outward = anchor.at[1] == next[1]
+                            && ((anchor.at[0] == body[0] && next[0] < anchor.at[0])
+                                || (anchor.at[0] == body[2] && next[0] > anchor.at[0]));
+                        assert!(corner&&outward&&!within&&!through,"source departure must only touch its own corner, then stay strictly outside the closed box");
+                        assert!(
+                            !along,
+                            "a corner-outward segment is distinct from a positive-length along-edge departure"
+                        );
+                    }
+                }
+            }
+        }
+        violations.sort_unstable();
+        let expected = if label == "legacy" { Vec::new() } else { vec![(0, Some(2)), (1, Some(2))] };
+        assert_eq!(violations, expected, "exact physical source endpoints; duplicates are not discarded");
+        eprintln!("ota5t {label}: expanded={expanded} exit_hint_violations={violations:?}");
+    }
+}

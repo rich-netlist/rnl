@@ -10,6 +10,7 @@ on:
       - "crates/**"
       - "bindings/**"
       - "libraries/**"
+      - "config/**"
       - "tests/**"
       - "!tests/viewer/**"
       - "scripts/fonts.py"
@@ -22,6 +23,7 @@ on:
       - "crates/**"
       - "bindings/**"
       - "libraries/**"
+      - "config/**"
       - "tests/**"
       - "!tests/viewer/**"
       - "scripts/fonts.py"
@@ -73,6 +75,11 @@ jobs:
           node bindings/runtime-wasm/tests/core.mjs target/wasm-test
       - name: Build the CLI
         run: cargo build -p rnl-cli
+      - name: Execute the solver and embedded config parser in native Rust and WebAssembly
+        run: |
+          cargo build -p rnl-runtime-wasm --features test-solver --example solver-smoke
+          node bindings/runtime-wasm/build.mjs --features test-solver --out target/wasm-solver-test
+          node bindings/runtime-wasm/tests/solver.mjs
       - name: Native and WebAssembly builds give identical Documents and snapshots
         run: |
           node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl

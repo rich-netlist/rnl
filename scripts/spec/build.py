@@ -628,6 +628,7 @@ def write_moved(site: Path, v: str) -> None:
             redirect(old / f.name, "zh", v, f"../../{new}/" + ("" if f.name == "index.html" else f.name))
         else:
             shutil.copyfile(f, old / f.name)
+    write_sums(old)
 
 
 # --- main ----------------------------------------------------------------------------------------

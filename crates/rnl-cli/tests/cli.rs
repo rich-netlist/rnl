@@ -5,7 +5,12 @@ use std::path::Path;
 use std::process::Command;
 
 fn rnl(args: &[&str]) -> (i32, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_rnl")).args(args).output().unwrap();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_rnl"));
+    command.env_remove("RNL_SOLVER_CONFIG").args(args);
+    if args.first().is_some_and(|name| matches!(*name, "solve" | "problem" | "preview")) {
+        command.arg("--solver-config").arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/rnl-solver.toml"));
+    }
+    let out = command.output().unwrap();
     (out.status.code().unwrap_or(-1), String::from_utf8_lossy(&out.stdout).replace("\r\n", "\n"))
 }
 

@@ -1,0 +1,41 @@
+{
+  "base_sha": "41d6b7d68544601f7a206af69c5b91286a2ed7c9",
+  "policy": "Exact original solved snapshot bytes, used solely for explicit retained PLACE/ORIENT test facts.",
+  "fixtures": [
+    {
+      "source": "41d6b7d68544601f7a206af69c5b91286a2ed7c9:tests/integration/solver/solved/T1-rc-lowpass.sp",
+      "path": "crates/rnl-solver/tests/data/legacy-layout/T1-rc-lowpass.sp",
+      "sha256": "40941879013f04d0544a1b8148f46c8f145f23ffc5b814b06a1d5ddbf13e63ca"
+    },
+    {
+      "source": "41d6b7d68544601f7a206af69c5b91286a2ed7c9:tests/integration/solver/solved/T2-common-source.sp",
+      "path": "crates/rnl-solver/tests/data/legacy-layout/T2-common-source.sp",
+      "sha256": "922ebc3813b418c826af7b241fba49e2feda4d5e5391a7e6c94b0c1709254cb0"
+    },
+    {
+      "source": "41d6b7d68544601f7a206af69c5b91286a2ed7c9:tests/integration/solver/solved/T2b-common-source-dragged.sp",
+      "path": "crates/rnl-solver/tests/data/legacy-layout/T2b-common-source-dragged.sp",
+      "sha256": "b79a74bf47976597c72de4f137a6aa0d24e56ae4e6e5aa2b033b37cd2c5e7433"
+    },
+    {
+      "source": "41d6b7d68544601f7a206af69c5b91286a2ed7c9:tests/integration/solver/solved/T3-ota5t.sp",
+      "path": "crates/rnl-solver/tests/data/legacy-layout/T3-ota5t.sp",
+      "sha256": "59d0f1f019a532cbf8e702701464ac1d6f6e0a38972e5abb28d6b1cb91205711"
+    },
+    {
+      "source": "41d6b7d68544601f7a206af69c5b91286a2ed7c9:tests/integration/solver/solved/T4-miller-conflicts.sp",
+      "path": "crates/rnl-solver/tests/data/legacy-layout/T4-miller-conflicts.sp",
+      "sha256": "16998ad309636968ac93fbf1baadc054542465fee5d9ecf0430d697f67f27171"
+    },
+    {
+      "source": "41d6b7d68544601f7a206af69c5b91286a2ed7c9:tests/integration/solver/solved/T5-inverting-amp-rlc.sp",
+      "path": "crates/rnl-solver/tests/data/legacy-layout/T5-inverting-amp-rlc.sp",
+      "sha256": "04ad51794b53e47dee054679a1520f939331026279984e3589124bcead9e53d6"
+    },
+    {
+      "source": "41d6b7d68544601f7a206af69c5b91286a2ed7c9:tests/integration/solver/solved/T6-r2r-ladder.sp",
+      "path": "crates/rnl-solver/tests/data/legacy-layout/T6-r2r-ladder.sp",
+      "sha256": "3f8e196f2d9a62db3280e79e79bc2532f408358d0ff9c4930816039f89d9e1ee"
+    }
+  ]
+}

@@ -14,6 +14,7 @@ on:
       - "tests/conformance/**"
       - "crates/**"
       - "libraries/**"
+      - "config/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/viewer.yml"
@@ -26,6 +27,7 @@ on:
       - "tests/conformance/**"
       - "crates/**"
       - "libraries/**"
+      - "config/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/viewer.yml"
@@ -52,6 +54,8 @@ jobs:
           node-version: 24
       - name: Install Playwright
         run: npm ci
+      - name: Test hierarchy root selection
+        run: node --test roots.test.mjs
       - name: Install the browsers and what they need
         run: npx playwright install --with-deps chromium firefox webkit
       # the web server builds the web viewer's site and serves it; the global setup builds the rnl

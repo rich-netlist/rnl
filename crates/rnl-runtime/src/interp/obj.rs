@@ -206,6 +206,8 @@ pub struct Pin {
     pub label: Option<String>,
     /// Exit direction in degrees: 0 right, 90 up, 180 left, 270 down.
     pub dir: Option<u16>,
+    /// True only for an explicit `direction=` on this PIN (including inherited pins).
+    pub direction_written: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]

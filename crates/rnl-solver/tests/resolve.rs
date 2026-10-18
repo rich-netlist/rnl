@@ -150,7 +150,9 @@ fn check_with(file: &str, p: &LevelProblem, options: &SolverOptions) -> Resolved
     // no fact of the cases contradicts itself (the draft 0.3, 8.5)
     assert!(r.failed.is_empty() && r.errors.is_empty(), "{what}: {:?}", r.errors);
     // the witness is exact; converting it to f64 may cross the edge of the tolerance by rounding
-    let tol = options.tolerance + 1e-9;
+    let tol = options.tolerance.numer().to_string().parse::<f64>().unwrap()
+        / options.tolerance.denom().to_string().parse::<f64>().unwrap()
+        + 1e-9;
     for &f in &r.kept {
         assert!(holds(p, &r, &p.facts[f].kind, tol), "{what}: fact {f} kept but violated: {:?}", p.facts[f]);
     }

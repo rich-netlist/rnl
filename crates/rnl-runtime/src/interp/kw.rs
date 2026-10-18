@@ -1248,7 +1248,7 @@ impl Interp<'_> {
             "left" => 180,
             _ => 270,
         });
-        let pin = Pin { terms: terms.clone(), pos: (x, y), label, dir };
+        let pin = Pin { terms: terms.clone(), pos: (x, y), label, dir, direction_written: dir.is_some() };
         let symbol = ctx.frame.as_ref().unwrap().borrow().symbol.unwrap();
         add_pin(self.symbol_mut(symbol), pin);
         if x != x.round() || y != y.round() {

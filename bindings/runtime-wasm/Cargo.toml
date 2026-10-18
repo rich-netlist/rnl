@@ -15,6 +15,8 @@ crate-type = ["cdylib", "rlib"]
 [features]
 # A request may ask the core to panic, for testing that the page still gets an answer.
 test-panic = []
+# Executes the solver only for the native/WebAssembly acceptance harness.
+test-solver = ["dep:rnl-solver"]
 
 [dependencies]
 rnl-runtime.workspace = true
@@ -22,3 +24,8 @@ rnl-view.workspace = true
 rnl-edit.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+rnl-solver = { workspace = true, optional = true }
+
+[[example]]
+name = "solver-smoke"
+required-features = ["test-solver"]

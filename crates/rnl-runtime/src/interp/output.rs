@@ -441,6 +441,7 @@ impl Interp<'_> {
                 pos: p.pos,
                 label: p.label.clone(),
                 dir: p.dir,
+                direction_written: p.direction_written,
                 terminals: p
                     .terms
                     .iter()

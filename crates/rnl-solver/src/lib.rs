@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! let solved = rnl_solver::solve(problem, &options);
-//! let hash = rnl_runtime::problem::sig2(problem, &options.canonical());
+//! let hash = rnl_runtime::problem::sig3(problem, &options.canonical());
 //! let written = rnl_runtime::solution::write_record(problem, &solved.solution, rnl_solver::AUTHOR, &hash);
 //! ```
 //!
@@ -18,7 +18,7 @@
 //! conflicts with, and each statement whose facts are in such a group is told which facts were
 //! discarded because of it (the draft 0.3, 8.5).
 //!
-//! The work is in stages (the development plan of solver v1):
+//! The work is in stages:
 //!
 //! - resolution of 8.5 with exact rationals and an incremental simplex (`rational`, `simplex`,
 //!   `model`, `orient`, `resolve`);
@@ -27,12 +27,14 @@
 //! - coordinates by a lexicographic LP, routing of the ROUTEs, layered scoring (`coords`, `route`,
 //!   `score`, `driver`).
 //!
-//! **Status: stage S5.** [`resolve()`] resolves the facts of a level as 8.5 says, exactly, and gives
+//! [`resolve()`] resolves the facts of a level as 8.5 says, exactly, and gives
 //! a witness, a placement that satisfies every fact kept. [`solve`] then analyses the structure of
 //! the level, searches candidates structure first (rows by current depth, orders, orientations),
 //! places each by a lexicographic LP rounded to the grid, keeping every fact kept, routes the
-//! ROUTEs of the best of them by a rectilinear A* around the symbols (13.7), with branch points
-//! and junctions (13.2), and takes the best by the layered objectives in force on their wires.
+//! ROUTEs of the best of them by hard search, configured soft search and deterministic fallback,
+//! with branch points and junctions (13.2), and ranks their complete geometry by the configured
+//! exact objective levels. Step1 retains the old coordinate LP levels and two orientation choices;
+//! these restrictions do not add hidden levels to final candidate ranking.
 //! `rnl solve` (in `rnl-cli`) solves every level of a document and writes the records back.
 //!
 //! The crate does no file I/O, reads no clock and takes no randomness, so it builds for
@@ -42,6 +44,7 @@
 //! no check reaches it, the same input and options give the same result on every platform; the
 //! search, the coordinates and the routing are counted in work, never timed, so they always do.
 
+mod config;
 mod coords;
 mod driver;
 mod model;
@@ -51,16 +54,29 @@ mod orient;
 mod rational;
 mod resolve;
 mod route;
+mod routing_geometry;
 mod score;
 mod search;
 mod simplex;
 mod structure;
 
+#[cfg(test)]
+#[path = "../tests/unit/current.rs"]
+mod current_tests;
+#[cfg(test)]
+#[path = "../tests/unit/profile.rs"]
+mod test_profile;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use rnl_runtime::problem::FactKind;
 
-pub use options::{Budget, Layer, Objectives, SolverOptions, DEFAULT_LAYERS, DEFAULT_TIME_LIMIT, OBJECTIVES};
+pub use config::ConfigError;
+pub use options::{
+    Budget, Direction, Layer, ObjectiveScope, Objectives, SolverOptions, Term, DEFAULT_CONFIG, DEFAULT_LAYERS,
+    DEFAULT_TIME_LIMIT, OBJECTIVES,
+};
+pub use rational::{exact_text, Q as Exact};
 pub use resolve::Resolved;
 pub use rnl_runtime::problem::LevelProblem;
 pub use rnl_runtime::solution::Solution;
@@ -100,10 +116,10 @@ pub struct SolveReport {
     /// without a supply or ground symbol, or that this version does not compute: one sentence
     /// each.
     pub inert_objectives: Vec<String>,
-    /// The ROUTEs whose nets the router could not join into one tree (13.7), in the order of the
-    /// ROUTEs. The wires it made for them are in the solution all the same; a viewer draws flight
-    /// lines for what is left. Not an error.
-    pub unrouted: Vec<Unrouted>,
+    /// ROUTEs that needed the soft search or deterministic fallback to complete their tree.
+    pub routing_fallbacks: Vec<RoutingFallback>,
+    /// Every configured term, its exact value, and the effective configuration.
+    pub scoring: ScoreReport,
     pub work: Work,
     /// The errors of the solve (7.6), one sentence each: a fact that contradicts itself and fails
     /// (the draft 0.3, 8.5), one for each fact of `failed`, in order, naming it by its index, its
@@ -206,18 +222,42 @@ pub struct StatementHint {
 }
 
 /// A ROUTE whose net the router left in parts (13.7).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Unrouted {
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct RoutingFallback {
     /// The ROUTE, by its index in [`LevelProblem::routes`]: the first ROUTE of its net, whose style
     /// the wires routed for it take.
     pub route: usize,
     pub net: String,
-    /// The parts the net is left in, two or more: its pins, and the wires written on it, that no
-    /// wire joins to the rest.
-    pub parts: usize,
-    /// The budget of the router for the net ran out ([`Budget::astar_expansions`]); otherwise no
-    /// path around the symbols and the other wires joins a part to the rest.
-    pub budget: bool,
+    pub phase: String,
+    pub reason: String,
+}
+
+/// Machine-readable exact scoring of the chosen candidate.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
+pub struct ScoreReport {
+    pub config: String,
+    pub config_digest: String,
+    pub levels: Vec<ScoreLevel>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
+pub struct ScoreLevel {
+    pub level: usize,
+    pub total: String,
+    pub tolerance: String,
+    pub terms: Vec<ScoreTerm>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
+pub struct ScoreTerm {
+    pub kind: String,
+    pub parameters: serde_json::Value,
+    pub raw: String,
+    pub weight: String,
+    pub weighted: String,
+    pub estimated: bool,
+    pub inactive: bool,
+    pub diagnostics: Vec<String>,
 }
 
 /// The work done. The candidates and the expansions are what the [`Budget`] counts; the nodes and

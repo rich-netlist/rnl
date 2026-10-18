@@ -67,6 +67,8 @@ pub struct PinView {
     pub label: Option<String>,
     /// Exit direction in degrees: 0 right, 90 up, 180 left, 270 down.
     pub dir: Option<u16>,
+    /// The symbol's PIN explicitly writes `direction=`; generated defaults are false.
+    pub direction_written: bool,
     pub terminals: Vec<String>,
 }
 

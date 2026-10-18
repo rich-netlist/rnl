@@ -13,10 +13,10 @@ use serde_json::json;
 use rnl_cli::preview::{one_file, preview, save_copy, Copy, Report, StoppableClock};
 use rnl_cli::solve::{Progress, SolveOptions};
 use rnl_cli::FsProvider;
-use rnl_solver::{SolverOptions, OBJECTIVES};
+use rnl_solver::{exact_text, SolverOptions};
 use rnl_view::Document;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::files::{self, Edits};
@@ -58,50 +58,78 @@ pub struct Settings {
     options: String,
     #[serde(default)]
     hints_for_low: bool,
+    #[serde(default)]
+    solver_config: Option<String>,
 }
 
 impl Settings {
-    /// The defaults with these settings over them, as `rnl solve` reads `--solver-options`: an
-    /// unknown option, or a value that does not do, is an error that says why.
-    fn solver(&self) -> Result<SolverOptions, String> {
-        let options = SolverOptions::default().with_overrides(&self.options)?;
-        Ok(SolverOptions { hints_for_low: self.hints_for_low, ..options })
+    fn loaded(&self, resource_directory: Option<&Path>) -> Result<rnl_cli::solver_config::LoadedConfig, String> {
+        let mut loaded = rnl_cli::solver_config::resolve(
+            self.solver_config.as_deref().filter(|s| !s.is_empty()).map(Path::new),
+            resource_directory,
+            &self.options,
+        )?;
+        loaded.options.hints_for_low = self.hints_for_low;
+        Ok(loaded)
     }
 }
 
-/// The solver's defaults and the objectives it knows, for the settings dialog to show: the options
-/// as the page edits them, `grid` and `time_limit` null for none, and the layers of the objectives,
-/// the first first, each with its objectives and their weights and its tolerance.
-#[tauri::command]
-pub fn solver_defaults() -> serde_json::Value {
-    let d = SolverOptions::default();
-    let layers: Vec<_> = d
-        .objectives
-        .layers
-        .iter()
-        .map(|layer| {
-            let items: Vec<_> =
-                layer.items.iter().map(|(name, weight)| json!({ "name": name, "weight": weight })).collect();
-            json!({ "items": items, "tolerance": layer.tolerance })
-        })
-        .collect();
+fn resource_directory(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path().resource_dir().map_err(|e| format!("cannot locate solver resources: {e}"))
+}
+
+fn defaults_json(d: &SolverOptions, source: &str) -> serde_json::Value {
     json!({
-        "tolerance": d.tolerance,
-        "grid": d.grid,
-        "beam": d.beam,
-        "budget": { "candidates": d.budget.candidates, "astar_expansions": d.budget.astar_expansions },
-        "time_limit": d.time_limit,
+        "source": source,
+        "tolerance": exact_text(&d.tolerance),
+        "grid": d.grid.as_ref().map(exact_text),
+        "beam": d.beam.to_string(),
+        "route_beam": d.route_beam.to_string(),
+        "separate_symbols": d.separate_symbols,
+        "separate_gap": exact_text(&d.separate_gap),
+        "route_clearance": exact_text(&d.route_clearance),
+        "texts_at_anchor": d.texts_at_anchor,
+        "budget": { "candidates": d.budget.candidates.to_string(), "astar_expansions": d.budget.astar_expansions.to_string(), "soft_expansions": d.budget.soft_expansions.to_string(), "symmetry_steps": d.budget.symmetry_steps.to_string() },
+        "time_limit": d.time_limit.as_ref().map(exact_text),
         "hints_for_low": d.hints_for_low,
-        "objectives": layers,
-        "names": OBJECTIVES,
     })
 }
 
-/// Whether the solver takes settings written as `--solver-options` takes them: nothing when it does,
-/// else what is wrong, in its own words.
 #[tauri::command]
-pub fn check_solver_options(options: String) -> Result<(), String> {
-    SolverOptions::default().with_overrides(&options).map(|_| ())
+pub fn solver_defaults(app: AppHandle, solver_config: Option<String>) -> Result<serde_json::Value, String> {
+    let directory = resource_directory(&app)?;
+    let settings = Settings { solver_config, ..Settings::default() };
+    match settings.loaded(Some(&directory)) {
+        Ok(loaded) => Ok(defaults_json(&loaded.options, &loaded.source())),
+        Err(error) => {
+            // Keep the dialog usable so an invalid selected/default file can be replaced. This
+            // does not select a fallback for solving: checking or solving still returns the error.
+            let mut value = defaults_json(&SolverOptions::builtin(), "configuration error");
+            value["config_error"] = json!(error);
+            Ok(value)
+        }
+    }
+}
+
+#[tauri::command]
+pub fn check_solver_options(app: AppHandle, options: String, solver_config: Option<String>) -> Result<(), String> {
+    Settings { options, solver_config, ..Settings::default() }.loaded(Some(&resource_directory(&app)?)).map(|_| ())
+}
+
+#[tauri::command]
+pub async fn pick_solver_config(window: WebviewWindow) -> Result<Option<String>, String> {
+    let chosen = tauri::async_runtime::spawn_blocking(move || {
+        window
+            .dialog()
+            .file()
+            .set_parent(&window)
+            .set_title("Choose Solver Configuration")
+            .add_filter("Solver TOML", &["toml"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    chosen.map(|p| p.into_path().map(|p| p.to_string_lossy().into_owned()).map_err(|e| e.to_string())).transpose()
 }
 
 /// Solve the netlist the page shows, a file by its path or a text held in memory as the file
@@ -123,7 +151,9 @@ pub async fn solve_preview(
 ) -> Result<Solved, String> {
     let paths = preferences.paths()?;
     let pool = pool.unwrap_or_default();
-    let options = SolveOptions { solver: settings.unwrap_or_default().solver()?, ..SolveOptions::default() };
+    let loaded = settings.unwrap_or_default().loaded(Some(&resource_directory(window.app_handle())?))?;
+    let config_source = loaded.source();
+    let options = SolveOptions { solver: loaded.options, ..SolveOptions::default() };
     let stop = Arc::new(AtomicBool::new(false));
     if let Some(before) = solves.running.lock().map_err(|e| e.to_string())?.replace(stop.clone()) {
         before.store(true, Ordering::Relaxed);
@@ -168,7 +198,9 @@ pub async fn solve_preview(
             *running = None;
         }
     }
-    let shown = shown?;
+    let mut shown = shown?;
+    shown.report.text.insert(0, format!("solver config: {config_source}"));
+    shown.report.config_source = Some(config_source);
     *solves.last.lock().map_err(|e| e.to_string())? = Some(shown.copy);
     Ok(Solved { document: shown.document, report: shown.report })
 }
@@ -241,66 +273,31 @@ fn said(w: &rnl_cli::solve::Writing, to: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::{copy_name, defaults_json, Settings};
+    use rnl_solver::{exact_text, SolverOptions};
+    use serde_json::json;
     use std::path::Path;
 
-    use rnl_solver::{SolverOptions, DEFAULT_LAYERS, OBJECTIVES};
-    use serde_json::json;
-
-    use super::{check_solver_options, copy_name, solver_defaults, Settings};
-
-    /// The settings the page gives: none, or an empty text, are the defaults of `rnl solve`; a text
-    /// is read over them as `--solver-options` reads it; `hintsForLow` is not part of that text.
     #[test]
-    fn the_settings_the_page_gives() {
-        let given = |v: serde_json::Value| serde_json::from_value::<Settings>(v).unwrap().solver();
-        assert_eq!(Settings::default().solver(), Ok(SolverOptions::default()));
-        assert_eq!(given(json!({})), Ok(SolverOptions::default()));
-        assert_eq!(given(json!({ "options": "", "hintsForLow": false })), Ok(SolverOptions::default()));
-        let text = "beam=8;time_limit=none;grid=none;budget=candidates:7";
-        let set = given(json!({ "options": text, "hintsForLow": true })).unwrap();
-        let default = SolverOptions::default();
-        assert_eq!((set.beam, set.time_limit, set.grid), (8, None, None));
-        assert_eq!((set.budget.candidates, set.budget.astar_expansions), (7, default.budget.astar_expansions));
-        assert!(set.hints_for_low);
-        assert_eq!(set.objectives, default.objectives);
-        // the objectives replace the whole list, as `--solver-options` has them
-        let set = given(json!({ "options": "objectives=area+wire_length*2~0.5,turns" })).unwrap();
-        assert_eq!(set.canonical().split(';').nth(2), Some("objectives=area+wire_length*2~0.5,turns"));
-        // what does not read says why, in the solver's words, and so does the check
-        for (text, why) in [
-            ("beam=0", "the beam must be at least 1"),
-            ("time_limit=-1", "the time limit must be a number of seconds not below 0"),
-            ("tolerance=x", "the tolerance is not a number"),
-            ("objectives=beauty", "no objective is called `beauty`"),
-            ("budget=pivots:1", "the budget has no `pivots`"),
-            ("speed=3", "the solver has no option `speed`"),
-        ] {
-            let e = given(json!({ "options": text })).unwrap_err();
-            assert!(e.contains(why), "{text}: {e}");
-            assert_eq!(check_solver_options(text.to_string()), Err(e));
-        }
-        assert_eq!(check_solver_options(String::new()), Ok(()));
-        assert_eq!(check_solver_options("beam=2;time_limit=none".to_string()), Ok(()));
+    fn settings_keep_exact_text_and_selected_config_path() {
+        let settings: Settings = serde_json::from_value(
+            json!({"options":"tolerance=0.10000000000000001", "solverConfig":"custom.toml", "hintsForLow":true}),
+        )
+        .unwrap();
+        assert_eq!(settings.solver_config.as_deref(), Some("custom.toml"));
+        assert!(settings.hints_for_low);
+        let options = SolverOptions::builtin().with_overrides(&settings.options).unwrap();
+        assert_eq!(exact_text(&options.tolerance), "10000000000000001/100000000000000000");
+        assert!(SolverOptions::builtin().with_overrides("objectives=none").is_err());
     }
 
-    /// The dialog shows what the solver's defaults are, and which objectives there are, as the
-    /// solver says; the page keeps nothing of them itself.
     #[test]
-    fn the_defaults_the_dialog_shows_are_the_solvers() {
-        let d = solver_defaults();
-        let o = SolverOptions::default();
-        assert_eq!(d["tolerance"], json!(o.tolerance));
-        assert_eq!(d["grid"], json!(o.grid));
-        assert_eq!(d["beam"], json!(o.beam));
-        assert_eq!(d["time_limit"], json!(o.time_limit));
-        assert_eq!(d["hints_for_low"], json!(false));
-        let budget = json!({ "candidates": o.budget.candidates, "astar_expansions": o.budget.astar_expansions });
-        assert_eq!(d["budget"], budget);
-        assert_eq!(d["names"], json!(OBJECTIVES));
-        let layers = d["objectives"].as_array().unwrap();
-        let first: Vec<&str> = layers.iter().map(|l| l["items"][0]["name"].as_str().unwrap()).collect();
-        assert_eq!(first, DEFAULT_LAYERS);
-        assert!(layers.iter().all(|l| l["items"].as_array().unwrap().len() == 1 && l["tolerance"] == 0.0));
+    fn defaults_transport_rationals_as_strings() {
+        let options = SolverOptions::builtin();
+        let value = defaults_json(&options, "builtin");
+        assert_eq!(value["tolerance"], json!(exact_text(&options.tolerance)));
+        assert!(value.get("objectives").is_none());
+        assert_eq!(value["source"], "builtin");
     }
 
     #[test]

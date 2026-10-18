@@ -55,12 +55,13 @@
  *   (decision 0011). Rejects with a message when it cannot, and with CANCELLED when `cancelSolve`
  *   stopped it. Only the desktop offers it; without it, the Solve menu is not shown and its
  *   commands do nothing.
- * @property {() => Promise<SolverDefaults>} [solverDefaults] The solver's options as it has them
+ * @property {(solverConfig?: string | null) => Promise<SolverDefaults>} [solverDefaults] The solver's options as it has them
  *   without any setting, and the names of its objectives, for Solve > Settings to show
  *   (solve-settings.js); the page keeps none of them itself. Offered with `solve`.
- * @property {(options: string) => Promise<string | null>} [checkSolverOptions] Whether the solver takes
+ * @property {(options: string, solverConfig?: string | null) => Promise<string | null>} [checkSolverOptions] Whether the solver takes
  *   `options`, written as `rnl solve --solver-options` takes them: null when it does, else what is
  *   wrong, in the solver's words. Offered with `solve`.
+ * @property {() => Promise<string | null>} [pickSolverConfig] Select a solver TOML file.
  * @property {() => void} [cancelSolve] Stop the solve under way.
  * @property {() => Promise<string | null>} [saveSolved] Save a copy of the last solve shown where the
  *   user says, never over a file that was read: what was saved, in a sentence, or null when the
@@ -115,7 +116,7 @@
  * the defaults; `hintsForLow` asks for every conflict group of the facts of priority low, which
  * that text cannot say (`rnl solve --report` does).
  *
- * @typedef {{ options: string, hintsForLow: boolean }} SolverSettings
+ * @typedef {{ options: string, hintsForLow: boolean, solverConfig?: string }} SolverSettings
  */
 
 /**
@@ -126,14 +127,18 @@
  * every objective it knows, on or off.
  *
  * @typedef {object} SolverDefaults
- * @property {number} tolerance
- * @property {number | null} grid
- * @property {number} beam
- * @property {{ candidates: number, astar_expansions: number }} budget
- * @property {number | null} time_limit
+ * @property {string} tolerance
+ * @property {string | null} grid
+ * @property {string} beam
+ * @property {{ candidates: string, astar_expansions: string, soft_expansions: string, symmetry_steps: string }} budget
+ * @property {string | null} time_limit
  * @property {boolean} hints_for_low
- * @property {{ items: { name: string, weight: number }[], tolerance: number }[]} objectives
- * @property {string[]} names
+ * @property {string} route_beam
+ * @property {boolean} separate_symbols
+ * @property {string} separate_gap
+ * @property {string} route_clearance
+ * @property {string} source
+ * @property {string} [config_error]
  */
 
 /**

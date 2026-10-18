@@ -1,53 +1,21 @@
-//! The table of objectives (plan 5.4; algorithm synthesis 5.3, 5.7): for each, its default
-//! scope, the inputs it needs, whether it has a structural side, its estimate and its score.
-//!
-//! An objective is a preference of the solver's own, not a fact (14.8): the standard leaves the
-//! kinds of objectives and their order to the solver, which keeps them in its options. They rank
-//! after every fact (8.5), so they choose only among layouts that keep every fact kept.
-//!
-//! **Two faces.** An objective with a structural side is both a rule that makes candidates (the
-//! sources of `crate::structure`) and a measure that ranks them; one without is only a measure.
-//! An objective that is off has neither: it makes no candidate, ranks none and breaks no tie
-//! (decided 2026-10-16).
-//!
-//! **Inert objectives.** An objective that is on but has nothing to work with, such as the
-//! current direction in a level without a supply symbol, is treated as off, and the report says
-//! so in one sentence ([`Active::inert`]). So are the three this version does not compute,
-//! `terminal_wire_alignment`, `labels` and `bend_alignment`.
-//!
-//! **Values.** Every value is an exact rational ([`Q`]), so that candidates compare alike on
-//! every platform. A layer's value is the weighted sum of its objectives; layers rank
-//! lexicographically, the first first, a value within the layer's tolerance of the least counting
-//! as equal to it ([`Active::rank`]).
-//!
-//! - [`estimate`] measures a sketch: the rough placement of a partial candidate in the search
-//!   (`crate::search`), with the routing objectives measured on straight connections, since
-//!   nothing is routed yet.
-//! - [`score`] measures a candidate placed by the coordinate LP (`crate::coords`), and, once it
-//!   is routed (stage S4), its wires. Without wires the routing objectives are measured as the
-//!   estimate measures them.
-//!
-//! The counting objectives (distinct coordinates, kinds of gaps, crossings, turns) are not linear,
-//! so they never enter the coordinate LP, which minimises linear stand-ins (plan 5.6); they rank
-//! candidates once placed.
-
-use std::collections::BTreeSet;
-
+//! Configured exact scoring and deterministic tolerance-window ranking.
+use crate::model::PointId;
+use crate::options::{Direction, ObjectiveScope, Term};
+#[cfg(test)]
+use crate::rational::frac;
+use crate::rational::{int, Q};
+use crate::route::CLEARANCE;
+use crate::structure::Structure;
+use crate::Objectives;
 use num_traits::{Signed, Zero};
 use rnl_runtime::geom::Orient;
+use std::cell::OnceCell;
+use std::collections::BTreeSet;
 
-use crate::model::PointId;
-use crate::rational::{frac, from_f64, int, Q};
-use crate::route::CLEARANCE;
-use crate::structure::{Role, Structure};
-use crate::{Objectives, OBJECTIVES};
-
-/// An objective, as [`OBJECTIVES`] names it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Objective {
     CurrentDirection,
     GroundDirection,
-    SignalFlow,
     ComponentAlignment,
     Distribution,
     Symmetry,
@@ -57,257 +25,207 @@ pub(crate) enum Objective {
     Area,
     Aspect,
     TerminalWireAlignment,
-    Labels,
-    BendAlignment,
+    SymbolOverlaps,
+    WireShorts,
+    WireOverlaps,
+    LabelOverlaps,
 }
-
-/// Where an objective is measured by default (algorithm synthesis 3.5).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Scope {
-    /// Within each group (11.5): a group is where symmetry and even spacing are judged. The
-    /// components in no group are not a group, and nothing is judged among them (algorithm
-    /// synthesis 9.3, decided 2026-10-17; quality review SE-3): the structural side of such an
-    /// objective still makes its candidates, its measure is 0 where there is no group.
     Group,
-    /// Over the whole level.
     Level,
 }
-
-/// What an objective needs from the level to have anything to measure.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Need {
-    /// A supply symbol: `$SUPPLY`, which `$SUPPLY_STUB` makes.
-    Supply,
-    /// A ground symbol: `$GND`, which `$GND_STUB` makes.
-    Ground,
-    /// A port whose kind, input or output, can be told from what it connects to.
-    PortKinds,
-    /// Something drawn as wires: a ROUTE (13.7) or a wire (13.1).
-    Wires,
-    /// Routing templates, which this version does not make.
-    Templates,
-}
-
-/// One row of the table of objectives.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Entry {
-    pub objective: Objective,
-    pub scope: Scope,
-    pub needs: &'static [Need],
-    /// Whether it makes candidates as well as ranking them (`crate::structure::Source`).
     pub structural: bool,
-    /// Whether this version computes it; one it does not is inert when configured.
-    pub implemented: bool,
 }
-
-/// The table, in the order of [`OBJECTIVES`].
-pub(crate) const TABLE: [Entry; 14] = [
-    // MOS and BJT whose source (emitter) is not on the side of the ground; rows by current depth
-    Entry {
-        objective: Objective::CurrentDirection,
-        scope: Scope::Level,
-        needs: &[Need::Supply, Need::Ground],
-        structural: true,
-        implemented: true,
-    },
-    // ground symbols whose pin is not above their body; they hang below their pins
-    Entry {
-        objective: Objective::GroundDirection,
-        scope: Scope::Level,
-        needs: &[Need::Ground],
-        structural: true,
-        implemented: true,
-    },
-    // pairs of an input port right of an output port; inputs left, outputs right
-    Entry {
-        objective: Objective::SignalFlow,
-        scope: Scope::Level,
-        needs: &[Need::PortKinds],
-        structural: true,
-        implemented: true,
-    },
-    // distinct x plus distinct y of the components' origins; who shares a row or a column
-    Entry {
-        objective: Objective::ComponentAlignment,
-        scope: Scope::Group,
-        needs: &[],
-        structural: true,
-        implemented: true,
-    },
-    // kinds of gaps between adjacent component coordinates (the prototype's gap kinds); even rows
-    Entry { objective: Objective::Distribution, scope: Scope::Group, needs: &[], structural: true, implemented: true },
-    // mirror pairs not symmetric; mirrored orientations
-    Entry { objective: Objective::Symmetry, scope: Scope::Group, needs: &[], structural: true, implemented: true },
-    // bends of the wires; no structural side without routing templates
-    Entry {
-        objective: Objective::Turns,
-        scope: Scope::Level,
-        needs: &[Need::Wires],
-        structural: false,
-        implemented: true,
-    },
-    // crossings of wires of different nets; the order of the columns
-    Entry {
-        objective: Objective::Crossings,
-        scope: Scope::Level,
-        needs: &[Need::Wires],
-        structural: true,
-        implemented: true,
-    },
-    // the length of the wires; what is connected is put side by side
-    Entry {
-        objective: Objective::WireLength,
-        scope: Scope::Level,
-        needs: &[Need::Wires],
-        structural: true,
-        implemented: true,
-    },
-    // the area of the envelope; blocks side by side or stacked
-    Entry { objective: Objective::Area, scope: Scope::Level, needs: &[], structural: true, implemented: true },
-    // |width / height − 16/9| of the envelope
-    Entry { objective: Objective::Aspect, scope: Scope::Level, needs: &[], structural: true, implemented: true },
-    Entry {
-        objective: Objective::TerminalWireAlignment,
-        scope: Scope::Level,
-        needs: &[Need::Wires],
-        structural: false,
-        implemented: false,
-    },
-    Entry {
-        objective: Objective::Labels,
-        scope: Scope::Level,
-        needs: &[Need::Wires],
-        structural: false,
-        implemented: false,
-    },
-    Entry {
-        objective: Objective::BendAlignment,
-        scope: Scope::Group,
-        needs: &[Need::Templates],
-        structural: true,
-        implemented: false,
-    },
-];
-
 impl Objective {
-    /// Its name in the options ([`OBJECTIVES`]).
+    #[cfg(test)]
     pub(crate) fn name(self) -> &'static str {
-        OBJECTIVES[self as usize]
+        match self {
+            Self::CurrentDirection => "current_direction",
+            Self::GroundDirection => "symbol_direction",
+            Self::ComponentAlignment => "symbol_alignment",
+            Self::Distribution => "symbol_distribution",
+            Self::Symmetry => "symbol_symmetry",
+            Self::Turns => "wire_turns",
+            Self::Crossings => "wire_crossings",
+            Self::WireLength => "wire_length",
+            Self::Area => "area",
+            Self::Aspect => "aspect",
+            Self::TerminalWireAlignment => "pin_wire_alignment",
+            Self::SymbolOverlaps => "symbol_overlaps",
+            Self::WireShorts => "wire_shorts",
+            Self::WireOverlaps => "wire_overlaps",
+            Self::LabelOverlaps => "label_overlaps",
+        }
     }
-
-    /// The objective of a name in the options.
-    pub(crate) fn from_name(name: &str) -> Option<Objective> {
-        let i = OBJECTIVES.iter().position(|n| *n == name)?;
-        Some(TABLE[i].objective)
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "current_direction" => Self::CurrentDirection,
+            "symbol_direction" => Self::GroundDirection,
+            "symbol_alignment" => Self::ComponentAlignment,
+            "symbol_distribution" => Self::Distribution,
+            "symbol_symmetry" => Self::Symmetry,
+            "wire_turns" => Self::Turns,
+            "wire_crossings" => Self::Crossings,
+            "wire_length" => Self::WireLength,
+            "area" => Self::Area,
+            "aspect" => Self::Aspect,
+            "pin_wire_alignment" => Self::TerminalWireAlignment,
+            "symbol_overlaps" => Self::SymbolOverlaps,
+            "wire_shorts" => Self::WireShorts,
+            "wire_overlaps" => Self::WireOverlaps,
+            "label_overlaps" => Self::LabelOverlaps,
+            _ => return None,
+        })
     }
-
-    /// Its row of the table.
-    pub(crate) fn entry(self) -> &'static Entry {
-        &TABLE[self as usize]
-    }
-}
-
-/// What the level offers the objectives (`crate::structure`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Inputs {
-    pub supply: bool,
-    pub ground: bool,
-    pub port_kinds: bool,
-    pub wires: bool,
-}
-
-impl Inputs {
-    fn has(&self, need: Need) -> bool {
-        match need {
-            Need::Supply => self.supply,
-            Need::Ground => self.ground,
-            Need::PortKinds => self.port_kinds,
-            Need::Wires => self.wires,
-            Need::Templates => false,
+    pub(crate) fn entry(self) -> Entry {
+        Entry {
+            structural: matches!(
+                self,
+                Self::CurrentDirection
+                    | Self::GroundDirection
+                    | Self::ComponentAlignment
+                    | Self::Distribution
+                    | Self::Crossings
+                    | Self::WireLength
+                    | Self::Area
+                    | Self::Aspect
+            ),
         }
     }
 }
-
-/// One layer of the objectives in force.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Inputs {
+    pub wires: bool,
+    pub currents: bool,
+}
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ActiveLayer {
-    pub items: Vec<(Objective, u32)>,
-    /// Two values within it count as equal (`Layer::tolerance`).
+    pub items: Vec<(Objective, Q)>,
+    pub terms: Vec<Term>,
     pub tolerance: Q,
 }
-
-/// The objectives in force in a level: the layers configured, without the objectives that are
-/// inert there, and a sentence for each of those.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Active {
     pub layers: Vec<ActiveLayer>,
     pub inert: Vec<String>,
 }
-
 impl Active {
-    /// The layers of `objectives` that the level can measure ([`Inputs`]). A layer left with no
-    /// objective is dropped.
-    pub(crate) fn new(objectives: &Objectives, inputs: &Inputs) -> Active {
+    pub(crate) fn new(objectives: &Objectives, inputs: &Inputs) -> Self {
         let mut layers = Vec::new();
         let mut inert = Vec::new();
         for layer in &objectives.layers {
-            let mut items = Vec::new();
-            for (name, weight) in &layer.items {
-                let Some(o) = Objective::from_name(name) else { continue };
-                match inert_reason(o, inputs) {
-                    Some(reason) => inert.push(reason),
-                    None => items.push((o, *weight)),
+            let mut terms = layer.items.clone();
+            terms.sort_by_key(Term::key);
+            for t in &terms {
+                if t.kind == "current_direction" && !inputs.currents {
+                    inert.push(
+                        "current_direction is inactive: no marked terminal with an explicit pin direction".into(),
+                    );
+                }
+                if matches!(
+                    t.kind.as_str(),
+                    "wire_turns" | "wire_crossings" | "wire_length" | "wire_shorts" | "wire_overlaps"
+                ) && !inputs.wires
+                {
+                    inert.push(format!("{} is inactive: nothing drawn as wires", t.kind));
                 }
             }
-            if !items.is_empty() {
-                let tolerance = from_f64(layer.tolerance).filter(|t| !t.is_negative()).unwrap_or_default();
-                layers.push(ActiveLayer { items, tolerance });
-            }
+            let items =
+                terms.iter().filter_map(|t| Objective::from_name(&t.kind).map(|o| (o, t.weight.clone()))).collect();
+            layers.push(ActiveLayer { items, terms, tolerance: layer.tolerance.clone() });
         }
-        Active { layers, inert }
+        Self { layers, inert }
     }
-
-    /// Whether an objective is in force.
     #[cfg(test)]
     pub(crate) fn is_on(&self, o: Objective) -> bool {
         self.layers.iter().any(|l| l.items.iter().any(|(x, _)| *x == o))
     }
-
-    /// The objectives in force in the order of their layers.
     pub(crate) fn in_order(&self) -> Vec<Objective> {
-        self.layers.iter().flat_map(|l| l.items.iter().map(|(o, _)| *o)).collect()
-    }
-
-    /// The value of each layer on a sketch ([`estimate`]).
-    pub(crate) fn estimate(&self, view: &View) -> Vec<Q> {
-        self.layers.iter().map(|l| l.items.iter().map(|(o, w)| estimate(*o, view) * int(i64::from(*w))).sum()).collect()
-    }
-
-    /// The value of each layer on a placed candidate ([`score`]).
-    pub(crate) fn score(&self, view: &View, routed: Option<&Routed>) -> Vec<Q> {
         self.layers
             .iter()
-            .map(|l| l.items.iter().map(|(o, w)| score(*o, view, routed) * int(i64::from(*w))).sum())
+            .flat_map(|l| l.items.iter().map(|(o, _)| *o))
+            .filter(|o| {
+                *o != Objective::CurrentDirection || !self.inert.iter().any(|s| s.starts_with("current_direction"))
+            })
             .collect()
     }
-
-    /// The order of some candidates, best first, from the value of each layer and the canonical
-    /// code of each (plan 5.8). The best is chosen layer by layer: the least value of the first
-    /// layer, the candidates within its tolerance of that value kept, then the least value of the
-    /// next layer among those, and so on; of the candidates left, the smallest code wins, then the
-    /// earlier entry. The best of the others comes next, and so on.
-    ///
-    /// A layer is compared with its least value, never one candidate with another: within a
-    /// tolerance, "equal" is not transitive (0 ≈ 0.6 t and 0.6 t ≈ 1.2 t, yet 0 < 1.2 t), so a
-    /// sort by a pairwise comparison would not be well defined. This order is, whatever the
-    /// tolerances, and does not depend on the order of the entries but for those equal in
-    /// everything. With every tolerance 0 it is the lexicographic order of the values, then the
-    /// codes. An objective that is off has no layer here, so it breaks no tie.
+    pub(crate) fn terms(&self) -> impl Iterator<Item = &Term> {
+        self.layers.iter().flat_map(|l| &l.terms)
+    }
+    pub(crate) fn report(
+        &self,
+        view: &View,
+        routed: Option<&Routed>,
+        options: &crate::SolverOptions,
+    ) -> crate::ScoreReport {
+        use crate::rational::exact_text;
+        let config = options.canonical();
+        let scoring = Scoring::new(*view, routed);
+        let levels = self
+            .layers
+            .iter()
+            .enumerate()
+            .map(|(i, l)| {
+                let values: Vec<Q> = l.terms.iter().map(|t| scoring.term(t)).collect();
+                let total: Q = l.terms.iter().zip(&values).map(|(t, v)| v * &t.weight).sum();
+                let terms = l
+                    .terms
+                    .iter()
+                    .zip(values)
+                    .map(|(t, v)| {
+                        let (inactive, diagnostics) = term_status(t, view);
+                        crate::ScoreTerm {
+                            kind: t.kind.clone(),
+                            parameters: t.parameters(),
+                            raw: exact_text(&v),
+                            weight: exact_text(&t.weight),
+                            weighted: exact_text(&(&v * &t.weight)),
+                            estimated: routed.is_none() || t.kind == "label_overlaps",
+                            inactive,
+                            diagnostics,
+                        }
+                    })
+                    .collect();
+                crate::ScoreLevel { level: i, total: exact_text(&total), tolerance: exact_text(&l.tolerance), terms }
+            })
+            .collect();
+        crate::ScoreReport { config_digest: rnl_runtime::problem::options_digest(&config), config, levels }
+    }
+    pub(crate) fn estimate(&self, view: &View) -> Vec<Q> {
+        #[cfg(test)]
+        let _profile = crate::test_profile::section("active.estimate");
+        self.score(view, None)
+    }
+    pub(crate) fn score(&self, view: &View, routed: Option<&Routed>) -> Vec<Q> {
+        let scoring = Scoring::new(*view, routed);
+        let values = self.layers.iter().map(|l| l.terms.iter().map(|t| scoring.term(t) * &t.weight).sum()).collect();
+        #[cfg(test)]
+        if crate::test_profile::oracle_enabled() {
+            let _profile = crate::test_profile::section("reference.score");
+            let reference: Vec<Q> = self
+                .layers
+                .iter()
+                .map(|l| l.terms.iter().map(|t| score_term(t, view, routed) * &t.weight).sum())
+                .collect();
+            assert_eq!(values, reference, "cached full exact score differs from reference");
+        }
+        values
+    }
     pub(crate) fn rank(&self, entries: &[(&[Q], &[u32])]) -> Vec<usize> {
         let by_code = |a: &usize, b: &usize| entries[*a].1.cmp(entries[*b].1).then(a.cmp(b));
         if self.layers.iter().all(|l| l.tolerance.is_zero()) {
             let mut order: Vec<usize> = (0..entries.len()).collect();
-            order.sort_by(|a, b| entries[*a].0.cmp(entries[*b].0).then_with(|| by_code(a, b)));
+            order.sort_by(|a, b| {
+                entries[*a]
+                    .0
+                    .iter()
+                    .take(self.layers.len())
+                    .cmp(entries[*b].0.iter().take(self.layers.len()))
+                    .then_with(|| by_code(a, b))
+            });
             return order;
         }
         let mut left: Vec<usize> = (0..entries.len()).collect();
@@ -330,128 +248,332 @@ impl Active {
     }
 }
 
-/// Why an objective is inert in a level, in one sentence; none when it is in force.
-fn inert_reason(o: Objective, inputs: &Inputs) -> Option<String> {
-    let entry = o.entry();
-    let name = o.name();
-    if !entry.implemented {
-        return Some(format!("{name} is not computed by this version of the solver (solver v1): it is treated as off"));
-    }
-    let missing: Vec<&str> = entry
-        .needs
-        .iter()
-        .filter(|n| !inputs.has(**n))
-        .map(|n| match n {
-            Need::Supply => "no supply symbol ($SUPPLY or $SUPPLY_STUB)",
-            Need::Ground => "no ground symbol ($GND or $GND_STUB)",
-            Need::PortKinds => "no port whose kind, input or output, can be told",
-            Need::Wires => "nothing drawn as wires (no ROUTE and no wire)",
-            Need::Templates => "no routing templates",
-        })
-        .collect();
-    if missing.is_empty() {
-        None
-    } else {
-        Some(format!(
-            "{name} has nothing to work with in this level, which has {}: it is treated as off",
-            missing.join(" and ")
-        ))
-    }
-}
-
-/// A placement to measure: an origin and an orientation for every object of the problem. The
-/// origin of an object drawn at the point of its main object (12.1) is that point, and of a text
-/// placed by its symbol its own position (13.3).
 #[derive(Clone, Copy)]
 pub(crate) struct View<'a> {
     pub s: &'a Structure,
     pub at: &'a [[Q; 2]],
     pub orient: &'a [Orient],
 }
-
 impl View<'_> {
-    fn pin(&self, k: usize, pin: usize) -> Option<[Q; 2]> {
-        self.s.pin_at(self.at, self.orient, k, pin)
-    }
-
     fn bbox(&self, k: usize) -> Option<[Q; 4]> {
         self.s.box_at(self.at, self.orient, k)
     }
-
     fn point(&self, p: PointId) -> Option<[Q; 2]> {
         self.s.point_at(self.at, self.orient, p)
     }
 }
-
-/// The wires of a routed candidate (stage S4): each a polyline, by the index of the drawn net
-/// of `crate::structure::Connections::drawn` it belongs to.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Routed {
     pub paths: Vec<(usize, Vec<[Q; 2]>)>,
+    pub geometry: crate::routing_geometry::RoutingGeometry,
 }
 
-/// The value of an objective on a sketch, for a partial candidate (plan 5.5): as [`score`]
-/// measures a placed candidate that is not routed. The routing objectives measure the straight
-/// connections of a minimum spanning tree of each net: their length; an L for each connection not
-/// along an axis, crossing what it crosses; the turns the router makes of each, by the direction
-/// each pin leaves ([`connection_turns`]).
-pub(crate) fn estimate(o: Objective, view: &View) -> Q {
-    score(o, view, None)
+struct TreeConnection {
+    net: usize,
+    routed: bool,
+    a: PointId,
+    b: PointId,
+    from: [Q; 2],
+    to: [Q; 2],
 }
-
-/// The value of an objective on a placed candidate (plan 5.8); smaller is better. With `routed`,
-/// the routing objectives measure the wires; without, the connections as [`estimate`] does.
-/// An objective this version does not compute is 0.
-pub(crate) fn score(o: Objective, view: &View, routed: Option<&Routed>) -> Q {
-    match o {
-        Objective::CurrentDirection => current_direction(view),
-        Objective::GroundDirection => ground_direction(view),
-        Objective::SignalFlow => signal_flow(view),
-        Objective::ComponentAlignment => scoped(view, o.entry().scope, alignment),
-        Objective::Distribution => scoped(view, o.entry().scope, |pts| {
-            gap_kinds(pts.iter().map(|p| &p[0])) + gap_kinds(pts.iter().map(|p| &p[1]))
-        }),
-        Objective::Symmetry => symmetry(view),
-        Objective::Turns => match routed {
-            Some(r) => r.paths.iter().map(|(_, path)| int(bends(path) as i64)).sum(),
-            None => turns(view),
-        },
-        Objective::Crossings => match routed {
-            Some(r) => {
-                let segments: Vec<(usize, [Q; 2], [Q; 2])> = r
-                    .paths
-                    .iter()
-                    .flat_map(|(net, path)| path.windows(2).map(move |w| (*net, w[0].clone(), w[1].clone())))
-                    .collect();
-                crossings(&segments)
-            }
-            None => {
-                // each connection drawn as an L, horizontal from its first end
-                let mut segments = Vec::new();
-                for (net, a, b) in connections(view) {
-                    let corner = [b[0].clone(), a[1].clone()];
-                    segments.push((net, a, corner.clone()));
-                    segments.push((net, corner, b));
+/// A cache never survives a scoring call, even when only one orientation changes.
+struct Scoring<'a> {
+    geometry: crate::score::ViewGeometry<'a>,
+    routed: Option<&'a Routed>,
+    tree: OnceCell<Vec<TreeConnection>>,
+    envelope: OnceCell<Option<[Q; 4]>>,
+}
+impl<'a> Scoring<'a> {
+    fn new(view: View<'a>, routed: Option<&'a Routed>) -> Self {
+        Self {
+            geometry: crate::score::ViewGeometry::new(view),
+            routed,
+            tree: OnceCell::new(),
+            envelope: OnceCell::new(),
+        }
+    }
+    fn tree(&self) -> &[TreeConnection] {
+        self.tree.get_or_init(|| {
+            let mut out = Vec::new();
+            for (net, drawn) in self.geometry.view.s.connections.drawn.iter().enumerate() {
+                let points: Vec<_> = drawn.points.iter().filter_map(|p| Some((*p, self.geometry.point(*p)?))).collect();
+                let positions: Vec<_> = points.iter().map(|(_, q)| q.clone()).collect();
+                for (a, b) in spanning_tree(&positions) {
+                    out.push(TreeConnection {
+                        net,
+                        routed: drawn.routed,
+                        a: points[a].0,
+                        b: points[b].0,
+                        from: points[a].1.clone(),
+                        to: points[b].1.clone(),
+                    });
                 }
+            }
+            out
+        })
+    }
+    fn term(&self, t: &Term) -> Q {
+        #[cfg(test)]
+        let _profile = crate::test_profile::section(&t.kind);
+        let view = &self.geometry.view;
+        match t.kind.as_str() {
+            "symbol_overlaps" => self.geometry.overlaps().into_q(),
+            "label_overlaps" => self.geometry.texts_over().into_q(),
+            "wire_shorts" | "wire_overlaps" => {
+                self.geometry.wire_penalty(self.routed, t.kind == "wire_shorts").into_q()
+            }
+            "wire_length" if self.routed.is_none() => self.tree().iter().map(|c| manhattan(&c.from, &c.to)).sum(),
+            "wire_turns" if self.routed.is_none() => {
+                let exit = |p: PointId| match p {
+                    PointId::Pin(k, pin) => view.s.exit(k, pin, view.orient[k]),
+                    _ => None,
+                };
+                self.tree()
+                    .iter()
+                    .map(|c| {
+                        let (a, b) = (&c.from, &c.to);
+                        let (ea, eb) = (exit(c.a), exit(c.b));
+                        int(if c.routed {
+                            connection_turns(a, ea, b, eb)
+                        } else {
+                            usize::from(a[0] != b[0] && a[1] != b[1])
+                                + usize::from(!leaves_towards(a, ea, b))
+                                + usize::from(!leaves_towards(b, eb, a))
+                        } as i64)
+                    })
+                    .sum()
+            }
+            "wire_crossings" if self.routed.is_none() => {
+                let segments = self
+                    .tree()
+                    .iter()
+                    .flat_map(|c| {
+                        let middle = [c.to[0].clone(), c.from[1].clone()];
+                        [(c.net, c.from.clone(), middle.clone()), (c.net, middle, c.to.clone())]
+                    })
+                    .collect::<Vec<_>>();
                 crossings(&segments)
             }
-        },
-        Objective::WireLength => match routed {
-            Some(r) => r.paths.iter().flat_map(|(_, path)| path.windows(2).map(|w| manhattan(&w[0], &w[1]))).sum(),
-            None => connections(view).iter().map(|(_, a, b)| manhattan(a, b)).sum(),
-        },
-        Objective::Area => match envelope(view) {
-            Some(e) => (&e[2] - &e[0]) * (&e[3] - &e[1]),
-            None => Q::zero(),
-        },
-        Objective::Aspect => match envelope(view) {
-            Some(e) => aspect(&(&e[2] - &e[0]), &(&e[3] - &e[1])),
-            None => Q::zero(),
-        },
-        Objective::TerminalWireAlignment | Objective::Labels | Objective::BendAlignment => Q::zero(),
+            "area" | "aspect" => match self.envelope.get_or_init(|| {
+                let mut out: Option<[Q; 4]> = None;
+                for k in view.s.components() {
+                    let Some(b) = self.geometry.bbox(k) else { continue };
+                    out = Some(match out {
+                        None => b.clone(),
+                        Some(e) => [
+                            e[0].clone().min(b[0].clone()),
+                            e[1].clone().min(b[1].clone()),
+                            e[2].clone().max(b[2].clone()),
+                            e[3].clone().max(b[3].clone()),
+                        ],
+                    });
+                }
+                out
+            }) {
+                Some(e) => {
+                    let (w, h) = (&e[2] - &e[0], &e[3] - &e[1]);
+                    if t.kind == "area" {
+                        w * h
+                    } else {
+                        aspect(&w, &h, &t.ratio)
+                    }
+                }
+                None => Q::zero(),
+            },
+            _ => score_term(t, view, self.routed),
+        }
     }
 }
-
+#[cfg(test)]
+pub(crate) fn score(o: Objective, view: &View, routed: Option<&Routed>) -> Q {
+    let mut term = Term::new(o.name());
+    term.direction = Some(Direction::Down);
+    score_term(&term, view, routed)
+}
+pub(crate) fn score_term(t: &Term, view: &View, routed: Option<&Routed>) -> Q {
+    let scope = if t.scope == ObjectiveScope::Group { Scope::Group } else { Scope::Level };
+    match t.kind.as_str() {
+        "current_direction" => current_term(t, view),
+        "symbol_direction" => symbol_term(t, view),
+        "symbol_alignment" => scoped(view, scope, alignment),
+        "symbol_distribution" => {
+            scoped(view, scope, |p| gap_kinds(p.iter().map(|p| &p[0])) + gap_kinds(p.iter().map(|p| &p[1])))
+        }
+        "symbol_overlaps" => crate::coords::overlapping(view.s, view.at, view.orient).len().into_q(),
+        "label_overlaps" => crate::score::texts_over(view.s, view.at, view.orient).into_q(),
+        "wire_shorts" | "wire_overlaps" => crate::score::wire_penalty(view, routed, t.kind == "wire_shorts").into_q(),
+        "wire_turns" => match routed {
+            Some(r) => r.paths.iter().map(|(_, p)| int(bends(p) as i64)).sum(),
+            None => turns(view),
+        },
+        "wire_crossings" => {
+            let mut segments = Vec::new();
+            if let Some(r) = routed {
+                for (net, path) in &r.paths {
+                    for w in path.windows(2) {
+                        segments.push((*net, w[0].clone(), w[1].clone()));
+                    }
+                }
+            } else {
+                for (net, a, b) in connections(view) {
+                    let c = [b[0].clone(), a[1].clone()];
+                    segments.push((net, a, c.clone()));
+                    segments.push((net, c, b));
+                }
+            }
+            crossings(&segments)
+        }
+        "wire_length" => match routed {
+            Some(r) => r.paths.iter().flat_map(|(_, p)| p.windows(2).map(|w| manhattan(&w[0], &w[1]))).sum(),
+            None => connections(view).iter().map(|(_, a, b)| manhattan(a, b)).sum(),
+        },
+        "area" | "aspect" => match envelope(view) {
+            Some(e) => {
+                let (w, h) = (&e[2] - &e[0], &e[3] - &e[1]);
+                if t.kind == "area" {
+                    w * h
+                } else {
+                    aspect(&w, &h, &t.ratio)
+                }
+            }
+            None => Q::zero(),
+        },
+        _ => Q::zero(),
+    }
+}
+fn aspect(w: &Q, h: &Q, ratio: &Q) -> Q {
+    let rh = ratio * h;
+    let den = w + &rh;
+    if den.is_zero() {
+        Q::zero()
+    } else {
+        (w - rh).abs() / den
+    }
+}
+fn current_term(t: &Term, view: &View) -> Q {
+    use rnl_runtime::problem::CurrentDirection;
+    let target = t.direction.unwrap_or(Direction::Down).vector();
+    view.s
+        .currents
+        .iter()
+        .filter(|c| {
+            let Some(rnl_runtime::problem::PointRef::Pin { object, pin, .. }) = &c.display else { return false };
+            if view.s.objects[*object].left_free || !view.s.explicit_pin(*object, *pin) {
+                return false;
+            }
+            let Some(mut d) = view.s.exit(*object, *pin, view.orient[*object]) else { return false };
+            if c.direction == CurrentDirection::In {
+                d = (-d.0, -d.1)
+            }
+            d != target
+        })
+        .count()
+        .into_q()
+}
+/// Symbol-direction matches all actually drawn objects, independently of search
+/// components or collision-marker exemptions (phase0 reply B03).
+fn symbol_direction_objects(s: &Structure) -> impl Iterator<Item = usize> + '_ {
+    s.objects
+        .iter()
+        .enumerate()
+        .filter_map(|(object, info)| (info.symbol.is_some() && !info.left_free).then_some(object))
+}
+fn symbol_term(t: &Term, view: &View) -> Q {
+    let target = t.direction.unwrap_or(Direction::Down).vector();
+    symbol_direction_objects(view.s)
+        .filter(|&k| {
+            let Some(symbol) = view.s.objects[k].symbol else { return false };
+            let name = &view.s.symbol_names[symbol];
+            if !t.symbols.contains(name) {
+                return false;
+            }
+            let reference = t.references.get(name).copied().or(t.reference).map(Direction::vector).or_else(|| {
+                let pins = view.s.pins(k);
+                if pins.len() != 1 {
+                    return None;
+                }
+                let b = &view.s.symbols[symbol].bbox;
+                let dx = (&b[0] + &b[2]) / int(2) - &pins[0].local.0;
+                let dy = (&b[1] + &b[3]) / int(2) - &pins[0].local.1;
+                if dx.is_zero() && !dy.is_zero() {
+                    Some((0, if dy.is_positive() { 1 } else { -1 }))
+                } else if dy.is_zero() && !dx.is_zero() {
+                    Some((if dx.is_positive() { 1 } else { -1 }, 0))
+                } else {
+                    None
+                }
+            });
+            let Some(d) = reference else { return false };
+            let local = (int(d.0), int(d.1));
+            crate::model::turned(view.orient[k], &local, 0) != int(target.0)
+                || crate::model::turned(view.orient[k], &local, 1) != int(target.1)
+        })
+        .count()
+        .into_q()
+}
+fn term_status(t: &Term, view: &View) -> (bool, Vec<String>) {
+    let mut diagnostics = Vec::new();
+    let inactive = match t.kind.as_str() {
+        "current_direction" => {
+            let ports = view
+                .s
+                .currents
+                .iter()
+                .filter(|c| matches!(c.terminal, rnl_runtime::problem::CurrentTerminal::Port { .. }))
+                .count();
+            if ports > 0 {
+                diagnostics.push(format!("{ports} local port terminals have no drawing pin in this version"));
+            }
+            !view.s.currents.iter().any(|c| match &c.display {
+                Some(rnl_runtime::problem::PointRef::Pin { object, pin, .. }) => {
+                    !view.s.objects[*object].left_free
+                        && view.s.explicit_pin(*object, *pin)
+                        && view.s.exit(*object, *pin, view.orient[*object]).is_some()
+                }
+                _ => false,
+            })
+        }
+        "symbol_direction" => {
+            let mut count = 0;
+            for k in symbol_direction_objects(view.s) {
+                let Some(symbol) = view.s.objects[k].symbol else { continue };
+                let name = &view.s.symbol_names[symbol];
+                if !t.symbols.contains(name) {
+                    continue;
+                }
+                if t.references.contains_key(name) || t.reference.is_some() {
+                    count += 1;
+                    continue;
+                }
+                let pins = view.s.pins(k);
+                let b = &view.s.symbols[symbol].bbox;
+                let valid = pins.len() == 1 && {
+                    let dx = &b[0] + &b[2] - &pins[0].local.0 * int(2);
+                    let dy = &b[1] + &b[3] - &pins[0].local.1 * int(2);
+                    dx.is_zero() != dy.is_zero()
+                };
+                if valid {
+                    count += 1
+                } else {
+                    diagnostics.push(format!(
+                        "symbol {} requires a cardinal reference direction",
+                        view.s.problem.objects[k].label
+                    ));
+                }
+            }
+            count == 0
+        }
+        "wire_turns" | "wire_crossings" | "wire_length" | "wire_shorts" | "wire_overlaps" => {
+            view.s.problem.wires.is_empty() && view.s.problem.routes.is_empty()
+        }
+        "symbol_alignment" | "symbol_distribution" if t.scope == ObjectiveScope::Group => view.s.scopes.is_empty(),
+        _ => view.s.components().next().is_none(),
+    };
+    if inactive {
+        diagnostics.push("this term has no eligible objects in this level".into());
+    }
+    (inactive, diagnostics)
+}
 trait IntoQ {
     fn into_q(self) -> Q;
 }
@@ -460,49 +582,6 @@ impl IntoQ for usize {
     fn into_q(self) -> Q {
         int(self as i64)
     }
-}
-
-/// MOS and BJT whose source (emitter) is not on the side of the ground: an n-type with its source
-/// not below its drain, a p-type with its source not above it. Two-terminal elements and other
-/// devices are left out.
-fn current_direction(view: &View) -> Q {
-    let mut count = 0usize;
-    for &k in &view.s.elements {
-        let Some(n_type) = view.s.objects[k].device.n_type() else { continue };
-        let (Some(d), Some(s)) = (view.s.drain(k), view.s.source(k)) else { continue };
-        let (Some(d), Some(s)) = (view.pin(k, d), view.pin(k, s)) else { continue };
-        let wrong = if n_type { s[1] >= d[1] } else { s[1] <= d[1] };
-        count += usize::from(wrong);
-    }
-    count.into_q()
-}
-
-/// Ground symbols whose pin is not above the middle of their body.
-fn ground_direction(view: &View) -> Q {
-    let mut count = 0usize;
-    for (k, info) in view.s.objects.iter().enumerate() {
-        if info.role != Role::Ground {
-            continue;
-        }
-        let (Some(pin), Some(b)) = (view.pin(k, 0), view.bbox(k)) else { continue };
-        count += usize::from(pin[1].clone() * int(2) <= &b[1] + &b[3]);
-    }
-    count.into_q()
-}
-
-/// Pairs of an input port right of an output port.
-fn signal_flow(view: &View) -> Q {
-    use crate::structure::PortKind;
-    let x = |k: usize| view.at[k][0].clone();
-    let inputs: Vec<usize> = view.s.ports.iter().filter(|p| p.kind == PortKind::Input).map(|p| p.object).collect();
-    let outputs: Vec<usize> = view.s.ports.iter().filter(|p| p.kind == PortKind::Output).map(|p| p.object).collect();
-    let mut count = 0usize;
-    for &i in &inputs {
-        for &o in &outputs {
-            count += usize::from(x(i) > x(o));
-        }
-    }
-    count.into_q()
 }
 
 /// A measure of the components' origins: summed over the scopes of the groups (`Structure::scopes`)
@@ -539,26 +618,11 @@ pub(crate) fn gap_kinds<'a>(coords: impl Iterator<Item = &'a Q>) -> Q {
     for w in xs.windows(2) {
         *counts.entry(w[1] - w[0]).or_default() += 1;
     }
-    let n = (xs.len() - 1) as i64;
-    let shares: Q = counts.values().map(|c| frac(c * c, n * n)).sum();
-    int(counts.len() as i64 - 1) + int(1) - shares
+    int(counts.len() as i64 - 1)
 }
 
 /// Mirror pairs not symmetric: not on one row, orientations not mirrored (`b` is `a` then MY,
 /// 14.9), or not equally far from their axis when they have one.
-fn symmetry(view: &View) -> Q {
-    let mut count = 0usize;
-    for pair in &view.s.pairs {
-        let (a, b) = (&view.at[pair.a], &view.at[pair.b]);
-        let mut ok = a[1] == b[1] && view.orient[pair.b] == view.orient[pair.a].then(Orient::MY);
-        if let Some(axis) = pair.axis {
-            ok &= &a[0] + &b[0] == view.at[axis][0].clone() * int(2);
-        }
-        count += usize::from(!ok);
-    }
-    count.into_q()
-}
-
 fn manhattan(a: &[Q; 2], b: &[Q; 2]) -> Q {
     (&a[0] - &b[0]).abs() + (&a[1] - &b[1]).abs()
 }
@@ -791,202 +855,6 @@ fn envelope(view: &View) -> Option<[Q; 4]> {
 
 /// `|w / h − 16/9|`; for an envelope without height, its width, so that a flat drawing is not
 /// taken for a well-proportioned one.
-fn aspect(w: &Q, h: &Q) -> Q {
-    if h.is_zero() {
-        w.abs()
-    } else {
-        (w / h - frac(16, 9)).abs()
-    }
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{Layer, SolverOptions};
-
-    #[test]
-    fn the_table_follows_the_names_of_the_options() {
-        assert_eq!(TABLE.len(), OBJECTIVES.len());
-        for (i, entry) in TABLE.iter().enumerate() {
-            assert_eq!(entry.objective as usize, i);
-            assert_eq!(entry.objective.name(), OBJECTIVES[i]);
-            assert_eq!(Objective::from_name(OBJECTIVES[i]), Some(entry.objective));
-        }
-        assert_eq!(Objective::from_name("beauty"), None);
-        let off: Vec<&str> = TABLE.iter().filter(|e| !e.implemented).map(|e| e.objective.name()).collect();
-        assert_eq!(off, ["terminal_wire_alignment", "labels", "bend_alignment"]);
-        assert!(!Objective::Turns.entry().structural && Objective::CurrentDirection.entry().structural);
-        assert_eq!(Objective::Symmetry.entry().scope, Scope::Group);
-    }
-
-    #[test]
-    fn objectives_without_their_inputs_are_inert_and_said_so() {
-        let options = SolverOptions::without_time_limit();
-        let all = Inputs { supply: true, ground: true, port_kinds: true, wires: true };
-        let active = Active::new(&options.objectives, &all);
-        // the default layers less terminal_wire_alignment, which this version does not compute
-        assert_eq!(active.layers.len(), 10);
-        assert_eq!(active.inert.len(), 1);
-        assert!(active.inert[0].starts_with("terminal_wire_alignment is not computed"));
-        assert_eq!(active.in_order()[0], Objective::CurrentDirection);
-        let none = Inputs::default();
-        let active = Active::new(&options.objectives, &none);
-        assert!(!active.is_on(Objective::CurrentDirection) && !active.is_on(Objective::Turns));
-        assert!(active.is_on(Objective::ComponentAlignment) && active.is_on(Objective::Area));
-        let current = active.inert.iter().find(|s| s.starts_with("current_direction")).unwrap();
-        assert!(current.contains("no supply symbol") && current.contains("no ground symbol"), "{current}");
-        // one sentence per objective configured but inert: current, turns, ground, terminal wire
-        // alignment, crossings, wire length
-        assert_eq!(active.inert.len(), 6, "{:?}", active.inert);
-        // an objective off is neither in force nor inert
-        assert!(!active.is_on(Objective::SignalFlow));
-        assert!(!active.inert.iter().any(|s| s.starts_with("signal_flow")));
-    }
-
-    fn ranked(active: &Active, entries: &[(Vec<Q>, Vec<u32>)]) -> Vec<usize> {
-        let refs: Vec<(&[Q], &[u32])> = entries.iter().map(|(v, c)| (v.as_slice(), c.as_slice())).collect();
-        active.rank(&refs)
-    }
-
-    #[test]
-    fn layers_rank_lexicographically_within_their_tolerances() {
-        let objectives = Objectives {
-            layers: vec![
-                Layer { items: vec![("area".to_string(), 1)], tolerance: 0.5 },
-                Layer { items: vec![("aspect".to_string(), 2)], tolerance: 0.0 },
-            ],
-        };
-        let active = Active::new(&objectives, &Inputs::default());
-        assert_eq!(active.layers[0].tolerance, frac(1, 2));
-        let e = |a: Q, b: i64, code: u32| (vec![a, int(b)], vec![code]);
-        // 1 and 2 are further apart than the tolerance: the first layer decides
-        assert_eq!(ranked(&active, &[e(int(2), 0, 0), e(int(1), 5, 1)]), vec![1, 0]);
-        // within the tolerance of the first layer, the second decides
-        assert_eq!(ranked(&active, &[e(int(1), 5, 0), e(frac(3, 2), 0, 1)]), vec![1, 0]);
-        // equal in every layer: the smaller code, then the earlier entry
-        assert_eq!(ranked(&active, &[e(int(1), 5, 3), e(int(1), 5, 2), e(int(1), 5, 2)]), vec![1, 2, 0]);
-    }
-
-    /// Within a tolerance "equal" is not transitive: a pairwise comparison would put A before C,
-    /// C before B and B before A. The rank is still one order, whatever the order of the entries.
-    #[test]
-    fn a_rank_is_well_defined_where_tolerances_are_not_transitive() {
-        let objectives = Objectives {
-            layers: vec![
-                Layer { items: vec![("area".to_string(), 1)], tolerance: 1.0 },
-                Layer { items: vec![("aspect".to_string(), 1)], tolerance: 0.0 },
-            ],
-        };
-        let active = Active::new(&objectives, &Inputs::default());
-        let (a, b, c) =
-            ((vec![int(0), int(5)], vec![0]), (vec![frac(3, 5), int(3)], vec![1]), (vec![frac(6, 5), int(1)], vec![2]));
-        // the least of the first layer is 0: A and B are within 1 of it, and B is better in the
-        // second; then A, the least of what is left; then C
-        let entries = [a.clone(), b.clone(), c.clone()];
-        let codes = |order: Vec<usize>, entries: &[(Vec<Q>, Vec<u32>)]| -> Vec<u32> {
-            order.into_iter().map(|i| entries[i].1[0]).collect()
-        };
-        assert_eq!(codes(ranked(&active, &entries), &entries), vec![1, 0, 2]);
-        for permutation in
-            [[c.clone(), b.clone(), a.clone()], [b.clone(), c.clone(), a.clone()], [c.clone(), a.clone(), b.clone()]]
-        {
-            assert_eq!(codes(ranked(&active, &permutation), &permutation), vec![1, 0, 2]);
-        }
-        // with no tolerance it is the lexicographic order
-        let exact = Active::new(
-            &Objectives { layers: vec![Layer::single("area"), Layer::single("aspect")] },
-            &Inputs::default(),
-        );
-        assert_eq!(codes(ranked(&exact, &entries), &entries), vec![0, 1, 2]);
-        // and the layer-by-layer choice agrees with the sort when every tolerance is 0
-        let many: Vec<(Vec<Q>, Vec<u32>)> = (0..40u32)
-            .map(|i| (vec![int(i64::from(i % 5)), int(i64::from((i * 7) % 3))], vec![(i * 13) % 11]))
-            .collect();
-        let mut by_hand: Vec<usize> = (0..many.len()).collect();
-        by_hand.sort_by(|&x, &y| many[x].0.cmp(&many[y].0).then(many[x].1.cmp(&many[y].1)).then(x.cmp(&y)));
-        assert_eq!(ranked(&exact, &many), by_hand);
-        let tiny = Active::new(
-            &Objectives {
-                layers: vec![Layer { items: vec![("area".to_string(), 1)], tolerance: 1e-9 }, Layer::single("aspect")],
-            },
-            &Inputs::default(),
-        );
-        assert_eq!(ranked(&tiny, &many), by_hand);
-    }
-
-    #[test]
-    fn gap_kinds_count_kinds_and_prefer_one_dominant_spacing() {
-        let q = |v: &[i64]| v.iter().map(|x| int(*x)).collect::<Vec<Q>>();
-        // one gap kind: 0
-        assert_eq!(gap_kinds(q(&[0, 2, 4, 6]).iter()), int(0));
-        // repeats count once, fewer than two coordinates cost nothing
-        assert_eq!(gap_kinds(q(&[3, 3, 3]).iter()), int(0));
-        // two kinds 2, 2, 5: 1 + 1 − (4/9 + 1/9) = 13/9
-        assert_eq!(gap_kinds(q(&[0, 2, 4, 9]).iter()), frac(13, 9));
-        // two kinds 2, 5: 1 + 1 − (1/4 + 1/4) = 3/2, worse than one dominant kind
-        assert_eq!(gap_kinds(q(&[0, 2, 7]).iter()), frac(3, 2));
-    }
-
-    #[test]
-    fn spanning_trees_bends_and_crossings() {
-        let p = |x: i64, y: i64| [int(x), int(y)];
-        let points = [p(0, 0), p(10, 0), p(1, 1), p(10, 5)];
-        // (1, 0) is as near to (0, 0) as to (1, 1): it hangs from the earlier
-        assert_eq!(spanning_tree(&points), vec![(0, 2), (0, 1), (1, 3)]);
-        assert_eq!(bends(&[p(0, 0), p(5, 0), p(5, 5), p(5, 9), p(7, 9)]), 2);
-        assert_eq!(bends(&[p(0, 0), p(5, 0)]), 0);
-        // a plus crosses, a T and a shared end do not
-        assert!(proper_crossing(&p(0, 0), &p(4, 0), &p(2, -2), &p(2, 2)));
-        assert!(!proper_crossing(&p(0, 0), &p(4, 0), &p(2, 0), &p(2, 2)));
-        assert!(!proper_crossing(&p(0, 0), &p(4, 0), &p(4, 0), &p(4, 2)));
-        let segments = vec![(0, p(0, 0), p(4, 0)), (1, p(2, -2), p(2, 2)), (0, p(3, -1), p(3, 1))];
-        // the two of net 0 cross each other but count only against net 1
-        assert_eq!(crossings(&segments), int(1));
-        // oblique segments: against all the others, each pair once
-        let segments =
-            vec![(0, p(0, 0), p(4, 4)), (1, p(0, 4), p(4, 0)), (2, p(2, -1), p(2, 5)), (3, p(-1, 2), p(5, 2))];
-        // the two diagonals cross each other at (2, 2), where the plus also crosses: every pair
-        assert_eq!(crossings(&segments), int(6));
-        // touching at an end is no crossing
-        assert_eq!(crossings(&[(0, p(0, 0), p(4, 0)), (1, p(4, 0), p(4, 3))]), int(0));
-        assert_eq!(aspect(&int(16), &int(9)), int(0));
-        assert_eq!(aspect(&int(4), &int(0)), int(4));
-    }
-
-    /// The turns of a connection as the router draws it (quality review SC-1), with T1's pins: the
-    /// source's pin leaving up, the resistor's leaving left towards it.
-    #[test]
-    fn a_connection_counts_the_turns_of_a_jog_an_l_and_a_straight_line() {
-        let p = |x: i64, y: i64| [int(x), int(y)];
-        let (up, down, left, right) = (Some((0, 1)), Some((0, -1)), Some((-1, 0)), Some((1, 0)));
-        // the jog: on one height, the wire goes up, across and down again
-        assert_eq!(connection_turns(&p(-7, 6), up, &p(-3, 6), left), 3);
-        assert_eq!(connection_turns(&p(-3, 6), left, &p(-7, 6), up), 3);
-        // less than a lead above is a jog too, off the grid
-        assert_eq!(connection_turns(&p(0, 0), up, &[int(4), frac(1, 2)], left), 3);
-        // the L: the resistor's pin above the end of the source's lead
-        assert_eq!(connection_turns(&p(-7, 6), up, &p(-3, 7), left), 1);
-        assert_eq!(connection_turns(&p(-7, 6), up, &p(-3, 9), left), 1);
-        // the straight line: two pins facing each other, or a pin and a point on its way
-        assert_eq!(connection_turns(&p(0, 0), right, &p(5, 0), left), 0);
-        assert_eq!(connection_turns(&p(0, 0), up, &p(0, 4), down), 0);
-        assert_eq!(connection_turns(&p(0, 0), right, &p(5, 0), None), 0);
-        // a U: both leave up on one height; an S: one up, one down
-        assert_eq!(connection_turns(&p(0, 0), up, &p(5, 0), up), 2);
-        assert_eq!(connection_turns(&p(0, 0), up, &p(5, 0), down), 4);
-        // a U too: both leave the same way, off an axis, the wire out past the farther and back
-        // to it, (0, 0) (0, 2) (4, 2) (4, 1) and (0, 0) (-1, 0) (-1, 3) (5, 3)
-        assert_eq!(connection_turns(&p(0, 0), up, &p(4, 1), up), 2);
-        assert_eq!(connection_turns(&p(4, 1), up, &p(0, 0), up), 2);
-        assert_eq!(connection_turns(&p(0, 0), up, &p(4, 5), up), 2);
-        assert_eq!(connection_turns(&p(0, 0), down, &[int(4), frac(1, 2)], down), 2);
-        assert_eq!(connection_turns(&p(0, 0), left, &p(5, 3), left), 2);
-        // an end that leaves away from the other: two more
-        assert_eq!(connection_turns(&p(0, 0), left, &p(5, 0), left), 2);
-        assert_eq!(connection_turns(&p(0, 0), up, &p(5, 0), right), 3);
-        assert_eq!(connection_turns(&p(0, 0), up, &p(5, 3), right), 3);
-        // points that are no pins: an L when not along an axis
-        assert_eq!(connection_turns(&p(0, 0), None, &p(5, 3), None), 1);
-        assert_eq!(connection_turns(&p(0, 0), None, &p(5, 0), None), 0);
-    }
-}
+#[path = "../tests/unit/objectives.rs"]
+mod tests;

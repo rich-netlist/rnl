@@ -12,10 +12,10 @@
 //! problem. The indexes follow the order of the interpretation, so the same input gives the same
 //! problem, on every platform.
 //!
-//! [`sig2`] is the hash of chapter 17 over a problem: `sig2:` then two digests of 16 hexadecimal
+//! [`sig3`] is the current hash of chapter 17: `sig3:` then two digests of 16 hexadecimal
 //! digits joined by `.`, the first of the solver's input, the second of the solver's options. A
 //! viewer without a solver computes the first and compares only it ([`same_input`]), also for a
-//! `sig1` hash that tools wrote before, over the problem without its nets.
+//! historical `sig1` and `sig2` hashes, over their frozen field projections.
 
 use crate::diag::Loc;
 use crate::geom::{fmt_num, Orient, Pt};
@@ -300,6 +300,39 @@ pub struct ProblemNet {
     pub port: Option<usize>,
 }
 
+/// A semantic host terminal, independent of the physical pin that draws it. Instances retain
+/// their index in the host level's netlist even when several are drawn by one bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum CurrentTerminal {
+    Instance { instance: usize, terminal: String },
+    Port { terminal: String },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CurrentDirection {
+    In,
+    Out,
+}
+
+impl CurrentDirection {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::In => "in",
+            Self::Out => "out",
+        }
+    }
+}
+
+/// The final CURRENT value of one semantic terminal (15.2). Unspecified values are omitted;
+/// local ports and terminals without a drawn pin retain their semantic identity.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProblemCurrent {
+    pub terminal: CurrentTerminal,
+    pub net: String,
+    pub direction: CurrentDirection,
+    pub display: Option<PointRef>,
+}
+
 /// A symbol as a solver sees it: its box and its pins (9.2.3, 9.2.4).
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProblemSymbol {
@@ -501,6 +534,8 @@ pub struct LevelProblem {
     /// The nets of the level, in the order the netlist first names them: the ports of the
     /// subcircuit, then the nets of the instances, line by line.
     pub nets: Vec<ProblemNet>,
+    /// Instance terminals in netlist/terminal order, then the level's ports in port order.
+    pub currents: Vec<ProblemCurrent>,
 }
 
 impl LevelProblem {
@@ -551,13 +586,21 @@ fn fnv1a(bytes: &[u8]) -> u64 {
     h
 }
 
-/// The tag of the algorithm that a solver writes now (17): that of [`SIG1`], with the nets.
+/// The historical sig2 algorithm: sig1 with the nets.
 pub const SIG2: &str = "sig2";
+
+/// The current input projection: sig2 plus semantic CURRENT and written pin directions.
+pub const SIG3: &str = "sig3";
 
 /// The digest of the solver's input: 16 hexadecimal digits over [`canonical`]. A viewer without
 /// a solver computes it from a problem built without the generated records ([`crate::Options::solver`]).
 pub fn input_digest(p: &LevelProblem) -> String {
-    format!("{:016x}", fnv1a(canonical(p).as_bytes()))
+    format!("{:016x}", fnv1a(canonical_sig3(p).as_bytes()))
+}
+
+/// Historical sig2 digest; its projection must never acquire new fields.
+pub fn input_digest_sig2(p: &LevelProblem) -> String {
+    format!("{:016x}", fnv1a(canonical_sig2(p).as_bytes()))
 }
 
 /// The digest of the input that a `sig1` hash gives: over [`canonical_sig1`], without the nets.
@@ -573,7 +616,7 @@ pub fn options_digest(options: &str) -> String {
     format!("{:016x}", fnv1a(options.as_bytes()))
 }
 
-/// The `hash` a solver writes in the head of its record for a level (2.8, 17):
+/// The historical sig2 hash of a level and solver options (2.8, 17):
 /// `sig2:<input digest>.<options digest>`.
 ///
 /// The input digest covers the level after inheritance, as the problem holds it: the rules that
@@ -593,17 +636,22 @@ pub fn options_digest(options: &str) -> String {
 /// terminal elsewhere changes it. A record with a `sig1` hash, written before, is still compared,
 /// over what that hash covers ([`same_input`]).
 pub fn sig2(p: &LevelProblem, solver_options: &str) -> String {
-    format!("{SIG2}:{}.{}", input_digest(p), options_digest(solver_options))
+    format!("{SIG2}:{}.{}", input_digest_sig2(p), options_digest(solver_options))
+}
+
+/// The chapter 17 hash written by the current solver.
+pub fn sig3(p: &LevelProblem, solver_options: &str) -> String {
+    format!("{SIG3}:{}.{}", input_digest(p), options_digest(solver_options))
 }
 
 /// Does a `hash` written in a record head match the input of the level now? Only the input
-/// digest is compared: a viewer does not know the solver's options. A `sig2` hash is compared
-/// with [`input_digest`]; a `sig1` hash, which tools wrote before and no longer write, with
-/// [`input_digest_sig1`], what it covers, so that a record written so reads as it did. None when
-/// the value is neither, which a tool does not compare (17).
+/// digest is compared: a viewer does not know the solver's options. Each recognized tag is
+/// compared with its own frozen projection: sig3 includes CURRENT, sig2 includes nets, and sig1
+/// predates nets. Unknown tags and malformed digests are not compared (17).
 pub fn same_input(hash: &str, p: &LevelProblem) -> Option<bool> {
     let (digest, rest): (fn(&LevelProblem) -> String, &str) = match hash.split_once(':') {
-        Some((SIG2, rest)) => (input_digest, rest),
+        Some((SIG3, rest)) => (input_digest, rest),
+        Some((SIG2, rest)) => (input_digest_sig2, rest),
         Some((SIG1, rest)) => (input_digest_sig1, rest),
         _ => return None,
     };
@@ -614,10 +662,13 @@ pub fn same_input(hash: &str, p: &LevelProblem) -> Option<bool> {
     Some(input.eq_ignore_ascii_case(&digest(p)))
 }
 
-/// The canonical text of a problem that [`input_digest`] hashes: that of [`canonical_sig1`], then
-/// the nets, each net's name, reference, pins, wires, ROUTEs and place among the ports, and the
-/// nets of each object.
+/// The current canonical projection, including semantic currents and explicit pin directions.
 pub fn canonical(p: &LevelProblem) -> String {
+    canonical_sig3(p)
+}
+
+/// Frozen historical sig2 projection: sig1 followed by nets and object nets only.
+pub fn canonical_sig2(p: &LevelProblem) -> String {
     let mut c = Canon(canonical_sig1(p));
     c.word("nets");
     for n in &p.nets {
@@ -635,9 +686,41 @@ pub fn canonical(p: &LevelProblem) -> String {
     c.0
 }
 
-/// The canonical text of a problem that a `sig1` hash covers ([`input_digest_sig1`]): every field
-/// but those that say where things are written and the nets, in a fixed order, numbers by
-/// [`fmt_num`] and strings quoted.
+/// The current projection adds each semantic terminal independently of its display pin.
+pub fn canonical_sig3(p: &LevelProblem) -> String {
+    let mut c = Canon(canonical_sig2(p));
+    c.word("pin-direction-written");
+    for symbol in &p.symbols {
+        c.word("symbol");
+        for pin in &symbol.pins {
+            c.bool(pin.direction_written);
+        }
+    }
+    c.word("currents");
+    for current in &p.currents {
+        match &current.terminal {
+            CurrentTerminal::Instance { instance, terminal } => {
+                c.word("instance");
+                c.index(*instance);
+                c.str(terminal);
+            }
+            CurrentTerminal::Port { terminal } => {
+                c.word("port");
+                c.str(terminal);
+            }
+        }
+        c.str(&current.net);
+        c.word(current.direction.as_str());
+        match &current.display {
+            Some(point) => c.point(point),
+            None => c.word("-"),
+        }
+    }
+    c.0
+}
+
+/// Frozen historical sig1 projection. It predates nets, currents and written-direction flags,
+/// and omits source locations. Field order and numeric/string formatting remain unchanged.
 pub fn canonical_sig1(p: &LevelProblem) -> String {
     let mut c = Canon(String::new());
     c.word("level");
@@ -1048,8 +1131,16 @@ mod tests {
             groups: Vec::new(),
             usages: Vec::new(),
             nets: Vec::new(),
+            currents: Vec::new(),
         };
         let h = sig2(&p, "tolerance=0.000001");
+        // Fixed historical vectors, independent of any new problem fields.
+        assert_eq!(
+            canonical_sig1(&p),
+            "level \"t.sp\" file \"t.sp\" packages names symbols objects facts wires routes groups usages"
+        );
+        assert_eq!(input_digest_sig1(&p), "37f98493400f7834");
+        assert_eq!(input_digest_sig2(&p), "196940231356f25a");
         assert!(h.starts_with("sig2:"));
         assert_eq!(h.len(), "sig2:".len() + 16 + 1 + 16);
         assert_ne!(h, sig2(&p, "tolerance=0.001"));
@@ -1060,8 +1151,24 @@ mod tests {
         let renamed = LevelProblem { title: "u.sp".into(), ..p.clone() };
         assert_eq!(same_input(&h, &renamed), Some(false));
         assert_eq!(same_input("sig2:00000000", &p), None);
-        assert_eq!(same_input("sig3:0000000000000000.0000000000000000", &p), None);
+        assert_eq!(same_input("sig4:0000000000000000.0000000000000000", &p), None);
         assert_eq!(same_input("sig1:5be1c09a", &p), None);
+        let mut marked = p.clone();
+        marked.currents.push(ProblemCurrent {
+            terminal: CurrentTerminal::Instance { instance: 0, terminal: "p".into() },
+            net: "a".into(),
+            direction: CurrentDirection::Out,
+            display: None,
+        });
+        assert_eq!(canonical_sig1(&marked), canonical_sig1(&p));
+        assert_eq!(canonical_sig2(&marked), canonical_sig2(&p));
+        assert_ne!(sig3(&marked, "o"), sig3(&p, "o"));
+        assert_eq!(same_input(&h, &marked), Some(true));
+        assert_eq!(same_input(&sig3(&p, "o"), &marked), Some(false));
+        let left = sig3(&p, "config-a");
+        let right = sig3(&p, "config-b");
+        assert_eq!(left.split('.').next(), right.split('.').next());
+        assert_ne!(left, right);
     }
 
     #[test]
@@ -1096,6 +1203,7 @@ mod tests {
             groups: Vec::new(),
             usages: Vec::new(),
             nets: vec![net("a", None)],
+            currents: Vec::new(),
         };
         let old = format!("{SIG1}:{}.{}", input_digest_sig1(&p), options_digest("o"));
         assert_eq!(same_input(&old, &p), Some(true));

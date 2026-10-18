@@ -1,0 +1,86 @@
+# Standard objectives supported by solver v2, Step1.
+# Every objective is optional. An empty `level = []` disables every objective.
+format = "rnl-solver-config/1"
+
+[rules]
+grid = 1
+tolerance = 0.000001
+separate_symbols = true
+separate_gap = 1
+route_clearance = 1
+beam = 4
+route_beam = 4
+time_limit = 5
+# Text remains at its anchor on axes untouched by facts in this version.
+texts_at_anchor = true
+
+[rules.budget]
+candidates = 256
+astar_expansions = 200000
+soft_expansions = 200000
+symmetry_steps = 1000000
+
+[[level]]
+[[level.term]]
+kind = "symbol_overlaps"
+
+[[level]]
+[[level.term]]
+kind = "wire_shorts"
+
+[[level]]
+[[level.term]]
+kind = "wire_overlaps"
+
+[[level]]
+[[level.term]]
+kind = "label_overlaps"
+
+[[level]]
+[[level.term]]
+kind = "current_direction"
+direction = "down"
+
+[[level]]
+[[level.term]]
+kind = "wire_turns"
+
+[[level]]
+[[level.term]]
+kind = "symbol_direction"
+symbols = ["$GROUND_SYMBOL", "$NAMED_GROUND_SYMBOL"]
+direction = "down"
+[[level.term]]
+kind = "symbol_direction"
+symbols = ["$SUPPLY_SYMBOL"]
+direction = "up"
+
+[[level]]
+[[level.term]]
+kind = "symbol_alignment"
+scope = "group"
+
+[[level]]
+[[level.term]]
+kind = "symbol_distribution"
+scope = "group"
+
+# Step1 measures the symbol envelope only. Wires join it in Step2.
+[[level]]
+[[level.term]]
+kind = "area"
+include_wires = false
+
+[[level]]
+[[level.term]]
+kind = "wire_crossings"
+
+[[level]]
+[[level.term]]
+kind = "aspect"
+ratio = [16, 9]
+include_wires = false
+
+[[level]]
+[[level.term]]
+kind = "wire_length"

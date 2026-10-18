@@ -45,7 +45,7 @@ pub struct Previous {
     /// The `hash` in the record head, as written (2.8, 17).
     pub hash: Option<String>,
     /// Whether the input digest of `hash` is the problem's ([`same_input`]); None for a record
-    /// without a `sig2` or a `sig1` hash, which is not compared (17).
+    /// without a recognized `sig3`, `sig2` or `sig1` hash, which is not compared (17).
     pub same_input: Option<bool>,
     /// Whether its numbers hold (5.9); None when it uses no number. False when its `numbering` is
     /// missing or not the check of the level: then its statements that use a number take no

@@ -34,7 +34,8 @@
 //! clock the caller gives (`crate::Clock`); a fact whose check did not finish is discarded
 //! undecided, with a warning in the report (7.6), and a fact whose groups were not all found says
 //! so (`crate::Discarded::complete`). Everything after it is counted, never timed, so that it is
-//! the same on every machine: the search makes at most `candidates`, P0 always among them
+//! the same on every machine: the search admits at most `candidates` attempts, including P0;
+//! a zero budget permits only that one necessary P0 fallback
 //! (`crate::Budget`); the router expands at most `astar_expansions` cells for one net and leaves
 //! the rest of the net to flight lines; the witness of the resolution taken as written, the
 //! solver's own resolutions of the relations of a candidate and of the rows, and the coordinate LP
@@ -51,11 +52,11 @@ use crate::coords::{place, Cause, Placed};
 use crate::options::{Caps, CAPS};
 use crate::rational::{to_f64, Q};
 use crate::resolve::Resolved;
-use crate::route::{route, style_notes, Failure, Routing};
-use crate::score::{crowding, drawn, layers, misleading, order, Entry};
+use crate::route::{route, style_notes, Routing};
+use crate::score::{drawn, layers, order, Entry};
 use crate::search::{search, Candidate, RelKind};
 use crate::structure::{analyse, Role, Structure};
-use crate::{Clock, SolveReport, Solved, SolverOptions, StoppedClock, Unrouted};
+use crate::{Clock, SolveReport, Solved, SolverOptions, StoppedClock};
 
 /// The note of every solve: how this solver solves a level.
 pub(crate) const METHOD_NOTE: &str =
@@ -136,33 +137,20 @@ pub(crate) fn solve_exact_with(
     for c in candidates {
         let placed = place(problem, &structure, &c, options, &mut work);
         let estimate = layers(&structure, &placed.origins, &placed.geometry, None);
-        let written = drawn(problem, &structure, &placed.geometry, &Routing::default());
-        let entry = Entry {
-            overlaps: placed.overlaps.len(),
-            crowding: crowding(&structure, &placed.origins, &placed.geometry.orient, &placed.dropped),
-            misleading: misleading(problem, &structure, &placed.origins, &placed.geometry, &written),
-            joins_left: 0,
-            layers: estimate,
-            code: c.code(&structure),
-        };
+        let entry = Entry { layers: estimate, code: c.code(&structure) };
         all.push(Placing { candidate: c, placed, entry });
     }
     // the best `beam` by the estimate are routed and scored on their wires (plan 5.8)
     let estimated: Vec<Entry> = all.iter().map(|c| c.entry.clone()).collect();
     let ranked = order(&structure.active, &estimated);
-    let beam = options.beam.max(1);
+    let beam = options.route_beam.max(1);
     let mut finals: Vec<(usize, Routing, Entry)> = Vec::new();
     for &i in ranked.iter().take(beam) {
         let p = &all[i];
         let routing = route(problem, &structure, &p.placed.geometry, &p.placed.origins, options, &mut work);
         let wires = drawn(problem, &structure, &p.placed.geometry, &routing);
         let score = layers(&structure, &p.placed.origins, &p.placed.geometry, Some(&wires));
-        let entry = Entry {
-            misleading: misleading(problem, &structure, &p.placed.origins, &p.placed.geometry, &wires),
-            joins_left: routing.joins_left(),
-            layers: score,
-            ..p.entry.clone()
-        };
+        let entry = Entry { layers: score, ..p.entry.clone() };
         finals.push((i, routing, entry));
     }
     let entries: Vec<Entry> = finals.iter().map(|(_, _, e)| e.clone()).collect();
@@ -224,21 +212,22 @@ pub(crate) fn solve_exact_with(
             count(usize::try_from(routing.expansions).unwrap_or(usize::MAX), "cell")
         ));
     }
-    let mut unrouted = Vec::new();
-    for l in &routing.left {
-        notes.push(format!(
-            "the ROUTE of &{} is left in {} parts, which a viewer draws flight lines between: {}",
-            l.net,
-            l.parts,
-            l.failure.reason()
-        ));
-        unrouted.push(Unrouted {
-            route: l.route,
-            net: l.net.clone(),
-            parts: l.parts,
-            budget: l.failure == Failure::Budget,
-        });
-    }
+    let routing_fallbacks = routing
+        .fallbacks
+        .iter()
+        .map(|f| crate::RoutingFallback {
+            route: f.route,
+            net: f.net.clone(),
+            phase: f.phase.clone(),
+            reason: f.reason.clone(),
+        })
+        .collect();
+    let final_wires = drawn(problem, &structure, &placed.geometry, &routing);
+    let scoring = structure.active.report(
+        &crate::objectives::View { s: &structure, at: &placed.origins, orient: &placed.geometry.orient },
+        Some(&final_wires),
+        options,
+    );
     let mut placements = Vec::new();
     let (mut texts, mut symbols) = (0, 0);
     for (k, o) in problem.objects.iter().enumerate() {
@@ -296,7 +285,8 @@ pub(crate) fn solve_exact_with(
         failed: resolved.failed.clone(),
         statements: resolved.statements.clone(),
         inert_objectives: structure.active.inert.clone(),
-        unrouted,
+        routing_fallbacks,
+        scoring,
         work,
         errors: resolved.errors.clone(),
         warnings: resolved.warnings.clone(),
@@ -330,4 +320,5 @@ pub(crate) fn left_free(s: &Structure, k: usize) -> bool {
 }
 
 #[cfg(test)]
+#[path = "../tests/unit/driver.rs"]
 mod tests;

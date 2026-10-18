@@ -20,6 +20,7 @@ const USAGE: &str = "usage:
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
+  rnl solver-config [options]      print the selected configuration TOML and its source
   rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
@@ -40,6 +41,7 @@ view options:
   --status            give each level its solve status: fixed, unsolved, solved or stale
 problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
+  --solver-config FILE  load solver TOML (otherwise environment, executable directory, then builtin)
   --solver-options S  key=value;... over the solver's defaults, as for solve: the options the hash covers
   --previous          give each level what its type=\"generated\" record decided, as hints
 solve options (the levels are read without their type=\"generated\" records; -o or --in-place is needed):
@@ -47,7 +49,7 @@ solve options (the levels are read without their type=\"generated\" records; -o 
                       with a copy of the other files they read from there, such as includes
   --in-place          write them over the files read instead
   --level TITLE       only the level with this title
-  --solver-options S  key=value;... over the solver's defaults, for tolerance, grid, objectives, beam,
+  --solver-options S  key=value;... over the selected TOML, for tolerance, grid, beam,
                       budget and time_limit, as rnl-solver's canonical text writes them; the hash
                       covers them. time_limit is the seconds the resolution of a level may spend on
                       checking (8.5), 5 by default, or none for no limit: a fact whose check does not
@@ -62,6 +64,9 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   solve exits with 1 when an error was reported, once the files are written: one of the netlist as a
   solver reads it, whose number it gives on the standard error as rnl check --no-generated counts
   them, or one of the solver
+solver-config options:
+  --defaults          print the embedded standard TOML
+  -o FILE             save the selected TOML
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
 catalog options (the packages are those of --package-dir and the bundled ones, each read as rnl
@@ -88,6 +93,8 @@ struct Args {
     level: Option<String>,
     /// As given; `problem` and `solve` each have their own default.
     solver_options: Option<String>,
+    solver_config: Option<PathBuf>,
+    defaults: bool,
     in_place: bool,
     report: bool,
     previous: bool,
@@ -116,6 +123,8 @@ fn parse_args() -> Result<Args, String> {
     let mut level = None;
     let mut previous = false;
     let mut solver_options = None;
+    let mut solver_config = None;
+    let mut defaults = false;
     let (mut in_place, mut report) = (false, false);
     let mut author = None;
     let mut parts = None;
@@ -140,6 +149,8 @@ fn parse_args() -> Result<Args, String> {
             "--previous" => previous = true,
             "--level" => level = Some(it.next().ok_or("--level needs a title")?),
             "--solver-options" => solver_options = Some(it.next().ok_or("--solver-options needs a text")?),
+            "--solver-config" => solver_config = Some(PathBuf::from(it.next().ok_or("--solver-config needs a path")?)),
+            "--defaults" => defaults = true,
             "--in-place" => in_place = true,
             "--report" => report = true,
             "--author" => author = Some(it.next().ok_or("--author needs a name")?),
@@ -152,6 +163,8 @@ fn parse_args() -> Result<Args, String> {
     }
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
+        ("solver-config", None) => PathBuf::new(),
+        ("solver-config", Some(_)) => return Err("rnl solver-config takes no FILE".into()),
         ("catalog", None) => PathBuf::new(),
         ("catalog", Some(f)) => return Err(format!("rnl catalog takes no FILE, not {}\n{USAGE}", f.display())),
         (_, file) => file.ok_or(USAGE)?,
@@ -171,6 +184,8 @@ fn parse_args() -> Result<Args, String> {
         status,
         level,
         solver_options,
+        solver_config,
+        defaults,
         in_place,
         report,
         previous,
@@ -193,12 +208,16 @@ fn main() -> ExitCode {
         Ok(code) => code,
         Err(msg) => {
             eprintln!("rnl: {msg}");
-            ExitCode::from(2)
+            ExitCode::from(if args.command == "solve" { 1 } else { 2 })
         }
     }
 }
 
 /// The runtime's options the command line gives.
+fn effective_config(args: &Args) -> Result<rnl_cli::solver_config::LoadedConfig, String> {
+    rnl_cli::solver_config::resolve(args.solver_config.as_deref(), None, args.solver_options.as_deref().unwrap_or(""))
+}
+
 fn options(args: &Args) -> Options {
     Options { std: args.std, std_version: args.std_version.clone(), generated: args.generated, ..Options::default() }
 }
@@ -210,6 +229,23 @@ fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, Strin
 fn run(args: &Args) -> Result<ExitCode, String> {
     let provider = FsProvider::new(&args.package_dirs).with_search_paths(&args.search_paths);
     match args.command.as_str() {
+        "solver-config" => {
+            let loaded = if args.defaults {
+                rnl_cli::solver_config::LoadedConfig {
+                    options: SolverOptions::builtin(),
+                    path: None,
+                    text: rnl_solver::DEFAULT_CONFIG.to_string(),
+                }
+            } else {
+                effective_config(args)?
+            };
+            let output = format!("# solver config: {}\n{}", loaded.source(), loaded.text);
+            match &args.out {
+                Some(path) => std::fs::write(path, output).map_err(|e| format!("{}: {e}", path.display()))?,
+                None => print!("{output}"),
+            }
+            Ok(ExitCode::SUCCESS)
+        }
         "check" => {
             let r = interpret(args, &provider)?;
             let shown = r.diagnostics();
@@ -232,10 +268,9 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         "problem" => {
             // the options as the solver's canonical text writes them, so that the hash is the one
             // `rnl solve` writes with the same options
-            let problem_options = SolverOptions::default()
-                .with_overrides(args.solver_options.as_deref().unwrap_or(""))
-                .map_err(|e| format!("--solver-options: {e}"))?
-                .canonical();
+            let loaded = effective_config(args)?;
+            let config_source = loaded.source();
+            let problem_options = loaded.options.canonical();
             let options = Options { std: args.std, std_version: args.std_version.clone(), ..Options::solver() };
             let (r, previous) = if args.previous {
                 rnl_view::read_previous(&args.file.to_string_lossy(), args.dialect.as_deref(), &provider, &options)?
@@ -261,7 +296,13 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                     return Err(format!("no drawing level is titled {t}"));
                 }
             }
-            println!("{}", serde_json::to_string_pretty(&serde_json::json!({ "levels": levels })).unwrap());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(
+                    &serde_json::json!({ "levels": levels, "config_source": config_source, "config": problem_options })
+                )
+                .unwrap()
+            );
             Ok(ExitCode::SUCCESS)
         }
         "view" => {
@@ -328,13 +369,15 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         "preview" => {
             // as `rnl solve` solves, and nothing written: the Document of the files as solved and the
             // report, which the desktop viewer shows (decision 0010)
-            let solver = SolverOptions::default()
-                .with_overrides(args.solver_options.as_deref().unwrap_or(""))
-                .map_err(|e| format!("--solver-options: {e}"))?;
+            let loaded = effective_config(args)?;
+            let config_source = loaded.source();
+            let solver = loaded.options;
             let options =
                 SolveOptions { dialect: args.dialect.clone(), std: args.std, level: args.level.clone(), solver };
             let entry = rnl_cli::path_str(&args.file);
-            let shown = rnl_cli::preview::preview(&entry, &provider, &options, &WallClock::new(), &|_| true)?;
+            let mut shown = rnl_cli::preview::preview(&entry, &provider, &options, &WallClock::new(), &|_| true)?;
+            shown.report.text.insert(0, format!("solver config: {config_source}"));
+            shown.report.config_source = Some(config_source);
             let out = serde_json::json!({ "document": shown.document, "report": shown.report });
             println!("{}", serde_json::to_string_pretty(&out).unwrap());
             Ok(ExitCode::SUCCESS)
@@ -380,8 +423,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
 /// `rnl solve`: solve, print what became of each level, write the files (plan 5.10). Exits with 1
 /// when any error was reported, once the files are written: an error of the netlist as a solver
 /// reads it, counted as `rnl check --no-generated` counts them (7.6), or an error of the solver, a
-/// fact that contradicts itself (the draft 0.3, 8.5; 7.6); with 2 when a file cannot be read or
-/// written.
+/// fact that contradicts itself (the draft 0.3, 8.5; 7.6); with 1 for input, output and configuration errors.
 fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
     let target = match (&args.out, args.in_place) {
         (Some(_), true) => return Err("solve writes under -o DIR or --in-place, not both".into()),
@@ -392,9 +434,9 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
                 .into(),
         ),
     };
-    let solver = SolverOptions::default()
-        .with_overrides(args.solver_options.as_deref().unwrap_or(""))
-        .map_err(|e| format!("--solver-options: {e}"))?;
+    let loaded = effective_config(args)?;
+    println!("solver config: {}", loaded.source());
+    let solver = loaded.options;
     // the groups of the facts of priority low are sought only for their hints (8.5, 7.6)
     let solver = SolverOptions { hints_for_low: args.report, ..solver };
     let options = SolveOptions { dialect: args.dialect.clone(), std: args.std, level: args.level.clone(), solver };

@@ -118,12 +118,32 @@ test("lines have a darker line every fifth, the axes cross at the origin, and No
 });
 
 test("zoomed out, the grid takes 2, 5, 10, 20, 50 units and so on, 10 pixels apart or more", async ({ page, viewer }) => {
-  /** The grid drawn, and the pixels of one unit. */
-  const now = () =>
-    page.evaluate(() => {
-      const [, , w] = document.querySelector("#canvas > svg").getAttribute("viewBox").split(" ").map(Number);
-      return { ...window.viewer.grid, unit: (document.getElementById("canvas").clientWidth / w) * 14 };
-    });
+  /** Read the current view and canvas pixels in one turn, after the existing aspect wait. */
+  const sample = (style) =>
+    page.evaluate(({ style, scale }) => {
+      const canvas = document.getElementById("canvas");
+      const [x, y, w] = document.querySelector("#canvas > svg").getAttribute("viewBox").split(" ").map(Number);
+      const r = canvas.getBoundingClientRect();
+      const k = canvas.clientWidth / w;
+      const g = { ...window.viewer.grid, unit: k * scale };
+      // The same scene-to-page arithmetic as viewer.point; no input occurs between these reads.
+      const point = (u, v) => ({ x: r.left + (u - x) * k, y: r.top + (v - y) * k });
+      const [a, b] = [point(0 * scale, -0 * scale), point(g.step * scale, -0 * scale)];
+      const inView = { x: r.x, y: r.y, width: r.width, height: r.height };
+      let dot, pixels;
+      if (style === "dots") {
+        const hex = getComputedStyle(document.getElementById("grid")).getPropertyValue("--grid-dot").trim();
+        dot = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).concat(255);
+        if (a.x > inView.x + 2 && b.x < inView.x + inView.width - 2 && a.y > inView.y + 2 && a.y < inView.y + inView.height - 2) {
+          const grid = document.getElementById("grid");
+          const rect = grid.getBoundingClientRect();
+          const ratio = grid.width / rect.width;
+          const pixelAt = ({ x, y }) => [...grid.getContext("2d").getImageData(Math.floor((x - rect.left) * ratio), Math.floor((y - rect.top) * ratio), 1, 1).data];
+          pixels = [pixelAt(a), pixelAt(b), pixelAt({ x: (a.x + b.x) / 2, y: a.y })];
+        }
+      }
+      return { g, a, b, inView, dot, pixels };
+    }, { style, scale: SCALE });
   const sequence = [1, 2, 5, 10, 20, 50, 100, 200, 500];
   // the major lines: every fifth line, or the next step of the sequence that is a multiple of the step
   const majors = { 1: 5, 2: 10, 5: 50, 10: 50, 20: 100, 50: 500 };
@@ -132,7 +152,8 @@ test("zoomed out, the grid takes 2, 5, 10, 20, 50 units and so on, 10 pixels apa
     await page.keyboard.press("f");
     await page.evaluate((s) => window.viewer.command(`grid-${s}`), style);
     for (let i = 0; i < 25; i++) {
-      const g = await now();
+      await viewer.settled();
+      const { g, a, b, inView, dot, pixels } = await sample(style);
       expect(sequence).toContain(g.step);
       // the least step of the sequence that keeps 10 pixels between neighbours
       expect(g.step * g.unit).toBeGreaterThanOrEqual(10 - 1e-9);
@@ -140,15 +161,12 @@ test("zoomed out, the grid takes 2, 5, 10, 20, 50 units and so on, 10 pixels apa
       if (style === "lines") expect(g.majorStep).toBe(majors[g.step]);
       seen.add(g.step);
       // the dots or lines drawn are that far apart: one at the origin, the next a step away
-      const [a, b] = [await at(viewer, 0, 0), await at(viewer, g.step, 0)];
       expect(b.x - a.x).toBeGreaterThanOrEqual(10 - 1e-6);
       if (style === "dots") {
-        const dot = await colour(page, "--grid-dot");
-        const inView = await page.locator("#canvas").boundingBox();
         if (a.x > inView.x + 2 && b.x < inView.x + inView.width - 2 && a.y > inView.y + 2 && a.y < inView.y + inView.height - 2) {
-          expect(await pixel(page, a)).toEqual(dot);
-          expect(await pixel(page, b)).toEqual(dot);
-          expect(await pixel(page, { x: (a.x + b.x) / 2, y: a.y })).toEqual(NONE);
+          expect(pixels[0]).toEqual(dot);
+          expect(pixels[1]).toEqual(dot);
+          expect(pixels[2]).toEqual(NONE);
         }
       }
       await page.keyboard.press("Control+-");

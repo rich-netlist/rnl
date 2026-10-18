@@ -36,7 +36,7 @@ M5 tail vbias vss vss nch W=4u L=1u
 *   &vss @ADD-TO $GROUND_NET_SET;
 *   $WIRE_NET_SET @ROUTE
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:ab3e7987ac2f925c.1f3b310f8bee492a") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig3:2884dc320b3f48e9.22233424deb2d8ec") {
 *   %gnd_stub_M5_s = $GND_STUB @ATTACH(gap=2) #M5:s;
 *   %supply_stub_M3_s = $SUPPLY_STUB @ATTACH(gap=2) #M3:s;
 *   %supply_stub_M4_s = $SUPPLY_STUB @ATTACH(gap=2) #M4:s;
@@ -46,40 +46,40 @@ M5 tail vbias vss vss nch W=4u L=1u
 *   %ioport_vdd = $IOPORT @ATTACH &vdd;
 *   %ioport_vss = $IOPORT @ATTACH &vss;
 *   %ioport_vbias = $IOPORT @ATTACH &vbias;
-*   %rt1 = (0, -2);
-*   %rt2 = (-4, 2);
-*   %rt3 = (-8, -1);
-*   %rt4 = (-4, -9);
-*   #M1 @PLACE(-8, -5) => @ORIENT("R0");
-*   #M2 @PLACE(0, -5) => @ORIENT("MY");
-*   #M3 @PLACE(-8, 2) => @ORIENT("MY");
-*   #M4 @PLACE(0, 2) => @ORIENT("R0");
-*   #M5 @PLACE(-4, -12) => @ORIENT("R0");
-*   %gnd_stub_M5_s::g @PLACE(-4, -16) => @ORIENT("R0");
-*   %supply_stub_M3_s::s @PLACE(-8, 6) => @ORIENT("R0");
-*   %supply_stub_M4_s::s @PLACE(0, 6) => @ORIENT("R0");
-*   %ioport_inp @PLACE(-13, -5) => @ORIENT("R0");
-*   %ioport_inn @PLACE(5, -5) => @ORIENT("MY");
-*   %ioport_out @PLACE(5, -2) => @ORIENT("MY");
-*   %ioport_vdd @PLACE(-13, 4) => @ORIENT("R0");
-*   %ioport_vss @PLACE(-9, -14) => @ORIENT("R0");
-*   %ioport_vbias @PLACE(-9, -12) => @ORIENT("R0");
-*   %ax @PLACE(-4, 0);
-*   %tc::mid @PLACE(-4, 0);
+*   %rt1 = (5, 4);
+*   %rt2 = (-4, 5);
+*   %rt3 = (-7, 7);
+*   %rt4 = (0, -2);
+*   #M1 @PLACE(-5, 0) => @ORIENT("R0");
+*   #M2 @PLACE(5, 0) => @ORIENT("MY");
+*   #M3 @PLACE(-4, 7) => @ORIENT("R0");
+*   #M4 @PLACE(4, 7) => @ORIENT("MY");
+*   #M5 @PLACE(0, -7) => @ORIENT("R0");
+*   %gnd_stub_M5_s::g @PLACE(0, -11) => @ORIENT("R0");
+*   %supply_stub_M3_s::s @PLACE(-4, 11) => @ORIENT("R0");
+*   %supply_stub_M4_s::s @PLACE(4, 11) => @ORIENT("R0");
+*   %ioport_inp @PLACE(-10, 0) => @ORIENT("R0");
+*   %ioport_inn @PLACE(13, 0) => @ORIENT("R0");
+*   %ioport_out @PLACE(5, 4) => @ORIENT("R0");
+*   %ioport_vdd @PLACE(-4, 14) => @ORIENT("R0");
+*   %ioport_vss @PLACE(0, -15) => @ORIENT("R0");
+*   %ioport_vbias @PLACE(-5, -7) => @ORIENT("R0");
+*   %ax @PLACE(0, 0);
+*   %tc::mid @PLACE(0, 0);
 *   &inp @WIRE(mode="straight") {%ioport_inp:p #M1:g};
-*   &inn @WIRE(mode="straight") {#M2:g %ioport_inn:p};
+*   &inn @WIRE(mode="straight") {#M2:g (8, -3) (13, -3) %ioport_inn:p};
+*   &out @WIRE(mode="straight") {#M4:d (8, 5) (8, 4) %rt1};
 *   &out @WIRE(mode="straight") {#M2:d %rt1};
-*   &out @WIRE(mode="straight") {%rt1 #M4:d};
-*   &out @WIRE(mode="straight") {%ioport_out:p %rt1};
+*   &out @WIRE(mode="straight") {%rt1 %ioport_out:p};
 *   &vbias @WIRE(mode="straight") {%ioport_vbias:p #M5:g};
-*   &x @WIRE(mode="straight") {#M3:g %rt2};
-*   &x @WIRE(mode="straight") {%rt2 #M4:g};
-*   &x @WIRE(mode="straight") {#M3:d %rt3};
-*   &x @WIRE(mode="straight") {%rt3 (-4, -1) %rt2};
-*   &x @WIRE(mode="straight") {#M1:d %rt3};
-*   &tail @WIRE(mode="straight") {#M1:s (-8, -9) %rt4};
+*   &x @WIRE(mode="straight") {#M1:d (-4, 2) %rt2};
+*   &x @WIRE(mode="straight") {%rt3 (-7, 5) %rt2};
+*   &x @WIRE(mode="straight") {#M4:g (7, 10) (-7, 10) %rt3};
+*   &x @WIRE(mode="straight") {%rt2 #M3:d};
+*   &x @WIRE(mode="straight") {%rt3 #M3:g};
+*   &tail @WIRE(mode="straight") {#M1:s %rt4};
 *   &tail @WIRE(mode="straight") {%rt4 #M5:d};
-*   &tail @WIRE(mode="straight") {#M2:s (0, -9) %rt4};
+*   &tail @WIRE(mode="straight") {#M2:s %rt4};
 *   $JUNCTION @ATTACH %rt1;
 *   $JUNCTION @ATTACH %rt2;
 *   $JUNCTION @ATTACH %rt3;
@@ -97,7 +97,7 @@ CL out 0 1p
 *   {{#VIP #VIN} #XU1 #CL} @AS $FLOW;
 *   $WIRE_NET_SET @ROUTE
 * }
-* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig2:cff169f7ae0ac311.1f3b310f8bee492a") {
+* @RNL(type="generated", priority="high", author="rnl-solver 0.1", hash="sig3:32748af38187648e.22233424deb2d8ec") {
 *   %gnd_stub_XU1_vss = $GND_STUB @ATTACH(gap=2) #XU1:vss;
 *   %gnd_stub_VDD_n = $GND_STUB @ATTACH(gap=2) #VDD:n;
 *   %gnd_stub_VB_n = $GND_STUB @ATTACH(gap=2) #VB:n;
@@ -106,23 +106,23 @@ CL out 0 1p
 *   %gnd_stub_CL_n = $GND_STUB @ATTACH(gap=2) #CL:n;
 *   %supply_stub_XU1_vdd = $SUPPLY_STUB @ATTACH(gap=2) #XU1:vdd;
 *   %supply_stub_VDD_p = $SUPPLY_STUB @ATTACH(gap=2) #VDD:p;
-*   #XU1 @PLACE(10, 1) => @ORIENT("R0");
-*   #VDD @PLACE(0, 1) => @ORIENT("R0");
-*   #VB @PLACE(19, -11) => @ORIENT("R0");
-*   #VIP @PLACE(-7, -11) => @ORIENT("R0");
-*   #VIN @PLACE(5, -11) => @ORIENT("R0");
-*   #CL @PLACE(26, -11) => @ORIENT("R0");
-*   %gnd_stub_XU1_vss::g @PLACE(10, -4) => @ORIENT("R0");
-*   %gnd_stub_VDD_n::g @PLACE(0, -4) => @ORIENT("R0");
-*   %gnd_stub_VB_n::g @PLACE(19, -16) => @ORIENT("R0");
-*   %gnd_stub_VIP_n::g @PLACE(-7, -16) => @ORIENT("R0");
-*   %gnd_stub_VIN_n::g @PLACE(5, -16) => @ORIENT("R0");
-*   %gnd_stub_CL_n::g @PLACE(26, -15) => @ORIENT("R0");
-*   %supply_stub_XU1_vdd::s @PLACE(10, 6) => @ORIENT("R0");
-*   %supply_stub_VDD_p::s @PLACE(0, 6) => @ORIENT("R0");
-*   &inp @WIRE(mode="straight") {#VIP:p (-7, -7) (4, -7) (4, 2) #XU1:inp};
-*   &inn @WIRE(mode="straight") {#VIN:p (5, 0) #XU1:inn};
-*   &out @WIRE(mode="straight") {#XU1:out (26, 1) #CL:p};
-*   &vb @WIRE(mode="straight") {#XU1:vbias (8, -7) (19, -7) #VB:p}
+*   #XU1 @PLACE(43, -3) => @ORIENT("R0");
+*   #VDD @PLACE(0, -8) => @ORIENT("R0");
+*   #VB @PLACE(8, -8) => @ORIENT("R0");
+*   #VIP @PLACE(15, -8) => @ORIENT("R0");
+*   #VIN @PLACE(27, -8) => @ORIENT("R0");
+*   #CL @PLACE(50, -6) => @ORIENT("R0");
+*   %gnd_stub_XU1_vss::g @PLACE(43, -8) => @ORIENT("R0");
+*   %gnd_stub_VDD_n::g @PLACE(0, -13) => @ORIENT("R0");
+*   %gnd_stub_VB_n::g @PLACE(8, -13) => @ORIENT("R0");
+*   %gnd_stub_VIP_n::g @PLACE(15, -13) => @ORIENT("R0");
+*   %gnd_stub_VIN_n::g @PLACE(27, -13) => @ORIENT("R0");
+*   %gnd_stub_CL_n::g @PLACE(50, -10) => @ORIENT("R0");
+*   %supply_stub_XU1_vdd::s @PLACE(43, 2) => @ORIENT("R0");
+*   %supply_stub_VDD_p::s @PLACE(0, -3) => @ORIENT("R0");
+*   &inp @WIRE(mode="straight") {#VIP:p (15, -2) #XU1:inp};
+*   &inn @WIRE(mode="straight") {#VIN:p (27, -4) #XU1:inn};
+*   &out @WIRE(mode="straight") {#XU1:out (50, -3) #CL:p};
+*   &vb @WIRE(mode="straight") {#VB:p (12, -5) (12, -16) (41, -16) #XU1:vbias}
 * }
 .end

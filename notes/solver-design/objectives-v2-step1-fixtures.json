@@ -1,0 +1,59 @@
+{
+  "fixture_commit": "09f32d297377aca02267399dabf6598fe65fbeae",
+  "policy": "Fixtures only; no solver-names implementation or snapshots copied.",
+  "fixtures": [
+    {
+      "path": "tests/integration/solver/0.3/T1-rc-lowpass.sp",
+      "source": "09f32d297377aca02267399dabf6598fe65fbeae:tests/integration/solver/0.3/T1-rc-lowpass.sp",
+      "original_sha256": "59f61e45453db13897d9d2c964034756e4c002cadb546f6ea5daef5e15b6d26b",
+      "copied_sha256": "59f61e45453db13897d9d2c964034756e4c002cadb546f6ea5daef5e15b6d26b",
+      "transforms": []
+    },
+    {
+      "path": "tests/integration/solver/0.3/T2-common-source.sp",
+      "source": "09f32d297377aca02267399dabf6598fe65fbeae:tests/integration/solver/0.3/T2-common-source.sp",
+      "original_sha256": "1b1b2cdb7cf5c67684c4854a2db35272a38a560d2b8aea3f4abd8f8bc573c6ff",
+      "copied_sha256": "1b1b2cdb7cf5c67684c4854a2db35272a38a560d2b8aea3f4abd8f8bc573c6ff",
+      "transforms": []
+    },
+    {
+      "path": "tests/integration/solver/0.3/T2b-common-source-dragged.sp",
+      "source": "09f32d297377aca02267399dabf6598fe65fbeae:tests/integration/solver/0.3/T2b-common-source-dragged.sp",
+      "original_sha256": "e3e37029acf0488d1ce2eb175bf9b9213360f2ead7807db62f1f06cf1af974f6",
+      "copied_sha256": "e3e37029acf0488d1ce2eb175bf9b9213360f2ead7807db62f1f06cf1af974f6",
+      "transforms": []
+    },
+    {
+      "path": "tests/integration/solver/0.3/T3-ota5t.sp",
+      "source": "09f32d297377aca02267399dabf6598fe65fbeae:tests/integration/solver/0.3/T3-ota5t.sp",
+      "original_sha256": "0c09cd7427fc123e07f6bd593860f0477142b6f2ce099c9e1c67e280e5af60f1",
+      "copied_sha256": "1bd239876006328b60a5cab1dba4c71ee504d58eed22e892cd2f495b05366a75",
+      "transforms": [
+        "$MIRROR_PAIR -> $MIRRORED (handoff v3, standard package #84)"
+      ]
+    },
+    {
+      "path": "tests/integration/solver/0.3/T4-miller-conflicts.sp",
+      "source": "09f32d297377aca02267399dabf6598fe65fbeae:tests/integration/solver/0.3/T4-miller-conflicts.sp",
+      "original_sha256": "b6f741d88b660c89602d76b652e4b6ac6e784899a4a43b066321c9850eb72dbb",
+      "copied_sha256": "5bce1378f0cefe0fbebde7c62f4c2546cc8cdc8a6c8b7ee0227dd0ae49ef5afa",
+      "transforms": [
+        "$MIRROR_PAIR -> $MIRRORED (handoff v3, standard package #84)"
+      ]
+    },
+    {
+      "path": "tests/integration/solver/0.3/T5-inverting-amp-rlc.sp",
+      "source": "09f32d297377aca02267399dabf6598fe65fbeae:tests/integration/solver/0.3/T5-inverting-amp-rlc.sp",
+      "original_sha256": "763aef331a36f70d513eb8bb36f6584aaf7bfc5f7c19388083314db51bcf9219",
+      "copied_sha256": "763aef331a36f70d513eb8bb36f6584aaf7bfc5f7c19388083314db51bcf9219",
+      "transforms": []
+    },
+    {
+      "path": "tests/integration/solver/0.3/T6-r2r-ladder.sp",
+      "source": "09f32d297377aca02267399dabf6598fe65fbeae:tests/integration/solver/0.3/T6-r2r-ladder.sp",
+      "original_sha256": "0116b7ed5e5960127f60b56365ad9b068107585fb77c2d62d1ec95e868ba7c2e",
+      "copied_sha256": "0116b7ed5e5960127f60b56365ad9b068107585fb77c2d62d1ec95e868ba7c2e",
+      "transforms": []
+    }
+  ]
+}

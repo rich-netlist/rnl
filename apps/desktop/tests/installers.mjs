@@ -160,7 +160,7 @@ async function nsis(setup) {
   await installed(
     () => {
       console.log(`installed: ${fs.readdirSync(dir).join(", ")}`);
-      for (const file of [EXE, "uninstall.exe", "LICENSE.txt"]) check(fs.existsSync(path.join(dir, file)), `${file} was not installed.`);
+      for (const file of [EXE, "uninstall.exe", "LICENSE.txt", "rnl-solver.toml"]) check(fs.existsSync(path.join(dir, file)), `${file} was not installed.`);
       const entry = registry(USER_ENTRY);
       check(entry !== null, `There is no ${USER_ENTRY}.`);
       same([entry.DisplayName, entry.DisplayVersion, entry.Publisher], [NAME, VERSION, PUBLISHER], "the entry among the installed apps");
@@ -192,7 +192,7 @@ async function msi(pkg) {
   await installed(
     () => {
       console.log(`installed: ${fs.readdirSync(dir).join(", ")}`);
-      for (const file of [EXE, "LICENSE.txt"]) check(fs.existsSync(path.join(dir, file)), `${file} was not installed.`);
+      for (const file of [EXE, "LICENSE.txt", "rnl-solver.toml"]) check(fs.existsSync(path.join(dir, file)), `${file} was not installed.`);
       same(machineEntries(), [{ name: NAME, version: VERSION, publisher: PUBLISHER }], "the entry among the installed apps");
       same(present(shortcuts), shortcuts, "the shortcuts in the Start menu and on the desktop");
       tryApp(path.join(dir, EXE));

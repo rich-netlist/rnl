@@ -12,7 +12,7 @@ import { stopEditing } from "./editor.js";
 import { currentSource, isLoading, openSource, showBuilt } from "./open.js";
 import { setPane } from "./panels.js";
 import { shell } from "./shell.js";
-import { solverSettings } from "./solve-settings.js";
+import { migrationNotice, solverSettings } from "./solve-settings.js";
 import { doc } from "./state.js";
 import { revealLine } from "./text.js";
 import { $, span } from "./util.js";
@@ -48,7 +48,10 @@ export async function solve() {
   document.body.classList.add("solving");
   status(`Solving ${source.name}…`, true);
   try {
-    const solved = await shell.solve(source, solverSettings(), changes(true));
+    const settings = solverSettings();
+    const solved = await shell.solve(source, settings, changes(true));
+    const migrated = migrationNotice();
+    if (migrated) solved.report.notes.unshift(migrated);
     shown = { source, report: solved.report };
     showBuilt(solved.document, true);
     renderReport(solved.report);
@@ -189,6 +192,7 @@ function renderReport(report) {
     "A preview of the solve: nothing was written, and the files are as they were. Solve › Save Solved Copy As saves the files solved elsewhere; Solve › Close Preview shows the file as written.";
   box.append(note);
   const plain = (text, cls = "solve-line") => line(cls, [span("msg", text)], null);
+  if (report.config_source) group(box, "Solver configuration", [plain(report.config_source)]);
   group(box, "Files", report.notes.map((n) => plain(n)));
   for (const level of report.levels) {
     const section = document.createElement("section");
@@ -212,7 +216,15 @@ function renderReport(report) {
     group(section, "Errors", level.errors.map((e) => plain(e, "solve-line error")));
     group(section, "Warnings", level.warnings.map((w) => plain(w, "solve-line warning")));
     group(section, "What the record cannot hold", level.unsolved.map((u) => plain(u)));
-    group(section, "ROUTEs left in parts", level.unrouted.map((u) => plain(u)));
+    group(section, "Routing fallbacks", (level.routing_fallbacks || []).map((u) => plain(typeof u === "string" ? u : `${u.net}: ${u.phase} (${u.reason})`)));
+    if (level.scoring) {
+      const scoring = level.scoring;
+      const values = scoring.levels.flatMap((l) => [
+        plain(`Level ${l.level}: total ${l.total}, tolerance ${l.tolerance}`),
+        ...l.terms.map((t) => plain(`${t.kind} ${JSON.stringify(t.parameters)}: ${t.raw} × ${t.weight} = ${t.weighted}${t.estimated ? " (estimate)" : " (real)"}${t.inactive ? " (inactive)" : ""}${t.diagnostics.length ? `; ${t.diagnostics.join("; ")}` : ""}`)),
+      ]);
+      group(section, "Scoring", [plain(`Configuration digest: ${scoring.config_digest}`), ...values], false);
+    }
     group(section, "Notes", level.notes.map((n) => plain(n)), false);
     box.append(section);
   }

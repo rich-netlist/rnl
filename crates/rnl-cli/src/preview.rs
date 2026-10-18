@@ -36,6 +36,8 @@ pub struct Preview {
 /// What became of the facts, level by level, each line located in the texts of the Document.
 #[derive(Clone, Debug, Serialize)]
 pub struct Report {
+    pub config_source: Option<String>,
+    pub invocation: crate::solve::Invocation,
     /// The lines of the files raised to 0.3 or kept at 0.2 (16.1), and of the levels not solved.
     pub notes: Vec<String>,
     pub levels: Vec<LevelReport>,
@@ -66,7 +68,8 @@ pub struct LevelReport {
     pub warnings: Vec<String>,
     /// What the record cannot hold.
     pub unsolved: Vec<String>,
-    pub unrouted: Vec<String>,
+    pub routing_fallbacks: Vec<rnl_solver::RoutingFallback>,
+    pub scoring: rnl_solver::ScoreReport,
     pub notes: Vec<String>,
 }
 
@@ -177,14 +180,6 @@ fn report(run: &SolveRun, document: &Document, problems: &[LevelProblem]) -> Rep
                 Line { text, at: hint.facts.first().and_then(|&k| fact_at(k)) }
             })
             .collect();
-        let unrouted = r
-            .unrouted
-            .iter()
-            .map(|u| {
-                let why = if u.budget { "the budget of the router ran out" } else { "no path joins them" };
-                format!("the net {}: left in {} parts, {why}", u.net, u.parts)
-            })
-            .collect();
         let failed = if r.failed.is_empty() { String::new() } else { format!(", {} failed", r.failed.len()) };
         let noun = if p.facts.len() == 1 { "fact" } else { "facts" };
         levels.push(LevelReport {
@@ -201,7 +196,8 @@ fn report(run: &SolveRun, document: &Document, problems: &[LevelProblem]) -> Rep
             errors: r.errors.clone(),
             warnings: r.warnings.clone(),
             unsolved: level.written.unsolved.iter().map(|u| u.to_string()).collect(),
-            unrouted,
+            routing_fallbacks: r.routing_fallbacks.clone(),
+            scoring: r.scoring.clone(),
             notes: r.notes.iter().chain(&level.written.notes).cloned().collect(),
         });
     }
@@ -216,6 +212,8 @@ fn report(run: &SolveRun, document: &Document, problems: &[LevelProblem]) -> Rep
             .map_or(path.clone(), |f| f.name.clone())
     };
     Report {
+        config_source: None,
+        invocation: run.invocation.clone(),
         notes,
         levels,
         errors: run.errors + crate::solve::errors(run),
@@ -278,6 +276,7 @@ impl Copy {
     /// A run of these files and no level, which is what writing them takes.
     fn run(&self) -> SolveRun {
         SolveRun {
+            invocation: crate::solve::Invocation::default(),
             entry: self.entry.clone(),
             levels: Vec::new(),
             not_solved: Vec::new(),

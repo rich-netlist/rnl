@@ -66,7 +66,7 @@ use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::LevelProblem;
 
 use crate::model::{turned, Model, PointId};
-use crate::rational::{from_f64, int, Q};
+use crate::rational::{int, Q};
 use crate::resolve::{Geometry, Resolver, Tag};
 use crate::route::CLEARANCE;
 use crate::search::{
@@ -134,7 +134,7 @@ pub(crate) fn place(
     options: &SolverOptions,
     work: &mut Work,
 ) -> Placed {
-    let grid = options.grid.and_then(from_f64).filter(|g| *g > Q::zero());
+    let grid = options.grid.clone().filter(|g| *g > Q::zero());
     let orient = orientation_relations(s, c);
     let actual: Vec<Orient> = with_relations(s, &orient, work, |r, _, _| r.geometry().orient.clone());
     let mut separations: Vec<Tagged> = Vec::new();
@@ -159,7 +159,12 @@ pub(crate) fn place(
         // with the larger gap it asks; only for a candidate with rows to put apart, and while
         // the LP was solved
         let mut rows_again = false;
-        if c.rows.len() > 1 && optimised && row_rounds < ROW_ROUNDS {
+        if options.separate_symbols
+            && matches!(c.flow, None | Some(crate::Direction::Down))
+            && c.rows.len() > 1
+            && optimised
+            && row_rounds < ROW_ROUNDS
+        {
             let mut all: BTreeMap<(usize, usize), Q> =
                 pairs.iter().flatten().map(|p| ((p.upper, p.lower), p.least.clone())).collect();
             let before = all.clone();
@@ -182,7 +187,7 @@ pub(crate) fn place(
             // overlaps of this placement may not be those of the next
             continue;
         }
-        if new.is_empty() || round >= REPAIR_ROUNDS {
+        if !options.separate_symbols || new.is_empty() || round >= REPAIR_ROUNDS {
             let dropped = rels.iter().zip(&kept).filter(|(_, k)| !**k).map(|(t, _)| t.kind).collect();
             let overlaps = overlaps
                 .into_iter()
@@ -294,7 +299,7 @@ pub(crate) fn separation(
     let mut order: Vec<usize> = (0..4).collect();
     order.sort_by_key(|&i| (&sides[i].2 - &sides[i].3, i));
     let mut alternatives = Vec::new();
-    for gap in [one(), Q::zero()] {
+    for gap in [s.separate_gap.clone(), Q::zero()] {
         for &i in &order {
             let (axis, terms, c, _) = &sides[i];
             // on the grid, as the constants of the other relations are
@@ -590,7 +595,7 @@ fn round_to_grid(sx: &mut Simplex<Tag>, order: &[Visit], grid: &Q, kept: &BTreeS
 fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOptions) -> (Geometry, bool) {
     let fallback = r.geometry().clone();
     let ori = fallback.orient.clone();
-    let grid = options.grid.and_then(from_f64).filter(|g| *g > Q::zero());
+    let grid = options.grid.clone().filter(|g| *g > Q::zero());
     let own: Vec<(usize, Var)> = (0..s.objects.len())
         .filter(|&k| s.objects[k].own)
         .filter_map(|k| Some((k, model.points.get(&PointId::Origin(k))?.var)))
@@ -676,17 +681,5 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rational::{frac, int};
-
-    #[test]
-    fn halves_go_up_to_the_grid() {
-        let g = Some(int(1));
-        assert_eq!(round(&frac(9, 2), &g), int(5));
-        assert_eq!(round(&frac(-9, 2), &g), int(-4));
-        assert_eq!(round(&frac(21, 5), &g), int(4));
-        assert_eq!(round(&frac(21, 5), &None), frac(21, 5));
-        assert_eq!(round(&frac(13, 10), &Some(frac(1, 2))), frac(3, 2));
-    }
-}
+#[path = "../tests/unit/coords.rs"]
+mod tests;

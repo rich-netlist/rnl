@@ -793,4 +793,5 @@ fn sorted<T: Ord>(mut tags: Vec<T>) -> Vec<T> {
 }
 
 #[cfg(test)]
+#[path = "../tests/unit/simplex.rs"]
 mod tests;

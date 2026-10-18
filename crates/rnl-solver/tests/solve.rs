@@ -54,7 +54,7 @@ fn every_level_solved_and_written_back_is_drawn_with_its_wires() {
             let what = format!("{entry} / {}", p.title);
             let solved = solve(&p, &options);
             assert_eq!(solved, solve(&p, &options), "{what}: not the same twice");
-            assert!(solved.report.unrouted.is_empty(), "{what}: {:?}", solved.report.unrouted);
+            assert!(solved.report.routing_fallbacks.is_empty(), "{what}: {:?}", solved.report.routing_fallbacks);
             // nothing that RNL cannot write
             for w in &solved.solution.wires {
                 for q in &w.points {
@@ -130,7 +130,7 @@ fn the_netlists_of_the_review_are_routed_whole_and_read_back() {
         assert_eq!(ps.len(), 1, "{body}");
         let p = &ps[0];
         let solved = solve(p, &options);
-        assert!(solved.report.unrouted.is_empty(), "{body}: {:?}", solved.report.unrouted);
+        assert!(solved.report.routing_fallbacks.is_empty(), "{body}: {:?}", solved.report.routing_fallbacks);
         let hash = sig2(p, &options.canonical());
         let written = write_record(p, &solved.solution, AUTHOR, &hash);
         let lost: Vec<String> = written

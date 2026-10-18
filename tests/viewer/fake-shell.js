@@ -30,20 +30,10 @@ let handler = null; // the page's handler of the commands chosen in the platform
  * the shape, not that they are the solver's present values.
  */
 const DEFAULTS = {
-  tolerance: 0.000001,
-  grid: 1,
-  beam: 4,
-  budget: { candidates: 256, astar_expansions: 200000 },
-  time_limit: 5,
-  hints_for_low: false,
-  objectives: [
-    "current_direction", "turns", "ground_direction", "component_alignment", "distribution", "symmetry",
-    "terminal_wire_alignment", "area", "crossings", "wire_length", "aspect",
-  ].map((name) => ({ items: [{ name, weight: 1 }], tolerance: 0 })),
-  names: [
-    "current_direction", "ground_direction", "signal_flow", "component_alignment", "distribution", "symmetry",
-    "turns", "crossings", "wire_length", "area", "aspect", "terminal_wire_alignment", "labels", "bend_alignment",
-  ],
+  source: "builtin", tolerance: "1/1000000", grid: "1", beam: "4", route_beam: "2",
+  separate_symbols: true, separate_gap: "1", route_clearance: "1", texts_at_anchor: true,
+  budget: { candidates: "256", astar_expansions: "200000", soft_expansions: "200000", symmetry_steps: "100000" },
+  time_limit: "5", hints_for_low: false,
 };
 
 /** What the page asked of the shell, and what it should do next. */
@@ -137,12 +127,28 @@ let progress = null; // the page's handler of each level a solve begins
  * ["checkSolverOptions", options], which `optionsError` makes it refuse.
  */
 const solving = {
-  async solverDefaults() {
-    fake.calls.push(["solverDefaults"]);
-    return structuredClone(DEFAULTS);
+  async solverDefaults(path = null) {
+    fake.calls.push(["solverDefaults", path]);
+    const configured = fake.configDefaults?.[path || "builtin"] || {};
+    const answer = { ...structuredClone(DEFAULTS), ...structuredClone(configured), ...(fake.configError ? { config_error: fake.configError } : {}) };
+    if (fake.waitConfigDefaults?.includes(path)) {
+      return new Promise((resolve) => {
+        (fake.pendingDefaults ||= []).push({ path, finish: () => resolve(answer) });
+      });
+    }
+    return answer;
   },
-  async checkSolverOptions(options) {
-    fake.calls.push(["checkSolverOptions", options]);
+  async pickSolverConfig() {
+    fake.calls.push(["pickSolverConfig"]);
+    return fake.configPick || null;
+  },
+  async checkSolverOptions(options, solverConfig = null) {
+    fake.calls.push(["checkSolverOptions", options, solverConfig]);
+    if (fake.waitOptionsChecks) {
+      return new Promise((resolve) => {
+        (fake.pendingChecks ||= []).push({ options, solverConfig, finish: () => resolve(fake.optionsError) });
+      });
+    }
     return fake.optionsError;
   },
   async solve(src, settings, edits) {

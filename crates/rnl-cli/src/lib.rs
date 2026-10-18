@@ -7,6 +7,7 @@ pub mod preview;
 pub mod problem;
 pub mod provider;
 pub mod solve;
+pub mod solver_config;
 
 use std::path::Path;
 

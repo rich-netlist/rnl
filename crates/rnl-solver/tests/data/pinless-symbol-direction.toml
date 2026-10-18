@@ -1,0 +1,11 @@
+format = "rnl-solver-config/1"
+[rules]
+separate_symbols = false
+[rules.budget]
+candidates = 0
+[[level]]
+[[level.term]]
+kind = "symbol_direction"
+symbols = ["$BADGE_SYMBOL"]
+direction = "down"
+reference = "up"

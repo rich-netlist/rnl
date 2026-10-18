@@ -122,7 +122,7 @@ use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use num_traits::Zero;
-use rnl_runtime::geom::{fmt_num, Orient};
+use rnl_runtime::geom::Orient;
 use rnl_runtime::host::file_name;
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::problem::{FactKind, LevelProblem, PointRef, Position};
@@ -1397,13 +1397,11 @@ pub(crate) fn point_value(problem: &LevelProblem, g: &Geometry, r: &PointRef, ax
 /// within the one limit; then, counted in work and not timed, the witness taken as written (see
 /// the module).
 pub(crate) fn resolve(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Resolved {
-    let tol = from_f64(options.tolerance)
-        .filter(|t| *t >= Q::zero())
-        .unwrap_or_else(|| from_f64(rnl_runtime::geom::TOL).unwrap_or_default());
+    let tol = options.tolerance.clone();
     let n = problem.objects.len();
-    let deadline = Deadline::new(clock, options.time_limit);
+    let deadline = Deadline::new(clock, options.time_limit.as_ref().map(crate::rational::to_f64));
     let limits = Limits::Time(&deadline);
-    let seconds = fmt_num(options.time_limit.unwrap_or_default());
+    let seconds = options.time_limit.as_ref().map(crate::rational::exact_text).unwrap_or_default();
     let mut work = Work::default();
     // Facts that contradict themselves (the draft 0.3, 8.5): each fact is first checked on its
     // own, within the limit, as this is checking too. One with no solution fails (7.6) and takes
@@ -1965,4 +1963,5 @@ impl Map {
 }
 
 #[cfg(test)]
+#[path = "../tests/unit/resolve.rs"]
 pub(crate) mod tests;

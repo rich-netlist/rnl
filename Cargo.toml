@@ -28,6 +28,7 @@ num-bigint = "0.4"
 num-integer = "0.1"
 num-rational = "0.4"
 num-traits = "0.2"
+toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
 rnl-runtime = { path = "crates/rnl-runtime" }
 rnl-host-spice = { path = "crates/rnl-host-spice" }
 rnl-host-spectre = { path = "crates/rnl-host-spectre" }

@@ -167,7 +167,7 @@ fn the_time_limit_leaves_facts_undecided_in_the_report() {
     let file = dir.join("t.sp");
     std::fs::write(&file, NET).unwrap();
     let options =
-        SolveOptions { solver: SolverOptions { time_limit: Some(0.0), ..SolverOptions::default() }, ..unlimited() };
+        SolveOptions { solver: SolverOptions::default().with_overrides("time_limit=0").unwrap(), ..unlimited() };
     let shown = preview(&path(&file), &FsProvider::new(&[]), &options, &Ticks::default(), &|_| true).unwrap();
     let level = &shown.report.levels[0];
     let undecided: Vec<&str> =

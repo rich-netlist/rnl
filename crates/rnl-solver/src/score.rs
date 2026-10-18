@@ -7,20 +7,10 @@
 //! (13.1), drawn by their mode. Before routing, the routing objectives measure the straight
 //! connections of each net; that is the estimate the driver picks the candidates to route by.
 //!
-//! **The order of candidates** ([`order`]) has four counts ahead of the objectives, as the
-//! solver's own rules rank after every fact and before every objective (8.5, 11.7): first the
-//! pairs of symbols that overlap; then what crowds the drawing ([`crowding`]): the gaps between
-//! neighbours in a row that the facts kept left out of the candidate, and the texts drawn over
-//! another symbol; then the places where the wires mislead ([`misleading`]): lines that touch or
-//! overlap make no connection (13.2), so wires of different nets that do, a pin on a wire of
-//! another net, or a wire through a symbol read as what they are not; then the joins that routing
-//! left undone, a ROUTE (13.7) being a request of the file and the objectives only preferences of
-//! the solver. The wires routed avoid all of it by themselves; the count is there for the wires
-//! written (13.1), which the placement moves and their mode draws. Among candidates equal in the
-//! four, the layers decide as `crate::objectives::Active::rank` does: layer by layer, the
-//! candidates within the layer's tolerance of its least value kept, the canonical code breaking
-//! what is left tied. An objective that is off has no layer, so it neither ranks nor breaks ties.
-
+//! Candidate ranking uses only configured level totals and the canonical code. At each level,
+//! keep the tolerance window anchored at the least remaining value, then continue to the next
+//! level. Collision diagnostics and routing fallback reports add no hidden ranking counters.
+use std::cell::OnceCell;
 use std::collections::BTreeSet;
 
 use num_traits::{One, Zero};
@@ -31,26 +21,13 @@ use crate::coords::solid;
 use crate::objectives::{Active, Routed, View};
 use crate::rational::Q;
 use crate::resolve::Geometry;
-use crate::route::{written_path, Routing};
-use crate::search::RelKind;
+use crate::route::Routing;
 use crate::structure::Structure;
 
 /// A candidate as the order of candidates sees it.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Entry {
-    /// The pairs of symbols that overlap.
-    pub overlaps: usize,
-    /// What crowds the drawing ([`crowding`]): the gaps between neighbours left out, and the texts
-    /// over another symbol.
-    pub crowding: usize,
-    /// The places where the wires mislead ([`misleading`]); before routing, those of the wires
-    /// written.
-    pub misleading: usize,
-    /// The joins routing left undone (`Routing::joins_left`); 0 before routing.
-    pub joins_left: usize,
-    /// The value of each layer of the objectives in force.
     pub layers: Vec<Q>,
-    /// The canonical code (`crate::search::Candidate::code`).
     pub code: Vec<u32>,
 }
 
@@ -59,18 +36,25 @@ pub(crate) struct Entry {
 /// net that a ROUTE asks for counts as of that net, so that the routed wires that meet it do not
 /// count as crossing another net.
 pub(crate) fn drawn(problem: &LevelProblem, s: &Structure, g: &Geometry, routing: &Routing) -> Routed {
-    let drawn = &s.connections.drawn;
-    // a net by the first entry drawn with its name
-    let net = |d: usize| drawn.iter().position(|e| drawn.get(d).is_some_and(|x| x.net == e.net)).unwrap_or(d);
-    let mut paths: Vec<(usize, Vec<[Q; 2]>)> =
-        routing.drawn.iter().zip(&routing.paths).map(|(d, path)| (net(*d), path.clone())).collect();
-    let first_written = drawn.len().saturating_sub(problem.wires.len());
-    for w in 0..problem.wires.len() {
-        if let Some(path) = written_path(problem, g, w) {
-            paths.push((net(first_written + w), path));
+    let geometry = if routing.geometry.wires.is_empty() {
+        crate::routing_geometry::RoutingGeometry {
+            wires: (0..problem.wires.len())
+                .filter_map(|w| crate::routing_geometry::authored_wire(problem, g, w))
+                .collect(),
         }
-    }
-    Routed { paths }
+    } else {
+        routing.geometry.clone()
+    };
+    let paths = geometry
+        .wires
+        .iter()
+        .map(|w| {
+            let net =
+                s.connections.drawn.iter().position(|d| w.nets.contains(&d.net)).unwrap_or(s.connections.drawn.len());
+            (net, w.vertices.iter().map(|v| v.at.clone()).collect())
+        })
+        .collect();
+    Routed { paths, geometry }
 }
 
 /// The value of each layer of the objectives in force on a placed candidate: with `routed`, the
@@ -78,6 +62,139 @@ pub(crate) fn drawn(problem: &LevelProblem, s: &Structure, g: &Geometry, routing
 pub(crate) fn layers(s: &Structure, origins: &[[Q; 2]], g: &Geometry, routed: Option<&Routed>) -> Vec<Q> {
     let view = View { s, at: origins, orient: &g.orient };
     s.active.score(&view, routed)
+}
+
+/// Exact geometry shared only by the terms evaluated on this one immutable view. Eligibility
+/// remains with each measure: components, solid bodies, label owners and net pins differ.
+pub(crate) struct ViewGeometry<'a> {
+    pub view: View<'a>,
+    boxes: OnceCell<Vec<Option<[Q; 4]>>>,
+    pins: OnceCell<Vec<Vec<Option<[Q; 2]>>>>,
+    authored: OnceCell<Routed>,
+}
+impl<'a> ViewGeometry<'a> {
+    pub fn new(view: View<'a>) -> Self {
+        Self { view, boxes: OnceCell::new(), pins: OnceCell::new(), authored: OnceCell::new() }
+    }
+    pub fn bbox(&self, k: usize) -> Option<&[Q; 4]> {
+        self.boxes
+            .get_or_init(|| {
+                (0..self.view.s.objects.len()).map(|k| self.view.s.box_at(self.view.at, self.view.orient, k)).collect()
+            })
+            .get(k)?
+            .as_ref()
+    }
+    pub fn pins(&self, k: usize) -> &[Option<[Q; 2]>] {
+        &self.pins.get_or_init(|| {
+            (0..self.view.s.objects.len())
+                .map(|k| {
+                    (0..self.view.s.pins(k).len())
+                        .map(|pin| self.view.s.pin_at(self.view.at, self.view.orient, k, pin))
+                        .collect()
+                })
+                .collect()
+        })[k]
+    }
+    pub fn point(&self, p: crate::model::PointId) -> Option<[Q; 2]> {
+        match p {
+            crate::model::PointId::Pin(k, pin) => self.pins(k).get(pin)?.clone(),
+            _ => self.view.s.point_at(self.view.at, self.view.orient, p),
+        }
+    }
+    fn authored(&self) -> &Routed {
+        self.authored.get_or_init(|| {
+            let g = Geometry { origin: self.view.at.to_vec(), orient: self.view.orient.to_vec() };
+            drawn(&self.view.s.problem, self.view.s, &g, &Routing::default())
+        })
+    }
+    pub fn overlaps(&self) -> usize {
+        let boxes: Vec<_> =
+            (0..self.view.s.objects.len()).filter(|&k| solid(self.view.s, k)).filter_map(|k| self.bbox(k)).collect();
+        (0..boxes.len())
+            .map(|i| {
+                boxes
+                    .iter()
+                    .skip(i + 1)
+                    .filter(|b| {
+                        let a = boxes[i];
+                        a[0].clone().max(b[0].clone()) < a[2].clone().min(b[2].clone())
+                            && a[1].clone().max(b[1].clone()) < a[3].clone().min(b[3].clone())
+                    })
+                    .count()
+            })
+            .sum()
+    }
+    pub fn texts_over(&self) -> usize {
+        let s = self.view.s;
+        let bodies: Vec<_> =
+            (0..s.objects.len()).filter(|&k| solid(s, k)).filter_map(|k| Some((k, self.bbox(k)?))).collect();
+        let host = |k: usize| s.objects[k].stub.as_ref().map(|stub| stub.host.0);
+        let owners: BTreeSet<usize> = s.labels.keys().chain(s.offset_labels.keys()).copied().collect();
+        let mut count = 0;
+        for k in owners.into_iter().filter(|&k| !s.objects[k].left_free) {
+            let (Some(at), Some(&o)) = (self.view.at.get(k), self.view.orient.get(k)) else { continue };
+            let placed = |b: &[Q; 4]| [&at[0] + &b[0], &at[1] + &b[1], &at[0] + &b[2], &at[1] + &b[3]];
+            let texts: Vec<_> = s
+                .label_offset(k, o)
+                .into_iter()
+                .chain(s.offset_labels.get(&k).into_iter().flatten().cloned())
+                .map(|b| placed(&b))
+                .collect();
+            for (j, body) in &bodies {
+                if *j == k || host(*j) == Some(k) || host(k) == Some(*j) {
+                    continue;
+                }
+                count += texts.iter().filter(|t| meet(t, body)).count();
+            }
+        }
+        count
+    }
+    pub fn wire_penalty(&self, routed: Option<&Routed>, shorts: bool) -> usize {
+        let s = self.view.s;
+        let r = routed.unwrap_or_else(|| self.authored());
+        let nets: Vec<BTreeSet<&str>> =
+            r.geometry.wires.iter().map(|w| w.nets.iter().map(String::as_str).collect()).collect();
+        let segments: Vec<_> = r
+            .geometry
+            .wires
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !nets[*i].is_empty())
+            .flat_map(|(i, w)| w.vertices.windows(2).map(move |v| (i, &v[0].at, &v[1].at)))
+            .filter(|(_, a, b)| a != b)
+            .collect();
+        let mut count = 0;
+        if shorts {
+            for (&(k, pin), on) in &s.connections.nets_of {
+                if s.objects[k].left_free {
+                    continue;
+                }
+                let names: BTreeSet<_> =
+                    on.iter().filter_map(|&i| s.connections.nets.get(i)).map(|n| n.name.as_str()).collect();
+                if names.is_empty() {
+                    continue;
+                }
+                let Some(p) = self.pins(k).get(pin).and_then(Option::as_ref) else { continue };
+                count +=
+                    segments.iter().filter(|(i, a, b)| nets[*i].is_disjoint(&names) && on_segment(p, a, b)).count();
+            }
+        } else {
+            for k in (0..s.objects.len()).filter(|&k| solid(s, k)) {
+                let Some(b) = self.bbox(k) else { continue };
+                let inner: Vec<_> = self
+                    .pins(k)
+                    .iter()
+                    .flatten()
+                    .filter(|p| b[0] < p[0] && p[0] < b[2] && b[1] < p[1] && p[1] < b[3])
+                    .collect();
+                count += segments
+                    .iter()
+                    .filter(|(_, a, c)| through(b, a, c) && !inner.iter().any(|p| *p == *a || *p == *c))
+                    .count();
+            }
+        }
+        count
+    }
 }
 
 /// The places where the wires of a candidate, drawn as they will be (`routed`: the wires routed and
@@ -99,6 +216,7 @@ pub(crate) fn layers(s: &Structure, origins: &[[Q; 2]], g: &Geometry, routed: Op
 ///
 /// Nets are compared by name, a wire of a bus being on each of its nets: two wires are of
 /// different nets when they share none. A wire on no net is left out.
+#[cfg(test)]
 pub(crate) fn misleading(
     problem: &LevelProblem,
     s: &Structure,
@@ -156,14 +274,58 @@ pub(crate) fn misleading(
     count
 }
 
-/// What crowds a placed candidate, in the order of candidates after the symbols that overlap and
-/// before everything else (review of phase 2 of the quality review): each gap between neighbours
-/// in a row that the facts kept left out of it (`RelKind::Gap`, of `dropped`, the relations its
-/// resolution dropped), as its neighbours may then lie on each other's texts; and each text drawn
-/// over another symbol ([`texts_over`]). A DISTRIBUTE whose members a candidate puts in another
-/// order drops such gaps, its even steps then as short as the facts allow.
-pub(crate) fn crowding(s: &Structure, origins: &[[Q; 2]], ori: &[Orient], dropped: &[RelKind]) -> usize {
-    dropped.iter().filter(|k| **k == RelKind::Gap).count() + texts_over(s, origins, ori)
+/// Step1 splits the former misleading diagnostic into pin/line and line/body measures.
+/// Per-segment counting is retained until Step2, without the old line/line penalty.
+pub(crate) fn wire_penalty(view: &View, routed: Option<&Routed>, shorts: bool) -> usize {
+    let s = view.s;
+    let g = Geometry { origin: view.at.to_vec(), orient: view.orient.to_vec() };
+    let authored;
+    let r = match routed {
+        Some(r) => r,
+        None => {
+            authored = drawn(&s.problem, s, &g, &Routing::default());
+            &authored
+        }
+    };
+    let nets: Vec<BTreeSet<&str>> =
+        r.geometry.wires.iter().map(|w| w.nets.iter().map(String::as_str).collect()).collect();
+    let segments: Vec<_> = r
+        .geometry
+        .wires
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !nets[*i].is_empty())
+        .flat_map(|(i, w)| w.vertices.windows(2).map(move |v| (i, &v[0].at, &v[1].at)))
+        .filter(|(_, a, b)| a != b)
+        .collect();
+    let mut count = 0;
+    if shorts {
+        for (&(k, pin), on) in &s.connections.nets_of {
+            if s.objects[k].left_free {
+                continue;
+            }
+            let names: BTreeSet<_> =
+                on.iter().filter_map(|&i| s.connections.nets.get(i)).map(|n| n.name.as_str()).collect();
+            if names.is_empty() {
+                continue;
+            }
+            let Some(p) = s.pin_at(view.at, view.orient, k, pin) else { continue };
+            count += segments.iter().filter(|(i, a, b)| nets[*i].is_disjoint(&names) && on_segment(&p, a, b)).count();
+        }
+    } else {
+        for k in (0..s.objects.len()).filter(|&k| solid(s, k)) {
+            let Some(b) = s.box_at(view.at, view.orient, k) else { continue };
+            let inner: Vec<_> = (0..s.pins(k).len())
+                .filter_map(|pin| s.pin_at(view.at, view.orient, k, pin))
+                .filter(|p| b[0] < p[0] && p[0] < b[2] && b[1] < p[1] && p[1] < b[3])
+                .collect();
+            count += segments
+                .iter()
+                .filter(|(_, a, c)| through(&b, a, c) && !inner.iter().any(|p| p == *a || p == *c))
+                .count();
+        }
+    }
+    count
 }
 
 /// The texts drawn over the box of another symbol, with some area (13.3): for each object drawn
@@ -231,6 +393,7 @@ fn on_segment(p: &[Q; 2], a: &[Q; 2], b: &[Q; 2]) -> bool {
 /// Whether two segments touch, as a reader takes for a connection: an end of one is on the other.
 /// That covers two segments on one line that share a point or a stretch, and leaves out two that
 /// cross, meeting inside both. Segments whose boxes are apart are told at once.
+#[cfg(test)]
 fn touch(a: &[Q; 2], b: &[Q; 2], c: &[Q; 2], d: &[Q; 2]) -> bool {
     let apart = |i: usize| {
         let ((lo1, hi1), (lo2, hi2)) = (span(a, b, i), span(c, d, i));
@@ -274,218 +437,10 @@ fn through(bx: &[Q; 4], a: &[Q; 2], b: &[Q; 2]) -> bool {
 /// crowding, then the fewest places where the wires mislead, then the fewest joins left undone,
 /// then the layers within their tolerances, then the code.
 pub(crate) fn order(active: &Active, entries: &[Entry]) -> Vec<usize> {
-    let key = |e: &Entry| (e.overlaps, e.crowding, e.misleading, e.joins_left);
-    let mut keys: Vec<(usize, usize, usize, usize)> = entries.iter().map(key).collect();
-    keys.sort_unstable();
-    keys.dedup();
-    let mut out = Vec::with_capacity(entries.len());
-    for k in keys {
-        let members: Vec<usize> = (0..entries.len()).filter(|&i| key(&entries[i]) == k).collect();
-        let refs: Vec<(&[Q], &[u32])> =
-            members.iter().map(|&i| (entries[i].layers.as_slice(), entries[i].code.as_slice())).collect();
-        out.extend(active.rank(&refs).into_iter().map(|j| members[j]));
-    }
-    out
+    let refs: Vec<(&[Q], &[u32])> = entries.iter().map(|e| (e.layers.as_slice(), e.code.as_slice())).collect();
+    active.rank(&refs)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::objectives::Inputs;
-    use crate::rational::int;
-    use crate::{Layer, Objectives};
-
-    fn entry(overlaps: usize, joins_left: usize, layers: &[i64], code: u32) -> Entry {
-        Entry {
-            overlaps,
-            crowding: 0,
-            misleading: 0,
-            joins_left,
-            layers: layers.iter().map(|v| int(*v)).collect(),
-            code: vec![code],
-        }
-    }
-
-    #[test]
-    fn overlaps_then_joins_left_then_the_layers_then_the_code() {
-        let active = Active::new(
-            &Objectives { layers: vec![Layer::single("area"), Layer::single("aspect")] },
-            &Inputs::default(),
-        );
-        let entries = [
-            entry(1, 0, &[0, 0], 0),
-            entry(0, 2, &[0, 0], 1),
-            entry(0, 0, &[5, 0], 2),
-            entry(0, 0, &[3, 9], 3),
-            entry(0, 0, &[3, 1], 5),
-            entry(0, 0, &[3, 1], 4),
-            entry(0, 1, &[0, 0], 6),
-        ];
-        assert_eq!(order(&active, &entries), vec![5, 4, 3, 2, 6, 1, 0]);
-    }
-
-    fn pt(x: i64, y: i64) -> [Q; 2] {
-        [int(x), int(y)]
-    }
-
-    #[test]
-    fn what_misleads_ranks_after_the_overlaps_and_before_the_joins_left() {
-        let active = Active::new(&Objectives { layers: vec![Layer::single("area")] }, &Inputs::default());
-        let mut entries = [entry(0, 0, &[5], 0), entry(0, 0, &[1], 1), entry(1, 0, &[0], 2), entry(0, 1, &[0], 3)];
-        entries[1].misleading = 2;
-        entries[0].misleading = 1;
-        // the overlaps first, then what misleads, then the joins left, then the layers
-        assert_eq!(order(&active, &entries), vec![3, 0, 1, 2]);
-    }
-
-    /// What crowds the drawing ranks after the overlaps and before what misleads (review of phase
-    /// 2 of the quality review): a candidate that left a gap out, or draws a text over a symbol,
-    /// comes after one that did not, whatever its wires and its layers.
-    #[test]
-    fn what_crowds_ranks_after_the_overlaps_and_before_what_misleads() {
-        let active = Active::new(&Objectives { layers: vec![Layer::single("area")] }, &Inputs::default());
-        let mut entries = [
-            entry(0, 0, &[1], 0),
-            entry(0, 1, &[9], 1),
-            entry(1, 0, &[0], 2),
-            entry(0, 0, &[0], 3),
-            entry(0, 0, &[2], 4),
-        ];
-        entries[0].crowding = 1;
-        entries[3].crowding = 2;
-        entries[1].misleading = 3;
-        // 4 and 1 crowd nothing, 1 misleading more; then 0, then 3, crowding more; 2 overlaps
-        assert_eq!(order(&active, &entries), vec![4, 1, 0, 3, 2]);
-    }
-
-    #[test]
-    fn segments_touch_at_an_end_or_along_a_line_and_not_where_they_cross() {
-        // along one line: a stretch shared, an end on the other, ends that meet, apart
-        assert!(touch(&pt(0, 0), &pt(4, 0), &pt(2, 0), &pt(6, 0)));
-        assert!(touch(&pt(0, 0), &pt(4, 0), &pt(4, 0), &pt(6, 0)));
-        assert!(!touch(&pt(0, 0), &pt(4, 0), &pt(5, 0), &pt(6, 0)));
-        // a T: the end of one inside the other; a bend on the other
-        assert!(touch(&pt(0, 0), &pt(4, 0), &pt(2, 0), &pt(2, 3)));
-        assert!(touch(&pt(0, 0), &pt(4, 0), &pt(2, -3), &pt(2, 0)));
-        // a crossing, inside both: the objective crossings, not a touch; parallel lines apart
-        assert!(!touch(&pt(0, 0), &pt(4, 0), &pt(2, -3), &pt(2, 3)));
-        assert!(!touch(&pt(0, 0), &pt(4, 0), &pt(0, 1), &pt(4, 1)));
-        // oblique: an end on it, and a crossing
-        assert!(touch(&pt(0, 0), &pt(4, 4), &pt(2, 2), &pt(5, 0)));
-        assert!(!touch(&pt(0, 0), &pt(4, 4), &pt(0, 4), &pt(4, 0)));
-        assert!(on_segment(&pt(2, 2), &pt(0, 0), &pt(4, 4)) && !on_segment(&pt(5, 5), &pt(0, 0), &pt(4, 4)));
-    }
-
-    /// The one level of a netlist given as text, as a solver reads it, and its structure.
-    fn level(text: &str) -> (LevelProblem, Structure) {
-        let files = rnl_runtime::source::MemoryProvider::new().with("t.sp", text);
-        let mut ps = rnl_view::interpret("t.sp", None, &files, &rnl_runtime::Options::solver()).unwrap().problems;
-        assert_eq!(ps.len(), 1);
-        let p = ps.remove(0);
-        let options = crate::SolverOptions::without_time_limit();
-        let resolved = crate::resolve(&p, &options);
-        let mut work = resolved.work;
-        let s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut work);
-        (p, s)
-    }
-
-    /// Every object where the PLACEs and the coordinates of the file put it, turned R0; the others
-    /// at the origin.
-    fn as_written(p: &LevelProblem) -> Geometry {
-        use rnl_runtime::problem::{Position, Slot};
-        let mut g = Geometry::new(p.objects.len());
-        for (k, o) in p.objects.iter().enumerate() {
-            if let Position::Own { x: Slot::Fixed { value: x, .. }, y: Slot::Fixed { value: y, .. } } = &o.position {
-                g.origin[k] = [crate::rational::from_f64(*x).unwrap(), crate::rational::from_f64(*y).unwrap()];
-            }
-        }
-        g
-    }
-
-    /// The places where wires mislead, counted on a layout drawn by hand, each case apart from the
-    /// others so that the count of each is known: the wire written of `a` runs over the pin of R1
-    /// on `c`, which the ROUTE draws; the bus `Q<1:0>` meets the wire of `Q<1>`, one of its nets,
-    /// which does not count, and the wire of `d`, which does; the wire written of `b`, a net that
-    /// a ROUTE asks for, is of the ROUTE's net (`drawn`), so that it meets a wire routed for `b`
-    /// without counting, and the wire of `e`, written first so that it has the index of the ROUTE
-    /// of `b` among the wires written, with.
-    #[test]
-    fn wires_written_mislead_over_pins_of_other_nets_and_where_they_meet_one() {
-        let (p, s) = level(
-            "* t\n* @RNL(type=\"header\") { @VERSION(\"0.2\")}\n\
-             R1 c z1 1k\nR2 c z2 1k\nR3 b z3 1k\nR4 b z4 1k\nR5 Q<1> z5 1k\nR6 Q<0> z6 1k\nR7 d z7 1k\nR8 e z8 1k\n\
-             R9 a z9 1k\n* @RNL {\n\
-             *   #R1 @PLACE(10, -3); #R2 @PLACE(100, -40); #R3 @PLACE(110, -40); #R4 @PLACE(120, -40);\n\
-             *   #R5 @PLACE(130, -40); #R6 @PLACE(140, -40); #R7 @PLACE(150, -40); #R8 @PLACE(160, -40);\n\
-             *   #R9 @PLACE(170, -40);\n\
-             *   {&b &c} @ROUTE;\n\
-             *   &e @WIRE {(55, 20) (55, 15)};\n\
-             *   &a @WIRE {(5, 0) (15, 0)};\n\
-             *   &Q<1:0> @WIRE {(30, 0) (40, 0)};\n\
-             *   &Q<1> @WIRE {(40, 0) (40, 5)};\n\
-             *   &d @WIRE {(35, 0) (35, -5)};\n\
-             *   &b @WIRE {(50, 20) (60, 20)}\n* }\n.end\n",
-        );
-        let g = as_written(&p);
-        let origins = s.origins(&p, &g);
-        let nets: Vec<String> = p.wires.iter().map(|w| w.nets.join(",")).collect();
-        assert_eq!(nets, ["e", "a", "Q<1>,Q<0>", "Q<1>", "d", "b"]);
-        let route_b = s.connections.drawn.iter().position(|d| d.routed && d.net == "b").unwrap();
-        assert_eq!(route_b, 0);
-        let written = drawn(&p, &s, &g, &Routing::default());
-        assert_eq!(written.paths.len(), p.wires.len());
-        // the wire written of b is of the ROUTE's net, the others their own
-        assert_eq!(written.paths[5].0, route_b);
-        assert_eq!(written.paths[0].0, s.connections.drawn.len() - p.wires.len());
-        // the pin of R1 that the wire of a runs over, on c
-        let r1 = p.objects.iter().position(|o| o.label == "#R1").unwrap();
-        assert_eq!(s.pin_at(&origins, &g.orient, r1, 0), Some(pt(10, 0)));
-        let routed_b = (route_b, vec![pt(60, 20), pt(60, 25)]);
-        let count = |wires: &[usize], routed: bool| {
-            let mut paths: Vec<(usize, Vec<[Q; 2]>)> = wires.iter().map(|&w| written.paths[w].clone()).collect();
-            if routed {
-                paths.push(routed_b.clone());
-            }
-            misleading(&p, &s, &origins, &g, &Routed { paths })
-        };
-        assert_eq!(count(&[1], false), 1, "the pin of R1 on the wire of a");
-        assert_eq!(count(&[2, 3], false), 0, "a bus and a wire of one of its nets");
-        assert_eq!(count(&[2, 3, 4], false), 1, "and a wire of another net");
-        assert_eq!(count(&[5], true), 0, "a wire written and one routed of the ROUTE's net");
-        assert_eq!(count(&[5, 0], true), 1, "and a wire of another net");
-        assert_eq!(count(&[0, 1, 2, 3, 4, 5], true), 3);
-    }
-
-    #[test]
-    fn a_segment_runs_through_a_box_only_inside_it() {
-        let b = [int(0), int(0), int(4), int(2)];
-        // across, and along the middle; in from the edge to the inside
-        assert!(through(&b, &pt(-1, 1), &pt(5, 1)));
-        assert!(through(&b, &pt(2, -3), &pt(2, 1)));
-        // along an edge, up to an edge, past a corner, outside
-        assert!(!through(&b, &pt(-1, 2), &pt(5, 2)));
-        assert!(!through(&b, &pt(-3, 1), &pt(0, 1)));
-        assert!(!through(&b, &pt(-1, 1), &pt(1, -1)));
-        assert!(!through(&b, &pt(5, 0), &pt(5, 2)));
-        // oblique, through the inside and only touching a corner
-        assert!(through(&b, &pt(-1, -1), &pt(5, 3)));
-        assert!(!through(&b, &pt(3, 3), &pt(5, 1)));
-    }
-
-    /// Within a layer's tolerance the next layer decides, and an objective that is off breaks no
-    /// tie: with no objective at all, the code alone orders candidates equal in the counts.
-    #[test]
-    fn tolerances_and_objectives_off() {
-        let active = Active::new(
-            &Objectives {
-                layers: vec![Layer { items: vec![("area".to_string(), 1)], tolerance: 2.0 }, Layer::single("aspect")],
-            },
-            &Inputs::default(),
-        );
-        let entries = [entry(0, 0, &[1, 7], 0), entry(0, 0, &[2, 3], 1), entry(0, 0, &[4, 0], 2)];
-        assert_eq!(order(&active, &entries), vec![1, 0, 2]);
-        let none = Active::new(&Objectives::none(), &Inputs::default());
-        let entries = [entry(0, 0, &[], 3), entry(0, 0, &[], 1), entry(0, 1, &[], 0), entry(0, 0, &[], 2)];
-        assert_eq!(order(&none, &entries), vec![1, 3, 0, 2]);
-    }
-}
+#[path = "../tests/unit/score.rs"]
+mod tests;

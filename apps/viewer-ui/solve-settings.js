@@ -1,511 +1,246 @@
-// Solve > Settings (desktop): the options of the solver, as `rnl solve --solver-options` has them
-// (crates/rnl-solver/src/options.rs): the time limit of the resolution, the tolerance, the grid, the
-// beam, the work of the search and the router, whether to seek every conflict group of the facts of
-// priority low, and the objectives, the order in which the solver ranks candidates, with their levels.
-// The solver's defaults come from the shell, so the page keeps none of them; what the user changed
-// is kept in the shell's settings under `solve-options`, as only the settings that differ from the defaults,
-// and so follows the solver's defaults where it was not changed. A solve gets them as the text
-// `--solver-options` takes (`solverSettings`), which the solver reads, so its rules are the only ones.
-
+// Step 1 settings: a TOML configuration file and scalar rule overrides. Numeric text is
+// preserved through the shell settings store and IPC; objective editing returns in Step 3.
 import { form, inform, modal } from "./dialog.js";
 import { shell } from "./shell.js";
 import { load, save, span } from "./util.js";
 
 const KEY = "solve-options";
+const NOTICE = "solve-objectives-migration-notice";
+const MIGRATED = "Old solver objective settings were removed. Objectives now come from the solver TOML configuration.";
+const RULES = [
+  ["time_limit", "Time limit"], ["tolerance", "Tolerance"], ["grid", "Grid"],
+  ["beam", "Beam"], ["route_beam", "Route beam"], ["separate_gap", "Symbol gap"],
+  ["route_clearance", "Route clearance"],
+];
+const BUDGETS = [["candidates", "Candidates"], ["astar_expansions", "Router cells"], ["soft_expansions", "Soft router cells"], ["symmetry_steps", "Symmetry steps"]];
+const scalar = (value) => typeof value === "string" || typeof value === "number";
+// Config decimals become reduced fractions at the host boundary. Render their exact finite
+// decimal expansion so an edited field can be sent back through the decimal override grammar.
+function written(value) {
+  if (value === null || value === undefined) return "none";
+  const text = String(value);
+  const match = /^(-?)(\d+)\/(\d+)$/.exec(text);
+  if (!match) return text;
+  const denominator = BigInt(match[3]);
+  if (!denominator) return text;
+  let finite = denominator;
+  for (const factor of [2n, 5n]) while (finite % factor === 0n) finite /= factor;
+  if (finite !== 1n) return text;
+  const numerator = BigInt(match[2]);
+  let result = `${match[1]}${numerator / denominator}`;
+  let remainder = numerator % denominator;
+  if (remainder) result += ".";
+  while (remainder) {
+    remainder *= 10n;
+    result += String(remainder / denominator);
+    remainder %= denominator;
+  }
+  return result;
+}
 
-/** What each objective of the solver does, for the dialog; one the page does not know has none. */
-const WHAT = {
-  current_direction: "the sources of transistors towards the ground",
-  ground_direction: "ground symbols below their pins",
-  signal_flow: "input ports left of output ports",
-  component_alignment: "connected elements in few columns and rows",
-  distribution: "elements evenly spaced",
-  symmetry: "mirror pairs placed symmetrically",
-  turns: "wires with fewer bends",
-  crossings: "wires of different nets crossing less",
-  wire_length: "shorter wires",
-  area: "a smaller drawing",
-  aspect: "a drawing about as wide as 16 to 9",
-  terminal_wire_alignment: "wires leaving terminals in line",
-  labels: "the places of labels",
-  bend_alignment: "the bends of wires in line",
-};
-
-/**
- * What the user changed, as kept for the next start: any of `time_limit`, `tolerance`, `grid`,
- * `beam`, `budget` ({ candidates, astar_expansions }), `objectives` (the layers) and
- * `hints_for_low`; a setting not there is the solver's default. The time limit that Solve > Time
- * Limit kept before the settings took it over is read as one.
- */
 function changed() {
-  const stored = load(KEY, null);
-  if (stored !== null && typeof stored === "object" && !Array.isArray(stored)) return stored;
-  const limit = load("solve-time-limit", null);
-  return limit === null ? {} : { time_limit: limit };
-}
-
-/** A number, or "none", for a setting that takes either. */
-const numberOrNone = (v) => v === "none" || (typeof v === "number" && Number.isFinite(v));
-
-/** Whether a value is a list of layers of objectives: each a list of items, and a tolerance. */
-const layersOk = (v) =>
-  Array.isArray(v) &&
-  v.every(
-    (layer) =>
-      layer !== null &&
-      typeof layer === "object" &&
-      typeof layer.tolerance === "number" &&
-      Array.isArray(layer.items) &&
-      layer.items.length > 0 &&
-      layer.items.every((i) => i !== null && typeof i === "object" && typeof i.name === "string" && Number.isInteger(i.weight)),
-  );
-
-/**
- * The settings a solve gets from the page: the changed settings written as `--solver-options` takes
- * them, such as `beam=8;time_limit=none`, empty when none is changed, and whether to seek every
- * conflict group of the facts of priority low, which that text cannot say.
- *
- * @returns {{ options: string, hintsForLow: boolean }}
- */
-export function solverSettings() {
-  return textOf(changed());
-}
-
-/** The text of changed settings, in the order the solver writes its own; what is not valid is left out. */
-function textOf(c) {
-  const parts = [];
-  if (typeof c.tolerance === "number") parts.push(`tolerance=${c.tolerance}`);
-  if (numberOrNone(c.grid)) parts.push(`grid=${c.grid}`);
-  if (layersOk(c.objectives)) parts.push(`objectives=${objectivesText(c.objectives)}`);
-  if (typeof c.beam === "number") parts.push(`beam=${c.beam}`);
-  const budget = c.budget || {};
-  const counts = ["candidates", "astar_expansions"].filter((k) => typeof budget[k] === "number");
-  if (counts.length > 0) parts.push(`budget=${counts.map((k) => `${k}:${budget[k]}`).join(",")}`);
-  if (numberOrNone(c.time_limit)) parts.push(`time_limit=${c.time_limit}`);
-  return { options: parts.join(";"), hintsForLow: c.hints_for_low === true };
-}
-
-/** Layers of objectives as the solver writes them: `area+wire_length*2~0.5,turns`, `none` for no layer. */
-function objectivesText(layers) {
-  if (layers.length === 0) return "none";
-  const one = (layer) => {
-    const items = layer.items.map((i) => (i.weight === 1 ? i.name : `${i.name}*${i.weight}`)).join("+");
-    return layer.tolerance ? `${items}~${layer.tolerance}` : items;
-  };
-  return layers.map(one).join(",");
-}
-
-/** A row of the objectives: an objective, whether it is on, and how it joins the layers. */
-function rowsOf(layers, names) {
-  const rows = [];
-  const seen = new Set();
-  for (const layer of layers) {
-    layer.items.forEach((item, k) => {
-      if (!names.includes(item.name) || seen.has(item.name)) return;
-      seen.add(item.name);
-      rows.push({ name: item.name, on: true, together: k > 0, weight: item.weight, tolerance: k === 0 ? layer.tolerance : 0 });
-    });
+  const raw = load(KEY, null);
+  const c = raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+  if (Object.hasOwn(c, "objectives")) {
+    delete c.objectives;
+    save(KEY, c);
+    save(NOTICE, true);
   }
-  for (const name of names) if (!seen.has(name)) rows.push({ name, on: false, together: false, weight: 1, tolerance: 0 });
-  return rows;
-}
-
-/** The layers the rows make: the objectives that are on, in order, each starting a layer unless it is together with the one above. */
-function layersOf(rows) {
-  const layers = [];
-  for (const r of rows) {
-    if (!r.on) continue;
-    if (r.together && layers.length > 0) layers[layers.length - 1].items.push({ name: r.name, weight: r.weight });
-    else layers.push({ items: [{ name: r.name, weight: r.weight }], tolerance: r.tolerance });
+  if (raw === null) {
+    const limit = load("solve-time-limit", null);
+    if (limit !== null) c.time_limit = limit;
   }
-  return layers;
-}
-
-/** The values of the dialog's fields: the solver's defaults, with what the user changed over them. */
-function valuesOf(defaults, c) {
-  const budget = c.budget || {};
-  const layers = layersOk(c.objectives) ? c.objectives : defaults.objectives;
-  return {
-    time_limit: numberOrNone(c.time_limit) ? c.time_limit : defaults.time_limit === null ? "none" : defaults.time_limit,
-    tolerance: typeof c.tolerance === "number" ? c.tolerance : defaults.tolerance,
-    grid: numberOrNone(c.grid) ? c.grid : defaults.grid === null ? "none" : defaults.grid,
-    beam: typeof c.beam === "number" ? c.beam : defaults.beam,
-    candidates: typeof budget.candidates === "number" ? budget.candidates : defaults.budget.candidates,
-    astar_expansions:
-      typeof budget.astar_expansions === "number" ? budget.astar_expansions : defaults.budget.astar_expansions,
-    hints_for_low: typeof c.hints_for_low === "boolean" ? c.hints_for_low : defaults.hints_for_low,
-    rows: rowsOf(layers, defaults.names),
-  };
-}
-
-/** What differs from the defaults in values read from the dialog: the settings to keep. */
-function differences(defaults, v) {
-  const c = {};
-  const orNone = (d) => (d === null ? "none" : d);
-  if (v.time_limit !== orNone(defaults.time_limit)) c.time_limit = v.time_limit;
-  if (v.tolerance !== defaults.tolerance) c.tolerance = v.tolerance;
-  if (v.grid !== orNone(defaults.grid)) c.grid = v.grid;
-  if (v.beam !== defaults.beam) c.beam = v.beam;
-  const budget = {};
-  if (v.candidates !== defaults.budget.candidates) budget.candidates = v.candidates;
-  if (v.astar_expansions !== defaults.budget.astar_expansions) budget.astar_expansions = v.astar_expansions;
-  if (Object.keys(budget).length > 0) c.budget = budget;
-  if (v.hints_for_low !== defaults.hints_for_low) c.hints_for_low = v.hints_for_low;
-  const layers = layersOf(v.rows);
-  if (objectivesText(layers) !== objectivesText(defaults.objectives)) c.objectives = layers;
   return c;
 }
 
-/**
- * Solve > Settings: show the settings in a dialog, ask the shell whether the solver takes them, and
- * keep them for the next start. Cancel keeps nothing; Restore Defaults sets the fields to the
- * solver's defaults, which OK then keeps as no changes at all.
- */
-export async function settings() {
-  if (!shell || !shell.solverDefaults || modal()) return;
-  let defaults;
-  try {
-    defaults = await shell.solverDefaults();
-  } catch (e) {
-    await inform({ title: "Solver Settings", paragraphs: [`The solver's defaults could not be read: ${e instanceof Error ? e.message : String(e)}`] });
-    return;
-  }
-  const fields = fieldsOf(defaults);
-  fields.set(valuesOf(defaults, changed()));
-  const error = document.createElement("p");
-  error.className = "dialog-error";
-  error.hidden = true;
-  const restore = document.createElement("button");
-  restore.type = "button";
-  restore.className = "settings-restore";
-  restore.textContent = "Restore Defaults";
-  restore.addEventListener("click", () => {
-    fields.set(valuesOf(defaults, {}));
-    error.hidden = true;
-  });
-  // the settings as the command line takes them, for whoever solves outside the viewer too
-  const asText = span("settings-text", "");
-  const showText = () => {
-    const v = fields.read();
-    const kept = v.error ? null : textOf(differences(defaults, v));
-    const flag = kept && kept.hintsForLow ? " --report" : "";
-    const option = kept && kept.options ? ` --solver-options "${kept.options}"` : "";
-    asText.textContent = !kept ? "" : flag || option ? `As rnl solve takes them: rnl solve${flag}${option}` : "The defaults of rnl solve.";
-  };
-  for (const type of ["input", "change", "click"]) fields.el.addEventListener(type, showText);
-  restore.addEventListener("click", showText);
-  showText();
-  const chosen = await form({
-    title: "Solver Settings",
-    parts: [
-      priorityNote(),
-      fields.el,
-      document.createElement("hr"),
-      row(restore, asText),
-      error,
-    ],
-    answer: async () => {
-      const v = fields.read();
-      if (v.error) return fail(error, v.error);
-      const kept = differences(defaults, v);
-      const wrong = await shell.checkSolverOptions(textOf(kept).options);
-      if (wrong) return fail(error, wrong);
-      return { kept };
-    },
-    focus: fields.first,
-    wide: true,
-  });
-  if (chosen) save(KEY, chosen.kept);
+/** Consume the one-time migration notice in Settings or the next solve report. */
+export function migrationNotice() {
+  changed();
+  if (!load(NOTICE, false)) return null;
+  save(NOTICE, false);
+  return MIGRATED;
 }
 
-/** Say what is wrong in a dialog and keep it open. */
-function fail(error, message) {
-  error.textContent = message;
-  error.hidden = false;
-  return undefined;
+function textOf(c) {
+  const parts = RULES.filter(([key]) => scalar(c[key])).map(([key]) => `${key}=${c[key]}`);
+  if (typeof c.separate_symbols === "boolean") parts.push(`separate_symbols=${c.separate_symbols}`);
+  const budget = c.budget || {};
+  const counts = BUDGETS.filter(([key]) => scalar(budget[key])).map(([key]) => `${key}:${budget[key]}`);
+  if (counts.length) parts.push(`budget=${counts.join(",")}`);
+  const settings = { options: parts.join(";"), hintsForLow: c.hints_for_low === true };
+  if (typeof c.solver_config === "string" && c.solver_config.trim()) settings.solverConfig = c.solver_config.trim();
+  return settings;
 }
 
-/** The note that tells what these settings are not: the priorities of constraints are written in the netlist. */
-function priorityNote() {
-  const p = document.createElement("p");
-  p.className = "dialog-note settings-note";
-  p.textContent =
-    "The priority of a constraint, low, normal or high, is written in the netlist (7.6, 8.5), not set here. " +
-    "These settings are for what the solver does after the constraints are satisfied: which objective counts " +
-    "first and which next when it ranks the placements that satisfy them, and how long and how hard it works.";
-  return p;
-}
+export function solverSettings() { return textOf(changed()); }
 
-/** A line of a dialog of a few parts side by side. */
-function row(...parts) {
-  const el = document.createElement("div");
-  el.className = "dialog-line settings-line";
-  el.append(...parts);
-  return el;
-}
-
-/** An input of a number, with its label, in a line. */
-function numberField(label, { step = "any", min = "0", hint = "" } = {}) {
+function inputField(label, type = "text") {
   const input = document.createElement("input");
-  input.type = "number";
-  input.step = step;
-  input.min = min;
+  input.type = type;
   const caption = document.createElement("label");
   caption.className = "settings-label";
   caption.append(span("name", label), input);
-  const line = row(caption);
-  if (hint) line.append(span("settings-hint", hint));
-  return { input, line, label };
+  const line = document.createElement("div");
+  line.className = "dialog-line settings-line";
+  line.append(caption);
+  return { input, line };
 }
 
-/** A checkbox with its label. */
-function checkField(label) {
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  const caption = document.createElement("label");
-  caption.className = "dialog-choice";
-  caption.append(input, label);
-  return { input, caption };
-}
-
-/**
- * The fields of the dialog, as an element: `set(values)` fills them, and `read()` gives the values
- * they hold in the form `valuesOf` makes, or `{ error }` when one is not a number; `first` has the
- * focus at first.
- */
-function fieldsOf(defaults) {
+export async function settings() {
+  if (!shell?.solverDefaults || modal()) return;
+  const before = changed();
+  let defaults;
+  try { defaults = await shell.solverDefaults(before.solver_config || null); }
+  catch (e) {
+    await inform({ title: "Solver Settings", paragraphs: [String(e)] });
+    return;
+  }
   const el = document.createElement("div");
   el.className = "settings";
-
-  const limit = numberField("Time limit", { hint: "seconds the solver may spend on checking the facts of each level (8.5)" });
-  const noLimit = checkField("No limit");
-  limit.line.insertBefore(noLimit.caption, limit.line.children[1]);
-  noLimit.input.addEventListener("change", () => (limit.input.disabled = noLimit.input.checked));
-  const tolerance = numberField("Tolerance", { hint: "differences within it count as satisfied (11.7)" });
-  const grid = numberField("Grid", { hint: "free coordinates are rounded to it when the facts allow" });
-  const noGrid = checkField("No rounding");
-  grid.line.insertBefore(noGrid.caption, grid.line.children[1]);
-  noGrid.input.addEventListener("change", () => (grid.input.disabled = noGrid.input.checked));
-  const beam = numberField("Beam", { step: "1", min: "1", hint: "variants of each group the search keeps" });
-  const candidates = numberField("Candidates", { step: "1", hint: "the search makes at most as many over a level" });
-  const expansions = numberField("Router cells", { step: "1", hint: "the router expands at most as many for one net" });
-  const hints = checkField("Seek every conflict group of the facts of priority low");
-  const hintsNote = span("settings-hint", "Only the report changes, and it can take far longer.");
-  const objectives = objectiveRows(defaults.names);
-
-  const group = (title, ...parts) => {
-    const set = document.createElement("fieldset");
-    const legend = document.createElement("legend");
-    legend.textContent = title;
-    set.append(legend, ...parts);
-    return set;
+  const config = inputField("Configuration file");
+  const browse = document.createElement("button");
+  browse.type = "button";
+  browse.textContent = "Choose File…";
+  browse.disabled = !shell.pickSolverConfig;
+  browse.addEventListener("click", async () => {
+    try {
+      const path = await shell.pickSolverConfig();
+      if (path) { revision++; config.input.value = path; refreshDefaults(); }
+    } catch (e) { fail(String(e)); }
+  });
+  config.line.append(browse);
+  const source = span("settings-source", `Default configuration: ${defaults.source || "builtin"}`);
+  const note = span("settings-note", "Objectives are read from the TOML configuration. A blank file uses the environment, application directory, then builtin configuration. Rule overrides below apply last. The priority of a constraint is written in the netlist. Use none for no time limit or no grid rounding.");
+  el.append(note, config.line, source);
+  const fields = new Map();
+  for (const [key, label] of [...RULES, ...BUDGETS]) {
+    const field = inputField(label);
+    fields.set(key, field.input);
+    el.append(field.line);
+  }
+  const separate = inputField("Separate symbols", "checkbox");
+  const hints = inputField("Seek every conflict group of the facts of priority low", "checkbox");
+  el.append(separate.line, hints.line, span("settings-hint", "Text positions stay at their anchors in this version."));
+  const error = span("dialog-error", "");
+  error.hidden = !defaults.config_error;
+  error.textContent = defaults.config_error || "";
+  const fail = (message) => { error.textContent = message; error.hidden = false; return undefined; };
+  const restore = document.createElement("button");
+  restore.type = "button";
+  restore.textContent = "Restore Defaults";
+  const asText = span("settings-text", "");
+  const explicit = new Set();
+  let requestedPath = before.solver_config?.trim() || "";
+  let generation = 0;
+  let pending = Promise.resolve();
+  let loadError = defaults.config_error || null;
+  let revision = 0;
+  const set = (c) => {
+    config.input.value = c.solver_config || "";
+    explicit.clear();
+    for (const [key] of RULES) {
+      if (Object.hasOwn(c, key)) explicit.add(key);
+      fields.get(key).value = written(c[key] ?? defaults[key]);
+    }
+    for (const [key] of BUDGETS) {
+      if (Object.hasOwn(c.budget || {}, key)) explicit.add(key);
+      fields.get(key).value = written(c.budget?.[key] ?? defaults.budget?.[key]);
+    }
+    for (const key of ["separate_symbols", "hints_for_low"]) if (Object.hasOwn(c, key)) explicit.add(key);
+    separate.input.checked = c.separate_symbols ?? defaults.separate_symbols ?? true;
+    hints.input.checked = c.hints_for_low ?? defaults.hints_for_low ?? false;
   };
-  el.append(
-    group("Time", limit.line),
-    group("Placement", tolerance.line, grid.line, beam.line),
-    group("Work", candidates.line, expansions.line, row(hints.caption, hintsNote)),
-    group("Objectives", objectives.el),
-  );
-
-  /** The number in a field, or null when it holds none. */
-  const read = (field, integer = false) => {
-    const text = field.input.value.trim();
-    const v = Number(text);
-    return text === "" || !Number.isFinite(v) || (integer && !Number.isInteger(v)) ? null : v;
+  const read = () => {
+    const c = {};
+    if (config.input.value.trim()) c.solver_config = config.input.value.trim();
+    for (const [key] of RULES) {
+      const value = fields.get(key).value.trim();
+      if (!value) return { error: `${key} requires a value.` };
+      if (explicit.has(key)) c[key] = value;
+    }
+    const budget = {};
+    for (const [key] of BUDGETS) {
+      const value = fields.get(key).value.trim();
+      if (!value) return { error: `${key} requires a value.` };
+      if (explicit.has(key)) budget[key] = value;
+    }
+    if (Object.keys(budget).length) c.budget = budget;
+    if (explicit.has("separate_symbols")) c.separate_symbols = separate.input.checked;
+    if (explicit.has("hints_for_low")) c.hints_for_low = hints.input.checked;
+    return c;
   };
-  return {
-    el,
-    first: limit.input,
-    set(v) {
-      noLimit.input.checked = v.time_limit === "none";
-      limit.input.value = v.time_limit === "none" ? "" : String(v.time_limit);
-      limit.input.disabled = noLimit.input.checked;
-      tolerance.input.value = String(v.tolerance);
-      noGrid.input.checked = v.grid === "none";
-      grid.input.value = v.grid === "none" ? "" : String(v.grid);
-      grid.input.disabled = noGrid.input.checked;
-      beam.input.value = String(v.beam);
-      candidates.input.value = String(v.candidates);
-      expansions.input.value = String(v.astar_expansions);
-      hints.input.checked = v.hints_for_low;
-      objectives.set(v.rows);
-    },
-    read() {
-      const v = {
-        time_limit: noLimit.input.checked ? "none" : read(limit),
-        tolerance: read(tolerance),
-        grid: noGrid.input.checked ? "none" : read(grid),
-        beam: read(beam, true),
-        candidates: read(candidates, true),
-        astar_expansions: read(expansions, true),
-        hints_for_low: hints.input.checked,
-      };
-      const bad = [
-        ["time_limit", "The time limit is a number of seconds, or no limit."],
-        ["tolerance", "The tolerance is a number."],
-        ["grid", "The grid is a number, or no rounding."],
-        ["beam", "The beam is a whole number."],
-        ["candidates", "The candidates are a whole number."],
-        ["astar_expansions", "The router cells are a whole number."],
-      ].find(([k]) => v[k] === null);
-      if (bad) return { error: bad[1] };
-      const rows = objectives.read();
-      if (rows.error) return { error: rows.error };
-      return { ...v, rows: rows.rows };
-    },
-  };
-}
-
-/**
- * The objectives as an ordered list of rows, each with buttons that move it up and down, a check
- * box that turns it on, one that puts it in the level of the objective above, its weight, and for
- * the first of a level how far from the best a value still counts as equal to it. `set(rows)`
- * fills them, and `read()` gives `{ rows }` as `rowsOf` makes them, or `{ error }`.
- */
-function objectiveRows(names) {
-  const el = document.createElement("div");
-  el.className = "objectives";
-  const note = document.createElement("p");
-  note.className = "dialog-note";
-  note.textContent =
-    "The solver ranks the placements by these, the first level first. Objectives together in a level add up " +
-    "with their weights; a placement whose level is no further than its tolerance from the best counts as equal " +
-    "to it, and the next level decides among those. An objective that is off is not computed.";
-  const list = document.createElement("ol");
-  list.className = "objective-list";
-  el.append(note, list);
-  let rows = []; // { name, el, on, together, weight, tolerance, ... } in the order shown
-
-  /** A row's element, with the controls that set its state. */
-  function make(state) {
-    const r = { ...state };
-    const li = document.createElement("li");
-    li.className = "objective";
-    li.dataset.name = r.name;
-    const badge = span("objective-level", "");
-    const on = document.createElement("input");
-    on.type = "checkbox";
-    on.setAttribute("aria-label", `${r.name} is on`);
-    const name = span("objective-name", r.name);
-    const what = span("objective-what", WHAT[r.name] || "");
-    const label = document.createElement("label");
-    label.className = "objective-on";
-    label.append(on, name);
-    const together = checkField("with the one above");
-    together.caption.classList.add("objective-together");
-    together.caption.title = "Put it in the level of the objective above: they add up";
-    const weight = numberInput("1", "weight", "Its weight in the level");
-    const tolerance = numberInput("any", "equal within", "The tolerance of the level: how far from the best a value counts as equal to it");
-    const up = moveButton("Move up", "↑", r.name);
-    const down = moveButton("Move down", "↓", r.name);
-    const moves = span("objective-moves", "");
-    moves.append(up, down);
-    const top = document.createElement("div");
-    top.className = "objective-top";
-    top.append(badge, label, what, moves);
-    const more = document.createElement("div");
-    more.className = "objective-more";
-    more.append(together.caption, weight.caption, tolerance.caption);
-    li.append(top, more);
-    on.addEventListener("change", () => {
-      r.on = on.checked;
-      refresh();
-    });
-    together.input.addEventListener("change", () => {
-      r.together = together.input.checked;
-      refresh();
-    });
-    weight.input.addEventListener("input", () => (r.weight = weight.input.value));
-    tolerance.input.addEventListener("input", () => (r.tolerance = tolerance.input.value));
-    up.addEventListener("click", () => move(r, -1, up));
-    down.addEventListener("click", () => move(r, 1, down));
-    Object.assign(r, { el: li, badge, on_: on, together_: together, weight_: weight, tolerance_: tolerance, up, down });
-    on.checked = r.on;
-    together.input.checked = r.together;
-    weight.input.value = String(r.weight);
-    tolerance.input.value = String(r.tolerance);
-    r.weight = String(r.weight);
-    r.tolerance = String(r.tolerance);
-    return r;
-  }
-
-  function numberInput(step, text, title) {
-    const input = document.createElement("input");
-    input.type = "number";
-    input.step = step;
-    input.min = step === "1" ? "1" : "0";
-    input.setAttribute("aria-label", text);
-    const caption = document.createElement("label");
-    caption.className = "objective-number";
-    caption.title = title;
-    caption.append(span("name", text), input);
-    return { input, caption };
-  }
-
-  function moveButton(text, arrow, name) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = arrow;
-    b.title = text;
-    b.setAttribute("aria-label", `${text}: ${name}`);
-    return b;
-  }
-
-  /** Move a row by one place; the button keeps the focus. */
-  function move(r, by, button) {
-    const k = rows.indexOf(r);
-    const to = k + by;
-    if (to < 0 || to >= rows.length) return;
-    rows.splice(k, 1);
-    rows.splice(to, 0, r);
-    list.replaceChildren(...rows.map((x) => x.el));
-    refresh();
-    (button.disabled ? (by < 0 ? r.down : r.up) : button).focus();
-  }
-
-  /** Show each row as what it is now: its level, and what applies to it. */
-  function refresh() {
-    let level = 0;
-    let anyOn = false;
-    rows.forEach((r, k) => {
-      const leader = r.on && !(r.together && anyOn);
-      r.el.classList.toggle("off", !r.on);
-      r.badge.textContent = !r.on ? "off" : leader ? String(++level) : "+";
-      r.badge.title = !r.on ? "Not computed" : leader ? `Level ${level}` : "Added to the level above";
-      r.together_.caption.hidden = !(r.on && anyOn);
-      r.weight_.input.disabled = !r.on;
-      r.tolerance_.caption.hidden = !leader;
-      r.up.disabled = k === 0;
-      r.down.disabled = k === rows.length - 1;
-      anyOn = anyOn || r.on;
-    });
-  }
-
-  return {
-    el,
-    set(values) {
-      rows = values.map(make);
-      list.replaceChildren(...rows.map((x) => x.el));
-      refresh();
-    },
-    read() {
-      const out = [];
-      let anyOn = false;
-      for (const r of rows) {
-        const weight = Number(r.weight);
-        const tolerance = Number(r.tolerance);
-        // the weight counts where an objective is on, and the tolerance where it begins a level
-        const leader = r.on && !(r.together && anyOn);
-        if (r.on && (r.weight.trim() === "" || !Number.isInteger(weight))) {
-          return { error: `The weight of ${r.name} is a whole number.` };
-        }
-        if (leader && (r.tolerance.trim() === "" || !Number.isFinite(tolerance))) {
-          return { error: `The tolerance of the level of ${r.name} is a number.` };
-        }
-        out.push({ name: r.name, on: r.on, together: r.together, weight: r.on ? weight : 1, tolerance: leader ? tolerance : 0 });
-        anyOn = anyOn || r.on;
+  function refreshDefaults(force = false) {
+    const path = config.input.value.trim();
+    if (!force && path === requestedPath) return pending;
+    requestedPath = path;
+    const ticket = ++generation;
+    source.textContent = "Loading configuration…";
+    pending = (async () => {
+      try {
+        const loaded = await shell.solverDefaults(path || null);
+        if (ticket !== generation) return;
+        defaults = loaded;
+        loadError = loaded.config_error || null;
+        for (const [key] of RULES) if (!explicit.has(key)) fields.get(key).value = written(defaults[key]);
+        for (const [key] of BUDGETS) if (!explicit.has(key)) fields.get(key).value = written(defaults.budget?.[key]);
+        if (!explicit.has("separate_symbols")) separate.input.checked = defaults.separate_symbols ?? true;
+        if (!explicit.has("hints_for_low")) hints.input.checked = defaults.hints_for_low ?? false;
+        source.textContent = `Default configuration: ${defaults.source || "builtin"}`;
+        error.textContent = loadError || "";
+        error.hidden = !loadError;
+        showText();
+      } catch (e) {
+        if (ticket !== generation) return;
+        loadError = String(e);
+        source.textContent = "Configuration could not be loaded";
+        fail(loadError);
       }
-      return { rows: out };
+    })();
+    return pending;
+  }
+  function showText() {
+    const c = read();
+    const settings = c.error ? null : textOf(c);
+    asText.textContent = !settings ? "" : `rnl solve${settings.solverConfig ? ` --solver-config "${settings.solverConfig}"` : ""}${settings.options ? ` --solver-options "${settings.options}"` : ""}${settings.hintsForLow ? " --report" : ""}`;
+  }
+  set(before);
+  showText();
+  restore.addEventListener("click", () => { revision++; set({}); refreshDefaults(true); });
+  for (const [key, input] of [...fields, ["separate_symbols", separate.input], ["hints_for_low", hints.input]]) {
+    input.addEventListener("input", () => explicit.add(key));
+    input.addEventListener("change", () => explicit.add(key));
+  }
+  config.input.addEventListener("input", () => refreshDefaults());
+  config.input.addEventListener("change", () => refreshDefaults());
+  el.addEventListener("input", () => { revision++; showText(); });
+  el.addEventListener("change", () => { revision++; showText(); });
+  const migrated = migrationNotice();
+  const chosen = await form({
+    title: "Solver Settings",
+    parts: [...(migrated ? [span("settings-migration", migrated)] : []), el, restore, asText, error],
+    focus: config.input,
+    wide: true,
+    answer: async () => {
+      // A path can change while an earlier host read is pending. Only the newest result may
+      // update the form, and saving must wait for that result before reading rule overrides.
+      for (;;) {
+        for (;;) {
+          refreshDefaults();
+          const latest = pending;
+          await latest;
+          if (latest === pending && config.input.value.trim() === requestedPath) break;
+        }
+        if (loadError) return fail(loadError);
+        const kept = read();
+        if (kept.error) return fail(kept.error);
+        const value = textOf(kept);
+        const checking = revision;
+        const wrong = await shell.checkSolverOptions(value.options, value.solverConfig || null);
+        if (checking !== revision || config.input.value.trim() !== requestedPath) continue;
+        if (wrong) return fail(wrong);
+        return { kept };
+      }
     },
-  };
+  });
+  if (chosen) save(KEY, chosen.kept);
 }

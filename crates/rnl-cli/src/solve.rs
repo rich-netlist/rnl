@@ -3,7 +3,7 @@
 //!
 //! The document is read as a solver reads it, `Options::solver()`, without the records with
 //! `type="generated"` (2.8). Each level is solved by `rnl-solver`; its record is written with
-//! `solution::write_record`, the hash `sig2` of its problem and of the solver's canonical options in
+//! `solution::write_record`, the hash `sig3` of its problem and of the solver's canonical options in
 //! the head, finished with `rnl_view::finish_record`, which adds the check of its numbers in a file
 //! of the draft 0.3 (5.9), and put in place of the level's records of the solver with
 //! `writeback::replace_generated_with_header`, at the end of the level's own text (17). A record of
@@ -78,7 +78,7 @@ use rnl_runtime::diag::Severity;
 use rnl_runtime::host::{file_name, LevelKind};
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::interp::unit::DEFAULT_VERSION;
-use rnl_runtime::problem::{sig2, FactKind, LevelProblem, PointRef, Reference};
+use rnl_runtime::problem::{sig3, FactKind, LevelProblem, PointRef, Reference};
 use rnl_runtime::solution::{write_record, Written};
 use rnl_runtime::source::{dirname, normalize, relative_to, Layered, MemoryProvider, Provider};
 use rnl_runtime::writeback::{
@@ -167,6 +167,7 @@ pub struct SolvedFile {
 /// What [`solve`] gives.
 #[derive(Clone, Debug)]
 pub struct SolveRun {
+    pub invocation: Invocation,
     /// The file solved, `/`-separated.
     pub entry: String,
     /// The levels solved, in the order of the document's drawing levels.
@@ -185,6 +186,19 @@ pub struct SolveRun {
     /// The files of 0.2 that records are written into (16.1): raised, or kept at 0.2 when they
     /// cannot be.
     pub raised: Vec<VersionRaise>,
+}
+
+#[derive(Clone, Debug, Default, serde::Serialize)]
+pub struct Invocation {
+    pub solver_revision: String,
+    pub inputs: Vec<InputFile>,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct InputFile {
+    pub path: String,
+    /// SHA256 of the UTF-8 text presented to the runtime, after host decoding.
+    pub text_sha256: String,
 }
 
 /// A file of 0.2 that `rnl solve` writes a record into: a tool writes only 0.3, so it raises the
@@ -261,7 +275,7 @@ impl Clock for WallClock {
 /// The files given by another provider, with the paths of those it gave noted.
 struct Noting<'a> {
     files: &'a dyn Provider,
-    read: RefCell<Vec<String>>,
+    read: RefCell<Vec<InputFile>>,
 }
 
 impl Provider for Noting<'_> {
@@ -269,8 +283,12 @@ impl Provider for Noting<'_> {
         let text = self.files.read(path)?;
         let path = normalize(path);
         let mut read = self.read.borrow_mut();
-        if !read.contains(&path) {
-            read.push(path);
+        if !read.iter().any(|input| input.path == path) {
+            let text_sha256 = rnl_runtime::numbering::sha256(text.as_bytes())
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            read.push(InputFile { path, text_sha256 });
         }
         Some(text)
     }
@@ -393,8 +411,17 @@ pub fn solve_watched(
     }
     // the files read are those of the first pass: the second reads the files raised from memory
     let read = run.read.clone();
+    let mut invocation = run.invocation.clone();
     let mut run = if texts.is_empty() { run } else { pass(file, files, options, clock, &texts, watch)?.0 };
     run.read = read;
+    // Keep original provider text hashes for raised files, plus any dependency first read by
+    // the raised pass. The memory overlay is an internal transformation, not a new input file.
+    for input in std::mem::take(&mut run.invocation.inputs) {
+        if !invocation.inputs.iter().any(|old| old.path == input.path) {
+            invocation.inputs.push(input);
+        }
+    }
+    run.invocation = invocation;
     // a file level that cannot say 0.3 itself, such as a library section without a header record,
     // takes the version of the file that includes it (16.1): when that one is raised, it reads in
     // 0.3 too, and the line of that file says so
@@ -518,7 +545,7 @@ fn pass(
         let start = Instant::now();
         let solved = rnl_solver::solve_with_clock(p, &options.solver, clock);
         let time = start.elapsed();
-        let hash = sig2(p, &canonical);
+        let hash = sig3(p, &canonical);
         let mut written = write_record(p, &solved.solution, AUTHOR, &hash);
         let host = &r.doc.levels[p.level];
         let path = normalize(&host.path);
@@ -572,8 +599,14 @@ fn pass(
         levels.push(SolvedLevel { problem: p.clone(), solved, written, record, hash, path, time, hints_for_low });
     }
     let packages: Vec<String> = files.files.package_files().iter().map(|p| normalize(p)).collect();
-    let read: Vec<String> = files.read.take().into_iter().filter(|p| !packages.contains(p)).collect();
-    Ok((SolveRun { entry, levels, not_solved, files: solved_files, read, errors, raised: Vec::new() }, wants))
+    let inputs = files.read.take();
+    let read: Vec<String> =
+        inputs.iter().filter(|input| !packages.contains(&input.path)).map(|input| input.path.clone()).collect();
+    let invocation = Invocation { solver_revision: env!("RNL_SOLVER_REVISION").into(), inputs };
+    Ok((
+        SolveRun { invocation, entry, levels, not_solved, files: solved_files, read, errors, raised: Vec::new() },
+        wants,
+    ))
 }
 
 /// The text of a file as the reading `r` found it, which the positions of its records refer to; read
@@ -889,6 +922,11 @@ pub fn errors(run: &SolveRun) -> usize {
 /// level solved as [`report`] gives it, each level not solved in one line.
 pub fn lines(run: &SolveRun, all: bool) -> Vec<String> {
     let mut out: Vec<String> = run.raised.iter().flat_map(raised).collect();
+    out.push(format!("solver revision: {}", run.invocation.solver_revision));
+    out.push(format!(
+        "input manifest: {}",
+        serde_json::to_string(&run.invocation.inputs).expect("input manifest serializes")
+    ));
     for k in 0..=run.levels.len() {
         for n in run.not_solved.iter().filter(|n| n.before == k) {
             out.push(not_solved(n));
@@ -1055,16 +1093,13 @@ pub fn report(level: &SolvedLevel, all: bool) -> Vec<String> {
     section(&mut out, "unsolved", level.written.unsolved.iter().map(|u| u.to_string()).collect());
     section(
         &mut out,
-        "unrouted",
-        r.unrouted
-            .iter()
-            .map(|u| {
-                let why = if u.budget { "the budget of the router ran out" } else { "no path joins them" };
-                format!("the net {}: left in {} parts, {why}", u.net, u.parts)
-            })
-            .collect(),
+        "routing fallbacks",
+        r.routing_fallbacks.iter().map(|u| format!("the net {}: {} ({})", u.net, u.phase, u.reason)).collect(),
     );
     section(&mut out, "inert objectives", r.inert_objectives.clone());
+    if all {
+        out.push(format!("  scoring: {}", serde_json::to_string(&r.scoring).expect("exact scoring serializes")));
+    }
     section(&mut out, "notes", r.notes.iter().chain(&level.written.notes).cloned().collect());
     let w = &r.work;
     out.push(format!(

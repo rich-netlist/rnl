@@ -33,6 +33,11 @@ use rnl_runtime::Options;
 use rnl_view::{BuildOptions, Catalog, CatalogOptions, Document, Drawings, Parts, Snapshot, UnplacedDrawing};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "test-solver")]
+mod solver_test;
+#[cfg(feature = "test-solver")]
+pub use solver_test::solver_test;
+
 /// What to build: the workspace and how. Fields the core does not know are ignored, so that a
 /// frontend can ask for options an older core does not have yet.
 #[derive(Deserialize, Debug)]
@@ -182,6 +187,10 @@ pub struct DrawingsQuery {
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Response {
+    /// Test-only solver result, absent from regular builds and the product browser API.
+    #[cfg(feature = "test-solver")]
+    #[serde(rename = "solver_test")]
+    SolverTest(serde_json::Value),
     /// The Document of the entry.
     Document(Box<Document>),
     /// The snapshot of the entry, when the request asks for `parts`.
@@ -212,6 +221,17 @@ pub fn respond(request: &[u8]) -> Response {
         Ok(v) => v,
         Err(e) => return invalid(e),
     };
+    #[cfg(feature = "test-solver")]
+    if value.get("solver_test").is_some() {
+        return if value.get("solver_test").and_then(serde_json::Value::as_bool) != Some(true) {
+            Response::Error("solver_test must be true".into())
+        } else {
+            match solver_test() {
+                Ok(result) => Response::SolverTest(result),
+                Err(error) => Response::Error(error),
+            }
+        };
+    }
     if value.get("write").is_some() {
         return match serde_json::from_value(value) {
             Ok(w) => write(w),

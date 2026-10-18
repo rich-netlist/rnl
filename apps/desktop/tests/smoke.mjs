@@ -518,7 +518,7 @@ async function drive(app, port, profile, t0, session) {
       return error && !error.hidden ? error.textContent : null;
     })()`),
   );
-  same(refused, "the beam must be at least 1", "what the solver says of a beam of 0");
+  check(refused.includes("beam") && refused.includes("positive"), "what the solver says of a beam of 0");
   await page.evaluate(`[...document.querySelectorAll("dialog.dialog button")].find((b) => b.textContent === "Cancel").click()`);
   await until("the dialog to close", async () => !(await page.evaluate(`!!document.querySelector("dialog.dialog")`)), 10_000);
   same(await page.evaluate(`localStorage.getItem("solve-options")`), null, "the settings kept after Cancel");

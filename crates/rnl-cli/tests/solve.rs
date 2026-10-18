@@ -90,8 +90,8 @@ fn scratch(name: &str) -> PathBuf {
 
 /// The text `rnl solve` wrote for a case is its snapshot, byte for byte; with `RNL_BLESS` set it
 /// becomes the snapshot.
-fn compare_or_bless(name: &str, text: &str) {
-    let path = solver_dir().join("solved").join(format!("{name}.sp"));
+fn compare_or_bless(root: &Path, name: &str, text: &str) {
+    let path = root.join("solved").join(format!("{name}.sp"));
     if std::env::var("RNL_BLESS").is_ok() {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, text).unwrap();
@@ -357,9 +357,18 @@ fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, what: &st
 
 #[test]
 fn every_case_solved_and_written_back_reads_back_whole() {
+    check_solver_cases(&solver_dir(), "0.2");
+}
+
+#[test]
+fn every_03_case_solved_and_written_back_reads_back_whole() {
+    check_solver_cases(&solver_dir().join("0.3"), "0.3");
+}
+
+fn check_solver_cases(root: &Path, version: &str) {
     let fs = FsProvider::new(&[]);
     for name in CASES {
-        let f = case(name);
+        let f = root.join(format!("{name}.sp"));
         let run = solve(&f, &fs, &unlimited()).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(run.errors, 0, "{name}");
         assert!(run.not_solved.is_empty(), "{name}: {:?}", run.not_solved);
@@ -374,7 +383,7 @@ fn every_case_solved_and_written_back_reads_back_whole() {
             assert_eq!(report.kept.len() + report.discarded.len(), level.problem.facts.len(), "{name}");
             // no fact contradicts itself (the draft 0.3, 8.5)
             assert!(report.failed.is_empty() && report.errors.is_empty(), "{name}: {:?}", report.errors);
-            assert!(report.unrouted.is_empty(), "{name}: {:?}", report.unrouted);
+            assert!(report.routing_fallbacks.is_empty(), "{name}: {:?}", report.routing_fallbacks);
             // the record holds every decision: every object is placed and every constraint read
             // back (plan 5.11)
             assert!(level.written.unsolved.is_empty(), "{name}: {:?}", level.written.unsolved);
@@ -387,7 +396,7 @@ fn every_case_solved_and_written_back_reads_back_whole() {
             assert!(run.files[0].text.contains(&level.hash), "{name}");
         }
         check_facts(&run, name);
-        let dir = scratch(name);
+        let dir = scratch(&format!("{version}/{name}"));
         let writing = write(&run, &Target::Dir(dir.clone()));
         assert_eq!(writing.error, None, "{name}");
         let out = dir.join(format!("{name}.sp"));
@@ -396,7 +405,7 @@ fn every_case_solved_and_written_back_reads_back_whole() {
         let text = std::fs::read_to_string(&out).unwrap();
         assert_eq!(text, run.files[0].text);
         check_read_back(&run, &out, &fs, name);
-        compare_or_bless(name, &text);
+        compare_or_bless(root, name, &text);
     }
 }
 
@@ -509,10 +518,19 @@ fn an_orientation_is_described_once() {
 
 #[test]
 fn a_solve_is_the_same_twice_and_again_on_its_own_output() {
+    check_solver_cases_repeatable(&solver_dir());
+}
+
+#[test]
+fn a_03_solve_is_the_same_twice_and_again_on_its_own_output() {
+    check_solver_cases_repeatable(&solver_dir().join("0.3"));
+}
+
+fn check_solver_cases_repeatable(root: &Path) {
     let fs = FsProvider::new(&[]);
     let options = unlimited();
     for name in CASES {
-        let f = case(name);
+        let f = root.join(format!("{name}.sp"));
         let a = solve(&f, &fs, &options).unwrap();
         let b = solve(&f, &fs, &options).unwrap();
         assert_eq!(a.files, b.files, "{name}: not the same twice");
@@ -551,6 +569,27 @@ fn in_a_file_of_the_draft_the_record_reaches_every_object() {
     }
 }
 
+/// Exact public provenance, including original Provider-decoded texts rather than raised
+/// overlays. These two report migrations must not hide or discard the metadata lines.
+fn expected_provenance(run: &SolveRun, inputs: &[(&str, &str)]) -> [String; 2] {
+    assert!(!run.invocation.solver_revision.is_empty());
+    let expected: Vec<_> = inputs
+        .iter()
+        .map(|(path, text)| {
+            let digest = rnl_runtime::numbering::sha256(text.as_bytes())
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            serde_json::json!({"path":normalize(path),"text_sha256":digest})
+        })
+        .collect();
+    assert_eq!(serde_json::to_value(&run.invocation.inputs).unwrap(), serde_json::json!(expected));
+    [
+        format!("solver revision: {}", run.invocation.solver_revision),
+        format!("input manifest: {}", serde_json::to_string(&expected).unwrap()),
+    ]
+}
+
 #[test]
 fn a_level_whose_rnl_is_not_interpreted_is_not_solved() {
     let fs = FsProvider::new(&[]);
@@ -560,8 +599,13 @@ fn a_level_whose_rnl_is_not_interpreted_is_not_solved() {
     let run = solve(&f, &fs, &unlimited()).unwrap();
     assert!(run.levels.is_empty() && run.files.is_empty(), "{:?}", run.levels.len());
     assert_eq!(run.not_solved.len(), 1);
+    let original = fs.read(&path_str(&f)).unwrap();
+    let provenance = expected_provenance(&run, &[(&path_str(&f), &original)]);
+    let said = lines(&run, false);
+    assert_eq!(said.len(), 3, "two provenance lines precede the unchanged not-solved report");
+    assert_eq!(said[..2], provenance);
     assert_eq!(
-        lines(&run, false),
+        &said[2..],
         ["level 13-unsupported-version.sp (file in 13-unsupported-version.sp): not solved, and nothing is written \
              for it: 13-unsupported-version.sp declares the version 9.0, which this reading does not interpret: none \
              of its RNL is read, and it is kept as it is (16.1)"]
@@ -778,13 +822,18 @@ fn a_write_that_fails_says_what_it_wrote_before() {
     std::fs::create_dir_all(dir.join("04-hierarchy-lib.inc")).unwrap();
     let (code, stdout, stderr) =
         rnl(&["solve", &path_str(&f), "-o", &path_str(&dir), "--solver-options", "time_limit=none"]);
-    assert_eq!(code, 2, "{stdout}{stderr}");
+    assert_eq!(code, 1, "{stdout}{stderr}");
     assert!(stdout.ends_with(&format!("wrote {}\n", path_str(&dir.join("04-hierarchy.sp")))), "{stdout}");
     assert!(stderr.contains("rnl: cannot write "), "{stderr}");
 }
 
 fn rnl(args: &[&str]) -> (i32, String, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_rnl")).args(args).output().unwrap();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_rnl"));
+    command.env_remove("RNL_SOLVER_CONFIG").args(args);
+    if args.first().is_some_and(|name| matches!(*name, "solve" | "problem" | "preview")) {
+        command.arg("--solver-config").arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/rnl-solver.toml"));
+    }
+    let out = command.output().unwrap();
     let text = |b: &[u8]| String::from_utf8_lossy(b).replace("\r\n", "\n");
     (out.status.code().unwrap_or(-1), text(&out.stdout), text(&out.stderr))
 }
@@ -796,16 +845,16 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
     let out = path_str(&dir.join("out"));
     // where to write is not optional, and what does not read is an error
     let (code, _, err) = rnl(&["solve", &f, "--solver-options", "time_limit=none"]);
-    assert_eq!(code, 2);
+    assert_eq!(code, 1);
     assert!(err.contains("solve needs -o DIR"), "{err}");
-    assert_eq!(rnl(&["solve", &f, "-o", &out, "--in-place", "--solver-options", "time_limit=none"]).0, 2);
+    assert_eq!(rnl(&["solve", &f, "-o", &out, "--in-place", "--solver-options", "time_limit=none"]).0, 1);
     let (code, _, err) = rnl(&["solve", &f, "-o", &out, "--solver-options", "speed=3"]);
-    assert_eq!(code, 2);
-    assert!(err.contains("--solver-options: the solver has no option `speed`"), "{err}");
-    assert_eq!(rnl(&["solve", &f, "-o", &out, "--level", "nope", "--solver-options", "time_limit=none"]).0, 2);
+    assert_eq!(code, 1);
+    assert!(err.contains("--solver-options: unknown solver rule `speed`"), "{err}");
+    assert_eq!(rnl(&["solve", &f, "-o", &out, "--level", "nope", "--solver-options", "time_limit=none"]).0, 1);
     assert_eq!(
         rnl(&["solve", &path_str(&dir.join("missing.sp")), "-o", &out, "--solver-options", "time_limit=none"]).0,
-        2
+        1
     );
     assert!(!dir.join("out").exists());
 
@@ -813,8 +862,8 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
     let (code, stdout, _) = rnl(&["solve", &f, "-o", &out, "--report", "--solver-options", "beam=2"]);
     assert_eq!(code, 0, "{stdout}");
     let options = SolverOptions { beam: 2, ..SolverOptions::default() }.canonical();
-    assert!(options.ends_with(";time_limit=5"), "{options}");
-    assert!(stdout.starts_with(&format!("solver options: {options}\n")), "{stdout}");
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&options).unwrap()["rules"]["time_limit"], "5");
+    assert!(stdout.contains(&format!("solver options: {options}\n")), "{stdout}");
     assert!(stdout.contains("\nlevel T1-rc-lowpass.sp (file in T1-rc-lowpass.sp): "), "{stdout}");
     assert!(stdout.contains("\n    kept [0] "), "{stdout}");
     assert!(!stdout.contains("stage S"), "{stdout}");
@@ -829,8 +878,8 @@ fn the_command_writes_where_it_is_told_and_reports_each_level() {
     let (code, stdout, _) = rnl(&["solve", &path_str(&copy), "--in-place", "--solver-options", "time_limit=none"]);
     assert_eq!(code, 0, "{stdout}");
     let options = SolverOptions::without_time_limit().canonical();
-    assert!(options.ends_with(";time_limit=none"), "{options}");
-    assert!(stdout.starts_with(&format!("solver options: {options}\n")), "{stdout}");
+    assert!(serde_json::from_str::<serde_json::Value>(&options).unwrap()["rules"]["time_limit"].is_null());
+    assert!(stdout.contains(&format!("solver options: {options}\n")), "{stdout}");
     assert!(!stdout.contains("warning: "), "{stdout}");
     let snapshot = std::fs::read(solver_dir().join("solved/T1-rc-lowpass.sp")).unwrap();
     assert!(std::fs::read(&copy).unwrap() == snapshot);
@@ -1395,7 +1444,7 @@ fn the_problem_command_hashes_the_options_as_solve_writes_them() {
     assert!(with.ends_with(&rnl_runtime::problem::options_digest(&beam)), "{with}");
     let (code, _, err) = rnl(&["problem", &f, "--solver-options", "speed=3"]);
     assert_eq!(code, 2);
-    assert!(err.contains("--solver-options: the solver has no option `speed`"), "{err}");
+    assert!(err.contains("--solver-options: unknown solver rule `speed`"), "{err}");
 }
 
 /// The texts solved, as `rnl solve` wrote them back, read again as a viewer reads them, with the
@@ -1730,7 +1779,7 @@ fn within_its_tolerance_the_record_writes_the_constants_of_the_facts_that_rank_f
          {#R1 #R2} @ALIGN(\"x\", priority=\"high\") }\n.end\n",
     );
     let entry = Path::new("/w/tol.sp");
-    let solver = SolverOptions { tolerance: 0.5, ..SolverOptions::without_time_limit() };
+    let solver = SolverOptions::without_time_limit().with_overrides("tolerance=0.5").unwrap();
     let run = solve(entry, &files, &SolveOptions { solver, ..unlimited() }).unwrap();
     let level = &run.levels[0];
     let p = &level.problem;
@@ -1775,7 +1824,7 @@ fn check_kept(run: &SolveRun, what: &str) {
 
 /// The options of `rnl solve` with a time limit of `seconds`, which [`Ticks`] counts in readings.
 fn within(seconds: f64) -> SolveOptions {
-    let solver = SolverOptions { time_limit: Some(seconds), ..SolverOptions::without_time_limit() };
+    let solver = SolverOptions::without_time_limit().with_overrides(&format!("time_limit={seconds}")).unwrap();
     SolveOptions { solver, ..unlimited() }
 }
 
@@ -1855,12 +1904,34 @@ fn every_minimal_group_is_named_and_a_limit_that_cuts_them_says_the_list_is_not_
                 {#R1 #R2 #R3} @ALIGN(\"x\"); #R1 @PLACE(0, 0); #R2 @PLACE(10, 0); #R3 @PLACE(20, 0) }\n.end\n";
     let files = MemoryProvider::new().with("/w/t.sp", body);
     let clock = Ticks::default();
-    let all = solve_with_clock(Path::new("/w/t.sp"), &files, &within(1e9), &clock).unwrap();
+    let timed_options = within(1e9);
+    let all = solve_with_clock(Path::new("/w/t.sp"), &files, &timed_options, &clock).unwrap();
     let reads = clock.reads();
     let level = &all.levels[0];
     let p = &level.problem;
     let whole = &level.solved.report;
-    assert_eq!(whole, &solve(Path::new("/w/t.sp"), &files, &unlimited()).unwrap().levels[0].solved.report);
+    let untimed_options = unlimited();
+    let untimed = solve(Path::new("/w/t.sp"), &files, &untimed_options).unwrap();
+    let untimed_report = &untimed.levels[0].solved.report;
+    // Each report describes the exact configuration actually used, including the time limit.
+    for (report, options) in [(whole, &timed_options.solver), (untimed_report, &untimed_options.solver)] {
+        let canonical = options.canonical();
+        assert_eq!(report.scoring.config, canonical);
+        assert_eq!(report.scoring.config_digest, rnl_runtime::problem::options_digest(&canonical));
+    }
+    let mut timed_config: serde_json::Value = serde_json::from_str(&whole.scoring.config).unwrap();
+    let untimed_config: serde_json::Value = serde_json::from_str(&untimed_report.scoring.config).unwrap();
+    assert_eq!(timed_config["rules"]["time_limit"].as_str(), Some("1000000000"));
+    assert!(untimed_config["rules"]["time_limit"].is_null());
+    timed_config["rules"]["time_limit"] = serde_json::Value::Null;
+    assert_eq!(timed_config, untimed_config, "only the configured time limit differs");
+    assert_ne!(whole.scoring.config_digest, untimed_report.scoring.config_digest);
+    // Translate only those independently verified configuration fields in a comparison clone.
+    // All facts, groups, exact term values/metadata, work and notes still compare in full.
+    let mut same_semantics = untimed_report.clone();
+    same_semantics.scoring.config = timed_options.solver.canonical();
+    same_semantics.scoring.config_digest = rnl_runtime::problem::options_digest(&same_semantics.scoring.config);
+    assert_eq!(whole, &same_semantics);
     let fact = |text: &str| (0..p.facts.len()).find(|&k| describe_fact(p, k).contains(text)).unwrap();
     let align = fact("ALIGN x");
     let xs = [fact("the x of #R1 = 0"), fact("the x of #R2 = 10"), fact("the x of #R3 = 20")];
@@ -2352,6 +2423,15 @@ fn a_raise_warns_of_the_aliases_imported_and_of_the_files_that_take_its_version(
     let clashes = vec!["an alias, `numbering`, line 2", "a parameter name, `numbering`, line 6"];
     assert_eq!(followers, [("/w/child.inc", clashes), ("/w/grand.inc", vec![])]);
     let said = lines(&run, false);
+    let provenance = expected_provenance(
+        &run,
+        &[("/w/top.sp", top), ("/w/child.inc", child), ("/w/grand.inc", grand), ("/w/kept.inc", kept)],
+    );
+    let metadata_at = said.iter().position(|line| line == &provenance[0]).unwrap();
+    assert_eq!(said.iter().filter(|line| line.starts_with("solver revision: ")).count(), 1);
+    assert_eq!(said.iter().filter(|line| line.starts_with("input manifest: ")).count(), 1);
+    assert_eq!(said[metadata_at..metadata_at + 2], provenance);
+    assert_eq!(said[metadata_at + 2], "level top.sp (file in top.sp): 0 kept, 0 discarded of 0 facts");
     let follows = |name: &str| {
         format!(
             "warning: {name}: it writes no VERSION and takes that of top.sp: it reads in 0.3 too, its text unchanged \
@@ -2361,9 +2441,14 @@ fn a_raise_warns_of_the_aliases_imported_and_of_the_files_that_take_its_version(
     let alias = "warning: child.inc: an alias, `numbering`, line 2, has the spelling of a word that 0.3 adds (2.8): \
                  read in 0.3, it may mean something else (16.1)";
     for line in [follows("child.inc"), alias.to_string(), follows("grand.inc")] {
-        assert!(said.contains(&line), "{line}: {said:?}");
+        assert!(said[..metadata_at].contains(&line), "the original warnings precede provenance: {line}: {said:?}");
     }
-    assert!(!said.iter().any(|l| l.contains("kept.inc")), "{said:?}");
+    // kept.inc is read and therefore belongs in the exact provenance manifest, but it
+    // declares its own version: it is still absent from all raise/warning/level body lines.
+    assert!(
+        !said[..metadata_at].iter().chain(said[metadata_at + 2..].iter()).any(|line| line.contains("kept.inc")),
+        "{said:?}"
+    );
     assert_eq!(run.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["/w/top.sp"]);
 }
 

@@ -589,13 +589,14 @@ fn a_change_above_changes_the_hash_below() {
 fn the_brainstorm_cases_give_whole_problems() {
     let fs = FsProvider::new(&[]);
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/integration/solver");
-    let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
-        .unwrap()
+    let mut files: Vec<PathBuf> = [dir.clone(), dir.join("0.3")]
+        .into_iter()
+        .flat_map(|root| std::fs::read_dir(root).unwrap())
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().is_some_and(|e| e == "sp"))
         .collect();
     files.sort();
-    assert_eq!(files.len(), 7);
+    assert_eq!(files.len(), 14);
     for f in &files {
         let ps = problems(f, &fs);
         assert!(!ps.is_empty(), "{}", f.display());
