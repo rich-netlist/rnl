@@ -234,7 +234,7 @@ R1 in out 1k
 
 ### 默认的符号和引脚
 
-R `$RESISTOR`，C `$CAPACITOR`，L `$INDUCTOR`，V `$VOLTAGE_SOURCE`，I `$CURRENT_SOURCE`，D `$DIODE`，E `$VCVS_4TERM`，G `$VCCS_4TERM`，F `$CCCS`，H `$CCVS`，B `$BEHAVIORAL_SOURCE`，S `$VOLTAGE_CONTROLLED_SWITCH`，W `$SWITCH`，J 和 Z `$NJFET`，T 和 O `$TRANSMISSION_LINE`，U `$RC_LINE`。晶体管按 `.model` 的类型：nmos `$NMOS_4TERM`，pmos `$PMOS_4TERM`，npn `$NPN`，pnp `$PNP`，njf `$NJFET`，pjf `$PJFET`；写上 `.model` 卡，或者自己给符号，极性才是确定的。
+R `$RESISTOR`，C `$CAPACITOR`，L `$INDUCTOR`，V `$VOLTAGE_SOURCE`，I `$CURRENT_SOURCE`，D `$DIODE`，E `$VCVS_4TERM`，G `$VCCS_4TERM`，F `$CCCS`，H `$CCVS`，B `$BEHAVIORAL_SOURCE`，S `$VOLTAGE_CONTROLLED_SWITCH`，W `$SWITCH`，J 和 Z `$NJFET`，T 和 O `$TRANSMISSION_LINE`，U `$RC_LINE`。晶体管按 `.model` 的类型：nmos `$NMOS_4TERM`，pmos `$PMOS_4TERM`，npn `$NPN`，pnp `$PNP`，njf `$NJFET`，pjf `$PJFET`；找不到 `.model` 卡的晶体管不给符号、不画，所以要写上卡，或者自己给符号。
 
 | 符号 | R0 时的引脚 |
 |---|---|
@@ -314,6 +314,7 @@ R2 b 0 1k
 | 没点名包就用 `$OPAMP` | `$OPAMP cannot be found: … rnl-std-functional` | 用 USE-PACKAGE 点名 `rnl-std-functional` |
 | 自己的记录里写 `%#3 @PLACE(1, 2)` | `a number is written only in the record of the solver` | 给对象起名 |
 | 往 `$NMOS` 的体端接导线 | `#M1:b has no pin in its symbol: the wire fails` | `$NMOS_4TERM` |
+| 写了 `M1 d g 0 0 nch`，却没有 `.model nch` | `the model card nch is not found, so the polarity of M1 is not known and it is not drawn`（警告） | `.model nch nmos level=1`，或 `#M1 @SET-SYMBOL $NMOS_4TERM` |
 | `#M1.d`、`M3`、`&vdd!` | 不报错：它们是自由文本 | `#M1:d`、`#M3`、`&"vdd!"` |
 
 ```spice error
