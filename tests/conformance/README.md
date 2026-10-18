@@ -1,6 +1,6 @@
 # conformance
 
-Conformance corpus for RNL 0.2, the language standard in [`spec/`](../../spec/README.md), and for RNL 0.3, whose text is still a draft. The cases were written against the draft the standard was consolidated from; section numbers in file comments and diagnostics are the standard's.
+Conformance corpus for RNL 0.3, the language standard in [`spec/`](../../spec/README.md), and for RNL 0.2, which the tools still read. The cases were written against the draft the standard was consolidated from; section numbers in file comments and diagnostics are the standard's.
 
 | Path | Content |
 | --- | --- |

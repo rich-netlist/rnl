@@ -1,6 +1,6 @@
 # rnl-runtime
 
-The language core of RNL 0.2, the language standard in [`spec/`](../../spec/README.md), and of RNL 0.3, whose text is still a draft. It takes a host document that a host adapter read (levels, instances, nets, and the records cut out of comment carriers) and returns an interpretation: the diagnostics and the effective model of every drawing level.
+The language core of RNL 0.3, the language standard in [`spec/`](../../spec/README.md), and of RNL 0.2, which it still reads. It takes a host document that a host adapter read (levels, instances, nets, and the records cut out of comment carriers) and returns an interpretation: the diagnostics and the effective model of every drawing level.
 
 | Module | Content |
 | --- | --- |
