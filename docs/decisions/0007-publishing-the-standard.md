@@ -17,13 +17,16 @@ The standard is read in several ways: on GitHub, downloaded to read offline or p
   - a PDF.
 
   Apart from the combined Markdown, none of these is committed.
+
+  A version may also have a short guide to its language, `spec/rnl-<version>-guide.md` and `.zh.md`, next to the combined texts. It is not a part of the standard and not normative: it is the first section of the web page of its version on the project site, and in no other form, and it is not among the sources the revision label counts, so a change to it leaves the label as it is. The checks cover it too (below). The English file is also the guide of the skill package for AI agents in [`skills/`](../../skills/README.md), whose files are all in English.
 - **One build.** pandoc reads the chapters once per language. One filter gives the web page and the PDF their section anchors, the links of section references and the colours of RNL code; Typst turns pandoc's output into the PDF. Section numbers are the anchors in every form and in both languages, such as `#9.4`. CI uses pinned versions of pandoc and Typst. The build lives in `scripts/spec/` (MIT), not in `spec/` (CC-BY-4.0).
 - **Checks.** Before anything is built, CI checks that:
   1. the Chinese chapters have the sections, list items, table rows and code of the English ones;
   2. each Chinese part is stamped with the hash of the English part it was translated from, and that hash is current;
   3. Annex A in both languages is what the word list gives;
   4. every section number cited in the text exists;
-  5. the combined Markdown is what the chapters give.
+  5. the combined Markdown is what the chapters give;
+  6. the short guide, where a version has one, is in both languages with the same headings, list items, table rows and code, and every section it cites exists.
 
   pandoc and Typst must finish without warnings. Any failure stops the build and the publication.
 - **Revisions.** The version number (0.2) changes only when the language changes; a new version gets its own files and pages, and the earlier versions stay published. A change that leaves the language as it is (wording, references, examples, errata) makes a new revision of the same version. A revision is published by the tag `spec-<version>-r<n>`, numbered from 1, such as `spec-0.2-r1`. CI then attaches all the forms and their `SHA256SUMS` to a GitHub release named "RNL 0.2, revision 1", whose notes list the changes.

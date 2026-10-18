@@ -1,0 +1,77 @@
+# Checks the RNL skill package, skills/rnl/ (scripts/skill/build.py): that the files generated from the
+# package files and the short guide are what they give, that the package is whole (front matter,
+# links, every file linked from SKILL.md, the page for agents and llms.txt naming every file), and that
+# every netlist in it reads with `rnl check`, without errors or warnings, an `error` example with an
+# error. The site's pages publish the package (pages.yml).
+name: Skill
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/**"
+      - "scripts/skill/**"
+      - "spec/rnl-*-guide*.md"
+      - "site/src/agents.html"
+      - "site/src/llms*.txt"
+      - "site/src/assets/gallery.js"
+      - "libraries/**"
+      - "crates/**"
+      - "LICENSES/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/skill.yml"
+  pull_request:
+    paths:
+      - "skills/**"
+      - "scripts/skill/**"
+      - "spec/rnl-*-guide*.md"
+      - "site/src/agents.html"
+      - "site/src/llms*.txt"
+      - "site/src/assets/gallery.js"
+      - "libraries/**"
+      - "crates/**"
+      - "LICENSES/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/skill.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # the zip's timestamps and the manifest's commit come from git
+          fetch-depth: 0
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: skill-${{ hashFiles('Cargo.lock') }}
+          restore-keys: skill-
+      # the command that reads the examples, and whose catalog the reference to the packages is written from
+      - name: Build the rnl command
+        run: cargo build -p rnl-cli
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Check the skill package
+        run: python scripts/skill/build.py --check --rnl target/debug/rnl
+      # the downloads pages.yml publishes, written once to see that they can be
+      - name: Write the package's downloads
+        run: |
+          mkdir -p "$RUNNER_TEMP/site"
+          python scripts/skill/build.py --site "$RUNNER_TEMP/site"
+          unzip -l "$RUNNER_TEMP/site/skill/rnl-skill.zip"

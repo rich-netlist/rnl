@@ -16,7 +16,7 @@
           {
             "id": "#Rtop",
             "subckt": false,
-            "master": null,
+            "master": "resistor",
             "terminals": [
               {
                 "n": 1,
@@ -1086,7 +1086,7 @@
           {
             "id": "#Rsec",
             "subckt": false,
-            "master": null,
+            "master": "resistor",
             "terminals": [
               {
                 "n": 1,

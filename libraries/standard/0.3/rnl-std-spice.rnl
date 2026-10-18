@@ -49,6 +49,9 @@
   /* narrow: the model type picks the P variants */
   # @SELECT-INSTANCE(type="pmos") => @SET-SYMBOL $PMOS_4TERM;
   # @SELECT-INSTANCE(type="pnp") => @SET-SYMBOL $PNP;
+  # @SELECT-INSTANCE(type="lpnp") => @SET-SYMBOL $PNP;
   # @SELECT-INSTANCE(type="pjf") => @SET-SYMBOL $PJFET;
-  # @SELECT-INSTANCE(type="pmf") => @SET-SYMBOL $PJFET
+  # @SELECT-INSTANCE(type="pmf") => @SET-SYMBOL $PJFET;
+  /* the adapter's type for the W and U of HSPICE that are transmission lines, not a switch and an RC line */
+  # @SELECT-INSTANCE(type="tline") => @SET-SYMBOL $TRANSMISSION_LINE
 }

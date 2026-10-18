@@ -54,6 +54,7 @@ Every form is built from the chapters of one commit and names its revision ([dec
 | [`libraries/`](libraries/README.md) | External data libraries: the standard package with its symbols, and the Chinese alias package. |
 | [`tests/`](tests/README.md) | Conformance corpus, and browser tests of the viewers; future roundtrip and integration corpora. |
 | [`examples/`](examples/README.md) | Future example documents. |
+| [`skills/`](skills/README.md) | Skill packages for AI agents: the RNL skill, which teaches an agent to read, write, check and draw RNL 0.3, published on the site with an entry for agents ([For agents](https://rich-netlist.github.io/rnl/en/agents.html)). |
 | [`scripts/`](scripts/README.md) | Maintenance scripts: the build of the standard's published forms, and the fonts shipped with the core. |
 | [`.github/workflows/`](.github/workflows/README.md) | CI workflows: the project site, the releases of the standard and of the desktop viewer, the Rust workspace, the viewers and their browser tests. |
 | [`docs/`](docs/README.md) | Toolchain architecture proposal, roadmap, and decision records. |

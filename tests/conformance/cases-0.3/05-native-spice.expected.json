@@ -4327,7 +4327,15 @@
             -10.95
           ],
           "lines": [
-            []
+            [
+              {
+                "text": "2*V(a1)",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
           ],
           "halign": "start",
           "valign": "baseline",
@@ -5087,15 +5095,7 @@
             -40.95
           ],
           "lines": [
-            [
-              {
-                "text": "rmod",
-                "level": 0,
-                "bold": false,
-                "italic": false,
-                "overline": false
-              }
-            ]
+            []
           ],
           "halign": "start",
           "valign": "baseline",

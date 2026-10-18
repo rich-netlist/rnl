@@ -71,7 +71,10 @@ LANGS = {
     "en": {"suffix": "", "html_lang": "en", "other": "zh", "other_label": "中文", "contents": "Contents",
            "zip_label": "Markdown, chapters", "md_label": "Markdown", "sums_label": "SHA-256 checksums",
            "intro": "Introduction", "tour": "Language tour", "spec": "Standard", "packages": "Packages",
-           "tools": "Tools", "pages": "Pages",
+           "tools": "Tools", "agents": "For agents", "pages": "Pages",
+           "guide_note": "This is the short version of the standard: what it takes to read and write RNL files. It is not "
+                         "normative; where it differs from the text below, the text below prevails. The same guide is "
+                         "part of the [skill package for AI agents]({agents}).",
            "kicker": "Rich Netlist language standard", "theme_dark": "Switch to dark theme",
            "theme_light": "Switch to light theme", "site_home": "en/",
            "body_font": "IBM+Plex+Sans:wght@400;500;600;700",
@@ -87,7 +90,10 @@ LANGS = {
            "only": "Only what changed"},
     "zh": {"suffix": ".zh", "html_lang": "zh-CN", "other": "en", "other_label": "EN", "contents": "目录",
            "zip_label": "Markdown 分章包", "md_label": "Markdown 合订本", "sums_label": "SHA-256 校验值",
-           "intro": "介绍", "tour": "语言导览", "spec": "标准", "packages": "标准包", "tools": "工具", "pages": "页面",
+           "intro": "介绍", "tour": "语言导览", "spec": "标准", "packages": "标准包", "tools": "工具", "agents": "给 agent",
+           "pages": "页面",
+           "guide_note": "这是标准的简版：读写 RNL 文件需要知道的东西。它不是正式文本，与下面的正文不一致时，以正文为准。"
+                         "同一份指南也在[给 AI agent 的 skill 包]({agents})里。",
            "kicker": "Rich Netlist 语言标准", "theme_dark": "切换到深色", "theme_light": "切换到浅色", "site_home": "zh/",
            "body_font": "Noto+Sans+SC:wght@400;500;700;900",
            "foot": "标准文本按 CC-BY-4.0 许可发布。本文是中文译本，以英文版为准。",
@@ -135,6 +141,13 @@ def translated(spec: Path, v: str) -> list[str]:
 
 def name(v: str, lang: str, ext: str) -> str:
     return f"rnl-{v}{LANGS[lang]['suffix']}{ext}"
+
+
+def guide_path(spec: Path, v: str, lang: str) -> Path:
+    """The short guide of version v, next to the combined texts: rnl-0.3-guide.md, rnl-0.3-guide.zh.md. It is
+    a section of the web page of the version and not a part of the standard, so it is in none of the other
+    forms and leaves the revision label as it is."""
+    return spec / f"rnl-{v}-guide{LANGS[lang]['suffix']}.md"
 
 
 def own_files(out: Path, v: str) -> list[Path]:
@@ -224,16 +237,34 @@ def check_word_list(spec: Path, v: str) -> list[str]:
     return msgs
 
 
+def prose_blocks(text: str) -> str:
+    """The text without code blocks."""
+    return re.sub(r"^[ \t]*```.*?^[ \t]*```[ \t]*$", "", text, flags=re.M | re.S)
+
+
 def prose(text: str) -> str:
     """The text without code blocks and inline code."""
-    text = re.sub(r"^[ \t]*```.*?^[ \t]*```[ \t]*$", "", text, flags=re.M | re.S)
-    return re.sub(r"`[^`\n]+`", "", text)
+    return re.sub(r"`[^`\n]+`", "", prose_blocks(text))
 
 
 REF = re.compile(r"(?<![\w.])(\d{1,2}(?:\.\d{1,2}){1,3})(?![\w])")
 # Numbers that name principles ("Principles 2.4, 2.9") or versions; the same rule as rnl.lua.
 NOT_A_SECTION = re.compile(r"(?:(?:Principles|原则)\s*(?:\d+(?:\.\d+)*\s*(?:,|、|and|or|和|或)\s*)*"
                            r"|(?:[Vv]ersions?|版本|before|RNL|0\.x)\s*)$")
+
+
+def not_sections(text: str, ids: set[str], last: int) -> list[str]:
+    """The numbers in the text that cite a section and name none of ids; those beyond chapter `last`, and
+    versions and principles, are not citations."""
+    body, found = prose(text), []
+    for m in REF.finditer(body):
+        num = m.group(1).rstrip(".")
+        if num in ids or num.split(".")[0] == "0" or int(num.split(".")[0]) > last:
+            continue
+        if NOT_A_SECTION.search(body[max(0, m.start() - 60):m.start()]):
+            continue
+        found.append(num)
+    return found
 
 
 def check_refs(spec: Path, v: str) -> list[str]:
@@ -244,14 +275,32 @@ def check_refs(spec: Path, v: str) -> list[str]:
         texts = {p: read(spec / v / lang / p) for p in ["front.md"] + names}
         ids = set(HEADING_ID.findall("\n".join(texts.values())))
         for part, text in texts.items():
-            body = prose(text)
-            for m in REF.finditer(body):
-                num = m.group(1).rstrip(".")
-                if num in ids or num.split(".")[0] == "0" or int(num.split(".")[0]) > last:
-                    continue
-                if NOT_A_SECTION.search(body[max(0, m.start() - 60):m.start()]):
-                    continue
-                msgs.append(f"{v}/{lang}/{part}: cites {num}, which is not a section")
+            msgs += [f"{v}/{lang}/{part}: cites {num}, which is not a section" for num in not_sections(text, ids, last)]
+    return msgs
+
+
+def check_guide(spec: Path, v: str) -> list[str]:
+    """The short guide, when the version has one: both languages, one title, the same structure and code in
+    both, and every section it cites exists."""
+    found = {lang: guide_path(spec, v, lang).exists() for lang in LANGS}
+    if not any(found.values()):
+        return []
+    msgs = [f"{guide_path(spec, v, lang).name}: missing" for lang in LANGS if not found[lang]]
+    if msgs:
+        return msgs
+    texts = {lang: read(guide_path(spec, v, lang)) for lang in LANGS}
+    for lang, text in texts.items():
+        titles = re.findall(r"^# ", prose_blocks(text), re.M)
+        if not text.startswith("# ") or len(titles) != 1:
+            msgs.append(f"{guide_path(spec, v, lang).name}: it starts with one title, `# ...`, and has no other level 1 heading")
+    if msgs:
+        return msgs
+    msgs += [f"{v} guide {m}" for m in spectools.compare(texts["en"], texts["zh"], "guide", by_position=True)]
+    names = parts(spec, v)
+    last = max(int(p[2:-3]) for p in names if p.startswith("ch"))
+    for lang, text in texts.items():
+        ids = set(HEADING_ID.findall("\n".join(read(spec / v / lang / p) for p in ["front.md"] + names)))
+        msgs += [f"{guide_path(spec, v, lang).name}: cites {num}, which is not a section" for num in not_sections(text, ids, last)]
     return msgs
 
 
@@ -266,7 +315,7 @@ def check_combined(spec: Path, v: str) -> list[str]:
 
 
 CHECKS = (("structure", check_structure), ("translation stamps", check_stamps), ("word list", check_word_list),
-          ("references", check_refs), ("combined texts", check_combined))
+          ("references", check_refs), ("combined texts", check_combined), ("short guide", check_guide))
 
 
 # --- builds ----------------------------------------------------------------------------------------
@@ -283,6 +332,37 @@ def pandoc_input(spec: Path, v: str, lang: str, work: Path) -> Path:
     # The translation stamps are for the checks; before the title they would also keep it from being one.
     texts = [STAMP.sub("", read(spec / v / lang / p)).strip() + "\n" for p in ["front.md"] + parts(spec, v)]
     p = work / f"{v}-{lang}.md"
+    p.write_text(FENCE.sub(fence_attrs, "\n".join(texts)), encoding="utf-8", newline="\n")
+    return p
+
+
+def guide_section(spec: Path, v: str, lang: str, agents: str) -> str:
+    """The guide as the first section of the page, after the front matter: its title one level down, with the
+    id `guide` and a note that it is not the standard, and every heading below it one level down as well (not
+    the lines of code blocks, which may start with #)."""
+    out, in_code, first = [], False, True
+    for line in read(guide_path(spec, v, lang)).strip().split("\n"):
+        if re.match(r"^[ \t]*```", line):
+            in_code = not in_code
+        elif not in_code and re.match(r"^#{1,3} ", line):
+            if first:
+                first = False
+                out += [f"#{line} {{#guide}}", "", LANGS[lang]["guide_note"].format(agents=agents)]
+                continue
+            line = "#" + line
+        out.append(line)
+    return "\n".join(out) + "\n"
+
+
+def html_input(spec: Path, v: str, lang: str, work: Path, site_root: str) -> Path:
+    """The input of the web page of a version: that of the other forms, with the short guide before chapter 1
+    when the version has one. site_root is where the links of the page lead, such as the page for agents."""
+    if not guide_path(spec, v, lang).exists():
+        return pandoc_input(spec, v, lang, work)
+    texts = [STAMP.sub("", read(spec / v / lang / "front.md")).strip() + "\n",
+             guide_section(spec, v, lang, site_root + "agents.html")]
+    texts += [STAMP.sub("", read(spec / v / lang / p)).strip() + "\n" for p in parts(spec, v)]
+    p = work / f"{v}-{lang}-web.md"
     p.write_text(FENCE.sub(fence_attrs, "\n".join(texts)), encoding="utf-8", newline="\n")
     return p
 
@@ -343,7 +423,8 @@ def page_meta(lang: str, title: str, other_href: str, site_root: str) -> dict:
     return {"html-lang": L["html_lang"], "pagetitle": title,
             "other-lang": LANGS[other]["html_lang"], "other-label": L["other_label"], "other-href": other_href,
             "site-root": site_root, "intro-label": L["intro"], "tour-label": L["tour"], "spec-label": L["spec"],
-            "packages-label": L["packages"], "tools-label": L["tools"], "pages-label": L["pages"],
+            "packages-label": L["packages"], "tools-label": L["tools"], "agents-label": L["agents"],
+            "pages-label": L["pages"],
             "kicker": L["kicker"],
             "theme-label": L["theme_dark"],
             "theme-dark": L["theme_dark"], "theme-light": L["theme_light"], "foot-note": L["foot"],
@@ -576,7 +657,8 @@ def main(argv: list[str]) -> int:
                     d.mkdir(parents=True, exist_ok=True)
                     for ext in (".md", "-chapters.zip") + (() if args.no_pdf else (".pdf",)):
                         shutil.copyfile(out / name(v, lang, ext), d / name(v, lang, ext))
-                    build_html(src, lang, v, rev, d / "index.html", L["site_other"].format(v=v), "../../",
+                    build_html(html_input(spec, v, lang, work, "../../"), lang, v, rev, d / "index.html",
+                               L["site_other"].format(v=v), "../../",
                                version_links(lang, v, all_versions, lambda x: f"../{x}/",
                                              lambda w: f"compare-{w}.html"), out, work)
                     for w in earlier(all_versions, v):

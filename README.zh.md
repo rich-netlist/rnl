@@ -56,6 +56,7 @@ M5 tail vbias vss  vss nch W=4u L=1u
 | [`libraries/`](libraries/README.md) | 外部数据库：标准包及其符号，以及中文代称包。 |
 | [`tests/`](tests/README.md) | 一致性测试语料，以及查看器的浏览器测试；往返和集成测试语料是将来的工作。 |
 | [`examples/`](examples/README.md) | 将来的示例文档。 |
+| [`skills/`](skills/README.md) | 给 AI agent 的 skill 包：RNL skill，教 agent 读、写、检查和绘制 RNL 0.3，随网站发布，入口是[给 agent 的页面](https://rich-netlist.github.io/rnl/zh/agents.html)。 |
 | [`scripts/`](scripts/README.md) | 项目维护脚本：生成标准的各种发布形式，以及随核心附带的字体。 |
 | [`.github/workflows/`](.github/workflows/README.md) | CI 工作流：项目网站、标准和桌面版查看器的发布、Rust 工作区、查看器及其浏览器测试。 |
 | [`docs/`](docs/README.md) | 工具链架构提案、路线图和决定记录。 |

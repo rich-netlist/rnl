@@ -69,13 +69,17 @@ HOME = DIRS["en"]
 MOVED = DIRS["zh"]
 
 # Each page and the name of its single-file version; None for a page that has none, such as the
-# gallery of the standard packages, which loads its data from gallery/ (site/gallery/build.mjs).
+# gallery of the standard packages, which loads its data from gallery/ (site/gallery/build.mjs), and the
+# page for agents, whose downloads are written by scripts/skill/build.py.
 PAGES = {
     "index.html": "rnl-intro-standalone.html",
     "language.html": "rnl-language-standalone.html",
     "tools.html": "rnl-tools-standalone.html",
     "packages.html": None,
+    "agents.html": None,
 }
+# Pages added after the Chinese pages moved to zh/ have no old address at the root.
+NEW_PAGES = ("agents.html",)
 
 LANG_TAG = re.compile(r"</?(?:%s)>" % "|".join(CODES))
 # One block per language, in LANGS order, separated only by whitespace; a block holds no language tags.
@@ -272,6 +276,8 @@ def redirects():
     browser's language."""
     out = {"index.html": home()}
     for page, single in PAGES.items():
+        if page in NEW_PAGES:
+            continue
         for name in (page, single):
             if name and name != "index.html":
                 out[name] = redirect(MOVED + name, "zh-CN", "这一页已移到 " + MOVED + name)
