@@ -1,7 +1,7 @@
 // The name beside the pointer while it rests on an instance or a net of the drawing
 // (apps/viewer-ui/hover.js), with View > Show Names on Hover to turn it off. The box is beside the
 // pointer, never under it, takes no clicks, and goes when the pointer leaves what it names. A
-// virtual part, such as a ground or a port, shows its net's name only when the netlist names the
+// virtual part, such as a ground or a port, shows its own name only when the netlist names the
 // part: the ground symbols of 04-hierarchy have no name of their own, the ports of the OTA have.
 // Both platforms, the web viewer's menu bar and the desktop's native menu, have the item.
 
@@ -89,7 +89,7 @@ for (const [platform, query] of Object.entries(PLATFORMS)) {
       await expect(tip(page)).toBeHidden();
     });
 
-    test("a virtual part that the netlist names shows its net", async ({ page, viewer }) => {
+    test("a virtual part that the netlist names shows its name", async ({ page, viewer }) => {
       await viewer.open("03-five-transistor-ota", query);
       // the ports of the OTA are %pi, %pn and %po, on the nets inp, inn and out
       const named = await page.evaluate(() => {
@@ -104,7 +104,7 @@ for (const [platform, query] of Object.entries(PLATFORMS)) {
       });
       const p = await viewer.point(u, v);
       await page.mouse.move(p.x, p.y);
-      await expect(tip(page)).toHaveText("inp");
+      await expect(tip(page)).toHaveText("pi");
     });
 
     test("View > Show Names on Hover is on to begin with, turns it off, and the choice is kept", async ({ page, viewer }) => {

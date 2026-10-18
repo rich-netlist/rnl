@@ -98,15 +98,15 @@ export function objectsOf(hits) {
 
 /**
  * The name a pointer on `hit` shows, or null for none: an instance's, or the names of the nets of a
- * pin or a wire. A symbol that stands for a net, such as a ground or a port, is a virtual part: it
- * shows its net's name when the netlist names the part (`hit.name`), and nothing when it does not. A
- * label shows nothing, being a name already.
+ * pin or a wire. A symbol that stands for a net, such as a ground, a supply, a junction or a port, is
+ * a virtual part: it shows its own name when the netlist gives it one (`hit.name`, `gnd1` for
+ * `%gnd1`), and nothing when it does not. A label shows nothing, being a name already.
  */
 export function nameOf(doc, hit) {
   if (!hit || hit.kind === "label" || hit.objects.length === 0) return null;
   const objects = hit.objects.map((o) => doc.objects[o]).filter(Boolean);
   if (objects.length === 0) return null;
-  if (hit.kind === "box" && objects[0].kind !== "instance" && !hit.name) return null;
+  if (hit.kind === "box" && objects[0].kind !== "instance") return hit.name ?? null;
   return objects.map((o) => o.name).join(", ");
 }
 
