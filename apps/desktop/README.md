@@ -64,10 +64,10 @@ Both show the licence in [`LICENSE.txt`](LICENSE.txt) and install it next to the
 The installers also install and uninstall silently, for scripts and for deployment. The NSIS installer takes the directory last, after `/D=`, unquoted even with spaces:
 
 ```bat
-RNL-Viewer-0.1.0-windows-x64-setup.exe /S /D=C:\Tools\RNL Viewer
+RNL-Viewer-0.1.1-windows-x64-setup.exe /S /D=C:\Tools\RNL Viewer
 "%LOCALAPPDATA%\RNL Viewer\uninstall.exe" /S
-msiexec /i RNL-Viewer-0.1.0-windows-x64.msi /qn
-msiexec /x RNL-Viewer-0.1.0-windows-x64.msi /qn
+msiexec /i RNL-Viewer-0.1.1-windows-x64.msi /qn
+msiexec /x RNL-Viewer-0.1.1-windows-x64.msi /qn
 ```
 
 ## Releasing
