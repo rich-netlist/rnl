@@ -2097,6 +2097,39 @@
             "rotate": 0.0,
             "size": 1.0,
             "style": {}
+          },
+          {
+            "id": "#rd1::value",
+            "attach": "#rd1",
+            "key": "value",
+            "markup": {
+              "value": "${value}",
+              "source": null
+            },
+            "written": false,
+            "lines": [
+              [
+                {
+                  "kind": "text",
+                  "text": "500",
+                  "style": {
+                    "level": 0,
+                    "bold": false,
+                    "italic": false,
+                    "overline": false
+                  }
+                }
+              ]
+            ],
+            "anchor": [
+              40.95,
+              -15.95
+            ],
+            "halign": "start",
+            "valign": "baseline",
+            "rotate": 0.0,
+            "size": 1.0,
+            "style": {}
           }
         ],
         "shapes": []

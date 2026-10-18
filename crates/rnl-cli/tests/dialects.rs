@@ -167,9 +167,10 @@ fn each_file_of_a_spectre_netlist_drops_by_the_mode_of_its_first_line() {
     assert_eq!(rules(&r, "xsub"), SPECTRE_ONLY);
     assert_ne!(symbol(&r, "xsub", "#I2"), "$ISRC");
     // a `simulator lang=spice` in the middle of the main file does not change its dialect: the
-    // current source written there in SPICE is not drawn by the rules of SPICE
+    // rules of SPICE are dropped, and the current source written there in SPICE is drawn by the
+    // rules of Spectre, through the master that the adapter gives it, `isource`
     assert_eq!(rules(&r, "mid"), SPECTRE_ONLY);
-    assert_ne!(symbol(&r, "mid", "#I3"), "$ISRC");
+    assert_eq!(symbol(&r, "mid", "#I3"), "$ISRC");
 }
 
 #[test]

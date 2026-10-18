@@ -4496,7 +4496,15 @@
             -10.95
           ],
           "lines": [
-            []
+            [
+              {
+                "text": "2*v(a1)",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
           ],
           "halign": "start",
           "valign": "baseline",
@@ -5064,7 +5072,15 @@
             -30.95
           ],
           "lines": [
-            []
+            [
+              {
+                "text": "1k",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
           ],
           "halign": "start",
           "valign": "baseline",

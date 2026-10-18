@@ -2619,7 +2619,15 @@
             -15.95
           ],
           "lines": [
-            []
+            [
+              {
+                "text": "500",
+                "level": 0,
+                "bold": false,
+                "italic": false,
+                "overline": false
+              }
+            ]
           ],
           "halign": "start",
           "valign": "baseline",

@@ -31,6 +31,7 @@
   # @SELECT-INSTANCE(model="switch") => @SET-SYMBOL $SWITCH;
   # @SELECT-INSTANCE(model="port") => @SET-SYMBOL $RF_PORT;
   # @SELECT-INSTANCE(model="transformer") => @SET-SYMBOL $TRANSFORMER;
+  # @SELECT-INSTANCE(model="tline") => @SET-SYMBOL $TRANSMISSION_LINE;
 
   /* the model type of the model card an instance names, in SPICE's words (the adapter's family()) */
   # @SELECT-INSTANCE(type="d") => @SET-SYMBOL $DIODE;
@@ -41,8 +42,10 @@
   # @SELECT-INSTANCE(type="nmos") => @SET-SYMBOL $NMOS_4TERM;
   # @SELECT-INSTANCE(type="npn") => @SET-SYMBOL $NPN;
   # @SELECT-INSTANCE(type="njf") => @SET-SYMBOL $NJFET;
+  # @SELECT-INSTANCE(type="nmf") => @SET-SYMBOL $NJFET;
   /* narrow: the model type picks the P variants */
   # @SELECT-INSTANCE(type="pmos") => @SET-SYMBOL $PMOS_4TERM;
   # @SELECT-INSTANCE(type="pnp") => @SET-SYMBOL $PNP;
-  # @SELECT-INSTANCE(type="pjf") => @SET-SYMBOL $PJFET
+  # @SELECT-INSTANCE(type="pjf") => @SET-SYMBOL $PJFET;
+  # @SELECT-INSTANCE(type="pmf") => @SET-SYMBOL $PJFET
 }
