@@ -285,8 +285,10 @@ The rules of `rnl-std-spice` and `rnl-std-spectre` give an instance its symbol; 
 | `type="nmf"` | `$NJFET` |
 | `type="pmos"` | `$PMOS_4TERM` |
 | `type="pnp"` | `$PNP` |
+| `type="lpnp"` | `$PNP` |
 | `type="pjf"` | `$PJFET` |
 | `type="pmf"` | `$PJFET` |
+| `type="tline"` | `$TRANSMISSION_LINE` |
 
 ### rnl-std-spectre: Spectre, by master (primitives), then by the type of the model card
 
