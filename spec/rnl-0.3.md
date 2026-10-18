@@ -190,6 +190,7 @@ Annex A lists the signatures of the keywords; it is generated from the word list
 ```spice
 * Five-transistor OTA, input stage
 * @RNL(type="header") { @VERSION("0.3")}
+.model nch nmos level=1
 .subckt ota5t inp inn out vdd vss vbias
 M1 x    inp   tail vss nch W=2u L=0.5u
 M2 out  inn   tail vss nch W=2u L=0.5u
@@ -1068,6 +1069,7 @@ $GROUND @ATTACH &vss;
 
 ```spice fragment
 * @RNL(type="header") { @VERSION("0.3")}
+.model nch nmos level=1
 .subckt amp in out vdd vss
 M1 out in vss vss nch
 R1 vdd out 10k
@@ -3385,3 +3387,5 @@ Version 0.3 lets the solver write back every decision it makes, so that a viewer
 **Removed.** `$INPUT_STAGE`: its tail goes into the role `tail` of its differential pair, as in `#M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR`. `$TAIL_CENTER`: the standard package centres the tail of each differential pair itself; to centre other objects, a file writes a definition of its own, such as `$TAIL_MID` of 9.4. `rnl-std-semantics` and `rnl-std-layout`: they are one package, `rnl-std-structures` (16.3); a file that dropped `rnl-std-layout` to do without the default layouts writes, for each definition, a rule such as `# @SELECT-USAGE $MIRRORED => @PRIORITY("disabled")` (14.8).
 
 **New.** `rnl-std-basic` and `rnl-std-semiconductors` add symbols, such as switches, current-controlled sources, transmission lines and JFETs. The series also adds packages that `rnl-std` does not bring in: `rnl-std-functional`, `rnl-std-rf`, `rnl-std-logic` and `rnl-std-signal-flow`, the collection `rnl-std-full` of these with `rnl-std`, and the optional `rnl-std-no-labels` (16.3). A name that a file defines itself and that the series 0.3 adds, such as `$SWITCH`, hides the standard one with a hint (6.8), so the file keeps its own.
+
+**Revision 2.** An editorial revision; the language does not change. The examples of 1.3 and 5.9 write the model card of their transistors, `.model nch nmos level=1`, so that the standard package can tell their polarity and give them a symbol.
