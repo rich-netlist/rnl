@@ -411,6 +411,10 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
   stroke-dasharray: 5 3;
   vector-effect: non-scaling-stroke;
 }
+.canvas svg .overlay rect.label {
+  fill: var(--select-fill);
+  stroke: none;
+}
 .canvas svg .overlay circle {
   fill: var(--select);
   stroke: #ffffff;
@@ -1018,3 +1022,54 @@ body.dropping::after {
   border-radius: 8px;
   pointer-events: none;
 }
+
+/* the name beside the pointer on an instance or a net, and the list of the objects under a click:
+   both are over everything, and the name takes no clicks, so that it never hides what it names */
+.hover-tip {
+  position: fixed;
+  z-index: 30;
+  max-width: 320px;
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hover-tip[hidden], .pick-list[hidden] { display: none; }
+.pick-list {
+  position: fixed;
+  z-index: 31;
+  min-width: 140px;
+  max-width: 320px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+.pick-list:focus { outline: none; }
+.pick-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 12px;
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+.pick-row .kind { flex: none; min-width: 5.2em; font-size: 11px; color: var(--muted); }
+.pick-row .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-row[aria-selected="true"] { background: var(--select-text); box-shadow: inset 3px 0 0 var(--select); }

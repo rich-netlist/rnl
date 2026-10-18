@@ -9,7 +9,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { root, UNCALLED } from "../fixtures.js";
+import { PICK, root, UNCALLED } from "../fixtures.js";
 
 // Playwright builds and serves the site when the run can include these tests (playwright.config.js)
 test.skip(!process.env.RNL_WEB_URL, "the site is not built: RNL_WEB=0");
@@ -479,6 +479,53 @@ test("the Not drawn list asks the core for the drawings of its rows, which the D
   // each is drawn with its own symbol and the nets at its pins
   const nets = rows.filter({ has: page.locator(".name", { hasText: /^M1$/ }) }).locator(".thumb svg text");
   expect((await nets.allTextContents()).sort()).toEqual(["0", "d", "g", "s"]);
+});
+
+test("the core's labels are clicked and marked, the pointer shows names, and a click on two objects lists them", async ({ page }) => {
+  await start(page);
+  await page.evaluate((t) => {
+    navigator.clipboard.readText = async () => t;
+  }, PICK.concat("").join("\n"));
+  const doc = await opened(page, async () => {
+    await page.locator("#menubar .menu-title", { hasText: "File" }).click();
+    await page.locator('#menubar .menu-item[data-id="load-clipboard"]').click();
+    await page.locator("dialog.dialog").getByRole("button", { name: "Load" }).click();
+  });
+  const labels = doc.levels[0].hits.filter((h) => h.kind === "label");
+  expect(labels.map((h) => h.id).sort()).toEqual(["#C1::name", "#C1::value", "#R1::name", "#R1::value", "#R2::name", "#R2::value", "a text"]);
+  expect(labels.filter((h) => h.objects.length === 0).map((h) => h.id)).toEqual(["a text"]);
+  /** The page point of a point of the drawing, in its pixels. */
+  const point = ([u, v]) =>
+    page.evaluate(
+      ([u, v]) => {
+        const canvas = document.getElementById("canvas");
+        const [x, y, w] = document.querySelector("#canvas > svg").getAttribute("viewBox").split(" ").map(Number);
+        const r = canvas.getBoundingClientRect();
+        const k = canvas.clientWidth / w;
+        return { x: r.left + (u - x) * k, y: r.top + (v - y) * k };
+      },
+      [u, v],
+    );
+  const middle = (h) => [(h.points[0][0] + h.points[1][0]) / 2, (h.points[0][1] + h.points[1][1]) / 2];
+  const selected = () => page.evaluate(() => (window.viewer.selected === null ? null : window.viewer.doc.objects[window.viewer.selected].name));
+  // a click on C1's value selects C1, and its two labels are marked
+  const value = await point(middle(labels.find((h) => h.id === "#C1::value")));
+  await page.mouse.click(value.x, value.y);
+  await expect.poll(selected).toBe("C1");
+  await expect(page.locator("#canvas svg .overlay rect.label")).toHaveCount(2);
+  // the pointer at rest on C1's symbol shows its name
+  const c1 = await point(middle(doc.levels[0].hits.find((h) => h.kind === "box" && h.objects.some((o) => doc.objects[o].name === "C1"))));
+  await page.mouse.move(c1.x, c1.y);
+  await expect(page.locator("#hover-tip")).toHaveText("C1");
+  // a click where R1's box and R2's overlap lists both
+  const box = (name) => doc.levels[0].hits.find((h) => h.kind === "box" && h.objects.some((o) => doc.objects[o].name === name)).points;
+  const [[a0, b0], [a1, b1]] = [box("R1"), box("R2")];
+  const both = await point([(Math.max(a0[0], a1[0]) + Math.min(b0[0], b1[0])) / 2, (Math.max(a0[1], a1[1]) + Math.min(b0[1], b1[1])) / 2]);
+  await page.mouse.click(both.x, both.y);
+  await expect(page.locator("#pick-list .pick-row")).toHaveText(["instanceR1", "instanceR2"]);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect.poll(selected).toBe("R2");
 });
 
 test("the text edited and applied is built by the core as rnl view builds the same files, and Save downloads the file shown", async ({ page }) => {

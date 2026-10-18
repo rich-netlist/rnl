@@ -1,11 +1,16 @@
 // The drawing: one level at a time, as the SVG the core drew. The view moves by changing the SVG's
-// viewBox; a click selects what it hits, found from the boxes, pins and wires of the level; the
-// selection is marked over the drawing, and a selected subcircuit instance gets the open badge. The
-// grid under it follows the view, and the status bar shows where the pointer is in the scene.
+// viewBox; a click selects what it hits, found from the boxes, pins, wires and labels of the level
+// (hits.js), or lists what it hits for the user to choose (picker.js); the pointer resting on an
+// instance or a net shows its name (hover.js). The selection is marked over the drawing, with the
+// labels attached to it, and a selected subcircuit instance gets the open badge. The grid under it
+// follows the view, and the status bar shows where the pointer is in the scene.
 
 import { current, doc, selected, setCurrent, setPath } from "./state.js";
 import { paintGrid } from "./grid.js";
 import { updateHierarchy } from "./hierarchy.js";
+import { boxAt, hitsAt, nameOf, objectsOf } from "./hits.js";
+import { hideTip, hoverNamesOn, showTip } from "./hover.js";
+import { closePicker, openPicker } from "./picker.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens, updatePath } from "./subcircuits.js";
 import { markUnplaced, scopeSource } from "./text.js";
@@ -18,7 +23,6 @@ const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 50;
 const FIT_MARGIN = 24; // pixels around the drawing when it is fitted
 const CLICK_SLOP = 4; // pixels a press may move and still be a click
-const HIT_SLOP = 6; // pixels around a pin or a wire that still hit it
 let svg = null; // the <svg> element of the level drawn
 let overlay = null; // the selection marks drawn over it
 let groups = new Map(); // data-id -> the SVG groups that draw it
@@ -45,6 +49,8 @@ export function showLevel(i, keptView) {
   svg = null;
   overlay = null;
   groups = new Map();
+  closePicker();
+  hideTip();
   updateHierarchy();
   updatePath();
   scopeSource(i);
@@ -111,6 +117,8 @@ export function notice(text) {
 
 export function clearDrawing(message) {
   notice("");
+  closePicker();
+  hideTip();
   if (svg) svg.remove();
   svg = null;
   overlay = null;
@@ -195,6 +203,7 @@ canvas.addEventListener(
   (e) => {
     e.preventDefault();
     if (!view) return;
+    hideTip();
     const p = canvasPoint(e);
     const r = canvas.getBoundingClientRect();
     const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * r.height : e.deltaY;
@@ -206,6 +215,7 @@ canvas.addEventListener(
 canvas.addEventListener("pointerdown", (e) => {
   if (!view || (e.button !== 0 && e.button !== 1)) return;
   e.preventDefault();
+  hideTip();
   canvas.focus({ preventScroll: true }); // so that Enter and Backspace act on the drawing
   canvas.setPointerCapture(e.pointerId);
   press = { id: e.pointerId, button: e.button, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, drag: false };
@@ -215,7 +225,7 @@ canvas.addEventListener("pointermove", (e) => {
   pointer = canvasPoint(e);
   showPointer();
   if (!press || e.pointerId !== press.id) {
-    if (!press && view) canvas.classList.toggle("over-object", hitAt(canvasPoint(e)) !== null);
+    if (!press && view) pointOut(e);
     return;
   }
   if (!press.drag && Math.hypot(e.clientX - press.x0, e.clientY - press.y0) > CLICK_SLOP) {
@@ -235,15 +245,32 @@ function endPress(e, cancelled) {
   press = null;
   canvas.classList.remove("dragging");
   if (!click) return;
-  const hit = hitAt(canvasPoint(e));
-  if (hit) select(hit.objects[0], "drawing");
-  else clearSelection();
+  const { hits, blocked } = hitsAt(doc && doc.levels[current], view, canvasPoint(e));
+  const objects = objectsOf(hits);
+  if (objects.length > 1) {
+    hideTip();
+    openPicker(objects, e.clientX, e.clientY, (o) => select(o, "drawing"));
+  } else if (objects.length === 1) select(objects[0], "drawing");
+  else if (!blocked) clearSelection();
+}
+
+/**
+ * The pointer moved over the drawing with no button down: the cursor says whether a click selects
+ * something, and, if names are shown on hover, the box beside the pointer names what it rests on.
+ */
+function pointOut(e) {
+  const { hits } = hitsAt(doc && doc.levels[current], view, canvasPoint(e));
+  canvas.classList.toggle("over-object", hits.length > 0);
+  const name = hoverNamesOn() ? nameOf(doc, hits[0]) : null;
+  if (name === null) hideTip();
+  else showTip(name, e.clientX, e.clientY);
 }
 canvas.addEventListener("pointerup", (e) => endPress(e, false));
 canvas.addEventListener("pointercancel", (e) => endPress(e, true));
 canvas.addEventListener("pointerleave", () => {
   pointer = null;
   showPointer();
+  hideTip();
 });
 // no autoscroll on the middle button, no page menu on the drawing
 canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
@@ -251,7 +278,7 @@ canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 // a double click opens a subcircuit instance, and fits the drawing anywhere else
 canvas.addEventListener("dblclick", (e) => {
   if (e.target.closest("#enter-badge")) return;
-  const box = boxAt(canvasPoint(e));
+  const box = boxAt(doc && doc.levels[current], view, canvasPoint(e));
   const o = box ? box.objects.find((k) => opens(k) !== null) : undefined;
   if (o !== undefined) descend(o);
   else fit();
@@ -265,69 +292,7 @@ new ResizeObserver(() => {
   apply();
 }).observe(canvas);
 
-// ------------------------------------------------------------------ what a click on the drawing hits
-
-/**
- * The hit under a canvas point that stands for some object: a pin first, then a wire, then the
- * smallest symbol box around the point. Null when there is none.
- */
-function hitAt(p) {
-  if (!view || !doc || !doc.levels[current]) return null;
-  const u = view.x + p.x / view.k;
-  const v = view.y + p.y / view.k;
-  const slop = HIT_SLOP / view.k;
-  const hits = doc.levels[current].hits.filter((h) => h.objects.length > 0);
-  let best = null;
-  let bestD = Infinity;
-  for (const h of hits) {
-    if (h.kind !== "pin") continue;
-    const d = Math.hypot(u - h.points[0][0], v - h.points[0][1]);
-    if (d <= slop && d < bestD) [best, bestD] = [h, d];
-  }
-  if (best) return best;
-  for (const h of hits) {
-    if (h.kind !== "wire") continue;
-    for (let k = 1; k < h.points.length; k++) {
-      const d = segmentDistance(u, v, h.points[k - 1], h.points[k]);
-      if (d <= slop && d < bestD) [best, bestD] = [h, d];
-    }
-  }
-  if (best) return best;
-  let bestArea = Infinity;
-  for (const h of hits) {
-    if (h.kind !== "box") continue;
-    const [[x0, y0], [x1, y1]] = h.points;
-    if (u < x0 - slop || u > x1 + slop || v < y0 - slop || v > y1 + slop) continue;
-    const area = (x1 - x0) * (y1 - y0);
-    if (area < bestArea) [best, bestArea] = [h, area];
-  }
-  return best;
-}
-
-/** The smallest symbol box around a canvas point, whatever pin or wire is on it; or null. */
-function boxAt(p) {
-  if (!view || !doc || !doc.levels[current]) return null;
-  const u = view.x + p.x / view.k;
-  const v = view.y + p.y / view.k;
-  let best = null;
-  let bestArea = Infinity;
-  for (const h of doc.levels[current].hits) {
-    if (h.kind !== "box" || h.objects.length === 0) continue;
-    const [[x0, y0], [x1, y1]] = h.points;
-    if (u < x0 || u > x1 || v < y0 || v > y1) continue;
-    const area = (x1 - x0) * (y1 - y0);
-    if (area < bestArea) [best, bestArea] = [h, area];
-  }
-  return best;
-}
-
-function segmentDistance(u, v, a, b) {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const len2 = dx * dx + dy * dy;
-  const t = len2 === 0 ? 0 : clamp(((u - a[0]) * dx + (v - a[1]) * dy) / len2, 0, 1);
-  return Math.hypot(u - (a[0] + t * dx), v - (a[1] + t * dy));
-}
+// ------------------------------------------------------------------ the selection
 
 export function paintDrawingSelection() {
   badgeAt = null;
@@ -341,7 +306,12 @@ export function paintDrawingSelection() {
   for (const h of doc.levels[current].hits) {
     if (!h.objects.includes(selected)) continue;
     if (h.id) for (const g of groups.get(h.id) || []) g.classList.add("sel");
-    if (h.kind === "box" && isInstance) {
+    if (h.kind === "label") {
+      // the labels of the selected object are marked too, also those whose group is not theirs alone
+      const [[x0, y0], [x1, y1]] = h.points;
+      const r = svgElement("rect", { x: x0 - 1.5, y: y0 - 1.5, width: x1 - x0 + 3, height: y1 - y0 + 3, class: "label" });
+      overlay.append(r);
+    } else if (h.kind === "box" && isInstance) {
       const [[x0, y0], [x1, y1]] = h.points;
       if (opens(selected) !== null && !badgeAt) badgeAt = [x1 + pad, y0 - pad];
       const r = svgElement("rect", { x: x0 - pad, y: y0 - pad, width: x1 - x0 + 2 * pad, height: y1 - y0 + 2 * pad });

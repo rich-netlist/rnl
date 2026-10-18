@@ -13,7 +13,7 @@ use rnl_runtime::geom::{Orient, Pt};
 use rnl_runtime::host::{file_name, HostDocument, LevelKind};
 use rnl_runtime::interp::obj::{Lit, WStr};
 use rnl_runtime::markup;
-use rnl_runtime::model::{ItemView, Layer, LevelView, RefTarget, Style, SymbolView, TextView};
+use rnl_runtime::model::{ItemView, Layer, LevelView, RefTarget, Style, SymbolView, TextTarget, TextView};
 use rnl_runtime::source::{dirname, relative_to};
 use rnl_runtime::Interpretation;
 use serde::Serialize;
@@ -240,14 +240,23 @@ pub struct Child {
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Hit {
     /// "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
-    /// "wire": a wire, its vertices.
+    /// "wire": a wire, its vertices; "label": a label of an object, given by its top-left and
+    /// bottom-right corners, which stands for what that object stands for, and for nothing when
+    /// it is not an instance, a bundle, a usage, a wire or a net.
     pub kind: &'static str,
     /// In SVG pixels, y down.
     pub points: Vec<[f64; 2]>,
     /// The objects it stands for: an instance (several for a bundle), or nets.
     pub objects: Vec<usize>,
-    /// The `data-id` of the SVG groups that draw it, and the owner of its primitives.
+    /// The `data-id` of the SVG groups that draw it, and the owner of its primitives. A label
+    /// has one only when no other text of the level has the same.
     pub id: Option<String>,
+    /// The name a netlist gives a usage, such as a ground or a port, for the box of one that has a
+    /// name (`%gnd1`: "gnd1"); a viewer names an instance or a net by `objects`. Absent for the
+    /// others, the usages that are not named among them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub name: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -554,6 +563,8 @@ impl<'a> Index<'a> {
         let prims = rnl_render::primitives(lv, &render);
         let px = |p: Pt| [p.0 * render.scale, -p.1 * render.scale];
         let mut hits = Vec::new();
+        // what each item stands for, for the labels attached to it
+        let mut item_objects: Vec<Vec<usize>> = Vec::with_capacity(lv.items.len());
         for it in &lv.items {
             let sym = &lv.symbols[it.symbol];
             let [x0, y0, x1, y1] = sym.bbox;
@@ -571,18 +582,26 @@ impl<'a> Index<'a> {
                     objects = nets;
                 }
             }
+            item_objects.push(objects.clone());
+            // a usage the level names, such as `%gnd1`, has that name; the others have none
+            let name = (it.kind == "usage")
+                .then(|| it.object_id.strip_prefix('%'))
+                .flatten()
+                .map(|n| n.trim_matches(['\'', '"']).to_string());
             hits.push(Hit {
                 kind: "box",
                 points: vec![px((left, top)), px((right, bottom))],
                 objects,
                 id: Some(it.id.clone()),
+                name,
             });
             for (pin, nets) in sym.pins.iter().zip(&it.pin_nets) {
                 if nets.is_empty() {
                     continue;
                 }
                 let objects = nets.iter().map(|n| self.net(lv.level, n)).collect();
-                hits.push(Hit { kind: "pin", points: vec![px(place(it.at, it.orient, pin.pos))], objects, id: None });
+                let points = vec![px(place(it.at, it.orient, pin.pos))];
+                hits.push(Hit { kind: "pin", points, objects, id: None, name: None });
             }
         }
         for w in &lv.wires {
@@ -592,6 +611,34 @@ impl<'a> Index<'a> {
                 points: w.points.iter().map(|p| px(*p)).collect(),
                 objects,
                 id: Some(w.id.clone()),
+                name: None,
+            });
+        }
+        // a label stands for what it is attached to, and for nothing when that cannot be selected:
+        // a click on it is then not a click on whatever is under it. Its group is its own only when
+        // no other text has the same id.
+        let boxes = rnl_render::text_boxes(lv, &render);
+        let mut same_id: HashMap<&str, usize> = HashMap::new();
+        for t in &lv.texts {
+            *same_id.entry(t.id.as_str()).or_default() += 1;
+        }
+        for (t, bbox) in lv.texts.iter().zip(boxes) {
+            let (true, Some([x0, y0, x1, y1])) = (t.attach.is_some(), bbox) else { continue };
+            let objects = match &t.target {
+                Some(TextTarget::Item(i)) => item_objects.get(*i).cloned().unwrap_or_default(),
+                Some(TextTarget::Wire(i)) => {
+                    lv.wires.get(*i).map(|w| w.nets.iter().map(|n| self.net(lv.level, n)).collect()).unwrap_or_default()
+                }
+                Some(TextTarget::Net(n)) => vec![self.net(lv.level, n)],
+                None => Vec::new(),
+            };
+            let alone = same_id[t.id.as_str()] == 1;
+            hits.push(Hit {
+                kind: "label",
+                points: vec![px((x0.min(x1), y0.max(y1))), px((x0.max(x1), y0.min(y1)))],
+                objects,
+                id: alone.then(|| t.id.clone()),
+                name: None,
             });
         }
         Level {
@@ -689,6 +736,7 @@ fn net_labels(it: &ItemView, sym: &SymbolView) -> Vec<TextView> {
             id: format!("net-{k}"),
             object_id: format!("net-{k}"),
             attach: None,
+            target: None,
             key: None,
             markup: text.clone(),
             written: false,
@@ -931,6 +979,77 @@ M1 d g s 0 nmos
         assert!(drawings.unplaced(0, &[99], &[]).is_err());
         assert!(drawings.unplaced(7, &[0], &[]).is_err());
         assert!(drawings.unplaced(0, &[0, 1], &["R2".to_string()]).is_err());
+    }
+
+    #[test]
+    fn a_label_stands_for_what_it_is_attached_to() {
+        let text = "* labels
+R1 a b 1k
+C1 b 0 1p
+* @RNL(type=\"header\") { @VERSION(\"0.2\")}
+* @RNL {
+*   #R1 @PLACE(0, 0);
+*   #C1 @PLACE(6, 0);
+*   (-3, 5) @TEXT(\"free\");
+*   #R1:1 @TEXT(\"pin\", dy=1)
+* }
+.end
+";
+        let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", text);
+        let d = crate::build("a.sp", &files, &BuildOptions::default()).unwrap();
+        let level = &d.levels[0];
+        let labels: Vec<&Hit> = level.hits.iter().filter(|h| h.kind == "label").collect();
+        let names = |h: &Hit| h.objects.iter().map(|o| d.objects[*o].name.as_str()).collect::<Vec<_>>();
+        // the name and value of each instance stand for it; the text at a point is no label
+        let of = |name: &str| labels.iter().filter(|h| names(h) == [name]).count();
+        assert!((of("R1"), of("C1")) == (2, 2) || (of("R1"), of("C1")) == (2, 1), "{labels:?}");
+        assert!(labels.iter().all(|h| h.points.len() == 2 && h.points[0][0] < h.points[1][0]));
+        assert!(labels.iter().all(|h| h.points[0][1] < h.points[1][1]));
+        // a label of something that cannot be selected stands for nothing, and is still a hit
+        let nothing: Vec<&&Hit> = labels.iter().filter(|h| h.objects.is_empty()).collect();
+        assert_eq!(nothing.len(), 1, "{labels:?}");
+        // a label's group is in the SVG, and its box is around the text
+        let svg = level.svg.as_deref().unwrap();
+        for h in labels.iter().filter(|h| !h.objects.is_empty()) {
+            let id = h.id.as_deref().unwrap();
+            assert!(svg.contains(&format!("data-id=\"{id}\"")), "{id}");
+        }
+        // none of it changes the other hits
+        assert_eq!(level.hits.iter().filter(|h| h.kind == "box").count(), 2);
+    }
+
+    #[test]
+    fn labels_of_equal_ids_have_no_group_of_their_own() {
+        // the supply symbols of the corpus: four unnamed usages, whose labels are all `%s::name`
+        let d = load(&case("03-five-transistor-ota.sp")).unwrap();
+        let level = &d.levels[0];
+        let on_vdd = |kind: &str| {
+            let hits = level.hits.iter();
+            hits.filter(|h| {
+                h.kind == kind && !h.objects.is_empty() && h.objects.iter().all(|o| d.objects[*o].name == "vdd")
+            })
+            .collect::<Vec<&Hit>>()
+        };
+        let vdd = on_vdd("label");
+        assert!(vdd.len() >= 3, "{vdd:?}");
+        assert!(vdd.iter().all(|h| h.id.is_none()), "{vdd:?}");
+        // and each stands for the net its symbol is on
+        assert_eq!(vdd.len(), on_vdd("box").len());
+        // the supply symbols have no name of their own, the ports of the netlist have
+        let named: Vec<(&str, Vec<&str>)> = level
+            .hits
+            .iter()
+            .filter_map(|h| {
+                h.name.as_deref().map(|n| (n, h.objects.iter().map(|o| d.objects[*o].name.as_str()).collect()))
+            })
+            .collect();
+        assert!(on_vdd("box").iter().all(|h| h.name.is_none()));
+        assert_eq!(
+            named,
+            [("pi", vec!["inp"]), ("pn", vec!["inn"]), ("po", vec!["out"])],
+            "the ports of the netlist have their names"
+        );
+        assert!(named.iter().all(|(_, nets)| nets.len() == 1), "{named:?}");
     }
 
     #[test]

@@ -25,7 +25,7 @@ test("F5 and Ctrl+R read the document again and keep the level, the view and the
     expect(await viewer.viewBox()).toBe(view);
     await viewer.selected("instance M1 in amp");
     expect(await viewer.markedLines()).toEqual([9]);
-    await expect(page.locator("#canvas > svg .overlay rect")).toHaveCount(1);
+    await expect(page.locator("#canvas > svg .overlay rect:not(.label)")).toHaveCount(1);
   }
   expect(await viewer.calls("build")).toEqual(Array(4).fill(["04-hierarchy"]));
   // the page was not loaded again

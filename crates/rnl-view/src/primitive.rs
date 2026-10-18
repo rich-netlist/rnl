@@ -754,8 +754,13 @@ mod tests {
         for f in corpus() {
             let d = crate::build(&f, &Disk, &options).unwrap();
             for level in &d.levels {
-                let ids: Vec<&str> = level.hits.iter().filter_map(|h| h.id.as_deref()).collect();
+                let ids: Vec<&str> =
+                    level.hits.iter().filter(|h| h.kind != "label").filter_map(|h| h.id.as_deref()).collect();
                 let prims = level.primitives.as_ref().unwrap();
+                // a label that has a group of its own is the owner of text primitives
+                for id in level.hits.iter().filter(|h| h.kind == "label").filter_map(|h| h.id.as_deref()) {
+                    assert!(prims.iter().any(|p| p.owner == id && matches!(p.shape, Shape::Text(_))), "{f}: {id}");
+                }
                 for p in prims {
                     let owner = p.owner.as_str();
                     let numbered =
@@ -767,7 +772,7 @@ mod tests {
                     } else if numbered("item-") || numbered("wire-") {
                         assert!(ids.contains(&owner), "{f}: {owner}");
                     } else {
-                        // any other text has a name of the diagnostics, which no hit has
+                        // any other text has a name of the diagnostics, which no hit but a label's has
                         assert!(text && !ids.contains(&owner), "{f}: {p:?}");
                         named += 1;
                         shared += usize::from(prims.iter().filter(|q| q.owner == owner).count() > 1);

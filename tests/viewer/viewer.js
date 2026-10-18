@@ -146,6 +146,48 @@ class Viewer {
     await this.page.mouse.click(p.x, p.y);
   }
 
+  /**
+   * Where the label with the group id `id`, such as `#R1::name`, of the level shown is drawn, in
+   * page pixels: the middle of its hit.
+   */
+  async labelWhere(id) {
+    const [u, v] = await this.page.evaluate((id) => {
+      const level = window.viewer.doc.levels[window.viewer.level];
+      const hit = level.hits.find((h) => h.kind === "label" && h.id === id);
+      if (!hit) throw new Error(`${level.title} has no label ${id}`);
+      const [a, b] = hit.points;
+      return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    }, id);
+    return this.point(u, v);
+  }
+
+  /**
+   * A page point inside both the boxes of two instances of the level shown, or inside the label
+   * `id` and the box of the instance `name`: where a click is on both.
+   */
+  async overlap(first, second) {
+    const [u, v] = await this.page.evaluate(
+      ([first, second]) => {
+        const doc = window.viewer.doc;
+        const level = doc.levels[window.viewer.level];
+        const find = (what) => {
+          const hit = level.hits.find((h) =>
+            what.startsWith("#") ? h.kind === "label" && h.id === what : h.kind === "box" && h.objects.some((o) => doc.objects[o].name === what),
+          );
+          if (!hit) throw new Error(`${level.title} has no ${what}`);
+          return hit.points;
+        };
+        const [[a0, b0], [a1, b1]] = [find(first), find(second)];
+        const x = [Math.max(a0[0], a1[0]), Math.min(b0[0], b1[0])];
+        const y = [Math.max(a0[1], a1[1]), Math.min(b0[1], b1[1])];
+        if (x[0] >= x[1] || y[0] >= y[1]) throw new Error(`${first} and ${second} do not overlap`);
+        return [(x[0] + x[1]) / 2, (y[0] + y[1]) / 2];
+      },
+      [first, second],
+    );
+    return this.point(u, v);
+  }
+
   /** A point of the drawing's canvas where nothing is drawn, near its top left corner while the level is fitted. */
   async empty() {
     const r = await this.page.locator("#canvas").boundingBox();

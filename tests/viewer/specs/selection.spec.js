@@ -29,7 +29,9 @@ test("clicking a symbol selects its instance and marks its statement and the pla
   await expect(viewer.places(x2).first()).toHaveClass(/\bhl\b/);
   // its symbol, its box and the badge that opens it
   expect(await viewer.selectedGroups()).toEqual(await groupsOf(page, x2));
-  await expect(page.locator("#canvas > svg .overlay rect")).toHaveCount(1);
+  await expect(page.locator("#canvas > svg .overlay rect:not(.label)")).toHaveCount(1);
+  // and the labels attached to it: its name, and the subcircuit it is an instance of
+  await expect(page.locator("#canvas > svg .overlay rect.label")).toHaveCount(2);
   await expect(page.locator("#enter-badge")).toBeVisible();
   await expect(page.locator("#canvas")).toHaveClass(/\bsel-sub\b/);
   await expect(page.locator("#selection")).toHaveText(`X2 instance of amp in ${TOP} · Enter opens it`);
@@ -63,7 +65,7 @@ test("clicking a wire, a pin or a ground selects the net", async ({ page, viewer
     // its pins are marked, and no instance box
     const pins = await page.evaluate((o) => window.viewer.doc.levels[0].hits.filter((h) => h.kind === "pin" && h.objects.includes(o)).length, net);
     await expect(page.locator("#canvas > svg .overlay circle")).toHaveCount(pins);
-    await expect(page.locator("#canvas > svg .overlay rect")).toHaveCount(0);
+    await expect(page.locator("#canvas > svg .overlay rect:not(.label)")).toHaveCount(0);
     await expect(page.locator("#enter-badge")).toBeHidden();
   }
 });

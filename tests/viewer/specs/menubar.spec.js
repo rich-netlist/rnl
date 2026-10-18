@@ -73,7 +73,7 @@ test.describe("on the web", () => {
         letter: "V",
         items: [
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "",
           "Open SubcircuitEnter", "Up to Parent LevelBackspace", "",
           "Netlist PanelCtrl+B", "ProblemsCtrl+Shift+M",
         ],
@@ -428,6 +428,7 @@ test.describe("with a native menu", () => {
     const marks = [
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
+      ["toggle-hover-names", true],
     ];
     expect(await viewer.calls("setCheck")).toEqual(marks);
     await page.keyboard.press("Control+B");

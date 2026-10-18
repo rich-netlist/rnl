@@ -117,7 +117,9 @@ export type Level = {
 export type Hit = {
   /**
    * "box": a symbol, given by its top-left and bottom-right corners; "pin": a pin, one point;
-   * "wire": a wire, its vertices.
+   * "wire": a wire, its vertices; "label": a label of an object, given by its top-left and
+   * bottom-right corners, which stands for what that object stands for, and for nothing when
+   * it is not an instance, a bundle, a usage, a wire or a net.
    */
   kind: string,
   /**
@@ -129,9 +131,16 @@ export type Hit = {
    */
   objects: Array<number>,
   /**
-   * The `data-id` of the SVG groups that draw it, and the owner of its primitives.
+   * The `data-id` of the SVG groups that draw it, and the owner of its primitives. A label
+   * has one only when no other text of the level has the same.
    */
   id: string | null,
+  /**
+   * The name a netlist gives a usage, such as a ground or a port, for the box of one that has a
+   * name (`%gnd1`: "gnd1"); a viewer names an instance or a net by `objects`. Absent for the
+   * others, the usages that are not named among them.
+   */
+  name?: string,
 };
 
 /**

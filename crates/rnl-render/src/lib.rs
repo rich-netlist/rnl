@@ -20,7 +20,7 @@ mod text;
 use rnl_runtime::geom::{Orient, Pt};
 use rnl_runtime::interp::obj::{Lit, PrimParams, Shape};
 use rnl_runtime::markup::{self, Line};
-use rnl_runtime::model::{Layer, LevelView, Style, SymbolView};
+use rnl_runtime::model::{Layer, LevelView, Style, SymbolView, TextView};
 
 pub use svg::svg_document;
 pub use text::{lay_out, Face};
@@ -438,6 +438,22 @@ impl Out {
         }
     }
 
+    /// A text of the level, drawn as `primitives` draws it.
+    fn view_text(&mut self, t: &TextView) {
+        self.text(
+            &t.id,
+            t.anchor,
+            t.lines.clone(),
+            &t.halign,
+            &t.valign,
+            t.rotate,
+            &t.style,
+            t.layer,
+            t.order.clone(),
+            t.orient,
+        );
+    }
+
     /// A text at an anchor (9.2.5, 13.6), laid out with the shipped fonts' metrics: the box sits by
     /// the alignment and turns with `rotate` and the instance's orientation, but the glyphs always
     /// read upright.
@@ -660,6 +676,24 @@ fn arc_segs(a: Pt, b: Pt, c: Pt) -> Vec<PathSeg> {
     vec![PathSeg::Move(a), PathSeg::Arc { r, large: span > std::f64::consts::PI, ccw, to: c }]
 }
 
+/// The bounding box of each text of the level as it is drawn, `x0, y0, x1, y1` in scene units, in
+/// the order of `lv.texts`; None for a text that draws nothing. The primitives of texts that have
+/// the same id are not told apart by their owner; this is how a viewer finds where one text is.
+pub fn text_boxes(lv: &LevelView, o: &RenderOptions) -> Vec<Option<[f64; 4]>> {
+    let mut out = Out { prims: Vec::new(), scale: o.scale };
+    lv.texts
+        .iter()
+        .map(|t| {
+            let from = out.prims.len();
+            out.view_text(t);
+            out.prims[from..]
+                .iter()
+                .map(|p| p.bbox)
+                .reduce(|a, b| [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])])
+        })
+        .collect()
+}
+
 /// The primitives of one level, in drawing order: by layer, then by position (11.6), with their
 /// strokes resolved at the scale of `o`.
 pub fn primitives(lv: &LevelView, o: &RenderOptions) -> Vec<Primitive> {
@@ -685,18 +719,7 @@ pub fn primitives(lv: &LevelView, o: &RenderOptions) -> Vec<Primitive> {
         out.shape("", s.shape, &s.points, &s.params, &s.style, s.layer, s.order.clone());
     }
     for t in &lv.texts {
-        out.text(
-            &t.id,
-            t.anchor,
-            t.lines.clone(),
-            &t.halign,
-            &t.valign,
-            t.rotate,
-            &t.style,
-            t.layer,
-            t.order.clone(),
-            t.orient,
-        );
+        out.view_text(t);
     }
     let mut prims = out.prims;
     prims.sort_by(|a, b| {

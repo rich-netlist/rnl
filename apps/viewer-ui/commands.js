@@ -7,6 +7,7 @@ import { inform } from "./dialog.js";
 import { fit, zoomCenter } from "./drawing.js";
 import { applyChanges, save, saveAs, toggleEdit } from "./editor.js";
 import { gridCommand } from "./grid.js";
+import { hoverNamesOn, setHoverNames } from "./hover.js";
 import { loadClipboard, pickAndOpen, reload } from "./open.js";
 import { setProblems, setSidebar } from "./panels.js";
 import { clearSelection } from "./selection.js";
@@ -54,6 +55,7 @@ export function command(id) {
     case "grid-lines":
     case "grid-axes":
     case "grid-settings": gridCommand(id); break;
+    case "toggle-hover-names": setHoverNames(!hoverNamesOn()); break;
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "descend": descend(selected); break;

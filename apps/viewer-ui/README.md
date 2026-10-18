@@ -21,7 +21,10 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `shells/web.js` | The web shell: files, a folder, a URL or what is dropped, read as the core asks for them, and built by the core in a Worker. |
 | `state.js` | What the page shows: the Document, the level drawn, the selection, the hierarchy path to the level and the views kept by path. Modules read these bindings and change them through setters. |
 | `open.js` | Opening a source through the shell; reading it again keeps the level, the hierarchy path while its instances are there, the view and the selection. File › Load from Clipboard: the clipboard's text, shown with what it is guessed to be, opened as a source that holds it. |
-| `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; what a click hits, from the boxes, pins and wires the Document gives; the selection marks and the open badge; where the pointer is in the scene, in the status bar. |
+| `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; a click and the pointer on it, with `hits.js`, `picker.js` and `hover.js` (see [Clicking and pointing](#clicking-and-pointing)); the selection marks, those of the labels attached to it too, and the open badge; where the pointer is in the scene, in the status bar. |
+| `hits.js` | What a point of the drawing is on: the Document's hits (boxes, pins, wires and labels) under it, in the order a click prefers them, the objects they stand for, and the name the pointer shows. |
+| `picker.js` | The list beside the pointer that a click on several objects opens, to choose from with the mouse or the keys. |
+| `hover.js` | The name beside the pointer while it rests on an instance or a net, and View › Show Names on Hover. |
 | `grid.js` | The grid under the drawing, a view aid of the page on a canvas of its own (see [The grid](#the-grid)), and its settings dialog. |
 | `selection.js` | Selecting an instance or a net. |
 | `subcircuits.js` | The hierarchy path of the level shown and the bar above the drawing that shows it (see [The hierarchy path](#the-hierarchy-path)): going down into a subcircuit instance and back along the path, each level with the view it had on it. |
@@ -98,6 +101,15 @@ An object that has no position, such as an instance that no `PLACE` fixes before
 - **The netlist** greys the lines of the statements of these objects on the level shown, as it dims the text outside the subcircuit drawn: the line's text faded on the grey of `--out-of-scope`, with the title *Not drawn: it has no position yet*. Another level greys its own.
 
 The status bar's line about what the level lacks without a solver says how many are without a position; clicking it shows the view. A solve shown as a preview (`solve.js`) is a Document with the positions the solver found, so the objects it placed are not listed.
+
+## Clicking and pointing
+
+The Document gives each level its `hits` (`rnl-view`): a `box` for each symbol, a `pin` for each pin with its nets, a `wire` for each wire, and a `label` for each text attached to an object, with its bounding box. Each stands for objects, an instance or nets, and none for what cannot be selected. `hits.js` finds what a canvas point is on: a pin or a wire within 6 pixels, a label within 2, the inside of a box, and a box within 6 pixels only where nothing else is. A pin is on its symbol's outline and on its net, so a click on it is on the net, and the boxes it lies on are left out. Of everything under the point, in the order pin, label, wire, box (the nearer or the smaller first, equal ones in the order of the netlist), the first of each hit's objects is what a click selects.
+
+- **A click on one object** selects it, as before. A label stands for what its text is attached to: the instance for its name, its value and the rest, the net for the label of a supply symbol or a wire. A symbol and its labels, a pin and its wire, are one object. A label of something that is not an instance or a net, such as a terminal, stands for nothing: a click on it, with nothing else under it, changes nothing, not even the selection.
+- **A click on several objects** opens a list beside the pointer (`picker.js`), a row for each with its kind and name, the first being what a click would have selected. Up and Down move, Home and End jump, Enter chooses, Escape closes it and leaves the selection as it was; the mouse over a row makes it the one Enter takes, and a click on a row chooses it. A click anywhere else, the wheel, another level or a document read again closes it.
+- **The selection marks the labels attached to it**: a rectangle over each label of the selected object, and its text in the selection colour where the label has an SVG group of its own (the texts of the supply symbols all share one, and have none).
+- **The pointer at rest on an instance or a net** shows its name in a box beside it, not under it (`hover.js`): the instance's name over a symbol, the net's over a pin or a wire. A virtual part, such as a ground, a supply or a port, is a usage of the netlist and stands for the net it is on; it shows that net's name when the netlist names the usage (`Hit.name`), and nothing when it does not, as a ground that the standard package adds. Labels show nothing. A press, the wheel and leaving the drawing take the box away. View › Show Names on Hover turns it off; it is on to begin with, and the choice is kept in `localStorage` as the other settings of the view are.
 
 ## The grid
 

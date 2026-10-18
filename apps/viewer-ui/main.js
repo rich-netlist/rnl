@@ -7,6 +7,7 @@ import { command, isChecked, setCheck, startCommands } from "./commands.js";
 import { closeRequested } from "./editor.js";
 import { dirtyPaths, unappliedPaths } from "./edits.js";
 import { gridState, setGrid } from "./grid.js";
+import { setHoverNames } from "./hover.js";
 import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
 import {
@@ -34,6 +35,7 @@ setGrid({
   major: load("grid-major", 5),
   axes: load("grid-axes", false),
 });
+setHoverNames(load("hover-names", true));
 {
   const li = document.createElement("li");
   li.className = "nothing";

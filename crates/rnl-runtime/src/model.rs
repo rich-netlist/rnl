@@ -112,6 +112,9 @@ pub enum SymbolOrigin {
 #[derive(Clone, Debug)]
 pub struct ItemView {
     pub id: String,
+    /// Its id in the editor interface: [`ObjectInfo::id`], `#M1` for an instance, `%gnd1` for a usage
+    /// the level names, else where the statement is. Empty for an item that is not drawn on a level.
+    pub object_id: String,
     pub kind: &'static str,
     pub symbol: usize,
     pub at: Pt,
@@ -186,6 +189,17 @@ pub struct ShapeView {
     pub order: Vec<f64>,
 }
 
+/// What a text is attached to, as the level draws it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TextTarget {
+    /// The item at this index of `LevelView::items`: an instance, a bundle or a usage.
+    Item(usize),
+    /// The wire at this index of `LevelView::wires`; the first run of one drawn in several.
+    Wire(usize),
+    /// The net of this displayed name.
+    Net(String),
+}
+
 #[derive(Clone, Debug)]
 pub struct TextView {
     pub id: String,
@@ -193,6 +207,10 @@ pub struct TextView {
     pub object_id: String,
     /// The id of the object it is attached to; None for a text at a point.
     pub attach: Option<String>,
+    /// What a click on it stands for in the drawing: where the object it is attached to is drawn,
+    /// or its net. None for a text at a point, and for one attached to an object that is not drawn
+    /// as an item or a wire (a terminal, a point).
+    pub target: Option<TextTarget>,
     /// The key of a label, such as "name".
     pub key: Option<String>,
     /// The text as written, before `${…}` is read (13.6).

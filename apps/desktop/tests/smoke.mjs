@@ -171,6 +171,10 @@ async function connect(port) {
 }
 
 /** Click a page point, in CSS pixels, with the left button. */
+async function hover(page, { x, y }) {
+  await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, button: "none", buttons: 0 });
+}
+
 async function click(page, { x, y }) {
   await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, button: "none", buttons: 0 });
   await page.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", buttons: 1, clickCount: 1 });
@@ -206,6 +210,20 @@ function symbol(page, name) {
   return page.evaluate(`(() => {
     const v = window.viewer;
     const hit = v.doc.levels[v.level].hits.find((h) => h.kind === "box" && h.objects.some((o) => v.doc.objects[o].name === ${JSON.stringify(name)}));
+    const [[x0, y0], [x1, y1]] = hit.points;
+    const canvas = document.getElementById("canvas");
+    const [x, y, w] = document.querySelector("#canvas > svg").getAttribute("viewBox").split(" ").map(Number);
+    const r = canvas.getBoundingClientRect();
+    const k = canvas.clientWidth / w;
+    return { x: r.left + ((x0 + x1) / 2 - x) * k, y: r.top + ((y0 + y1) / 2 - y) * k };
+  })()`);
+}
+
+/** The page point in the middle of the label with the group id `id`, such as `#X3::name`, on the level shown. */
+function labelPoint(page, id) {
+  return page.evaluate(`(() => {
+    const v = window.viewer;
+    const hit = v.doc.levels[v.level].hits.find((h) => h.kind === "label" && h.id === ${JSON.stringify(id)});
     const [[x0, y0], [x1, y1]] = hit.points;
     const canvas = document.getElementById("canvas");
     const [x, y, w] = document.querySelector("#canvas > svg").getAttribute("viewBox").split(" ").map(Number);
@@ -369,6 +387,11 @@ async function drive(app, port, profile, t0, session) {
   same(back.selected, "instance X2", "the selection after going back up");
   console.log("selected X2, opened amp and came back");
 
+  // a click on an instance's label selects the instance, which the native Document gives the label's hit for
+  await click(page, await labelPoint(page, "#X3::name"));
+  await until("X3 to be selected by its label", async () => (await shown(page)).selected === "instance X3", 10_000);
+  console.log("a click on X3's label selected X3");
+
   // the native menu: the command table's items, with the page's check marks
   const ids = commands(table.menus.flatMap((m) => m.items)).filter((c) => c.check).map((c) => c.id);
   const marks = await page.evaluate(`Object.fromEntries(${JSON.stringify(ids)}.map((id) => [id, window.viewer.checked(id)]))`);
@@ -400,6 +423,25 @@ async function drive(app, port, profile, t0, session) {
   await until("the marks of Lines and Axes", () => checked("grid-lines") && checked("grid-axes"), 10_000);
   same((await grid()).style, "lines", "the grid's style");
   console.log("the native menu has the command table's items, its submenus too, and follows the page");
+
+  // the pointer at rest on an instance shows its name beside it; View > Show Names on Hover, on to
+  // begin with, takes it away, and brings it back
+  const tipText = () => page.evaluate(`(() => { const t = document.getElementById("hover-tip"); return t.hidden ? null : t.textContent; })()`);
+  await hover(page, await symbol(page, "X3"));
+  await until("X3's name beside the pointer", async () => (await tipText()) === "X3", 10_000);
+  chooseItem(app.pid, at("toggle-hover-names"));
+  await until("Show Names on Hover's check mark to clear", () => !checked("toggle-hover-names"), 10_000);
+  await until("the name to go", async () => (await tipText()) === null, 10_000);
+  const x2 = await symbol(page, "X2");
+  await hover(page, x2);
+  await hover(page, { x: x2.x + 3, y: x2.y + 3 });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  same(await tipText(), null, "the name beside the pointer with Show Names on Hover off");
+  chooseItem(app.pid, at("toggle-hover-names"));
+  await until("Show Names on Hover's check mark", () => checked("toggle-hover-names"), 10_000);
+  await hover(page, x2);
+  await until("X2's name beside the pointer", async () => (await tipText()) === "X2", 10_000);
+  console.log("the pointer at rest showed X3's and X2's names, and View > Show Names on Hover took them away and brought them back");
 
   // Help > Check for Updates: the app's version, from Tauri; the page asks GitHub's API, which the
   // content security policy lets it reach, for the releases, answered here with a newer one, and

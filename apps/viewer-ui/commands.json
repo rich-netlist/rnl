@@ -42,6 +42,7 @@
             { "id": "grid-settings", "label": "Grid &Settings..." }
           ]
         },
+        { "id": "toggle-hover-names", "label": "Show &Names on Hover", "check": true },
         "-",
         { "id": "descend", "label": "Open &Subcircuit", "keys": ["Enter"], "page": true },
         { "id": "ascend", "label": "&Up to Parent Level", "keys": ["Backspace"], "page": true },
