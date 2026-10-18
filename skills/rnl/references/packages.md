@@ -309,6 +309,7 @@ The rules of `rnl-std-spice` and `rnl-std-spectre` give an instance its symbol; 
 | `model="switch"` | `$SWITCH` |
 | `model="port"` | `$RF_PORT` |
 | `model="transformer"` | `$TRANSFORMER` |
+| `model="tline"` | `$TRANSMISSION_LINE` |
 | `type="d"` | `$DIODE` |
 | `type="r"` | `$RESISTOR` |
 | `type="c"` | `$CAPACITOR` |
@@ -317,9 +318,11 @@ The rules of `rnl-std-spice` and `rnl-std-spectre` give an instance its symbol; 
 | `type="nmos"` | `$NMOS_4TERM` |
 | `type="npn"` | `$NPN` |
 | `type="njf"` | `$NJFET` |
+| `type="nmf"` | `$NJFET` |
 | `type="pmos"` | `$PMOS_4TERM` |
 | `type="pnp"` | `$PNP` |
 | `type="pjf"` | `$PJFET` |
+| `type="pmf"` | `$PJFET` |
 
 ## Sets
 
