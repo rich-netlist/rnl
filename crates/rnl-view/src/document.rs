@@ -90,8 +90,10 @@ pub struct Level {
     pub hits: Vec<Hit>,
     /// The subcircuit instances of the level, in netlist order: the hierarchy below it.
     pub children: Vec<Child>,
-    /// The objects of the level that have no position and so are not drawn on it, each with its
-    /// symbol drawn alone, in the order of the netlist. Their number is the one `status` gives.
+    /// The objects of the level that are not drawn on it: those that have no position, each with
+    /// its symbol drawn alone, in the order of the netlist (their number is the one `status`
+    /// gives), then those that are not drawn at all, since no symbol can be chosen for them, each
+    /// with its `reason` and no symbol.
     pub unplaced: Vec<Unplaced>,
 }
 
@@ -106,8 +108,14 @@ pub struct Unplaced {
     /// An instance's name; for a bundle or a usage, the label the diagnostics give it, such as
     /// "a usage of $GND".
     pub name: String,
-    /// The name of the symbol it is drawn with.
+    /// The name of the symbol it is drawn with; empty for an object that has none (see `reason`).
     pub symbol: String,
+    /// Why it is not drawn at all, whatever its position, such as `model card not found` for a
+    /// transistor whose model the netlist does not define; absent for an object that only lacks a
+    /// position, which a solver can place. Such an object has no symbol and no drawing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub reason: Option<String>,
     /// The instances it stands for, indexes into `Document::objects`: one for an instance, its
     /// members for a bundle, none for a usage. A viewer shows the first one's statement.
     pub objects: Vec<usize>,
@@ -636,9 +644,26 @@ impl<'a> Index<'a> {
                 kind: it.kind,
                 name: name.unwrap_or_else(|| it.id.clone()),
                 symbol: sym.name.clone(),
+                reason: None,
                 objects: it.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect(),
                 svg: drawn.as_ref().and_then(|d| d.svg.clone()),
                 primitives: drawn.and_then(|d| d.primitives),
+            });
+        }
+        // the devices that are not drawn at all: listed after, with the reason and no drawing
+        for u in &lv.undrawn {
+            let name = match u.host.as_slice() {
+                [i] => self.doc.levels[lv.level].instances.get(*i).map(|inst| inst.name.clone()),
+                _ => None,
+            };
+            out.push(Unplaced {
+                kind: if u.host.len() == 1 { "instance" } else { "bundle" },
+                name: name.unwrap_or_else(|| u.id.clone()),
+                symbol: String::new(),
+                reason: Some(u.reason.clone()),
+                objects: u.host.iter().filter_map(|i| self.insts.get(&(lv.level, *i)).copied()).collect(),
+                svg: None,
+                primitives: None,
             });
         }
         out
@@ -855,6 +880,7 @@ mod tests {
         let text = "* two of three are left to a solver
 R1 a b 1k
 C1 b 0 1p
+.model nmos nmos
 M1 d g s 0 nmos
 * @RNL { #R1 @PLACE(0, 0) }
 .end
@@ -897,7 +923,7 @@ M1 d g s 0 nmos
 
     #[test]
     fn the_drawings_of_the_unplaced_can_be_asked_for_instead_of_carried() {
-        let text = "* some left\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\nR2 a d 2k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+        let text = "* some left\n.model nmos nmos\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\nR2 a d 2k\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
         let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", text);
         let options = BuildOptions { primitives: true, ..BuildOptions::default() };
         let carried = crate::build("a.sp", &files, &options).unwrap();
@@ -1111,5 +1137,39 @@ R1 a b 1k
         let (last, tokens) = statement(&lines, 0).unwrap();
         assert_eq!(last, 1);
         assert_eq!(tokens.iter().map(|t| t.text.as_str()).collect::<Vec<_>>(), ["m1", "d", "g", "s", "b", "nch"]);
+    }
+
+    #[test]
+    fn a_device_that_cannot_be_drawn_is_listed_after_the_unplaced_with_its_reason() {
+        let text = "* a transistor without its model card is not drawn
+.model nch nmos
+R1 a b 1k
+M1 d g s b nch
+M2 d g s b pch
+* @RNL { #R1 @PLACE(0, 0) }
+.end
+";
+        let files = rnl_runtime::source::MemoryProvider::new().with("a.sp", text);
+        let d = crate::build("a.sp", &files, &BuildOptions::default()).unwrap();
+        let level = &d.levels[0];
+        let listed: Vec<(&str, &str, Option<&str>)> =
+            level.unplaced.iter().map(|u| (u.name.as_str(), u.symbol.as_str(), u.reason.as_deref())).collect();
+        let names: Vec<&str> = listed.iter().map(|l| l.0).collect();
+        assert_eq!(names.last(), Some(&"M2"), "{listed:?}");
+        assert_eq!(listed.last().unwrap(), &("M2", "", Some("model card not found")));
+        // the others, which a solver can place, have a symbol and no reason
+        assert!(listed[..listed.len() - 1].iter().all(|(_, symbol, reason)| !symbol.is_empty() && reason.is_none()));
+        // it has no drawing, and stands for its instance in the objects
+        let m2 = level.unplaced.last().unwrap();
+        assert!(m2.svg.is_none() && m2.primitives.is_none());
+        assert_eq!((m2.kind, m2.objects.len()), ("instance", 1));
+        assert_eq!(d.objects[m2.objects[0]].name, "M2");
+        // the status counts the objects without a position, not the ones that cannot be drawn
+        assert!(level.status.as_deref().unwrap().starts_with("1 without a position"), "{:?}", level.status);
+        // in the JSON the reason is there for it alone
+        let json = serde_json::to_value(&d).unwrap();
+        let rows = json["levels"][0]["unplaced"].as_array().unwrap();
+        assert_eq!(rows.iter().filter(|u| u.get("reason").is_some()).count(), 1);
+        assert_eq!(rows.last().unwrap()["reason"], "model card not found");
     }
 }

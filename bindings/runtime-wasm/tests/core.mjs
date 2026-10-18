@@ -222,7 +222,7 @@ test("parts ask for a snapshot, through the core and through the Worker", async 
 });
 
 test("the drawings of the objects without a position are kept for a request, through the core and through the Worker", async () => {
-  const text = "* some left\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
+  const text = "* some left\n.model nmos nmos\nR1 a b 1k\nC1 b 0 1p\nM1 d g s 0 nmos\n* @RNL { #R1 @PLACE(0, 0) }\n.end\n";
   const request = { entry: "/w/a.sp", files: { "/w/a.sp": text }, primitives: true };
   const carried = core.build(request);
   const listed = carried.levels[0].unplaced;

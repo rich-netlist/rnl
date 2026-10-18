@@ -47,6 +47,10 @@ pub struct Instance {
     pub is_subckt: bool,
     /// The adapter's default terminal names (its standard DEVICE table, 6.12).
     pub default_terminals: Option<Vec<String>>,
+    /// A device whose model card tells its polarity (M, Q, J and Z of SPICE) and that names a model
+    /// the netlist has no card of, or none: nothing can tell which symbol to draw it with, so unless
+    /// a rule or a statement of the file gives it one, it is not drawn (9.2.6).
+    pub model_missing: bool,
     /// Names compare by case (Spectre) or not (SPICE).
     pub case_sensitive: bool,
 }

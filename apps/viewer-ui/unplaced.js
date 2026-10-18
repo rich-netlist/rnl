@@ -1,6 +1,8 @@
 // The "Not drawn" view of the side panel: the objects of the level shown that have no position, so
-// that nothing draws them until a solver places them. Each is listed with its symbol and the nets at
-// its terminals as the core drew them (`Level.unplaced`), and its name. The list loads a part at a
+// that nothing draws them until a solver places them, and the devices that cannot be drawn at all,
+// since no symbol can be chosen for them, such as a transistor whose model card is not found. Each is
+// listed with its symbol and the nets at its terminals as the core drew them (`Level.unplaced`), and
+// its name; a device that cannot be drawn has its reason, `Unplaced.reason`, in place of the symbol. The list loads a part at a
 // time, the next when it is scrolled to its end, and is searched by name; picking an object selects
 // it and shows its statement in the netlist. The lines of those statements are greyed in the
 // netlist (text.js, `markUnplaced`). The drawings are not all in the Document: a netlist with no
@@ -102,7 +104,7 @@ function fill() {
  */
 function draw(items) {
   const all = unplaced();
-  const wanted = items.filter((i) => !all[i].svg && !drawn.has(all[i]));
+  const wanted = items.filter((i) => !all[i].svg && !all[i].reason && !drawn.has(all[i]));
   if (wanted.length === 0 || !shell || !shell.unplacedDrawings) return;
   const failed = (e) => ({ error: e instanceof Error ? e.message : String(e) });
   let request;
@@ -125,6 +127,7 @@ function row(i, q) {
   el.dataset.name = u.name;
   const located = u.objects.length > 0 && doc.objects[u.objects[0]].lines !== null;
   el.classList.toggle("located", located);
+  el.classList.toggle("undrawn", Boolean(u.reason));
   el.title = located ? "Show in the netlist" : "This object is written in a record, not in a statement";
   el.append(thumbnail(u));
   const name = span("name", "");
@@ -137,7 +140,7 @@ function row(i, q) {
     name.textContent = u.name;
   }
   const info = span("info", "");
-  info.append(name, span("symbol", `${u.kind} · ${u.symbol}`));
+  info.append(name, span("symbol", u.reason ? `${u.kind} · not drawn: ${u.reason}` : `${u.kind} · ${u.symbol}`));
   el.append(info);
   el.addEventListener("click", () => pick(u));
   el.addEventListener("keydown", (e) => {

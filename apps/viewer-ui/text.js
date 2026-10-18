@@ -183,9 +183,9 @@ export function scopeSource(i) {
 }
 
 /**
- * Grey the statements of the objects of level `i` that have no position and so are not drawn, the
- * way the text outside the subcircuit drawn is dimmed; the statements of the level drawn before
- * are no longer greyed.
+ * Grey the statements of the objects of level `i` that are not drawn, those that have no position
+ * and those that cannot be drawn at all, the way the text outside the subcircuit drawn is dimmed;
+ * the statements of the level drawn before are no longer greyed.
  */
 export function markUnplaced(i) {
   for (const el of notDrawn) {
@@ -204,7 +204,7 @@ export function markUnplaced(i) {
         const el = fileViews[f] && fileViews[f].lines[n - 1];
         if (!el) continue;
         el.classList.add("not-drawn");
-        el.title = "Not drawn: it has no position yet";
+        el.title = u.reason ? `Not drawn: ${u.reason}` : "Not drawn: it has no position yet";
         notDrawn.push(el);
       }
     }

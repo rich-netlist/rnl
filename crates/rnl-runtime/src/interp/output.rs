@@ -609,6 +609,26 @@ impl Interp<'_> {
         }
     }
 
+    /// The devices the level does not draw, since no symbol can be chosen for them.
+    fn undrawn_views(&mut self, s: SceneId) -> Vec<UndrawnView> {
+        let mut out = Vec::new();
+        for (o, reason) in self.scenes[s].undrawn.clone() {
+            let host = match self.o(o).clone() {
+                ObjData::Inst { idx, .. } => vec![idx],
+                ObjData::Bundle { members, .. } => members
+                    .iter()
+                    .filter_map(|m| match self.o(*m) {
+                        ObjData::Inst { idx, .. } => Some(*idx),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            };
+            out.push(UndrawnView { id: self.label(o), host, reason });
+        }
+        out
+    }
+
     fn level_view(&mut self, s: SceneId) -> LevelView {
         let lv = self.scenes[s].level;
         let level = self.doc.levels[lv].clone();
@@ -821,6 +841,7 @@ impl Interp<'_> {
             flylines,
             constraints,
             unplaced: self.scenes[s].unplaced.clone(),
+            undrawn: self.undrawn_views(s),
             unplaced_items,
             unplaced_symbols,
             objects,

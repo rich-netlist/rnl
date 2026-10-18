@@ -105,8 +105,10 @@ export type Level = {
    */
   children: Array<Child>,
   /**
-   * The objects of the level that have no position and so are not drawn on it, each with its
-   * symbol drawn alone, in the order of the netlist. Their number is the one `status` gives.
+   * The objects of the level that are not drawn on it: those that have no position, each with
+   * its symbol drawn alone, in the order of the netlist (their number is the one `status`
+   * gives), then those that are not drawn at all, since no symbol can be chosen for them, each
+   * with its `reason` and no symbol.
    */
   unplaced: Array<Unplaced>,
 };
@@ -166,9 +168,15 @@ export type Unplaced = {
    */
   name: string,
   /**
-   * The name of the symbol it is drawn with.
+   * The name of the symbol it is drawn with; empty for an object that has none (see `reason`).
    */
   symbol: string,
+  /**
+   * Why it is not drawn at all, whatever its position, such as `model card not found` for a
+   * transistor whose model the netlist does not define; absent for an object that only lacks a
+   * position, which a solver can place. Such an object has no symbol and no drawing.
+   */
+  reason?: string,
   /**
    * The instances it stands for, indexes into `Document::objects`: one for an instance, its
    * members for a bundle, none for a usage. A viewer shows the first one's statement.

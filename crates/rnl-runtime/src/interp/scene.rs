@@ -157,6 +157,8 @@ pub struct Scene {
     pub style: HashMap<ObjId, BTreeMap<String, (Lit, Pos)>>,
     pub layer: HashMap<ObjId, (String, Pos)>,
     pub unplaced: Vec<String>,
+    /// The devices no symbol can be chosen for, with the reason; they are not drawn.
+    pub undrawn: Vec<(ObjId, String)>,
     pub failed_facts: HashSet<(u8, usize)>,
     /// The symbol facts weighed for some object, and those that won (8.3), by index in `appear`.
     pub symbol_weighed: HashSet<usize>,
@@ -236,6 +238,7 @@ impl Scene {
             style: HashMap::new(),
             layer: HashMap::new(),
             unplaced: Vec::new(),
+            undrawn: Vec::new(),
             failed_facts: HashSet::new(),
             symbol_weighed: HashSet::new(),
             symbol_won: HashSet::new(),

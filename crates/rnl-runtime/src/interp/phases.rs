@@ -270,10 +270,56 @@ impl Interp<'_> {
                 }
                 self.set_symbol(s, o, sym);
             } else if matches!(self.o(o), ObjData::Inst { .. } | ObjData::Bundle { .. }) {
+                if self.inst_of(base).model_missing {
+                    // nothing tells which symbol this device has, and the renderer's own would
+                    // only pretend: it is not drawn (9.2.6), and listed with the reason
+                    let reason = match self.inst_of(base).model {
+                        Some(_) => "model card not found",
+                        None => "no model named",
+                    };
+                    self.scenes[s].undrawn.push((o, reason.to_string()));
+                    continue;
+                }
                 let d = self.default_symbol(s, base);
                 self.set_symbol(s, o, d);
                 self.scenes[s].default_symbol.insert(o);
             }
+        }
+        self.warn_undrawn(s);
+    }
+
+    /// One warning for each model card that devices of the level name and the netlist lacks: they
+    /// are not drawn, since their polarity is not known.
+    fn warn_undrawn(&mut self, s: SceneId) {
+        let mut by_model: Vec<(Option<String>, Vec<ObjId>)> = Vec::new();
+        for (o, _) in self.scenes[s].undrawn.clone() {
+            let base = match self.o(o) {
+                ObjData::Bundle { members, .. } => members[0],
+                _ => o,
+            };
+            let model = self.inst_of(base).model.clone();
+            match by_model.iter_mut().find(|(m, _)| *m == model) {
+                Some((_, v)) => v.push(base),
+                None => by_model.push((model, vec![base])),
+            }
+        }
+        for (model, bases) in by_model {
+            let names: Vec<String> = bases.iter().map(|b| self.inst_of(*b).name.clone()).collect();
+            let first = self.inst_of(bases[0]).clone();
+            let shown: Vec<&String> = names.iter().take(8).collect();
+            let more = if names.len() > 8 { format!(" and {} more", names.len() - 8) } else { String::new() };
+            let list = shown.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", ");
+            let (what, verb) = if names.len() == 1 { ("it", "is") } else { ("they", "are") };
+            let message = match &model {
+                Some(m) => format!(
+                    "the model card `{m}` is not found, so the polarity of {list}{more} is not known and {what} {verb} not drawn (a `.model` card or an include may be missing)"
+                ),
+                None => format!(
+                    "{list}{more} name{} no model, so the polarity is not known and {what} {verb} not drawn",
+                    if names.len() == 1 { "s" } else { "" }
+                ),
+            };
+            self.sink.warning(message, Some(Loc::line(first.file.clone(), first.line.max(1))));
         }
     }
 
@@ -781,8 +827,9 @@ impl Interp<'_> {
         }
         // 6. unplaced drawn objects
         let mut un = Vec::new();
+        let undrawn: Vec<ObjId> = self.scenes[s].undrawn.iter().map(|(o, _)| *o).collect();
         for o in self.inst_like(s) {
-            if self.bundle_empty(o) {
+            if self.bundle_empty(o) || undrawn.contains(&o) {
                 continue;
             }
             if self.xy(s, o).is_none() {

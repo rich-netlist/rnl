@@ -262,15 +262,11 @@ The rules of `rnl-std-spice` and `rnl-std-spectre` give an instance its symbol; 
 | `name="D*"` | `$DIODE` |
 | `name="E*"` | `$VCVS_4TERM` |
 | `name="G*"` | `$VCCS_4TERM` |
-| `name="M*"` | `$NMOS_4TERM` |
-| `name="Q*"` | `$NPN` |
 | `name="F*"` | `$CCCS` |
 | `name="H*"` | `$CCVS` |
 | `name="B*"` | `$BEHAVIORAL_SOURCE` |
 | `name="S*"` | `$VOLTAGE_CONTROLLED_SWITCH` |
 | `name="W*"` | `$SWITCH` |
-| `name="J*"` | `$NJFET` |
-| `name="Z*"` | `$NJFET` |
 | `name="T*"` | `$TRANSMISSION_LINE` |
 | `name="O*"` | `$TRANSMISSION_LINE` |
 | `name="U*"` | `$RC_LINE` |

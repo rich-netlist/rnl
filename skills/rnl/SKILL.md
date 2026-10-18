@@ -9,11 +9,12 @@ compatibility: Reading and writing RNL needs no tools. Checking needs the rnl co
 
 RNL is written in the comments of a SPICE or Spectre netlist. It says how the circuit is drawn as a schematic (which symbols, where things go, how wires run, what the parts mean) while the netlist alone defines the circuit. Simulators ignore the comments, so a netlist with RNL records still simulates as before. This skill covers the language **0.3** (the standard, revision 1) and the standard packages of the **series 0.3**; files of 0.2 use other names and are read with the series 0.2.
 
-A complete file, one of the standard's own examples:
+A complete file, one of the standard's own examples, with the model card that a transistor needs to be drawn (a transistor is drawn by the type of its model card, so one whose card the netlist lacks is not drawn):
 
 ```spice
 * Five-transistor OTA, input stage
 * @RNL(type="header") { @VERSION("0.3")}
+.model nch nmos
 .subckt ota5t inp inn out vdd vss vbias
 M1 x    inp   tail vss nch W=2u L=0.5u
 M2 out  inn   tail vss nch W=2u L=0.5u
