@@ -236,7 +236,7 @@ A file uses `rnl-std` `"0.3"` implicitly: the styles, the symbols of `rnl-std-ba
 
 ### Default symbols and pins
 
-R `$RESISTOR`, C `$CAPACITOR`, L `$INDUCTOR`, V `$VOLTAGE_SOURCE`, I `$CURRENT_SOURCE`, D `$DIODE`, E `$VCVS_4TERM`, G `$VCCS_4TERM`, F `$CCCS`, H `$CCVS`, B `$BEHAVIORAL_SOURCE`, S `$VOLTAGE_CONTROLLED_SWITCH`, W `$SWITCH`, J and Z `$NJFET`, T and O `$TRANSMISSION_LINE`, U `$RC_LINE`. Transistors follow the type of their `.model`: nmos `$NMOS_4TERM`, pmos `$PMOS_4TERM`, npn `$NPN`, pnp `$PNP`, njf `$NJFET`, pjf `$PJFET`; write the `.model` card, or set the symbol, so that the polarity is known.
+R `$RESISTOR`, C `$CAPACITOR`, L `$INDUCTOR`, V `$VOLTAGE_SOURCE`, I `$CURRENT_SOURCE`, D `$DIODE`, E `$VCVS_4TERM`, G `$VCCS_4TERM`, F `$CCCS`, H `$CCVS`, B `$BEHAVIORAL_SOURCE`, S `$VOLTAGE_CONTROLLED_SWITCH`, W `$SWITCH`, J and Z `$NJFET`, T and O `$TRANSMISSION_LINE`, U `$RC_LINE`. Transistors follow the type of their `.model`: nmos `$NMOS_4TERM`, pmos `$PMOS_4TERM`, npn `$NPN`, pnp `$PNP`, njf `$NJFET`, pjf `$PJFET`; a transistor whose `.model` card is not found gets no symbol and is not drawn, so write the card, or set the symbol yourself.
 
 | Symbols | Pins at R0 |
 |---|---|
@@ -316,6 +316,7 @@ R2 b 0 1k
 | `$OPAMP` without its package | `$OPAMP cannot be found: … rnl-std-functional` | USE-PACKAGE of `rnl-std-functional` |
 | `%#3 @PLACE(1, 2)` in your record | `a number is written only in the record of the solver` | give the object a name |
 | a wire to the bulk of `$NMOS` | `#M1:b has no pin in its symbol: the wire fails` | `$NMOS_4TERM` |
+| `M1 d g 0 0 nch` without `.model nch` | `the model card nch is not found, so the polarity of M1 is not known and it is not drawn` (a warning) | `.model nch nmos level=1`, or `#M1 @SET-SYMBOL $NMOS_4TERM` |
 | `#M1.d`, `M3`, `&vdd!` | nothing: they are free text | `#M1:d`, `#M3`, `&"vdd!"` |
 
 ```spice error

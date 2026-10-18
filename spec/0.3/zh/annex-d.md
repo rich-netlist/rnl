@@ -1,4 +1,4 @@
-<!-- translated from en/annex-d.md sha256:a70061555085 -->
+<!-- translated from en/annex-d.md sha256:e2fc46c84cae -->
 ## 附录 D 与 0.2 版相比的改动（说明性）
 
 0.3 版让求解器把自己定下的每个决定都写回，使不求解的查看器画出的就是求解器画的图。0.x 各版本之间不承诺兼容（16.1）；本附录列出改了什么，以及文件怎样迁到 0.3 版。
@@ -80,3 +80,5 @@
 **去掉的**：`$INPUT_STAGE`：把它的尾管写进对应差分对的角色 `tail`，如 `#M1(in_p) #M2(in_n) #M5(tail) @AS $DIFFERENTIAL_PAIR`。`$TAIL_CENTER`：标准包自己会把每个差分对的尾管放在中间；要让别的对象居中，文件自己写一个定义，如 9.4 的 `$TAIL_MID`。`rnl-std-semantics` 和 `rnl-std-layout`：合成了一个包 `rnl-std-structures`（16.3）；原来去掉 `rnl-std-layout` 来不要默认布局的文件，改为对每个定义写一条规则，如 `# @SELECT-USAGE $MIRRORED => @PRIORITY("disabled")`（14.8）。
 
 **新加的**：`rnl-std-basic`、`rnl-std-semiconductors` 加了符号，如开关、电流控制的源、传输线、JFET。系列还加了 `rnl-std` 不带进来的包：`rnl-std-functional`、`rnl-std-rf`、`rnl-std-logic`、`rnl-std-signal-flow`，把它们和 `rnl-std` 合在一起的集合 `rnl-std-full`，以及可选的 `rnl-std-no-labels`（16.3）。文件自己定义了、系列 0.3 又新加的名字，如 `$SWITCH`，遮蔽标准包的那个并给提示（6.8），文件用的仍是它自己的。
+
+**修订 2**：编辑性的修订，语言没有改动。1.3 和 5.9 的例子写上了晶体管的模型卡 `.model nch nmos level=1`，让标准包认得出它们的极性、给它们符号。
