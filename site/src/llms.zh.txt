@@ -4,7 +4,7 @@
 
 ## 安装 skill
 
-skill 是文件夹 `rnl/`（Agent Skills 格式：`rnl/SKILL.md` 和它指向的文件）。下载 {{site}}skill/rnl-skill.zip 并解压到你的 agent 存放 skill 的目录，使 `rnl/SKILL.md` 落在那里。Claude Code 是 `~/.claude/skills/`（所有项目）或项目里的 `.claude/skills/`；别的能读 Agent Skills 文件夹的 agent 有各自的 skills 目录。
+skill 是文件夹 `rnl/`（Agent Skills 格式：`rnl/SKILL.md` 和它指向的文件），里面的文字都是英文。下载 {{site}}skill/rnl-skill.zip 并解压到你的 agent 存放 skill 的目录，使 `rnl/SKILL.md` 落在那里。Claude Code 是 `~/.claude/skills/`（所有项目）或项目里的 `.claude/skills/`；别的能读 Agent Skills 文件夹的 agent 有各自的 skills 目录。
 
 macOS、Linux、Git Bash：
 
@@ -21,9 +21,8 @@ Windows PowerShell：
 ## skill 里的文件
 
 - [SKILL.md]({{site}}skill/rnl/SKILL.md)：从这里开始：RNL 是什么、一个完整的例子、怎么做、省时间的规则（英文）
-- [references/language.md]({{site}}skill/rnl/references/language.md)：RNL 0.3 语言简明指南，英文
-- [references/language.zh.md]({{site}}skill/rnl/references/language.zh.md)：同一份指南，中文
-- [references/packages.md]({{site}}skill/rnl/references/packages.md)：标准系列 0.3 的标准包：定义和它们的角色、符号和引脚、元件默认配哪个符号、集合、中文代称（由包文件生成，英文）
+- [references/language.md]({{site}}skill/rnl/references/language.md)：RNL 0.3 语言简明指南（中文版在语言标准 0.3 的中文页面里，见下面的链接）
+- [references/packages.md]({{site}}skill/rnl/references/packages.md)：标准系列 0.3 的标准包：定义和它们的角色、符号和引脚、元件默认配哪个符号、集合、中文代称包 `rnl-zh`（由包文件生成，英文）
 - [references/tools.md]({{site}}skill/rnl/references/tools.md)：怎样检查和绘制文件：`rnl` 命令、npm 包 `@rich-netlist/runtime`、网页版和桌面版查看器（英文）
 - [examples/ota5t.sp]({{site}}skill/rnl/examples/ota5t.sp)：五管运放，SPICE，写了结构，没放位置
 - [examples/ota5t.scs]({{site}}skill/rnl/examples/ota5t.scs)：同一个电路，Spectre

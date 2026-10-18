@@ -1,6 +1,6 @@
 ---
 name: rnl
-description: Read, write, check and draw RNL (Rich Netlist) 0.3, the drawing of a schematic written into a SPICE or Spectre netlist as `@RNL` comment records. Use it when a netlist has `* @RNL` or `// @RNL` records or `.rnl` package files, when asked to place, wire, annotate or draw a circuit's schematic from a netlist, to pick symbols or define structures such as a differential pair or a current mirror, or to check a file with `rnl check`, `@rich-netlist/runtime` or the RNL viewers. Covers the language 0.3, the standard packages of series 0.3 and the tools; there is a Chinese guide too.
+description: Read, write, check and draw RNL (Rich Netlist) 0.3, the drawing of a schematic written into a SPICE or Spectre netlist as `@RNL` comment records. Use it when a netlist has `* @RNL` or `// @RNL` records or `.rnl` package files, when asked to place, wire, annotate or draw a circuit's schematic from a netlist, to pick symbols or define structures such as a differential pair or a current mirror, or to check a file with `rnl check`, `@rich-netlist/runtime` or the RNL viewers. Covers the language 0.3, the standard packages of series 0.3 and the tools.
 license: See LICENSE.md (MIT, CC-BY-4.0 and CC0-1.0, by file)
 compatibility: Reading and writing RNL needs no tools. Checking needs the rnl command (Rust 1.85 or later, built from source) or Node 18 or later with the npm package @rich-netlist/runtime.
 ---
@@ -33,8 +33,8 @@ The record says that M1 and M2 are a differential pair sharing one y, where M5 g
 
 ## How to work
 
-1. **Read [references/language.md](references/language.md) once, all of it** (Chinese: [references/language.zh.md](references/language.zh.md)). It is the short guide to the language. For anything it leaves open, the standard decides: <https://rich-netlist.github.io/rnl/en/spec/0.3/> (English, normative), with a Chinese translation at <https://rich-netlist.github.io/rnl/zh/spec/0.3/>.
-2. **Look every `$NAME` up in [references/packages.md](references/packages.md)** before you write it: the definitions, symbols and sets of the standard packages, which symbol an instance gets by default, and the Chinese aliases. A name that is not there is an error; do not guess names from other EDA tools or from 0.2 (`$RES` and `$GND` of 0.2 are `$RESISTOR` and `$GROUND` in 0.3).
+1. **Read [references/language.md](references/language.md) once, all of it**. It is the short guide to the language. For anything it leaves open, the standard decides: <https://rich-netlist.github.io/rnl/en/spec/0.3/> (normative).
+2. **Look every `$NAME` up in [references/packages.md](references/packages.md)** before you write it: the definitions, symbols and sets of the standard packages, which symbol an instance gets by default, and what the alias package `rnl-zh` is. A name that is not there is an error; do not guess names from other EDA tools or from 0.2 (`$RES` and `$GND` of 0.2 are `$RESISTOR` and `$GROUND` in 0.3).
 3. **Write the records into the netlist's comments** and leave the netlist's own lines alone. A record belongs to the level it is written in: inside a `.subckt` for that subcircuit, outside any for the file's top level. Each line of a record is a whole-line comment: the comment character in column 1 (`*`; in Spectre `//` or `*`), then nothing or one space, then the text. `*@RNL` and an indented `* @RNL` are not record lines and cut the record off.
 4. **Check the file** with a tool of [references/tools.md](references/tools.md) after every change, and fix what it reports until there are no errors and no warnings. A file without positions says in a hint that some objects are left to a solver and not drawn; that is not a problem.
 5. **Draw it** when the user wants to see it: `rnl render FILE -o DIR` writes an SVG for each drawing level, the web viewer at <https://rich-netlist.github.io/rnl/viewer/> opens a file in the browser, and the desktop viewer does the same on Windows. Only what has coordinates is drawn.
@@ -51,9 +51,8 @@ The record says that M1 and M2 are a differential pair sharing one y, where M5 g
 
 | File | Content |
 | --- | --- |
-| [references/language.md](references/language.md) | The short guide to RNL 0.3, in English: how to read and write a file, with examples that read without errors |
-| [references/language.zh.md](references/language.zh.md) | The same guide in Chinese |
-| [references/packages.md](references/packages.md) | The standard packages of series 0.3: packages, definitions with their roles, symbols with their pins, the default symbol rules, sets, and the Chinese aliases of `rnl-zh`. Generated from the package files, so it is in step with them |
+| [references/language.md](references/language.md) | The short guide to RNL 0.3: how to read and write a file, with examples that read without errors |
+| [references/packages.md](references/packages.md) | The standard packages of series 0.3: packages, definitions with their roles, symbols with their pins, the default symbol rules, sets, and `rnl-zh`. Generated from the package files, so it is in step with them |
 | [references/tools.md](references/tools.md) | How to check and draw files: the `rnl` command built from source, the npm package `@rich-netlist/runtime`, the web viewer and the desktop viewer |
 | [examples/ota5t.sp](examples/ota5t.sp) | The five-transistor OTA of the standard, in SPICE, with the records of the example above |
 | [examples/ota5t.scs](examples/ota5t.scs) | The same circuit in Spectre, with `//` records |

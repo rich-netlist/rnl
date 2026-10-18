@@ -79,8 +79,8 @@
         <p class="eyebrow"><span>RICH NETLIST · AGENT SKILL</span><span class="chip chip-ok"><zh>RNL 0.3 · 标准包 0.3</zh><en>RNL 0.3 · packages 0.3</en></span></p>
         <h1 id="agents-title" class="tour-h1"><zh>给 agent</zh><en>For agents</en></h1>
         <p class="thesis"><zh>下载 skill 包，agent 就会读、写、检查和绘制 RNL。</zh><en>Download the skill package, and your agent can read, write, check and draw RNL.</en></p>
-        <p class="lead"><zh>RNL 把原理图的画法写进 SPICE 或 Spectre 网表的注释里，网表本身还是电路的唯一定义。skill 包是一个 Agent Skills 格式的文件夹：语言简明指南（中英文）、标准包参考、检查和绘制的工具、几个都能通过 <code>rnl check</code> 的例子。这一页说明怎样取得它、装上它；给 agent 读的纯文本入口是 <a href="llms.txt">llms.txt</a>。</zh>
-          <en>RNL writes the drawing of a schematic into the comments of a SPICE or Spectre netlist, and the netlist alone still defines the circuit. The skill package is a folder in the Agent Skills format: a short guide to the language (in English and Chinese), a reference to the standard packages, the tools to check and draw files, and examples that all read with <code>rnl check</code>. This page says how to get it and install it; the plain-text entry that an agent reads is <a href="../llms.txt">llms.txt</a>.</en></p>
+        <p class="lead"><zh>RNL 把原理图的画法写进 SPICE 或 Spectre 网表的注释里，网表本身还是电路的唯一定义。skill 包是一个 Agent Skills 格式的文件夹：语言简明指南、标准包参考、检查和绘制的工具、几个都能通过 <code>rnl check</code> 的例子。包里的文字都是英文，因为 agent 读的是英文；中文版的简明指南在<a href="spec/0.3/">语言标准 0.3 的中文页面</a>里。这一页说明怎样取得它、装上它；给 agent 读的纯文本入口是 <a href="llms.txt">llms.txt</a>。</zh>
+          <en>RNL writes the drawing of a schematic into the comments of a SPICE or Spectre netlist, and the netlist alone still defines the circuit. The skill package is a folder in the Agent Skills format: a short guide to the language, a reference to the standard packages, the tools to check and draw files, and examples that all read with <code>rnl check</code>. This page says how to get it and install it; the plain-text entry that an agent reads is <a href="../llms.txt">llms.txt</a>.</en></p>
         <div class="cta">
           <a class="btn btn-primary" href="../skill/rnl-skill.zip"><svg class="ico"><use href="#i-download"/></svg><zh>下载 rnl-skill.zip</zh><en>Download rnl-skill.zip</en></a>
           <a class="btn" href="<zh>llms.txt</zh><en>../llms.txt</en>"><svg class="ico"><use href="#i-file"/></svg>llms.txt</a>
@@ -179,13 +179,13 @@
         </li>
         <li>
           <a class="dl-file" href="../skill/rnl/references/language.md"><svg class="ico"><use href="#i-file"/></svg><span><b><zh>语言简明指南</zh><en>Short guide to the language</en></b><code>references/language.md</code></span></a>
-          <p><zh>读写 RNL 0.3 文件所需要的全部：文件的形状、语句、对象和引用、定义、布局、导线、文字、包。英文；中文版是 <a href="../skill/rnl/references/language.zh.md"><code>references/language.zh.md</code></a>。同一份指南也在<a href="spec/0.3/">语言标准 0.3 的页面</a>里。</zh>
-            <en>All that reading and writing a file of RNL 0.3 takes: the shape of a file, statements, objects and references, definitions, layout, wires, text, packages. In English; the Chinese version is <a href="../skill/rnl/references/language.zh.md"><code>references/language.zh.md</code></a>. The same guide is also a section of the <a href="spec/0.3/">page of the language standard 0.3</a>.</en></p>
+          <p><zh>读写 RNL 0.3 文件所需要的全部：文件的形状、语句、对象和引用、定义、布局、导线、文字、包。英文。同一份指南，另有中文版，也在<a href="spec/0.3/">语言标准 0.3 的页面</a>里。</zh>
+            <en>All that reading and writing a file of RNL 0.3 takes: the shape of a file, statements, objects and references, definitions, layout, wires, text, packages. The same guide is also a section of the <a href="spec/0.3/">page of the language standard 0.3</a>.</en></p>
         </li>
         <li>
           <a class="dl-file" href="../skill/rnl/references/packages.md"><svg class="ico"><use href="#i-layers"/></svg><span><b><zh>标准包参考</zh><en>The standard packages</en></b><code>references/packages.md</code></span></a>
-          <p><zh>系列 0.3 的每个包、定义和它们的角色、符号和引脚、元件默认配哪个符号、集合，以及 <code>rnl-zh</code> 的中文代称。图库在<a href="packages.html">标准包页面</a>。</zh>
-            <en>Every package of the series 0.3, the definitions with their roles, the symbols with their pins, which symbol an instance gets by default, the sets, and the Chinese aliases of <code>rnl-zh</code>. The gallery with the drawings is on the <a href="packages.html">page of the packages</a>.</en></p>
+          <p><zh>系列 0.3 的每个包、定义和它们的角色、符号和引脚、元件默认配哪个符号、集合，以及中文代称包 <code>rnl-zh</code> 是什么。图库在<a href="packages.html">标准包页面</a>。</zh>
+            <en>Every package of the series 0.3, the definitions with their roles, the symbols with their pins, which symbol an instance gets by default, the sets, and what the alias package <code>rnl-zh</code> is. The gallery with the drawings is on the <a href="packages.html">page of the packages</a>.</en></p>
         </li>
         <li>
           <a class="dl-file" href="../skill/rnl/references/tools.md"><svg class="ico"><use href="#i-cpu"/></svg><span><b><zh>检查和绘制</zh><en>Check and draw</en></b><code>references/tools.md</code></span></a>

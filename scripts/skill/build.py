@@ -31,15 +31,11 @@ SERIES = "0.3"
 SITE_URL = "https://rich-netlist.github.io/rnl/"
 GITHUB = "https://github.com/rich-netlist/rnl"
 
-# the short guide to the language: its sources, and where the skill keeps its copies
-GUIDES = {"en": (SPEC / "rnl-0.3-guide.md", "references/language.md"),
-          "zh": (SPEC / "rnl-0.3-guide.zh.md", "references/language.zh.md")}
-GUIDE_NOTE = {
-    "en": f"> The short guide to the language RNL {SERIES}, for reading and writing RNL files. It is not the standard, "
-          f"which prevails where the two differ: {SITE_URL}en/spec/{SERIES}/. Licence: CC-BY-4.0, see `LICENSE.md`.",
-    "zh": f"> RNL {SERIES} 语言简明指南，用来读和写 RNL 文件。它不是标准，两者不一致时以标准为准："
-          f"{SITE_URL}zh/spec/{SERIES}/。许可：CC-BY-4.0，见 `LICENSE.md`。",
-}
+# the short guide to the language: its source, and where the skill keeps its copy. The package is in English
+# only; the Chinese guide, spec/rnl-0.3-guide.zh.md, is for the Chinese page of the standard.
+GUIDE = (SPEC / "rnl-0.3-guide.md", "references/language.md")
+GUIDE_NOTE = (f"> The short guide to the language RNL {SERIES}, for reading and writing RNL files. It is not the standard, "
+              f"which prevails where the two differ: {SITE_URL}en/spec/{SERIES}/. Licence: CC-BY-4.0, see `LICENSE.md`.")
 LICENSE_TEXTS = ("MIT", "CC-BY-4.0", "CC0-1.0")  # the licences of what the package holds, copied to LICENSES/
 GALLERY_JS = ROOT / "site" / "src" / "assets" / "gallery.js"  # what each package is for, in both languages
 SITE_SRC = ROOT / "site" / "src"
@@ -251,15 +247,12 @@ def packages_md(rnl: Path) -> str:
     out += [f"| `{s['set']}` | `{s['package']}` |" for s in cat["sets"] if s["version"] == SERIES]
     out.append("")
 
-    zh = ALIAS.findall(files["rnl-zh", SERIES][1])
-    kinds = {"keywords": [(a, b) for a, b in zh if b.startswith("@")],
-             "names of the standard packages": [(a, b) for a, b in zh if b.startswith("$")],
-             "parameters, roles and other words": [(a, b) for a, b in zh if not b.startswith(("@", "$"))]}
-    out += [f"## Chinese aliases, `rnl-zh` {SERIES}", "",
-            f"Loaded with `@USE-ALIASES(name=\"rnl-zh\", version=\"{SERIES}\")` in the header record. Each alias reads as the "
-            "standard word after it (16.5), so a file may mix both spellings.", ""]
-    for title, pairs in kinds.items():
-        out += [f"### {title.capitalize()}", "", "; ".join(f"`{a}` = `{b}`" for a, b in pairs), ""]
+    aliases = len(ALIAS.findall(files["rnl-zh", SERIES][1]))
+    out += [f"## Chinese aliases", "",
+            f"`rnl-zh` {SERIES} gives Chinese spellings of the keywords, of the names above and of the parameters and roles "
+            f"of their definitions: {aliases} aliases, listed in `libraries/standard/0.3/rnl-zh.rnl` of the repository. A file "
+            f"loads it with `@USE-ALIASES(name=\"rnl-zh\", version=\"{SERIES}\")` in the header record. Each alias reads as "
+            "the standard word it stands for (16.5), so a file may mix both spellings, and the standard spellings keep working.", ""]
     return "\n".join(out).rstrip() + "\n"
 
 
@@ -268,12 +261,11 @@ def packages_md(rnl: Path) -> str:
 def generated(rnl: Path) -> dict[str, str]:
     """{path in the skill: text} of the files that are generated."""
     out = {"references/packages.md": packages_md(rnl)}
-    for lang, (src, dest) in GUIDES.items():
-        text = read(src)
-        title, _, rest = text.partition("\n")
-        if not title.startswith("# "):
-            raise Failed(f"{src.relative_to(ROOT)}: the first line is not a title, `# …`")
-        out[dest] = f"{title}\n\n{GUIDE_NOTE[lang]}\n{rest}"
+    src, dest = GUIDE
+    title, _, rest = read(src).partition("\n")
+    if not title.startswith("# "):
+        raise Failed(f"{src.relative_to(ROOT)}: the first line is not a title, `# …`")
+    out[dest] = f"{title}\n\n{GUIDE_NOTE}\n{rest}"
     for name in LICENSE_TEXTS:
         out[f"LICENSES/{name}.txt"] = read(ROOT / "LICENSES" / f"{name}.txt")
     return out

@@ -1,6 +1,6 @@
 # RNL (Rich Netlist)
 
-> RNL writes the drawing of a schematic into a SPICE or Spectre netlist as comment records (`@RNL`), so the netlist alone is the source of the schematic. This file tells an AI agent how to install the RNL skill, a folder that teaches reading, writing, checking and drawing RNL 0.3, and where the rest is. 中文版: {{site}}zh/llms.txt
+> RNL writes the drawing of a schematic into a SPICE or Spectre netlist as comment records (`@RNL`), so the netlist alone is the source of the schematic. This file tells an AI agent how to install the RNL skill, a folder that teaches reading, writing, checking and drawing RNL 0.3, and where the rest is. Chinese version of this file: {{site}}zh/llms.txt
 
 ## Install the skill
 
@@ -21,9 +21,8 @@ If you cannot unpack or write files, read the files below as they are; they are 
 ## The files of the skill
 
 - [SKILL.md]({{site}}skill/rnl/SKILL.md): start here: what RNL is, a complete example, how to work, the rules that save time
-- [references/language.md]({{site}}skill/rnl/references/language.md): the short guide to the language RNL 0.3, in English
-- [references/language.zh.md]({{site}}skill/rnl/references/language.zh.md): the same guide, in Chinese
-- [references/packages.md]({{site}}skill/rnl/references/packages.md): the standard packages of series 0.3: definitions and their roles, symbols and pins, which symbol an instance gets, sets, Chinese aliases (generated from the package files)
+- [references/language.md]({{site}}skill/rnl/references/language.md): the short guide to the language RNL 0.3
+- [references/packages.md]({{site}}skill/rnl/references/packages.md): the standard packages of series 0.3: definitions and their roles, symbols and pins, which symbol an instance gets, sets, the alias package `rnl-zh` (generated from the package files)
 - [references/tools.md]({{site}}skill/rnl/references/tools.md): how to check and draw files: the `rnl` command, the npm package `@rich-netlist/runtime`, the web viewer, the desktop viewer
 - [examples/ota5t.sp]({{site}}skill/rnl/examples/ota5t.sp): a five-transistor OTA in SPICE, structure written, nothing placed
 - [examples/ota5t.scs]({{site}}skill/rnl/examples/ota5t.scs): the same circuit in Spectre
