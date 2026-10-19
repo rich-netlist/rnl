@@ -8,6 +8,61 @@
 
   /* ================= Hero ================= */
 
+  function initLogoViewer() {
+    var button = $('#hero-logo'), panel = $('#hero-logo-panel'), closeButton = $('#hero-logo-close');
+    if (!button || !panel || !closeButton) return;
+    var frame = null, viewerOrigin = null, ready = false;
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    function theme() {
+      var chosen = document.documentElement.getAttribute('data-theme');
+      return chosen === 'dark' || chosen === 'light' ? chosen : mq.matches ? 'dark' : 'light';
+    }
+    function syncTheme() {
+      if (frame && ready) frame.contentWindow.postMessage({ rnl: 1, type: 'background', value: theme() }, viewerOrigin);
+    }
+    function close() {
+      panel.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+      button.focus({ preventScroll: true });
+    }
+    function escape(e) {
+      if (e.key !== 'Escape' || panel.hidden) return;
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    }
+    button.addEventListener('click', function () {
+      if (!panel.hidden) { close(); return; }
+      panel.hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+      if (!frame) {
+        var url = new URL(panel.getAttribute('data-viewer-url'), document.baseURI);
+        url.search = new URLSearchParams({ embed: '1', url: 'samples/brand/rnl-logo.sp', background: theme(), grid: 'off' });
+        if (location.origin !== 'null') url.searchParams.set('origin', location.origin);
+        viewerOrigin = url.origin;
+        frame = document.createElement('iframe');
+        frame.title = panel.getAttribute('aria-label');
+        frame.addEventListener('load', function () {
+          // The published homepage and viewer are same-origin. Capture Escape inside the iframe
+          // too; keyboard events do not bubble between browsing contexts.
+          var child = frame.contentDocument;
+          if (child) child.addEventListener('keydown', escape, true);
+        });
+        frame.src = url.href;
+        panel.appendChild(frame);
+      } else syncTheme();
+      closeButton.focus({ preventScroll: true });
+    });
+    closeButton.addEventListener('click', close);
+    document.addEventListener('keydown', escape, true);
+    window.addEventListener('message', function (e) {
+      if (!frame || e.source !== frame.contentWindow || e.origin !== viewerOrigin || e.data?.rnl !== 1) return;
+      if (e.data.type === 'ready') { ready = true; syncTheme(); }
+    });
+    new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    mq.addEventListener('change', syncTheme);
+  }
+
   function drawBode(svg) {
     var el = S.el, W = 340, H = 220, m = { l: 40, r: 12, t: 24, b: 32 };
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -394,6 +449,7 @@
   /* ================= Startup ================= */
 
   function boot() {
+    initLogoViewer();
     initHero();
     initOwners();
     initFixes();

@@ -188,6 +188,8 @@ Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `
 | `src/assets/scenes.js` | Circuits, layouts, wiring, annotations, and example files for the introduction's demos |
 | `src/assets/common.js` | Shared by all pages: theme, navigation (a top bar whose links do not fit draws them closer, then writes the short forms, such as T1 to T9 in the tour, and then folds them into a menu), tabs, segmented controls, highlighting of static snippets |
 | `src/assets/intro.js` | Introduction interactions: the hero, the scenarios and the journey |
+| `tests/logo-embed.spec.mjs` | The homepage logo's lazy iframe, close/focus handling, theme synchronization and 390px layout, tested in Chromium and WebKit. `RNL_EMBED_REVIEW_DIR` saves screenshots and a before/after click request log. |
+| `serve.py` | Local static server for browser tests, with enough queued connections for both workers' viewer module requests. |
 | `src/assets/toolchain.js` | The toolchain diagram of the page of the tools |
 | `src/assets/glance.js` | The language at a glance, with the 46-keyword reference, and the examples, of the language tour |
 | `src/assets/tour.js` | The interactions of the nine sections of the language tour |

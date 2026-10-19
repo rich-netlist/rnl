@@ -370,7 +370,7 @@ def standalone(page, out, page_url):
             url = url[3:]
             base = base[:base.rstrip("/").rfind("/") + 1]
         return m.group(1) + base + url + '"'
-    return re.sub(r'(\shref=")([^"]*)"', absolute, html)
+    return re.sub(r'(\s(?:href|data-viewer-url)=")([^"]*)"', absolute, html)
 
 
 def redirect(target, lang, text):

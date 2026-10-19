@@ -105,7 +105,10 @@
     <div class="hero-grid">
       <div class="hero-copy">
         <p class="eyebrow"><span>RICH NETLIST</span><span class="chip chip-ok"><zh>标准 0.3 已发布 · 工具链预览版</zh><en>Standard 0.3 released · toolkit preview</en></span></p>
-        <h1 id="hero-title"><span class="hero-logo theme-logo"><img class="logo-light" src="assets/brand/rnl-logo.svg" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-dark.svg" alt=""></span><span class="wordmark">RNL</span></h1>
+        <h1 id="hero-title"><button id="hero-logo" type="button" class="hero-logo theme-logo" aria-label="<zh>打开 logo 的电路</zh><en>Open the logo's circuit</en>" title="<zh>打开 logo 的电路</zh><en>Open the logo's circuit</en>" aria-expanded="false" aria-controls="hero-logo-panel"><img class="logo-light" src="assets/brand/rnl-logo.svg" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-dark.svg" alt=""></button><span class="wordmark">RNL</span></h1>
+        <div id="hero-logo-panel" class="hero-logo-panel panel" role="region" aria-label="<zh>logo 的电路</zh><en>The logo's circuit</en>" data-viewer-url="../viewer/" hidden>
+          <div class="hero-logo-controls"><button id="hero-logo-close" type="button" aria-label="<zh>关闭</zh><en>Close</en>" title="<zh>关闭</zh><en>Close</en>">×</button></div>
+        </div>
         <p class="thesis"><zh>让一份网表既能仿真，也能画成原理图。</zh><en>A netlist you can simulate and also draw as a schematic.</en></p>
         <p class="lead"><zh>RNL 把“这个电路该怎么理解、怎么画”写进网表的注释里。仿真器照常把它当注释跳过；支持 RNL 的工具读它，画出整洁的原理图。</zh>
           <en>RNL writes “how to understand and draw this circuit” into the netlist’s comments. Simulators skip it as a comment, as they always do; tools that support RNL read it and draw a clean schematic.</en></p>

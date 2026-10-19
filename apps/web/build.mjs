@@ -83,6 +83,8 @@ if (samples) {
     cpSync(join(root, "tests", "conformance", name), join(out, "samples", name), { recursive: true });
   }
   cpSync(join(root, "site", "examples"), join(out, "samples", "site"), { recursive: true });
+  mkdirSync(join(out, "samples", "brand"), { recursive: true });
+  cpSync(join(root, "brand", "rnl-logo.sp"), join(out, "samples", "brand", "rnl-logo.sp"));
 }
 
 /** The files under a directory, by their paths relative to it, `/`-separated. */

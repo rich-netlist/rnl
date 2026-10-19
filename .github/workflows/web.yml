@@ -14,6 +14,7 @@ on:
       - "libraries/**"
       - "scripts/fonts.py"
       - "site/examples/**"
+      - "brand/rnl-logo.sp"
       - "tests/conformance/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -27,6 +28,7 @@ on:
       - "libraries/**"
       - "scripts/fonts.py"
       - "site/examples/**"
+      - "brand/rnl-logo.sp"
       - "tests/conformance/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -76,4 +78,5 @@ jobs:
           test "$(served fonts/noto-sans-sc-400-latin.woff2)" = "font/woff2"
           test "$(served samples/cases/04-hierarchy-lib.inc)" = "application/octet-stream"
           test "$(served samples/site/ota5t.sp)" = "application/octet-stream"
+          test "$(served samples/brand/rnl-logo.sp)" = "application/octet-stream"
           if curl -fs -o /dev/null http://127.0.0.1:8000/shells/desktop.js; then echo "the desktop shell is in the site"; exit 1; fi

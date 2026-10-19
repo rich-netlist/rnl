@@ -139,6 +139,14 @@ class ReleaseDownloads(unittest.TestCase):
 
 
 class SiteExamples(unittest.TestCase):
+    def test_logo_viewer_is_lazy_and_standalone_points_to_published_viewer(self):
+        with patch.object(build, "has_linux_release", return_value=False):
+            pages = build.build(None)
+        for lang in ("zh", "en"):
+            self.assertIn('data-viewer-url="../viewer/"', pages[f"{lang}/index.html"])
+            self.assertIn(f'data-viewer-url="{build.SITE_URL}viewer/"', pages[f"{lang}/rnl-intro-standalone.html"])
+            self.assertNotIn("<iframe", pages[f"{lang}/index.html"])
+
     def test_examples_are_published_and_linked_in_both_languages(self):
         with patch.object(build, "has_linux_release", return_value=False):
             pages = build.build(None)
