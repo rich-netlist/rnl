@@ -10,7 +10,10 @@
 // Load from Clipboard draws the text the test gives the page as the clipboard's. The netlist is
 // a copy of one of the corpus, in a directory of the test's own, which it may save over. The
 // app runs with a WebView2 profile of its own in a temporary directory, so that the user's layout
-// stays as it was, and is stopped by its process ID. The test fails at once when the app exits, and
+// stays as it was, and with settings of its own: a debug build keeps them where
+// RNL_VIEWER_TEST_CONFIG_DIR says, and for a release build, which keeps them where Tauri puts them
+// whatever the environment says, the user's settings file is set aside for the run and put back
+// after, so that each run starts from the defaults. The app is stopped by its process ID. The test fails at once when the app exits, and
 // a step fails when the page stops answering. Node 22 or later, with no dependencies.
 //
 //   node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build | --exe PATH]
@@ -36,8 +39,26 @@ let netlistInclude = null;
 const TOP = "04-hierarchy.sp";
 /** The command table, which the native menu is built from. */
 const table = JSON.parse(fs.readFileSync(path.join(root, "apps", "viewer-ui", "commands.json"), "utf8"));
+const tauriConf = JSON.parse(fs.readFileSync(path.join(root, "apps", "desktop", "tauri.conf.json"), "utf8"));
 /** The app's version, which Tauri reports. */
-const version = JSON.parse(fs.readFileSync(path.join(root, "apps", "desktop", "tauri.conf.json"), "utf8")).version;
+const version = tauriConf.version;
+/** The settings file of a release build on Windows: in Tauri's app_config_dir, which no variable of the environment moves. */
+const releaseSettings = path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), tauriConf.identifier, "settings.json");
+
+/**
+ * Set the release build's settings file aside, so that the run starts from the defaults and leaves
+ * the user's settings as they were; return what puts it back. A file set aside before and not put
+ * back, by a run that was killed, stops the test rather than be written over.
+ */
+function setSettingsAside() {
+  const kept = `${releaseSettings}.smoke-kept`;
+  check(!fs.existsSync(kept), `${kept} is left from an earlier run: put it back as ${releaseSettings}, or delete it.`);
+  if (fs.existsSync(releaseSettings)) fs.renameSync(releaseSettings, kept);
+  return () => {
+    fs.rmSync(releaseSettings, { force: true });
+    if (fs.existsSync(kept)) fs.renameSync(kept, releaseSettings);
+  };
+}
 const TIMEOUT = 60_000; // the first start of WebView2 on a fresh machine can be slow
 
 if (process.platform !== "win32") {
@@ -744,6 +765,7 @@ async function main() {
   for (const name of ["04-hierarchy.sp", "04-hierarchy-lib.inc"]) fs.copyFileSync(path.join(cases, name), path.join(work, name));
   netlist = path.join(work, "04-hierarchy.sp");
   netlistInclude = path.join(work, "04-hierarchy-lib.inc");
+  const putSettingsBack = setSettingsAside();
   const t0 = Date.now();
   // the app gives the port to WebView2 itself: WebView2 ignores WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
   // where the app runs elevated, as on GitHub's runners, but takes the profile from the environment
@@ -787,6 +809,7 @@ async function main() {
       }
     }
     await exited;
+    putSettingsBack();
     fs.rmSync(work, { recursive: true, force: true });
     // the WebView's own processes let go of the profile a little after the app is gone
     try {
