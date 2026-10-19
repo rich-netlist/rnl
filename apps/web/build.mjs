@@ -86,7 +86,7 @@ if (samples) {
   mkdirSync(join(out, "samples", "brand"), { recursive: true });
   // Caption the interactive sample; the canonical source still generates the text-free icons.
   const logo = readFileSync(join(root, "brand", "rnl-logo.sp"), "utf8");
-  const caption = '* @RNL {\n*   (4.5, 0.3) @TEXT("RNL", size=11, bold=true, valign="middle");\n*   (4.8, -4.5) @TEXT("logo by RNL", size=2, valign="top")\n* }\n.end';
+  const caption = '* @RNL {\n*   (4.5, 0.3) @TEXT("RNL", size=11, bold=true, valign="middle");\n*   (28, -4.5) @TEXT("logo by RNL", size=3.3, bold=false)\n* }\n.end';
   writeFileSync(join(out, "samples", "brand", "rnl-logo.sp"), logo.replace(/^\.end[ \t]*\r?$/im, caption));
 }
 

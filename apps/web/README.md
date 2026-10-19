@@ -184,15 +184,19 @@ switches three conformance examples and the site's five-transistor OTA through t
 Build with `--samples` to include those files.
 
 The same build also publishes `samples/brand/rnl-logo.sp`, with real RNL `@TEXT` annotations:
-a large **RNL** and a smaller “logo by RNL” together to the right of the circuit.
+a large **RNL**, followed on its lower right by “logo by RNL”.
 The canonical brand source used for icons stays text-free. On the project homepage, clicking
 the large logo replaces the static logo and wordmark with a short embedded viewer in that same
-row, keeping the following content in place. Closing with × or Escape restores the wordmark
+row, keeping the following content in place. The frame is up to 640px wide and fills the available
+width on narrow screens; its initial view keeps the circuit logo close to the original icon's size.
+Closing with × or Escape restores the wordmark
 and keeps that iframe for the next click; theme changes reach it through the `background`
 message. No viewer files are requested until the first click.
 
-For embeds at most 180px tall, the fit margin is smaller and the floating controls run
-horizontally, appearing on hover or keyboard focus so the drawing fits a short row.
+For embeds at most 180px tall, fitting uses the painted paths, strokes and text ink after fonts
+load, excluding the renderer's paper margin and empty font ascender/descender space. A 2px fit
+margin keeps these short drawings large. The floating controls run horizontally, appearing on
+hover or keyboard focus.
 
 ## Structure
 

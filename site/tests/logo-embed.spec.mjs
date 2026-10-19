@@ -57,6 +57,37 @@ async function brandReady(page) {
   });
 }
 
+async function brandLayout(frame) {
+  return frame.evaluate(() => {
+    const groups = [...document.querySelectorAll("#canvas > svg > g[data-id]")].filter(group => !group.querySelector("text"));
+    const boxes = groups.flatMap(group => [...group.querySelectorAll("path, circle, ellipse, line, polyline, polygon, rect")]).map(el => {
+      const b = el.getBoundingClientRect(), matrix = el.getScreenCTM(), style = getComputedStyle(el);
+      const half = style.stroke === "none" ? 0 : parseFloat(style.strokeWidth) * Math.hypot(matrix.a, matrix.b) / 2;
+      return { left: b.left - half, top: b.top - half, right: b.right + half, bottom: b.bottom + half };
+    });
+    const logo = { left: Math.min(...boxes.map(b => b.left)), right: Math.max(...boxes.map(b => b.right)),
+      top: Math.min(...boxes.map(b => b.top)), bottom: Math.max(...boxes.map(b => b.bottom)) };
+    const texts = [...document.querySelectorAll("#canvas > svg text")];
+    return { width: innerWidth, height: innerHeight, logo,
+      wordmark: texts.find(el => el.textContent === "RNL").getBoundingClientRect().toJSON(),
+      byline: texts.find(el => el.textContent === "logo by RNL").getBoundingClientRect().toJSON() };
+  });
+}
+
+async function checkComposition(frame, originalLogo) {
+  const layout = await brandLayout(frame);
+  // Match the visible circuit to the original icon, allowing for its SVG's small paper margin.
+  const ratio = (layout.logo.bottom - layout.logo.top) / originalLogo.height;
+  expect(ratio).toBeGreaterThan(0.9);
+  expect(ratio).toBeLessThan(1.1);
+  expect(layout.logo.top).toBeGreaterThanOrEqual(0);
+  expect(layout.logo.bottom).toBeLessThanOrEqual(layout.height);
+  expect(layout.byline.left).toBeGreaterThan(layout.wordmark.right);
+  expect(layout.byline.top).toBeGreaterThan(layout.wordmark.y + layout.wordmark.height / 2);
+  expect(layout.byline.right).toBeGreaterThan(layout.width * 0.94);
+  expect(layout.byline.right).toBeLessThanOrEqual(layout.width);
+}
+
 for (const lang of ["zh", "en"]) {
   test(`${lang}: click lazily opens the logo circuit, closes by Escape and ×, and reuses its iframe`, async ({ page }, info) => {
     const requests = [];
@@ -75,6 +106,7 @@ for (const lang of ["zh", "en"]) {
     const beforeDemo = await documentTop(page.locator("#hero-demo"));
     const beforeThesis = await documentTop(page.locator(".thesis"));
     const beforeHeading = await page.locator("#hero-title").boundingBox();
+    const originalLogo = await button.boundingBox();
     if (lang === "zh") await capture(page, "home-before.png", info.project.name);
     await button.click();
     const frame = await loaded(page);
@@ -95,7 +127,8 @@ for (const lang of ["zh", "en"]) {
     expect(await documentTop(page.locator("#hero-demo"))).toBeCloseTo(beforeDemo, 1);
     const textSizes = await frame.evaluate(() => [...document.querySelectorAll("#canvas > svg text")]
       .map(text => ({ name: text.textContent, size: parseFloat(getComputedStyle(text).fontSize) })));
-    expect(textSizes.find(text => text.name === "RNL").size).toBeGreaterThan(textSizes.find(text => text.name === "logo by RNL").size * 5);
+    expect(textSizes.find(text => text.name === "RNL").size).toBeGreaterThan(textSizes.find(text => text.name === "logo by RNL").size * 3);
+    await checkComposition(frame, originalLogo);
     const circuitRight = await frame.locator("#canvas > svg > g[data-id]").evaluateAll(groups =>
       Math.max(...groups.filter(group => !group.querySelector("text")).map(group => group.getBoundingClientRect().right)));
     for (const text of await frame.locator("#canvas > svg text").all()) {
@@ -129,10 +162,12 @@ for (const lang of ["zh", "en"]) {
     // Resizing while hidden must refit on reopening, without recreating or reloading the iframe.
     await page.setViewportSize({ width: 390, height: 1100 });
     await button.click();
-    await expect.poll(() => frame.locator("#canvas > svg text").evaluateAll(texts => texts.every(text => {
-      const box = text.getBoundingClientRect();
-      return box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight;
-    }))).toBe(true);
+    const narrowLogo = await button.boundingBox();
+    await expect.poll(async () => {
+      const { logo } = await brandLayout(frame);
+      return (logo.bottom - logo.top) / narrowLogo.height;
+    }).toBeLessThan(1.1);
+    await checkComposition(frame, narrowLogo);
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
     await expect(button).toBeFocused();
@@ -166,15 +201,18 @@ for (const lang of ["zh", "en"]) {
     await page.goto(`/${lang}/`);
     await brandReady(page);
     const heading = await page.locator("#hero-title").boundingBox();
+    const originalLogo = await page.locator("#hero-logo").boundingBox();
     await page.getByRole("button", { name: label(lang), exact: true }).click();
     const frame = await loaded(page);
     const panel = await page.locator("#hero-logo-panel").boundingBox();
     expect(panel.height).toBeCloseTo(heading.height, 1);
     expect(panel.width).toBeCloseTo(heading.width, 1);
+    expect(panel.width).toBe(350);
     expect(panel.height).toBeLessThan(130);
     expect(panel.x + panel.width).toBeLessThanOrEqual(390);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(page.locator("#hero-logo-close")).toBeInViewport();
+    await checkComposition(frame, originalLogo);
     await frame.locator("#canvas").focus();
     for (const button of await frame.locator(".embed-toolbar button").all()) {
       expect(await button.evaluate(element => {

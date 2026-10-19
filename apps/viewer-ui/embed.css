@@ -53,7 +53,7 @@ body.embed[data-background="dark"] {
 /* Short embeds can replace a wordmark. Keep the drawing large and expose the floating controls
    on hover or keyboard focus, arranged horizontally so every button fits even on a short row. */
 @media (max-height: 180px) {
-  .embed .canvas { --fit-margin: 6px; }
+  .embed .canvas { --fit-margin: 2px; --fit-content: 1; }
   .embed-toolbar { flex-direction: row; top: 4px; right: 4px; }
   #embed-open { bottom: 2px; right: 4px; font-size: 9px; }
   .embed-toolbar, #embed-open { opacity: 0; pointer-events: none; }

@@ -181,14 +181,54 @@ function showPointer() {
   el.textContent = `x ${fixed(x)}, y ${fixed(y)}`;
 }
 
+// Compact embeds frame painted ink instead of the renderer's paper margin and font line boxes.
+// Text's getBBox includes the font's ascender/descender space, even for three capital letters.
+let inkMeasure = null;
+function inkExtent() {
+  const inverse = svg.getCTM()?.inverse();
+  if (!inverse) return extent;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const el of svg.querySelectorAll("path, circle, ellipse, line, polyline, polygon, rect, text")) {
+    if (el.classList.contains("backdrop") || el.closest(".overlay")) continue;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || (style.fill === "none" && style.stroke === "none")) continue;
+    let { x, y, width, height } = el.getBBox();
+    if (el.localName === "text") {
+      inkMeasure ||= document.createElement("canvas").getContext("2d");
+      inkMeasure.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      inkMeasure.fontKerning = "none";
+      const metrics = inkMeasure.measureText(el.textContent);
+      const advance = el.textLength.baseVal.value || metrics.width;
+      const stretch = metrics.width ? advance / metrics.width : 1;
+      const anchor = style.textAnchor === "middle" ? advance / 2 : style.textAnchor === "end" ? advance : 0;
+      x = (el.x.baseVal[0]?.value || 0) - anchor - metrics.actualBoundingBoxLeft * stretch;
+      y = (el.y.baseVal[0]?.value || 0) - metrics.actualBoundingBoxAscent;
+      width = (metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight) * stretch;
+      height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+    }
+    const half = style.stroke === "none" ? 0 : parseFloat(style.strokeWidth) / 2;
+    if (!width && !height && !half) continue;
+    const matrix = inverse.multiply(el.getCTM());
+    for (const point of [[x - half, y - half], [x + width + half, y - half],
+      [x - half, y + height + half], [x + width + half, y + height + half]]) {
+      const p = new DOMPoint(...point).matrixTransform(matrix);
+      x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
+      x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
+    }
+  }
+  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : extent;
+}
+
 export function fit() {
   cancelGesture();
   if (!svg) return;
   const { w, h } = canvasSize();
-  const padding = parseFloat(getComputedStyle(canvas).getPropertyValue("--fit-margin"));
+  const style = getComputedStyle(canvas);
+  const padding = parseFloat(style.getPropertyValue("--fit-margin"));
   const margin = Number.isFinite(padding) ? Math.max(0, padding) : FIT_MARGIN;
-  const k = clamp(Math.min((w - 2 * margin) / extent.w, (h - 2 * margin) / extent.h), MIN_ZOOM, MAX_ZOOM);
-  view = { k, x: extent.x - (w / k - extent.w) / 2, y: extent.y - (h / k - extent.h) / 2 };
+  const box = style.getPropertyValue("--fit-content").trim() === "1" ? inkExtent() : extent;
+  const k = clamp(Math.min((w - 2 * margin) / box.w, (h - 2 * margin) / box.h), MIN_ZOOM, MAX_ZOOM);
+  view = { k, x: box.x - (w / k - box.w) / 2, y: box.y - (h / k - box.h) / 2 };
   apply();
 }
 
