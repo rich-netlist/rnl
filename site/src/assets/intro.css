@@ -355,7 +355,7 @@ section[id] { scroll-margin-top: 72px; }
 .hero { padding-block: 48px 72px; }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 48px; align-items: end; }
 .eyebrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font: 600 12px/1 var(--f-mono); letter-spacing: .18em; color: var(--ink-2); }
-.hero h1 { margin: 14px 0 0; display: flex; align-items: baseline; gap: 0; flex-wrap: nowrap; font: 700 clamp(92px, 14vw, 172px)/.8 var(--f-disp); }
+#hero-title { margin: 14px 0 0; display: flex; align-items: baseline; gap: 0; flex-wrap: nowrap; font: 700 clamp(92px, 14vw, 172px)/.8 var(--f-disp); }
 .wordmark { font: inherit; font-weight: 600; letter-spacing: -.015em; color: var(--ink); }
 /* The SVG has 3.85% vertical padding per side: match its painted height to the font's capitals. */
 .hero-logo { display: block; flex: none; height: .756em; height: 1.083415cap; transform: translateY(3.84955%); }
