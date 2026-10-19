@@ -59,7 +59,7 @@ for (const width of [1440, 390]) {
         if (!row.hidden) expect(row.badge).toBe(`Shown at ×${row.ratio.toFixed(2)}`);
       }
     }
-    await page.goto("/en/packages.html?series=eda-style&package=eda-style");
+    await page.goto("/en/packages.html?series=eda-symbol&package=eda-symbol");
     const osc = page.locator('.gl-card[data-sym="$OSC"]');
     // The previous group kept the origin setting in localStorage.
     await expect(page.locator('[data-show="origin"]')).toHaveAttribute("aria-pressed", "true");
