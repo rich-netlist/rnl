@@ -31,6 +31,7 @@ async function loaded(page) {
   const frame = page.frames().find(frame => frame.url().includes("embed=1"));
   expect(frame).toBeTruthy();
   await expect(frame.locator("#canvas > svg")).toBeVisible();
+  await expect(frame.locator("#canvas > svg")).toContainText("RNL logo by RNL");
   await frame.evaluate(() => document.fonts.ready);
   return frame;
 }
