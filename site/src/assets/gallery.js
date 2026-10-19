@@ -20,7 +20,8 @@
      its file starts with. A line holds for every version of the package, unless one is written for
      its name and version, such as 'rnl-std-fill 0.3', where the versions differ. */
   var SUMMARY = {
-    'eda-style': '<zh>公开扩展包：137 个绿色细线、红色端子和等宽标签的原理图符号，替换标准符号名，适合深色背景。</zh><en>A public extension package: 137 schematic symbols with green hairlines, red terminals and monospaced labels, replacing standard symbol names and suited to dark backgrounds.</en>',
+    'eda-symbol': '<zh>独立符号包：137 个不绑定配色的原理图符号和选用规则，引脚方向与标准库一致；可单独使用或搭配 eda-style。</zh><en>An independent package of 137 schematic symbols and selection rules, with no fixed colors and standard-compatible pin directions; use alone or with eda-style.</en>',
+    'eda-style': '<zh>独立样式包：绿色细线、红色符号文字、自动红色端子方块和等宽标签；适用于标准、eda-symbol 和自定义符号，符号几何由所用符号包提供。</zh><en>An independent visual package: green hairlines, red symbol text, automatic red terminal squares and monospaced labels for standard, eda-symbol and custom symbols; geometry comes from the chosen symbol package.</en>',
     'rnl-std': '<zh>标准包。每份网表的根上默认就用它；它只引用别的包，自己没有内容。</zh><en>The standard package, used at the root of every netlist by default. It only references other packages and has no content of its own.</en>',
     'rnl-std-core': '<zh>最小的组合：样式、符号和配符号的规则，把网表画出来，别的什么都不加——不补地、电源和端口标签。</zh><en>The smallest collection: styles, symbols and the rules that give them, enough to draw the netlist and nothing more — no grounds, supplies or port tags filled in.</en>',
     'rnl-std-style': '<zh>样式 $base、$bus、$signal、$note、$grey，和给每类对象默认样式的规则。</zh><en>The styles $base, $bus, $signal, $note and $grey, and the rules that give every kind of object its default style.</en>',

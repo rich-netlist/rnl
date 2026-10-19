@@ -68,12 +68,15 @@ if (entries.length < 20) fail(`only ${entries.length} files found under ${root}`
 entries.push(join(root, "tests/viewer/inputs/view-improvements.sp"));
 const defaultHairlines = join(root, "tests/viewer/inputs/default-hairlines.sp");
 entries.push(defaultHairlines);
-// A public package, not bundled in either core, exercises custom font hints and every symbol.
-const edaDir = join(root, "libraries/eda-style").replaceAll("\\", "/");
-const edaEntries = new Set(files(edaDir).filter((path) => /\.(rnl|scs)$/.test(path)));
+// Independent public geometry and style packages exercise custom fonts and generated terminal markers.
+const edaDirs = ["eda-symbol", "eda-style"].map((name) => join(root, "libraries", name).replaceAll("\\", "/"));
+const edaEntries = new Set(edaDirs.flatMap((dir) => files(dir).filter((path) => /\.(rnl|scs|sp)$/.test(path))));
 entries.push(...edaEntries);
-const edaFile = `${edaDir}/eda-style.rnl`;
-const edaText = await readText(edaFile);
+const edaFiles = Object.fromEntries(await Promise.all(edaDirs.map(async (dir) => {
+  const name = dir.split("/").at(-1);
+  const path = `${dir}/${name}.rnl`;
+  return [path, await readText(path)];
+})));
 // and a file that is not UTF-8, which rnl reads as Latin-1
 const temp = mkdtempSync(join(tmpdir(), "rnl-equality-"));
 process.on("exit", () => rmSync(temp, { recursive: true, force: true }));
@@ -147,7 +150,7 @@ function files(dir) {
 function native(entry) {
   const command = snapshot ? ["snapshot", entry, "--parts", "host,model"] : ["view", entry];
   if (entry === defaultHairlines) command.push("--no-std");
-  if (edaEntries.has(entry)) command.push("--package-dir", edaDir);
+  if (edaEntries.has(entry)) for (const dir of edaDirs) command.push("--package-dir", dir);
   try {
     const out = execFileSync(rnl, [...command, ...view], { encoding: "utf8", maxBuffer: 1 << 30, stdio: "pipe" });
     return { value: JSON.parse(out) };
@@ -178,7 +181,7 @@ async function webAssembly(entry) {
     const lazy = snapshot ? {} : { lazy_unplaced: true };
     const defaults = entry === defaultHairlines ? { std: false } : {};
     const external = edaEntries.has(entry)
-      ? { package_dirs: [...(extra.package_dirs ?? []), edaDir], files: { ...packages, [edaFile]: edaText } }
+      ? { package_dirs: [...(extra.package_dirs ?? []), ...edaDirs], files: { ...packages, ...edaFiles } }
       : { files: packages };
     const request = { ...extra, ...lazy, ...defaults, ...external, entry };
     const { document, files } = await collect(counted, request, readText);

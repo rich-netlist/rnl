@@ -1,6 +1,6 @@
-// eda-style Gallery — 130 visually unique IC schematic symbols across 6 categories
+// eda-symbol + eda-style Gallery — 130 visually unique IC schematic symbols across 6 categories
 simulator lang=spectre
-// @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="eda-style", version="0.1")}
+// @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-style", version="0.1")}
 
 // ================================================================ std_basic_semiconductors (48 symbols)
 subckt std_basic_semiconductors ()

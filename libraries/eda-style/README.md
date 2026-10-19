@@ -1,40 +1,40 @@
 # eda-style
 
-[`eda-style.rnl`](eda-style.rnl) is the public extension package `eda-style` 0.1 for RNL 0.3: 137 schematic symbols with green hairline strokes, red terminal markers and monospaced labels. It is loaded from a package file and is not bundled into the core.
+[`eda-style.rnl`](eda-style.rnl) is the independent visual package `eda-style` 0.1 for RNL 0.3. It styles standard, [`eda-symbol`](../eda-symbol/README.md), and user-defined symbols without supplying their geometry. Neither EDA package imports the other; both are public extensions, outside the core's built-in packages.
 
 ## Use
 
-Add this header to a Spectre netlist (use `*` instead of `//` in SPICE):
+To keep the EDA drawings as well as their appearance, include both packages, in this order (use `*` instead of `//` in SPICE):
 
 ```spectre
 // @RNL(type="header") {
 //   @VERSION("0.3");
+//   @USE-PACKAGE(name="eda-symbol", version="0.1");
 //   @USE-PACKAGE(name="eda-style", version="0.1")
 // }
 ```
 
-Make the package available to the viewer or command:
+Use only the `eda-style` line to apply the appearance to the standard drawings or to your own symbols. Existing netlists that used the previous combined `eda-style` package should add `eda-symbol` to retain its symbol definitions and selection rules.
 
-- **Web viewer:** open **Library → Include Public Package…**, search for `eda-style` and include version `0.1`, then open your netlist or the gallery below.
-- **Desktop viewer:** add `eda-style.rnl` with **Library → Include File…**, or add its directory with **Library → Add PATH Directory…**.
-- **Command line:** pass the package directory with `--path`:
+- **Web viewer:** in **Library → Include Public Package…**, add `eda-style` and, for EDA geometry, `eda-symbol`; then open the netlist. Importing one package does not import the other.
+- **Desktop viewer:** include the required `.rnl` files through **Library → Include File…**, or add both directories through **Add PATH Directory…**.
+- **Command line:** pass each required directory with `--path`:
 
 ```sh
 rnl check libraries/eda-style/eda-style.rnl
-rnl check libraries/eda-style/eda-style-gallery.scs --path libraries/eda-style
-rnl render libraries/eda-style/eda-style-gallery.scs --path libraries/eda-style -o out/eda-style
+rnl check libraries/eda-style/eda-style-gallery.scs --path libraries/eda-symbol --path libraries/eda-style
+rnl render libraries/eda-style/eda-style-gallery.scs --path libraries/eda-symbol --path libraries/eda-style -o out/eda-style
 ```
 
-The package **replaces standard symbol names**, including `$RESISTOR`, `$CAPACITOR`, `$NMOS_4TERM`, `$OPAMP`, `$AND_2INPUT` and `$GROUND_SYMBOL`, as well as the base styles, at the level that uses it and below. The corresponding hints about hiding standard definitions are expected. Use it after other packages whose appearance it should replace.
+## Appearance
 
-## Appearance and contents
+- Symbol outlines use green hairlines (`#00cc66`, `linewidth=0`); symbol text and labels use red (`#ff0000`).
+- `$PIN_SQUARE` attaches solid red 0.8 × 0.8 terminal squares through a terminal-selection set. Markers are drawn on the top layer, including on user-defined symbols; geometry files do not repeat the squares. Ground and supply usages are included explicitly. Port models use solid red polygons instead of an additional square.
+- Wires and scene annotations use dark hairlines (`#1d1d1f`), with wires on the bottom layer. Net and wire labels keep the base text style.
+- Labels hint `Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace`; the viewer chooses an available font.
 
-Symbol lines are green (`#00cc66`) hairlines (`linewidth=0`); terminals are solid red (`#ff0000`) squares, 0.8 × 0.8 grid units, or red port polygons. Wires use hairlines. Green lines and red terminals stand out on a dark background; the viewer also supports a light background. Labels hint `Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace`, with the available font chosen by the viewer.
+The viewer supports light and dark backgrounds. Green outlines and red terminals remain explicit package colors; the viewer adapts the dark base colors to a dark background.
 
-| Category | Symbols |
-| --- | ---: |
-| Standard RNL 0.3 symbol names | 93 |
-| Additional sources, switches, amplifiers, RF parts and filters | 44 |
-| Total | 137 |
+## Examples
 
-[`eda-style-gallery.scs`](eda-style-gallery.scs) places 130 visually distinct symbols in a 12-column top-level gallery, with six thematic subcircuits for closer inspection. It is an example netlist; the public package index and website package gallery read only `.rnl` files.
+[`eda-style-gallery.scs`](eda-style-gallery.scs) imports both packages and places 130 visually distinct symbols in a 12-column root gallery, with six thematic subcircuits. [`examples/custom-symbol.sp`](examples/custom-symbol.sp) shows the same visual rules on a user-defined symbol, a standard resistor, ground and supply usages, and a wire. Both run with the two `--path` options above. The public package index and website package gallery read only `.rnl` files.
