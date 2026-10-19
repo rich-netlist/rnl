@@ -105,6 +105,7 @@ for (const platform of ["desktop", "web"]) {
     const area = page.locator("#source textarea:not([hidden])").first();
     await area.fill(applied);
     await viewer.build(() => page.locator("#apply-edits").click());
+    await page.evaluate(() => window.viewer.command("toggle-edit"));
     await area.fill(applied.replace("2k", "3k"));
     await page.locator("#tab-files").click();
     await files(page).locator(".pool-open").click();

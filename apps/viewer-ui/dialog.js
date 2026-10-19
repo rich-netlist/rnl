@@ -186,8 +186,8 @@ export function offer({ title, paragraphs, action }) {
  * @returns {Promise<string | null>} The label of the button pressed, or null when the dialog is
  *   cancelled by Escape or Cancel.
  */
-export function decide({ title, paragraphs, action, others = [] }) {
-  const d = frame(title, "", action, true, others);
+export function decide({ title, paragraphs, action, others = [], cancel = "Cancel" }) {
+  const d = frame(title, "", action, cancel, others);
   addParagraphs(d.body, paragraphs);
   return d.show(d.ok, () => action);
 }
@@ -249,7 +249,7 @@ function frame(title, text, action, cancel = true, others = []) {
   if (cancel) {
     const no = document.createElement("button");
     no.type = "button";
-    no.textContent = "Cancel";
+    no.textContent = typeof cancel === "string" ? cancel : "Cancel";
     no.addEventListener("click", () => el.close());
     buttons.append(no);
   }

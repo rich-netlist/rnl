@@ -34,7 +34,7 @@ test("clicking a symbol selects its instance and marks its statement and the pla
   await expect(page.locator("#canvas > svg .overlay rect.label")).toHaveCount(2);
   await expect(page.locator("#enter-badge")).toBeVisible();
   await expect(page.locator("#canvas")).toHaveClass(/\bsel-sub\b/);
-  await expect(page.locator("#selection")).toHaveText(`X2 instance of amp in ${TOP} · Enter opens it`);
+  await expect(page.locator("#selection")).toHaveText(`X2 instance of amp in ${TOP} · E or Enter opens it; Shift opens a new window`);
   // the statement is scrolled into view
   const [line, source] = [await viewer.line(50).boundingBox(), await page.locator("#source").boundingBox()];
   expect(line.y).toBeGreaterThanOrEqual(source.y);

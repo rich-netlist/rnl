@@ -3,6 +3,7 @@
     {
       "label": "&File",
       "items": [
+        { "id": "new-window", "label": "&New Window" },
         { "id": "open", "label": "&Open File...", "keys": ["Ctrl+O"] },
         { "id": "include-file", "label": "&Include File..." },
         { "id": "include-folder", "label": "Include &Folder..." },
@@ -20,8 +21,13 @@
     {
       "label": "&Edit",
       "items": [
-        { "id": "toggle-edit", "label": "&Edit Text", "keys": ["Ctrl+E"], "check": true },
-        { "id": "apply-edits", "label": "&Apply Changes", "keys": ["Ctrl+Enter"] }
+        { "id": "toggle-edit", "label": "&Edit Text", "keys": ["Control+Q"], "shown": "Ctrl+Q", "check": true },
+        { "id": "apply-edits", "label": "&Apply and Exit Editing", "keys": ["Ctrl+Enter"] },
+        { "id": "discard-edits", "label": "&Discard Changes" },
+        "-",
+        { "id": "descend", "label": "Open &Subcircuit", "keys": ["E", "Enter"], "page": true },
+        { "id": "descend-new-window", "label": "Open Subcircuit in New &Window…", "keys": ["Shift+E", "Shift+Enter"], "page": true },
+        { "id": "ascend", "label": "&Up to Parent Level", "keys": ["Ctrl+E", "Backspace"], "page": true }
       ]
     },
     {
@@ -53,9 +59,6 @@
         },
         { "id": "toggle-hover-names", "label": "Show &Names on Hover", "check": true },
         "-",
-        { "id": "descend", "label": "Open &Subcircuit", "keys": ["Enter"], "page": true },
-        { "id": "ascend", "label": "&Up to Parent Level", "keys": ["Backspace"], "page": true },
-        "-",
         { "id": "toggle-netlist", "label": "&Netlist Panel", "keys": ["Ctrl+B"], "check": true },
         { "id": "toggle-problems", "label": "&Problems", "keys": ["Ctrl+Shift+M"], "check": true }
       ]
@@ -74,6 +77,7 @@
     {
       "label": "&Help",
       "items": [
+        { "id": "shortcuts", "label": "&Keyboard Shortcuts..." },
         { "id": "desktop-viewer", "label": "&Desktop Viewer...", "platforms": ["web"] },
         { "id": "check-updates", "label": "Check for &Updates...", "platforms": ["desktop"] },
         "-",

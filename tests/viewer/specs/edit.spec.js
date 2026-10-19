@@ -30,7 +30,7 @@ const text = (page) => area(page).inputValue();
 
 /** Switch the pane to edit, with Ctrl+E, and wait for the text box. */
 async function begin(page) {
-  await page.keyboard.press("Control+e");
+  await page.keyboard.press("Control+q");
   await expect(page.locator("#source .editor:not([hidden]) textarea")).toBeVisible();
 }
 
@@ -76,12 +76,12 @@ test.describe("on the desktop", () => {
       Array.from({ length: lines }, (_, k) => k + 1).join("\n"),
     );
     await expect(state(page)).toHaveText("No changes");
-    await expect(page.locator("#apply-edits")).toBeDisabled();
+    await expect(page.locator("#apply-edits")).toBeEnabled();
     // the other file's tab shows the other file's text box
     await tab(page, "lib.inc").click();
     expect(await text(page)).toBe((await original(page, "04-hierarchy-lib.inc")).replace(/\r\n/g, "\n"));
     // Ctrl+E again: the highlighted text, as before
-    await page.keyboard.press("Control+e");
+    await page.keyboard.press("Control+q");
     await expect(page.locator("#source .editor")).toHaveCount(0);
     await expect(page.locator("#source .file:not([hidden])")).toBeVisible();
     expect(await checked(page, "toggle-edit")).toBe(false);
@@ -109,43 +109,35 @@ test.describe("on the desktop", () => {
     expect(await viewer.builds()).toBe(builds);
   });
 
-  test("Apply Changes builds the Document from the text held, and keeps the level and the mode", async ({ page, viewer }) => {
+  test("Apply and Exit builds text and leaves editing", async ({ page, viewer }) => {
     await open(viewer, page);
     await rename(page);
     const edited = await text(page);
     await page.evaluate(() => (window.fakeShell.next = "edit-changed"));
     await viewer.build(() => page.locator("#apply-edits").click());
-    // the shell was given the text, by the path the Document names the file by, with the original's
-    // line ends
-    const edits = await page.evaluate(() => window.fakeShell.buildEdits);
-    expect(edits.at(-1)).toEqual({ "edit.sp": edited });
-    // the Document is the new one, drawn and checked; the bar says so, and what is applied is not saved
-    expect(await page.evaluate(() => window.viewer.doc.objects.some((o) => o.name === "C2"))).toBe(true);
-    await expect(state(page)).toHaveText("Applied, not saved");
-    await expect(page.locator("#apply-edits")).toBeDisabled();
+    expect(await page.evaluate(() => window.fakeShell.buildEdits.at(-1))).toEqual({ "edit.sp": edited });
+    await expect(area(page)).toHaveCount(0);
+    expect(await checked(page, "toggle-edit")).toBe(false);
     await expect(tab(page, "edit.sp")).toHaveAttribute("data-unapplied", "false");
     await expect(tab(page, "edit.sp")).toHaveAttribute("data-unsaved", "true");
-    // still editing, with the text as it was typed
-    await expect(area(page)).toBeVisible();
-    expect(await text(page)).toBe(edited);
-    // the highlighted text, shown again, is the applied one
-    await page.keyboard.press("Control+e");
     await expect(page.locator("#source .file:not([hidden]) .ln").nth(2)).toContainText("C2 b 0 1p");
+    await begin(page);
+    expect(await text(page)).toBe(edited);
   });
 
-  test("Ctrl+Enter applies too, from the text box, and a build that fails keeps the changes", async ({ page, viewer }) => {
+  test("Ctrl+Enter exits on failure, reports Problems and keeps the buffer", async ({ page, viewer }) => {
     await open(viewer, page);
     await rename(page);
     await page.evaluate(() => (window.fakeShell.fail = "cannot read edit.sp"));
     await page.keyboard.press("Control+Enter");
-    await expect(dialog(page)).toContainText("The changes could not be applied: cannot read edit.sp");
-    await answer(page, "Close");
-    await expect(state(page)).toHaveText("Changes not applied yet");
+    await expect(area(page)).toHaveCount(0);
+    await expect(page.locator("#diags")).toContainText("The changes could not be applied: cannot read edit.sp");
+    await begin(page);
     expect(await text(page)).toContain("C2");
-    // the next try goes through
     await page.evaluate(() => (window.fakeShell.next = "edit-changed"));
     await viewer.build(() => page.keyboard.press("Control+Enter"));
-    await expect(state(page)).toHaveText("Applied, not saved");
+    await expect(area(page)).toHaveCount(0);
+    expect(await page.evaluate(() => window.viewer.edits)).toEqual({ unsaved: ["edit.sp"], unapplied: [] });
   });
 
   test("each file of an include has its own text, its own marks, and its own changes", async ({ page, viewer }) => {
@@ -166,52 +158,57 @@ test.describe("on the desktop", () => {
     expect(edits["04-hierarchy-lib.inc"].startsWith("* a comment")).toBe(true);
   });
 
-  test("leaving edit with changes not applied asks to apply them, to discard them, or to stay", async ({ page, viewer }) => {
+  test("exiting applies automatically; Discard confirms and exits without building", async ({ page, viewer }) => {
     await open(viewer, page);
     const was = await text(page);
     await rename(page);
-    // Cancel stays in edit with the changes
-    await page.keyboard.press("Control+e");
-    await expect(dialog(page)).toContainText("Some changes are not applied yet");
+    await page.evaluate(() => window.viewer.command("discard-edits"));
     await answer(page, "Cancel");
     expect(await text(page)).toContain("C2");
-    // Discard Changes puts the text back as the Document has it, and leaves
-    await page.keyboard.press("Control+e");
+    const builds = await viewer.builds();
+    await page.evaluate(() => window.viewer.command("discard-edits"));
     await answer(page, "Discard Changes");
-    await expect(page.locator("#source .editor")).toHaveCount(0);
-    await expect(page.locator("#source .file:not([hidden])")).toBeVisible();
+    await expect(area(page)).toHaveCount(0);
+    expect(await viewer.builds()).toBe(builds);
     expect(await page.evaluate(() => window.viewer.edits)).toEqual({ unsaved: [], unapplied: [] });
     await begin(page);
     expect(await text(page)).toBe(was);
-    // Apply Changes applies and leaves
     await rename(page);
     await page.evaluate(() => (window.fakeShell.next = "edit-changed"));
-    await page.keyboard.press("Control+e");
-    await viewer.build(() => dialog(page).getByRole("button", { name: "Apply Changes" }).click());
-    await expect(page.locator("#source .editor")).toHaveCount(0);
+    await viewer.build(() => page.keyboard.press("Control+q"));
+    await expect(area(page)).toHaveCount(0);
     expect(await page.evaluate(() => window.viewer.edits)).toEqual({ unsaved: ["edit.sp"], unapplied: [] });
+    await begin(page);
+    const applied = await text(page);
+    await type(page, applied + "* pending\n");
+    await page.evaluate(() => window.viewer.command("discard-edits"));
+    await answer(page, "Discard Changes");
+    await begin(page);
+    expect(await text(page)).toBe(applied);
+    await page.keyboard.press("Control+q");
+    expect(await viewer.builds()).toBe(builds + 1);
   });
 
   test("a preview is not edited, and a solve is of the text applied", async ({ page, viewer }) => {
     await open(viewer, page, "T4-miller-conflicts");
-    // changes are not applied: the solve has none of them
+    // Solve exits editing, applying the pending text first
     await type(page, `${await text(page)}\n* a note`);
     await page.evaluate(() => window.viewer.command("solve"));
     await page.waitForFunction(() => document.body.classList.contains("preview") && !document.body.classList.contains("solving"));
-    expect(await page.evaluate(() => window.fakeShell.solveEdits.at(-1))).toEqual({});
-    // the pane is not in edit while the preview is shown, and says that the change was left out
+    expect(Object.values(await page.evaluate(() => window.fakeShell.solveEdits.at(-1)))[0]).toContain("* a note");
+    // A preview is not edited; the change was applied before solving
     await expect(page.locator("#source .editor")).toHaveCount(0);
-    await expect(page.locator("#solve-step")).toContainText("Changes not applied yet are not in it.");
+    await expect(page.locator("#solve-step")).not.toContainText("Changes not applied yet are not in it.");
     expect(await checked(page, "toggle-edit")).toBe(false);
     await page.evaluate(() => window.viewer.command("toggle-edit"));
     await expect(dialog(page)).toContainText("A solve is shown as a preview");
     await answer(page, "Close");
     // closing the preview shows the netlist again, and the changes are still there to apply
     await viewer.build(() => page.locator("#preview-close").click());
-    expect(await page.evaluate(() => window.fakeShell.buildEdits.at(-1))).toEqual({});
+    expect(Object.values(await page.evaluate(() => window.fakeShell.buildEdits.at(-1)))[0]).toContain("* a note");
     await begin(page);
     expect((await text(page)).endsWith("\n* a note")).toBe(true);
-    await expect(state(page)).toHaveText("Changes not applied yet");
+    await expect(state(page)).toHaveText("Applied, not saved");
   });
 
   test("a solve is of the text applied, and closing the preview shows that text, not the file", async ({ page, viewer }) => {
@@ -272,7 +269,7 @@ test.describe("saving", () => {
     await rename(page);
     await page.evaluate(() => (window.fakeShell.next = "edit-changed"));
     await viewer.build(() => page.locator("#apply-edits").click());
-    await page.keyboard.press("Control+e");
+    await expect(area(page)).toHaveCount(0);
     await page.evaluate(() => (window.fakeShell.writeFail = "access is denied"));
     await page.evaluate(() => window.viewer.command("save"));
     await expect(dialog(page)).toContainText("The changes were not saved: access is denied");
@@ -445,6 +442,7 @@ test.describe("leaving with changes not saved", () => {
     await answer(page, "Cancel");
     expect(await viewer.builds()).toBe(builds);
     expect(await page.evaluate(() => window.viewer.edits.unsaved)).toEqual(["edit.sp"]);
+    await begin(page);
     expect(await text(page)).toContain("C2");
   });
 
@@ -458,8 +456,8 @@ test.describe("leaving with changes not saved", () => {
     await viewer.build(() => dialog(page).getByRole("button", { name: "Save", exact: true }).click());
     expect(await page.evaluate(() => window.fakeShell.writes)).toHaveLength(1);
     expect(await page.evaluate(() => window.viewer.edits.unsaved)).toEqual([]);
-    // Don't Save: the changes are gone, and the file is read again; the pane is still in edit
-    await expect(area(page)).toBeVisible();
+    // Re-enter editing before another change.
+    await begin(page);
     await rename(page);
     await page.keyboard.press("F5");
     await viewer.build(() => dialog(page).getByRole("button", { name: "Don't Save" }).click());
@@ -522,7 +520,7 @@ test.describe("leaving with changes not saved", () => {
 test.describe("on the web", () => {
   test("the page offers Edit and Save, which downloads, and no Save As", async ({ page, viewer }) => {
     await viewer.open("edit");
-    await page.keyboard.press("Control+e");
+    await page.keyboard.press("Control+q");
     await expect(area(page)).toBeVisible();
     await rename(page);
     // Save is offered to the shell as it is on the desktop; of what is saved, the web shell
@@ -543,7 +541,7 @@ test.describe("on the web", () => {
       const table = await (await fetch("commands.json")).json();
       return table.menus.map((m) => [m.label, m.items.filter((i) => i !== "-").map((i) => i.id)]);
     });
-    expect(menus.find(([label]) => label === "&Edit")[1]).toEqual(["toggle-edit", "apply-edits"]);
+    expect(menus.find(([label]) => label === "&Edit")[1]).toEqual(["toggle-edit", "apply-edits", "discard-edits", "descend", "descend-new-window", "ascend"]);
     expect(menus.find(([label]) => label === "&File")[1]).toContain("save");
   });
 });

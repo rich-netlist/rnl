@@ -89,19 +89,28 @@ function writeIcns(file, blocks) {
   writeFileSync(file, Buffer.concat([header, ...sorted]));
 }
 
-// Keep Tauri's larger frames; replace only 16/24/32px frames with the native Chromium PNGs.
-function smallIco(file) {
+// Windows can choose larger frames even for its taskbar at higher DPI. Keep the 32px logo's
+// heavier, simpler strokes in those frames too, rendering its geometry at the requested size.
+export async function windowsIco(file) {
   const data = readFileSync(file), count = data.readUInt16LE(4);
   const directory = Buffer.from(data.subarray(0, 6 + count * 16)), images = [];
-  let offset = directory.length;
-  for (let i = 0; i < count; i++) {
-    const entry = 6 + i * 16, size = data[entry] || 256;
-    const image = size <= 32 ? readFileSync(join(root, `brand/rnl-icon-${size}.png`)) :
-      data.subarray(data.readUInt32LE(entry + 12), data.readUInt32LE(entry + 12) + data.readUInt32LE(entry + 8));
-    directory.writeUInt32LE(image.length, entry + 8);
-    directory.writeUInt32LE(offset, entry + 12);
-    images.push(image);
-    offset += image.length;
+  const icon = readFileSync(join(root, "brand/rnl-icon.svg"), "utf8").replace(/<style>.*?<\/style>/s,
+    "<style>.icon-normal, .icon-small { display: none; } .icon-32 { display: inline; }</style>");
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    let offset = directory.length;
+    for (let i = 0; i < count; i++) {
+      const entry = 6 + i * 16, size = data[entry] || 256;
+      const image = size <= 32 ? readFileSync(join(root, `brand/rnl-icon-${size}.png`)) :
+        await png(page, icon, size);
+      directory.writeUInt32LE(image.length, entry + 8);
+      directory.writeUInt32LE(offset, entry + 12);
+      images.push(image);
+      offset += image.length;
+    }
+  } finally {
+    await browser.close();
   }
   writeFileSync(file, Buffer.concat([directory, ...images]));
 }
@@ -164,7 +173,7 @@ export function iconSvg(logo, bounds, { background = ICON_BACKGROUND } = {}) {
 async function png(page, svg, size, path) {
   await page.setViewportSize({ width: size, height: size });
   await page.setContent(`<style>html,body{margin:0;width:100%;height:100%}svg{display:block;width:100%;height:100%}</style>${svg}`);
-  await page.screenshot({ path, omitBackground: true });
+  return page.screenshot({ path, omitBackground: true });
 }
 
 async function generate() {
@@ -209,7 +218,7 @@ async function generate() {
     const config = JSON.parse(readFileSync(join(root, "apps/desktop/tauri.conf.json"), "utf8"));
     for (const icon of config.bundle.icon) copyFileSync(join(temporary, icon.replace(/^icons\//, "")), join(root, "apps/desktop", icon));
     copyFileSync(join(root, "brand/rnl-icon-32.png"), join(root, "apps/desktop/icons/32x32.png"));
-    smallIco(join(root, "apps/desktop/icons/icon.ico"));
+    await windowsIco(join(root, "apps/desktop/icons/icon.ico"));
     const blocks = icnsBlocks(join(temporary, "icon.icns"));
     // Let Tauri encode legacy ICNS RGB/mask pairs; retain just the requested physical sizes.
     // Resource types follow tauri-cli/src/helpers/icns.json; masks accompany is32 and il32.

@@ -63,11 +63,11 @@ test.describe("on the web", () => {
         title: "File",
         letter: "F",
         items: [
-          "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
+          "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
           "", "SaveCtrl+S",
         ],
       },
-      { title: "Edit", letter: "E", items: ["Edit TextCtrl+E", "Apply ChangesCtrl+Enter"] },
+      { title: "Edit", letter: "E", items: ["Edit TextCtrl+Q", "Apply and Exit EditingCtrl+Enter", "Discard Changes", "", "Open SubcircuitE", "Open Subcircuit in New Window…Shift+E", "Up to Parent LevelCtrl+E"] },
       {
         title: "View",
         letter: "V",
@@ -75,7 +75,6 @@ test.describe("on the web", () => {
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-",
           "Background", "Light", "Dark",
           "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "",
-          "Open SubcircuitEnter", "Up to Parent LevelBackspace", "",
           "Netlist PanelCtrl+B", "ProblemsCtrl+Shift+M",
         ],
       },
@@ -86,7 +85,7 @@ test.describe("on the web", () => {
     for (const id of ["grid-none", "grid-dots", "grid-lines"]) await expect(viewer.menuItem(id)).toHaveAttribute("role", "menuitemradio");
     for (const id of ["toggle-grid", "grid-axes"]) await expect(viewer.menuItem(id)).toHaveAttribute("role", "menuitemcheckbox");
     // Help has the web's own Desktop Viewer, before About
-    expect(menus.at(-1)).toEqual({ title: "Help", letter: "H", items: ["Desktop Viewer...", "", "About RNL Viewer"] });
+    expect(menus.at(-1)).toEqual({ title: "Help", letter: "H", items: ["Keyboard Shortcuts...", "Desktop Viewer...", "", "About RNL Viewer"] });
   });
 
   test("Help > Desktop Viewer shows the site's page of the tools, in Chinese if the browser puts Chinese first", async ({ page, viewer }) => {
@@ -211,9 +210,9 @@ test.describe("on the web", () => {
     await page.evaluate(() => window.fakeShell.picks.push("04-hierarchy"));
     await viewer.build(() => choose("File", "open"));
     await viewer.click("X3");
-    await choose("View", "descend");
+    await choose("Edit", "descend");
     await expect(page.locator("#level-name")).toHaveText("rdiv");
-    await choose("View", "ascend");
+    await choose("Edit", "ascend");
     await expect(page.locator("#level-name")).toHaveText(TOP);
     await viewer.selected(`instance X3 in ${TOP}`);
   });

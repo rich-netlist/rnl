@@ -13,6 +13,7 @@ import { rootPath } from "./hierarchy.js";
 import { uncalledRoots } from "./roots.js";
 import { clearSelection, select } from "./selection.js";
 import { revealDefinition } from "./text.js";
+import { navigate } from "./navigation.js";
 import { $, span } from "./util.js";
 
 const bar = $("level-path");
@@ -44,12 +45,15 @@ function rememberView() {
  * Show the level a path leads to, with the view kept for the path, or else the view shown when the
  * level stays; with `via`, select the instance of that name on it, the one the path was left through.
  */
-function enter(next, via) {
+export function commitNavigation({ path: next, via, selection, reveal = false }) {
   rememberView();
   const level = next[next.length - 1].level;
   const kept = viewCache.get(key(next)) || (level === current ? view : null);
   setPath(next);
   showLevel(level, kept);
+  if (selection === null) clearSelection();
+  else if (selection !== undefined) select(selection, "reload");
+  if (reveal) revealDefinition(level);
   if (via === undefined) return;
   // the instance we came out of stays selected, so the way back down is one Enter away
   const host = doc.levels[level].host;
@@ -64,38 +68,36 @@ function cutTo(level) {
 }
 
 /** Open the subcircuit of instance `o`, below the level that has the instance. */
-export function descend(o) {
+export function descend(o, options) {
   const level = opens(o);
   if (level === null) return;
   const obj = doc.objects[o];
   // the instance is on the level shown, or on one that the path is cut back to or starts at
   const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
-  clearSelection();
-  enter(at < 0 ? [{ level, via: null }] : [...cutTo(at), { level, via: obj.name }]);
-  revealDefinition(level);
+  return navigate({ path: at < 0 ? [{ level, via: null }] : [...cutTo(at), { level, via: obj.name }], selection: null, reveal: true }, options);
 }
 
 /** Go back along the path to its level at `depth`. */
-export function backTo(depth) {
+export function backTo(depth, options) {
   if (depth < 0 || depth >= path.length - 1) return;
-  enter(path.slice(0, depth + 1), path[depth + 1].via);
+  return navigate({ path: path.slice(0, depth + 1), via: path[depth + 1].via }, options);
 }
 
 /** Go one level up the path; at its root, nothing. */
-export function ascend() {
-  backTo(path.length - 2);
+export function ascend(options) {
+  return backTo(path.length - 2, options);
 }
 
 /** Show a level reached otherwise than through an instance, such as by an object of it in the text. */
-export function goTo(level) {
-  enter(cutTo(level));
+export function goTo(level, selection, options) {
+  return navigate({ path: cutTo(level), selection }, options);
 }
 
 /**
  * Show the level of a row of the hierarchy tree, by the way to it from the root of its tree: the top
  * level, "0/1", or a subcircuit that the top level does not call, "r3/0" (hierarchy.js).
  */
-export function enterRow(row) {
+export function enterRow(row, options = {}) {
   const [start, ...rest] = row.split("/");
   const next = [{ level: start.startsWith("r") ? Number(start.slice(1)) : 0, via: null }];
   for (const k of rest.map(Number)) {
@@ -104,16 +106,14 @@ export function enterRow(row) {
     next.push({ level: child.level, via: child.instance });
   }
   // the path shown already changes nothing, so that the tree is not drawn again (openLevel)
-  if (same(next, path)) return;
-  enter(next);
-  revealDefinition(next[next.length - 1].level);
+  if (same(next, path) && !options.newWindow) return;
+  return navigate({ path: next, reveal: true }, options);
 }
 
 /** Show a level as the root of the path, as the subcircuit index does. */
-export function enterRoot(level) {
-  if (same([{ level, via: null }], path)) return;
-  enter([{ level, via: null }]);
-  revealDefinition(level);
+export function enterRoot(level, options = {}) {
+  if (same([{ level, via: null }], path) && !options.newWindow) return;
+  return navigate({ path: [{ level, via: null }], reveal: true }, options);
 }
 
 /**
@@ -180,7 +180,7 @@ export function updatePath() {
       crumb.className = "crumb";
       crumb.title = `Back to ${title}`;
       crumb.append(span("name", title));
-      crumb.addEventListener("click", () => backTo(d));
+      crumb.addEventListener("click", (e) => backTo(d, { newWindow: e.shiftKey }));
     }
     if (s.via !== null) {
       crumb.append(span("via", s.via));
@@ -223,7 +223,7 @@ export function updatePath() {
   $("up").hidden = up === null;
   if (up !== null) {
     $("up-name").textContent = up;
-    $("up").title = `Up to ${up} (Backspace)`;
+    $("up").title = `Up to ${up} (Ctrl+E or Backspace; Shift opens a new window)`;
   }
   fitPath();
 }
@@ -279,9 +279,9 @@ function openMore(fromKeys) {
       b.append(span("name", title));
       if (s.via !== null) b.append(span("via", s.via));
       b.setAttribute("aria-label", s.via !== null ? `${title} ${s.via}` : title);
-      b.addEventListener("click", () => {
+      b.addEventListener("click", (e) => {
         closeMore();
-        backTo(d);
+        backTo(d, { newWindow: e.shiftKey });
       });
       return b;
     }),
@@ -332,4 +332,4 @@ new ResizeObserver(() => {
   fitPath();
 }).observe(bar.parentElement);
 
-$("up").addEventListener("click", ascend);
+$("up").addEventListener("click", (e) => ascend({ newWindow: e.shiftKey }));

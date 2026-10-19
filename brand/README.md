@@ -44,9 +44,12 @@ The script uses `target/debug/rnl` (`rnl.exe` on Windows); `RNL_BIN` can select 
 It invokes the installed Tauri CLI's `icon` command, equivalent to `npx tauri icon`, in a temporary
 folder and copies only the five icons listed in `apps/desktop/tauri.conf.json`. Unused Appx,
 Android and iOS outputs are discarded; the bundle configuration stays unchanged.
-The 32px desktop PNG and ICO's 16/24/32px frames use the small Chromium PNGs. Tauri also encodes
+The 32px desktop PNG and ICO's 16/24/32px frames use the small Chromium PNGs. Larger Windows ICO
+frames render the 32px variant's geometry at their own size, so high-DPI taskbars and Explorer use
+the same small-logo strokes without shrinking the 1024px logo. The Windows viewer also explicitly
+uses the 32px PNG for its window icon. Tauri also encodes
 the small ICNS RGB/mask resources, including the 16pt@2x (32 physical pixels) representation;
-larger resources retain their normal strokes. ICNS blocks are sorted by type for reproducibility.
+larger ICNS resources retain their normal strokes. ICNS blocks are sorted by type for reproducibility.
 
 The same command also updates:
 

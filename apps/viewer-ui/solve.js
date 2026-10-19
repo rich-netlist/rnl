@@ -8,7 +8,7 @@
 
 import { inform, modal } from "./dialog.js";
 import { changes, unappliedPaths } from "./edits.js";
-import { stopEditing } from "./editor.js";
+import { editing, stopEditing } from "./editor.js";
 import { currentSource, isLoading, openSource, showBuilt } from "./open.js";
 import { setPane } from "./panels.js";
 import { shell } from "./shell.js";
@@ -43,7 +43,7 @@ export async function solve() {
     return;
   }
   hookProgress();
-  stopEditing(); // a preview is not edited; the text the editor holds stays
+  if (editing && !await stopEditing()) return; // do not solve stale text if applying failed
   running = true;
   document.body.classList.add("solving");
   status(`Solving ${source.name}…`, true);

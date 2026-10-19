@@ -12,10 +12,12 @@ import { gridState, setGrid } from "./grid.js";
 import { setHoverNames } from "./hover.js";
 import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
+import { restoreSession } from "./navigation.js";
 import {
   setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
 } from "./panels.js";
 import { loadShell } from "./shell.js";
+import { finishStartup } from "./startup.js";
 import { current, doc, path, selected } from "./state.js";
 import { renderUnplaced } from "./unplaced.js";
 import { $, load, startSettings } from "./util.js";
@@ -61,13 +63,15 @@ async function start() {
   if (!shell.nativeMenu) showMenuBar(true);
   if (shell.onOpen) shell.onOpen((source) => openSource(source, false));
   if (shell.onCloseRequested) shell.onCloseRequested(closeRequested);
-  openSource(await shell.initial(), false);
+  const session = await shell.initialSession?.();
+  if (session) await restoreSession(session);
+  else await openSource(await shell.initial(), false);
 }
 
 // a shell may reject with a plain message, as Tauri's invoke does
 start().catch((e) => {
   $("empty").textContent = e instanceof Error ? e.message : String(e);
-});
+}).finally(finishStartup);
 
 // A handle for tests and the console, which cannot see into the modules.
 window.viewer = {
@@ -105,3 +109,8 @@ window.viewer = {
     return { unsaved: dirtyPaths(), unapplied: unappliedPaths() };
   },
 };
+
+// Keep native/browser copy-paste menus in editable controls; the rest of the sidebar is a viewer.
+$("sidebar").addEventListener("contextmenu", (e) => {
+  if (!e.target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]')) e.preventDefault();
+});

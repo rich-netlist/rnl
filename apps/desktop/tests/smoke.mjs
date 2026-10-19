@@ -428,6 +428,7 @@ async function drive(app, port, profile, t0, session) {
   chooseItem(app.pid, at("toggle-netlist"));
   await until("the side panel to be shown", async () => (await shown(page)).sidebar, 10_000);
   await until("Netlist Panel's check mark", () => checked("toggle-netlist"), 10_000);
+  await newWindowSmoke(app, page, at);
   const zoom = (await shown(page)).zoom;
   chooseItem(app.pid, at("zoom-in"));
   await until("View > Zoom In", async () => (await shown(page)).zoom !== zoom, 10_000);
@@ -585,6 +586,8 @@ async function drive(app, port, profile, t0, session) {
   same(fs.readFileSync(netlistInclude).equals(includeOnDisk), true, "the include after the netlist was saved");
   // another program changes the file after the viewer read it: Save does not write over it, and asks;
   // Overwrite writes the text of the viewer
+  chooseItem(app.pid, at("toggle-edit"));
+  await until("editing again", () => page.evaluate(`!!document.querySelector("#source textarea")`));
   const eol = saved.includes("\r\n") ? "\r\n" : "\n";
   fs.appendFileSync(netlist, `* changed by another program${eol}`);
   await page.evaluate(`(() => {
@@ -605,8 +608,7 @@ async function drive(app, port, profile, t0, session) {
   await until("the file overwritten", () => fs.readFileSync(netlist, "utf8") === `${saved}* and in the viewer${eol}`, 20_000);
   // what was saved is not applied yet, and leaving the text boxes with a line not applied asks about it
   chooseItem(app.pid, at("apply-edits"));
-  await until("the line applied", () => page.evaluate(`document.getElementById("apply-edits").disabled`), 20_000);
-  chooseItem(app.pid, at("toggle-edit"));
+  await until("applied and exited", () => page.evaluate(`document.querySelectorAll("#source .editor").length === 0`), 20_000);
   await until("the text read again", () => page.evaluate(`document.querySelectorAll("#source .editor").length === 0`));
   console.log("Edit > Edit Text, Apply Changes and File > Save built the edited text natively and saved the one file, as it was written");
 
@@ -659,6 +661,60 @@ async function drive(app, port, profile, t0, session) {
 
   await filePoolSmoke(page);
   same(page.errors, [], "the page's errors");
+}
+
+/** File > New Window launches this executable again, restores the session and leaves its parent. */
+async function newWindowSmoke(app, page, at) {
+  const port = await freePort();
+  const before = await page.evaluate(`({ path: window.viewer.path, level: window.viewer.level, selected: window.viewer.selected })`);
+  await page.evaluate(`(async () => {
+    const shell = (await import('./shells/desktop.js')).default;
+    const original = shell.newWindow;
+    shell.newWindow = async (session, doc) => {
+      session.testPort = ${port};
+      const pid = await original(session, doc);
+      window.spawnedViewer = pid;
+      return pid;
+    };
+  })()`);
+  let child = null;
+  let pid = null;
+  try {
+    chooseItem(app.pid, at("new-window"));
+    pid = await until("the second viewer process", () => page.evaluate("window.spawnedViewer || null"));
+    check(pid !== app.pid, "New Window reused the original process");
+    const childInfo = JSON.parse(powershell(`Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" | Select-Object ParentProcessId,CommandLine | ConvertTo-Json -Compress`));
+    same(childInfo.ParentProcessId, app.pid, "the new process's parent");
+    check(childInfo.CommandLine.includes("--session"), "the child has no session file argument");
+    child = await connect(port);
+    await until("the child document and level", async () => {
+      const shown = await child.evaluate(`window.viewer?.doc && !document.body.classList.contains('busy') && ({ path: window.viewer.path, level: window.viewer.level, selected: window.viewer.selected })`);
+      return shown && JSON.stringify(shown) === JSON.stringify(before);
+    });
+    same(await child.evaluate(`document.querySelectorAll('#pool-list .pool-row').length`), 1, "the child's Library");
+    same(await page.evaluate(`({ path: window.viewer.path, level: window.viewer.level, selected: window.viewer.selected })`), before, "the parent after New Window");
+    // Both processes start from the same preferences, then save distinct keys without losing either.
+    await page.evaluate(`(async () => { const u = await import('./util.js'); await u.save('background', 'dark'); })()`);
+    await child.evaluate(`(async () => { const u = await import('./util.js'); await u.save('grid-major', 7); })()`);
+    const settings = await child.evaluate(`(async () => (await import('./util.js')).settingsPath)()`);
+    const values = JSON.parse(fs.readFileSync(settings, "utf8"));
+    same([values.background, values["grid-major"]], ["dark", 7], "independent settings updates");
+    if (process.env.SMOKE_OUTPUT_DIR) {
+      fs.mkdirSync(process.env.SMOKE_OUTPUT_DIR, { recursive: true });
+      for (const [name, target] of [["desktop-parent.png", page], ["desktop-new-window.png", child]]) {
+        const screenshot = await target.send("Page.captureScreenshot", { format: "png" });
+        fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR, name), Buffer.from(screenshot.data, "base64"));
+      }
+      fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR, "desktop-two-processes.json"), JSON.stringify({ parent: app.pid, child: pid, session: before, process: childInfo }, null, 2));
+    }
+    console.log(`File > New Window started independent process ${pid} from ${app.pid}, restored its level/selection/Library and preserved concurrent settings`);
+  } finally {
+    child?.ws.close();
+    if (pid) {
+      try { execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" }); } catch { /* already closed */ }
+    }
+    await page.evaluate(`(async () => { const shell = (await import('./shells/desktop.js')).default; delete window.spawnedViewer; })()`);
+  }
 }
 
 /** Exercise the real desktop shell and native core; replace only the OS chooser's selection. */

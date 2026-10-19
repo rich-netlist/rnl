@@ -11,6 +11,7 @@ mod core_thread;
 mod files;
 mod menu;
 mod pool;
+mod session;
 mod settings;
 mod solve;
 
@@ -72,7 +73,17 @@ fn devtools_port(args: impl IntoIterator<Item = OsString>) -> Option<u16> {
 
 /// The file among the command line's arguments: the first that is not the DevTools switch.
 fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
-    args.into_iter().find(|a| !a.to_string_lossy().starts_with(DEVTOOLS_SWITCH))
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        if arg == "--session" {
+            args.next();
+            continue;
+        }
+        if !arg.to_string_lossy().starts_with(DEVTOOLS_SWITCH) {
+            return Some(arg);
+        }
+    }
+    None
 }
 
 /// The extensions offered first in the open dialog.
@@ -250,7 +261,17 @@ fn initial_file() -> Option<String> {
 }
 
 fn main() {
+    let session = session::read(std::env::args_os().skip(1)).expect("the viewer session could not be read");
     let mut context = tauri::generate_context!();
+    // Keep the small-logo strokes in the title bar and taskbar, including at higher system DPI.
+    #[cfg(windows)]
+    context.set_default_window_icon(Some(tauri::include_image!("icons/32x32.png")));
+    if let Some(position) = session.as_ref().and_then(|s| s.get("position")) {
+        if let Some(window) = context.config_mut().app.windows.first_mut() {
+            window.x = position["x"].as_f64();
+            window.y = position["y"].as_f64();
+        }
+    }
     if let Some(port) = devtools_port(std::env::args_os().skip(1)) {
         for window in &mut context.config_mut().app.windows {
             window.additional_browser_args = Some(format!("{WEBVIEW_ARGS} {DEVTOOLS_SWITCH}{port}"));
@@ -263,6 +284,7 @@ fn main() {
         .manage(solve::Solves::default())
         .manage(Unsaved::default())
         .manage(settings::Settings::default())
+        .manage(session::Initial(Mutex::new(session)))
         .manage(Core::new())
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -290,12 +312,15 @@ fn main() {
             quit,
             pick_file,
             initial_file,
+            session::initial_session,
+            session::new_window,
             settings::load_settings,
             settings::save_setting,
             pool::pick_pool,
             pool::bundled_files,
             pool::path_packages,
             menu::set_view_check,
+            menu::set_command_enabled,
             solve::solve_preview,
             solve::solver_defaults,
             solve::check_solver_options,
@@ -329,6 +354,8 @@ mod tests {
         assert_eq!(file_argument(args(&["a.sp"])), Some("a.sp".into()));
         assert_eq!(devtools_port(args(&["--remote-debugging-port=a.sp"])), None);
         assert_eq!(file_argument(args(&["--remote-debugging-port=9222"])), None);
+        assert_eq!(file_argument(args(&["--session", "session.json", "--remote-debugging-port=9222"])), None);
+        assert_eq!(file_argument(args(&["--session", "session.json", "a.sp"])), Some("a.sp".into()));
     }
 
     /// The version in `[workspace.package]` of a Cargo manifest.

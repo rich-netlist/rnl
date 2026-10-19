@@ -11,6 +11,104 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { PICK, root, UNCALLED } from "../fixtures.js";
 
+test("New Window hands local files, applied include text, hierarchy and Library to a new tab", async ({ page }, info) => {
+  await start(page);
+  const top = '* local top\n.include "part.inc"\nX1 a 0 part\n* @RNL { #X1 @PLACE(0, 0) }\n.end\n';
+  const part = '.subckt part p q\nR1 p q 1k\n.ends\n* @RNL(scope="part") { #R1 @PLACE(0, 0) }\n';
+  await page.locator("#file-input").setInputFiles({ name: "top.sp", mimeType: "text/plain", buffer: Buffer.from(top) });
+  await shown(page);
+  await opened(page, () => page.locator("#include-input").setInputFiles({ name: "part.inc", mimeType: "text/plain", buffer: Buffer.from(part) }));
+  await page.locator("#tab-netlist").click();
+  await page.keyboard.press("Control+q");
+  await page.locator("#file-tabs button", { hasText: "part.inc" }).click();
+  await page.locator("#source textarea:visible").fill(part.replaceAll("R1", "R7"));
+  await opened(page, () => page.keyboard.press("Control+Enter"));
+  await page.evaluate(async () => {
+    const { select } = await import('./selection.js');
+    select(window.viewer.doc.objects.findIndex((o) => o.name === 'X1'), 'drawing');
+  });
+  await page.keyboard.press("e");
+  await expect(page.locator("#level-name")).toHaveText("part");
+  await page.evaluate(async () => {
+    const { select } = await import('./selection.js');
+    select(window.viewer.doc.objects.findIndex((o) => o.name === 'R7'), 'drawing');
+    (await import('./background.js')).setBackground('dark');
+  });
+  const before = await page.evaluate(() => ({ level: window.viewer.level, path: window.viewer.path, selected: window.viewer.selected }));
+  // Unapplied text must stay in this tab, while its applied predecessor is handed to the child.
+  await page.keyboard.press("Control+q");
+  await page.locator("#source textarea:visible").fill(part.replaceAll("R1", "R8"));
+  await page.getByRole("menuitem", { name: "File", exact: true }).click();
+  const popup = page.waitForEvent("popup");
+  await page.locator('[data-id="new-window"]').click();
+  const child = await popup;
+  try {
+    await expect(child.locator("#level-name")).toHaveText("part");
+    await expect.poll(() => child.evaluate(() => window.viewer.path)).toEqual(before.path);
+    expect(await child.evaluate(() => window.viewer.doc.objects[window.viewer.selected].name)).toBe("R7");
+    expect(await child.evaluate(() => window.viewer.doc.files.some((f) => f.text.includes("R8")))).toBe(false);
+    await expect(child.locator("#pool-list .pool-row")).toHaveCount(2);
+    expect(await child.evaluate(async () => (await import('./util.js')).load('background'))).toBe("dark");
+    expect(await page.evaluate(() => ({ level: window.viewer.level, path: window.viewer.path, selected: window.viewer.selected }))).toEqual(before);
+    if (process.env.RNL_NAV_SCREENSHOTS && info.project.name === "chromium") {
+      await child.screenshot({ path: path.join(process.env.RNL_NAV_SCREENSHOTS, "web-new-tab.png") });
+      fs.writeFileSync(path.join(process.env.RNL_NAV_SCREENSHOTS, "web-tabs.json"), JSON.stringify({ parent: page.url(), child: child.url(), path: before.path }, null, 2));
+    }
+  } finally { await child.close(); }
+});
+
+test("Shift double click opens a subcircuit in a real new tab and pop-up blocking is explained", async ({ page }, info) => {
+  await start(page, "?url=samples/cases/04-hierarchy.sp");
+  await shown(page);
+  await page.locator("#canvas").focus();
+  await page.keyboard.press("f");
+  const target = await page.evaluate(async () => {
+    const { view } = await import('./drawing.js');
+    const { doc, level } = window.viewer;
+    const hit = doc.levels[level].hits.find((h) => h.kind === 'box' && h.objects.some((o) => doc.objects[o].name === 'X2'));
+    const [a, b] = hit.points;
+    const canvas = document.getElementById('canvas'), rect = canvas.getBoundingClientRect();
+    return { x: rect.left + ((a[0] + b[0]) / 2 - view.x) * view.k, y: rect.top + ((a[1] + b[1]) / 2 - view.y) * view.k };
+  });
+  const before = await page.evaluate(() => ({ path: window.viewer.path, selected: window.viewer.selected }));
+  const popup = page.waitForEvent("popup");
+  await page.keyboard.down("Shift");
+  await page.mouse.dblclick(target.x, target.y);
+  await page.keyboard.up("Shift");
+  const child = await popup;
+  try {
+    await expect(child.locator("#level-name")).toHaveText("amp");
+    expect(await page.evaluate(() => ({ path: window.viewer.path, selected: window.viewer.selected }))).toEqual(before);
+    if (process.env.RNL_NAV_SCREENSHOTS && info.project.name === "chromium") await child.screenshot({ path: path.join(process.env.RNL_NAV_SCREENSHOTS, "shift-double-click-new-window.png") });
+  } finally { await child.close(); }
+  await page.evaluate(() => { window.open = () => null; });
+  await page.getByRole("menuitem", { name: "File", exact: true }).click();
+  await page.locator('[data-id="new-window"]').click();
+  await expect(page.locator("dialog.dialog")).toContainText("The browser blocked the new viewer tab");
+});
+
+test("Shift Library opens a previous URL with its includes, and the child retains URL pool sources", async ({ page }) => {
+  await start(page, "?url=samples/cases/04-hierarchy.sp");
+  const expected = await shown(page);
+  await opened(page, () => page.locator("#file-input").setInputFiles({ name: "other.sp", mimeType: "text/plain", buffer: Buffer.from("R1 a 0 1k\n.end\n") }));
+  await page.locator("#tab-files").click();
+  const before = await page.evaluate(() => ({ path: window.viewer.path, text: window.viewer.doc.files[0].text }));
+  const popup = page.waitForEvent("popup");
+  await page.locator("#pool-list .pool-open").filter({ hasText: "04-hierarchy.sp" }).click({ modifiers: ["Shift"] });
+  const child = await popup;
+  try {
+    await expect(child.locator("#level-name")).toHaveText("04-hierarchy.sp");
+    expect((await shown(child)).files).toEqual(expected.files);
+    expect(await page.evaluate(() => ({ path: window.viewer.path, text: window.viewer.doc.files[0].text }))).toEqual(before);
+    await expect(page.locator("#pane-files")).toBeVisible();
+    // Switch away and reopen the inherited URL pool row: its relative include still resolves.
+    await child.locator("#tab-files").click();
+    await opened(child, () => child.locator("#pool-list .pool-open").filter({ hasText: /^other.sp$/ }).click());
+    await opened(child, () => child.locator("#pool-list .pool-open").filter({ hasText: "04-hierarchy.sp" }).click());
+    expect(await child.evaluate(() => window.viewer.doc.files)).toEqual(expected.files);
+  } finally { await child.close(); }
+});
+
 // Playwright builds and serves the site when the run can include these tests (playwright.config.js)
 test.skip(!process.env.RNL_WEB_URL, "the site is not built: RNL_WEB=0");
 
@@ -531,7 +629,7 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   await start(page, `?url=${path.basename(dir)}/top.sp`);
   await shown(page);
   // edit the netlist and its include, each in the text box of its own tab
-  await page.keyboard.press("Control+e");
+  await page.keyboard.press("Control+q");
   const area = page.locator("#source .editor:not([hidden]) textarea");
   const editedTop = top.replace("R1 a 0 1k", "R1 a 0 2k");
   const editedParts = parts.replace("R2", "R7");
@@ -544,7 +642,7 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   expect(doc.files.map((f) => [f.path, f.text])).toEqual([["top.sp", editedTop], ["parts.inc", editedParts]]);
   expect(doc.objects.some((o) => o.kind === "instance" && o.name === "R7")).toBe(true);
   sameAsRnl(doc, path.join(folder({ "top.sp": editedTop, "parts.inc": editedParts }), "top.sp"));
-  await expect(page.locator("#edit-state")).toHaveText("Applied, not saved");
+  await expect(page.locator("#source .editor")).toHaveCount(0);
   // the server's files are as they were: nothing was written
   expect(fs.readFileSync(path.join(dir, "parts.inc"), "utf8")).toBe(parts);
   // Save downloads the file shown, as the text box holds it
@@ -714,6 +812,7 @@ test("temporary package is absent from include and USE-PACKAGE lookup; applied t
   expect(missing.diagnostics.some((d) => d.message.includes("acme-temp 1.0 cannot be found"))).toBe(true);
   await page.locator("#tab-files").click();
   await opened(page, () => page.locator(".pool-temporary .pool-open").click());
+  await page.locator("#tab-netlist").click();
   await page.evaluate(() => window.viewer.command("toggle-edit"));
   const edited = pkg.replace("1.0", "2.0");
   await page.locator("#source textarea").fill(edited);

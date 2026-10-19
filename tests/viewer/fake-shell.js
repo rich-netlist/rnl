@@ -129,6 +129,7 @@ const fake = {
 window.fakeShell = fake;
 
 let held = null; // the solve that waits: { resolve, reject }
+let solveCancelled = false; // cancellation can arrive before the fixture fetch finishes
 let heldDrawings = []; // the requests for drawings that wait: their resolve
 let kept = null; // the drawings of the last build that left them out of its Document, by level: { names, drawings }
 let closing = null; // the page's handler of a request to close the window
@@ -151,6 +152,7 @@ const solving = {
     return fake.optionsError;
   },
   async solve(src, settings, edits) {
+    solveCancelled = false;
     fake.calls.push(["solve", src.name, settings]);
     fake.solveEdits.push(edits);
     const fail = fake.solveFail;
@@ -159,10 +161,12 @@ const solving = {
     const response = await fetch(`/fixtures/${encodeURIComponent(src.fixture)}-preview.json`);
     if (!response.ok) throw `${src.name}: there is no such preview`;
     const solved = await response.json();
+    if (solveCancelled) throw "the solve was cancelled";
     if (fake.hold) await new Promise((resolve, reject) => (held = { resolve, reject }));
     return solved;
   },
   cancelSolve() {
+    solveCancelled = true;
     fake.calls.push(["cancelSolve"]);
     if (held) held.reject("the solve was cancelled");
     held = null;
@@ -187,6 +191,7 @@ async function version() {
 
 /** @type {import("../../apps/viewer-ui/shell.js").Shell} */
 export default {
+  newWindow(session) { fake.calls.push(["newWindow", JSON.parse(JSON.stringify(session))]); },
   include: async (kind) => { fake.calls.push(["include", kind]); return fake.includes || []; },
   ...(params.has("pool") ? {
     bundledFiles: async () => ({ "<bundled>/0.3/rnl-std.rnl": "@RNL(type=\"header\") { @PACKAGE(name=\"rnl-std\", version=\"0.3\") }" }),
@@ -241,6 +246,7 @@ export default {
       src.fixture = name;
       document.files[0].text = edits?.[document.files[0].path] ?? src.text;
     }
+    for (const file of document.files) if (edits?.[file.path] !== undefined) file.text = edits[file.path];
     if (!fake.carry) {
       kept = document.levels.map((level) => ({
         names: level.unplaced.map((u) => u.name),

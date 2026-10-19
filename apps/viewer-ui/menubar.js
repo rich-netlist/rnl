@@ -6,7 +6,7 @@
 // menu; then the arrows move, ArrowRight opens a submenu and ArrowLeft closes it, Enter chooses, and
 // the underlined letters choose too.
 
-import { command, isChecked, menus, shortcut } from "./commands.js";
+import { command, isChecked, isEnabled, menus, shortcut } from "./commands.js";
 import { modal } from "./dialog.js";
 import { $ } from "./util.js";
 
@@ -117,7 +117,7 @@ function entry(item) {
   const b = button(item.label, item.radio ? "menuitemradio" : item.check ? "menuitemcheckbox" : "menuitem");
   b.dataset.id = item.id;
   b.lastChild.textContent = shortcut(item);
-  b.addEventListener("click", () => choose(b));
+  b.addEventListener("click", (e) => choose(b, e.shiftKey));
   return b;
 }
 
@@ -189,6 +189,7 @@ function leave() {
 /** Show the check marks of a list's entries as the commands have them. */
 function showChecks(el) {
   for (const b of entriesOf(el)) {
+    if (b.dataset.id) b.disabled = !isEnabled(b.dataset.id);
     if (!b.dataset.id || b.getAttribute("role") === "menuitem") continue;
     b.setAttribute("aria-checked", String(isChecked(b.dataset.id)));
   }
@@ -245,9 +246,10 @@ function point(b) {
   mark(el, b);
 }
 
-function choose(item) {
+function choose(item, newWindow) {
+  if (!isEnabled(item.dataset.id)) return;
   leave();
-  command(item.dataset.id);
+  command(item.dataset.id, newWindow === undefined ? {} : { newWindow });
 }
 
 /** The menu whose underlined letter a key types, or -1. */

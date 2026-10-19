@@ -222,12 +222,12 @@ source.addEventListener("click", (e) => {
   const s = e.target.closest("[data-obj]");
   if (s) {
     // the first object of a place is the one written most narrowly: `#M1` in `#M1:d` is M1
-    select(Number(s.dataset.obj.split(" ")[0]), "source");
+    select(Number(s.dataset.obj.split(" ")[0]), "source", { newWindow: e.shiftKey });
     return;
   }
   const ln = e.target.closest(".ln");
   const owner = ln ? lineOwners[fileShown].get(Number(ln.dataset.line)) : undefined;
-  if (owner !== undefined) select(owner, "source");
+  if (owner !== undefined) select(owner, "source", { newWindow: e.shiftKey });
   else clearSelection();
 });
 
@@ -240,7 +240,7 @@ source.addEventListener("dblclick", (e) => {
     : ln ? lineOwners[fileShown].get(Number(ln.dataset.line)) : undefined;
   if (opens(o) === null) return;
   window.getSelection().removeAllRanges(); // the word the double click selected
-  descend(o);
+  descend(o, { newWindow: e.shiftKey });
 });
 
 /** The line elements of a file: numbers, highlighted text, and the names of objects. */

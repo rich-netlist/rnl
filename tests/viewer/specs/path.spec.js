@@ -53,7 +53,7 @@ test("going down adds each instance to the path; a segment names its subcircuit,
   await page.locator("#enter-badge").click();
   await expect(page.locator("#level-name")).toHaveText("cell");
   await viewer.click("XL2");
-  await viewer.menuTitle("View").click();
+  await viewer.menuTitle("Edit").click();
   await viewer.menuItem("descend").click();
   await expect(page.locator("#level-name")).toHaveText("leaf");
   expect(await segments(page)).toEqual([TOP, "bank XK1", "block XB2", "cell XC1", "leaf XL2"]);

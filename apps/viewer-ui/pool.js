@@ -4,6 +4,7 @@ import { changes } from "./edits.js";
 import { currentSource, isLoading, openSource } from "./open.js";
 import { setPane, setSidebar } from "./panels.js";
 import { shell } from "./shell.js";
+import { navigate } from "./navigation.js";
 import { $, load, save, settingsPath } from "./util.js";
 
 let items = [];
@@ -130,9 +131,8 @@ function fileRow(item, kind) {
   const active = kind === "temporary" ? currentSource() === item.source : currentPath === item.path;
   row.classList.toggle("current", active);
   if (active) row.setAttribute("aria-current", "true");
-  const open = button(item.name, async () => {
-    await openSource(item.source, false);
-    if (currentSource() === item.source) setPane("netlist");
+  const open = button(item.name, (e) => {
+    navigate({ source: item.source }, { newWindow: e.shiftKey });
   }, item.path || item.name);
   open.className = "pool-open";
   open.setAttribute("aria-label", `Open ${item.name}`);
@@ -243,4 +243,10 @@ export async function startPool() {
   });
   render();
   await scanPaths();
+}
+
+export const poolSnapshot = () => items.filter((i) => !i.builtin).slice();
+export async function restorePool(pool) {
+  addItems(pool);
+  render();
 }

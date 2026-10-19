@@ -20,7 +20,7 @@ test("Enter opens a selected subcircuit instance, and Backspace goes back with t
   await viewer.selected(null);
   await expect(page.locator("#up")).toBeVisible();
   await expect(page.locator("#up-name")).toHaveText(TOP);
-  await expect(page.locator("#up")).toHaveAttribute("title", `Up to ${TOP} (Backspace)`);
+  await expect(page.locator("#up")).toHaveAttribute("title", `Up to ${TOP} (Ctrl+E or Backspace; Shift opens a new window)`);
   await page.keyboard.press("Control+-");
   const amp = await viewer.viewBox();
 

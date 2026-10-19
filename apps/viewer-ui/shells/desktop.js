@@ -21,6 +21,17 @@ export default {
   pathPackages: (dir) => invoke("path_packages", { dir }),
   setPool: (items) => { pool = items.filter((item) => !item.builtin).map((item) => item.path); },
   nativeMenu: true,
+  initialSession: () => invoke("initial_session"),
+  newWindow: async (session) => {
+    await flushSettings();
+    return invoke("new_window", { session: { ...session,
+      entry: session.entry ? { path: session.entry.path, name: session.entry.name,
+        text: session.entry.path ? undefined : session.entry.text, readonly: session.entry.readonly,
+        temporary: session.entry.temporary } : null,
+      pool: session.pool.map((item) => ({ path: item.path, name: item.name, source: { path: item.path, name: item.source.name } })),
+    } });
+  },
+  setEnabled: (id, enabled) => invoke("set_command_enabled", { id, enabled }).catch(() => {}),
   initial: () => invoke("initial_file").then(file),
   pick: (kind) => (kind === "file" ? invoke("pick_file").then(file) : Promise.resolve(null)),
   // a file by its path, or text held by the source, with edits to it and its includes

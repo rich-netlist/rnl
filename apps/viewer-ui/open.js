@@ -23,6 +23,7 @@ import { endPreview, previewing, solve } from "./solve.js";
 import { namedPath, restorePath } from "./subcircuits.js";
 import { clearSource, fileShown, fileViews, renderFiles, showFile } from "./text.js";
 import { $ } from "./util.js";
+import { setEnabled } from "./commands.js";
 
 let lastSource = null; // what was last opened, also when it failed to open, for reloading
 let loading = false;
@@ -47,6 +48,7 @@ export async function openSource(source, keep, edited) {
     else resetBuffers(d);
     showBuilt(d, keep);
     sourceOpened(source, d, !keep, !!edited);
+    return true;
   } catch (e) {
     if (keep && edited) {
       await inform({ title: "Rebuild", paragraphs: [`The document could not be rebuilt: ${e}. Your edits are still kept.`] });
@@ -99,13 +101,21 @@ export async function applyEdits() {
     loading = false;
     document.body.classList.remove("busy");
   }
-  if (failed !== null) await inform({ title: "Apply Changes", paragraphs: [`The changes could not be applied: ${failed}`] });
+  if (failed !== null) {
+    renderDiagnostics([...doc.diagnostics, { severity: "error", message: `The changes could not be applied: ${failed}`, file: "", line: 0, col: 0, origin: "" }]);
+    setProblems(true);
+  }
   return failed === null;
 }
 
 /** What was last opened, also when it failed to open; null before anything was. */
 export function currentSource() {
   return lastSource;
+}
+
+/** A shell that builds its own opening flow (the web embed) publishes the displayed source here. */
+export function adoptSource(source) {
+  lastSource = source;
 }
 
 /** Whether a source is being read. */
@@ -241,6 +251,7 @@ function snapshot() {
 
 function showDocument(before) {
   setSelected(null);
+  setEnabled("descend-new-window", false);
   // the trees of the subcircuits that the top level does not call start open, also those that a
   // document read again gained
   const roots = uncalledRoots().map(rootPath);

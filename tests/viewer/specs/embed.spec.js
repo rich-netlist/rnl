@@ -117,6 +117,26 @@ test("URL open fills the iframe, hides all chrome and provides working controls"
   await screenshot(page, "embed-light.png", browserName);
 });
 
+test("Shift+E opens an embedded subcircuit in a full viewer and keeps the iframe unchanged", async ({ page }) => {
+  const frame = await start(page, { url: hierarchy });
+  await waitMessage(page, "loaded");
+  await frame.evaluate(async () => {
+    const { select } = await import('./selection.js');
+    select(window.viewer.doc.objects.findIndex((o) => o.name === 'X2'), 'drawing');
+  });
+  const before = await frame.evaluate(() => ({ path: window.viewer.path, selected: window.viewer.selected }));
+  await frame.locator("#canvas").focus();
+  const popup = page.context().waitForEvent("page");
+  await page.keyboard.press("Shift+e");
+  const child = await popup;
+  try {
+    await expect(child.locator("#level-name")).toHaveText("amp");
+    await expect(child.locator("#menubar")).toBeVisible();
+    expect(new URL(child.url()).searchParams.has("embed")).toBe(false);
+    expect(await frame.evaluate(() => ({ path: window.viewer.path, selected: window.viewer.selected }))).toEqual(before);
+  } finally { await child.close(); }
+});
+
 test("URL preferences are isolated from existing storage and the OS theme", async ({ page, browserName }) => {
   await page.emulateMedia({ colorScheme: "light" });
   const frame = await start(page, { url: hierarchy, level: "amp", background: "dark", grid: "lines", names: "0" }, {

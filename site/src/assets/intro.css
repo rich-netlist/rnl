@@ -356,7 +356,7 @@ section[id] { scroll-margin-top: 72px; }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 48px; align-items: end; }
 .eyebrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font: 600 12px/1 var(--f-mono); letter-spacing: .18em; color: var(--ink-2); }
 .hero-brand { position: relative; width: min(640px, 100%); margin-top: 14px; }
-.hero h1 { margin: 0; display: flex; align-items: baseline; gap: 0; flex-wrap: nowrap; font: 700 clamp(92px, 14vw, 172px)/.8 var(--f-disp); }
+#hero-title { margin: 0; display: flex; align-items: baseline; gap: 0; flex-wrap: nowrap; font: 700 clamp(92px, 14vw, 172px)/.8 var(--f-disp); }
 .hero-brand h1, .hero-brand h1 * { transition-property: none; }
 .hero-brand.is-viewing h1 { visibility: hidden; }
 .wordmark { font: inherit; font-weight: 600; letter-spacing: -.015em; color: var(--ink); }

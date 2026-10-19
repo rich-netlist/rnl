@@ -1,7 +1,7 @@
 // Editing the text (decision 0011): the netlist pane can be switched to edit, with a text box for
 // each file of the document, the tabs as they are. A change is shown as not applied until the user
-// applies it (Edit > Apply Changes), which builds the Document again from the texts in memory, as
-// opening the files would, and draws it; nothing applies itself, and nothing solves itself. Nothing is
+// exits editing or chooses Apply and Exit Editing, which builds the Document again from the texts in memory, as
+// opening the files would, and draws it; solving remains a separate action. Nothing is
 // written to a file until the user saves (File > Save, and Save As on the desktop; on the web, Save
 // downloads the file shown), and a document, or the window, is not left with changes unsaved without
 // asking. A solve (solve.js) is of the text applied.
@@ -13,7 +13,7 @@ import * as edits from "./edits.js";
 import { shell } from "./shell.js";
 import { previewing } from "./solve.js";
 import { doc } from "./state.js";
-import { fileShown, showFile } from "./text.js";
+import { fileShown, fileViews, showFile } from "./text.js";
 import { $ } from "./util.js";
 
 const source = $("source");
@@ -26,6 +26,47 @@ export let editing = false;
 const editors = new Map(); // by the file's path: { el, area, gutter, lines, caret, scroll }
 let notified = false; // what the shell was last told about changes not saved
 let noteTimer = 0;
+let exiting = false;
+const positions = new Map(); // per path: caret and first visible line, independent of line height
+
+// A browser can round scrollTop to whole CSS pixels. Snap within one pixel of a line boundary,
+// so a fractional line height does not move the viewport back one row on every mode change.
+const firstLine = (scroll, height) => Math.max(0, Math.floor((scroll - 4 + 1) / height));
+
+function keepPosition() {
+  if (!doc) return;
+  for (const [k, file] of doc.files.entries()) {
+    const e = editors.get(file.path);
+    const old = positions.get(file.path) || { caret: 0, line: 0 };
+    if (editing && e) {
+      const height = parseFloat(getComputedStyle(e.area).lineHeight) || 19;
+      positions.set(file.path, { caret: e.area.selectionStart, line: firstLine(e.area.scrollTop, height) });
+    } else {
+      const v = fileViews[k];
+      const height = v?.lines[0]?.getBoundingClientRect().height || 19;
+      const scroll = k === fileShown ? source.scrollTop : v?.scroll || 0;
+      positions.set(file.path, { ...old, line: firstLine(scroll, height) });
+    }
+  }
+}
+
+function restorePosition() {
+  if (!doc) return;
+  for (const [k, file] of doc.files.entries()) {
+    const p = positions.get(file.path);
+    if (!p) continue;
+    const e = editors.get(file.path);
+    if (editing && e) {
+      e.area.setSelectionRange(p.caret, p.caret);
+      e.area.scrollTop = 4 + p.line * (parseFloat(getComputedStyle(e.area).lineHeight) || 19);
+      e.gutter.scrollTop = e.area.scrollTop;
+    } else if (fileViews[k]) {
+      const height = fileViews[k].lines[0]?.getBoundingClientRect().height || 19;
+      fileViews[k].scroll = 4 + p.line * height;
+      if (k === fileShown) source.scrollTop = fileViews[k].scroll;
+    }
+  }
+}
 
 /** The files shown in the pane, as their paths. */
 const paths = () => (doc ? doc.files.map((f) => f.path) : []);
@@ -146,7 +187,7 @@ export function refreshEditing() {
   state.dataset.state = unapplied.length > 0 ? "unapplied" : dirty.length > 0 ? "unsaved" : "clean";
   state.textContent = unapplied.length > 0 ? "Changes not applied yet" : dirty.length > 0 ? "Applied, not saved" : "No changes";
   $("apply-edits").hidden = !editing;
-  $("apply-edits").disabled = unapplied.length === 0;
+  $("apply-edits").disabled = exiting;
   [...tabs.children].forEach((tab, k) => {
     const path = doc && doc.files[k] ? doc.files[k].path : "";
     tab.dataset.unsaved = String(dirty.includes(path));
@@ -171,7 +212,7 @@ function note(text) {
   if (text) noteTimer = setTimeout(() => note(""), 6000);
 }
 
-/** Edit > Edit Text: switch the netlist pane to edit, or back; changes not applied are asked about. */
+/** Edit > Edit Text: enter editing, or apply pending text and return to reading. */
 export async function toggleEdit() {
   if (currentSource()?.readonly) return;
   if (modal()) return;
@@ -187,44 +228,58 @@ export async function toggleEdit() {
       });
       return;
     }
+    keepPosition();
     editing = true;
     setCheck("toggle-edit", true);
     renderEditors();
+    // Set the caret before focusing: Firefox otherwise schedules a caret reveal that overrides
+    // the restored first visible line, even when focus itself uses preventScroll.
+    restorePosition();
     focusEditor();
     return;
   }
-  if (edits.unappliedPaths().length > 0) {
-    const choice = await decide({
-      title: "Changes Not Applied",
-      paragraphs: ["Some changes are not applied yet, so the drawing and the problems do not have them."],
-      action: "Apply Changes",
-      others: ["Discard Changes"],
-    });
-    if (choice === null) return;
-    if (choice === "Apply Changes") {
-      if (!(await applyChanges())) return;
-    } else {
-      for (const path of edits.unappliedPaths()) edits.discard(path);
-    }
-  }
-  stopEditing();
+  await stopEditing();
 }
 
-/** Switch the pane back to reading, keeping the text the editor holds. */
-export function stopEditing() {
-  if (!editing) return;
+/** All exits apply first, including programmatic exits such as Solve. */
+export async function stopEditing() {
+  return applyChanges();
+}
+
+function finishEditing() {
   editing = false;
   setCheck("toggle-edit", false);
   renderEditors();
+  restorePosition();
+  if (document.activeElement === document.body) source.focus({ preventScroll: true });
 }
 
-/** Edit > Apply Changes: build the Document again from the texts held, and draw it. True when it did. */
+/** Apply and exit, even when a rebuild reports errors. No changes means no rebuild. */
 export async function applyChanges() {
-  if (!doc || !editing) return false;
-  if (edits.unappliedPaths().length === 0) return true;
-  const ok = await applyEdits();
-  if (ok) note("Changes applied.");
-  return ok;
+  if (!doc || !editing || exiting) return false;
+  exiting = true;
+  keepPosition();
+  try {
+    const ok = edits.unappliedPaths().length === 0 || await applyEdits();
+    if (ok) note("Changes applied; editing closed.");
+    return ok;
+  } finally {
+    exiting = false;
+    finishEditing();
+  }
+}
+
+/** Discard only pending edits; already applied, unsaved text remains available to Save. */
+export async function discardChanges() {
+  if (!editing || exiting || modal()) return;
+  if (edits.unappliedPaths().length && await decide({
+    title: "Discard Changes",
+    paragraphs: ["Discard the changes that have not been applied and exit editing?"],
+    action: "Discard Changes",
+  }) !== "Discard Changes") return;
+  keepPosition();
+  for (const path of edits.unappliedPaths()) edits.discard(path);
+  finishEditing();
 }
 
 /** The files to write or download for File > Save: the files with changes not saved; on the web the file shown. */

@@ -121,7 +121,9 @@ fn entries(items: &[Entry], windows: bool) -> Vec<Shown> {
             Entry::Command(c) => {
                 let (text, accelerator) = match (c.shown.as_ref().or(c.keys.first()), c.keys.first()) {
                     (Some(shown), _) if windows => (format!("{}\t{shown}", c.label), None),
-                    (_, Some(key)) if !c.page => (c.label.clone(), Some(key.replacen("Ctrl+", "CmdOrCtrl+", 1))),
+                    (_, Some(key)) if !c.page => {
+                        (c.label.clone(), Some(key.replacen("Ctrl+", "CmdOrCtrl+", 1).replacen("Control+", "Ctrl+", 1)))
+                    }
                     _ => (c.label.clone(), None),
                 };
                 Shown::Item { id: c.id.clone(), text, accelerator, check: c.check }
@@ -216,6 +218,13 @@ pub fn set_view_check(checks: State<'_, Checks>, id: String, checked: bool) {
     }
 }
 
+#[tauri::command]
+pub fn set_command_enabled(app: AppHandle, id: String, enabled: bool) {
+    if let Some(tauri::menu::MenuItemKind::MenuItem(item)) = app.menu().and_then(|menu| menu.get(&id)) {
+        let _ = item.set_enabled(enabled);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,14 +264,36 @@ mod tests {
     /// changes, with their keys shown after a tab on Windows (`tabbed`) and as accelerators elsewhere.
     fn edit(tabbed: bool) -> (String, Vec<Shown>) {
         let (switch, apply) = if tabbed {
-            (check("toggle-edit", "&Edit Text\tCtrl+E", None), item("apply-edits", "&Apply Changes\tCtrl+Enter", None))
+            (
+                check("toggle-edit", "&Edit Text\tCtrl+Q", None),
+                item("apply-edits", "&Apply and Exit Editing\tCtrl+Enter", None),
+            )
         } else {
             (
-                check("toggle-edit", "&Edit Text", Some("CmdOrCtrl+E")),
-                item("apply-edits", "&Apply Changes", Some("CmdOrCtrl+Enter")),
+                check("toggle-edit", "&Edit Text", Some("Ctrl+Q")),
+                item("apply-edits", "&Apply and Exit Editing", Some("CmdOrCtrl+Enter")),
             )
         };
-        ("&Edit".to_string(), vec![switch, apply])
+        (
+            "&Edit".to_string(),
+            vec![
+                switch,
+                apply,
+                item("discard-edits", "&Discard Changes", None),
+                Shown::Separator,
+                item("descend", if tabbed { "Open &Subcircuit\tE" } else { "Open &Subcircuit" }, None),
+                item(
+                    "descend-new-window",
+                    if tabbed {
+                        "Open Subcircuit in New &Window…\tShift+E"
+                    } else {
+                        "Open Subcircuit in New &Window…"
+                    },
+                    None,
+                ),
+                item("ascend", if tabbed { "&Up to Parent Level\tCtrl+E" } else { "&Up to Parent Level" }, None),
+            ],
+        )
     }
 
     /// The Solve menu, which only the desktop offers (decision 0010): Solve, with its key shown after
@@ -293,7 +324,15 @@ mod tests {
     /// which has no keys, then About.
     fn help() -> (String, Vec<Shown>) {
         let updates = item("check-updates", "Check for &Updates...", None);
-        ("&Help".to_string(), vec![updates, Shown::Separator, Shown::About("&About RNL Viewer".into())])
+        (
+            "&Help".to_string(),
+            vec![
+                item("shortcuts", "&Keyboard Shortcuts...", None),
+                updates,
+                Shown::Separator,
+                Shown::About("&About RNL Viewer".into()),
+            ],
+        )
     }
 
     /// The menu bar as it was written by hand before the table, on Windows, and the grid's submenu.
@@ -304,6 +343,7 @@ mod tests {
             (
                 "&File".to_string(),
                 vec![
+                    item("new-window", "&New Window", None),
                     item("open", "&Open File...\tCtrl+O", None),
                     item("include-file", "&Include File...", None),
                     item("include-folder", "Include &Folder...", None),
@@ -330,9 +370,6 @@ mod tests {
                     grid("Show &Grid\tG"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
                     Shown::Separator,
-                    item("descend", "Open &Subcircuit\tEnter", None),
-                    item("ascend", "&Up to Parent Level\tBackspace", None),
-                    Shown::Separator,
                     check("toggle-netlist", "&Netlist Panel\tCtrl+B", None),
                     check("toggle-problems", "&Problems\tCtrl+Shift+M", None),
                 ],
@@ -352,6 +389,7 @@ mod tests {
             (
                 "&File".to_string(),
                 vec![
+                    item("new-window", "&New Window", None),
                     item("open", "&Open File...", Some("CmdOrCtrl+O")),
                     item("include-file", "&Include File...", None),
                     item("include-folder", "Include &Folder...", None),
@@ -377,9 +415,6 @@ mod tests {
                     ),
                     grid("Show &Grid"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
-                    Shown::Separator,
-                    item("descend", "Open &Subcircuit", None),
-                    item("ascend", "&Up to Parent Level", None),
                     Shown::Separator,
                     check("toggle-netlist", "&Netlist Panel", Some("CmdOrCtrl+B")),
                     check("toggle-problems", "&Problems", Some("CmdOrCtrl+Shift+M")),

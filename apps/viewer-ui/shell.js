@@ -18,6 +18,9 @@
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
  * @property {(legacy: object) => Promise<{ path: string, values: object }>} [loadSettings] Native settings and migration.
  * @property {(key: string, value: unknown) => Promise<void>} [saveSetting] Persist a native setting.
+ * @property {(session: object, doc?: object) => Promise<unknown>} [newWindow] Open an independent viewer with a session.
+ * @property {() => Promise<object | null>} [initialSession] Consume the one-use startup session, before initial().
+ * @property {(id: string, enabled: boolean) => void} [setEnabled] Update a native command enabled state.
  * @property {boolean} nativeMenu Whether the platform shows the menu bar itself; if not, the page shows
  *   its own (menubar.js).
  * @property {() => Promise<Source | null>} initial What to open at start, if anything: on the desktop,

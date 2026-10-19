@@ -5,7 +5,7 @@ import { clearDrawing, fit, zoomCenter } from "./drawing.js";
 import { resetBuffers } from "./edits.js";
 import { setGrid } from "./grid.js";
 import { setHoverNames } from "./hover.js";
-import { showBuilt } from "./open.js";
+import { adoptSource, showBuilt } from "./open.js";
 import { shell } from "./shell.js";
 import { prepareEmbed, sourceFromUrl } from "./shells/web.js";
 import { current, doc, path, setDoc } from "./state.js";
@@ -53,8 +53,8 @@ function level(name) {
     return null;
   }
   const row = find(0, "0", new Set());
-  if (row) enterRow(row);
-  else enterRoot(wanted);
+  if (row) enterRow(row, { newWindow: false });
+  else enterRoot(wanted, { newWindow: false });
 }
 
 function updateLevel() {
@@ -70,7 +70,7 @@ function updateLevel() {
     if (item instanceof HTMLButtonElement) {
       item.type = "button";
       item.title = zh ? `返回 ${name}` : `Back to ${name}`;
-      item.addEventListener("click", () => backTo(index));
+      item.addEventListener("click", (e) => backTo(index, { newWindow: e.shiftKey }));
     } else item.setAttribute("aria-current", "location");
     crumbs.append(item);
   });
@@ -101,6 +101,7 @@ async function open(message, initial = false) {
     const errors = built.diagnostics.filter((item) => item.severity === "error");
     if (built.failed || errors.length) throw new Error(built.failed || errors[0].message);
     resetBuffers(built);
+    adoptSource(source);
     showBuilt(built, false);
     document.title = `${built.name} - RNL Viewer`;
     if (initial && params.has("level")) level(params.get("level"));

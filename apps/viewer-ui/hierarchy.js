@@ -94,7 +94,7 @@ function treeRow({ level, path, depth, child, branches, open, cycle }) {
   row.dataset.level = String(level);
   if (level === current) row.classList.add("current");
   if (path === active) row.classList.add("active");
-  row.addEventListener("click", () => openLevel(level, path));
+  row.addEventListener("click", (e) => openLevel(level, path, { newWindow: e.shiftKey }));
   row.addEventListener("dblclick", () => { if (branches) toggleBranch(path); });
   return row;
 }
@@ -213,7 +213,7 @@ function indexRow(level, q, count) {
     row.classList.add("current");
     row.setAttribute("aria-selected", "true");
   }
-  row.addEventListener("click", () => openLevel(level, null));
+  row.addEventListener("click", (e) => openLevel(level, null, { newWindow: e.shiftKey }));
   return row;
 }
 
@@ -223,10 +223,10 @@ function indexRow(level, q, count) {
  * changes nothing, and the tree is not drawn again, so that the second click of a double click
  * presses the row the first did: Firefox sends no dblclick to a row that is out of the page.
  */
-export function openLevel(level, path) {
+export function openLevel(level, path, options) {
   if (!doc) return;
-  if (path !== null) enterRow(path);
-  else enterRoot(level);
+  if (path !== null) enterRow(path, options);
+  else enterRoot(level, options);
 }
 
 /**
@@ -260,6 +260,6 @@ $("search").addEventListener("keydown", (e) => {
     e.stopPropagation();
   } else if (e.key === "Enter") {
     const first = $("index").querySelector(".index-row:not(.top)");
-    if (first) openLevel(Number(first.dataset.level), null);
+    if (first) openLevel(Number(first.dataset.level), null, { newWindow: e.shiftKey });
   }
 });

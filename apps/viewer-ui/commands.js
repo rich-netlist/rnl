@@ -7,7 +7,8 @@ import { includeFiles } from "./pool.js";
 import { setBackground } from "./background.js";
 import { inform } from "./dialog.js";
 import { cancelGesture, fit, pan, zoomCenter } from "./drawing.js";
-import { applyChanges, save, saveAs, toggleEdit } from "./editor.js";
+import { applyChanges, discardChanges, save, saveAs, toggleEdit } from "./editor.js";
+import { duplicateWindow } from "./navigation.js";
 import { gridCommand } from "./grid.js";
 import { hoverNamesOn, setHoverNames } from "./hover.js";
 import { loadClipboard, pickAndOpen, reload } from "./open.js";
@@ -31,15 +32,18 @@ export async function startCommands() {
   table = await response.json();
   for (const [id, checked] of checks) shell.setCheck(id, checked);
   shell.onCommand(command);
+  setEnabled("descend-new-window", false);
 }
 
 /**
  * Run a command by its id. Exit and About are the platform's own: the page has nothing to do for
  * Exit, and shows the shell's About box, or a plain one (about).
  */
-export function command(id) {
-  if (shell?.embed && !["fit", "zoom-in", "zoom-out", "descend", "ascend"].includes(id)) return;
+export function command(id, options = {}) {
+  if (!isEnabled(id)) return;
+  if (shell?.embed && !["fit", "zoom-in", "zoom-out", "descend", "descend-new-window", "ascend"].includes(id)) return;
   switch (id) {
+    case "new-window": return duplicateWindow();
     case "open": pickAndOpen("file"); break;
     case "include-file": includeFiles("file"); break;
     case "include-folder": includeFiles("folder"); break;
@@ -51,6 +55,7 @@ export function command(id) {
     case "save-as": saveAs(); break;
     case "toggle-edit": toggleEdit(); break;
     case "apply-edits": applyChanges(); break;
+    case "discard-edits": discardChanges(); break;
     case "fit": fit(); break;
     case "zoom-in": zoomCenter(1.25); break;
     case "zoom-out": zoomCenter(0.8); break;
@@ -65,8 +70,14 @@ export function command(id) {
     case "toggle-hover-names": setHoverNames(!hoverNamesOn()); break;
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
-    case "descend": descend(selected); break;
-    case "ascend": ascend(); break;
+    case "descend": return descend(selected, options);
+    case "descend-new-window": return descend(selected, { newWindow: true });
+    case "ascend": return ascend(options);
+    case "shortcuts": inform({ title: "Keyboard Shortcuts", paragraphs: [
+      "E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level.",
+      "Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window.",
+      "Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing.",
+    ] }); break;
     case "solve": solve(); break;
     case "solve-close": closePreview(); break;
     case "solve-save": saveSolved(); break;
@@ -114,6 +125,11 @@ export function setCheck(id, checked) {
 /** Whether a check-mark command is checked. */
 export function isChecked(id) {
   return checks.get(id) === true;
+}
+
+export const isEnabled = (id) => id !== "descend-new-window" || opens(selected) !== null;
+export function setEnabled(id, enabled) {
+  shell?.setEnabled?.(id, enabled);
 }
 
 /** Whether this platform offers a command; one that names no platforms is offered on all. */
@@ -164,15 +180,17 @@ export function shortcut(item) {
 /**
  * Whether a key event is the key `spec` names, such as "Ctrl+Shift+M", "F" or "Enter"; Ctrl stands
  * for Cmd too. A key with Ctrl compares Shift only for a letter, since typing "+" may need Shift.
- * A key without Ctrl that types or deletes does not count while Ctrl, Cmd or Alt is held; other
- * keys, such as Enter and F5, count whatever is held with them.
+ * E and Enter have separate Shift commands. Other page shortcuts keep their existing Shift
+ * behavior; typing or deleting keys do not count while Ctrl, Cmd or Alt is held.
  */
 function matches(e, spec) {
   const parts = spec.split(/\+(?=.)/);
   const key = parts.pop().toLowerCase();
   if (e.key.toLowerCase() !== key) return false;
   const ctrl = e.ctrlKey || e.metaKey;
+  if (parts.includes("Control")) return e.ctrlKey && !e.metaKey && !e.altKey && e.shiftKey === parts.includes("Shift");
   if (parts.includes("Ctrl")) return ctrl && (!/^[a-z]$/.test(key) || e.shiftKey === parts.includes("Shift"));
+  if (key === "e" || key === "enter") return !ctrl && !e.altKey && e.shiftKey === parts.includes("Shift");
   return !(ctrl || e.altKey) || !(key.length === 1 || key === "backspace");
 }
 
@@ -183,7 +201,7 @@ function keyCommand(e, typing) {
     for (const item of commandsIn(m.items)) {
       if (!offered(item)) continue;
       for (const spec of item.keys || []) {
-        if (typing && !/^(Ctrl\+|F\d+$)/.test(spec)) continue;
+        if (typing && !/^(Ctrl\+|Control\+|F\d+$)/.test(spec)) continue;
         if (matches(e, spec)) return item.id;
       }
     }
@@ -194,7 +212,8 @@ function keyCommand(e, typing) {
 document.addEventListener("keydown", (e) => {
   if (shell?.embed && !document.hasFocus()) return;
   const ctrl = e.ctrlKey || e.metaKey;
-  const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target.isContentEditable;
+  const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target.isContentEditable ||
+    !!e.target.closest('select, [role="listbox"], [role="tree"], #tree, #index, #unplaced-list');
   if (e.defaultPrevented) return;
   if (e.key === "Escape" && cancelGesture()) {
     e.preventDefault();
@@ -217,9 +236,12 @@ document.addEventListener("keydown", (e) => {
   // Enter opens a selected subcircuit instance, and presses a button that has the focus; a button
   // hidden with the focus still on it, until the browser moves the focus, is pressed by nothing
   const button = e.target instanceof HTMLButtonElement && e.target.getClientRects().length > 0;
-  if (id === "descend" && (button || opens(selected) === null)) return;
+  if ((id === "descend" || id === "descend-new-window") && (button || opens(selected) === null)) return;
+  // Shift modifies navigation, including Ctrl+Shift+E (up) and Shift+Backspace.
+  if (!typing && e.shiftKey && e.key === "Backspace" && !ctrl && !e.altKey) id = "ascend";
+  if (e.shiftKey && ctrl && e.key.toLowerCase() === "e") id = "ascend";
   if (id) {
     e.preventDefault();
-    command(id);
+    command(id, { newWindow: e.shiftKey });
   }
 });

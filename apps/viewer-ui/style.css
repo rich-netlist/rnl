@@ -101,6 +101,20 @@ body {
 }
 
 body.busy, body.busy *, body.checking, body.checking * { cursor: progress !important; }
+body.starting > #app, body.starting > .menubar, body.starting > .statusbar { visibility: hidden; }
+.startup {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg);
+}
+.startup strong { font-size: 28px; font-weight: 600; }
+.startup small { min-height: 1.4em; color: var(--muted); font-size: 13px; }
 body.resizing-x, body.resizing-x * { cursor: col-resize !important; user-select: none; }
 body.resizing-y, body.resizing-y * { cursor: row-resize !important; user-select: none; }
 
@@ -872,6 +886,7 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
   top: calc(100% + 3px);
   left: 0;
   min-width: 240px;
+  width: max-content;
   padding: 4px 0;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -886,6 +901,7 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
   top: -5px;
   left: calc(100% - 2px);
   min-width: 180px;
+  width: max-content;
   padding: 4px 0;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -905,6 +921,7 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
   white-space: nowrap;
 }
 .menu-item.active { background: var(--hover); }
+.menu-item:disabled { color: var(--muted); }
 .menu-item .check { text-align: center; color: var(--accent); }
 .menu-item[aria-checked="true"] .check::before { content: "\2713"; }
 /* one of a group, of which one is checked */
