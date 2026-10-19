@@ -49,3 +49,14 @@ body.embed[data-background="dark"] {
 #embed-path button { padding: 0 2px; cursor: pointer; }
 #embed-open { position: absolute; right: 8px; bottom: 8px; z-index: 5; color: var(--muted); font-size: 11px; }
 .embed .empty { max-width: calc(100% - 32px); overflow-wrap: anywhere; }
+
+/* Short embeds can replace a wordmark. Keep the drawing large and expose the floating controls
+   on hover or keyboard focus, arranged horizontally so every button fits even on a short row. */
+@media (max-height: 180px) {
+  .embed .canvas { --fit-margin: 6px; }
+  .embed-toolbar { flex-direction: row; top: 4px; right: 4px; }
+  #embed-open { bottom: 2px; right: 4px; font-size: 9px; }
+  .embed-toolbar, #embed-open { opacity: 0; pointer-events: none; }
+  .canvas:hover .embed-toolbar, .canvas:focus-within .embed-toolbar,
+  .canvas:hover #embed-open, .canvas:focus-within #embed-open { opacity: 1; pointer-events: auto; }
+}

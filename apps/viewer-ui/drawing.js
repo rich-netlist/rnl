@@ -185,7 +185,9 @@ export function fit() {
   cancelGesture();
   if (!svg) return;
   const { w, h } = canvasSize();
-  const k = clamp(Math.min((w - 2 * FIT_MARGIN) / extent.w, (h - 2 * FIT_MARGIN) / extent.h), MIN_ZOOM, MAX_ZOOM);
+  const padding = parseFloat(getComputedStyle(canvas).getPropertyValue("--fit-margin"));
+  const margin = Number.isFinite(padding) ? Math.max(0, padding) : FIT_MARGIN;
+  const k = clamp(Math.min((w - 2 * margin) / extent.w, (h - 2 * margin) / extent.h), MIN_ZOOM, MAX_ZOOM);
   view = { k, x: extent.x - (w / k - extent.w) / 2, y: extent.y - (h / k - extent.h) / 2 };
   apply();
 }

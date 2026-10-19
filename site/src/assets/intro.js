@@ -9,8 +9,8 @@
   /* ================= Hero ================= */
 
   function initLogoViewer() {
-    var button = $('#hero-logo'), panel = $('#hero-logo-panel'), closeButton = $('#hero-logo-close');
-    if (!button || !panel || !closeButton) return;
+    var button = $('#hero-logo'), panel = $('#hero-logo-panel'), closeButton = $('#hero-logo-close'), brand = $('#hero-brand');
+    if (!button || !panel || !closeButton || !brand) return;
     var frame = null, viewerOrigin = null, ready = false;
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
     function theme() {
@@ -22,8 +22,10 @@
     }
     function close() {
       panel.hidden = true;
+      brand.classList.remove('is-viewing');
       button.setAttribute('aria-expanded', 'false');
-      button.focus({ preventScroll: true });
+      // Let the hidden iframe release focus before returning it to the restored wordmark.
+      requestAnimationFrame(function () { if (panel.hidden) button.focus({ preventScroll: true }); });
     }
     function escape(e) {
       if (e.key !== 'Escape' || panel.hidden) return;
@@ -34,6 +36,7 @@
     button.addEventListener('click', function () {
       if (!panel.hidden) { close(); return; }
       panel.hidden = false;
+      brand.classList.add('is-viewing');
       button.setAttribute('aria-expanded', 'true');
       if (!frame) {
         var url = new URL(panel.getAttribute('data-viewer-url'), document.baseURI);
@@ -60,6 +63,9 @@
       if (e.data.type === 'ready') { ready = true; syncTheme(); }
     });
     new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    new ResizeObserver(function () {
+      if (frame && ready && !panel.hidden) frame.contentWindow.postMessage({ rnl: 1, type: 'fit' }, viewerOrigin);
+    }).observe(brand);
     mq.addEventListener('change', syncTheme);
   }
 

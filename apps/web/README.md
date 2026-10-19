@@ -183,12 +183,16 @@ fetches or holds the text and sends it directly. Text opens have no sibling incl
 switches three conformance examples and the site's five-transistor OTA through this interface.
 Build with `--samples` to include those files.
 
-The same build also publishes `samples/brand/rnl-logo.sp`, with an RNL `@TEXT` caption,
-“RNL logo by RNL”, below the circuit. The canonical brand source used for icons stays text-free.
-On the project homepage, clicking
-the large logo creates an embedded viewer below it. Closing with × or Escape keeps that iframe
-for the next click; theme changes reach it through the `background` message. No viewer files
-are requested until the first click.
+The same build also publishes `samples/brand/rnl-logo.sp`, with real RNL `@TEXT` annotations:
+a large **RNL** and a smaller “logo by RNL” together to the right of the circuit.
+The canonical brand source used for icons stays text-free. On the project homepage, clicking
+the large logo replaces the static logo and wordmark with a short embedded viewer in that same
+row, keeping the following content in place. Closing with × or Escape restores the wordmark
+and keeps that iframe for the next click; theme changes reach it through the `background`
+message. No viewer files are requested until the first click.
+
+For embeds at most 180px tall, the fit margin is smaller and the floating controls run
+horizontally, appearing on hover or keyboard focus so the drawing fits a short row.
 
 ## Structure
 

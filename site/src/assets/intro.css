@@ -355,21 +355,22 @@ section[id] { scroll-margin-top: 72px; }
 .hero { padding-block: 48px 72px; }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 48px; align-items: end; }
 .eyebrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font: 600 12px/1 var(--f-mono); letter-spacing: .18em; color: var(--ink-2); }
-.hero h1 { margin: 14px 0 0; display: flex; align-items: baseline; gap: 0; flex-wrap: nowrap; font: 700 clamp(92px, 14vw, 172px)/.8 var(--f-disp); }
+.hero-brand { position: relative; width: max-content; max-width: 100%; margin-top: 14px; }
+.hero h1 { margin: 0; display: flex; align-items: baseline; gap: 0; flex-wrap: nowrap; font: 700 clamp(92px, 14vw, 172px)/.8 var(--f-disp); }
+.hero-brand h1, .hero-brand h1 * { transition-property: none; }
+.hero-brand.is-viewing h1 { visibility: hidden; }
 .wordmark { font: inherit; font-weight: 600; letter-spacing: -.015em; color: var(--ink); }
 /* The SVG has 3.85% vertical padding per side: match its painted height to the font's capitals. */
 .hero-logo { display: block; flex: none; height: .756em; height: 1.083415cap; transform: translateY(3.84955%); }
 .hero-logo img { display: block; height: 100%; width: auto; }
 button.hero-logo { padding: 0; border: 0; background: none; cursor: pointer; }
 .hero-logo-panel {
-  width: min(560px, 100%); height: 360px; margin-top: 16px; overflow: hidden;
-  display: grid; grid-template-rows: 32px minmax(0, 1fr);
+  position: absolute; inset: 0;
 }
-.hero-logo-controls { display: flex; justify-content: flex-end; padding: 4px 8px 0; }
+.hero-logo-controls { position: absolute; top: 0; left: calc(100% + 4px); }
 #hero-logo-close { width: 28px; height: 28px; border: 0; padding: 0; border-radius: 6px; background: none; color: var(--ink-3); font-size: 22px; line-height: 1; cursor: pointer; }
 #hero-logo-close:hover { background: var(--panel-2); color: var(--ink); }
-.hero-logo-panel iframe { display: block; width: 100%; height: 100%; min-height: 0; border: 0; }
-@media (max-width: 640px) { .hero-logo-panel { height: 300px; } }
+.hero-logo-panel iframe { display: block; width: 100%; height: 100%; border: 0; border-radius: calc(var(--radius) - 1px); }
 .theme-logo .logo-dark { display: none; }
 :root[data-theme="dark"] .theme-logo .logo-light { display: none; }
 :root[data-theme="dark"] .theme-logo .logo-dark { display: block; }

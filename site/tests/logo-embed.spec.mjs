@@ -31,7 +31,8 @@ async function loaded(page) {
   const frame = page.frames().find(frame => frame.url().includes("embed=1"));
   expect(frame).toBeTruthy();
   await expect(frame.locator("#canvas > svg")).toBeVisible();
-  await expect(frame.locator("#canvas > svg")).toContainText("RNL logo by RNL");
+  await expect(frame.locator("#canvas > svg text").filter({ hasText: /^RNL$/ })).toBeVisible();
+  await expect(frame.locator("#canvas > svg text").filter({ hasText: /^logo by RNL$/ })).toBeVisible();
   await frame.evaluate(() => document.fonts.ready);
   return frame;
 }
@@ -48,14 +49,22 @@ async function documentTop(locator) {
   return locator.evaluate(element => element.getBoundingClientRect().top + scrollY);
 }
 
+async function brandReady(page) {
+  await page.evaluate(async () => {
+    await Promise.all([600, 700].map(weight => document.fonts.load(`${weight} 172px "IBM Plex Sans Condensed"`)));
+    await document.fonts.ready;
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+}
+
 for (const lang of ["zh", "en"]) {
   test(`${lang}: click lazily opens the logo circuit, closes by Escape and ×, and reuses its iframe`, async ({ page }, info) => {
     const requests = [];
     page.on("request", request => requests.push(request.url()));
     await page.emulateMedia({ colorScheme: "light" });
     await page.goto(`/${lang}/`);
-    await page.evaluate(() => document.fonts.ready);
-    const button = page.getByRole("button", { name: label(lang), exact: true });
+    await brandReady(page);
+    const button = page.locator("#hero-logo");
     const panel = page.locator("#hero-logo-panel");
     await expect(button).toHaveAttribute("title", label(lang));
     await expect(button).toHaveAttribute("aria-expanded", "false");
@@ -64,20 +73,34 @@ for (const lang of ["zh", "en"]) {
     expect(requests.filter(url => new URL(url).pathname.includes("/viewer/"))).toEqual([]);
     const beforeRequests = [...requests];
     const beforeDemo = await documentTop(page.locator("#hero-demo"));
+    const beforeThesis = await documentTop(page.locator(".thesis"));
+    const beforeHeading = await page.locator("#hero-title").boundingBox();
     if (lang === "zh") await capture(page, "home-before.png", info.project.name);
     await button.click();
     const frame = await loaded(page);
     await expect(button).toHaveAttribute("aria-expanded", "true");
     await expect(panel).toBeVisible();
-    expect(await panel.boundingBox()).toMatchObject({ width: 560, height: 360 });
+    await expect(page.locator("#hero-title")).toBeHidden();
+    await expect(page.locator(".wordmark")).toBeHidden();
+    const replacement = await panel.boundingBox();
+    for (const key of ["x", "y", "width", "height"]) expect(replacement[key]).toBeCloseTo(beforeHeading[key], 1);
+    expect(replacement.width / replacement.height).toBeGreaterThan(2);
     const iframeUrl = new URL(frame.url());
     expect(iframeUrl.searchParams.get("url")).toBe("samples/brand/rnl-logo.sp");
     expect(iframeUrl.searchParams.get("grid")).toBe("off");
     expect(iframeUrl.searchParams.get("origin")).toBe(new URL(page.url()).origin);
     await expect(frame.locator("body")).toHaveAttribute("data-background", "light");
     expect(await frame.evaluate(() => window.viewer.grid.shown)).toBe(false);
-    expect(await documentTop(page.locator(".thesis"))).toBeGreaterThan(await documentTop(panel) + 360);
-    expect(await documentTop(page.locator("#hero-demo"))).toBeGreaterThan(beforeDemo + 300);
+    expect(await documentTop(page.locator(".thesis"))).toBeCloseTo(beforeThesis, 1);
+    expect(await documentTop(page.locator("#hero-demo"))).toBeCloseTo(beforeDemo, 1);
+    const textSizes = await frame.evaluate(() => [...document.querySelectorAll("#canvas > svg text")]
+      .map(text => ({ name: text.textContent, size: parseFloat(getComputedStyle(text).fontSize) })));
+    expect(textSizes.find(text => text.name === "RNL").size).toBeGreaterThan(textSizes.find(text => text.name === "logo by RNL").size * 5);
+    const circuitRight = await frame.locator("#canvas > svg > g[data-id]").evaluateAll(groups =>
+      Math.max(...groups.filter(group => !group.querySelector("text")).map(group => group.getBoundingClientRect().right)));
+    for (const text of await frame.locator("#canvas > svg text").all()) {
+      expect(await text.evaluate(element => element.getBoundingClientRect().left)).toBeGreaterThan(circuitRight);
+    }
     await frame.evaluate(() => { window.logoMarker = "reused"; });
     if (lang === "zh") {
       await capture(page, "home-after.png", info.project.name);
@@ -94,6 +117,7 @@ for (const lang of ["zh", "en"]) {
     await frame.locator("#canvas").focus();
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
+    await expect(page.locator("#hero-title")).toBeVisible();
     await expect(button).toBeFocused();
     expect(await documentTop(page.locator("#hero-demo"))).toBeCloseTo(beforeDemo, 1);
     await button.click();
@@ -130,19 +154,31 @@ for (const lang of ["zh", "en"]) {
     await expect(frame.locator("body")).toHaveAttribute("data-background", "light");
   });
 
-  test(`${lang}: the panel fits 390px at 300px high`, async ({ page }, info) => {
+  test(`${lang}: the short viewer replaces the same row at 390px and keeps its controls usable`, async ({ page }, info) => {
     await page.setViewportSize({ width: 390, height: 1100 });
     await page.emulateMedia({ colorScheme: "light" });
     await page.goto(`/${lang}/`);
+    await brandReady(page);
+    const heading = await page.locator("#hero-title").boundingBox();
     await page.getByRole("button", { name: label(lang), exact: true }).click();
-    await loaded(page);
+    const frame = await loaded(page);
     const panel = await page.locator("#hero-logo-panel").boundingBox();
-    const copy = await page.locator(".hero-copy").boundingBox();
-    expect(panel.height).toBe(300);
-    expect(panel.width).toBeCloseTo(copy.width, 1);
+    expect(panel.height).toBeCloseTo(heading.height, 1);
+    expect(panel.width).toBeCloseTo(heading.width, 1);
+    expect(panel.height).toBeLessThan(130);
     expect(panel.x + panel.width).toBeLessThanOrEqual(390);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(page.locator("#hero-logo-close")).toBeInViewport();
+    await frame.locator("#canvas").focus();
+    for (const button of await frame.locator(".embed-toolbar button").all()) {
+      expect(await button.evaluate(element => {
+        const box = element.getBoundingClientRect();
+        return box.top >= 0 && box.bottom <= innerHeight && box.right <= innerWidth && getComputedStyle(element.parentElement).opacity === "1";
+      })).toBe(true);
+    }
+    await frame.locator("#embed-zoom-in").click();
+    await frame.locator("#embed-fit").click();
+    await page.locator("#hero-logo-close").focus();
     if (lang === "zh") await capture(page, "home-narrow.png", info.project.name);
   });
 }
