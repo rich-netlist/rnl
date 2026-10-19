@@ -15,12 +15,12 @@ X1 a b custom
 *     @LINE {(1, 0) (2, 0)};
 *     (-2, 0) @PIN(terminal=1, direction="left");
 *     (2, 0) @PIN(terminal=2, direction="right");
-*     (0, 0) @TEXT("custom", halign="middle", valign="middle")
+*     (0, 0) @TEXT("custom", halign="middle", valign="middle", size=0.5)
 *   };
 *   #R1 @PLACE(-8, 0);
 *   #X1 @SET-SYMBOL $CUSTOM;
 *   #X1 @PLACE(8, 0);
-*   &a @WIRE(mode="vertical-horizontal") {#R1:1 #X1:1};
+*   &a @WIRE {#R1:1 (-8, 5) (4, 5) (4, 0) #X1:1};
 *   %ground = $GROUND @ATTACH &a => @PLACE(-8, -10);
 *   %supply = $SUPPLY @ATTACH &b => @PLACE(0, -10);
 *   %unused = $NO_CONNECT @ATTACH #X1:2
