@@ -126,7 +126,13 @@ for (const lang of ["zh", "en"]) {
     await panel.getByRole("button", { name: lang === "zh" ? "关闭" : "Close", exact: true }).click();
     await expect(panel).toBeHidden();
     await expect(button).toBeFocused();
+    // Resizing while hidden must refit on reopening, without recreating or reloading the iframe.
+    await page.setViewportSize({ width: 390, height: 1100 });
     await button.click();
+    await expect.poll(() => frame.locator("#canvas > svg text").evaluateAll(texts => texts.every(text => {
+      const box = text.getBoundingClientRect();
+      return box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight;
+    }))).toBe(true);
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
     await expect(button).toBeFocused();
