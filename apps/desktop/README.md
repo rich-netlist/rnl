@@ -40,7 +40,7 @@ All viewer settings (including Solve › Settings, grid, hover names, sidebar st
 
 Download the files from a [viewer release](https://github.com/rich-netlist/rnl/releases?q=viewer-v), or the [tools page](https://rich-netlist.github.io/rnl/en/tools.html#desktop). Windows x64 has the NSIS installer, MSI and portable executable described below; run the installer or the portable `.exe`. Windows 10 and 11 normally include WebView2. The files are unsigned: if SmartScreen warns, choose **More info › Run anyway**.
 
-Linux x86_64 packages start with the next `viewer-v*` tag that includes the Linux build. They are built and tested on Ubuntu 22.04, the minimum supported Ubuntu; newer Ubuntu versions are supported too. Other distributions need compatible glibc and WebKitGTK 4.1. AppImage bundles most dependencies but cannot make an older glibc compatible. Replace `X.Y.Z` below with the downloaded version:
+Linux x86_64 packages start with 0.1.2. They are built and tested on Ubuntu 22.04, the minimum supported Ubuntu; newer Ubuntu versions are supported too. Other distributions need compatible glibc and WebKitGTK 4.1. AppImage bundles most dependencies but cannot make an older glibc compatible. Replace `X.Y.Z` below with the downloaded version:
 
 ```bash
 chmod +x RNL-Viewer-X.Y.Z-linux-x86_64.AppImage
@@ -103,10 +103,10 @@ Both show the licence in [`LICENSE.txt`](LICENSE.txt) and install it next to the
 The installers also install and uninstall silently, for scripts and for deployment. The NSIS installer takes the directory last, after `/D=`, unquoted even with spaces:
 
 ```bat
-RNL-Viewer-0.1.1-windows-x64-setup.exe /S /D=C:\Tools\RNL Viewer
+RNL-Viewer-0.1.2-windows-x64-setup.exe /S /D=C:\Tools\RNL Viewer
 "%LOCALAPPDATA%\RNL Viewer\uninstall.exe" /S
-msiexec /i RNL-Viewer-0.1.1-windows-x64.msi /qn
-msiexec /x RNL-Viewer-0.1.1-windows-x64.msi /qn
+msiexec /i RNL-Viewer-0.1.2-windows-x64.msi /qn
+msiexec /x RNL-Viewer-0.1.2-windows-x64.msi /qn
 ```
 
 ## Releasing
