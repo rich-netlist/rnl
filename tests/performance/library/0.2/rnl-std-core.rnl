@@ -1,0 +1,12 @@
+/* rnl-std-core, the smallest collection of the standard package rnl-std (16.3): it references
+   rnl-std-style, rnl-std-symbols and rnl-std-virtual and has no content of its own. It draws the
+   netlist and adds nothing: the grounds, supplies and port tags for unwired pins are rnl-std-fill.
+   A file that wants only this drops rnl-std with an empty inline package of that name in its
+   header record and uses rnl-std-core there instead (16.3). */
+@RNL(type="header") {
+  @VERSION("0.2");
+  @PACKAGE(name="rnl-std-core", version="0.2");
+  @USE-PACKAGE(name="rnl-std-style", version="0.2");
+  @USE-PACKAGE(name="rnl-std-symbols", version="0.2");
+  @USE-PACKAGE(name="rnl-std-virtual", version="0.2")
+}

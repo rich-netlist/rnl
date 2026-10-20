@@ -13,6 +13,8 @@ on:
       - "tests/**"
       - "!tests/viewer/**"
       - "scripts/fonts.py"
+      - "scripts/solver-performance/**"
+      - ".github/workflows/solver-performance.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rustfmt.toml"
@@ -25,11 +27,26 @@ on:
       - "tests/**"
       - "!tests/viewer/**"
       - "scripts/fonts.py"
+      - "scripts/solver-performance/**"
+      - ".github/workflows/solver-performance.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rustfmt.toml"
       - ".github/workflows/rust.yml"
   workflow_dispatch:
+    inputs:
+      solver_performance:
+        description: Collect optimized solver measurements instead of the standard test jobs
+        type: boolean
+        default: false
+      baseline_sha:
+        description: Fixed public main baseline commit (40-character SHA)
+        type: string
+        default: "0e9b63ecc84b87fdaa69b31251ba683b740fb9bf"
+      candidate_sha:
+        description: Optional fixed public candidate commit; empty means baseline only
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -39,6 +56,7 @@ env:
 
 jobs:
   test:
+    if: github.event_name != 'workflow_dispatch' || !inputs.solver_performance
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +75,7 @@ jobs:
         run: cargo test --workspace
 
   wasm:
+    if: github.event_name != 'workflow_dispatch' || !inputs.solver_performance
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -80,6 +99,7 @@ jobs:
           node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl --snapshot
 
   fonts:
+    if: github.event_name != 'workflow_dispatch' || !inputs.solver_performance
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,3 +111,23 @@ jobs:
       # downloads the pinned fonts and fails when crates/rnl-render/fonts/ is not what they give
       - name: The renderer's font metrics are those of the shipped fonts
         run: python scripts/fonts.py metrics --check
+
+  performance-harness:
+    if: github.event_name != 'workflow_dispatch' || !inputs.solver_performance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Check the bounded measurement policy and frozen fixture bytes
+        run: |
+          python scripts/solver-performance/test_benchmark.py
+          python scripts/solver-performance/benchmark.py --fixtures tests/performance
+
+  solver-performance:
+    if: github.event_name == 'workflow_dispatch' && inputs.solver_performance
+    uses: ./.github/workflows/solver-performance.yml
+    with:
+      baseline_sha: ${{ inputs.baseline_sha }}
+      candidate_sha: ${{ inputs.candidate_sha }}

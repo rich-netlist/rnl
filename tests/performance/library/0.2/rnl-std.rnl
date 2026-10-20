@@ -1,0 +1,16 @@
+/* The standard package rnl-std (standard appendix B, 16.3, U3), used implicitly at the root of
+   every document. A package collection: it references rnl-std-core, then rnl-std-fill,
+   rnl-std-semantics and rnl-std-layout, and has no content of its own. Used, it brings them in in
+   that order, each once (16.2): styles, symbols, virtual elements, fill, semantic and layout
+   definitions, with the statements and rules of the single file of the RNL toolkit 0.1 in their
+   order. Its content is a draft: the package of the Python prototype in the research repository
+   (2026-10-12) with the symbols reviewed, an explicit box= on every symbol (9.2.3), and symbol
+   rules for Spectre primitives and model cards. */
+@RNL(type="header") {
+  @VERSION("0.2");
+  @PACKAGE(name="rnl-std", version="0.2");
+  @USE-PACKAGE(name="rnl-std-core", version="0.2");
+  @USE-PACKAGE(name="rnl-std-fill", version="0.2");
+  @USE-PACKAGE(name="rnl-std-semantics", version="0.2");
+  @USE-PACKAGE(name="rnl-std-layout", version="0.2")
+}

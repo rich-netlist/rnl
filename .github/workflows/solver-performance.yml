@@ -1,0 +1,123 @@
+name: Optimized solver measurements
+
+on:
+  workflow_call:
+    inputs:
+      baseline_sha:
+        type: string
+        required: true
+      candidate_sha:
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: solver-performance-optimized
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: "4"
+      RUST_TOOLCHAIN: "1.97.1-x86_64-pc-windows-gnu"
+      BASELINE_SHA: ${{ inputs.baseline_sha }}
+      CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: harness
+          persist-credentials: false
+      - name: Require immutable public source commits
+        shell: pwsh
+        run: |
+          if ($env:BASELINE_SHA -notmatch '^[0-9a-f]{40}$') { throw 'baseline_sha must be a full public commit SHA' }
+          if ($env:CANDIDATE_SHA -and $env:CANDIDATE_SHA -notmatch '^[0-9a-f]{40}$') { throw 'candidate_sha must be a full public commit SHA' }
+          if ($env:CANDIDATE_SHA -eq $env:BASELINE_SHA) { throw 'Do not measure the same product revision twice' }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rich-netlist/rnl
+          ref: ${{ inputs.baseline_sha }}
+          path: source-base
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: inputs.candidate_sha != ''
+        with:
+          repository: rich-netlist/rnl
+          ref: ${{ inputs.candidate_sha }}
+          path: source-head
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Set the isolated artifact directory
+        shell: pwsh
+        run: '"ARTIFACT=$env:RUNNER_TEMP/solver-performance-artifact" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append'
+      - name: Verify policies
+        shell: pwsh
+        run: |
+          python harness/scripts/solver-performance/test_benchmark.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify frozen fixture bytes
+        shell: pwsh
+        run: |
+          python harness/scripts/solver-performance/benchmark.py --fixtures harness/tests/performance
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify owned-process cleanup before any solver dispatch
+        shell: pwsh
+        run: |
+          python harness/scripts/solver-performance/test_benchmark.py --owned-helper-fixture "$env:ARTIFACT/helper-fixture"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Keep the frozen fixture manifest
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:ARTIFACT/fixtures" | Out-Null
+          Copy-Item harness/tests/performance/manifest.json "$env:ARTIFACT/fixtures/manifest.json"
+      - name: Install the fixed GNU Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal --no-self-update
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $paths = @('C:\msys64\mingw64\bin', 'C:\mingw64\bin', 'C:\ProgramData\mingw64\mingw64\bin')
+          $mingw = $paths | Where-Object { Test-Path (Join-Path $_ 'gcc.exe') } | Select-Object -First 1
+          if ($mingw) { $mingw | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append }
+      # All compilation finishes before the first measured solver command.
+      - name: Build the frozen baseline (optimized, jobs=4)
+        shell: pwsh
+        run: python harness/scripts/solver-performance/ci_build.py --source source-base --source-head $env:BASELINE_SHA --output "$env:ARTIFACT/baseline" --target-dir "${{ runner.temp }}/solver-build-base" --toolchain $env:RUST_TOOLCHAIN
+      - name: Build the frozen candidate (optimized, jobs=4)
+        if: inputs.candidate_sha != ''
+        shell: pwsh
+        run: python harness/scripts/solver-performance/ci_build.py --source source-head --source-head $env:CANDIDATE_SHA --output "$env:ARTIFACT/candidate" --target-dir "${{ runner.temp }}/solver-build-head" --toolchain $env:RUST_TOOLCHAIN
+      - name: Make verified optimized binaries available before measurement
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: solver-performance-binaries-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/solver-performance-artifact/**/bin/rnl.exe
+            ${{ runner.temp }}/solver-performance-artifact/**/build-info.json
+            ${{ runner.temp }}/solver-performance-artifact/**/build-command.json
+            ${{ runner.temp }}/solver-performance-artifact/**/build-resources.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Measure baseline defaults, off and diagnostic on once
+        shell: pwsh
+        run: python harness/scripts/solver-performance/benchmark.py --fixtures harness/tests/performance --executable "$env:ARTIFACT/baseline/bin/rnl.exe" --build-info "$env:ARTIFACT/baseline/build-info.json" --output "$env:ARTIFACT/baseline/runs" --execute
+      - name: Measure candidate defaults on the same runner
+        if: inputs.candidate_sha != ''
+        shell: pwsh
+        run: python harness/scripts/solver-performance/benchmark.py --fixtures harness/tests/performance --executable "$env:ARTIFACT/candidate/bin/rnl.exe" --build-info "$env:ARTIFACT/candidate/build-info.json" --output "$env:ARTIFACT/candidate/runs" --execute
+      - name: Separate common points, newly completed points and performance failures
+        shell: pwsh
+        run: python harness/scripts/solver-performance/compare.py --artifact "$env:ARTIFACT"
+      - name: Keep optimized EXEs, build identities and all measurements
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: solver-performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/solver-performance-artifact/
+          if-no-files-found: error
+          retention-days: 14

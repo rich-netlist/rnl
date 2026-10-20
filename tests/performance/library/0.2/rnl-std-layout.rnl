@@ -1,0 +1,22 @@
+/* rnl-std-layout, a sub-package of the standard package rnl-std (16.3): the layout definitions
+   (9.4, 14): a mirrored pair about an axis point, a tail centred under a pair, and signal flow
+   (14.6). */
+@RNL(type="header") { @VERSION("0.2"); @PACKAGE(name="rnl-std-layout", version="0.2")}
+
+/* ---------------------------------------------------------------- layout (9.4, 14) */
+@RNL {
+  /* layout (14) */
+  $MIRROR_PAIR = @DEFINE(roles=["a", "b", "axis"]) {
+    {?a ?b} @ALIGN("y");
+    {?a ?axis ?b} @DISTRIBUTE("x");
+    ?a ?b @ORIENT-RELATION("MY")
+  };
+  $TAIL_CENTER = @DEFINE(roles=["a", "b", "t"]) {
+    %mid = (_, _);
+    {?a %mid ?b} @DISTRIBUTE("x");
+    {%mid ?t} @ALIGN("x")
+  };
+  $FLOW = @DEFINE(roles=["{path}"], parameters=[["direction", "left-to-right"]]) {
+    ?path @ORDER(?direction, priority="low")
+  }
+}

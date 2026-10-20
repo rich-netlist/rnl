@@ -1,0 +1,4 @@
+# Preserve the exact fixture/package bytes on every runner, including Windows.
+inputs/** -text -whitespace
+library/** -text -whitespace
+manifest.json text eol=lf

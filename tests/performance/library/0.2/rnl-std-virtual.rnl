@@ -1,0 +1,73 @@
+/* rnl-std-virtual, a sub-package of the standard package rnl-std through rnl-std-core (16.3):
+   the virtual elements ground, supply, port, no-connect mark, junction and current arrow
+   (12.5, 12.6, 13.2, 15.2), their symbols and the rules that give their usages these symbols,
+   and $GND_STUB and $SUPPLY_STUB, a ground or supply right below or above a pin, wired to it
+   (10.5). rnl-std-fill applies the stubs to unwired pins; without it they can still be applied
+   by hand. Coordinates are y-up; one unit is one grid step. */
+@RNL(type="header") { @VERSION("0.2"); @PACKAGE(name="rnl-std-virtual", version="0.2")}
+
+/* ---------------------------------------------------------------- symbols of the virtual elements (9.2) */
+@RNL {
+  /* virtual elements (12.5, 12.6, 13.2, 15.2). Their role is p (net is a standard subobject name, 9.4);
+     ${p} shows the net, or the net of the terminal when drawn on a pin (13.6, PR1). */
+  $GROUND = @DEFINE-SYMBOL(box=[-1, -1.5, 1, 0]) {
+    (0, 0) @PIN(terminal=1, direction="up");
+    @LINE {(0, 0) (0, -0.8)};
+    @LINE {(-1, -0.8) (1, -0.8)};
+    @LINE {(-0.6, -1.15) (0.6, -1.15)};
+    @LINE {(-0.2, -1.5) (0.2, -1.5)}
+  };
+  $SUPPLY_BAR = @DEFINE-SYMBOL(box=[-1, 0, 1, 0.8]) {
+    (0, 0) @PIN(terminal=1, direction="down");
+    @LINE {(0, 0) (0, 0.8)};
+    @LINE {(-1, 0.8) (1, 0.8)};
+    ? @TEXT("${p}", key="name", halign="middle", valign="bottom") => @PLACE(0, 1.1)
+  };
+  $PORT_TAG = @DEFINE-SYMBOL(box=[-3, -0.6, 0, 0.6]) {
+    (0, 0) @PIN(terminal=1, direction="right");
+    @LINE {(0, 0) (-0.7, 0.6) (-3, 0.6) (-3, -0.6) (-0.7, -0.6) (0, 0)};
+    ? @TEXT("${p}", key="name", halign="end", valign="middle") => @PLACE(-3.3, 0)
+  };
+  $NC_CROSS = @DEFINE-SYMBOL(box=[-0.5, -0.5, 0.5, 0.5]) {
+    @LINE {(-0.5, -0.5) (0.5, 0.5)};
+    @LINE {(-0.5, 0.5) (0.5, -0.5)}
+  };
+  $JUNCTION_DOT = @DEFINE-SYMBOL(box=[-0.25, -0.25, 0.25, 0.25]) {(0, 0) @CIRCLE(radius=0.25, fill="linecolor", linestyle="none")};
+  /* points right; ORIENT("R270") points down (15.2) */
+  $CURRENT_ARROW_SYM = @DEFINE-SYMBOL(box=[-0.6, 0.25, 0.6, 0.75]) { @LINE(arrow="end") {(-0.6, 0.5) (0.6, 0.5)}}
+}
+
+/* ---------------------------------------------------------------- definitions (9.4, 10.5, 12) */
+@RNL {
+  /* virtual elements */
+  $GND = @DEFINE(roles=[["p", ["net", "terminal"]]]) {};
+  $SUPPLY = @DEFINE(roles=[["p", ["net", "terminal"]]]) {};
+  $IOPORT = @DEFINE(roles=[["p", ["net", "terminal"]]]) {};
+  $NC = @DEFINE(roles=[["t", "terminal"]]) {};
+  $JUNCTION = @DEFINE(roles=[["p", ["point", "terminal"]]]) {};
+  $CURRENT_ARROW = @DEFINE(roles=[["p", ["terminal", "point"]]]) {};
+
+  /* a ground or supply for one pin: a stub with its own wire, gap below or above the pin (10.5) */
+  $GND_STUB = @DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {
+    %g = $GND @ATTACH ?t::net;
+    ?t::net @WIRE {?t %g:p};
+    {?t %g:p} @ALIGN("x");
+    %g:p ?t @DISTANCE("bottom-to-top", min=?gap, max=?gap)
+  };
+  $SUPPLY_STUB = @DEFINE(roles=[["t", "terminal"]], parameters=[["gap", 2]]) {
+    %s = $SUPPLY @ATTACH ?t::net;
+    ?t::net @WIRE {?t %s:p};
+    {?t %s:p} @ALIGN("x");
+    ?t %s:p @DISTANCE("bottom-to-top", min=?gap, max=?gap)
+  }
+}
+
+/* ---------------------------------------------------------------- default symbol rules (8.3, 16.3) */
+@RNL {
+  # @SELECT-USAGE $GND => @SET-SYMBOL $GROUND;
+  # @SELECT-USAGE $SUPPLY => @SET-SYMBOL $SUPPLY_BAR;
+  # @SELECT-USAGE $IOPORT => @SET-SYMBOL $PORT_TAG;
+  # @SELECT-USAGE $NC => @SET-SYMBOL $NC_CROSS;
+  # @SELECT-USAGE $JUNCTION => @SET-SYMBOL $JUNCTION_DOT;
+  # @SELECT-USAGE $CURRENT_ARROW => @SET-SYMBOL $CURRENT_ARROW_SYM
+}

@@ -1,0 +1,18 @@
+/* rnl-std-semantics, a sub-package of the standard package rnl-std (16.3): the semantic
+   definitions (9.4, 9.5, 15.1), roles only, nothing drawn. */
+@RNL(type="header") { @VERSION("0.2"); @PACKAGE(name="rnl-std-semantics", version="0.2")}
+
+/* ---------------------------------------------------------------- semantics (9.4, 15.1) */
+@RNL {
+  /* semantics: roles only (15.1) */
+  $DIFFPAIR = @DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"]]) {};
+  $DIFFPAIR_TAIL = @DEFINE(roles=[["in_p", "instance"], ["in_n", "instance"], ["tail", "instance"]]) {};
+  $CURRENT_MIRROR = @DEFINE(roles=[["ref", "instance"], ["out", "instance"]]) {};
+  $INPUT_STAGE = @DEFINE(roles=[["pair", "usage"], ["tail", "instance"]]) {};
+  $MATCHED = @DEFINE(roles=["{members}"]) {};
+  $BRANCH = @DEFINE(roles=["{members}"]) {};
+  $CHAIN = @DEFINE(roles=["source", "{series}", "load"]) {};
+  $CASCADE = @DEFINE(roles=["first", "second", "feedback", "load"]) {};
+  $SUPPLY_HIGH = @DEFINE(roles=[["pin", "terminal"]]) {};
+  $SUPPLY_LOW = @DEFINE(roles=[["pin", "terminal"]]) {}
+}

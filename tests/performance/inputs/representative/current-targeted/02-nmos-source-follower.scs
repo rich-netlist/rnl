@@ -1,0 +1,45 @@
+// CC0-1.0 — 02-nmos-source-follower.scs: NMOS source follower with current-source load (Spectre)
+//! 检验目标：检验项目 2——NMOS 源极跟随器（共漏级 #M1）加 NMOS 恒流源负载（#M2）与理想偏置电流源（#IBIAS）在默认偏好（电流朝下）下的朝向推算。
+//! 推算过程（按 rnl-std-basic.rnl、rnl-std-semiconductors.rnl 中的引脚 direction= 与标准 11.2、15.2）：
+//! 1. #M1（NMOS 源极跟随器，漏极接 vdd、源极接输出 out）与 #M2（NMOS 电流源负载，漏极接 out、源极接 0）及 #M3（二极管接法偏置管）均使用符号 $NMOS：
+//!    - 端子 1 (d) 的引脚明写 direction="up" (0, +1)，标 @CURRENT("in") 后局部电流方向为 (0, -1)（"down"）；
+//!    - 端子 3 (s) 的引脚明写 direction="down" (0, -1)，标 @CURRENT("out") 后局部电流方向为 (0, -1)（"down"）；
+//!    - 栅极 g 与衬底 b 不标 @CURRENT，不计分。
+//!    - 经 8 种朝向变换，仅 R0 (x, y) 与 MY (-x, y) 将 (0, -1) 保持为 (0, -1)（"down"）。
+//! 2. #IBIAS（Spectre isource，正电流从端子 1 p 流向端子 2 n）使用标准符号 $CURRENT_SOURCE：
+//!    - 端子 1 (p)：局部坐标 (0, 2)，引脚明写 direction="up" (0, +1)。标 #IBIAS:p @CURRENT("in")（流入取反），局部电流方向为 (0, -1)（"down"）。
+//!    - 端子 2 (n)：局部坐标 (0, -2)，引脚明写 direction="down" (0, -1)。标 #IBIAS:n @CURRENT("out")（流出取同），局部电流方向为 (0, -1)（"down"）。
+//!    - 经 8 种朝向变换，仅 R0 与 MY 使 #IBIAS 的两个端子电流方向同时为 "down"（0 个不合）；MX/R180 使两端均朝上（2 个不合），R90/R270/MXR90/MYR90 使两端水平（2 个不合）。
+//! 3. #VDD、#VIN、#CL 未标 @CURRENT，不计分，朝向不受它影响。
+//! 预期结果：
+//! - #M1（源极跟随管）、#M2（电流源负载管）、#M3（偏置参考管）均应当取 R0 或 MY；
+//! - #IBIAS（理想偏置电流源）应当取 R0 或 MY；
+//! - #VDD、#VIN、#CL 不计分，朝向不受 current_direction 影响。
+simulator lang=spectre
+// @RNL(type="header") { @VERSION("0.3") }
+
+model nch mos1 type=n
+
+IBIAS (vdd vb) isource dc=20u
+M3 (vb vb 0 0) nch w=8u l=1u
+
+M1 (vdd in out 0) nch w=16u l=0.5u
+M2 (out vb 0 0) nch w=16u l=1u
+
+CL (out 0) capacitor c=1p
+VDD (vdd 0) vsource dc=1.8
+VIN (in 0) vsource dc=1.2
+
+// @RNL {
+//   # @SELECT-INSTANCE(type="nmos") => @SET-SYMBOL $NMOS;
+//
+//   {#IBIAS #M3} @AS $BRANCH;
+//   {#M1 #M2} @AS $BRANCH;
+//   %cm = #M3(ref) #M2(out) @AS $CURRENT_MIRROR;
+//
+//   {#IBIAS:p #M3:d #M1:d #M2:d} @CURRENT("in");
+//   {#IBIAS:n #M3:s #M1:s #M2:s} @CURRENT("out");
+//
+//   &vdd @ADD-TO $SUPPLY_NET_SET;
+//   $WIRE_NET_SET @ROUTE
+// }
