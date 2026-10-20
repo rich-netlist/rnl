@@ -170,6 +170,14 @@ export function iconSvg(logo, bounds, { background = ICON_BACKGROUND } = {}) {
     group("icon-normal", body) + [16, 24, 32].map(size => group(`icon-small icon-${size}`, pixelHint(size))).join("") + "</svg>\n";
 }
 
+export function faviconSvg(logo, bounds) {
+  return iconSvg(logo, bounds, { background: null }).replace("</style>",
+    `@media (prefers-color-scheme: dark) {\n` +
+    `  [stroke="#1d1d1f"] { stroke: #e0e0e2; }\n` +
+    `  [fill="#1d1d1f"] { fill: #e0e0e2; }\n` +
+    `}\n</style>`);
+}
+
 async function png(page, svg, size, path) {
   await page.setViewportSize({ width: size, height: size });
   await page.setContent(`<style>html,body{margin:0;width:100%;height:100%}svg{display:block;width:100%;height:100%}</style>${svg}`);
@@ -212,8 +220,9 @@ async function generate(lightPngsOnly = false) {
     for (const name of ["rnl-logo.svg", "rnl-logo-dark.svg", "rnl-logo-small.svg", "rnl-logo-small-dark.svg"]) {
       copyFileSync(join(root, "brand", name), join(assets, "brand", name));
     }
-    writeFileSync(join(assets, "favicon.svg"), icon);
-    copyFileSync(join(root, "brand/rnl-icon-32.png"), join(assets, "favicon-32.png"));
+    const favicon = faviconSvg(svg, bounds);
+    writeFileSync(join(assets, "favicon.svg"), favicon);
+    await png(page, favicon, 32, join(assets, "favicon-32.png"));
     await png(page, icon, 180, join(assets, "apple-touch-icon.png"));
     const viewerIcons = join(root, "apps/viewer-ui/icons");
     mkdirSync(viewerIcons, { recursive: true });

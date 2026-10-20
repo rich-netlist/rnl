@@ -7,64 +7,67 @@
 }
 @media (max-width: 28px) { .icon-32 { display: none; } .icon-24 { display: inline; } }
 @media (max-width: 20px) { .icon-24 { display: none; } .icon-16 { display: inline; } }
+@media (prefers-color-scheme: dark) {
+  [stroke="#1d1d1f"] { stroke: #e0e0e2; }
+  [fill="#1d1d1f"] { fill: #e0e0e2; }
+}
 </style>
-<rect width="1024" height="1024" rx="180" fill="#132033"/>
 <g class="icon-normal" transform="translate(499.724787 479.393965) scale(5.480006)">
-<g data-id="#M1"><path d="M-14.00,-28.00 L11.90,-28.00" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M-14.00,-0.00 L11.90,-0.00" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M-5.60,-0.00 L6.02,-7.84 L6.02,7.84 L-5.60,-0.00 Z" fill="#e0e0e2" stroke="none"/></g>
-<g data-id="#M1"><path d="M11.90,9.52 L11.90,-37.52" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M23.10,-1.68 L23.10,-26.32" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M23.10,-14.00 L28.00,-14.00" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="a wire"><path d="M-14.00,-28.00 L-14.00,-0.00 L-14.00,30.80 L42.00,30.80 L42.00,-14.00 L42.00,-58.80 L-42.00,-58.80 L-42.00,58.80 L12.60,58.80" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="a wire"><path d="M28.00,-14.00 L42.00,-14.00" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="%g0"><path d="M12.60,58.80 L25.20,58.80" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="%g0"><path d="M25.20,70.70 L25.20,46.90 L42.00,58.80 L25.20,70.70 Z" fill="none" stroke="#e0e0e2" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M-14.00,-28.00 L11.90,-28.00" fill="none" stroke="#1d1d1f" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M-14.00,-0.00 L11.90,-0.00" fill="none" stroke="#1d1d1f" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M-5.60,-0.00 L6.02,-7.84 L6.02,7.84 L-5.60,-0.00 Z" fill="#1d1d1f" stroke="none"/></g>
+<g data-id="#M1"><path d="M11.90,9.52 L11.90,-37.52" fill="none" stroke="#1d1d1f" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M23.10,-1.68 L23.10,-26.32" fill="none" stroke="#1d1d1f" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M23.10,-14.00 L28.00,-14.00" fill="none" stroke="#1d1d1f" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="a wire"><path d="M-14.00,-28.00 L-14.00,-0.00 L-14.00,30.80 L42.00,30.80 L42.00,-14.00 L42.00,-58.80 L-42.00,-58.80 L-42.00,58.80 L12.60,58.80" fill="none" stroke="#1d1d1f" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="a wire"><path d="M28.00,-14.00 L42.00,-14.00" fill="none" stroke="#1d1d1f" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="%g0"><path d="M12.60,58.80 L25.20,58.80" fill="none" stroke="#1d1d1f" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="%g0"><path d="M25.20,70.70 L25.20,46.90 L42.00,58.80 L25.20,70.70 Z" fill="none" stroke="#1d1d1f" stroke-width="5.04" stroke-linecap="round" stroke-linejoin="round"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="-14.00" cy="-28.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="-14.00" cy="-0.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="42.00" cy="-14.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 </g>
 <g class="icon-small icon-16" transform="translate(499.724787 479.393965) scale(5.480006)">
-<g data-id="#M1"><path d="M-15.278229,-23.247048 L8.07941,-23.247048" fill="none" stroke="#e0e0e2" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M-15.278229,0.11059 L8.07941,0.11059" fill="none" stroke="#e0e0e2" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M-5.60,-0.00 L6.02,-7.84 L6.02,7.84 L-5.60,-0.00 Z" fill="#e0e0e2" stroke="none"/></g>
-<g data-id="#M1"><path d="M8.07941,11.78941 L8.07941,-34.925868" fill="none" stroke="#e0e0e2" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M19.758229,0.11059 L19.758229,-23.247048" fill="none" stroke="#e0e0e2" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M19.758229,-11.568229 L31.437048,-11.568229" fill="none" stroke="#e0e0e2" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="a wire"><path d="M-15.278229,-23.247048 L-15.278229,0.11059 L-15.278229,35.147048 L43.115868,35.147048 L43.115868,-11.568229 L43.115868,-58.283506 L-38.635868,-58.283506 L-38.635868,58.504687 L8.07941,58.504687" fill="none" stroke="#e0e0e2" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="a wire"><path d="M31.437048,-11.568229 L43.115868,-11.568229" fill="none" stroke="#e0e0e2" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="%g0"><path d="M8.07941,58.504687 L19.758229,58.504687" fill="none" stroke="#e0e0e2" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="%g0"><path d="M25.597639,40.986458 L37.276458,40.986458 L37.276458,52.665277 L25.597639,52.665277 Z M25.597639,52.665277 L48.955277,52.665277 L48.955277,64.344097 L25.597639,64.344097 Z M25.597639,64.344097 L37.276458,64.344097 L37.276458,76.022916 L25.597639,76.022916 Z" fill="#e0e0e2" stroke="none"/></g>
+<g data-id="#M1"><path d="M-15.278229,-23.247048 L8.07941,-23.247048" fill="none" stroke="#1d1d1f" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M-15.278229,0.11059 L8.07941,0.11059" fill="none" stroke="#1d1d1f" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M-5.60,-0.00 L6.02,-7.84 L6.02,7.84 L-5.60,-0.00 Z" fill="#1d1d1f" stroke="none"/></g>
+<g data-id="#M1"><path d="M8.07941,11.78941 L8.07941,-34.925868" fill="none" stroke="#1d1d1f" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M19.758229,0.11059 L19.758229,-23.247048" fill="none" stroke="#1d1d1f" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M19.758229,-11.568229 L31.437048,-11.568229" fill="none" stroke="#1d1d1f" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="a wire"><path d="M-15.278229,-23.247048 L-15.278229,0.11059 L-15.278229,35.147048 L43.115868,35.147048 L43.115868,-11.568229 L43.115868,-58.283506 L-38.635868,-58.283506 L-38.635868,58.504687 L8.07941,58.504687" fill="none" stroke="#1d1d1f" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="a wire"><path d="M31.437048,-11.568229 L43.115868,-11.568229" fill="none" stroke="#1d1d1f" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="%g0"><path d="M8.07941,58.504687 L19.758229,58.504687" fill="none" stroke="#1d1d1f" stroke-width="11.678819" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="%g0"><path d="M25.597639,40.986458 L37.276458,40.986458 L37.276458,52.665277 L25.597639,52.665277 Z M25.597639,52.665277 L48.955277,52.665277 L48.955277,64.344097 L25.597639,64.344097 Z M25.597639,64.344097 L37.276458,64.344097 L37.276458,76.022916 L25.597639,76.022916 Z" fill="#1d1d1f" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="-14.00" cy="-28.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="-14.00" cy="-0.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="42.00" cy="-14.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 </g>
 <g class="icon-small icon-24" transform="translate(499.724787 479.393965) scale(5.480006)">
-<g data-id="#M1"><path d="M-17.224699,-29.086458 L13.918819,-29.086458" fill="none" stroke="#e0e0e2" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M-17.224699,2.05706 L13.918819,2.05706" fill="none" stroke="#e0e0e2" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M-5.60,-0.00 L6.02,-7.84 L6.02,7.84 L-5.60,-0.00 Z" fill="#e0e0e2" stroke="none"/></g>
-<g data-id="#M1"><path d="M13.918819,9.84294 L13.918819,-36.872338" fill="none" stroke="#e0e0e2" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M21.704699,2.05706 L21.704699,-29.086458" fill="none" stroke="#e0e0e2" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M21.704699,-13.514699 L29.490578,-13.514699" fill="none" stroke="#e0e0e2" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="a wire"><path d="M-17.224699,-29.086458 L-17.224699,2.05706 L-17.224699,33.200578 L45.062337,33.200578 L45.062337,-13.514699 L45.062337,-60.229976 L-40.582338,-60.229976 L-40.582338,56.558217 L13.918819,56.558217" fill="none" stroke="#e0e0e2" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="a wire"><path d="M29.490578,-13.514699 L45.062337,-13.514699" fill="none" stroke="#e0e0e2" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="%g0"><path d="M13.918819,56.558217 L21.704699,56.558217" fill="none" stroke="#e0e0e2" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="%g0"><path d="M25.597639,44.879398 L33.383518,44.879398 L33.383518,52.665277 L25.597639,52.665277 Z M25.597639,52.665277 L41.169398,52.665277 L41.169398,60.451157 L25.597639,60.451157 Z M25.597639,60.451157 L33.383518,60.451157 L33.383518,68.237036 L25.597639,68.237036 Z" fill="#e0e0e2" stroke="none"/></g>
+<g data-id="#M1"><path d="M-17.224699,-29.086458 L13.918819,-29.086458" fill="none" stroke="#1d1d1f" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M-17.224699,2.05706 L13.918819,2.05706" fill="none" stroke="#1d1d1f" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M-5.60,-0.00 L6.02,-7.84 L6.02,7.84 L-5.60,-0.00 Z" fill="#1d1d1f" stroke="none"/></g>
+<g data-id="#M1"><path d="M13.918819,9.84294 L13.918819,-36.872338" fill="none" stroke="#1d1d1f" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M21.704699,2.05706 L21.704699,-29.086458" fill="none" stroke="#1d1d1f" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M21.704699,-13.514699 L29.490578,-13.514699" fill="none" stroke="#1d1d1f" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="a wire"><path d="M-17.224699,-29.086458 L-17.224699,2.05706 L-17.224699,33.200578 L45.062337,33.200578 L45.062337,-13.514699 L45.062337,-60.229976 L-40.582338,-60.229976 L-40.582338,56.558217 L13.918819,56.558217" fill="none" stroke="#1d1d1f" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="a wire"><path d="M29.490578,-13.514699 L45.062337,-13.514699" fill="none" stroke="#1d1d1f" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="%g0"><path d="M13.918819,56.558217 L21.704699,56.558217" fill="none" stroke="#1d1d1f" stroke-width="7.78588" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="%g0"><path d="M25.597639,44.879398 L33.383518,44.879398 L33.383518,52.665277 L25.597639,52.665277 Z M25.597639,52.665277 L41.169398,52.665277 L41.169398,60.451157 L25.597639,60.451157 Z M25.597639,60.451157 L33.383518,60.451157 L33.383518,68.237036 L25.597639,68.237036 Z" fill="#1d1d1f" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="-14.00" cy="-28.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="-14.00" cy="-0.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="42.00" cy="-14.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 </g>
 <g class="icon-small icon-32" transform="translate(499.724787 479.393965) scale(5.480006)">
-<g data-id="#M1"><path d="M-12.358524,-26.166753 L10.999114,-26.166753" fill="none" stroke="#e0e0e2" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M-12.358524,-2.809115 L10.999114,-2.809115" fill="none" stroke="#e0e0e2" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M-5.60,-0.00 L6.02,-7.84 L6.02,7.84 L-5.60,-0.00 Z" fill="#e0e0e2" stroke="none"/></g>
-<g data-id="#M1"><path d="M10.999114,8.869705 L10.999114,-37.845573" fill="none" stroke="#e0e0e2" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M22.677934,-2.809115 L22.677934,-26.166753" fill="none" stroke="#e0e0e2" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="#M1"><path d="M22.677934,-14.487934 L28.517343,-14.487934" fill="none" stroke="#e0e0e2" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="a wire"><path d="M-12.358524,-26.166753 L-12.358524,-2.809115 L-12.358524,32.227343 L40.196163,32.227343 L40.196163,-14.487934 L40.196163,-61.203211 L-41.555573,-61.203211 L-41.555573,61.424392 L10.999114,61.424392" fill="none" stroke="#e0e0e2" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="a wire"><path d="M28.517343,-14.487934 L40.196163,-14.487934" fill="none" stroke="#e0e0e2" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="%g0"><path d="M10.999114,61.424392 L22.677934,61.424392" fill="none" stroke="#e0e0e2" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
-<g data-id="%g0"><path d="M25.597639,46.825868 L31.437048,46.825868 L31.437048,52.665277 L25.597639,52.665277 Z M25.597639,52.665277 L37.276458,52.665277 L37.276458,58.504687 L25.597639,58.504687 Z M25.597639,58.504687 L43.115868,58.504687 L43.115868,64.344097 L25.597639,64.344097 Z M25.597639,64.344097 L37.276458,64.344097 L37.276458,70.183506 L25.597639,70.183506 Z M25.597639,70.183506 L31.437048,70.183506 L31.437048,76.022916 L25.597639,76.022916 Z" fill="#e0e0e2" stroke="none"/></g>
+<g data-id="#M1"><path d="M-12.358524,-26.166753 L10.999114,-26.166753" fill="none" stroke="#1d1d1f" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M-12.358524,-2.809115 L10.999114,-2.809115" fill="none" stroke="#1d1d1f" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M-5.60,-0.00 L6.02,-7.84 L6.02,7.84 L-5.60,-0.00 Z" fill="#1d1d1f" stroke="none"/></g>
+<g data-id="#M1"><path d="M10.999114,8.869705 L10.999114,-37.845573" fill="none" stroke="#1d1d1f" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M22.677934,-2.809115 L22.677934,-26.166753" fill="none" stroke="#1d1d1f" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="#M1"><path d="M22.677934,-14.487934 L28.517343,-14.487934" fill="none" stroke="#1d1d1f" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="a wire"><path d="M-12.358524,-26.166753 L-12.358524,-2.809115 L-12.358524,32.227343 L40.196163,32.227343 L40.196163,-14.487934 L40.196163,-61.203211 L-41.555573,-61.203211 L-41.555573,61.424392 L10.999114,61.424392" fill="none" stroke="#1d1d1f" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="a wire"><path d="M28.517343,-14.487934 L40.196163,-14.487934" fill="none" stroke="#1d1d1f" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="%g0"><path d="M10.999114,61.424392 L22.677934,61.424392" fill="none" stroke="#1d1d1f" stroke-width="6.804" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g data-id="%g0"><path d="M25.597639,46.825868 L31.437048,46.825868 L31.437048,52.665277 L25.597639,52.665277 Z M25.597639,52.665277 L37.276458,52.665277 L37.276458,58.504687 L25.597639,58.504687 Z M25.597639,58.504687 L43.115868,58.504687 L43.115868,64.344097 L25.597639,64.344097 Z M25.597639,64.344097 L37.276458,64.344097 L37.276458,70.183506 L25.597639,70.183506 Z M25.597639,70.183506 L31.437048,70.183506 L31.437048,76.022916 L25.597639,76.022916 Z" fill="#1d1d1f" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="-14.00" cy="-28.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="-14.00" cy="-0.00" r="7.00" fill="#e8590c" stroke="none"/></g>
 <g data-id="a usage of $JUNCTION"><circle cx="42.00" cy="-14.00" r="7.00" fill="#e8590c" stroke="none"/></g>

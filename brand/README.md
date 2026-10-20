@@ -71,7 +71,10 @@ larger ICNS resources retain their normal strokes. ICNS blocks are sorted by typ
 
 The same command also updates:
 
-- `site/src/assets/favicon.svg`, `favicon-32.png` and `apple-touch-icon.png` (180px).
+- `site/src/assets/favicon.svg` and `favicon-32.png`: transparent background, original
+  dark circuit lines and orange junctions, with the same pixel-fitted small variants.
+  The SVG uses light circuit lines under `prefers-color-scheme: dark`.
+- `site/src/assets/apple-touch-icon.png` (180px): the dark application icon.
 - `apps/viewer-ui/icons/`: copies of those favicons, carried into the web viewer by its existing build.
 - `site/src/assets/brand/`: copies of the transparent homepage and small navigation logos.
 
