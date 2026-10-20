@@ -298,24 +298,41 @@ pub(crate) fn with_relations<R>(
     s: &Structure,
     relations: &[Tagged],
     work: &mut Work,
+    purpose: &'static str,
     f: impl FnOnce(&mut Resolver, &Model, &Taken) -> R,
 ) -> R {
+    let _call = crate::profile::work_span("with_relations", purpose);
+    if let Some(id) = crate::profile::work::next_call() {
+        crate::profile::work_set("work_call_id", id);
+        crate::profile::work_set("work_kept_units", s.kept.len() as u64);
+        crate::profile::work_set("work_relation_units", relations.len() as u64);
+    }
+    let phase = crate::profile::work_span("relations_phase", "model_prepare");
     let mut model = s.model.clone();
     let base = model.units.len();
     let units: Vec<Unit> = relations.iter().enumerate().map(|(i, r)| r.rel.unit(&mut model, base + i)).collect();
     model.units.extend(units);
+    drop(phase);
+    let phase = crate::profile::work_span("relations_phase", "resolver_init_seed");
     let mut r = Resolver::new(&model, s.objects.len(), Limits::Caps(s.caps));
     r.seed(s.witness.clone());
+    drop(phase);
+    let phase = crate::profile::work_span("relations_phase", "kept_replay");
     for &f in &s.kept {
         let kept = r.add(f);
         debug_assert_eq!(kept, Outcome::Kept, "the facts kept hold at the witness");
     }
+    drop(phase);
+    let phase = crate::profile::work_span("relations_phase", "relations_take");
     let outcomes: Vec<Outcome> = (0..relations.len()).map(|i| r.add(base + i)).collect();
     let taken = Taken {
         kept: outcomes.iter().map(|o| *o == Outcome::Kept).collect(),
         undecided: outcomes.contains(&Outcome::Undecided),
     };
+    drop(phase);
+    let phase = crate::profile::work_span("relations_phase", "consumer");
     let out = f(&mut r, &model, &taken);
+    drop(phase);
     work.resolve_nodes += r.nodes;
     work.pivots += r.pivots();
     out
@@ -2140,7 +2157,7 @@ impl Search<'_> {
         let ori = c.orientations(s);
         let mut rels = orientation_relations(s, c);
         rels.extend(relations_within(s, c, &ori, self.options, Some(within), None));
-        with_relations(s, &rels, &mut *self.work, |_, _, t| t.kept.iter().filter(|k| !**k).count())
+        with_relations(s, &rels, &mut *self.work, "search_check", |_, _, t| t.kept.iter().filter(|k| !**k).count())
     }
 }
 

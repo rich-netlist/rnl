@@ -329,7 +329,7 @@ fn forced_overlap(e: &Exact, a: usize, b: usize) -> bool {
             rel: Relation::Linear { axis, terms, lo: Some(c), hi: None },
         });
         let mut work = crate::Work::default();
-        with_relations(s, &rels, &mut work, |_, _, t| !t.kept[t.kept.len() - 1])
+        with_relations(s, &rels, &mut work, "test_overlap_cause", |_, _, t| !t.kept[t.kept.len() - 1])
     })
 }
 

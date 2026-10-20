@@ -7,10 +7,22 @@ use std::rc::Rc;
 
 use crate::Clock;
 
+pub(crate) mod work;
+
 /// A caller-owned observer. Timing must use the existing `Clock` interface. Implementations
 /// should accumulate counters in memory and throttle durable checkpoints.
 pub trait ProfileObserver: Clock {
     fn record(&self, event: ProfileEvent);
+
+    /// Explicit work diagnostics; ordinary profiling keeps its existing events and scans.
+    fn work_diagnostics(&self) -> bool {
+        false
+    }
+
+    /// Work diagnostics skip the expensive stored-rational scan, rather than reporting zeros.
+    fn tableau_details(&self) -> bool {
+        !self.work_diagnostics()
+    }
 }
 
 /// A shared observer supplied by `Clock::profiler`.
@@ -19,14 +31,43 @@ pub type ProfileHandle = Rc<dyn ProfileObserver>;
 /// Observations, separate from the solution and the canonical solver options.
 #[derive(Clone, Debug)]
 pub enum ProfileEvent {
-    Level { level: usize, title: String, objects: usize, facts: usize, routes: usize, options: String, hash: String },
+    Level {
+        level: usize,
+        title: String,
+        objects: usize,
+        facts: usize,
+        routes: usize,
+        options: String,
+        hash: String,
+    },
     LevelEnd,
-    Begin { category: &'static str, name: String },
+    Begin {
+        category: &'static str,
+        name: String,
+    },
     End,
-    Add { name: &'static str, value: u64 },
-    Max { name: &'static str, value: u64 },
-    Set { name: &'static str, value: u64 },
-    Text { name: &'static str, value: String },
+    Add {
+        name: &'static str,
+        value: u64,
+    },
+    Max {
+        name: &'static str,
+        value: u64,
+    },
+    Set {
+        name: &'static str,
+        value: u64,
+    },
+    Text {
+        name: &'static str,
+        value: String,
+    },
+    /// One batch at a coarse boundary. Gauges are current state, not cumulative work.
+    Work {
+        counters: Vec<(&'static str, u64)>,
+        maxima: Vec<(&'static str, u64)>,
+        gauges: Vec<(&'static str, u64)>,
+    },
     Checkpoint,
 }
 
@@ -38,7 +79,18 @@ pub(crate) fn enabled() -> bool {
     OBSERVER.with(|o| o.borrow().is_some())
 }
 
+pub(crate) fn work_enabled() -> bool {
+    OBSERVER.with(|o| o.borrow().as_ref().is_some_and(|o| o.work_diagnostics()))
+}
+
+pub(crate) fn tableau_details_enabled() -> bool {
+    OBSERVER.with(|o| o.borrow().as_ref().is_some_and(|o| o.tableau_details()))
+}
+
 pub(crate) fn emit(event: ProfileEvent) {
+    if matches!(event, ProfileEvent::Begin { .. } | ProfileEvent::End | ProfileEvent::LevelEnd) {
+        work::flush();
+    }
     let observer = OBSERVER.with(|o| o.borrow().clone());
     if let Some(observer) = observer {
         observer.record(event);
@@ -87,6 +139,20 @@ pub(crate) fn span_lazy(category: &'static str, name: impl FnOnce() -> String) -
     }
 }
 
+pub(crate) fn work_span(category: &'static str, name: &'static str) -> Span {
+    if work_enabled() {
+        span(category, name)
+    } else {
+        Span(false)
+    }
+}
+
+pub(crate) fn work_set(name: &'static str, value: u64) {
+    if work_enabled() {
+        set(name, value);
+    }
+}
+
 impl Drop for Span {
     fn drop(&mut self) {
         if self.0 {
@@ -104,6 +170,7 @@ pub(crate) fn with<R>(observer: Option<ProfileHandle>, f: impl FnOnce() -> R) ->
     }
     let previous = OBSERVER.with(|o| o.replace(observer));
     let _restore = Restore(previous);
+    let _work = work::Scope::new(work_enabled());
     f()
 }
 
@@ -117,7 +184,7 @@ mod tests {
     use std::rc::Rc;
 
     #[derive(Default)]
-    struct Observer(RefCell<Vec<ProfileEvent>>);
+    struct Observer(RefCell<Vec<ProfileEvent>>, bool);
     impl Clock for Observer {
         fn elapsed(&self) -> f64 {
             0.0
@@ -126,6 +193,9 @@ mod tests {
     impl ProfileObserver for Observer {
         fn record(&self, e: ProfileEvent) {
             self.0.borrow_mut().push(e);
+        }
+        fn work_diagnostics(&self) -> bool {
+            self.1
         }
     }
     struct Ticks {
@@ -161,15 +231,30 @@ mod tests {
             let measured = Ticks { reads: Cell::new(0), observer: Some(observer.clone()) };
             let a = crate::solve_with_clock(&p, &options, &plain);
             let b = crate::solve_with_clock(&p, &options, &measured);
+            let work_observer = Rc::new(Observer(RefCell::new(Vec::new()), true));
+            let work = Ticks { reads: Cell::new(0), observer: Some(work_observer.clone()) };
+            let c = crate::solve_with_clock(&p, &options, &work);
             assert_eq!(a, b, "limit {limit:?}");
+            assert_eq!(a, c, "work mode at limit {limit:?}");
             assert_eq!(plain.reads.get(), measured.reads.get(), "deadline reads at {limit:?}");
+            assert_eq!(plain.reads.get(), work.reads.get(), "work deadline reads at {limit:?}");
             let hash = rnl_runtime::problem::sig2(&p, &options.canonical());
             let ra = rnl_runtime::solution::write_record(&p, &a.solution, crate::AUTHOR, &hash);
             let rb = rnl_runtime::solution::write_record(&p, &b.solution, crate::AUTHOR, &hash);
+            let rc = rnl_runtime::solution::write_record(&p, &c.solution, crate::AUTHOR, &hash);
             assert_eq!(ra.record.as_bytes(), rb.record.as_bytes());
+            assert_eq!(ra.record.as_bytes(), rc.record.as_bytes());
             let events = observer.0.borrow();
             assert!(matches!(events.first(), Some(ProfileEvent::Level { hash: h, .. }) if h == &hash));
             assert!(matches!(events.last(), Some(ProfileEvent::LevelEnd)));
+            assert!(!events.iter().any(|e| matches!(e, ProfileEvent::Work { .. })));
+            let work_events = work_observer.0.borrow();
+            assert!(work_events.iter().any(|e| matches!(e, ProfileEvent::Work { .. })));
+            assert!(!work_events.iter().any(|e| matches!(
+                e,
+                ProfileEvent::Add { name: "tableau_scans", .. }
+                    | ProfileEvent::Max { name: "max_numerator_bits" | "max_denominator_bits", .. }
+            )));
             assert!(!enabled());
         }
     }

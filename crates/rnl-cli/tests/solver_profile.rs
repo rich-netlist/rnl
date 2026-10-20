@@ -35,6 +35,8 @@ fn profile_json_and_records_are_independent() {
     assert_eq!(json["status"], "complete");
     assert_eq!(json["counts_complete"], true);
     assert_eq!(json["schema_version"], 1);
+    assert!(json.get("work_diagnostics_schema_version").is_none());
+    assert!(json.get("tableau_details").is_none());
     assert!(json["levels"].as_array().unwrap().iter().all(|l| l["status"] == "complete"));
 }
 
@@ -122,4 +124,48 @@ fn disabled_profile_keeps_committed_t1_bytes() {
     let expected = std::fs::read(root.join("solved/T1-rc-lowpass.sp")).unwrap();
     assert_eq!(run.files.len(), 1);
     assert_eq!(run.files[0].text.as_bytes(), expected);
+}
+
+#[test]
+fn work_profile_is_opt_in_and_preserves_files_records_and_options() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("solver-work-profile");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("work.json");
+    let _ = std::fs::remove_file(&path);
+    let provider = MemoryProvider::default()
+        .with("test.sp", ".title Work\n* @VERSION(\"0.3\")\nR1 a b 1k\nR2 b 0 2k\n* #R1 @PLACE(0,0)\n.end\n");
+    let options = SolveOptions { std: false, ..SolveOptions::default() };
+    let plain = solve_with_clock(Path::new("test.sp"), &provider, &options, &StoppedClock).unwrap();
+    let clock = ProfileClock::new_work(&path).unwrap();
+    let measured = solve_with_clock(Path::new("test.sp"), &provider, &options, &clock).unwrap();
+    clock.finish(true).unwrap();
+    assert_eq!(plain.files, measured.files);
+    assert!(!plain.levels.is_empty());
+    assert_eq!(plain.levels.len(), measured.levels.len());
+    for (a, b) in plain.levels.iter().zip(&measured.levels) {
+        assert_eq!(a.hash, b.hash);
+        assert_eq!(a.record, b.record);
+        assert_eq!(a.solved, b.solved);
+    }
+    let data: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(data["schema_version"], 1);
+    assert_eq!(data["work_diagnostics_schema_version"], 1);
+    assert_eq!(data["diagnostic_mode"], "work");
+    assert_eq!(data["tableau_details"]["status"], "not_observed");
+    let level = &data["levels"][0];
+    assert!(level["metrics"]["work_tableaux_created"].as_u64().unwrap() > 0);
+    assert!(level["metrics"].get("max_numerator_bits").is_none());
+    assert!(level["metrics"].get("tableau_scans").is_none());
+    assert!(level["spans"].as_array().unwrap().iter().any(|s| s["category"] == "with_relations"));
+    assert_eq!(level["metrics"]["work_counter_overflow"], 0);
+}
+
+#[test]
+fn cli_work_profile_requires_an_explicit_profile() {
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_rnl"))
+        .args(["solve", "unused.sp", "-o", "unused-output", "--profile-work"])
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("--profile-work requires solve with --profile"));
 }

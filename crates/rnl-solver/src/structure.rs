@@ -1820,7 +1820,7 @@ fn rows(problem: &LevelProblem, s: &Structure, work: &mut Work) -> Vec<Vec<usize
                     },
                 })
                 .collect();
-            let fits = with_relations(s, &rels, work, |_, _, t| t.kept.clone());
+            let fits = with_relations(s, &rels, work, "structure_row_feasibility", |_, _, t| t.kept.clone());
             for (&(a, b, _, _), fit) in pairs.iter().zip(fits) {
                 if fit {
                     joined.join(a, b);

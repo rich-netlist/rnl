@@ -8,6 +8,107 @@ use num_traits::{Signed, Zero};
 use super::*;
 use crate::rational::{frac, int};
 
+#[test]
+fn work_accounting_clone_rollback_and_drop_match_small_oracles() {
+    use crate::profile::{self, ProfileEvent, ProfileObserver};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[derive(Default)]
+    struct Observer(RefCell<Vec<ProfileEvent>>);
+    impl crate::Clock for Observer {
+        fn elapsed(&self) -> f64 {
+            panic!("work accounting must not read a clock");
+        }
+    }
+    impl ProfileObserver for Observer {
+        fn record(&self, e: ProfileEvent) {
+            self.0.borrow_mut().push(e);
+        }
+        fn work_diagnostics(&self) -> bool {
+            true
+        }
+    }
+
+    let observer = Rc::new(Observer::default());
+    let mut expected_update_rows = 0;
+    let mut expected_update_hits = 0;
+    let mut expected_pivot_rows = 0;
+    let mut expected_pivot_hits = 0;
+    profile::with(Some(observer.clone()), || {
+        let mut sx = Simplex::<usize>::new();
+        let x = sx.new_var();
+        let y = sx.new_var();
+        sx.add_row(&LinExpr::diff(x, y));
+        sx.add_row(&LinExpr::from_terms([(x, int(1)), (y, int(1))], int(0)));
+        sx.add_row(&LinExpr::term(y, int(2)));
+        let oracle_nnz = |s: &Simplex<usize>| s.rows.iter().map(|r| r.terms.len() as u64).sum::<u64>();
+        assert_eq!(sx.work.nnz(), Some(oracle_nnz(&sx)));
+        expected_update_rows += sx.rows.len() as u64;
+        expected_update_hits += sx.rows.iter().filter(|r| r.terms.iter().any(|(v, _)| *v == x)).count() as u64;
+        sx.assert_bounds(x, Some(int(2)), None, 0).unwrap();
+        // Flush the source first: its executed work must not be inherited by the clone.
+        profile::work::flush();
+        {
+            let mut copy = sx.clone();
+            assert_eq!(copy.work.nnz(), Some(oracle_nnz(&copy)));
+            expected_update_rows += copy.rows.len() as u64;
+            expected_update_hits += copy.rows.iter().filter(|r| r.terms.iter().any(|(v, _)| *v == x)).count() as u64;
+            copy.assert_bounds(x, Some(int(3)), None, 1).unwrap();
+            let cp = copy.checkpoint();
+            let r = copy.add_row(&LinExpr::from_terms([(x, int(1)), (y, int(2))], int(0)));
+            copy.assert_bounds(r, Some(int(8)), None, 2).unwrap();
+            assert!(matches!(copy.assert_bounds(x, None, Some(int(1)), 3), Err(Failure::Conflict(_))));
+            copy.backtrack(cp);
+            // Bounds roll back; the new row and its nnz remain, as the algorithm specifies.
+            assert_eq!(copy.work.nnz(), Some(oracle_nnz(&copy)));
+            assert_eq!(copy.rows.len(), 4);
+            // Drop before any coarse boundary: all this short-lived work must still be reported.
+        }
+        assert_eq!(sx.work.nnz(), Some(oracle_nnz(&sx)));
+        expected_pivot_rows = sx.rows.len().saturating_sub(1) as u64;
+        expected_pivot_hits = sx.rows.iter().skip(1).filter(|r| r.terms.iter().any(|(v, _)| *v == x)).count() as u64;
+        let basic = sx.rows[0].basic;
+        sx.pivot_and_update(basic, x, int(5));
+        sx.assert_invariants();
+        assert_eq!(sx.work.nnz(), Some(oracle_nnz(&sx)));
+        profile::work::flush();
+        profile::work::flush(); // A second boundary cannot count the same work again.
+    });
+    let sum = |name| {
+        observer
+            .0
+            .borrow()
+            .iter()
+            .filter_map(|e| match e {
+                ProfileEvent::Work { counters, .. } => Some(counters),
+                _ => None,
+            })
+            .flat_map(|c| c.iter())
+            .filter(|(n, _)| *n == name)
+            .map(|(_, v)| *v)
+            .sum::<u64>()
+    };
+    assert_eq!(sum("work_tableaux_created"), 1);
+    assert_eq!(sum("work_tableaux_cloned"), 1);
+    assert_eq!(sum("work_clone_rows"), 3);
+    assert_eq!(sum("work_clone_terms"), 5);
+    assert_eq!(sum("work_new_rows"), 4);
+    assert_eq!(sum("work_update_rows_visited"), expected_update_rows);
+    assert_eq!(sum("work_update_rows_hit"), expected_update_hits);
+    assert_eq!(sum("work_update_rows_missed"), expected_update_rows - expected_update_hits);
+    for (visited, hit) in [
+        ("work_pivot_value_rows_visited", "work_pivot_value_rows_hit"),
+        ("work_pivot_rewrite_rows_visited", "work_pivot_rewrite_rows_hit"),
+    ] {
+        assert_eq!(sum(visited), expected_pivot_rows);
+        assert_eq!(sum(hit), expected_pivot_hits);
+    }
+    let (mut disabled, vars) = simplex(2);
+    disabled.add_row(&LinExpr::diff(vars[0], vars[1]));
+    assert_eq!(disabled.work.nnz(), None);
+}
+
 /// A fixed xorshift sequence, so every run tests the same systems.
 struct Rng(u64);
 

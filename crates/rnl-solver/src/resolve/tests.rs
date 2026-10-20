@@ -14,6 +14,63 @@ use crate::options::CAPS;
 use crate::rational::{frac, int};
 use crate::StoppedClock;
 
+#[test]
+fn work_rebuild_counts_survive_failed_replay_and_drop() {
+    use crate::profile::{self, ProfileEvent, ProfileObserver};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[derive(Default)]
+    struct Observer(RefCell<Vec<ProfileEvent>>);
+    impl Clock for Observer {
+        fn elapsed(&self) -> f64 {
+            panic!("coarse work accounting must not read the deadline clock");
+        }
+    }
+    impl ProfileObserver for Observer {
+        fn record(&self, event: ProfileEvent) {
+            self.0.borrow_mut().push(event);
+        }
+        fn work_diagnostics(&self) -> bool {
+            true
+        }
+    }
+    let p = problem_of(
+        vec![point()],
+        vec![
+            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: 4.0 }),
+            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: 9.0 }),
+        ],
+    );
+    let observer = Rc::new(Observer::default());
+    profile::with(Some(observer.clone()), || {
+        let model = Model::new(&p, int(0));
+        let mut r = Resolver::new(&model, p.objects.len(), Limits::Caps(CAPS));
+        assert_eq!(r.add(0), Outcome::Kept);
+        r.rebuild(None, false).unwrap();
+        assert!(r.rebuild(Some(1), false).is_err());
+        r.rebuild(None, true).unwrap();
+        // No explicit flush: dropping this failed/rebuilt resolution must retain every attempt.
+    });
+    let sum = |name| {
+        observer
+            .0
+            .borrow()
+            .iter()
+            .filter_map(|e| match e {
+                ProfileEvent::Work { counters, .. } => Some(counters),
+                _ => None,
+            })
+            .flat_map(|c| c.iter())
+            .filter(|(n, _)| *n == name)
+            .map(|(_, v)| *v)
+            .sum::<u64>()
+    };
+    assert_eq!(sum("work_rebuild_calls"), 3);
+    assert_eq!(sum("work_fixed_reassertions"), 4);
+    assert_eq!(sum("work_outcomes_kept"), 1);
+}
+
 /// The resolution of 8.5 with a clock that never advances: the time limit is never reached.
 fn resolve(problem: &LevelProblem, options: &SolverOptions) -> Resolved {
     super::resolve(problem, options, &StoppedClock)

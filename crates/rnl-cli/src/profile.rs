@@ -57,6 +57,7 @@ struct Writer {
     clock: WallClock,
     path: PathBuf,
     state: RefCell<State>,
+    work: bool,
 }
 
 /// A wall clock with profiling. Deadline readings and profiling readings use the same source,
@@ -65,6 +66,15 @@ pub struct ProfileClock(Rc<Writer>);
 
 impl ProfileClock {
     pub fn new(path: &Path) -> Result<Self, String> {
+        Self::create(path, false)
+    }
+
+    /// Explicit diagnostic mode: coarse batch accounting without stored-tableau bit scans.
+    pub fn new_work(path: &Path) -> Result<Self, String> {
+        Self::create(path, true)
+    }
+
+    fn create(path: &Path, work: bool) -> Result<Self, String> {
         // Reserve only a new path: a profile must never replace an input/include/package file.
         std::fs::OpenOptions::new()
             .write(true)
@@ -75,6 +85,7 @@ impl ProfileClock {
             clock: WallClock::new(),
             path: path.to_path_buf(),
             state: RefCell::new(State { status: "running".into(), ..State::default() }),
+            work,
         });
         writer.flush(true);
         if let Some(error) = writer.state.borrow().error.clone() {
@@ -109,17 +120,40 @@ impl Clock for Writer {
     }
 }
 
-fn metric(metrics: &mut BTreeMap<String, Value>, name: &str, value: u64, mode: u8) {
+fn metric(metrics: &mut BTreeMap<String, Value>, name: &str, value: u64, mode: u8) -> bool {
     let old = metrics.get(name).and_then(Value::as_u64).unwrap_or(0);
+    let overflow = mode == 0 && old.checked_add(value).is_none();
     let value = match mode {
         0 => old.saturating_add(value),
         1 => old.max(value),
         _ => value,
     };
     metrics.insert(name.into(), json!(value));
+    overflow
+}
+
+fn work_metrics(
+    metrics: &mut BTreeMap<String, Value>,
+    counters: &[(&str, u64)],
+    maxima: &[(&str, u64)],
+    gauges: &[(&str, u64)],
+) {
+    let mut overflow = false;
+    for (values, mode) in [(counters, 0), (maxima, 1), (gauges, 2)] {
+        for &(name, value) in values {
+            overflow |= metric(metrics, name, value, mode);
+        }
+    }
+    if overflow {
+        metric(metrics, "work_counter_overflow", 1, 1);
+    }
 }
 
 impl ProfileObserver for Writer {
+    fn work_diagnostics(&self) -> bool {
+        self.work
+    }
+
     fn record(&self, event: ProfileEvent) {
         let mut force = false;
         let mut checkpoint = false;
@@ -229,7 +263,18 @@ impl ProfileObserver for Writer {
                     }
                 }
             }
-            ProfileEvent::Checkpoint => checkpoint = true,
+            ProfileEvent::Work { counters, maxima, gauges } => {
+                let stack = state.stack.clone();
+                if let Some(level) = state.levels.last_mut() {
+                    work_metrics(&mut level.metrics, &counters, &maxima, &gauges);
+                    for i in stack {
+                        work_metrics(&mut level.spans[i].metrics, &counters, &maxima, &gauges);
+                    }
+                }
+            }
+            // Hot simplex/resolver checkpoints do not serialize work diagnostics. Existing
+            // coarse Begin/End boundaries still checkpoint; there is no refresh-time guarantee.
+            ProfileEvent::Checkpoint => checkpoint = !self.work,
         }
         drop(state);
         if force || checkpoint {
@@ -260,7 +305,7 @@ impl Writer {
         }
         state.checkpoints += 1;
         let current = levels.last();
-        let data = json!({
+        let mut data = json!({
             "schema_version": 1,
             "status": state.status,
             "elapsed_seconds": now,
@@ -285,6 +330,30 @@ impl Writer {
             ],
             "levels": levels,
         });
+        if self.work {
+            data["work_diagnostics_schema_version"] = json!(1);
+            data["diagnostic_mode"] = json!("work");
+            data["tableau_details"] = json!({
+                "status": "not_observed",
+                "omitted_metrics": ["tableau_scans", "tableau_rows", "variables", "constraints",
+                    "max_numerator_bits", "max_denominator_bits"],
+                "reason": "work mode disables the full stored-rational tableau scan"
+            });
+            data["work_counter_notes"] = json!([
+                "work counts are saturated u64 execution totals, not timings; overflow is flagged",
+                "visits include coefficient misses; hit/miss counts do not imply time shares",
+                "tableau nnz is maintained from executed row changes without a new row scan",
+                "work_live_nnz is a current live-account gauge; maxima and work totals are separate",
+                "clone starts new execution totals; rollback does not undo work; drop retains pending work",
+                "reserve requests and capacity changes are not exact allocator-call counts",
+                "work_axpy_* covers nonzero, nonempty tableau add_row/pivot merges, not LinExpr merges",
+                "work_rewrite_*_terms covers nonpivot elimination rows, not total index maintenance",
+                "partial cumulative counts are lower bounds through the last coarse boundary, not all work at exit",
+                "partial live gauges are last-boundary states, not lower bounds or measurements at exit",
+                "nested work spans include axis/lex children; never add parent and child seconds",
+                "work diagnostics have overhead and are not profile-off performance measurements"
+            ]);
+        }
         let tmp = self.path.with_extension(format!("json.partial-{}-{}", std::process::id(), state.checkpoints));
         let result = serde_json::to_vec(&data).map_err(|e| e.to_string()).and_then(|bytes| {
             state.written_bytes = state.written_bytes.saturating_add(bytes.len() as u64);
@@ -311,6 +380,19 @@ impl Writer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn work_batches_add_execution_but_replace_gauges_and_flag_overflow() {
+        let mut metrics = BTreeMap::new();
+        work_metrics(&mut metrics, &[("work_rows", 5)], &[("work_peak", 7)], &[("work_live", 9)]);
+        work_metrics(&mut metrics, &[("work_rows", 2)], &[("work_peak", 4)], &[("work_live", 3)]);
+        assert_eq!(metrics["work_rows"], 7);
+        assert_eq!(metrics["work_peak"], 7);
+        assert_eq!(metrics["work_live"], 3);
+        work_metrics(&mut metrics, &[("work_rows", u64::MAX)], &[], &[]);
+        assert_eq!(metrics["work_rows"], u64::MAX);
+        assert_eq!(metrics["work_counter_overflow"], 1);
+    }
 
     #[test]
     fn checkpoints_keep_active_work_and_replace_valid_json() {

@@ -55,6 +55,7 @@ solve options (the levels are read without their type=\"generated\" records; -o 
                       from one run to the next; when the conflict groups of a fact are not all found
                       within it, its hint says that the list is not complete
   --profile OUT.json  checkpoint solver timings and counters (solve only; may affect a wall-clock deadline)
+  --profile-work      opt-in work diagnostics with --profile; skips full tableau bit scans
   --report            print what became of every fact, not only of the facts discarded, and the hints
                       of the facts of priority low and of the statements only they lose (8.5), whose
                       minimal conflict groups the solver then seeks all, not only the first
@@ -92,6 +93,7 @@ struct Args {
     in_place: bool,
     report: bool,
     profile: Option<PathBuf>,
+    profile_work: bool,
     previous: bool,
     author: Option<String>,
     parts: Option<String>,
@@ -119,6 +121,7 @@ fn parse_args() -> Result<Args, String> {
     let mut previous = false;
     let mut solver_options = None;
     let mut profile = None;
+    let mut profile_work = false;
     let (mut in_place, mut report) = (false, false);
     let mut author = None;
     let mut parts = None;
@@ -146,6 +149,7 @@ fn parse_args() -> Result<Args, String> {
             "--in-place" => in_place = true,
             "--report" => report = true,
             "--profile" => profile = Some(PathBuf::from(it.next().ok_or("--profile needs a JSON path")?)),
+            "--profile-work" => profile_work = true,
             "--author" => author = Some(it.next().ok_or("--author needs a name")?),
             "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
             "--package" => packages.push(it.next().ok_or("--package needs a name, such as rnl-std-basic")?),
@@ -156,6 +160,9 @@ fn parse_args() -> Result<Args, String> {
     }
     if profile.is_some() && command != "solve" {
         return Err("--profile is an option of solve".into());
+    }
+    if profile_work && (command != "solve" || profile.is_none()) {
+        return Err("--profile-work requires solve with --profile".into());
     }
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
@@ -181,6 +188,7 @@ fn parse_args() -> Result<Args, String> {
         in_place,
         report,
         profile,
+        profile_work,
         previous,
         author,
         parts,
@@ -414,7 +422,11 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
             {
                 return Err("--profile must differ from the input file".to_string());
             }
-            rnl_cli::profile::ProfileClock::new(path)
+            if args.profile_work {
+                rnl_cli::profile::ProfileClock::new_work(path)
+            } else {
+                rnl_cli::profile::ProfileClock::new(path)
+            }
         })
         .transpose()?;
     let result = match &profile_clock {
