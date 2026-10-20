@@ -64,6 +64,11 @@ async function start() {
   if (!shell.nativeMenu) showMenuBar(true);
   if (shell.onOpen) shell.onOpen((source) => openSource(source, false));
   if (shell.onCloseRequested) shell.onCloseRequested(closeRequested);
+  if (shell.platform === "web" && new URLSearchParams(location.search).get("api") === "1") {
+    const { startFullViewerApi } = await import("./full-viewer-api.js");
+    await startFullViewerApi();
+    return;
+  }
   const session = await shell.initialSession?.();
   if (session) await restoreSession(session);
   else await openSource(await shell.initial(), false);

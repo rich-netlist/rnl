@@ -15,6 +15,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+import { API_FEATURES, MAX_OPEN_BYTES } from "../viewer-ui/viewer-api-contract.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
@@ -77,6 +78,7 @@ try {
   // not a git checkout, or no git: the box names the version only
 }
 writeFileSync(join(out, "about.json"), `${JSON.stringify({ version: version ? version[1] : null, commit }, null, 2)}\n`);
+writeFileSync(join(out, "viewer-api.json"), JSON.stringify({ rnl: 1, features: API_FEATURES, maxOpenBytes: MAX_OPEN_BYTES }) + "\n");
 
 if (samples) {
   for (const name of ["cases", "equivalence"]) {

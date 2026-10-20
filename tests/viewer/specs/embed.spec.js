@@ -80,6 +80,34 @@ async function send(page, message) {
 }
 
 const viewBox = (frame) => frame.locator("#canvas > svg").getAttribute("viewBox");
+test("the shared API advertises optional fields and correlates explicit package imports", async ({ page }) => {
+  await start(page);
+  expect((await messages(page, "ready"))[0].features).toEqual(expect.arrayContaining(["requestId", "packages"]));
+  await send(page, { type: "open", requestId: "canvas", name: "canvas.sp",
+    text: fs.readFileSync(new URL("../inputs/missing-canvas-package.sp", import.meta.url), "utf8"),
+    packages: [{ name: "analog-canvas-extensions", version: "0.1" }] });
+  expect(await waitMessage(page, "loaded")).toMatchObject({ requestId: "canvas", errors: 0 });
+});
+
+test("the first open uses the core warmed before ready and keeps only one standby", async ({ page }) => {
+  await start(page);
+  const warmed = page.workers().find(worker => worker.url().endsWith("/core/worker.js"));
+  expect(warmed).toBeTruthy();
+  await page.evaluate(text => document.querySelector('iframe').contentWindow.postMessage({ rnl: 1, type: "open", name: "warm.sp", text }, location.origin), text("warm"));
+  await waitMessage(page, "loaded");
+  expect(await warmed.evaluate(() => location.pathname)).toContain("/core/worker.js");
+  await expect.poll(() => page.workers().length).toBe(2);
+});
+
+test("initialization failures still notify an embedded caller before ready", async ({ page }) => {
+  const frame = await start(page);
+  await page.route("**/about.json", route => route.fulfill({ status: 503, body: "unavailable" }));
+  await frame.goto(`${base}/?embed=1`);
+  const error = await waitMessage(page, "error");
+  expect(error.message).toContain("The viewer version could not be read (503)");
+  await expect(frame.locator("#empty")).toHaveText(error.message);
+  expect(await messages(page, "ready")).toHaveLength(1);
+});
 const width = async (frame) => Number((await viewBox(frame)).split(" ")[2]);
 
 async function screenshot(page, name, browserName) {

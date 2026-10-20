@@ -28,6 +28,16 @@ import { startLoading, nextPaint } from "./loading.js";
 
 let lastSource = null; // what was last opened, also when it failed to open, for reloading
 let loading = false;
+let operation = null;
+
+/** API imports and ordinary opens/rebuilds share ownership of the displayed document. */
+export function beginOpenOperation() {
+  operation?.abort();
+  operation = new AbortController();
+  loading = false;
+  document.body.classList.remove("busy");
+  return operation;
+}
 
 /**
  * Open a source, or read it again with `keep`. Opening another one asks first about changes not
@@ -37,16 +47,21 @@ let loading = false;
  */
 export async function openSource(source, keep, edited) {
   if (!source || loading) return;
-  if (!keep && !edited && !(await confirmLeave("open another file"))) return;
+  const operation = beginOpenOperation();
+  if (!keep && !edited && !(await confirmLeave("open another file", operation.signal))) return;
+  if (operation.signal.aborted) return;
   if (loading) return;
   loading = true;
   document.body.classList.add("busy");
   const progress = startLoading();
+  let d;
   try {
-    lastSource = source;
     await progress.stage("reading");
-    const d = await shell.build(source, edited, progress.setStage);
+    d = await shell.build(source, edited, progress.setStage, undefined, operation.signal);
+    if (operation.signal.aborted) return;
     await progress.stage("displaying");
+    if (operation.signal.aborted) return;
+    lastSource = source;
     endPreview();
     if (edited) adoptBuffers(d);
     else resetBuffers(d);
@@ -55,6 +70,8 @@ export async function openSource(source, keep, edited) {
     await nextPaint();
     return true;
   } catch (e) {
+    if (operation.signal.aborted) return;
+    lastSource = source;
     progress.finish();
     if (keep && edited) {
       await inform({ title: "Rebuild", paragraphs: [`The document could not be rebuilt: ${e}. Your edits are still kept.`] });
@@ -70,9 +87,12 @@ export async function openSource(source, keep, edited) {
     setProblems(true);
     sourceOpened(source, null, false);
   } finally {
+    if (d) shell.discardBuild?.(d);
     progress.finish();
-    loading = false;
-    document.body.classList.remove("busy");
+    if (!operation.signal.aborted) {
+      loading = false;
+      document.body.classList.remove("busy");
+    }
   }
 }
 
@@ -94,24 +114,32 @@ export async function reload() {
  */
 export async function applyEdits() {
   if (!lastSource || !doc || loading || previewing()) return false;
+  const operation = beginOpenOperation();
   loading = true;
   document.body.classList.add("busy");
   const progress = startLoading();
   let failed = null;
+  let d;
   try {
     await progress.stage("reading");
-    const d = await shell.build(lastSource, changes(false), progress.setStage);
+    d = await shell.build(lastSource, changes(false), progress.setStage, undefined, operation.signal);
+    if (operation.signal.aborted) return false;
     await progress.stage("displaying");
+    if (operation.signal.aborted) return false;
     adoptBuffers(d);
     showBuilt(d, true);
     sourceOpened(lastSource, d, false, true);
     await nextPaint();
   } catch (e) {
+    if (operation.signal.aborted) return false;
     failed = e instanceof Error ? e.message : String(e);
   } finally {
+    if (d) shell.discardBuild?.(d);
     progress.finish();
-    loading = false;
-    document.body.classList.remove("busy");
+    if (!operation.signal.aborted) {
+      loading = false;
+      document.body.classList.remove("busy");
+    }
   }
   if (failed !== null) {
     renderDiagnostics([...doc.diagnostics, { severity: "error", message: `The changes could not be applied: ${failed}`, file: "", line: 0, col: 0, origin: "" }]);
@@ -141,6 +169,8 @@ export function isLoading() {
  * scroll.
  */
 export function showBuilt(d, keep) {
+  shell.commitBuild?.(d);
+  if (shell.platform === "web") document.title = `${d.name} - RNL Viewer`;
   const before = keep && doc ? snapshot() : null;
   setDoc(d);
   showDocument(before);
