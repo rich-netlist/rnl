@@ -88,6 +88,16 @@ test("the shared API advertises optional fields and correlates explicit package 
     packages: [{ name: "analog-canvas-extensions", version: "0.1" }] });
   expect(await waitMessage(page, "loaded")).toMatchObject({ requestId: "canvas", errors: 0 });
 });
+
+test("initialization failures still notify an embedded caller before ready", async ({ page }) => {
+  const frame = await start(page);
+  await page.route("**/about.json", route => route.fulfill({ status: 503, body: "unavailable" }));
+  await frame.goto(`${base}/?embed=1`);
+  const error = await waitMessage(page, "error");
+  expect(error.message).toContain("The viewer version could not be read (503)");
+  await expect(frame.locator("#empty")).toHaveText(error.message);
+  expect(await messages(page, "ready")).toHaveLength(1);
+});
 const width = async (frame) => Number((await viewBox(frame)).split(" ")[2]);
 
 async function screenshot(page, name, browserName) {

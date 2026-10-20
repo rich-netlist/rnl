@@ -9,6 +9,7 @@ import { adoptSource, showBuilt } from "./open.js";
 import { shell } from "./shell.js";
 import { prepareViewer } from "./shells/web.js";
 import { startViewerApi } from "./viewer-api.js";
+import { viewerChannel } from "./window-session.js";
 import { current, doc, path, setDoc } from "./state.js";
 import { backTo, enterRow, enterRoot } from "./subcircuits.js";
 import { $, span, svgElement } from "./util.js";
@@ -205,5 +206,7 @@ export async function startEmbed() {
     if (params.has("url")) void api.open({ url: params.get("url") }, true);
   } catch (reason) {
     error(reason);
+    // Initialization can fail before the shared API has announced readiness.
+    viewerChannel().send("error", { message: `Could not open the netlist: ${reason instanceof Error ? reason.message : String(reason)}` });
   }
 }
