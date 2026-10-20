@@ -69,7 +69,7 @@ def work_errors(profile):
             errors.append(f'Level {index}: missing purpose-labelled with_relations spans')
         for span in relations:
             call_id = span.get('metrics', {}).get('work_call_id')
-            if type(call_id) is not int or call_id < 1:
+            if type(call_id) is not int or call_id < 0:
                 errors.append(f'Level {index}: invalid with_relations call id')
         phases = {span.get('name') for span in spans if span.get('category') == 'relations_phase'}
         if not {'model_prepare', 'resolver_init_seed', 'kept_replay', 'relations_take', 'consumer'}.issubset(phases):

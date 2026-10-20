@@ -16,7 +16,7 @@ def complete_profile():
     ):
         for name in names:
             spans.append({'category': category, 'name': name, 'complete': True,
-                          'metrics': {'work_call_id': len(spans)+1}})
+                          'metrics': {'work_call_id': len(spans)}})
     return {'schema_version': 1, 'work_diagnostics_schema_version': 1, 'diagnostic_mode': 'work',
             'tableau_details': {'status': 'not_observed', 'omitted_metrics': sorted(w.OMITTED)},
             'work_counter_notes': ['inclusive spans'], 'status': 'complete',
@@ -37,6 +37,10 @@ class WorkChecks(unittest.TestCase):
     def test_complete_work_requires_counters_and_explicit_omissions(self):
         profile = complete_profile()
         self.assertEqual(w.work_errors(profile), [])
+        self.assertEqual(profile['levels'][0]['spans'][0]['metrics']['work_call_id'], 0)
+        profile['levels'][0]['spans'][0]['metrics']['work_call_id'] = -1
+        self.assertTrue(w.work_errors(profile))
+        profile['levels'][0]['spans'][0]['metrics']['work_call_id'] = 0
         profile['levels'][0]['metrics']['tableau_rows'] = 0
         self.assertTrue(w.work_errors(profile))
         profile['levels'][0]['metrics'].pop('tableau_rows')
