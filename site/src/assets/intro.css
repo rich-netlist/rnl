@@ -359,7 +359,7 @@ section[id] { scroll-margin-top: 72px; }
 #hero-title { margin: 0; display: flex; align-items: baseline; gap: 0; flex-wrap: nowrap; font: 700 clamp(92px, 14vw, 172px)/.8 var(--f-disp); }
 .hero-brand h1, .hero-brand h1 * { transition-property: none; }
 .hero-brand.is-viewing h1 { visibility: hidden; }
-.wordmark { font: inherit; font-weight: 600; letter-spacing: -.015em; color: var(--ink); }
+.wordmark { font: inherit; font-size: .9em; font-weight: 600; letter-spacing: -.015em; color: var(--ink); -webkit-user-select: none; user-select: none; }
 /* The SVG has 3.85% vertical padding per side: match its painted height to the font's capitals. */
 .hero-logo { display: block; flex: none; height: .756em; height: 1.083415cap; transform: translateY(3.84955%); }
 .hero-logo img { display: block; height: 100%; width: auto; }
