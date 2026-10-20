@@ -119,6 +119,7 @@ fn same_indexed_and_linear(a: &Simplex<usize>, b: &Simplex<usize>) {
     assert_eq!(a.forms, b.forms);
     assert_eq!(a.trail, b.trail);
     assert_eq!(a.occurrences, b.occurrences);
+    assert_eq!(a.violated, b.violated);
     assert_eq!(a.pivots, b.pivots);
     assert_eq!(a.trace, b.trace);
     a.assert_invariants();
@@ -263,6 +264,118 @@ fn indexed_access_preserves_controlled_time_budget_and_resume() {
     assert_eq!(a.check(), Ok(()));
     assert_eq!(b.check(), Ok(()));
     same_indexed_and_linear(&a, &b);
+}
+
+#[test]
+fn violated_basics_use_variable_order_and_survive_basis_changes_and_undo() {
+    let (mut a, mut b, v) = indexed_and_linear(2);
+    let sum = LinExpr::from_terms([(v[0], int(1)), (v[1], int(1))], int(0));
+    let other = LinExpr::from_terms([(v[0], int(2)), (v[1], int(1))], int(0));
+    let s = a.add_row(&sum);
+    assert_eq!(s, b.add_row(&sum));
+    let t = a.add_row(&other);
+    assert_eq!(t, b.add_row(&other));
+    let cp = a.checkpoint();
+    assert_eq!(cp, b.checkpoint());
+    for sx in [&mut a, &mut b] {
+        sx.assert_bounds(v[0], None, Some(int(0)), 1).unwrap();
+        sx.assert_bounds(s, None, Some(int(1)), 2).unwrap();
+        // A pivot may put its new basic outside its own bounds; update both old/new basics.
+        sx.pivot_and_update(t, v[0], int(6));
+    }
+    same_indexed_and_linear(&a, &b);
+    assert_eq!(a.violated.iter().copied().collect::<Vec<_>>(), [v[0], s]);
+    assert_eq!(a.rows[0].basic, s);
+    assert_eq!(a.rows[1].basic, v[0]);
+    assert_eq!(a.violated_pick(None), Some((v[0], false)));
+    assert_eq!(b.violated_pick(None), Some((v[0], false)));
+    // An immediate conflict must leave the cached set, basis, tags and bounds unchanged.
+    assert_eq!(a.assert_bounds(v[0], Some(int(4)), None, 3), Err(Failure::Conflict(vec![1, 3])));
+    assert_eq!(b.assert_bounds(v[0], Some(int(4)), None, 3), Err(Failure::Conflict(vec![1, 3])));
+    same_indexed_and_linear(&a, &b);
+    let (mut ca, mut cb) = (a.clone(), b.clone());
+    assert_eq!(ca.check(), Ok(()));
+    assert_eq!(cb.check(), Ok(()));
+    same_indexed_and_linear(&ca, &cb);
+    // Undo acts on the current basis, not the basis at the checkpoint. Retained rows stay.
+    ca.backtrack(cp);
+    cb.backtrack(cp);
+    assert!(ca.violated.is_empty());
+    same_indexed_and_linear(&ca, &cb);
+    same_indexed_and_linear(&a, &b);
+    a.backtrack(cp);
+    b.backtrack(cp);
+    assert!(a.violated.is_empty());
+    same_indexed_and_linear(&a, &b);
+}
+
+#[test]
+fn a_minimum_bound_flip_and_optimum_bounds_keep_the_violation_cache_exact() {
+    let (mut a, mut b, v) = indexed_and_linear(1);
+    for sx in [&mut a, &mut b] {
+        sx.assert_bounds(v[0], Some(int(0)), Some(int(3)), 0).unwrap();
+    }
+    let objective = LinExpr::term(v[0], int(-1));
+    assert_eq!(a.minimize(&objective), Ok(int(-3)));
+    assert_eq!(b.minimize(&objective), Ok(int(-3)));
+    same_indexed_and_linear(&a, &b);
+    assert_eq!(a.pivots(), 1);
+    assert_eq!(a.trace.as_ref().unwrap()[0].entering, a.trace.as_ref().unwrap()[0].leaving);
+    assert!(a.violated.is_empty());
+    assert_eq!(a.keep_optimum(&objective, 1), Ok(()));
+    assert_eq!(b.keep_optimum(&objective, 1), Ok(()));
+    same_indexed_and_linear(&a, &b);
+}
+
+#[test]
+fn violation_work_counts_selection_separately_from_incremental_refresh() {
+    use crate::profile::{self, ProfileEvent, ProfileObserver};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    #[derive(Default)]
+    struct Observer(RefCell<Vec<ProfileEvent>>);
+    impl crate::Clock for Observer {
+        fn elapsed(&self) -> f64 {
+            panic!("violation maintenance must not read a clock");
+        }
+    }
+    impl ProfileObserver for Observer {
+        fn record(&self, event: ProfileEvent) {
+            self.0.borrow_mut().push(event);
+        }
+        fn work_diagnostics(&self) -> bool {
+            true
+        }
+    }
+    let observer = Rc::new(Observer::default());
+    profile::with(Some(observer.clone()), || {
+        let (mut sx, v) = simplex(2);
+        let s = sx.add_row(&LinExpr::from_terms([(v[0], int(1)), (v[1], int(1))], int(0)));
+        sx.add_row(&LinExpr::term(v[1], int(2))); // not involved in the chosen pivot
+        sx.assert_bounds(s, Some(int(2)), None, 1).unwrap();
+        assert_eq!(sx.check(), Ok(()));
+        sx.assert_invariants();
+    });
+    let sum = |name| {
+        observer
+            .0
+            .borrow()
+            .iter()
+            .filter_map(|e| match e {
+                ProfileEvent::Work { counters, .. } => Some(counters),
+                _ => None,
+            })
+            .flat_map(|c| c.iter())
+            .filter(|(n, _)| *n == name)
+            .map(|(_, v)| v)
+            .sum::<u64>()
+    };
+    assert_eq!(sum("work_check_passes"), 2);
+    assert_eq!(sum("work_check_rows_examined"), 1);
+    assert_eq!(sum("work_check_violations"), 1);
+    assert_eq!(sum("work_violation_refreshes"), 3);
+    assert_eq!(sum("work_violation_basic_checks"), 2);
+    assert_eq!(sum("work_violation_membership_changes"), 2);
 }
 
 /// A fixed xorshift sequence, so every run tests the same systems.

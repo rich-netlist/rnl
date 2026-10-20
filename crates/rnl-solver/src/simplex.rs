@@ -44,7 +44,7 @@
 // Used by `resolve`; what only the coordinate LP uses (minimisation) waits for stage S3.
 #![cfg_attr(not(test), allow(dead_code))]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use num_traits::{One, Signed, Zero};
 
@@ -273,6 +273,8 @@ pub(crate) struct Simplex<T> {
     occurrences: Vec<u32>,
     /// The stable row IDs containing each nonbasic variable, in row order.
     incidence: Vec<RowSet>,
+    /// Exactly the basic variables currently outside their bounds, ordered by variable ID.
+    violated: BTreeSet<Var>,
     pivots: u64,
     pivot_limit: Option<u64>,
     /// [`Simplex::check`] chooses by Bland's rule once variables have left the basis again this
@@ -293,6 +295,7 @@ struct PivotTrace {
     rows: Vec<Row>,
     values: Vec<Q>,
     occurrences: Vec<u32>,
+    violated: Vec<Var>,
 }
 
 /// How many times variables may leave the basis again within one [`Simplex::check`] before it
@@ -321,6 +324,7 @@ impl<T: Clone + Ord> Simplex<T> {
             trail: Vec::new(),
             occurrences: Vec::new(),
             incidence: Vec::new(),
+            violated: BTreeSet::new(),
             pivots: 0,
             pivot_limit: None,
             bland_after: BLAND_AFTER,
@@ -495,10 +499,12 @@ impl<T: Clone + Ord> Simplex<T> {
                 return Err(Failure::Conflict(sorted(vec![l.tag.clone(), tag])));
             }
         }
+        let mut changed = false;
         if let Some(l) = lower {
             if self.vars[v].lower.as_ref().is_none_or(|old| l > old.value) {
                 let old = self.vars[v].lower.replace(Bound { value: l.clone(), tag: tag.clone() });
                 self.trail.push(Undo { var: v, side: Side::Lower, old });
+                changed = true;
                 if self.vars[v].row.is_none() && self.vars[v].value < l {
                     self.update(v, l);
                 }
@@ -508,10 +514,15 @@ impl<T: Clone + Ord> Simplex<T> {
             if self.vars[v].upper.as_ref().is_none_or(|old| u < old.value) {
                 let old = self.vars[v].upper.replace(Bound { value: u.clone(), tag });
                 self.trail.push(Undo { var: v, side: Side::Upper, old });
+                changed = true;
                 if self.vars[v].row.is_none() && self.vars[v].value > u {
                     self.update(v, u);
                 }
             }
+        }
+        if changed {
+            let mut work = self.work.block();
+            refresh_violation(&self.vars, &mut self.violated, v, work.as_mut());
         }
         Ok(())
     }
@@ -523,6 +534,7 @@ impl<T: Clone + Ord> Simplex<T> {
 
     /// Undoes the bounds asserted since `checkpoint`. The rows made since stay.
     pub(crate) fn backtrack(&mut self, checkpoint: usize) {
+        let mut work = self.work.block();
         while self.trail.len() > checkpoint {
             let Some(u) = self.trail.pop() else { break };
             let s = &mut self.vars[u.var];
@@ -530,6 +542,7 @@ impl<T: Clone + Ord> Simplex<T> {
                 Side::Lower => s.lower = u.old,
                 Side::Upper => s.upper = u.old,
             }
+            refresh_violation(&self.vars, &mut self.violated, u.var, work.as_mut());
         }
     }
 
@@ -554,22 +567,8 @@ impl<T: Clone + Ord> Simplex<T> {
         loop {
             if let Some(w) = &mut work {
                 w.add(Key::CheckPasses, 1);
-                w.add(Key::CheckRows, self.rows.len() as u64);
             }
-            // the smallest basic variable out of its bounds
-            let mut pick: Option<(Var, bool)> = None;
-            for row in &self.rows {
-                let s = &self.vars[row.basic];
-                let below = s.below();
-                if below || s.above() {
-                    if let Some(w) = &mut work {
-                        w.add(Key::CheckViolations, 1);
-                    }
-                    if pick.is_none_or(|(p, _)| row.basic < p) {
-                        pick = Some((row.basic, below));
-                    }
-                }
-            }
+            let pick = self.violated_pick(work.as_mut());
             let Some((xi, below)) = pick else {
                 if let Some(w) = &mut work {
                     w.add(Key::CheckFeasible, 1);
@@ -595,6 +594,38 @@ impl<T: Clone + Ord> Simplex<T> {
                 repeats += 1;
             }
         }
+    }
+
+    fn violated_pick(&self, mut work: Option<&mut Block>) -> Option<(Var, bool)> {
+        // The old all-row selection remains an independent test oracle for variable-ID order.
+        #[cfg(test)]
+        if self.linear_scans {
+            if let Some(w) = &mut work {
+                w.add(Key::CheckRows, self.rows.len() as u64);
+            }
+            let mut pick: Option<(Var, bool)> = None;
+            for row in &self.rows {
+                let s = &self.vars[row.basic];
+                let below = s.below();
+                if below || s.above() {
+                    if let Some(w) = &mut work {
+                        w.add(Key::CheckViolations, 1);
+                    }
+                    if pick.is_none_or(|(p, _)| row.basic < p) {
+                        pick = Some((row.basic, below));
+                    }
+                }
+            }
+            return pick;
+        }
+        let &v = self.violated.first()?;
+        if let Some(w) = &mut work {
+            // One selected basic is inspected, rather than every stored row. Refresh checks
+            // occur at value/bound changes and have their own execution counters.
+            w.add(Key::CheckRows, 1);
+            w.add(Key::CheckViolations, 1);
+        }
+        Some((v, self.vars[v].below()))
     }
 
     /// The nonbasic variable of row `r` that [`Simplex::check`] moves to bring the row's basic
@@ -790,6 +821,7 @@ impl<T: Clone + Ord> Simplex<T> {
                     w.add(Key::UpdateHits, 1);
                 }
                 self.vars[row.basic].value += a * &delta;
+                refresh_violation(&self.vars, &mut self.violated, row.basic, work.as_mut());
             }
         }
         self.vars[v].value = value;
@@ -823,6 +855,7 @@ impl<T: Clone + Ord> Simplex<T> {
                         w.add(Key::PivotValueHits, 1);
                     }
                     self.vars[row.basic].value += c * &theta;
+                    refresh_violation(&self.vars, &mut self.violated, row.basic, work.as_mut());
                 }
             }
         }
@@ -874,6 +907,8 @@ impl<T: Clone + Ord> Simplex<T> {
         self.rows[r] = Row { basic: xj, terms: def };
         self.vars[xi].row = None;
         self.vars[xj].row = Some(r);
+        refresh_violation(&self.vars, &mut self.violated, xi, work.as_mut());
+        refresh_violation(&self.vars, &mut self.violated, xj, work.as_mut());
         self.pivots += 1;
         crate::profile::add("pivots", 1);
         self.profile_tableau();
@@ -894,6 +929,9 @@ impl<T: Clone + Ord> Simplex<T> {
 
     #[cfg(test)]
     fn record_trace(&mut self, leaving: Var, entering: Var) {
+        if self.trace.is_some() {
+            self.assert_invariants();
+        }
         if let Some(trace) = &mut self.trace {
             trace.push(PivotTrace {
                 leaving,
@@ -901,6 +939,7 @@ impl<T: Clone + Ord> Simplex<T> {
                 rows: self.rows.clone(),
                 values: self.vars.iter().map(|v| v.value.clone()).collect(),
                 occurrences: self.occurrences.clone(),
+                violated: self.violated.iter().copied().collect(),
             });
         }
     }
@@ -961,6 +1000,13 @@ impl<T: Clone + Ord> Simplex<T> {
             count(&mut occurrences, &row.terms, true);
         }
         assert_eq!(occurrences, self.occurrences);
+        let violated: BTreeSet<Var> = self
+            .vars
+            .iter()
+            .enumerate()
+            .filter_map(|(v, s)| (s.row.is_some() && (s.below() || s.above())).then_some(v))
+            .collect();
+        assert_eq!(self.violated, violated);
         assert_eq!(self.incidence.len(), self.vars.len());
         for (v, incidence) in self.incidence.iter().enumerate() {
             let expected: Vec<usize> =
@@ -977,6 +1023,20 @@ impl<T: Clone + Ord> Simplex<T> {
     #[cfg(test)]
     pub(crate) fn satisfied(&self) -> bool {
         self.vars.iter().all(|s| !s.below() && !s.above())
+    }
+}
+
+/// Updates a derived index only. Bound and value mutation order, arithmetic and tags stay with
+/// their original callers; execution accounting is local and never calls an observer here.
+fn refresh_violation<T>(vars: &[VarState<T>], violated: &mut BTreeSet<Var>, v: Var, mut work: Option<&mut Block>) {
+    let s = &vars[v];
+    let basic = s.row.is_some();
+    let outside = basic && (s.below() || s.above());
+    let changed = if outside { violated.insert(v) } else { violated.remove(&v) };
+    if let Some(w) = &mut work {
+        w.add(Key::ViolationRefreshes, 1);
+        w.add(Key::ViolationBasicChecks, u64::from(basic));
+        w.add(Key::ViolationChanges, u64::from(changed));
     }
 }
 

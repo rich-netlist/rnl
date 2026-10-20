@@ -342,7 +342,9 @@ impl Writer {
             data["work_counter_notes"] = json!([
                 "work counts are saturated u64 execution totals, not timings; overflow is flagged",
                 "visits count coefficient probes in the respective row loops (pivot row excluded), not all logically eligible rows; hit/miss counts do not imply time shares",
-                "ratio/update/pivot use ordered nonzero-row incidence; check still scans all rows",
+                "ratio/update/pivot use ordered nonzero-row incidence; check inspects the minimum cached violated basic variable",
+                "work_check_rows_examined/violations count inspected/selected basics inside check, not unvisited cache members",
+                "work_violation_refreshes counts refresh attempts; work_violation_basic_checks counts basic-state bound tests; membership_changes counts actual set changes",
                 "pivots/simplex_checks retain logical counts; physical row visits may differ from the linear-scan implementation",
                 "tableau nnz is maintained from executed row changes without a new row scan",
                 "work_live_nnz is a current live-account gauge; maxima and work totals are separate",
