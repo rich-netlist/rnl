@@ -46,6 +46,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use num_integer::Integer;
 use num_traits::{One, Signed, Zero};
 
 use crate::profile::work::{Block, Key, Local};
@@ -1079,6 +1080,42 @@ fn axpy_observed(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q, work: Option<&m
     axpy_changed(acc, x, a, work, |_, _| {});
 }
 
+// Only the tests can select the original arithmetic, independently of the kernel below. The
+// flag is local to a test thread, so parallel tests do not change one another's arithmetic.
+#[cfg(test)]
+std::thread_local! {
+    static REFERENCE_AXPY_MUL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[inline]
+fn axpy_mul(a: &Q, b: &Q) -> Q {
+    #[cfg(test)]
+    if REFERENCE_AXPY_MUL.with(|reference| reference.get()) {
+        return a * b;
+    }
+    canonical_mul(a, b)
+}
+
+/// Multiplies canonical rationals without normalising the cross-cancelled result again.
+///
+/// This is private to axpy, including LinExpr's uses of it. Its inputs come from the solver's
+/// canonical constructors (rational.rs), clones and canonical arithmetic. Arbitrary Ratio
+/// deserialisation/new_raw inputs are not part of that contract: Ratio's type alone does not
+/// guarantee it. In particular, do not extend this to such an input without restoring the
+/// original multiplication or proving that input is canonical first.
+#[inline]
+fn canonical_mul(a: &Q, b: &Q) -> Q {
+    if a.is_zero() || b.is_zero() {
+        return Q::zero();
+    }
+    let g = a.numer().gcd(b.denom());
+    let h = a.denom().gcd(b.numer());
+    // Positive input denominators and positive g,h give a positive denominator. Each input
+    // was reduced, and both cross pairs have now been cancelled, so the resulting numerator
+    // and denominator are coprime. BigInt has no fixed-width overflow; zero was handled above.
+    Q::new_raw((a.numer() / &g) * (b.numer() / &h), (a.denom() / &h) * (b.denom() / &g))
+}
+
 fn axpy_changed(
     acc: &mut Vec<(Var, Q)>,
     x: &[(Var, Q)],
@@ -1110,7 +1147,7 @@ fn axpy_changed(
             (Some((u, _)), Some((v, _))) if u == v => {
                 let (u, c) = old.next().expect("peeked");
                 let (_, d) = x.next().expect("peeked");
-                let sum = c + a * d;
+                let sum = c + axpy_mul(a, d);
                 if !sum.is_zero() {
                     acc.push((u, sum));
                 } else {
@@ -1119,7 +1156,7 @@ fn axpy_changed(
             }
             (_, Some(_)) => {
                 let (v, d) = x.next().expect("peeked");
-                acc.push((*v, a * d));
+                acc.push((*v, axpy_mul(a, d)));
                 changed(*v, true);
             }
             (Some(_), None) => acc.extend(old.next()),
