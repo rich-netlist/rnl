@@ -19,3 +19,4 @@ Decisions made before this log started, including those from the first architect
 | [0009](0009-fonts-shipped-with-the-core.md) | The core ships Noto Sans SC and lays out text with its metrics | accepted |
 | [0010](0010-desktop-viewer-solves-as-a-preview.md) | The desktop viewer solves as a preview and saves a solved copy; it never changes the files it opens | accepted; its second point is changed by [0011](0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md) |
 | [0011](0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md) | The viewers edit the text, and write a file only when the user has edited it and saves it | accepted |
+| [0012](0012-public-packages-use-an-immutable-catalog.md) | Optional public packages use a separate repository and an immutable catalog | accepted; implementation under review |
