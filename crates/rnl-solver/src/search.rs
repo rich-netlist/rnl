@@ -338,8 +338,19 @@ fn with_relations_from<R>(
     model.units.extend(units);
     drop(phase);
     let phase = crate::profile::work_span("relations_phase", "resolver_init_seed");
-    let mut r = Resolver::new(&model, s.objects.len(), Limits::Caps(s.caps));
-    seed_resolution(&mut r, s, seed, purpose == "placement");
+    let mut r = match validated_seed(s, &model, seed, purpose == "placement") {
+        Some(geometry) => {
+            if crate::profile::work_enabled() {
+                crate::profile::add("coords_simplex_seeded_calls", 1);
+            }
+            Resolver::with_geometry_values(&model, s.objects.len(), Limits::Caps(s.caps), geometry.clone())
+        }
+        None => {
+            let mut r = Resolver::new(&model, s.objects.len(), Limits::Caps(s.caps));
+            r.seed(s.witness.clone());
+            r
+        }
+    };
     drop(phase);
     let phase = crate::profile::work_span("relations_phase", "kept_replay");
     for &f in &s.kept {
@@ -364,7 +375,12 @@ fn with_relations_from<R>(
 
 /// Validate a proposed geometry before adopting any unit. In particular, a seed that only
 /// satisfies some of the kept facts cannot send the others through a new resolution.
-fn seed_resolution(r: &mut Resolver, s: &Structure, seed: Option<(&Geometry, &[Orient])>, placement: bool) {
+fn validated_seed<'g>(
+    s: &Structure,
+    model: &Model,
+    seed: Option<(&'g Geometry, &[Orient])>,
+    placement: bool,
+) -> Option<&'g Geometry> {
     let observe = |name| {
         if placement && crate::profile::work_enabled() {
             crate::profile::add(name, 1);
@@ -377,17 +393,16 @@ fn seed_resolution(r: &mut Resolver, s: &Structure, seed: Option<(&Geometry, &[O
         } else if geometry.orient.as_slice() != orient {
             observe("coords_seed_rejected_orientation");
         } else {
-            r.seed(geometry.clone());
-            if s.kept.iter().all(|&f| r.holds(f)) {
+            if s.kept.iter().all(|&f| geometry.holds(model, f)) {
                 observe("coords_seed_accepted");
-                return;
+                return Some(geometry);
             }
             observe("coords_seed_rejected_kept");
         }
     } else {
         observe("coords_seed_cold");
     }
-    r.seed(s.witness.clone());
+    None
 }
 
 /// The point that is an object's origin in the model: its own, or the point it is drawn at.

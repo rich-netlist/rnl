@@ -9,6 +9,91 @@ use super::*;
 use crate::rational::{frac, int};
 
 #[test]
+fn structural_starting_values_keep_exact_rows_indices_clone_and_undo() {
+    let huge = num_bigint::BigInt::from(1) << 220usize;
+    let values = [frac(7, 3), frac(-5, 2), Q::new(huge, 37.into())];
+    let mut sx = Simplex::<usize>::new();
+    let vars: Vec<Var> = values.iter().map(|v| sx.new_var_at(v.clone())).collect();
+    assert_eq!(vars, [0, 1, 2]);
+    for (v, expected) in values.iter().enumerate() {
+        let state = &sx.vars[v];
+        assert_eq!(state.value.numer(), expected.numer());
+        assert_eq!(state.value.denom(), expected.denom());
+        assert!(state.row.is_none() && state.lower.is_none() && state.upper.is_none());
+    }
+    assert!(sx.rows.is_empty() && sx.violated.is_empty());
+    for terms in [vec![(0, int(2)), (1, int(-3))], vec![(1, int(1)), (2, frac(1, 7))]] {
+        let expected = terms.iter().fold(int(0), |s, (v, a)| s + a * &values[*v]);
+        let row = sx.add_row(&LinExpr::from_terms(terms, int(0)));
+        assert_eq!(sx.value(row).numer(), expected.numer());
+        assert_eq!(sx.value(row).denom(), expected.denom());
+        sx.assert_invariants(); // independently reconstructs row equations, both indices and forms
+    }
+    let cp = sx.checkpoint();
+    sx.assert_bounds(vars[0], Some(int(4)), None, 0).unwrap();
+    sx.assert_invariants();
+    let original = sx.vars.clone();
+    let mut copy = sx.clone();
+    let slack = copy.rows[0].basic;
+    let target = copy.value(slack) + int(2);
+    copy.assert_bounds(slack, Some(target), None, 1).unwrap();
+    copy.assert_invariants();
+    assert!(!copy.violated.is_empty());
+    assert_eq!(copy.check(), Ok(()));
+    copy.assert_invariants();
+    copy.backtrack(cp);
+    copy.assert_invariants();
+    assert!(copy.violated.is_empty());
+    assert_eq!(sx.vars, original, "a clone's pivots and undo cannot change its source");
+    sx.backtrack(cp);
+    sx.assert_invariants();
+}
+
+#[test]
+fn nonzero_structural_starts_agree_with_cold_simplex_and_independent_decider() {
+    let mut rng = Rng(0x5eed_0711);
+    for _ in 0..32 {
+        let n = 2 + rng.below(2) as usize;
+        let mut cs: Vec<Constraint> = (0..n).flat_map(|i| [ge(&[(i, 1)], -4), le(&[(i, 1)], 5)]).collect();
+        cs.extend((0..3).map(|_| random_linear(&mut rng, n)));
+        let (mut cold, cold_vars, cold_results) = resolve(&cs, n);
+        let mut sx = Simplex::<usize>::new();
+        let vars: Vec<Var> = (0..n).map(|_| sx.new_var_at(frac(rng.int(-8, 8), 3))).collect();
+        let mut kept: Vec<&Constraint> = Vec::new();
+        for (i, c) in cs.iter().enumerate() {
+            let mut proposed = kept.clone();
+            proposed.push(c);
+            let feasible = fourier_motzkin(&proposed, n, &[], 0).is_some();
+            let cp = sx.checkpoint();
+            let got = sx.assert(&c.expr(&vars), c.rel, &c.c, i).and_then(|()| sx.check());
+            assert_eq!(got.is_ok(), feasible, "{i} of {cs:?}");
+            assert_eq!(got.is_ok(), cold_results[i].is_ok());
+            match got {
+                Ok(()) => kept.push(c),
+                Err(Failure::Conflict(tags)) => {
+                    let conflict: Vec<&Constraint> = tags.iter().map(|&t| &cs[t]).collect();
+                    assert!(fourier_motzkin(&conflict, n, &[], 0).is_none());
+                    sx.backtrack(cp);
+                    assert_eq!(sx.check(), Ok(()));
+                }
+                Err(e) => panic!("unexpected stop: {e:?}"),
+            }
+            sx.assert_invariants();
+            assert!(kept.iter().all(|c| c.holds(|j| sx.value(vars[j]).clone())));
+        }
+        let objective: Vec<i64> = (0..n).map(|_| rng.int(-2, 2)).collect();
+        let form = |v: &[Var]| LinExpr::from_terms(objective.iter().enumerate().map(|(i, &a)| (v[i], int(a))), int(0));
+        let expected = fm_minimum(&kept, n, &objective).expect("feasible system").expect("bounded variables");
+        let optimum = sx.minimize(&form(&vars)).unwrap();
+        assert_eq!(optimum.numer(), expected.numer());
+        assert_eq!(optimum.denom(), expected.denom());
+        assert_eq!(cold.minimize(&form(&cold_vars)), Ok(expected));
+        sx.assert_invariants();
+        assert!(kept.iter().all(|c| c.holds(|j| sx.value(vars[j]).clone())));
+    }
+}
+
+#[test]
 fn work_accounting_clone_rollback_and_drop_match_small_oracles() {
     use crate::profile::{self, ProfileEvent, ProfileObserver};
     use std::cell::RefCell;

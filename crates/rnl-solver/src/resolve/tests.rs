@@ -15,6 +15,146 @@ use crate::rational::{frac, int};
 use crate::StoppedClock;
 
 #[test]
+fn fresh_geometry_values_cover_points_extents_separators_and_free_text_axes() {
+    let o = PointRef::Origin;
+    let pin = |pin| PointRef::Pin { object: 0, pin, terminal: ["g", "d", "s"][pin].to_string() };
+    let mut attached = point();
+    attached.position = Position::At(pin(1));
+    let p = problem_of(
+        vec![instance(), label(Some(Axis::X)), point(), point(), attached],
+        vec![
+            fact(FactKind::Align { axis: Axis::X, members: vec![PointRef::Centre(vec![o(0), o(2), o(3)]), o(1)] }),
+            fact(FactKind::Distance {
+                axis: Axis::X,
+                sense: Sense::Increasing,
+                min: Some(1.0),
+                max: None,
+                from: vec![o(0), o(2)],
+                to: vec![o(1), o(3)],
+            }),
+            fact(FactKind::Place { at: pin(0), axis: Axis::Y, value: 17.0 }),
+        ],
+    );
+    let model = Model::new(&p, int(0));
+    let mut g = Geometry::new(p.objects.len());
+    g.origin = vec![[int(10), int(20)], [int(-3), int(99)], [int(-4), int(6)], [int(8), int(-2)], [int(99), int(99)]];
+    g.orient[0] = Orient::R90;
+    // Independent values from the symbol's coordinates and a 90-degree rotation, not a call
+    // to Geometry::var_value. The attached point contributes its main pin, not origin[4].
+    let point_at = |point| match point {
+        PointId::Origin(0) => [int(10), int(20)],
+        PointId::Origin(2) => [int(-4), int(6)],
+        PointId::Origin(3) => [int(8), int(-2)],
+        PointId::Text(1) => [int(-3), int(21)],
+        PointId::Pin(0, 0) => [int(10), int(17)],
+        PointId::Pin(0, 1) => [int(8), int(20)],
+        PointId::Centre(0) => [int(3), int(9)],
+        other => panic!("unexpected point {other:?}"),
+    };
+    let r = Resolver::with_geometry_values(&model, p.objects.len(), Limits::Caps(CAPS), g.clone());
+    let mut kinds = [0; 4];
+    for (v, kind) in model.vars.iter().enumerate() {
+        let expected = match kind {
+            VarKind::Point(point) => {
+                kinds[0] += 1;
+                point_at(*point)
+            }
+            VarKind::CentreLo(0) => {
+                kinds[1] += 1;
+                [int(-4), int(-2)]
+            }
+            VarKind::CentreHi(0) => {
+                kinds[2] += 1;
+                [int(10), int(20)]
+            }
+            VarKind::Separator { before, .. } => {
+                kinds[3] += 1;
+                assert_eq!(before, &[PointId::Origin(0), PointId::Origin(2)]);
+                [int(10), int(20)]
+            }
+            other => panic!("unexpected variable {other:?}"),
+        };
+        for (axis, expected) in expected.iter().enumerate() {
+            assert_eq!(r.sx[axis].value(v).numer(), expected.numer());
+            assert_eq!(r.sx[axis].value(v).denom(), expected.denom());
+        }
+    }
+    assert!(kinds.iter().all(|&n| n > 0), "all four model variable kinds must be covered");
+    assert!(r.kept.is_empty() && r.held.is_empty() && r.nogoods.is_empty() && r.choices.is_empty());
+    assert_eq!(r.pivots(), 0);
+    for sx in &r.sx {
+        sx.assert_invariants();
+        assert!(sx.satisfied());
+    }
+    // Old witness-only seeding deliberately leaves the fresh numeric state at zero.
+    let mut cold = Resolver::new(&model, p.objects.len(), Limits::Caps(CAPS));
+    cold.seed(g);
+    assert_eq!(cold.sx[0].value(model.var(PointId::Origin(0))), &int(0));
+    assert_eq!(r.sx[0].value(model.var(PointId::Origin(0))), &int(10));
+}
+
+#[test]
+fn fresh_geometry_values_keep_per_search_nodes_and_per_axis_cumulative_pivots() {
+    let p = problem_of(
+        vec![instance(), instance()],
+        vec![
+            fact(FactKind::Orient { object: 0, code: Orient::R90 }),
+            fact(FactKind::Orient { object: 1, code: Orient::R180 }),
+        ],
+    );
+    let model = Model::new(&p, int(0));
+    let caps = Caps { nodes: 1, ..CAPS };
+    let mut r = Resolver::with_geometry_values(&model, 2, Limits::Caps(caps), Geometry::new(2));
+    assert_eq!(r.add(0), Outcome::Kept);
+    assert_eq!(r.add(1), Outcome::Kept);
+    assert_eq!(r.nodes, 2, "two one-node searches, not one shared node allowance");
+
+    let p = problem_of(vec![point(), point()], Vec::new());
+    let model = Model::new(&p, int(0));
+    let mut geometry = Geometry::new(2);
+    geometry.origin = vec![[int(4), int(8)], [int(-2), int(-5)]];
+    let mut r = Resolver::with_geometry_values(&model, 2, Limits::Caps(Caps { pivots: 1, ..CAPS }), geometry);
+    let (x, y) = (model.var(PointId::Origin(0)), model.var(PointId::Origin(1)));
+    for axis in 0..2 {
+        r.sx[axis].assert(&LinExpr::diff(x, y), Rel::Eq, &int(axis as i64 * 2), Tag::Def).unwrap();
+    }
+    assert_eq!(r.check(), Ok(()));
+    assert_eq!([r.sx[0].pivots(), r.sx[1].pivots()], [1, 1]);
+    let extra = LinExpr::from_terms([(x, int(2)), (y, int(-1))], int(0));
+    let target = r.sx[0].eval(&extra) + int(1);
+    r.sx[0].assert(&extra, Rel::Ge, &target, Tag::Def).unwrap();
+    assert_eq!(r.sx[0].check(), Err(Failure::Budget), "the same axis cannot start another pivot allowance");
+    assert_eq!(r.sx[0].pivots(), 1);
+    r.sx[0].assert_invariants();
+}
+
+#[test]
+fn fresh_geometry_construction_and_pure_holds_do_not_read_the_deadline_clock() {
+    let p = problem_of(vec![instance()], vec![fact(FactKind::Orient { object: 0, code: Orient::R90 })]);
+    let model = Model::new(&p, int(0));
+    for seconds in [0.0, 1000.0] {
+        let (cold_clock, warm_clock) = (Ticks::default(), Ticks::default());
+        let cold_deadline = Deadline::new(&cold_clock, Some(seconds));
+        let warm_deadline = Deadline::new(&warm_clock, Some(seconds));
+        let mut geometry = Geometry::new(1);
+        geometry.origin[0] = [frac(7, 3), frac(-5, 2)];
+        let mut cold = Resolver::new(&model, 1, Limits::Time(&cold_deadline));
+        cold.seed(geometry.clone());
+        let mut warm = Resolver::with_geometry_values(&model, 1, Limits::Time(&warm_deadline), geometry.clone());
+        assert_eq!(cold_clock.reads(), 1);
+        assert_eq!(warm_clock.reads(), 1);
+        assert!(!geometry.holds(&model, 0));
+        assert!(!cold.holds(0) && !warm.holds(0));
+        assert_eq!(warm_clock.reads(), 1);
+        let a = cold.add(0);
+        let b = warm.add(0);
+        assert_eq!(a, b);
+        assert_eq!(a, if seconds == 0.0 { Outcome::Undecided } else { Outcome::Kept });
+        assert_eq!(cold_clock.reads(), warm_clock.reads(), "same clock contract on this no-pivot fixture");
+    }
+}
+
+#[test]
 fn work_rebuild_counts_survive_failed_replay_and_drop() {
     use crate::profile::{self, ProfileEvent, ProfileObserver};
     use std::cell::RefCell;
