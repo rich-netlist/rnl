@@ -17,16 +17,11 @@
 // the web viewer's tests skip; RNL_WEB=1 builds it in any case.
 
 import net from "node:net";
-import { execFileSync } from "node:child_process";
-import { packageCache, publicPackagesAvailable } from "../../scripts/packages.mjs";
-import { join } from "node:path";
+import { preparePublicPackageFixture } from "../../scripts/packages.mjs";
 import { defineConfig, devices } from "@playwright/test";
 import { root } from "./fixtures.js";
 
-if (!process.env.RNL_PACKAGE_FIXTURE && publicPackagesAvailable()) {
-  execFileSync("python", ["scripts/packages.py", "fixture"], { cwd: root });
-  process.env.RNL_PACKAGE_FIXTURE = join(packageCache, "fixture");
-}
+process.env.RNL_PACKAGE_FIXTURE ||= preparePublicPackageFixture();
 
 const ci = !!process.env.CI;
 const channel = process.env.RNL_CHANNEL || undefined;

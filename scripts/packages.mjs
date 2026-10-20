@@ -1,6 +1,7 @@
 // Node consumers of the single public-package lock and the verified checkout-local cache.
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 export const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -28,4 +29,14 @@ export function publicPackagesAvailable(names = packageLocks.map(p => p.name)) {
   }
   for (const name of names) publicPackageText(name);
   return true;
+}
+export function preparePublicPackageFixture() {
+  const fixture = join(packageCache, 'fixture');
+  if (publicPackagesAvailable()) execFileSync('python', [join(root, 'scripts/packages.py'), 'fixture'], { cwd: root });
+  else {
+    // Non-package browser tests must remain offline even when the local download was omitted.
+    mkdirSync(fixture, { recursive: true });
+    writeFileSync(join(fixture, 'catalog.json'), JSON.stringify({ schemaVersion: 1, packages: [] }) + '\n');
+  }
+  return fixture;
 }
