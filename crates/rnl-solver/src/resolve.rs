@@ -563,7 +563,8 @@ impl<'a> Resolver<'a> {
                 );
             }
             let before_bounds = source.len();
-            let before_nnz: usize = source.iter().map(|b| b.expr.terms().len()).sum();
+            let before_nnz =
+                crate::profile::work_enabled().then(|| source.iter().map(|b| b.expr.terms().len()).sum::<usize>());
             let compiled = compile(model.vars.len(), source, &priority)
                 .expect("a feasible immutable core cannot compile to a contradiction");
             for (v, value) in values.iter().enumerate() {
@@ -573,7 +574,7 @@ impl<'a> Resolver<'a> {
                     "invalid frozen affine lift"
                 );
             }
-            if crate::profile::work_enabled() {
+            if let Some(before_nnz) = before_nnz {
                 crate::profile::work_set("affine_source_vars", model.vars.len() as u64);
                 crate::profile::work_set("affine_reduced_vars", compiled.map.retained.len() as u64);
                 crate::profile::work_set("affine_source_bounds", before_bounds as u64);

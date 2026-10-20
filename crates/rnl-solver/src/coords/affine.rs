@@ -323,10 +323,11 @@ impl<T: Clone + Ord> Axis<T> {
         let source = self.sx.active_bounds_in_source_variables();
         let n = source.variables.len();
         let before_bounds = source.bounds.len();
-        let before_nnz: usize = source.bounds.iter().map(|b| b.expr.terms().len()).sum();
+        let before_nnz =
+            crate::profile::work_enabled().then(|| source.bounds.iter().map(|b| b.expr.terms().len()).sum::<usize>());
         let compiled = compile(n, source.bounds, &[])
             .unwrap_or_else(|_| panic!("a checked active axis became inconsistent during affine compilation"));
-        if crate::profile::work_enabled() {
+        if let Some(before_nnz) = before_nnz {
             crate::profile::work_set("affine_source_vars", n as u64);
             crate::profile::work_set("affine_reduced_vars", compiled.map.retained.len() as u64);
             crate::profile::work_set("affine_source_bounds", before_bounds as u64);
