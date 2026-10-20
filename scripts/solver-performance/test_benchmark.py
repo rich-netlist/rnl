@@ -128,6 +128,18 @@ class Policy(unittest.TestCase):
         manifest=b.verify_fixtures(root)
         self.assertEqual(sum(p['profile_cap_seconds']==120 for p in manifest['representative']),2)
 
+    def test_sealed_main_legacy_stdout_matches_profile_without_translation(self):
+        root=Path(__file__).resolve().parents[2]/'tests/performance'
+        fixture=b.load(root/'canonical-main.json')
+        _,canonical,errors=b.stdout_options(fixture['stdout_line'])
+        self.assertEqual(errors,[])
+        self.assertEqual(canonical,fixture['profile_options_canonical'])
+        self.assertEqual(b.normalize_options(fixture['profile_options_canonical']),canonical)
+        profile=valid_profile();profile['levels'][0]['options_canonical']=fixture['profile_options_canonical']
+        self.assertEqual(b.complete_profile_errors(profile,1.2,canonical),[])
+        for invalid in (canonical.rsplit(';',1)[0],canonical.replace('tolerance=0.000001;grid=1','grid=1;tolerance=0.000001')):
+            self.assertIsNone(b.stdout_options('solver options: '+invalid)[1])
+
 
 def owned_fixture(folder):
     if os.name!='nt' or os.environ.get('GITHUB_ACTIONS')!='true':

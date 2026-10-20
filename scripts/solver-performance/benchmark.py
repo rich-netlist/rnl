@@ -109,6 +109,31 @@ def guard(path, minimum_free_gib):
 
 
 def normalize_options(value):
+    # Main's sig2 formatter is legacy text; S2's sig3 formatter is structured JSON.
+    # Preserve every main field and its canonical order rather than translating it.
+    if isinstance(value,str) and value.startswith('tolerance='):
+        fields = value.split(';')
+        keys = ('tolerance','grid','objectives','beam','budget','time_limit')
+        if len(fields)!=len(keys) or any(part.partition('=')[0]!=key for part,key in zip(fields,keys)) or any(c.isspace() for c in value):
+            raise ValueError('invalid legacy canonical field order/completeness')
+        settings = dict(part.split('=',1) for part in fields)
+        for name,allow_none,strict_positive in (('tolerance',False,False),('grid',True,True),('time_limit',True,False)):
+            number=settings[name]
+            if allow_none and number=='none':
+                continue
+            parsed=float(number)
+            if not math.isfinite(parsed) or parsed<0 or (strict_positive and parsed==0):
+                raise ValueError('invalid legacy canonical '+name)
+        if not re.fullmatch(r'[1-9][0-9]*',settings['beam']) or not re.fullmatch(r'candidates:[0-9]+,astar_expansions:[0-9]+',settings['budget']):
+            raise ValueError('invalid legacy canonical beam/budget')
+        if settings['objectives']!='none':
+            for layer in settings['objectives'].split(','):
+                terms,sep,tolerance=layer.partition('~')
+                if not re.fullmatch(r'[a-z_][a-z0-9_]*(?:\*[1-9][0-9]*)?(?:\+[a-z_][a-z0-9_]*(?:\*[1-9][0-9]*)?)*',terms):
+                    raise ValueError('invalid legacy canonical objectives')
+                if sep and (not math.isfinite(float(tolerance)) or float(tolerance)<0):
+                    raise ValueError('invalid legacy objective tolerance')
+        return value
     if isinstance(value, str):
         value = json.loads(value)
     if not isinstance(value, dict) or value.get('format') != 'rnl-solver-config/1' or not isinstance(value.get('level'), list) or not value['level'] or not isinstance(value.get('rules'), dict):
