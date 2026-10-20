@@ -127,11 +127,14 @@ use rnl_runtime::host::file_name;
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::problem::{FactKind, LevelProblem, PointRef, Position};
 
+use crate::coords::affine::{compile, Axis as AffineAxis};
 use crate::model::{ax, turned, Bound, ChoiceKind, LitKey, Model, OrientEffect, PointId, VarKind};
 use crate::options::{Caps, CAPS};
 use crate::orient::{from_index, index, OrientClasses};
 use crate::rational::{from_f64, to_f64, Q};
-use crate::simplex::{Failure, LinExpr, Rel, Simplex, Var};
+#[cfg(test)]
+use crate::simplex::Simplex;
+use crate::simplex::{Failure, LinExpr, Rel, SourceBound, Var};
 use crate::{Clock, Discarded, SolverOptions, Statement, StatementHint, Work};
 
 /// The time limit of the resolution of one level (the draft 0.3, 8.5), on the clock the caller
@@ -390,7 +393,7 @@ struct Saved {
 pub(crate) struct Resolver<'a> {
     model: &'a Model,
     limits: Limits<'a>,
-    sx: [Simplex<Tag>; 2],
+    sx: [AffineAxis<Tag>; 2],
     classes: OrientClasses,
     geometry: Geometry,
     /// The points that the units kept constrain, by axis (plan 5.1).
@@ -416,7 +419,7 @@ pub(crate) struct Resolver<'a> {
 impl<'a> Resolver<'a> {
     /// A resolution with nothing taken in yet, every object at the origin with R0.
     pub(crate) fn new(model: &'a Model, n_objects: usize, limits: Limits<'a>) -> Resolver<'a> {
-        let mut sx = [Simplex::new(), Simplex::new()];
+        let mut sx = [AffineAxis::new(), AffineAxis::new()];
         for s in &mut sx {
             for _ in 0..model.vars.len() {
                 s.new_var();
@@ -463,7 +466,7 @@ impl<'a> Resolver<'a> {
 
     /// The simplex of an axis, with the bounds of the units kept and of the literals held: the
     /// coordinates of a candidate are optimised over it (`crate::coords`).
-    pub(crate) fn simplex_mut(&mut self, axis: usize) -> &mut Simplex<Tag> {
+    pub(crate) fn simplex_mut(&mut self, axis: usize) -> &mut AffineAxis<Tag> {
         &mut self.sx[axis]
     }
 
@@ -479,6 +482,133 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn classes(&self) -> &OrientClasses {
         &self.classes
+    }
+
+    /// Replaces only the numerical representation, after placement's full kept facts and
+    /// explicit orientation prefix. No Saved or search checkpoint may span this boundary.
+    /// The new base contains definitions and proven immutable equations; mutable literals are
+    /// replayed ABOVE it, so `rebuild(_, false)` can still change every unfixed decision.
+    pub(crate) fn freeze_placement_core(&mut self) {
+        assert!(matches!(self.limits, Limits::Caps(_)), "affine take is placement-only");
+        let model = self.model;
+        let kept: BTreeSet<usize> = self.kept.iter().copied().collect();
+        let priority: Vec<u8> = model
+            .vars
+            .iter()
+            .map(|v| match v {
+                VarKind::Point(PointId::Pin(..) | PointId::Text(_)) => 0,
+                VarKind::CentreLo(_) | VarKind::CentreHi(_) => 1,
+                VarKind::Point(_) => 2,
+                VarKind::Separator { .. } => 3,
+            })
+            .collect();
+        let mut replacement = Vec::with_capacity(2);
+        for axis in 0..2 {
+            let _phase = crate::profile::work_span("affine_phase", "take_compile");
+            crate::profile::work_set("affine_axis", axis as u64);
+            let mut source: Vec<SourceBound<Tag>> = Vec::new();
+            let mut support = BTreeSet::new();
+            let mut put = |b: Bound, tag: Tag| {
+                source.push(SourceBound { expr: b.expr, lower: b.lo.map(|v| (v, tag)), upper: b.hi.map(|v| (v, tag)) });
+            };
+            // Permanent centre definitions include their remaining inequalities. They are not
+            // inferred from a current basis or from a selected centre extreme.
+            for c in 0..model.centres.len() {
+                for b in model.centre_definition(c, axis) {
+                    put(b, Tag::Def);
+                }
+            }
+            for &u in &self.kept {
+                for b in &model.units[u].fixed {
+                    if b.axis == axis && matches!((&b.lo, &b.hi), (Some(lo), Some(hi)) if lo == hi) {
+                        put(b.clone(), Tag::Fact(u));
+                        support.insert(Tag::Fact(u));
+                    }
+                }
+            }
+            for k in 0..model.oriented.len() {
+                if !model.oriented[k] {
+                    continue;
+                }
+                let (root, label) = self.classes.find(k);
+                let Some(fixed) = self.classes.fixed(root) else { continue };
+                let proof = self.classes.fixed_reason(k);
+                assert!(
+                    !proof.is_empty() && proof.iter().all(|f| kept.contains(f)),
+                    "a frozen orientation needs its complete immutable relate/fix proof"
+                );
+                let Some(origin) = model.origin_point[k] else { continue };
+                let ori = fixed.value.then(label);
+                for &p in &model.object_points[k] {
+                    let info = &model.points[&p];
+                    if p == origin || !info.linked(axis) {
+                        continue;
+                    }
+                    let local = info.local.as_ref().expect("a linked point has a local offset");
+                    let offset = turned(ori, local, axis);
+                    put(Bound::equal(axis, LinExpr::diff(info.var, model.var(origin)), offset), Tag::Def);
+                    support.extend(proof.iter().copied().map(Tag::Fact));
+                }
+            }
+            let values: Vec<Q> = (0..model.vars.len()).map(|v| self.geometry.var_value(model, v, axis)).collect();
+            // An untouched pin in the old simplex may still be zero. Only original physical
+            // coordinates provide a valid seed for newly explicit rigid links. Separator bounds
+            // outside this core are replayed normally, and may still need the next normal check.
+            for b in &source {
+                let value = b.expr.eval(|v| values[v].clone());
+                assert!(
+                    b.lower.as_ref().is_none_or(|(lo, _)| value >= *lo)
+                        && b.upper.as_ref().is_none_or(|(hi, _)| value <= *hi),
+                    "the placement witness must satisfy its frozen core"
+                );
+            }
+            let before_bounds = source.len();
+            let before_nnz =
+                crate::profile::work_enabled().then(|| source.iter().map(|b| b.expr.terms().len()).sum::<usize>());
+            let compiled = compile(model.vars.len(), source, &priority)
+                .expect("a feasible immutable core cannot compile to a contradiction");
+            for (v, value) in values.iter().enumerate() {
+                assert_eq!(
+                    *value,
+                    compiled.map.eval_original(v, |z| values[compiled.map.retained[z]].clone()),
+                    "invalid frozen affine lift"
+                );
+            }
+            if let Some(before_nnz) = before_nnz {
+                crate::profile::work_set("affine_source_vars", model.vars.len() as u64);
+                crate::profile::work_set("affine_reduced_vars", compiled.map.retained.len() as u64);
+                crate::profile::work_set("affine_source_bounds", before_bounds as u64);
+                crate::profile::work_set("affine_reduced_bounds", compiled.bounds.len() as u64);
+                crate::profile::work_set("affine_source_nnz", before_nnz as u64);
+                crate::profile::work_set(
+                    "affine_reduced_nnz",
+                    compiled.bounds.iter().map(|b| b.expr.terms().len() as u64).sum(),
+                );
+                crate::profile::work_set("affine_eliminated_rank", compiled.eliminated.len() as u64);
+                crate::profile::work_set(
+                    "affine_retained_equalities",
+                    compiled
+                        .bounds
+                        .iter()
+                        .filter(|b| matches!((&b.lower, &b.upper), (Some((lo, _)), Some((hi, _))) if lo == hi))
+                        .count() as u64,
+                );
+            }
+            replacement.push(
+                AffineAxis::from_compiled(
+                    compiled,
+                    &values,
+                    self.sx[axis].pivots(),
+                    self.sx[axis].pivot_limit(),
+                    support,
+                )
+                .expect("valid frozen-core bounds cannot contradict each other"),
+            );
+        }
+        let mut replacement = replacement.into_iter();
+        self.sx = [replacement.next().unwrap(), replacement.next().unwrap()];
+        self.base = self.checkpoint();
+        self.rebuild(None, true).expect("the kept facts and mutable witness literals hold together");
     }
 
     /// Takes a unit in (8.5).
@@ -1302,7 +1432,7 @@ fn facts_of(tags: &[Tag], u: usize) -> Vec<usize> {
 }
 
 /// Asserts a bound with a tag; a conflict found at once gives its tags.
-fn assert_bound(s: &mut Simplex<Tag>, b: &Bound, tag: Tag) -> Result<(), Vec<Tag>> {
+fn assert_bound(s: &mut AffineAxis<Tag>, b: &Bound, tag: Tag) -> Result<(), Vec<Tag>> {
     let result = match (&b.lo, &b.hi) {
         (Some(lo), Some(hi)) if lo == hi => s.assert(&b.expr, Rel::Eq, lo, tag),
         (lo, hi) => {
@@ -2030,3 +2160,6 @@ impl Map {
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+#[cfg(test)]
+mod affine_tests;

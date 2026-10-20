@@ -301,7 +301,7 @@ pub(crate) fn with_relations<R>(
     purpose: &'static str,
     f: impl FnOnce(&mut Resolver, &Model, &Taken) -> R,
 ) -> R {
-    with_relations_from(s, relations, work, purpose, None, f)
+    with_relations_from(s, relations, work, purpose, None, None, f)
 }
 
 /// A placement round may start at the previous successful round's geometry. The model,
@@ -309,12 +309,13 @@ pub(crate) fn with_relations<R>(
 pub(crate) fn with_placement_seed<R>(
     s: &Structure,
     relations: &[Tagged],
+    orientation_prefix: usize,
     work: &mut Work,
     seed: Option<&Geometry>,
     orient: &[Orient],
     f: impl FnOnce(&mut Resolver, &Model, &Taken) -> R,
 ) -> R {
-    with_relations_from(s, relations, work, "placement", seed.map(|g| (g, orient)), f)
+    with_relations_from(s, relations, work, "placement", seed.map(|g| (g, orient)), Some(orientation_prefix), f)
 }
 
 fn with_relations_from<R>(
@@ -323,6 +324,7 @@ fn with_relations_from<R>(
     work: &mut Work,
     purpose: &'static str,
     seed: Option<(&Geometry, &[Orient])>,
+    orientation_prefix: Option<usize>,
     f: impl FnOnce(&mut Resolver, &Model, &Taken) -> R,
 ) -> R {
     let _call = crate::profile::work_span("with_relations", purpose);
@@ -348,7 +350,17 @@ fn with_relations_from<R>(
     }
     drop(phase);
     let phase = crate::profile::work_span("relations_phase", "relations_take");
-    let outcomes: Vec<Outcome> = (0..relations.len()).map(|i| r.add(base + i)).collect();
+    let mut outcomes = Vec::with_capacity(relations.len());
+    if let Some(prefix) = orientation_prefix {
+        assert!(prefix <= relations.len(), "the caller supplies the explicit orientation prefix");
+        outcomes.extend((0..prefix).map(|i| r.add(base + i)));
+        // Model variables, original Unit identities and the discrete resolver state are now
+        // fixed. There is no Saved/search checkpoint across this numerical-only replacement.
+        r.freeze_placement_core();
+        outcomes.extend((prefix..relations.len()).map(|i| r.add(base + i)));
+    } else {
+        outcomes.extend((0..relations.len()).map(|i| r.add(base + i)));
+    }
     let taken = Taken {
         kept: outcomes.iter().map(|o| *o == Outcome::Kept).collect(),
         undecided: outcomes.contains(&Outcome::Undecided),

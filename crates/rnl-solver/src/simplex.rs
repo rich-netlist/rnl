@@ -188,6 +188,22 @@ pub(crate) enum Rel {
     Eq,
 }
 
+/// A currently effective bound, in immutable source variables rather than the current basis.
+#[derive(Clone, Debug)]
+pub(crate) struct SourceBound<T> {
+    pub expr: LinExpr,
+    pub lower: Option<(Q, T)>,
+    pub upper: Option<(Q, T)>,
+}
+
+/// Source variables are dense in the exported expressions; `variables` gives their old IDs.
+/// `forms` also expands unbounded historical slacks needed by a bound or a caller expression.
+pub(crate) struct SourceProgram<T> {
+    pub variables: Vec<Var>,
+    pub forms: Vec<LinExpr>,
+    pub bounds: Vec<SourceBound<T>>,
+}
+
 /// Why [`Simplex::check`] or [`Simplex::minimize`] gave no result.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Failure<T> {
@@ -343,6 +359,68 @@ impl<T: Clone + Ord> Simplex<T> {
         self.occurrences.push(0);
         self.work.dimensions(self.rows.len(), self.vars.len());
         self.vars.len() - 1
+    }
+
+    /// A new independent variable at an exact value. Its rows are created afterwards, so their
+    /// initial values are evaluated consistently by `add_row`; no existing basis is modified.
+    pub(crate) fn new_var_at(&mut self, value: Q) -> Var {
+        let v = self.new_var();
+        self.vars[v].value = value;
+        v
+    }
+
+    /// Carry the *same axis* work count into a fresh representation. This is not a new cap.
+    pub(crate) fn carry_pivots(&mut self, used: u64) {
+        assert!(used >= self.pivots, "axis pivot accounting must be monotonic");
+        self.pivots = used;
+    }
+
+    pub(crate) fn pivot_limit(&self) -> Option<u64> {
+        self.pivot_limit
+    }
+
+    /// Nonbasic bound changes clamp their value immediately; the maintained violated set is
+    /// therefore an O(1) feasibility check for a freshly installed exact helper assignment.
+    pub(crate) fn assignment_is_feasible(&self) -> bool {
+        self.violated.is_empty()
+    }
+
+    /// Recover active bounds through the immutable form DAG, never through pivoted rows. A
+    /// slack with no bounds can still be a dependency of a currently bounded source form.
+    pub(crate) fn active_bounds_in_source_variables(&self) -> SourceProgram<T> {
+        let definitions: BTreeMap<Var, &Vec<(Var, Q)>> = self.forms.iter().map(|(e, v)| (*v, e)).collect();
+        let mut variables = Vec::new();
+        let mut forms: Vec<LinExpr> = Vec::with_capacity(self.vars.len());
+        for v in 0..self.vars.len() {
+            let e = match definitions.get(&v) {
+                Some(terms) => {
+                    let mut e = LinExpr::default();
+                    for (w, a) in *terms {
+                        assert!(*w < v, "source forms must form a creation-ordered DAG");
+                        e.add_scaled(&forms[*w], a);
+                    }
+                    e
+                }
+                None => {
+                    let dense = variables.len();
+                    variables.push(v);
+                    LinExpr::var(dense)
+                }
+            };
+            forms.push(e);
+        }
+        let bounds = self
+            .vars
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.lower.is_some() || s.upper.is_some())
+            .map(|(v, s)| SourceBound {
+                expr: forms[v].clone(),
+                lower: s.lower.as_ref().map(|b| (b.value.clone(), b.tag.clone())),
+                upper: s.upper.as_ref().map(|b| (b.value.clone(), b.tag.clone())),
+            })
+            .collect();
+        SourceProgram { variables, forms, bounds }
     }
 
     /// How many variables there are, structural and slack.
@@ -589,6 +667,9 @@ impl<T: Clone + Ord> Simplex<T> {
             let target = if below { &s.lower } else { &s.upper };
             let target = target.as_ref().expect("the violated bound").value.clone();
             self.pivot_and_update(xi, xj, target);
+            if let Some(w) = &mut work {
+                w.add(Key::CheckPivots, 1);
+            }
             made += 1;
             if std::mem::replace(&mut left[xi], true) {
                 repeats += 1;
@@ -755,6 +836,9 @@ impl<T: Clone + Ord> Simplex<T> {
                 let target = if up { &b.upper } else { &b.lower };
                 let target = target.as_ref().expect("the bound reached").value.clone();
                 self.pivot_and_update(xl, xk, target);
+            }
+            if let Some(w) = &mut work {
+                w.add(Key::PrimalPivots, 1);
             }
         }
     }

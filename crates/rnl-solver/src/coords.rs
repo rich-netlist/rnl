@@ -61,7 +61,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use num_traits::{One, Zero};
+use num_traits::{One, Signed, Zero};
 use rnl_runtime::geom::Orient;
 use rnl_runtime::problem::LevelProblem;
 
@@ -73,9 +73,12 @@ use crate::search::{
     orientation_relations, relations, relations_by_pairs, row_pairs, up, with_placement_seed, with_relations,
     Candidate, RelKind, Relation, RowPair, Tagged,
 };
-use crate::simplex::{LinExpr, Rel, Simplex, Var};
+use crate::simplex::{LinExpr, Rel, Var};
 use crate::structure::{Drawn, Role, Structure};
 use crate::{SolverOptions, Work};
+
+pub(crate) mod affine;
+use affine::Axis;
 
 /// How many rounds of putting overlapping symbols apart.
 const REPAIR_ROUNDS: usize = 6;
@@ -163,7 +166,7 @@ pub(crate) fn place(
         crate::profile::work_set("work_row_round", row_rounds as u64);
         let seed = next_seed.take();
         let (geometry, kept, undecided, optimised, seed_complete) =
-            with_placement_seed(s, &rels, work, seed.as_ref(), &actual, |r, model, t| {
+            with_placement_seed(s, &rels, orient.len(), work, seed.as_ref(), &actual, |r, model, t| {
                 let (g, optimised, seed_complete) = optimise(r, model, s, options);
                 (g, t.kept.clone(), t.undecided, optimised, seed_complete)
             });
@@ -345,7 +348,7 @@ fn round(v: &Q, grid: &Option<Q>) -> Q {
 
 /// Every pin and text of the model linked to its object's origin by its orientation, a text only
 /// on the axes its owner's symbol gives (13.3); then a check.
-fn link(sx: &mut Simplex<Tag>, model: &Model, ori: &[Orient], axis: usize) -> bool {
+fn link(sx: &mut Axis<Tag>, model: &Model, ori: &[Orient], axis: usize) -> bool {
     for (id, info) in &model.points {
         let (Some(k), Some(local), true) = (info.object, &info.local, info.linked(axis)) else { continue };
         let Some(base) = model.origin_point.get(k).copied().flatten() else { continue };
@@ -361,10 +364,13 @@ fn link(sx: &mut Simplex<Tag>, model: &Model, ori: &[Orient], axis: usize) -> bo
 }
 
 /// Minimises a form and keeps its optimum for the layers after it (`Simplex::keep_optimum`).
-fn minimise_and_keep(sx: &mut Simplex<Tag>, objective: &LinExpr) -> Result<(), ()> {
+fn minimise_and_keep(sx: &mut Axis<Tag>, objective: &LinExpr) -> Result<(), ()> {
     if objective.is_constant() {
         return Ok(());
     }
+    let feasible = sx.assignment_is_feasible();
+    crate::profile::work_set("affine_helper_validation_failures", u64::from(!feasible));
+    assert!(feasible, "exact helper lift must preserve the current legal assignment");
     sx.minimize(objective).map_err(|_| ())?;
     sx.keep_optimum(objective, Tag::Def).map_err(|_| ())
 }
@@ -452,7 +458,7 @@ fn stub_nets(model: &Model, s: &Structure, ori: &[Orient], axis: usize) -> Vec<B
 
 /// The four layers of the LP on one axis (see the module).
 fn layers(
-    sx: &mut Simplex<Tag>,
+    sx: &mut Axis<Tag>,
     model: &Model,
     s: &Structure,
     ori: &[Orient],
@@ -461,6 +467,7 @@ fn layers(
     axis: usize,
 ) -> Result<(), ()> {
     let fail = |_| ();
+    let mut helpers = 0_u64;
     let phase = crate::profile::span("lex_layer", "1_wire_length");
     // 1. the wire length: a pin of a net routed by the end of its lead
     let mut objective = LinExpr::default();
@@ -470,7 +477,10 @@ fn layers(
         if ends.iter().map(|(v, _)| v).collect::<BTreeSet<_>>().len() < 2 {
             continue;
         }
-        let (hi, lo) = (sx.new_var(), sx.new_var());
+        let hi_at = ends.iter().map(|(v, c)| sx.value(*v) + c).max().expect("nonempty net");
+        let lo_at = ends.iter().map(|(v, c)| sx.value(*v) + c).min().expect("nonempty net");
+        let (hi, lo) = (sx.new_var_at(hi_at), sx.new_var_at(lo_at));
+        helpers += 2;
         // hi ≥ v + c and lo ≤ v + c
         for (v, c) in &ends {
             sx.assert(&LinExpr::diff(hi, *v), Rel::Ge, c, Tag::Def).map_err(fail)?;
@@ -486,7 +496,10 @@ fn layers(
     let boxes: Vec<(Var, [Q; 4])> =
         own.iter().filter(|(k, _)| solid(s, *k)).filter_map(|&(k, v)| Some((v, s.box_offset(k, ori[k])?))).collect();
     if !boxes.is_empty() {
-        let (hi, lo) = (sx.new_var(), sx.new_var());
+        let hi_at = boxes.iter().map(|(v, b)| sx.value(*v) + &b[axis + 2]).max().expect("nonempty envelope");
+        let lo_at = boxes.iter().map(|(v, b)| sx.value(*v) + &b[axis]).min().expect("nonempty envelope");
+        let (hi, lo) = (sx.new_var_at(hi_at), sx.new_var_at(lo_at));
+        helpers += 2;
         for (v, b) in &boxes {
             sx.assert(&LinExpr::diff(hi, *v), Rel::Ge, &b[axis + 2], Tag::Def).map_err(fail)?;
             sx.assert(&LinExpr::diff(*v, lo), Rel::Ge, &-b[axis].clone(), Tag::Def).map_err(fail)?;
@@ -498,7 +511,10 @@ fn layers(
     // 3. the nets that only stubs draw: the extent of the pins of the elements on each
     let mut objective = LinExpr::default();
     for ends in stub_nets(model, s, ori, axis) {
-        let (hi, lo) = (sx.new_var(), sx.new_var());
+        let hi_at = ends.iter().map(|(v, c)| sx.value(*v) + c).max().expect("nonempty stub net");
+        let lo_at = ends.iter().map(|(v, c)| sx.value(*v) + c).min().expect("nonempty stub net");
+        let (hi, lo) = (sx.new_var_at(hi_at), sx.new_var_at(lo_at));
+        helpers += 2;
         for (v, c) in &ends {
             sx.assert(&LinExpr::diff(hi, *v), Rel::Ge, c, Tag::Def).map_err(fail)?;
             sx.assert(&LinExpr::diff(*v, lo), Rel::Ge, &-c.clone(), Tag::Def).map_err(fail)?;
@@ -513,14 +529,16 @@ fn layers(
     // d ≥ e − c and d ≥ c − e, for e = v or e = v − base
     let mut objective = LinExpr::default();
     for ((_, v), t) in own.iter().zip(targets) {
-        let d = sx.new_var();
         let (bases, c) = match t {
             Target::At(c) => (&[][..], c),
             Target::From(bases, c) => (&bases[..], c),
         };
+        let share = Q::one() / int(i64::try_from(bases.len().max(1)).unwrap_or(1));
+        let base = bases.iter().fold(Q::zero(), |sum, b| sum + sx.value(*b) * &share);
+        let d = sx.new_var_at((sx.value(*v) - base - c).abs());
+        helpers += 1;
         let mut below = LinExpr::from_terms([(d, Q::one()), (*v, -Q::one())], Q::zero());
         let mut above = LinExpr::from_terms([(d, Q::one()), (*v, Q::one())], Q::zero());
-        let share = Q::one() / int(i64::try_from(bases.len().max(1)).unwrap_or(1));
         for b in bases {
             below.add_term(*b, &share);
             above.add_term(*b, &-share.clone());
@@ -529,11 +547,12 @@ fn layers(
         sx.assert(&above, Rel::Ge, c, Tag::Def).map_err(fail)?;
         objective.add_term(d, &Q::one());
     }
+    crate::profile::work_set("affine_helper_installs", helpers);
     minimise_and_keep(sx, &objective)
 }
 
 /// Holds `v` at `r` when the bounds allow it, and says whether they did.
-fn try_pin(sx: &mut Simplex<Tag>, v: Var, r: &Q) -> bool {
+fn try_pin(sx: &mut Axis<Tag>, v: Var, r: &Q) -> bool {
     let cp = sx.checkpoint();
     if sx.assert(&LinExpr::var(v), Rel::Eq, r, Tag::Def).is_ok() && sx.check().is_ok() {
         return true;
@@ -566,7 +585,7 @@ type Visit = (usize, Var, bool);
 /// can no longer be on the grid, all is as before, and the origin stays where it is, free. `kept`
 /// are the origins held on the grid already, which are left as they are. Gives the origins moved
 /// onto the grid, with where.
-fn round_to_grid(sx: &mut Simplex<Tag>, order: &[Visit], grid: &Q, kept: &BTreeSet<usize>) -> Vec<(usize, Q)> {
+fn round_to_grid(sx: &mut Axis<Tag>, order: &[Visit], grid: &Q, kept: &BTreeSet<usize>) -> Vec<(usize, Q)> {
     let start = sx.checkpoint();
     // the origins held in this call, in the order they were held, with where
     let mut held: Vec<(usize, Var, Q)> = Vec::new();
@@ -671,51 +690,66 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
                 let _ = sx.check();
             }
         }
-        let base = sx.checkpoint();
+        let source = sx;
+        if source.check().is_err() {
+            return (fallback, false, false);
+        }
         let mut moved: Vec<(usize, Q)> = Vec::new();
         // two passes at most: the layers, the grid, and once more when the grid moved something
         for _ in 0..2 {
-            // the origins the grid moved in the pass before stay where it put them; the others are
-            // free for the layers again
-            sx.backtrack(base);
-            for (k, at) in &moved {
-                let Some(&(_, v)) = own.iter().find(|(j, _)| j == k) else { continue };
-                if sx.assert(&LinExpr::var(v), Rel::Eq, at, Tag::Def).is_err() {
-                    return (fallback, false, false);
+            // Each pass starts at the original link/anchor base. In particular, an origin that
+            // was already on the grid and merely held by the last visit is NOT inherited.
+            // No old helper, objective optimum or grid trail enters this fresh compact table.
+            let mut sx = match source.compact() {
+                Ok(sx) => sx,
+                Err(_) => return (fallback, false, false),
+            };
+            let pass = (|| -> Result<Vec<(usize, Q)>, ()> {
+                let _solve = crate::profile::work_span("affine_phase", "consumer_solve");
+                for (k, at) in &moved {
+                    let Some(&(_, v)) = own.iter().find(|(j, _)| j == k) else { continue };
+                    sx.assert(&LinExpr::var(v), Rel::Eq, at, Tag::Def).map_err(|_| ())?;
                 }
-            }
-            if sx.check().is_err() {
-                return (fallback, false, false);
-            }
-            let cp = sx.checkpoint();
-            let solved = layers(sx, model, s, &ori, &own, &targets, axis).is_ok();
-            all_layers_completed &= solved;
-            sx.backtrack(cp);
-            if !solved && sx.check().is_err() {
-                return (fallback, false, false);
-            }
-            let Some(g) = &grid else { break };
-            let kept: BTreeSet<usize> = moved.iter().map(|(k, _)| *k).collect();
-            let now = round_to_grid(sx, &order, g, &kept);
+                sx.check().map_err(|_| ())?;
+                let cp = sx.checkpoint();
+                let solved = layers(&mut sx, model, s, &ori, &own, &targets, axis).is_ok();
+                all_layers_completed &= solved;
+                sx.backtrack(cp);
+                if !solved {
+                    sx.check().map_err(|_| ())?;
+                }
+                let now = match &grid {
+                    Some(g) => {
+                        let kept: BTreeSet<usize> = moved.iter().map(|(k, _)| *k).collect();
+                        round_to_grid(&mut sx, &order, g, &kept)
+                    }
+                    None => Vec::new(),
+                };
+                sx.check().map_err(|_| ())?;
+                for (k, v) in &own {
+                    out.origin[*k][axis] = sx.value(*v);
+                }
+                for (id, info) in &model.points {
+                    if let (PointId::Text(t), Some(free)) = (id, info.free) {
+                        if free == axis {
+                            out.origin[*t][axis] = sx.value(info.var);
+                        }
+                    }
+                }
+                Ok(now)
+            })();
+            // Charge even a failed layer/grid check, before following the original fallback.
+            // Prefix, take, both consumer passes and bound flips spend ONE monotonic axis cap.
+            source.carry_pivots(sx.pivots());
+            let now = match pass {
+                Ok(now) => now,
+                Err(()) => return (fallback, false, false),
+            };
             // the layers again only when the grid moved something
             if now.is_empty() {
                 break;
             }
             moved.extend(now);
-        }
-        if sx.check().is_err() {
-            return (fallback, false, false);
-        }
-        for (k, v) in &own {
-            out.origin[*k][axis] = sx.value(*v).clone();
-        }
-        // a text on the axis that the scene gives it has its own coordinate there (13.3)
-        for (id, info) in &model.points {
-            if let (PointId::Text(t), Some(free)) = (id, info.free) {
-                if free == axis {
-                    out.origin[*t][axis] = sx.value(info.var).clone();
-                }
-            }
         }
     }
     // Grid/try_pin may ignore a failed check. Any Budget there requires the monotonic axis
@@ -727,7 +761,9 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::coords::affine::compile;
     use crate::rational::{frac, int};
+    use crate::simplex::SourceBound;
 
     #[test]
     fn halves_go_up_to_the_grid() {
@@ -737,6 +773,128 @@ mod tests {
         assert_eq!(round(&frac(21, 5), &g), int(4));
         assert_eq!(round(&frac(21, 5), &None), frac(21, 5));
         assert_eq!(round(&frac(13, 10), &Some(frac(1, 2))), frac(3, 2));
+    }
+
+    #[test]
+    fn grid_pins_the_original_half_coordinate_and_can_leave_the_previous_optimum() {
+        let bounds = vec![
+            SourceBound {
+                expr: LinExpr::from_terms([(0, int(1)), (1, frac(-1, 2))], int(0)),
+                lower: Some((frac(1, 3), Tag::Def)),
+                upper: Some((frac(1, 3), Tag::Def)),
+            },
+            SourceBound { expr: LinExpr::var(1), lower: Some((int(0), Tag::Def)), upper: Some((int(4), Tag::Def)) },
+        ];
+        let c = compile(2, bounds, &[0, 1]).unwrap();
+        assert_eq!(c.map.retained, vec![1]);
+        let mut sx = Axis::from_compiled(c, &[frac(5, 6), int(1)], 0, None, []).unwrap();
+        let cp = sx.checkpoint();
+        // The earlier LP optimum would put the original origin at 1/3, off-grid.
+        sx.minimize(&LinExpr::var(0)).unwrap();
+        sx.keep_optimum(&LinExpr::var(0), Tag::Def).unwrap();
+        assert_eq!(sx.value(0), frac(1, 3));
+        sx.backtrack(cp);
+        let moved = round_to_grid(&mut sx, &[(0, 0, true)], &int(1), &BTreeSet::new());
+        assert_eq!(moved, vec![(0, int(1))]);
+        assert_eq!(sx.value(0), int(1));
+        assert_eq!(sx.value(1), frac(4, 3), "the free variable itself must NOT be rounded");
+    }
+
+    #[test]
+    fn second_grid_pass_only_inherits_moved_origins() {
+        let mut base = Axis::<Tag>::new();
+        let a = base.new_var_at(int(0));
+        let b = base.new_var_at(frac(1, 2));
+        base.assert(&LinExpr::var(a), Rel::Ge, &int(0), Tag::Def).unwrap();
+        base.assert(&LinExpr::var(a), Rel::Le, &int(2), Tag::Def).unwrap();
+        base.assert(&LinExpr::var(b), Rel::Ge, &frac(1, 2), Tag::Def).unwrap();
+        base.assert(&LinExpr::var(b), Rel::Le, &int(1), Tag::Def).unwrap();
+        let mut first = base.compact().unwrap();
+        let moved = round_to_grid(&mut first, &[(0, a, true), (1, b, false)], &int(1), &BTreeSet::new());
+        assert_eq!(moved, vec![(1, int(1))]);
+        assert_eq!(first.value(a), int(0), "first pass temporarily holds the already-on-grid origin");
+        base.carry_pivots(first.pivots());
+        let mut second = base.compact().unwrap();
+        for (k, value) in moved {
+            second.assert(&LinExpr::var(if k == 0 { a } else { b }), Rel::Eq, &value, Tag::Def).unwrap();
+        }
+        second.minimize(&LinExpr::term(a, int(-1))).unwrap();
+        assert_eq!(second.value(a), int(2), "unmoved origin must be free for the second LP");
+        assert_eq!(second.value(b), int(1));
+        assert!(second.pivots() >= first.pivots());
+    }
+
+    #[test]
+    fn actual_origin_distance_helpers_begin_feasible_without_check_pivots() {
+        use crate::profile::{self, ProfileEvent, ProfileObserver};
+        use crate::resolve::tests::{point, problem_of};
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        #[derive(Default)]
+        struct Observer(RefCell<Vec<ProfileEvent>>);
+        impl crate::Clock for Observer {
+            fn elapsed(&self) -> f64 {
+                panic!("placement helper construction must not read Clock")
+            }
+        }
+        impl ProfileObserver for Observer {
+            fn record(&self, event: ProfileEvent) {
+                self.0.borrow_mut().push(event);
+            }
+            fn work_diagnostics(&self) -> bool {
+                true
+            }
+        }
+        let p = problem_of(vec![point(), point()], Vec::new());
+        let options = SolverOptions::without_time_limit();
+        let resolved = crate::resolve(&p, &options);
+        let mut s = crate::structure::analyse(&p, &resolved, &options, crate::options::CAPS, &mut Work::default());
+        s.connections.drawn.push(Drawn {
+            net: "oracle".into(),
+            points: vec![PointId::Origin(0), PointId::Origin(1)],
+            routed: false,
+        });
+        let observer = Rc::new(Observer::default());
+        profile::with(Some(observer.clone()), || {
+            let mut sx = Axis::<Tag>::new();
+            for _ in &s.model.vars {
+                sx.new_var_at(int(2));
+            }
+            let x = s.model.var(PointId::Origin(0));
+            let y = s.model.var(PointId::Origin(1));
+            sx.assert(&LinExpr::var(x), Rel::Ge, &int(1), Tag::Def).unwrap();
+            sx.assert(&LinExpr::var(x), Rel::Le, &int(3), Tag::Def).unwrap();
+            sx.assert(&LinExpr::var(y), Rel::Ge, &int(4), Tag::Def).unwrap();
+            sx.assert(&LinExpr::var(y), Rel::Le, &int(6), Tag::Def).unwrap();
+            let mut sx = sx.compact().unwrap();
+            layers(
+                &mut sx,
+                &s.model,
+                &s,
+                &[Orient::R0; 2],
+                &[(0, x), (1, y)],
+                &[Target::At(int(0)), Target::At(int(0))],
+                0,
+            )
+            .unwrap();
+            assert_eq!(sx.value(x), int(3));
+            assert_eq!(sx.value(y), int(4));
+        });
+        let events = observer.0.borrow();
+        let count = |name: &str| -> u64 {
+            events
+                .iter()
+                .filter_map(|e| match e {
+                    ProfileEvent::Work { counters, .. } => {
+                        Some(counters.iter().filter(|(key, _)| *key == name).map(|(_, value)| *value).sum::<u64>())
+                    }
+                    _ => None,
+                })
+                .sum()
+        };
+        let checks = count("work_check_pivots");
+        assert!(count("work_primal_pivots") > 0, "the observer must capture the actual LP work");
+        assert_eq!(checks, 0, "the physical point is legal, so helper installation needs no feasibility pivot");
     }
 }
 
