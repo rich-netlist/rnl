@@ -1,4 +1,4 @@
-name: M04 work diagnostic
+name: Frozen optimized candidate
 
 on:
   workflow_call:
@@ -6,6 +6,9 @@ on:
       candidate_sha:
         type: string
         required: true
+      build_only:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -47,6 +50,7 @@ jobs:
           if (Test-Path "$env:RUNNER_TEMP/solver-work-diagnostic") { throw 'Work artifact must be new' }
           "ARTIFACT=$env:RUNNER_TEMP/solver-work-diagnostic" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Verify the single-command wrapper without native execution
+        if: ${{ !inputs.build_only }}
         shell: pwsh
         run: |
           python harness/scripts/solver-performance/test_work.py
@@ -54,6 +58,7 @@ jobs:
           python harness/scripts/solver-performance/benchmark.py --fixtures harness/tests/performance
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify owned cleanup with synthetic processes
+        if: ${{ !inputs.build_only }}
         shell: pwsh
         run: |
           python harness/scripts/solver-performance/test_benchmark.py --owned-helper-fixture "$env:ARTIFACT/helper-fixture"
@@ -75,13 +80,14 @@ jobs:
           New-Item -ItemType Directory -Path "$env:ARTIFACT/fixtures" | Out-Null
           Copy-Item harness/tests/performance/manifest.json "$env:ARTIFACT/fixtures/manifest.json"
       - name: Run only M04 work once with an external 120 second cap
+        if: ${{ !inputs.build_only }}
         shell: pwsh
         run: python harness/scripts/solver-performance/measure_work.py --fixtures harness/tests/performance --executable "$env:ARTIFACT/candidate/bin/rnl.exe" --build-info "$env:ARTIFACT/candidate/build-info.json" --source-head $env:CANDIDATE_SHA --output "$env:ARTIFACT/candidate/m04-work" --execute
       - name: Keep completed or partial evidence without retry
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: solver-m04-work-${{ github.run_id }}-${{ github.run_attempt }}
+          name: solver-${{ inputs.build_only && 'build' || 'm04-work' }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/solver-work-diagnostic/
           if-no-files-found: error
           retention-days: 14
