@@ -89,20 +89,20 @@ fn scratch(name: &str) -> PathBuf {
 }
 
 /// The text `rnl solve` wrote for a case is its snapshot, byte for byte; with `RNL_BLESS` set it
-/// becomes the snapshot.
-fn compare_or_bless(name: &str, text: &str) {
+/// becomes the snapshot. Report a mismatch without stopping the caller's case loop.
+fn compare_or_bless(name: &str, text: &str) -> bool {
     let path = solver_dir().join("solved").join(format!("{name}.sp"));
     if std::env::var("RNL_BLESS").is_ok() {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, text).unwrap();
-        return;
+        return true;
     }
     let want = std::fs::read(&path).unwrap_or_default();
-    assert!(
-        want == text.as_bytes(),
-        "{} is not what `rnl solve` writes now; run with RNL_BLESS=1 after a change that is meant:\n{text}",
-        path.display()
-    );
+    if want == text.as_bytes() {
+        return true;
+    }
+    eprintln!("SNAPSHOT_MISMATCH_BEGIN case={name} path={}\n{text}SNAPSHOT_MISMATCH_END case={name}", path.display());
+    false
 }
 
 /// Where a solution puts the points of its level: each object where the solver placed it, or
@@ -358,6 +358,7 @@ fn check_read_back(run: &SolveRun, entry: &Path, files: &dyn Provider, what: &st
 #[test]
 fn every_case_solved_and_written_back_reads_back_whole() {
     let fs = FsProvider::new(&[]);
+    let mut snapshot_mismatches = Vec::new();
     for name in CASES {
         let f = case(name);
         let run = solve(&f, &fs, &unlimited()).unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -396,8 +397,11 @@ fn every_case_solved_and_written_back_reads_back_whole() {
         let text = std::fs::read_to_string(&out).unwrap();
         assert_eq!(text, run.files[0].text);
         check_read_back(&run, &out, &fs, name);
-        compare_or_bless(name, &text);
+        if !compare_or_bless(name, &text) {
+            snapshot_mismatches.push(name);
+        }
     }
+    assert!(snapshot_mismatches.is_empty(), "solver snapshot mismatches: {snapshot_mismatches:?}");
 }
 
 #[test]
