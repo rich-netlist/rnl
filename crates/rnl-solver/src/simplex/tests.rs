@@ -44,16 +44,18 @@ fn work_accounting_clone_rollback_and_drop_match_small_oracles() {
         sx.add_row(&LinExpr::term(y, int(2)));
         let oracle_nnz = |s: &Simplex<usize>| s.rows.iter().map(|r| r.terms.len() as u64).sum::<u64>();
         assert_eq!(sx.work.nnz(), Some(oracle_nnz(&sx)));
-        expected_update_rows += sx.rows.len() as u64;
-        expected_update_hits += sx.rows.iter().filter(|r| r.terms.iter().any(|(v, _)| *v == x)).count() as u64;
+        let hits = sx.rows.iter().filter(|r| r.terms.iter().any(|(v, _)| *v == x)).count() as u64;
+        expected_update_rows += hits;
+        expected_update_hits += hits;
         sx.assert_bounds(x, Some(int(2)), None, 0).unwrap();
         // Flush the source first: its executed work must not be inherited by the clone.
         profile::work::flush();
         {
             let mut copy = sx.clone();
             assert_eq!(copy.work.nnz(), Some(oracle_nnz(&copy)));
-            expected_update_rows += copy.rows.len() as u64;
-            expected_update_hits += copy.rows.iter().filter(|r| r.terms.iter().any(|(v, _)| *v == x)).count() as u64;
+            let hits = copy.rows.iter().filter(|r| r.terms.iter().any(|(v, _)| *v == x)).count() as u64;
+            expected_update_rows += hits;
+            expected_update_hits += hits;
             copy.assert_bounds(x, Some(int(3)), None, 1).unwrap();
             let cp = copy.checkpoint();
             let r = copy.add_row(&LinExpr::from_terms([(x, int(1)), (y, int(2))], int(0)));
@@ -66,8 +68,8 @@ fn work_accounting_clone_rollback_and_drop_match_small_oracles() {
             // Drop before any coarse boundary: all this short-lived work must still be reported.
         }
         assert_eq!(sx.work.nnz(), Some(oracle_nnz(&sx)));
-        expected_pivot_rows = sx.rows.len().saturating_sub(1) as u64;
         expected_pivot_hits = sx.rows.iter().skip(1).filter(|r| r.terms.iter().any(|(v, _)| *v == x)).count() as u64;
+        expected_pivot_rows = expected_pivot_hits;
         let basic = sx.rows[0].basic;
         sx.pivot_and_update(basic, x, int(5));
         sx.assert_invariants();
@@ -107,6 +109,160 @@ fn work_accounting_clone_rollback_and_drop_match_small_oracles() {
     let (mut disabled, vars) = simplex(2);
     disabled.add_row(&LinExpr::diff(vars[0], vars[1]));
     assert_eq!(disabled.work.nnz(), None);
+}
+
+/// Compare complete semantic state and every pivot, excluding diagnostic account identity and
+/// the test-only access policy. Membership is independently rebuilt from stored row terms.
+fn same_indexed_and_linear(a: &Simplex<usize>, b: &Simplex<usize>) {
+    assert_eq!(a.vars, b.vars);
+    assert_eq!(a.rows, b.rows);
+    assert_eq!(a.forms, b.forms);
+    assert_eq!(a.trail, b.trail);
+    assert_eq!(a.occurrences, b.occurrences);
+    assert_eq!(a.pivots, b.pivots);
+    assert_eq!(a.trace, b.trace);
+    a.assert_invariants();
+    b.assert_invariants();
+}
+
+fn indexed_and_linear(n: usize) -> (Simplex<usize>, Simplex<usize>, Vec<Var>) {
+    let (mut a, v) = simplex(n);
+    a.trace = Some(Vec::new());
+    let mut b = a.clone();
+    b.linear_scans = true;
+    (a, b, v)
+}
+
+#[test]
+fn incidence_transfer_cancellation_zero_step_and_later_rows_match_linear_access() {
+    let (mut a, mut b, v) = indexed_and_linear(3);
+    let sum = LinExpr::from_terms([(v[0], int(1)), (v[1], int(1))], int(0));
+    let extended = LinExpr::from_terms([(v[0], int(1)), (v[1], int(1)), (v[2], int(1))], int(0));
+    let first = a.add_row(&sum);
+    assert_eq!(first, b.add_row(&sum));
+    let second = a.add_row(&extended);
+    assert_eq!(second, b.add_row(&extended));
+    // An unrelated row must not be visited. Extra rows also cross multiple incidence blocks.
+    for i in 2..135 {
+        let e = LinExpr::from_terms([(v[1], int(i)), (v[2], int(1))], int(0));
+        assert_eq!(a.add_row(&e), b.add_row(&e));
+    }
+    same_indexed_and_linear(&a, &b);
+    // theta = 0 still exchanges the basis. y cancels from the second row; the whole x column
+    // becomes the first slack's column, including the pivot row, without duplicate xi updates.
+    a.pivot_and_update(first, v[0], int(0));
+    b.pivot_and_update(first, v[0], int(0));
+    same_indexed_and_linear(&a, &b);
+    assert!(coefficient(&a.rows[a.vars[second].row.unwrap()].terms, v[1]).is_none());
+    assert!(a.incidence[v[0]].is_empty());
+    assert_eq!(a.incidence[first].iter().collect::<Vec<_>>(), [0, 1]);
+
+    let e = LinExpr::from_terms([(v[0], int(2)), (v[2], int(-1))], frac(1, 3));
+    assert_eq!(a.add_row(&e), b.add_row(&e));
+    let cp = a.checkpoint();
+    assert_eq!(cp, b.checkpoint());
+    assert_eq!(a.assert_bounds(v[0], Some(int(2)), None, 7), b.assert_bounds(v[0], Some(int(2)), None, 7));
+    same_indexed_and_linear(&a, &b);
+    assert_eq!(a.check(), b.check());
+    same_indexed_and_linear(&a, &b);
+    a.backtrack(cp);
+    b.backtrack(cp);
+    same_indexed_and_linear(&a, &b);
+    // Neither rows nor the basis is rolled back. A clone owns independent, matching columns.
+    let (mut ca, mut cb) = (a.clone(), b.clone());
+    assert_eq!(ca.assert_bounds(v[2], None, Some(int(-2)), 8), cb.assert_bounds(v[2], None, Some(int(-2)), 8));
+    assert_eq!(ca.check(), cb.check());
+    same_indexed_and_linear(&ca, &cb);
+    same_indexed_and_linear(&a, &b);
+}
+
+#[test]
+fn indexed_ratio_preserves_basic_id_ties_and_exact_random_trajectories() {
+    let (mut a, mut b, v) = indexed_and_linear(2);
+    for sx in [&mut a, &mut b] {
+        sx.assert_bounds(v[0], Some(int(0)), None, 0).unwrap();
+        sx.assert_bounds(v[1], Some(int(0)), Some(int(4)), 1).unwrap();
+        sx.assert(&LinExpr::from_terms([(v[0], int(1)), (v[1], int(1))], int(0)), Rel::Le, &int(4), 2).unwrap();
+        sx.assert(&LinExpr::from_terms([(v[0], int(1)), (v[1], int(2))], int(0)), Rel::Le, &int(4), 3).unwrap();
+    }
+    let objective = LinExpr::term(v[0], int(-1));
+    assert_eq!(a.minimize(&objective), Ok(int(-4)));
+    assert_eq!(b.minimize(&objective), Ok(int(-4)));
+    same_indexed_and_linear(&a, &b);
+    assert_eq!((a.trace.as_ref().unwrap()[0].leaving, a.trace.as_ref().unwrap()[0].entering), (2, v[0]));
+
+    let mut rng = Rng(0x1234_5678_9abc_def1);
+    for _ in 0..24 {
+        let (mut a, mut b, v) = indexed_and_linear(4);
+        for &x in &v {
+            assert_eq!(
+                a.assert_bounds(x, Some(int(-10)), Some(int(10)), x),
+                b.assert_bounds(x, Some(int(-10)), Some(int(10)), x)
+            );
+        }
+        for tag in 4..16 {
+            let constant = frac(rng.int(-2, 2), 3);
+            let e = LinExpr::from_terms(v.iter().map(|&x| (x, frac(rng.int(-3, 3), rng.int(1, 3)))), constant);
+            // Every constraint contains this known witness, but the starting geometry need not.
+            let c = e.eval(|x| int(x as i64 - 2));
+            let rel = match rng.below(3) {
+                0 => Rel::Le,
+                1 => Rel::Ge,
+                _ => Rel::Eq,
+            };
+            assert_eq!(a.assert(&e, rel, &c, tag), b.assert(&e, rel, &c, tag));
+            same_indexed_and_linear(&a, &b);
+            assert_eq!(a.check(), b.check());
+            same_indexed_and_linear(&a, &b);
+        }
+        let cp = a.checkpoint();
+        assert_eq!(cp, b.checkpoint());
+        assert_eq!(a.assert_bounds(v[0], Some(int(20)), None, 20), b.assert_bounds(v[0], Some(int(20)), None, 20));
+        same_indexed_and_linear(&a, &b); // immediate conflict must leave the same bounds/tags
+        a.backtrack(cp);
+        b.backtrack(cp);
+        let objective = LinExpr::from_terms([(v[0], frac(2, 3)), (v[3], frac(-1, 2))], int(1));
+        assert_eq!(a.minimize(&objective), b.minimize(&objective));
+        same_indexed_and_linear(&a, &b);
+        assert_eq!(a.keep_optimum(&objective, 21), b.keep_optimum(&objective, 21));
+        same_indexed_and_linear(&a, &b);
+        assert_eq!(a.minimize(&LinExpr::var(v[2])), b.minimize(&LinExpr::var(v[2])));
+        same_indexed_and_linear(&a, &b);
+    }
+}
+
+#[test]
+fn indexed_access_preserves_controlled_time_budget_and_resume() {
+    use std::cell::RefCell;
+    let mut a = chain_of_links();
+    a.trace = Some(Vec::new());
+    let mut b = a.clone();
+    b.linear_scans = true;
+    let (reads_a, reads_b) = (RefCell::new(Vec::new()), RefCell::new(Vec::new()));
+    let run = |sx: &mut Simplex<usize>, reads: &RefCell<Vec<bool>>| {
+        sx.check_until(&|| {
+            let mut r = reads.borrow_mut();
+            let passed = !r.is_empty();
+            r.push(passed);
+            passed
+        })
+    };
+    assert_eq!(run(&mut a, &reads_a), Err(Failure::Time));
+    assert_eq!(run(&mut b, &reads_b), Err(Failure::Time));
+    assert_eq!(*reads_a.borrow(), [false, true]);
+    assert_eq!(*reads_a.borrow(), *reads_b.borrow());
+    same_indexed_and_linear(&a, &b);
+    assert_eq!(a.pivots(), 2 * PIVOTS_PER_READ);
+    a.set_pivot_limit(Some(a.pivots()));
+    b.set_pivot_limit(Some(b.pivots()));
+    assert_eq!(a.check(), Err(Failure::Budget));
+    assert_eq!(b.check(), Err(Failure::Budget));
+    same_indexed_and_linear(&a, &b);
+    a.set_pivot_limit(None);
+    b.set_pivot_limit(None);
+    assert_eq!(a.check(), Ok(()));
+    assert_eq!(b.check(), Ok(()));
+    same_indexed_and_linear(&a, &b);
 }
 
 /// A fixed xorshift sequence, so every run tests the same systems.

@@ -341,7 +341,9 @@ impl Writer {
             });
             data["work_counter_notes"] = json!([
                 "work counts are saturated u64 execution totals, not timings; overflow is flagged",
-                "visits include coefficient misses; hit/miss counts do not imply time shares",
+                "visits count coefficient probes in the respective row loops (pivot row excluded), not all logically eligible rows; hit/miss counts do not imply time shares",
+                "ratio/update/pivot use ordered nonzero-row incidence; check still scans all rows",
+                "pivots/simplex_checks retain logical counts; physical row visits may differ from the linear-scan implementation",
                 "tableau nnz is maintained from executed row changes without a new row scan",
                 "work_live_nnz is a current live-account gauge; maxima and work totals are separate",
                 "clone starts new execution totals; rollback does not undo work; drop retains pending work",
