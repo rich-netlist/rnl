@@ -400,7 +400,8 @@ test("public packages: every picker record loads through the offline catalog", a
 test("public packages: failed catalogs preserve built-ins and altered package bytes fail", async ({ page }) => {
   test.skip(!publicPackagesAvailable(), "Run python scripts/packages.py download");
   await page.route('**/public-packages/catalog.json', route => route.fulfill({ status: 503, body: 'unavailable' }));
-  await page.goto(base);
+  await page.goto(`${base}/?url=samples/cases/01-rc-lowpass.sp`);
+  await page.locator('#tab-files').click();
   await expect(page.locator('#public-package-status')).toContainText('Built-in standard packages remain available');
   await page.locator('[data-group="builtin"] .lib-toggle').click();
   await expect(page.locator('[data-group="builtin"] .pool-row')).toHaveCount(25);
