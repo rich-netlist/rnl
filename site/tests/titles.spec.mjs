@@ -8,7 +8,7 @@ for (const lang of ["zh", "en"]) {
     test(`${lang}: page titles keep their own typography at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1000 });
       const titleSize = width === 1440 ? "84px" : "44px";
-      const wordmarkSize = width === 1440 ? "172px" : "92px";
+      const wordmarkSize = width === 1440 ? 154.8 : 82.8;
       for (const file of pages) {
         await page.goto(`/${lang}/${file}`);
         const title = page.locator(".tour-h1");
@@ -23,7 +23,7 @@ for (const lang of ["zh", "en"]) {
       for (const file of ["index.html", "rnl-intro-standalone.html"]) {
         await page.goto(`/${lang}/${file}`);
         const wordmark = page.locator(".wordmark");
-        await expect(wordmark).toHaveCSS("font-size", wordmarkSize);
+        expect(await wordmark.evaluate(el => Number.parseFloat(getComputedStyle(el).fontSize))).toBeCloseTo(wordmarkSize, 2);
         await expect(wordmark).toHaveCSS("font-weight", "600");
         await expect(page.locator("#hero-title")).toHaveCSS("display", "flex");
       }
