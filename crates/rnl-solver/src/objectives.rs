@@ -331,7 +331,7 @@ impl Active {
 }
 
 /// Why an objective is inert in a level, in one sentence; none when it is in force.
-fn inert_reason(o: Objective, inputs: &Inputs) -> Option<String> {
+pub(crate) fn inert_reason(o: Objective, inputs: &Inputs) -> Option<String> {
     let entry = o.entry();
     let name = o.name();
     if !entry.implemented {

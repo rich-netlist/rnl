@@ -56,6 +56,7 @@ solve options (the levels are read without their type=\"generated\" records; -o 
                       within it, its hint says that the list is not complete
   --profile OUT.json  checkpoint solver timings and counters (solve only; may affect a wall-clock deadline)
   --profile-work      opt-in work diagnostics with --profile; skips full tableau bit scans
+  --quality-exact OUT.json  opt-in new Exact evidence; evaluated after all levels; may affect memory
   --report            print what became of every fact, not only of the facts discarded, and the hints
                       of the facts of priority low and of the statements only they lose (8.5), whose
                       minimal conflict groups the solver then seeks all, not only the first
@@ -94,6 +95,7 @@ struct Args {
     report: bool,
     profile: Option<PathBuf>,
     profile_work: bool,
+    quality_exact: Option<PathBuf>,
     previous: bool,
     author: Option<String>,
     parts: Option<String>,
@@ -122,6 +124,7 @@ fn parse_args() -> Result<Args, String> {
     let mut solver_options = None;
     let mut profile = None;
     let mut profile_work = false;
+    let mut quality_exact = None;
     let (mut in_place, mut report) = (false, false);
     let mut author = None;
     let mut parts = None;
@@ -150,6 +153,9 @@ fn parse_args() -> Result<Args, String> {
             "--report" => report = true,
             "--profile" => profile = Some(PathBuf::from(it.next().ok_or("--profile needs a JSON path")?)),
             "--profile-work" => profile_work = true,
+            "--quality-exact" => {
+                quality_exact = Some(PathBuf::from(it.next().ok_or("--quality-exact needs a JSON path")?))
+            }
             "--author" => author = Some(it.next().ok_or("--author needs a name")?),
             "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
             "--package" => packages.push(it.next().ok_or("--package needs a name, such as rnl-std-basic")?),
@@ -163,6 +169,9 @@ fn parse_args() -> Result<Args, String> {
     }
     if profile_work && (command != "solve" || profile.is_none()) {
         return Err("--profile-work requires solve with --profile".into());
+    }
+    if quality_exact.is_some() && (command != "solve" || profile.is_some()) {
+        return Err("--quality-exact requires solve without --profile".into());
     }
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
@@ -189,6 +198,7 @@ fn parse_args() -> Result<Args, String> {
         report,
         profile,
         profile_work,
+        quality_exact,
         previous,
         author,
         parts,
@@ -414,6 +424,19 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
     // the groups of the facts of priority low are sought only for their hints (8.5, 7.6)
     let solver = SolverOptions { hints_for_low: args.report, ..solver };
     let options = SolveOptions { dialect: args.dialect.clone(), std: args.std, level: args.level.clone(), solver };
+    // Reserve a new sidecar, as for --profile: never overwrite any existing source/dependency.
+    // No quality evaluation or JSON formatting happens before all document levels are solved.
+    let mut quality_file = args
+        .quality_exact
+        .as_ref()
+        .map(|path| {
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)
+                .map_err(|e| format!("cannot create new quality sidecar {}: {e}", path.display()))
+        })
+        .transpose()?;
     let profile_clock = args
         .profile
         .as_ref()
@@ -431,6 +454,9 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
         .transpose()?;
     let result = match &profile_clock {
         Some(clock) => rnl_cli::solve::solve_with_clock(&args.file, provider, &options, clock),
+        None if args.quality_exact.is_some() => {
+            rnl_cli::solve::solve_quality_with_clock(&args.file, provider, &options, &WallClock::new())
+        }
         None => rnl_cli::solve::solve(&args.file, provider, &options),
     };
     if let Some(clock) = &profile_clock {
@@ -443,6 +469,12 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
         let profile = std::fs::canonicalize(profile).map_err(|e| format!("cannot resolve profile path: {e}"))?;
         if output_paths.iter().any(|p| std::fs::canonicalize(p).is_ok_and(|p| p == profile)) {
             return Err("--profile conflicts with a solved output path".into());
+        }
+    }
+    if let Some(path) = &args.quality_exact {
+        let sidecar = std::fs::canonicalize(path).map_err(|e| format!("cannot resolve quality sidecar: {e}"))?;
+        if output_paths.iter().any(|p| std::fs::canonicalize(p).is_ok_and(|p| p == sidecar)) {
+            return Err("--quality-exact conflicts with a solved/copied output path".into());
         }
     }
     println!("solver options: {}", options.solver.canonical());
@@ -473,6 +505,31 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
             "{} errors in {} as a solver reads it; run `rnl check --no-generated` to see them",
             run.errors, run.entry
         );
+    }
+    if writing.error.is_none() {
+        if let Some(file) = &mut quality_file {
+            // The entire document, any version-raise pass, and writeback are now complete.
+            let levels = run
+                .levels
+                .iter()
+                .map(|level| {
+                    let exact = level.quality_exact.as_ref().expect("quality was requested for every solved level");
+                    serde_json::json!({"hash": level.hash, "path": level.path, "record": level.record,
+                    "exact": exact.evaluate(&level.problem, &options.solver)})
+                })
+                .collect::<Vec<_>>();
+            let value = serde_json::json!({"schema": "rnl-new-quality-exact/1", "entry": run.entry,
+                "evidence_kind": "new_production_diagnostic_exact", "all_levels_finished_before_evaluation": true,
+                "source_identity": "bind_with_external_build_manifest", "options_canonical": options.solver.canonical(),
+                "historical_memory_exact": "not_saved_unknown", "quality_accepted": false,
+                "binding_gate": "pending_bytes_metadata_defaults_facts_comparison_to_six_saved_artifacts",
+                "levels": levels, "not_solved_count": run.not_solved.len(), "netlist_errors": run.errors,
+                "serialized_files": run.files.iter().map(|f| serde_json::json!({"path": f.path, "text": f.text})).collect::<Vec<_>>()});
+            use std::io::Write;
+            let text =
+                serde_json::to_string_pretty(&value).map_err(|e| format!("cannot format quality sidecar: {e}"))?;
+            file.write_all(text.as_bytes()).map_err(|e| format!("cannot write quality sidecar: {e}"))?;
+        }
     }
     // an error of the netlist, or a fact that contradicts itself (8.5, 7.6): the levels are written
     // all the same
