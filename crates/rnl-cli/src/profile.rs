@@ -346,7 +346,10 @@ impl Writer {
                 "work_live_nnz is a current live-account gauge; maxima and work totals are separate",
                 "clone starts new execution totals; rollback does not undo work; drop retains pending work",
                 "reserve requests and capacity changes are not exact allocator-call counts",
-                "work is batched at coarse boundaries; partial data is a lower-bound prefix, not all work at exit",
+                "work_axpy_* covers nonzero, nonempty tableau add_row/pivot merges, not LinExpr merges",
+                "work_rewrite_*_terms covers nonpivot elimination rows, not total index maintenance",
+                "partial cumulative counts are lower bounds through the last coarse boundary, not all work at exit",
+                "partial live gauges are last-boundary states, not lower bounds or measurements at exit",
                 "nested work spans include axis/lex children; never add parent and child seconds",
                 "work diagnostics have overhead and are not profile-off performance measurements"
             ]);
