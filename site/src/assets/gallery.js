@@ -192,7 +192,8 @@
     var sum = hasSummary ? '<zh>' + esc(pkg.summary.zh) + '</zh><en>' + esc(pkg.summary.en) + '</en>' : SUMMARY[pkg.name + ' ' + pkg.version] || SUMMARY[pkg.name];
     h += '<p class="gl-sum">' + (sum || esc(pkg.description.split('\n\n')[0])) + '</p>';
     h += '<dl class="gl-meta">';
-    h += '<div><dt><zh>文件</zh><en>File</en></dt><dd><a href="' + esc(pkg.source || REPO + pkg.path) + '">' + esc(pkg.path) + '</a></dd></div>';
+    var sourcePath = pkg.source ? new URL(pkg.source).pathname.replace(/^\/[^/]+\/[^/]+\/blob\/[^/]+\//, '') : pkg.path;
+    h += '<div><dt><zh>文件</zh><en>File</en></dt><dd><a href="' + esc(pkg.source || REPO + pkg.path) + '">' + esc(sourcePath) + '</a></dd></div>';
     if (pkg.references.length) {
       h += '<div><dt><zh>引用</zh><en>References</en></dt><dd>' + pkg.references.map(function (r) {
         return '<a class="gl-ref" href="#' + esc(r.name) + '" data-goto="' + esc(r.name) + '">' + esc(r.name) + '</a>';

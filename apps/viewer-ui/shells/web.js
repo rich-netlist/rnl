@@ -169,11 +169,18 @@ function serverPath(url) {
  * @returns {Promise<{ bytes: Uint8Array, url: string } | { bytes?: undefined, why: string }>}
  */
 async function fetchBytes(href, again) {
-  const legacy = /\/libraries\/(?!standard\/)(.+\.rnl)$/.exec(new URL(href).pathname);
-  if (legacy) {
-    const pkg = (await publicPackages()).find(p => p.path === decodeURIComponent(legacy[1]));
-    if (!pkg) throw new Error(`No public package matches the old address: ${href}`);
-    return { bytes: new Uint8Array(await readPublicPackage(pkg)), url: href };
+  const url = new URL(href);
+  const library = new URL("libraries/", location.href);
+  const legacy = url.origin === library.origin && url.pathname.startsWith(library.pathname)
+    ? decode(url.pathname.slice(library.pathname.length)) : null;
+  if (legacy && !legacy.startsWith("standard/") && legacy.endsWith(".rnl")) {
+    try {
+      const pkg = (await publicPackages()).find(p => p.path === legacy);
+      if (!pkg) return { why: `No public package matches the old address: ${href}` };
+      return { bytes: new Uint8Array(await readPublicPackage(pkg)), url: href };
+    } catch (error) {
+      return { why: error.message || String(error) };
+    }
   }
   const stop = new AbortController();
   let timer = 0;
@@ -350,9 +357,9 @@ async function includePackage(selected) {
   const pkg = packages.find(p => p.name === selected.name && p.version === selected.version);
   if (!pkg) throw new Error(`Public package ${selected.name} ${selected.version} is unavailable.`);
   const text = decodeText(await readPublicPackage(pkg));
-  const path = `/library/${selected.path}`;
-  const read = () => new File([text], selected.name + ".rnl");
-  return [{ path, name: `${selected.name} ${selected.version}`, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];
+  const path = `/library/${pkg.path}`;
+  const read = () => new File([text], pkg.name + ".rnl");
+  return [{ path, name: `${pkg.name} ${pkg.version}`, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];
 }
 
 /** Ask for a URL, resolved against the page. */

@@ -2,8 +2,9 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { publicPackagesAvailable } from "../../../scripts/packages.mjs";
+import { publicPackagesAvailable, publicPackageText } from "../../../scripts/packages.mjs";
 
 test.skip(!process.env.RNL_WEB_URL, "the site is not built: RNL_WEB=0");
 const base = process.env.RNL_WEB_URL;
@@ -429,4 +430,90 @@ test("public packages: legacy URLs and embedded USE-PACKAGE resolve through the 
   const loaded = await waitMessage(page, 'loaded');
   expect(loaded.errors).toBe(0);
   await expect(frame.locator('#canvas > svg')).toBeVisible();
+});
+
+test("public packages: foreign library URLs and includes bypass the catalog", async ({ page }) => {
+  let catalogs = 0;
+  await page.route('**/public-packages/catalog.json', route => {
+    catalogs++;
+    return route.fulfill({ json: { schemaVersion: 1, packages: [] } });
+  });
+  const include = 'Rexternal a 0 2k\n';
+  const requests = [];
+  const server = http.createServer((request, response) => {
+    requests.push(request.url);
+    response.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+    response.end(request.url === '/libraries/x.rnl' ? include : '* external includes\n.include "../libraries/x.rnl"\nR1 a 0 1k\n.end\n');
+  });
+  servers.push(server);
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const foreign = `http://127.0.0.1:${server.address().port}`;
+  const frame = await start(page);
+  const result = await frame.evaluate(async foreign => {
+    const { default: shell, sourceFromUrl } = await import('./shells/web.js');
+    const opened = await sourceFromUrl(`${foreign}/libraries/x.rnl`).open(false);
+    const doc = await shell.build(sourceFromUrl(`${foreign}/proj/top.sp`));
+    return { opened, files: doc.files, errors: doc.diagnostics.filter(d => d.severity === 'error') };
+  }, foreign);
+  expect(result.opened.text).toBe(include);
+  expect(result.errors).toEqual([]);
+  expect(result.files).toEqual(expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining('Rexternal') })]));
+  expect(requests.filter(url => url === '/libraries/x.rnl')).toHaveLength(2);
+  expect(catalogs).toBe(0);
+});
+
+test("public packages: only the local library root maps, and missing includes return null", async ({ page }) => {
+  let catalogs = 0;
+  await page.route('**/public-packages/catalog.json', route => {
+    catalogs++;
+    return route.fulfill({ json: { schemaVersion: 1, packages: [] } });
+  });
+  await page.route('**/other/libraries/x.rnl', route => route.fulfill({ body: 'Rother a 0 3k\n' }));
+  const frame = await start(page);
+  const ordinary = await frame.evaluate(async () => {
+    const { sourceFromUrl } = await import('./shells/web.js');
+    return (await sourceFromUrl('other/libraries/x.rnl').open(false)).text;
+  });
+  expect(ordinary).toBe('Rother a 0 3k\n');
+  expect(catalogs).toBe(0);
+  const missing = await frame.evaluate(async () => {
+    const { sourceFromUrl } = await import('./shells/web.js');
+    const source = sourceFromUrl('samples/cases/01-rc-lowpass.sp');
+    await source.open(false);
+    const included = await source.read('/libraries/not-published.rnl', false);
+    let error;
+    try { await sourceFromUrl('libraries/not-published.rnl').open(false); }
+    catch (failure) { error = failure.message; }
+    return { included, error };
+  });
+  expect(missing.included).toBeNull();
+  expect(missing.error).toContain('could not be fetched: No public package matches the old address:');
+  expect(catalogs).toBe(1);
+});
+
+test("public packages: versions coexist at their canonical catalog paths", async ({ page }) => {
+  test.skip(!publicPackagesAvailable(), "Run python scripts/packages.py download");
+  const catalog = JSON.parse(fs.readFileSync(path.join(process.env.RNL_PACKAGE_FIXTURE, 'catalog.json'), 'utf8'));
+  const previous = catalog.packages.find(pkg => pkg.name === 'eda-symbol');
+  const bytes = publicPackageText('eda-symbol').replace('@PACKAGE(name="eda-symbol", version="0.1")', '@PACKAGE(name="eda-symbol", version="0.2")');
+  const next = { ...previous, version: '0.2', path: 'eda-symbol/0.2/eda-symbol.rnl',
+    url: 'packages/eda-symbol/0.2/eda-symbol.rnl', sha256: createHash('sha256').update(bytes).digest('hex') };
+  catalog.packages.push(next);
+  await page.route('**/public-packages/catalog.json', route => route.fulfill({ json: catalog }));
+  await page.route('**/public-packages/packages/eda-symbol/0.2/eda-symbol.rnl', route => route.fulfill({ body: bytes }));
+  const frame = await start(page);
+  const result = await frame.evaluate(async () => {
+    const { default: shell } = await import('./shells/web.js');
+    const packages = (await shell.publicPackages()).filter(pkg => pkg.name === 'eda-symbol');
+    const items = [];
+    for (const pkg of packages) {
+      // A restored descriptor must not override the canonical path from the catalog.
+      items.push(...await shell.includePackage({ ...pkg, path: 'eda-symbol/eda-symbol.rnl' }));
+    }
+    shell.setPool(items);
+    const doc = await shell.build({ name: 'versions.sp', text: '* versions\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="eda-symbol", version="0.1"); @USE-PACKAGE(name="eda-symbol", version="0.2") }\nR1 a 0 1k\n.end\n' });
+    return { paths: items.map(item => item.path), errors: doc.diagnostics.filter(d => d.severity === 'error') };
+  });
+  expect(result.paths).toEqual(['/library/eda-symbol/eda-symbol.rnl', '/library/eda-symbol/0.2/eda-symbol.rnl']);
+  expect(result.errors).toEqual([]);
 });
