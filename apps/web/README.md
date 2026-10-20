@@ -120,7 +120,7 @@ Send object messages to the iframe's `contentWindow`, each with `rnl: 1`:
 | `open` | `text` and `name` (e.g. `amp.sp`), or `url`; optional `requestId`, `packages` | Replace the netlist without reloading. The filename determines its dialect. |
 | `level` | `name` | Display that level. |
 | `fit` | None | Fit the drawing to the iframe. |
-| `background` | `value`: `light` or `dark` | Change the drawing and floating controls' background. |
+| `background` | `value`: `light` or `dark` | Change this page's drawing and floating controls' background without saving a user preference. |
 
 The iframe sends these messages to `window.parent`, also with `rnl: 1`:
 

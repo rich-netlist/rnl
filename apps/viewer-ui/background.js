@@ -40,10 +40,10 @@ export function colourDrawing(svg) {
   }
 }
 
-export function setBackground(mode) {
+export function setBackground(mode, { persist = true } = {}) {
   dark = mode === "dark";
   document.body.dataset.background = dark ? "dark" : "light";
-  save("background", dark ? "dark" : "light");
+  if (persist) save("background", dark ? "dark" : "light");
   setCheck("background-light", !dark);
   setCheck("background-dark", dark);
   // Keep the normal highlight styles. Their colours obey the same rule as drawing colours.

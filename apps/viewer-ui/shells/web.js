@@ -30,8 +30,21 @@ if (embed) {
   document.head.append(style);
 }
 
-let core = startCore();
+const WARMUP = { entry: "/ready.sp", files: { "/ready.sp": "* Ready\n.end\n" }, svg: false };
+function warmCore() {
+  const worker = startCore();
+  const ready = worker.build(WARMUP);
+  ready.catch(() => {}); // prepareViewer or the next build reports initialization failures.
+  return { worker, ready };
+}
+
+let core = null; // only the displayed document's lazy drawing provider
+let spare = warmCore();
+const pendingCores = new Set(); // candidates building or waiting to be accepted
 const candidates = new WeakMap();
+function replenishCore() {
+  if (!spare && pendingCores.size === 0) spare = warmCore();
+}
 const built = new WeakSet(); // the sources built before: building one again reads it again
 let opened = null; // the page's handler for sources opened without asking, such as dropped files
 let included = null;
@@ -260,9 +273,10 @@ export function sourceFromUrl(text) {
 
 /** Warm the actual Worker/core before announcing that messages can be handled. */
 export async function prepareViewer() {
+  const prepared = spare ??= warmCore();
   const [response] = await Promise.all([
     fetch("about.json"),
-    core.build({ entry: "/ready.sp", files: { "/ready.sp": "* Ready\n.end\n" }, svg: false }),
+    prepared.ready,
     embedStyle,
   ]);
   if (!response.ok) throw new Error(`The viewer version could not be read (${response.status}).`);
@@ -653,8 +667,12 @@ export default {
       // An incoming candidate may be declined or superseded after building. Its lazy
       // drawings must not replace those of the retained document until display commits it.
       if (signal?.aborted) throw new Error("superseded");
-      buildingCore = startCore();
+      const prepared = spare ?? warmCore();
+      spare = null;
+      buildingCore = prepared.worker;
+      pendingCores.add(buildingCore);
       signal?.addEventListener("abort", abort, { once: true });
+      await prepared.ready;
       const builder = { build: (request) => {
         if (signal?.aborted) throw new Error("superseded");
         progress?.("parsing"); return buildingCore.build(request);
@@ -689,19 +707,27 @@ export default {
       return doc;
     } catch (e) {
       buildingCore?.terminate();
+      pendingCores.delete(buildingCore);
+      replenishCore();
       throw e instanceof Error ? e.message : String(e);
     } finally { signal?.removeEventListener("abort", abort); }
   },
   commitBuild(doc) {
     const candidate = candidates.get(doc);
     if (!candidate) return;
-    core.terminate();
+    core?.terminate();
     core = candidate;
     candidates.delete(doc);
+    pendingCores.delete(candidate);
+    replenishCore();
   },
   discardBuild(doc) {
-    candidates.get(doc)?.terminate();
+    const candidate = candidates.get(doc);
+    if (!candidate) return;
+    candidate.terminate();
     candidates.delete(doc);
+    pendingCores.delete(candidate);
+    replenishCore();
   },
   /** The drawings of the objects the last Document lists without a position, which the core keeps. */
   unplacedDrawings: (level, items, names) => core.drawings({ drawings: { level, items, names } }),

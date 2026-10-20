@@ -55,7 +55,7 @@ export async function startFullViewerApi() {
     return operation.signal;
   }, command(message) {
     if (message.type === "fit") fit();
-    else if (message.type === "background" && ["light", "dark"].includes(message.value)) setBackground(message.value);
+    else if (message.type === "background" && ["light", "dark"].includes(message.value)) setBackground(message.value, { persist: false });
     else if (message.type === "level" && typeof message.name === "string") {
       const level = doc?.levels.findIndex(l => l.title === message.name) ?? -1;
       if (level < 0) throw new Error(`Unknown level: ${message.name}`);

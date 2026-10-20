@@ -89,6 +89,16 @@ test("the shared API advertises optional fields and correlates explicit package 
   expect(await waitMessage(page, "loaded")).toMatchObject({ requestId: "canvas", errors: 0 });
 });
 
+test("the first open uses the core warmed before ready and keeps only one standby", async ({ page }) => {
+  await start(page);
+  const warmed = page.workers().find(worker => worker.url().endsWith("/core/worker.js"));
+  expect(warmed).toBeTruthy();
+  await page.evaluate(text => document.querySelector('iframe').contentWindow.postMessage({ rnl: 1, type: "open", name: "warm.sp", text }, location.origin), text("warm"));
+  await waitMessage(page, "loaded");
+  expect(await warmed.evaluate(() => location.pathname)).toContain("/core/worker.js");
+  await expect.poll(() => page.workers().length).toBe(2);
+});
+
 test("initialization failures still notify an embedded caller before ready", async ({ page }) => {
   const frame = await start(page);
   await page.route("**/about.json", route => route.fulfill({ status: 503, body: "unavailable" }));

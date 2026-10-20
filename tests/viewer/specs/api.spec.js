@@ -42,6 +42,18 @@ async function result(page, requestId, type) {
   return page.evaluate(({ requestId, type }) => messages.find(m => m.requestId === requestId && m.type === type), { requestId, type });
 }
 
+test("API backgrounds affect only this page while menu choices keep saving the preference", async ({ page }) => {
+  const viewer = await launch(page);
+  await viewer.evaluate(() => window.viewer.command("background-dark"));
+  await send(page, { type: "background", value: "light" });
+  await expect(viewer.locator("body")).toHaveAttribute("data-background", "light");
+  expect(await viewer.evaluate(() => JSON.parse(localStorage.getItem("background")))).toBe("dark");
+  await viewer.reload();
+  await expect(viewer.locator("body")).toHaveAttribute("data-background", "dark");
+  await viewer.evaluate(() => window.viewer.command("background-light"));
+  expect(await viewer.evaluate(() => JSON.parse(localStorage.getItem("background")))).toBe("light");
+});
+
 test("a complete Viewer imports exact packages and asks before replacing unsaved text", async ({ page, browserName }) => {
   const viewer = await launch(page);
   const text = fs.readFileSync(new URL("../inputs/missing-canvas-package.sp", import.meta.url), "utf8");
