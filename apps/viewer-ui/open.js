@@ -51,7 +51,7 @@ export async function openSource(source, keep, edited) {
     if (edited) adoptBuffers(d);
     else resetBuffers(d);
     showBuilt(d, keep);
-    sourceOpened(source, d, !keep, !!edited);
+    await sourceOpened(source, d, !keep, !!edited);
     await nextPaint();
     return true;
   } catch (e) {
@@ -68,7 +68,7 @@ export async function openSource(source, keep, edited) {
     renderHierarchy();
     renderDiagnostics([{ severity: "error", message: String(e), file: "", line: 0, col: 0, origin: "" }]);
     setProblems(true);
-    sourceOpened(source, null, false);
+    await sourceOpened(source, null, false);
   } finally {
     progress.finish();
     loading = false;
@@ -104,7 +104,7 @@ export async function applyEdits() {
     await progress.stage("displaying");
     adoptBuffers(d);
     showBuilt(d, true);
-    sourceOpened(lastSource, d, false, true);
+    await sourceOpened(lastSource, d, false, true);
     await nextPaint();
   } catch (e) {
     failed = e instanceof Error ? e.message : String(e);

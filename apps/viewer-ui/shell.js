@@ -12,9 +12,9 @@
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
  * @property {(pkg: {name: string, version: string, path: string}) => Promise<object[]>} [includePackage] Include an exact published package.
  * @property {(kind: string) => Promise<object[]>} [include] Include files, a folder or a library package.
- * @property {(items: object[]) => void} [setPool] Replace the session's search pool.
+ * @property {(items: object[], reload?: boolean, refresh?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
- * @property {(dir: string) => Promise<string[]>} [pathPackages] Package paths in a desktop PATH directory.
+ * @property {(dir: string) => Promise<string[]>} [pathPackages] Package and netlist paths in a desktop PATH directory.
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
  * @property {(legacy: object) => Promise<{ path: string, values: object }>} [loadSettings] Native settings and migration.
  * @property {(key: string, value: unknown) => Promise<void>} [saveSetting] Persist a native setting.

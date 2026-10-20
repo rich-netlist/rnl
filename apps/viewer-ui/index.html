@@ -58,6 +58,7 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
       <p class="pool-note">Files here are searched for packages and includes, in this order.</p>
       <div id="library-groups" class="library-groups"></div>
       <p id="path-note" class="pool-note"></p>
+      <p id="library-status" class="pool-note lib-warning" role="status"></p>
     </div>
     <div id="pane-netlist" class="pane netlist-pane" role="tabpanel">
       <div class="netlist-head">
@@ -65,6 +66,9 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
         <nav id="file-tabs" class="tabs file-tabs" aria-label="Files"></nav>
         <span id="edit-state" class="edit-state" role="status" hidden></span>
         <button id="apply-edits" class="apply-edits" type="button" hidden title="Apply the text and exit editing (Ctrl+Enter)">Apply and Exit Editing</button>
+        <label class="auto-include-toggle" title="Automatically include uniquely defined missing subcircuits from the Library; report each automatic include in Problems">
+          <input id="auto-include" type="checkbox">Auto Include
+        </label>
         <input id="show-failed" class="failed-check" type="checkbox" checked title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
         <label for="show-failed" class="failed-toggle" title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
           <span class="caption">Failed statements</span>

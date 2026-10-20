@@ -792,6 +792,7 @@ async function filePoolSmoke(page) {
     const util = await import('./util.js'); await util.flushSettings(); return util.settingsPath;
   })()`);
   same(JSON.parse(fs.readFileSync(settings, "utf8"))["search-paths"], [slashed(parts)], "native settings file PATH");
+  await autoIncludeSmoke(page, work, parts, pkg);
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-row')).every(r => !r.textContent.includes('Exclude'))`), "a built-in can be excluded");
   await page.evaluate(`document.querySelector('[data-group="builtin"] .lib-toggle').click()`);
   await page.evaluate(`document.querySelector('[aria-label="Open 0.3/rnl-std.rnl"]').click()`);
@@ -821,6 +822,46 @@ async function filePoolSmoke(page) {
     fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR, "desktop-native-missing-canvas-hint.png"), Buffer.from(image.data, "base64"));
   }
   console.log("The native core bundles only standard packages and offers the public-package website on missing USE-PACKAGE");
+}
+
+async function autoIncludeSmoke(page, work, parts, pkg) {
+  const top = path.join(work, "auto-top.sp");
+  const cell = path.join(parts, "cell.NETLIST");
+  const duplicate = path.join(parts, "duplicate.inc");
+  const body = '* auto top\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="acme", version="1.0") }\nX1 a 0 cell\n.end\n';
+  fs.writeFileSync(top, body);
+  fs.writeFileSync(cell, ".subckt cell p n\nR1 p n 1k\n.ends\n");
+  await page.evaluate(`(async () => {
+    await (await import('./open.js')).openSource({ path: ${JSON.stringify(top)}, name: 'auto-top.sp' }, false);
+    await window.viewer.command('reload-library');
+  })()`);
+  check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group^="path:"] .pool-row')).some(r => r.dataset.path.endsWith('cell.NETLIST'))`), "PATH did not list netlists alongside packages");
+  same(await page.evaluate("window.viewer.doc.files.length"), 1, "Auto Include defaults off");
+  await page.evaluate("window.viewer.command('toggle-auto-include')");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('cell.NETLIST') && d.message.includes('added by Auto Include'))`), "the automatic include warning is missing");
+  same(await page.evaluate("window.viewer.doc.files[0].text"), body, "Auto Include altered the source");
+  check(await page.evaluate("document.getElementById('auto-include').checked && window.viewer.checked('toggle-auto-include')"), "Auto Include controls disagree");
+  const solved = await page.evaluate(`(async () => {
+    const shell = (await import('./shells/desktop.js')).default;
+    const result = await shell.solve({ path: ${JSON.stringify(top)}, name: 'auto-top.sp' }, {});
+    return { files: result.document.files.map(f => f.name), levels: result.report.levels.map(l => l.title) };
+  })()`);
+  check(solved.levels.some(name => name === 'cell'), "Solve did not inherit Auto Include");
+  fs.writeFileSync(duplicate, ".subckt cell p n\n.ends\n");
+  await page.evaluate("window.viewer.command('reload-library')");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('conflicting definitions'))`), "the reloaded collision was ignored");
+  same(await page.evaluate("window.viewer.doc.files.length"), 1, "an ambiguous definition was imported");
+  fs.unlinkSync(duplicate);
+  fs.writeFileSync(cell, ".subckt replacement p n\nR2 p n 2k\n.ends\n");
+  fs.writeFileSync(top, body.replace("X1 a 0 cell", "X1 a 0 replacement"));
+  await page.evaluate("window.viewer.command('reload-library')");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('replacement') && d.message.includes('added by Auto Include'))`), "Reload Library retained stale definitions");
+  fs.writeFileSync(pkg, fs.readFileSync(pkg, "utf8").replace('version="1.0"', 'version="2.0"'));
+  await page.evaluate("window.viewer.command('reload-library')");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('acme 1.0 cannot be found'))`), "Reload Library did not reread packages");
+  await page.evaluate("window.viewer.command('toggle-auto-include')");
+  same(await page.evaluate("window.viewer.doc.files.length"), 1, "disabling Auto Include kept the library file");
+  console.log("PATH lists netlists; Auto Include imports unique definitions without changing text, reports collisions, and Reload Library refreshes netlists/packages and rebuilds the index");
 }
 
 /**

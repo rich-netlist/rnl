@@ -83,7 +83,28 @@ pub fn path_packages(dir: String) -> Result<Vec<String>, String> {
             e.to_string()
         }
     })?;
-    Ok(rnl_cli::provider::directory_packages(path))
+    let mut files = rnl_cli::provider::directory_packages(path);
+    // Netlists follow the same direct/numeric-version layout as packages. Arbitrary child
+    // directories remain opt-in through Include Folder, rather than recursively searching PATH.
+    for entry in std::fs::read_dir(path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let p = entry.path();
+        if p.is_file() && p.extension().is_some_and(|e| super::NETLISTS.iter().any(|x| e.eq_ignore_ascii_case(x))) {
+            files.push(rnl_cli::path_str(&p));
+        } else if p.is_dir() && rnl_runtime::source::version_directory(&entry.file_name().to_string_lossy()) {
+            for file in std::fs::read_dir(&p).map_err(|e| e.to_string())? {
+                let file = file.map_err(|e| e.to_string())?.path();
+                if file.is_file()
+                    && file.extension().is_some_and(|e| super::NETLISTS.iter().any(|x| e.eq_ignore_ascii_case(x)))
+                {
+                    files.push(rnl_cli::path_str(&file));
+                }
+            }
+        }
+    }
+    files.sort();
+    files.dedup();
+    Ok(files)
 }
 
 #[cfg(test)]
@@ -112,12 +133,34 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("rnl-path-packages-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("0.3")).unwrap();
         std::fs::create_dir_all(dir.join("other")).unwrap();
-        for name in ["direct.rnl", "0.3/versioned.RNL", "other/ignored.rnl", "notes.txt"] {
+        for name in [
+            "direct.rnl",
+            "0.3/versioned.RNL",
+            "other/ignored.rnl",
+            "notes.txt",
+            "cell.NETLIST",
+            "0.3/cell.spi",
+            "cell.sp",
+            "cell.scs",
+            "cell.inc",
+            "cell.lib",
+            "other/ignored.sp",
+        ] {
             std::fs::write(dir.join(name), "text").unwrap();
         }
         assert_eq!(
             path_packages(rnl_cli::path_str(&dir)).unwrap(),
-            ["0.3/versioned.RNL", "direct.rnl"].map(|name| rnl_cli::path_str(&dir.join(name)))
+            [
+                "0.3/cell.spi",
+                "0.3/versioned.RNL",
+                "cell.NETLIST",
+                "cell.inc",
+                "cell.lib",
+                "cell.scs",
+                "cell.sp",
+                "direct.rnl"
+            ]
+            .map(|name| rnl_cli::path_str(&dir.join(name)))
         );
         assert_eq!(path_packages(rnl_cli::path_str(&dir.join("missing"))).unwrap_err(), "Directory not found.");
         std::fs::remove_dir_all(dir).unwrap();

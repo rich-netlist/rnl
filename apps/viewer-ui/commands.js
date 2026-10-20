@@ -3,7 +3,7 @@
 // item its id, its label, its keys and the platforms that offer it. A command runs by its id,
 // whether it comes from the platform's menu, the HTML menu bar or a key.
 
-import { includeFiles } from "./pool.js";
+import { includeFiles, reloadLibrary, toggleAutoInclude } from "./pool.js";
 import { setBackground } from "./background.js";
 import { inform } from "./dialog.js";
 import { cancelGesture, fit, pan, zoomCenter } from "./drawing.js";
@@ -54,6 +54,8 @@ export function command(id, options = {}) {
     case "open-url": pickAndOpen("url"); break;
     case "load-clipboard": loadClipboard(); break;
     case "reload": reload(); break;
+    case "reload-library": return reloadLibrary();
+    case "toggle-auto-include": return toggleAutoInclude();
     case "save": save(); break;
     case "save-as": saveAs(); break;
     case "file-associations": return fileAssociations();

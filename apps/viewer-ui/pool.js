@@ -1,5 +1,6 @@
 // The Library: session files, one temporary source, ordered desktop PATH groups and built-ins.
 import { inform } from "./dialog.js";
+import { setCheck } from "./commands.js";
 import { changes } from "./edits.js";
 import { currentSource, isLoading, openSource } from "./open.js";
 import { setPane, setSidebar } from "./panels.js";
@@ -14,6 +15,33 @@ let changing = false;
 let scanVersion = 0;
 const expanded = new Map([["files", true]]); // session only; never written to settings
 let scanned = new Map();
+let libraryErrors = [];
+const refreshPaths = new Set();
+
+async function syncPool(reload = false) {
+  const all = [...items];
+  const seen = new Set(all.map((i) => i.path));
+  for (const { files } of scanned.values()) for (const path of files) {
+    if (!seen.has(path)) { all.push({ path, searchPath: true, source: { path, name: path } }); seen.add(path); }
+  }
+  const refresh = [...refreshPaths];
+  refreshPaths.clear();
+  try { libraryErrors = await shell.setPool?.(all, reload, refresh) || []; }
+  catch (e) { for (const path of refresh) refreshPaths.add(path); throw e; }
+}
+
+function showAutoInclude() {
+  const enabled = load("auto-include", false) === true;
+  $("auto-include").checked = enabled;
+  setCheck("toggle-auto-include", enabled);
+}
+
+export async function toggleAutoInclude(value = !load("auto-include", false)) {
+  if (changing || isLoading()) { showAutoInclude(); return; }
+  await update(async () => { await save("auto-include", value); showAutoInclude(); });
+}
+
+export const reloadLibrary = () => update(async () => {}, true, true);
 
 // Native choosers/CLI arguments use Windows separators; the lookup provider lists forward slashes.
 const filePath = (path) => shell.platform === "desktop" ? path.replace(/\\/g, "/") : path;
@@ -32,15 +60,15 @@ function addItems(added) {
   for (const item of added) {
     item.path = filePath(item.path);
     item.source.path = filePath(item.source.path || item.path);
+    refreshPaths.add(item.path);
     const at = items.findIndex((old) => old.path === item.path && !old.builtin);
     if (at < 0) { items.push(item); expanded.set("files", true); }
     else items[at] = item;
   }
-  shell.setPool?.(items);
 }
 
 /** Called only when a root is opened/applied, never when a Netlist include tab is selected. */
-export function sourceOpened(source, doc, add, applied = false) {
+export async function sourceOpened(source, doc, add, applied = false) {
   const held = source.temporary || (source.text !== undefined && !source.path && !source.readonly);
   if (held) {
     if (add) temporary = { source, name: source.name || "Pasted text" };
@@ -54,20 +82,24 @@ export function sourceOpened(source, doc, add, applied = false) {
       source.path = path;
       const item = shell.poolItem?.(source) || { path, name: source.name, source };
       // Keep Include's display name/read handle when opening its own source again.
-      if (!items.some((i) => i.path === item.path && i.source === source)) addItems([item]);
+      if (!items.some((i) => i.path === item.path && i.source === source)) {
+        addItems([item]);
+        await syncPool();
+      }
     }
   }
   render();
 }
 
-async function update(action, rescan = false) {
+async function update(action, rescan = false, reload = false) {
   if (changing || isLoading()) return;
   changing = true;
+  if (reload) $("library-status").textContent = "Reloading library…";
+  $("library-groups").setAttribute("aria-busy", "true");
   try {
     if (await action() === false) return false;
-    shell.setPool?.(items);
-    if (rescan) await scanPaths();
-    else render();
+    if (rescan) await scanPaths(reload);
+    else { await syncPool(reload); render(); }
     // Rebuild applied text without re-adding an excluded root or dropping pending edits.
     if (currentSource()) await openSource(currentSource(), true, changes(true));
     return true;
@@ -76,6 +108,7 @@ async function update(action, rescan = false) {
     await inform({ title: "Library", paragraphs: [String(e)] });
   } finally {
     changing = false;
+    $("library-groups").setAttribute("aria-busy", "false");
   }
 }
 
@@ -104,8 +137,8 @@ function paths() {
   return Array.isArray(value) ? value.filter((p) => typeof p === "string") : [];
 }
 
-async function scanPaths() {
-  if (!shell.pathPackages) return;
+async function scanPaths(reload = false) {
+  if (!shell.pathPackages) { await syncPool(reload); render(); return; }
   const version = ++scanVersion;
   const results = await Promise.all(paths().map(async (dir) => {
     try { return [dir, { files: await shell.pathPackages(dir) }]; }
@@ -113,6 +146,7 @@ async function scanPaths() {
   }));
   if (version !== scanVersion) return;
   scanned = new Map(results);
+  await syncPool(reload);
   render();
 }
 
@@ -190,7 +224,7 @@ function group(key, title, files, kind, pathInfo) {
     const empty = document.createElement("li");
     const error = pathInfo && scanned.get(title)?.error;
     empty.className = error ? "lib-warning" : "lib-empty";
-    empty.textContent = error || (kind === "path" ? "No .rnl packages found." : "No files.");
+    empty.textContent = error || (kind === "path" ? "No packages or netlists found." : "No files.");
     list.append(empty);
   }
   el.append(head, list);
@@ -211,9 +245,12 @@ function render() {
     groups.append(group(`path:${dir}`, dir, files, "path", { index, all }));
   });
   groups.append(group("builtin", "Built-in", items.filter((i) => i.builtin), "builtin"));
+  $("library-status").textContent = libraryErrors.join("\n");
 }
 
 export async function startPool() {
+  showAutoInclude();
+  $("auto-include").addEventListener("change", (e) => toggleAutoInclude(e.target.checked));
   if (shell.bundledFiles) {
     const bundled = await shell.bundledFiles();
     items = Object.entries(bundled).map(([path, text]) => ({ path, name: path.replace("<bundled>/", ""), builtin: true,
@@ -237,7 +274,7 @@ export async function startPool() {
     setSidebar(true);
     setPane("files");
   }));
-  window.addEventListener("library-shown", scanPaths);
+  window.addEventListener("library-shown", () => { if (!changing && !isLoading()) scanPaths().catch(console.error); });
   window.addEventListener("settings-error", (event) => {
     $("path-note").textContent = `Settings could not be saved: ${event.detail}`;
   });
@@ -248,5 +285,6 @@ export async function startPool() {
 export const poolSnapshot = () => items.filter((i) => !i.builtin).slice();
 export async function restorePool(pool) {
   addItems(pool);
+  await syncPool();
   render();
 }

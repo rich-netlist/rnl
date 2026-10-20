@@ -64,6 +64,7 @@ test.describe("on the web", () => {
         letter: "F",
         items: [
           "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
+          "Reload Library", "Auto Include",
           "", "SaveCtrl+S",
         ],
       },
@@ -431,6 +432,7 @@ test.describe("with a native menu", () => {
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
       ["toggle-hover-names", true],
+      ["toggle-auto-include", false],
     ];
     expect(await viewer.calls("setCheck")).toEqual(marks);
     await page.keyboard.press("Control+B");

@@ -1,10 +1,11 @@
 // The desktop shell: the page inside the RNL Viewer app (apps/desktop), which reads files and builds
 // documents natively and shows the menu bar itself. The only module that uses window.__TAURI__.
 
-import { flushSettings } from "../util.js";
+import { flushSettings, load } from "../util.js";
 import { choose, inform, modal } from "../dialog.js";
 
 let pool = [];
+let poolReady = Promise.resolve();
 const tauri = window.__TAURI__;
 const invoke = (cmd, args) => tauri.core.invoke(cmd, args);
 
@@ -21,7 +22,14 @@ export default {
   include: async (kind) => (await invoke("pick_pool", { kind })).map((path) => ({ path, name: path, source: file(path) })),
   pickPath: () => invoke("pick_pool", { kind: "path" }).then((paths) => paths[0] || null),
   pathPackages: (dir) => invoke("path_packages", { dir }),
-  setPool: (items) => { pool = items.filter((item) => !item.builtin).map((item) => item.path); },
+  setPool: (items, reload = false, refresh = []) => {
+    const paths = items.filter((item) => !item.builtin).map((item) => item.path);
+    // PATH packages retain the provider's per-directory precedence. Netlists may also resolve
+    // bare includes; both kinds enter the subcircuit index, independently of package lookup.
+    pool = items.filter((item) => !item.builtin && (!item.searchPath || !/\.rnl$/i.test(item.path))).map((item) => item.path);
+    poolReady = poolReady.catch(() => {}).then(() => invoke("update_library", { pool: paths, reload, refresh }));
+    return poolReady;
+  },
   nativeMenu: true,
   initialSession: () => invoke("initial_session"),
   newWindow: async (session) => {
@@ -64,6 +72,8 @@ export default {
   // a file by its path, or text held by the source, with edits to it and its includes
   build: async (source, edits, progress) => {
     await flushSettings();
+    await poolReady;
+    const autoInclude = load("auto-include", false) === true;
     const requestId = progress ? crypto.randomUUID() : null;
     const unlisten = progress ? await tauri.event.listen("load-stage", ({ payload }) => {
       if (payload.id === requestId) progress(payload.stage);
@@ -71,8 +81,8 @@ export default {
     try {
       progress?.("reading");
       return await (source.text === undefined
-        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId })
-        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId }));
+        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId, autoInclude })
+        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId, autoInclude }));
     } finally { unlisten?.(); }
   },
   // the drawings of the objects listed without a position, which the app keeps from the last build
@@ -90,11 +100,13 @@ export default {
   // the Solve menu (decision 0010): solved natively on a thread of the app's, nothing written
   solve: async (source, settings, edits) => {
     await flushSettings();
+    await poolReady;
+    const autoInclude = load("auto-include", false) === true;
     return invoke(
       "solve_preview",
       source.text === undefined
-        ? { path: source.path, settings, edits: edits || null, pool }
-        : { name: source.name, text: source.text, settings, edits: edits || null, pool },
+        ? { path: source.path, settings, edits: edits || null, pool, autoInclude }
+        : { name: source.name, text: source.text, settings, edits: edits || null, pool, autoInclude },
     );
   },
   // the solver's own defaults and options, which Solve > Settings shows and checks

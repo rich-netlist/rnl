@@ -6,9 +6,10 @@
 import { collect, decodeText, startCore } from "../core/client.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
+import { load } from "../util.js";
 
 /** The extensions of netlists that are opened on their own, listed first as the file to open. */
-const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "scs"];
+const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "scs"];
 /** The extensions of files mostly included or used by a netlist, listed after the netlists. */
 const PARTS = ["inc", "lib", "rnl"];
 /** How long a server may send nothing, before or during its answer, until a fetch is given up (ms). */
@@ -34,6 +35,8 @@ const built = new WeakSet(); // the sources built before: building one again rea
 let opened = null; // the page's handler for sources opened without asking, such as dropped files
 let included = null;
 let poolFiles = new Map();
+let poolTexts = new Map();
+let poolReady = Promise.resolve();
 let lastUrl = ""; // the URL opened last, which Open URL offers again
 
 /**
@@ -335,9 +338,16 @@ async function includePackage(selected) {
   if (url.origin !== base.origin || !url.pathname.startsWith(base.pathname)) throw new Error("Invalid package library path.");
   const got = await fetchBytes(url.href, false);
   if (!got.bytes) throw new Error(`The package could not be fetched: ${got.why}`);
-  const text = decodeText(got.bytes);
+  let cached = new File([got.bytes], selected.name + ".rnl");
   const path = `/library/${selected.path}`;
-  const read = () => new File([text], selected.name + ".rnl");
+  const read = async (again = false) => {
+    if (again) {
+      const fresh = await fetchBytes(url.href, true);
+      if (!fresh.bytes) throw new Error(`The package could not be fetched: ${fresh.why}`);
+      cached = new File([fresh.bytes], selected.name + ".rnl");
+    }
+    return cached;
+  };
   return [{ path, name: `${selected.name} ${selected.version}`, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];
 }
 
@@ -573,7 +583,25 @@ export default {
     if (kind === "library") return includeLibrary();
     return chooseFiles(kind === "folder" ? folderInput : includeInput).then((files) => poolItems(files, kind === "folder"));
   },
-  setPool(items) { poolFiles = new Map(items.filter((item) => !item.builtin).map((item) => [item.path, item.read])); },
+  setPool(items, reload = false, refresh = []) {
+    const next = new Map(items.filter((item) => !item.builtin).map((item) => [item.path, item.read]));
+    poolReady = poolReady.catch(() => {}).then(async () => {
+      const texts = new Map();
+      const errors = [];
+      for (const [path, read] of next) {
+        try {
+          const text = !reload && !refresh.includes(path) && poolFiles.get(path) === read && poolTexts.has(path) ? poolTexts.get(path)
+            : decodeText(await (await read(reload)).arrayBuffer());
+          texts.set(path, text);
+        } catch (e) { errors.push(`Cannot read library file ${path}: ${e.message || e}`); }
+      }
+      poolFiles = next;
+      poolTexts = texts;
+      const indexed = await core.library({ library: { reload, refresh }, pool: [...texts.keys()], files: Object.fromEntries(texts) });
+      return [...errors, ...indexed];
+    });
+    return poolReady;
+  },
   onInclude(handler) { included = handler; },
   nativeMenu: false,
   /** The URL that `?url=` names in the page's address, resolved against the page. */
@@ -598,6 +626,7 @@ export default {
    * is read.
    */
   async build(source, edits, progress) {
+    await poolReady;
     const again = built.has(source);
     built.add(source);
     try {
@@ -609,13 +638,18 @@ export default {
       // An independently opened source owns its relative paths. Put the pool in a separate
       // namespace so preloaded pool text cannot hide a source-relative file collect has yet to read.
       const poolPath = (path) => source.fromPool ? path : `/<pool>${path}`;
-      for (const [path, read] of poolFiles) {
-        files[poolPath(path)] = path === entry.path ? entry.text : decodeText(await (await read()).arrayBuffer());
+      for (const [path, text] of poolTexts) {
+        files[poolPath(path)] = path === entry.path ? entry.text : text;
       }
       files[entry.path] = entry.text;
       Object.assign(files, source.snapshot || {});
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
-      const request = { entry: entry.path, files, pool: [...poolFiles.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true };
+      const request = { entry: entry.path, files, pool: [...poolTexts.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true,
+        auto_include: load("auto-include", false) === true, library_prefix: source.fromPool ? "" : "/<pool>",
+        library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {
+          const full = joined(dir, path);
+          return [full.replace(/^\/<pool>(?=\/)/, ""), text];
+        })) };
       const read = held ? async () => null : (path) => {
         progress?.("reading");
         return path.startsWith("/<pool>/") ? Promise.resolve(null) : source.read(path, again);

@@ -6,6 +6,7 @@
 
 mod catalog;
 mod document;
+mod library;
 mod primitive;
 mod snapshot;
 #[cfg(test)]
@@ -30,6 +31,7 @@ pub use catalog::{
 pub use document::{
     Child, Diagnostic, Document, Drawings, Hit, Level, Object, SourceFile, Span, Unplaced, UnplacedDrawing,
 };
+pub use library::{LibraryIndex, LibraryProvider};
 pub use primitive::{
     Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
 };
@@ -218,11 +220,13 @@ pub fn read_host(
 fn read_host_in(entry: &str, dialect: Option<&str>, ws: &Workspace, sink: &mut Sink) -> Result<HostDocument, String> {
     let path = slashed(entry);
     let text = ws.read(&path).ok_or_else(|| format!("cannot read {entry}"))?;
-    let doc = if is_spectre(&path, &text, dialect) {
-        rnl_host_spectre::read(&path, ws, sink)
-    } else {
-        rnl_host_spice::read(&path, ws, sink)
-    };
+    let doc = library::resolve(&path, ws, sink, |extra, sink| {
+        if is_spectre(&path, &text, dialect) {
+            rnl_host_spectre::read_with_includes(&path, ws, sink, extra)
+        } else {
+            rnl_host_spice::read_with_includes(&path, ws, sink, extra)
+        }
+    });
     doc.ok_or_else(|| format!("cannot read {entry}"))
 }
 
@@ -330,6 +334,9 @@ impl Workspace<'_> {
 }
 
 impl Provider for Workspace<'_> {
+    fn auto_include(&self) -> Option<&dyn rnl_runtime::source::LibraryLookup> {
+        self.files.auto_include()
+    }
     fn read(&self, path: &str) -> Option<String> {
         if path.starts_with(BUNDLED_DIR) {
             return self.bundled.read(path);

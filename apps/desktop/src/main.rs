@@ -9,6 +9,7 @@
 
 mod core_thread;
 mod files;
+mod library;
 mod load_progress;
 mod menu;
 mod pool;
@@ -102,6 +103,8 @@ async fn open_document(
     unsaved: State<'_, Unsaved>,
     core: State<'_, Core>,
     settings: State<'_, settings::Settings>,
+    library: State<'_, library::Library>,
+    auto_include: Option<bool>,
     pool: Option<Vec<String>>,
     path: String,
     edits: Option<Edits>,
@@ -109,6 +112,7 @@ async fn open_document(
 ) -> Result<Document, String> {
     let core = core.inner().clone();
     let paths = settings.paths()?;
+    let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let progress_window = window.clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
@@ -123,6 +127,9 @@ async fn open_document(
             let disk = FsProvider::new(&paths).with_search_paths(&paths);
             let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
             let layered = files::layered(&held, &disk);
+            let index = library.with_edits(&held, &layered);
+            let layered =
+                rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&layered, &progress_window, request_id.as_deref());
             let (doc, kept) = rnl_view::build_drawn(&entry, &provider, &BuildOptions::default())?;
             *drawn = Some(kept);
@@ -145,6 +152,8 @@ async fn open_text(
     unsaved: State<'_, Unsaved>,
     core: State<'_, Core>,
     settings: State<'_, settings::Settings>,
+    library: State<'_, library::Library>,
+    auto_include: Option<bool>,
     pool: Option<Vec<String>>,
     name: String,
     text: String,
@@ -153,6 +162,7 @@ async fn open_text(
 ) -> Result<Document, String> {
     let core = core.inner().clone();
     let paths = settings.paths()?;
+    let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let progress_window = window.clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
@@ -162,6 +172,9 @@ async fn open_text(
             let disk = FsProvider::new(&paths).with_search_paths(&paths);
             let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
             let files = files::layered(&held, &disk);
+            let index = library.with_edits(&held, &files);
+            let files =
+                rnl_view::LibraryProvider { files: &files, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&files, &progress_window, request_id.as_deref());
             let (doc, kept) = rnl_view::build_drawn(&entry, &provider, &BuildOptions::default())?;
             *drawn = Some(kept);
@@ -319,6 +332,7 @@ fn main() {
         .manage(settings::Settings::default())
         .manage(session::Initial(Mutex::new(session)))
         .manage(Core::new())
+        .manage(library::Library::default())
         .manage(startup)
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -356,6 +370,7 @@ fn main() {
             pool::dropped_files,
             pool::bundled_files,
             pool::path_packages,
+            library::update_library,
             menu::set_view_check,
             menu::set_command_enabled,
             solve::solve_preview,

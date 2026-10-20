@@ -18,6 +18,9 @@ impl<'a> LoadingProvider<'a> {
 }
 
 impl Provider for LoadingProvider<'_> {
+    fn auto_include(&self) -> Option<&dyn rnl_runtime::source::LibraryLookup> {
+        self.inner.auto_include()
+    }
     fn read(&self, path: &str) -> Option<String> {
         let text = self.inner.read(path);
         if text.is_none() || self.parsing.replace(true) {

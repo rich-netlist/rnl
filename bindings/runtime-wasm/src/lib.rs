@@ -28,7 +28,7 @@ use std::fmt::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, Once, PoisonError};
 
-use rnl_runtime::source::{normalize, MemoryProvider};
+use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, MemoryProvider, Provider};
 use rnl_runtime::Options;
 use rnl_view::{BuildOptions, Catalog, CatalogOptions, Document, Drawings, Parts, Snapshot, UnplacedDrawing};
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,13 @@ pub struct Request {
     /// Explicit temporary files, searched before package directories.
     #[serde(default)]
     pub pool: Vec<String>,
+    #[serde(default)]
+    pub auto_include: bool,
+    /// Namespace used by the browser to keep independently opened files ahead of pool files.
+    #[serde(default)]
+    pub library_prefix: String,
+    #[serde(default)]
+    pub library_edits: BTreeMap<String, String>,
     /// The texts of the workspace by path, the entry's among them.
     #[serde(default)]
     pub files: BTreeMap<String, String>,
@@ -182,6 +189,7 @@ pub struct DrawingsQuery {
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Response {
+    Library(Vec<String>),
     /// The Document of the entry.
     Document(Box<Document>),
     /// The snapshot of the entry, when the request asks for `parts`.
@@ -199,6 +207,7 @@ pub enum Response {
 }
 
 thread_local! {
+    static LIBRARY: RefCell<rnl_view::LibraryIndex> = RefCell::new(rnl_view::LibraryIndex::default());
     /// The drawings of the last build with `lazy_unplaced`. They hold what the model does, which is
     /// not `Send`, so they stay in the thread that built them; a module is one thread.
     static DRAWN: RefCell<Option<Drawings>> = const { RefCell::new(None) };
@@ -212,6 +221,39 @@ pub fn respond(request: &[u8]) -> Response {
         Ok(v) => v,
         Err(e) => return invalid(e),
     };
+    if value.get("library").is_some() {
+        #[derive(Deserialize)]
+        struct Update {
+            library: Query,
+            #[serde(default)]
+            pool: Vec<String>,
+            #[serde(default)]
+            files: BTreeMap<String, String>,
+        }
+        #[derive(Deserialize)]
+        struct Query {
+            #[serde(default)]
+            reload: bool,
+            #[serde(default)]
+            refresh: Vec<String>,
+        }
+        return match serde_json::from_value::<Update>(value) {
+            Ok(update) => {
+                let files = MemoryProvider {
+                    files: update.files.into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
+                    package_dirs: Vec::new(),
+                };
+                let pool: Vec<_> = update.pool.iter().map(|p| normalize(p)).collect();
+                let files = rnl_runtime::source::FilePool { files: &files, paths: &pool };
+                Response::Library(LIBRARY.with(|index| {
+                    let mut index = index.borrow_mut();
+                    index.invalidate(&update.library.refresh);
+                    index.update(&pool, &files, update.library.reload)
+                }))
+            }
+            Err(e) => invalid(e),
+        };
+    }
     if value.get("write").is_some() {
         return match serde_json::from_value(value) {
             Ok(w) => write(w),
@@ -250,6 +292,21 @@ pub fn respond(request: &[u8]) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let paths: Vec<String> = request.pool.iter().map(|p| normalize(p)).collect();
     let files = rnl_runtime::source::FilePool { files: &files, paths: &paths };
+    let canonical: Vec<_> =
+        paths.iter().map(|p| p.strip_prefix(&request.library_prefix).unwrap_or(p).to_string()).collect();
+    let namespace = PoolNamespace { files: &files, prefix: &request.library_prefix };
+    let pool = rnl_runtime::source::FilePool { files: &namespace, paths: &canonical };
+    let edits = MemoryProvider {
+        files: request.library_edits.into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
+        package_dirs: Vec::new(),
+    };
+    let index = LIBRARY.with(|index| {
+        let mut index = index.borrow_mut();
+        index.update(&canonical, &pool, false);
+        index.with_edits(&edits, &pool)
+    });
+    let lookup = NamespacedIndex { index: &index, prefix: &request.library_prefix };
+    let files = AutoLibrary { files: &files, index: &lookup, enabled: request.auto_include };
     let options = BuildOptions {
         dialect: request.dialect,
         runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
@@ -276,6 +333,62 @@ pub fn respond(request: &[u8]) -> Response {
     match rnl_view::build(&request.entry, &files, &options) {
         Ok(d) => Response::Document(Box::new(d)),
         Err(e) => Response::Error(e),
+    }
+}
+
+/// Index in canonical pool paths; resolve the same entries in the browser's source namespace.
+struct PoolNamespace<'a> {
+    files: &'a dyn Provider,
+    prefix: &'a str,
+}
+impl Provider for PoolNamespace<'_> {
+    fn read(&self, path: &str) -> Option<String> {
+        self.files.read(&format!("{}{path}", self.prefix))
+    }
+}
+struct NamespacedIndex<'a> {
+    index: &'a rnl_view::LibraryIndex,
+    prefix: &'a str,
+}
+impl NamespacedIndex<'_> {
+    fn map(&self, mut d: LibraryDefinition) -> LibraryDefinition {
+        d.path = format!("{}{}", self.prefix, d.path);
+        d.file = format!("{}{}", self.prefix, d.file);
+        d
+    }
+}
+impl LibraryLookup for NamespacedIndex<'_> {
+    fn candidates(&self, name: &str, sensitive: bool) -> Vec<LibraryDefinition> {
+        self.index.candidates(name, sensitive).into_iter().map(|d| self.map(d)).collect()
+    }
+    fn definitions(&self, path: &str) -> Vec<LibraryDefinition> {
+        self.index
+            .definitions(path.strip_prefix(self.prefix).unwrap_or(path))
+            .into_iter()
+            .map(|d| self.map(d))
+            .collect()
+    }
+}
+struct AutoLibrary<'a> {
+    files: &'a dyn Provider,
+    index: &'a dyn LibraryLookup,
+    enabled: bool,
+}
+impl Provider for AutoLibrary<'_> {
+    fn read(&self, path: &str) -> Option<String> {
+        self.files.read(path)
+    }
+    fn package_files(&self) -> Vec<String> {
+        self.files.package_files()
+    }
+    fn package_candidates(&self, name: &str) -> Vec<String> {
+        self.files.package_candidates(name)
+    }
+    fn include_candidates(&self, name: &str) -> Vec<String> {
+        self.files.include_candidates(name)
+    }
+    fn auto_include(&self) -> Option<&dyn LibraryLookup> {
+        self.enabled.then_some(self.index)
     }
 }
 
@@ -544,6 +657,35 @@ C1 a 0 1p
         let v = answer(json!({ "entry": "/w/top.sp", "files": files }));
         assert_eq!(v["document"]["missing"], json!([]));
         assert_eq!(v["document"]["files"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn library_updates_auto_include_namespaces_and_reload_replaces_definitions() {
+        let cell = ".subckt cell p n\nR1 p n 1k\n.ends\n";
+        let updated =
+            answer(json!({ "library": {"reload": true}, "pool": ["/cell.inc"], "files": {"/cell.inc": cell} }));
+        assert_eq!(updated["library"], json!([]));
+        let build = |name: &str, text: &str, enabled: bool| {
+            answer(json!({
+                "entry": "/top.sp", "pool": ["/<pool>/cell.inc"], "library_prefix": "/<pool>", "auto_include": enabled,
+                "files": {"/top.sp": format!("* top\nX1 a 0 {name}\n.end\n"), "/<pool>/cell.inc": text}
+            }))
+        };
+        let off = build("cell", cell, false);
+        assert_eq!(off["document"]["files"].as_array().unwrap().len(), 1);
+        let on = build("cell", cell, true);
+        assert_eq!(on["document"]["files"].as_array().unwrap().len(), 2);
+        assert!(on["document"]["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["severity"] == "warning" && d["message"].as_str().unwrap().contains("added by Auto Include")));
+        let replacement = cell.replace("cell", "replacement");
+        answer(json!({ "library": {"reload": true}, "pool": ["/cell.inc"], "files": {"/cell.inc": replacement} }));
+        let reloaded = build("replacement", &replacement, true);
+        assert_eq!(reloaded["document"]["files"].as_array().unwrap().len(), 2);
+        let removed = build("cell", &replacement, true);
+        assert_eq!(removed["document"]["files"].as_array().unwrap().len(), 1);
     }
 
     #[test]

@@ -196,7 +196,11 @@ export default {
   ...(params.has("pool") ? {
     bundledFiles: async () => ({ "<bundled>/0.3/rnl-std.rnl": "@RNL(type=\"header\") { @PACKAGE(name=\"rnl-std\", version=\"0.3\") }" }),
     include: async (kind) => { fake.calls.push(["include", kind]); return fake.includes || []; },
-    setPool: (items) => { fake.pool = items.filter((item) => !item.builtin).map((item) => item.path); },
+    setPool: (items, reload = false) => {
+      fake.pool = items.filter((item) => !item.builtin).map((item) => item.path);
+      fake.calls.push(["setPool", [...fake.pool], reload]);
+      return fake.libraryErrors || [];
+    },
     ...(platform === "desktop" ? {
       pickPath: async () => fake.path || null,
       pathPackages: async (dir) => {

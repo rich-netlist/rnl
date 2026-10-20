@@ -881,6 +881,31 @@ impl Continued {
 
 /// Read a SPICE document whose main file is `path`.
 pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<HostDocument> {
+    read_with_includes(path, provider, sink, &[])
+}
+
+/// Read additional files as root includes, without altering source text or line numbers.
+pub fn read_with_includes(
+    path: &str,
+    provider: &dyn Provider,
+    sink: &mut Sink,
+    includes: &[String],
+) -> Option<HostDocument> {
+    read_as(path, provider, sink, includes, true)
+}
+
+/// Index a library file as an include: its first line is a statement, not a SPICE title.
+pub fn read_library(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<HostDocument> {
+    read_as(path, provider, sink, &[], false)
+}
+
+fn read_as(
+    path: &str,
+    provider: &dyn Provider,
+    sink: &mut Sink,
+    includes: &[String],
+    main_file: bool,
+) -> Option<HostDocument> {
     let path = normalize(path);
     provider.read(&path)?;
     let main_dir = dirname(&path);
@@ -890,7 +915,11 @@ pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<Host
     let doc = HostDocument::new(main, dialect());
     let mut r =
         Reader { provider, sink, doc, models: HashMap::new(), names: HashMap::new(), unresolved: Vec::new(), main_dir };
-    r.read_file(&path, 0, 0, true, &[format!("{path}#")], None);
+    r.read_file(&path, 0, 0, main_file, &[format!("{path}#")], None);
+    let fname = file_name(&path);
+    for extra in includes {
+        r.include(extra, None, 1, fname, &path, 0, 0, &[format!("{path}#")]);
+    }
     finish(&mut r.doc, &r.models, std::mem::take(&mut r.unresolved));
     Some(r.doc)
 }

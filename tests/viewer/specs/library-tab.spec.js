@@ -155,7 +155,7 @@ test("desktop: PATH groups scan on entry and changes, preserve collapse and high
   await expect(page.locator(".lib-path")).toHaveText(["/empty", "/pdk", "/missing", "/denied"]);
   await expect(pdk.locator(".lib-toggle")).toHaveAttribute("aria-expanded", "true");
   for (const dir of ["/empty", "/missing", "/denied"]) await group(page, `path:${dir}`).locator(".lib-toggle").click();
-  await expect(group(page, "path:/empty").locator(".lib-empty")).toHaveText("No .rnl packages found.");
+  await expect(group(page, "path:/empty").locator(".lib-empty")).toHaveText("No packages or netlists found.");
   await expect(group(page, "path:/missing").locator(".lib-warning")).toHaveText("Directory not found.");
   await expect(group(page, "path:/denied").locator(".lib-warning")).toHaveText("Permission denied (os error 13)");
   const warning = await group(page, "path:/missing").locator(".lib-warning").evaluate((el) => {

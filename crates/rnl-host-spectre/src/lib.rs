@@ -1057,6 +1057,31 @@ fn spice_mode(spice: &mut Option<u32>, mode: Mode, after: u32, file: &str, regio
 
 /// Read a Spectre document whose main file is `path`.
 pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<HostDocument> {
+    read_with_includes(path, provider, sink, &[])
+}
+
+/// Read additional files before resolving models, just like explicit root includes.
+pub fn read_with_includes(
+    path: &str,
+    provider: &dyn Provider,
+    sink: &mut Sink,
+    includes: &[String],
+) -> Option<HostDocument> {
+    read_as(path, provider, sink, includes, true)
+}
+
+/// Index a library file without treating its first SPICE statement as a title.
+pub fn read_library(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<HostDocument> {
+    read_as(path, provider, sink, &[], false)
+}
+
+fn read_as(
+    path: &str,
+    provider: &dyn Provider,
+    sink: &mut Sink,
+    includes: &[String],
+    main_file: bool,
+) -> Option<HostDocument> {
     let path = normalize(path);
     provider.read(&path)?;
     let main_dir = dirname(&path);
@@ -1076,7 +1101,11 @@ pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<Host
         pending_spice: Vec::new(),
         main_dir,
     };
-    r.read_file(&path, 0, 0, true, mode, &[format!("{path}#")], None);
+    r.read_file(&path, 0, 0, main_file, mode, &[format!("{path}#")], None);
+    let st = State { mode, cur: 0, circ: 0, stack: Vec::new() };
+    for extra in includes {
+        r.include(extra, None, 1, file_name(&path), &path, &st, &[format!("{path}#")], mode);
+    }
     r.finish();
     Some(r.doc)
 }

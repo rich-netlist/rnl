@@ -11,6 +11,35 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { PICK, root, UNCALLED } from "../fixtures.js";
 
+test("Auto Include resolves indexed library subcircuits, warns on conflicts and reloads the library", async ({ page }) => {
+  await start(page);
+  const cell = ".subckt cell p n\nR1 p n 1k\n.ends\n";
+  await page.locator("#include-input").setInputFiles({ name: "cell.inc", mimeType: "text/plain", buffer: Buffer.from(cell) });
+  await expect(page.getByRole("button", { name: "Exclude cell.inc", exact: true })).toBeVisible();
+  await page.locator("#file-input").setInputFiles({ name: "top.netlist", mimeType: "text/plain", buffer: Buffer.from("* top\nX1 a 0 cell\n.end\n") });
+  await shown(page);
+  expect(await page.evaluate(() => window.viewer.doc.files.length)).toBe(1);
+  await page.locator("#tab-netlist").click();
+  const imported = await opened(page, () => page.locator("#auto-include").check());
+  expect(imported.files).toHaveLength(2);
+  expect(imported.files[0].text).toBe("* top\nX1 a 0 cell\n.end\n");
+  expect(imported.diagnostics.some((d) => d.severity === "warning" && d.message.includes("cell") && d.message.includes("added by Auto Include"))).toBe(true);
+  const conflict = await opened(page, () => page.locator("#include-input").setInputFiles({ name: "duplicate.inc", mimeType: "text/plain", buffer: Buffer.from(cell) }));
+  expect(conflict.files).toHaveLength(1);
+  expect(conflict.diagnostics.some((d) => d.message.includes("conflicting definitions"))).toBe(true);
+  await opened(page, () => page.getByRole("button", { name: "Exclude duplicate.inc", exact: true }).click());
+  const reloaded = await opened(page, () => page.evaluate(() => window.viewer.command("reload-library")));
+  expect(reloaded.files).toHaveLength(2);
+  const replacement = cell.replace("cell", "replacement");
+  const replaced = await opened(page, () => page.locator("#include-input").setInputFiles({ name: "cell.inc", mimeType: "text/plain", buffer: Buffer.from(replacement) }));
+  expect(replaced.files).toHaveLength(1);
+  const refreshed = await opened(page, () => page.locator("#file-input").setInputFiles({ name: "fresh.sp", mimeType: "text/plain", buffer: Buffer.from("* fresh\nX2 a 0 replacement\n.end\n") }));
+  expect(refreshed.files).toHaveLength(2);
+  await page.locator("#tab-netlist").click();
+  const disabled = await opened(page, () => page.locator("#auto-include").uncheck());
+  expect(disabled.files).toHaveLength(1);
+});
+
 test("New Window hands local files, applied include text, hierarchy and Library to a new tab", async ({ page }, info) => {
   await start(page);
   const top = '* local top\n.include "part.inc"\nX1 a 0 part\n* @RNL { #X1 @PLACE(0, 0) }\n.end\n';

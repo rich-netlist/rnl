@@ -32,7 +32,7 @@ export async function startSettings(shell) {
   if (!shell.loadSettings) return;
   const keys = ["sidebar-width", "sidebar-shown", "side-pane", "problems-height", "problems-shown",
     "index-height", "show-failed", "hover-names", "grid-shown", "grid-style", "grid-spacing",
-    "grid-major", "grid-axes", "solve-options", "solve-time-limit", "search-paths", "background"];
+    "grid-major", "grid-axes", "solve-options", "solve-time-limit", "search-paths", "background", "auto-include"];
   const legacy = {};
   for (const key of keys) {
     const value = load(key, undefined);
