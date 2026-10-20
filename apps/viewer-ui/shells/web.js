@@ -6,6 +6,7 @@
 import { collect, decodeText, startCore } from "../core/client.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
+import { DEFAULT_CATALOG, readCatalog, readPublicPackage, latestPackages } from "../public-packages.js";
 
 /** The extensions of netlists that are opened on their own, listed first as the file to open. */
 const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "scs"];
@@ -168,6 +169,19 @@ function serverPath(url) {
  * @returns {Promise<{ bytes: Uint8Array, url: string } | { bytes?: undefined, why: string }>}
  */
 async function fetchBytes(href, again) {
+  const url = new URL(href);
+  const library = new URL("libraries/", location.href);
+  const legacy = url.origin === library.origin && url.pathname.startsWith(library.pathname)
+    ? decode(url.pathname.slice(library.pathname.length)) : null;
+  if (legacy && !legacy.startsWith("standard/") && legacy.endsWith(".rnl")) {
+    try {
+      const pkg = (await publicPackages()).find(p => p.path === legacy);
+      if (!pkg) return { why: `No public package matches the old address: ${href}` };
+      return { bytes: new Uint8Array(await readPublicPackage(pkg)), url: href };
+    } catch (error) {
+      return { why: error.message || String(error) };
+    }
+  }
   const stop = new AbortController();
   let timer = 0;
   const wait = () => {
@@ -313,16 +327,24 @@ function poolItems(files, folder = false) {
 
 let libraryIndex = null;
 function publicPackages() {
-  if (!libraryIndex) libraryIndex = fetch("libraries/index.json").then(async (response) => {
-    if (!response.ok) throw new Error(`The package library could not be read (${response.status}).`);
-    return response.json();
-  }).catch((error) => { libraryIndex = null; throw error; });
+  if (!libraryIndex) libraryIndex = (async () => {
+    const config = await fetch("public-packages.json");
+    const url = new URL(config.ok ? (await config.json()).url : DEFAULT_CATALOG, location.href).href;
+    return (await readCatalog(url)).packages;
+  })().then(packages => {
+    window.dispatchEvent(new CustomEvent("public-package-status", { detail: "" }));
+    return packages;
+  }).catch((error) => {
+    libraryIndex = null;
+    window.dispatchEvent(new CustomEvent("public-package-status", { detail: `Public packages unavailable: ${error.message} Built-in standard packages remain available.` }));
+    throw error;
+  });
   return libraryIndex;
 }
 
 async function includeLibrary() {
   const catalog = await publicPackages();
-  const packages = catalog.filter((p) => !p.builtin);
+  const packages = latestPackages(catalog);
   const selected = await choose({ title: "Include Public Package", text: "Choose a package to add to the file pool.",
     items: packages.map((p) => ({ label: `${p.name} ${p.version} — ${p.description}`, value: p })), filter: true });
   if (!selected) return [];
@@ -330,15 +352,14 @@ async function includeLibrary() {
 }
 
 async function includePackage(selected) {
-  const url = new URL(selected.path, new URL("libraries/", location.href));
-  const base = new URL("libraries/", location.href);
-  if (url.origin !== base.origin || !url.pathname.startsWith(base.pathname)) throw new Error("Invalid package library path.");
-  const got = await fetchBytes(url.href, false);
-  if (!got.bytes) throw new Error(`The package could not be fetched: ${got.why}`);
-  const text = decodeText(got.bytes);
-  const path = `/library/${selected.path}`;
-  const read = () => new File([text], selected.name + ".rnl");
-  return [{ path, name: `${selected.name} ${selected.version}`, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];
+  // Re-resolve against the validated catalog rather than trusting an old session descriptor.
+  const packages = await publicPackages();
+  const pkg = packages.find(p => p.name === selected.name && p.version === selected.version);
+  if (!pkg) throw new Error(`Public package ${selected.name} ${selected.version} is unavailable.`);
+  const text = decodeText(await readPublicPackage(pkg));
+  const path = `/library/${pkg.path}`;
+  const read = () => new File([text], pkg.name + ".rnl");
+  return [{ path, name: `${pkg.name} ${pkg.version}`, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];
 }
 
 /** Ask for a URL, resolved against the page. */
@@ -621,7 +642,32 @@ export default {
         return path.startsWith("/<pool>/") ? Promise.resolve(null) : source.read(path, again);
       };
       const builder = { build: (request) => { progress?.("parsing"); return core.build(request); } };
-      const { document: doc } = await collect(builder, request, read);
+      let { document: doc } = await collect(builder, request, read);
+      if (embed) {
+        // Embeds have no Library controls. Resolve named public dependencies with the same
+        // catalog and verification as Include Public Package; keep downloads request-local.
+        const added = new Set();
+        while (true) {
+          const missing = doc.diagnostics.filter(d => d.severity === "error")
+            .map(d => /^package (\S+) (\S+) cannot be found:/.exec(d.message)).filter(Boolean);
+          if (!missing.length) break;
+          const catalog = await publicPackages();
+          let changed = false;
+          for (const [, name, version] of missing) {
+            const key = `${name} ${version}`;
+            if (added.has(key)) continue;
+            added.add(key);
+            const pkg = catalog.find(p => p.name === name && p.version === version);
+            if (!pkg) continue;
+            const path = `/library/${pkg.path}`;
+            request.files[path] = decodeText(await readPublicPackage(pkg));
+            request.pool.push(path);
+            changed = true;
+          }
+          if (!changed) break;
+          ({ document: doc } = await collect(builder, request, read));
+        }
+      }
       if (!embed) document.title = `${doc.name} - RNL Viewer`;
       return doc;
     } catch (e) {

@@ -15,6 +15,8 @@ on:
   push:
     branches: [main]
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "site/**"
       - "spec/**"
       - "scripts/spec/**"
@@ -35,6 +37,8 @@ on:
       - ".github/workflows/pages.yml"
   pull_request:
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "site/**"
       - "spec/**"
       - "scripts/spec/**"
@@ -59,6 +63,8 @@ on:
   workflow_run:
     workflows: ["Standard release", "Viewer release"]
     types: [completed]
+  schedule:
+    - cron: "17 2 * * *"
   workflow_dispatch:
 
 # Each job gets only what it needs: the build reads the repository and the Pages site
@@ -68,6 +74,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
 
 jobs:
   build:
@@ -82,14 +89,19 @@ jobs:
           # the tags give the revision label of the standard (decision 0007), and the desktop viewer's
           # newest release, whose files the page of the tools links to
           fetch-depth: 0
+          ref: ${{ github.event_name == 'schedule' && 'main' || github.ref }}
 
       # Writes site/dist/: the Chinese pages under zh/ and the English pages under en/, index.html, which
       # leads to either by the browser's language, and the old addresses of the Chinese pages, which lead
       # to zh/; the page of the tools has the files of the newest tag viewer-vX.Y.Z. site/README.md,
       # site/build.py and site/src/ stay out of the published site.
+      - name: Download and verify locked public packages
+        working-directory: ${{ github.workspace }}
+        run: python scripts/packages.py download
       - name: Build the site
         run: |
           python3 -m unittest discover -s site -p 'test_*.py'
+          python3 -m unittest discover -s scripts -p 'test_packages.py'
           python3 site/build.py
 
       - uses: ./.github/actions/install-spec-tools
@@ -153,7 +165,7 @@ jobs:
       # and puts it at site/dist/viewer/, where the pages of both languages link
       - name: Build the web viewer, with samples and the package library
         run: |
-          node --test apps/web/library.test.mjs
+          node --test apps/web/*.test.mjs
           node apps/web/build.mjs --samples
           cp -r apps/web/dist site/dist/viewer
 
@@ -166,12 +178,30 @@ jobs:
           node --test site/gallery/package-file.test.mjs
           node site/gallery/build.mjs
 
+      - name: Use the locked offline catalog for browser tests
+        run: |
+          python scripts/packages.py fixture
+          echo "RNL_PACKAGE_CATALOG=$GITHUB_WORKSPACE/.rnl-packages/fixture/catalog.json" >> "$GITHUB_ENV"
       - name: Check site navigation in Chromium and WebKit
+        env:
+          RNL_SITE_SCREENSHOTS: ${{ runner.temp }}/package-review
         run: |
           npm ci --prefix tests/viewer
           node tests/viewer/node_modules/@playwright/test/cli.js install --with-deps chromium webkit
           node --test scripts/brand.test.mjs
           node tests/viewer/node_modules/@playwright/test/cli.js test --config site/playwright.config.mjs
+
+      - name: Keep bilingual light and dark review screenshots
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: public-package-review-screenshots
+          path: ${{ runner.temp }}/package-review
+          if-no-files-found: error
+
+      - name: Restore production gallery from the latest catalog
+        env:
+          RNL_PACKAGE_CATALOG: https://rich-netlist.github.io/rnl-packages/catalog.json
+        run: node site/gallery/build.mjs
 
       - if: github.event_name != 'pull_request'
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

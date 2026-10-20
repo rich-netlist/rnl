@@ -42,7 +42,9 @@ GALLERY_JS = ROOT / "site" / "src" / "assets" / "gallery.js"  # what each packag
 SITE_SRC = ROOT / "site" / "src"
 # the package files the reference is written from: the series, and the packages outside it that the
 # catalog lists with it
-LIBRARIES = [ROOT / "libraries" / "standard" / SERIES, ROOT / "libraries" / "analog-canvas-extensions"]
+sys.path.insert(0, str(ROOT / "scripts"))
+from packages import require as require_public_package
+LIBRARIES = [ROOT / "libraries" / "standard" / SERIES]
 ALLOWED_FRONT = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
 SUMMARY_LINE = re.compile(r"^\s*'([\w-]+(?: [\d.]+)?)':\s*'<zh>.*?</zh><en>(.*?)</en>'", re.M)
 FENCE = re.compile(r"^(```+)([^\n]*)\n(.*?)^\1[ \t]*$", re.M | re.S)
@@ -81,7 +83,7 @@ def run_rnl(rnl: Path, *args: str) -> subprocess.CompletedProcess:
 def package_files() -> dict[tuple[str, str], tuple[Path, str]]:
     """{(name, version): (file, text)} of every package file of the series and of the packages listed with it."""
     found = {}
-    for d in LIBRARIES:
+    for d in [*LIBRARIES, require_public_package("analog-canvas-extensions")]:
         for f in sorted(d.glob("*.rnl")):
             text = read(f)
             m = PACKAGE.search(text)
@@ -119,7 +121,11 @@ def symbols_in(text: str) -> set[str]:
 
 def summaries() -> dict[str, str]:
     """What each package is for, in English, from the gallery's table: {'rnl-std-fill': …, 'rnl-std-fill 0.3': …}."""
-    return {m.group(1): re.sub(r"\s+", " ", m.group(2)).replace("’", "'") for m in SUMMARY_LINE.finditer(read(GALLERY_JS))}
+    result = {m.group(1): re.sub(r"\s+", " ", m.group(2)).replace("’", "'") for m in SUMMARY_LINE.finditer(read(GALLERY_JS))}
+    catalog = json.loads(read(ROOT / ".rnl-packages" / "catalog.json"))
+    for p in catalog["packages"]:
+        result[p["name"]] = re.sub(r"\s+", " ", p["summary"]["en"]).replace("’", "'")
+    return result
 
 
 # --- the reference to the packages ------------------------------------------------------------------
@@ -134,7 +140,7 @@ def role_text(role) -> str:
 
 
 def packages_md(rnl: Path) -> str:
-    r = run_rnl(rnl, "catalog", "--path", str(ROOT / "libraries" / "analog-canvas-extensions"))
+    r = run_rnl(rnl, "catalog", "--path", str(require_public_package("analog-canvas-extensions")))
     if r.returncode != 0:
         raise Failed(f"rnl catalog:\n{r.stderr or r.stdout}")
     cat = json.loads(r.stdout)
@@ -410,9 +416,10 @@ def git_commit() -> str:
 
 
 def git_time() -> int:
-    r = subprocess.run(["git", "-C", str(ROOT), "log", "-1", "--format=%ct", "--", "skills/rnl", "scripts/skill",
+    r = subprocess.run(["git", "-C", str(ROOT), "log", "-1", "--format=%ct", "--", "skills/rnl",
                         "spec/rnl-0.3-guide.md", "spec/rnl-0.3-guide.zh.md"], capture_output=True, text=True)
-    return int(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else 1767225600  # 2026-01-01
+    # Preserve the previously published zip for unchanged skill files when build plumbing changes.
+    return max(1792412288, int(r.stdout.strip())) if r.returncode == 0 and r.stdout.strip() else 1792412288
 
 
 def build_zip(dest: Path) -> None:

@@ -11,11 +11,7 @@ test("the published library describes every package and separates built-ins from
   try {
     const index = publishLibrary(fileURLToPath(new URL("../../libraries", import.meta.url)), out);
     const optional = index.filter((p) => !p.builtin);
-    assert.ok(optional.some((p) => p.name === "pdk-sky130" && p.version === "0.1"));
-    assert.ok(optional.some((p) => p.name === "analog-canvas-extensions" && p.version === "0.1"));
-    for (const name of ["eda-symbol", "eda-style"]) {
-      assert.deepEqual(optional.filter((p) => p.name === name).map((p) => p.path), [`${name}/${name}.rnl`]);
-    }
+    assert.deepEqual(optional, []);
     assert.ok(index.every((p) => p.path.endsWith(".rnl")));
     assert.ok(index.filter((p) => p.builtin).every((p) => p.path.startsWith("standard/") && (p.name.startsWith("rnl-std") || p.name === "rnl-zh")));
     for (const p of index) assert.ok(readFileSync(join(out, p.path), "utf8").includes(`name="${p.name}"`));

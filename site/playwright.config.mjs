@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export default defineConfig({
+  globalSetup: "./test-setup.mjs",
   testDir: "./tests",
   workers: 2,
   fullyParallel: true,

@@ -14,3 +14,8 @@ site/__pycache__/
 
 # Web fonts written by scripts/fonts.py web
 apps/viewer-ui/fonts/
+
+# Verified public package cache, local to each checkout/worktree
+.rnl-packages/
+scripts/__pycache__/
+scripts/skill/__pycache__/

@@ -106,3 +106,5 @@ node apps/web/serve.mjs
 ## 参与贡献
 
 修改语言或模块边界之前，请先在 issue 或 pull request 里讨论，并让文档的状态始终写清楚。贡献按它所修改路径的许可证授权，不需要签署声明或贡献者协议。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+公开扩展和工艺包由 [rnl-packages](https://github.com/rich-netlist/rnl-packages) 维护，网页版查看器从清单下载并校验 SHA-256；标准系列仍然内置。开发和测试前运行 `python scripts/packages.py download`，版本由 `packages.lock.json` 固定，详见 [贡献指南](CONTRIBUTING.md)。

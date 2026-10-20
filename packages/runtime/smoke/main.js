@@ -3,7 +3,7 @@
 // an edit into a netlist without RNL records. #result gets what smoke.mjs checks, and its
 // data-state "done", or "failed" with the error.
 import { startCore } from "@rich-netlist/runtime";
-import canvasUrl from "@rich-netlist/runtime/packages/analog-canvas-extensions.rnl?url";
+import canvasUrl from "rnl-public-canvas?url";
 
 const netlist = `* smoke
 * @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="analog-canvas-extensions", version="0.1")}
