@@ -234,6 +234,8 @@ pub(crate) struct Simplex<T> {
     /// How many rows each variable occurs in, the basic variables of the rows not counted: what
     /// a pivot on it costs, which [`Simplex::check`] weighs.
     occurrences: Vec<u32>,
+    /// An empty buffer exchanged with a row while merging its terms; only its capacity is reused.
+    merge_scratch: Vec<(Var, Q)>,
     pivots: u64,
     pivot_limit: Option<u64>,
     /// [`Simplex::check`] chooses by Bland's rule once variables have left the basis again this
@@ -266,6 +268,7 @@ impl<T: Clone + Ord> Simplex<T> {
             forms: BTreeMap::new(),
             trail: Vec::new(),
             occurrences: Vec::new(),
+            merge_scratch: Vec::new(),
             pivots: 0,
             pivot_limit: None,
             bland_after: BLAND_AFTER,
@@ -346,8 +349,8 @@ impl<T: Clone + Ord> Simplex<T> {
         let mut row: Vec<(Var, Q)> = Vec::new();
         for (v, a) in terms {
             match self.vars[*v].row {
-                Some(r) => axpy(&mut row, &self.rows[r].terms, a),
-                None => axpy(&mut row, &[(*v, Q::one())], a),
+                Some(r) => axpy_reusing(&mut row, &self.rows[r].terms, a, &mut self.merge_scratch),
+                None => axpy_reusing(&mut row, &[(*v, Q::one())], a, &mut self.merge_scratch),
             }
         }
         let value = row.iter().fold(Q::zero(), |sum, (v, a)| sum + a * &self.vars[*v].value);
@@ -702,7 +705,7 @@ impl<T: Clone + Ord> Simplex<T> {
             if let Ok(i) = row.terms.binary_search_by_key(&xj, |(v, _)| *v) {
                 count(occurrences, &row.terms, false);
                 let (_, c) = row.terms.remove(i);
-                axpy(&mut row.terms, &def, &c);
+                axpy_reusing(&mut row.terms, &def, &c, &mut self.merge_scratch);
                 count(occurrences, &row.terms, true);
             }
         }
@@ -756,6 +759,7 @@ impl<T: Clone + Ord> Simplex<T> {
     /// within their bounds, and the slack of every form equals the form. For tests.
     #[cfg(test)]
     pub(crate) fn assert_invariants(&self) {
+        assert!(self.merge_scratch.is_empty());
         for (r, row) in self.rows.iter().enumerate() {
             assert_eq!(self.vars[row.basic].row, Some(r));
             let sum = row.terms.iter().fold(Q::zero(), |sum, (v, a)| sum + a * &self.vars[*v].value);
@@ -806,32 +810,40 @@ fn coefficient(terms: &[(Var, Q)], v: Var) -> Option<&Q> {
 
 /// `acc += a x` over sorted terms, dropping the terms that cancel.
 fn axpy(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q) {
+    axpy_reusing(acc, x, a, &mut Vec::new());
+}
+
+/// The same sorted merge, retaining both buffers for the next row or substitution.
+fn axpy_reusing(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q, scratch: &mut Vec<(Var, Q)>) {
     if a.is_zero() || x.is_empty() {
         return;
     }
-    let old = std::mem::take(acc);
-    acc.reserve(old.len() + x.len());
-    let mut old = old.into_iter().peekable();
-    let mut x = x.iter().peekable();
-    loop {
-        match (old.peek(), x.peek()) {
-            (Some((u, _)), Some((v, _))) if u < v => acc.extend(old.next()),
-            (Some((u, _)), Some((v, _))) if u == v => {
-                let (u, c) = old.next().expect("peeked");
-                let (_, d) = x.next().expect("peeked");
-                let sum = c + a * d;
-                if !sum.is_zero() {
-                    acc.push((u, sum));
+    debug_assert!(scratch.is_empty());
+    scratch.reserve(acc.len() + x.len());
+    {
+        let mut old = acc.drain(..).peekable();
+        let mut x = x.iter().peekable();
+        loop {
+            match (old.peek(), x.peek()) {
+                (Some((u, _)), Some((v, _))) if u < v => scratch.extend(old.next()),
+                (Some((u, _)), Some((v, _))) if u == v => {
+                    let (u, c) = old.next().expect("peeked");
+                    let (_, d) = x.next().expect("peeked");
+                    let sum = c + a * d;
+                    if !sum.is_zero() {
+                        scratch.push((u, sum));
+                    }
                 }
+                (_, Some(_)) => {
+                    let (v, d) = x.next().expect("peeked");
+                    scratch.push((*v, a * d));
+                }
+                (Some(_), None) => scratch.extend(old.next()),
+                (None, None) => break,
             }
-            (_, Some(_)) => {
-                let (v, d) = x.next().expect("peeked");
-                acc.push((*v, a * d));
-            }
-            (Some(_), None) => acc.extend(old.next()),
-            (None, None) => break,
         }
     }
+    std::mem::swap(acc, scratch);
 }
 
 fn sorted<T: Ord>(mut tags: Vec<T>) -> Vec<T> {

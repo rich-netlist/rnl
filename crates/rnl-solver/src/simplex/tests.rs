@@ -151,6 +151,46 @@ fn linear_forms_merge_sort_and_cancel() {
 }
 
 #[test]
+fn sparse_merges_reuse_both_buffers_and_agree_with_exact_map_sums() {
+    let mut acc = Vec::with_capacity(64);
+    acc.extend([(0, frac(1, 3)), (2, frac(4, 7)), (5, frac(-7, 2))]);
+    let mut scratch = Vec::with_capacity(64);
+    let buffers = [acc.as_ptr(), scratch.as_ptr()];
+    let mut rng = Rng(0x5eed_0011);
+    for step in 0..256 {
+        let mut x: Vec<_> = (0..16)
+            .filter_map(|v| {
+                let q = frac(rng.int(-5, 5), rng.int(1, 9));
+                (!q.is_zero()).then_some((v, q))
+            })
+            .collect();
+        let mut factor = frac(rng.int(-3, 3), rng.int(1, 7));
+        if step % 11 == 0 {
+            factor = Q::zero();
+        }
+        if step % 13 == 0 {
+            x.clear();
+        }
+        if step % 17 == 0 {
+            x = acc.clone();
+            factor = int(-1);
+        }
+        // An independent sparse-map sum also checks insertion, overlap and complete cancellation.
+        let mut expected: BTreeMap<_, _> = acc.iter().cloned().collect();
+        for (v, q) in &x {
+            *expected.entry(*v).or_insert_with(Q::zero) += &factor * q;
+        }
+        expected.retain(|_, q| !q.is_zero());
+        axpy_reusing(&mut acc, &x, &factor, &mut scratch);
+        assert_eq!(acc, expected.into_iter().collect::<Vec<_>>(), "merge {step}");
+        assert!(scratch.is_empty());
+        // Each merge needs at most 32 slots. Neither of the original allocations is replaced.
+        let now = [acc.as_ptr(), scratch.as_ptr()];
+        assert!(now == buffers || now == [buffers[1], buffers[0]], "merge {step} reallocated");
+    }
+}
+
+#[test]
 fn opposite_bounds_conflict_at_once_and_change_nothing() {
     let (mut sx, v) = simplex(1);
     assert_eq!(sx.assert(&LinExpr::var(v[0]), Rel::Ge, &int(1), 7), Ok(()));
@@ -418,6 +458,38 @@ fn a_check_stops_when_its_time_is_out_and_goes_on_after() {
     assert_eq!(a.pivots(), b.pivots());
     assert!(a.pivots() >= 59);
     assert_eq!(asked.get(), (a.pivots() - 1) / PIVOTS_PER_READ);
+}
+
+#[test]
+fn merge_buffer_capacity_does_not_change_caps_clock_reads_or_tableau() {
+    let (mut a, mut b) = (chain_of_links(), chain_of_links());
+    a.merge_scratch = Vec::new();
+    b.merge_scratch = Vec::with_capacity(128);
+    for sx in [&mut a, &mut b] {
+        sx.set_pivot_limit(Some(17));
+        assert_eq!(sx.check(), Err(Failure::Budget));
+        assert_eq!(sx.pivots(), 17);
+        sx.set_pivot_limit(None);
+        let reads = std::cell::Cell::new(0);
+        assert_eq!(
+            sx.check_until(&|| {
+                reads.set(reads.get() + 1);
+                true
+            }),
+            Err(Failure::Time)
+        );
+        assert_eq!((reads.get(), sx.pivots()), (1, 17 + PIVOTS_PER_READ));
+        assert_eq!(sx.check(), Ok(()));
+        let cp = sx.checkpoint();
+        sx.assert(&LinExpr::var(0), Rel::Ge, &int(3), 100).unwrap();
+        assert_eq!(sx.minimize(&LinExpr::var(59)), Ok(int(62)));
+        sx.keep_optimum(&LinExpr::var(59), 101).unwrap();
+        sx.backtrack(cp);
+        assert_eq!(sx.check(), Ok(()));
+        sx.assert_invariants();
+    }
+    // Debug includes all rows, values, bounds, tags, trail, forms, counts and limits, not capacity.
+    assert_eq!(format!("{a:?}"), format!("{b:?}"));
 }
 
 // ------------------------------------------------------------------------------ deciders
