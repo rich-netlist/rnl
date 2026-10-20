@@ -63,7 +63,7 @@ pub(crate) const METHOD_NOTE: &str =
      by the lexicographic LP and rounded to the grid, the best of them by the estimate routed (13.7), and the best by \
      the layered objectives on their wires taken";
 
-/// A solve with its exact result, for the tests.
+/// A solve with its exact result, for tests and opt-in quality evidence.
 #[derive(Clone, Debug)]
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct Exact {
@@ -74,6 +74,10 @@ pub(crate) struct Exact {
     pub routing: Routing,
     /// The value of each layer of the objectives in force, on the wires.
     pub score: Vec<Q>,
+    /// The four production ranking counts ahead of the objectives, and its tie-break code.
+    pub rank: [usize; 4],
+    pub code: Vec<u32>,
+    pub candidate_id: usize,
 }
 
 pub(crate) fn solve(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
@@ -189,6 +193,8 @@ pub(crate) fn solve_exact_with(
     let best = order(&structure.active, &entries)[0];
     let (taken, routing, entry) = finals.swap_remove(best);
     let Placing { candidate, placed, .. } = all.swap_remove(taken);
+    let rank = [entry.overlaps, entry.crowding, entry.misleading, entry.joins_left];
+    let code = entry.code;
     let score = entry.layers;
     drop(phase);
     notes.push(format!(
@@ -330,7 +336,7 @@ pub(crate) fn solve_exact_with(
         wire_routes: Vec::new(),
     };
     let solved = Solved { solution, report };
-    (solved, Exact { resolved, structure, candidate, placed, routing, score })
+    (solved, Exact { resolved, structure, candidate, placed, routing, score, rank, code, candidate_id: taken })
 }
 
 /// Whether the solution leaves the position and the orientation of object `k` free, as what the

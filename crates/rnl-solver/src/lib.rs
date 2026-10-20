@@ -49,6 +49,7 @@ mod objectives;
 mod options;
 mod orient;
 pub mod profile;
+pub mod quality;
 mod rational;
 mod resolve;
 mod route;
@@ -292,6 +293,29 @@ pub fn solve(problem: &LevelProblem, options: &SolverOptions) -> Solved {
 /// for its minimal conflict groups; the witness taken as written, the search, the coordinates and
 /// the routing are counted in work.
 pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: &dyn Clock) -> Solved {
+    solve_profiled(problem, options, clock, || driver::solve(problem, options, clock))
+}
+
+/// Opt-in quality evidence. Retains the already selected exact state, without evaluating or
+/// formatting it. The caller must finish every level before calling [`quality::Captured::evaluate`].
+/// The same real `clock`, options and production caps are used as by [`solve_with_clock`].
+pub fn solve_with_clock_quality(
+    problem: &LevelProblem,
+    options: &SolverOptions,
+    clock: &dyn Clock,
+) -> (Solved, Box<quality::Captured>) {
+    solve_profiled(problem, options, clock, || {
+        let (solved, exact) = driver::solve_exact_with(problem, options, clock, options::CAPS);
+        (solved, Box::new(quality::Captured(exact)))
+    })
+}
+
+fn solve_profiled<T>(
+    problem: &LevelProblem,
+    options: &SolverOptions,
+    clock: &dyn Clock,
+    solve: impl FnOnce() -> T,
+) -> T {
     profile::with(clock.profiler(), || {
         if profile::enabled() {
             profile::emit(profile::ProfileEvent::Level {
@@ -312,9 +336,9 @@ pub fn solve_with_clock(problem: &LevelProblem, options: &SolverOptions, clock: 
                 problem.objects.iter().filter(|o| o.kind == rnl_runtime::problem::ObjectKind::Instance).count() as u64,
             );
         }
-        let solved = driver::solve(problem, options, clock);
+        let result = solve();
         profile::emit(profile::ProfileEvent::LevelEnd);
-        solved
+        result
     })
 }
 
