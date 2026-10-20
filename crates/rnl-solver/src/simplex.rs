@@ -44,12 +44,44 @@
 // Used by `resolve`; what only the coordinate LP uses (minimisation) waits for stage S3.
 #![cfg_attr(not(test), allow(dead_code))]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use num_traits::{One, Signed, Zero};
 
 use crate::profile::work::{Block, Key, Local};
 use crate::rational::Q;
+
+mod row_set;
+use row_set::RowSet;
+
+enum RowIndices<'a> {
+    Indexed(row_set::Iter<'a>),
+    // The original all-row access path, retained only for exact trajectory tests.
+    #[cfg(test)]
+    Linear(std::ops::Range<usize>),
+}
+
+impl Iterator for RowIndices<'_> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        match self {
+            Self::Indexed(rows) => rows.next(),
+            #[cfg(test)]
+            Self::Linear(rows) => rows.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Indexed(rows) => rows.size_hint(),
+            #[cfg(test)]
+            Self::Linear(rows) => rows.size_hint(),
+        }
+    }
+}
+
+impl ExactSizeIterator for RowIndices<'_> {}
 
 /// A variable of the tableau, by its index: structural and slack variables share the numbering,
 /// which is also the order of Bland's rule and of the ties of [`Simplex::check`].
@@ -171,12 +203,14 @@ pub(crate) enum Failure<T> {
 }
 
 #[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 struct Bound<T> {
     value: Q,
     tag: T,
 }
 
 #[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 struct VarState<T> {
     value: Q,
     lower: Option<Bound<T>>,
@@ -205,6 +239,7 @@ impl<T> VarState<T> {
 
 /// A row of the tableau: `basic = Σ aⱼ xⱼ` over nonbasic variables, sorted, none zero.
 #[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 struct Row {
     basic: Var,
     terms: Vec<(Var, Q)>,
@@ -218,6 +253,7 @@ enum Side {
 
 /// A bound replaced, to put back on undo.
 #[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 struct Undo<T> {
     var: Var,
     side: Side,
@@ -235,12 +271,31 @@ pub(crate) struct Simplex<T> {
     /// How many rows each variable occurs in, the basic variables of the rows not counted: what
     /// a pivot on it costs, which [`Simplex::check`] weighs.
     occurrences: Vec<u32>,
+    /// The stable row IDs containing each nonbasic variable, in row order.
+    incidence: Vec<RowSet>,
+    /// Exactly the basic variables currently outside their bounds, ordered by variable ID.
+    violated: BTreeSet<Var>,
     pivots: u64,
     pivot_limit: Option<u64>,
     /// [`Simplex::check`] chooses by Bland's rule once variables have left the basis again this
     /// many times within one check ([`BLAND_AFTER`]).
     bland_after: u64,
     work: Local,
+    #[cfg(test)]
+    linear_scans: bool,
+    #[cfg(test)]
+    trace: Option<Vec<PivotTrace>>,
+}
+
+#[cfg(test)]
+#[derive(Clone, Debug, PartialEq)]
+struct PivotTrace {
+    leaving: Var,
+    entering: Var,
+    rows: Vec<Row>,
+    values: Vec<Q>,
+    occurrences: Vec<u32>,
+    violated: Vec<Var>,
 }
 
 /// How many times variables may leave the basis again within one [`Simplex::check`] before it
@@ -268,16 +323,23 @@ impl<T: Clone + Ord> Simplex<T> {
             forms: BTreeMap::new(),
             trail: Vec::new(),
             occurrences: Vec::new(),
+            incidence: Vec::new(),
+            violated: BTreeSet::new(),
             pivots: 0,
             pivot_limit: None,
             bland_after: BLAND_AFTER,
             work: Local::new(Key::Tableaux),
+            #[cfg(test)]
+            linear_scans: false,
+            #[cfg(test)]
+            trace: None,
         }
     }
 
     /// A new structural variable, with no bound and the value 0.
     pub(crate) fn new_var(&mut self) -> Var {
         self.vars.push(VarState { value: Q::zero(), lower: None, upper: None, row: None });
+        self.incidence.push(RowSet::default());
         self.occurrences.push(0);
         self.work.dimensions(self.rows.len(), self.vars.len());
         self.vars.len() - 1
@@ -365,7 +427,11 @@ impl<T: Clone + Ord> Simplex<T> {
         let s = self.vars.len();
         self.vars.push(VarState { value, lower: None, upper: None, row: Some(self.rows.len()) });
         self.occurrences.push(0);
-        count(&mut self.occurrences, &row, true);
+        self.incidence.push(RowSet::default());
+        let r = self.rows.len();
+        for (v, _) in &row {
+            membership(&mut self.incidence, &mut self.occurrences, r, *v, true);
+        }
         if let Some(w) = &mut work {
             w.add(Key::NewRows, 1);
             w.row_change(0, row.len());
@@ -433,10 +499,12 @@ impl<T: Clone + Ord> Simplex<T> {
                 return Err(Failure::Conflict(sorted(vec![l.tag.clone(), tag])));
             }
         }
+        let mut changed = false;
         if let Some(l) = lower {
             if self.vars[v].lower.as_ref().is_none_or(|old| l > old.value) {
                 let old = self.vars[v].lower.replace(Bound { value: l.clone(), tag: tag.clone() });
                 self.trail.push(Undo { var: v, side: Side::Lower, old });
+                changed = true;
                 if self.vars[v].row.is_none() && self.vars[v].value < l {
                     self.update(v, l);
                 }
@@ -446,10 +514,15 @@ impl<T: Clone + Ord> Simplex<T> {
             if self.vars[v].upper.as_ref().is_none_or(|old| u < old.value) {
                 let old = self.vars[v].upper.replace(Bound { value: u.clone(), tag });
                 self.trail.push(Undo { var: v, side: Side::Upper, old });
+                changed = true;
                 if self.vars[v].row.is_none() && self.vars[v].value > u {
                     self.update(v, u);
                 }
             }
+        }
+        if changed {
+            let mut work = self.work.block();
+            refresh_violation(&self.vars, &mut self.violated, v, work.as_mut());
         }
         Ok(())
     }
@@ -461,6 +534,7 @@ impl<T: Clone + Ord> Simplex<T> {
 
     /// Undoes the bounds asserted since `checkpoint`. The rows made since stay.
     pub(crate) fn backtrack(&mut self, checkpoint: usize) {
+        let mut work = self.work.block();
         while self.trail.len() > checkpoint {
             let Some(u) = self.trail.pop() else { break };
             let s = &mut self.vars[u.var];
@@ -468,6 +542,7 @@ impl<T: Clone + Ord> Simplex<T> {
                 Side::Lower => s.lower = u.old,
                 Side::Upper => s.upper = u.old,
             }
+            refresh_violation(&self.vars, &mut self.violated, u.var, work.as_mut());
         }
     }
 
@@ -492,22 +567,8 @@ impl<T: Clone + Ord> Simplex<T> {
         loop {
             if let Some(w) = &mut work {
                 w.add(Key::CheckPasses, 1);
-                w.add(Key::CheckRows, self.rows.len() as u64);
             }
-            // the smallest basic variable out of its bounds
-            let mut pick: Option<(Var, bool)> = None;
-            for row in &self.rows {
-                let s = &self.vars[row.basic];
-                let below = s.below();
-                if below || s.above() {
-                    if let Some(w) = &mut work {
-                        w.add(Key::CheckViolations, 1);
-                    }
-                    if pick.is_none_or(|(p, _)| row.basic < p) {
-                        pick = Some((row.basic, below));
-                    }
-                }
-            }
+            let pick = self.violated_pick(work.as_mut());
             let Some((xi, below)) = pick else {
                 if let Some(w) = &mut work {
                     w.add(Key::CheckFeasible, 1);
@@ -533,6 +594,38 @@ impl<T: Clone + Ord> Simplex<T> {
                 repeats += 1;
             }
         }
+    }
+
+    fn violated_pick(&self, mut work: Option<&mut Block>) -> Option<(Var, bool)> {
+        // The old all-row selection remains an independent test oracle for variable-ID order.
+        #[cfg(test)]
+        if self.linear_scans {
+            if let Some(w) = &mut work {
+                w.add(Key::CheckRows, self.rows.len() as u64);
+            }
+            let mut pick: Option<(Var, bool)> = None;
+            for row in &self.rows {
+                let s = &self.vars[row.basic];
+                let below = s.below();
+                if below || s.above() {
+                    if let Some(w) = &mut work {
+                        w.add(Key::CheckViolations, 1);
+                    }
+                    if pick.is_none_or(|(p, _)| row.basic < p) {
+                        pick = Some((row.basic, below));
+                    }
+                }
+            }
+            return pick;
+        }
+        let &v = self.violated.first()?;
+        if let Some(w) = &mut work {
+            // One selected basic is inspected, rather than every stored row. Refresh checks
+            // occur at value/bound changes and have their own execution counters.
+            w.add(Key::CheckRows, 1);
+            w.add(Key::CheckViolations, 1);
+        }
+        Some((v, self.vars[v].below()))
     }
 
     /// The nonbasic variable of row `r` that [`Simplex::check`] moves to bring the row's basic
@@ -607,16 +700,18 @@ impl<T: Clone + Ord> Simplex<T> {
             // the ratio test: how far it can move before a variable reaches a bound; of equal
             // steps, the smallest variable (Bland), itself included
             let x = &self.vars[xk];
+            let rows = self.row_indices(&self.incidence[xk]);
             if let Some(w) = &mut work {
                 w.add(Key::RatioCalls, 1);
-                w.add(Key::RatioRows, self.rows.len() as u64);
+                w.add(Key::RatioRows, rows.len() as u64);
             }
             let mut step: Option<(Q, Var)> = if increase {
                 x.upper.as_ref().map(|u| (&u.value - &x.value, xk))
             } else {
                 x.lower.as_ref().map(|l| (&x.value - &l.value, xk))
             };
-            for row in &self.rows {
+            for r in rows {
+                let row = &self.rows[r];
                 let Some(a) = coefficient(&row.terms, xk) else { continue };
                 if let Some(w) = &mut work {
                     w.add(Key::RatioHits, 1);
@@ -651,6 +746,8 @@ impl<T: Clone + Ord> Simplex<T> {
                 if self.pivots % PIVOTS_PER_READ == 0 {
                     crate::profile::checkpoint();
                 }
+                #[cfg(test)]
+                self.record_trace(xk, xk);
             } else {
                 let rate = coefficient(&self.rows[self.vars[xl].row.expect("basic")].terms, xk).expect("in the row");
                 let up = rate.is_positive() == increase;
@@ -711,17 +808,20 @@ impl<T: Clone + Ord> Simplex<T> {
     /// Sets a nonbasic variable to `value`, and the basic variables with it.
     fn update(&mut self, v: Var, value: Q) {
         let mut work = self.work.block();
+        let rows = self.row_indices(&self.incidence[v]);
         if let Some(w) = &mut work {
             w.add(Key::UpdateCalls, 1);
-            w.add(Key::UpdateRows, self.rows.len() as u64);
+            w.add(Key::UpdateRows, rows.len() as u64);
         }
         let delta = &value - &self.vars[v].value;
-        for row in &self.rows {
+        for r in rows {
+            let row = &self.rows[r];
             if let Some(a) = coefficient(&row.terms, v) {
                 if let Some(w) = &mut work {
                     w.add(Key::UpdateHits, 1);
                 }
                 self.vars[row.basic].value += a * &delta;
+                refresh_violation(&self.vars, &mut self.violated, row.basic, work.as_mut());
             }
         }
         self.vars[v].value = value;
@@ -731,23 +831,31 @@ impl<T: Clone + Ord> Simplex<T> {
     /// exchanges them: `xj` becomes basic in `xi`'s row.
     fn pivot_and_update(&mut self, xi: Var, xj: Var, value: Q) {
         let mut work = self.work.block();
+        let r = self.vars[xi].row.expect("basic");
+        // xi is basic, hence absent from every term; xj's old column is frozen while rows
+        // change. At the end xi occurs in exactly this column and xj is absent everywhere.
+        debug_assert!(self.incidence[xi].is_empty());
+        debug_assert_eq!(self.occurrences[xi], 0);
+        let affected = std::mem::take(&mut self.incidence[xj]);
+        debug_assert!(affected.iter().any(|k| k == r));
+        let value_rows = self.row_indices(&affected);
         if let Some(w) = &mut work {
             w.add(Key::PivotCalls, 1);
-            w.add(Key::PivotValueRows, self.rows.len().saturating_sub(1) as u64);
-            w.add(Key::PivotRewriteRows, self.rows.len().saturating_sub(1) as u64);
+            w.add(Key::PivotValueRows, value_rows.len().saturating_sub(1) as u64);
         }
-        let r = self.vars[xi].row.expect("basic");
         let a = coefficient(&self.rows[r].terms, xj).expect("in the row").clone();
         let theta = (&value - &self.vars[xi].value) / &a;
         self.vars[xi].value = value;
         self.vars[xj].value += &theta;
-        for (k, row) in self.rows.iter().enumerate() {
+        for k in value_rows {
             if k != r {
+                let row = &self.rows[k];
                 if let Some(c) = coefficient(&row.terms, xj) {
                     if let Some(w) = &mut work {
                         w.add(Key::PivotValueHits, 1);
                     }
                     self.vars[row.basic].value += c * &theta;
+                    refresh_violation(&self.vars, &mut self.violated, row.basic, work.as_mut());
                 }
             }
         }
@@ -757,40 +865,82 @@ impl<T: Clone + Ord> Simplex<T> {
             self.rows[r].terms.iter().filter(|(v, _)| *v != xj).map(|(v, c)| (*v, -(c * &inv))).collect();
         let at = def.partition_point(|(v, _)| *v < xi);
         def.insert(at, (xi, inv));
+        let rewrite_rows = self.row_indices(&affected);
+        if let Some(w) = &mut work {
+            w.add(Key::PivotRewriteRows, rewrite_rows.len().saturating_sub(1) as u64);
+        }
         let occurrences = &mut self.occurrences;
-        for (k, row) in self.rows.iter_mut().enumerate() {
+        let incidence = &mut self.incidence;
+        for k in rewrite_rows {
             if k == r {
                 continue;
             }
+            let row = &mut self.rows[k];
             if let Ok(i) = row.terms.binary_search_by_key(&xj, |(v, _)| *v) {
                 let old_len = row.terms.len();
                 if let Some(w) = &mut work {
                     w.add(Key::PivotRewriteHits, 1);
                     w.add(Key::RewriteOldTerms, old_len as u64);
                 }
-                count(occurrences, &row.terms, false);
                 let (_, c) = row.terms.remove(i);
-                axpy_observed(&mut row.terms, &def, &c, work.as_mut());
-                count(occurrences, &row.terms, true);
+                axpy_changed(&mut row.terms, &def, &c, work.as_mut(), |v, add| {
+                    // xj was removed above; xi is new in every affected row. Their whole
+                    // columns are transferred once below, never charged here a second time.
+                    if v != xi && v != xj {
+                        membership(incidence, occurrences, k, v, add);
+                    }
+                });
                 if let Some(w) = &mut work {
                     w.add(Key::RewriteNewTerms, row.terms.len() as u64);
                     w.row_change(old_len, row.terms.len());
                 }
             }
         }
-        count(occurrences, &self.rows[r].terms, false);
-        count(occurrences, &def, true);
+        // The pivot row retains all other keys, with nonzero scaled coefficients. Thus only
+        // xj -> xi changes its membership, just as in every nonpivot affected row.
+        occurrences[xi] = occurrences[xj];
+        occurrences[xj] = 0;
+        incidence[xi] = affected;
         if let Some(w) = &mut work {
             w.row_change(self.rows[r].terms.len(), def.len());
         }
         self.rows[r] = Row { basic: xj, terms: def };
         self.vars[xi].row = None;
         self.vars[xj].row = Some(r);
+        refresh_violation(&self.vars, &mut self.violated, xi, work.as_mut());
+        refresh_violation(&self.vars, &mut self.violated, xj, work.as_mut());
         self.pivots += 1;
         crate::profile::add("pivots", 1);
         self.profile_tableau();
         if self.pivots % PIVOTS_PER_READ == 0 {
             crate::profile::checkpoint();
+        }
+        #[cfg(test)]
+        self.record_trace(xi, xj);
+    }
+
+    fn row_indices<'a>(&self, incidence: &'a RowSet) -> RowIndices<'a> {
+        #[cfg(test)]
+        if self.linear_scans {
+            return RowIndices::Linear(0..self.rows.len());
+        }
+        RowIndices::Indexed(incidence.iter())
+    }
+
+    #[cfg(test)]
+    fn record_trace(&mut self, leaving: Var, entering: Var) {
+        if self.trace.is_some() {
+            self.assert_invariants();
+        }
+        if let Some(trace) = &mut self.trace {
+            trace.push(PivotTrace {
+                leaving,
+                entering,
+                rows: self.rows.clone(),
+                values: self.vars.iter().map(|v| v.value.clone()).collect(),
+                occurrences: self.occurrences.clone(),
+                violated: self.violated.iter().copied().collect(),
+            });
         }
     }
 
@@ -850,6 +1000,19 @@ impl<T: Clone + Ord> Simplex<T> {
             count(&mut occurrences, &row.terms, true);
         }
         assert_eq!(occurrences, self.occurrences);
+        let violated: BTreeSet<Var> = self
+            .vars
+            .iter()
+            .enumerate()
+            .filter_map(|(v, s)| (s.row.is_some() && (s.below() || s.above())).then_some(v))
+            .collect();
+        assert_eq!(self.violated, violated);
+        assert_eq!(self.incidence.len(), self.vars.len());
+        for (v, incidence) in self.incidence.iter().enumerate() {
+            let expected: Vec<usize> =
+                self.rows.iter().enumerate().filter_map(|(r, row)| coefficient(&row.terms, v).map(|_| r)).collect();
+            assert_eq!(incidence.iter().collect::<Vec<_>>(), expected, "incidence for {v}");
+        }
         for (form, s) in &self.forms {
             let sum = form.iter().fold(Q::zero(), |sum, (v, a)| sum + a * &self.vars[*v].value);
             assert_eq!(sum, self.vars[*s].value);
@@ -863,7 +1026,35 @@ impl<T: Clone + Ord> Simplex<T> {
     }
 }
 
-/// Counts the variables of a row's terms in `occurrences`, or with `add` false uncounts them.
+/// Updates a derived index only. Bound and value mutation order, arithmetic and tags stay with
+/// their original callers; execution accounting is local and never calls an observer here.
+fn refresh_violation<T>(vars: &[VarState<T>], violated: &mut BTreeSet<Var>, v: Var, mut work: Option<&mut Block>) {
+    let s = &vars[v];
+    let basic = s.row.is_some();
+    let outside = basic && (s.below() || s.above());
+    let changed = if outside { violated.insert(v) } else { violated.remove(&v) };
+    if let Some(w) = &mut work {
+        w.add(Key::ViolationRefreshes, 1);
+        w.add(Key::ViolationBasicChecks, u64::from(basic));
+        w.add(Key::ViolationChanges, u64::from(changed));
+    }
+}
+
+/// Adds or removes one actual nonzero row membership. Untouched keys need no count update.
+fn membership(incidence: &mut [RowSet], occurrences: &mut [u32], row: usize, v: Var, add: bool) {
+    if add {
+        let changed = incidence[v].insert(row);
+        debug_assert!(changed, "a membership is inserted once");
+        occurrences[v] += 1;
+    } else {
+        let changed = incidence[v].remove(row);
+        debug_assert!(changed, "a membership removed was present");
+        occurrences[v] -= 1;
+    }
+}
+
+/// Independently counts the terms for the test oracle, without using the index.
+#[cfg(test)]
 fn count(occurrences: &mut [u32], terms: &[(Var, Q)], add: bool) {
     for (v, _) in terms {
         if add {
@@ -884,7 +1075,17 @@ fn axpy(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q) {
     axpy_observed(acc, x, a, None);
 }
 
-fn axpy_observed(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q, mut work: Option<&mut Block>) {
+fn axpy_observed(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q, work: Option<&mut Block>) {
+    axpy_changed(acc, x, a, work, |_, _| {});
+}
+
+fn axpy_changed(
+    acc: &mut Vec<(Var, Q)>,
+    x: &[(Var, Q)],
+    a: &Q,
+    mut work: Option<&mut Block>,
+    mut changed: impl FnMut(Var, bool),
+) {
     if a.is_zero() || x.is_empty() {
         return;
     }
@@ -912,11 +1113,14 @@ fn axpy_observed(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q, mut work: Optio
                 let sum = c + a * d;
                 if !sum.is_zero() {
                     acc.push((u, sum));
+                } else {
+                    changed(u, false);
                 }
             }
             (_, Some(_)) => {
                 let (v, d) = x.next().expect("peeked");
                 acc.push((*v, a * d));
+                changed(*v, true);
             }
             (Some(_), None) => acc.extend(old.next()),
             (None, None) => break,
