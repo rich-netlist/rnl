@@ -140,6 +140,8 @@ pub struct SolvedLevel {
     /// conflict group of each and its hints by statement (`SolverOptions::hints_for_low`), as
     /// `--report` asks: [`report`] prints them only then.
     pub hints_for_low: bool,
+    /// Opt-in selected state; evaluated only after the complete document solve returns.
+    pub quality_exact: Option<Box<rnl_solver::quality::Captured>>,
 }
 
 /// A level that is not solved, because the reading does not interpret its RNL (16.1).
@@ -347,7 +349,29 @@ pub fn solve_watched(
     clock: &dyn Clock,
     watch: &dyn Fn(&Progress) -> bool,
 ) -> Result<SolveRun, String> {
-    let (run, wants) = pass(file, files, options, clock, &[], watch)?;
+    solve_watched_impl(file, files, options, clock, watch, false)
+}
+
+/// The same document solve and real clock, retaining the selected Exact per final-pass level.
+/// No additional evaluation or formatting occurs until the caller requests it after return.
+pub fn solve_quality_with_clock(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    clock: &dyn Clock,
+) -> Result<SolveRun, String> {
+    solve_watched_impl(file, files, options, clock, &|_| true, true)
+}
+
+fn solve_watched_impl(
+    file: &Path,
+    files: &dyn Provider,
+    options: &SolveOptions,
+    clock: &dyn Clock,
+    watch: &dyn Fn(&Progress) -> bool,
+    quality: bool,
+) -> Result<SolveRun, String> {
+    let (mut run, wants) = pass(file, files, options, clock, &[], watch, quality)?;
     if wants.is_empty() {
         return Ok(run);
     }
@@ -393,7 +417,14 @@ pub fn solve_watched(
     }
     // the files read are those of the first pass: the second reads the files raised from memory
     let read = run.read.clone();
-    let mut run = if texts.is_empty() { run } else { pass(file, files, options, clock, &texts, watch)?.0 };
+    if quality && !texts.is_empty() {
+        // First-pass selections do not describe the final version-raised files. Drop only the
+        // optional retained states before the production second pass, without scoring them.
+        for level in &mut run.levels {
+            level.quality_exact = None;
+        }
+    }
+    let mut run = if texts.is_empty() { run } else { pass(file, files, options, clock, &texts, watch, quality)?.0 };
     run.read = read;
     // a file level that cannot say 0.3 itself, such as a library section without a header record,
     // takes the version of the file that includes it (16.1): when that one is raised, it reads in
@@ -433,6 +464,7 @@ fn pass(
     clock: &dyn Clock,
     raised: &[(String, String)],
     watch: &dyn Fn(&Progress) -> bool,
+    quality: bool,
 ) -> Result<(SolveRun, Vec<Want>), String> {
     let entry = path_str(file);
     let runtime = options.runtime();
@@ -516,7 +548,12 @@ fn pass(
             .find(|p| p.level == level && p.title == title)
             .ok_or_else(|| format!("the level {title} is not read again after the levels before it were solved"))?;
         let start = Instant::now();
-        let solved = rnl_solver::solve_with_clock(p, &options.solver, clock);
+        let (solved, quality_exact) = if quality {
+            let (solved, exact) = rnl_solver::solve_with_clock_quality(p, &options.solver, clock);
+            (solved, Some(exact))
+        } else {
+            (rnl_solver::solve_with_clock(p, &options.solver, clock), None)
+        };
         let time = start.elapsed();
         let hash = sig2(p, &canonical);
         let mut written = write_record(p, &solved.solution, AUTHOR, &hash);
@@ -569,7 +606,17 @@ fn pass(
             }
         }
         let hints_for_low = options.solver.hints_for_low;
-        levels.push(SolvedLevel { problem: p.clone(), solved, written, record, hash, path, time, hints_for_low });
+        levels.push(SolvedLevel {
+            problem: p.clone(),
+            solved,
+            written,
+            record,
+            hash,
+            path,
+            time,
+            hints_for_low,
+            quality_exact,
+        });
     }
     let packages: Vec<String> = files.files.package_files().iter().map(|p| normalize(p)).collect();
     let read: Vec<String> = files.read.take().into_iter().filter(|p| !packages.contains(p)).collect();

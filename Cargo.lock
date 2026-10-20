@@ -190,6 +190,7 @@ dependencies = [
  "rnl-render",
  "rnl-runtime",
  "rnl-view",
+ "serde_json",
 ]
 
 [[package]]
