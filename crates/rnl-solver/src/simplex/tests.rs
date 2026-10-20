@@ -8,6 +8,227 @@ use num_traits::{Signed, Zero};
 use super::*;
 use crate::rational::{frac, int};
 
+/// The reference never enters canonical_mul, and the scope restores a nested/panicking caller.
+fn with_reference_axpy<R>(f: impl FnOnce() -> R) -> R {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REFERENCE_AXPY_MUL.with(|reference| reference.set(self.0));
+        }
+    }
+    let old = REFERENCE_AXPY_MUL.with(|reference| reference.replace(true));
+    let _restore = Restore(old);
+    f()
+}
+
+fn same_canonical_parts(actual: &Q, expected: &Q) {
+    assert_eq!(actual.numer(), expected.numer());
+    assert_eq!(actual.denom(), expected.denom());
+    assert!(actual.denom().is_positive());
+    assert!(actual.numer().gcd(actual.denom()).is_one());
+    if actual.is_zero() {
+        assert!(actual.denom().is_one());
+    }
+}
+
+fn same_canonical_simplex(a: &Simplex<usize>, b: &Simplex<usize>) {
+    same_indexed_and_linear(a, b);
+    let numbers = |s: &Simplex<usize>| {
+        let mut out = Vec::new();
+        for v in &s.vars {
+            out.push(v.value.clone());
+            out.extend(v.lower.iter().chain(&v.upper).map(|bound| bound.value.clone()));
+        }
+        out.extend(s.rows.iter().flat_map(|row| row.terms.iter().map(|(_, q)| q.clone())));
+        out.extend(s.forms.keys().flat_map(|terms| terms.iter().map(|(_, q)| q.clone())));
+        out.extend(s.trail.iter().flat_map(|undo| undo.old.iter().map(|bound| bound.value.clone())));
+        for pivot in s.trace.iter().flatten() {
+            out.extend(pivot.values.iter().cloned());
+            out.extend(pivot.rows.iter().flat_map(|row| row.terms.iter().map(|(_, q)| q.clone())));
+        }
+        out
+    };
+    let (a, b) = (numbers(a), numbers(b));
+    assert_eq!(a.len(), b.len());
+    for (a, b) in a.iter().zip(&b) {
+        same_canonical_parts(a, b);
+    }
+}
+
+#[test]
+fn canonical_mul_matches_original_ratio_components_for_signs_and_large_cross_factors() {
+    use num_bigint::BigInt;
+    let p = (BigInt::one() << 521usize) - BigInt::one();
+    let q = BigInt::one() << 256usize;
+    let mut cases = vec![
+        int(0),
+        int(1),
+        int(-1),
+        int(7),
+        int(-11),
+        frac(2, 3),
+        frac(-7, 11),
+        Q::new(p.clone(), q.clone()),
+        Q::new(q.clone(), p.clone()),
+        Q::new(-p.clone(), q.clone()),
+        Q::new(q.clone(), -p.clone()),
+        Q::new(BigInt::zero(), -p.clone()),
+        Q::new(&p * &p, &q * &q),
+    ];
+    let mut rng = Rng(0x54b9_e235_78c1_06ad);
+    for _ in 0..24 {
+        let numerator = (BigInt::from(rng.int(-23, 23)) << rng.below(300) as usize) + BigInt::from(rng.int(-3, 3));
+        let denominator = (BigInt::from(rng.int(1, 23)) << rng.below(300) as usize) + BigInt::one();
+        cases.push(Q::new(numerator, denominator));
+    }
+    for a in &cases {
+        for b in &cases {
+            // This remains the original Ratio implementation, not the new helper or dispatcher.
+            same_canonical_parts(&canonical_mul(a, b), &(a * b));
+        }
+    }
+    // Chaining results tests the canonical closure as well as isolated inputs.
+    let (mut actual, mut reference) = (frac(-5, 7), frac(-5, 7));
+    for b in cases.iter().filter(|q| !q.is_zero()).cycle().take(48) {
+        actual = canonical_mul(&actual, b);
+        reference = &reference * b;
+        same_canonical_parts(&actual, &reference);
+    }
+}
+
+#[test]
+fn canonical_axpy_matches_map_oracle_cancellation_order_and_linexpr_reference() {
+    let acc = vec![(1, frac(-6, 35)), (4, frac(-15, 77)), (7, frac(9, 13))];
+    let x = vec![(0, int(-1)), (1, frac(2, 5)), (3, frac(-2, 3)), (4, frac(5, 11)), (8, int(1))];
+    for a in [int(0), int(1), int(-1), frac(3, 7), frac(-7, 3)] {
+        for x in [x.as_slice(), &[]] {
+            // Independent map oracle: only the original Ratio product/addition is used.
+            let mut expected: BTreeMap<_, _> = acc.iter().cloned().collect();
+            let mut expected_changes = Vec::new();
+            if !a.is_zero() {
+                for (v, d) in x {
+                    let product = &a * d;
+                    if let Some(c) = expected.get(v) {
+                        let sum = c + product;
+                        if sum.is_zero() {
+                            expected.remove(v);
+                            expected_changes.push((*v, false));
+                        } else {
+                            expected.insert(*v, sum);
+                        }
+                    } else {
+                        expected.insert(*v, product);
+                        expected_changes.push((*v, true));
+                    }
+                }
+            }
+            let mut actual = acc.clone();
+            let mut changes = Vec::new();
+            axpy_changed(&mut actual, x, &a, None, |v, add| changes.push((v, add)));
+            assert_eq!(changes, expected_changes);
+            assert_eq!(actual.len(), expected.len());
+            for ((v, value), (want_v, want)) in actual.iter().zip(&expected) {
+                assert_eq!(v, want_v);
+                same_canonical_parts(value, want);
+            }
+            let build = || {
+                let mut e = LinExpr::from_terms(acc.iter().cloned(), frac(1, 5));
+                e.add_scaled(&LinExpr::from_terms(x.iter().cloned(), frac(-2, 7)), &a);
+                e
+            };
+            let (actual, reference) = (build(), with_reference_axpy(build));
+            assert_eq!(actual.terms.len(), reference.terms.len());
+            for ((v, value), (want_v, want)) in actual.terms.iter().zip(&reference.terms) {
+                assert_eq!(v, want_v);
+                same_canonical_parts(value, want);
+            }
+            same_canonical_parts(&actual.constant, &reference.constant);
+        }
+    }
+}
+
+#[test]
+fn canonical_mul_solver_trajectories_match_original_ratio_arithmetic() {
+    let mut rng = Rng(0x53a7_e02b_98d4_10fc);
+    for _ in 0..16 {
+        let (mut a, vars) = simplex(3);
+        a.trace = Some(Vec::new());
+        let mut b = a.clone();
+        for &v in &vars {
+            assert_eq!(
+                a.assert_bounds(v, Some(int(-8)), Some(int(8)), v),
+                with_reference_axpy(|| b.assert_bounds(v, Some(int(-8)), Some(int(8)), v))
+            );
+        }
+        for tag in 3..11 {
+            let terms: Vec<_> = vars.iter().map(|&v| (v, frac(rng.int(-3, 3), rng.int(1, 5)))).collect();
+            let e = LinExpr::from_terms(terms.iter().cloned(), frac(2, 7));
+            let original = with_reference_axpy(|| LinExpr::from_terms(terms, frac(2, 7)));
+            let value = original.eval(|v| int(v as i64 - 1));
+            let relation = [Rel::Le, Rel::Ge, Rel::Eq][rng.below(3) as usize];
+            assert_eq!(
+                a.assert(&e, relation, &value, tag),
+                with_reference_axpy(|| b.assert(&original, relation, &value, tag))
+            );
+            assert_eq!(a.check(), with_reference_axpy(|| b.check()));
+            same_canonical_simplex(&a, &b);
+        }
+        let objective = LinExpr::from_terms([(vars[0], frac(-3, 5)), (vars[2], frac(7, 11))], frac(1, 3));
+        let original =
+            with_reference_axpy(|| LinExpr::from_terms([(vars[0], frac(-3, 5)), (vars[2], frac(7, 11))], frac(1, 3)));
+        let (left, right) = (a.minimize(&objective), with_reference_axpy(|| b.minimize(&original)));
+        assert_eq!(left, right);
+        same_canonical_parts(left.as_ref().unwrap(), right.as_ref().unwrap());
+        same_canonical_simplex(&a, &b);
+        let (cp_a, cp_b) = (a.checkpoint(), b.checkpoint());
+        assert_eq!(a.keep_optimum(&objective, 12), with_reference_axpy(|| b.keep_optimum(&original, 12)));
+        assert_eq!(
+            a.assert_bounds(vars[0], Some(int(9)), None, 13),
+            with_reference_axpy(|| b.assert_bounds(vars[0], Some(int(9)), None, 13))
+        );
+        a.backtrack(cp_a);
+        with_reference_axpy(|| b.backtrack(cp_b));
+        same_canonical_simplex(&a, &b);
+        let (mut a, mut b) = (a.clone(), b.clone());
+        assert_eq!(a.check(), with_reference_axpy(|| b.check()));
+        same_canonical_simplex(&a, &b);
+    }
+}
+
+#[test]
+fn canonical_mul_preserves_controlled_time_budget_resume_and_pivot_trace() {
+    use std::cell::RefCell;
+    let mut a = chain_of_links();
+    let mut b = with_reference_axpy(chain_of_links);
+    a.trace = Some(Vec::new());
+    b.trace = Some(Vec::new());
+    let (reads_a, reads_b) = (RefCell::new(Vec::new()), RefCell::new(Vec::new()));
+    let run = |sx: &mut Simplex<usize>, reads: &RefCell<Vec<bool>>| {
+        sx.check_until(&|| {
+            let mut reads = reads.borrow_mut();
+            let expired = !reads.is_empty();
+            reads.push(expired);
+            expired
+        })
+    };
+    assert_eq!(run(&mut a, &reads_a), Err(Failure::Time));
+    assert_eq!(with_reference_axpy(|| run(&mut b, &reads_b)), Err(Failure::Time));
+    assert_eq!(*reads_a.borrow(), [false, true]);
+    assert_eq!(*reads_a.borrow(), *reads_b.borrow());
+    same_canonical_simplex(&a, &b);
+    assert_eq!(a.pivots(), 2 * PIVOTS_PER_READ);
+    a.set_pivot_limit(Some(a.pivots()));
+    b.set_pivot_limit(Some(b.pivots()));
+    assert_eq!(a.check(), Err(Failure::Budget));
+    assert_eq!(with_reference_axpy(|| b.check()), Err(Failure::Budget));
+    same_canonical_simplex(&a, &b);
+    a.set_pivot_limit(None);
+    b.set_pivot_limit(None);
+    assert_eq!(a.check(), Ok(()));
+    assert_eq!(with_reference_axpy(|| b.check()), Ok(()));
+    same_canonical_simplex(&a, &b);
+}
+
 #[test]
 fn work_accounting_clone_rollback_and_drop_match_small_oracles() {
     use crate::profile::{self, ProfileEvent, ProfileObserver};
