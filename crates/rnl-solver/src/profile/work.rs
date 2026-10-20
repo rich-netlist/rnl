@@ -42,6 +42,8 @@ counters! {
     CheckRows => "work_check_rows_examined",
     CheckViolations => "work_check_violations",
     CheckFeasible => "work_check_feasible_passes",
+    CheckPivots => "work_check_pivots",
+    PrimalPivots => "work_primal_pivots",
     ViolationRefreshes => "work_violation_refreshes",
     ViolationBasicChecks => "work_violation_basic_checks",
     ViolationChanges => "work_violation_membership_changes",

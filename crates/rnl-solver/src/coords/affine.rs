@@ -2,7 +2,7 @@
 //! source variables; the simplex's variables are private to `Axis`.
 use std::collections::BTreeSet;
 
-use num_traits::{One, Zero};
+use num_traits::Zero;
 
 use crate::rational::Q;
 use crate::simplex::{Failure, LinExpr, Rel, Simplex, SourceBound, Var};
@@ -73,8 +73,12 @@ pub(crate) fn compile<T: Clone + Ord>(
     priority: &[u8],
 ) -> Result<Compiled<T>, Failure<T>> {
     bounds.sort_by(|a, b| {
-        (a.expr.terms(), a.expr.constant_part(), &a.lower, &a.upper)
-            .cmp(&(b.expr.terms(), b.expr.constant_part(), &b.lower, &b.upper))
+        (a.expr.terms(), a.expr.constant_part(), &a.lower, &a.upper).cmp(&(
+            b.expr.terms(),
+            b.expr.constant_part(),
+            &b.lower,
+            &b.upper,
+        ))
     });
     let original = bounds.clone();
     let m = bounds.len();
@@ -112,6 +116,7 @@ pub(crate) fn compile<T: Clone + Ord>(
                     why.extend(tags(&bounds[i]));
                     return Err(Failure::Conflict(why.into_iter().collect()));
                 }
+                removed[i] = true; // redundant, not another independent eliminated equation
                 continue;
             }
             let mut best: Option<((isize, u8, Var), LinExpr)> = None;
@@ -161,10 +166,7 @@ pub(crate) fn compile<T: Clone + Ord>(
     for (z, v) in retained.iter().enumerate() {
         renumber[*v] = LinExpr::var(z);
     }
-    let map = AffineMap {
-        images: expressions[m..].iter().map(|e| substitute(e, &renumber)).collect(),
-        retained,
-    };
+    let map = AffineMap { images: expressions[m..].iter().map(|e| substitute(e, &renumber)).collect(), retained };
     let mut remaining = Vec::new();
     for (i, mut b) in bounds.drain(..).enumerate() {
         if removed[i] {
@@ -173,8 +175,7 @@ pub(crate) fn compile<T: Clone + Ord>(
         b.expr = substitute(&expressions[i], &renumber);
         if b.expr.is_constant() {
             let value = b.expr.constant_part();
-            if b.lower.as_ref().is_some_and(|(lo, _)| value < lo)
-                || b.upper.as_ref().is_some_and(|(hi, _)| value > hi)
+            if b.lower.as_ref().is_some_and(|(lo, _)| value < lo) || b.upper.as_ref().is_some_and(|(hi, _)| value > hi)
             {
                 let mut why = support.clone();
                 why.extend(tags(&b));
@@ -193,11 +194,12 @@ pub(crate) struct Axis<T> {
     sx: Simplex<T>,
     map: AffineMap,
     support: Vec<T>,
+    projected: bool,
 }
 
 impl<T: Clone + Ord> Axis<T> {
     pub(crate) fn new() -> Self {
-        Self { sx: Simplex::new(), map: AffineMap::identity(0), support: Vec::new() }
+        Self { sx: Simplex::new(), map: AffineMap::identity(0), support: Vec::new(), projected: false }
     }
 
     pub(crate) fn new_var(&mut self) -> Var {
@@ -208,6 +210,7 @@ impl<T: Clone + Ord> Axis<T> {
         let original = self.map.images.len();
         let v = self.sx.new_var_at(value);
         self.map.images.push(LinExpr::var(v));
+        self.projected |= v != original;
         original
     }
 
@@ -228,7 +231,7 @@ impl<T: Clone + Ord> Axis<T> {
         }
         let mut support: BTreeSet<T> = compiled.support.into_iter().collect();
         support.extend(extra_support);
-        let mut out = Self { sx, map: compiled.map, support: support.into_iter().collect() };
+        let mut out = Self { sx, map: compiled.map, support: support.into_iter().collect(), projected: true };
         for b in compiled.bounds {
             if let Some((v, tag)) = b.lower {
                 out.sx.assert(&b.expr, Rel::Ge, &v, tag).map_err(|f| out.explain(f))?;
@@ -252,16 +255,18 @@ impl<T: Clone + Ord> Axis<T> {
     }
 
     pub(crate) fn assert(&mut self, e: &LinExpr, rel: Rel, c: &Q, tag: T) -> Result<(), Failure<T>> {
+        if !self.projected {
+            return self.sx.assert(e, rel, c, tag);
+        }
         let e = self.map.map_expr(e);
         self.sx.assert(&e, rel, c, tag).map_err(|f| self.explain(f))
     }
 
     pub(crate) fn value(&self, v: Var) -> Q {
+        if !self.projected {
+            return self.sx.value(v).clone();
+        }
         self.map.eval_original(v, |z| self.sx.value(z).clone())
-    }
-
-    pub(crate) fn eval(&self, e: &LinExpr) -> Q {
-        self.sx.eval(&self.map.map_expr(e))
     }
 
     pub(crate) fn check(&mut self) -> Result<(), Failure<T>> {
@@ -273,20 +278,43 @@ impl<T: Clone + Ord> Axis<T> {
     }
 
     pub(crate) fn minimize(&mut self, e: &LinExpr) -> Result<Q, Failure<T>> {
+        if !self.projected {
+            return self.sx.minimize(e);
+        }
         self.sx.minimize(&self.map.map_expr(e)).map_err(|f| self.explain(f))
     }
 
     pub(crate) fn keep_optimum(&mut self, e: &LinExpr, tag: T) -> Result<(), Failure<T>> {
+        if !self.projected {
+            return self.sx.keep_optimum(e, tag);
+        }
         self.sx.keep_optimum(&self.map.map_expr(e), tag).map_err(|f| self.explain(f))
     }
 
-    pub(crate) fn checkpoint(&self) -> usize { self.sx.checkpoint() }
-    pub(crate) fn backtrack(&mut self, cp: usize) { self.sx.backtrack(cp); }
-    pub(crate) fn pivots(&self) -> u64 { self.sx.pivots() }
-    pub(crate) fn carry_pivots(&mut self, used: u64) { self.sx.carry_pivots(used); }
-    pub(crate) fn set_pivot_limit(&mut self, limit: Option<u64>) { self.sx.set_pivot_limit(limit); }
-    pub(crate) fn pivot_limit(&self) -> Option<u64> { self.sx.pivot_limit() }
-    pub(crate) fn profile_tableau(&self) { self.sx.profile_tableau(); }
+    pub(crate) fn checkpoint(&self) -> usize {
+        self.sx.checkpoint()
+    }
+    pub(crate) fn backtrack(&mut self, cp: usize) {
+        self.sx.backtrack(cp);
+    }
+    pub(crate) fn pivots(&self) -> u64 {
+        self.sx.pivots()
+    }
+    pub(crate) fn carry_pivots(&mut self, used: u64) {
+        self.sx.carry_pivots(used);
+    }
+    pub(crate) fn set_pivot_limit(&mut self, limit: Option<u64>) {
+        self.sx.set_pivot_limit(limit);
+    }
+    pub(crate) fn pivot_limit(&self) -> Option<u64> {
+        self.sx.pivot_limit()
+    }
+    pub(crate) fn assignment_is_feasible(&self) -> bool {
+        self.sx.assignment_is_feasible()
+    }
+    pub(crate) fn profile_tableau(&self) {
+        self.sx.profile_tableau();
+    }
 
     /// Compile this axis's current active constraints; no history, old optimum or grid pin is
     /// inherited unless currently bounded. Call BEFORE adding this pass's layers/grid pins.
@@ -296,28 +324,40 @@ impl<T: Clone + Ord> Axis<T> {
         let n = source.variables.len();
         let before_bounds = source.bounds.len();
         let before_nnz: usize = source.bounds.iter().map(|b| b.expr.terms().len()).sum();
-        let compiled = compile(n, source.bounds, &[]).map_err(|f| self.explain(f))?;
+        let compiled = compile(n, source.bounds, &[])
+            .unwrap_or_else(|_| panic!("a checked active axis became inconsistent during affine compilation"));
         if crate::profile::work_enabled() {
             crate::profile::work_set("affine_source_vars", n as u64);
             crate::profile::work_set("affine_reduced_vars", compiled.map.retained.len() as u64);
             crate::profile::work_set("affine_source_bounds", before_bounds as u64);
             crate::profile::work_set("affine_reduced_bounds", compiled.bounds.len() as u64);
             crate::profile::work_set("affine_source_nnz", before_nnz as u64);
-            crate::profile::work_set("affine_reduced_nnz", compiled.bounds.iter().map(|b| b.expr.terms().len() as u64).sum());
+            crate::profile::work_set(
+                "affine_reduced_nnz",
+                compiled.bounds.iter().map(|b| b.expr.terms().len() as u64).sum(),
+            );
             crate::profile::work_set("affine_eliminated_rank", compiled.eliminated.len() as u64);
-            crate::profile::work_set("affine_retained_equalities", compiled.bounds.iter().filter(|b| equation(b).is_some()).count() as u64);
+            crate::profile::work_set(
+                "affine_retained_equalities",
+                compiled.bounds.iter().filter(|b| equation(b).is_some()).count() as u64,
+            );
         }
         let values: Vec<Q> = source.variables.iter().map(|v| self.sx.value(*v).clone()).collect();
         // Check x=T(Px)+d at the existing source point. Failure is a compiler invariant error,
         // never an ordinary UNSAT outcome or permission to retry a second cold solve.
         for (v, value) in values.iter().enumerate() {
-            assert_eq!(*value, compiled.map.eval_original(v, |z| values[compiled.map.retained[z]].clone()), "invalid affine lift");
+            assert_eq!(
+                *value,
+                compiled.map.eval_original(v, |z| values[compiled.map.retained[z]].clone()),
+                "invalid affine lift"
+            );
         }
         let old_images: Vec<LinExpr> = self.map.images.iter().map(|e| substitute(e, &source.forms)).collect();
         let images: Vec<LinExpr> = old_images.iter().map(|e| compiled.map.map_expr(e)).collect();
         let mut out = Self::from_compiled(compiled, &values, self.pivots(), self.pivot_limit(), self.support.clone())?;
         out.map.images = images;
         out.check()?;
+        assert_eq!(out.pivots(), self.pivots(), "a legal affine projection must not require feasibility pivots");
         Ok(out)
     }
 }

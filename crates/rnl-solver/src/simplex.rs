@@ -379,6 +379,12 @@ impl<T: Clone + Ord> Simplex<T> {
         self.pivot_limit
     }
 
+    /// Nonbasic bound changes clamp their value immediately; the maintained violated set is
+    /// therefore an O(1) feasibility check for a freshly installed exact helper assignment.
+    pub(crate) fn assignment_is_feasible(&self) -> bool {
+        self.violated.is_empty()
+    }
+
     /// Recover active bounds through the immutable form DAG, never through pivoted rows. A
     /// slack with no bounds can still be a dependency of a currently bounded source form.
     pub(crate) fn active_bounds_in_source_variables(&self) -> SourceProgram<T> {
@@ -403,13 +409,17 @@ impl<T: Clone + Ord> Simplex<T> {
             };
             forms.push(e);
         }
-        let bounds = self.vars.iter().enumerate().filter_map(|(v, s)| {
-            (s.lower.is_some() || s.upper.is_some()).then(|| SourceBound {
+        let bounds = self
+            .vars
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.lower.is_some() || s.upper.is_some())
+            .map(|(v, s)| SourceBound {
                 expr: forms[v].clone(),
                 lower: s.lower.as_ref().map(|b| (b.value.clone(), b.tag.clone())),
                 upper: s.upper.as_ref().map(|b| (b.value.clone(), b.tag.clone())),
             })
-        }).collect();
+            .collect();
         SourceProgram { variables, forms, bounds }
     }
 
@@ -657,6 +667,9 @@ impl<T: Clone + Ord> Simplex<T> {
             let target = if below { &s.lower } else { &s.upper };
             let target = target.as_ref().expect("the violated bound").value.clone();
             self.pivot_and_update(xi, xj, target);
+            if let Some(w) = &mut work {
+                w.add(Key::CheckPivots, 1);
+            }
             made += 1;
             if std::mem::replace(&mut left[xi], true) {
                 repeats += 1;
@@ -823,6 +836,9 @@ impl<T: Clone + Ord> Simplex<T> {
                 let target = if up { &b.upper } else { &b.lower };
                 let target = target.as_ref().expect("the bound reached").value.clone();
                 self.pivot_and_update(xl, xk, target);
+            }
+            if let Some(w) = &mut work {
+                w.add(Key::PrimalPivots, 1);
             }
         }
     }

@@ -85,7 +85,7 @@ fn run_round(
         }
     };
     match seed {
-        Some(seed) => with_placement_seed(s, rels, &mut Work::default(), Some(seed), &s.witness.orient, consume),
+        Some(seed) => with_placement_seed(s, rels, 0, &mut Work::default(), Some(seed), &s.witness.orient, consume),
         // The original entry point has no seed proposal or geometry gate.
         None => with_relations(s, rels, &mut Work::default(), "placement", consume),
     }
@@ -129,7 +129,7 @@ fn geometry_seed_checks_shape_orientation_and_every_kept_fact_before_add() {
     ] {
         let observer = Rc::new(Observer::default());
         let geometry = profile::with(Some(observer.clone()), || {
-            with_placement_seed(&s, &[], &mut Work::default(), Some(seed), &s.witness.orient, |r, _, _| {
+            with_placement_seed(&s, &[], 0, &mut Work::default(), Some(seed), &s.witness.orient, |r, _, _| {
                 r.geometry().clone()
             })
         });
