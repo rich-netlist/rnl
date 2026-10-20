@@ -2853,7 +2853,7 @@ dependencies = [
 
 [[package]]
 name = "rnl-cli"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "rnl-edit",
  "rnl-render",
@@ -2866,7 +2866,7 @@ dependencies = [
 
 [[package]]
 name = "rnl-edit"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "rnl-runtime",
  "rnl-view",
@@ -2876,7 +2876,7 @@ dependencies = [
 
 [[package]]
 name = "rnl-host-spectre"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "rnl-host-spice",
  "rnl-runtime",
@@ -2884,14 +2884,14 @@ dependencies = [
 
 [[package]]
 name = "rnl-host-spice"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "rnl-runtime",
 ]
 
 [[package]]
 name = "rnl-render"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "libm",
  "rnl-runtime",
@@ -2902,7 +2902,7 @@ dependencies = [
 
 [[package]]
 name = "rnl-runtime"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "libm",
  "serde_json",
@@ -2910,7 +2910,7 @@ dependencies = [
 
 [[package]]
 name = "rnl-solver"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "num-bigint",
  "num-integer",
@@ -2922,7 +2922,7 @@ dependencies = [
 
 [[package]]
 name = "rnl-view"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "rnl-host-spectre",
  "rnl-host-spice",
@@ -2934,7 +2934,7 @@ dependencies = [
 
 [[package]]
 name = "rnl-viewer"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "rnl-cli",
  "rnl-runtime",
