@@ -70,8 +70,8 @@ use crate::rational::{from_f64, int, Q};
 use crate::resolve::{Geometry, Resolver, Tag};
 use crate::route::CLEARANCE;
 use crate::search::{
-    orientation_relations, relations, relations_by_pairs, row_pairs, up, with_relations, Candidate, RelKind, Relation,
-    RowPair, Tagged,
+    orientation_relations, relations, relations_by_pairs, row_pairs, up, with_placement_seed, with_relations,
+    Candidate, RelKind, Relation, RowPair, Tagged,
 };
 use crate::simplex::{LinExpr, Rel, Simplex, Var};
 use crate::structure::{Drawn, Role, Structure};
@@ -145,6 +145,8 @@ pub(crate) fn place(
     // the rows apart as wholes in the first LP, then pair by pair (quality review SE-4)
     let mut pairs: Option<Vec<RowPair>> = None;
     let mut row_rounds = 0;
+    // Local to this candidate. A failed round clears it; the last round never stores one.
+    let mut next_seed = None;
     loop {
         let phase = crate::profile::work_span("coords_work", "relations_build");
         crate::profile::work_set("work_repair_round", round as u64);
@@ -159,10 +161,12 @@ pub(crate) fn place(
         let phase = crate::profile::work_span("coords_work", "placement");
         crate::profile::work_set("work_repair_round", round as u64);
         crate::profile::work_set("work_row_round", row_rounds as u64);
-        let (geometry, kept, undecided, optimised) = with_relations(s, &rels, work, "placement", |r, model, t| {
-            let (g, optimised) = optimise(r, model, s, options);
-            (g, t.kept.clone(), t.undecided, optimised)
-        });
+        let seed = next_seed.take();
+        let (geometry, kept, undecided, optimised, seed_complete) =
+            with_placement_seed(s, &rels, work, seed.as_ref(), &actual, |r, model, t| {
+                let (g, optimised, seed_complete) = optimise(r, model, s, options);
+                (g, t.kept.clone(), t.undecided, optimised, seed_complete)
+            });
         drop(phase);
         let _post = crate::profile::work_span("coords_work", "post_geometry");
         let origins = s.origins(problem, &geometry);
@@ -191,6 +195,7 @@ pub(crate) fn place(
         if rows_again && round < REPAIR_ROUNDS {
             // placed again with the rows apart pair by pair before any overlap is repaired: the
             // overlaps of this placement may not be those of the next
+            next_seed = subsequent_seed(geometry, optimised, undecided, seed_complete);
             continue;
         }
         if new.is_empty() || round >= REPAIR_ROUNDS {
@@ -217,6 +222,20 @@ pub(crate) fn place(
             }
         }
         round += 1;
+        next_seed = subsequent_seed(geometry, optimised, undecided, seed_complete);
+    }
+}
+
+/// Called only when another round will run. Do not retain an older seed after a failed round,
+/// and never retry an unsuccessful solve with a second, cold resolution.
+fn subsequent_seed(geometry: Geometry, optimised: bool, undecided: bool, seed_complete: bool) -> Option<Geometry> {
+    if optimised && !undecided && seed_complete {
+        Some(geometry)
+    } else {
+        if crate::profile::work_enabled() {
+            crate::profile::add("coords_seed_skipped_incomplete", 1);
+        }
+        None
     }
 }
 
@@ -606,7 +625,7 @@ fn round_to_grid(sx: &mut Simplex<Tag>, order: &[Visit], grid: &Q, kept: &BTreeS
 
 /// The coordinates of what a resolution holds (see the module); the resolution's own witness when
 /// the LP cannot finish, with false.
-fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOptions) -> (Geometry, bool) {
+fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOptions) -> (Geometry, bool, bool) {
     let fallback = r.geometry().clone();
     let ori = fallback.orient.clone();
     let grid = options.grid.and_then(from_f64).filter(|g| *g > Q::zero());
@@ -618,6 +637,9 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
     // text on an axis that no fact kept reaches stays at its anchor, where the viewer puts it (13.3)
     let at_anchor = |k: usize, axis: usize| s.anchors.contains_key(&k) && !s.objects[k].fact_axes[axis];
     let mut out = fallback.clone();
+    // The old optimised flag also permits feasible results after a failed layer. Track seed
+    // eligibility separately without changing the old flow, result, or failure handling.
+    let mut all_layers_completed = true;
     for axis in 0..2 {
         let _lp = crate::profile::span_lazy("lp", || format!("axis_{axis}"));
         crate::profile::add("lps", 1);
@@ -628,7 +650,7 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
         sx.profile_tableau();
         let linked = link(sx, model, &ori, axis);
         if !linked {
-            return (fallback, false);
+            return (fallback, false, false);
         }
         // where the resolution of the candidate put each origin, a symbol's on the grid; a text or a
         // point follows what it is placed from, and a target rounded on its own would pull that
@@ -659,17 +681,18 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
             for (k, at) in &moved {
                 let Some(&(_, v)) = own.iter().find(|(j, _)| j == k) else { continue };
                 if sx.assert(&LinExpr::var(v), Rel::Eq, at, Tag::Def).is_err() {
-                    return (fallback, false);
+                    return (fallback, false, false);
                 }
             }
             if sx.check().is_err() {
-                return (fallback, false);
+                return (fallback, false, false);
             }
             let cp = sx.checkpoint();
             let solved = layers(sx, model, s, &ori, &own, &targets, axis).is_ok();
+            all_layers_completed &= solved;
             sx.backtrack(cp);
             if !solved && sx.check().is_err() {
-                return (fallback, false);
+                return (fallback, false, false);
             }
             let Some(g) = &grid else { break };
             let kept: BTreeSet<usize> = moved.iter().map(|(k, _)| *k).collect();
@@ -681,7 +704,7 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
             moved.extend(now);
         }
         if sx.check().is_err() {
-            return (fallback, false);
+            return (fallback, false, false);
         }
         for (k, v) in &own {
             out.origin[*k][axis] = sx.value(*v).clone();
@@ -695,7 +718,10 @@ fn optimise(r: &mut Resolver, model: &Model, s: &Structure, options: &SolverOpti
             }
         }
     }
-    (out, true)
+    // Grid/try_pin may ignore a failed check. Any Budget there requires the monotonic axis
+    // pivot count to have reached the same cap; conservatively exclude equality as well.
+    let below_caps = (0..2).all(|axis| r.simplex_mut(axis).pivots() < s.caps.pivots);
+    (out, true, all_layers_completed && below_caps)
 }
 
 #[cfg(test)]
@@ -713,3 +739,7 @@ mod tests {
         assert_eq!(round(&frac(13, 10), &Some(frac(1, 2))), frac(3, 2));
     }
 }
+
+#[cfg(test)]
+#[path = "coords/geometry_seed_tests.rs"]
+mod geometry_seed_tests;

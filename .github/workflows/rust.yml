@@ -54,7 +54,7 @@ jobs:
       - name: Lints
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
 
   wasm:
     runs-on: ubuntu-latest

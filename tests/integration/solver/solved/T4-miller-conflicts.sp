@@ -58,6 +58,7 @@ CL out 0 2p
 *   %rt5 = (8, 13);
 *   %rt6 = (8, -15);
 *   %rt7 = (19, 6);
+*   %rt8 = (21, 3);
 *   #M1 @PLACE(0, 0) => @ORIENT("R0");
 *   #M2 @PLACE(8, 3) => @ORIENT("MY");
 *   #M3 @PLACE(0, 16) => @ORIENT("MY");
@@ -70,14 +71,14 @@ CL out 0 2p
 *   #VB @PLACE(-35, 2) => @ORIENT("R0");
 *   #VIP @PLACE(-7, -4) => @ORIENT("MY");
 *   #VIN @PLACE(-19, 2) => @ORIENT("MY");
-*   #CL @PLACE(21, 2) => @ORIENT("R0");
+*   #CL @PLACE(21, 0) => @ORIENT("R0");
 *   %gnd_stub_M5_s::g @PLACE(4, -19) => @ORIENT("R0");
 *   %gnd_stub_M7_s::g @PLACE(16, -19) => @ORIENT("R0");
 *   %gnd_stub_VDD_n::g @PLACE(-9, 11) => @ORIENT("R0");
 *   %gnd_stub_VB_n::g @PLACE(-35, -3) => @ORIENT("R0");
 *   %gnd_stub_VIP_n::g @PLACE(-7, -9) => @ORIENT("R0");
 *   %gnd_stub_VIN_n::g @PLACE(-19, -3) => @ORIENT("R0");
-*   %gnd_stub_CL_n::g @PLACE(21, -2) => @ORIENT("R0");
+*   %gnd_stub_CL_n::g @PLACE(21, -4) => @ORIENT("R0");
 *   %supply_stub_M3_s::s @PLACE(0, 20) => @ORIENT("R0");
 *   %supply_stub_M4_s::s @PLACE(8, 20) => @ORIENT("R0");
 *   %supply_stub_M6_s::s @PLACE(18, 17) => @ORIENT("R0");
@@ -104,14 +105,16 @@ CL out 0 2p
 *   &vb @WIRE(mode="straight") {#VB:p (-35, 6) (-22, 6) (-22, -12) (8, -12) %rt6};
 *   &out @WIRE(mode="straight") {#CC:n %rt7};
 *   &out @WIRE(mode="straight") {%rt7 (19, 10) (18, 10) #M6:d};
-*   &out @WIRE(mode="straight") {#CL:p (21, 6) %rt7};
-*   &out @WIRE(mode="straight") {#M7:d (16, 4) (19, 4) %rt7};
+*   &out @WIRE(mode="straight") {#CL:p %rt8};
+*   &out @WIRE(mode="straight") {%rt8 (21, 6) %rt7};
+*   &out @WIRE(mode="straight") {#M7:d (16, 3) %rt8};
 *   $JUNCTION @ATTACH %rt1;
 *   $JUNCTION @ATTACH %rt2;
 *   $JUNCTION @ATTACH %rt3;
 *   $JUNCTION @ATTACH %rt4;
 *   $JUNCTION @ATTACH %rt5;
 *   $JUNCTION @ATTACH %rt6;
-*   $JUNCTION @ATTACH %rt7
+*   $JUNCTION @ATTACH %rt7;
+*   $JUNCTION @ATTACH %rt8
 * }
 .end
