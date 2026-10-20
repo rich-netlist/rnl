@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import shutil
 import sys
@@ -29,8 +30,14 @@ def catalog(url):
     result = json.loads(data)
     if result.get('schemaVersion') != 1 or not isinstance(result.get('packages'), list):
         raise ValueError('unsupported public package catalog')
-    base = url if urllib.parse.urlparse(url).scheme else Path(url).resolve().as_uri()
+    base = url if urllib.parse.urlparse(url).scheme in ('http', 'https', 'file') else Path(url).resolve().as_uri()
+    seen = set()
     for p in result['packages']:
+        key = p['name'], p['version']
+        if (not re.fullmatch(r'[a-z0-9-]+', p['name']) or not re.fullmatch(r'[0-9]+\.[0-9]+', p['version'])
+                or not re.fullmatch(r'[a-f0-9]{64}', p['sha256']) or key in seen):
+            raise ValueError(f'invalid or duplicate package record: {key}')
+        seen.add(key)
         p['url'] = urllib.parse.urljoin(base, p['url'])
         for asset in p['assets']:
             asset['url'] = urllib.parse.urljoin(base, asset['url'])

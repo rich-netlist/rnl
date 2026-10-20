@@ -101,6 +101,7 @@ jobs:
       - name: Build the site
         run: |
           python3 -m unittest discover -s site -p 'test_*.py'
+          python3 -m unittest discover -s scripts -p 'test_packages.py'
           python3 site/build.py
 
       - uses: ./.github/actions/install-spec-tools
@@ -182,11 +183,20 @@ jobs:
           python scripts/packages.py fixture
           echo "RNL_PACKAGE_CATALOG=$GITHUB_WORKSPACE/.rnl-packages/fixture/catalog.json" >> "$GITHUB_ENV"
       - name: Check site navigation in Chromium and WebKit
+        env:
+          RNL_SITE_SCREENSHOTS: ${{ runner.temp }}/package-review
         run: |
           npm ci --prefix tests/viewer
           node tests/viewer/node_modules/@playwright/test/cli.js install --with-deps chromium webkit
           node --test scripts/brand.test.mjs
           node tests/viewer/node_modules/@playwright/test/cli.js test --config site/playwright.config.mjs
+
+      - name: Keep bilingual light and dark review screenshots
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: public-package-review-screenshots
+          path: ${{ runner.temp }}/package-review
+          if-no-files-found: error
 
       - name: Restore production gallery from the latest catalog
         env:

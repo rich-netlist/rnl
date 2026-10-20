@@ -63,6 +63,17 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests
         run: cargo test --workspace
+      - name: Public package tests skip locally and fail when missing in CI
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          mv .rnl-packages .rnl-packages-held
+          trap 'mv .rnl-packages-held .rnl-packages' EXIT
+          env -u CI cargo test -p rnl-cli --test device_symbols --test extensions --test eda_style --test pdk_sky130
+          if CI=true cargo test -p rnl-cli --test extensions; then
+            echo 'Missing public packages must fail in CI'
+            exit 1
+          fi
 
   wasm:
     runs-on: ubuntu-latest
