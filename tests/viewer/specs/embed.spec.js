@@ -3,6 +3,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { publicPackagesAvailable } from "../../../scripts/packages.mjs";
 
 test.skip(!process.env.RNL_WEB_URL, "the site is not built: RNL_WEB=0");
 const base = process.env.RNL_WEB_URL;
@@ -372,4 +373,59 @@ test("demo switches all four published examples in its existing iframe", async (
   }
   expect(await frame.evaluate(() => window.pageMarker)).toBe(42);
   await screenshot(page, "demo-after.png", browserName);
+});
+
+test("public packages: every picker record loads through the offline catalog", async ({ page }) => {
+  test.skip(!publicPackagesAvailable(), "Run python scripts/packages.py download");
+  await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
+  await page.goto(base);
+  await expect(page.locator("#menubar")).toBeVisible();
+  const results = await page.evaluate(async () => {
+    const { default: shell } = await import('./shells/web.js');
+    const packages = await shell.publicPackages();
+    const results = [];
+    for (const pkg of packages) {
+      const items = await shell.includePackage(pkg);
+      shell.setPool(items);
+      const source = { name: 'public.sp', text: `* public\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="${pkg.name}", version="${pkg.version}") }\nR1 a 0 1k\n.end\n` };
+      const doc = await shell.build(source);
+      results.push({ name: pkg.name, errors: doc.diagnostics.filter(d => d.severity === 'error') });
+    }
+    return results;
+  });
+  expect(results.map(p => p.name).sort()).toEqual(['analog-canvas-extensions', 'eda-style', 'eda-symbol', 'pdk-sky130']);
+  for (const result of results) expect(result.errors, result.name).toEqual([]);
+});
+
+test("public packages: failed catalogs preserve built-ins and altered package bytes fail", async ({ page }) => {
+  test.skip(!publicPackagesAvailable(), "Run python scripts/packages.py download");
+  await page.route('**/public-packages/catalog.json', route => route.fulfill({ status: 503, body: 'unavailable' }));
+  await page.goto(base);
+  await expect(page.locator('#public-package-status')).toContainText('Built-in standard packages remain available');
+  await page.locator('[data-group="builtin"] .lib-toggle').click();
+  await expect(page.locator('[data-group="builtin"] .pool-row')).toHaveCount(25);
+  await page.unroute('**/public-packages/catalog.json');
+  await page.route('**/public-packages/packages/analog-canvas-extensions/**/analog-canvas-extensions.rnl', route => route.fulfill({ body: 'altered package' }));
+  const error = await page.evaluate(async () => {
+    const { default: shell } = await import('./shells/web.js');
+    const pkg = (await shell.publicPackages()).find(p => p.name === 'analog-canvas-extensions');
+    try { await shell.includePackage(pkg); } catch (error) { return String(error); }
+  });
+  expect(error).toContain('SHA-256 mismatch');
+});
+
+test("public packages: legacy URLs and embedded USE-PACKAGE resolve through the catalog", async ({ page }) => {
+  test.skip(!publicPackagesAvailable(), "Run python scripts/packages.py download");
+  await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
+  await page.goto(`${base}/?url=libraries/eda-symbol/eda-symbol.rnl`);
+  await page.waitForFunction(() => window.viewer?.doc && !document.body.classList.contains('busy'));
+  const doc = await page.evaluate(() => window.viewer.doc);
+  expect(doc.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+  expect(doc.files[0].text).toContain('@PACKAGE(name="eda-symbol", version="0.1")');
+  const frame = await start(page);
+  const source = fs.readFileSync(new URL('../inputs/missing-canvas-package.sp', import.meta.url), 'utf8');
+  await send(page, { type: 'open', text: source, name: 'canvas.sp' });
+  const loaded = await waitMessage(page, 'loaded');
+  expect(loaded.errors).toBe(0);
+  await expect(frame.locator('#canvas > svg')).toBeVisible();
 });
