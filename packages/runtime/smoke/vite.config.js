@@ -7,7 +7,7 @@ publicPackageText("analog-canvas-extensions");
 // README says: the Worker is a module with a top-level await, and pre-bundling would move the
 // modules away from worker.js and the module next to them.
 export default defineConfig({
-  resolve: { alias: { "rnl-public-canvas": join(publicPackageDir("analog-canvas-extensions"), "analog-canvas-extensions.rnl") } },
+  resolve: { alias: { "rnl-public-canvas?url": join(publicPackageDir("analog-canvas-extensions"), "analog-canvas-extensions.rnl") + "?url" } },
   worker: { format: "es" },
   optimizeDeps: { exclude: ["@rich-netlist/runtime"] },
 });

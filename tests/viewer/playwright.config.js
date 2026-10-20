@@ -23,7 +23,7 @@ import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import { root } from "./fixtures.js";
 
-if (publicPackagesAvailable()) {
+if (!process.env.RNL_PACKAGE_FIXTURE && publicPackagesAvailable()) {
   execFileSync("python", ["scripts/packages.py", "fixture"], { cwd: root });
   process.env.RNL_PACKAGE_FIXTURE = join(packageCache, "fixture");
 }

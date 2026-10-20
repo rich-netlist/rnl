@@ -2,18 +2,9 @@ import { defineConfig } from "../tests/viewer/node_modules/@playwright/test/inde
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { execFileSync } from "node:child_process";
-import { packageCache, publicPackagesAvailable } from "../scripts/packages.mjs";
-
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-if (publicPackagesAvailable()) {
-  execFileSync("python", ["scripts/packages.py", "fixture"], { cwd: root });
-  process.env.RNL_PACKAGE_CATALOG = resolve(packageCache, "fixture/catalog.json");
-  // Rebuild only gallery data; all browser assertions see the locked fixture, even when the
-  // preceding production build used a newer catalog.
-  execFileSync(process.execPath, ["site/gallery/build.mjs"], { cwd: root, stdio: "inherit" });
-}
 export default defineConfig({
+  globalSetup: "./test-setup.mjs",
   testDir: "./tests",
   workers: 2,
   fullyParallel: true,

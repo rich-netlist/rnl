@@ -635,7 +635,32 @@ export default {
         return path.startsWith("/<pool>/") ? Promise.resolve(null) : source.read(path, again);
       };
       const builder = { build: (request) => { progress?.("parsing"); return core.build(request); } };
-      const { document: doc } = await collect(builder, request, read);
+      let { document: doc } = await collect(builder, request, read);
+      if (embed) {
+        // Embeds have no Library controls. Resolve named public dependencies with the same
+        // catalog and verification as Include Public Package; keep downloads request-local.
+        const added = new Set();
+        while (true) {
+          const missing = doc.diagnostics.filter(d => d.severity === "error")
+            .map(d => /^package (\S+) (\S+) cannot be found:/.exec(d.message)).filter(Boolean);
+          if (!missing.length) break;
+          const catalog = await publicPackages();
+          let changed = false;
+          for (const [, name, version] of missing) {
+            const key = `${name} ${version}`;
+            if (added.has(key)) continue;
+            added.add(key);
+            const pkg = catalog.find(p => p.name === name && p.version === version);
+            if (!pkg) continue;
+            const path = `/library/${pkg.path}`;
+            request.files[path] = decodeText(await readPublicPackage(pkg));
+            request.pool.push(path);
+            changed = true;
+          }
+          if (!changed) break;
+          ({ document: doc } = await collect(builder, request, read));
+        }
+      }
       if (!embed) document.title = `${doc.name} - RNL Viewer`;
       return doc;
     } catch (e) {

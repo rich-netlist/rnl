@@ -164,7 +164,7 @@ jobs:
       # and puts it at site/dist/viewer/, where the pages of both languages link
       - name: Build the web viewer, with samples and the package library
         run: |
-          node --test apps/web/library.test.mjs
+          node --test apps/web/*.test.mjs
           node apps/web/build.mjs --samples
           cp -r apps/web/dist site/dist/viewer
 
