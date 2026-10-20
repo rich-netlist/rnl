@@ -7,24 +7,24 @@ import { setGrid } from "./grid.js";
 import { setHoverNames } from "./hover.js";
 import { adoptSource, showBuilt } from "./open.js";
 import { shell } from "./shell.js";
-import { prepareEmbed, sourceFromUrl } from "./shells/web.js";
+import { prepareViewer } from "./shells/web.js";
+import { startViewerApi } from "./viewer-api.js";
 import { current, doc, path, setDoc } from "./state.js";
 import { backTo, enterRow, enterRoot } from "./subcircuits.js";
 import { $, span, svgElement } from "./util.js";
 import { startLoading, nextPaint } from "./loading.js";
 
 const params = new URLSearchParams(location.search);
-const targetOrigin = params.has("origin") ? params.get("origin") : "*";
 const language = navigator.languages.find((value) => /^(zh|en)\b/i.test(value)) || navigator.language;
 const zh = /^zh\b/i.test(language);
-let generation = 0;
+let api;
 let opening = false;
 let reportedLevel = null;
 let link;
 let crumbs;
 
 function send(type, fields = {}) {
-  window.parent.postMessage({ rnl: 1, type, ...fields }, targetOrigin);
+  api?.send(type, fields);
 }
 
 function error(reason) {
@@ -35,7 +35,6 @@ function error(reason) {
   crumbs.hidden = true;
   link.hidden = true;
   reportedLevel = null;
-  send("error", { message });
 }
 
 /** A level named by the API; preserve a real hierarchy path when it is reachable from the top. */
@@ -83,26 +82,19 @@ function updateLevel() {
 }
 
 /** Each open has an identity. Late reads, builds and errors never replace a newer request. */
-async function open(message, initial = false) {
-  const request = ++generation;
+async function open(source, packages, isCurrent, initial, message, signal) {
   opening = true;
   document.body.classList.add("busy");
   const progress = startLoading();
   link.hidden = true;
+  let built;
   try {
-    let source;
-    let url = null;
-    if (typeof message.text === "string" && typeof message.name === "string" && message.name.trim()) {
-      source = { name: message.name, text: message.text, temporary: true };
-    } else if (typeof message.url === "string") {
-      source = sourceFromUrl(message.url);
-      url = message.url;
-    } else throw new Error("open needs text and name, or url.");
+    const url = message.url ?? null;
     await progress.stage("reading");
-    const built = await shell.build(source, undefined, progress.setStage);
-    if (request !== generation) return;
+    built = await shell.build(source, undefined, progress.setStage, packages, signal);
+    if (!isCurrent()) return;
     await progress.stage("displaying");
-    if (request !== generation) return;
+    if (!isCurrent()) return;
     const errors = built.diagnostics.filter((item) => item.severity === "error");
     if (built.failed || errors.length) throw new Error(built.failed || errors[0].message);
     resetBuffers(built);
@@ -114,11 +106,11 @@ async function open(message, initial = false) {
     if (getComputedStyle($("canvas")).getPropertyValue("--fit-content").trim() === "1") {
       $("canvas").getBoundingClientRect();
       await document.fonts.ready;
-      if (request !== generation) return;
+      if (!isCurrent()) return;
     }
     fit();
     await nextPaint();
-    if (request !== generation) return;
+    if (!isCurrent()) return;
     if (url !== null) {
       const full = new URL(location.href);
       full.searchParams.delete("embed");
@@ -128,19 +120,19 @@ async function open(message, initial = false) {
     }
     opening = false;
     reportedLevel = null;
-    send("loaded", {
+    const result = {
       name: built.name,
       levels: built.levels.map((item) => item.title),
       level: built.levels[current]?.title ?? "",
       errors: errors.length,
       warnings: built.diagnostics.filter((item) => item.severity === "warning").length,
-    });
+    };
     updateLevel();
-  } catch (reason) {
-    if (request === generation) error(reason);
+    return result;
   } finally {
+    if (built) shell.discardBuild?.(built);
     progress.finish();
-    if (request === generation) {
+    if (isCurrent()) {
       opening = false;
       document.body.classList.remove("busy");
     }
@@ -192,19 +184,14 @@ export async function startEmbed() {
   clearDrawing(zh ? "等待网表。" : "Waiting for a netlist.");
   $("canvas").tabIndex = 0;
   try {
-    const [version] = await Promise.all([prepareEmbed(), startCommands()]);
+    const [version] = await Promise.all([prepareViewer(), startCommands()]);
     setBackground(params.get("background") === "dark" ? "dark" : "light");
     const grid = params.get("grid");
     setGrid({ shown: grid === "dots" || grid === "lines", style: grid === "lines" ? "lines" : "dots" });
     setHoverNames(params.get("names") !== "0");
     window.addEventListener("viewer-level", updateLevel);
-    window.addEventListener("message", (event) => {
-      if (params.has("origin") && event.origin !== targetOrigin) return;
-      const message = event.data;
-      if (!message || typeof message !== "object" || message.rnl !== 1) return;
-      try {
+    api = startViewerApi({ version, open, onError: message => error(message.replace(/^Could not open the netlist: /, "")), command(message) {
         switch (message.type) {
-          case "open": void open(message); break;
           case "level":
             if (typeof message.name === "string") level(message.name);
             break;
@@ -214,12 +201,8 @@ export async function startEmbed() {
             break;
           default: break;
         }
-      } catch (reason) {
-        send("error", { message: reason instanceof Error ? reason.message : String(reason) });
-      }
-    });
-    send("ready", { version });
-    if (params.has("url")) void open({ url: params.get("url") }, true);
+    } });
+    if (params.has("url")) void api.open({ url: params.get("url") }, true);
   } catch (reason) {
     error(reason);
   }

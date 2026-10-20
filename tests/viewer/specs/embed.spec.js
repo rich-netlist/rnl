@@ -80,6 +80,14 @@ async function send(page, message) {
 }
 
 const viewBox = (frame) => frame.locator("#canvas > svg").getAttribute("viewBox");
+test("the shared API advertises optional fields and correlates explicit package imports", async ({ page }) => {
+  await start(page);
+  expect((await messages(page, "ready"))[0].features).toEqual(expect.arrayContaining(["requestId", "packages"]));
+  await send(page, { type: "open", requestId: "canvas", name: "canvas.sp",
+    text: fs.readFileSync(new URL("../inputs/missing-canvas-package.sp", import.meta.url), "utf8"),
+    packages: [{ name: "analog-canvas-extensions", version: "0.1" }] });
+  expect(await waitMessage(page, "loaded")).toMatchObject({ requestId: "canvas", errors: 0 });
+});
 const width = async (frame) => Number((await viewBox(frame)).split(" ")[2]);
 
 async function screenshot(page, name, browserName) {

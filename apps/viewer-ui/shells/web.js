@@ -1,7 +1,7 @@
 // The web shell: the page in a browser, served with the core next to it as core/ (apps/web). It opens
 // files the user chooses or drops, a folder, or a URL; reads only the files a document needs, as
 // collect in the core's client asks for them; and builds the Document with the core as WebAssembly in
-// a module Worker, one for the page's lifetime. The page shows its own menu bar.
+// module Workers. Each candidate keeps its own lazy drawings until the page accepts it.
 
 import { collect, decodeText, startCore } from "../core/client.js";
 import { ask, choose, inform, modal } from "../dialog.js";
@@ -30,7 +30,8 @@ if (embed) {
   document.head.append(style);
 }
 
-const core = startCore();
+let core = startCore();
+const candidates = new WeakMap();
 const built = new WeakSet(); // the sources built before: building one again reads it again
 let opened = null; // the page's handler for sources opened without asking, such as dropped files
 let included = null;
@@ -258,7 +259,7 @@ export function sourceFromUrl(text) {
 }
 
 /** Warm the actual Worker/core before announcing that messages can be handled. */
-export async function prepareEmbed() {
+export async function prepareViewer() {
   const [response] = await Promise.all([
     fetch("about.json"),
     core.build({ entry: "/ready.sp", files: { "/ready.sp": "* Ready\n.end\n" }, svg: false }),
@@ -618,9 +619,11 @@ export default {
    * texts of `edits`, by the paths the Document names the files by, are those of the files, not what
    * is read.
    */
-  async build(source, edits, progress) {
+  async build(source, edits, progress, suppliedPackages, signal) {
     const again = built.has(source);
     built.add(source);
+    let buildingCore;
+    const abort = () => buildingCore?.terminate();
     try {
       progress?.("reading");
       const held = source.text !== undefined;
@@ -637,11 +640,25 @@ export default {
       Object.assign(files, source.snapshot || {});
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
       const request = { entry: entry.path, files, pool: [...poolFiles.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true };
+      // API packages are request-local until the newest request commits them to Library.
+      for (const item of suppliedPackages || []) {
+        const path = `/<api>${item.path}`;
+        request.files[path] = decodeText(await (await item.read()).arrayBuffer());
+        request.pool.push(path);
+      }
       const read = held ? async () => null : (path) => {
         progress?.("reading");
         return path.startsWith("/<pool>/") ? Promise.resolve(null) : source.read(path, again);
       };
-      const builder = { build: (request) => { progress?.("parsing"); return core.build(request); } };
+      // An incoming candidate may be declined or superseded after building. Its lazy
+      // drawings must not replace those of the retained document until display commits it.
+      if (signal?.aborted) throw new Error("superseded");
+      buildingCore = startCore();
+      signal?.addEventListener("abort", abort, { once: true });
+      const builder = { build: (request) => {
+        if (signal?.aborted) throw new Error("superseded");
+        progress?.("parsing"); return buildingCore.build(request);
+      } };
       let { document: doc } = await collect(builder, request, read);
       if (embed) {
         // Embeds have no Library controls. Resolve named public dependencies with the same
@@ -668,11 +685,23 @@ export default {
           ({ document: doc } = await collect(builder, request, read));
         }
       }
-      if (!embed) document.title = `${doc.name} - RNL Viewer`;
+      candidates.set(doc, buildingCore);
       return doc;
     } catch (e) {
+      buildingCore?.terminate();
       throw e instanceof Error ? e.message : String(e);
-    }
+    } finally { signal?.removeEventListener("abort", abort); }
+  },
+  commitBuild(doc) {
+    const candidate = candidates.get(doc);
+    if (!candidate) return;
+    core.terminate();
+    core = candidate;
+    candidates.delete(doc);
+  },
+  discardBuild(doc) {
+    candidates.get(doc)?.terminate();
+    candidates.delete(doc);
   },
   /** The drawings of the objects the last Document lists without a position, which the core keeps. */
   unplacedDrawings: (level, items, names) => core.drawings({ drawings: { level, items, names } }),

@@ -117,7 +117,7 @@ Send object messages to the iframe's `contentWindow`, each with `rnl: 1`:
 
 | `type` | Other fields | Effect |
 | --- | --- | --- |
-| `open` | `text` and `name` (e.g. `amp.sp`), or `url` | Replace the netlist without reloading. The filename determines its dialect. |
+| `open` | `text` and `name` (e.g. `amp.sp`), or `url`; optional `requestId`, `packages` | Replace the netlist without reloading. The filename determines its dialect. |
 | `level` | `name` | Display that level. |
 | `fit` | None | Fit the drawing to the iframe. |
 | `background` | `value`: `light` or `dark` | Change the drawing and floating controls' background. |
@@ -126,14 +126,16 @@ The iframe sends these messages to `window.parent`, also with `rnl: 1`:
 
 | `type` | Fields | When |
 | --- | --- | --- |
-| `ready` | `version` | The page and WebAssembly core are ready for messages, once per page load. |
-| `loaded` | `name`, `levels` (names), `level` (current name), `errors`, `warnings` (counts) | Each successful open. |
+| `ready` | `version`, `features`, `maxOpenBytes` | The page and WebAssembly core are ready for messages, once per page load. |
+| `loaded` | `name`, `levels` (names), `level` (current name), `errors`, `warnings` (counts), optional `requestId` | Each successful open. |
 | `level` | `name` | The current level changes, including mouse and keyboard navigation, and after an open. |
-| `error` | `message` | A file cannot be fetched or built, has errors, or a requested level does not exist. |
+| `error` | `message`, optional `requestId`, `reason` | A file cannot be fetched or built, has errors, or a requested level does not exist. |
 
 Wait for `ready` before sending commands. The initial `url`, when supplied, opens after `ready`.
 When several `open` requests overlap, only the latest result is displayed or reported; late reads
-and errors from older requests are discarded. A URL-backed drawing offers **Open in RNL Viewer ↗**
+and errors from older requests are discarded. A replaced request with `requestId` receives one
+`error` with its own ID and `reason: "superseded"`; legacy requests without IDs stay silent.
+A URL-backed drawing offers **Open in RNL Viewer ↗**
 in a new tab with the same URL minus `embed`; opening text hides this link. `level` in the URL
 applies to the initial file. Later opens use the normal automatic choice unless sent a `level` message.
 
@@ -172,6 +174,71 @@ are accepted, and replies use that same `targetOrigin`. Without it, any origin i
 replies use `"*"`. Messages without `rnl: 1` are ignored. Replies contain only the fields above,
 never netlist text. The parent should also check `event.source`, `event.origin` and `rnl`.
 Use an HTTP(S) server for the parent, rather than a `file:` URL with an opaque origin.
+
+### Unified API and complete Viewer tabs
+
+`?api=1&origin=EXACT_HTTP_OR_HTTPS_ORIGIN&token=RANDOM_TOKEN` enables the same protocol in the
+complete Viewer, communicating with `window.opener` instead of the iframe's `window.parent`.
+The token is a random 16–128 character alphanumeric/hyphen launch identifier, sent in every
+message in both directions. Window identity and exact origin checks are shared with the existing
+same-origin new-window mechanism. API tabs keep their connection for subsequent opens;
+internal File › New Window still uses its existing one-use session handoff.
+
+Both modes accept optional `requestId` (a nonempty string of at most 128 characters) and
+`packages: [{ name, version }]` (at most 64 exact `major.minor` versions). Packages are resolved
+by exact name/version through the public catalog and verified with SHA-256 **before** building.
+They enter the build's file pool, and successful complete-Viewer imports retain them in Library.
+Package failures identify the name/version in an `error` carrying the request ID. Embedded
+automatic resolution of missing `@USE-PACKAGE` dependencies remains available for legacy callers.
+An `open` message may occupy at most **64 MiB (67,108,864 bytes) of UTF-8 JSON**, including its
+text and metadata. Larger messages return an error naming the actual and maximum byte counts;
+they are never truncated. Existing calls without the new fields, including the site's Logo
+easter egg, keep their existing behavior.
+
+`ready.features` advertises `requestId` and `packages`, plus `opener` in complete API mode.
+`viewer-api.json` publishes the supported complete-Viewer features and size limit, using the
+same constants as `ready`. Callers can check it to report an old complete Viewer promptly:
+versions predating this API emit no `ready` at all. In a complete Viewer, an incoming `open`
+asks before replacing unsaved or unapplied edits; refusal returns `reason: "declined"` with
+the request ID. Replaced requests return `reason: "superseded"` once; stale results never commit.
+
+The caller must synchronously call `window.open(url, "rnl-viewer")` in the click event, with no
+`noopener` and no preceding `await`. A plain `<a target="_blank">` normally severs the opener.
+Its page must omit COOP or use `Cross-Origin-Opener-Policy: same-origin-allow-popups`, rather
+than `same-origin`; check for dependencies on cross-origin isolation before changing that header.
+Reuse an already connected window without navigating it again, so its edit confirmation can run.
+Netlist text is sent only by `postMessage`, never in the URL or to an upload service.
+
+```js
+let viewer, token;
+const viewerUrl = new URL("https://rich-netlist.github.io/rnl/viewer/");
+const sendOpen = () => viewer.postMessage({
+  rnl: 1, type: "open", token, requestId: crypto.randomUUID(),
+  name: "circuit.sp", text: currentCompletedExport,
+  packages: [{ name: "analog-canvas-extensions", version: "0.1" }]
+}, viewerUrl.origin);
+window.addEventListener("message", event => {
+  const m = event.data;
+  if (event.source !== viewer || event.origin !== viewerUrl.origin || m?.rnl !== 1 || m.token !== token) return;
+  if (m.type === "ready") {
+    if (!["requestId", "packages", "opener"].every(f => m.features?.includes(f))) {
+      showError("Viewer version too old"); return;
+    }
+    sendOpen();
+  }
+  // Match loaded/error by requestId; clear that request's timer and show errors.
+});
+openButton.onclick = () => {
+  if (viewer && !viewer.closed) { viewer.focus(); sendOpen(); return; }
+  token = crypto.randomUUID();
+  viewerUrl.search = new URLSearchParams({ api: "1", origin: location.origin, token });
+  viewer = window.open(viewerUrl, "rnl-viewer");
+  if (!viewer) showError("Allow pop-ups and retry");
+};
+```
+
+Enable the button only when the current export is complete. Production callers also check
+`viewer-api.json`, track readiness and request IDs, and report timeout/closed-tab failures.
 
 **CORS:** `open` with `url` uses the same fetch/include behaviour as `?url=` and can read only
 servers that permit the viewer's cross-origin requests. Relative URLs resolve against the

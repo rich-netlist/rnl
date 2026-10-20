@@ -11,7 +11,7 @@ import { serve } from "./server.js";
 export default async function globalSetup() {
   // Embed tests exercise the real web core and need no native CLI or fake-shell fixtures.
   const specs = process.argv.filter((arg) => /\.spec\.js(:\d+)*$/.test(arg));
-  if (specs.length && specs.every((spec) => /embed\.spec\.js/.test(spec))) return;
+  if (specs.length && specs.every((spec) => /(?:embed|api)\.spec\.js/.test(spec))) return;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-"));
   const rnl = buildRnl();
   process.env.RNL_BIN = rnl;

@@ -45,7 +45,7 @@ function freePort() {
 /** Whether the command line names spec files, and none of them is the web viewer's. */
 function pageSpecsOnly() {
   const specs = process.argv.filter((arg) => /\.spec\.js(:\d+)*$/.test(arg));
-  return specs.length > 0 && !specs.some((spec) => /(?:web|embed)\.spec\.js/.test(spec));
+  return specs.length > 0 && !specs.some((spec) => /(?:web|embed|api)\.spec\.js/.test(spec));
 }
 
 // the workers load this file too, and inherit whether the runner builds the site, and its port
