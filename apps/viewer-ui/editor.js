@@ -13,7 +13,7 @@ import * as edits from "./edits.js";
 import { shell } from "./shell.js";
 import { previewing } from "./solve.js";
 import { doc } from "./state.js";
-import { fileShown, fileViews, showFile, sourceLineHeight, refreshSource } from "./text.js";
+import { circuitFile, fileShown, fileViews, showFile, sourceLineHeight, refreshSource } from "./text.js";
 import { $ } from "./util.js";
 
 const source = $("source");
@@ -194,9 +194,11 @@ export function refreshEditing() {
   $("apply-edits").hidden = !editing;
   $("apply-edits").disabled = exiting;
   const name = $("netlist-file");
+  const file = doc?.files[circuitFile()];
+  name.textContent = file?.name.split(/[\\/]/).pop() || '';
   name.dataset.unsaved = String(dirty.length > 0);
   name.dataset.unapplied = String(unapplied.length > 0);
-  name.title = [doc?.files[0]?.path || '', 'Show the top file', ...dirty.map(path => `${path}: ${unapplied.includes(path) ? 'changes not applied; ' : ''}not saved`)].join('\n');
+  name.title = [file?.path || '', 'Show the current circuit source', ...dirty.map(path => `${path}: ${unapplied.includes(path) ? 'changes not applied; ' : ''}not saved`)].join('\n');
   const any = dirty.length > 0;
   if (any !== notified) {
     notified = any;

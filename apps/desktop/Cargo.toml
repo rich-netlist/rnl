@@ -10,6 +10,23 @@ description = "Desktop viewer for Rich Netlist (RNL) documents"
 # A workspace of its own: the WebView dependencies stay out of the library crates' builds.
 [workspace]
 
+# Keep local Viewer builds quick to link, but execute large RNL hierarchies with an optimized
+# core. An unoptimized interpreter can take seconds per Library switch even with a warm index.
+[profile.dev.package.rnl-runtime]
+opt-level = 2
+
+[profile.dev.package.rnl-view]
+opt-level = 2
+
+[profile.dev.package.rnl-render]
+opt-level = 2
+
+[profile.dev.package.rnl-host-spice]
+opt-level = 2
+
+[profile.dev.package.rnl-host-spectre]
+opt-level = 2
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

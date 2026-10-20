@@ -3,7 +3,7 @@
 // the text selects its object; double-clicking a subcircuit instance opens it. While a subcircuit
 // is drawn, the text outside its definition is dimmed.
 
-import { doc, selected } from "./state.js";
+import { current, doc, selected } from "./state.js";
 import { clearEditors, editing, focusEditor, refreshEditing, renderEditors, revealInEditor, showEditor } from "./editor.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens } from "./subcircuits.js";
@@ -17,7 +17,7 @@ const app = $("app");
 const source = $("source");
 const netlistPane = $("pane-netlist");
 const fileName = $("netlist-file");
-fileName.addEventListener('click', () => { showFile(0); focusEditor(); });
+fileName.addEventListener('click', () => { showFile(circuitFile()); focusEditor(); });
 $("choose-source").addEventListener('click', async () => {
   const before = doc;
   if (!before) return;
@@ -27,6 +27,8 @@ $("choose-source").addEventListener('click', async () => {
 });
 
 export let fileShown = 0; // the file in the text pane
+// Drawing levels are the main circuit or a subcircuit with its defining file in `lines`.
+export const circuitFile = () => doc?.levels[current]?.lines?.[0] ?? 0;
 export let fileViews = []; // per file: a LineWindow with text data, rendered rows and saved scroll
 let lineOwners = []; // per file: line number -> the instance whose statement it is
 let pendingReveal = null; // a line to bring into view once the text pane is shown
@@ -129,7 +131,6 @@ export function renderFiles(shown = 0) {
     const [f, a, b] = o.lines;
     for (let n = a; n <= b; n++) lineOwners[f].set(n, k);
   });
-  fileName.textContent = doc.files[0]?.name.split(/[\\/]/).pop() || '';
   fileName.hidden = !doc.files.length;
   $("choose-source").hidden = doc.files.length < 2;
   const spans = doc.files.map(() => []), folds = doc.files.map(() => []);
@@ -154,7 +155,7 @@ export function showFile(f) {
   fileViews.forEach((v, k) => { v.el.hidden = k !== f || editing; });
   fileShown = f;
   const origin = $("source-file");
-  origin.hidden = f === 0;
+  origin.hidden = f === circuitFile();
   origin.textContent = doc.files[f].name.split(/[\\/]/).pop();
   origin.title = doc.files[f].path;
   refreshEditing();
@@ -214,6 +215,8 @@ export function scopeSource(i) {
   scope = lines ? { f: lines[0], from: lines[1], to: lines[2] } : null;
   repaintLines();
   source.classList.toggle("scoped", scope !== null);
+  refreshEditing();
+  $("source-file").hidden = fileShown === circuitFile();
 }
 
 /**

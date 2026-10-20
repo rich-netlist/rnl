@@ -77,6 +77,11 @@ From the repository root:
 cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-five-transistor-ota.sp
 ```
 
+Local development builds optimize the RNL runtime, host readers, viewer model and renderer at
+level 2 while keeping the desktop shell in the development profile. Large hierarchies otherwise
+spend seconds interpreting their circuits even when the Library's definition index is already warm.
+Release builds retain their usual profile.
+
 The menus and their keys come from the page's command table ([`commands.json`](../viewer-ui/README.md#the-command-table)). On Windows the page handles the shortcut keys and the menu only shows them, because the keys reach the WebView first; on macOS and Linux the menu handles them.
 
 The app embeds the page in [`apps/viewer-ui`](../viewer-ui/README.md) when it is built, with the drawing's web fonts in its `fonts/` when `python scripts/fonts.py web` has written them ([Fonts](../viewer-ui/README.md#fonts)); they add 17.3 MB. Without them the drawing falls back on the fonts installed on the computer. The About box gives the fonts' copyright and licence.

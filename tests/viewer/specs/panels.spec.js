@@ -195,16 +195,28 @@ test("one top filename and both toggles remain reachable in a narrow panel", asy
   })).toBe(true);
 });
 
-test("source navigation follows an included definition and the top filename returns to the root", async ({ page, viewer }) => {
+test("the filename follows the current circuit and returns to its defining source", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy");
   await dragSplitter(page, viewer, "#vsplit", { x: 0 });
   await page.locator("#tab-hierarchy").click();
   await page.locator("#index .index-row", { hasText: "rdiv" }).click();
+  await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy-lib.inc");
   await page.locator("#tab-netlist").click();
-  await expect(page.locator("#source-file")).toBeVisible();
+  await expect(page.locator("#source-file")).toBeHidden();
   await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
-  await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy.sp");
+  await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy-lib.inc");
+  await page.locator("#choose-source").click();
+  await page.getByRole("option", { name: "04-hierarchy.sp", exact: true }).dblclick();
+  await expect(page.locator("#source-file")).toBeVisible();
+  await expect(page.locator("#source-file")).toHaveText("04-hierarchy.sp");
+  await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy-lib.inc");
   await page.locator("#netlist-file").click();
   await expect(page.locator("#source-file")).toBeHidden();
+  await expect(viewer.line(2)).toHaveText(/subckt rdiv/);
+  await page.locator("#tab-hierarchy").click();
+  await page.locator('#tree .tree-row[data-path="0"]').click();
+  await page.locator("#tab-netlist").click();
+  await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy.sp");
+  await page.locator("#netlist-file").click();
   await expect(viewer.line(49)).toHaveText(/X1 a b vdd 0 amp/);
 });

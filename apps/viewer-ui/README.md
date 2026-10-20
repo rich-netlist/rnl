@@ -294,7 +294,7 @@ File > Reload Library rescans PATH, rereads all current Library files (packages 
 
 ### Source display and folding
 
-Netlist has one top-file button; clicking it returns to the root source. The adjacent source chooser reaches every included file, including parameter/model-only files. Hierarchy, drawing selections and Problems also navigate to included source files, whose name is shown above their text. The controls wrap in narrow panes. The filename's unsaved marker covers changes in any source file; its tooltip names them.
+Netlist shows one filename: the source that defines the circuit currently drawn. It follows circuit navigation, and clicking it returns to that circuit's source. The adjacent source chooser reaches every included file, including parameter/model-only files. Hierarchy, drawing selections and Problems also navigate to source files; a separate caption appears only when the text shows a different file from the current circuit. The controls wrap in narrow panes. The filename's unsaved marker covers changes in any source file; its tooltip names them.
 
 Source models, syntax checkpoints and rows are prepared only when a file is viewed. Subcircuit blocks have guide lines and +/- gutter buttons, including definitions in unselected library sections. Folding preserves original line numbers and full-source copy; find and diagnostic navigation expand hidden destinations. Virtual scrolling maps visible rows to logical lines. Unchanged reloads keep folds, and edit mode shows the complete buffer at the corresponding source line.
 
