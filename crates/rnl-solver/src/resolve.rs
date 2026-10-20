@@ -410,6 +410,7 @@ pub(crate) struct Resolver<'a> {
     base: [usize; 2],
     /// The nodes searched.
     pub(crate) nodes: u64,
+    work: crate::profile::work::Local,
 }
 
 impl<'a> Resolver<'a> {
@@ -448,6 +449,7 @@ impl<'a> Resolver<'a> {
             held: BTreeMap::new(),
             base,
             nodes: 0,
+            work: crate::profile::work::Local::new(crate::profile::work::Key::Resolvers),
         }
     }
 
@@ -483,6 +485,21 @@ impl<'a> Resolver<'a> {
     pub(crate) fn add(&mut self, u: usize) -> Outcome {
         crate::profile::add("fact_add_calls", 1);
         crate::profile::checkpoint();
+        let mut work = self.work.block();
+        let outcome = self.add_unit(u);
+        if let Some(w) = &mut work {
+            use crate::profile::work::Key;
+            let key = match &outcome {
+                Outcome::Kept => Key::Kept,
+                Outcome::Conflict(_) => Key::Conflict,
+                Outcome::Undecided => Key::Undecided,
+            };
+            w.add(key, 1);
+        }
+        outcome
+    }
+
+    fn add_unit(&mut self, u: usize) -> Outcome {
         if self.holds(u) {
             let saved = self.save();
             if self.commit(u).is_ok() && self.hold_new(u).is_ok() {
@@ -556,17 +573,27 @@ impl<'a> Resolver<'a> {
     /// `held`, those of the literals held. The bounds of `extra` may contradict those of the units
     /// kept at once: that conflict is given.
     fn rebuild(&mut self, extra: Option<usize>, held: bool) -> Result<(), Vec<Tag>> {
+        let mut work = self.work.block();
+        if let Some(w) = &mut work {
+            w.add(crate::profile::work::Key::Rebuilds, 1);
+        }
         self.backtrack(self.base);
         let model = self.model;
         for i in 0..self.kept.len() {
             let u = self.kept[i];
             for b in &model.units[u].fixed {
+                if let Some(w) = &mut work {
+                    w.add(crate::profile::work::Key::FixedReasserts, 1);
+                }
                 let r = assert_bound(&mut self.sx[b.axis], b, Tag::Fact(u));
                 debug_assert!(r.is_ok(), "the units kept hold together");
             }
         }
         if let Some(u) = extra {
             for b in &model.units[u].fixed {
+                if let Some(w) = &mut work {
+                    w.add(crate::profile::work::Key::FixedReasserts, 1);
+                }
                 assert_bound(&mut self.sx[b.axis], b, Tag::Fact(u))?;
             }
         }
@@ -574,6 +601,9 @@ impl<'a> Resolver<'a> {
             let entries: Vec<(Held, u32)> = self.held.iter().map(|(h, v)| (*h, *v)).collect();
             for (h, v) in entries {
                 for (b, tag) in self.held_bounds(h, v) {
+                    if let Some(w) = &mut work {
+                        w.add(crate::profile::work::Key::HeldReasserts, 1);
+                    }
                     let r = assert_bound(&mut self.sx[b.axis], &b, tag);
                     debug_assert!(r.is_ok(), "the literals held hold with the units kept");
                 }

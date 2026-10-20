@@ -135,8 +135,10 @@ pub(crate) fn place(
     work: &mut Work,
 ) -> Placed {
     let grid = options.grid.and_then(from_f64).filter(|g| *g > Q::zero());
+    let phase = crate::profile::work_span("coords_work", "orientation");
     let orient = orientation_relations(s, c);
-    let actual: Vec<Orient> = with_relations(s, &orient, work, |r, _, _| r.geometry().orient.clone());
+    let actual: Vec<Orient> = with_relations(s, &orient, work, "orientation", |r, _, _| r.geometry().orient.clone());
+    drop(phase);
     let mut separations: Vec<Tagged> = Vec::new();
     let mut separated: BTreeSet<(usize, usize)> = BTreeSet::new();
     let mut round = 0;
@@ -144,16 +146,25 @@ pub(crate) fn place(
     let mut pairs: Option<Vec<RowPair>> = None;
     let mut row_rounds = 0;
     loop {
+        let phase = crate::profile::work_span("coords_work", "relations_build");
+        crate::profile::work_set("work_repair_round", round as u64);
+        crate::profile::work_set("work_row_round", row_rounds as u64);
         let mut rels = orient.clone();
         rels.extend(separations.iter().cloned());
         rels.extend(match &pairs {
             None => relations(s, c, &actual, options),
             Some(pairs) => relations_by_pairs(s, c, &actual, options, pairs),
         });
-        let (geometry, kept, undecided, optimised) = with_relations(s, &rels, work, |r, model, t| {
+        drop(phase);
+        let phase = crate::profile::work_span("coords_work", "placement");
+        crate::profile::work_set("work_repair_round", round as u64);
+        crate::profile::work_set("work_row_round", row_rounds as u64);
+        let (geometry, kept, undecided, optimised) = with_relations(s, &rels, work, "placement", |r, model, t| {
             let (g, optimised) = optimise(r, model, s, options);
             (g, t.kept.clone(), t.undecided, optimised)
         });
+        drop(phase);
+        let _post = crate::profile::work_span("coords_work", "post_geometry");
         let origins = s.origins(problem, &geometry);
         // the pairs of the rows that this LP made neighbours on x, added to those before, each
         // with the larger gap it asks; only for a candidate with rows to put apart, and while
@@ -228,7 +239,8 @@ fn apart_cause(
         .map(|c| Tagged { kind: RelKind::Orientation, rel: Relation::Orient { root: c.root, value: ori[c.root] } })
         .collect();
     rels.push(apart);
-    let (fits, undecided) = with_relations(s, &rels, work, |_, _, t| (t.kept[t.kept.len() - 1], t.undecided));
+    let (fits, undecided) =
+        with_relations(s, &rels, work, "apart_cause", |_, _, t| (t.kept[t.kept.len() - 1], t.undecided));
     match (fits, undecided) {
         (true, _) => Cause::Others,
         (false, true) => Cause::Budget,

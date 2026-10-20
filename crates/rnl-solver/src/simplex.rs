@@ -48,6 +48,7 @@ use std::collections::BTreeMap;
 
 use num_traits::{One, Signed, Zero};
 
+use crate::profile::work::{Block, Key, Local};
 use crate::rational::Q;
 
 /// A variable of the tableau, by its index: structural and slack variables share the numbering,
@@ -239,6 +240,7 @@ pub(crate) struct Simplex<T> {
     /// [`Simplex::check`] chooses by Bland's rule once variables have left the basis again this
     /// many times within one check ([`BLAND_AFTER`]).
     bland_after: u64,
+    work: Local,
 }
 
 /// How many times variables may leave the basis again within one [`Simplex::check`] before it
@@ -269,6 +271,7 @@ impl<T: Clone + Ord> Simplex<T> {
             pivots: 0,
             pivot_limit: None,
             bland_after: BLAND_AFTER,
+            work: Local::new(Key::Tableaux),
         }
     }
 
@@ -276,6 +279,7 @@ impl<T: Clone + Ord> Simplex<T> {
     pub(crate) fn new_var(&mut self) -> Var {
         self.vars.push(VarState { value: Q::zero(), lower: None, upper: None, row: None });
         self.occurrences.push(0);
+        self.work.dimensions(self.rows.len(), self.vars.len());
         self.vars.len() - 1
     }
 
@@ -333,21 +337,28 @@ impl<T: Clone + Ord> Simplex<T> {
     /// single term with coefficient 1, otherwise the slack variable of a row, made the first
     /// time the form is seen.
     pub(crate) fn add_row(&mut self, e: &LinExpr) -> Var {
+        let mut work = self.work.block();
         let terms = &e.terms;
         if let [(v, a)] = terms.as_slice() {
             if a.is_one() {
+                if let Some(w) = &mut work {
+                    w.add(Key::UnitForms, 1);
+                }
                 return *v;
             }
         }
         if let Some(&s) = self.forms.get(terms) {
+            if let Some(w) = &mut work {
+                w.add(Key::ReusedForms, 1);
+            }
             return s;
         }
         // the row over the nonbasic variables: the basic ones replaced by their rows
         let mut row: Vec<(Var, Q)> = Vec::new();
         for (v, a) in terms {
             match self.vars[*v].row {
-                Some(r) => axpy(&mut row, &self.rows[r].terms, a),
-                None => axpy(&mut row, &[(*v, Q::one())], a),
+                Some(r) => axpy_observed(&mut row, &self.rows[r].terms, a, work.as_mut()),
+                None => axpy_observed(&mut row, &[(*v, Q::one())], a, work.as_mut()),
             }
         }
         let value = row.iter().fold(Q::zero(), |sum, (v, a)| sum + a * &self.vars[*v].value);
@@ -355,7 +366,12 @@ impl<T: Clone + Ord> Simplex<T> {
         self.vars.push(VarState { value, lower: None, upper: None, row: Some(self.rows.len()) });
         self.occurrences.push(0);
         count(&mut self.occurrences, &row, true);
+        if let Some(w) = &mut work {
+            w.add(Key::NewRows, 1);
+            w.row_change(0, row.len());
+        }
         self.rows.push(Row { basic: s, terms: row });
+        self.work.dimensions(self.rows.len(), self.vars.len());
         self.forms.insert(terms.clone(), s);
         s
     }
@@ -465,6 +481,7 @@ impl<T: Clone + Ord> Simplex<T> {
     /// of the resolution of 8.5 (the draft 0.3, 8.5). A check stopped leaves a valid tableau, its
     /// variables not all within their bounds; a later check goes on from there.
     pub(crate) fn check_until(&mut self, out_of_time: &dyn Fn() -> bool) -> Result<(), Failure<T>> {
+        let mut work = self.work.block();
         crate::profile::add("simplex_checks", 1);
         self.profile_tableau();
         crate::profile::checkpoint();
@@ -473,16 +490,30 @@ impl<T: Clone + Ord> Simplex<T> {
         let mut repeats: u64 = 0;
         let mut made: u64 = 0;
         loop {
+            if let Some(w) = &mut work {
+                w.add(Key::CheckPasses, 1);
+                w.add(Key::CheckRows, self.rows.len() as u64);
+            }
             // the smallest basic variable out of its bounds
             let mut pick: Option<(Var, bool)> = None;
             for row in &self.rows {
                 let s = &self.vars[row.basic];
                 let below = s.below();
-                if (below || s.above()) && pick.is_none_or(|(p, _)| row.basic < p) {
-                    pick = Some((row.basic, below));
+                if below || s.above() {
+                    if let Some(w) = &mut work {
+                        w.add(Key::CheckViolations, 1);
+                    }
+                    if pick.is_none_or(|(p, _)| row.basic < p) {
+                        pick = Some((row.basic, below));
+                    }
                 }
             }
-            let Some((xi, below)) = pick else { return Ok(()) };
+            let Some((xi, below)) = pick else {
+                if let Some(w) = &mut work {
+                    w.add(Key::CheckFeasible, 1);
+                }
+                return Ok(());
+            };
             let r = self.vars[xi].row.expect("a basic variable has a row");
             let Some(xj) = self.entering(r, below, repeats >= self.bland_after) else {
                 return Err(Failure::Conflict(self.explain(r, below)));
@@ -513,8 +544,12 @@ impl<T: Clone + Ord> Simplex<T> {
     /// `t ≥ |xᵢ − xⱼ|`, so fixes its row in one pivot. None when no variable can move: the row
     /// explains the conflict.
     fn entering(&self, r: usize, below: bool, bland: bool) -> Option<Var> {
+        let mut work = self.work.block();
         let mut best: Option<((bool, u32), Var)> = None;
         for (xj, a) in &self.rows[r].terms {
+            if let Some(w) = &mut work {
+                w.add(Key::EnteringTerms, 1);
+            }
             let s = &self.vars[*xj];
             let (can_move, bounded) = if below == a.is_positive() {
                 (s.can_increase(), s.upper.is_some())
@@ -544,6 +579,7 @@ impl<T: Clone + Ord> Simplex<T> {
     /// reduced costs, and the pivots keep it up to date. A layer of the lexicographic LP that
     /// bounds the form by its optimum then bounds that same row.
     pub(crate) fn minimize(&mut self, objective: &LinExpr) -> Result<Q, Failure<T>> {
+        let mut work = self.work.block();
         crate::profile::add("simplex_minimizations", 1);
         self.check()?;
         let Some((_, lead)) = objective.terms.first() else { return Ok(objective.constant.clone()) };
@@ -571,6 +607,10 @@ impl<T: Clone + Ord> Simplex<T> {
             // the ratio test: how far it can move before a variable reaches a bound; of equal
             // steps, the smallest variable (Bland), itself included
             let x = &self.vars[xk];
+            if let Some(w) = &mut work {
+                w.add(Key::RatioCalls, 1);
+                w.add(Key::RatioRows, self.rows.len() as u64);
+            }
             let mut step: Option<(Q, Var)> = if increase {
                 x.upper.as_ref().map(|u| (&u.value - &x.value, xk))
             } else {
@@ -578,6 +618,9 @@ impl<T: Clone + Ord> Simplex<T> {
             };
             for row in &self.rows {
                 let Some(a) = coefficient(&row.terms, xk) else { continue };
+                if let Some(w) = &mut work {
+                    w.add(Key::RatioHits, 1);
+                }
                 let rate = if increase { a.clone() } else { -a };
                 let b = &self.vars[row.basic];
                 let limit = if rate.is_positive() {
@@ -586,6 +629,9 @@ impl<T: Clone + Ord> Simplex<T> {
                     b.lower.as_ref().map(|l| (&l.value - &b.value) / &rate)
                 };
                 if let Some(t) = limit {
+                    if let Some(w) = &mut work {
+                        w.add(Key::RatioBounded, 1);
+                    }
                     if step.as_ref().is_none_or(|(best, var)| t < *best || (t == *best && row.basic < *var)) {
                         step = Some((t, row.basic));
                     }
@@ -664,9 +710,17 @@ impl<T: Clone + Ord> Simplex<T> {
 
     /// Sets a nonbasic variable to `value`, and the basic variables with it.
     fn update(&mut self, v: Var, value: Q) {
+        let mut work = self.work.block();
+        if let Some(w) = &mut work {
+            w.add(Key::UpdateCalls, 1);
+            w.add(Key::UpdateRows, self.rows.len() as u64);
+        }
         let delta = &value - &self.vars[v].value;
         for row in &self.rows {
             if let Some(a) = coefficient(&row.terms, v) {
+                if let Some(w) = &mut work {
+                    w.add(Key::UpdateHits, 1);
+                }
                 self.vars[row.basic].value += a * &delta;
             }
         }
@@ -676,6 +730,12 @@ impl<T: Clone + Ord> Simplex<T> {
     /// Gives the basic variable `xi` the value `value` by moving the nonbasic `xj`, then
     /// exchanges them: `xj` becomes basic in `xi`'s row.
     fn pivot_and_update(&mut self, xi: Var, xj: Var, value: Q) {
+        let mut work = self.work.block();
+        if let Some(w) = &mut work {
+            w.add(Key::PivotCalls, 1);
+            w.add(Key::PivotValueRows, self.rows.len().saturating_sub(1) as u64);
+            w.add(Key::PivotRewriteRows, self.rows.len().saturating_sub(1) as u64);
+        }
         let r = self.vars[xi].row.expect("basic");
         let a = coefficient(&self.rows[r].terms, xj).expect("in the row").clone();
         let theta = (&value - &self.vars[xi].value) / &a;
@@ -684,6 +744,9 @@ impl<T: Clone + Ord> Simplex<T> {
         for (k, row) in self.rows.iter().enumerate() {
             if k != r {
                 if let Some(c) = coefficient(&row.terms, xj) {
+                    if let Some(w) = &mut work {
+                        w.add(Key::PivotValueHits, 1);
+                    }
                     self.vars[row.basic].value += c * &theta;
                 }
             }
@@ -700,14 +763,26 @@ impl<T: Clone + Ord> Simplex<T> {
                 continue;
             }
             if let Ok(i) = row.terms.binary_search_by_key(&xj, |(v, _)| *v) {
+                let old_len = row.terms.len();
+                if let Some(w) = &mut work {
+                    w.add(Key::PivotRewriteHits, 1);
+                    w.add(Key::RewriteOldTerms, old_len as u64);
+                }
                 count(occurrences, &row.terms, false);
                 let (_, c) = row.terms.remove(i);
-                axpy(&mut row.terms, &def, &c);
+                axpy_observed(&mut row.terms, &def, &c, work.as_mut());
                 count(occurrences, &row.terms, true);
+                if let Some(w) = &mut work {
+                    w.add(Key::RewriteNewTerms, row.terms.len() as u64);
+                    w.row_change(old_len, row.terms.len());
+                }
             }
         }
         count(occurrences, &self.rows[r].terms, false);
         count(occurrences, &def, true);
+        if let Some(w) = &mut work {
+            w.row_change(self.rows[r].terms.len(), def.len());
+        }
         self.rows[r] = Row { basic: xj, terms: def };
         self.vars[xi].row = None;
         self.vars[xj].row = Some(r);
@@ -721,7 +796,7 @@ impl<T: Clone + Ord> Simplex<T> {
 
     /// Maximum stored tableau sizes and rational bit lengths; never called on a clock.
     pub(crate) fn profile_tableau(&self) {
-        if !crate::profile::enabled() {
+        if !crate::profile::tableau_details_enabled() {
             return;
         }
         crate::profile::add("tableau_scans", 1);
@@ -806,11 +881,26 @@ fn coefficient(terms: &[(Var, Q)], v: Var) -> Option<&Q> {
 
 /// `acc += a x` over sorted terms, dropping the terms that cancel.
 fn axpy(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q) {
+    axpy_observed(acc, x, a, None);
+}
+
+fn axpy_observed(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q, mut work: Option<&mut Block>) {
     if a.is_zero() || x.is_empty() {
         return;
     }
     let old = std::mem::take(acc);
+    if let Some(w) = &mut work {
+        w.add(Key::AxpyCalls, 1);
+        w.add(Key::AxpyLeft, old.len() as u64);
+        w.add(Key::AxpyRight, x.len() as u64);
+        // mem::take left an empty Vec: this is a reserve request, not an allocator measurement.
+        w.add(Key::ReserveRequests, u64::from(old.len() + x.len() > acc.capacity()));
+    }
+    let capacity = acc.capacity();
     acc.reserve(old.len() + x.len());
+    if let Some(w) = &mut work {
+        w.add(Key::CapacityChanges, u64::from(acc.capacity() != capacity));
+    }
     let mut old = old.into_iter().peekable();
     let mut x = x.iter().peekable();
     loop {
@@ -831,6 +921,9 @@ fn axpy(acc: &mut Vec<(Var, Q)>, x: &[(Var, Q)], a: &Q) {
             (Some(_), None) => acc.extend(old.next()),
             (None, None) => break,
         }
+    }
+    if let Some(w) = &mut work {
+        w.add(Key::AxpyResult, acc.len() as u64);
     }
 }
 
