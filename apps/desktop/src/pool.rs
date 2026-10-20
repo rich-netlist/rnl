@@ -3,6 +3,24 @@ use std::path::Path;
 use tauri::WebviewWindow;
 use tauri_plugin_dialog::DialogExt;
 
+/// Keep native file drops to actual netlists/packages; directories and unrelated files do not open.
+#[tauri::command]
+pub async fn dropped_files(paths: Vec<String>) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        paths
+            .into_iter()
+            .filter_map(|name| {
+                let path = Path::new(&name);
+                (path.is_file()
+                    && path.extension().is_some_and(|e| super::NETLISTS.iter().any(|x| e.eq_ignore_ascii_case(x))))
+                .then_some(name)
+            })
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 pub fn folder_files(dir: &Path, out: &mut Vec<String>) -> Result<(), String> {
     let entries = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     for entry in entries {
@@ -71,6 +89,24 @@ pub fn path_packages(dir: String) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_drops_keep_existing_netlists_in_order_and_ignore_directories() {
+        let dir = std::env::temp_dir().join(format!("rnl-drop-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("folder.sp")).unwrap();
+        let names = ["中文 电路.NETLIST", "part.SPI", "model.scs", "notes.txt"];
+        for name in names {
+            std::fs::write(dir.join(name), "R1 a 0 1k").unwrap();
+        }
+        let paths = names
+            .into_iter()
+            .chain(["folder.sp", "missing.sp"])
+            .map(|name| rnl_cli::path_str(&dir.join(name)))
+            .collect();
+        let kept = tauri::async_runtime::block_on(dropped_files(paths)).unwrap();
+        assert_eq!(kept, names[..3].iter().map(|name| rnl_cli::path_str(&dir.join(name))).collect::<Vec<_>>());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn path_packages_matches_lookup_direct_and_version_directories_only() {
         let dir = std::env::temp_dir().join(format!("rnl-path-packages-{}", std::process::id()));

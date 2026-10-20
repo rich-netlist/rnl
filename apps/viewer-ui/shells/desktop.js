@@ -2,6 +2,7 @@
 // documents natively and shows the menu bar itself. The only module that uses window.__TAURI__.
 
 import { flushSettings } from "../util.js";
+import { choose, inform, modal } from "../dialog.js";
 
 let pool = [];
 const tauri = window.__TAURI__;
@@ -9,6 +10,7 @@ const invoke = (cmd, args) => tauri.core.invoke(cmd, args);
 
 /** A file on disk, named by its path; null for no path. */
 const file = (path) => (path ? { name: path, path } : null);
+let openingDrop = false;
 
 /** @type {import("../shell.js").Shell} */
 export default {
@@ -33,6 +35,31 @@ export default {
   },
   setEnabled: (id, enabled) => invoke("set_command_enabled", { id, enabled }).catch(() => {}),
   initial: () => invoke("initial_file").then(file),
+  fileAssociations: () => invoke("open_default_apps"),
+  async onOpen(handler) {
+    await tauri.webview.getCurrentWebview().onDragDropEvent(async ({ payload }) => {
+      const blocked = openingDrop || modal() || document.body.classList.contains("busy");
+      document.body.classList.toggle("dropping", !blocked && ["enter", "over"].includes(payload.type));
+      if (payload.type !== "drop" || blocked) return;
+      openingDrop = true;
+      try {
+        const paths = await invoke("dropped_files", { paths: payload.paths });
+        if (!paths.length) {
+          await inform({ title: "Open", paragraphs: ["Drop a netlist or RNL package file (.sp, .spi, .spice, .cir, .ckt, .net, .netlist, .inc, .lib, .scs or .rnl)."] });
+          return;
+        }
+        const path = paths.length === 1 ? paths[0] : await choose({
+          title: "Open Netlist", text: "Choose the dropped file to open.", filter: true,
+          items: paths.map((path) => ({ label: path, value: path })),
+        });
+        if (path) await handler(file(path));
+      } catch (error) {
+        await inform({ title: "Open", paragraphs: [`The dropped files could not be opened: ${error.message || error}`] });
+      } finally {
+        openingDrop = false;
+      }
+    });
+  },
   pick: (kind) => (kind === "file" ? invoke("pick_file").then(file) : Promise.resolve(null)),
   // a file by its path, or text held by the source, with edits to it and its includes
   build: async (source, edits, progress) => {

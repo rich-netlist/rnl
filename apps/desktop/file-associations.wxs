@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="RnlDefaultApps" Guid="*" Win64="yes">
+        <RegistryKey Root="HKLM" Key="Software\RegisteredApplications">
+          <RegistryValue Name="RNL Viewer" Value="Software\Rich Netlist\RNL Viewer\Capabilities" Type="string" KeyPath="yes" />
+        </RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\RNLViewer.Netlist">
+          <RegistryValue Value="Netlist or RNL package" Type="string" />
+          <RegistryKey Key="DefaultIcon">
+            <RegistryValue Value="&quot;[INSTALLDIR]rnl-viewer.exe&quot;,0" Type="string" />
+          </RegistryKey>
+          <RegistryKey Key="shell\open\command">
+            <RegistryValue Value="&quot;[INSTALLDIR]rnl-viewer.exe&quot; &quot;%1&quot;" Type="string" />
+          </RegistryKey>
+          <RegistryKey Key="Application">
+            <RegistryValue Name="ApplicationName" Value="RNL Viewer" Type="string" />
+          </RegistryKey>
+        </RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.sp\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.spi\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.spice\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.cir\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.ckt\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.net\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.netlist\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.inc\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.lib\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.scs\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\.rnl\OpenWithProgids"><RegistryValue Name="RNLViewer.Netlist" Type="string" Value="" /></RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Rich Netlist\RNL Viewer\Capabilities">
+          <RegistryValue Name="ApplicationName" Value="RNL Viewer" Type="string" />
+          <RegistryValue Name="ApplicationDescription" Value="View and edit SPICE/Spectre netlists and RNL packages." Type="string" />
+          <RegistryValue Name="ApplicationIcon" Value="&quot;[INSTALLDIR]rnl-viewer.exe&quot;,0" Type="string" />
+          <RegistryKey Key="FileAssociations">
+            <RegistryValue Name=".sp" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".spi" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".spice" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".cir" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".ckt" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".net" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".netlist" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".inc" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".lib" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".scs" Value="RNLViewer.Netlist" Type="string" />
+            <RegistryValue Name=".rnl" Value="RNLViewer.Netlist" Type="string" />
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

@@ -12,6 +12,7 @@
       {
         "label": "main",
         "title": "RNL Viewer",
+        "dragDropEnabled": true,
         "width": 1200,
         "height": 800,
         "minWidth": 480,

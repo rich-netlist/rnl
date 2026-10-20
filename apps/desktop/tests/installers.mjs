@@ -21,6 +21,9 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../../..");
 const config = JSON.parse(fs.readFileSync(path.join(root, "apps", "desktop", "tauri.conf.json"), "utf8"));
+const EXTENSIONS = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"];
+const PROGID = "RNLViewer.Netlist";
+const CAPABILITIES = "Software\\Rich Netlist\\RNL Viewer\\Capabilities";
 const NAME = config.productName;
 const VERSION = config.version;
 const PUBLISHER = config.bundle.publisher;
@@ -69,7 +72,7 @@ const quote = (text) => `'${text.replace(/'/g, "''")}'`;
  * installer takes /D= last and unquoted, spaces and all.
  */
 function run(file, args) {
-  return Number(powershell(`(Start-Process -FilePath ${quote(file)} -ArgumentList ${quote(args)} -Wait -PassThru).ExitCode`));
+  return Number(powershell(`(Start-Process -FilePath ${quote(file)} -ArgumentList ${quote(args)} -WindowStyle Hidden -Wait -PassThru).ExitCode`));
 }
 
 /** The values of a registry key by name, or null when there is no such key. */
@@ -82,6 +85,101 @@ function registry(key) {
     if (m) values[m[1]] = m[2];
   }
   return values;
+}
+
+/** Existing defaults must survive installation, updates and removal. */
+function associationDefaults(hive) {
+  return EXTENSIONS.map((ext) => [ext,
+    registry(`${hive}\\Software\\Classes\\.${ext}`) || {},
+    registry(`HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.${ext}\\UserChoice`),
+  ]);
+}
+
+function checkAssociations(hive, exe, before) {
+  same(registry(`${hive}\\Software\\RegisteredApplications`)?.[NAME], CAPABILITIES, "the Default Apps registration");
+  same(registry(`${hive}\\${CAPABILITIES}`)?.ApplicationName, NAME, "the application name");
+  const types = registry(`${hive}\\${CAPABILITIES}\\FileAssociations`);
+  for (const ext of EXTENSIONS) {
+    same(types?.[`.${ext}`], PROGID, `the .${ext} default-app capability`);
+    check(Object.hasOwn(registry(`${hive}\\Software\\Classes\\.${ext}\\OpenWithProgids`) || {}, PROGID), `.${ext} does not offer RNL Viewer in Open With`);
+  }
+  same(Object.values(registry(`${hive}\\Software\\Classes\\${PROGID}\\shell\\open\\command`) || {}),
+    [`"${exe}" "%1"`], "the quoted file-open command");
+  same(associationDefaults(hive), before, "the user's previous defaults after installation");
+}
+
+function checkAssociationsRemoved(hive, before) {
+  check(!Object.hasOwn(registry(`${hive}\\Software\\RegisteredApplications`) || {}, NAME), "Default Apps registration was left behind");
+  same(registry(`${hive}\\${CAPABILITIES}`), null, "the capabilities left behind");
+  same(registry(`${hive}\\Software\\Classes\\${PROGID}`), null, "the ProgID left behind");
+  for (const ext of EXTENSIONS) {
+    check(!Object.hasOwn(registry(`${hive}\\Software\\Classes\\.${ext}\\OpenWithProgids`) || {}, PROGID), `.${ext} retained the Open With entry`);
+  }
+  same(associationDefaults(hive), before, "the user's previous defaults after uninstallation");
+}
+
+/** Ask Explorer's association machinery to use our ProgID, without changing UserChoice. */
+function openAssociatedFile(exe) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-association-"));
+  const file = path.join(dir, "中文 网表.NETLIST");
+  fs.writeFileSync(file, "* file association path quoting\nR1 a 0 1k\n.end\n");
+  try {
+    powershell(`Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class RnlAssociation {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public struct Info {
+    public uint cbSize, fMask;
+    public IntPtr hwnd;
+    public string lpVerb, lpFile, lpParameters, lpDirectory;
+    public int nShow;
+    public IntPtr hInstApp, lpIDList;
+    public string lpClass;
+    public IntPtr hkeyClass;
+    public uint dwHotKey;
+    public IntPtr hIcon, hProcess;
+  }
+  [DllImport("shell32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern bool ShellExecuteEx(ref Info info);
+  [DllImport("kernel32.dll")] public static extern uint GetProcessId(IntPtr process);
+  [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr handle);
+  public static int Open(string file) {
+    var info = new Info { cbSize=(uint)Marshal.SizeOf(typeof(Info)), fMask=0x541,
+      lpVerb="open", lpFile=file, lpClass="RNLViewer.Netlist", nShow=1 };
+    if (!ShellExecuteEx(ref info)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+    var pid=GetProcessId(info.hProcess);
+    CloseHandle(info.hProcess);
+    return (int)pid;
+  }
+}
+'@
+$env:WEBVIEW2_USER_DATA_FOLDER = ${quote(path.join(dir, "profile"))}
+$env:RNL_VIEWER_TEST_CONFIG_DIR = ${quote(path.join(dir, "settings"))}
+$viewerProcess = Get-Process -Id ([RnlAssociation]::Open(${quote(file)}))
+try {
+  $deadline = [DateTime]::UtcNow.AddSeconds(30)
+  do {
+    $viewerProcess.Refresh()
+    if ($viewerProcess.HasExited) { throw 'The associated Viewer exited before opening the file.' }
+    if ($viewerProcess.MainWindowTitle -eq ${quote(`${path.basename(file)} - RNL Viewer`)}) { break }
+    Start-Sleep -Milliseconds 100
+  } while ([DateTime]::UtcNow -lt $deadline)
+  if ($viewerProcess.MainWindowTitle -ne ${quote(`${path.basename(file)} - RNL Viewer`)}) { throw 'The associated Viewer did not open the Unicode filename.' }
+  if ($viewerProcess.Path -ne ${quote(exe)}) { throw 'The association started a different executable.' }
+} finally {
+  [void]$viewerProcess.CloseMainWindow()
+  if (!$viewerProcess.WaitForExit(5000)) { $viewerProcess.Kill(); $viewerProcess.WaitForExit() }
+  $testProfile = ${quote(path.join(dir, "profile"))}
+  Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" |
+    Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($testProfile, [StringComparison]::OrdinalIgnoreCase) -ge 0 } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}`);
+    console.log("the Windows file association opened a Unicode/space .NETLIST path with the installed Viewer");
+  } finally {
+    try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }); }
+    catch (error) { console.warn(`The temporary association-test profile remains at ${dir}: ${error.message}`); }
+  }
 }
 
 /** The app's entries among the apps installed for the machine: their names, versions and publishers. */
@@ -154,6 +252,8 @@ async function nsis(setup) {
   const shortcuts = [path.join(shell.Programs, `${NAME}.lnk`), path.join(shell.Desktop, `${NAME}.lnk`)];
   same(present(shortcuts), [], "the shortcuts there before the test");
   const own = registry(OWN_KEY);
+  check(registry(`HKCU\\Software\\Classes\\${PROGID}`) === null, "RNL Viewer file associations already exist; leave them intact.");
+  const defaults = associationDefaults("HKCU");
 
   console.log(`installing ${setup} into ${dir}`);
   same(run(setup, `/S /D=${dir}`), 0, "the installer's exit code");
@@ -165,6 +265,8 @@ async function nsis(setup) {
       check(entry !== null, `There is no ${USER_ENTRY}.`);
       same([entry.DisplayName, entry.DisplayVersion, entry.Publisher], [NAME, VERSION, PUBLISHER], "the entry among the installed apps");
       same(present(shortcuts), shortcuts, "the shortcuts in the Start menu and on the desktop");
+      checkAssociations("HKCU", path.join(dir, EXE), defaults);
+      openAssociatedFile(path.join(dir, EXE));
       tryApp(path.join(dir, EXE));
     },
     async () => {
@@ -174,6 +276,7 @@ async function nsis(setup) {
   );
   same(present(shortcuts), [], "the shortcuts left");
   same(registry(OWN_KEY), own, `what is left in ${OWN_KEY}`);
+  checkAssociationsRemoved("HKCU", defaults);
   if (base) fs.rmSync(base, { recursive: true, force: true });
   console.log("the NSIS installer installed the app for the user, and its uninstaller left nothing of it");
 }
@@ -184,6 +287,8 @@ async function msi(pkg) {
   same(machineEntries(), [], `the entries of ${NAME} among the apps installed for the machine before the test`);
   const dir = path.join(shell.ProgramFiles, NAME);
   check(!fs.existsSync(dir), `${dir} is there already.`);
+  check(registry(`HKLM\\Software\\Classes\\${PROGID}`) === null, "RNL Viewer file associations already exist; leave them intact.");
+  const defaults = associationDefaults("HKLM");
   const shortcuts = [path.join(shell.CommonPrograms, NAME, `${NAME}.lnk`), path.join(shell.CommonDesktopDirectory, `${NAME}.lnk`)];
   const log = path.join(os.tmpdir(), "rnl-viewer-msi.log");
 
@@ -195,12 +300,15 @@ async function msi(pkg) {
       for (const file of [EXE, "LICENSE.txt"]) check(fs.existsSync(path.join(dir, file)), `${file} was not installed.`);
       same(machineEntries(), [{ name: NAME, version: VERSION, publisher: PUBLISHER }], "the entry among the installed apps");
       same(present(shortcuts), shortcuts, "the shortcuts in the Start menu and on the desktop");
+      checkAssociations("HKLM", path.join(dir, EXE), defaults);
+      openAssociatedFile(path.join(dir, EXE));
       tryApp(path.join(dir, EXE));
     },
     () => same(run("msiexec", `/x "${pkg}" /qn /norestart`), 0, "msiexec's exit code when uninstalling"),
   );
   same(present([dir, ...shortcuts]), [], "the files and shortcuts left");
   same(machineEntries(), [], "the entries left among the installed apps");
+  checkAssociationsRemoved("HKLM", defaults);
   console.log("the MSI installed the app for the machine, and uninstalling it left nothing of it");
 }
 

@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "windows": {
+      "wix": {
+        "fragmentPaths": ["file-associations.wxs"],
+        "componentRefs": ["RnlDefaultApps"]
+      }
+    }
+  }
+}

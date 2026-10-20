@@ -62,7 +62,7 @@ async function start() {
   await startCommands();
   await startPool();
   if (!shell.nativeMenu) showMenuBar(true);
-  if (shell.onOpen) shell.onOpen((source) => openSource(source, false));
+  if (shell.onOpen) await shell.onOpen((source) => openSource(source, false));
   if (shell.onCloseRequested) shell.onCloseRequested(closeRequested);
   const session = await shell.initialSession?.();
   if (session) await restoreSession(session);

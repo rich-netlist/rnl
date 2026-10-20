@@ -68,6 +68,8 @@ struct Command {
     page: bool,
     /// The platforms that offer it; all when not given.
     platforms: Option<Vec<String>>,
+    #[serde(default, rename = "windowsOnly")]
+    windows_only: bool,
 }
 
 /// An entry of the menu bar as this platform shows it.
@@ -117,6 +119,7 @@ fn entries(items: &[Entry], windows: bool) -> Vec<Shown> {
                 inner => Shown::Submenu(menu.label.clone(), inner),
             },
             Entry::Command(c) if c.platforms.as_ref().is_some_and(|p| !p.iter().any(|p| p == PLATFORM)) => continue,
+            Entry::Command(c) if c.windows_only && !windows => continue,
             Entry::Command(c) if c.id == "about" => Shown::About(c.label.clone()),
             Entry::Command(c) => {
                 let (text, accelerator) = match (c.shown.as_ref().or(c.keys.first()), c.keys.first()) {
@@ -354,6 +357,7 @@ mod tests {
                     item("save", "&Save\tCtrl+S", None),
                     item("save-as", "Save &As...", None),
                     Shown::Separator,
+                    item("file-associations", "File &Associations...", None),
                     item("exit", "E&xit", None),
                 ],
             ),

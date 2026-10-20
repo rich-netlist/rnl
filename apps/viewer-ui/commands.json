@@ -15,6 +15,7 @@
         { "id": "save", "label": "&Save", "keys": ["Ctrl+S"] },
         { "id": "save-as", "label": "Save &As...", "platforms": ["desktop"] },
         "-",
+        { "id": "file-associations", "label": "File &Associations...", "platforms": ["desktop"], "windowsOnly": true },
         { "id": "exit", "label": "E&xit", "platforms": ["desktop"] }
       ]
     },

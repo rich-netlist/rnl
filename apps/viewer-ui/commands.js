@@ -21,6 +21,7 @@ import { doc, selected } from "./state.js";
 import { findInSource } from "./text.js";
 import { ascend, descend, opens } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
+import { fileAssociations } from "./file-associations.js";
 import { $ } from "./util.js";
 
 let table = null; // commands.json, once loaded
@@ -55,6 +56,7 @@ export function command(id, options = {}) {
     case "reload": reload(); break;
     case "save": save(); break;
     case "save-as": saveAs(); break;
+    case "file-associations": return fileAssociations();
     case "toggle-edit": toggleEdit(); break;
     case "apply-edits": applyChanges(); break;
     case "discard-edits": discardChanges(); break;
@@ -138,7 +140,7 @@ export function setEnabled(id, enabled) {
 
 /** Whether this platform offers a command; one that names no platforms is offered on all. */
 function offered(item) {
-  return !item.platforms || item.platforms.includes(shell.platform);
+  return (!item.platforms || item.platforms.includes(shell.platform)) && (!item.windowsOnly || /Win/.test(navigator.platform));
 }
 
 /**

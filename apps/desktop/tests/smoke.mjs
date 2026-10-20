@@ -421,6 +421,10 @@ async function drive(app, port, profile, t0, session) {
   same(nativeMenu(app.pid), want, "the native menu");
   // a key in the page clears a check mark, and an item chosen in the menu reaches the page
   const at = (id) => find(want, id).at;
+  chooseItem(app.pid, at("file-associations"));
+  await until("the File Associations dialog", () => page.evaluate(`document.querySelector('dialog[open] .dialog-title')?.textContent === 'File Associations'`));
+  check(await page.evaluate(`document.querySelector('dialog[open]').textContent.includes('.netlist')`), "file-association help omits .netlist");
+  await page.evaluate(`Array.from(document.querySelectorAll('dialog[open] button')).find(b => b.textContent === 'Cancel').click()`);
   const checked = (id) => find(nativeMenu(app.pid), id).item.checked;
   await press(page, "b", "KeyB", 66, 2);
   await until("the side panel to be hidden", async () => !(await shown(page)).sidebar, 10_000);
@@ -660,7 +664,25 @@ async function drive(app, port, profile, t0, session) {
   console.log(`The Not drawn list asked the app for the drawings of its ${thumbs} rows, which the Document did not carry`);
 
   await filePoolSmoke(page);
+  await nativeDropSmoke(page, app.pid);
   same(page.errors, [], "the page's errors");
+}
+
+/** Exercise the actual native event bridge and backend, preserving the normal opening flow. */
+async function nativeDropSmoke(page, pid) {
+  const dropped = path.join(path.dirname(netlist), "拖入 电路.NETLIST");
+  fs.copyFileSync(netlist, dropped);
+  const emit = (type, paths = []) => page.evaluate(`window.__TAURI__.event.emitTo({ kind: 'Webview', label: 'main' }, 'tauri://drag-${type}', ${JSON.stringify({ paths, position: { x: 100, y: 100 } })})`);
+  await emit("enter", [dropped]);
+  await until("native drag feedback", () => page.evaluate(`document.body.classList.contains('dropping')`));
+  await emit("leave");
+  await until("native drag feedback to clear", () => page.evaluate(`!document.body.classList.contains('dropping')`));
+  await emit("drop", [dropped]);
+  await until("the dropped netlist", () => page.evaluate(`window.viewer.doc?.name === ${JSON.stringify(path.basename(dropped))} && !document.body.classList.contains('busy')`));
+  await until("the dropped Unicode filename in the title", () => windowTitle(pid) === `${path.basename(dropped)} - RNL Viewer`);
+  await emit("drop", [netlist]);
+  await until("the original netlist after a second drop", () => page.evaluate(`window.viewer.doc?.name === ${JSON.stringify(TOP)} && !document.body.classList.contains('busy')`));
+  console.log("native drop events opened a Unicode/space .NETLIST path, preserved includes and cleared drag feedback");
 }
 
 /** File > New Window launches this executable again, restores the session and leaves its parent. */

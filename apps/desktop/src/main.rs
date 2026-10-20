@@ -89,7 +89,7 @@ fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
 }
 
 /// The extensions offered first in the open dialog.
-const NETLISTS: [&str; 10] = ["sp", "spi", "spice", "cir", "ckt", "net", "inc", "lib", "scs", "rnl"];
+const NETLISTS: [&str; 11] = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"];
 
 /// Read and draw a file, and name the window after it. With `edits`, the texts of some of its
 /// files are those, over what is on disk. The drawings of the objects it lists without a position
@@ -277,6 +277,21 @@ fn initial_file() -> Option<String> {
     Some(path.to_string_lossy().into_owned())
 }
 
+/// Windows owns the choice of a default application; show its supported settings UI.
+#[tauri::command]
+fn open_default_apps(app: AppHandle) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use tauri_plugin_opener::OpenerExt;
+        app.opener().open_url("ms-settings:defaultapps", None::<&str>).map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        Err("File associations are configured in the operating system.".into())
+    }
+}
+
 fn main() {
     let startup = startup::Startup::new();
     let session = session::read(std::env::args_os().skip(1)).expect("the viewer session could not be read");
@@ -332,11 +347,13 @@ fn main() {
             finish_startup,
             pick_file,
             initial_file,
+            open_default_apps,
             session::initial_session,
             session::new_window,
             settings::load_settings,
             settings::save_setting,
             pool::pick_pool,
+            pool::dropped_files,
             pool::bundled_files,
             pool::path_packages,
             menu::set_view_check,
