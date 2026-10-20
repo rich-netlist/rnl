@@ -127,7 +127,7 @@ use rnl_runtime::host::file_name;
 use rnl_runtime::interp::obj::Priority;
 use rnl_runtime::problem::{FactKind, LevelProblem, PointRef, Position};
 
-use crate::coords::affine::{compile, Axis};
+use crate::coords::affine::{compile, Axis as AffineAxis};
 use crate::model::{ax, turned, Bound, ChoiceKind, LitKey, Model, OrientEffect, PointId, VarKind};
 use crate::options::{Caps, CAPS};
 use crate::orient::{from_index, index, OrientClasses};
@@ -393,7 +393,7 @@ struct Saved {
 pub(crate) struct Resolver<'a> {
     model: &'a Model,
     limits: Limits<'a>,
-    sx: [Axis<Tag>; 2],
+    sx: [AffineAxis<Tag>; 2],
     classes: OrientClasses,
     geometry: Geometry,
     /// The points that the units kept constrain, by axis (plan 5.1).
@@ -419,7 +419,7 @@ pub(crate) struct Resolver<'a> {
 impl<'a> Resolver<'a> {
     /// A resolution with nothing taken in yet, every object at the origin with R0.
     pub(crate) fn new(model: &'a Model, n_objects: usize, limits: Limits<'a>) -> Resolver<'a> {
-        let mut sx = [Axis::new(), Axis::new()];
+        let mut sx = [AffineAxis::new(), AffineAxis::new()];
         for s in &mut sx {
             for _ in 0..model.vars.len() {
                 s.new_var();
@@ -466,7 +466,7 @@ impl<'a> Resolver<'a> {
 
     /// The simplex of an axis, with the bounds of the units kept and of the literals held: the
     /// coordinates of a candidate are optimised over it (`crate::coords`).
-    pub(crate) fn simplex_mut(&mut self, axis: usize) -> &mut Axis<Tag> {
+    pub(crate) fn simplex_mut(&mut self, axis: usize) -> &mut AffineAxis<Tag> {
         &mut self.sx[axis]
     }
 
@@ -595,8 +595,14 @@ impl<'a> Resolver<'a> {
                 );
             }
             replacement.push(
-                Axis::from_compiled(compiled, &values, self.sx[axis].pivots(), self.sx[axis].pivot_limit(), support)
-                    .expect("valid frozen-core bounds cannot contradict each other"),
+                AffineAxis::from_compiled(
+                    compiled,
+                    &values,
+                    self.sx[axis].pivots(),
+                    self.sx[axis].pivot_limit(),
+                    support,
+                )
+                .expect("valid frozen-core bounds cannot contradict each other"),
             );
         }
         let mut replacement = replacement.into_iter();
@@ -1426,7 +1432,7 @@ fn facts_of(tags: &[Tag], u: usize) -> Vec<usize> {
 }
 
 /// Asserts a bound with a tag; a conflict found at once gives its tags.
-fn assert_bound(s: &mut Axis<Tag>, b: &Bound, tag: Tag) -> Result<(), Vec<Tag>> {
+fn assert_bound(s: &mut AffineAxis<Tag>, b: &Bound, tag: Tag) -> Result<(), Vec<Tag>> {
     let result = match (&b.lo, &b.hi) {
         (Some(lo), Some(hi)) if lo == hi => s.assert(&b.expr, Rel::Eq, lo, tag),
         (lo, hi) => {
