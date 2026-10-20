@@ -30,3 +30,36 @@ When you add files or change licensing, run [`reuse lint`](https://reuse.softwar
 When you change the Rust crates, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test --workspace` must pass. When a change is meant to alter the results of the [conformance corpus](tests/conformance/README.md), write its expected files again with `RNL_BLESS=1`, or `RNL_BLESS_0_3=1` for the cases of 0.3, and review the difference.
 
 When you change the pages of the site, edit `site/src/` and write every text in both languages, as described in [`site/README.md`](site/README.md); `python site/build.py --check` must pass.
+
+## Public packages
+
+From the root of **each checkout or Git worktree**, run:
+
+```sh
+python scripts/packages.py download
+```
+
+This reads `packages.lock.json`, looks up each exact name/version in the public catalog,
+checks the locked SHA-256, downloads and verifies all version assets, and writes the ignored
+`.rnl-packages/NAME/VERSION/` directory beside that checkout's `Cargo.toml`. No shared Git-dir
+assumption is made; invoking the script by absolute path from another directory also works.
+Use `python scripts/packages.py check` to verify the cache, or `python scripts/packages.py fixture`
+to generate `.rnl-packages/fixture/catalog.json` and offline assets for browser tests.
+
+Without the download, local tests that require public packages skip with this command in their
+message; other tests still run and compile. In CI, missing packages or hash mismatches fail.
+Rust package tests use Python to verify the cache once per integration-test process.
+Browser tests use only the locked fixture, and never the online catalog. To update a lock, review
+the new catalog record, change the one lock file, download again and run the relevant tests.
+
+The public catalog and immutable version files are maintained in
+[rnl-packages](https://github.com/rich-netlist/rnl-packages); publish changed content under a new
+`major.minor` package version. The site/viewer follow the latest catalog; tests and skill generation
+use the lock. The Pages workflow rebuilds **main** once daily at 02:17 UTC, and its Actions page
+retains **Run workflow**. GitHub disables scheduled workflows in public repositories after
+60 days without repository activity; re-enable the schedule in Actions if this happens.
+The separate daily Public package compatibility workflow checks main against every public
+package's latest version and reports failures in Actions without blocking unrelated merges.
+
+The runtime no longer packages the optional Canvas file starting with the next npm version
+after preview.14. This change does not create a tag or publish npm; release approval is separate.

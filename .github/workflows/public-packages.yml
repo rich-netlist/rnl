@@ -1,0 +1,38 @@
+name: Public package compatibility
+on:
+  schedule:
+    - cron: '43 3 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packages.lock.json'
+      - 'scripts/packages*'
+      - '.github/workflows/public-packages.yml'
+permissions:
+  contents: read
+env:
+  CARGO_BUILD_JOBS: 4
+jobs:
+  compatibility:
+    # This monitors external package changes; it is not a merge gate for core changes.
+    continue-on-error: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          path: .compat-rnl
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+      - name: Build the main runtime
+        run: |
+          cargo build --locked --manifest-path .compat-rnl/Cargo.toml -p rnl-cli
+          node .compat-rnl/bindings/runtime-wasm/build.mjs
+      - name: Download latest versions and check all symbols
+        run: |
+          python scripts/packages.py download --latest
+          node scripts/packages-compat.mjs .compat-rnl

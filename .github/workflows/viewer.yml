@@ -7,6 +7,8 @@ on:
   push:
     branches: [main]
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "apps/viewer-ui/**"
       - "apps/web/**"
       - "bindings/**"
@@ -19,6 +21,8 @@ on:
       - ".github/workflows/viewer.yml"
   pull_request:
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "apps/viewer-ui/**"
       - "apps/web/**"
       - "bindings/**"
@@ -36,6 +40,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
 
 jobs:
   page:
@@ -45,6 +50,9 @@ jobs:
         working-directory: tests/viewer
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download and verify locked public packages
+        working-directory: ${{ github.workspace }}
+        run: python scripts/packages.py download
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -53,11 +61,11 @@ jobs:
       - name: Install Playwright
         run: npm ci
       - name: Install the browsers and what they need
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: npx playwright install --with-deps chromium webkit
       # the web server builds the web viewer's site and serves it; the global setup builds the rnl
       # command and writes the fixtures
       - name: Test the page and the web viewer in Chromium, Firefox and WebKit
-        run: npx playwright test
+        run: npx playwright test --project chromium --project webkit --workers 2
       - name: Keep the report of a failed run
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

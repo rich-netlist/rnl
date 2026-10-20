@@ -12,7 +12,7 @@
 // private, and has the README of packages/runtime and the licenses of what it holds.
 
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -51,16 +51,15 @@ for (const name of readdirSync(join(here, "js"))) copyFileSync(join(here, "js", 
 for (const name of ["document.d.ts", "snapshot.d.ts", "catalog.d.ts"]) {
   copyFileSync(join(here, "..", "..", "crates", "rnl-view", "types", name), join(out, name));
 }
-// Ship the optional public package as data; it is never added to packages.js or the default pool.
-mkdirSync(join(out, "packages"), { recursive: true });
-copyFileSync(join(here, "..", "..", "libraries", "analog-canvas-extensions", "analog-canvas-extensions.rnl"), join(out, "packages", "analog-canvas-extensions.rnl"));
+// An incremental build must not retain the optional data shipped by earlier npm versions.
+rmSync(join(out, "packages", "analog-canvas-extensions.rnl"), { force: true });
 const lines = (...l) => l.join("\n") + "\n";
 if (Object.keys(manifest).length) {
   const pkg = JSON.parse(readFileSync(join(here, "js", "package.json"), "utf8"));
   delete pkg.private;
   writeFileSync(join(out, "package.json"), lines(JSON.stringify({ ...pkg, ...manifest }, null, 2)));
   // the code's license, MIT, and those of what the module compiles in: the standard packages and
-  // the optional analog-canvas-extensions file (CC0-1.0) and the metrics of Noto Sans SC (OFL-1.1)
+  // the metrics of Noto Sans SC (OFL-1.1)
   const root = join(here, "..", "..");
   copyFileSync(join(root, "packages", "runtime", "README.md"), join(out, "README.md"));
   copyFileSync(join(root, "LICENSE"), join(out, "LICENSE"));

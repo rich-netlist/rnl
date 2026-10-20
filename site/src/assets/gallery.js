@@ -20,8 +20,6 @@
      its file starts with. A line holds for every version of the package, unless one is written for
      its name and version, such as 'rnl-std-fill 0.3', where the versions differ. */
   var SUMMARY = {
-    'eda-symbol': '<zh>独立符号包：137 个不绑定配色的原理图符号和选用规则，引脚方向与标准库一致；可单独使用或搭配 eda-style。</zh><en>An independent package of 137 schematic symbols and selection rules, with no fixed colors and standard-compatible pin directions; use alone or with eda-style.</en>',
-    'eda-style': '<zh>独立样式包：绿色细线、红色符号文字、自动红色端子方块和等宽标签；适用于标准、eda-symbol 和自定义符号，符号几何由所用符号包提供。</zh><en>An independent visual package: green hairlines, red symbol text, automatic red terminal squares and monospaced labels for standard, eda-symbol and custom symbols; geometry comes from the chosen symbol package.</en>',
     'rnl-std': '<zh>标准包。每份网表的根上默认就用它；它只引用别的包，自己没有内容。</zh><en>The standard package, used at the root of every netlist by default. It only references other packages and has no content of its own.</en>',
     'rnl-std-core': '<zh>最小的组合：样式、符号和配符号的规则，把网表画出来，别的什么都不加——不补地、电源和端口标签。</zh><en>The smallest collection: styles, symbols and the rules that give them, enough to draw the netlist and nothing more — no grounds, supplies or port tags filled in.</en>',
     'rnl-std-style': '<zh>样式 $base、$bus、$signal、$note、$grey，和给每类对象默认样式的规则。</zh><en>The styles $base, $bus, $signal, $note and $grey, and the rules that give every kind of object its default style.</en>',
@@ -43,7 +41,6 @@
     'rnl-std-signal-flow': '<zh>信号流图：加法器、乘法器，和只画图的积分器、离散时间积分器、量化器、单位延迟。</zh><en>Signal-flow blocks: adder and multiplier, and the drawing-only integrator, discrete-time integrator, quantizer and unit delay.</en>',
     'rnl-std-no-labels': '<zh>关掉标准符号的默认标签，给自己写全部标签的文件用。</zh><en>Turns off the default labels of the standard symbols, for files that write all their labels themselves.</en>',
     'rnl-zh': '<zh>中文别名包：标准词和标准包名字的中文写法，在头段记录里用 @USE-ALIASES 载入。</zh><en>The Chinese alias package: Chinese spellings of the standard words and of the standard package’s names, loaded with @USE-ALIASES in the header record.</en>',
-    'analog-canvas-extensions': '<zh>Analog Canvas 的外观变体和 chopper：Analog Canvas 自己的包，不属于标准系列。</zh><en>The look variants of Analog Canvas and its chopper: Analog Canvas’s own package, not part of the standard series.</en>'
   };
 
   var DIRS = {
@@ -81,7 +78,7 @@
   /* A long name may break after its underscores and hyphens */
   function breakable(n) { return esc(n).replace(/([_-])/g, '$1<wbr>'); }
   function lineLink(pkg, line, end) {
-    var href = REPO + pkg.path + '#L' + line + (end && end !== line ? '-L' + end : '');
+    var href = (pkg.source || REPO + pkg.path) + '#L' + line + (end && end !== line ? '-L' + end : '');
     return '<a class="gl-line" href="' + href + '" title="<zh>在 GitHub 上看这几行</zh><en>See these lines on GitHub</en>">' +
       (end && end !== line ? fill('<zh>第 {a}–{b} 行</zh><en>lines {a}–{b}</en>', { a: line, b: end }) : fill('<zh>第 {a} 行</zh><en>line {a}</en>', { a: line })) + '</a>';
   }
@@ -191,10 +188,11 @@
       (pkg.language !== pkg.version ? '<span class="chip chip-mute">' + fill('<zh>语言 {v}</zh><en>language {v}</en>', { v: esc(pkg.language) }) + '</span>' : '') +
       (group.series ? '' : '<span class="chip chip-warn"><zh>不属于标准系列</zh><en>not in the standard series</en></span>') +
       '</div>';
-    var sum = SUMMARY[pkg.name + ' ' + pkg.version] || SUMMARY[pkg.name];
+    var hasSummary = pkg.summary && (pkg.summary.en !== pkg.description.split('\n\n')[0] || pkg.summary.zh !== pkg.description.split('\n\n')[0]);
+    var sum = hasSummary ? '<zh>' + esc(pkg.summary.zh) + '</zh><en>' + esc(pkg.summary.en) + '</en>' : SUMMARY[pkg.name + ' ' + pkg.version] || SUMMARY[pkg.name];
     h += '<p class="gl-sum">' + (sum || esc(pkg.description.split('\n\n')[0])) + '</p>';
     h += '<dl class="gl-meta">';
-    h += '<div><dt><zh>文件</zh><en>File</en></dt><dd><a href="' + REPO + esc(pkg.path) + '">' + esc(pkg.path) + '</a></dd></div>';
+    h += '<div><dt><zh>文件</zh><en>File</en></dt><dd><a href="' + esc(pkg.source || REPO + pkg.path) + '">' + esc(pkg.path) + '</a></dd></div>';
     if (pkg.references.length) {
       h += '<div><dt><zh>引用</zh><en>References</en></dt><dd>' + pkg.references.map(function (r) {
         return '<a class="gl-ref" href="#' + esc(r.name) + '" data-goto="' + esc(r.name) + '">' + esc(r.name) + '</a>';

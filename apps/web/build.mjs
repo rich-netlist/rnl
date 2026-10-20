@@ -98,6 +98,12 @@ function files(dir, base = dir) {
 }
 
 publishLibrary(join(root, "libraries"), join(out, "libraries"));
+// Tests use a verified offline fixture, never the public service.
+const fixture = process.env.RNL_PACKAGE_FIXTURE;
+if (fixture) cpSync(fixture, join(out, "public-packages"), { recursive: true });
+writeFileSync(join(out, "public-packages.json"), JSON.stringify({
+  url: fixture ? "public-packages/catalog.json" : process.env.RNL_PACKAGE_CATALOG || "https://rich-netlist.github.io/rnl-packages/catalog.json",
+}) + "\n");
 
 const all = files(out);
 const bytes = all.reduce((n, f) => n + statSync(join(out, f)).size, 0);

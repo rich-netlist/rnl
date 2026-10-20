@@ -9,6 +9,8 @@ on:
   push:
     branches: [main]
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "skills/**"
       - "scripts/skill/**"
       - "spec/rnl-*-guide*.md"
@@ -23,6 +25,8 @@ on:
       - ".github/workflows/skill.yml"
   pull_request:
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "skills/**"
       - "scripts/skill/**"
       - "spec/rnl-*-guide*.md"
@@ -42,6 +46,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
 
 jobs:
   check:
@@ -51,6 +56,9 @@ jobs:
         with:
           # the zip's timestamps and the manifest's commit come from git
           fetch-depth: 0
+      - name: Download and verify locked public packages
+        working-directory: ${{ github.workspace }}
+        run: python scripts/packages.py download
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

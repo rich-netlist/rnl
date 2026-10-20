@@ -3,6 +3,9 @@
 
 use std::path::{Path, PathBuf};
 
+#[path = "support/public_packages.rs"]
+mod public_packages;
+
 use rnl_cli::{interpret_file, FsProvider};
 use rnl_runtime::diag::Severity;
 use rnl_runtime::model::LevelView;
@@ -20,7 +23,7 @@ const GATES: [&str; 6] = [
 ];
 
 fn package_file() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/analog-canvas-extensions/analog-canvas-extensions.rnl")
+    public_packages::package_dir("analog-canvas-extensions").join("analog-canvas-extensions.rnl")
 }
 
 fn extension_files() -> MemoryProvider {
@@ -56,6 +59,9 @@ fn top(r: &Interpretation) -> &LevelView {
 
 #[test]
 fn a_file_that_names_the_package_finds_it_on_the_search_path() {
+    if !public_packages::available() {
+        return;
+    }
     // The public extension must be provided explicitly.
     let r = read_gates();
     assert!(errors(&r).is_empty(), "{:?}", errors(&r));
@@ -74,6 +80,9 @@ fn a_file_that_names_the_package_finds_it_on_the_search_path() {
 
 #[test]
 fn its_gates_keep_the_inputs_where_analog_canvas_puts_them() {
+    if !public_packages::available() {
+        return;
+    }
     // 0.8 apart, not on integer points, unlike the standard gates with four inputs
     let r = read_gates();
     let lv = top(&r);
@@ -86,6 +95,9 @@ fn its_gates_keep_the_inputs_where_analog_canvas_puts_them() {
 
 #[test]
 fn checked_on_its_own_it_gives_a_hint_for_those_pins_alone() {
+    if !public_packages::available() {
+        return;
+    }
     // every symbol is named $CANVAS_ and the component of Analog Canvas it draws
     let text = std::fs::read_to_string(package_file()).unwrap();
     let defined: Vec<&str> = text
@@ -106,6 +118,9 @@ fn checked_on_its_own_it_gives_a_hint_for_those_pins_alone() {
 
 #[test]
 fn the_diamond_sources_have_their_terminals_box_and_labels() {
+    if !public_packages::available() {
+        return;
+    }
     // $CANVAS_VCVS_DIAMOND and $CANVAS_CCVS_DIAMOND, the diamonds of E and H without their control
     // leads: the output's two terminals, Analog Canvas's view box, and the name and the value at
     // the right of the diamond, as the catalog gives a frontend the symbols
@@ -184,6 +199,9 @@ const BEFORE_THE_DIAMONDS: &str = r#"@RNL(type="header") { @VERSION("0.3"); @PAC
 
 #[test]
 fn the_circle_sources_draw_what_the_standard_series_drew_before_its_diamonds() {
+    if !public_packages::available() {
+        return;
+    }
     // Analog Canvas's own drawing of the four controlled sources, kept for the files it exports: the
     // same graphics, pins and box as the standard symbols had, beside the diamonds of the package
     let pairs = [
@@ -226,6 +244,9 @@ fn the_circle_sources_draw_what_the_standard_series_drew_before_its_diamonds() {
 
 #[test]
 fn the_circle_sources_are_in_the_catalog_with_their_terminals_box_and_labels() {
+    if !public_packages::available() {
+        return;
+    }
     let options =
         rnl_view::CatalogOptions { packages: Some(vec!["analog-canvas-extensions".into()]), ..Default::default() };
     let c = serde_json::to_value(rnl_view::catalog(

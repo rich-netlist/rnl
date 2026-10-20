@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "name": "analog-canvas-extensions",
+      "version": "0.1",
+      "sha256": "3738e1ce0c5d6fca3e13ad44faac8bd54f5eeb70577a22e412f5858f21f86711"
+    },
+    {
+      "name": "eda-style",
+      "version": "0.1",
+      "sha256": "899d4251f7fb899551fe8b0d1404cb5277fca6428efb226d619f4361e45d6765"
+    },
+    {
+      "name": "eda-symbol",
+      "version": "0.1",
+      "sha256": "9981cdd09b186afda7ceed20cdb7c35da0550ba12c7e09fa9fb13b1911df3b64"
+    },
+    {
+      "name": "pdk-sky130",
+      "version": "0.1",
+      "sha256": "be951141fd977b3cb8c3556df48ea742d073b14df26a6c3494b0cfd432802859"
+    }
+  ]
+}
