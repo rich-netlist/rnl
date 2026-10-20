@@ -280,6 +280,47 @@ mod tests {
     }
 
     #[test]
+    fn many_missing_masters_validate_their_library_only_once() {
+        use std::cell::Cell;
+        struct Count<'a> {
+            files: &'a MemoryProvider,
+            index: &'a LibraryIndex,
+            validations: Cell<usize>,
+        }
+        impl LibraryLookup for Count<'_> {
+            fn candidates(&self, name: &str, sensitive: bool) -> Vec<LibraryDefinition> {
+                self.index.candidates(name, sensitive)
+            }
+            fn definitions(&self, path: &str) -> Vec<LibraryDefinition> {
+                self.validations.set(self.validations.get() + 1);
+                self.index.definitions(path)
+            }
+        }
+        impl Provider for Count<'_> {
+            fn read(&self, path: &str) -> Option<String> {
+                self.files.read(path)
+            }
+            fn auto_include(&self) -> Option<&dyn LibraryLookup> {
+                Some(self)
+            }
+        }
+        let mut top = "* top\n".to_string();
+        let mut lib = String::new();
+        for i in 0..200 {
+            top.push_str(&format!("X{i} a 0 cell{i}\n"));
+            lib.push_str(&format!(".subckt cell{i} p n\nR1 p n 1k\n.ends\n"));
+        }
+        let files = MemoryProvider::new().with("/top.sp", &top).with("/cells.inc", &lib);
+        let index = index(&files, &["/cells.inc"]);
+        let count = Count { files: &files, index: &index, validations: Cell::new(0) };
+        let mut sink = Sink::new();
+        let doc = crate::read_host("/top.sp", None, &count, &mut sink).unwrap();
+        assert_eq!(doc.subckts.len(), 200);
+        assert_eq!(count.validations.get(), 1);
+        assert_eq!(sink.all().iter().filter(|d| d.message.contains("added by Auto Include")).count(), 200);
+    }
+
+    #[test]
     fn repeated_auto_include_uses_the_index_without_reading_unrelated_library_files() {
         use std::cell::RefCell;
         struct Count {
@@ -370,6 +411,7 @@ pub(crate) fn resolve(
         let mut parsed = Sink::new();
         let doc = reader(&extra, &mut parsed)?;
         let mut next = Vec::new();
+        let mut approved = HashSet::new();
         let mut reserved: HashMap<String, LibraryDefinition> = HashMap::new();
         for lv in &doc.levels {
             for inst in &lv.instances {
@@ -390,6 +432,12 @@ pub(crate) fn resolve(
                     if extra.contains(&def.path) || normalize(path) == def.path {
                         continue;
                     }
+                    // A library can define thousands of missing masters. Validate its complete
+                    // definition list once per pass, not once per referenced master (quadratic).
+                    if approved.contains(&def.path) {
+                        automatic.push((model.to_string(), def.source.clone(), loc));
+                        continue;
+                    }
                     let definitions = index.definitions(&def.path);
                     let mut own: HashMap<String, LibraryDefinition> = HashMap::new();
                     let conflict = definitions.iter().find(|d| {
@@ -406,6 +454,7 @@ pub(crate) fn resolve(
                     if let Some(other) = conflict {
                         conflicts.push((model.to_string(), format!("Auto Include: {} was not included for subcircuit {model} because its definition of {} conflicts with an existing definition", def.source, other.name), loc));
                     } else {
+                        approved.insert(def.path.clone());
                         automatic.push((model.to_string(), def.source.clone(), loc));
                         for d in definitions {
                             reserved.insert(doc.key(&d.name), d);

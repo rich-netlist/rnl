@@ -73,7 +73,7 @@ export default {
   build: async (source, edits, progress) => {
     await flushSettings();
     await poolReady;
-    const autoInclude = load("auto-include", false) === true;
+    const autoInclude = load("auto-include", true) === true;
     const requestId = progress ? crypto.randomUUID() : null;
     const unlisten = progress ? await tauri.event.listen("load-stage", ({ payload }) => {
       if (payload.id === requestId) progress(payload.stage);
@@ -101,7 +101,7 @@ export default {
   solve: async (source, settings, edits) => {
     await flushSettings();
     await poolReady;
-    const autoInclude = load("auto-include", false) === true;
+    const autoInclude = load("auto-include", true) === true;
     return invoke(
       "solve_preview",
       source.text === undefined

@@ -251,7 +251,8 @@ function snapshot() {
   return {
     level: doc.levels[current] ? doc.levels[current].title : null,
     view,
-    files: doc.files.map((f, k) => ({ path: f.path, scroll: fileViews[k] ? fileViews[k].scroll : 0 })),
+    files: doc.files.map((f, k) => ({ path: f.path, text: f.text, scroll: fileViews[k]?.scroll || 0, pendingLine: fileViews[k]?.pendingLine,
+      collapsed: [...(fileViews[k]?.collapsed || [])] })),
     file: doc.files[fileShown] ? doc.files[fileShown].path : null,
     selected: sel && { kind: sel.kind, name: sel.name, level: sel.level },
     expanded,
@@ -270,7 +271,8 @@ function showDocument(before) {
   const gained = before ? roots.filter((r) => !before.roots.includes(r)) : roots;
   setExpanded(new Set([...(before ? before.expanded : ["0"]), ...gained]));
   setViewCache(before ? before.viewCache : new Map());
-  renderFiles();
+  const file = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
+  renderFiles(file >= 0 ? file : 0);
   const diags = doc.diagnostics.slice();
   if (doc.failed) diags.unshift({ severity: "error", message: doc.failed, file: "", line: 0, col: 0, origin: "" });
   renderDiagnostics(diags);
@@ -280,10 +282,18 @@ function showDocument(before) {
   if (before) {
     for (const f of before.files) {
       const k = doc.files.findIndex((x) => x.path === f.path);
-      if (k >= 0) fileViews[k].scroll = f.scroll;
+      if (k >= 0) {
+        const v = fileViews[k];
+        v.scroll = f.scroll;
+        // A changed source can move its definitions. Preserve folds only for unchanged text.
+        if (doc.files[k].text === f.text && f.collapsed.length) {
+          v.collapsed = new Set(f.collapsed);
+          if (v._model) { v.mapLines(); v.refresh(true); }
+        }
+        if (f.pendingLine !== undefined) v.restoreLine(f.pendingLine);
+      }
     }
   }
-  const file = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
   showFile(file >= 0 ? file : 0);
 
   if (doc.levels.length === 0) {

@@ -272,9 +272,14 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
   padding: 3px 8px 3px 6px;
   border-bottom: 1px solid var(--line);
 }
-/* the file tabs ask for the room they take up, unlike other tabs (.tabs) */
-.file-bar .file-tabs { flex: 1 1 auto; margin-right: 8px; }
-.auto-include-toggle { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; font-size: 11px; }
+/* One top-file button; controls wrap rather than disappearing beyond the pane. */
+.file-bar { flex-wrap: wrap; gap: 4px; }
+.netlist-file { flex: 1 1 90px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; color: var(--fg); }
+.netlist-file[hidden], .source-file[hidden], .choose-source[hidden] { display: none; }
+.choose-source { flex: none; padding: 1px 5px; }
+.source-file { padding: 3px 8px; color: var(--muted); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-bottom: 1px solid var(--line); }
+.auto-include-toggle { flex: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.auto-include-toggle input { accent-color: var(--accent); cursor: pointer; }
 #library-status { white-space: pre-line; }
 #library-status:empty { display: none; }
 .netlist-head { min-width: 0; }
@@ -292,8 +297,8 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 .apply-edits:not(:disabled) { color: var(--panel); background: var(--accent); border-color: var(--accent); }
 .apply-edits:disabled { opacity: 0.5; }
 .netlist-pane.editing .failed-check, .netlist-pane.editing .failed-toggle { display: none; }
-.tabs button[data-unsaved="true"]::after { content: " \25CF"; color: var(--accent); }
-.tabs button[data-unsaved="true"][data-unapplied="true"]::after { color: var(--warning); }
+.netlist-file[data-unsaved="true"]::after { content: " \25CF"; color: var(--accent); }
+.netlist-file[data-unsaved="true"][data-unapplied="true"]::after { color: var(--warning); }
 .source.editing { overflow: hidden; }
 .editor { position: absolute; inset: 0; display: flex; }
 .editor[hidden] { display: none; }
@@ -325,17 +330,14 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 }
 .editor .area:focus { box-shadow: inset 0 0 0 1px var(--accent); }
 
-/* the failed statements' checkbox, and its label, which gives way to the file tabs when they need
-   the room, so that a tab of each file stays within reach: the label shrinks before them, and what
-   of it no longer fits on its line wraps out of sight, first its legend, then its caption; the
-   title still says what the checkbox marks, and the caption, out of sight, still names it */
+/* Keep the checkbox and its caption on the same row; the optional legend yields in narrow panes. */
 .failed-check { flex: none; margin: 0 2px 0 0; accent-color: var(--accent); cursor: pointer; }
 .failed-toggle {
   display: flex;
-  flex: 0 1000 auto;
+  flex: 0 1 auto;
   flex-wrap: wrap;
   align-items: center;
-  min-width: 0;
+  min-width: 130px;
   height: 1.4em;
   overflow: hidden;
   color: var(--muted);
@@ -508,9 +510,10 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
   min-height: 1.55em;
 }
 .ln .no {
+  position: relative;
   flex: 0 0 auto;
   width: var(--line-number-width, 4.5em);
-  padding-right: 1em;
+  padding-right: 1.5em;
   text-align: right;
   color: var(--syn-marker);
   user-select: none;
@@ -520,6 +523,12 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .ln.d-warning .no { border-right-color: var(--warning); color: var(--warning); }
 .ln.d-hint .no { border-right-color: var(--hint); }
 .ln .code { padding-left: 0.8em; padding-right: 2em; }
+.ln.subckt-line .code { box-shadow: inset 1px 0 var(--line); }
+.ln.subckt-start .code { box-shadow: inset 1px 0 var(--line), inset 0 1px var(--line); }
+.ln.subckt-end .code { box-shadow: inset 1px 0 var(--line), inset 0 -1px var(--line); }
+.fold-toggle { position: absolute; right: 1px; top: 2px; width: 14px; height: 14px; padding: 0; border: 1px solid var(--line); border-radius: 2px; font: 12px/12px monospace; color: var(--muted); background: var(--panel); cursor: pointer; }
+.fold-toggle:focus-visible { outline: 1px solid var(--accent); }
+.ln.subckt-collapsed .code::after { content: '  …'; color: var(--muted); }
 .ln.hl-line { background: var(--select-line); }
 .ln.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { from { background: var(--flash); } to { background: transparent; } }

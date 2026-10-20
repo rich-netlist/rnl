@@ -31,12 +31,12 @@ async function syncPool(reload = false) {
 }
 
 function showAutoInclude() {
-  const enabled = load("auto-include", false) === true;
+  const enabled = load("auto-include", true) === true;
   $("auto-include").checked = enabled;
   setCheck("toggle-auto-include", enabled);
 }
 
-export async function toggleAutoInclude(value = !load("auto-include", false)) {
+export async function toggleAutoInclude(value = !load("auto-include", true)) {
   if (changing || isLoading()) { showAutoInclude(); return; }
   await update(async () => { await save("auto-include", value); showAutoInclude(); });
 }
@@ -56,11 +56,11 @@ function button(label, action, title = label) {
   return b;
 }
 
-function addItems(added) {
+function addItems(added, refresh = true) {
   for (const item of added) {
     item.path = filePath(item.path);
     item.source.path = filePath(item.source.path || item.path);
-    refreshPaths.add(item.path);
+    if (refresh) refreshPaths.add(item.path);
     const at = items.findIndex((old) => old.path === item.path && !old.builtin);
     if (at < 0) { items.push(item); expanded.set("files", true); }
     else items[at] = item;
@@ -82,8 +82,10 @@ export async function sourceOpened(source, doc, add, applied = false) {
       source.path = path;
       const item = shell.poolItem?.(source) || { path, name: source.name, source };
       // Keep Include's display name/read handle when opening its own source again.
-      if (!items.some((i) => i.path === item.path && i.source === source)) {
-        addItems([item]);
+      if (!items.some((i) => i.path === item.path && (i.source === source || source.library))) {
+        // Selecting a PATH row promotes it to Files but does not change its contents. Its
+        // definitions (and dependent roots) are already indexed. Include/Reload refresh them.
+        addItems([item], !source.library);
         await syncPool();
       }
     }
@@ -240,7 +242,7 @@ function render() {
     const prefix = dir.replace(/\\/g, "/").replace(/\/$/, "") + "/";
     const files = (scanned.get(dir)?.files || []).map((path) => ({
       path, name: path.startsWith(prefix) ? path.slice(prefix.length) : path,
-      source: { path, name: path },
+      source: { path, name: path, library: true },
     }));
     groups.append(group(`path:${dir}`, dir, files, "path", { index, all }));
   });

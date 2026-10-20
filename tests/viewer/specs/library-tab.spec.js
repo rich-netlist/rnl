@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 import fs from "node:fs";
 import path from "node:path";
 import { test, expect } from "../viewer.js";
@@ -50,7 +51,7 @@ for (const platform of ["desktop", "web"]) {
     // Include tabs change the text shown, never the Library's root highlight.
     const root = await files(page).locator(".current").getAttribute("data-path");
     await page.locator("#tab-netlist").click();
-    await page.locator("#file-tabs button").nth(1).click();
+    await showSource(page, 1);
     await page.locator("#tab-files").click();
     await expect(files(page).locator(".current")).toHaveAttribute("data-path", root);
     await files(page).locator(".lib-toggle").click();

@@ -394,6 +394,23 @@ async function drive(app, port, profile, t0, session) {
   console.log(`drawn ${s.level} in ${Date.now() - t0} ms, at ${s.zoom}`);
   same(s.level, TOP, "the level drawn");
   await until("the window's title", () => windowTitle(app.pid) === `${TOP} - RNL Viewer`, 10_000);
+  same(await page.evaluate("window.__TAURI__.app.getVersion()"), version, "the running Viewer version");
+  await page.evaluate(`(async () => {
+    (await import('./panels.js')).setPane('netlist');
+    (await import('./text.js')).revealLine(0, 8, false, true);
+  })()`);
+  check(await page.evaluate("document.querySelector('#source .file:not([hidden]) [data-line=\"8\"] .fold-toggle')?.getAttribute('aria-expanded') === 'true'"), "the subcircuit fold control is missing");
+  if (process.env.SMOKE_OUTPUT_DIR) {
+    const capture = await page.send("Page.captureScreenshot", { format: "png" });
+    fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR, "native-source-expanded.png"), Buffer.from(capture.data, "base64"));
+  }
+  await page.evaluate("document.querySelector('#source .file:not([hidden]) [data-line=\"8\"] .fold-toggle').click()");
+  check(await page.evaluate("!document.querySelector('#source .file:not([hidden]) [data-line=\"9\"]')"), "folding kept the subcircuit body visible");
+  if (process.env.SMOKE_OUTPUT_DIR) {
+    const capture = await page.send("Page.captureScreenshot", { format: "png" });
+    fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR, "native-source-folded.png"), Buffer.from(capture.data, "base64"));
+  }
+  await page.evaluate("document.querySelector('#source .file:not([hidden]) [data-line=\"8\"] .fold-toggle').click()");
 
   // a click selects an instance; Enter opens its subcircuit and Backspace comes back
   await click(page, await symbol(page, "X2"));
@@ -585,7 +602,7 @@ async function drive(app, port, profile, t0, session) {
   const saved = onDisk.toString("utf8").replace(/\bX3\b/g, "X9");
   await until("the file saved", () => fs.readFileSync(netlist, "utf8") === saved, 20_000);
   await until("no file with changes not saved", () =>
-    page.evaluate(`document.querySelectorAll("#file-tabs button[data-unsaved='true']").length === 0`),
+    page.evaluate(`document.querySelectorAll("#netlist-file[data-unsaved='true']").length === 0`),
   );
   same(fs.readFileSync(netlistInclude).equals(includeOnDisk), true, "the include after the netlist was saved");
   // another program changes the file after the viewer read it: Save does not write over it, and asks;
@@ -836,8 +853,7 @@ async function autoIncludeSmoke(page, work, parts, pkg) {
     await window.viewer.command('reload-library');
   })()`);
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group^="path:"] .pool-row')).some(r => r.dataset.path.endsWith('cell.NETLIST'))`), "PATH did not list netlists alongside packages");
-  same(await page.evaluate("window.viewer.doc.files.length"), 1, "Auto Include defaults off");
-  await page.evaluate("window.viewer.command('toggle-auto-include')");
+  same(await page.evaluate("window.viewer.doc.files.length"), 2, "Auto Include defaults on");
   check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('cell.NETLIST') && d.message.includes('added by Auto Include'))`), "the automatic include warning is missing");
   same(await page.evaluate("window.viewer.doc.files[0].text"), body, "Auto Include altered the source");
   check(await page.evaluate("document.getElementById('auto-include').checked && window.viewer.checked('toggle-auto-include')"), "Auto Include controls disagree");
@@ -899,6 +915,8 @@ async function main() {
   }
   const exe = given ? path.resolve(given) : appPath();
   check(fs.existsSync(exe), `There is no ${exe} to start${given ? "" : ": build the app, or leave out --no-build"}.`);
+  const pe = fs.readFileSync(exe);
+  same(pe.readUInt16LE(pe.readUInt32LE(0x3c) + 24 + 68), 2, "Viewer uses the Windows GUI subsystem, without a console");
   console.log(`starting ${exe}, on the WebView2 Runtime ${runtimeVersion() || "that the registry does not name"}`);
   const port = Number(option("--port")) || (await freePort());
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-smoke-"));

@@ -19,6 +19,7 @@ export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 /** The fixtures by name, and the files of the corpus they are built from. */
 export const FILES = {
+  "fold-sections": "tests/viewer/inputs/fold-sections.sp",
   "missing-canvas-package": "tests/viewer/inputs/missing-canvas-package.sp",
   "virtual-selection": "tests/viewer/inputs/virtual-selection.sp",
   "selection-boxes": "tests/viewer/inputs/selection-boxes.sp",

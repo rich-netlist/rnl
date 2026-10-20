@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 // The text pane: the highlighting of the host statements and the records, the statements over
 // several lines, the statements that do not take effect and the box that marks them, the problems
 // that show their lines, the file tabs, a line that waits for the text pane to be shown, and the
@@ -178,11 +179,11 @@ test("selecting on the drawing shows the file and the line of the statement", as
   await page.locator("#tab-netlist").click();
   await viewer.click("R2");
   await viewer.selected("instance R2 in rdiv");
-  await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");
+  await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
   expect(await viewer.markedLines()).toEqual([4]);
 
   // each file keeps its own scroll
-  await page.locator("#file-tabs button", { hasText: TOP }).click();
+  await showSource(page, TOP);
   expect(await page.locator("#source").evaluate((s) => s.scrollTop)).toBe(main);
 });
 

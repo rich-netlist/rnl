@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 // Smoke tests of the web viewer (apps/web): the site that build.mjs makes with the samples, served by
 // serve.mjs, with the web shell and the real core as WebAssembly in its Worker. It opens netlists by
 // URL, files set on its file inputs, a folder and dropped files, and each Document is the one
@@ -18,9 +19,9 @@ test("Auto Include resolves indexed library subcircuits, warns on conflicts and 
   await expect(page.getByRole("button", { name: "Exclude cell.inc", exact: true })).toBeVisible();
   await page.locator("#file-input").setInputFiles({ name: "top.netlist", mimeType: "text/plain", buffer: Buffer.from("* top\nX1 a 0 cell\n.end\n") });
   await shown(page);
-  expect(await page.evaluate(() => window.viewer.doc.files.length)).toBe(1);
   await page.locator("#tab-netlist").click();
-  const imported = await opened(page, () => page.locator("#auto-include").check());
+  await expect(page.locator("#auto-include")).toBeChecked();
+  const imported = await page.evaluate(() => window.viewer.doc);
   expect(imported.files).toHaveLength(2);
   expect(imported.files[0].text).toBe("* top\nX1 a 0 cell\n.end\n");
   expect(imported.diagnostics.some((d) => d.severity === "warning" && d.message.includes("cell") && d.message.includes("added by Auto Include"))).toBe(true);
@@ -49,7 +50,7 @@ test("New Window hands local files, applied include text, hierarchy and Library 
   await opened(page, () => page.locator("#include-input").setInputFiles({ name: "part.inc", mimeType: "text/plain", buffer: Buffer.from(part) }));
   await page.locator("#tab-netlist").click();
   await page.keyboard.press("Control+q");
-  await page.locator("#file-tabs button", { hasText: "part.inc" }).click();
+  await showSource(page, "part.inc");
   await page.locator("#source textarea:visible").fill(part.replaceAll("R1", "R7"));
   await opened(page, () => page.keyboard.press("Control+Enter"));
   await page.evaluate(async () => {
@@ -259,7 +260,7 @@ async function showsDocument(page, doc) {
   const groups = doc.levels[0].svg.split("<g data-id=").length - 1;
   await expect(page.locator("#canvas > svg g[data-id]")).toHaveCount(groups);
   // the text: a tab for each file, and the lines of the first
-  await expect(page.locator("#file-tabs button")).toHaveText(doc.files.map((f) => f.name.split("/").pop()));
+  await expect(page.locator("#netlist-file")).toHaveText(doc.files[0].name.split("/").pop());
   const lines = doc.files[0].text.replace(/\r?\n$/, "").split(/\r?\n/).length;
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);
   // Core diagnostics retain their counts; viewer-only package remedies follow the relevant error.
@@ -300,7 +301,7 @@ test("a URL's include is read from its server, and the levels, files and problem
   await page.locator("#index .index-row", { hasText: "rdiv" }).click();
   await expect(page.locator("#level-name")).toHaveText("rdiv");
   await page.locator("#tab-netlist").click();
-  await page.locator("#file-tabs button", { hasText: "04-hierarchy-lib.inc" }).click();
+  await showSource(page, "04-hierarchy-lib.inc");
   const first = doc.files[1].text.split(/\r?\n/)[0];
   await expect(page.locator("#source .file:not([hidden]) .ln").first()).toContainText(first);
 
@@ -663,7 +664,7 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   const editedTop = top.replace("R1 a 0 1k", "R1 a 0 2k");
   const editedParts = parts.replace("R2", "R7");
   await area.fill(editedTop);
-  await page.locator("#file-tabs button", { hasText: "parts.inc" }).click();
+  await showSource(page, "parts.inc");
   await area.fill(editedParts);
   await expect(page.locator("#edit-state")).toHaveText("Changes not applied yet");
   // applied, the core builds the files with the texts in place of what is read, as it builds the same texts from disk
@@ -680,7 +681,7 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   expect(fs.readFileSync(await download.path(), "utf8")).toBe(editedParts);
   await expect(page.locator("#note")).toHaveText("Downloaded parts.inc.");
   // the file downloaded is what was read from now on; the netlist's change is still not saved
-  await expect(page.locator("#file-tabs button[data-unsaved='true']")).toHaveText(["top.sp"]);
+  await expect(page.locator("#netlist-file[data-unsaved='true']")).toHaveText(["top.sp"]);
 });
 
 

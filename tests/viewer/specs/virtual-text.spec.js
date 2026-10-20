@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 import { expect, test } from "../viewer.js";
 
 const reveal = (page, file, line) => page.evaluate(async ({ file, line }) => {
@@ -58,11 +59,11 @@ test("random access preserves multiline syntax, per-file scroll and edit positio
     return Math.max(0, Math.floor((s.scrollTop - 4 + 1) / sourceLineHeight(fileShown)));
   });
   const before = await first();
-  await page.locator("#file-tabs button").nth(1).click();
+  await showSource(page, 1);
   const included = await lineOf(page, "R2 top tap", 1);
   await reveal(page, 1, included || 1105);
   const other = await first();
-  await page.locator("#file-tabs button").first().click();
+  await page.locator("#netlist-file").click();
   expect(await first()).toBe(before);
   await page.locator('#tab-hierarchy').click();
   await page.locator('#tab-netlist').click();
@@ -78,7 +79,7 @@ test("random access preserves multiline syntax, per-file scroll and edit positio
   await page.keyboard.press("Control+q");
   await expect(area).toHaveCount(0);
   expect(await first()).toBe(before);
-  await page.locator("#file-tabs button").nth(1).click();
+  await showSource(page, 1);
   expect(await first()).toBe(other);
 });
 
@@ -106,7 +107,7 @@ test("find searches the full file and follows file changes outside the DOM windo
   const row = await lineOf(page, 'suffix 1299');
   await expect.poll(() => viewer.within(viewer.line(row))).toBe(true);
   expect(await page.evaluate(() => String(window.getSelection()))).toBe('suffix 1299');
-  await page.locator('#file-tabs button').nth(1).click();
+  await showSource(page, 1);
   await query.fill('include 1000');
   await expect(page.locator('#netlist-matches')).toHaveText('1 / 1');
   const included = await lineOf(page, 'include 1000', 1);

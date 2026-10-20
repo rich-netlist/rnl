@@ -1,5 +1,5 @@
 // Editing the text (decision 0011): the netlist pane can be switched to edit, with a text box for
-// each file of the document, the tabs as they are. A change is shown as not applied until the user
+// each file of the document, following source navigation. A change is shown as not applied until the user
 // exits editing or chooses Apply and Exit Editing, which builds the Document again from the texts in memory, as
 // opening the files would, and draws it; solving remains a separate action. Nothing is
 // written to a file until the user saves (File > Save, and Save As on the desktop; on the web, Save
@@ -18,7 +18,6 @@ import { $ } from "./util.js";
 
 const source = $("source");
 const pane = $("pane-netlist");
-const tabs = $("file-tabs");
 
 /** Whether the netlist pane is switched to edit. */
 export let editing = false;
@@ -45,7 +44,7 @@ function keepPosition() {
       const v = fileViews[k];
       const height = sourceLineHeight(k);
       const scroll = k === fileShown ? source.scrollTop : v?.scroll || 0;
-      positions.set(file.path, { ...old, line: firstLine(scroll, height) });
+      positions.set(file.path, { ...old, line: v?.pendingLine ?? v?.lineAt(firstLine(scroll, height)) ?? firstLine(scroll, height) });
     }
   }
 }
@@ -61,8 +60,7 @@ function restorePosition() {
       e.area.scrollTop = e.scroll = 4 + p.line * (parseFloat(getComputedStyle(e.area).lineHeight) || 19);
       e.gutter.scrollTop = e.area.scrollTop;
     } else if (fileViews[k]) {
-      const height = sourceLineHeight(k);
-      fileViews[k].scroll = 4 + p.line * height;
+      fileViews[k].restoreLine(p.line);
       if (k === fileShown) source.scrollTop = fileViews[k].scroll;
     }
   }
@@ -183,7 +181,7 @@ export function revealInEditor(f, line) {
   e.area.scrollTop = Math.max(0, (line - 1) * height - e.area.clientHeight / 2 + height / 2);
 }
 
-/** Show what the bar above the text says, the marks of the tabs, and tell the shell whether changes are not saved. */
+/** Show the document's edit state, and tell the shell whether changes are not saved. */
 export function refreshEditing() {
   setEnabled("find-text", !!doc && !editing);
   const unapplied = edits.unappliedPaths();
@@ -195,14 +193,10 @@ export function refreshEditing() {
   state.textContent = unapplied.length > 0 ? "Changes not applied yet" : dirty.length > 0 ? "Applied, not saved" : "No changes";
   $("apply-edits").hidden = !editing;
   $("apply-edits").disabled = exiting;
-  [...tabs.children].forEach((tab, k) => {
-    const path = doc && doc.files[k] ? doc.files[k].path : "";
-    tab.dataset.unsaved = String(dirty.includes(path));
-    tab.dataset.unapplied = String(unapplied.includes(path));
-    tab.title = [path, unapplied.includes(path) ? "changes not applied" : "", dirty.includes(path) ? "not saved" : ""]
-      .filter(Boolean)
-      .join(", ");
-  });
+  const name = $("netlist-file");
+  name.dataset.unsaved = String(dirty.length > 0);
+  name.dataset.unapplied = String(unapplied.length > 0);
+  name.title = [doc?.files[0]?.path || '', 'Show the top file', ...dirty.map(path => `${path}: ${unapplied.includes(path) ? 'changes not applied; ' : ''}not saved`)].join('\n');
   const any = dirty.length > 0;
   if (any !== notified) {
     notified = any;

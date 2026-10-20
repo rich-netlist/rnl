@@ -645,7 +645,7 @@ export default {
       Object.assign(files, source.snapshot || {});
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
       const request = { entry: entry.path, files, pool: [...poolTexts.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true,
-        auto_include: load("auto-include", false) === true, library_prefix: source.fromPool ? "" : "/<pool>",
+        auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
         library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {
           const full = joined(dir, path);
           return [full.replace(/^\/<pool>(?=\/)/, ""), text];

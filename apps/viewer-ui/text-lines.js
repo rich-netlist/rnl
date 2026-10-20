@@ -40,18 +40,30 @@ export function lineModel(file, f, allSpans, dialect) {
     return { cls, flags: (joined ? 1 : 0) | (state.comment ? 2 : 0) };
   }
   const states = new Uint8Array(texts.length);
+  const folds = [], blocks = [];
   let flags = 0, longest = "", columns = 0;
   for (let i = 0; i < texts.length; i++) {
     states[i] = flags;
-    flags = syntax(i, flags).flags;
+    const lex = syntax(i, flags);
+    flags = lex.flags;
     const text = texts[i];
+    // Also mark definitions in library sections that the host did not select. Reuse lexical
+    // state so comments, RNL records and continuation lines cannot open/close a block.
+    const head = /^\s*(\.?subckt|inline\s+subckt|\.?ends)\b/i.exec(text);
+    if (head && lex.cls[text.search(/\S/)] === 'directive') {
+      if (/ends$/i.test(head[1])) {
+        const from = blocks.pop();
+        if (from !== undefined) folds.push([from, i]);
+      } else blocks.push(i);
+    }
     // A conservative monospace width estimate, refined from rendered rows by LineWindow.
     let width = 0;
     for (const c of text) width = c === "\t" ? width + 8 - width % 8 : width + (c.codePointAt(0) >= 0x1100 ? 2 : 1);
     if (width > columns) { columns = width; longest = text; }
   }
+  for (const from of blocks) folds.push([from, texts.length - 1]);
   return {
-    texts, columns, longest, text: file.text.replace(/\r\n/g, "\n"),
+    texts, columns, longest, folds, text: file.text.replace(/\r\n/g, "\n"),
     render(i) {
       const text = texts[i], { cls } = syntax(i, states[i]);
       const fail = new Array(text.length).fill("");

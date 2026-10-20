@@ -4,18 +4,27 @@
 // is drawn, the text outside its definition is dimmed.
 
 import { doc, selected } from "./state.js";
-import { clearEditors, editing, focusEditor, renderEditors, revealInEditor, showEditor } from "./editor.js";
+import { clearEditors, editing, focusEditor, refreshEditing, renderEditors, revealInEditor, showEditor } from "./editor.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens } from "./subcircuits.js";
 import { lineModel } from "./text-lines.js";
 import { LineWindow } from "./line-window.js";
 import { TextFind } from "./text-find.js";
 import { $ } from "./util.js";
+import { choose } from "./dialog.js";
 
 const app = $("app");
 const source = $("source");
 const netlistPane = $("pane-netlist");
-const tabs = $("file-tabs");
+const fileName = $("netlist-file");
+fileName.addEventListener('click', () => { showFile(0); focusEditor(); });
+$("choose-source").addEventListener('click', async () => {
+  const before = doc;
+  if (!before) return;
+  const f = await choose({ title: 'Source Files', action: 'Show', filter: true,
+    items: before.files.map((file, value) => ({ label: file.name, value })) });
+  if (f !== null && doc === before) { showFile(f); focusEditor(); }
+});
 
 export let fileShown = 0; // the file in the text pane
 export let fileViews = []; // per file: a LineWindow with text data, rendered rows and saved scroll
@@ -96,7 +105,9 @@ export function clearSource(message) {
   source.classList.remove("scoped");
   fileViews = [];
   lineOwners = [];
-  tabs.replaceChildren();
+  fileName.hidden = true;
+  $("choose-source").hidden = true;
+  $("source-file").hidden = true;
   source.replaceChildren();
   const p = document.createElement("p");
   p.className = "placeholder";
@@ -104,34 +115,34 @@ export function clearSource(message) {
   source.append(p);
 }
 
-export function renderFiles() {
+export function renderFiles(shown = 0) {
   for (const view of fileViews) view.destroy();
   source.replaceChildren();
   scope = null;
   notDrawn = doc.files.map(() => new Map());
   source.classList.remove("scoped");
   fileViews = [];
+  fileShown = shown;
   lineOwners = doc.files.map(() => new Map());
   doc.objects.forEach((o, k) => {
     if (o.kind !== "instance" || !o.lines) return;
     const [f, a, b] = o.lines;
     for (let n = a; n <= b; n++) lineOwners[f].set(n, k);
   });
-  tabs.replaceChildren();
+  fileName.textContent = doc.files[0]?.name.split(/[\\/]/).pop() || '';
+  fileName.hidden = !doc.files.length;
+  $("choose-source").hidden = doc.files.length < 2;
+  const spans = doc.files.map(() => []), folds = doc.files.map(() => []);
+  for (const span of doc.spans) spans[span.file]?.push(span);
+  for (const level of doc.levels) if (level.lines) {
+    const [f, from, to] = level.lines;
+    folds[f]?.push([from, to]);
+  }
   doc.files.forEach((file, f) => {
-    const view = new LineWindow(source, lineModel(file, f, doc.spans, doc.dialect), (el, n) => decorateLine(f, n, el));
+    const dialect = doc.dialect;
+    const view = new LineWindow(source, () => lineModel(file, f, spans[f], dialect), (el, n) => decorateLine(f, n, el), folds[f]);
     fileViews.push(view);
     source.append(view.el);
-    if (!view.virtual) view.refresh();
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = file.name.split(/[\\/]/).pop();
-    b.title = file.path;
-    b.addEventListener("click", () => {
-      showFile(f);
-      focusEditor();
-    });
-    tabs.append(b);
   });
   renderEditors();
   if (doc.files.length === 0) clearSource("This document has no host file to show.");
@@ -141,40 +152,20 @@ export function showFile(f) {
   if (!fileViews[f]) return;
   if (fileViews[fileShown] && fileShown !== f) fileViews[fileShown].scroll = source.scrollTop;
   fileViews.forEach((v, k) => { v.el.hidden = k !== f || editing; });
-  [...tabs.children].forEach((b, k) => b.setAttribute("aria-selected", String(k === f)));
   fileShown = f;
+  const origin = $("source-file");
+  origin.hidden = f === 0;
+  origin.textContent = doc.files[f].name.split(/[\\/]/).pop();
+  origin.title = doc.files[f].path;
+  refreshEditing();
   showEditor(f);
   if (editing) find.close(false);
-  source.classList.toggle("virtualized", fileViews[f].virtual && !editing);
   if (!editing) fileViews[f].refresh();
+  source.classList.toggle("virtualized", fileViews[f].virtual && !editing);
   source.scrollTop = fileViews[f].scroll;
   refreshSource();
-  tabInView(tabs.children[f]);
   find.changed();
 }
-
-// The file tabs scroll sideways with no scrollbar: the tab of the file shown is kept in view, and a
-// wheel turned over them scrolls them, as a sideways swipe does.
-
-/**
- * Scroll the file tabs, when they must, so that `tab` is in view, or as much of it as fits. They
- * scroll by whole pixels, rounded to bring the tab's edge in, as WebKit cuts a scroll to whole pixels.
- */
-function tabInView(tab) {
-  const [s, t] = [tabs.getBoundingClientRect(), tab.getBoundingClientRect()];
-  if (t.left < s.left) tabs.scrollLeft -= Math.ceil(s.left - t.left);
-  else if (t.right > s.right) tabs.scrollLeft += Math.min(Math.ceil(t.right - s.right), Math.floor(t.left - s.left));
-}
-
-tabs.addEventListener(
-  "wheel",
-  (e) => {
-    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || tabs.scrollWidth <= tabs.clientWidth) return;
-    e.preventDefault();
-    tabs.scrollLeft += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * tabs.clientWidth : e.deltaY;
-  },
-  { passive: false },
-);
 
 /** Whether the text pane is on screen, so that lines can be scrolled to. */
 function sourceShown() {

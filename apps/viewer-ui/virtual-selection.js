@@ -68,7 +68,7 @@ export class VirtualSelection {
   atPoint(x, y) {
     const v = this.view, rect = v.source.getBoundingClientRect();
     y = Math.max(rect.top + 1, Math.min(rect.bottom - 1, y));
-    const line = Math.max(0, Math.min(v.model.texts.length - 1, Math.floor((y - rect.top + v.source.scrollTop - 4) / v.height)));
+    const line = v.lineAt(Math.floor((y - rect.top + v.source.scrollTop - 4) / v.height));
     const code = v.lines[line]?.querySelector(".code");
     if (!code) return { line, col: 0 };
     const caret = document.caretPositionFromPoint?.(x, y);
@@ -77,7 +77,7 @@ export class VirtualSelection {
     return pos?.line === line ? pos : { line, col: x < code.getBoundingClientRect().left ? 0 : v.model.texts[line].length };
   }
   pointerDown(e) {
-    if (e.button !== 0 || e.pointerType !== "mouse" || !e.target.closest(".ln")) return;
+    if (e.button !== 0 || e.pointerType !== "mouse" || !e.target.closest(".ln") || e.target.closest('button')) return;
     this.syncNative();
     const pos = this.atPoint(e.clientX, e.clientY);
     if (!e.shiftKey || !this.anchor || e.target.closest("[data-obj]")) this.anchor = pos;

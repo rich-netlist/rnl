@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 // Reading the document again, by F5 or Ctrl+R: the level, the view, the selection, the views left on
 // other levels, the folded branches of the tree, the file shown and its scroll stay, also when the
 // file has changed; a reading that fails is shown, and the next one shows the document again.
@@ -76,9 +77,9 @@ test("a file that changed keeps the selection on its statement, which moved", as
   expect(await page.locator("#source").evaluate((s) => s.scrollTop)).toBe(scroll);
 
   // the file shown stays shown
-  await page.locator("#file-tabs button", { hasText: "04-hierarchy-lib.inc" }).click();
+  await showSource(page, "04-hierarchy-lib.inc");
   await viewer.build(() => page.keyboard.press("F5"));
-  await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");
+  await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
   await expect(viewer.line(2)).toHaveText(/\.subckt rdiv top mid bot/);
 });
 

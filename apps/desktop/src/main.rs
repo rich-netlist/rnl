@@ -4,8 +4,8 @@
 //! it can solve the netlist as a preview, and save a solved copy where the user says (decision
 //! 0010). It writes no file otherwise, and as opened, objects without a position are not drawn.
 
-// no console window behind the app in release builds on Windows
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Viewer is a GUI application, including local fast/debug builds. The CLI keeps its console.
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod core_thread;
 mod files;

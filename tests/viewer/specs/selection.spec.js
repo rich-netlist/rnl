@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 // Selecting an instance or a net, on the drawing or in the text, and following it to the other.
 
 import { expect, test } from "../viewer.js";
@@ -95,7 +96,7 @@ test("clicking a statement or a node in the text selects it on the drawing, on i
   expect(await viewer.markedLines()).toEqual([51]);
 
   // a node in the included file, in the subcircuit rdiv
-  await page.locator("#file-tabs button", { hasText: "04-hierarchy-lib.inc" }).click();
+  await showSource(page, "04-hierarchy-lib.inc");
   const mid = await viewer.object("net", "mid", "rdiv");
   await viewer.line(3).locator(`[data-obj~="${mid}"]`).click();
   await viewer.selected("net mid in rdiv");

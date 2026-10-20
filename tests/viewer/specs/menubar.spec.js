@@ -432,7 +432,7 @@ test.describe("with a native menu", () => {
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
       ["toggle-hover-names", true],
-      ["toggle-auto-include", false],
+      ["toggle-auto-include", true],
     ];
     expect(await viewer.calls("setCheck")).toEqual(marks);
     await page.keyboard.press("Control+B");

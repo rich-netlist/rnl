@@ -39,7 +39,7 @@ function top(page) {
     const lines = [...source.querySelectorAll(".file:not([hidden]) .ln")];
     const first = lines.find((l) => l.getBoundingClientRect().top >= edge - 1);
     return {
-      file: document.querySelector("#file-tabs button[aria-selected=true]").textContent,
+      file: document.querySelector("#source-file").textContent,
       line: first ? Number(first.dataset.line) : null,
       gap: first ? Math.round(first.getBoundingClientRect().top - edge) : null,
     };
@@ -63,12 +63,12 @@ test("while a subcircuit is drawn, the text outside its definition is dimmed", a
   await down(page, viewer, "X1");
   expect((await viewer.state()).title).toBe("amp");
   await expect(page.locator("#source")).toHaveClass(/\bscoped\b/);
-  expect(await dimmed(page)).toEqual([[[1, 7], [49, 78]], [[1, 19]]]);
+  expect(await dimmed(page)).toEqual([[[1, 7], [49, 78]], []]);
   // the definition's lines are as at the top level
   expect(await viewer.line(11).evaluate((e) => getComputedStyle(e.querySelector(".code")).opacity)).toBe("1");
   // reading the file again keeps it so
   await viewer.build(() => page.keyboard.press("F5"));
-  expect(await dimmed(page)).toEqual([[[1, 7], [49, 78]], [[1, 19]]]);
+  expect(await dimmed(page)).toEqual([[[1, 7], [49, 78]], []]);
   // back up, nothing is
   await page.keyboard.press("Backspace");
   await expect.poll(async () => (await viewer.state()).title).toBe("04-hierarchy.sp");
@@ -93,10 +93,11 @@ test("a subcircuit opened from the index or the tree shows its definition, in it
   await page.locator("#tab-hierarchy").click();
   await page.locator("#index .index-row", { hasText: "rdiv" }).click();
   await expect(page.locator("#level-name")).toHaveText("rdiv");
-  expect(await dimmed(page)).toEqual([[[1, 78]], [[1, 1]]]);
+  expect(await dimmed(page)).toEqual([[[1, 78]], []]);
   // the text, hidden behind the hierarchy, shows the definition once it is shown again
   await page.locator("#tab-netlist").click();
-  await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");
+  await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
+  expect(await dimmed(page)).toEqual([[[1, 78]], [[1, 1]]]);
   expect(await viewer.within(viewer.line(2))).toBe(true);
   // the tree: X2 of the top level, which opens amp
   await page.locator("#tab-hierarchy").click();
