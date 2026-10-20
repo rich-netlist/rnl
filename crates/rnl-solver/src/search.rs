@@ -301,6 +301,30 @@ pub(crate) fn with_relations<R>(
     purpose: &'static str,
     f: impl FnOnce(&mut Resolver, &Model, &Taken) -> R,
 ) -> R {
+    with_relations_from(s, relations, work, purpose, None, f)
+}
+
+/// A placement round may start at the previous successful round's geometry. The model,
+/// resolution, constraints and consumer are still fresh; this does not reuse an LP basis.
+pub(crate) fn with_placement_seed<R>(
+    s: &Structure,
+    relations: &[Tagged],
+    work: &mut Work,
+    seed: Option<&Geometry>,
+    orient: &[Orient],
+    f: impl FnOnce(&mut Resolver, &Model, &Taken) -> R,
+) -> R {
+    with_relations_from(s, relations, work, "placement", seed.map(|g| (g, orient)), f)
+}
+
+fn with_relations_from<R>(
+    s: &Structure,
+    relations: &[Tagged],
+    work: &mut Work,
+    purpose: &'static str,
+    seed: Option<(&Geometry, &[Orient])>,
+    f: impl FnOnce(&mut Resolver, &Model, &Taken) -> R,
+) -> R {
     let _call = crate::profile::work_span("with_relations", purpose);
     if let Some(id) = crate::profile::work::next_call() {
         crate::profile::work_set("work_call_id", id);
@@ -315,7 +339,7 @@ pub(crate) fn with_relations<R>(
     drop(phase);
     let phase = crate::profile::work_span("relations_phase", "resolver_init_seed");
     let mut r = Resolver::new(&model, s.objects.len(), Limits::Caps(s.caps));
-    r.seed(s.witness.clone());
+    seed_resolution(&mut r, s, seed, purpose == "placement");
     drop(phase);
     let phase = crate::profile::work_span("relations_phase", "kept_replay");
     for &f in &s.kept {
@@ -336,6 +360,34 @@ pub(crate) fn with_relations<R>(
     work.resolve_nodes += r.nodes;
     work.pivots += r.pivots();
     out
+}
+
+/// Validate a proposed geometry before adopting any unit. In particular, a seed that only
+/// satisfies some of the kept facts cannot send the others through a new resolution.
+fn seed_resolution(r: &mut Resolver, s: &Structure, seed: Option<(&Geometry, &[Orient])>, placement: bool) {
+    let observe = |name| {
+        if placement && crate::profile::work_enabled() {
+            crate::profile::add(name, 1);
+        }
+    };
+    if let Some((geometry, orient)) = seed {
+        observe("coords_seed_proposed");
+        if geometry.origin.len() != s.objects.len() || geometry.orient.len() != s.objects.len() {
+            observe("coords_seed_rejected_shape");
+        } else if geometry.orient.as_slice() != orient {
+            observe("coords_seed_rejected_orientation");
+        } else {
+            r.seed(geometry.clone());
+            if s.kept.iter().all(|&f| r.holds(f)) {
+                observe("coords_seed_accepted");
+                return;
+            }
+            observe("coords_seed_rejected_kept");
+        }
+    } else {
+        observe("coords_seed_cold");
+    }
+    r.seed(s.witness.clone());
 }
 
 /// The point that is an object's origin in the model: its own, or the point it is drawn at.
