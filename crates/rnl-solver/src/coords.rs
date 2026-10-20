@@ -73,9 +73,12 @@ use crate::search::{
     orientation_relations, relations, relations_by_pairs, row_pairs, up, with_placement_seed, with_relations,
     Candidate, RelKind, Relation, RowPair, Tagged,
 };
-use crate::simplex::{LinExpr, Rel, Simplex, Var};
+use crate::simplex::{LinExpr, Rel, Var};
 use crate::structure::{Drawn, Role, Structure};
 use crate::{SolverOptions, Work};
+
+pub(crate) mod affine;
+use affine::Axis;
 
 /// How many rounds of putting overlapping symbols apart.
 const REPAIR_ROUNDS: usize = 6;
@@ -345,7 +348,7 @@ fn round(v: &Q, grid: &Option<Q>) -> Q {
 
 /// Every pin and text of the model linked to its object's origin by its orientation, a text only
 /// on the axes its owner's symbol gives (13.3); then a check.
-fn link(sx: &mut Simplex<Tag>, model: &Model, ori: &[Orient], axis: usize) -> bool {
+fn link(sx: &mut Axis<Tag>, model: &Model, ori: &[Orient], axis: usize) -> bool {
     for (id, info) in &model.points {
         let (Some(k), Some(local), true) = (info.object, &info.local, info.linked(axis)) else { continue };
         let Some(base) = model.origin_point.get(k).copied().flatten() else { continue };
@@ -361,7 +364,7 @@ fn link(sx: &mut Simplex<Tag>, model: &Model, ori: &[Orient], axis: usize) -> bo
 }
 
 /// Minimises a form and keeps its optimum for the layers after it (`Simplex::keep_optimum`).
-fn minimise_and_keep(sx: &mut Simplex<Tag>, objective: &LinExpr) -> Result<(), ()> {
+fn minimise_and_keep(sx: &mut Axis<Tag>, objective: &LinExpr) -> Result<(), ()> {
     if objective.is_constant() {
         return Ok(());
     }
@@ -452,7 +455,7 @@ fn stub_nets(model: &Model, s: &Structure, ori: &[Orient], axis: usize) -> Vec<B
 
 /// The four layers of the LP on one axis (see the module).
 fn layers(
-    sx: &mut Simplex<Tag>,
+    sx: &mut Axis<Tag>,
     model: &Model,
     s: &Structure,
     ori: &[Orient],
@@ -533,7 +536,7 @@ fn layers(
 }
 
 /// Holds `v` at `r` when the bounds allow it, and says whether they did.
-fn try_pin(sx: &mut Simplex<Tag>, v: Var, r: &Q) -> bool {
+fn try_pin(sx: &mut Axis<Tag>, v: Var, r: &Q) -> bool {
     let cp = sx.checkpoint();
     if sx.assert(&LinExpr::var(v), Rel::Eq, r, Tag::Def).is_ok() && sx.check().is_ok() {
         return true;
@@ -566,7 +569,7 @@ type Visit = (usize, Var, bool);
 /// can no longer be on the grid, all is as before, and the origin stays where it is, free. `kept`
 /// are the origins held on the grid already, which are left as they are. Gives the origins moved
 /// onto the grid, with where.
-fn round_to_grid(sx: &mut Simplex<Tag>, order: &[Visit], grid: &Q, kept: &BTreeSet<usize>) -> Vec<(usize, Q)> {
+fn round_to_grid(sx: &mut Axis<Tag>, order: &[Visit], grid: &Q, kept: &BTreeSet<usize>) -> Vec<(usize, Q)> {
     let start = sx.checkpoint();
     // the origins held in this call, in the order they were held, with where
     let mut held: Vec<(usize, Var, Q)> = Vec::new();

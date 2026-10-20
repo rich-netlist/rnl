@@ -131,7 +131,8 @@ use crate::model::{ax, turned, Bound, ChoiceKind, LitKey, Model, OrientEffect, P
 use crate::options::{Caps, CAPS};
 use crate::orient::{from_index, index, OrientClasses};
 use crate::rational::{from_f64, to_f64, Q};
-use crate::simplex::{Failure, LinExpr, Rel, Simplex, Var};
+use crate::coords::affine::Axis;
+use crate::simplex::{Failure, LinExpr, Rel, Var};
 use crate::{Clock, Discarded, SolverOptions, Statement, StatementHint, Work};
 
 /// The time limit of the resolution of one level (the draft 0.3, 8.5), on the clock the caller
@@ -390,7 +391,7 @@ struct Saved {
 pub(crate) struct Resolver<'a> {
     model: &'a Model,
     limits: Limits<'a>,
-    sx: [Simplex<Tag>; 2],
+    sx: [Axis<Tag>; 2],
     classes: OrientClasses,
     geometry: Geometry,
     /// The points that the units kept constrain, by axis (plan 5.1).
@@ -416,7 +417,7 @@ pub(crate) struct Resolver<'a> {
 impl<'a> Resolver<'a> {
     /// A resolution with nothing taken in yet, every object at the origin with R0.
     pub(crate) fn new(model: &'a Model, n_objects: usize, limits: Limits<'a>) -> Resolver<'a> {
-        let mut sx = [Simplex::new(), Simplex::new()];
+        let mut sx = [Axis::new(), Axis::new()];
         for s in &mut sx {
             for _ in 0..model.vars.len() {
                 s.new_var();
@@ -463,7 +464,7 @@ impl<'a> Resolver<'a> {
 
     /// The simplex of an axis, with the bounds of the units kept and of the literals held: the
     /// coordinates of a candidate are optimised over it (`crate::coords`).
-    pub(crate) fn simplex_mut(&mut self, axis: usize) -> &mut Simplex<Tag> {
+    pub(crate) fn simplex_mut(&mut self, axis: usize) -> &mut Axis<Tag> {
         &mut self.sx[axis]
     }
 
@@ -1302,7 +1303,7 @@ fn facts_of(tags: &[Tag], u: usize) -> Vec<usize> {
 }
 
 /// Asserts a bound with a tag; a conflict found at once gives its tags.
-fn assert_bound(s: &mut Simplex<Tag>, b: &Bound, tag: Tag) -> Result<(), Vec<Tag>> {
+fn assert_bound(s: &mut Axis<Tag>, b: &Bound, tag: Tag) -> Result<(), Vec<Tag>> {
     let result = match (&b.lo, &b.hi) {
         (Some(lo), Some(hi)) if lo == hi => s.assert(&b.expr, Rel::Eq, lo, tag),
         (lo, hi) => {
