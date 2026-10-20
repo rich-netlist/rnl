@@ -156,7 +156,9 @@ fn fixed_links_use_physical_seeds_and_complete_relate_fix_support() {
     assert_eq!(r.sx[0].value(pin), int(3));
     let b = &model.units[3].fixed[0];
     let why = assert_bound(&mut r.sx[0], b, Tag::Fact(3)).unwrap_err();
-    assert_eq!(why, vec![Tag::Fact(0), Tag::Fact(1), Tag::Fact(2), Tag::Fact(3)]);
+    let facts: Vec<Tag> = why.into_iter().filter(|t| *t != Tag::Def).collect();
+    assert_eq!(facts, vec![Tag::Fact(0), Tag::Fact(1), Tag::Fact(2), Tag::Fact(3)]);
+    assert_eq!(r.add(3), Outcome::Conflict(vec![0, 1, 2]), "the public conflict contains original facts only");
     // The support is in the original domain and each original fact is necessary here:
     // remove relate => object 1 can be R0; remove fix => 0=MY,1=R0; remove origin=0
     // => origin 1 can be -6. Each explicit witness then places the gate at -3.
@@ -202,13 +204,29 @@ fn an_unfixed_held_orientation_is_not_part_of_the_new_base() {
     assert_eq!(r.add(0), Outcome::Kept);
     assert_eq!(r.add(1), Outcome::Kept);
     assert_eq!(r.geometry.orient[0], Orient::R0);
+    let link = Held::Link(0, 0, PointId::Pin(0, 0));
+    assert_eq!(r.held[&link], u32::from(index(Orient::R0)));
+    assert!(r.classes.fixed(0).is_none());
+    assert_eq!(r.geometry.origin[0][0], int(0));
+    assert_eq!(r.geometry.value(&model, PointId::Pin(0, 0), 0), int(-3));
+    // add's witness fast path can leave a basic row outside its new bounds. Establish
+    // the feasible OLD numerical state explicitly before testing that it can be retracted.
+    r.check().expect("the original held R0 link has the hand witness origin=0, gate=-3");
     assert_eq!(r.sx[0].value(pin), int(-3));
+    let mut legal = Geometry::new(1);
+    legal.orient[0] = Orient::MY;
+    assert_eq!(legal.value(&model, PointId::Pin(0, 0), 0), int(3));
+    assert!(model.units.iter().flat_map(|u| &u.fixed).all(|b| b.holds(|v| legal.var_value(&model, v, b.axis))));
     r.freeze_placement_core();
     assert!(r.classes.fixed(0).is_none());
     assert_eq!(r.add(2), Outcome::Kept);
     assert_ne!(r.geometry.orient[0], Orient::R0);
+    assert!(r.classes.fixed(0).is_none());
+    assert_eq!(r.held[&link], u32::from(index(r.geometry.orient[0])));
+    assert_eq!(r.kept, vec![0, 1, 2]);
     assert_eq!(r.geometry.origin[0][0], int(0));
     assert_eq!(r.geometry.value(&model, PointId::Pin(0, 0), 0), int(3));
+    assert!((0..3).all(|u| r.holds(u)), "the final physical geometry satisfies every original kept unit");
 }
 
 #[test]

@@ -938,8 +938,18 @@ fn an_overlap_is_noted_with_its_cause() {
     let options = SolverOptions::without_time_limit();
     let caps = Caps { pivots: 40, ..CAPS };
     let mut budget = false;
-    for p in &ps {
+    let mut diagnostics = Vec::new();
+    for (level, p) in ps.iter().enumerate() {
         let (solved, e) = solve_exact_with(p, &options, &StoppedClock, caps);
+        diagnostics.push(format!(
+            "level {level} {:?}: overlaps={:?}, optimised={}, undecided={}, Work.pivots={}, notes={:?}",
+            p.title,
+            e.placed.overlaps,
+            e.placed.optimised,
+            e.placed.undecided,
+            solved.report.work.pivots,
+            solved.report.notes
+        ));
         let tol = if e.resolved.as_written { Q::zero() } else { from_f64(options.tolerance).unwrap() };
         for &k in &solved.report.kept {
             assert!(holds_exactly(p, &e.placed.geometry, &p.facts[k].kind, &tol), "{} fact {k}", p.title);
@@ -959,7 +969,12 @@ fn an_overlap_is_noted_with_its_cause() {
             );
         }
     }
-    assert!(budget, "40 pivots leave some symbols overlapping for want of work");
+    assert!(
+        budget,
+        "40 pivots leave some symbols overlapping for want of work; Work.pivots is the total over all simplexes, \
+         not one axis's 40-pivot cap:\n{}",
+        diagnostics.join("\n")
+    );
     let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
     let (solved, e) = solve_exact(&ps[0], &SolverOptions::without_time_limit());
     let [m2, cl] = ["#M2", "#CL"].map(|l| object(&ps[0], l));
