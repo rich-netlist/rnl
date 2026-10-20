@@ -176,19 +176,32 @@ async function png(page, svg, size, path) {
   return page.screenshot({ path, omitBackground: true });
 }
 
-async function generate() {
-  execFileSync(rnl, ["check", "brand/rnl-logo.sp"], { cwd: root, stdio: "inherit" });
+async function lightLogoPngs(page, svg) {
+  for (const size of [16, 24, 32, 48, 64, 128, 256, 512, 1024]) {
+    await png(page, svg, size, join(root, `brand/rnl-logo-${size}.png`));
+  }
+}
+
+async function generate(lightPngsOnly = false) {
+  if (!lightPngsOnly) execFileSync(rnl, ["check", "brand/rnl-logo.sp"], { cwd: root, stdio: "inherit" });
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ deviceScaleFactor: 1 });
+    if (lightPngsOnly) {
+      await lightLogoPngs(page, readFileSync(join(root, "brand/rnl-logo-small.svg"), "utf8"));
+      console.log("Light logo PNGs regenerated from the committed transparent SVG.");
+      return;
+    }
     const { svg, bounds } = await renderLogo(page);
     const dark = darkLogo(svg), icon = iconSvg(dark, bounds);
+    const light = iconSvg(svg, bounds, { background: null });
     const write = (path, text) => writeFileSync(join(root, path), text);
     write("brand/rnl-logo.svg", svg);
     write("brand/rnl-logo-dark.svg", dark);
     write("brand/rnl-icon.svg", icon);
-    write("brand/rnl-logo-small.svg", iconSvg(svg, bounds, { background: null }));
+    write("brand/rnl-logo-small.svg", light);
     write("brand/rnl-logo-small-dark.svg", iconSvg(dark, bounds, { background: null }));
+    await lightLogoPngs(page, light);
     for (const size of [16, 24, 32, 1024]) await png(page, icon, size, join(root, `brand/rnl-icon-${size}.png`));
 
     const assets = join(root, "site/src/assets");
@@ -239,4 +252,10 @@ async function generate() {
   console.log("Brand assets regenerated. Review the SVG and small-size icons before committing.");
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await generate();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2);
+  if (args.length > 1 || (args.length === 1 && args[0] !== "--light-pngs")) {
+    throw new Error("Usage: node scripts/brand.mjs [--light-pngs]");
+  }
+  await generate(args[0] === "--light-pngs");
+}

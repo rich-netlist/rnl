@@ -9,6 +9,7 @@ It defines its own symbols and styles and contains no text. Keep its circuit and
 | `rnl-logo.svg` | Transparent original colours for light backgrounds |
 | `rnl-logo-dark.svg` | Transparent colours for dark backgrounds, using the viewer's `darkColour` rule |
 | `rnl-logo-small.svg`, `rnl-logo-small-dark.svg` | Transparent, pixel-fitted light/dark logos for the site's 24px navigation mark |
+| `rnl-logo-{16,24,32,48,64,128,256,512,1024}.png` | Transparent square PNGs in the original black/orange colours for light backgrounds |
 | `rnl-icon.svg` | Responsive 1024-unit icon, dark logo on `#132033`, corner radius 180 |
 | `rnl-icon-1024.png` | Chromium rasterization used as Tauri's input |
 | `rnl-icon-16.png`, `rnl-icon-24.png`, `rnl-icon-32.png` | Small icons with stronger strokes, also packed into the desktop icon containers |
@@ -22,6 +23,12 @@ junctions use `crispEdges` rendering. The hollow ground becomes a solid stepped 
 SVG media queries select the matching small variant for browser favicons (16px up to 20px,
 24px up to 28px, and 32px up to 32px). Raster icons are rendered directly at their target size.
 Larger icons and the transparent homepage logos retain their original line weights; the source circuit stays unchanged.
+
+The light-background PNGs use the same square framing and 72% painted extent as the icon,
+with no backdrop. Sizes 16/24/32 use the approved hard-edge small artwork and solid stepped
+ground; sizes 48 and above use the original smooth artwork. Each PNG is rasterized directly
+at its named pixel dimensions rather than resized from a larger image. The portrait SVG
+`rnl-logo.svg` keeps its original framing for the homepage.
 
 ## Regeneration
 
@@ -39,6 +46,15 @@ Then regenerate everything with one command:
 ```sh
 node scripts/brand.mjs
 ```
+
+To export only the light-background PNG sizes from the committed `rnl-logo-small.svg`,
+without rebuilding the RNL CLI or invoking Tauri:
+
+```sh
+node scripts/brand.mjs --light-pngs
+```
+
+This shorter command needs only the existing Playwright/Chromium installation in `tests/viewer`.
 
 The script uses `target/debug/rnl` (`rnl.exe` on Windows); `RNL_BIN` can select another freshly built CLI.
 It invokes the installed Tauri CLI's `icon` command, equivalent to `npx tauri icon`, in a temporary
