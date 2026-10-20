@@ -930,14 +930,14 @@ fn layers_with_tolerances_rank_the_candidates_in_a_well_defined_order() {
     }
 }
 
-/// A note on two symbols that overlap says why: with too few pivots, the cap of work; with the
-/// facts of corpus 03, which tie CL to M2, the facts.
+/// Affine placement finishes this case without overlap under the original forty-pivot cap.
+/// A faster solve need not leave an overlap just to exercise the explanation of a spent budget.
 #[test]
-fn an_overlap_is_noted_with_its_cause() {
+fn t4_has_no_overlap_with_forty_pivots() {
     let ps = problems(&repo().join("tests/integration/solver/T4-miller-conflicts.sp"));
     let options = SolverOptions::without_time_limit();
     let caps = Caps { pivots: 40, ..CAPS };
-    let mut budget = false;
+    let mut overlaps = 0;
     let mut diagnostics = Vec::new();
     for (level, p) in ps.iter().enumerate() {
         let (solved, e) = solve_exact_with(p, &options, &StoppedClock, caps);
@@ -954,8 +954,8 @@ fn an_overlap_is_noted_with_its_cause() {
         for &k in &solved.report.kept {
             assert!(holds_exactly(p, &e.placed.geometry, &p.facts[k].kind, &tol), "{} fact {k}", p.title);
         }
+        overlaps += e.placed.overlaps.len();
         for o in &e.placed.overlaps {
-            budget |= o.cause == crate::coords::Cause::Budget;
             assert!(matches!(o.cause, crate::coords::Cause::Budget | crate::coords::Cause::Facts), "{o:?}");
         }
         for n in solved.report.notes.iter().filter(|n| n.contains(" overlap: ")) {
@@ -969,12 +969,67 @@ fn an_overlap_is_noted_with_its_cause() {
             );
         }
     }
-    assert!(
-        budget,
-        "40 pivots leave some symbols overlapping for want of work; Work.pivots is the total over all simplexes, \
+    assert_eq!(
+        overlaps,
+        0,
+        "T4 finishes without overlap with forty pivots; Work.pivots is the total over all simplexes, \
          not one axis's 40-pivot cap:\n{}",
         diagnostics.join("\n")
     );
+}
+
+/// A note on two symbols that overlap says why: a genuinely spent search budget, or the facts
+/// of corpus 03, which tie CL to M2. Neither requires a particular large case to stay unsolved.
+#[test]
+fn an_overlap_is_noted_with_its_cause() {
+    let p = problem_of(
+        vec![instance(), instance()],
+        vec![
+            fact(FactKind::Orient { object: 0, code: Orient::R0 }),
+            fact(FactKind::Orient { object: 1, code: Orient::R0 }),
+            fact(FactKind::Place { at: PointRef::Origin(0), axis: Axis::X, value: 0.0 }),
+            fact(FactKind::Place { at: PointRef::Origin(1), axis: Axis::X, value: 0.0 }),
+        ],
+    );
+    let options = SolverOptions::without_time_limit().with_overrides("budget=candidates:0").unwrap();
+    // P0 puts these unconnected elements in one row. Horizontal separation contradicts the
+    // fixed x values; the one-node search examines it but cannot visit a vertical alternative.
+    // Only this fixture has the small node cap; pivots retain their normal per-axis cap.
+    let caps = Caps { nodes: 1, ..CAPS };
+    let (solved, e) = solve_exact_with(&p, &options, &StoppedClock, caps);
+    assert_eq!(solved.report.kept, vec![0, 1, 2, 3]);
+    assert_eq!(e.candidate.origin, "P0");
+    assert_eq!(e.candidate.rows, vec![vec![0, 1]]);
+    assert!(solved.report.work.resolve_nodes > 0, "the positive search budget was actually used");
+    // StoppedClock cannot time out, and this global upper bound rules out any per-axis
+    // pivot cap. The undecided search below must therefore have spent its positive node cap.
+    assert!(
+        solved.report.work.pivots < caps.pivots,
+        "even the sum over all simplexes is below one pivot cap: {:?}",
+        solved.report.work
+    );
+    assert!(e.placed.optimised && e.placed.undecided, "the LP finishes but relation search is undecided: {e:?}");
+    assert_eq!(e.placed.overlaps.len(), 1, "{:?}", e.placed.overlaps);
+    let o = &e.placed.overlaps[0];
+    assert_eq!((o.a, o.b, o.cause), (0, 1, crate::coords::Cause::Budget));
+    assert!(solved
+        .report
+        .notes
+        .iter()
+        .any(|n| n.contains("overlap: a cap of work ran out before they were put apart")));
+    for &k in &solved.report.kept {
+        assert!(holds_exactly(&p, &e.placed.geometry, &p.facts[k].kind, &Q::zero()), "fact {k}");
+    }
+    // Independent original-coordinate witness: both x=0 and R0, but y=0 and y=10.
+    // The known symbol boxes [-3,-2,0,2] then have disjoint y intervals [-2,2] and [8,12].
+    let mut apart = e.placed.geometry.clone();
+    apart.origin = vec![[int(0), int(0)], [int(0), int(10)]];
+    apart.orient = vec![Orient::R0; 2];
+    assert_eq!(p.symbols[0].bbox, [-3.0, -2.0, 0.0, 2.0]);
+    assert!(&apart.origin[0][1] + int(2) < &apart.origin[1][1] - int(2));
+    for fact in &p.facts {
+        assert!(holds_exactly(&p, &apart, &fact.kind, &Q::zero()));
+    }
     let ps = problems(&repo().join("tests/conformance/cases/03-five-transistor-ota.sp"));
     let (solved, e) = solve_exact(&ps[0], &SolverOptions::without_time_limit());
     let [m2, cl] = ["#M2", "#CL"].map(|l| object(&ps[0], l));
