@@ -338,7 +338,13 @@ impl<T: Clone + Ord> Simplex<T> {
 
     /// A new structural variable, with no bound and the value 0.
     pub(crate) fn new_var(&mut self) -> Var {
-        self.vars.push(VarState { value: Q::zero(), lower: None, upper: None, row: None });
+        self.new_var_at(Q::zero())
+    }
+
+    /// A new unbounded, nonbasic structural variable at an exact starting value. Nonzero
+    /// starts are used only by a fresh resolution, before any row or bound is constructed.
+    pub(crate) fn new_var_at(&mut self, value: Q) -> Var {
+        self.vars.push(VarState { value, lower: None, upper: None, row: None });
         self.incidence.push(RowSet::default());
         self.occurrences.push(0);
         self.work.dimensions(self.rows.len(), self.vars.len());

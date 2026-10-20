@@ -130,12 +130,14 @@ fn geometry_seed_checks_shape_orientation_and_every_kept_fact_before_add() {
         let observer = Rc::new(Observer::default());
         let geometry = profile::with(Some(observer.clone()), || {
             with_placement_seed(&s, &[], &mut Work::default(), Some(seed), &s.witness.orient, |r, _, _| {
+                assert_eq!(r.simplex_mut(1).value(s.model.var(PointId::Origin(0))), &expected.origin[0][1]);
                 r.geometry().clone()
             })
         });
         assert_eq!(&geometry, expected, "{reason}");
         assert_eq!(observer.sum("coords_seed_proposed"), 1);
         assert_eq!(observer.sum(reason), 1);
+        assert_eq!(observer.sum("coords_simplex_seeded_calls"), u64::from(reason == "coords_seed_accepted"));
         assert_eq!(observer.sum("fact_add_calls"), s.kept.len() as u64);
         assert_eq!(observer.calls(), 1, "no cold resolution rerun");
         let events = observer.0.borrow();

@@ -283,6 +283,22 @@ impl Geometry {
             VarKind::Separator { before, .. } => self.extent(model, before, axis).1,
         }
     }
+
+    /// Whether this geometry satisfies a unit, independently of any simplex state. This is
+    /// also the gate for using a placement's geometry before a fresh tableau is constructed.
+    pub(crate) fn holds(&self, model: &Model, u: usize) -> bool {
+        let unit = &model.units[u];
+        let ori = &self.orient;
+        let oriented = match &unit.orient {
+            OrientEffect::None => true,
+            OrientEffect::Fix { object, code } => ori.get(*object) == Some(code),
+            OrientEffect::Relate { relation, from, to } => relation_holds(ori, *relation, from, to),
+        };
+        let holds = |b: &Bound| b.holds(|v| self.var_value(model, v, b.axis));
+        oriented
+            && unit.fixed.iter().all(holds)
+            && unit.choices.iter().all(|c| c.values.iter().any(|bounds| bounds.iter().all(holds)))
+    }
 }
 
 /// What became of a unit taken in.
@@ -416,10 +432,31 @@ pub(crate) struct Resolver<'a> {
 impl<'a> Resolver<'a> {
     /// A resolution with nothing taken in yet, every object at the origin with R0.
     pub(crate) fn new(model: &'a Model, n_objects: usize, limits: Limits<'a>) -> Resolver<'a> {
+        Self::new_from(model, n_objects, limits, None)
+    }
+
+    /// A fresh resolution whose structural variables start at a validated placement. No
+    /// bounds, rows, basis, held literals or objective state are borrowed from the old call.
+    pub(crate) fn with_geometry_values(
+        model: &'a Model,
+        n_objects: usize,
+        limits: Limits<'a>,
+        geometry: Geometry,
+    ) -> Resolver<'a> {
+        debug_assert_eq!(geometry.origin.len(), n_objects);
+        debug_assert_eq!(geometry.orient.len(), n_objects);
+        Self::new_from(model, n_objects, limits, Some(geometry))
+    }
+
+    fn new_from(model: &'a Model, n_objects: usize, limits: Limits<'a>, geometry: Option<Geometry>) -> Resolver<'a> {
         let mut sx = [Simplex::new(), Simplex::new()];
-        for s in &mut sx {
-            for _ in 0..model.vars.len() {
-                s.new_var();
+        for (axis, s) in sx.iter_mut().enumerate() {
+            for v in 0..model.vars.len() {
+                if let Some(g) = &geometry {
+                    s.new_var_at(g.var_value(model, v, axis));
+                } else {
+                    s.new_var();
+                }
             }
             if let Limits::Caps(caps) = limits {
                 s.set_pivot_limit(Some(caps.pivots));
@@ -440,7 +477,7 @@ impl<'a> Resolver<'a> {
             limits,
             sx,
             classes: OrientClasses::new(n_objects),
-            geometry: Geometry::new(n_objects),
+            geometry: geometry.unwrap_or_else(|| Geometry::new(n_objects)),
             touched: [BTreeSet::new(), BTreeSet::new()],
             centres_on: [BTreeSet::new(), BTreeSet::new()],
             choices: Vec::new(),
@@ -530,17 +567,7 @@ impl<'a> Resolver<'a> {
     /// Whether the witness satisfies a unit: its orientations, its bounds, and for each choice
     /// the bounds of one of its values.
     pub(crate) fn holds(&self, u: usize) -> bool {
-        let unit = &self.model.units[u];
-        let ori = &self.geometry.orient;
-        let oriented = match &unit.orient {
-            OrientEffect::None => true,
-            OrientEffect::Fix { object, code } => ori.get(*object) == Some(code),
-            OrientEffect::Relate { relation, from, to } => relation_holds(ori, *relation, from, to),
-        };
-        let holds = |b: &Bound| b.holds(|v| self.geometry.var_value(self.model, v, b.axis));
-        oriented
-            && unit.fixed.iter().all(holds)
-            && unit.choices.iter().all(|c| c.values.iter().any(|bounds| bounds.iter().all(holds)))
+        self.geometry.holds(self.model, u)
     }
 
     fn save(&self) -> Saved {
