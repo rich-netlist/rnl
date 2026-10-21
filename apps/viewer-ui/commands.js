@@ -12,7 +12,7 @@ import { duplicateWindow } from "./navigation.js";
 import { gridCommand } from "./grid.js";
 import { hoverNamesOn, setHoverNames } from "./hover.js";
 import { loadClipboard, pickAndOpen, reload } from "./open.js";
-import { setProblems, setSidebar } from "./panels.js";
+import { setProblems, setSidebar, showPane } from "./panels.js";
 import { clearSelection } from "./selection.js";
 import { shell } from "./shell.js";
 import { closePreview, saveSolved, solve } from "./solve.js";
@@ -79,10 +79,17 @@ export function command(id, options = {}) {
     case "toggle-hover-names": setHoverNames(!hoverNamesOn()); break;
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
+    case "panel-files":
+    case "panel-netlist":
+    case "panel-hierarchy":
+    case "panel-symbol":
+    case "panel-unplaced":
+    case "panel-solve": return showPane(id.slice("panel-".length));
     case "descend": return descend(selected, options);
     case "descend-new-window": return descend(selected, { newWindow: true });
     case "ascend": return ascend(options);
     case "shortcuts": inform({ title: "Keyboard Shortcuts", paragraphs: [
+      "1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Not drawn." + (shell.solve ? " 6: Solve report." : "") + " These keys also expand a collapsed side panel; they do not run while typing.",
       "E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level.",
       "Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window.",
       "Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing.",
@@ -201,17 +208,19 @@ function matches(e, spec) {
   if (parts.includes("Control")) return e.ctrlKey && !e.metaKey && !e.altKey && e.shiftKey === parts.includes("Shift");
   if (parts.includes("Ctrl")) return ctrl && (!/^[a-z]$/.test(key) || e.shiftKey === parts.includes("Shift"));
   if (key === "e" || key === "enter") return !ctrl && !e.altKey && e.shiftKey === parts.includes("Shift");
+  if (/^[1-6]$/.test(key)) return !ctrl && !e.altKey && !e.shiftKey;
   return !(ctrl || e.altKey) || !(key.length === 1 || key === "backspace");
 }
 
 /** The command a key runs, or null. In a text box only keys with Ctrl and function keys count. */
-function keyCommand(e, typing) {
+function keyCommand(e, typing, input) {
   if (!table) return null;
   for (const m of table.menus) {
     for (const item of commandsIn(m.items)) {
       if (!offered(item)) continue;
       for (const spec of item.keys || []) {
-        if (typing && !/^(Ctrl\+|Control\+|F\d+$)/.test(spec)) continue;
+        // Panel keys work from navigation lists too, but never from editable controls.
+        if ((item.id.startsWith("panel-") ? input : typing) && !/^(Ctrl\+|Control\+|F\d+$)/.test(spec)) continue;
         if (matches(e, spec)) return item.id;
       }
     }
@@ -221,10 +230,11 @@ function keyCommand(e, typing) {
 
 document.addEventListener("keydown", (e) => {
   if (shell?.embed && !document.hasFocus()) return;
+  if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
   const ctrl = e.ctrlKey || e.metaKey;
-  const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target.isContentEditable ||
-    !!e.target.closest('select, [role="listbox"], [role="tree"], #tree, #index, #unplaced-list');
-  if (e.defaultPrevented) return;
+  const input = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target.isContentEditable || !!e.target.closest("select");
+  const textInput = input && !e.target.matches('input[type="checkbox"], input[type="radio"]');
+  const typing = input || !!e.target.closest('[role="listbox"], [role="tree"], #tree, #index, #unplaced-list');
   if (e.key === "Escape" && cancelGesture()) {
     e.preventDefault();
     return;
@@ -242,7 +252,7 @@ document.addEventListener("keydown", (e) => {
     clearSelection();
     e.preventDefault();
     return;
-  } else id = keyCommand(e, typing);
+  } else id = keyCommand(e, typing, textInput);
   if (id === "find-text" && (typing || !isEnabled(id))) return;
   // Focused buttons and source links retain native Enter activation.
   const control = e.target.closest('button, a[href]')?.getClientRects().length > 0;

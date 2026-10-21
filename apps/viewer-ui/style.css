@@ -252,11 +252,23 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 /* the side panel's views: tabs that look like the tabs of a window */
 .view-tabs { align-self: stretch; align-items: flex-end; gap: 0; }
 .view-tabs button {
+  position: relative;
   border-radius: 4px 4px 0 0;
   border: 1px solid transparent;
   border-bottom: 0;
-  padding: 4px 12px;
+  padding: 8px 10px 4px 14px;
   margin-bottom: -1px;
+}
+.view-tabs .tab-key {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 .view-tabs button[aria-selected="true"] {
   background: var(--panel);

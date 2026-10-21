@@ -76,7 +76,7 @@ test.describe("on the web", () => {
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-",
           "Background", "Light", "Dark",
           "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "",
-          "Netlist PanelCtrl+B", "ProblemsCtrl+Shift+M",
+          "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Not Drawn5", "Netlist PanelCtrl+B", "ProblemsCtrl+Shift+M",
         ],
       },
     ]);

@@ -17,6 +17,7 @@ import {
   setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
 } from "./panels.js";
 import { loadShell } from "./shell.js";
+import { startSolvePanel } from "./solve.js";
 import { finishStartup, stylesReady } from "./startup.js";
 import { current, doc, path, selected } from "./state.js";
 import { renderUnplaced } from "./unplaced.js";
@@ -38,6 +39,7 @@ async function start() {
   setProblemsHeight(load("problems-height", 180));
   setSidebar(load("sidebar-shown", true));
   setProblems(load("problems-shown", true));
+  startSolvePanel();
   setPane(load("side-pane", "netlist"));
   setShowFailed(load("show-failed", true));
   setSemanticsOnly(load("semantics-only", false));

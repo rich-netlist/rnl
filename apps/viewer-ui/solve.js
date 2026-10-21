@@ -29,6 +29,20 @@ export function previewing() {
   return shown !== null;
 }
 
+/** Keep the desktop report reachable before the first solve, without running the solver. */
+export function startSolvePanel() {
+  $("tab-solve").hidden = !shell.solve;
+  emptyReport();
+}
+
+function emptyReport() {
+  const note = document.createElement("p");
+  note.className = "solve-note";
+  note.textContent = "Run Solve (F9) to show the preview report.";
+  $("solve-counts").textContent = "";
+  $("solve-report").replaceChildren(note);
+}
+
 /**
  * Solve the netlist shown (Solve > Solve, F9), or, while a preview is shown, solve its file
  * again; File > Reload does the same then. The file is read again first, so that the solve is
@@ -134,9 +148,8 @@ function showPreview(on) {
   document.body.classList.toggle("preview", on);
   $("preview-badge").hidden = !on;
   $("preview-close").hidden = !on;
-  $("tab-solve").hidden = !on;
   if (!on && !$("pane-solve").hidden) setPane("netlist");
-  if (!on) $("solve-report").replaceChildren();
+  if (!on) emptyReport();
   if (on) setPane("solve");
 }
 

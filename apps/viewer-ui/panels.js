@@ -26,13 +26,10 @@ export function setSidebar(shown) {
   save("sidebar-shown", shown);
   setCheck("toggle-netlist", shown);
   if (shown) { refreshSource(); revealPending(); }
+  else if (sidebar.contains(document.activeElement)) $("show-sidebar").focus({ preventScroll: true });
 }
 
-/**
- * Show the "netlist", the "hierarchy", the objects "unplaced" (not drawn) or the "solve" view of the
- * side panel; the solve's only while a solve is shown (solve.js), and the netlist's for any other
- * name.
- */
+/** Select a side-panel view; Solve is available in shells with a solver. */
 export function setPane(name) {
   const view =
     name === "files" || name === "hierarchy" || name === "symbol" || name === "unplaced" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
@@ -57,6 +54,15 @@ export function setPane(name) {
   } else if (view === "symbol") {
     renderSymbol();
   }
+}
+
+/** A menu or shortcut opens the requested pane, including when the sidebar was collapsed. */
+export function showPane(name) {
+  const tab = $(`tab-${name}`);
+  if (!tab || tab.hidden) return;
+  if (app.classList.contains("sidebar-hidden")) setSidebar(true);
+  setPane(name);
+  tab.focus({ preventScroll: true });
 }
 
 export function setShowFailed(shown) {

@@ -263,6 +263,26 @@ mod tests {
         )
     }
 
+    /// Panel digits are page-handled, so native accelerators cannot intercept text input.
+    fn panels(tabbed: bool) -> Shown {
+        let entries = [
+            ("files", "&Library"),
+            ("netlist", "&Netlist"),
+            ("hierarchy", "&Hierarchy"),
+            ("symbol", "&Symbol"),
+            ("unplaced", "Not &Drawn"),
+            ("solve", "S&olve"),
+        ]
+        .iter()
+        .enumerate()
+        .map(|(i, (id, label))| {
+            let text = if tabbed { format!("{label}\t{}", i + 1) } else { label.to_string() };
+            item(&format!("panel-{id}"), &text, None)
+        })
+        .collect();
+        Shown::Submenu("Side P&anels".into(), entries)
+    }
+
     /// The Edit menu (decision 0011): switching the text to edit, a check item, and applying its
     /// changes, with their keys shown after a tab on Windows (`tabbed`) and as accelerators elsewhere.
     fn edit(tabbed: bool) -> (String, Vec<Shown>) {
@@ -378,6 +398,7 @@ mod tests {
                     grid("Show &Grid\tG"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
                     Shown::Separator,
+                    panels(true),
                     check("toggle-netlist", "&Netlist Panel\tCtrl+B", None),
                     check("toggle-problems", "&Problems\tCtrl+Shift+M", None),
                 ],
@@ -427,6 +448,7 @@ mod tests {
                     grid("Show &Grid"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
                     Shown::Separator,
+                    panels(false),
                     check("toggle-netlist", "&Netlist Panel", Some("CmdOrCtrl+B")),
                     check("toggle-problems", "&Problems", Some("CmdOrCtrl+Shift+M")),
                 ],

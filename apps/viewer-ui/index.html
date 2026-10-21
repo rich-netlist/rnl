@@ -39,12 +39,12 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
   <aside id="sidebar" class="sidebar" aria-label="Side panel">
     <div class="side-head">
       <nav class="tabs view-tabs" role="tablist" aria-label="Side panel views">
-        <button id="tab-files" type="button" role="tab" aria-controls="pane-files" aria-selected="false">Library</button>
-        <button id="tab-netlist" type="button" role="tab" aria-controls="pane-netlist" aria-selected="true">Netlist</button>
-        <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false">Hierarchy</button>
-        <button id="tab-symbol" type="button" role="tab" aria-controls="pane-symbol" aria-selected="false">Symbol</button>
-        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" title="The objects of the level shown that are not drawn: those with no position, and devices no symbol can be chosen for">Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
-        <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" hidden>Solve</button>
+        <button id="tab-files" type="button" role="tab" aria-controls="pane-files" aria-selected="false" aria-keyshortcuts="1"><span class="tab-key" aria-hidden="true">1</span>Library</button>
+        <button id="tab-netlist" type="button" role="tab" aria-controls="pane-netlist" aria-selected="true" aria-keyshortcuts="2"><span class="tab-key" aria-hidden="true">2</span>Netlist</button>
+        <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false" aria-keyshortcuts="3"><span class="tab-key" aria-hidden="true">3</span>Hierarchy</button>
+        <button id="tab-symbol" type="button" role="tab" aria-controls="pane-symbol" aria-selected="false" aria-keyshortcuts="4"><span class="tab-key" aria-hidden="true">4</span>Symbol</button>
+        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" aria-keyshortcuts="5" title="The objects of the level shown that are not drawn: those with no position, and devices no symbol can be chosen for"><span class="tab-key" aria-hidden="true">5</span>Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
+        <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" aria-keyshortcuts="6" hidden><span class="tab-key" aria-hidden="true">6</span>Solve</button>
       </nav>
       <button id="hide-sidebar" class="icon" type="button" title="Hide the side panel (Ctrl+B)" aria-label="Hide the side panel">&#x2039;</button>
     </div>
