@@ -22,7 +22,7 @@ A frontend that links the result as a package, such as Analog Canvas with pnpm's
 node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --packages DIR --name @rich-netlist/runtime --version 0.1.0-preview.1
 ```
 
-`--packages DIR` brings the `.rnl` files of DIR with the build: `packages.js` holds them under `/rnl-bundled/packages`, and the Worker gives them to every request, after the request's own files and package directories. A newer `rnl-std` among them is the standard package at the root (16.3). `--name` and `--version` go into the `package.json`, whose `exports` name `client.js` as the package and `core.js` as `./core`. A named package is not private, and holds the README of [`packages/runtime`](../../packages/runtime/README.md) and the licenses of what it holds: MIT for the code, CC0-1.0 for the standard packages and the separately shipped `analog-canvas-extensions` file, and OFL-1.1 for the metrics of Noto Sans SC.
+`--packages DIR` brings the `.rnl` files of DIR with the build: `packages.js` holds them under `/rnl-bundled/packages`, and the Worker gives them to every request, after the request's own files and package directories. A newer `rnl-std` among them is the standard package at the root (16.3). `--name` and `--version` go into the `package.json`, whose `exports` name `client.js` as the package and `core.js` as `./core`. A named package is not private, and holds the README of [`packages/runtime`](../../packages/runtime/README.md) and the licenses of what it holds: MIT for the code, CC0-1.0 for the standard packages, and OFL-1.1 for the metrics of Noto Sans SC.
 
 A frontend built with Vite needs three settings for it, as Analog Canvas found:
 
@@ -207,9 +207,8 @@ A build or snapshot request may include `pool: string[]`, the paths of explicitl
 ## Upgrading after 0.1.0-preview.13
 
 Only the standard series 0.2 and 0.3, including `rnl-zh`, remain built into the default core.
-`analog-canvas-extensions` 0.1 is still shipped at `packages/analog-canvas-extensions.rnl`, but is
-not implicitly searched. Analog Canvas and other frontends that export its USE-PACKAGE record
-must read that file, put its text into the request's `files`, and add its path to `pool` for every
+`analog-canvas-extensions` 0.1 is available through the [public catalog](https://rich-netlist.github.io/rnl-packages/catalog.json). The next npm version after preview.14 removes its optional data file and export; already published preview.14 remains unchanged. Analog Canvas and other frontends that export its USE-PACKAGE record
+must download and verify that file using the catalog SHA-256, put its text into the request's `files`, and add its path to `pool` for every
 build/snapshot/rebuild. The package name, version and exported netlist records stay unchanged.
 See the [runtime's optional-package example](../../packages/runtime/README.md#optional-canvas-package).
 An application that deliberately builds with `--packages DIR` can still opt into its own packages.
@@ -217,7 +216,7 @@ No npm version is published by this change.
 
 In viewers, include the package in Library; the web viewer offers the public package directly below
 the missing-package error when the exact version is published. In the CLI, use
-`rnl check file.sp --path libraries/analog-canvas-extensions`.
-
+`python scripts/packages.py download`, then
+`rnl check file.sp --path .rnl-packages/analog-canvas-extensions/0.1`.
 
 Viewer library indexing is opt-in. `core.library({library: {reload: false}, pool: [...paths], files: {...}})` eagerly indexes new files and returns read errors; `reload: true` rebuilds all entries. Builds accept `auto_include: true` with the same pool and files. The browser's `library_prefix` maps canonical indexed paths into its isolated pool namespace; `library_edits` supplies canonical applied-text overrides. No switch changes ordinary builds or CLI parsing. Library updates preserve the last lazy drawing buffer.

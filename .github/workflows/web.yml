@@ -7,6 +7,8 @@ on:
   push:
     branches: [main]
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "apps/web/**"
       - "apps/viewer-ui/**"
       - "bindings/**"
@@ -21,6 +23,8 @@ on:
       - ".github/workflows/web.yml"
   pull_request:
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "apps/web/**"
       - "apps/viewer-ui/**"
       - "bindings/**"
@@ -40,12 +44,16 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download and verify locked public packages
+        working-directory: ${{ github.workspace }}
+        run: python scripts/packages.py download
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
       - name: Check the scripts

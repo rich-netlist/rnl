@@ -104,7 +104,7 @@ export default {
     if (generation !== preloadGeneration) return "cancelled";
     return invoke("preload_document", { path: source.path, pool, ticket, autoInclude: load("auto-include", true) === true });
   },
-  build: async (source, edits, progress, { fresh = false } = {}) => {
+  build: async (source, edits, progress, _packages, _signal, { fresh = false } = {}) => {
     cancelPreload().catch(() => {});
     await flushSettings();
     await poolReady;

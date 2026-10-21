@@ -59,8 +59,10 @@ const { loadCore } = await import(pathToFileURL(join(dist, "core.js")));
 const { collect, decodeText } = await import(pathToFileURL(join(dist, "client.js")));
 const core = await loadCore(pathToFileURL(join(dist, "rnl_runtime_wasm.wasm")));
 
+const { publicPackageDir, publicPackagesAvailable } = await import("../../../scripts/packages.mjs");
+const hasPublicPackages = publicPackagesAvailable();
 const entries = [];
-for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "tests/conformance/cases-0.3", "libraries/standard", "libraries/analog-canvas-extensions"]) {
+for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "tests/conformance/cases-0.3", "libraries/standard"]) {
   entries.push(...files(join(root, dir)).filter((path) => /\.(sp|scs|inc|rnl)$/.test(path)));
 }
 if (entries.length < 20) fail(`only ${entries.length} files found under ${root}`);
@@ -69,11 +71,12 @@ entries.push(join(root, "tests/viewer/inputs/view-improvements.sp"));
 const defaultHairlines = join(root, "tests/viewer/inputs/default-hairlines.sp");
 entries.push(defaultHairlines);
 // Independent public geometry and style packages exercise custom fonts and generated terminal markers.
-const edaDirs = ["eda-symbol", "eda-style"].map((name) => join(root, "libraries", name).replaceAll("\\", "/"));
+const edaDirs = hasPublicPackages ? ["eda-symbol", "eda-style"].map(name => publicPackageDir(name).replaceAll("\\", "/")) : [];
 const edaEntries = new Set(edaDirs.flatMap((dir) => files(dir).filter((path) => /\.(rnl|scs|sp)$/.test(path))));
 entries.push(...edaEntries);
+if (hasPublicPackages) entries.push(join(publicPackageDir("analog-canvas-extensions"), "analog-canvas-extensions.rnl"));
 const edaFiles = Object.fromEntries(await Promise.all(edaDirs.map(async (dir) => {
-  const name = dir.split("/").at(-1);
+  const name = dir.split("/").at(-2);
   const path = `${dir}/${name}.rnl`;
   return [path, await readText(path)];
 })));

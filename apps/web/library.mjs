@@ -1,4 +1,4 @@
-// Publish packages with the viewer. No GitHub API or cross-origin requests are needed at runtime.
+// Publish the built-in standard series; optional packages come from the public catalog.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { readPackage } from "../../site/gallery/package-file.mjs";
@@ -9,7 +9,7 @@ export function publishLibrary(libraries, out) {
   function walk(dir, prefix = "") {
     for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const path = prefix + entry.name;
-      if (entry.isDirectory()) walk(join(dir, entry.name), path + "/");
+      if (entry.isDirectory() && (prefix || entry.name === "standard")) walk(join(dir, entry.name), path + "/");
       else if (entry.isFile() && entry.name.endsWith(".rnl")) {
         const text = readFileSync(join(dir, entry.name), "utf8").replace(/\r\n/g, "\n");
         const { header, description } = readPackage(text);

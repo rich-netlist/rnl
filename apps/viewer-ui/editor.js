@@ -404,13 +404,14 @@ export async function saveAs() {
  * unsaved, or not to go on. On the web, where saving is a download, it asks to leave them unsaved
  * or not to go on. True to go on.
  */
-export async function confirmLeave(what) {
+export async function confirmLeave(what, signal) {
   const files = edits.dirtyPaths().map((path) => (doc && doc.files.find((f) => f.path === path)) || { name: path });
   if (files.length === 0) return true;
   if (modal()) return false;
   const names = files.map((f) => f.name).join(", ");
   const can = shell.platform !== "web" && shell.save;
   const choice = await decide({
+    signal,
     title: m("Changes Not Saved"),
     paragraphs: [m`${files.length === 1 ? "This file has" : "These files have"} changes that are not saved: ${names}.`, m`Do you want to ${what}?`],
     action: can ? "Save" : "Discard Changes",

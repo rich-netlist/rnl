@@ -1,3 +1,5 @@
+import { publicPackagesAvailable } from "../../scripts/packages.mjs";
+const hasPublicPackages = publicPackagesAvailable();
 import { test, expect } from "../../tests/viewer/node_modules/@playwright/test/index.mjs";
 import { readFileSync } from "node:fs";
 
@@ -5,6 +7,7 @@ const index = JSON.parse(readFileSync(new URL("../dist/gallery/index.js", import
 
 for (const width of [1440, 390]) {
   test(`all gallery SVGs stay inside their viewBoxes and cards at ${width}px`, async ({ page }) => {
+    test.skip(!hasPublicPackages, "Run python scripts/packages.py download");
     test.setTimeout(90_000);
     await page.setViewportSize({ width, height: 1000 });
     for (const group of index.groups) {

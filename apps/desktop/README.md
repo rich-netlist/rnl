@@ -133,10 +133,10 @@ Both show the licence in [`LICENSE.txt`](LICENSE.txt) and install it next to the
 The installers also install and uninstall silently, for scripts and for deployment. The NSIS installer takes the directory last, after `/D=`, unquoted even with spaces:
 
 ```bat
-RNL-Viewer-0.1.2-windows-x64-setup.exe /S /D=C:\Tools\RNL Viewer
+RNL-Viewer-0.1.3-windows-x64-setup.exe /S /D=C:\Tools\RNL Viewer
 "%LOCALAPPDATA%\RNL Viewer\uninstall.exe" /S
-msiexec /i RNL-Viewer-0.1.2-windows-x64.msi /qn
-msiexec /x RNL-Viewer-0.1.2-windows-x64.msi /qn
+msiexec /i RNL-Viewer-0.1.3-windows-x64.msi /qn
+msiexec /x RNL-Viewer-0.1.3-windows-x64.msi /qn
 ```
 
 ## Releasing
@@ -229,3 +229,4 @@ New windows are independent processes started with `--session FILE`; the one-use
 
 
 File > Reload Library rereads every session Library file and package, rescans PATH, and rebuilds the subcircuit index. PATH lists recognized netlists (`.sp`, `.spi`, `.spice`, `.cir`, `.ckt`, `.net`, `.netlist`, `.inc`, `.lib`, `.scs`) alongside `.rnl` packages, directly and in numeric version directories. File > Auto Include and the Netlist checkbox enable indexed lookup of undefined subcircuits; unique matches produce warnings in Problems. The switch is saved, defaults on, and also applies to Solve. Conflicting definitions require an explicit include. No include statements are written to source files by this option.
+Optional public packages are maintained in [rnl-packages](https://github.com/rich-netlist/rnl-packages) and are not bundled with the desktop viewer. Download and verify them, then include the files in Library or a PATH directory. The missing `analog-canvas-extensions` hint remains unchanged; a desktop catalog picker is outside this change.

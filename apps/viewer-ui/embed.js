@@ -5,9 +5,11 @@ import { clearDrawing, fit, zoomCenter } from "./drawing.js";
 import { resetBuffers } from "./edits.js";
 import { setGrid } from "./grid.js";
 import { setHoverNames } from "./hover.js";
-import { adoptSource, beginExternalOpen, showBuilt } from "./open.js";
+import { adoptSource, beginOpenOperation, showBuilt } from "./open.js";
 import { shell } from "./shell.js";
-import { prepareEmbed, sourceFromUrl } from "./shells/web.js";
+import { prepareViewer } from "./shells/web.js";
+import { startViewerApi } from "./viewer-api.js";
+import { viewerChannel } from "./window-session.js";
 import { current, doc, path, setDoc } from "./state.js";
 import { backTo, enterRow, enterRoot } from "./subcircuits.js";
 import { $, span, svgElement } from "./util.js";
@@ -15,15 +17,14 @@ import { startLoading, nextPaint } from "./loading.js";
 import { m, setText, setAttr } from "./i18n.js";
 
 const params = new URLSearchParams(location.search);
-const targetOrigin = params.has("origin") ? params.get("origin") : "*";
-let generation = 0;
+let api;
 let opening = false;
 let reportedLevel = null;
 let link;
 let crumbs;
 
 function send(type, fields = {}) {
-  window.parent.postMessage({ rnl: 1, type, ...fields }, targetOrigin);
+  api?.send(type, fields);
 }
 
 function error(reason) {
@@ -34,11 +35,10 @@ function error(reason) {
   crumbs.hidden = true;
   link.hidden = true;
   reportedLevel = null;
-  send("error", { message });
 }
 
 /** A level named by the API; preserve a real hierarchy path when it is reachable from the top. */
-function level(name) {
+function level(name, signal) {
   const wanted = doc?.levels.findIndex((item) => item.title === name) ?? -1;
   if (wanted < 0) throw new Error(`Unknown level: ${name}`);
   function find(at, row, visited) {
@@ -53,8 +53,8 @@ function level(name) {
     return null;
   }
   const row = find(0, "0", new Set());
-  if (row) return enterRow(row, { newWindow: false });
-  return enterRoot(wanted, { newWindow: false });
+  if (row) return enterRow(row, { newWindow: false, signal });
+  return enterRoot(wanted, { newWindow: false, signal });
 }
 
 function updateLevel() {
@@ -75,52 +75,43 @@ function updateLevel() {
     crumbs.append(item);
   });
   const name = doc.levels[current]?.title;
-  if (!opening && name !== undefined && name !== reportedLevel) {
+  if ((!opening || opening.aborted) && name !== undefined && name !== reportedLevel) {
     reportedLevel = name;
     send("level", { name });
   }
 }
 
 /** Each open has an identity. Late reads, builds and errors never replace a newer request. */
-async function open(message, initial = false) {
-  const request = ++generation;
-  const pending = beginExternalOpen();
-  opening = true;
+async function open(source, packages, isCurrent, initial, message, signal) {
+  opening = signal;
   document.body.classList.add("busy");
   const progress = startLoading();
   link.hidden = true;
+  let built;
   try {
-    let source;
-    let url = null;
-    if (typeof message.text === "string" && typeof message.name === "string" && message.name.trim()) {
-      source = { name: message.name, text: message.text, temporary: true };
-    } else if (typeof message.url === "string") {
-      source = sourceFromUrl(message.url);
-      url = message.url;
-    } else throw new Error("open needs text and name, or url.");
+    const url = message.url ?? null;
     await progress.stage("reading");
-    const built = await shell.build(source, undefined, progress.setStage);
-    if (request !== generation) return;
+    built = await shell.build(source, undefined, progress.setStage, packages, signal);
+    if (!isCurrent()) return;
     await progress.stage("displaying");
-    if (request !== generation) return;
+    if (!isCurrent()) return;
     const errors = built.diagnostics.filter((item) => item.severity === "error");
     if (built.failed || errors.length) throw new Error(built.failed || errors[0].message);
     resetBuffers(built);
     adoptSource(source);
     showBuilt(built, false);
-    pending.finish(); // the initial level may itself independently open a different file
     document.title = `${built.name} - RNL Viewer`;
-    if (initial && params.has("level")) await level(params.get("level"));
-    if (request !== generation) return;
+    if (initial && params.has("level")) await level(params.get("level"), signal);
+    if (!isCurrent()) return;
     // A short embed fits visible ink, so its first view needs the drawing's actual font metrics.
     if (getComputedStyle($("canvas")).getPropertyValue("--fit-content").trim() === "1") {
       $("canvas").getBoundingClientRect();
       await document.fonts.ready;
-      if (request !== generation) return;
+      if (!isCurrent()) return;
     }
     fit();
     await nextPaint();
-    if (request !== generation) return;
+    if (!isCurrent()) return;
     if (url !== null) {
       const full = new URL(location.href);
       full.searchParams.delete("embed");
@@ -130,20 +121,19 @@ async function open(message, initial = false) {
     }
     opening = false;
     reportedLevel = null;
-    send("loaded", {
+    const result = {
       name: built.name,
       levels: doc.levels.map((item) => item.title),
       level: doc.levels[current]?.title ?? "",
       errors: errors.length,
       warnings: built.diagnostics.filter((item) => item.severity === "warning").length,
-    });
+    };
     updateLevel();
-  } catch (reason) {
-    if (request === generation) error(reason);
+    return result;
   } finally {
-    pending.finish();
+    if (built) shell.discardBuild?.(built);
     progress.finish();
-    if (request === generation) {
+    if (isCurrent()) {
       opening = false;
       document.body.classList.remove("busy");
     }
@@ -195,19 +185,18 @@ export async function startEmbed() {
   clearDrawing(m("Waiting for a netlist."));
   $("canvas").tabIndex = 0;
   try {
-    const [version] = await Promise.all([prepareEmbed(), startCommands()]);
+    const [version] = await Promise.all([prepareViewer(), startCommands()]);
     setBackground(params.get("background") === "dark" ? "dark" : "light");
     const grid = params.get("grid");
     setGrid({ shown: grid === "dots" || grid === "lines", style: grid === "lines" ? "lines" : "dots" });
     setHoverNames(params.get("names") !== "0");
     window.addEventListener("viewer-level", updateLevel);
-    window.addEventListener("message", async (event) => {
-      if (params.has("origin") && event.origin !== targetOrigin) return;
-      const message = event.data;
-      if (!message || typeof message !== "object" || message.rnl !== 1) return;
-      try {
+    api = startViewerApi({ version, open, onError: message => error(message.replace(/^Could not open the netlist: /, "")), begin(signal) {
+      const operation = beginOpenOperation();
+      signal.addEventListener("abort", () => operation.abort(), { once: true });
+      return operation.signal;
+    }, async command(message) {
         switch (message.type) {
-          case "open": void open(message); break;
           case "level":
             if (typeof message.name === "string") await level(message.name);
             break;
@@ -217,13 +206,11 @@ export async function startEmbed() {
             break;
           default: break;
         }
-      } catch (reason) {
-        send("error", { message: reason instanceof Error ? reason.message : String(reason) });
-      }
-    });
-    send("ready", { version });
-    if (params.has("url")) void open({ url: params.get("url") }, true);
+    } });
+    if (params.has("url")) void api.open({ url: params.get("url") }, true);
   } catch (reason) {
     error(reason);
+    // Initialization can fail before the shared API has announced readiness.
+    viewerChannel().send("error", { message: `Could not open the netlist: ${reason instanceof Error ? reason.message : String(reason)}` });
   }
 }

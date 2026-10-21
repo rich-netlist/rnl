@@ -41,12 +41,20 @@ for (const platform of ["web", "desktop"]) {
       // the cell is below the testbench, not a root of its own
       await expect(page.locator("#tree .tree-row .badge", { hasText: "not called" })).toHaveCount(1);
 
-      // the instance opens the cell, the way down from the testbench; the line is gone with the level it was about
+      // A tree pick starts a new visit history; only descent through an instance keeps its parent.
       await row(page, "r2/0").click();
       await expect(page.locator("#level-name")).toHaveText("ota_5t");
-      expect(await segments(page)).toEqual(["Testbench", "ota_5t XDUT"]);
+      expect(await segments(page)).toEqual(["ota_5t"]);
       await expect(page.locator("#notice")).toBeHidden();
       await expect(row(page, "r2/0")).toHaveClass(/\bactive\b/);
+      await page.keyboard.press("Backspace");
+      await expect(page.locator("#level-name")).toHaveText("ota_5t");
+      await row(page, "r2").click();
+      await page.evaluate(async () => {
+        const { descend } = await import('./subcircuits.js');
+        await descend(window.viewer.doc.objects.findIndex(o => o.name === 'XDUT'));
+      });
+      expect(await segments(page)).toEqual(["Testbench", "ota_5t XDUT"]);
       await page.keyboard.press("Backspace");
       await expect(page.locator("#level-name")).toHaveText("Testbench");
 
@@ -159,7 +167,10 @@ test("a netlist whose top level is drawn lists no group of roots", async ({ page
 test("reading again keeps the level, and a root's tree folded stays folded", async ({ page, viewer }) => {
   await viewer.open("uncalled");
   await page.locator("#tab-hierarchy").click();
-  await row(page, "r2/0").click();
+  await page.evaluate(async () => {
+    const { descend } = await import('./subcircuits.js');
+    await descend(window.viewer.doc.objects.findIndex(o => o.name === 'XDUT'));
+  });
   await expect(page.locator("#level-name")).toHaveText("ota_5t");
   await viewer.build(() => page.keyboard.press("F5"));
   await expect(page.locator("#level-name")).toHaveText("ota_5t");

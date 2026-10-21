@@ -2,13 +2,14 @@ import { append, m, setAttr, setText } from "../i18n.js";
 // The web shell: the page in a browser, served with the core next to it as core/ (apps/web). It opens
 // files the user chooses or drops, a folder, or a URL; reads only the files a document needs, as
 // collect in the core's client asks for them; and builds the Document with the core as WebAssembly in
-// a module Worker, one for the page's lifetime. The page shows its own menu bar.
+// module Workers. Each candidate keeps its own lazy drawings until the page accepts it.
 
 import { collect, decodeText, startCore } from "../core/client.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
 import { sourcePath } from "../source-path.js";
+import { DEFAULT_CATALOG, readCatalog, readPublicPackage, latestPackages } from "../public-packages.js";
 
 /** The extensions of netlists that are opened on their own, listed first as the file to open. */
 const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "scs"];
@@ -32,7 +33,21 @@ if (embed) {
   append(document.head, style);
 }
 
-const core = startCore();
+const WARMUP = { entry: "/ready.sp", files: { "/ready.sp": "* Ready\n.end\n" }, svg: false };
+function warmCore() {
+  const worker = startCore();
+  const ready = worker.build(WARMUP);
+  ready.catch(() => {}); // prepareViewer or the next build reports initialization failures.
+  return { worker, ready };
+}
+
+let core = null; // only the displayed document's lazy drawing provider
+let spare = warmCore();
+const pendingCores = new Set(); // candidates building or waiting to be accepted
+const candidates = new WeakMap();
+function replenishCore() {
+  if (!spare && pendingCores.size === 0) spare = warmCore();
+}
 const built = new WeakSet(); // the sources built before: building one again reads it again
 let opened = null; // the page's handler for sources opened without asking, such as dropped files
 let included = null;
@@ -40,6 +55,21 @@ let poolFiles = new Map();
 let poolSources = new Map();
 let poolTexts = new Map();
 let poolReady = Promise.resolve();
+let librarySnapshot = { texts: poolTexts, epoch: 0 };
+const indexedLibraries = new WeakMap();
+
+// Candidate workers retain independent lazy drawings and indexes. Synchronize only changed
+// library files when a worker is reused; a reload invalidates both workers on their next use.
+async function indexLibrary(worker, snapshot) {
+  const previous = indexedLibraries.get(worker);
+  if (previous === snapshot) return [];
+  const refresh = previous ? [...snapshot.texts].filter(([p, text]) =>
+    previous.texts.has(p) && previous.texts.get(p) !== text).map(([p]) => p) : [];
+  const errors = await worker.library({ library: { reload: previous?.epoch !== snapshot.epoch, refresh },
+    pool: [...snapshot.texts.keys()], files: Object.fromEntries(snapshot.texts) });
+  indexedLibraries.set(worker, snapshot);
+  return errors;
+}
 let lastUrl = ""; // the URL opened last, which Open URL offers again
 
 /**
@@ -184,6 +214,19 @@ function serverPath(url) {
  * @returns {Promise<{ bytes: Uint8Array, url: string } | { bytes?: undefined, why: string }>}
  */
 async function fetchBytes(href, again) {
+  const url = new URL(href);
+  const library = new URL("libraries/", location.href);
+  const legacy = url.origin === library.origin && url.pathname.startsWith(library.pathname)
+    ? decode(url.pathname.slice(library.pathname.length)) : null;
+  if (legacy && !legacy.startsWith("standard/") && legacy.endsWith(".rnl")) {
+    try {
+      const pkg = (await publicPackages()).find(p => p.path === legacy);
+      if (!pkg) return { why: `No public package matches the old address: ${href}` };
+      return { bytes: new Uint8Array(await readPublicPackage(pkg)), url: href };
+    } catch (error) {
+      return { why: error.message || String(error) };
+    }
+  }
   const stop = new AbortController();
   let timer = 0;
   const wait = () => {
@@ -260,10 +303,11 @@ export function sourceFromUrl(text) {
 }
 
 /** Warm the actual Worker/core before announcing that messages can be handled. */
-export async function prepareEmbed() {
+export async function prepareViewer() {
+  const prepared = spare ??= warmCore();
   const [response] = await Promise.all([
     fetch("about.json"),
-    core.build({ entry: "/ready.sp", files: { "/ready.sp": "* Ready\n.end\n" }, svg: false }),
+    prepared.ready,
     embedStyle,
   ]);
   if (!response.ok) throw new Error(`The viewer version could not be read (${response.status}).`);
@@ -329,16 +373,24 @@ function poolItems(files, folder = false) {
 
 let libraryIndex = null;
 function publicPackages() {
-  if (!libraryIndex) libraryIndex = fetch("libraries/index.json").then(async (response) => {
-    if (!response.ok) throw new Error(`The package library could not be read (${response.status}).`);
-    return response.json();
-  }).catch((error) => { libraryIndex = null; throw error; });
+  if (!libraryIndex) libraryIndex = (async () => {
+    const config = await fetch("public-packages.json");
+    const url = new URL(config.ok ? (await config.json()).url : DEFAULT_CATALOG, location.href).href;
+    return (await readCatalog(url)).packages;
+  })().then(packages => {
+    window.dispatchEvent(new CustomEvent("public-package-status", { detail: "" }));
+    return packages;
+  }).catch((error) => {
+    libraryIndex = null;
+    window.dispatchEvent(new CustomEvent("public-package-status", { detail: m`Public packages unavailable: ${error.message} Built-in standard packages remain available.` }));
+    throw error;
+  });
   return libraryIndex;
 }
 
 async function includeLibrary() {
   const catalog = await publicPackages();
-  const packages = catalog.filter((p) => !p.builtin);
+  const packages = latestPackages(catalog);
   const selected = await choose({ title: m("Include Public Package"), text: m("Choose a package to add to the file pool."),
     items: packages.map((p) => ({ label: `${p.name} ${p.version} — ${p.description}`, value: p })), filter: true });
   if (!selected) return [];
@@ -346,22 +398,14 @@ async function includeLibrary() {
 }
 
 async function includePackage(selected) {
-  const url = new URL(selected.path, new URL("libraries/", location.href));
-  const base = new URL("libraries/", location.href);
-  if (url.origin !== base.origin || !url.pathname.startsWith(base.pathname)) throw new Error("Invalid package library path.");
-  const got = await fetchBytes(url.href, false);
-  if (!got.bytes) throw new Error(`The package could not be fetched: ${got.why}`);
-  let cached = new File([got.bytes], selected.name + ".rnl");
-  const path = `/library/${selected.path}`;
-  const read = async (again = false) => {
-    if (again) {
-      const fresh = await fetchBytes(url.href, true);
-      if (!fresh.bytes) throw new Error(`The package could not be fetched: ${fresh.why}`);
-      cached = new File([fresh.bytes], selected.name + ".rnl");
-    }
-    return cached;
-  };
-  return [{ path, name: `${selected.name} ${selected.version}`, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];
+  // Re-resolve against the validated catalog rather than trusting an old session descriptor.
+  const packages = await publicPackages();
+  const pkg = packages.find(p => p.name === selected.name && p.version === selected.version);
+  if (!pkg) throw new Error(`Public package ${selected.name} ${selected.version} is unavailable.`);
+  const text = decodeText(await readPublicPackage(pkg));
+  const path = `/library/${pkg.path}`;
+  const read = () => new File([text], pkg.name + ".rnl");
+  return [{ path, name: `${pkg.name} ${pkg.version}`, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];
 }
 
 /** Ask for a URL, resolved against the page. */
@@ -656,7 +700,9 @@ export default {
       }
       poolFiles = next;
       poolTexts = texts;
-      const indexed = await core.library({ library: { reload, refresh }, pool: [...texts.keys()], files: Object.fromEntries(texts) });
+      librarySnapshot = { texts, epoch: librarySnapshot.epoch + (reload ? 1 : 0) };
+      if (!spare && !core) spare = warmCore();
+      const indexed = await indexLibrary(spare?.worker ?? core, librarySnapshot);
       return [...errors, ...indexed];
     });
     return poolReady;
@@ -684,10 +730,13 @@ export default {
    * texts of `edits`, by the paths the Document names the files by, are those of the files, not what
    * is read.
    */
-  async build(source, edits, progress) {
+  async build(source, edits, progress, suppliedPackages, signal) {
     await poolReady;
+    const library = librarySnapshot;
     const again = built.has(source);
     built.add(source);
+    let buildingCore;
+    const abort = () => buildingCore?.terminate();
     try {
       progress?.("reading");
       const held = source.text !== undefined;
@@ -697,29 +746,97 @@ export default {
       // An independently opened source owns its relative paths. Put the pool in a separate
       // namespace so preloaded pool text cannot hide a source-relative file collect has yet to read.
       const poolPath = (path) => source.fromPool ? path : `/<pool>${path}`;
-      for (const [path, text] of poolTexts) {
+      for (const [path, text] of library.texts) {
         files[poolPath(path)] = path === entry.path ? entry.text : text;
       }
       files[entry.path] = entry.text;
       Object.assign(files, source.snapshot || {});
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
-      const request = { entry: entry.path, files, pool: [...poolTexts.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true,
+      const request = { entry: entry.path, files, pool: [...library.texts.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true,
         auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
         library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {
           const full = joined(dir, path);
           return [full.replace(/^\/<pool>(?=\/)/, ""), text];
         })) };
+      // API packages are request-local until the newest request commits them to Library.
+      for (const item of suppliedPackages || []) {
+        const path = `/<api>${item.path}`;
+        request.files[path] = decodeText(await (await item.read()).arrayBuffer());
+        request.pool.push(path);
+      }
       const read = held ? async () => null : (path) => {
         progress?.("reading");
         return path.startsWith("/<pool>/") ? Promise.resolve(null) : source.read(path, again);
       };
-      const builder = { build: (request) => { progress?.("parsing"); return core.build(request); } };
-      const { document: doc } = await collect(builder, request, read);
-      if (!embed) document.title = `${doc.name} - RNL Viewer`;
+      // An incoming candidate may be declined or superseded after building. Its lazy
+      // drawings must not replace those of the retained document until display commits it.
+      if (signal?.aborted) throw new Error("superseded");
+      const prepared = spare ?? warmCore();
+      spare = null;
+      buildingCore = prepared.worker;
+      pendingCores.add(buildingCore);
+      signal?.addEventListener("abort", abort, { once: true });
+      await prepared.ready;
+      await indexLibrary(buildingCore, library);
+      const builder = { build: (request) => {
+        if (signal?.aborted) throw new Error("superseded");
+        progress?.("parsing"); return buildingCore.build(request);
+      } };
+      let { document: doc } = await collect(builder, request, read);
+      if (embed) {
+        // Embeds have no Library controls. Resolve named public dependencies with the same
+        // catalog and verification as Include Public Package; keep downloads request-local.
+        const added = new Set();
+        while (true) {
+          const missing = doc.diagnostics.filter(d => d.severity === "error")
+            .map(d => /^package (\S+) (\S+) cannot be found:/.exec(d.message)).filter(Boolean);
+          if (!missing.length) break;
+          const catalog = await publicPackages();
+          let changed = false;
+          for (const [, name, version] of missing) {
+            const key = `${name} ${version}`;
+            if (added.has(key)) continue;
+            added.add(key);
+            const pkg = catalog.find(p => p.name === name && p.version === version);
+            if (!pkg) continue;
+            const path = `/library/${pkg.path}`;
+            request.files[path] = decodeText(await readPublicPackage(pkg));
+            request.pool.push(path);
+            changed = true;
+          }
+          if (!changed) break;
+          ({ document: doc } = await collect(builder, request, read));
+        }
+      }
+      candidates.set(doc, buildingCore);
       return doc;
     } catch (e) {
+      buildingCore?.terminate();
+      pendingCores.delete(buildingCore);
+      replenishCore();
       throw e instanceof Error ? e.message : String(e);
+    } finally { signal?.removeEventListener("abort", abort); }
+  },
+  commitBuild(doc) {
+    const candidate = candidates.get(doc);
+    if (!candidate) return;
+    if (core) {
+      if (!spare) spare = { worker: core, ready: Promise.resolve() };
+      else core.terminate();
     }
+    core = candidate;
+    candidates.delete(doc);
+    pendingCores.delete(candidate);
+    replenishCore();
+  },
+  discardBuild(doc) {
+    const candidate = candidates.get(doc);
+    if (!candidate) return;
+    if (!spare) spare = { worker: candidate, ready: Promise.resolve() };
+    else candidate.terminate();
+    candidates.delete(doc);
+    pendingCores.delete(candidate);
+    replenishCore();
   },
   /** The drawings of the objects the last Document lists without a position, which the core keeps. */
   unplacedDrawings: (level, items, names) => core.drawings({ drawings: { level, items, names } }),

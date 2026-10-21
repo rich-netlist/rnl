@@ -16,6 +16,9 @@ import { dirname, join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
+const { publicPackagesAvailable } = await import("../../../scripts/packages.mjs");
+if (!publicPackagesAvailable(["analog-canvas-extensions"])) process.exit(0);
+
 const here = dirname(fileURLToPath(import.meta.url));
 const spec = process.argv[2];
 if (!spec) {

@@ -22,6 +22,7 @@ import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync }
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { readPackage, resolve, terminalNames } from "./package-file.mjs";
+import { publicGalleryPackages } from "./public-packages.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
@@ -85,6 +86,16 @@ const groups = groupDirs(libraries).map(({ dir, files }) => {
     packages,
   };
 });
+const publicCatalog = args.includes("--libraries") ? { packages: [], provenance: null } : await publicGalleryPackages();
+for (const pkg of publicCatalog.packages) {
+  const rel = `libraries/${pkg.path.slice(0, pkg.path.lastIndexOf("/"))}`;
+  groups.push({ id: rel.replace(/^libraries\//, "").replace(/[^\w.-]+/g, "-"), dir: rel,
+    kind: pkg.kind, series: null,
+    packages: [{ file: `${pkg.name}.rnl`, path: `libraries/${pkg.path}`, source: pkg.source,
+      summary: pkg.summary, ...readPackage(pkg.text) }],
+  });
+}
+
 groups.sort((a, b) => {
   if (a.series && b.series) return compareVersions(b.series, a.series);
   if (a.series || b.series) return a.series ? -1 : 1;
@@ -363,6 +374,7 @@ function groupData(group) {
       language: pkg.header.language,
       file: pkg.file,
       path: pkg.path,
+      ...(pkg.source ? { source: pkg.source, summary: pkg.summary } : {}),
       implicit: implicit.has(pkg.header.name),
       references: pkg.header.references,
       referencedBy: referencedBy.get(pkg.header.name) || [],
@@ -395,6 +407,7 @@ function groupData(group) {
 const target = join(out, "gallery");
 rmSync(target, { recursive: true, force: true });
 mkdirSync(target, { recursive: true });
+if (publicCatalog.provenance) writeFileSync(join(target, "catalog-provenance.json"), JSON.stringify(publicCatalog.provenance, null, 2) + "\n");
 const index = [];
 for (const group of groups) {
   const data = groupData(group);

@@ -5,6 +5,9 @@
 
 use std::path::{Path, PathBuf};
 
+#[path = "support/public_packages.rs"]
+mod public_packages;
+
 use rnl_cli::{interpret_file, FsProvider};
 use rnl_render::RenderOptions;
 use rnl_runtime::diag::Severity;
@@ -12,7 +15,7 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
 fn pdk_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/pdk/sky130")
+    public_packages::package_dir("pdk-sky130")
 }
 
 fn package_file() -> PathBuf {
@@ -48,6 +51,9 @@ const CUSTOM_SYMBOLS: [&str; 8] = [
 
 #[test]
 fn package_checked_on_its_own_has_zero_diagnostics_and_integer_pins() {
+    if !public_packages::available() {
+        return;
+    }
     let text = std::fs::read_to_string(package_file()).unwrap();
     let defined: Vec<&str> = text
         .lines()
@@ -90,6 +96,9 @@ fn package_checked_on_its_own_has_zero_diagnostics_and_integer_pins() {
 
 #[test]
 fn all_sky130_examples_check_and_render_without_and_with_pdk_models() {
+    if !public_packages::available() {
+        return;
+    }
     let pkg_text = std::fs::read_to_string(package_file()).unwrap();
     let stub_spice = r#"* Stub SKY130 subckt headers
 * @RNL { @USE-PACKAGE(name="rnl-std-fill") {} }
@@ -160,6 +169,9 @@ ends sky130_fd_pr__cap_mim_m3_1
 
 #[test]
 fn device_families_and_symbols_match_in_spice_and_spectre() {
+    if !public_packages::available() {
+        return;
+    }
     let pkg_text = std::fs::read_to_string(package_file()).unwrap();
     let spice = r#"* All SKY130 device families in SPICE
 * @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="pdk-sky130", version="0.1") }

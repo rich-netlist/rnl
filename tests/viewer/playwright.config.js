@@ -17,11 +17,14 @@
 // the web viewer's tests skip; RNL_WEB=1 builds it in any case.
 
 import net from "node:net";
+import { preparePublicPackageFixture } from "../../scripts/packages.mjs";
 import { defineConfig, devices } from "@playwright/test";
 import { root } from "./fixtures.js";
 
+process.env.RNL_PACKAGE_FIXTURE ||= preparePublicPackageFixture();
+
 const ci = !!process.env.CI;
-const channel = process.env.RNL_CHANNEL || (ci ? undefined : "chrome");
+const channel = process.env.RNL_CHANNEL || undefined;
 // the size of the desktop viewer's window
 const viewport = { width: 1200, height: 800 };
 // the file of the long netlist's test, which runs in a project of its own
@@ -42,7 +45,7 @@ function freePort() {
 /** Whether the command line names spec files, and none of them is the web viewer's. */
 function pageSpecsOnly() {
   const specs = process.argv.filter((arg) => /\.spec\.js(:\d+)*$/.test(arg));
-  return specs.length > 0 && !specs.some((spec) => /(?:web|embed)\.spec\.js/.test(spec));
+  return specs.length > 0 && !specs.some((spec) => /(?:web|embed|api)\.spec\.js/.test(spec));
 }
 
 // the workers load this file too, and inherit whether the runner builds the site, and its port

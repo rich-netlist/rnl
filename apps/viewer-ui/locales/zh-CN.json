@@ -1,4 +1,6 @@
 {
+  "open {0}": "打开 {0}",
+  "Public packages unavailable: {0} Built-in standard packages remain available.": "公共包暂不可用：{0} 内置标准包仍然可用。",
   "Preload nearby netlists while idle": "空闲时预加载附近的网表",
   "{0} preloaded documents. Uses the same cache budget; starts new jobs only while idle.": "已预加载 {0} 个文档。共用缓存上限；操作时暂停安排新任务。",
   "&File": "文件(&F)",

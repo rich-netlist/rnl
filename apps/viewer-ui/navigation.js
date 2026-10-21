@@ -26,7 +26,7 @@ export function navigate(target, options = {}) {
   if (target.source || target.file !== undefined || !sameSource(visit.entry, currentSource())) {
     rememberView();
     return openSource(visit.entry, false, undefined, false,
-      { ...visit, viewCache: visit.path.length ? viewCache : new Map() });
+      { ...visit, viewCache: visit.path.length ? viewCache : new Map() }, options.signal);
   }
   const next = visit.path.map(s => ({ ...s,
     level: sameSource(s.entry, currentSource()) ? doc.levels.findIndex(l => l.title === s.title) : -1 }));

@@ -29,13 +29,15 @@ import { startLoading, nextPaint } from "./loading.js";
 
 let lastSource = null; // what was last opened, also when it failed to open, for reloading
 let loading = false;
-let opening = 0;
+let operation = null;
 
-/** Embed opens participate in the same ordering as interactive file navigation. */
-export function beginExternalOpen() {
-  const id = ++opening;
-  loading = true;
-  return { finish() { if (id === opening) loading = false; } };
+/** API imports and ordinary opens/rebuilds share ownership of the displayed document. */
+export function beginOpenOperation() {
+  operation?.abort();
+  operation = new AbortController();
+  loading = false;
+  document.body.classList.remove("busy");
+  return operation;
 }
 
 /**
@@ -44,24 +46,26 @@ export function beginExternalOpen() {
  * preview closed shows the text applied); without them the files are read as they are, and the
  * text edited is what they hold.
  */
-export async function openSource(source, keep, edited, fresh = false, navigation = null) {
+export async function openSource(source, keep, edited, fresh = false, navigation = null, signal = null) {
   if (!source || loading) return;
-  if (!keep && !edited && !(await confirmLeave(m("open another file")))) return;
+  // Initial API level selection is part of its import, not a competing user navigation.
+  const operation = signal ? { signal } : beginOpenOperation();
+  if (!keep && !edited && !(await confirmLeave(m("open another file"), operation.signal))) return;
+  if (operation.signal.aborted) return;
   if (loading) return;
-  const id = ++opening;
   loading = true;
   document.body.classList.add("busy");
   const progress = startLoading();
+  let d;
   try {
     await progress.stage("reading");
-    const d = await shell.build(source, edited, stage => {
-      // A superseded URL read must not start another core build or replace its lazy drawings.
-      if (id !== opening) throw new Error('Opening superseded');
+    d = await shell.build(source, edited, stage => {
+      if (operation.signal.aborted) throw new Error('Opening superseded');
       progress.setStage(stage);
-    }, { fresh });
-    if (id !== opening) return;
+    }, undefined, operation.signal, { fresh });
+    if (operation.signal.aborted) return;
     await progress.stage("displaying");
-    if (id !== opening) return;
+    if (operation.signal.aborted) return;
     lastSource = source;
     endPreview();
     if (edited) adoptBuffers(d);
@@ -71,7 +75,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     await nextPaint();
     return true;
   } catch (e) {
-    if (id !== opening) return;
+    if (operation.signal.aborted) return;
     lastSource = source;
     progress.finish();
     if (keep && edited) {
@@ -88,8 +92,9 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     setProblems(true);
     await sourceOpened(source, null, false);
   } finally {
+    if (d) shell.discardBuild?.(d);
     progress.finish();
-    if (id === opening) {
+    if (!operation.signal.aborted) {
       loading = false;
       document.body.classList.remove("busy");
     }
@@ -114,24 +119,32 @@ export async function reload() {
  */
 export async function applyEdits() {
   if (!lastSource || !doc || loading || previewing()) return false;
+  const operation = beginOpenOperation();
   loading = true;
   document.body.classList.add("busy");
   const progress = startLoading();
   let failed = null;
+  let d;
   try {
     await progress.stage("reading");
-    const d = await shell.build(lastSource, changes(false), progress.setStage);
+    d = await shell.build(lastSource, changes(false), progress.setStage, undefined, operation.signal);
+    if (operation.signal.aborted) return false;
     await progress.stage("displaying");
+    if (operation.signal.aborted) return false;
     adoptBuffers(d);
     showBuilt(d, true);
     await sourceOpened(lastSource, d, false, true);
     await nextPaint();
   } catch (e) {
+    if (operation.signal.aborted) return false;
     failed = e instanceof Error ? e.message : String(e);
   } finally {
+    if (d) shell.discardBuild?.(d);
     progress.finish();
-    loading = false;
-    document.body.classList.remove("busy");
+    if (!operation.signal.aborted) {
+      loading = false;
+      document.body.classList.remove("busy");
+    }
   }
   if (failed !== null) {
     renderDiagnostics([...doc.diagnostics, { severity: "error", message: m`The changes could not be applied: ${failed}`, file: "", line: 0, col: 0, origin: "" }]);
@@ -161,6 +174,8 @@ export function isLoading() {
  * scroll.
  */
 export function showBuilt(d, keep, navigation = null) {
+  shell.commitBuild?.(d);
+  if (shell.platform === "web") document.title = `${d.name} - RNL Viewer`;
   const before = keep && doc ? snapshot() : null;
   setDoc(d);
   showDocument(before, navigation);

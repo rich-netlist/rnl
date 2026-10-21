@@ -281,6 +281,18 @@ export async function startPool() {
   window.addEventListener("settings-error", (event) => {
     setText($("path-note"), m`Settings could not be saved: ${event.detail}`);
   });
+  window.addEventListener("public-package-status", event => {
+    const note = document.getElementById("public-package-status");
+    setText(note, event.detail);
+    note.hidden = !event.detail;
+  });
+  if (shell.publicPackages) {
+    const note = span("lib-note", "");
+    note.id = "public-package-status";
+    note.hidden = true;
+    $("library-groups").before(note);
+    shell.publicPackages().catch(() => {});
+  }
   render();
   await scanPaths();
 }

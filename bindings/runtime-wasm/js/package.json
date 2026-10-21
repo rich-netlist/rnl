@@ -17,8 +17,7 @@
     ".": { "types": "./client.d.ts", "default": "./client.js" },
     "./core": { "types": "./core.d.ts", "default": "./core.js" },
     "./worker": "./worker.js",
-    "./package.json": "./package.json",
-    "./packages/analog-canvas-extensions.rnl": "./packages/analog-canvas-extensions.rnl"
+    "./package.json": "./package.json"
   },
   "publishConfig": { "access": "public", "tag": "next" }
 }

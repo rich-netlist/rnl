@@ -1,29 +1,28 @@
-import { test, expect, showSource } from '../viewer.js';
+import { test, expect } from '../viewer.js';
 
-test('include links use parsed targets and Shift transfers a source location without changing this viewer', async ({page,viewer}) => {
+for (const keyboard of [false, true]) test(`include links open independent files using ${keyboard ? 'Enter' : 'click'}; Shift keeps this viewer`, async ({page,viewer}) => {
   await viewer.open('fold-sections');
+  await page.evaluate(() => {
+    window.fakeShell.fileSources = {
+      'fold-models.inc': {name:'fold-models.inc', fixture:'fold-models'},
+      'fold-sections.inc': {name:'fold-sections.inc', fixture:'fold-sections-include'},
+    };
+  });
   const links = page.locator('#source .file:not([hidden]) .include-link');
   await expect(links).toHaveCount(2);
-  const level = await page.evaluate(() => window.viewer.level);
-  await links.nth(1).click({modifiers:['Shift']});
+  const link = links.nth(keyboard ? 0 : 1);
+  const name = keyboard ? 'fold-sections.inc' : 'fold-models.inc';
+  if (keyboard) { await link.focus(); await page.keyboard.press('Shift+Enter'); }
+  else await link.click({modifiers:['Shift']});
   const session = await page.evaluate(() => window.fakeShell.calls.findLast(c => c[0] === 'newWindow')[1]);
-  expect(session.sourceFile).toBe('fold-models.inc');
+  expect(session.entry.name).toBe(name);
+  expect(session.path).toEqual([]);
+  expect(session.netlist).toBe(true);
   await expect(page.locator('#netlist-file')).toHaveText(/fold-sections\.sp$/);
-  await links.nth(1).click();
-  await expect(page.locator('#netlist-file')).toHaveText(/fold-models\.inc$/);
-  await expect(viewer.line(1)).toHaveText(/\.param bias=1.2/);
-  expect(await page.evaluate(() => window.viewer.level)).toBe(level);
-  // The current document is retained, including the selected library section and line 1.
-  await showSource(page,0);
-  await page.evaluate(async () => {
-    (await import('./selection.js')).select(window.viewer.doc.objects.findIndex(o => o.name === 'X1'), 'drawing');
-  });
-  await links.nth(0).focus();
-  await page.keyboard.press('Shift+Enter');
-  expect(await page.evaluate(() => window.fakeShell.calls.findLast(c => c[0] === 'newWindow')[1].sourceFile)).toBe('fold-sections.inc');
-  await page.keyboard.press('Enter');
-  await expect(page.locator('#netlist-file')).toHaveText(/fold-sections\.inc$/);
-  await expect(viewer.line(2)).toHaveText(/subckt active_cell/);
+  await viewer.build(() => keyboard ? page.keyboard.press('Enter') : link.click());
+  await expect(page.locator('#netlist-file')).toHaveText(new RegExp(name.replace('.', '\\.')));
+  await expect(viewer.line(keyboard ? 2 : 1)).toHaveText(keyboard ? /subckt active_cell/ : /\.param bias=1.2/);
+  expect(await page.evaluate(() => window.viewer.doc.files.some(f => f.name === 'fold-sections.sp'))).toBe(false);
 });
 
 test('Failed statements search follows same-file circuit navigation', async ({page,viewer}) => {

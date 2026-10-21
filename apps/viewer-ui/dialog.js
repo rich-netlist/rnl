@@ -187,10 +187,13 @@ export function offer({ title, paragraphs, action }) {
  * @returns {Promise<string | null>} The label of the button pressed, or null when the dialog is
  *   cancelled by Escape or Cancel.
  */
-export function decide({ title, paragraphs, action, others = [], cancel = "Cancel" }) {
+export function decide({ title, paragraphs, action, others = [], cancel = "Cancel", signal }) {
   const d = frame(title, "", action, cancel, others);
   addParagraphs(d.body, paragraphs);
-  return d.show(d.ok, () => action);
+  const answer = d.show(d.ok, () => action);
+  if (signal?.aborted) d.cancel();
+  else signal?.addEventListener("abort", d.cancel, { once: true });
+  return answer.finally(() => signal?.removeEventListener("abort", d.cancel));
 }
 
 /** Add paragraphs to a dialog's body: each a text, or a node to show as it is. */
@@ -226,6 +229,7 @@ function textBox(type, placeholder) {
  * returns resolves with that, or with null when the dialog is cancelled by Escape or Cancel.
  */
 function frame(title, text, action, cancel = true, others = []) {
+  let dismiss = () => {};
   const id = `dialog-${++made}`;
   const el = document.createElement("dialog");
   el.className = "dialog";
@@ -302,14 +306,19 @@ function frame(title, text, action, cancel = true, others = []) {
     focus.focus();
     if (focus instanceof HTMLInputElement) focus.select();
     return new Promise((resolve) => {
-      el.addEventListener("close", () => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
         shown -= 1;
         el.remove();
         if (before instanceof HTMLElement && before.isConnected) before.focus();
         resolve(result);
-      });
+      };
+      el.addEventListener("close", finish, { once: true });
+      dismiss = () => { el.close(); finish(); };
     });
   }
 
-  return { id, body, ok, show };
+  return { id, body, ok, show, cancel: () => dismiss() };
 }

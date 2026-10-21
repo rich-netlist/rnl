@@ -185,8 +185,11 @@ async function png(page, svg, size, path) {
 }
 
 async function lightLogoPngs(page, svg) {
+  const white = svg.replace(/^(<svg\b[^>]*>)/,
+    '$1\n<rect width="1024" height="1024" fill="#ffffff"/>');
   for (const size of [16, 24, 32, 48, 64, 128, 256, 512, 1024]) {
     await png(page, svg, size, join(root, `brand/rnl-logo-${size}.png`));
+    await png(page, white, size, join(root, `brand/rnl-logo-white-${size}.png`));
   }
 }
 
@@ -197,7 +200,7 @@ async function generate(lightPngsOnly = false) {
     const page = await browser.newPage({ deviceScaleFactor: 1 });
     if (lightPngsOnly) {
       await lightLogoPngs(page, readFileSync(join(root, "brand/rnl-logo-small.svg"), "utf8"));
-      console.log("Light logo PNGs regenerated from the committed transparent SVG.");
+      console.log("Transparent and white-background logo PNGs regenerated from the committed SVG.");
       return;
     }
     const { svg, bounds } = await renderLogo(page);

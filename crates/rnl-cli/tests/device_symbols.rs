@@ -2,6 +2,9 @@
 //! as `$PMOS` and `$PNP` do, its source up and its drain down, and the controlled sources of two
 //! terminals are the diamonds of Analog Canvas.
 
+#[path = "support/public_packages.rs"]
+mod public_packages;
+
 use std::path::Path;
 
 use rnl_cli::interpret_file;
@@ -65,6 +68,9 @@ fn a_p_jfet_has_its_source_up_and_its_drain_down() {
 
 #[test]
 fn the_controlled_sources_of_two_terminals_are_the_diamonds_of_analog_canvas() {
+    if !public_packages::available() {
+        return;
+    }
     // the symbols of the standard series draw what $CANVAS_*_DIAMOND of analog-canvas-extensions
     // draw: the same graphics, pins and box, for each of the four kinds
     let pairs = [
@@ -86,7 +92,10 @@ fn the_controlled_sources_of_two_terminals_are_the_diamonds_of_analog_canvas() {
     );
     let mut files = MemoryProvider::new().with("t.sp", &text).with(
         "pkgs/canvas.rnl",
-        include_str!("../../../libraries/analog-canvas-extensions/analog-canvas-extensions.rnl"),
+        &std::fs::read_to_string(
+            public_packages::package_dir("analog-canvas-extensions").join("analog-canvas-extensions.rnl"),
+        )
+        .unwrap(),
     );
     files.package_dirs.push("pkgs".into());
     let r = interpret_file(Path::new("t.sp"), None, &files, &Options::default()).unwrap();

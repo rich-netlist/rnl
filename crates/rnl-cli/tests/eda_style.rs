@@ -1,6 +1,9 @@
 //! Independent public EDA geometry and style packages, loaded from disk.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+#[path = "support/public_packages.rs"]
+mod public_packages;
 
 use rnl_cli::{interpret_file, FsProvider};
 use rnl_render::{Kind, RenderOptions};
@@ -10,11 +13,11 @@ use rnl_runtime::source::MemoryProvider;
 use rnl_runtime::{Interpretation, Options};
 
 fn package_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/eda-style")
+    public_packages::package_dir("eda-style")
 }
 
 fn symbol_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries/eda-symbol")
+    public_packages::package_dir("eda-symbol")
 }
 
 fn clean(r: &Interpretation) {
@@ -34,6 +37,9 @@ fn symbols() -> rnl_view::Catalog {
 
 #[test]
 fn package_and_gallery_check_without_errors_or_warnings_and_the_gallery_renders() {
+    if !public_packages::available() {
+        return;
+    }
     let provider = FsProvider::new(&[symbol_dir(), package_dir()]);
     for (dir, name, levels) in [
         (symbol_dir(), "eda-symbol.rnl", 0),
@@ -60,6 +66,9 @@ fn package_and_gallery_check_without_errors_or_warnings_and_the_gallery_renders(
 
 #[test]
 fn every_eda_symbol_has_its_pin_sides_on_its_outermost_pins() {
+    if !public_packages::available() {
+        return;
+    }
     let c = symbols();
     assert_eq!(c.packages.len(), 1);
     assert_eq!(c.symbols.len(), 137);
@@ -83,6 +92,9 @@ fn every_eda_symbol_has_its_pin_sides_on_its_outermost_pins() {
 
 #[test]
 fn neither_package_is_builtin_and_neither_imports_the_other() {
+    if !public_packages::available() {
+        return;
+    }
     let c = rnl_view::catalog(&FsProvider::new(&[]), &rnl_view::CatalogOptions::default());
     for name in ["eda-symbol", "eda-style"] {
         assert!(!c.packages.iter().any(|p| p.name == name));
@@ -101,6 +113,9 @@ fn neither_package_is_builtin_and_neither_imports_the_other() {
 
 #[test]
 fn all_93_shared_symbols_follow_standard_terminal_directions() {
+    if !public_packages::available() {
+        return;
+    }
     let geometry = symbols();
     let standard = rnl_view::catalog(&FsProvider::new(&[]), &rnl_view::CatalogOptions::default());
     let shared: Vec<_> = standard.symbols.iter().filter(|s| s.version == "0.3").collect();
@@ -136,6 +151,9 @@ fn all_93_shared_symbols_follow_standard_terminal_directions() {
 
 #[test]
 fn style_alone_and_combined_style_mark_standard_custom_and_virtual_pins_once() {
+    if !public_packages::available() {
+        return;
+    }
     let example = std::fs::read_to_string(package_dir().join("examples/custom-symbol.sp")).unwrap();
     for (geometry, style) in [(true, false), (false, true), (true, true)] {
         let text = example

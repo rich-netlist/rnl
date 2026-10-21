@@ -49,7 +49,7 @@ test('reload requests a fresh build rather than reusing a cached result', async 
   await page.evaluate(async () => {
     const { shell } = await import('./shell.js');
     const build = shell.build;
-    shell.build = (...args) => { window.buildOptions = args[3]; return build(...args); };
+    shell.build = (...args) => { window.buildOptions = args[5]; return build(...args); };
   });
   await viewer.build(() => page.keyboard.press('F5'));
   expect(await page.evaluate(() => window.buildOptions)).toEqual({ fresh: true });

@@ -671,6 +671,8 @@ async function drive(app, port, profile, t0, session) {
   await until("the text read again", () => page.evaluate(`document.querySelectorAll("#source .editor").length === 0`));
   console.log("Edit > Edit Text, Apply Changes and File > Save built the edited text natively and saved the one file, as it was written");
 
+  // Disable Auto Include to check normal clipboard include resolution independently of Library.
+  await page.evaluate(`import('./pool.js').then(p => p.toggleAutoInclude(false))`);
   // File > Load from Clipboard: the page reads the clipboard, whose text the test gives in the page,
   // shows it, and on Load the app draws it natively as clipboard.sp, alone, its include missing
   const text = fs.readFileSync(netlist, "utf8");
@@ -692,6 +694,10 @@ async function drive(app, port, profile, t0, session) {
   const pasted = await page.evaluate(`({ files: window.viewer.doc.files.length, missing: window.viewer.doc.missing })`);
   same(pasted, { files: 1, missing: ["/04-hierarchy-lib.inc"] }, "the clipboard's netlist, alone");
   console.log("File > Load from Clipboard drew the netlist that the clipboard held, alone");
+  await page.evaluate(`import('./pool.js').then(p => p.toggleAutoInclude(true))`);
+  check(await page.evaluate(`window.viewer.doc.files.length === 2 && window.viewer.doc.files.some(f => f.name.endsWith('04-hierarchy-lib.inc')) &&
+    window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('added by Auto Include'))`),
+  "clipboard Auto Include did not resolve the library subcircuit");
 
   // a netlist with nothing placed: its Document carries no drawing of the objects that have no
   // position, the app keeps them from the build, and the Not drawn list asks for those of its rows
@@ -947,7 +953,7 @@ async function memoryCacheSmoke(page, work) {
     const a = { path: ${JSON.stringify(file)}, name: 'cache-a.sp' };
     const doc = await shell.build(a);
     const changed = await shell.memoryCache();
-    await shell.build(a, undefined, undefined, { fresh: true });
+    await shell.build(a, undefined, undefined, undefined, undefined, { fresh: true });
     const fresh = await shell.memoryCache();
     await shell.memoryCache(true);
     const after = await shell.memoryCache();
@@ -1093,6 +1099,7 @@ $all | Where-Object { $_.ParentProcessId -eq ${pid} } | ForEach-Object { "the ap
 }
 
 async function main() {
+  if (process.env.SMOKE_OUTPUT_DIR) fs.mkdirSync(process.env.SMOKE_OUTPUT_DIR, { recursive: true });
   const given = option("--exe");
   if (!given && !process.argv.includes("--no-build")) {
     execFileSync("cargo", ["build", "--manifest-path", manifest], { cwd: root, stdio: "inherit" });

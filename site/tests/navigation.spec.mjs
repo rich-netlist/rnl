@@ -1,3 +1,5 @@
+import { publicPackagesAvailable } from "../../scripts/packages.mjs";
+const hasPublicPackages = publicPackagesAvailable();
 import { test, expect } from "../../tests/viewer/node_modules/@playwright/test/index.mjs";
 import { readFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -21,6 +23,7 @@ async function capture(page, name, project) {
 }
 
 test.beforeEach(async ({ page }) => {
+  await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
   pageErrors.set(page, []);
   page.on("pageerror", error => pageErrors.get(page).push(error.message));
   await page.addInitScript(() => localStorage.setItem("rnl-intro-theme", "light"));
@@ -79,6 +82,7 @@ test("existing deep links and the full-width introduction hero remain usable", a
 });
 
 test("gallery: directory categories, search, disclosure, packages, history and shared URLs", async ({ page }) => {
+  test.skip(!hasPublicPackages, "Run python scripts/packages.py download");
   for (const g of index.groups) {
     expect(g.kind).toBe(g.dir.startsWith("libraries/standard/") ? "standard" : g.dir.startsWith("libraries/pdk/") ? "pdk" : "extension");
   }

@@ -21,6 +21,8 @@ export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 export const FILES = {
   "symbol-inspector": "tests/viewer/inputs/symbol-inspector.sp",
   "fold-sections": "tests/viewer/inputs/fold-sections.sp",
+  "fold-sections-include": "tests/viewer/inputs/fold-sections.inc",
+  "fold-models": "tests/viewer/inputs/fold-models.inc",
   "missing-canvas-package": "tests/viewer/inputs/missing-canvas-package.sp",
   "virtual-selection": "tests/viewer/inputs/virtual-selection.sp",
   "selection-boxes": "tests/viewer/inputs/selection-boxes.sp",

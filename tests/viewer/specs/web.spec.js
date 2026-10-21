@@ -11,6 +11,11 @@ import os from "node:os";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { PICK, root, UNCALLED } from "../fixtures.js";
+import { publicPackageDir, publicPackagesAvailable } from "../../../scripts/packages.mjs";
+const hasPublicPackages = publicPackagesAvailable();
+test.beforeEach(async ({ page }) => {
+  await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
+});
 
 test("the web core supplies semantic lines and the actual parent symbol", async ({ page }) => {
   await start(page);
@@ -967,6 +972,7 @@ test("the web library adds SKY130 without duplicating built-ins, which open read
 });
 
 test("a missing published Canvas package offers Include and rebuilds; other versions offer the File menu hint", async ({ page }, info) => {
+  test.skip(!hasPublicPackages, "Run python scripts/packages.py download");
   await start(page);
   const source = fs.readFileSync(path.join(root, "tests/viewer/inputs/missing-canvas-package.sp"));
   const before = await opened(page, () => page.locator("#file-input").setInputFiles({ name: "canvas.sp", mimeType: "text/plain", buffer: source }));
@@ -995,11 +1001,12 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
 
 
 test("independent public EDA packages draw their gallery and custom terminal markers", async ({ page }) => {
+  test.skip(!hasPublicPackages, "Run python scripts/packages.py download");
   await start(page);
-  const index = await (await page.request.get(`${process.env.RNL_WEB_URL}/libraries/index.json`)).json();
+  const { packages: index } = await (await page.request.get(`${process.env.RNL_WEB_URL}/public-packages/catalog.json`)).json();
   for (const name of ["eda-style", "eda-symbol"]) {
     expect(index.filter((p) => p.name === name)).toMatchObject([
-      { version: "0.1", path: `${name}/${name}.rnl`, builtin: false },
+      { version: "0.1", path: `${name}/${name}.rnl` },
     ]);
   }
   expect(index.every((p) => p.path.endsWith(".rnl"))).toBe(true);
@@ -1016,14 +1023,14 @@ test("independent public EDA packages draw their gallery and custom terminal mar
       await expect(page.getByRole("button", { name: "Exclude eda-symbol 0.1", exact: true })).toHaveCount(0);
     }
   }
-  const doc = await opened(page, () => page.locator("#file-input").setInputFiles(path.join(root, "libraries/eda-style/eda-style-gallery.scs")));
+  const doc = await opened(page, () => page.locator("#file-input").setInputFiles(path.join(publicPackageDir("eda-style"), "eda-style-gallery.scs")));
   expect(doc.diagnostics.filter((d) => ["error", "warning"].includes(d.severity))).toEqual([]);
   expect(doc.levels).toHaveLength(7);
   const svg = doc.levels[0].svg;
   expect(svg).toContain("#00cc66");
   expect(svg).toContain("#ff0000");
   expect(svg).toContain('font-family="Lucida Console, Monaco, DejaVu Sans Mono, Consolas, monospace"');
-  const custom = await opened(page, () => page.locator("#file-input").setInputFiles(path.join(root, "libraries/eda-style/examples/custom-symbol.sp")));
+  const custom = await opened(page, () => page.locator("#file-input").setInputFiles(path.join(publicPackageDir("eda-style"), "examples/custom-symbol.sp")));
   expect(custom.diagnostics.filter((d) => ["error", "warning"].includes(d.severity))).toEqual([]);
   expect(await page.evaluate((svg) => new DOMParser().parseFromString(svg, "image/svg+xml").querySelectorAll('rect[fill="#ff0000"]').length, custom.levels[0].svg)).toBe(6);
 });

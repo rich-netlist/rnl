@@ -52,7 +52,6 @@ const expected = [
   "document.d.ts",
   "package.json",
   "packages.js",
-  "packages/analog-canvas-extensions.rnl",
   "rnl_runtime_wasm.wasm",
   "snapshot.d.ts",
   "worker.js",

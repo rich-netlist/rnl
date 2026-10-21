@@ -11,7 +11,7 @@
  * @property {(language: "en" | "zh-CN") => Promise<void>} [setLanguage] Update native UI labels, preserving command IDs and state.
  * @property {() => Promise<Record<string, string>>} [bundledFiles] Built-in package texts by path.
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
- * @property {(pkg: {name: string, version: string, path: string}) => Promise<object[]>} [includePackage] Include an exact published package.
+ * @property {(pkg: {name: string, version: string}) => Promise<object[]>} [includePackage] Include an exact published package.
  * @property {(kind: string) => Promise<object[]>} [include] Include files, a folder or a library package.
  * @property {(items: object[], reload?: boolean, refresh?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
@@ -33,15 +33,18 @@
  * @property {(kind: string) => Promise<Source | null>} pick Ask for something to open: kind "file", and on
  *   the web also "url". Null when nothing is chosen.
  * @property {(clear?: boolean) => Promise<{ limit: number, used: number, entries: number, hits: number, misses: number, prefetched?: number }>} [memoryCache] Desktop render cache statistics; apply the saved limit and optionally clear retained results.
- * @property {(source: Source, edits?: Edits, progress?: (stage: string) => void, options?: { fresh?: boolean }) => Promise<import("../../crates/rnl-view/types/document.js").Document>} build
+ * @property {(source: Source, edits?: Edits, progress?: (stage: string) => void, packages?: object[], signal?: AbortSignal, options?: { fresh?: boolean }) => Promise<import("../../crates/rnl-view/types/document.js").Document>} build
  *   Read a source and build its Document; rejects with a message when it cannot. With `edits`, the
  *   texts of some of its files are those, not what is read: Edit > Apply Changes (editor.js). The
  *   Document's types are generated from the core's Rust types into
  *   crates/rnl-view/types/document.d.ts, for checking the page; nothing is loaded from there at
  *   run time.
+ *   Web API packages are request-local pool items; signal cancels an obsolete build.
+ * @property {(doc: object) => void} [commitBuild] Adopt a web candidate's lazy drawing provider when displayed.
+ * @property {(doc: object) => void} [discardBuild] Dispose of an unaccepted web candidate; harmless after commit.
  * @property {(level: number, items: number[], names: string[]) => Promise<{ svg?: string }[]>} [unplacedDrawings]
  *   The drawings of the objects at `items` of `levels[level].unplaced` of the Document `build` gave
- *   last, `{ svg }` each, in order: the Document leaves them out (`Level.unplaced[].svg`), a netlist
+ *   and the page accepted, `{ svg }` each, in order: the Document leaves them out (`Level.unplaced[].svg`), a netlist
  *   with no positions listing every object, and the list of them in the side panel asks for the
  *   rows it shows (unplaced.js). `names` are the objects' names as the Document lists them, which the
  *   shell's core checks, so that a request about a Document that was built since is refused. Rejects

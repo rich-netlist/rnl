@@ -6,7 +6,7 @@ The core of [RNL](https://github.com/rich-netlist/rnl), the Rich Netlist, as Web
 - the editor interface's snapshot;
 - the netlist with an edit's operations written into it.
 
-It is the same core as the `rnl` command and the desktop viewer, and gives the Documents they give. It bundles only the standard packages, the series 0.2 and 0.3 (including `rnl-zh`). Other packages must be supplied explicitly. The npm package ships `packages/analog-canvas-extensions.rnl` as an optional data file; shipping it does not load it.
+It is the same core as the `rnl` command and the desktop viewer, and gives the Documents they give. It bundles only the standard packages, the series 0.2 and 0.3 (including `rnl-zh`). Other packages must be supplied explicitly. Starting with the next npm version after 0.1.0-preview.14, optional package files are distributed by the [public package catalog](https://rich-netlist.github.io/rnl-packages/catalog.json), rather than the npm tarball. Published preview.14 is unchanged.
 
 ## Install
 
@@ -35,27 +35,35 @@ core.terminate();
 
 ## Optional Canvas package
 
-In a Vite frontend, import the shipped file as a URL, read it, then explicitly add it to both `files` and `pool`:
+Fetch the exact package record from the public catalog, verify its raw bytes, and explicitly add the decoded text to `files` and its path to `pool`:
 
 ```js
 import { startCore } from "@rich-netlist/runtime";
-import canvasUrl from "@rich-netlist/runtime/packages/analog-canvas-extensions.rnl?url";
-
+const catalogUrl = "https://rich-netlist.github.io/rnl-packages/catalog.json";
+const response = await fetch(catalogUrl);
+if (!response.ok) throw new Error(`Catalog HTTP ${response.status}`);
+const catalog = await response.json();
+if (catalog.schemaVersion !== 1) throw new Error("Unsupported catalog");
+const pkg = catalog.packages.find(p => p.name === "analog-canvas-extensions" && p.version === "0.1");
+if (!pkg) throw new Error("Missing analog-canvas-extensions 0.1");
+const download = await fetch(new URL(pkg.url, catalogUrl));
+if (!download.ok) throw new Error(`Package HTTP ${download.status}`);
+const bytes = await download.arrayBuffer();
+const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+  b => b.toString(16).padStart(2, "0")).join("");
+if (hash !== pkg.sha256) throw new Error("Public package SHA-256 mismatch");
 const core = startCore();
 const packagePath = "/library/analog-canvas-extensions.rnl";
-const packageText = await (await fetch(canvasUrl)).text();
-const document = await core.build({
-  entry: "/top.sp",
-  files: { "/top.sp": netlistText, [packagePath]: packageText },
-  pool: [packagePath],
-});
+const files = { "/top.sp": netlistText, [packagePath]: new TextDecoder().decode(bytes) };
+const pool = [packagePath];
+const document = await core.build({ entry: "/top.sp", files, pool });
 ```
 
 The netlist still writes `@USE-PACKAGE(name="analog-canvas-extensions", version="0.1")`.
-Supplying the file in `files` alone does not make it searchable. Keep the same `files` and `pool`
-for snapshot requests and subsequent rebuilds. In Node, read the data file with
-`readFile(new URL(import.meta.resolve("@rich-netlist/runtime/packages/analog-canvas-extensions.rnl")), "utf8")`
-from `node:fs/promises` instead of the Vite URL import.
+Keep the same `files` and `pool` for snapshot requests and subsequent rebuilds. Supplying only
+`files` does not make a package searchable. Applications that need repeatable builds should
+pin the expected SHA-256 as well as the package name and version. This repository's smoke
+fixture uses its single `packages.lock.json` via `python scripts/packages.py download`.
 
 ## Catalog
 

@@ -7,6 +7,8 @@ on:
   push:
     branches: [main]
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "crates/**"
       - "bindings/**"
       - "libraries/**"
@@ -19,6 +21,8 @@ on:
       - ".github/workflows/rust.yml"
   pull_request:
     paths:
+      - "packages.lock.json"
+      - "scripts/packages*"
       - "crates/**"
       - "bindings/**"
       - "libraries/**"
@@ -36,6 +40,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
 
 jobs:
   test:
@@ -46,6 +51,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download and verify locked public packages
+        working-directory: ${{ github.workspace }}
+        run: python scripts/packages.py download
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal --component rustfmt,clippy && rustup default stable
       - name: Formatting
@@ -55,11 +63,25 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests
         run: cargo test --workspace
+      - name: Public package tests skip locally and fail when missing in CI
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          mv .rnl-packages .rnl-packages-held
+          trap 'mv .rnl-packages-held .rnl-packages' EXIT
+          env -u CI cargo test -p rnl-cli --test device_symbols --test extensions --test eda_style --test pdk_sky130
+          if CI=true cargo test -p rnl-cli --test extensions; then
+            echo 'Missing public packages must fail in CI'
+            exit 1
+          fi
 
   wasm:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download and verify locked public packages
+        working-directory: ${{ github.workspace }}
+        run: python scripts/packages.py download
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
       # the core reads no files itself, so it builds for the browser as it is
@@ -83,6 +105,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download and verify locked public packages
+        working-directory: ${{ github.workspace }}
+        run: python scripts/packages.py download
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"

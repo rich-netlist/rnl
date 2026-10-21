@@ -104,3 +104,5 @@ The [roadmap](docs/roadmap.md) is the list, and says what is done and what is no
 ## Contributing
 
 Please discuss language or module boundary changes in an issue or pull request and keep documentation status explicit. A contribution is licensed under the license of the path it changes; no sign-off or contributor agreement is required. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Optional extension and PDK packages live in [rnl-packages](https://github.com/rich-netlist/rnl-packages). The web viewer reads its catalog and verifies SHA-256; the standard series stays built in. For development and tests run `python scripts/packages.py download`; `packages.lock.json` pins the versions. See [Contributing](CONTRIBUTING.md).
