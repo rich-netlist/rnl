@@ -616,6 +616,8 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 }
 .diag .more { grid-column: 2; color: var(--muted); }
 .diags .nothing { padding: 6px 10px; color: var(--muted); }
+.diagnostics-more { padding: 6px 10px; }
+.diagnostics-more button { color: var(--muted); text-align: left; }
 
 /* ------------------------------------------------------------------ status bar */
 

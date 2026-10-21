@@ -304,7 +304,7 @@ canvas.addEventListener("pointermove", (e) => {
   pointer = canvasPoint(e);
   showPointer();
   if (!press || e.pointerId !== press.id) {
-    if (!press && view) pointOut(e);
+    if (!press && view) pointOut(e, pointer);
     return;
   }
   if (!press.drag && Math.hypot(e.clientX - press.x0, e.clientY - press.y0) > CLICK_SLOP) {
@@ -360,8 +360,8 @@ function endPress(e, cancelled) {
  * The pointer moved over the drawing with no button down: the cursor says whether a click selects
  * something, and, if names are shown on hover, the box beside the pointer names what it rests on.
  */
-function pointOut(e) {
-  const { hits } = hitsAt(doc && doc.levels[current], view, canvasPoint(e));
+function pointOut(e, point) {
+  const { hits } = hitsAt(doc && doc.levels[current], view, point);
   canvas.classList.toggle("over-object", hits.length > 0);
   const name = hoverNamesOn() ? nameOf(doc, hits[0]) : null;
   if (name === null) hideTip();

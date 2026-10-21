@@ -18,7 +18,9 @@ export function startLoading() {
   const id = ++generation;
   const el = document.getElementById("loading");
   const app = document.getElementById("app");
-  el.hidden = false;
+  // A cached/small open should not flash an indicator or wait for extra frames solely to paint it.
+  el.hidden = true;
+  const timer = setTimeout(() => { if (id === generation) el.hidden = false; }, 120);
   app.setAttribute("aria-busy", "true");
   const setStage = (stage) => {
     if (id !== generation || !(stage in stages)) return;
@@ -28,8 +30,9 @@ export function startLoading() {
   setStage("reading");
   return {
     setStage,
-    async stage(stage) { setStage(stage); await nextPaint(); },
+    async stage(stage) { setStage(stage); if (!el.hidden) await nextPaint(); },
     finish() {
+      clearTimeout(timer);
       if (id !== generation) return;
       el.hidden = true;
       app.removeAttribute("aria-busy");

@@ -3,7 +3,9 @@
 import { VirtualSelection } from "./virtual-selection.js";
 import { m, setText, setAttr } from "./i18n.js";
 
-const LIMIT = 1000;
+// A few hundred RNL lines can contain thousands of syntax tokens. Bound their DOM too,
+// rather than waiting for a file to reach a thousand physical lines.
+const LIMIT = 200;
 const OVERSCAN = 40;
 
 export class LineWindow {

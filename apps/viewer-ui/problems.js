@@ -9,6 +9,46 @@ import { includePublicPackage } from "./pool.js";
 
 const SEVERITY_ORDER = { error: 0, warning: 1, hint: 2 };
 let renderVersion = 0;
+const BATCH = 100;
+const body = $("problems-body"), ul = $("diags");
+let diagnostics = [], shown = 0, more = null, frame = 0;
+
+// Thousands of diagnostics must not all take part in the first layout after navigation.
+// Keep every diagnostic in the model and append another batch as the list is read.
+function appendBatch() {
+  more?.remove();
+  more = null;
+  const fragment = document.createDocumentFragment();
+  const end = Math.min(shown + BATCH, diagnostics.length);
+  for (; shown < end; shown++) {
+    const d = diagnostics[shown];
+    append(fragment, diagnosticRow(d));
+    const hint = packageHint(d, renderVersion);
+    if (hint) append(fragment, hint);
+  }
+  if (shown < diagnostics.length) {
+    more = document.createElement("li");
+    more.className = "diagnostics-more";
+    const button = document.createElement("button");
+    button.type = "button";
+    setText(button, m`${shown} of ${diagnostics.length} shown: scroll for more`);
+    button.addEventListener("click", appendBatch);
+    append(more, button);
+    append(fragment, more);
+  }
+  append(ul, fragment);
+  scheduleMore();
+}
+
+function scheduleMore() {
+  if (frame || !more) return;
+  frame = requestAnimationFrame(() => {
+    frame = 0;
+    if (more && body.clientHeight > 0 && body.scrollHeight - body.scrollTop - body.clientHeight < 100) appendBatch();
+  });
+}
+body.addEventListener("scroll", scheduleMore, { passive: true });
+new ResizeObserver(scheduleMore).observe(body);
 
 function packageHint(d, version) {
   // Path-based includes and alias failures need different remedies. Keep the core diagnostic intact.
@@ -46,34 +86,19 @@ function packageHint(d, version) {
 }
 
 export function renderDiagnostics(list) {
-  const version = ++renderVersion;
-  const sorted = list
+  ++renderVersion;
+  diagnostics = list
     .map((d, i) => ({ d, i }))
     .sort((a, b) => SEVERITY_ORDER[a.d.severity] - SEVERITY_ORDER[b.d.severity] || a.i - b.i)
     .map((x) => x.d);
-  const ul = $("diags");
+  cancelAnimationFrame(frame);
+  frame = 0;
+  more = null;
+  shown = 0;
   ul.replaceChildren();
-  for (const d of sorted) {
-    const li = document.createElement("li");
-    li.className = `diag ${d.severity}`;
-    append(li, span("sev", m(d.severity)), span("msg", d.message));
-    if (d.file) {
-      const loc = span("loc", `${d.file}:${d.line}${d.col ? `:${d.col}` : ""}`);
-      if (d.full_path) setAttr(loc, "title", d.full_path);
-      append(li, loc);
-    }
-    if (d.origin) append(li, span("more", d.origin));
-    if (d.cause) append(li, span("more", `upstream cause: ${d.cause}`));
-    if (d.file_index !== null && d.file_index !== undefined && d.line) {
-      li.classList.add("located");
-      setAttr(li, "title", m("Show in the netlist"));
-      li.addEventListener("click", () => revealLine(d.file_index, d.line, true));
-    }
-    append(ul, li);
-    const hint = packageHint(d, version);
-    if (hint) append(ul, hint);
-  }
-  if (sorted.length === 0) {
+  body.scrollTop = 0;
+  appendBatch();
+  if (diagnostics.length === 0) {
     const li = document.createElement("li");
     li.className = "nothing";
     setText(li, m("No errors, warnings or hints."));
@@ -87,6 +112,25 @@ export function renderDiagnostics(list) {
     if (k) append(counts, span(`n-${s}`, m`${k} ${m(k === 1 ? one : many)}`));
   }
   if (list.length === 0) append(counts, span("none", m("none")));
+}
+
+function diagnosticRow(d) {
+  const li = document.createElement("li");
+  li.className = `diag ${d.severity}`;
+  append(li, span("sev", m(d.severity)), span("msg", d.message));
+  if (d.file) {
+    const loc = span("loc", `${d.file}:${d.line}${d.col ? `:${d.col}` : ""}`);
+    if (d.full_path) setAttr(loc, "title", d.full_path);
+    append(li, loc);
+  }
+  if (d.origin) append(li, span("more", d.origin));
+  if (d.cause) append(li, span("more", `upstream cause: ${d.cause}`));
+  if (d.file_index !== null && d.file_index !== undefined && d.line) {
+    li.classList.add("located");
+    setAttr(li, "title", m("Show in the netlist"));
+    li.addEventListener("click", () => revealLine(d.file_index, d.line, true));
+  }
+  return li;
 }
 
 /** Colour the line numbers of lines with diagnostics, by the most serious one. */

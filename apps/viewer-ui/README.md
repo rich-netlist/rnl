@@ -68,6 +68,7 @@ The modules import each other in cycles. At its top level a module only looks up
 Opening, reloading and applying text show **Reading files…**, **Parsing netlist…** and
 **Displaying netlist…** above an indeterminate bar. No percentage is claimed. The web shell reports
 file collection and Worker builds; the desktop shell matches native parsing events to one request.
+The indicator appears after 120 ms, so quick opens do not flash or wait for progress-only frames.
 Completion and errors clear the indicator. Embedded viewers use the same stages, and a late result
 from an older open cannot clear the newer open's indicator. Reduced-motion preferences stop the bar's animation.
 
@@ -77,11 +78,15 @@ The desktop shell keeps a bounded LRU of compiled documents, SVGs and lazy drawi
 rebuilds. The optional `shell.memoryCache(clear)` returns native cache statistics and can clear it.
 The web shell continues building in its Worker and does not expose this native cache setting.
 
-Files over 1,000 lines keep their full text and lexical state but render only the viewport and 40
+Files over 200 lines keep their full text and lexical state but render only the viewport and 40
 overscan rows on each side. Diagnostics, selected statements, scope and not-drawn marks are attached
 to logical lines and reapplied to recycled rows. File switches, hierarchy/Problems jumps, sidebar
 resizing and editing preserve the line position; the gutter grows to fit large line numbers.
 Editing continues to use a native textarea containing the complete file.
+
+Problems retains the complete diagnostic list and total counts, but initially creates only 100
+rows. Scrolling near the bottom, or activating the button there, appends the next 100. This keeps
+large diagnostic sets out of navigation's first layout; every row still links to its source.
 
 **Edit › Find in Netlist** / **Ctrl+F** (Cmd+F on macOS) searches the entire active read-only file, including offscreen
 text; Enter and Shift+Enter move between matches, Escape closes find. Mouse selection is retained
