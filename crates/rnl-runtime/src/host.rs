@@ -98,6 +98,8 @@ impl Record {
 
 #[derive(Clone, Debug)]
 pub struct Level {
+    /// The explicit include directive that loaded this file level; absent for auto-includes.
+    pub include_site: Option<Loc>,
     pub kind: LevelKind,
     pub name: String,
     /// The file the level's text is in.
@@ -130,6 +132,7 @@ pub struct Level {
 impl Level {
     pub fn new(kind: LevelKind, name: impl Into<String>, file: impl Into<String>, path: impl Into<String>) -> Level {
         Level {
+            include_site: None,
             kind,
             name: name.into(),
             file: file.into(),

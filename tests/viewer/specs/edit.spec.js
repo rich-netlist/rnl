@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 // Editing the text (apps/viewer-ui/editor.js, edits.js; decision 0011): the netlist pane switched to
 // edit, a text box for each file; a change shown as not applied until Apply Changes builds the
 // Document again from the texts in memory (the fake shell answers with a fixture, as the core would
@@ -23,7 +24,7 @@ const area = (page) => page.locator("#source .editor:not([hidden]) textarea");
 const state = (page) => page.locator("#edit-state");
 
 /** The tab of a file, by its name. */
-const tab = (page, name) => page.locator("#file-tabs button", { hasText: name });
+const tab = (page) => page.locator("#netlist-file");
 
 /** The text of the file shown: what the page's `edit` would give. */
 const text = (page) => area(page).inputValue();
@@ -67,7 +68,7 @@ test.describe("on the desktop", () => {
     expect(await checked(page, "toggle-edit")).toBe(true);
     // a text box for each of the two files, the tabs as they were, and the first shown
     await expect(page.locator("#source .editor")).toHaveCount(2);
-    await expect(page.locator("#file-tabs button")).toHaveText(["04-hierarchy.sp", "04-hierarchy-lib.inc"]);
+    await expect(page.locator("#netlist-file")).toHaveText(/04-hierarchy\.sp$/);
     expect(await text(page)).toBe((await original(page, "04-hierarchy.sp")).replace(/\r\n/g, "\n"));
     await expect(page.locator("#source .file:not([hidden])")).toHaveCount(0);
     // line numbers beside it, one for each line
@@ -78,7 +79,7 @@ test.describe("on the desktop", () => {
     await expect(state(page)).toHaveText("No changes");
     await expect(page.locator("#apply-edits")).toBeEnabled();
     // the other file's tab shows the other file's text box
-    await tab(page, "lib.inc").click();
+    await showSource(page, "lib.inc");
     expect(await text(page)).toBe((await original(page, "04-hierarchy-lib.inc")).replace(/\r\n/g, "\n"));
     // Ctrl+E again: the highlighted text, as before
     await page.keyboard.press("Control+q");
@@ -142,14 +143,14 @@ test.describe("on the desktop", () => {
 
   test("each file of an include has its own text, its own marks, and its own changes", async ({ page, viewer }) => {
     await open(viewer, page, "04-hierarchy");
-    await tab(page, "lib.inc").click();
+    await showSource(page, "lib.inc");
     const lib = await text(page);
     await type(page, `* a comment\n${lib}`);
     await expect(tab(page, "lib.inc")).toHaveAttribute("data-unsaved", "true");
-    await expect(tab(page, "04-hierarchy.sp")).toHaveAttribute("data-unsaved", "false");
-    await expect(page.locator("#file-tabs button[data-unsaved='true']")).toHaveCount(1);
+    expect(await page.evaluate(() => window.viewer.edits.unsaved)).toEqual(["04-hierarchy-lib.inc"]);
+    await expect(page.locator("#netlist-file[data-unsaved='true']")).toHaveCount(1);
     // the first file is as it was
-    await tab(page, "04-hierarchy.sp").click();
+    await showSource(page, "04-hierarchy.sp");
     expect(await text(page)).toBe((await original(page, "04-hierarchy.sp")).replace(/\r\n/g, "\n"));
     // the include's edit is built by its path, and only it
     await viewer.build(() => page.locator("#apply-edits").click());
@@ -240,9 +241,9 @@ test.describe("on the desktop", () => {
 test.describe("saving", () => {
   test("Save writes the files with changes, those only, and the marks go", async ({ page, viewer }) => {
     await open(viewer, page, "04-hierarchy");
-    await tab(page, "lib.inc").click();
+    await showSource(page, "lib.inc");
     await type(page, `* a comment\n${await text(page)}`);
-    await tab(page, "04-hierarchy.sp").click();
+    await showSource(page, "04-hierarchy.sp");
     await type(page, `${await text(page)}\n* another`);
     await page.keyboard.press("Control+s");
     await expect(page.locator("#note")).toHaveText("Saved 04-hierarchy.sp, 04-hierarchy-lib.inc.");
@@ -250,7 +251,7 @@ test.describe("saving", () => {
     expect(written).toHaveLength(1);
     expect(written[0].map((f) => f.path).sort()).toEqual(["04-hierarchy-lib.inc", "04-hierarchy.sp"]);
     expect(written[0].find((f) => f.path === "04-hierarchy-lib.inc").text.startsWith("* a comment")).toBe(true);
-    await expect(page.locator("#file-tabs button[data-unsaved='true']")).toHaveCount(0);
+    await expect(page.locator("#netlist-file[data-unsaved='true']")).toHaveCount(0);
     expect(await page.evaluate(() => window.viewer.edits.unsaved)).toEqual([]);
     expect(await viewer.calls("setDirty")).toEqual([[true], [false]]);
     // changes not applied are saved too: Save writes what the text boxes hold; and a second Save
@@ -259,7 +260,7 @@ test.describe("saving", () => {
     await expect(page.locator("#note")).toHaveText("No changes to save.");
     expect(await page.evaluate(() => window.fakeShell.writes)).toHaveLength(1);
     // the file saved is what was read from now on: changing it back is a change
-    await tab(page, "lib.inc").click();
+    await showSource(page, "lib.inc");
     await type(page, (await text(page)).replace(/^\* a comment\n/, ""));
     await expect(tab(page, "lib.inc")).toHaveAttribute("data-unsaved", "true");
   });
@@ -295,7 +296,7 @@ test.describe("saving", () => {
 
   test("the shell is given what was read of each file, to look for on disk", async ({ page, viewer }) => {
     await open(viewer, page, "04-hierarchy");
-    await tab(page, "lib.inc").click();
+    await showSource(page, "lib.inc");
     const lib = await text(page);
     await type(page, `* a comment\n${lib}`);
     await page.keyboard.press("Control+s");
@@ -352,7 +353,7 @@ test.describe("saving", () => {
   test("several files changed on disk are named together, and the files are not written one by one", async ({ page, viewer }) => {
     await open(viewer, page, "04-hierarchy");
     await type(page, `${await text(page)}* a\n`);
-    await tab(page, "lib.inc").click();
+    await showSource(page, "lib.inc");
     await type(page, `${await text(page)}* b\n`);
     await page.evaluate(() => (window.fakeShell.changedOnDisk = ["04-hierarchy.sp", "04-hierarchy-lib.inc"]));
     await page.keyboard.press("Control+s");
@@ -396,12 +397,12 @@ test.describe("saving", () => {
 
   test("Save As is of the netlist opened: not of an include, nor while another file has changes", async ({ page, viewer }) => {
     await open(viewer, page, "04-hierarchy");
-    await tab(page, "lib.inc").click();
+    await showSource(page, "lib.inc");
     await type(page, `* a comment\n${await text(page)}`);
     await page.evaluate(() => window.viewer.command("save-as"));
     await expect(dialog(page)).toContainText("Save As saves the netlist that was opened, the first file");
     await answer(page, "Close");
-    await tab(page, "04-hierarchy.sp").click();
+    await showSource(page, "04-hierarchy.sp");
     await page.evaluate(() => window.viewer.command("save-as"));
     await expect(dialog(page)).toContainText("Save the other files with changes first, with File › Save: 04-hierarchy-lib.inc.");
     await answer(page, "Close");

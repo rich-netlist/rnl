@@ -11,10 +11,14 @@
         { "id": "open-url", "label": "Open &URL...", "platforms": ["web"] },
         { "id": "load-clipboard", "label": "Load from &Clipboard...", "keys": ["Ctrl+Shift+V"] },
         { "id": "reload", "label": "&Reload", "keys": ["F5", "Ctrl+R"] },
+        { "id": "reload-library", "label": "Reload &Library" },
+        { "id": "toggle-auto-include", "label": "&Auto Include", "check": true },
+        { "id": "memory-cache", "label": "Memory &Cache…", "platforms": ["desktop"] },
         "-",
         { "id": "save", "label": "&Save", "keys": ["Ctrl+S"] },
         { "id": "save-as", "label": "Save &As...", "platforms": ["desktop"] },
         "-",
+        { "id": "file-associations", "label": "File &Associations...", "platforms": ["desktop"], "windowsOnly": true },
         { "id": "exit", "label": "E&xit", "platforms": ["desktop"] }
       ]
     },
@@ -59,9 +63,27 @@
           ]
         },
         { "id": "toggle-hover-names", "label": "Show &Names on Hover", "check": true },
+        {
+          "label": "&Language",
+          "items": [
+            { "id": "language-en", "label": "English", "check": true, "radio": true },
+            { "id": "language-zh", "label": "简体中文", "check": true, "radio": true }
+          ]
+        },
         "-",
-        { "id": "toggle-netlist", "label": "&Netlist Panel", "keys": ["Ctrl+B"], "check": true },
-        { "id": "toggle-problems", "label": "&Problems", "keys": ["Ctrl+Shift+M"], "check": true }
+        {
+          "label": "Side P&anels",
+          "items": [
+            { "id": "panel-files", "label": "&Library", "keys": ["1"], "page": true, "check": true },
+            { "id": "panel-netlist", "label": "&Netlist", "keys": ["2"], "page": true, "check": true },
+            { "id": "panel-hierarchy", "label": "&Hierarchy", "keys": ["3"], "page": true, "check": true },
+            { "id": "panel-symbol", "label": "&Symbol", "keys": ["4"], "page": true, "check": true },
+            { "id": "panel-unplaced", "label": "Not &Drawn", "keys": ["5"], "page": true, "check": true },
+            { "id": "panel-solve", "label": "S&olve", "keys": ["6"], "page": true, "check": true, "platforms": ["desktop"] },
+            "-",
+            { "id": "panel-hide", "label": "&Hide" }
+          ]
+        }
       ]
     },
     {
@@ -85,5 +107,9 @@
         { "id": "about", "label": "&About RNL Viewer" }
       ]
     }
+  ],
+  "shortcuts": [
+    { "id": "toggle-netlist", "keys": ["Ctrl+B"] },
+    { "id": "toggle-problems", "keys": ["Ctrl+Shift+M"] }
   ]
 }

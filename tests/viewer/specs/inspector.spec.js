@@ -1,0 +1,147 @@
+import { test, expect } from '../viewer.js';
+
+const rows = page => page.locator('#source .file:not([hidden]) .ln');
+const copy = page => page.locator('#source').evaluate(source => {
+  const event = new ClipboardEvent('copy', { bubbles: true, cancelable: true, clipboardData: new DataTransfer() });
+  source.dispatchEvent(event);
+  return event.clipboardData.getData('text/plain');
+});
+
+test('semantic RNL filtering keeps source lines and excludes literals, comments and disabled records', async ({ page, viewer }) => {
+  await viewer.open('symbol-inspector');
+  await expect(viewer.line(12)).toHaveClass(/semantic-rnl/);
+  await expect(viewer.line(13)).toHaveClass(/rnl-line/);
+  await expect(viewer.line(13)).not.toHaveClass(/semantic-rnl/);
+  await expect(viewer.line(34)).not.toHaveClass(/rnl-line/);
+  await expect(viewer.line(36)).not.toHaveClass(/rnl-line/);
+  const colours = await page.evaluate(() => [12, 13].map(n => getComputedStyle(document.querySelector(`#source .ln[data-line="${n}"]`)).backgroundColor));
+  expect(colours[0]).not.toBe(colours[1]);
+  await expect(page.locator('#semantics-only')).toBeDisabled();
+  await page.locator('#rnl-only').check();
+  await expect(viewer.line(3)).toHaveCount(0);
+  await expect(viewer.line(13)).toBeVisible();
+  await page.locator('#semantics-only').check();
+  expect(await rows(page).evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([12, 31]);
+  await page.locator('#source').focus();
+  await page.keyboard.press('Control+a');
+  const selected = await copy(page);
+  expect(selected).toContain('is placed here');
+  expect(selected).toContain('descriptive 中文 text');
+  expect(selected).not.toContain('Xparent');
+  expect(selected).not.toContain('quoted string');
+  await page.keyboard.press('Control+f');
+  await page.locator('#netlist-query').fill('quoted string');
+  await expect(page.locator('#netlist-matches')).toHaveText('No matches');
+  await page.locator('#netlist-query').fill('descriptive');
+  await expect(page.locator('#netlist-matches')).toHaveText('1 / 1');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+q');
+  await expect(page.locator('#rnl-only')).not.toBeChecked();
+  await expect(page.locator('#semantics-only')).toBeDisabled();
+  await expect(page.locator('#source textarea:visible')).toHaveValue(/Xparent/);
+});
+
+test('empty semantic result and virtual files keep filtering across navigation and reload', async ({ page, viewer }) => {
+  await viewer.open('01-rc-lowpass');
+  await page.locator('#rnl-only').check();
+  await page.locator('#semantics-only').check();
+  await expect(rows(page)).toHaveCount(0);
+  await expect(page.locator('#source .placeholder:visible')).toHaveText('No semantic RNL lines in this file.');
+  await viewer.open('semantics-virtual');
+  await expect(rows(page)).toHaveCount(2);
+  const numbers = await rows(page).evaluateAll(es => es.map(e => Number(e.dataset.line)));
+  expect(numbers[1] - numbers[0]).toBeGreaterThan(1000);
+  await page.locator('#source').focus();
+  await page.keyboard.press('Control+a');
+  expect((await copy(page)).split('\n')).toHaveLength(2);
+  await page.locator('#semantics-only').uncheck();
+  expect(await rows(page).count()).toBeLessThan(200);
+  await page.locator('#semantics-only').check();
+  expect(await rows(page).evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual(numbers);
+  await page.locator('#rnl-only').uncheck();
+  await expect(page.locator('#semantics-only')).toBeDisabled();
+  await expect(viewer.line(1)).toBeAttached();
+  await page.locator('#rnl-only').check();
+  expect(await rows(page).evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual(numbers);
+});
+
+test('symbol viewport keeps application shortcuts available', async ({page,viewer}) => {
+  await viewer.open('symbol-inspector', {platform:'web'});
+  await viewer.click('Xparent');
+  await page.keyboard.press('Enter');
+  await page.locator('#tab-symbol').click();
+  const preview = page.locator('.symbol-preview');
+  await preview.focus();
+  await page.keyboard.press('Control+s');
+  await expect.poll(async () => (await viewer.calls('save')).length).toBe(1);
+  await preview.focus();
+  await page.keyboard.press('Control+f');
+  await expect(page.locator('#netlist-query')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await page.locator('#tab-symbol').click();
+  await preview.focus();
+  await viewer.build(() => page.keyboard.press('F5'));
+  await preview.focus();
+  await viewer.build(() => page.keyboard.press('Control+r'));
+});
+
+test('symbol follows parent assignment, package source and direct subcircuit entry', async ({ page, viewer }) => {
+  await viewer.open('symbol-inspector');
+  await expect(page.locator('#unplaced-tab-count')).toHaveText(' (1)');
+  await viewer.click('Xparent');
+  await page.keyboard.press('Enter');
+  await page.locator('#tab-symbol').click();
+  await expect(page.locator('.symbol-bounds')).toHaveText('Box = [-4, -2, 4, 2]');
+  await expect(page.locator('.symbol-context')).toContainText('Xparent');
+  await expect(page.locator('.symbol-definition')).toContainText('width=8');
+  await expect(page.locator('.symbol-pins-table tbody tr')).toHaveCount(2);
+  await expect(page.locator('.symbol-label-list')).toContainText('${name}');
+  const preview = page.locator('.symbol-preview > svg');
+  const fitted = await preview.getAttribute('viewBox');
+  const main = await page.locator('#canvas > svg').getAttribute('viewBox');
+  await page.locator('[data-action="zoom-in"]').click();
+  await expect(preview).not.toHaveAttribute('viewBox', fitted);
+  const zoomed = await preview.getAttribute('viewBox');
+  const box = await preview.boundingBox();
+  await page.mouse.move(box.x+box.width/2, box.y+box.height/2);
+  await page.mouse.down();
+  await page.mouse.move(box.x+box.width/2+40, box.y+box.height/2+20);
+  await page.mouse.up();
+  await expect(preview).not.toHaveAttribute('viewBox', zoomed);
+  const dragged = await preview.getAttribute('viewBox');
+  await page.mouse.wheel(0,-100);
+  await expect(preview).not.toHaveAttribute('viewBox', dragged);
+  await page.locator('[data-action="fit"]').click();
+  await expect(preview).toHaveAttribute('viewBox', fitted);
+  await expect(page.locator('#canvas > svg')).toHaveAttribute('viewBox', main);
+  await expect(page.locator('.symbol-source-location')).toHaveAttribute('title', /symbol-inspector\.sp$/);
+  expect(await page.locator('.symbol-source-location').evaluate(el => el.previousElementSibling.textContent)).toBe('Definition source');
+  for (const [name, selector] of [['box', '.symbol-box-mark'], ['origin', '.symbol-origin-mark'], ['pins', '.symbol-pin-marks'], ['labels', '[data-id="symbol-label"]']]) {
+    await page.locator(`#symbol-${name}`).uncheck();
+    await expect(page.locator(`.symbol-preview ${selector}`).first()).toBeHidden();
+    await page.locator(`#symbol-${name}`).check();
+    await expect(page.locator(`.symbol-preview ${selector}`).first()).toBeVisible();
+  }
+  await page.locator('#tab-hierarchy').click();
+  await page.locator('#index .index-row', { hasText: 'leaf' }).click();
+  await page.locator('#tab-symbol').click();
+  await expect(page.locator('.symbol-bounds')).toHaveText('Box = [-2, -1, 2, 1]');
+  await expect(page.locator('.symbol-context')).toContainText('own symbol');
+  await expect(page.locator('#unplaced-tab-count')).toHaveText('');
+  await page.locator('#tab-hierarchy').click();
+  await page.locator('#tree .tree-row[data-path="0"]').click();
+  await viewer.click('Xpackage');
+  await page.keyboard.press('Enter');
+  await page.locator('#tab-symbol').click();
+  await expect(page.locator('.symbol-name')).toHaveText('$RESISTOR');
+  await expect(page.locator('.symbol-origin-info')).toHaveText('Package rnl-std-basic 0.3');
+  await expect(page.locator('.symbol-definition')).toContainText('$RESISTOR = @DEFINE-SYMBOL');
+  await expect(page.locator('.symbol-label-list')).toContainText('${value}');
+  await page.evaluate(() => {
+    window.fakeShell.picks.push({ name: 'missing.sp', fixture: 'missing' });
+    window.fakeShell.fail = 'missing.sp cannot be read';
+  });
+  await viewer.build(() => page.keyboard.press('Control+O'));
+  await expect(page.locator('#symbol-detail')).toHaveText('No circuit is open.');
+  await expect(page.locator('.symbol-preview')).toHaveCount(0);
+});

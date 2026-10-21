@@ -5,6 +5,7 @@
 // subcircuits it calls, and the page opens on one of them when the top level has no objects.
 
 import { doc } from "./state.js";
+import { m } from "./i18n.js";
 
 let cached = { doc: null, roots: [] };
 
@@ -59,8 +60,9 @@ function compute(d) {
  */
 export function startLevel() {
   const top = doc.levels[0];
-  const roots = uncalledRoots();
+  // Opening a file may choose one of its own subcircuits, never an included file's circuit.
+  const roots = uncalledRoots().filter(r => doc.levels[r].lines?.[0] === 0);
   if (!top.empty || top.unplaced.length > 0 || roots.length === 0) return { level: 0, note: "" };
   const level = roots.find((r) => !doc.levels[r].empty) ?? roots[0];
-  return { level, note: `The top level is empty; showing ${doc.levels[level].title}.` };
+  return { level, note: m`The top level is empty; showing ${doc.levels[level].title}.` };
 }

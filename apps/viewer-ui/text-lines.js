@@ -1,6 +1,7 @@
 // Prepare line data and lexical checkpoints without constructing offscreen DOM. Syntax state is
 // retained across continued host statements and multi-line RNL comments, so any row can render alone.
 import { hostLine, mark, rnlRange } from "./syntax.js";
+import { m, setAttr } from "./i18n.js";
 
 export function lineModel(file, f, allSpans, dialect) {
   const texts = file.text.split(/\r?\n/);
@@ -11,6 +12,12 @@ export function lineModel(file, f, allSpans, dialect) {
     return starts.get(n)(c);
   };
   const rnl = new Map(), spans = new Map(), failed = new Map();
+  const semantics = new Set((file.semantics || []).map(n => n - 1));
+  const includes = new Map();
+  for (const link of file.includes || []) {
+    const location = includeLocation(texts, link.line - 1);
+    if (location) includes.set(location.line, {...location, file: link.file});
+  }
   const add = (map, i, value) => { if (!map.has(i)) map.set(i, []); map.get(i).push(value); };
   for (const [l0, c0, l1, c1] of file.records) {
     for (let n = l0; n <= l1 && n <= texts.length; n++) {
@@ -40,18 +47,30 @@ export function lineModel(file, f, allSpans, dialect) {
     return { cls, flags: (joined ? 1 : 0) | (state.comment ? 2 : 0) };
   }
   const states = new Uint8Array(texts.length);
+  const folds = [], blocks = [];
   let flags = 0, longest = "", columns = 0;
   for (let i = 0; i < texts.length; i++) {
     states[i] = flags;
-    flags = syntax(i, flags).flags;
+    const lex = syntax(i, flags);
+    flags = lex.flags;
     const text = texts[i];
+    // Also mark definitions in library sections that the host did not select. Reuse lexical
+    // state so comments, RNL records and continuation lines cannot open/close a block.
+    const head = /^\s*(\.?subckt|inline\s+subckt|\.?ends)\b/i.exec(text);
+    if (head && lex.cls[text.search(/\S/)] === 'directive') {
+      if (/ends$/i.test(head[1])) {
+        const from = blocks.pop();
+        if (from !== undefined) folds.push([from, i]);
+      } else blocks.push(i);
+    }
     // A conservative monospace width estimate, refined from rendered rows by LineWindow.
     let width = 0;
     for (const c of text) width = c === "\t" ? width + 8 - width % 8 : width + (c.codePointAt(0) >= 0x1100 ? 2 : 1);
     if (width > columns) { columns = width; longest = text; }
   }
+  for (const from of blocks) folds.push([from, texts.length - 1]);
   return {
-    texts, columns, longest, text: file.text.replace(/\r\n/g, "\n"),
+    texts, columns, longest, folds, semantics, rnl, failed, text: file.text.replace(/\r\n/g, "\n"),
     render(i) {
       const text = texts[i], { cls } = syntax(i, states[i]);
       const fail = new Array(text.length).fill("");
@@ -66,9 +85,52 @@ export function lineModel(file, f, allSpans, dialect) {
           if (!objs[c].includes(s.object)) objs[c].push(s.object);
         }
       }
-      return lineElement(text, i + 1, cls, objs.map(o => o ? o.join(" ") : ""), fail);
+      const el = lineElement(text, i + 1, cls, objs.map(o => o ? o.join(" ") : ""), fail);
+      el.classList.toggle("rnl-line", rnl.has(i));
+      el.classList.toggle("semantic-rnl", semantics.has(i));
+      el.classList.toggle("inactive-line", failed.has(i));
+      if (includes.has(i)) includeLink(el, includes.get(i));
+      return el;
     },
   };
+}
+
+// Resolution comes from the host parser. Only locate the written filename here, not its target.
+function includeLocation(texts, line) {
+  const head = /^\s*(?:\.inc\S*|\.lib|include)\b\s*/i.exec(texts[line] || '');
+  if (!head) return null;
+  const spectre = /^\s*include\b/i.test(head[0]);
+  let from = head[0].length;
+  while (line < texts.length) {
+    const tail = texts[line].slice(from);
+    const token = spectre && tail.startsWith('//') ? null : /^("[^"]+"|'[^']+'|[^\s]+)/.exec(tail);
+    if (token && token[0] !== '\\') return {line, from, to:from+token[0].length};
+    // Spectre backslash or SPICE/Spectre '+' continuation: keep the filename's physical line.
+    if (token?.[0] !== '\\' && !/^\s*\+/.test(texts[line+1] || '')) return null;
+    line++;
+    from = /^\s*\+?\s*/.exec(texts[line] || '')[0].length;
+  }
+  return null;
+}
+
+function includeLink(row, {file, from, to}) {
+  const code = row.querySelector('.code');
+  const point = offset => {
+    const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (offset <= node.length) return [node, offset];
+      offset -= node.length;
+    }
+    return [code, code.childNodes.length];
+  };
+  const range = document.createRange();
+  range.setStart(...point(from)); range.setEnd(...point(to));
+  const link = document.createElement('a');
+  link.className = 'include-link'; link.dataset.include = String(file);
+  link.href = `#source-${file}`;
+  setAttr(link, 'title', m('Go to included file (Shift: new window)'));
+  link.append(range.extractContents()); range.insertNode(link);
 }
 
 /**

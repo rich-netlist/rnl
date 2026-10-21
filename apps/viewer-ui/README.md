@@ -29,7 +29,7 @@ find apps/viewer-ui -name '*.js' -print0 | xargs -0 -n 1 node --check
 | `shells/desktop.js` | The desktop shell, the only module that uses `window.__TAURI__`. |
 | `shells/web.js` | The web shell: files, a folder, a URL or what is dropped, read as the core asks for them, and built by the core in a Worker. |
 | `state.js` | What the page shows: the Document, the level drawn, the selection, the hierarchy path to the level and the views kept by path. Modules read these bindings and change them through setters. |
-| `open.js` | Opening a source through the shell; reading it again keeps the level, the hierarchy path while its instances are there, the view and the selection. File › Load from Clipboard: the clipboard's text, shown with what it is guessed to be, opened as a source that holds it. |
+| `open.js` | Opening a source through the shell; reading it again keeps the level, the visit history while its circuits are there, the view and the selection. File › Load from Clipboard: the clipboard's text, shown with what it is guessed to be, opened as a source that holds it. |
 | `drawing.js` | The drawing of a level: the view, moved by changing the SVG's `viewBox`; a click and the pointer on it, with `hits.js`, `picker.js` and `hover.js` (see [Clicking and pointing](#clicking-and-pointing)); the selection marks, those of the labels attached to it too, and the open badge; where the pointer is in the scene, in the status bar. |
 | `hits.js` | What a point of the drawing is on: the Document's hits (boxes, pins, wires and labels) under it, in the order a click prefers them, the objects they stand for, and the name the pointer shows. |
 | `picker.js` | The list beside the pointer that a click on several objects opens, to choose from with the mouse or the keys. |
@@ -68,14 +68,25 @@ The modules import each other in cycles. At its top level a module only looks up
 Opening, reloading and applying text show **Reading files…**, **Parsing netlist…** and
 **Displaying netlist…** above an indeterminate bar. No percentage is claimed. The web shell reports
 file collection and Worker builds; the desktop shell matches native parsing events to one request.
+The indicator appears after 120 ms, so quick opens do not flash or wait for progress-only frames.
 Completion and errors clear the indicator. Embedded viewers use the same stages, and a late result
 from an older open cannot clear the newer open's indicator. Reduced-motion preferences stop the bar's animation.
 
-Files over 1,000 lines keep their full text and lexical state but render only the viewport and 40
+The desktop shell keeps a bounded LRU of compiled documents, SVGs and lazy drawings; a hit reports
+**Using cached drawing…**. File > Memory Cache configures its per-window budget (256 MiB by default).
+`shell.build` takes an optional fourth argument `{ fresh }`; Reload sets it to true so F5 always
+rebuilds. The optional `shell.memoryCache(clear)` returns native cache statistics and can clear it.
+The web shell continues building in its Worker and does not expose this native cache setting.
+
+Files over 200 lines keep their full text and lexical state but render only the viewport and 40
 overscan rows on each side. Diagnostics, selected statements, scope and not-drawn marks are attached
 to logical lines and reapplied to recycled rows. File switches, hierarchy/Problems jumps, sidebar
 resizing and editing preserve the line position; the gutter grows to fit large line numbers.
 Editing continues to use a native textarea containing the complete file.
+
+Problems retains the complete diagnostic list and total counts, but initially creates only 100
+rows. Scrolling near the bottom, or activating the button there, appends the next 100. This keeps
+large diagnostic sets out of navigation's first layout; every row still links to its source.
 
 **Edit › Find in Netlist** / **Ctrl+F** (Cmd+F on macOS) searches the entire active read-only file, including offscreen
 text; Enter and Shift+Enter move between matches, Escape closes find. Mouse selection is retained
@@ -116,13 +127,13 @@ including its chosen background, subject to the browser's background-printing op
 
 ## The hierarchy path
 
-The bar above the drawing shows the path of the level shown, from its root down to it, a segment per level: the root's names its level, the top level's title or a subcircuit's name, and every other names its subcircuit with, smaller and dimmer beside it, the instance it was reached through. The path is a list of levels, each with the name of its instance in the level before it (`state.js`):
+The bar above the drawing shows the path of the level shown, from its root down to it, a segment per level: the root's names its level, the top level's title or a subcircuit's name, and every other names its subcircuit with, smaller and dimmer beside it, the instance it was reached through. The path is a visit history of file sources and circuit names, with the instance used for each descent (`state.js`), independent of include resolution:
 
 - Going down into a subcircuit instance, by E or Enter, a double click, the open badge or Edit › Open Subcircuit, adds the instance to the path.
-- A subcircuit picked in the index is the root of a path of its own, with no way up from it; a row of the tree gives the path from the top level down to its instance; a level reached otherwise, such as by an object of it selected in the text, cuts the path back to it when it is on it, and is the root of a new path when not.
+- A subcircuit picked in the index is the root of a path of its own, with no way up from it; tree picks and other navigation, including an object selected in another level’s text, also make the target a new history head.
 - A click on a segment but the last goes back to its level, cutting the path there; the up button and Ctrl+E or Backspace go back one level, and at the root there is no up button and Backspace does nothing. The up button that hides at the root gives the focus to the drawing, so that Enter goes back down at once, also in a browser that moves the focus off a hidden element only later, as WebKit does; Enter is left to a focused button only while the button is shown. The level comes back with the view it had when it was left and the instance it was left through selected.
-- Reading the document again keeps the path when its levels and instances are still there by their names; otherwise the level shown is the root.
-- The views kept are by path, the root's title and the instances on it, so a subcircuit reached two ways keeps a view for each.
+- Reading the document again keeps the visits while circuits belonging to that file still exist by name; otherwise the level shown is the new history head. Visits in other files are resolved when returned to.
+- The views kept are by source identity, circuit title and descent instances, so a subcircuit reached two ways keeps a view for each.
 
 The tree marks the row of the path when the path starts at the top level, and else the first row that reaches the level; the index marks the level shown. Where the bar is narrow, the level's kind gives way first, then the levels after the root, from the root's side, behind an ellipsis whose list goes back to them, then the root; the level shown always stays, its name cut short only when nothing else is left to give way.
 
@@ -130,8 +141,8 @@ The tree marks the row of the path when the path starts at the top level, and el
 
 A netlist of subcircuits alone, a library or a testbench that is defined and never instantiated, has a top level with nothing on it, and no instance leads from it to its subcircuits. The page does not leave them to the index:
 
-- **The tree** lists, below the top level, a group *Not called from the top level*. Its roots are the subcircuits that no chain of instances from the top level reaches and that no other such subcircuit calls, in the order of the netlist, each with the subcircuits it calls below it (`Testbench` with its instance `XDUT` of `ota_5t`); a subcircuit that a root calls hangs below it and is not a root too, and may be below several. Of subcircuits that call each other around a cycle nothing outside calls, the first starts the tree. The roots start open. Their rows have the paths `r3`, `r3/0`, ..., `r3` being the root's level, and open a level as a row of the first tree does, by the way to it from the root. The core says nothing of this: `roots.js` works it out from `Level.children`.
-- **A document opens on** the top level, also when its objects have no position yet. When the top level has no objects at all (`Level.empty` and no `Level.unplaced`) and the netlist has roots, it opens on the first root that has something to draw, or else the first, and the status bar says so, *The top level is empty; showing Testbench*, until another level is shown. A document read again keeps the level it was on.
+- **The tree** lists, below the top level, a group *Not called from the top level*. Its roots are the subcircuits that no chain of instances from the top level reaches and that no other such subcircuit calls, in the order of the netlist, each with the subcircuits it calls below it (`Testbench` with its instance `XDUT` of `ota_5t`); a subcircuit that a root calls hangs below it and is not a root too, and may be below several. Of subcircuits that call each other around a cycle nothing outside calls, the first starts the tree. The roots start open. Their rows have the paths `r3`, `r3/0`, ..., `r3` being the root's level, and open a level as a new history head, as rows of the first tree do. The core says nothing of this: `roots.js` works it out from `Level.children`.
+- **A document opens on** the top level, also when its objects have no position yet. When the top level has no objects at all (`Level.empty` and no `Level.unplaced`) and the entry file itself defines roots, it opens on the first of those roots that has something to draw, or else the first, and the status bar says so, *The top level is empty; showing Testbench*, until another level is shown. A document read again keeps the level it was on.
 - **A level with nothing to draw** says why: *Nothing on this level has a position yet, so nothing is drawn.* when it has objects that have no position (they are in the Not drawn view), and *This level has no objects, so nothing is drawn.* when it has none, with *The subcircuits of this netlist are in the Hierarchy.* when the netlist has any.
 
 ## The solver's settings
@@ -209,10 +220,11 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 | `nativeMenu` | Whether the platform shows the menu bar itself; if not, the page shows its own. |
 | `initial()` | What to open at start, or null; on the desktop, the file on the command line. |
 | `pick(kind)` | Ask for something to open: `"file"`, and on the web also `"folder"` or `"url"`; null when nothing is chosen. |
-| `build(source, edits, progress)` | Read a source and return its Document; rejects with a message when it cannot. Optional `progress(stage)` reports `reading` or `parsing`. With `edits`, `{ path: text }` by the path the Document names a file by, the texts of those files are the ones given, not what is read: Edit > Apply Changes. A source that holds its text takes the text of its one file. The Document's TypeScript declarations are generated from the core's Rust types ([`crates/rnl-view/types`](../../crates/rnl-view/README.md#type-definitions)); `shell.js` refers to them in its JSDoc, which loads nothing at run time. |
+| `build(source, edits, progress, packages, signal, options)` | Read a source and return its Document; rejects with a message when it cannot. Optional `progress(stage)` reports `reading` or `parsing`. Web API imports can supply request-local `packages` and an abort `signal`; desktop `options.fresh` bypasses cached compilation on explicit reload. With `edits`, `{ path: text }` by the path the Document names a file by, the texts of those files are the ones given, not what is read: Edit > Apply Changes. A source that holds its text takes the text of its one file. The Document's TypeScript declarations are generated from the core's Rust types ([`crates/rnl-view/types`](../../crates/rnl-view/README.md#type-definitions)); `shell.js` refers to them in its JSDoc, which loads nothing at run time. |
 | `setCheck(id, checked)` | Show a check-mark command's state in the platform's menu. |
 | `onCommand(handler)` | Call `handler(id)` for each command chosen in the platform's menu. |
-| `onOpen(handler)` | Optional. Call `handler(source)` for each source opened without `pick`, such as files dropped on the page. |
+| `onOpen(handler)` | Optional. Call `handler(source)` for each source opened without `pick`, such as files dropped on the page. Startup awaits listener registration before opening the initial source. Desktop drops use Tauri's native WebView drag/drop events. |
+| `fileAssociations()` | Optional. Open Windows Default Apps settings; File > File Associations explains installed and standalone builds before invoking it. |
 | `about()` | Optional. Show the platform's About box, for Help > About in the page's own menu bar; without it the page shows a plain one. A platform whose menu shows its own About box has none. |
 | `browse(url)` | Optional. Show a web page outside the viewer: the web shell opens it in a new tab, with no hold on the page (`noopener`); the desktop shell opens it in the default browser through Tauri's opener plugin, which the app's capability lets open the repository's pages on GitHub only. Help > Desktop Viewer (web) shows the project site's page of the tools with it, and Help > Check for Updates (desktop) a release's page; without it, those commands do nothing. |
 | `solve(source, settings, edits)` | Optional. Solve a source as `rnl solve` solves it, without its records of the solver, and give `{document, report}`: the Document of the files as solved, nothing written, and the report of [`rnl_cli::preview`](../../crates/rnl-cli/src/preview.rs), every line of it located in that Document's files. `settings` is `{ options, hintsForLow }`: the options that differ from the solver's defaults as `rnl solve --solver-options` takes them (empty for the defaults), and whether to seek every conflict group of the facts of priority low; `edits` are the texts applied, as `build` takes them. Rejects with a message when it cannot, and with `the solve was cancelled` when `cancelSolve` stopped it. The desktop shell solves natively on a thread of the app's; the web shell has none, so the Solve menu, whose commands the table offers on the desktop only, and the Solve view are not shown there. |
@@ -230,7 +242,7 @@ Everything platform-specific goes through the shell, chosen at start: `shells/de
 
 A Source is the shell's own object: the page keeps it to read it again and shows its `name`. Its optional `path` identifies a real file in the Library; native backslashes are normalized to forward slashes for matching and deduplication. On the desktop it is a file path; on the web, files chosen or dropped, a folder or a URL, each with a way to read its entry and its other files. A URL updates its workspace path after redirects. The source that the page makes for File › Load from Clipboard holds its `text` and is marked `temporary`: each shell builds that text, with the file pool available, as the file `name`, such as `clipboard.sp`, whose extension says how it is read: the desktop with the app's `open_text` command, the web in the core's Worker.
 
-The web shell takes each candidate from a prewarmed standby module Worker, adopts its lazy drawing provider only when the document is displayed, and terminates rejected or superseded candidates. It prepares the next standby in the background after acceptance or disposal; `ready` waits for the standby actually used by the first open. The displayed document stays isolated so a rejected build cannot replace its lazy drawings. It loads the core as WebAssembly from `core/client.js` next to the page ([`bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md), which [`apps/web`](../web/README.md) puts there), and asks for the SVG only. `collect` reads the files a document needs, decoded with `decodeText`, each named in the workspace by a rooted path: files chosen with Open or dropped at `/NAME`, a folder's at `/FOLDER/SUB/NAME`, and a URL's by their paths on the server that served the netlist, after any redirect, fetched relative to that address; a server that sends nothing for 30 seconds is given up. When more than one file could be the netlist, it asks which with `dialog.js`. It names the browser tab after the document, as the desktop app names its window. Its file inputs have the ids `file-input` and `folder-input`, for tests: files set on one while no chooser is shown open as if chosen with Open File or Include Folder.
+The web shell takes each candidate from a prewarmed standby module Worker, adopts its lazy drawing provider only when the document is displayed, and recycles the previous or rejected candidate as the next standby. Superseded builds terminate their worker. Each worker retains its Library index; changed files are synchronized before reuse, and Reload Library invalidates both indexes on their next use. It prepares a standby in the background when none can be reused; `ready` waits for the standby actually used by the first open. The displayed document stays isolated so a rejected build cannot replace its lazy drawings. It loads the core as WebAssembly from `core/client.js` next to the page ([`bindings/runtime-wasm`](../../bindings/runtime-wasm/README.md), which [`apps/web`](../web/README.md) puts there), and asks for the SVG only. `collect` reads the files a document needs, decoded with `decodeText`, each named in the workspace by a rooted path: files chosen with Open or dropped at `/NAME`, a folder's at `/FOLDER/SUB/NAME`, and a URL's by their paths on the server that served the netlist, after any redirect, fetched relative to that address; a server that sends nothing for 30 seconds is given up. When more than one file could be the netlist, it asks which with `dialog.js`. It names the browser tab after the document, as the desktop app names its window. Its file inputs have the ids `file-input` and `folder-input`, for tests: files set on one while no chooser is shown open as if chosen with Open File or Include Folder.
 
 ## The command table
 
@@ -246,6 +258,7 @@ The web shell takes each candidate from a prewarmed standby module Worker, adopt
 | `radio` | Whether, with `check`, it is one of a group of which the page checks one: the page's menu bar shows a dot, a native menu a check mark. |
 | `page` | Whether the page always handles its key, as for Enter, Backspace and G: no menu accelerator would take the key from a text box. |
 | `platforms` | The platforms that offer it; all when not given. |
+| `windowsOnly` | Offer this command only on Windows, in addition to its `platforms` restriction. |
 
 The desktop app builds its native menu from the table ([`src/menu.rs`](../desktop/src/menu.rs)), its submenus too: on Windows the page handles the keys and the menu shows them after a tab; elsewhere the menu's accelerators handle them. A native menu toggles a check item when it is chosen, so the page sets the marks of a command's group again after running it, whether or not they changed. In the page's own menu bar, pointing at a submenu's entry opens the submenu beside it; from the keyboard, ArrowRight, Enter or the entry's letter opens it, and ArrowLeft or Escape closes it. The page runs keys by the same table. A key with Ctrl compares Shift only for a letter, since typing `+` may need Shift; a key without Ctrl that types or deletes does not count while Ctrl or Alt is held. In a text box or list only Ctrl keys and function keys count. E and Enter open a selected subcircuit instance, Escape clears the selection, and F5 and Ctrl+R, whatever else is held, read the document again instead of reloading the page.
 
@@ -257,7 +270,7 @@ Module scope hides the page's state from tests and the console, so `window.viewe
 | --- | --- |
 | `doc` | The Document shown, or null. |
 | `level` | The level drawn, an index into `doc.levels`. |
-| `path` | The hierarchy path to it from its root: per level, `{ level, via }`, its index and the name of the instance it was reached through, null for the root. |
+| `path` | Visit history: `{ level, via }`; level is its index in the current entry, or -1 for a visit in another file. via names the descent instance, null for the head. |
 | `selected` | The selected object, an index into `doc.objects`, or null. |
 | `edits` | `{ unsaved, unapplied }`: the paths of the files whose text is not saved, and of those whose text is not applied. |
 | `command(id)` | Run a command, as its menu item does. |
@@ -267,16 +280,84 @@ Module scope hides the page's state from tests and the console, so `window.viewe
 
 ## File pool and settings storage
 
-`pool.js` manages the Library tab (the stable IDs remain `tab-files`/`pane-files`): Files, ordered desktop PATH groups, and immutable Built-in packages. Opened files join Files; Include only adds, and Exclude leaves an open root visible. Files starts expanded, PATH/Built-in collapsed; collapse state stays in memory. A separate single temporary row retains clipboard content and applied edits without entering search. Root-file rows highlight across groups, independently of the Netlist include tab. Shells supply `bundledFiles`, `include`, `setPool`, a web `poolItem`, and (desktop only) `pickPath`/`pathPackages`; the native enumeration calls `rnl_cli::provider::directory_packages` directly. PATH rescans when Library is shown and after PATH changes; `onInclude` delivers dropped folders and test file-input selections. Search changes rebuild the applied document without dropping pending edits. Built-in sources carry `readonly`, which editing, saving and solving honor.
+`pool.js` manages the Library tab (the stable IDs remain `tab-files`/`pane-files`): Files, ordered desktop PATH groups, and immutable Built-in packages. Opened files join Files; Include only adds, and Exclude leaves an open root visible. Files starts expanded, PATH/Built-in collapsed; collapse state stays in memory. A separate single temporary row retains clipboard content and applied edits without entering search. Root-file rows highlight across groups, independently of the source file shown in Netlist. Shells supply `bundledFiles`, `include`, `setPool`, a web `poolItem`, and (desktop only) `pickPath`/`pathPackages`; native PATH enumeration lists recognized netlists as well as `.rnl` packages, directly and in numeric version subdirectories. Package lookup keeps its existing directory precedence. PATH rescans when Library is shown and after PATH changes; `onInclude` delivers dropped folders and test file-input selections. Search changes rebuild the applied document without dropping pending edits. Built-in sources carry `readonly`, which editing, saving and solving honor.
 
 `util.startSettings(shell)` runs before any initial view state is applied. Desktop shells supply `loadSettings(legacy)` and `saveSetting(key, value)`; the native settings file is authoritative after one successful migration. Writes are serialized and native builds/solves await them. Web and test shells without these methods keep using browser storage. The Library PATH groups and other settings use this one store. See the desktop and web READMEs for lifetime and lookup semantics.
 
 ## Navigation and new windows
 
-Every user action that changes the displayed circuit must call `navigate(target, { newWindow })` in `navigation.js`. Do not call `showLevel` or change the hierarchy path directly from a new click or key handler. Rendering/rebuilding and restoring a session are the internal exceptions. A target identifies its source (for another file), its hierarchy path and, when needed, an object to select. Instance double clicks, the open badge, E/Enter, Ctrl+E/Backspace, path segments and their overflow menu, Hierarchy rows, Subcircuits rows, Library files and cross-level selections in the text all use this entry point. Not drawn rows select objects on their existing level and have no cross-level jump.
+The unmodified number keys open the sidebar and select its view: **1 Library, 2 Netlist, 3 Hierarchy, 4 Symbol, 5 Not drawn, 6 Solve** (desktop only). Each tab carries its number at the upper left. View > Side Panels and Help > Keyboard Shortcuts list them too. These page-handled keys work from the drawing, tabs and navigation lists, but leave text inputs, selectors, editors, dialogs and IME composition alone. The desktop Solve tab is available before any solve and shows an empty-state hint; key 6 never starts a solve (F9 does).
+
+Every user action that changes the displayed circuit must call `navigate(target, { newWindow })` in `navigation.js`. Do not call `showLevel` or change the hierarchy path directly from a new click or key handler. Rendering/rebuilding and restoring a session are the internal exceptions. A target identifies its source, visit history and, when needed, an object to select. Crossing to a circuit owned by another file reopens that file as an independent entry and adds it to Files Library; only its own includes and the current Auto Include setting supply definitions. The history carries sources and circuit names, never a compiled document or an include closure. Only descent appends to it; tree/index/text/file navigation starts a new head. Ascend and breadcrumb clicks restore the corresponding prefix and view. Reload preserves valid visits, dropping a stale chain if a same-file ancestor was removed. Instance double clicks, the open badge, E/Enter, Ctrl+E/Backspace, path segments and their overflow menu, Hierarchy rows, Subcircuits rows, Library files and cross-level selections in the text all use this entry point. Not drawn rows select objects on their existing level and have no cross-level jump.
 
 Hold Shift during any of those actions to open the target in another viewer and preserve the original circuit, path, selection and buffers. Shift+E and Shift+Enter run Edit › Open Subcircuit in New Window…, enabled only for an openable selected instance. File › New Window copies the current source, path, selection and Library pool. Library file clicks retain the Library tab. Help › Keyboard Shortcuts lists the new keys. Ctrl+Q uses the physical Control key on macOS too, avoiding Cmd+Q's system Quit binding; other Ctrl shortcuts retain the existing Cmd mapping.
 
 Desktop shells start the same executable as an independent process, passing a temporary JSON file with `--session FILE`. The child reads and deletes it, restores its Library and target, and opens 24 logical pixels from the parent. Disk sources are read from disk; applied unsaved changes trigger the specified warning before opening. Clipboard sources retain their applied text. Settings are read once at startup; each changed key is persisted by a locked read/modify/replace of `settings.json`, so independent writers preserve other keys. Startup skips unchanged settings writes.
 
 Web shells synchronously reserve a new tab with `window.open`. A random one-use token, an exact origin check and matching opener/child references bind the ready/session `postMessage` exchange. Local files and the pool are serialized as text; applied document text takes precedence and unapplied editor text stays behind. The child drops its opener after receiving the session. A blocked pop-up or expired handoff is explained in a dialog. Sidebar context menus are suppressed except in editable controls.
+
+
+### Auto Include and Reload Library
+
+File > Auto Include and the Netlist checkbox share a persisted setting, on by default. Normal explicit includes always resolve first. With Auto Include enabled, undefined subcircuit instances use a session index of the current Library files (including desktop PATH netlists). New library files are indexed once using the host parser, with SPICE's case-insensitive and Spectre's case-sensitive names. Repeated lookups do not rescan unrelated files. Unique definitions are imported using the normal include reader, including relative dependencies and model cards; dependencies can themselves be resolved from the index. Source text and line numbers are preserved, and each automatically resolved subcircuit has a warning naming its source file in Problems. The same configurable provider is used for native Solve.
+
+Multiple definitions, including two in the same file, are reported as conflicts rather than chosen by PATH order. Auto Include also refuses a file that would redefine a subcircuit already loaded or selected in the same pass. Explicit includes choose the intended definition; sectioned libraries still require an explicit section selection. An included definition reached through several Library items counts as one definition.
+
+When a Library item discovers a definition through an include, the index also checks and caches the defining file as an independent import target. Auto Include imports that file and its dependencies, rather than the enclosing testbench, so it does not bring unrelated top-level circuits or a back-reference to the opened file into the document. A definition reached through an explicitly selected library section retains the selecting wrapper. These import targets follow the same refresh, reload and applied-edit invalidation as the Library index.
+
+File > Reload Library rescans PATH, rereads all current Library files (packages included), removes stale or unreadable definitions, rebuilds the index and the applied document, and preserves unapplied editor text. Failed reads appear beneath Library. Applied library edits use a document-local index overlay, without contaminating the saved session index. The web shell caches library text and indexes it in its Worker when included; Reload Library rereads available handles and refetches public packages. Browser-selected File objects remain snapshots: reselect changed local files to supply their new contents.
+
+### Source display and folding
+
+Netlist shows the current source path as plain text, with a shrinking directory portion and the filename kept at the end. It follows circuit navigation; explicit source navigation through Problems or include links shows that file instead. Controls occupy the row below the path and wrap in narrow panes. The filename's unsaved marker covers changes in any source file; its tooltip names them. Resolved explicit include filenames are links, using the host parser's resolved file identity (including selected library sections). Clicking opens the included file independently, including model/parameter-only files; Shift opens that target in a new viewer. Neither action inherits the parent file’s include context.
+
+Selected netlist names change text colour (including their syntax pieces), without a highlight fill. Active RNL records have a light blue background; lines with parser-recognized free text have a deeper blue. **RNL only** shows RNL lines; its subordinate **Semantics only** option narrows them to free-text lines and is disabled when RNL only is off. Quoted parameters, comments and disabled records do not count as free text. **Failed statements** controls visibility of grey failed/overridden rows and undrawn host statements in the current circuit. Filters preserve original line numbers and virtual scrolling; Find and copy use the filtered rows. Entering Edit Text disables filtering so editing shows the complete file. Filter preferences persist across restarts.
+
+The **Symbol** sidebar shows the symbol actually used by the parent instance when descending, or the subcircuit's own block symbol when entering directly from the index. Its embedded SVG viewer supports drag, wheel zoom, reset/zoom buttons, and Box, Origin, Pins and Labels toggles without changing the main drawing. Pin/label lists follow it; the original definition starts with an abbreviated source path and line range. Symbols are identified by runtime identity, so equally named definitions and overrides stay distinct. Nested usages contribute drawing graphics, not extra outer terminals. Generated default symbols say that they have no RNL source. The Document carries one preview per unique symbol (equivalent generated defaults share a preview); inspecting a symbol does not rebuild or solve the circuit. Not drawn's tab count counts undrawn host instances, excluding decorative usages and port markers, and disappears at zero.
+
+Source models, syntax checkpoints and rows are prepared only when a file is viewed. Subcircuit blocks have guide lines and +/- gutter buttons, including definitions in unselected library sections. Folding preserves original line numbers and full-source copy; find and diagnostic navigation expand hidden destinations. Virtual scrolling maps visible rows to logical lines. Unchanged reloads keep folds, and edit mode shows the complete buffer at the corresponding source line.
+
+Selecting an existing Library/PATH row reuses its index. Include of a replacement file and Reload Library invalidate definitions; an auto-include pass validates a library's complete definition list only once even when many missing masters come from it.
+
+### Side Panels menu
+
+View > Side Panels marks only the currently visible pane with a check. Hide collapses the sidebar, clears all pane marks and is disabled while collapsed. Tabs, number keys and restored layout update this same state. Ctrl+B still toggles the sidebar and Ctrl+Shift+M folds Problems; these are shortcut-only commands, separate from the menu entries in `commands.json`.
+
+### UI languages
+
+View > Language switches English / 简体中文 immediately, in both the web page and desktop native menus. The first start follows the system/browser's first preferred language; a user choice is saved with the other viewer settings. Embeds use their isolated settings and system language. Changing language only refreshes bound UI text and attributes: document identities, rendering, unsaved buffers, selection and viewport stay intact.
+
+`i18n.js` uses English source text as a stable catalog key and fallback, with Simplified Chinese in `locales/zh-CN.json`. Mark UI messages with `m("Text")` or a tagged template such as `` m`Open ${filename}` ``. Use `setText`, `append` and `setAttr` to bind the message to a text node or attribute. Keep the outer template marked when nesting translated fragments. `setAttr(node, name, null)` removes an attribute and its binding. The initial static HTML is bound once, before any user document is loaded. Desktop menu labels and native file chooser titles use the same catalog.
+
+Keep action tokens, menu IDs, shell return types, solver options, netlist/source text, filenames and parser/solver diagnostic payloads raw. Translate their surrounding UI only; dialog buttons render a translated label but return the original action token. Do not construct HTML from translated strings. Add catalog entries for new messages and run `i18n.spec.js`, plus the affected UI tests. Real web Save and the desktop smoke test cover the shell boundaries.
+
+
+### Idle preloading (desktop)
+
+File > Memory Cache also controls **Preload nearby netlists while idle**, enabled by default.
+After 1.5 seconds without pointer, wheel or keyboard input, the scheduler walks the currently
+shown subcircuit tree breadth first (direct children first), then the Library/PATH netlists.
+It deduplicates cycles/files and limits each plan to 128 candidates. This reads, interprets and
+renders each candidate as an independent entry with the current Auto Include setting: visit
+history and the parent file's includes never supply its scope. Preparation neither navigates nor
+adds hypothetical files to Files. It does not invoke the placement solver or write files.
+
+One separate native compiler runs at a time, using Windows background processing priority.
+Between jobs it rests for at least 1.5 seconds and three times the preceding job's duration,
+targeting roughly 25% of one core across repeated jobs, not a hard instantaneous CPU limit.
+New jobs pause while interacting, hidden, editing, unsaved, solving or displaying a dialog/preview.
+Foreground navigation and library changes invalidate in-flight results. A compiler already
+interpreting can finish at background priority; foreground commands never wait for it.
+
+Completed JSON, SVG and lazy Not drawn data transfer into the existing bounded cache. WStr's
+immutable strings use Arc so the exported drawing model is Send; interpreter contexts remain
+thread-local. Speculation uses spare cache space only and is evicted before visited entries.
+Cache hits still validate complete observed inputs, including missing files, package resolution
+and Auto Include conflicts. Clear/disable, reload and generation checks prevent old work from
+repopulating invalidated results. Cached hits are reactivated only by an actual open.
+
+Speculation pauses below 1 GiB available system memory, skips inputs exceeding min(8 MiB,
+remaining cache budget / 8), and stops the current plan when cache space is exhausted. These
+limits bound retained results and speculative input, not the compiler's transient working set.
+Oversized files still open normally. The web shell continues using its existing Worker; it does
+not expose native PATH preloading or its memory-cache controls.

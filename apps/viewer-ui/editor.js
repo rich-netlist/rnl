@@ -1,5 +1,6 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // Editing the text (decision 0011): the netlist pane can be switched to edit, with a text box for
-// each file of the document, the tabs as they are. A change is shown as not applied until the user
+// each file of the document, following source navigation. A change is shown as not applied until the user
 // exits editing or chooses Apply and Exit Editing, which builds the Document again from the texts in memory, as
 // opening the files would, and draws it; solving remains a separate action. Nothing is
 // written to a file until the user saves (File > Save, and Save As on the desktop; on the web, Save
@@ -13,12 +14,12 @@ import * as edits from "./edits.js";
 import { shell } from "./shell.js";
 import { previewing } from "./solve.js";
 import { doc } from "./state.js";
-import { fileShown, fileViews, showFile, sourceLineHeight, refreshSource } from "./text.js";
+import { fileShown, fileViews, showFile, sourceLineHeight, refreshSource, setRnlOnly } from "./text.js";
+import { setPathText, sourcePath } from "./source-path.js";
 import { $ } from "./util.js";
 
 const source = $("source");
 const pane = $("pane-netlist");
-const tabs = $("file-tabs");
 
 /** Whether the netlist pane is switched to edit. */
 export let editing = false;
@@ -45,7 +46,7 @@ function keepPosition() {
       const v = fileViews[k];
       const height = sourceLineHeight(k);
       const scroll = k === fileShown ? source.scrollTop : v?.scroll || 0;
-      positions.set(file.path, { ...old, line: firstLine(scroll, height) });
+      positions.set(file.path, { ...old, line: v?.pendingLine ?? v?.lineAt(firstLine(scroll, height)) ?? firstLine(scroll, height) });
     }
   }
 }
@@ -61,8 +62,7 @@ function restorePosition() {
       e.area.scrollTop = e.scroll = 4 + p.line * (parseFloat(getComputedStyle(e.area).lineHeight) || 19);
       e.gutter.scrollTop = e.area.scrollTop;
     } else if (fileViews[k]) {
-      const height = sourceLineHeight(k);
-      fileViews[k].scroll = 4 + p.line * height;
+      fileViews[k].restoreLine(p.line);
       if (k === fileShown) source.scrollTop = fileViews[k].scroll;
     }
   }
@@ -84,7 +84,7 @@ export function renderEditors() {
       const e = makeEditor(path, doc.files[k].name);
       const was = kept.get(path) || { caret: 0, scroll: 0 };
       editors.set(path, e);
-      source.append(e.el);
+      append(source, e.el);
       e.area.value = edits.textOf(path);
       number(e);
       const caret = Math.min(was.caret, e.area.value.length);
@@ -121,8 +121,8 @@ function makeEditor(path, name) {
   area.autocomplete = "off";
   area.autocapitalize = "off";
   area.wrap = "off";
-  area.setAttribute("aria-label", `Text of ${name}`);
-  el.append(gutter, area);
+  setAttr(area, "aria-label", m`Text of ${name}`);
+  append(el, gutter, area);
   const e = { el, area, gutter, lines: 0, caret: 0, scroll: 0 };
   area.addEventListener("input", () => {
     edits.setText(path, area.value);
@@ -130,6 +130,9 @@ function makeEditor(path, name) {
     refreshEditing();
   });
   area.addEventListener("scroll", () => {
+    // WebKit can deliver a queued scroll after source navigation hides the textarea; its
+    // scrollTop then reads as zero. showEditor already saved the last visible position.
+    if (el.hidden) return;
     gutter.scrollTop = area.scrollTop;
     e.scroll = area.scrollTop;
   });
@@ -143,7 +146,7 @@ function number(e) {
   if (lines === e.lines) return;
   e.lines = lines;
   e.el.style.setProperty("--line-number-width", `${Math.max(4.5, String(lines).length + 1.4)}em`);
-  e.gutter.textContent = Array.from({ length: lines }, (_, k) => k + 1).join("\n");
+  setText(e.gutter, Array.from({ length: lines }, (_, k) => k + 1).join("\n"));
 }
 
 /** Show the text box of the file at index `f` when the pane is in edit, and no other. */
@@ -183,8 +186,10 @@ export function revealInEditor(f, line) {
   e.area.scrollTop = Math.max(0, (line - 1) * height - e.area.clientHeight / 2 + height / 2);
 }
 
-/** Show what the bar above the text says, the marks of the tabs, and tell the shell whether changes are not saved. */
+/** Show the document's edit state, and tell the shell whether changes are not saved. */
 export function refreshEditing() {
+  $("rnl-only").disabled = editing;
+  $("semantics-only").disabled = editing || !$("rnl-only").checked;
   setEnabled("find-text", !!doc && !editing);
   const unapplied = edits.unappliedPaths();
   const dirty = edits.dirtyPaths();
@@ -192,17 +197,17 @@ export function refreshEditing() {
   const state = $("edit-state");
   state.hidden = !editing;
   state.dataset.state = unapplied.length > 0 ? "unapplied" : dirty.length > 0 ? "unsaved" : "clean";
-  state.textContent = unapplied.length > 0 ? "Changes not applied yet" : dirty.length > 0 ? "Applied, not saved" : "No changes";
+  setText(state, unapplied.length > 0 ? m("Changes not applied yet") : dirty.length > 0 ? m("Applied, not saved") : m("No changes"));
   $("apply-edits").hidden = !editing;
   $("apply-edits").disabled = exiting;
-  [...tabs.children].forEach((tab, k) => {
-    const path = doc && doc.files[k] ? doc.files[k].path : "";
-    tab.dataset.unsaved = String(dirty.includes(path));
-    tab.dataset.unapplied = String(unapplied.includes(path));
-    tab.title = [path, unapplied.includes(path) ? "changes not applied" : "", dirty.includes(path) ? "not saved" : ""]
-      .filter(Boolean)
-      .join(", ");
-  });
+  const name = $("netlist-file");
+  const file = doc?.files[fileShown];
+  const full = file ? sourcePath(doc, file) : '';
+  setPathText(name, full);
+  name.dataset.unsaved = String(dirty.length > 0);
+  name.dataset.unapplied = String(unapplied.length > 0);
+  setAttr(name, "title", dirty.reduce((text, path) => m`${text}
+${path}: ${unapplied.includes(path) ? m("changes not applied; ") : ""}${m("not saved")}`, full));
   const any = dirty.length > 0;
   if (any !== notified) {
     notified = any;
@@ -213,7 +218,7 @@ export function refreshEditing() {
 /** A line in the status bar that goes after a few seconds: what was done. */
 function note(text) {
   const el = $("note");
-  el.textContent = text;
+  setText(el, text);
   el.hidden = text === "";
   clearTimeout(noteTimer);
   if (text) noteTimer = setTimeout(() => note(""), 6000);
@@ -225,17 +230,18 @@ export async function toggleEdit() {
   if (modal()) return;
   if (!editing) {
     if (!doc) {
-      await inform({ title: "Edit Text", paragraphs: ["Open a netlist first: File › Open (Ctrl+O)."] });
+      await inform({ title: m("Edit Text"), paragraphs: [m("Open a netlist first: File › Open (Ctrl+O).")] });
       return;
     }
     if (previewing()) {
       await inform({
-        title: "Edit Text",
-        paragraphs: ["A solve is shown as a preview, which is not edited. Solve › Close Preview shows the netlist again."],
+        title: m("Edit Text"),
+        paragraphs: [m("A solve is shown as a preview, which is not edited. Solve › Close Preview shows the netlist again.")],
       });
       return;
     }
     keepPosition();
+    setRnlOnly(false);
     editing = true;
     setCheck("toggle-edit", true);
     renderEditors();
@@ -268,7 +274,7 @@ export async function applyChanges() {
   keepPosition();
   try {
     const ok = edits.unappliedPaths().length === 0 || await applyEdits();
-    if (ok) note("Changes applied; editing closed.");
+    if (ok) note(m("Changes applied; editing closed."));
     return ok;
   } finally {
     exiting = false;
@@ -280,8 +286,8 @@ export async function applyChanges() {
 export async function discardChanges() {
   if (!editing || exiting || modal()) return;
   if (edits.unappliedPaths().length && await decide({
-    title: "Discard Changes",
-    paragraphs: ["Discard the changes that have not been applied and exit editing?"],
+    title: m("Discard Changes"),
+    paragraphs: [m("Discard the changes that have not been applied and exit editing?")],
     action: "Discard Changes",
   }) !== "Discard Changes") return;
   keepPosition();
@@ -311,7 +317,7 @@ export async function save(overwrite = false) {
   if (shell.saveAs && opened && opened.text !== undefined) return saveAs();
   const files = filesToSave();
   if (files.length === 0) {
-    note(edits.dirtyPaths().length === 0 ? "No changes to save." : "");
+    note(edits.dirtyPaths().length === 0 ? m("No changes to save.") : "");
     return true;
   }
   try {
@@ -319,10 +325,12 @@ export async function save(overwrite = false) {
     if (result !== null && typeof result === "object") return changedOnDisk(result.changed);
     edits.markSaved(files.map((f) => f.path));
     refreshEditing();
-    note(result || "Saved.");
+    note(shell.platform === "web"
+      ? files.length === 1 ? m`Downloaded ${files[0].name.split("/").pop()}.` : m`Downloaded ${files.length} files.`
+      : result || m("Saved."));
     return true;
   } catch (e) {
-    await inform({ title: "Save", paragraphs: [`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
+    await inform({ title: m("Save"), paragraphs: [m`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
     return false;
   }
 }
@@ -335,10 +343,10 @@ export async function save(overwrite = false) {
 async function changedOnDisk(names) {
   const many = names.length > 1;
   const choice = await decide({
-    title: "File Changed on Disk",
+    title: m("File Changed on Disk"),
     paragraphs: [
-      `${many ? "These files were" : "This file was"} changed by another program since the viewer read ${many ? "them" : "it"}: ${names.join(", ")}.`,
-      "Nothing was saved. Overwrite writes the text in the viewer over what is on disk; Reload reads the files again and drops the changes made here.",
+      m`${many ? "These files were" : "This file was"} changed by another program since the viewer read ${many ? "them" : "it"}: ${names.join(", ")}.`,
+      m("Nothing was saved. Overwrite writes the text in the viewer over what is on disk; Reload reads the files again and drops the changes made here."),
     ],
     action: "Overwrite",
     others: ["Reload"],
@@ -360,12 +368,12 @@ export async function saveAs() {
   if (currentSource()?.readonly) return false;
   if (!doc || !shell.saveAs || modal()) return false;
   const entry = doc.files[0];
-  const title = "Save As";
+  const title = m("Save As");
   if (!entry) return false;
   if (fileShown !== 0) {
     await inform({
       title,
-      paragraphs: ["Save As saves the netlist that was opened, the first file. An included file is saved where it is with File › Save."],
+      paragraphs: [m("Save As saves the netlist that was opened, the first file. An included file is saved where it is with File › Save.")],
     });
     return false;
   }
@@ -373,7 +381,7 @@ export async function saveAs() {
   if (others.length > 0) {
     await inform({
       title,
-      paragraphs: [`Save the other files with changes first, with File › Save: ${others.map((f) => f.name).join(", ")}.`],
+      paragraphs: [m`Save the other files with changes first, with File › Save: ${others.map((f) => f.name).join(", ")}.`],
     });
     return false;
   }
@@ -382,10 +390,10 @@ export async function saveAs() {
     if (!written) return false;
     edits.markSaved([entry.path]);
     await openSource(written, false);
-    note(`Saved as ${written.name}.`);
+    note(m`Saved as ${written.name}.`);
     return true;
   } catch (e) {
-    await inform({ title, paragraphs: [`The netlist was not saved: ${e instanceof Error ? e.message : String(e)}`] });
+    await inform({ title, paragraphs: [m`The netlist was not saved: ${e instanceof Error ? e.message : String(e)}`] });
     return false;
   }
 }
@@ -404,8 +412,8 @@ export async function confirmLeave(what, signal) {
   const can = shell.platform !== "web" && shell.save;
   const choice = await decide({
     signal,
-    title: "Changes Not Saved",
-    paragraphs: [`${files.length === 1 ? "This file has" : "These files have"} changes that are not saved: ${names}.`, `Do you want to ${what}?`],
+    title: m("Changes Not Saved"),
+    paragraphs: [m`${files.length === 1 ? "This file has" : "These files have"} changes that are not saved: ${names}.`, m`Do you want to ${what}?`],
     action: can ? "Save" : "Discard Changes",
     others: can ? ["Don't Save"] : [],
   });
@@ -416,7 +424,7 @@ export async function confirmLeave(what, signal) {
 
 /** The window is asked to close (desktop): when it may, the shell quits. */
 export async function closeRequested() {
-  if (await confirmLeave("close the window")) shell.quit();
+  if (await confirmLeave(m("close the window"))) shell.quit();
 }
 
 $("apply-edits").addEventListener("click", () => applyChanges());

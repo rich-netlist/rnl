@@ -21,10 +21,15 @@ use serde::Serialize;
 use crate::primitive::{self, Primitive};
 use crate::BuildOptions;
 
+mod symbols;
+pub use symbols::{InspectedLabel, InspectedPin, InspectedSymbol};
+
 /// What a viewer shows of a document, as [`crate::build`] gives it.
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Document {
+    /// Symbols used by subcircuit instances or defined by subcircuits, once per runtime identity.
+    pub symbols: Vec<InspectedSymbol>,
     /// The entry as the frontend named it, for building again.
     pub path: String,
     /// Its file name, for the title bar.
@@ -54,6 +59,10 @@ pub struct Document {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Level {
+    /// Terminal names in subcircuit declaration order.
+    pub ports: Vec<String>,
+    /// The subcircuit's own block symbol, an index into `Document::symbols`.
+    pub symbol: Option<usize>,
     /// The host level drawn, as `Object::level` names it.
     pub host: usize,
     pub title: String,
@@ -149,14 +158,15 @@ pub struct UnplacedDrawing {
 /// The drawings of the objects that a Document lists without a position, kept to give on request
 /// instead of carried in the Document: a netlist with no positions has every object in the list,
 /// and the page shows a few of them at a time. [`crate::build_drawn`] makes them with the Document.
-/// They hold the items of the runtime's model, which are not `Send`, so a frontend that builds on
-/// one thread keeps them there.
+/// They own only the exported model, so a background compiler may transfer them to a frontend.
 pub struct Drawings {
     levels: Vec<DrawnLevel>,
     render: rnl_render::RenderOptions,
     svg: bool,
     primitives: bool,
 }
+
+mod memory;
 
 /// The unplaced objects of a level: the items to draw, the symbols they are drawn with, and their
 /// names as the Document lists them.
@@ -235,6 +245,8 @@ fn draw_alone(
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Child {
+    /// The symbol this instance actually uses in its parent, including parent overrides.
+    pub symbol: Option<usize>,
     pub instance: String,
     /// The subcircuit it instantiates, as written.
     pub master: String,
@@ -272,6 +284,10 @@ pub struct Hit {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SourceFile {
+    /// Explicit include directives and the files the host resolver actually loaded.
+    pub includes: Vec<SourceInclude>,
+    /// Physical lines containing free text in active, syntactically valid RNL members (1-based).
+    pub semantics: Vec<u32>,
     /// The file as the runtime knows it: relative to the opened file's directory when it is in it
     /// or below, otherwise as the provider names it. With a rooted or absolute entry, the entry's
     /// directory joined with this path (`rnl_runtime::source::join`) is the file in the
@@ -405,7 +421,7 @@ pub(crate) fn document(
             .map(|i| {
                 let master = i.model.clone().unwrap_or_default();
                 let level = r.doc.subckt(&master).and_then(|h| drawn.get(&h).copied());
-                Child { instance: i.name.clone(), master, level }
+                Child { instance: i.name.clone(), master, level, symbol: None }
             })
             .collect();
     }
@@ -417,6 +433,7 @@ pub(crate) fn document(
         }
     }
 
+    let symbols = symbols::inspect(r, &mut levels);
     let diagnostic = |d: &Diag, sink: &Sink| {
         let (file, line, col) = match &d.loc {
             Some(l) => (l.file.clone(), l.line, l.col),
@@ -444,6 +461,7 @@ pub(crate) fn document(
     let diagnostics = r.diagnostics().into_iter().map(|d| diagnostic(d, &r.sink)).collect();
     let (objects, spans) = (ix.objects, ix.spans);
     Document {
+        symbols,
         path: entry.to_string(),
         name: file_name(entry).to_string(),
         dialect: r.doc.dialect.name.clone(),
@@ -457,12 +475,22 @@ pub(crate) fn document(
     }
 }
 
+#[derive(Serialize, Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct SourceInclude {
+    pub line: u32,
+    /// Index in Document.files.
+    pub file: usize,
+}
+
 /// The host files with the places of their records; the opened file comes first.
 fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<SourceFile> {
     let mut files: Vec<SourceFile> = doc
         .sources
         .iter()
         .map(|(p, text)| SourceFile {
+            includes: Vec::new(),
+            semantics: Vec::new(),
             path: p.clone(),
             name: shown(p),
             text: text.clone(),
@@ -476,18 +504,53 @@ fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<Sourc
         files.insert(0, f);
     }
     for lv in &doc.levels {
+        if let Some(site) = &lv.include_site {
+            if let Some(target) = files.iter().position(|f| f.path == lv.file) {
+                if let Some(file) = files.iter_mut().find(|f| f.path == site.file) {
+                    let link = SourceInclude { line: site.line, file: target };
+                    if !file.includes.contains(&link) {
+                        file.includes.push(link);
+                    }
+                }
+            }
+        }
         for rec in &lv.records {
             let Some(f) = files.iter_mut().find(|f| f.path == rec.file) else { continue };
             let n = rec.text.chars().count();
             let (a, b) = (rec.loc(0), rec.loc(n.saturating_sub(1)));
             f.records.push([a.line, a.col, b.line, b.col]);
+            if let Some(body) = rnl_runtime::syntax::parse_record(&rec.text).body {
+                semantic_lines(&body, rec, &mut f.semantics);
+            }
         }
     }
     for f in &mut files {
         f.records.sort();
         f.records.dedup();
+        f.semantics.sort_unstable();
+        f.semantics.dedup();
     }
     files
+}
+
+fn semantic_lines(set: &rnl_runtime::syntax::SetExpr, rec: &rnl_runtime::host::Record, out: &mut Vec<u32>) {
+    for member in &set.members {
+        if member.error.is_some() {
+            continue;
+        }
+        out.extend(
+            member
+                .free_words
+                .iter()
+                .filter(|(word, _)| word.chars().any(char::is_alphanumeric))
+                .map(|(_, off)| rec.loc(*off).line),
+        );
+        for arg in member.segments.iter().flat_map(|s| &s.args) {
+            if let rnl_runtime::syntax::ObjExpr::Set(body) = &arg.obj {
+                semantic_lines(body, rec, out);
+            }
+        }
+    }
 }
 
 struct Index<'a> {
@@ -683,6 +746,8 @@ impl<'a> Index<'a> {
             });
         }
         Level {
+            ports: self.doc.levels[lv.level].ports.clone(),
+            symbol: None,
             host: lv.level,
             title: lv.title.clone(),
             kind: lv.kind,
@@ -1169,6 +1234,7 @@ R1 a b 1k
         let (root, w) = (build(""), build("/w"));
         let names: Vec<(&str, &str)> = root.files.iter().map(|f| (f.path.as_str(), f.name.as_str())).collect();
         assert_eq!(names, [("top.sp", "top.sp"), ("x.inc", "x.inc"), ("sub/y.inc", "sub/y.inc")]);
+        assert_eq!(root.files[0].includes, [SourceInclude { line: 2, file: 1 }, SourceInclude { line: 3, file: 2 }]);
         assert_eq!(root.missing, ["/gone.inc"]);
         // every diagnostic is at a line of one of the files, and names it as the file's tab does
         for x in &root.diagnostics {
@@ -1187,6 +1253,32 @@ R1 a b 1k
         };
         assert_eq!(json(&root), json(&w));
         assert_eq!((w.path.as_str(), w.missing.as_slice()), ("/w/top.sp", ["/w/gone.inc".to_string()].as_slice()));
+    }
+
+    #[test]
+    fn include_links_use_resolved_paths_sections_and_exclude_auto_includes() {
+        use rnl_runtime::source::MemoryProvider;
+        let files = MemoryProvider::new()
+            .with("/w/top.sp", "* t\n.include a/x.inc\n.include b/x.inc\n.lib lib.inc tt\n")
+            .with("/w/a/x.inc", ".subckt a p n\n.ends\n")
+            .with("/w/b/x.inc", ".subckt b p n\n.ends\n")
+            .with("/w/lib.inc", ".lib tt\n.model n nmos\n.endl\n")
+            .with("/w/auto.inc", ".subckt auto p n\n.ends\n");
+        let host =
+            rnl_host_spice::read_with_includes("/w/top.sp", &files, &mut Sink::default(), &["/w/auto.inc".into()])
+                .unwrap();
+        let shown = source_files(&host, &str::to_string);
+        let targets: Vec<_> = shown[0].includes.iter().map(|i| (i.line, shown[i.file].path.as_str())).collect();
+        assert_eq!(targets, [(2, "a/x.inc"), (3, "b/x.inc"), (4, "lib.inc")]);
+
+        let files = MemoryProvider::new()
+            .with("/w/top.scs", "simulator lang=spectre\ninclude \"a/x.scs\" section=tt\ninclude \"b/x.scs\"\n")
+            .with("/w/a/x.scs", "section tt\nmodel n mos1\nendsection\n")
+            .with("/w/b/x.scs", "subckt b p n\nends b\n");
+        let host = rnl_host_spectre::read("/w/top.scs", &files, &mut Sink::default()).unwrap();
+        let shown = source_files(&host, &str::to_string);
+        let targets: Vec<_> = shown[0].includes.iter().map(|i| (i.line, shown[i.file].path.as_str())).collect();
+        assert_eq!(targets, [(2, "a/x.scs"), (3, "b/x.scs")]);
     }
 
     #[test]

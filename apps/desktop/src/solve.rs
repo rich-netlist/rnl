@@ -16,7 +16,7 @@ use rnl_cli::FsProvider;
 use rnl_solver::{SolverOptions, OBJECTIVES};
 use rnl_view::Document;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, State, WebviewWindow};
+use tauri::{Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::files::{self, Edits};
@@ -114,6 +114,8 @@ pub async fn solve_preview(
     window: WebviewWindow,
     solves: State<'_, Solves>,
     preferences: State<'_, crate::settings::Settings>,
+    library: State<'_, crate::library::Library>,
+    auto_include: Option<bool>,
     pool: Option<Vec<String>>,
     path: Option<String>,
     name: Option<String>,
@@ -122,6 +124,7 @@ pub async fn solve_preview(
     edits: Option<Edits>,
 ) -> Result<Solved, String> {
     let paths = preferences.paths()?;
+    let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let options = SolveOptions { solver: settings.unwrap_or_default().solver()?, ..SolveOptions::default() };
     let stop = Arc::new(AtomicBool::new(false));
@@ -145,17 +148,26 @@ pub async fn solve_preview(
                 let entry = path.to_string_lossy().into_owned();
                 // the text applied is what is solved, over the files on disk
                 let held = files::held(&entry, &edits.unwrap_or_default());
-                preview(&entry, &files::layered(&held, &disk), &options, &clock, &watch)
+                let layered = files::layered(&held, &disk);
+                let index = library.with_edits(&held, &layered);
+                let files = rnl_view::LibraryProvider {
+                    files: &layered,
+                    index: &index,
+                    enabled: auto_include.unwrap_or(false),
+                };
+                preview(&entry, &files, &options, &clock, &watch)
             }
             (None, Some(name), Some(text)) => {
                 let entry = format!("/{name}");
-                preview(
-                    &entry,
-                    &files::layered(&files::held_text(&entry, &text, &edits.unwrap_or_default()), &disk),
-                    &options,
-                    &clock,
-                    &watch,
-                )
+                let held = files::held_text(&entry, &text, &edits.unwrap_or_default());
+                let layered = files::layered(&held, &disk);
+                let index = library.with_edits(&held, &layered);
+                let files = rnl_view::LibraryProvider {
+                    files: &layered,
+                    index: &index,
+                    enabled: auto_include.unwrap_or(false),
+                };
+                preview(&entry, &files, &options, &clock, &watch)
             }
             _ => Err("nothing to solve: open a netlist first".to_string()),
         }
@@ -198,11 +210,16 @@ pub async fn save_solved_copy(window: WebviewWindow, solves: State<'_, Solves>) 
         None => dialog,
     };
     let one = one_file(&run);
+    let title = crate::menu::text(
+        window.app_handle(),
+        if one { "Save Solved Copy As" } else { "Save the Solved Files Into a Folder" },
+    );
+    let dialog = dialog.set_title(title);
     let chosen = tauri::async_runtime::spawn_blocking(move || {
         if one {
-            dialog.set_title("Save Solved Copy As").set_file_name(copy_name(&entry)).blocking_save_file()
+            dialog.set_file_name(copy_name(&entry)).blocking_save_file()
         } else {
-            dialog.set_title("Save the Solved Files Into a Folder").blocking_pick_folder()
+            dialog.blocking_pick_folder()
         }
     })
     .await

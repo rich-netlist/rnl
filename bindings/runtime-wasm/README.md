@@ -218,3 +218,5 @@ In viewers, include the package in Library; the web viewer offers the public pac
 the missing-package error when the exact version is published. In the CLI, use
 `python scripts/packages.py download`, then
 `rnl check file.sp --path .rnl-packages/analog-canvas-extensions/0.1`.
+
+Viewer library indexing is opt-in. `core.library({library: {reload: false}, pool: [...paths], files: {...}})` eagerly indexes new files and returns read errors; `reload: true` rebuilds all entries. Builds accept `auto_include: true` with the same pool and files. The browser's `library_prefix` maps canonical indexed paths into its isolated pool namespace; `library_edits` supplies canonical applied-text overrides. No switch changes ordinary builds or CLI parsing. Library updates preserve the last lazy drawing buffer.

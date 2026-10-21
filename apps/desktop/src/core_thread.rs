@@ -1,21 +1,22 @@
 //! The thread that builds the documents. A build keeps the drawings of the objects it lists without
 //! a position ([`rnl_view::build_drawn`]) for the page to ask for as it scrolls; they hold what the
-//! model does, which is not `Send`, so they stay in the thread that built them, and every build and
-//! every request for drawings runs there, one after the other.
+//! model does. Foreground builds and requests for drawings run in order. Speculative builds run
+//! separately and transfer completed owned results to this thread without changing its active view.
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 
-use rnl_view::Drawings;
+use crate::build_cache::BuildCache;
 
-/// What the core thread runs, with the drawings of the last build it made.
-type Job = Box<dyn FnOnce(&mut Option<Drawings>) + Send>;
+/// What the core thread runs, with its result cache and the active document's drawings.
+type Job = Box<dyn FnOnce(&mut BuildCache) + Send>;
 
 /// The core thread, as a handle that can be cloned and sent to the threads of the commands.
 #[derive(Clone)]
 pub struct Core {
     jobs: Arc<Mutex<Sender<Job>>>,
+    pub preload: Arc<crate::preload::Control>,
 }
 
 impl Core {
@@ -25,22 +26,19 @@ impl Core {
         std::thread::Builder::new()
             .name("rnl-core".into())
             .spawn(move || {
-                let mut drawn = None;
+                let mut drawn = BuildCache::default();
                 for job in queue {
                     job(&mut drawn);
                 }
             })
             .expect("the core thread could not be started");
-        Core { jobs: Arc::new(Mutex::new(jobs)) }
+        Core { jobs: Arc::new(Mutex::new(jobs)), preload: Arc::default() }
     }
 
-    /// Run `job` in the core thread, with the drawings of the last build, and wait for its result:
+    /// Run `job` in the core thread, with its cache and active drawings, and wait for its result:
     /// call it from a thread that may block, such as a command's `spawn_blocking`. A job that
     /// panics is an error, and the thread goes on.
-    pub fn run<T: Send + 'static>(
-        &self,
-        job: impl FnOnce(&mut Option<Drawings>) -> T + Send + 'static,
-    ) -> Result<T, String> {
+    pub fn run<T: Send + 'static>(&self, job: impl FnOnce(&mut BuildCache) -> T + Send + 'static) -> Result<T, String> {
         let (reply, result) = channel();
         let job: Job = Box::new(move |drawn| {
             let _ = reply.send(catch_unwind(AssertUnwindSafe(|| job(drawn))));
@@ -53,7 +51,7 @@ impl Core {
 
 #[cfg(test)]
 mod tests {
-    use rnl_view::{BuildOptions, MemoryProvider};
+    use rnl_view::MemoryProvider;
 
     use super::*;
 
@@ -62,9 +60,14 @@ mod tests {
     fn build(core: &Core) -> Vec<String> {
         core.run(|drawn| {
             let files = MemoryProvider::new().with("/a.sp", TEXT);
-            let (doc, kept) = rnl_view::build_drawn("/a.sp", &files, &BuildOptions::default()).unwrap();
-            *drawn = Some(kept);
-            doc.levels[0].unplaced.iter().map(|u| u.name.clone()).collect()
+            let built = drawn.build("/a.sp", &files, false).unwrap();
+            let doc: serde_json::Value = serde_json::from_str(&built.json).unwrap();
+            doc["levels"][0]["unplaced"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|u| u["name"].as_str().unwrap().to_string())
+                .collect()
         })
         .unwrap()
     }
@@ -75,18 +78,18 @@ mod tests {
         let asked = |core: &Core, names: Vec<String>| {
             core.run(move |drawn| {
                 let items: Vec<usize> = (0..names.len()).collect();
-                drawn.as_ref().map(|d| d.unplaced(0, &items, &names))
+                drawn.unplaced(0, &items, &names)
             })
             .unwrap()
         };
         // none before a build kept them
-        assert!(asked(&core, vec![]).is_none());
+        assert!(asked(&core, vec![]).is_err());
         let names = build(&core);
         assert!(!names.is_empty());
         // asked for by a thread of another handle, as the commands do
         let other = core.clone();
         let (n, drawings) = std::thread::spawn(move || {
-            let drawings = asked(&other, names.clone()).unwrap().unwrap();
+            let drawings = asked(&other, names.clone()).unwrap();
             (names, drawings)
         })
         .join()
@@ -95,7 +98,7 @@ mod tests {
         assert!(drawings.iter().all(|d| d.svg.is_some()));
         // names of another build are refused
         let wrong = vec!["R9".to_string(); n.len()];
-        let e = asked(&core, wrong).unwrap().unwrap_err();
+        let e = asked(&core, wrong).unwrap_err();
         assert!(e.contains("built again"), "{e}");
     }
 

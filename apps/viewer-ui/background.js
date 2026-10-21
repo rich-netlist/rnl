@@ -55,6 +55,6 @@ export function setBackground(mode, { persist = true } = {}) {
   }
   const ink = style.getPropertyValue("--fg").trim();
   document.body.style.setProperty("--drawing-ink", dark ? darkColour(ink) : ink);
-  for (const svg of document.querySelectorAll("#canvas > svg, .thumb svg")) colourDrawing(svg);
+  for (const svg of document.querySelectorAll("#canvas > svg, .thumb svg, .symbol-preview svg")) colourDrawing(svg);
   refreshGridColours();
 }

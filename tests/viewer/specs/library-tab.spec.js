@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 import fs from "node:fs";
 import path from "node:path";
 import { test, expect } from "../viewer.js";
@@ -50,7 +51,7 @@ for (const platform of ["desktop", "web"]) {
     // Include tabs change the text shown, never the Library's root highlight.
     const root = await files(page).locator(".current").getAttribute("data-path");
     await page.locator("#tab-netlist").click();
-    await page.locator("#file-tabs button").nth(1).click();
+    await showSource(page, 1);
     await page.locator("#tab-files").click();
     await expect(files(page).locator(".current")).toHaveAttribute("data-path", root);
     await files(page).locator(".lib-toggle").click();
@@ -155,7 +156,7 @@ test("desktop: PATH groups scan on entry and changes, preserve collapse and high
   await expect(page.locator(".lib-path")).toHaveText(["/empty", "/pdk", "/missing", "/denied"]);
   await expect(pdk.locator(".lib-toggle")).toHaveAttribute("aria-expanded", "true");
   for (const dir of ["/empty", "/missing", "/denied"]) await group(page, `path:${dir}`).locator(".lib-toggle").click();
-  await expect(group(page, "path:/empty").locator(".lib-empty")).toHaveText("No .rnl packages found.");
+  await expect(group(page, "path:/empty").locator(".lib-empty")).toHaveText("No packages or netlists found.");
   await expect(group(page, "path:/missing").locator(".lib-warning")).toHaveText("Directory not found.");
   await expect(group(page, "path:/denied").locator(".lib-warning")).toHaveText("Permission denied (os error 13)");
   const warning = await group(page, "path:/missing").locator(".lib-warning").evaluate((el) => {

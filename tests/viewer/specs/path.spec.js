@@ -174,29 +174,27 @@ test("a subcircuit picked in the index is the root, with no up button; going dow
   await expect(page.locator("#up")).toBeHidden();
 });
 
-test("an instance picked in the tree shows the way to it from the top level", async ({ page }) => {
+test("a tree pick starts a new history head regardless of the structural ancestors", async ({ page }) => {
   await page.locator("#tab-hierarchy").click();
   const row = (p) => page.locator(`#tree .tree-row[data-path="${p}"]`);
   await row("0/0").locator(".twisty").click();
   await row("0/0/1").locator(".twisty").click();
   await row("0/0/1/0").click();
   await expect(page.locator("#level-name")).toHaveText("cell");
-  expect(await segments(page)).toEqual([TOP, "bank XK1", "block XB2", "cell XC1"]);
-  await expect(row("0/0/1/0")).toHaveClass(/\bactive\b/);
-  await expect(page.locator("#up-name")).toHaveText("block");
+  expect(await segments(page)).toEqual(["cell"]);
+  await expect(row("0/0/0/0")).toHaveClass(/\bactive\b/);
+  await expect(page.locator("#up")).toBeHidden();
 
   // the other way to cell
   await row("0/1").click();
-  expect(await segments(page)).toEqual([TOP, "cell XC9"]);
-  await expect(row("0/1")).toHaveClass(/\bactive\b/);
+  expect(await segments(page)).toEqual(["cell"]);
   await expect(row("0/0/1/0")).toHaveClass(/\bcurrent\b/);
   await expect(row("0/0/1/0")).not.toHaveClass(/\bactive\b/);
   await page.keyboard.press("Backspace");
-  expect(await segments(page)).toEqual([TOP]);
-  await expect(row("0")).toHaveClass(/\bactive\b/);
+  expect(await segments(page)).toEqual(["cell"]);
 });
 
-test("an object of another level selected in the text cuts the path back to its level, or starts it there", async ({ page, viewer }) => {
+test("an object of another level selected in the text starts a new history head", async ({ page, viewer }) => {
   await down(page, viewer, "XK1");
   await down(page, viewer, "XB2");
   await down(page, viewer, "XC1");
@@ -205,7 +203,7 @@ test("an object of another level selected in the text cuts the path back to its 
   // XB1's statement, on bank, which is on the path
   await viewer.line(14).locator(".no").click();
   await viewer.selected("instance XB1 in bank");
-  expect(await segments(page)).toEqual([TOP, "bank XK1"]);
+  expect(await segments(page)).toEqual(["bank"]);
   // R1's, on leaf, which is not: leaf is the root
   await viewer.line(3).locator(".no").click();
   await viewer.selected("instance R1 in leaf");
@@ -224,7 +222,7 @@ test("an object of another level selected in the text cuts the path back to its 
   expect(await segments(page)).toEqual([TOP, "bank XK1"]);
 });
 
-test("reading again keeps the path while its instances are there, and else starts it at the level shown", async ({ page, viewer }) => {
+test("reading again keeps circuit visits even if a previously used instance was renamed", async ({ page, viewer }) => {
   await down(page, viewer, "XK1");
   await down(page, viewer, "XB2");
   await down(page, viewer, "XC1");
@@ -237,7 +235,7 @@ test("reading again keeps the path while its instances are there, and else start
   expect(await segments(page)).toEqual([TOP, "bank XK1", "block XB2"]);
   await viewer.selected("instance XC1 in block");
 
-  // XB2 is named XB3 now: cell stays, with its view, as the root
+  // XB2 is named XB3 now: these circuits were still visited, independently of current edges.
   await page.keyboard.press("Enter");
   expect(await viewer.viewBox()).toBe(view);
   await page.evaluate(() => {
@@ -245,8 +243,8 @@ test("reading again keeps the path while its instances are there, and else start
   });
   await viewer.build(() => page.keyboard.press("F5"));
   await expect(page.locator("#level-name")).toHaveText("cell");
-  expect(await segments(page)).toEqual(["cell"]);
-  await expect(page.locator("#up")).toBeHidden();
+  expect(await segments(page)).toEqual([TOP, "bank XK1", "block XB2", "cell XC1"]);
+  await expect(page.locator("#up")).toBeVisible();
   expect(await viewer.viewBox()).toBe(view);
 });
 
@@ -263,12 +261,15 @@ test("a subcircuit reached two ways keeps a view for each", async ({ page, viewe
   await page.keyboard.press("Control+=");
   const xc1 = await viewer.viewBox();
 
-  // the tree's way through XC9 has the view it had there, and the way through XB1 its own
-  await page.locator("#tab-hierarchy").click();
-  await page.locator('#tree .tree-row[data-path="0/1"]').click();
+  // Repeating the descents restores their own views. Tree picks intentionally reset history.
+  await page.locator('#level-path .crumb[data-depth="0"]').click();
+  await down(page, viewer, "XC9");
   expect(await segments(page)).toEqual([TOP, "cell XC9"]);
   expect(await viewer.viewBox()).toBe(xc9);
-  await page.locator('#tree .tree-row[data-path="0/0/0/0"]').click();
+  await page.locator('#level-path .crumb[data-depth="0"]').click();
+  await down(page, viewer, "XK1");
+  await down(page, viewer, "XB1");
+  await down(page, viewer, "XC1");
   expect(await segments(page)).toEqual([TOP, "bank XK1", "block XB1", "cell XC1"]);
   expect(await viewer.viewBox()).toBe(xc1);
 });
@@ -367,4 +368,19 @@ test("a long path keeps the level shown in a narrow bar, and leaves the levels b
   await expect.poll(() => segments(page)).toEqual([TOP, "bank XK1", "block XB2", "cell XC1", "leaf XL2"]);
   await expect(more).toBeHidden();
   await expect(page.locator("#level-kind")).toBeVisible();
+});
+
+test('removing a same-file ancestor cannot leave an invalid history link', async ({page,viewer}) => {
+  await down(page,viewer,'XK1');
+  await down(page,viewer,'XB1');
+  await down(page,viewer,'XC1');
+  await page.evaluate(async()=>{
+    const d=structuredClone(window.viewer.doc);
+    d.levels.find(l=>l.title==='bank').title='renamed-bank';
+    (await import('./open.js')).showBuilt(d,true);
+  });
+  expect(await segments(page)).toEqual(['cell']);
+  await expect(page.locator('#up')).toBeHidden();
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('#level-name')).toHaveText('cell');
 });

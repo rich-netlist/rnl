@@ -9,6 +9,11 @@ const tip = $("hover-tip");
 const GAP_X = 14; // pixels from the pointer to the box, to the right
 const GAP_Y = 18; // and below
 let on = true;
+let tipSize = null;
+const forgetSize = () => { tipSize = null; };
+window.addEventListener('resize', forgetSize);
+window.addEventListener('language-changed', forgetSize);
+document.fonts?.addEventListener('loadingdone', forgetSize);
 
 /** Whether names are shown on hover. */
 export function hoverNamesOn() {
@@ -25,9 +30,11 @@ export function setHoverNames(shown) {
 
 /** Show `text` beside the window point (x, y), moving the box if it is already shown. */
 export function showTip(text, x, y) {
-  if (tip.textContent !== text) tip.textContent = text;
+  if (tip.textContent !== text) { tip.textContent = text; tipSize = null; }
   tip.hidden = false;
-  const { width, height } = tip.getBoundingClientRect();
+  // Moving across one object changes only position. Measuring it after every status-bar update
+  // would force a synchronous document layout on every pointer event.
+  const { width, height } = tipSize ||= tip.getBoundingClientRect();
   // to the left of and above the pointer where there is no room on the other side
   const left = x + GAP_X + width > window.innerWidth ? x - GAP_X - width : x + GAP_X;
   const top = y + GAP_Y + height > window.innerHeight ? y - GAP_Y - height : y + GAP_Y;

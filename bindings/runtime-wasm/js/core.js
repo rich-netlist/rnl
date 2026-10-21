@@ -9,6 +9,9 @@
  *
  * @typedef {object} Request
  * @property {string[]} [pool] Explicit temporary files searched before package directories.
+ * @property {boolean} [auto_include] Resolve unique undefined subcircuits through the viewer library index.
+ * @property {string} [library_prefix] Internal namespace prefix for indexed pool paths.
+ * @property {Record<string, string>} [library_edits] Applied library text overrides in canonical paths.
  * @property {string} entry The path of the file to open, as the frontend names it, such as `/w/top.sp`.
  * @property {Record<string, string>} [files] The texts of the workspace by path, the entry's among them.
  * @property {string[]} [package_dirs] The directories, among the paths of `files`, whose packages are
@@ -93,6 +96,7 @@
  *   request names, `{ svg?, primitives? }` each, in order (`UnplacedDrawing` of document.d.ts).
  *   Throws an Error with the core's message when no build kept drawings, when an object is not
  *   there, or when `names` are not those of that build.
+ * @property {(request: {library: {reload?: boolean, refresh?: string[]}, pool: string[], files: Record<string, string>} | string) => string[]} library Update the viewer library index; returns read errors.
  * @property {(request: Request | WriteRequest | CatalogRequest | DrawingsRequest | string) => object} respond
  *   The core's answer as it gives it: `{ document }`, `{ snapshot }`, `{ written }`, `{ catalog }`,
  *   `{ drawings }` or `{ error }`. Throws only when the core stops.
@@ -107,6 +111,7 @@ const ASKS = {
   written: "a write",
   catalog: "a catalog request",
   drawings: "a drawings request",
+  library: "a library update",
 };
 const REPLACEMENT = String.fromCharCode(0xfffd);
 
@@ -182,6 +187,7 @@ export async function loadCore(wasm) {
     write: (request) => part(request, "written"),
     catalog: (request) => part(request, "catalog"),
     drawings: (request) => part(request, "drawings"),
+    library: (request) => part(request, "library"),
   };
 }
 

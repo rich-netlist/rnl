@@ -31,6 +31,10 @@ export function startViewerApi({ version, opener = false, begin = () => null, op
     request.controller.abort();
     send("error", { ...request.fields, reason, message });
   }
+  function supersede(request) {
+    if (request.fields.requestId !== undefined) fail(request, "superseded", "superseded");
+    else { request.done = true; request.controller.abort(); } // legacy callers expect superseded opens to stay silent
+  }
   async function receiveOpen(message, initial = false) {
     const fields = typeof message.requestId === "string" ? { requestId: message.requestId } : {};
     const request = { fields, done: false, controller: new AbortController() };
@@ -38,13 +42,12 @@ export function startViewerApi({ version, opener = false, begin = () => null, op
     try { input = validateOpen(message); }
     catch (error) { fail(request, "invalid", String(error.message || error)); return; }
     if (pending && !pending.done) {
-      if (pending.fields.requestId !== undefined) fail(pending, "superseded", "superseded");
-      else { pending.done = true; pending.controller.abort(); } // legacy callers expect superseded opens to stay silent
+      supersede(pending);
     }
     pending = request;
     const current = () => pending === request && !request.done;
     const operation = begin(request.controller.signal);
-    operation?.addEventListener("abort", () => fail(request, "superseded", "superseded"), { once: true });
+    operation?.addEventListener("abort", () => { if (!request.done) supersede(request); }, { once: true });
     try {
       if (!current()) return;
       const packages = (await Promise.all(input.packages.map(async p => {
@@ -65,7 +68,7 @@ export function startViewerApi({ version, opener = false, begin = () => null, op
   }
   const stop = channel.listen(message => {
     if (message.type === "open") { void receiveOpen(message); return; }
-    try { command(message); }
+    try { Promise.resolve(command(message)).catch(error => send("error", { message: String(error.message || error) })); }
     catch (error) { send("error", { message: String(error.message || error) }); }
   });
   send("ready", { version, features: API_FEATURES.filter(f => opener || f !== "opener"), maxOpenBytes: MAX_OPEN_BYTES });

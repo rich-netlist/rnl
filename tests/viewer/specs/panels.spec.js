@@ -175,63 +175,44 @@ test("at its narrowest the side panel stays beside its splitter", async ({ page,
   expect(Math.abs((await size(page, "#sidebar", "width")) - 500)).toBeLessThanOrEqual(3);
 });
 
-test("at its narrowest the side panel keeps a tab of each file within reach", async ({ page, viewer }) => {
-  // The failed statements' label gives way to the file tabs: when they need the room, it leaves out
-  // its legend, then its caption, and the checkbox stays (style.css, .failed-toggle).
-  /** Per file tab, whether a part of it is what a click there hits. */
-  const reached = () =>
-    page.locator("#file-tabs button").evaluateAll((tabs) =>
-      tabs.map((b) => {
-        const r = b.getBoundingClientRect();
-        for (let x = r.left + 1; x < r.right; x += 2) if (document.elementFromPoint(x, r.top + r.height / 2) === b) return true;
-        return false;
-      }),
-    );
-  // the checkbox keeps its name, the caption's, also when the caption is out of sight
-  const checkbox = page.getByRole("checkbox", { name: "Failed statements" });
+test("one top filename and both toggles remain reachable in a narrow panel", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy");
-  expect(await reached()).toEqual([true, true]);
-  await expect(checkbox).toBeVisible();
   await dragSplitter(page, viewer, "#vsplit", { x: 0 });
-  expect(await size(page, "#sidebar", "width")).toBe(220);
-  expect(await reached()).toEqual([true, true]);
-  // the caption has wrapped off the label's line, out of sight
-  const below = (e) => e.getBoundingClientRect().top >= e.parentElement.getBoundingClientRect().bottom;
-  expect(await page.locator(".failed-toggle .caption").evaluate(below)).toBe(true);
-  await expect(checkbox).toBeVisible();
-  await page.locator("#file-tabs button", { hasText: "04-hierarchy-lib.inc" }).click({ timeout: 2000 });
-  await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");
+  await expect(page.locator("#netlist-file")).toHaveText(/04-hierarchy\.sp$/);
+  await expect(page.locator("#file-tabs")).toHaveCount(0);
+  await expect(page.locator('#choose-source')).toHaveCount(0);
+  for (const id of ['netlist-file', 'auto-include', 'show-failed', 'semantics-only', 'tab-symbol', 'tab-unplaced']) {
+    expect(await page.locator(`#${id}`).evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+    })).toBe(true);
+  }
+  const colors = await page.locator('#file-bar input').evaluateAll(es => es.map(e => getComputedStyle(e).accentColor));
+  expect(colors[0]).toBe(colors[1]);
+  expect(await page.locator('.failed-toggle').evaluate(label => {
+    const check = label.querySelector('input').getBoundingClientRect();
+    const caption = label.querySelector('.caption').getBoundingClientRect();
+    return Math.abs((check.top + check.bottom) / 2 - (caption.top + caption.bottom) / 2) < 2;
+  })).toBe(true);
 });
 
-test("the file tabs scroll with the wheel, and the tab of the file shown comes into view", async ({ page, viewer }) => {
-  const tabs = page.locator("#file-tabs");
-  /** Per file tab, whether it is wholly within the strip of tabs. */
-  const inView = () =>
-    tabs.evaluate((strip) => {
-      const s = strip.getBoundingClientRect();
-      return [...strip.children].map((b) => {
-        const r = b.getBoundingClientRect();
-        return r.left >= s.left - 0.5 && r.right <= s.right + 0.5;
-      });
-    });
+test("the plain filename follows the circuit and the controls stay below its path", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy");
   await dragSplitter(page, viewer, "#vsplit", { x: 0 });
-  // the two tabs are wider than the strip, which shows no scrollbar
-  expect(await tabs.evaluate((s) => s.scrollWidth > s.clientWidth)).toBe(true);
-  expect(await inView()).toEqual([true, false]);
-  // a wheel turned over the tabs scrolls them sideways, to the end
-  const strip = await viewer.middle(tabs);
-  await page.mouse.move(strip.x, strip.y);
-  await page.mouse.wheel(0, 400);
-  await expect.poll(inView).toEqual([false, true]);
-  await page.mouse.wheel(0, -400);
-  await expect.poll(inView).toEqual([true, false]);
-  // a part of the include selected shows its file, and the file's tab
   await page.locator("#tab-hierarchy").click();
   await page.locator("#index .index-row", { hasText: "rdiv" }).click();
-  await expect(page.locator("#level-name")).toHaveText("rdiv");
   await page.locator("#tab-netlist").click();
-  await viewer.click("R1");
-  await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");
-  expect(await inView()).toEqual([false, true]);
+  await expect(page.locator("#source-file")).toBeHidden();
+  await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
+  await expect(page.locator("#netlist-file")).toHaveText(/04-hierarchy-lib\.inc$/);
+  await expect(page.locator("#choose-source")).toHaveCount(0);
+  expect(await page.locator('#netlist-file').evaluate(el => el.tagName)).toBe('SPAN');
+  expect(await page.locator('.netlist-options').evaluate(el => el.getBoundingClientRect().top >= document.getElementById('netlist-file').getBoundingClientRect().bottom)).toBe(true);
+  await expect(page.locator("#source-file")).toBeHidden();
+  await expect(viewer.line(2)).toHaveText(/subckt rdiv/);
+  await page.locator("#tab-hierarchy").click();
+  await page.locator('#tree .tree-row[data-path="0"]').click();
+  await page.locator("#tab-netlist").click();
+  await expect(page.locator("#netlist-file")).toHaveText(/04-hierarchy\.sp$/);
+  await expect(viewer.line(49)).toHaveText(/X1 a b vdd 0 amp/);
 });

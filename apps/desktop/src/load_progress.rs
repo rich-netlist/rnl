@@ -12,12 +12,21 @@ pub struct LoadingProvider<'a> {
 }
 
 impl<'a> LoadingProvider<'a> {
+    pub fn cached(&self) {
+        if let Some(id) = self.request_id {
+            let _ = self.window.emit("load-stage", serde_json::json!({ "id": id, "stage": "cached" }));
+        }
+    }
+
     pub fn new(inner: &'a dyn Provider, window: &'a WebviewWindow, request_id: Option<&'a str>) -> Self {
         Self { inner, window, request_id, parsing: Cell::new(false) }
     }
 }
 
 impl Provider for LoadingProvider<'_> {
+    fn auto_include(&self) -> Option<&dyn rnl_runtime::source::LibraryLookup> {
+        self.inner.auto_include()
+    }
     fn read(&self, path: &str) -> Option<String> {
         let text = self.inner.read(path);
         if text.is_none() || self.parsing.replace(true) {

@@ -6,6 +6,7 @@
 
 mod catalog;
 mod document;
+mod library;
 mod primitive;
 mod snapshot;
 #[cfg(test)]
@@ -28,8 +29,10 @@ pub use catalog::{
     Terminal,
 };
 pub use document::{
-    Child, Diagnostic, Document, Drawings, Hit, Level, Object, SourceFile, Span, Unplaced, UnplacedDrawing,
+    Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol, Level, Object,
+    SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing,
 };
+pub use library::{LibraryIndex, LibraryProvider};
 pub use primitive::{
     Bar, Cap, Color, HAlign, Join, Layer, Primitive, Run, RunStyle, Segment, Shape, Stroke, Text, TextRun, Unit, VAlign,
 };
@@ -218,11 +221,13 @@ pub fn read_host(
 fn read_host_in(entry: &str, dialect: Option<&str>, ws: &Workspace, sink: &mut Sink) -> Result<HostDocument, String> {
     let path = slashed(entry);
     let text = ws.read(&path).ok_or_else(|| format!("cannot read {entry}"))?;
-    let doc = if is_spectre(&path, &text, dialect) {
-        rnl_host_spectre::read(&path, ws, sink)
-    } else {
-        rnl_host_spice::read(&path, ws, sink)
-    };
+    let doc = library::resolve(&path, ws, sink, |extra, sink| {
+        if is_spectre(&path, &text, dialect) {
+            rnl_host_spectre::read_with_includes(&path, ws, sink, extra)
+        } else {
+            rnl_host_spice::read_with_includes(&path, ws, sink, extra)
+        }
+    });
     doc.ok_or_else(|| format!("cannot read {entry}"))
 }
 
@@ -330,6 +335,9 @@ impl Workspace<'_> {
 }
 
 impl Provider for Workspace<'_> {
+    fn auto_include(&self) -> Option<&dyn rnl_runtime::source::LibraryLookup> {
+        self.files.auto_include()
+    }
     fn read(&self, path: &str) -> Option<String> {
         if path.starts_with(BUNDLED_DIR) {
             return self.bundled.read(path);
@@ -715,8 +723,19 @@ R1 p q 1k
         let d = build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &BuildOptions::default()).unwrap();
         let v = serde_json::to_value(&d).unwrap();
         let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
-        let want =
-            ["path", "name", "dialect", "levels", "diagnostics", "failed", "files", "objects", "spans", "missing"];
+        let want = [
+            "symbols",
+            "path",
+            "name",
+            "dialect",
+            "levels",
+            "diagnostics",
+            "failed",
+            "files",
+            "objects",
+            "spans",
+            "missing",
+        ];
         assert_eq!(keys, want);
         assert_eq!(v["missing"], serde_json::json!([]));
     }
@@ -729,7 +748,9 @@ R1 p q 1k
             let d = build("a.sp", &files, &options).unwrap();
             serde_json::to_value(&d).unwrap()["levels"][0].as_object().unwrap().clone()
         };
-        let keys = |l: &serde_json::Map<String, serde_json::Value>| l.keys().cloned().collect::<Vec<_>>().join(" ");
+        let keys = |l: &serde_json::Map<String, serde_json::Value>| {
+            l.keys().filter(|k| !["ports", "symbol"].contains(&k.as_str())).cloned().collect::<Vec<_>>().join(" ")
+        };
         // by default the SVG and no primitives, as the viewers have read the Document so far
         let default = BuildOptions::default();
         let l = level(default.svg, default.primitives);

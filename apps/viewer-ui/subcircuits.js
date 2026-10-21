@@ -1,11 +1,7 @@
-// The hierarchy path of the level shown, from its root down to it, and the bar above the drawing that
-// shows it. Going down into a subcircuit instance adds the instance to the path; its segments in the
-// bar, the up button and Backspace go back along it, each level with the view it had there and the
-// instance it was left through selected. Picking a subcircuit in the index makes it the root, picking
-// an instance in the tree gives the way to it from the top level, and reaching a level otherwise cuts
-// the path back to it, or starts it there. The views kept are by path, so a subcircuit reached two
-// ways keeps a view for each. Entering a subcircuit brings the start of its definition to the top of
-// the text; going back up shows the statement of the instance it was left through.
+import { append, m, setAttr, setText } from "./i18n.js";
+// The bar records visits, not the document's include scope. Only descent extends it;
+// other navigation starts a new chain. Ancestors retain their entry source and title so
+// crossing a file boundary can rebuild independently and still return to that visit.
 
 import { current, doc, path, setPath, viewCache } from "./state.js";
 import { showLevel, view } from "./drawing.js";
@@ -14,6 +10,8 @@ import { uncalledRoots } from "./roots.js";
 import { clearSelection, select } from "./selection.js";
 import { revealDefinition } from "./text.js";
 import { navigate } from "./navigation.js";
+import { currentSource } from "./open.js";
+import { sameSource, sourceKey } from "./visit-source.js";
 import { $, span } from "./util.js";
 
 const bar = $("level-path");
@@ -31,15 +29,17 @@ export function opens(o) {
 
 /** A path's key among the views kept: its root's title and the instances on it. */
 function key(p) {
-  return JSON.stringify(p.map((s, k) => (k === 0 ? doc.levels[s.level].title : s.via)));
+  return JSON.stringify(p.map(s => [sourceKey(s.entry || currentSource()), s.title || doc.levels[s.level]?.title, s.via]));
 }
 
 const same = (a, b) => a.length === b.length && a.every((s, k) => s.level === b[k].level && s.via === b[k].via);
 
 /** Keep the view of the level shown, for the path to it. */
-function rememberView() {
+export function rememberView() {
   if (view && path.length > 0) viewCache.set(key(path), view);
 }
+
+export const visitView = () => viewCache.get(key(path));
 
 /**
  * Show the level a path leads to, with the view kept for the path, or else the view shown when the
@@ -63,7 +63,7 @@ export function commitNavigation({ path: next, via, selection, reveal = false })
 
 /** The path cut back to a level on it, or else a path that starts at the level. */
 function cutTo(level) {
-  const k = path.map((s) => s.level).lastIndexOf(level);
+  const k = path.findLastIndex(s => sameSource(s.entry, currentSource()) && s.level === level);
   return k >= 0 ? path.slice(0, k + 1) : [{ level, via: null }];
 }
 
@@ -90,13 +90,10 @@ export function ascend(options) {
 
 /** Show a level reached otherwise than through an instance, such as by an object of it in the text. */
 export function goTo(level, selection, options) {
-  return navigate({ path: cutTo(level), selection }, options);
+  return navigate({ path: [{ level, via: null }], selection }, options);
 }
 
-/**
- * Show the level of a row of the hierarchy tree, by the way to it from the root of its tree: the top
- * level, "0/1", or a subcircuit that the top level does not call, "r3/0" (hierarchy.js).
- */
+/** A tree pick is a new visit head, not a descent through its displayed ancestors. */
 export function enterRow(row, options = {}) {
   const [start, ...rest] = row.split("/");
   const next = [{ level: start.startsWith("r") ? Number(start.slice(1)) : 0, via: null }];
@@ -105,9 +102,7 @@ export function enterRow(row, options = {}) {
     if (!child || child.level === null) return;
     next.push({ level: child.level, via: child.instance });
   }
-  // the path shown already changes nothing, so that the tree is not drawn again (openLevel)
-  if (same(next, path) && !options.newWindow) return;
-  return navigate({ path: next, reveal: true }, options);
+  return enterRoot(next.at(-1).level, options);
 }
 
 /** Show a level as the root of the path, as the subcircuit index does. */
@@ -121,12 +116,13 @@ export function enterRoot(level, options = {}) {
  * that the top level does not call, as "r3/0"; otherwise null.
  */
 export function pathRow() {
-  if (path.length === 0) return null;
-  const first = path[0].level;
+  const local = path.slice(path.findLastIndex(s => !sameSource(s.entry, currentSource())) + 1);
+  if (local.length === 0) return null;
+  const first = local[0].level;
   if (first !== 0 && !uncalledRoots().includes(first)) return null;
   const row = [first === 0 ? "0" : rootPath(first)];
-  for (let d = 1; d < path.length; d++) {
-    const k = doc.levels[path[d - 1].level].children.findIndex((c) => c.instance === path[d].via);
+  for (let d = 1; d < local.length; d++) {
+    const k = doc.levels[local[d - 1].level]?.children.findIndex(c => c.instance === local[d].via && c.level === local[d].level) ?? -1;
     if (k < 0) return null;
     row.push(String(k));
   }
@@ -134,29 +130,17 @@ export function pathRow() {
 }
 
 /** The path by the names on it, to find it again in the document read again: its levels' titles and instances. */
-export function namedPath() {
-  return path.map((s) => ({ title: doc.levels[s.level].title, via: s.via }));
+export function namedPath(route = path) {
+  return route.map(s => ({ title: s.title || doc.levels[s.level]?.title, via: s.via, entry: s.entry || currentSource() }));
 }
 
-/**
- * Find a path by its names (namedPath) in the document shown now, which leads to `level`: when its
- * levels and instances are all there, it is the path; otherwise the path starts at `level`.
- */
+/** Resolve only visits belonging to this entry; ancestors in other files need no local level. */
 export function restorePath(named, level) {
-  const next = [];
-  for (const s of named) {
-    let l = -1;
-    if (next.length === 0) {
-      l = doc.levels.findIndex((x) => x.title === s.title);
-    } else {
-      const child = doc.levels[next[next.length - 1].level].children.find((c) => c.instance === s.via);
-      if (child && child.level !== null) l = child.level;
-    }
-    if (l < 0 || doc.levels[l].title !== s.title) break;
-    next.push({ level: l, via: s.via });
-  }
-  const found = next.length > 0 && next.length === named.length && next[next.length - 1].level === level;
-  setPath(found ? next : [{ level, via: null }]);
+  const next = named.map(s => ({ ...s, entry: s.entry || currentSource(),
+    level: !s.entry || sameSource(s.entry, currentSource()) ? doc.levels.findIndex(l => l.title === s.title) : -1 }));
+  const found = next.length && next.at(-1).level === level
+    && next.every(s => !sameSource(s.entry, currentSource()) || s.level >= 0);
+  setPath(found ? next : [{ level, title: doc.levels[level].title, entry: currentSource(), via: null }]);
 }
 
 // ------------------------------------------------------------------ the bar above the drawing
@@ -166,37 +150,37 @@ export function updatePath() {
   closeMore();
   const name = $("level-name");
   crumbs = path.map((s, d) => {
-    const title = doc.levels[s.level].title;
+    const title = s.title || doc.levels[s.level]?.title;
     let crumb;
     if (d === path.length - 1) {
       crumb = document.createElement("span");
       crumb.className = "crumb current";
       crumb.setAttribute("aria-current", "location");
-      name.textContent = title;
-      crumb.append(name);
+      setText(name, title);
+      append(crumb, name);
     } else {
       crumb = document.createElement("button");
       crumb.type = "button";
       crumb.className = "crumb";
-      crumb.title = `Back to ${title}`;
-      crumb.append(span("name", title));
+      setAttr(crumb, "title", m`Back to ${title}`);
+      append(crumb, span("name", title));
       crumb.addEventListener("click", (e) => backTo(d, { newWindow: e.shiftKey }));
     }
     if (s.via !== null) {
-      crumb.append(span("via", s.via));
-      crumb.title += crumb.title ? ` (${s.via})` : `${title}, through ${s.via}`;
+      append(crumb, span("via", s.via));
+      setAttr(crumb, "title", d < path.length - 1 ? m`${m`Back to ${title}`} (${s.via})` : m`${title}, through ${s.via}`);
     }
     // the name and the instance read apart, as they are seen apart
-    if (d < path.length - 1) crumb.setAttribute("aria-label", s.via !== null ? `${title} ${s.via}` : title);
+    if (d < path.length - 1) setAttr(crumb, "aria-label", s.via !== null ? `${title} ${s.via}` : title);
     crumb.dataset.depth = String(d);
     return { crumb, sep: d > 0 ? separator() : null };
   });
   const ellipsis = document.createElement("button");
   ellipsis.type = "button";
   ellipsis.className = "crumb-more";
-  ellipsis.textContent = "…";
-  ellipsis.title = "The levels in between";
-  ellipsis.setAttribute("aria-label", "The levels in between");
+  setText(ellipsis, "…");
+  setAttr(ellipsis, "title", m("The levels in between"));
+  setAttr(ellipsis, "aria-label", m("The levels in between"));
   ellipsis.setAttribute("aria-haspopup", "menu");
   ellipsis.setAttribute("aria-expanded", "false");
   ellipsis.addEventListener("click", (e) => {
@@ -205,7 +189,7 @@ export function updatePath() {
   });
   more = { crumb: ellipsis, sep: separator() };
   if (path.length === 0) {
-    name.textContent = "";
+    setText(name, "");
     bar.replaceChildren(name);
   } else {
     bar.replaceChildren(
@@ -215,15 +199,15 @@ export function updatePath() {
       ...crumbs.slice(1).flatMap((c) => [c.sep, c.crumb]),
     );
   }
-  const up = path.length > 1 ? doc.levels[path[path.length - 2].level].title : null;
+  const up = path.length > 1 ? path.at(-2).title : null;
   // at the root the up button hides: the focus goes from it to the drawing first, so that the keys
   // act on the drawing at once. A browser that moves the focus off a hidden element only later,
   // as WebKit does, would otherwise give the next Enter to the hidden button.
   if (up === null && document.activeElement === $("up")) $("canvas").focus({ preventScroll: true });
   $("up").hidden = up === null;
   if (up !== null) {
-    $("up-name").textContent = up;
-    $("up").title = `Up to ${up} (Ctrl+E or Backspace; Shift opens a new window)`;
+    setText($("up-name"), up);
+    setAttr($("up"), "title", m`Up to ${up} (Ctrl+E or Backspace; Shift opens a new window)`);
   }
   fitPath();
 }
@@ -275,10 +259,10 @@ function openMore(fromKeys) {
       b.className = "path-menu-item";
       b.setAttribute("role", "menuitem");
       b.dataset.depth = String(d);
-      const title = doc.levels[s.level].title;
-      b.append(span("name", title));
-      if (s.via !== null) b.append(span("via", s.via));
-      b.setAttribute("aria-label", s.via !== null ? `${title} ${s.via}` : title);
+      const title = s.title || doc.levels[s.level]?.title;
+      append(b, span("name", title));
+      if (s.via !== null) append(b, span("via", s.via));
+      setAttr(b, "aria-label", s.via !== null ? `${title} ${s.via}` : title);
       b.addEventListener("click", (e) => {
         closeMore();
         backTo(d, { newWindow: e.shiftKey });

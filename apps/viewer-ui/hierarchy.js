@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // The hierarchy view: the subcircuit instances as a tree under the top level, below it the
 // subcircuits that the top level does not call as trees of their own, and every subcircuit by name
 // under its initial, with a search box. Picking a row opens its level: a row of the tree by the way
@@ -39,11 +40,11 @@ function renderTree() {
     const cycle = above.includes(level);
     const branches = cycle ? [] : lv.children;
     const open = branches.length > 0 && expanded.has(path);
-    tree.append(treeRow({ level, path, depth, child, branches: branches.length, open, cycle }));
+    append(tree, treeRow({ level, path, depth, child, branches: branches.length, open, cycle }));
     if (!open) return;
     branches.forEach((c, k) => {
       const p = `${path}/${k}`;
-      if (c.level === null) tree.append(treeRow({ level: null, path: p, depth: depth + 1, child: c, branches: 0 }));
+      if (c.level === null) append(tree, treeRow({ level: null, path: p, depth: depth + 1, child: c, branches: 0 }));
       else walk(c.level, p, depth + 1, c, above.concat(level));
     });
   };
@@ -52,8 +53,8 @@ function renderTree() {
   if (roots.length === 0) return;
   const heading = document.createElement("div");
   heading.className = "tree-group";
-  heading.textContent = "Not called from the top level";
-  tree.append(heading);
+  setText(heading, m("Not called from the top level"));
+  append(tree, heading);
   for (const r of roots) walk(r, rootPath(r), 0, ROOT, []);
 }
 
@@ -69,26 +70,26 @@ function treeRow({ level, path, depth, child, branches, open, cycle }) {
   twisty.tabIndex = -1;
   if (branches) {
     twisty.setAttribute("aria-expanded", String(open));
-    twisty.setAttribute("aria-label", open ? "Collapse" : "Expand");
+    setAttr(twisty, "aria-label", open ? m("Collapse") : m("Expand"));
     twisty.addEventListener("click", (e) => {
       e.stopPropagation();
       toggleBranch(path);
     });
   }
-  row.append(twisty);
+  append(row, twisty);
   if (child === null) {
-    row.append(span("inst", doc.levels[0].title), span("badge", "top"));
+    append(row, span("inst", doc.levels[0].title), span("badge", m("top")));
   } else if (child === ROOT) {
-    row.append(span("inst", doc.levels[level].title), span("badge", "not called"));
-    row.title = `No instance calls ${doc.levels[level].title}`;
+    append(row, span("inst", doc.levels[level].title), span("badge", m("not called")));
+    setAttr(row, "title", m`No instance calls ${doc.levels[level].title}`);
   } else {
-    row.append(span("inst", child.instance), span("master", child.master));
-    if (level === null) row.append(span("badge", "not defined"));
-    if (cycle) row.append(span("badge", "recursive"));
+    append(row, span("inst", child.instance), span("master", child.master));
+    if (level === null) append(row, span("badge", m("not defined")));
+    if (cycle) append(row, span("badge", m("recursive")));
   }
   if (level === null) {
     row.classList.add("undefined");
-    row.title = `${child.master} is not defined in the netlist`;
+    setAttr(row, "title", m`${child.master} is not defined in the netlist`);
     return row;
   }
   row.dataset.level = String(level);
@@ -136,17 +137,17 @@ function renderIndex() {
   const letters = $("letters");
   list.replaceChildren();
   letters.replaceChildren();
-  $("index-count").textContent = "";
+  setText($("index-count"), "");
   if (!doc || doc.levels.length === 0) return;
   const q = $("search").value.trim().toLowerCase();
   const uses = doc.levels.map(() => 0);
   for (const lv of doc.levels) for (const c of lv.children) if (c.level !== null) uses[c.level]++;
-  list.append(indexRow(0, "", null));
+  append(list, indexRow(0, "", null));
   const all = doc.levels.map((l, k) => ({ title: l.title, k })).filter((x) => x.k !== 0);
   const shown = all
     .filter((x) => !q || x.title.toLowerCase().includes(q))
     .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }));
-  $("index-count").textContent = q ? `${shown.length} of ${all.length}` : String(all.length);
+  setText($("index-count"), q ? m`${shown.length} of ${all.length}` : String(all.length));
   let group = null;
   for (const x of shown) {
     const initial = initialOf(x.title);
@@ -155,22 +156,22 @@ function renderIndex() {
       const h = document.createElement("div");
       h.className = "index-group";
       h.id = `initial-${initial}`;
-      h.textContent = initial;
-      list.append(h);
+      setText(h, initial);
+      append(list, h);
       const b = document.createElement("button");
       b.type = "button";
-      b.textContent = initial;
-      b.title = `Subcircuits starting with ${initial}`;
+      setText(b, initial);
+      setAttr(b, "title", m`Subcircuits starting with ${initial}`);
       b.addEventListener("click", () => scrollToGroup(list, h));
-      letters.append(b);
+      append(letters, b);
     }
-    list.append(indexRow(x.k, q, uses[x.k]));
+    append(list, indexRow(x.k, q, uses[x.k]));
   }
   if (all.length > 0 && shown.length === 0) {
     const p = document.createElement("div");
     p.className = "nothing";
-    p.textContent = "No subcircuit matches.";
-    list.append(p);
+    setText(p, m("No subcircuit matches."));
+    append(list, p);
   }
 }
 
@@ -201,14 +202,14 @@ function indexRow(level, q, count) {
   const at = q ? title.toLowerCase().indexOf(q) : -1;
   if (at >= 0) {
     const m = document.createElement("mark");
-    m.textContent = title.slice(at, at + q.length);
-    name.append(title.slice(0, at), m, title.slice(at + q.length));
+    setText(m, title.slice(at, at + q.length));
+    append(name, title.slice(0, at), m, title.slice(at + q.length));
   } else {
-    name.textContent = title;
+    setText(name, title);
   }
-  row.append(name);
-  if (level === 0) row.append(span("uses", "top level"));
-  else row.append(span("uses", count === 1 ? "1 use" : `${count} uses`));
+  append(row, name);
+  if (level === 0) append(row, span("uses", m("top level")));
+  else append(row, span("uses", count === 1 ? m("1 use") : m`${count} uses`));
   if (level === current) {
     row.classList.add("current");
     row.setAttribute("aria-selected", "true");

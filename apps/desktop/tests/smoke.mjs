@@ -328,6 +328,13 @@ $id = [Win32Menu]::GetMenuItemID($menu, ${at[at.length - 1]})
 [void][Win32Menu]::PostMessage($h, 0x0111, [IntPtr]$id, [IntPtr]::Zero)`);
 }
 
+function itemEnabled(pid, at) {
+  return powershell(`${WIN32}
+$menu = [Win32Menu]::GetMenu((Get-Process -Id ${pid}).MainWindowHandle)
+foreach ($k in @(${at.slice(0, -1).join(", ")})) { $menu = [Win32Menu]::GetSubMenu($menu, $k) }
+([Win32Menu]::GetMenuState($menu, ${at.at(-1)}, 0x400) -band 3) -eq 0`) === "True";
+}
+
 /** The commands of the table, those in its submenus too. */
 const commands = (items) => items.flatMap((item) => (item === "-" ? [] : item.items ? commands(item.items) : [item]));
 
@@ -392,8 +399,26 @@ async function drive(app, port, profile, t0, session) {
     return s.doc && s.drawn && !s.busy && s;
   });
   console.log(`drawn ${s.level} in ${Date.now() - t0} ms, at ${s.zoom}`);
+  await page.evaluate(`window.viewer.command('language-en')`);
   same(s.level, TOP, "the level drawn");
   await until("the window's title", () => windowTitle(app.pid) === `${TOP} - RNL Viewer`, 10_000);
+  same(await page.evaluate("window.__TAURI__.app.getVersion()"), version, "the running Viewer version");
+  await page.evaluate(`(async () => {
+    (await import('./panels.js')).setPane('netlist');
+    (await import('./text.js')).revealLine(0, 8, false, true);
+  })()`);
+  check(await page.evaluate("document.querySelector('#source .file:not([hidden]) [data-line=\"8\"] .fold-toggle')?.getAttribute('aria-expanded') === 'true'"), "the subcircuit fold control is missing");
+  if (process.env.SMOKE_OUTPUT_DIR) {
+    const capture = await page.send("Page.captureScreenshot", { format: "png" });
+    fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR, "native-source-expanded.png"), Buffer.from(capture.data, "base64"));
+  }
+  await page.evaluate("document.querySelector('#source .file:not([hidden]) [data-line=\"8\"] .fold-toggle').click()");
+  check(await page.evaluate("!document.querySelector('#source .file:not([hidden]) [data-line=\"9\"]')"), "folding kept the subcircuit body visible");
+  if (process.env.SMOKE_OUTPUT_DIR) {
+    const capture = await page.send("Page.captureScreenshot", { format: "png" });
+    fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR, "native-source-folded.png"), Buffer.from(capture.data, "base64"));
+  }
+  await page.evaluate("document.querySelector('#source .file:not([hidden]) [data-line=\"8\"] .fold-toggle').click()");
 
   // a click selects an instance; Enter opens its subcircuit and Backspace comes back
   await click(page, await symbol(page, "X2"));
@@ -421,13 +446,47 @@ async function drive(app, port, profile, t0, session) {
   same(nativeMenu(app.pid), want, "the native menu");
   // a key in the page clears a check mark, and an item chosen in the menu reaches the page
   const at = (id) => find(want, id).at;
+  // Use the real native command, then compare every label and preserve checks/shortcuts.
+  await page.evaluate(`window.localeDocument = window.viewer.doc; window.localeSvg = document.querySelector('#canvas > svg')`);
+  chooseItem(app.pid, at("language-zh"));
+  await until("Chinese UI", () => page.evaluate(`document.documentElement.lang === 'zh-CN' && window.viewer.checked('language-zh')`));
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, "apps/viewer-ui/locales/zh-CN.json"), "utf8"));
+  const translatedMenu = items => items.map(item => {
+    const [label, keys] = item.text.split('\t');
+    return { ...item, text: (catalog[label] || label) + (keys ? '\t' + keys : ''),
+      ...(item.items ? {items: translatedMenu(item.items)} : {}) };
+  });
+  same(nativeMenu(app.pid), translatedMenu(tableMenus({...marks, "language-en":false, "language-zh":true})), "Chinese native menu");
+  same(await page.evaluate(`window.localeDocument === window.viewer.doc && window.localeSvg === document.querySelector('#canvas > svg')`), true, "language change preserves document and drawing");
+  chooseItem(app.pid, at("about"));
+  await until("Chinese About", () => page.evaluate(`document.querySelector('dialog[open] .dialog-title')?.textContent === '关于 RNL Viewer'`));
+  await page.evaluate(`document.querySelector('dialog[open] button').click()`);
+  chooseItem(app.pid, at("language-en"));
+  await until("English UI", () => page.evaluate(`document.documentElement.lang === 'en' && window.viewer.checked('language-en')`));
+  same(nativeMenu(app.pid), want, "restored English native menu");
+  chooseItem(app.pid, at("file-associations"));
+  await until("the File Associations dialog", () => page.evaluate(`document.querySelector('dialog[open] .dialog-title')?.textContent === 'File Associations'`));
+  check(await page.evaluate(`document.querySelector('dialog[open]').textContent.includes('.netlist')`), "file-association help omits .netlist");
+  await page.evaluate(`Array.from(document.querySelectorAll('dialog[open] button')).find(b => b.textContent === 'Cancel').click()`);
   const checked = (id) => find(nativeMenu(app.pid), id).item.checked;
   await press(page, "b", "KeyB", 66, 2);
   await until("the side panel to be hidden", async () => !(await shown(page)).sidebar, 10_000);
-  await until("Netlist Panel's check mark to clear", () => !checked("toggle-netlist"), 10_000);
-  chooseItem(app.pid, at("toggle-netlist"));
+  await until("Netlist pane's check mark to clear", () => !checked("panel-netlist"), 10_000);
+  chooseItem(app.pid, at("panel-netlist"));
   await until("the side panel to be shown", async () => (await shown(page)).sidebar, 10_000);
-  await until("Netlist Panel's check mark", () => checked("toggle-netlist"), 10_000);
+  await until("Netlist pane's check mark", () => checked("panel-netlist"), 10_000);
+  chooseItem(app.pid, at("panel-symbol"));
+  await until("Symbol check mark", () => checked("panel-symbol") && !checked("panel-netlist"));
+  chooseItem(app.pid, at("panel-symbol"));
+  await until("Symbol stays checked when selected again", () => checked("panel-symbol"));
+  chooseItem(app.pid, at("panel-hide"));
+  await until("Hide disabled and every pane unchecked", () => {
+    const menu = nativeMenu(app.pid);
+    return !itemEnabled(app.pid, at("panel-hide")) &&
+      ["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"].every(name => !find(menu, `panel-${name}`).item.checked);
+  });
+  chooseItem(app.pid, at("panel-netlist"));
+  await until("Hide enabled again", () => checked("panel-netlist") && itemEnabled(app.pid, at("panel-hide")));
   await newWindowSmoke(app, page, at);
   const zoom = (await shown(page)).zoom;
   chooseItem(app.pid, at("zoom-in"));
@@ -581,7 +640,7 @@ async function drive(app, port, profile, t0, session) {
   const saved = onDisk.toString("utf8").replace(/\bX3\b/g, "X9");
   await until("the file saved", () => fs.readFileSync(netlist, "utf8") === saved, 20_000);
   await until("no file with changes not saved", () =>
-    page.evaluate(`document.querySelectorAll("#file-tabs button[data-unsaved='true']").length === 0`),
+    page.evaluate(`document.querySelectorAll("#netlist-file[data-unsaved='true']").length === 0`),
   );
   same(fs.readFileSync(netlistInclude).equals(includeOnDisk), true, "the include after the netlist was saved");
   // another program changes the file after the viewer read it: Save does not write over it, and asks;
@@ -612,6 +671,8 @@ async function drive(app, port, profile, t0, session) {
   await until("the text read again", () => page.evaluate(`document.querySelectorAll("#source .editor").length === 0`));
   console.log("Edit > Edit Text, Apply Changes and File > Save built the edited text natively and saved the one file, as it was written");
 
+  // Disable Auto Include to check normal clipboard include resolution independently of Library.
+  await page.evaluate(`import('./pool.js').then(p => p.toggleAutoInclude(false))`);
   // File > Load from Clipboard: the page reads the clipboard, whose text the test gives in the page,
   // shows it, and on Load the app draws it natively as clipboard.sp, alone, its include missing
   const text = fs.readFileSync(netlist, "utf8");
@@ -633,6 +694,10 @@ async function drive(app, port, profile, t0, session) {
   const pasted = await page.evaluate(`({ files: window.viewer.doc.files.length, missing: window.viewer.doc.missing })`);
   same(pasted, { files: 1, missing: ["/04-hierarchy-lib.inc"] }, "the clipboard's netlist, alone");
   console.log("File > Load from Clipboard drew the netlist that the clipboard held, alone");
+  await page.evaluate(`import('./pool.js').then(p => p.toggleAutoInclude(true))`);
+  check(await page.evaluate(`window.viewer.doc.files.length === 2 && window.viewer.doc.files.some(f => f.name.endsWith('04-hierarchy-lib.inc')) &&
+    window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('added by Auto Include'))`),
+  "clipboard Auto Include did not resolve the library subcircuit");
 
   // a netlist with nothing placed: its Document carries no drawing of the objects that have no
   // position, the app keeps them from the build, and the Not drawn list asks for those of its rows
@@ -660,7 +725,26 @@ async function drive(app, port, profile, t0, session) {
   console.log(`The Not drawn list asked the app for the drawings of its ${thumbs} rows, which the Document did not carry`);
 
   await filePoolSmoke(page);
+  await nativeDropSmoke(page, app.pid);
+  await independentNavigationSmoke(page);
   same(page.errors, [], "the page's errors");
+}
+
+/** Exercise the actual native event bridge and backend, preserving the normal opening flow. */
+async function nativeDropSmoke(page, pid) {
+  const dropped = path.join(path.dirname(netlist), "拖入 电路.NETLIST");
+  fs.copyFileSync(netlist, dropped);
+  const emit = (type, paths = []) => page.evaluate(`window.__TAURI__.event.emitTo({ kind: 'Webview', label: 'main' }, 'tauri://drag-${type}', ${JSON.stringify({ paths, position: { x: 100, y: 100 } })})`);
+  await emit("enter", [dropped]);
+  await until("native drag feedback", () => page.evaluate(`document.body.classList.contains('dropping')`));
+  await emit("leave");
+  await until("native drag feedback to clear", () => page.evaluate(`!document.body.classList.contains('dropping')`));
+  await emit("drop", [dropped]);
+  await until("the dropped netlist", () => page.evaluate(`window.viewer.doc?.name === ${JSON.stringify(path.basename(dropped))} && !document.body.classList.contains('busy')`));
+  await until("the dropped Unicode filename in the title", () => windowTitle(pid) === `${path.basename(dropped)} - RNL Viewer`);
+  await emit("drop", [netlist]);
+  await until("the original netlist after a second drop", () => page.evaluate(`window.viewer.doc?.name === ${JSON.stringify(TOP)} && !document.body.classList.contains('busy')`));
+  console.log("native drop events opened a Unicode/space .NETLIST path, preserved includes and cleared drag feedback");
 }
 
 /** File > New Window launches this executable again, restores the session and leaves its parent. */
@@ -770,6 +854,9 @@ async function filePoolSmoke(page) {
     const util = await import('./util.js'); await util.flushSettings(); return util.settingsPath;
   })()`);
   same(JSON.parse(fs.readFileSync(settings, "utf8"))["search-paths"], [slashed(parts)], "native settings file PATH");
+  await autoIncludeSmoke(page, work, parts, pkg);
+  await memoryCacheSmoke(page, work);
+  await preloadSmoke(page, work);
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-row')).every(r => !r.textContent.includes('Exclude'))`), "a built-in can be excluded");
   await page.evaluate(`document.querySelector('[data-group="builtin"] .lib-toggle').click()`);
   await page.evaluate(`document.querySelector('[aria-label="Open 0.3/rnl-std.rnl"]').click()`);
@@ -801,6 +888,188 @@ async function filePoolSmoke(page) {
   console.log("The native core bundles only standard packages and offers the public-package website on missing USE-PACKAGE");
 }
 
+/** File transitions exercise the real disk reader and build cache, not a fixture shell. */
+async function independentNavigationSmoke(page) {
+  const work = path.dirname(netlist);
+  const top = path.join(work, 'visit-top.sp'), cell = path.join(work, 'visit-cell.inc'), leaf = path.join(work, 'visit-leaf.inc');
+  fs.writeFileSync(top, '* visits\n.include "visit-cell.inc"\n.include "visit-leaf.inc"\nXcell a 0 visit_cell\n* @RNL { #Xcell @PLACE(0, 0) }\n.end\n');
+  fs.writeFileSync(cell, '* cell\n.subckt visit_cell p n\nXleaf p n visit_leaf\n* @RNL { #Xleaf @PLACE(0, 0) }\n.ends\n');
+  fs.writeFileSync(leaf, '* leaf\n.subckt visit_leaf p n\nRleaf p n 1k\n* @RNL { #Rleaf @PLACE(0, 0) }\n.ends\n');
+  const result = await page.evaluate(`(async () => {
+    const {openSource} = await import('./open.js');
+    const {descend, ascend, namedPath, backTo} = await import('./subcircuits.js');
+    const {toggleAutoInclude, poolSnapshot} = await import('./pool.js');
+    await toggleAutoInclude(false);
+    await openSource({path:${JSON.stringify(top)},name:'visit-top.sp'},false);
+    await descend(window.viewer.doc.objects.findIndex(o => o.name === 'Xcell'));
+    const v=window.viewer;
+    const isolated={entry:v.doc.path, files:v.doc.files.length, opens:v.doc.objects.find(o => o.name === 'Xleaf').opens,
+      path:namedPath().map(s=>s.title), listed:poolSnapshot().some(i=>i.path.endsWith('/visit-cell.inc'))};
+    await toggleAutoInclude(true);
+    const resolved=v.doc.objects.find(o=>o.name==='Xleaf').opens !== null;
+    await descend(v.doc.objects.findIndex(o=>o.name==='Xleaf'));
+    const deep=namedPath().map(s=>s.title);
+    await backTo(0);
+    const back={path:namedPath().map(s=>s.title),selected:v.doc.objects[v.selected]?.name};
+    await descend(v.doc.objects.findIndex(o=>o.name==='Xcell'));
+    await ascend();
+    return {isolated,resolved,deep,back,entry:v.doc.path};
+  })()`);
+  same(result.isolated.files,1,'child independently reads one disk file');
+  same(result.isolated.opens,null,'parent include definitions are absent with Auto Include off');
+  check(result.isolated.entry.replaceAll('\\','/').endsWith('/visit-cell.inc'),'child did not become the entry');
+  same(result.isolated.listed,true,'visited disk file joins Files');
+  same(result.isolated.path,['visit-top.sp','visit_cell'],'cross-file descent history');
+  same(result.resolved,true,'Auto Include resolves the leaf using the Library index');
+  same(result.deep,['visit-top.sp','visit_cell','visit_leaf'],'deep cross-file history');
+  same(result.back,{path:['visit-top.sp'],selected:'Xcell'},'cross-level breadcrumb jump restores prefix and selection');
+  check(result.entry.replaceAll('\\','/').endsWith('/visit-top.sp'),'ascend did not reopen the top entry');
+  console.log('Cross-file disk navigation isolates includes, adds Library files, and restores visit history');
+}
+
+async function memoryCacheSmoke(page, work) {
+  const file = path.join(work, 'cache-a.sp');
+  fs.writeFileSync(file, '* a\nRcache a 0 1k\n.end\n');
+  const first = await page.evaluate(`(async () => {
+    const { shell } = await import('./shell.js');
+    await shell.memoryCache(true);
+    const before = await shell.memoryCache();
+    const a = { path: ${JSON.stringify(file)}, name: 'cache-a.sp' };
+    const b = { name: 'cache-b.sp', text: '* b\\nCcache b 0 1p\\n.end\\n' };
+    const cold = await shell.build(a);
+    await shell.build(b);
+    const warm = await shell.build(a);
+    const stats = await shell.memoryCache();
+    if (JSON.stringify(cold) !== JSON.stringify(warm)) throw Error('cache changed the document');
+    const drawings = await shell.unplacedDrawings(0, [0], ['Rcache']);
+    return { before, stats, hasSvg: !!drawings[0].svg };
+  })()`);
+  same(first.stats.hits - first.before.hits, 1, 'native cached switch hit');
+  same(first.stats.misses - first.before.misses, 2, 'native cold builds');
+  check(first.hasSvg && first.stats.used <= first.stats.limit, 'cached drawings or budget are invalid');
+  fs.writeFileSync(file, '* a\nRcache a 0 9k\n.end\n');
+  const changed = await page.evaluate(`(async () => {
+    const { shell } = await import('./shell.js');
+    const a = { path: ${JSON.stringify(file)}, name: 'cache-a.sp' };
+    const doc = await shell.build(a);
+    const changed = await shell.memoryCache();
+    await shell.build(a, undefined, undefined, undefined, undefined, { fresh: true });
+    const fresh = await shell.memoryCache();
+    await shell.memoryCache(true);
+    const after = await shell.memoryCache();
+    const drawings = await shell.unplacedDrawings(0, [0], ['Rcache']);
+    const { save } = await import('./util.js');
+    await save('render-cache-mib', 0);
+    await shell.build(a);
+    const disabled = await shell.memoryCache();
+    await save('render-cache-mib', 256);
+    await shell.memoryCache();
+    return { text: doc.files[0].text, changed, fresh, after, disabled, hasSvg: !!drawings[0].svg };
+  })()`);
+  check(changed.text.includes('9k'), 'same-size source edit reused old text');
+  same(changed.changed.misses, first.stats.misses + 1, 'source edit did not invalidate the cache');
+  same(changed.fresh.misses, changed.changed.misses + 1, 'forced reload reused the cache');
+  same(changed.after.entries, 0, 'Clear Cache kept entries');
+  check(changed.hasSvg, 'Clear Cache lost current unplaced drawings');
+  same(changed.disabled.used, 0, 'disabled cache retained a result');
+  console.log('Native cache reuses JSON/SVG, restores lazy drawings, detects same-size edits, forces reload and respects clear/disable');
+}
+
+/** The native preloader never activates a document, inherits parent includes, or promotes Files. */
+async function preloadSmoke(page, work) {
+  const child = path.join(work, 'preload-cell.inc'), leaf = path.join(work, 'preload-leaf.inc');
+  fs.writeFileSync(child, '* cell\n.subckt preload_cell p n\nXleaf p n preload_leaf\n.ends\n');
+  fs.writeFileSync(leaf, '* leaf\n.subckt preload_leaf p n\nRleaf p n 1k\n.ends\n');
+  const result = await page.evaluate(`(async () => {
+    const {shell} = await import('./shell.js');
+    const {save} = await import('./util.js');
+    const {poolSnapshot} = await import('./pool.js');
+    const shown = window.viewer.doc;
+    const listed = poolSnapshot().map(i=>i.path);
+    await save('background-preload', true);
+    await save('auto-include', false);
+    await shell.memoryCache(true);
+    await shell.setPool([{path:${JSON.stringify(leaf)}, source:{path:${JSON.stringify(leaf)}}}]);
+    await shell.build({name:'active.sp',text:'* active\\nRactive a 0 1k\\n.end\\n'});
+    const before = await shell.memoryCache();
+    const source = {path:${JSON.stringify(child)}, name:'preload-cell.inc'};
+    const ticket = await window.__TAURI__.core.invoke('preload_ticket');
+    await shell.cancelPreload();
+    const late = await window.__TAURI__.core.invoke('preload_document', {
+      path:source.path, pool:[], autoInclude:false, ticket });
+    let status;
+    for(let i=0;i<30;i++) {
+      status = await shell.preload(source);
+      if(status !== 'busy' && status !== 'cancelled') break;
+      await new Promise(r=>setTimeout(r,100));
+    }
+    const prepared = await shell.memoryCache();
+    const drawn = await shell.unplacedDrawings(0,[0],['Ractive']);
+    const isolated = await shell.build(source);
+    const after = await shell.memoryCache();
+    const noLeaf = isolated.objects.find(o=>o.name==='Xleaf').opens === null;
+    await save('auto-include', true);
+    const automatic = await shell.preload(source);
+    const resolved = await shell.build(source);
+    await save('background-preload', false);
+    const disabled = await shell.preload(source);
+    await save('background-preload', true);
+    return {status,automatic,disabled,late,noLeaf,resolved:resolved.objects.find(o=>o.name==='Xleaf').opens !== null,
+      retained:prepared.prefetched, hit:after.hits-before.hits, misses:after.misses-before.misses,
+      hasSvg:!!drawn[0].svg, sameView:shown===window.viewer.doc,
+      sameLibrary:JSON.stringify(listed)===JSON.stringify(poolSnapshot().map(i=>i.path))};
+  })()`);
+  same(result.status,'ready','native preload completes');
+  same(result.late,'cancelled','a late asynchronous IPC cannot adopt the post-cancel generation');
+  same(result.retained,1,'native cache retains a speculative document');
+  same(result.hit,1,'first independent open uses the preloaded document');
+  same(result.misses,0,'preloaded open did not compile again');
+  check(result.hasSvg && result.sameView && result.sameLibrary,'preloading changed active drawings, view or Files');
+  check(result.noLeaf && result.resolved,'preloading did not respect independent Auto Include scopes');
+  same(result.automatic,'ready','Auto Include uses its own cache key');
+  same(result.disabled,'disabled','preload preference is respected');
+  console.log('Background native compile/SVG reuses its first open, preserves active drawings/Files and isolates Auto Include scopes');
+}
+
+async function autoIncludeSmoke(page, work, parts, pkg) {
+  const top = path.join(work, "auto-top.sp");
+  const cell = path.join(parts, "cell.NETLIST");
+  const duplicate = path.join(parts, "duplicate.inc");
+  const body = '* auto top\n* @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="acme", version="1.0") }\nX1 a 0 cell\n.end\n';
+  fs.writeFileSync(top, body);
+  fs.writeFileSync(cell, ".subckt cell p n\nR1 p n 1k\n.ends\n");
+  await page.evaluate(`(async () => {
+    await (await import('./open.js')).openSource({ path: ${JSON.stringify(top)}, name: 'auto-top.sp' }, false);
+    await window.viewer.command('reload-library');
+  })()`);
+  check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group^="path:"] .pool-row')).some(r => r.dataset.path.endsWith('cell.NETLIST'))`), "PATH did not list netlists alongside packages");
+  same(await page.evaluate("window.viewer.doc.files.length"), 2, "Auto Include defaults on");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.severity === 'warning' && d.message.includes('cell.NETLIST') && d.message.includes('added by Auto Include'))`), "the automatic include warning is missing");
+  same(await page.evaluate("window.viewer.doc.files[0].text"), body, "Auto Include altered the source");
+  check(await page.evaluate("document.getElementById('auto-include').checked && window.viewer.checked('toggle-auto-include')"), "Auto Include controls disagree");
+  const solved = await page.evaluate(`(async () => {
+    const shell = (await import('./shells/desktop.js')).default;
+    const result = await shell.solve({ path: ${JSON.stringify(top)}, name: 'auto-top.sp' }, {});
+    return { files: result.document.files.map(f => f.name), levels: result.report.levels.map(l => l.title) };
+  })()`);
+  check(solved.levels.some(name => name === 'cell'), "Solve did not inherit Auto Include");
+  fs.writeFileSync(duplicate, ".subckt cell p n\n.ends\n");
+  await page.evaluate("window.viewer.command('reload-library')");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('conflicting definitions'))`), "the reloaded collision was ignored");
+  same(await page.evaluate("window.viewer.doc.files.length"), 1, "an ambiguous definition was imported");
+  fs.unlinkSync(duplicate);
+  fs.writeFileSync(cell, ".subckt replacement p n\nR2 p n 2k\n.ends\n");
+  fs.writeFileSync(top, body.replace("X1 a 0 cell", "X1 a 0 replacement"));
+  await page.evaluate("window.viewer.command('reload-library')");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('replacement') && d.message.includes('added by Auto Include'))`), "Reload Library retained stale definitions");
+  fs.writeFileSync(pkg, fs.readFileSync(pkg, "utf8").replace('version="1.0"', 'version="2.0"'));
+  await page.evaluate("window.viewer.command('reload-library')");
+  check(await page.evaluate(`window.viewer.doc.diagnostics.some(d => d.message.includes('acme 1.0 cannot be found'))`), "Reload Library did not reread packages");
+  await page.evaluate("window.viewer.command('toggle-auto-include')");
+  same(await page.evaluate("window.viewer.doc.files.length"), 1, "disabling Auto Include kept the library file");
+  console.log("PATH lists netlists; Auto Include imports unique definitions without changing text, reports collisions, and Reload Library refreshes netlists/packages and rebuilds the index");
+}
+
 /**
  * What there is of the app's WebView, for when its DevTools port does not answer: whether the app's
  * window answers, the WebView2 browser processes that the app started, with their arguments, and
@@ -830,12 +1099,15 @@ $all | Where-Object { $_.ParentProcessId -eq ${pid} } | ForEach-Object { "the ap
 }
 
 async function main() {
+  if (process.env.SMOKE_OUTPUT_DIR) fs.mkdirSync(process.env.SMOKE_OUTPUT_DIR, { recursive: true });
   const given = option("--exe");
   if (!given && !process.argv.includes("--no-build")) {
     execFileSync("cargo", ["build", "--manifest-path", manifest], { cwd: root, stdio: "inherit" });
   }
   const exe = given ? path.resolve(given) : appPath();
   check(fs.existsSync(exe), `There is no ${exe} to start${given ? "" : ": build the app, or leave out --no-build"}.`);
+  const pe = fs.readFileSync(exe);
+  same(pe.readUInt16LE(pe.readUInt32LE(0x3c) + 24 + 68), 2, "Viewer uses the Windows GUI subsystem, without a console");
   console.log(`starting ${exe}, on the WebView2 Runtime ${runtimeVersion() || "that the registry does not name"}`);
   const port = Number(option("--port")) || (await freePort());
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "rnl-viewer-smoke-"));

@@ -22,19 +22,20 @@ test("the tree lists the instances under the top level and opens their levels", 
   await expect(row("0/2")).toHaveClass(/\bactive\b/);
   await expect(row("0/2")).toHaveClass(/\bcurrent\b/);
   await expect(page.locator("#index .index-row.current")).toHaveText("rdiv1 use");
-  // up goes back along that way
+  // A tree pick starts a new visit chain; Backspace has no parent to return to.
   await page.keyboard.press("Backspace");
+  await expect(page.locator("#level-name")).toHaveText("rdiv");
+  await expect(page.locator("#up")).toBeHidden();
+  await row("0").click();
   await expect(page.locator("#level-name")).toHaveText(TOP);
-  await viewer.selected(`instance X3 in ${TOP}`);
 
-  // the two instances of amp reach the same level, each its own way
+  // Picking either instance directly starts at amp; the tree marks its first use.
   await row("0/1").click();
   await expect(page.locator("#level-name")).toHaveText("amp");
-  await expect(row("0/1")).toHaveClass(/\bactive\b/);
+  await expect(row("0/0")).toHaveClass(/\bactive\b/);
   await expect(row("0/0")).toHaveClass(/\bcurrent\b/);
-  await expect(row("0/0")).not.toHaveClass(/\bactive\b/);
-  await page.locator("#up").click();
-  await viewer.selected(`instance X2 in ${TOP}`);
+  await expect(page.locator("#up")).toBeHidden();
+  await row("0").click();
 
   // the top row's twisty folds and unfolds the tree, and opens nothing
   const twisty = row("0").locator(".twisty");

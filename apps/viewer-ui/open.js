@@ -1,5 +1,6 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // Opening a document: the shell reads a source and builds its Document, and the page shows it.
-// Reading the same source again keeps the level, the hierarchy path to it while its instances are
+// Reading the same source again keeps the level, the visit history to it while its circuits are
 // still there, the view, the selection and the text's scroll. File > Load from Clipboard opens the
 // clipboard's text, once the user has seen it, as a source that holds its text. A solve shown as a
 // preview (solve.js) ends when a source is opened or read again, which shows it as written; while
@@ -20,8 +21,8 @@ import { markDiagnostics, renderDiagnostics } from "./problems.js";
 import { startLevel, uncalledRoots } from "./roots.js";
 import { select } from "./selection.js";
 import { endPreview, previewing, solve } from "./solve.js";
-import { namedPath, restorePath } from "./subcircuits.js";
-import { clearSource, fileShown, fileViews, renderFiles, showFile } from "./text.js";
+import { namedPath, restorePath, visitView } from "./subcircuits.js";
+import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
 import { startLoading, nextPaint } from "./loading.js";
@@ -45,10 +46,11 @@ export function beginOpenOperation() {
  * preview closed shows the text applied); without them the files are read as they are, and the
  * text edited is what they hold.
  */
-export async function openSource(source, keep, edited) {
+export async function openSource(source, keep, edited, fresh = false, navigation = null, signal = null) {
   if (!source || loading) return;
-  const operation = beginOpenOperation();
-  if (!keep && !edited && !(await confirmLeave("open another file", operation.signal))) return;
+  // Initial API level selection is part of its import, not a competing user navigation.
+  const operation = signal ? { signal } : beginOpenOperation();
+  if (!keep && !edited && !(await confirmLeave(m("open another file"), operation.signal))) return;
   if (operation.signal.aborted) return;
   if (loading) return;
   loading = true;
@@ -57,7 +59,10 @@ export async function openSource(source, keep, edited) {
   let d;
   try {
     await progress.stage("reading");
-    d = await shell.build(source, edited, progress.setStage, undefined, operation.signal);
+    d = await shell.build(source, edited, stage => {
+      if (operation.signal.aborted) throw new Error('Opening superseded');
+      progress.setStage(stage);
+    }, undefined, operation.signal, { fresh });
     if (operation.signal.aborted) return;
     await progress.stage("displaying");
     if (operation.signal.aborted) return;
@@ -65,8 +70,8 @@ export async function openSource(source, keep, edited) {
     endPreview();
     if (edited) adoptBuffers(d);
     else resetBuffers(d);
-    showBuilt(d, keep);
-    sourceOpened(source, d, !keep, !!edited);
+    showBuilt(d, keep, navigation);
+    await sourceOpened(source, d, !keep, !!edited);
     await nextPaint();
     return true;
   } catch (e) {
@@ -74,18 +79,18 @@ export async function openSource(source, keep, edited) {
     lastSource = source;
     progress.finish();
     if (keep && edited) {
-      await inform({ title: "Rebuild", paragraphs: [`The document could not be rebuilt: ${e}. Your edits are still kept.`] });
+      await inform({ title: m("Rebuild"), paragraphs: [m`The document could not be rebuilt: ${e}. Your edits are still kept.`] });
       return;
     }
     endPreview();
     resetBuffers(null);
     setDoc(null);
-    clearDrawing(`Could not open ${source.name}`);
-    clearSource("The file could not be read.");
+    clearDrawing(m`Could not open ${source.name}`);
+    clearSource(m("The file could not be read."));
     renderHierarchy();
     renderDiagnostics([{ severity: "error", message: String(e), file: "", line: 0, col: 0, origin: "" }]);
     setProblems(true);
-    sourceOpened(source, null, false);
+    await sourceOpened(source, null, false);
   } finally {
     if (d) shell.discardBuild?.(d);
     progress.finish();
@@ -104,7 +109,7 @@ export async function pickAndOpen(kind) {
 
 export async function reload() {
   if (previewing()) solve();
-  else if (lastSource && (await confirmLeave("read the file again"))) openSource(lastSource, true);
+  else if (lastSource && (await confirmLeave(m("read the file again")))) openSource(lastSource, true, undefined, true);
 }
 
 /**
@@ -128,7 +133,7 @@ export async function applyEdits() {
     if (operation.signal.aborted) return false;
     adoptBuffers(d);
     showBuilt(d, true);
-    sourceOpened(lastSource, d, false, true);
+    await sourceOpened(lastSource, d, false, true);
     await nextPaint();
   } catch (e) {
     if (operation.signal.aborted) return false;
@@ -142,7 +147,7 @@ export async function applyEdits() {
     }
   }
   if (failed !== null) {
-    renderDiagnostics([...doc.diagnostics, { severity: "error", message: `The changes could not be applied: ${failed}`, file: "", line: 0, col: 0, origin: "" }]);
+    renderDiagnostics([...doc.diagnostics, { severity: "error", message: m`The changes could not be applied: ${failed}`, file: "", line: 0, col: 0, origin: "" }]);
     setProblems(true);
   }
   return failed === null;
@@ -168,19 +173,19 @@ export function isLoading() {
  * with what reading the same source again keeps: the level, the view, the selection and the text's
  * scroll.
  */
-export function showBuilt(d, keep) {
+export function showBuilt(d, keep, navigation = null) {
   shell.commitBuild?.(d);
   if (shell.platform === "web") document.title = `${d.name} - RNL Viewer`;
   const before = keep && doc ? snapshot() : null;
   setDoc(d);
-  showDocument(before);
+  showDocument(before, navigation);
 }
 
 /** What a text from the clipboard can be read as, by the extension of the file it is opened as. */
 const KINDS = [
-  ["sp", "SPICE netlist"],
-  ["scs", "Spectre netlist"],
-  ["rnl", "RNL package, checked on its own"],
+  ["sp", m("SPICE netlist")],
+  ["scs", m("Spectre netlist")],
+  ["rnl", m("RNL package, checked on its own")],
 ];
 const PREVIEW_LINES = 200; // the lines of the clipboard's text that its preview shows at most
 
@@ -204,19 +209,19 @@ export function guessKind(text) {
  */
 export async function loadClipboard() {
   if (loading || modal()) return;
-  const title = "Load from Clipboard";
+  const title = m("Load from Clipboard");
   let text;
   try {
-    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error("the browser does not let the page read it");
+    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error(m("the browser does not let the page read it"));
     text = await navigator.clipboard.readText();
   } catch (e) {
     const why = (e instanceof Error && e.message ? e.message : String(e)).replace(/\.$/, "");
-    const again = "Allow the page to read the clipboard if the browser asks, and choose Load from Clipboard again.";
-    await inform({ title, paragraphs: [`The clipboard could not be read: ${why}.`, again] });
+    const again = m("Allow the page to read the clipboard if the browser asks, and choose Load from Clipboard again.");
+    await inform({ title, paragraphs: [m`The clipboard could not be read: ${why}.`, again] });
     return;
   }
   if (!text.trim()) {
-    await inform({ title, paragraphs: ["The clipboard holds no text to load."] });
+    await inform({ title, paragraphs: [m("The clipboard holds no text to load.")] });
     return;
   }
   const kind = await preview(title, text);
@@ -229,21 +234,20 @@ function preview(title, text) {
   if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
   const warning = document.createElement("p");
   warning.className = "dialog-warning";
-  warning.textContent =
-    "This text from the clipboard will be opened in place of the document shown. Check that it is the netlist you mean to load.";
+  setText(warning, m("This text from the clipboard will be opened in place of the document shown. Check that it is the netlist you mean to load."));
   const box = document.createElement("pre");
   box.className = "clip-preview";
   box.tabIndex = 0;
-  box.setAttribute("aria-label", "The clipboard's text");
-  box.textContent = lines.slice(0, PREVIEW_LINES).join("\n");
+  setAttr(box, "aria-label", m("The clipboard's text"));
+  setText(box, lines.slice(0, PREVIEW_LINES).join("\n"));
   const size = document.createElement("p");
   size.className = "dialog-note";
-  const more = lines.length > PREVIEW_LINES ? `; the first ${PREVIEW_LINES} are shown` : "";
-  size.textContent = `${count(lines.length, "line")}, ${count(text.length, "character")}${more}.`;
+  const more = lines.length > PREVIEW_LINES ? m`; the first ${PREVIEW_LINES} are shown` : "";
+  setText(size, m`${count(lines.length, "line")}, ${count(text.length, "character")}${more}.`);
   const set = document.createElement("fieldset");
   const legend = document.createElement("legend");
-  legend.textContent = "Read it as";
-  set.append(legend);
+  setText(legend, m("Read it as"));
+  append(set, legend);
   const guess = guessKind(text);
   const inputs = KINDS.map(([ext, label]) => {
     const input = document.createElement("input");
@@ -253,13 +257,13 @@ function preview(title, text) {
     input.checked = ext === guess;
     const choice = document.createElement("label");
     choice.className = "dialog-choice";
-    choice.append(input, `${label} (.${ext})`);
-    set.append(choice);
+    append(choice, input, m`${label} (.${ext})`);
+    append(set, choice);
     return input;
   });
   const alone = document.createElement("p");
   alone.className = "dialog-note";
-  alone.textContent = "It is read alone, as clipboard.sp, .scs or .rnl: files that it includes are missing.";
+  setText(alone, m("It is read alone, as clipboard.sp, .scs or .rnl: files that it includes are missing."));
   return form({
     title,
     parts: [warning, box, size, set, alone],
@@ -271,7 +275,7 @@ function preview(title, text) {
 
 /** A number of things, such as "1 line" or "12 lines". */
 function count(n, thing) {
-  return `${n} ${thing}${n === 1 ? "" : "s"}`;
+  return m`${n} ${m(thing + (n === 1 ? "" : "s"))}`;
 }
 
 /** What to keep when the same source is read again. */
@@ -281,7 +285,12 @@ function snapshot() {
   return {
     level: doc.levels[current] ? doc.levels[current].title : null,
     view,
-    files: doc.files.map((f, k) => ({ path: f.path, scroll: fileViews[k] ? fileViews[k].scroll : 0 })),
+    files: doc.files.map((f, k) => {
+      const v = fileViews[k];
+      return { path: f.path, text: f.text, scroll: v?.scroll || 0,
+        pendingLine: v?.pendingLine ?? (v?._model && v.filtered ? v.lineAt(Math.max(0, Math.floor((v.scroll - 4 + 1) / v.height))) : undefined),
+        collapsed: [...(v?.collapsed || [])] };
+    }),
     file: doc.files[fileShown] ? doc.files[fileShown].path : null,
     selected: sel && { kind: sel.kind, name: sel.name, level: sel.level },
     expanded,
@@ -291,7 +300,7 @@ function snapshot() {
   };
 }
 
-function showDocument(before) {
+function showDocument(before, navigation) {
   setSelected(null);
   setEnabled("descend-new-window", false);
   // the trees of the subcircuits that the top level does not call start open, also those that a
@@ -299,8 +308,9 @@ function showDocument(before) {
   const roots = uncalledRoots().map(rootPath);
   const gained = before ? roots.filter((r) => !before.roots.includes(r)) : roots;
   setExpanded(new Set([...(before ? before.expanded : ["0"]), ...gained]));
-  setViewCache(before ? before.viewCache : new Map());
-  renderFiles();
+  setViewCache(before?.viewCache || navigation?.viewCache || new Map());
+  const file = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
+  renderFiles(file >= 0 ? file : 0);
   const diags = doc.diagnostics.slice();
   if (doc.failed) diags.unshift({ severity: "error", message: doc.failed, file: "", line: 0, col: 0, origin: "" });
   renderDiagnostics(diags);
@@ -310,25 +320,41 @@ function showDocument(before) {
   if (before) {
     for (const f of before.files) {
       const k = doc.files.findIndex((x) => x.path === f.path);
-      if (k >= 0) fileViews[k].scroll = f.scroll;
+      if (k >= 0) {
+        const v = fileViews[k];
+        v.scroll = f.scroll;
+        // A changed source can move its definitions. Preserve folds only for unchanged text.
+        if (doc.files[k].text === f.text && f.collapsed.length) {
+          v.collapsed = new Set(f.collapsed);
+          if (v._model) { v.mapLines(); v.refresh(true); }
+        }
+        if (f.pendingLine !== undefined) v.restoreLine(f.pendingLine);
+      }
     }
   }
-  const file = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
   showFile(file >= 0 ? file : 0);
 
   if (doc.levels.length === 0) {
-    clearDrawing("Nothing to draw.");
+    clearDrawing(m("Nothing to draw."));
     renderHierarchy();
     return;
   }
-  const kept = before ? doc.levels.findIndex((l) => l.title === before.level) : -1;
+  const wanted = before?.level || navigation?.level;
+  const kept = wanted ? doc.levels.findIndex((l) => l.title === wanted) : -1;
   // the level it was, else the top level, or, when that has no objects, the first subcircuit that
   // nothing calls, with a line that says so
   const start = kept >= 0 ? { level: kept, note: "" } : startLevel();
   // the path by the names of its levels and instances, or else one that starts at the level
-  restorePath(before ? before.path : [], start.level);
-  showLevel(start.level, kept >= 0 ? before.view : null);
+  restorePath(before?.path || navigation?.path || [], start.level);
+  showLevel(start.level, kept >= 0 ? before?.view || visitView() : null);
   notice(start.note);
+
+  if (navigation?.reveal) revealDefinition(start.level);
+  if (navigation?.select) {
+    const s = navigation.select;
+    const o = doc.objects.findIndex(o => o.kind === s.kind && o.name === s.name && o.level_title === s.level);
+    if (o >= 0) select(o, "ascend");
+  }
 
   if (before && before.selected) {
     const s = before.selected;

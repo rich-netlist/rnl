@@ -46,8 +46,12 @@ test("a key with Ctrl and a letter counts only with the Shift it names", async (
   await expect(page.locator("#sidebar")).toBeHidden();
   await page.keyboard.press("Control+Shift+M");
   await expect(page.locator("#pane-netlist")).toHaveClass(/\bproblems-folded\b/);
-  // the shell was told of the two that counted, and of nothing else
-  expect((await viewer.calls("setCheck")).slice(start)).toEqual([["toggle-netlist", false], ["toggle-problems", false]]);
+  // The two shortcuts counted; hiding also clears all pane check marks.
+  const changes = (await viewer.calls("setCheck")).slice(start);
+  expect(changes.filter(([id]) => !id.startsWith("panel-"))).toEqual([["toggle-netlist", false], ["toggle-problems", false]]);
+  expect(changes.filter(([id]) => id.startsWith("panel-"))).toEqual(
+    ["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"].map(name => [`panel-${name}`, false]),
+  );
 });
 
 test("G shows and hides the grid, but not while Ctrl or Alt is held, nor in a text box", async ({ page, viewer }) => {

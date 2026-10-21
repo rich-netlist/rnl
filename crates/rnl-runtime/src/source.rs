@@ -3,6 +3,22 @@
 
 use std::collections::BTreeMap;
 
+/// An opt-in viewer library lookup. Ordinary providers do not enable automatic includes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LibraryDefinition {
+    pub name: String,
+    pub path: String,
+    pub file: String,
+    /// User-facing source path, independent of a browser's internal pool namespace.
+    pub source: String,
+    pub line: u32,
+}
+
+pub trait LibraryLookup {
+    fn candidates(&self, name: &str, case_sensitive: bool) -> Vec<LibraryDefinition>;
+    fn definitions(&self, path: &str) -> Vec<LibraryDefinition>;
+}
+
 /// Supplies file contents and the tool's package directories (16.2).
 pub trait Provider {
     /// The text of a file, or None when it does not exist or cannot be read.
@@ -23,6 +39,10 @@ pub trait Provider {
     fn include_candidates(&self, _name: &str) -> Vec<String> {
         Vec::new()
     }
+
+    fn auto_include(&self) -> Option<&dyn LibraryLookup> {
+        None
+    }
 }
 
 /// Explicit files in a viewer's temporary file pool. Their original paths stay intact, so
@@ -33,6 +53,9 @@ pub struct FilePool<'a> {
 }
 
 impl Provider for FilePool<'_> {
+    fn auto_include(&self) -> Option<&dyn LibraryLookup> {
+        self.files.auto_include()
+    }
     fn read(&self, path: &str) -> Option<String> {
         self.files.read(path)
     }
@@ -162,6 +185,9 @@ pub struct Layered<'a> {
 }
 
 impl Provider for Layered<'_> {
+    fn auto_include(&self) -> Option<&dyn LibraryLookup> {
+        self.layers.iter().find_map(|p| p.auto_include())
+    }
     fn read(&self, path: &str) -> Option<String> {
         self.layers.iter().find_map(|p| p.read(path))
     }

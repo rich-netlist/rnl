@@ -1,9 +1,11 @@
+import { append, m, setText, startI18n } from "./i18n.js";
 // The page of the RNL Viewer, shared by the desktop viewer and the web viewer. Its shell reads a
 // netlist and builds the Document (shell.js); the page shows the drawing, the netlist text, the
 // diagnostics and the subcircuit hierarchy, and follows a selected instance or net between the
 // drawing and the text. Each part is a module of its own (README.md); this one starts the page.
 
 import { startPool } from "./pool.js";
+import { startPreload } from "./preload.js";
 import { setBackground } from "./background.js";
 import { command, isChecked, setCheck, startCommands } from "./commands.js";
 import { closeRequested } from "./editor.js";
@@ -17,16 +19,19 @@ import {
   setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
 } from "./panels.js";
 import { loadShell } from "./shell.js";
+import { startSolvePanel } from "./solve.js";
 import { finishStartup, stylesReady } from "./startup.js";
 import { current, doc, path, selected } from "./state.js";
 import { renderUnplaced } from "./unplaced.js";
-import { $, load, startSettings } from "./util.js";
+import { setSemanticsOnly, setRnlOnly } from "./text.js";
+import { $, load, save, startSettings } from "./util.js";
 
 /** Load the shell and the command table, then open what the shell has for the start. */
 async function start() {
   await stylesReady;
   const shell = await loadShell();
   await startSettings(shell);
+  await startI18n(shell, load("language", null), value => save("language", value));
   if (shell.embed) {
     const { startEmbed } = await import("./embed.js");
     await startEmbed();
@@ -37,8 +42,11 @@ async function start() {
   setProblemsHeight(load("problems-height", 180));
   setSidebar(load("sidebar-shown", true));
   setProblems(load("problems-shown", true));
+  startSolvePanel();
   setPane(load("side-pane", "netlist"));
   setShowFailed(load("show-failed", true));
+  setSemanticsOnly(load("semantics-only", false));
+  setRnlOnly(load("rnl-only", false));
   // the text is read, not edited, until the user says (editor.js); the native menu starts checked
   setCheck("toggle-edit", false);
   setIndexHeight(load("index-height", 260));
@@ -54,15 +62,16 @@ async function start() {
   {
     const li = document.createElement("li");
     li.className = "nothing";
-    li.textContent = "No file is open.";
-    $("diags").append(li);
+    setText(li, m("No file is open."));
+    append($("diags"), li);
   }
   renderUnplaced();
 
   await startCommands();
   await startPool();
+  startPreload();
   if (!shell.nativeMenu) showMenuBar(true);
-  if (shell.onOpen) shell.onOpen((source) => openSource(source, false));
+  if (shell.onOpen) await shell.onOpen((source) => openSource(source, false));
   if (shell.onCloseRequested) shell.onCloseRequested(closeRequested);
   if (shell.platform === "web" && new URLSearchParams(location.search).get("api") === "1") {
     const { startFullViewerApi } = await import("./full-viewer-api.js");
@@ -76,7 +85,7 @@ async function start() {
 
 // a shell may reject with a plain message, as Tauri's invoke does
 start().catch((e) => {
-  $("empty").textContent = e instanceof Error ? e.message : String(e);
+  setText($("empty"), e instanceof Error ? e.message : String(e));
 }).finally(finishStartup);
 
 // A handle for tests and the console, which cannot see into the modules.
@@ -90,7 +99,7 @@ window.viewer = {
     return current;
   },
   /**
-   * The hierarchy path to it, from its root: per level, its index and the instance it was reached
+   * Visit history: per level, its index (-1 for another file) and the instance it was reached
    * through, null for the root.
    */
   get path() {

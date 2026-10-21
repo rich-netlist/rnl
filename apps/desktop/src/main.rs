@@ -4,14 +4,17 @@
 //! it can solve the netlist as a preview, and save a solved copy where the user says (decision
 //! 0010). It writes no file otherwise, and as opened, objects without a position are not drawn.
 
-// no console window behind the app in release builds on Windows
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Viewer is a GUI application, including local fast/debug builds. The CLI keeps its console.
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+mod build_cache;
 mod core_thread;
 mod files;
+mod library;
 mod load_progress;
 mod menu;
 mod pool;
+mod preload;
 mod session;
 mod settings;
 mod solve;
@@ -24,7 +27,7 @@ use std::sync::Mutex;
 use core_thread::Core;
 use files::{Edits, Saved, SavedFile};
 use rnl_cli::FsProvider;
-use rnl_view::{BuildOptions, Document, UnplacedDrawing};
+use rnl_view::UnplacedDrawing;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
@@ -89,7 +92,7 @@ fn file_argument(args: impl IntoIterator<Item = OsString>) -> Option<OsString> {
 }
 
 /// The extensions offered first in the open dialog.
-const NETLISTS: [&str; 10] = ["sp", "spi", "spice", "cir", "ckt", "net", "inc", "lib", "scs", "rnl"];
+const NETLISTS: [&str; 11] = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"];
 
 /// Read and draw a file, and name the window after it. With `edits`, the texts of some of its
 /// files are those, over what is on disk. The drawings of the objects it lists without a position
@@ -102,13 +105,19 @@ async fn open_document(
     unsaved: State<'_, Unsaved>,
     core: State<'_, Core>,
     settings: State<'_, settings::Settings>,
+    library: State<'_, library::Library>,
+    auto_include: Option<bool>,
     pool: Option<Vec<String>>,
     path: String,
     edits: Option<Edits>,
     request_id: Option<String>,
-) -> Result<Document, String> {
+    fresh: Option<bool>,
+) -> Result<tauri::ipc::Response, String> {
+    core.preload.cancel();
     let core = core.inner().clone();
     let paths = settings.paths()?;
+    let cache_limit = settings.cache_limit()?;
+    let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let progress_window = window.clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
@@ -123,16 +132,22 @@ async fn open_document(
             let disk = FsProvider::new(&paths).with_search_paths(&paths);
             let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
             let layered = files::layered(&held, &disk);
+            let index = library.with_edits(&held, &layered);
+            let layered =
+                rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&layered, &progress_window, request_id.as_deref());
-            let (doc, kept) = rnl_view::build_drawn(&entry, &provider, &BuildOptions::default())?;
-            *drawn = Some(kept);
-            Ok::<_, String>(doc)
+            drawn.set_limit(cache_limit);
+            let built = drawn.build(&entry, &provider, fresh.unwrap_or(false))?;
+            if built.hit {
+                provider.cached();
+            }
+            Ok::<_, String>(built)
         })
     })
     .await
     .map_err(|e| e.to_string())???;
     unsaved.set(&window, |state| state.0 = doc.name.clone());
-    Ok(doc)
+    Ok(tauri::ipc::Response::new(doc.json))
 }
 
 /// Draw a netlist held in memory, such as one from the clipboard, as the file `name`, whose
@@ -145,14 +160,20 @@ async fn open_text(
     unsaved: State<'_, Unsaved>,
     core: State<'_, Core>,
     settings: State<'_, settings::Settings>,
+    library: State<'_, library::Library>,
+    auto_include: Option<bool>,
     pool: Option<Vec<String>>,
     name: String,
     text: String,
     edits: Option<Edits>,
     request_id: Option<String>,
-) -> Result<Document, String> {
+    fresh: Option<bool>,
+) -> Result<tauri::ipc::Response, String> {
+    core.preload.cancel();
     let core = core.inner().clone();
     let paths = settings.paths()?;
+    let cache_limit = settings.cache_limit()?;
+    let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let progress_window = window.clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
@@ -162,16 +183,22 @@ async fn open_text(
             let disk = FsProvider::new(&paths).with_search_paths(&paths);
             let disk = rnl_runtime::source::FilePool { files: &disk, paths: &pool };
             let files = files::layered(&held, &disk);
+            let index = library.with_edits(&held, &files);
+            let files =
+                rnl_view::LibraryProvider { files: &files, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&files, &progress_window, request_id.as_deref());
-            let (doc, kept) = rnl_view::build_drawn(&entry, &provider, &BuildOptions::default())?;
-            *drawn = Some(kept);
-            Ok::<_, String>(doc)
+            drawn.set_limit(cache_limit);
+            let built = drawn.build(&entry, &provider, fresh.unwrap_or(false))?;
+            if built.hit {
+                provider.cached();
+            }
+            Ok::<_, String>(built)
         })
     })
     .await
     .map_err(|e| e.to_string())???;
     unsaved.set(&window, |state| state.0 = doc.name.clone());
-    Ok(doc)
+    Ok(tauri::ipc::Response::new(doc.json))
 }
 
 /// The drawings of the objects at `items` of `levels[level].unplaced` of the document opened last:
@@ -185,14 +212,39 @@ async fn unplaced_drawings(
     names: Vec<String>,
 ) -> Result<Vec<UnplacedDrawing>, String> {
     let core = core.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || core.run(move |drawn| drawn.unplaced(level, &items, &names)))
+        .await
+        .map_err(|e| e.to_string())??
+}
+
+/// Inspect/configure the bounded cache without changing the document currently displayed.
+#[tauri::command]
+async fn memory_cache(
+    core: State<'_, Core>,
+    settings: State<'_, settings::Settings>,
+    clear: Option<bool>,
+) -> Result<build_cache::Stats, String> {
+    let core = core.inner().clone();
+    let limit = settings.cache_limit()?;
+    let clear = clear.unwrap_or(false);
+    if clear || !settings.preload_enabled()? {
+        core.preload.cancel();
+    }
+    let preload = core.preload.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        core.run(move |drawn| match drawn {
-            Some(d) => d.unplaced(level, &items, &names),
-            None => Err("no document has kept drawings".to_string()),
+        core.run(move |cache| {
+            if cache.stats().limit != limit {
+                preload.cancel();
+            }
+            cache.set_limit(limit);
+            if clear {
+                cache.clear();
+            }
+            cache.stats()
         })
     })
     .await
-    .map_err(|e| e.to_string())??
+    .map_err(|e| e.to_string())?
 }
 
 /// Write the files of the netlist at `entry` that the user chose to save where they were read from,
@@ -224,9 +276,9 @@ async fn save_file_as(
         .dialog()
         .file()
         .set_parent(&window)
-        .set_title("Save As")
+        .set_title(menu::text(window.app_handle(), "Save As"))
         .set_file_name(name)
-        .add_filter("Netlists and packages", &NETLISTS);
+        .add_filter(menu::text(window.app_handle(), "Netlists and packages"), &NETLISTS);
     if let Some(dir) = entry.map(PathBuf::from).and_then(|p| p.parent().map(PathBuf::from)).filter(|d| d.is_dir()) {
         dialog = dialog.set_directory(dir);
     }
@@ -261,11 +313,14 @@ fn finish_startup(window: WebviewWindow, startup: State<'_, startup::Startup>) -
 /// Ask for a file to open; None when the dialog is cancelled.
 #[tauri::command]
 async fn pick_file(window: WebviewWindow) -> Option<String> {
-    let dialog = window.dialog().file().set_parent(&window).add_filter("Netlists and packages", &NETLISTS);
-    let picked =
-        tauri::async_runtime::spawn_blocking(move || dialog.add_filter("All files", &["*"]).blocking_pick_file())
-            .await
-            .ok()??;
+    let dialog = window
+        .dialog()
+        .file()
+        .set_parent(&window)
+        .set_title(menu::text(window.app_handle(), "Open Netlist"))
+        .add_filter(menu::text(window.app_handle(), "Netlists and packages"), &NETLISTS)
+        .add_filter(menu::text(window.app_handle(), "All files"), &["*"]);
+    let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_pick_file()).await.ok()??;
     picked.into_path().ok().map(|p| p.to_string_lossy().into_owned())
 }
 
@@ -275,6 +330,21 @@ fn initial_file() -> Option<String> {
     let arg = file_argument(std::env::args_os().skip(1))?;
     let path = std::path::absolute(PathBuf::from(arg)).ok()?;
     Some(path.to_string_lossy().into_owned())
+}
+
+/// Windows owns the choice of a default application; show its supported settings UI.
+#[tauri::command]
+fn open_default_apps(app: AppHandle) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use tauri_plugin_opener::OpenerExt;
+        app.opener().open_url("ms-settings:defaultapps", None::<&str>).map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        Err("File associations are configured in the operating system.".into())
+    }
 }
 
 fn main() {
@@ -304,6 +374,7 @@ fn main() {
         .manage(settings::Settings::default())
         .manage(session::Initial(Mutex::new(session)))
         .manage(Core::new())
+        .manage(library::Library::default())
         .manage(startup)
         .menu(menu::menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -322,9 +393,13 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            preload::preload_document,
+            preload::cancel_preload,
+            preload::preload_ticket,
             open_document,
             open_text,
             unplaced_drawings,
+            memory_cache,
             save_files,
             save_file_as,
             set_dirty,
@@ -332,15 +407,19 @@ fn main() {
             finish_startup,
             pick_file,
             initial_file,
+            open_default_apps,
             session::initial_session,
             session::new_window,
             settings::load_settings,
             settings::save_setting,
             pool::pick_pool,
+            pool::dropped_files,
             pool::bundled_files,
             pool::path_packages,
+            library::update_library,
             menu::set_view_check,
             menu::set_command_enabled,
+            menu::set_ui_language,
             solve::solve_preview,
             solve::solver_defaults,
             solve::check_solver_options,

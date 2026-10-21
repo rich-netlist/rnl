@@ -52,11 +52,11 @@ test.describe("the objects not drawn", () => {
     await viewer.open("unplaced");
   });
 
-  test("the tab counts the objects of the level shown, and the list names them in the order of the netlist", async ({ page }) => {
+  test("the tab counts components and the list names all undrawn objects in netlist order", async ({ page }) => {
     const n = await unplacedCount(page);
     // the three instances, the 60 resistors, and the grounds of net 0 that nothing places either
     expect(n).toBeGreaterThanOrEqual(63);
-    await expect(page.locator("#tab-unplaced")).toHaveText(`Not drawn (${n})`);
+    await expect(page.locator("#tab-unplaced")).toHaveAccessibleName('Not drawn (63)');
     await show(page);
     await expect(page.locator("#unplaced-count")).toHaveText(String(n));
     const shown = await names(page);
@@ -175,7 +175,7 @@ test.describe("the objects not drawn", () => {
     await page.evaluate(() => window.viewer.command("descend"));
     await expect.poll(() => page.evaluate(() => window.viewer.path.length)).toBe(2);
     await expect(page.locator("#source .ln.not-drawn")).toHaveCount(0);
-    await expect(page.locator("#tab-unplaced")).toHaveText("Not drawn (2)");
+    await expect(page.locator("#tab-unplaced")).toHaveAccessibleName("Not drawn");
     await show(page);
     await expect(rows(page)).toHaveCount(2);
     await expect(rows(page).locator(".symbol")).toHaveText([/^usage · /, /^usage · /]);
@@ -304,7 +304,7 @@ test("a device whose model card is not found is listed with the reason, has no d
   const listed = await page.evaluate(() => window.viewer.doc.levels[0].unplaced.map((u) => [u.name, u.reason ?? null]));
   expect(listed.filter(([, reason]) => reason).map(([name]) => name)).toEqual(["M2", "M3", "Q1"]);
   expect(listed.find(([name]) => name === "M1")[1]).toBeNull();
-  await expect(page.locator("#tab-unplaced")).toHaveText(`Not drawn (${listed.length})`);
+  await expect(page.locator("#tab-unplaced")).toHaveAccessibleName(`Not drawn (${listed.length})`);
   await show(page);
   const row = (name) => rows(page).filter({ has: page.locator(".name", { hasText: new RegExp(`^${name}$`) }) });
   await expect(row("M2").locator(".symbol")).toHaveText("instance · not drawn: model card not found");
@@ -319,7 +319,7 @@ test("a device whose model card is not found is listed with the reason, has no d
 
 test("a level with everything placed has no count and says so", async ({ page, viewer }) => {
   await viewer.open("04-hierarchy");
-  await expect(page.locator("#tab-unplaced")).toHaveText("Not drawn");
+  await expect(page.locator("#tab-unplaced")).toHaveAccessibleName("Not drawn");
   await show(page);
   await expect(page.locator("#unplaced-list .nothing")).toHaveText("Every object of this level has a position.");
   await expect(page.locator("#unplaced-count")).toHaveText("");

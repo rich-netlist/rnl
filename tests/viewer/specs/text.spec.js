@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 // The text pane: the highlighting of the host statements and the records, the statements over
 // several lines, the statements that do not take effect and the box that marks them, the problems
 // that show their lines, the file tabs, a line that waits for the text pane to be shown, and the
@@ -97,7 +98,7 @@ test("a statement over several lines is marked on each of them, and highlighted 
   expect(await highlighted(viewer, 9)).toEqual([["r", "param"]]);
 });
 
-test("failed and overridden statements are marked, and the checkbox turns the marks off", async ({ page, viewer }) => {
+test("failed and overridden statements are greyed, and the checkbox hides their rows", async ({ page, viewer }) => {
   await viewer.open("12-diagnostics");
   const failed = await page.evaluate(() => window.viewer.doc.files[0].failed);
   expect(failed.some((f) => f[4]) && failed.some((f) => !f[4])).toBe(true);
@@ -115,27 +116,22 @@ test("failed and overridden statements are marked, and the checkbox turns the ma
   await expect(viewer.line(44).locator(".x-overridden").first()).toHaveAttribute("title", /^Overridden/);
   await expect(viewer.line(44).locator(".x-failed").first()).toHaveAttribute("title", /^Failed/);
 
-  const background = (cls) => viewer.line(44).locator(cls).first().evaluate((e) => getComputedStyle(e).backgroundColor);
-  const none = "rgba(0, 0, 0, 0)";
-  const [failedBg, overriddenBg] = [await background(".x-failed"), await background(".x-overridden")];
-  expect(failedBg).not.toBe(none);
-  expect(overriddenBg).not.toBe(none);
-  expect(failedBg).not.toBe(overriddenBg);
+  await expect(viewer.line(44)).toHaveClass(/inactive-line/);
+  expect(await viewer.line(44).locator('.code').evaluate(el => Number(getComputedStyle(el).opacity))).toBeLessThan(1);
 
   const box = page.locator("#show-failed");
   await expect(box).toBeChecked();
   await box.uncheck();
-  await expect(page.locator("#source")).toHaveClass(/\bhide-failed\b/);
-  expect([await background(".x-failed"), await background(".x-overridden")]).toEqual([none, none]);
+  for (const [line] of failed) await expect(viewer.line(line)).toHaveCount(0);
   expect(await viewer.stored("show-failed")).toBe(false);
   // the setting is kept for the next start
   await viewer.open("12-diagnostics");
   await expect(box).not.toBeChecked();
-  await expect(page.locator("#source")).toHaveClass(/\bhide-failed\b/);
+  await expect(viewer.line(44)).toHaveCount(0);
   // the label's text turns it back on
   await page.locator(".failed-toggle span", { hasText: "Failed statements" }).click();
   await expect(box).toBeChecked();
-  expect([await background(".x-failed"), await background(".x-overridden")]).toEqual([failedBg, overriddenBg]);
+  await expect(viewer.line(44)).toHaveClass(/inactive-line/);
   expect(await viewer.stored("show-failed")).toBe(true);
 });
 
@@ -178,11 +174,11 @@ test("selecting on the drawing shows the file and the line of the statement", as
   await page.locator("#tab-netlist").click();
   await viewer.click("R2");
   await viewer.selected("instance R2 in rdiv");
-  await expect(page.locator("#file-tabs button[aria-selected=true]")).toHaveText("04-hierarchy-lib.inc");
+  await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
   expect(await viewer.markedLines()).toEqual([4]);
 
   // each file keeps its own scroll
-  await page.locator("#file-tabs button", { hasText: TOP }).click();
+  await showSource(page, TOP);
   expect(await page.locator("#source").evaluate((s) => s.scrollTop)).toBe(main);
 });
 

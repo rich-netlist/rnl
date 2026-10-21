@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // Solve > Settings (desktop): the options of the solver, as `rnl solve --solver-options` has them
 // (crates/rnl-solver/src/options.rs): the time limit of the resolution, the tolerance, the grid, the
 // beam, the work of the search and the router, whether to seek every conflict group of the facts of
@@ -15,20 +16,20 @@ const KEY = "solve-options";
 
 /** What each objective of the solver does, for the dialog; one the page does not know has none. */
 const WHAT = {
-  current_direction: "the sources of transistors towards the ground",
-  ground_direction: "ground symbols below their pins",
-  signal_flow: "input ports left of output ports",
-  component_alignment: "connected elements in few columns and rows",
-  distribution: "elements evenly spaced",
-  symmetry: "mirror pairs placed symmetrically",
-  turns: "wires with fewer bends",
-  crossings: "wires of different nets crossing less",
-  wire_length: "shorter wires",
-  area: "a smaller drawing",
-  aspect: "a drawing about as wide as 16 to 9",
-  terminal_wire_alignment: "wires leaving terminals in line",
-  labels: "the places of labels",
-  bend_alignment: "the bends of wires in line",
+  current_direction: m("the sources of transistors towards the ground"),
+  ground_direction: m("ground symbols below their pins"),
+  signal_flow: m("input ports left of output ports"),
+  component_alignment: m("connected elements in few columns and rows"),
+  distribution: m("elements evenly spaced"),
+  symmetry: m("mirror pairs placed symmetrically"),
+  turns: m("wires with fewer bends"),
+  crossings: m("wires of different nets crossing less"),
+  wire_length: m("shorter wires"),
+  area: m("a smaller drawing"),
+  aspect: m("a drawing about as wide as 16 to 9"),
+  terminal_wire_alignment: m("wires leaving terminals in line"),
+  labels: m("the places of labels"),
+  bend_alignment: m("the bends of wires in line"),
 };
 
 /**
@@ -167,7 +168,7 @@ export async function settings() {
   try {
     defaults = await shell.solverDefaults();
   } catch (e) {
-    await inform({ title: "Solver Settings", paragraphs: [`The solver's defaults could not be read: ${e instanceof Error ? e.message : String(e)}`] });
+    await inform({ title: m("Solver Settings"), paragraphs: [m`The solver's defaults could not be read: ${e instanceof Error ? e.message : String(e)}`] });
     return;
   }
   const fields = fieldsOf(defaults);
@@ -178,7 +179,7 @@ export async function settings() {
   const restore = document.createElement("button");
   restore.type = "button";
   restore.className = "settings-restore";
-  restore.textContent = "Restore Defaults";
+  setText(restore, m("Restore Defaults"));
   restore.addEventListener("click", () => {
     fields.set(valuesOf(defaults, {}));
     error.hidden = true;
@@ -190,13 +191,13 @@ export async function settings() {
     const kept = v.error ? null : textOf(differences(defaults, v));
     const flag = kept && kept.hintsForLow ? " --report" : "";
     const option = kept && kept.options ? ` --solver-options "${kept.options}"` : "";
-    asText.textContent = !kept ? "" : flag || option ? `As rnl solve takes them: rnl solve${flag}${option}` : "The defaults of rnl solve.";
+    setText(asText, !kept ? "" : flag || option ? m`As rnl solve takes them: rnl solve${flag}${option}` : m("The defaults of rnl solve."));
   };
   for (const type of ["input", "change", "click"]) fields.el.addEventListener(type, showText);
   restore.addEventListener("click", showText);
   showText();
   const chosen = await form({
-    title: "Solver Settings",
+    title: m("Solver Settings"),
     parts: [
       priorityNote(),
       fields.el,
@@ -220,7 +221,7 @@ export async function settings() {
 
 /** Say what is wrong in a dialog and keep it open. */
 function fail(error, message) {
-  error.textContent = message;
+  setText(error, message);
   error.hidden = false;
   return undefined;
 }
@@ -229,10 +230,7 @@ function fail(error, message) {
 function priorityNote() {
   const p = document.createElement("p");
   p.className = "dialog-note settings-note";
-  p.textContent =
-    "The priority of a constraint, low, normal or high, is written in the netlist (7.6, 8.5), not set here. " +
-    "These settings are for what the solver does after the constraints are satisfied: which objective counts " +
-    "first and which next when it ranks the placements that satisfy them, and how long and how hard it works.";
+  setText(p, m`${m`${m("The priority of a constraint, low, normal or high, is written in the netlist (7.6, 8.5), not set here. ")}${m("These settings are for what the solver does after the constraints are satisfied: which objective counts ")}`}${m("first and which next when it ranks the placements that satisfy them, and how long and how hard it works.")}`);
   return p;
 }
 
@@ -240,7 +238,7 @@ function priorityNote() {
 function row(...parts) {
   const el = document.createElement("div");
   el.className = "dialog-line settings-line";
-  el.append(...parts);
+  append(el, ...parts);
   return el;
 }
 
@@ -252,9 +250,9 @@ function numberField(label, { step = "any", min = "0", hint = "" } = {}) {
   input.min = min;
   const caption = document.createElement("label");
   caption.className = "settings-label";
-  caption.append(span("name", label), input);
+  append(caption, span("name", label), input);
   const line = row(caption);
-  if (hint) line.append(span("settings-hint", hint));
+  if (hint) append(line, span("settings-hint", hint));
   return { input, line, label };
 }
 
@@ -264,7 +262,7 @@ function checkField(label) {
   input.type = "checkbox";
   const caption = document.createElement("label");
   caption.className = "dialog-choice";
-  caption.append(input, label);
+  append(caption, input, label);
   return { input, caption };
 }
 
@@ -277,35 +275,30 @@ function fieldsOf(defaults) {
   const el = document.createElement("div");
   el.className = "settings";
 
-  const limit = numberField("Time limit", { hint: "seconds the solver may spend on checking the facts of each level (8.5)" });
-  const noLimit = checkField("No limit");
+  const limit = numberField(m("Time limit"), { hint: m("seconds the solver may spend on checking the facts of each level (8.5)") });
+  const noLimit = checkField(m("No limit"));
   limit.line.insertBefore(noLimit.caption, limit.line.children[1]);
   noLimit.input.addEventListener("change", () => (limit.input.disabled = noLimit.input.checked));
-  const tolerance = numberField("Tolerance", { hint: "differences within it count as satisfied (11.7)" });
-  const grid = numberField("Grid", { hint: "free coordinates are rounded to it when the facts allow" });
-  const noGrid = checkField("No rounding");
+  const tolerance = numberField(m("Tolerance"), { hint: m("differences within it count as satisfied (11.7)") });
+  const grid = numberField(m("Grid"), { hint: m("free coordinates are rounded to it when the facts allow") });
+  const noGrid = checkField(m("No rounding"));
   grid.line.insertBefore(noGrid.caption, grid.line.children[1]);
   noGrid.input.addEventListener("change", () => (grid.input.disabled = noGrid.input.checked));
-  const beam = numberField("Beam", { step: "1", min: "1", hint: "variants of each group the search keeps" });
-  const candidates = numberField("Candidates", { step: "1", hint: "the search makes at most as many over a level" });
-  const expansions = numberField("Router cells", { step: "1", hint: "the router expands at most as many for one net" });
-  const hints = checkField("Seek every conflict group of the facts of priority low");
-  const hintsNote = span("settings-hint", "Only the report changes, and it can take far longer.");
+  const beam = numberField(m("Beam"), { step: "1", min: "1", hint: m("variants of each group the search keeps") });
+  const candidates = numberField(m("Candidates"), { step: "1", hint: m("the search makes at most as many over a level") });
+  const expansions = numberField(m("Router cells"), { step: "1", hint: m("the router expands at most as many for one net") });
+  const hints = checkField(m("Seek every conflict group of the facts of priority low"));
+  const hintsNote = span("settings-hint", m("Only the report changes, and it can take far longer."));
   const objectives = objectiveRows(defaults.names);
 
   const group = (title, ...parts) => {
     const set = document.createElement("fieldset");
     const legend = document.createElement("legend");
-    legend.textContent = title;
-    set.append(legend, ...parts);
+    setText(legend, title);
+    append(set, legend, ...parts);
     return set;
   };
-  el.append(
-    group("Time", limit.line),
-    group("Placement", tolerance.line, grid.line, beam.line),
-    group("Work", candidates.line, expansions.line, row(hints.caption, hintsNote)),
-    group("Objectives", objectives.el),
-  );
+  append(el, group(m("Time"), limit.line), group(m("Placement"), tolerance.line, grid.line, beam.line), group(m("Work"), candidates.line, expansions.line, row(hints.caption, hintsNote)), group(m("Objectives"), objectives.el));
 
   /** The number in a field, or null when it holds none. */
   const read = (field, integer = false) => {
@@ -341,12 +334,12 @@ function fieldsOf(defaults) {
         hints_for_low: hints.input.checked,
       };
       const bad = [
-        ["time_limit", "The time limit is a number of seconds, or no limit."],
-        ["tolerance", "The tolerance is a number."],
-        ["grid", "The grid is a number, or no rounding."],
-        ["beam", "The beam is a whole number."],
-        ["candidates", "The candidates are a whole number."],
-        ["astar_expansions", "The router cells are a whole number."],
+        ["time_limit", m("The time limit is a number of seconds, or no limit.")],
+        ["tolerance", m("The tolerance is a number.")],
+        ["grid", m("The grid is a number, or no rounding.")],
+        ["beam", m("The beam is a whole number.")],
+        ["candidates", m("The candidates are a whole number.")],
+        ["astar_expansions", m("The router cells are a whole number.")],
       ].find(([k]) => v[k] === null);
       if (bad) return { error: bad[1] };
       const rows = objectives.read();
@@ -367,13 +360,10 @@ function objectiveRows(names) {
   el.className = "objectives";
   const note = document.createElement("p");
   note.className = "dialog-note";
-  note.textContent =
-    "The solver ranks the placements by these, the first level first. Objectives together in a level add up " +
-    "with their weights; a placement whose level is no further than its tolerance from the best counts as equal " +
-    "to it, and the next level decides among those. An objective that is off is not computed.";
+  setText(note, m`${m`${m("The solver ranks the placements by these, the first level first. Objectives together in a level add up ")}${m("with their weights; a placement whose level is no further than its tolerance from the best counts as equal ")}`}${m("to it, and the next level decides among those. An objective that is off is not computed.")}`);
   const list = document.createElement("ol");
   list.className = "objective-list";
-  el.append(note, list);
+  append(el, note, list);
   let rows = []; // { name, el, on, together, weight, tolerance, ... } in the order shown
 
   /** A row's element, with the controls that set its state. */
@@ -385,28 +375,28 @@ function objectiveRows(names) {
     const badge = span("objective-level", "");
     const on = document.createElement("input");
     on.type = "checkbox";
-    on.setAttribute("aria-label", `${r.name} is on`);
+    setAttr(on, "aria-label", m`${r.name} is on`);
     const name = span("objective-name", r.name);
     const what = span("objective-what", WHAT[r.name] || "");
     const label = document.createElement("label");
     label.className = "objective-on";
-    label.append(on, name);
-    const together = checkField("with the one above");
+    append(label, on, name);
+    const together = checkField(m("with the one above"));
     together.caption.classList.add("objective-together");
-    together.caption.title = "Put it in the level of the objective above: they add up";
-    const weight = numberInput("1", "weight", "Its weight in the level");
-    const tolerance = numberInput("any", "equal within", "The tolerance of the level: how far from the best a value counts as equal to it");
-    const up = moveButton("Move up", "↑", r.name);
-    const down = moveButton("Move down", "↓", r.name);
+    setAttr(together.caption, "title", m("Put it in the level of the objective above: they add up"));
+    const weight = numberInput("1", m("weight"), m("Its weight in the level"));
+    const tolerance = numberInput("any", m("equal within"), m("The tolerance of the level: how far from the best a value counts as equal to it"));
+    const up = moveButton(m("Move up"), "↑", r.name);
+    const down = moveButton(m("Move down"), "↓", r.name);
     const moves = span("objective-moves", "");
-    moves.append(up, down);
+    append(moves, up, down);
     const top = document.createElement("div");
     top.className = "objective-top";
-    top.append(badge, label, what, moves);
+    append(top, badge, label, what, moves);
     const more = document.createElement("div");
     more.className = "objective-more";
-    more.append(together.caption, weight.caption, tolerance.caption);
-    li.append(top, more);
+    append(more, together.caption, weight.caption, tolerance.caption);
+    append(li, top, more);
     on.addEventListener("change", () => {
       r.on = on.checked;
       refresh();
@@ -434,20 +424,20 @@ function objectiveRows(names) {
     input.type = "number";
     input.step = step;
     input.min = step === "1" ? "1" : "0";
-    input.setAttribute("aria-label", text);
+    setAttr(input, "aria-label", text);
     const caption = document.createElement("label");
     caption.className = "objective-number";
-    caption.title = title;
-    caption.append(span("name", text), input);
+    setAttr(caption, "title", title);
+    append(caption, span("name", text), input);
     return { input, caption };
   }
 
   function moveButton(text, arrow, name) {
     const b = document.createElement("button");
     b.type = "button";
-    b.textContent = arrow;
-    b.title = text;
-    b.setAttribute("aria-label", `${text}: ${name}`);
+    setText(b, arrow);
+    setAttr(b, "title", text);
+    setAttr(b, "aria-label", m`${text}: ${name}`);
     return b;
   }
 
@@ -470,8 +460,8 @@ function objectiveRows(names) {
     rows.forEach((r, k) => {
       const leader = r.on && !(r.together && anyOn);
       r.el.classList.toggle("off", !r.on);
-      r.badge.textContent = !r.on ? "off" : leader ? String(++level) : "+";
-      r.badge.title = !r.on ? "Not computed" : leader ? `Level ${level}` : "Added to the level above";
+      setText(r.badge, !r.on ? m("off") : leader ? String(++level) : "+");
+      setAttr(r.badge, "title", !r.on ? m("Not computed") : leader ? m`Level ${level}` : m("Added to the level above"));
       r.together_.caption.hidden = !(r.on && anyOn);
       r.weight_.input.disabled = !r.on;
       r.tolerance_.caption.hidden = !leader;
@@ -497,10 +487,10 @@ function objectiveRows(names) {
         // the weight counts where an objective is on, and the tolerance where it begins a level
         const leader = r.on && !(r.together && anyOn);
         if (r.on && (r.weight.trim() === "" || !Number.isInteger(weight))) {
-          return { error: `The weight of ${r.name} is a whole number.` };
+          return { error: m`The weight of ${r.name} is a whole number.` };
         }
         if (leader && (r.tolerance.trim() === "" || !Number.isFinite(tolerance))) {
-          return { error: `The tolerance of the level of ${r.name} is a number.` };
+          return { error: m`The tolerance of the level of ${r.name} is a number.` };
         }
         out.push({ name: r.name, on: r.on, together: r.together, weight: r.on ? weight : 1, tolerance: leader ? tolerance : 0 });
         anyOn = anyOn || r.on;

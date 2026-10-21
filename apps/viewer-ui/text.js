@@ -1,29 +1,55 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // The text pane: the netlist and the files it includes, highlighted, with the statements that do
 // not take effect marked, and the places of the selected object. Clicking a name or a statement in
 // the text selects its object; double-clicking a subcircuit instance opens it. While a subcircuit
 // is drawn, the text outside its definition is dimmed.
 
-import { doc, selected } from "./state.js";
-import { clearEditors, editing, focusEditor, renderEditors, revealInEditor, showEditor } from "./editor.js";
+import { current, doc, selected } from "./state.js";
+import { clearEditors, editing, refreshEditing, renderEditors, revealInEditor, showEditor } from "./editor.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens } from "./subcircuits.js";
 import { lineModel } from "./text-lines.js";
 import { LineWindow } from "./line-window.js";
 import { TextFind } from "./text-find.js";
-import { $ } from "./util.js";
+import { $, save } from "./util.js";
+import { navigate } from "./navigation.js";
 
 const app = $("app");
 const source = $("source");
 const netlistPane = $("pane-netlist");
-const tabs = $("file-tabs");
+const fileName = $("netlist-file");
 
 export let fileShown = 0; // the file in the text pane
+// Drawing levels are the main circuit or a subcircuit with its defining file in `lines`.
+export const circuitFile = () => doc?.levels[current]?.lines?.[0] ?? 0;
 export let fileViews = []; // per file: a LineWindow with text data, rendered rows and saved scroll
 let lineOwners = []; // per file: line number -> the instance whose statement it is
 let pendingReveal = null; // a line to bring into view once the text pane is shown
 let scope = null; // the definition of the subcircuit drawn: { f, from, to }, its file and lines
 let notDrawn = []; // per file: line number -> why its statement is not drawn
 const find = new TextFind(() => fileViews[fileShown], n => revealLine(fileShown, n, false));
+
+export function setSemanticsOnly(enabled) {
+  $("semantics-only").checked = enabled;
+  save("semantics-only", enabled);
+  updateSourceFilters();
+}
+$("semantics-only").addEventListener("change", () => setSemanticsOnly($("semantics-only").checked));
+
+export function setRnlOnly(enabled) {
+  $("rnl-only").checked = enabled;
+  save("rnl-only", enabled);
+  updateSourceFilters();
+}
+$("rnl-only").addEventListener("change", () => setRnlOnly($("rnl-only").checked));
+
+export function updateSourceFilters() {
+  $("semantics-only").disabled = editing || !$("rnl-only").checked;
+  for (const view of fileViews) view.setFilters(sourceFilters());
+  find.changed(true);
+}
+const sourceFilters = () => ({ rnlOnly: $("rnl-only").checked,
+  semanticsOnly: $("rnl-only").checked && $("semantics-only").checked, showFailed: $("show-failed").checked });
 
 /** Edit > Find in Netlist, routed through the shared command table like the other page commands. */
 export async function findInSource() {
@@ -50,8 +76,8 @@ function decorateLine(f, n, el) {
   el.classList.toggle("in-scope", !!scope && scope.f === f && n >= scope.from && n <= scope.to);
   const reason = notDrawn[f]?.get(n);
   el.classList.toggle("not-drawn", reason !== undefined);
-  if (reason !== undefined) el.title = reason;
-  else el.removeAttribute("title");
+  if (reason !== undefined) setAttr(el, "title", reason);
+  else setAttr(el, "title", null);
   const severity = fileViews[f]?.diagnostics?.get(n);
   for (const kind of ["error", "warning", "hint"]) el.classList.toggle(`d-${kind}`, severity === kind);
 }
@@ -96,85 +122,66 @@ export function clearSource(message) {
   source.classList.remove("scoped");
   fileViews = [];
   lineOwners = [];
-  tabs.replaceChildren();
+  fileName.hidden = true;
+  $("source-file").hidden = true;
   source.replaceChildren();
   const p = document.createElement("p");
   p.className = "placeholder";
-  p.textContent = message;
-  source.append(p);
+  setText(p, message);
+  append(source, p);
 }
 
-export function renderFiles() {
+export function renderFiles(shown = 0) {
   for (const view of fileViews) view.destroy();
   source.replaceChildren();
   scope = null;
   notDrawn = doc.files.map(() => new Map());
   source.classList.remove("scoped");
   fileViews = [];
+  fileShown = shown;
   lineOwners = doc.files.map(() => new Map());
   doc.objects.forEach((o, k) => {
     if (o.kind !== "instance" || !o.lines) return;
     const [f, a, b] = o.lines;
     for (let n = a; n <= b; n++) lineOwners[f].set(n, k);
   });
-  tabs.replaceChildren();
+  fileName.hidden = !doc.files.length;
+  const spans = doc.files.map(() => []), folds = doc.files.map(() => []);
+  for (const span of doc.spans) spans[span.file]?.push(span);
+  for (const level of doc.levels) if (level.lines) {
+    const [f, from, to] = level.lines;
+    folds[f]?.push([from, to]);
+  }
   doc.files.forEach((file, f) => {
-    const view = new LineWindow(source, lineModel(file, f, doc.spans, doc.dialect), (el, n) => decorateLine(f, n, el));
+    const dialect = doc.dialect;
+    const view = new LineWindow(source, () => lineModel(file, f, spans[f], dialect), (el, n) => decorateLine(f, n, el), folds[f]);
+    Object.assign(view, sourceFilters());
     fileViews.push(view);
-    source.append(view.el);
-    if (!view.virtual) view.refresh();
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = file.name.split(/[\\/]/).pop();
-    b.title = file.path;
-    b.addEventListener("click", () => {
-      showFile(f);
-      focusEditor();
-    });
-    tabs.append(b);
+    append(source, view.el);
   });
   renderEditors();
-  if (doc.files.length === 0) clearSource("This document has no host file to show.");
+  if (doc.files.length === 0) clearSource(m("This document has no host file to show."));
 }
 
 export function showFile(f) {
   if (!fileViews[f]) return;
   if (fileViews[fileShown] && fileShown !== f) fileViews[fileShown].scroll = source.scrollTop;
   fileViews.forEach((v, k) => { v.el.hidden = k !== f || editing; });
-  [...tabs.children].forEach((b, k) => b.setAttribute("aria-selected", String(k === f)));
   fileShown = f;
+  source.classList.toggle('scoped', !!scope && scope.f === f);
+  const origin = $("source-file");
+  origin.hidden = true;
+  setText(origin, doc.files[f].name.split(/[\\/]/).pop());
+  setAttr(origin, "title", doc.files[f].path);
+  refreshEditing();
   showEditor(f);
   if (editing) find.close(false);
-  source.classList.toggle("virtualized", fileViews[f].virtual && !editing);
   if (!editing) fileViews[f].refresh();
+  source.classList.toggle("virtualized", fileViews[f].virtual && !editing);
   source.scrollTop = fileViews[f].scroll;
   refreshSource();
-  tabInView(tabs.children[f]);
   find.changed();
 }
-
-// The file tabs scroll sideways with no scrollbar: the tab of the file shown is kept in view, and a
-// wheel turned over them scrolls them, as a sideways swipe does.
-
-/**
- * Scroll the file tabs, when they must, so that `tab` is in view, or as much of it as fits. They
- * scroll by whole pixels, rounded to bring the tab's edge in, as WebKit cuts a scroll to whole pixels.
- */
-function tabInView(tab) {
-  const [s, t] = [tabs.getBoundingClientRect(), tab.getBoundingClientRect()];
-  if (t.left < s.left) tabs.scrollLeft -= Math.ceil(s.left - t.left);
-  else if (t.right > s.right) tabs.scrollLeft += Math.min(Math.ceil(t.right - s.right), Math.floor(t.left - s.left));
-}
-
-tabs.addEventListener(
-  "wheel",
-  (e) => {
-    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || tabs.scrollWidth <= tabs.clientWidth) return;
-    e.preventDefault();
-    tabs.scrollLeft += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * tabs.clientWidth : e.deltaY;
-  },
-  { passive: false },
-);
 
 /** Whether the text pane is on screen, so that lines can be scrolled to. */
 function sourceShown() {
@@ -222,7 +229,9 @@ export function scopeSource(i) {
   const lines = doc && doc.levels[i] ? doc.levels[i].lines : null;
   scope = lines ? { f: lines[0], from: lines[1], to: lines[2] } : null;
   repaintLines();
-  source.classList.toggle("scoped", scope !== null);
+  source.classList.toggle("scoped", scope !== null && scope.f === fileShown);
+  refreshEditing();
+  $("source-file").hidden = true;
 }
 
 /**
@@ -238,9 +247,11 @@ export function markUnplaced(i) {
       const lines = doc.objects[o].lines;
       if (!lines) continue;
       const [f, from, to] = lines;
-      for (let n = from; n <= to; n++) notDrawn[f]?.set(n, u.reason ? `Not drawn: ${u.reason}` : "Not drawn: it has no position yet");
+      for (let n = from; n <= to; n++) notDrawn[f]?.set(n, u.reason ? m`Not drawn: ${u.reason}` : m("Not drawn: it has no position yet"));
     }
   }
+  for (const [f, view] of fileViews.entries()) view.setInactive(notDrawn[f]);
+  if (!$("show-failed").checked) find.changed(true);
   repaintLines();
 }
 
@@ -248,9 +259,16 @@ export function markUnplaced(i) {
 export function revealDefinition(i) {
   const lines = doc && doc.levels[i] ? doc.levels[i].lines : null;
   if (lines) revealLine(lines[0], lines[1], false, true);
+  else showFile(0);
 }
 
 source.addEventListener("click", (e) => {
+  const link = e.target.closest('a[data-include]');
+  if (link) {
+    e.preventDefault();
+    if (!String(window.getSelection())) navigate({file: Number(link.dataset.include)}, {newWindow: e.shiftKey});
+    return;
+  }
   if (!doc || String(window.getSelection())) return; // selecting text is not a click
   const s = e.target.closest("[data-obj]");
   if (s) {
@@ -265,6 +283,7 @@ source.addEventListener("click", (e) => {
 });
 
 source.addEventListener("dblclick", (e) => {
+  if (e.target.closest('a[data-include]')) { e.preventDefault(); return; }
   if (!doc) return;
   const s = e.target.closest("[data-obj]");
   const ln = e.target.closest(".ln");

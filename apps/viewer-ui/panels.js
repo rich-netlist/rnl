@@ -1,10 +1,11 @@
 // The side panel and its parts: the view it shows, what is folded, and the sizes the splitters
 // set, all kept through the shell's settings storage for the next start.
 
-import { setCheck } from "./commands.js";
+import { setCheck, setEnabled } from "./commands.js";
 import { updateHierarchy } from "./hierarchy.js";
-import { revealPending, refreshSource } from "./text.js";
+import { revealPending, refreshSource, updateSourceFilters } from "./text.js";
 import { showUnplaced } from "./unplaced.js";
+import { renderSymbol } from "./symbol.js";
 import { $, clamp, load, save } from "./util.js";
 
 const app = $("app");
@@ -20,26 +21,35 @@ const SOURCE_MIN = 120;
 const INDEX_MIN = 120;
 const TREE_MIN = 100;
 
+// All entry points (tabs, shortcuts, restore and menu) publish the same visible-pane state.
+function syncPanelCommands() {
+  const shown = !app.classList.contains("sidebar-hidden");
+  for (const name of ["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"]) {
+    const tab = $(`tab-${name}`);
+    setCheck(`panel-${name}`, shown && !tab.hidden && tab.getAttribute("aria-selected") === "true");
+  }
+  setEnabled("panel-hide", shown);
+}
+
 export function setSidebar(shown) {
   app.classList.toggle("sidebar-hidden", !shown);
   save("sidebar-shown", shown);
   setCheck("toggle-netlist", shown);
+  syncPanelCommands();
   if (shown) { refreshSource(); revealPending(); }
+  else if (sidebar.contains(document.activeElement)) $("show-sidebar").focus({ preventScroll: true });
 }
 
-/**
- * Show the "netlist", the "hierarchy", the objects "unplaced" (not drawn) or the "solve" view of the
- * side panel; the solve's only while a solve is shown (solve.js), and the netlist's for any other
- * name.
- */
+/** Select a side-panel view; Solve is available in shells with a solver. */
 export function setPane(name) {
   const view =
-    name === "files" || name === "hierarchy" || name === "unplaced" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
-  const panes = { files: $("pane-files"), netlist: netlistPane, hierarchy: hierarchyPane, unplaced: $("pane-unplaced"), solve: $("pane-solve") };
+    name === "files" || name === "hierarchy" || name === "symbol" || name === "unplaced" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
+  const panes = { files: $("pane-files"), netlist: netlistPane, hierarchy: hierarchyPane, symbol: $("pane-symbol"), unplaced: $("pane-unplaced"), solve: $("pane-solve") };
   for (const [k, el] of Object.entries(panes)) {
     el.hidden = k !== view;
     $(`tab-${k}`).setAttribute("aria-selected", String(k === view));
   }
+  syncPanelCommands();
   // a solve shown at the next start is not: the netlist's view then
   save("side-pane", view === "solve" ? "netlist" : view);
   if (view === "netlist") {
@@ -53,13 +63,24 @@ export function setPane(name) {
     showUnplaced();
   } else if (view === "files") {
     window.dispatchEvent(new Event("library-shown"));
+  } else if (view === "symbol") {
+    renderSymbol();
   }
+}
+
+/** A menu or shortcut opens the requested pane, including when the sidebar was collapsed. */
+export function showPane(name) {
+  const tab = $(`tab-${name}`);
+  if (!tab || tab.hidden) return;
+  if (app.classList.contains("sidebar-hidden")) setSidebar(true);
+  setPane(name);
+  tab.focus({ preventScroll: true });
 }
 
 export function setShowFailed(shown) {
   $("show-failed").checked = shown;
-  source.classList.toggle("hide-failed", !shown);
   save("show-failed", shown);
+  updateSourceFilters();
 }
 
 $("show-failed").addEventListener("change", () => setShowFailed($("show-failed").checked));
@@ -79,7 +100,7 @@ function sidebarWidthLimits() {
 // a hidden pane has no height yet: its size is taken as it is, and limited once it is shown
 function problemsHeightLimits() {
   if (netlistPane.clientHeight === 0) return [PROBLEMS_MIN, Infinity];
-  const fixed = $("problems-head").offsetHeight + $("file-bar").offsetHeight;
+  const fixed = $("problems-head").offsetHeight + netlistPane.querySelector('.netlist-head').offsetHeight;
   return [PROBLEMS_MIN, Math.max(PROBLEMS_MIN, netlistPane.clientHeight - fixed - SOURCE_MIN)];
 }
 
@@ -147,5 +168,6 @@ $("problems-head").addEventListener("click", () => setProblems(netlistPane.class
 $("tab-files").addEventListener("click", () => setPane("files"));
 $("tab-netlist").addEventListener("click", () => setPane("netlist"));
 $("tab-hierarchy").addEventListener("click", () => setPane("hierarchy"));
+$("tab-symbol").addEventListener("click", () => setPane("symbol"));
 $("tab-unplaced").addEventListener("click", () => setPane("unplaced"));
 $("tab-solve").addEventListener("click", () => setPane("solve"));

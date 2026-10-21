@@ -124,7 +124,7 @@
             "id": "a symbol",
             "name": "a symbol",
             "package": null,
-            "level": null,
+            "level": "file:08-styles-and-text.sp",
             "default": false,
             "definition": {
               "box": [

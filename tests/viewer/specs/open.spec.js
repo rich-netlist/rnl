@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 // Opening a document: the drawing, the text and the problems; a source that cannot be built; the
 // page with nothing open; and the colours of the dark mode.
 
@@ -16,8 +17,8 @@ test("opening shows the drawing, the text and the problems", async ({ page, view
   for (const id of ids) await expect(page.locator(`#canvas > svg [data-id="${id}"]`).first()).toBeAttached();
 
   // the files, the first one shown with all of its lines
-  await expect(page.locator("#file-tabs button")).toHaveText(["04-hierarchy.sp", "04-hierarchy-lib.inc"]);
-  await expect(page.locator("#file-tabs button").first()).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#netlist-file")).toHaveText(/04-hierarchy\.sp$/);
+  await expect(page.locator("#source-file")).toBeHidden();
   const lines = await page.evaluate(() => window.viewer.doc.files[0].text.split(/\r?\n/).filter((l, i, a) => i < a.length - 1 || l).length);
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);
   await expect(viewer.line(49)).toHaveText(/X1 a b vdd 0 amp/);
@@ -25,7 +26,7 @@ test("opening shows the drawing, the text and the problems", async ({ page, view
   await expect(page.locator("#diags")).toHaveText("No errors, warnings or hints.");
 
   // the other file
-  await page.locator("#file-tabs button", { hasText: "04-hierarchy-lib.inc" }).click();
+  await showSource(page, "04-hierarchy-lib.inc");
   await expect(viewer.line(2)).toHaveText(/\.subckt rdiv top mid bot/);
 });
 

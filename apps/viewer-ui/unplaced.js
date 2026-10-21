@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // The "Not drawn" view of the side panel: the objects of the level shown that have no position, so
 // that nothing draws them until a solver places them, and the devices that cannot be drawn at all,
 // since no symbol can be chosen for them, such as a transistor whose model card is not found. Each is
@@ -40,10 +41,11 @@ function unplaced() {
 export function renderUnplaced() {
   search.value = "";
   const n = unplaced().length;
-  $("unplaced-tab-count").textContent = n ? ` (${n})` : "";
+  const components = new Set(unplaced().flatMap(u => u.objects).filter(o => doc?.objects[o]?.kind === "instance")).size;
+  setText($("unplaced-tab-count"), components ? ` (${components})` : "");
   const status = $("status");
   status.classList.toggle("opens-unplaced", n > 0);
-  if (n > 0) status.title = "Show the objects that are not drawn";
+  if (n > 0) setAttr(status, "title", m("Show the objects that are not drawn"));
   rebuild();
 }
 
@@ -59,16 +61,16 @@ function rebuild() {
   scroll = 0;
   list.replaceChildren();
   list.scrollTop = 0;
-  $("unplaced-count").textContent = !doc || all.length === 0 ? "" : q ? `${found.length} of ${all.length}` : String(all.length);
+  setText($("unplaced-count"), !doc || all.length === 0 ? "" : q ? m`${found.length} of ${all.length}` : String(all.length));
   if (!doc || all.length === 0 || found.length === 0) {
     const p = document.createElement("div");
     p.className = "nothing";
-    p.textContent = !doc
-      ? "No file is open."
+    setText(p, !doc
+      ? m("No file is open.")
       : all.length === 0
-        ? "Every object of this level has a position."
-        : "No object matches.";
-    list.append(p);
+        ? m("Every object of this level has a position.")
+        : m("No object matches."));
+    append(list, p);
     return;
   }
   fill();
@@ -87,14 +89,14 @@ function fill() {
     const q = search.value.trim().toLowerCase();
     const part = found.slice(rows, rows + BATCH);
     draw(part);
-    for (const i of part) list.append(row(i, q));
+    for (const i of part) append(list, row(i, q));
     rows = Math.min(rows + BATCH, found.length);
   }
   if (rows < found.length) {
     const rest = document.createElement("div");
     rest.className = "more";
-    rest.textContent = `${rows} of ${found.length} shown: scroll for more`;
-    list.append(rest);
+    setText(rest, m`${rows} of ${found.length} shown: scroll for more`);
+    append(list, rest);
   }
 }
 
@@ -129,20 +131,20 @@ function row(i, q) {
   const located = u.objects.length > 0 && doc.objects[u.objects[0]].lines !== null;
   el.classList.toggle("located", located);
   el.classList.toggle("undrawn", Boolean(u.reason));
-  el.title = located ? "Show in the netlist" : "This object is written in a record, not in a statement";
-  el.append(thumbnail(u));
+  setAttr(el, "title", located ? m("Show in the netlist") : m("This object is written in a record, not in a statement"));
+  append(el, thumbnail(u));
   const name = span("name", "");
   const at = q ? u.name.toLowerCase().indexOf(q) : -1;
   if (at >= 0) {
     const m = document.createElement("mark");
-    m.textContent = u.name.slice(at, at + q.length);
-    name.append(u.name.slice(0, at), m, u.name.slice(at + q.length));
+    setText(m, u.name.slice(at, at + q.length));
+    append(name, u.name.slice(0, at), m, u.name.slice(at + q.length));
   } else {
-    name.textContent = u.name;
+    setText(name, u.name);
   }
   const info = span("info", "");
-  info.append(name, span("symbol", u.reason ? `${u.kind} · not drawn: ${u.reason}` : `${u.kind} · ${u.symbol}`));
-  el.append(info);
+  append(info, name, span("symbol", u.reason ? m`${u.kind} · not drawn: ${u.reason}` : `${u.kind} · ${u.symbol}`));
+  append(el, info);
   el.addEventListener("click", () => pick(u));
   el.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -166,14 +168,14 @@ function thumbnail(u) {
 
 /** Put a drawing, `{ svg }`, in the box; a failure, `{ error }`, is its tooltip. */
 function show(box, { svg, error }) {
-  if (error) box.title = `The drawing could not be made: ${error}`;
+  if (error) setAttr(box, "title", m`The drawing could not be made: ${error}`);
   if (!svg) return;
   const el = document.importNode(new DOMParser().parseFromString(svg, "image/svg+xml").documentElement, true);
   el.removeAttribute("width");
   el.removeAttribute("height");
   el.setAttribute("aria-hidden", "true");
   colourDrawing(el);
-  box.append(el);
+  append(box, el);
 }
 
 /** Select the object and show its statement in the netlist. */

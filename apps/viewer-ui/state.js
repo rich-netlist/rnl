@@ -7,8 +7,8 @@ export let current = 0; // the level drawn
 export let selected = null; // the selected object, an index into doc.objects
 
 export let expanded = new Set(["0"]); // the open branches of the hierarchy tree, by path
-// The hierarchy path of the level drawn (subcircuits.js), from its root down to it: per level of it,
-// { level, via }, its index and the name of the instance it was reached through, null for the root.
+// Visit history (subcircuits.js): { entry, title, level, via }. The level index is valid only
+// in this entry's Document; visits in other files have level -1. History never supplies includes.
 export let path = [];
 export let viewCache = new Map(); // a path, by the names on it -> the view its level had when it was left
 

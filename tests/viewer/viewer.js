@@ -6,6 +6,14 @@ import { expect, test as base } from "@playwright/test";
 
 export { expect };
 
+/** Source navigation used by tests of editing/scroll state; UI navigation is covered separately. */
+export const showSource = (page, file) => page.evaluate(async file => {
+  const f = typeof file === 'number' ? file : window.viewer.doc.files.findIndex(f => f.name.endsWith(file));
+  if (f < 0) throw new Error(`No source file ${file}`);
+  (await import('./text.js')).showFile(f);
+  (await import('./editor.js')).focusEditor();
+}, file);
+
 /** The page with the fake shell. */
 class Viewer {
   constructor(page) {

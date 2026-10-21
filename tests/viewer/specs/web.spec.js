@@ -1,3 +1,4 @@
+import { showSource } from "../viewer.js";
 // Smoke tests of the web viewer (apps/web): the site that build.mjs makes with the samples, served by
 // serve.mjs, with the web shell and the real core as WebAssembly in its Worker. It opens netlists by
 // URL, files set on its file inputs, a folder and dropped files, and each Document is the one
@@ -16,24 +17,111 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
 });
 
-test("New Window hands local files, applied include text, hierarchy and Library to a new tab", async ({ page }, info) => {
+test("the web core supplies semantic lines and the actual parent symbol", async ({ page }) => {
+  await start(page);
+  await opened(page, () => page.locator('#file-input').setInputFiles({
+    name: 'symbol-inspector.sp', mimeType: 'text/plain',
+    buffer: fs.readFileSync(path.join(root, 'tests/viewer/inputs/symbol-inspector.sp')),
+  }));
+  await page.locator('#tab-netlist').click();
+  await page.locator('#rnl-only').check();
+  await page.locator('#semantics-only').check();
+  expect(await page.locator('#source .file:not([hidden]) .ln').evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([12, 31]);
+  await page.evaluate(async () => {
+    const index = window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === 'Xparent');
+    await (await import('./subcircuits.js')).descend(index);
+  });
+  await page.locator('#tab-symbol').click();
+  await expect(page.locator('.symbol-bounds')).toHaveText('Box = [-4, -2, 4, 2]');
+  await expect(page.locator('.symbol-definition')).toContainText('width=8');
+  await expect(page.locator('.symbol-source-lines')).toHaveText('Lines 21–26');
+  await page.locator('#symbol-pins').uncheck();
+  await expect(page.locator('.symbol-pin-marks')).toBeHidden();
+});
+
+test("Auto Include resolves indexed library subcircuits, warns on conflicts and reloads the library", async ({ page }) => {
+  await start(page);
+  const cell = ".subckt cell p n\nR1 p n 1k\n.ends\n";
+  await page.locator("#include-input").setInputFiles({ name: "cell.inc", mimeType: "text/plain", buffer: Buffer.from(cell) });
+  await expect(page.getByRole("button", { name: "Exclude cell.inc", exact: true })).toBeVisible();
+  await page.locator("#file-input").setInputFiles({ name: "top.netlist", mimeType: "text/plain", buffer: Buffer.from("* top\nX1 a 0 cell\n.end\n") });
+  await shown(page);
+  await page.locator("#tab-netlist").click();
+  await expect(page.locator("#auto-include")).toBeChecked();
+  const imported = await page.evaluate(() => window.viewer.doc);
+  expect(imported.files).toHaveLength(2);
+  expect(imported.files[0].text).toBe("* top\nX1 a 0 cell\n.end\n");
+  expect(imported.diagnostics.some((d) => d.severity === "warning" && d.message.includes("cell") && d.message.includes("added by Auto Include"))).toBe(true);
+  const conflict = await opened(page, () => page.locator("#include-input").setInputFiles({ name: "duplicate.inc", mimeType: "text/plain", buffer: Buffer.from(cell) }));
+  expect(conflict.files).toHaveLength(1);
+  expect(conflict.diagnostics.some((d) => d.message.includes("conflicting definitions"))).toBe(true);
+  await opened(page, () => page.getByRole("button", { name: "Exclude duplicate.inc", exact: true }).click());
+  const reloaded = await opened(page, () => page.evaluate(() => window.viewer.command("reload-library")));
+  expect(reloaded.files).toHaveLength(2);
+  const replacement = cell.replace("cell", "replacement");
+  const replaced = await opened(page, () => page.locator("#include-input").setInputFiles({ name: "cell.inc", mimeType: "text/plain", buffer: Buffer.from(replacement) }));
+  expect(replaced.files).toHaveLength(1);
+  const refreshed = await opened(page, () => page.locator("#file-input").setInputFiles({ name: "fresh.sp", mimeType: "text/plain", buffer: Buffer.from("* fresh\nX2 a 0 replacement\n.end\n") }));
+  expect(refreshed.files).toHaveLength(2);
+  await page.locator("#tab-netlist").click();
+  const disabled = await opened(page, () => page.locator("#auto-include").uncheck());
+  expect(disabled.files).toHaveLength(1);
+});
+
+test("Auto Include imports the actual nested definition without pulling its testbench into the web document", async ({ page }) => {
+  await start(page);
+  const results = await page.evaluate(async () => {
+    const { startCore } = await import('./core/client.js');
+    const core = startCore();
+    const files = {
+      '/top.scs': 'simulator lang=spectre\nX1 (a b) cell\n// @RNL { #X1 @PLACE(0, 0) }\n',
+      '/tb.scs': 'include "top.scs"\ninclude "cells/cell.scs"\nXtb (a b) cell\n// @RNL { #Xtb @PLACE(0, 0) }\n',
+      '/cells/cell.scs': 'subckt cell (p n)\nR1 (p n) resistor r=1k\nends cell\n',
+    };
+    try {
+      await core.library({ library: { reload: true }, pool: ['/tb.scs'], files });
+      const results = [];
+      // A pool source and an independently opened source use different namespaces.
+      for (const prefix of ['', '/<pool>']) {
+        const request = { entry: '/top.scs', files: {
+          ...Object.fromEntries(Object.entries(files).map(([p, text]) => [prefix + p, text])),
+          '/top.scs': files['/top.scs'],
+        }, pool: [prefix + '/tb.scs'], library_prefix: prefix, auto_include: true, svg: true };
+        results.push({ on: await core.build(request), off: await core.build({ ...request, auto_include: false }) });
+      }
+      return results;
+    } finally { core.terminate(); }
+  });
+  for (const { on, off } of results) {
+    expect(on.files).toHaveLength(2);
+    expect(on.files.some(f => f.path.endsWith('/cell.scs'))).toBe(true);
+    expect(on.files.some(f => f.path.endsWith('tb.scs'))).toBe(false);
+    expect(on.objects.find(o => o.name === 'X1').opens).not.toBeNull();
+    expect(on.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    expect(on.diagnostics.some(d => d.message.includes('cells/cell.scs') && d.message.includes('added by Auto Include'))).toBe(true);
+    expect(off.files).toHaveLength(1);
+    expect(off.objects.find(o => o.name === 'X1').opens).toBeNull();
+  }
+});
+
+test("New Window hands local files, applied text, visit history and Library to a new tab", async ({ page }, info) => {
   await start(page);
   const top = '* local top\n.include "part.inc"\nX1 a 0 part\n* @RNL { #X1 @PLACE(0, 0) }\n.end\n';
-  const part = '.subckt part p q\nR1 p q 1k\n.ends\n* @RNL(scope="part") { #R1 @PLACE(0, 0) }\n';
+  const part = '* part\n.subckt part p q\nR1 p q 1k\n.ends\n* @RNL(scope="part") { #R1 @PLACE(0, 0) }\n';
   await page.locator("#file-input").setInputFiles({ name: "top.sp", mimeType: "text/plain", buffer: Buffer.from(top) });
   await shown(page);
   await opened(page, () => page.locator("#include-input").setInputFiles({ name: "part.inc", mimeType: "text/plain", buffer: Buffer.from(part) }));
   await page.locator("#tab-netlist").click();
-  await page.keyboard.press("Control+q");
-  await page.locator("#file-tabs button", { hasText: "part.inc" }).click();
-  await page.locator("#source textarea:visible").fill(part.replaceAll("R1", "R7"));
-  await opened(page, () => page.keyboard.press("Control+Enter"));
   await page.evaluate(async () => {
     const { select } = await import('./selection.js');
     select(window.viewer.doc.objects.findIndex((o) => o.name === 'X1'), 'drawing');
   });
-  await page.keyboard.press("e");
+  await page.locator('#canvas').focus();
+  await opened(page, () => page.keyboard.press("e"));
   await expect(page.locator("#level-name")).toHaveText("part");
+  await page.keyboard.press("Control+q");
+  await page.locator("#source textarea:visible").fill(part.replaceAll("R1", "R7"));
+  await opened(page, () => page.keyboard.press("Control+Enter"));
   await page.evaluate(async () => {
     const { select } = await import('./selection.js');
     select(window.viewer.doc.objects.findIndex((o) => o.name === 'R7'), 'drawing');
@@ -90,6 +178,186 @@ test("Shift double click opens a subcircuit in a real new tab and pop-up blockin
   await page.getByRole("menuitem", { name: "File", exact: true }).click();
   await page.locator('[data-id="new-window"]').click();
   await expect(page.locator("dialog.dialog")).toContainText("The browser blocked the new viewer tab");
+});
+
+const visitFiles = {
+  'visit-top.sp': '* top\n.include "cell.inc"\n.include "leaf.inc"\nXcell a 0 cell\n* @RNL { #Xcell @PLACE(0, 0) }\n.end\n',
+  'cell.inc': '* cell\n.subckt cell p n\nXleaf p n leaf\n* @RNL { #Xleaf @PLACE(0, 0) }\n.ends\n',
+  'leaf.inc': '* leaf\n.subckt leaf p n\nRleaf p n 1k\n* @RNL { #Rleaf @PLACE(0, 0) }\n.ends\n',
+};
+const descendNamed = (page, name) => page.evaluate(async name => {
+  const o = window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === name);
+  await (await import('./subcircuits.js')).descend(o);
+}, name);
+const visitTitles = page => page.locator('#level-path .crumb').evaluateAll(es => es.map(e => e.querySelector('.name, #level-name')?.textContent));
+
+for (const method of ['descend', 'tree', 'index', 'source', 'include']) {
+  test(`cross-file ${method} opens independently, joins Files and starts the correct history`, async ({page}) => {
+    await page.addInitScript(() => localStorage.setItem('auto-include', 'false'));
+    await start(page);
+    await opened(page, () => page.locator('#file-input').setInputFiles(Object.entries(visitFiles).map(([name,text]) =>
+      ({name,mimeType:'text/plain',buffer:Buffer.from(text)}))));
+    await expect(page.locator('#pool-list .pool-row')).toHaveCount(1);
+    await page.evaluate(() => window.viewer.command('zoom-in'));
+    const view = await page.locator('#canvas > svg').getAttribute('viewBox');
+    const child = await opened(page, async () => {
+      if (method === 'descend') return descendNamed(page, 'Xcell');
+      if (method === 'tree' || method === 'index') {
+        await page.locator('#tab-hierarchy').click();
+        return page.locator(method === 'tree' ? '.tree-row[data-path="0/0"]' : '.index-row').filter({hasText:/cell/}).first().click();
+      }
+      await page.locator('#tab-netlist').click();
+      if (method === 'include') return page.locator('.include-link').filter({hasText:'cell.inc'}).click();
+      await showSource(page, 'cell.inc');
+      return page.locator('#source .file:not([hidden]) .obj').filter({hasText:'Xleaf'}).first().click();
+    });
+    expect(child.path).toBe('/cell.inc');
+    expect(child.files.map(f => f.name)).toEqual(['cell.inc']);
+    expect(child.objects.find(o => o.name === 'Xleaf').opens).toBeNull();
+    expect(child.levels.some(l => l.title === 'leaf')).toBe(false);
+    await expect(page.locator('#pool-list .pool-row')).toHaveCount(2);
+    expect(await visitTitles(page)).toEqual(method === 'descend' ? ['visit-top.sp','cell'] : ['cell']);
+    await expect(page.locator('#auto-include')).not.toBeChecked();
+    if (method !== 'descend') { await expect(page.locator('#up')).toBeHidden(); return; }
+    // Reloading changes include scope but keeps visit history. The Library index may resolve leaf.
+    await page.locator('#tab-netlist').click();
+    await opened(page, () => page.locator('#include-input').setInputFiles({ name:'leaf.inc', mimeType:'text/plain', buffer:Buffer.from(visitFiles['leaf.inc']) }));
+    await page.locator('#tab-netlist').click();
+    const auto = await opened(page, () => page.locator('#auto-include').check());
+    expect(auto.objects.find(o => o.name === 'Xleaf').opens).not.toBeNull();
+    expect(auto.diagnostics.some(d => d.message.includes('added by Auto Include'))).toBe(true);
+    await opened(page, () => descendNamed(page, 'Xleaf'));
+    expect(await visitTitles(page)).toEqual(['visit-top.sp','cell','leaf']);
+    await expect(page.locator('#pool-list .pool-row')).toHaveCount(3);
+    await opened(page, () => page.locator('#level-path .crumb[data-depth="0"]').click());
+    expect(await visitTitles(page)).toEqual(['visit-top.sp']);
+    expect(await page.locator('#canvas > svg').getAttribute('viewBox')).toBe(view);
+    expect(await page.evaluate(() => window.viewer.doc.objects[window.viewer.selected].name)).toBe('Xcell');
+    await opened(page, () => descendNamed(page, 'Xcell'));
+    await opened(page, () => page.locator('#up').click());
+    expect(await visitTitles(page)).toEqual(['visit-top.sp']);
+    await page.locator('#tab-files').click();
+    await opened(page, () => page.getByRole('button', {name:'Open cell.inc',exact:true}).click());
+    expect(await visitTitles(page)).toEqual(['cell']);
+  });
+}
+
+test('a URL descent transfers independent scope and visit history to a new window', async ({page, context}) => {
+  await page.addInitScript(() => localStorage.setItem('auto-include', 'false'));
+  await context.route('**/visits/*', route => route.fulfill({contentType:'text/plain', body:visitFiles[new URL(route.request().url()).pathname.split('/').pop()] || ''}));
+  await start(page, '?url=visits/visit-top.sp');
+  await shown(page);
+  await page.evaluate(async () => (await import('./selection.js')).select(window.viewer.doc.objects.findIndex(o => o.name === 'Xcell'), 'drawing'));
+  const popup = page.waitForEvent('popup');
+  await page.keyboard.press('Shift+e');
+  const child = await popup;
+  try {
+    await expect(child.locator('#level-name')).toHaveText('cell');
+    const doc = await shown(child);
+    expect(doc.path).toBe('/visits/cell.inc');
+    expect(doc.files).toHaveLength(1);
+    expect(doc.objects.find(o => o.name === 'Xleaf').opens).toBeNull();
+    expect(await visitTitles(child)).toEqual(['visit-top.sp','cell']);
+    await opened(child, () => child.locator('#up').click());
+    expect(await visitTitles(child)).toEqual(['visit-top.sp']);
+    expect((await child.evaluate(() => window.viewer.doc.files)).length).toBe(3);
+    await opened(child, () => descendNamed(child, 'Xcell'));
+    await opened(child, () => child.evaluate(() => window.viewer.command('reload')));
+    expect(await visitTitles(child)).toEqual(['visit-top.sp','cell']);
+    expect((await child.evaluate(() => window.viewer.doc.files)).length).toBe(1);
+    expect(await visitTitles(page)).toEqual(['visit-top.sp']);
+  } finally { await child.close(); }
+});
+
+test('a transferred URL snapshot can open a child after the server becomes unavailable', async ({page,context}) => {
+  const host=await server({'/top.sp':visitFiles['visit-top.sp'],'/cell.inc':visitFiles['cell.inc'],'/leaf.inc':visitFiles['leaf.inc']});
+  await start(page, '?url='+encodeURIComponent(host+'/top.sp')); await shown(page);
+  const popup=page.waitForEvent('popup');
+  await page.evaluate(()=>window.viewer.command('new-window'));
+  const child=await popup;
+  try {
+    await shown(child);
+    await context.route(host+'/**',route=>route.abort());
+    const d=await opened(child,()=>descendNamed(child,'Xcell'));
+    expect(d.path).toBe('/cell.inc');
+    expect(d.levels.some(l=>l.title==='cell')).toBe(true);
+    expect(await visitTitles(child)).toEqual(['top.sp','cell']);
+  } finally {await child.close();}
+});
+
+test('canceling a dirty cross-file descent preserves the entry and visit history', async ({page}) => {
+  await start(page);
+  await opened(page, () => page.locator('#file-input').setInputFiles(Object.entries(visitFiles).map(([name,text]) =>
+    ({name,mimeType:'text/plain',buffer:Buffer.from(text)}))));
+  await page.locator('#tab-netlist').click();
+  await page.keyboard.press('Control+q');
+  await page.locator('#source textarea:visible').fill(visitFiles['visit-top.sp']+'* pending\n');
+  await page.evaluate(async () => {
+    const {descend}=await import('./subcircuits.js');
+    window.pendingDescent=descend(window.viewer.doc.objects.findIndex(o=>o.name==='Xcell'));
+  });
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.evaluate(()=>window.pendingDescent);
+  expect(await visitTitles(page)).toEqual(['visit-top.sp']);
+  expect(await page.evaluate(()=>window.viewer.doc.path)).toBe('/visit-top.sp');
+  await expect(page.locator('#pool-list .pool-row')).toHaveCount(1);
+  expect(await page.locator('#source textarea:visible').inputValue()).toContain('* pending');
+});
+
+test('independent URL child opens follow redirects for relative includes', async ({page}) => {
+  const host = await server({
+    '/alias/top.sp':'* top\n.include "cell.inc"\nXcell a 0 cell\n.end\n',
+    '/actual/cell.inc':'* cell\n.include "parts.inc"\n.subckt cell p n\nXleaf p n leaf\n.ends\n',
+    '/actual/parts.inc':visitFiles['leaf.inc'],
+  }, {'/alias/cell.inc':'/actual/cell.inc'});
+  await start(page, `?url=${encodeURIComponent(host+'/alias/top.sp')}`);
+  await shown(page);
+  const child = await opened(page, () => descendNamed(page,'Xcell'));
+  expect(child.path).toBe('/actual/cell.inc');
+  expect(child.objects.find(o=>o.name==='Xleaf').opens).not.toBeNull();
+  expect(child.missing).toEqual([]);
+});
+
+test("include links independently open the target in this tab and a Shift-opened tab", async ({ page }) => {
+  await start(page);
+  await opened(page, () => page.locator('#file-input').setInputFiles({name:'top.sp', mimeType:'text/plain',
+    buffer:Buffer.from('* Top\n.include "models.inc"\nR1 a 0 1k\n.end\n')}));
+  await opened(page, () => page.locator('#include-input').setInputFiles({name:'models.inc', mimeType:'text/plain',
+    buffer:Buffer.from('.param bias=1.2\n.model example d\n')}));
+  await page.locator('#tab-netlist').click();
+  const link = page.locator('#source .file:not([hidden]) .include-link');
+  const popup = page.waitForEvent('popup');
+  await link.click({modifiers:['Shift']});
+  const child = await popup;
+  try {
+    await expect(child.locator('#netlist-file')).toHaveText(/models\.inc$/);
+    await expect(child.locator('#source .file:not([hidden]) .ln').first()).toContainText('.param bias=1.2');
+    expect(await child.evaluate(() => window.viewer.doc.files.length)).toBe(1);
+    expect(await child.evaluate(() => window.viewer.doc.name)).toBe('models.inc');
+    await expect(page.locator('#netlist-file')).toHaveText(/top\.sp$/);
+    await link.click();
+    await expect(page.locator('#netlist-file')).toHaveText(/models\.inc$/);
+    await expect(page.locator('#up')).toBeHidden();
+  } finally { await child.close(); }
+});
+
+for (const [kind, directive, line] of [
+  ['backslash', 'include \\\n  "models.scs"', '3'],
+  ['comment', 'include // explanation\n+ "models.scs"', '3'],
+  ['continued comment', 'include \\\n // explanation\n+ "models.scs"', '4'],
+]) test(`continued Spectre include links point at the filename on its physical line: ${kind}`, async ({page}) => {
+  await start(page);
+  await opened(page, () => page.locator('#file-input').setInputFiles({name:'top.scs',mimeType:'text/plain',
+    buffer:Buffer.from(`simulator lang=spectre\n${directive}\n`)}));
+  await opened(page, () => page.locator('#include-input').setInputFiles({name:'models.scs',mimeType:'text/plain',
+    buffer:Buffer.from('parameters bias=1.2\n')}));
+  await page.locator('#tab-netlist').click();
+  const link = page.locator('#source .include-link');
+  await expect(link).toHaveText('"models.scs"');
+  await expect(link.locator('..').locator('..')).toHaveAttribute('data-line',line);
+  await link.click();
+  await expect(page.locator('#netlist-file')).toHaveText(/models\.scs$/);
+  await expect(page.locator('#source .file:not([hidden]) .ln').first()).toContainText('parameters bias=1.2');
 });
 
 test("Shift Library opens a previous URL with its includes, and the child retains URL pool sources", async ({ page }) => {
@@ -235,7 +503,7 @@ async function showsDocument(page, doc) {
   const groups = doc.levels[0].svg.split("<g data-id=").length - 1;
   await expect(page.locator("#canvas > svg g[data-id]")).toHaveCount(groups);
   // the text: a tab for each file, and the lines of the first
-  await expect(page.locator("#file-tabs button")).toHaveText(doc.files.map((f) => f.name.split("/").pop()));
+  await expect(page.locator("#netlist-file")).toHaveText(doc.path);
   const lines = doc.files[0].text.replace(/\r?\n$/, "").split(/\r?\n/).length;
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);
   // Core diagnostics retain their counts; viewer-only package remedies follow the relevant error.
@@ -276,7 +544,7 @@ test("a URL's include is read from its server, and the levels, files and problem
   await page.locator("#index .index-row", { hasText: "rdiv" }).click();
   await expect(page.locator("#level-name")).toHaveText("rdiv");
   await page.locator("#tab-netlist").click();
-  await page.locator("#file-tabs button", { hasText: "04-hierarchy-lib.inc" }).click();
+  await showSource(page, "04-hierarchy-lib.inc");
   const first = doc.files[1].text.split(/\r?\n/)[0];
   await expect(page.locator("#source .file:not([hidden]) .ln").first()).toContainText(first);
 
@@ -639,7 +907,7 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   const editedTop = top.replace("R1 a 0 1k", "R1 a 0 2k");
   const editedParts = parts.replace("R2", "R7");
   await area.fill(editedTop);
-  await page.locator("#file-tabs button", { hasText: "parts.inc" }).click();
+  await showSource(page, "parts.inc");
   await area.fill(editedParts);
   await expect(page.locator("#edit-state")).toHaveText("Changes not applied yet");
   // applied, the core builds the files with the texts in place of what is read, as it builds the same texts from disk
@@ -651,12 +919,16 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   // the server's files are as they were: nothing was written
   expect(fs.readFileSync(path.join(dir, "parts.inc"), "utf8")).toBe(parts);
   // Save downloads the file shown, as the text box holds it
+  await page.evaluate(() => window.viewer.command('language-zh'));
   const [download] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("Control+s")]);
   expect(download.suggestedFilename()).toBe("parts.inc");
   expect(fs.readFileSync(await download.path(), "utf8")).toBe(editedParts);
+  await expect(page.locator("#note")).toHaveText("已下载 parts.inc。");
+  await expect(page.locator('dialog.dialog')).toHaveCount(0);
+  await page.evaluate(() => window.viewer.command('language-en'));
   await expect(page.locator("#note")).toHaveText("Downloaded parts.inc.");
   // the file downloaded is what was read from now on; the netlist's change is still not saved
-  await expect(page.locator("#file-tabs button[data-unsaved='true']")).toHaveText(["top.sp"]);
+  await expect(page.locator("#netlist-file[data-unsaved='true']")).toHaveText(/parts\.inc$/);
 });
 
 

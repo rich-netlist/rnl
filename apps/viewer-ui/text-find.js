@@ -1,3 +1,4 @@
+import { m, setText } from "./i18n.js";
 // A virtualized file cannot delegate offscreen matches to the browser's DOM search. Search the
 // full text model in short slices, then reveal and select a match in the rendered window.
 export class TextFind {
@@ -32,8 +33,8 @@ export class TextFind {
     this.input.select();
     void this.scan();
   }
-  changed() {
-    if (this.model === this.view()?.model) return;
+  changed(force = false) {
+    if (!force && this.model === this.view()?.model) return;
     this.model = this.view()?.model;
     ++this.version;
     if (!this.bar.hidden) void this.scan();
@@ -43,12 +44,13 @@ export class TextFind {
     this.matches = [];
     this.index = 0;
     this.previous.disabled = this.next.disabled = true;
-    this.count.textContent = query ? "Searching…" : "";
+    setText(this.count, query ? m("Searching…") : "");
     if (!query || !view) return;
     const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu");
     const matches = [];
     let yielded = performance.now();
     for (let line = 0; line < view.model.texts.length; line++) {
+      if (!view.allows(line)) continue;
       pattern.lastIndex = 0;
       let match;
       while ((match = pattern.exec(view.model.texts[line]))) matches.push({ line, col: match.index, length: match[0].length });
@@ -70,7 +72,7 @@ export class TextFind {
   }
   show() {
     const match = this.matches[this.index], view = this.view();
-    this.count.textContent = match ? `${this.index + 1} / ${this.matches.length}` : "No matches";
+    setText(this.count, match ? `${this.index + 1} / ${this.matches.length}` : m("No matches"));
     if (!match || !view) return;
     this.reveal(match.line + 1);
     if (view.selection) {

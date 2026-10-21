@@ -51,6 +51,8 @@ impl Layer {
 /// A graphic of a symbol in local coordinates.
 #[derive(Clone, Debug)]
 pub struct SymbolPrim {
+    /// Original fixed text, before substituting an instance's parameters.
+    pub text: Option<String>,
     pub shape: Shape,
     pub points: Vec<Pt>,
     pub params: PrimParams,
@@ -91,6 +93,11 @@ pub struct UndrawnView {
 
 #[derive(Clone, Debug)]
 pub struct SymbolView {
+    /// Identity within this interpretation (names alone are not unique).
+    pub id: u32,
+    pub source: Option<(crate::diag::Loc, crate::diag::Loc)>,
+    pub labels: Vec<SymbolLabel>,
+    pub package_version: Option<String>,
     pub name: String,
     pub prims: Vec<SymbolPrim>,
     pub pins: Vec<PinView>,
@@ -105,6 +112,18 @@ pub struct SymbolView {
     pub default: bool,
     /// Where the symbol is defined: [`SymbolOrigin`].
     pub origin: SymbolOrigin,
+}
+
+/// A symbol's label template, before it is attached to a particular instance.
+#[derive(Clone, Debug)]
+pub struct SymbolLabel {
+    pub key: Option<String>,
+    pub text: String,
+    pub at: Option<Pt>,
+    pub halign: Option<String>,
+    pub valign: Option<String>,
+    pub rotate: f64,
+    pub style: Style,
 }
 
 /// Where a symbol is defined: in a package, or in a level of the document, such as the symbol of
@@ -321,6 +340,8 @@ pub struct BlockSymbol {
     /// What it is made of, without the symbols drawn in it (9.2.7). It is not among the level's
     /// `symbols`, which are those of the level's own items.
     pub view: SymbolView,
+    /// Complete table for drawing the symbol, including nested symbols; root is index zero.
+    pub symbols: Vec<SymbolView>,
 }
 
 /// An instance, bundle or usage of a level, drawn or not: what the editor interface's snapshot

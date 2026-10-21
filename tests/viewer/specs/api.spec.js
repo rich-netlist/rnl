@@ -77,7 +77,7 @@ test("a complete Viewer imports exact packages and asks before replacing unsaved
   await send(page, { type: "open", requestId: "accept", name: "new.sp", text: circuit("new") });
   await viewer.getByRole("button", { name: "Discard Changes", exact: true }).click();
   await result(page, "accept", "loaded");
-  await expect(viewer.locator("#source")).toContainText("* new");
+  await expect(viewer.locator("#source textarea:visible")).toHaveValue(circuit("new"));
   if (browserName === "chromium") await viewer.screenshot({ path: "test-results/api-full-viewer.png" });
   // The existing same-origin session mechanism must still work when its source is an API tab.
   const copied = viewer.waitForEvent("popup");
@@ -166,7 +166,7 @@ test("a newer open replaces an obsolete confirmation instead of falsely declinin
   await expect(viewer.getByRole("dialog")).toContainText("newest.sp");
   await viewer.getByRole("button", { name: "Discard Changes", exact: true }).click();
   await result(page, "newest", "loaded");
-  await expect(viewer.locator("#source")).toContainText("* newest");
+  await expect(viewer.locator("#source textarea:visible")).toHaveValue(circuit("newest"));
 });
 
 for (const first of ["api", "ordinary"]) test(`API and ordinary opens share ownership when ${first} starts first`, async ({ page }) => {

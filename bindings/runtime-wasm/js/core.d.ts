@@ -19,6 +19,12 @@ export interface Request {
   package_dirs?: string[];
   /** Explicit temporary files, searched before package directories. */
   pool?: string[];
+  /** Opt-in indexed lookup of undefined subcircuits. */
+  auto_include?: boolean;
+  /** The browser's internal pool namespace. */
+  library_prefix?: string;
+  /** Applied overrides, by canonical library path. */
+  library_edits?: Record<string, string>;
   /** The dialect, instead of guessing it from the entry. */
   dialect?: "spice" | "spectre";
   /** Use the standard package at the root (16.3); true when not given. */
@@ -215,6 +221,12 @@ export interface DrawingsRequest {
   drawings: { level: number; items: number[]; names?: string[] };
 }
 
+export interface LibraryRequest {
+  library: { reload?: boolean; refresh?: string[] };
+  pool: string[];
+  files: Record<string, string>;
+}
+
 /** The core, loaded. */
 export interface Core {
   /** Build the Document of a request; throws an Error with the core's message when there is none. */
@@ -227,15 +239,18 @@ export interface Core {
   catalog(request: CatalogRequest | string): Catalog;
   /** The drawings of the objects a request names, from the last build that kept them; throws when none did. */
   drawings(request: DrawingsRequest | string): UnplacedDrawing[];
+  /** Update the viewer library index; returns read errors. */
+  library(request: LibraryRequest | string): string[];
   /** The core's answer as it gives it; throws only when the core stops. */
   respond(
-    request: Request | WriteRequest | CatalogRequest | DrawingsRequest | string,
+    request: Request | WriteRequest | CatalogRequest | DrawingsRequest | LibraryRequest | string,
   ):
     | { document: Document }
     | { snapshot: Snapshot }
     | { written: Written }
     | { catalog: Catalog }
     | { drawings: UnplacedDrawing[] }
+    | { library: string[] }
     | { error: string };
 }
 
@@ -243,4 +258,4 @@ export interface Core {
 export function loadCore(wasm: string | URL | Response | BufferSource | WebAssembly.Module): Promise<Core>;
 
 /** A request as the JSON text the core reads. */
-export function requestText(request: Request | WriteRequest | CatalogRequest | DrawingsRequest): string;
+export function requestText(request: Request | WriteRequest | CatalogRequest | DrawingsRequest | LibraryRequest): string;

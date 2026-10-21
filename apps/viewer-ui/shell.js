@@ -8,14 +8,19 @@
  * @typedef {object} Shell
  * @property {boolean} [embed] The web shell's canvas-only mode, with no persisted preferences.
  * @property {"desktop" | "web"} platform The platform, which picks the commands of commands.json it offers.
+ * @property {(language: "en" | "zh-CN") => Promise<void>} [setLanguage] Update native UI labels, preserving command IDs and state.
  * @property {() => Promise<Record<string, string>>} [bundledFiles] Built-in package texts by path.
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
  * @property {(pkg: {name: string, version: string}) => Promise<object[]>} [includePackage] Include an exact published package.
  * @property {(kind: string) => Promise<object[]>} [include] Include files, a folder or a library package.
- * @property {(items: object[]) => void} [setPool] Replace the session's search pool.
+ * @property {(items: object[], reload?: boolean, refresh?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
- * @property {(dir: string) => Promise<string[]>} [pathPackages] Package paths in a desktop PATH directory.
+ * @property {(dir: string) => Promise<string[]>} [pathPackages] Package and netlist paths in a desktop PATH directory.
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
+ * @property {(source: Source, document: object, file: number) => Source} sourceForFile Re-root at a document file, retaining read capabilities but no compiled include scope.
+ * @property {() => Source[]} [preloadCandidates] Library/PATH sources eligible for background compilation.
+ * @property {(source: Source) => Promise<string>} [preload] Prepare an independent file without activating its document. Returns ready/cached/full/paused/busy/cancelled/skipped/disabled.
+ * @property {() => Promise<void>} [cancelPreload] Discard in-flight speculative results; never waits for their compiler.
  * @property {(legacy: object) => Promise<{ path: string, values: object }>} [loadSettings] Native settings and migration.
  * @property {(key: string, value: unknown) => Promise<void>} [saveSetting] Persist a native setting.
  * @property {(session: object, doc?: object) => Promise<unknown>} [newWindow] Open an independent viewer with a session.
@@ -27,7 +32,8 @@
  *   the file named on the command line.
  * @property {(kind: string) => Promise<Source | null>} pick Ask for something to open: kind "file", and on
  *   the web also "url". Null when nothing is chosen.
- * @property {(source: Source, edits?: Edits, progress?: (stage: string) => void, packages?: object[], signal?: AbortSignal) => Promise<import("../../crates/rnl-view/types/document.js").Document>} build
+ * @property {(clear?: boolean) => Promise<{ limit: number, used: number, entries: number, hits: number, misses: number, prefetched?: number }>} [memoryCache] Desktop render cache statistics; apply the saved limit and optionally clear retained results.
+ * @property {(source: Source, edits?: Edits, progress?: (stage: string) => void, packages?: object[], signal?: AbortSignal, options?: { fresh?: boolean }) => Promise<import("../../crates/rnl-view/types/document.js").Document>} build
  *   Read a source and build its Document; rejects with a message when it cannot. With `edits`, the
  *   texts of some of its files are those, not what is read: Edit > Apply Changes (editor.js). The
  *   Document's types are generated from the core's Rust types into
@@ -47,8 +53,9 @@
  *   "toggle-netlist", in the platform's menu.
  * @property {(handler: (id: string) => void) => void} onCommand Call `handler` with the id of each command
  *   chosen in the platform's menu.
- * @property {(handler: (source: Source) => void) => void} [onOpen] Call `handler` with each source opened
+ * @property {(handler: (source: Source) => void | Promise<unknown>) => void | Promise<void>} [onOpen] Call `handler` with each source opened
  *   without `pick`, such as files dropped on the page. A shell that opens nothing so leaves it out.
+ * @property {() => Promise<void>} [fileAssociations] Open the operating system's default-app settings.
  * @property {() => void} [about] Show the platform's About box, for Help > About in the page's own menu
  *   bar; without it the page shows a plain one. A platform whose menu shows its own About box leaves
  *   it out.

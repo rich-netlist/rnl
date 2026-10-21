@@ -21,6 +21,13 @@ let presses = 0; // the pointer presses so far
 let closedBy = 0; // the press that last closed an open menu, or 0
 let closing = false; // that press is not over yet
 
+window.addEventListener("language-changed", () => {
+  if (!built) return;
+  leave();
+  bar.replaceChildren();
+  build();
+});
+
 /** Show or hide the menu bar. */
 export function showMenuBar(shown) {
   if (shown && !built) build();

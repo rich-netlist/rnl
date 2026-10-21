@@ -11,9 +11,10 @@ import { fit, notice } from "./drawing.js";
 import { setBackground } from "./background.js";
 import { enterRoot } from "./subcircuits.js";
 import { startLoading } from "./loading.js";
+import { m } from "./i18n.js";
 
 async function mayReplace(source, signal) {
-  if (await confirmLeave(`open ${source.name}`, signal)) return;
+  if (await confirmLeave(m`open ${source.name}`, signal)) return;
   const error = new Error("declined");
   error.reason = "declined";
   throw error;
@@ -59,7 +60,7 @@ export async function startFullViewerApi() {
     else if (message.type === "level" && typeof message.name === "string") {
       const level = doc?.levels.findIndex(l => l.title === message.name) ?? -1;
       if (level < 0) throw new Error(`Unknown level: ${message.name}`);
-      enterRoot(level, { newWindow: false });
+      return enterRoot(level, { newWindow: false });
     }
   } });
 }

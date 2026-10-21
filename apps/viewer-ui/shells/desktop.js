@@ -1,42 +1,114 @@
+import { m } from "../i18n.js";
 // The desktop shell: the page inside the RNL Viewer app (apps/desktop), which reads files and builds
 // documents natively and shows the menu bar itself. The only module that uses window.__TAURI__.
 
-import { flushSettings } from "../util.js";
+import { flushSettings, load } from "../util.js";
+import { choose, inform, modal } from "../dialog.js";
+import { sourcePath } from "../source-path.js";
 
 let pool = [];
+let poolReady = Promise.resolve();
 const tauri = window.__TAURI__;
 const invoke = (cmd, args) => tauri.core.invoke(cmd, args);
+let preloadGeneration = 0;
+const cancelPreload = () => { preloadGeneration++; return invoke("cancel_preload"); };
 
 /** A file on disk, named by its path; null for no path. */
 const file = (path) => (path ? { name: path, path } : null);
+const sessionSource = source => source ? { path: source.path, name: source.name,
+  text: source.path && !source.readonly ? undefined : source.text, readonly: source.readonly,
+  temporary: source.temporary } : null;
+let openingDrop = false;
 
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "desktop",
+  sourceForFile(source, document, index) {
+    const f = document.files[index], path = sourcePath(document, f);
+    return path.startsWith('<') ? { path, name: f.name, text: f.text, readonly: true } : file(path);
+  },
+  setLanguage: language => invoke("set_ui_language", { language }),
+  async about() {
+    await inform({ title: m("About RNL Viewer"), paragraphs: [
+      `RNL Viewer ${await tauri.app.getVersion()}`,
+      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("nothing is written to a file until you save.")}`,
+      m("The drawing uses Noto Sans SC, copyright 2014–2021 Adobe, under the SIL Open Font License 1.1."),
+    ] });
+  },
   loadSettings: (legacy) => invoke("load_settings", { legacy }),
   saveSetting: (key, value) => invoke("save_setting", { key, value }),
   bundledFiles: () => invoke("bundled_files"),
   include: async (kind) => (await invoke("pick_pool", { kind })).map((path) => ({ path, name: path, source: file(path) })),
   pickPath: () => invoke("pick_pool", { kind: "path" }).then((paths) => paths[0] || null),
   pathPackages: (dir) => invoke("path_packages", { dir }),
-  setPool: (items) => { pool = items.filter((item) => !item.builtin).map((item) => item.path); },
+  setPool: (items, reload = false, refresh = []) => {
+    cancelPreload().catch(() => {});
+    const paths = items.filter((item) => !item.builtin).map((item) => item.path);
+    // PATH packages retain the provider's per-directory precedence. Netlists may also resolve
+    // bare includes; both kinds enter the subcircuit index, independently of package lookup.
+    pool = items.filter((item) => !item.builtin && (!item.searchPath || !/\.rnl$/i.test(item.path))).map((item) => item.path);
+    poolReady = poolReady.catch(() => {}).then(() => invoke("update_library", { pool: paths, reload, refresh }));
+    return poolReady;
+  },
   nativeMenu: true,
   initialSession: () => invoke("initial_session"),
   newWindow: async (session) => {
     await flushSettings();
     return invoke("new_window", { session: { ...session,
-      entry: session.entry ? { path: session.entry.path, name: session.entry.name,
-        text: session.entry.path ? undefined : session.entry.text, readonly: session.entry.readonly,
-        temporary: session.entry.temporary } : null,
+      entry: sessionSource(session.entry),
+      path: session.path.map(step => ({ ...step, entry: sessionSource(step.entry) })),
       pool: session.pool.map((item) => ({ path: item.path, name: item.name, source: { path: item.path, name: item.source.name } })),
     } });
   },
   setEnabled: (id, enabled) => invoke("set_command_enabled", { id, enabled }).catch(() => {}),
   initial: () => invoke("initial_file").then(file),
+  fileAssociations: () => invoke("open_default_apps"),
+  async onOpen(handler) {
+    await tauri.webview.getCurrentWebview().onDragDropEvent(async ({ payload }) => {
+      const blocked = openingDrop || modal() || document.body.classList.contains("busy");
+      document.body.classList.toggle("dropping", !blocked && ["enter", "over"].includes(payload.type));
+      if (payload.type !== "drop" || blocked) return;
+      openingDrop = true;
+      try {
+        const paths = await invoke("dropped_files", { paths: payload.paths });
+        if (!paths.length) {
+          await inform({ title: m("Open"), paragraphs: [m("Drop a netlist or RNL package file (.sp, .spi, .spice, .cir, .ckt, .net, .netlist, .inc, .lib, .scs or .rnl).")] });
+          return;
+        }
+        const path = paths.length === 1 ? paths[0] : await choose({
+          title: m("Open Netlist"), text: m("Choose the dropped file to open."), filter: true,
+          items: paths.map((path) => ({ label: path, value: path })),
+        });
+        if (path) await handler(file(path));
+      } catch (error) {
+        await inform({ title: m("Open"), paragraphs: [m`The dropped files could not be opened: ${error.message || error}`] });
+      } finally {
+        openingDrop = false;
+      }
+    });
+  },
   pick: (kind) => (kind === "file" ? invoke("pick_file").then(file) : Promise.resolve(null)),
   // a file by its path, or text held by the source, with edits to it and its includes
-  build: async (source, edits, progress) => {
+  memoryCache: async (clear = false) => {
+    if (clear) await cancelPreload();
+    await flushSettings(); return invoke("memory_cache", { clear });
+  },
+  preloadCandidates: () => pool.map(file),
+  cancelPreload,
+  preload: async source => {
+    const generation = preloadGeneration;
+    await poolReady;
     await flushSettings();
+    if (generation !== preloadGeneration) return "cancelled";
+    const ticket = await invoke("preload_ticket");
+    if (generation !== preloadGeneration) return "cancelled";
+    return invoke("preload_document", { path: source.path, pool, ticket, autoInclude: load("auto-include", true) === true });
+  },
+  build: async (source, edits, progress, _packages, _signal, { fresh = false } = {}) => {
+    cancelPreload().catch(() => {});
+    await flushSettings();
+    await poolReady;
+    const autoInclude = load("auto-include", true) === true;
     const requestId = progress ? crypto.randomUUID() : null;
     const unlisten = progress ? await tauri.event.listen("load-stage", ({ payload }) => {
       if (payload.id === requestId) progress(payload.stage);
@@ -44,8 +116,8 @@ export default {
     try {
       progress?.("reading");
       return await (source.text === undefined
-        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId })
-        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId }));
+        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId, autoInclude, fresh })
+        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId, autoInclude, fresh }));
     } finally { unlisten?.(); }
   },
   // the drawings of the objects listed without a position, which the app keeps from the last build
@@ -62,12 +134,15 @@ export default {
   browse: (url) => invoke("plugin:opener|open_url", { url }),
   // the Solve menu (decision 0010): solved natively on a thread of the app's, nothing written
   solve: async (source, settings, edits) => {
+    cancelPreload().catch(() => {});
     await flushSettings();
+    await poolReady;
+    const autoInclude = load("auto-include", true) === true;
     return invoke(
       "solve_preview",
       source.text === undefined
-        ? { path: source.path, settings, edits: edits || null, pool }
-        : { name: source.name, text: source.text, settings, edits: edits || null, pool },
+        ? { path: source.path, settings, edits: edits || null, pool, autoInclude }
+        : { name: source.name, text: source.text, settings, edits: edits || null, pool, autoInclude },
     );
   },
   // the solver's own defaults and options, which Solve > Settings shows and checks

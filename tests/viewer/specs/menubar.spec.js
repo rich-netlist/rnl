@@ -64,6 +64,7 @@ test.describe("on the web", () => {
         letter: "F",
         items: [
           "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
+          "Reload Library", "Auto Include",
           "", "SaveCtrl+S",
         ],
       },
@@ -74,8 +75,8 @@ test.describe("on the web", () => {
         items: [
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-",
           "Background", "Light", "Dark",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "",
-          "Netlist PanelCtrl+B", "ProblemsCtrl+Shift+M",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Language", "English", "简体中文", "",
+          "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Not Drawn5", "", "Hide",
         ],
       },
     ]);
@@ -95,7 +96,7 @@ test.describe("on the web", () => {
         Object.defineProperty(Navigator.prototype, "languages", { get: () => list, configurable: true });
       }, languages);
       await viewer.open("04-hierarchy");
-      await viewer.menuTitle("Help").click();
+      await viewer.menuTitle(languages[0].startsWith("zh") ? "帮助" : "Help").click();
       await viewer.menuItem("desktop-viewer").click();
       await expect(page.locator("#menubar .menu-list:visible")).toHaveCount(0);
       return viewer.calls("browse");
@@ -217,40 +218,34 @@ test.describe("on the web", () => {
     await viewer.selected(`instance X3 in ${TOP}`);
   });
 
-  test("the check marks follow Ctrl+B and Ctrl+Shift+M", async ({ page, viewer }) => {
-    const marks = async () => {
-      await viewer.menuTitle("View").click();
-      const both = [
-        await viewer.menuItem("toggle-netlist").getAttribute("aria-checked"),
-        await viewer.menuItem("toggle-problems").getAttribute("aria-checked"),
-      ];
-      await page.keyboard.press("Escape");
-      return both;
-    };
-    expect(await marks()).toEqual(["true", "true"]);
-    await page.keyboard.press("Control+B");
+  test("Side Panels reflects the visible pane and disables Hide when collapsed", async ({ page, viewer }) => {
+    const show = async () => { await viewer.menuTitle("View").click(); await entry(page, "Side Panels").hover(); };
+    const checked = async () => page.locator('.submenu [data-id^="panel-"][aria-checked="true"]').evaluateAll(es => es.map(e => e.dataset.id));
+    await show();
+    await expect(viewer.menuItem("toggle-netlist")).toHaveCount(0);
+    await expect(viewer.menuItem("toggle-problems")).toHaveCount(0);
+    expect(await checked()).toEqual(["panel-netlist"]);
+    await viewer.menuItem("panel-symbol").click();
+    await expect(page.locator("#pane-symbol")).toBeVisible();
+    await show();
+    expect(await checked()).toEqual(["panel-symbol"]);
+    await viewer.menuItem("panel-symbol").click(); // selecting again must retain the mark
+    await show();
+    expect(await checked()).toEqual(["panel-symbol"]);
+    await viewer.menuItem("panel-hide").click();
     await expect(page.locator("#sidebar")).toBeHidden();
-    expect(await marks()).toEqual(["false", "true"]);
+    await show();
+    expect(await checked()).toEqual([]);
+    await expect(viewer.menuItem("panel-hide")).toBeDisabled();
+    await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
+    await page.keyboard.press("Control+B");
+    await expect(page.locator("#pane-symbol")).toBeVisible();
+    await page.locator("#tab-netlist").click();
     await page.keyboard.press("Control+Shift+M");
-    expect(await marks()).toEqual(["false", "false"]);
-    await page.keyboard.press("Control+B");
-    await expect(page.locator("#pane-netlist")).toHaveClass(/\bproblems-folded\b/);
-    expect(await marks()).toEqual(["true", "false"]);
-    // the problems' header, and the items themselves
-    await page.locator("#problems-head").click();
-    expect(await marks()).toEqual(["true", "true"]);
-    await viewer.menuTitle("View").click();
-    await viewer.menuItem("toggle-problems").click();
     await expect(page.locator("#problems-head")).toHaveAttribute("aria-expanded", "false");
-    expect(await marks()).toEqual(["true", "false"]);
-    await viewer.menuTitle("View").click();
-    await viewer.menuItem("toggle-netlist").click();
-    await expect(page.locator("#sidebar")).toBeHidden();
-    expect(await marks()).toEqual(["false", "false"]);
-    // the shell is told as well, whether it shows a menu or not
-    expect(await viewer.calls("setCheck")).toEqual(
-      expect.arrayContaining([["toggle-netlist", false], ["toggle-problems", false]]),
-    );
+    await show();
+    expect(await checked()).toEqual(["panel-netlist"]);
+    await expect(viewer.menuItem("panel-hide")).toBeEnabled();
   });
 
   test("the keyboard uses the bar: Alt, F10, the arrows, Enter and the underlined letters", async ({ page, viewer }) => {
@@ -431,13 +426,16 @@ test.describe("with a native menu", () => {
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
       ["toggle-hover-names", true],
+      ["language-en", true], ["language-zh", false],
+      ["toggle-auto-include", true],
     ];
-    expect(await viewer.calls("setCheck")).toEqual(marks);
+    expect(await viewer.calls("setCheck")).toEqual(expect.arrayContaining(marks));
     await page.keyboard.press("Control+B");
     await page.keyboard.press("Control+Shift+M");
-    expect((await viewer.calls("setCheck")).slice(marks.length)).toEqual([["toggle-netlist", false], ["toggle-problems", false]]);
+    expect(await viewer.calls("setCheck")).toEqual(expect.arrayContaining([["toggle-netlist", false], ["toggle-problems", false]]));
     expect(await page.evaluate(() => window.fakeShell.checks)).toEqual({
       ...Object.fromEntries(marks), "toggle-netlist": false, "toggle-problems": false,
+      ...Object.fromEntries(["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"].map(name => [`panel-${name}`, false])),
     });
     // Alt and F10 do nothing on the page
     await page.keyboard.press("Alt");
@@ -447,10 +445,10 @@ test.describe("with a native menu", () => {
 
   test("the commands chosen in the native menu run", async ({ page, viewer }) => {
     const menu = (id) => page.evaluate((id) => window.fakeShell.menu(id), id);
-    await menu("toggle-netlist");
+    await menu("panel-hide");
     await expect(page.locator("#sidebar")).toBeHidden();
     expect(await page.evaluate(() => window.fakeShell.checks["toggle-netlist"])).toBe(false);
-    await menu("toggle-netlist");
+    await menu("panel-netlist");
     await menu("toggle-problems");
     await expect(page.locator("#problems-head")).toHaveAttribute("aria-expanded", "false");
 

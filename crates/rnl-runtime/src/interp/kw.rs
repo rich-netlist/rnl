@@ -303,6 +303,16 @@ impl Interp<'_> {
         let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
         let body = self.body_arg(kw, args, seg, ctx)?;
         let sym = self.new_obj(ObjData::Symbol(Box::default()));
+        self.symbol_mut(sym).unit = Some(ctx.unit);
+        let start = member
+            .binds
+            .iter()
+            .map(|b| b.off)
+            .chain(member.segments.iter().flat_map(|s| s.call.iter().map(|c| c.start)))
+            .min()
+            .unwrap_or(member.start);
+        self.symbol_mut(sym).source =
+            self.rec_loc(ctx.rec, start).zip(self.rec_loc(ctx.rec, member.end.saturating_sub(1)));
         self.node_memo.insert(key, sym);
         if let Some(b) = get(&p, "box") {
             let ok = match b {

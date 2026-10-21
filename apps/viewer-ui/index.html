@@ -39,11 +39,12 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
   <aside id="sidebar" class="sidebar" aria-label="Side panel">
     <div class="side-head">
       <nav class="tabs view-tabs" role="tablist" aria-label="Side panel views">
-        <button id="tab-files" type="button" role="tab" aria-controls="pane-files" aria-selected="false">Library</button>
-        <button id="tab-netlist" type="button" role="tab" aria-controls="pane-netlist" aria-selected="true">Netlist</button>
-        <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false">Hierarchy</button>
-        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" title="The objects of the level shown that are not drawn: those with no position, and devices no symbol can be chosen for">Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
-        <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" hidden>Solve</button>
+        <button id="tab-files" type="button" role="tab" aria-controls="pane-files" aria-selected="false" aria-keyshortcuts="1"><span class="tab-key" aria-hidden="true">1</span>Library</button>
+        <button id="tab-netlist" type="button" role="tab" aria-controls="pane-netlist" aria-selected="true" aria-keyshortcuts="2"><span class="tab-key" aria-hidden="true">2</span>Netlist</button>
+        <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false" aria-keyshortcuts="3"><span class="tab-key" aria-hidden="true">3</span>Hierarchy</button>
+        <button id="tab-symbol" type="button" role="tab" aria-controls="pane-symbol" aria-selected="false" aria-keyshortcuts="4"><span class="tab-key" aria-hidden="true">4</span>Symbol</button>
+        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" aria-keyshortcuts="5" title="The objects of the level shown that are not drawn: those with no position, and devices no symbol can be chosen for"><span class="tab-key" aria-hidden="true">5</span>Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
+        <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" aria-keyshortcuts="6" hidden><span class="tab-key" aria-hidden="true">6</span>Solve</button>
       </nav>
       <button id="hide-sidebar" class="icon" type="button" title="Hide the side panel (Ctrl+B)" aria-label="Hide the side panel">&#x2039;</button>
     </div>
@@ -58,20 +59,31 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
       <p class="pool-note">Files here are searched for packages and includes, in this order.</p>
       <div id="library-groups" class="library-groups"></div>
       <p id="path-note" class="pool-note"></p>
+      <p id="library-status" class="pool-note lib-warning" role="status"></p>
     </div>
     <div id="pane-netlist" class="pane netlist-pane" role="tabpanel">
       <div class="netlist-head">
       <div id="file-bar" class="file-bar">
-        <nav id="file-tabs" class="tabs file-tabs" aria-label="Files"></nav>
+        <span id="netlist-file" class="netlist-file path-text" hidden></span>
+        <div class="netlist-options">
         <span id="edit-state" class="edit-state" role="status" hidden></span>
         <button id="apply-edits" class="apply-edits" type="button" hidden title="Apply the text and exit editing (Ctrl+Enter)">Apply and Exit Editing</button>
-        <input id="show-failed" class="failed-check" type="checkbox" checked title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
-        <label for="show-failed" class="failed-toggle" title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
-          <span class="caption">Failed statements</span>
-          <span class="key"><span class="swatch x-failed" aria-hidden="true"></span><span class="legend">error</span></span>
-          <span class="key"><span class="swatch x-overridden" aria-hidden="true"></span><span class="legend">overridden</span></span>
+        <label class="auto-include-toggle" title="Automatically include uniquely defined missing subcircuits from the Library; report each automatic include in Problems">
+          <input id="auto-include" type="checkbox">Auto Include
         </label>
+        <span class="rnl-filter-group">
+          <label class="rnl-toggle"><input id="rnl-only" type="checkbox">RNL only</label>
+          <label class="semantics-toggle" title="Within RNL, show only lines containing free text">
+            <input id="semantics-only" type="checkbox" disabled>Semantics only
+          </label>
+        </span>
+        <label for="show-failed" class="failed-toggle" title="Show inactive statements: failed or overridden RNL and netlist statements not drawn">
+          <input id="show-failed" class="failed-check" type="checkbox" checked>
+          <span class="caption">Failed statements</span>
+        </label>
+        </div>
       </div>
+      <div id="source-file" class="source-file" hidden></div>
       <div id="netlist-find" class="netlist-find" hidden>
         <input id="netlist-query" type="search" aria-label="Find in netlist" placeholder="Find in netlist" spellcheck="false">
         <span id="netlist-matches" role="status"></span>
@@ -109,6 +121,15 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
         <nav id="letters" class="letters" aria-label="Initials"></nav>
         <div id="index" class="index-list" role="listbox" aria-label="Subcircuits by name"></div>
       </section>
+    </div>
+    <div id="pane-symbol" class="pane symbol-pane" role="tabpanel" aria-labelledby="tab-symbol" hidden>
+      <div class="symbol-options">
+        <label><input id="symbol-box" type="checkbox" checked>Box</label>
+        <label><input id="symbol-origin" type="checkbox" checked>Origin</label>
+        <label><input id="symbol-pins" type="checkbox" checked>Pins</label>
+        <label><input id="symbol-labels" type="checkbox" checked>Labels</label>
+      </div>
+      <div id="symbol-detail" class="symbol-detail"><p class="placeholder">No circuit is open.</p></div>
     </div>
     <div id="pane-unplaced" class="pane unplaced-pane" role="tabpanel" hidden>
       <div class="sub-head">

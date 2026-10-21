@@ -3,7 +3,7 @@ import { test, expect } from "../viewer.js";
 for (const platform of ["desktop", "web"]) {
   test(`${platform}: Include File/Folder, open from pool, Exclude and immutable built-ins`, async ({ page, viewer }) => {
     await viewer.open(null, { platform, pool: "1" });
-    await expect(page.locator(".view-tabs [role=tab]").first()).toHaveText("Library");
+    await expect(page.locator(".view-tabs [role=tab]").first()).toHaveAccessibleName("Library");
     await page.evaluate(() => {
       window.fakeShell.picks = [{ name: "04-hierarchy", fixture: "04-hierarchy" }];
       window.viewer.command("open");

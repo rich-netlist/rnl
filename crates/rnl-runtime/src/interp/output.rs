@@ -194,22 +194,19 @@ impl Interp<'_> {
 
     /// Where a symbol is defined: the unit whose binding made it.
     fn symbol_origin(&self, sym: ObjId) -> SymbolOrigin {
+        self.symbol_origin_version(sym).0
+    }
+
+    fn symbol_origin_version(&self, sym: ObjId) -> (SymbolOrigin, Option<String>) {
         if self.symbol(sym).default {
-            return SymbolOrigin::None;
+            return (SymbolOrigin::None, None);
         }
-        let mut found: Option<usize> = None;
-        for ((key, _), m) in &self.memo {
-            if let (super::Memo::Val(v), MemberKey::M { unit, .. }) = (m, key) {
-                if *v == sym {
-                    // the same symbol may be memoised per scene; any of them names the unit
-                    found = Some(found.map_or(*unit, |u: usize| u.min(*unit)));
-                }
+        match self.symbol(sym).unit.map(|u| &self.units[u]) {
+            Some(u) if u.kind == super::unit::UnitKind::Package => {
+                (SymbolOrigin::Package(u.pkg_name.clone()), Some(u.pkg_version.clone()))
             }
-        }
-        match found.map(|u| &self.units[u]) {
-            Some(u) if u.kind == super::unit::UnitKind::Package => SymbolOrigin::Package(u.pkg_name.clone()),
-            Some(u) => u.level.map(SymbolOrigin::Level).unwrap_or_default(),
-            None => SymbolOrigin::None,
+            Some(u) => (u.level.map(SymbolOrigin::Level).unwrap_or_default(), None),
+            None => (SymbolOrigin::None, None),
         }
     }
 
@@ -410,7 +407,23 @@ impl Interp<'_> {
             Some(b) => b,
             None => self.symbol_extent(sym, 0),
         };
+        let (origin, package_version) = self.symbol_origin_version(sym);
         out.push(SymbolView {
+            id: sym.0,
+            source: sd.source.clone(),
+            labels: sd
+                .labels
+                .iter()
+                .map(|l| SymbolLabel {
+                    key: l.key.clone(),
+                    text: l.items.text.as_ref().map(|t| t.as_str().to_string()).unwrap_or_default(),
+                    at: l.position,
+                    halign: l.items.halign.clone(),
+                    valign: l.items.valign.clone(),
+                    rotate: l.items.rotate.unwrap_or(0.0),
+                    style: l.style.clone(),
+                })
+                .collect(),
             name: self.label(sym),
             prims: Vec::new(),
             pins: Vec::new(),
@@ -418,13 +431,15 @@ impl Interp<'_> {
             bbox,
             box_written: sd.bbox.is_some(),
             default: sd.default,
-            origin: self.symbol_origin(sym),
+            origin,
+            package_version,
         });
 
         let prims = sd
             .prims
             .iter()
             .map(|p| SymbolPrim {
+                text: p.text.as_ref().and_then(|t| t.text.as_ref().map(|s| s.as_str().to_string())),
                 shape: p.shape,
                 points: p.points.clone(),
                 params: p.params.clone(),
@@ -900,7 +915,7 @@ impl Interp<'_> {
         let sym = self.block_symbols.get(&key)?.values().max_by(|a, b| a.0.cmp(&b.0))?.1;
         let mut views = Vec::new();
         let k = self.symbol_view(sym, &mut HashMap::new(), &mut views);
-        let mut view = views.swap_remove(k);
+        let mut view = views[k].clone();
         // the symbols drawn in it go by their index in `views`, which is not kept
         view.nested.clear();
         Some(BlockSymbol {
@@ -910,6 +925,7 @@ impl Interp<'_> {
                 default: self.symbol(sym).default,
             },
             view,
+            symbols: views,
         })
     }
 }

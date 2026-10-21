@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "../i18n.js";
 // The web shell: the page in a browser, served with the core next to it as core/ (apps/web). It opens
 // files the user chooses or drops, a folder, or a URL; reads only the files a document needs, as
 // collect in the core's client asks for them; and builds the Document with the core as WebAssembly in
@@ -6,10 +7,12 @@
 import { collect, decodeText, startCore } from "../core/client.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
+import { load } from "../util.js";
+import { sourcePath } from "../source-path.js";
 import { DEFAULT_CATALOG, readCatalog, readPublicPackage, latestPackages } from "../public-packages.js";
 
 /** The extensions of netlists that are opened on their own, listed first as the file to open. */
-const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "scs"];
+const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "scs"];
 /** The extensions of files mostly included or used by a netlist, listed after the netlists. */
 const PARTS = ["inc", "lib", "rnl"];
 /** How long a server may send nothing, before or during its answer, until a fetch is given up (ms). */
@@ -27,7 +30,7 @@ if (embed) {
     style.onerror = () => reject(new Error("The embed stylesheet could not be loaded."));
   });
   embedStyle.catch(() => {});
-  document.head.append(style);
+  append(document.head, style);
 }
 
 const WARMUP = { entry: "/ready.sp", files: { "/ready.sp": "* Ready\n.end\n" }, svg: false };
@@ -49,6 +52,24 @@ const built = new WeakSet(); // the sources built before: building one again rea
 let opened = null; // the page's handler for sources opened without asking, such as dropped files
 let included = null;
 let poolFiles = new Map();
+let poolSources = new Map();
+let poolTexts = new Map();
+let poolReady = Promise.resolve();
+let librarySnapshot = { texts: poolTexts, epoch: 0 };
+const indexedLibraries = new WeakMap();
+
+// Candidate workers retain independent lazy drawings and indexes. Synchronize only changed
+// library files when a worker is reused; a reload invalidates both workers on their next use.
+async function indexLibrary(worker, snapshot) {
+  const previous = indexedLibraries.get(worker);
+  if (previous === snapshot) return [];
+  const refresh = previous ? [...snapshot.texts].filter(([p, text]) =>
+    previous.texts.has(p) && previous.texts.get(p) !== text).map(([p]) => p) : [];
+  const errors = await worker.library({ library: { reload: previous?.epoch !== snapshot.epoch, refresh },
+    pool: [...snapshot.texts.keys()], files: Object.fromEntries(snapshot.texts) });
+  indexedLibraries.set(worker, snapshot);
+  return errors;
+}
 let lastUrl = ""; // the URL opened last, which Open URL offers again
 
 /**
@@ -139,16 +160,26 @@ function within(path, dir) {
  * @param {URL} url
  * @returns {WebSource}
  */
-function urlSource(url) {
+function urlSource(url, cached = null) {
   let served = url; // where the entry was served from when it was last read
   let dir = serverPath(url).split("/").slice(0, -1); // also supports transferred sources read before open
   return {
+    files: cached?.files,
     get url() { return served.href; },
     name: url.href,
     path: serverPath(url),
     async open(again) {
       const got = await fetchBytes(url.href, again);
-      if (!got.bytes) throw new Error(`${url.href} could not be fetched: ${got.why}.`);
+      if (!got.bytes) {
+        const path = serverPath(url), text = await cached?.read(path);
+        if (text != null) {
+          served = url;
+          this.path = path;
+          dir = path.split('/').slice(0, -1);
+          return { path, text };
+        }
+        throw new Error(`${url.href} could not be fetched: ${got.why}.`);
+      }
       served = new URL(got.url || url.href);
       const path = serverPath(served);
       this.path = path;
@@ -158,7 +189,7 @@ function urlSource(url) {
     async read(path, again) {
       if (!path.startsWith("/")) return null; // such as C:/models/x.lib
       const got = await fetchBytes(new URL(relative(dir, path), served).href, again);
-      return got.bytes ? decodeText(got.bytes) : null;
+      return got.bytes ? decodeText(got.bytes) : await cached?.read(path) ?? null;
     },
   };
 }
@@ -267,7 +298,7 @@ function parseUrl(text) {
 /** Resolve embed URLs exactly as File > Open URL and ?url= do. */
 export function sourceFromUrl(text) {
   const url = parseUrl(text);
-  if (!url) throw new Error("Give an http or https address, or one relative to this page.");
+  if (!url) throw new Error(m("Give an http or https address, or one relative to this page."));
   return urlSource(url);
 }
 
@@ -313,10 +344,10 @@ function chooseEntry(files, dir, folder) {
     if (entries.length === 1) return Promise.resolve(entries[0]);
     if (offered.length === 1) return Promise.resolve(offered[0]);
   }
-  let text = "Several of the files could be the netlist to open. Which one?";
-  if (folder !== null) text = folder ? `The netlist to open in ${folder}:` : "The netlist to open:";
+  let text = m("Several of the files could be the netlist to open. Which one?");
+  if (folder !== null) text = folder ? m`The netlist to open in ${folder}:` : m("The netlist to open:");
   return choose({
-    title: folder === null ? "Open" : "Open Folder",
+    title: folder === null ? m("Open") : m("Open Folder"),
     text,
     items: offered.map((p) => ({ label: within(p, dir), value: p })),
     filter: folder !== null,
@@ -351,7 +382,7 @@ function publicPackages() {
     return packages;
   }).catch((error) => {
     libraryIndex = null;
-    window.dispatchEvent(new CustomEvent("public-package-status", { detail: `Public packages unavailable: ${error.message} Built-in standard packages remain available.` }));
+    window.dispatchEvent(new CustomEvent("public-package-status", { detail: m`Public packages unavailable: ${error.message} Built-in standard packages remain available.` }));
     throw error;
   });
   return libraryIndex;
@@ -360,7 +391,7 @@ function publicPackages() {
 async function includeLibrary() {
   const catalog = await publicPackages();
   const packages = latestPackages(catalog);
-  const selected = await choose({ title: "Include Public Package", text: "Choose a package to add to the file pool.",
+  const selected = await choose({ title: m("Include Public Package"), text: m("Choose a package to add to the file pool."),
     items: packages.map((p) => ({ label: `${p.name} ${p.version} — ${p.description}`, value: p })), filter: true });
   if (!selected) return [];
   return includePackage(selected);
@@ -380,12 +411,12 @@ async function includePackage(selected) {
 /** Ask for a URL, resolved against the page. */
 async function openUrl() {
   const text = await ask({
-    title: "Open URL",
-    text: "The address of a netlist. The files it includes are read from the same server.",
+    title: m("Open URL"),
+    text: m("The address of a netlist. The files it includes are read from the same server."),
     value: lastUrl,
     placeholder: "https://example.org/netlists/top.sp",
     action: "Open",
-    check: (t) => (parseUrl(t) ? null : "Give an http or https address, or one relative to this page."),
+    check: (t) => (parseUrl(t) ? null : m("Give an http or https address, or one relative to this page.")),
   });
   if (text === null) return null;
   const url = parseUrl(text);
@@ -420,7 +451,7 @@ function input(id, folder) {
     }
   });
   el.addEventListener("cancel", () => chosen([]));
-  document.body.append(el);
+  append(document.body, el);
   return el;
 }
 
@@ -482,7 +513,7 @@ document.addEventListener("drop", (e) => {
   const open = opened;
   dropped(entries, files).then(
     (source) => source && open(source),
-    (err) => inform({ title: "Open", paragraphs: [`The dropped files could not be read: ${err.message || err}`] }),
+    (err) => inform({ title: m("Open"), paragraphs: [m`The dropped files could not be read: ${err.message || err}`] }),
   );
 });
 
@@ -528,7 +559,7 @@ function download(name, text) {
   a.href = url;
   a.download = name;
   a.hidden = true;
-  document.body.append(a);
+  append(document.body, a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -546,15 +577,13 @@ async function about() {
   const version = [site.version, site.commit && `(${site.commit})`].filter(Boolean).join(" ");
   const name = document.createElement("p");
   name.className = "dialog-name";
-  name.textContent = version ? `RNL Viewer ${version}` : "RNL Viewer";
+  setText(name, version ? `RNL Viewer ${version}` : "RNL Viewer");
   await inform({
-    title: "About RNL Viewer",
+    title: m("About RNL Viewer"),
     paragraphs: [
       name,
-      "Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; " +
-        "Save downloads the file shown, as no page can write a file where it was read from.",
-      "The RNL core runs in this page as WebAssembly. Files opened from this computer are read here " +
-        "and sent nowhere; a URL's files are fetched from its server.",
+      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("Save downloads the file shown, as no page can write a file where it was read from.")}`,
+      m`${m("The RNL core runs in this page as WebAssembly. Files opened from this computer are read here ")}${m("and sent nowhere; a URL's files are fetched from its server.")}`,
     ],
   });
 }
@@ -562,30 +591,77 @@ async function about() {
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "web",
+  sourceForFile(source, document, index) {
+    const f = document.files[index];
+    // At workspace root the core displays this virtual prefix without its leading slash.
+    const full = sourcePath(document, f).replace(/^<pool>\//, '/<pool>/');
+    const path = full.replace(/^\/<pool>(?=\/)/, '');
+    if (full !== path || source.fromPool && poolSources.has(path)) {
+      return poolSources.get(path) || { ...filesSource(poolFiles, path), fromPool: true };
+    }
+    if (full.startsWith('<')) return { path, name: f.name, text: f.text, readonly: true };
+    // A reader supplies available bytes, never a previously compiled include closure.
+    if (source.url) {
+      const url = new URL(relative(source.path.split('/').slice(0, -1), path), source.url);
+      // Re-read like Open URL, with the session's local bytes available if the server is gone.
+      return urlSource(url, source.files ? filesSource(source.files, path) : null);
+    }
+    const read = source.read || (async () => null);
+    return { path, name: path.slice(1), files: source.files, fromPool: source.fromPool,
+      read, async open(again) {
+        const text = await read(path, again);
+        if (text === null) throw new Error(`${path} could not be read. Open it again.`);
+        return { path, text };
+      } };
+  },
   newWindow(session, doc) {
     return openWebWindow(async () => {
+      // Share descriptors within the handoff, not entire Documents or duplicate folder snapshots.
+      const sources = [], ids = new Map(), snapshots = new Map();
+      const sourceId = async source => {
+        if (!source) return null;
+        if (ids.has(source)) return ids.get(source);
+        const id = sources.length;
+        ids.set(source, id);
+        let files = source.files && snapshots.get(source.files);
+        if (!files) {
+          files = {};
+          for (const [path, read] of source.files || []) files[path] = decodeText(await (await read()).arrayBuffer());
+          if (source.files) snapshots.set(source.files, files);
+        }
+        const descriptor = { name: source.name, path: source.path || `/${source.name}`, url: source.url,
+          temporary: source.temporary, readonly: source.readonly, fromPool: source.fromPool, files };
+        sources.push(descriptor);
+        if (source.text !== undefined) files[descriptor.path] = source.text;
+        return id;
+      };
+      const entryId = await sourceId(session.entry);
+      const route = [];
+      for (const step of session.path) route.push({ ...step, entry: await sourceId(step.entry) });
       const files = {};
-      for (const [path, read] of session.entry?.files || []) files[path] = decodeText(await (await read()).arrayBuffer());
-      if (session.entry?.text !== undefined) files[session.entry.path || `/${session.entry.name}`] = session.entry.text;
+      if (entryId !== null) Object.assign(files, sources[entryId].files);
       // The document contains applied text, never the pending editor buffer.
       if (doc) for (const f of doc.files) files[f.path.startsWith("/") || f.path.startsWith("<bundled>") ? f.path : joined(doc.path.slice(0, doc.path.lastIndexOf("/")), f.path)] = f.text;
       const pool = await Promise.all(session.pool.map(async (item) => ({ path: item.path, name: item.name, url: item.source.url,
         text: files[`/<pool>${item.path}`] ?? files[item.path] ?? decodeText(await (await item.read()).arrayBuffer()) })));
-      const source = session.entry;
-      return { ...session, files, pool, entry: source ? { name: source.name, path: source.path || `/${source.name}`, url: source.url,
-        temporary: source.temporary, readonly: source.readonly, fromPool: source.fromPool } : null };
+      if (entryId !== null) sources[entryId].files = files;
+      return { ...session, pool, sources, entry: entryId, path: route };
     });
   },
   async initialSession() {
     const session = await receiveWebSession();
     if (!session) return null;
-    const files = new Map(Object.entries(session.files || {}).map(([path, text]) => [path, () => new File([text], path)]));
+    const heldFiles = texts => new Map(Object.entries(texts || {}).map(([path, text]) => [path, () => new File([text], path)]));
     session.pool = session.pool.map((item) => {
       const read = () => new File([item.text], item.name);
       return { path: item.path, name: item.name, read, source: sessionSource(new Map([[item.path, read]]),
         { path: item.path, name: item.name, url: item.url, fromPool: !item.url }) };
     });
-    if (session.entry) session.entry = { ...sessionSource(files, session.entry), snapshot: session.files };
+    if (session.sources) {
+      const sources = session.sources.map(({ files, ...entry }) => ({ ...sessionSource(heldFiles(files), entry), snapshot: files }));
+      session.entry = sources[session.entry] || null;
+      session.path = session.path.map(step => ({ ...step, entry: sources[step.entry] }));
+    } else if (session.entry) session.entry = { ...sessionSource(heldFiles(session.files), session.entry), snapshot: session.files };
     return session;
   },
   embed,
@@ -609,7 +685,28 @@ export default {
     if (kind === "library") return includeLibrary();
     return chooseFiles(kind === "folder" ? folderInput : includeInput).then((files) => poolItems(files, kind === "folder"));
   },
-  setPool(items) { poolFiles = new Map(items.filter((item) => !item.builtin).map((item) => [item.path, item.read])); },
+  setPool(items, reload = false, refresh = []) {
+    const next = new Map(items.filter((item) => !item.builtin).map((item) => [item.path, item.read]));
+    poolSources = new Map(items.filter(item => !item.builtin).map(item => [item.path, item.source]));
+    poolReady = poolReady.catch(() => {}).then(async () => {
+      const texts = new Map();
+      const errors = [];
+      for (const [path, read] of next) {
+        try {
+          const text = !reload && !refresh.includes(path) && poolFiles.get(path) === read && poolTexts.has(path) ? poolTexts.get(path)
+            : decodeText(await (await read(reload)).arrayBuffer());
+          texts.set(path, text);
+        } catch (e) { errors.push(`Cannot read library file ${path}: ${e.message || e}`); }
+      }
+      poolFiles = next;
+      poolTexts = texts;
+      librarySnapshot = { texts, epoch: librarySnapshot.epoch + (reload ? 1 : 0) };
+      if (!spare && !core) spare = warmCore();
+      const indexed = await indexLibrary(spare?.worker ?? core, librarySnapshot);
+      return [...errors, ...indexed];
+    });
+    return poolReady;
+  },
   onInclude(handler) { included = handler; },
   nativeMenu: false,
   /** The URL that `?url=` names in the page's address, resolved against the page. */
@@ -634,6 +731,8 @@ export default {
    * is read.
    */
   async build(source, edits, progress, suppliedPackages, signal) {
+    await poolReady;
+    const library = librarySnapshot;
     const again = built.has(source);
     built.add(source);
     let buildingCore;
@@ -647,13 +746,18 @@ export default {
       // An independently opened source owns its relative paths. Put the pool in a separate
       // namespace so preloaded pool text cannot hide a source-relative file collect has yet to read.
       const poolPath = (path) => source.fromPool ? path : `/<pool>${path}`;
-      for (const [path, read] of poolFiles) {
-        files[poolPath(path)] = path === entry.path ? entry.text : decodeText(await (await read()).arrayBuffer());
+      for (const [path, text] of library.texts) {
+        files[poolPath(path)] = path === entry.path ? entry.text : text;
       }
       files[entry.path] = entry.text;
       Object.assign(files, source.snapshot || {});
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
-      const request = { entry: entry.path, files, pool: [...poolFiles.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true };
+      const request = { entry: entry.path, files, pool: [...library.texts.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true,
+        auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
+        library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {
+          const full = joined(dir, path);
+          return [full.replace(/^\/<pool>(?=\/)/, ""), text];
+        })) };
       // API packages are request-local until the newest request commits them to Library.
       for (const item of suppliedPackages || []) {
         const path = `/<api>${item.path}`;
@@ -673,6 +777,7 @@ export default {
       pendingCores.add(buildingCore);
       signal?.addEventListener("abort", abort, { once: true });
       await prepared.ready;
+      await indexLibrary(buildingCore, library);
       const builder = { build: (request) => {
         if (signal?.aborted) throw new Error("superseded");
         progress?.("parsing"); return buildingCore.build(request);
@@ -715,7 +820,10 @@ export default {
   commitBuild(doc) {
     const candidate = candidates.get(doc);
     if (!candidate) return;
-    core?.terminate();
+    if (core) {
+      if (!spare) spare = { worker: core, ready: Promise.resolve() };
+      else core.terminate();
+    }
     core = candidate;
     candidates.delete(doc);
     pendingCores.delete(candidate);
@@ -724,7 +832,8 @@ export default {
   discardBuild(doc) {
     const candidate = candidates.get(doc);
     if (!candidate) return;
-    candidate.terminate();
+    if (!spare) spare = { worker: candidate, ready: Promise.resolve() };
+    else candidate.terminate();
     candidates.delete(doc);
     pendingCores.delete(candidate);
     replenishCore();

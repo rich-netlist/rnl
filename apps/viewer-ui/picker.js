@@ -2,6 +2,7 @@
 // for each, with its kind and its name, to choose from with the mouse or with the keys (Up and
 // Down, Home and End, Enter to choose, Escape to close). Clicking anywhere else closes it.
 
+import { m } from "./i18n.js";
 import { doc } from "./state.js";
 import { $, span } from "./util.js";
 
@@ -33,7 +34,7 @@ export function openPicker(objects, x, y, onChoose) {
     row.tabIndex = -1;
     row.setAttribute("role", "option");
     row.dataset.object = String(o);
-    row.append(span("kind", obj.kind), span("name", obj.name));
+    row.append(span("kind", m(obj.kind)), span("name", obj.name));
     row.addEventListener("pointermove", () => activate(k));
     row.addEventListener("click", () => choose(k));
     return row;

@@ -102,8 +102,11 @@ test.describe("on the desktop", () => {
     // Close Preview: the file read again, as it is written
     await viewer.build(() => page.locator("#preview-close").click());
     await expect(page.locator("#preview-badge")).toBeHidden();
-    await expect(page.locator("#tab-solve")).toBeHidden();
+    await expect(page.locator("#tab-solve")).toBeVisible();
     await expect(page.locator("#pane-netlist")).toBeVisible();
+    await page.keyboard.press("6");
+    await expect(page.locator("#solve-report")).toHaveText("Run Solve (F9) to show the preview report.");
+    await expect(page.locator("#solve-counts")).toBeEmpty();
     expect(await page.evaluate(() => window.viewer.doc.files[0].text.includes('@RNL(type="generated"'))).toBe(false);
     // and Reload reads the file again, as before any solve
     await viewer.build(() => page.keyboard.press("F5"));
@@ -135,6 +138,6 @@ test.describe("on the desktop", () => {
     await expect(dialog(page)).toContainText("The netlist could not be solved: cannot read lib.inc");
     await dialog(page).getByRole("button", { name: "Close" }).click();
     await expect(page.locator("#preview-badge")).toBeHidden();
-    await expect(page.locator("#tab-solve")).toBeHidden();
+    await expect(page.locator("#tab-solve")).toBeVisible();
   });
 });

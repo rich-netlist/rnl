@@ -8,6 +8,10 @@
  */
 export type Document = {
   /**
+   * Symbols used by subcircuit instances or defined by subcircuits, once per runtime identity.
+   */
+  symbols: Array<InspectedSymbol>,
+  /**
    * The entry as the frontend named it, for building again.
    */
   path: string,
@@ -47,11 +51,40 @@ export type Document = {
   missing: Array<string>,
 };
 
+export type InspectedSymbol = {
+  name: string,
+  origin: string,
+  default: boolean,
+  file: string | null,
+  first_line: number,
+  source: string,
+  bbox: [number, number, number, number],
+  pins: Array<InspectedPin>,
+  labels: Array<InspectedLabel>,
+  /**
+   * Preview in the renderer's pixel coordinates; labels have data-id="symbol-label".
+   */
+  svg: string,
+  scale: number,
+};
+
+export type InspectedPin = { at: [number, number], terminals: Array<string>, name: string | null, direction: number | null };
+
+export type InspectedLabel = { key: string | null, text: string, at: [number, number] | null };
+
 /**
  * A drawing level. Its SVG and its hits are in pixels with y down; its primitives are in scene
  * units with y up, `scale` pixels each.
  */
 export type Level = {
+  /**
+   * Terminal names in subcircuit declaration order.
+   */
+  ports: Array<string>,
+  /**
+   * The subcircuit's own block symbol, an index into `Document::symbols`.
+   */
+  symbol: number | null,
   /**
    * The host level drawn, as `Object::level` names it.
    */
@@ -151,6 +184,10 @@ export type Hit = {
  * A subcircuit instance, as a branch of the hierarchy.
  */
 export type Child = {
+  /**
+   * The symbol this instance actually uses in its parent, including parent overrides.
+   */
+  symbol: number | null,
   instance: string,
   /**
    * The subcircuit it instantiates, as written.
@@ -215,6 +252,14 @@ export type UnplacedDrawing = { svg?: string, primitives?: Array<Primitive> };
 
 export type SourceFile = {
   /**
+   * Explicit include directives and the files the host resolver actually loaded.
+   */
+  includes: Array<SourceInclude>,
+  /**
+   * Physical lines containing free text in active, syntactically valid RNL members (1-based).
+   */
+  semantics: Array<number>,
+  /**
    * The file as the runtime knows it: relative to the opened file's directory when it is in it
    * or below, otherwise as the provider names it. With a rooted or absolute entry, the entry's
    * directory joined with this path (`rnl_runtime::source::join`) is the file in the
@@ -237,6 +282,14 @@ export type SourceFile = {
    * line, last column, and 0 when they failed or 1 when a conflict overrode them (7.5).
    */
   failed: Array<[number, number, number, number, number]>,
+};
+
+export type SourceInclude = {
+  line: number,
+  /**
+   * Index in Document.files.
+   */
+  file: number,
 };
 
 export type Object = {

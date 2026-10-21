@@ -5,6 +5,7 @@ import type {
   CatalogRequest,
   Document,
   DrawingsRequest,
+  LibraryRequest,
   Request,
   Snapshot,
   UnplacedDrawing,
@@ -17,6 +18,7 @@ export type {
   CatalogRequest,
   Document,
   DrawingsRequest,
+  LibraryRequest,
   Literal,
   Op,
   Point,
@@ -42,6 +44,8 @@ export interface CoreWorker {
   catalog(request: CatalogRequest): Promise<Catalog>;
   /** The drawings of the objects without a position that the last build with `lazy_unplaced` listed, as the request names them. */
   drawings(request: DrawingsRequest): Promise<UnplacedDrawing[]>;
+  /** Update the viewer library index; returns read errors. */
+  library(request: LibraryRequest): Promise<string[]>;
   /** Stop the Worker; calls still waiting, and later ones, reject. */
   terminate(): void;
 }

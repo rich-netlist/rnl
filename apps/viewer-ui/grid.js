@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // The grid: a view aid of the page, under the drawing and not a part of it. Dots or lines at the
 // integer points of the scene, x to the right and y up, or at a spacing of the user's; where they
 // would come closer than MIN_SPACING pixels, at 2, 5, 10, 20, 50 ... times the spacing instead, and
@@ -194,8 +195,8 @@ function field(type, before, after = "") {
   input.type = type;
   const label = document.createElement("label");
   label.className = `dialog-${type === "number" ? "line" : "choice"}`;
-  if (type === "number") label.append(before, input, after);
-  else label.append(input, before);
+  if (type === "number") append(label, before, input, after);
+  else append(label, input, before);
   return [label, input];
 }
 
@@ -203,14 +204,14 @@ function field(type, before, after = "") {
 function radios(legend, name, choices, value) {
   const set = document.createElement("fieldset");
   const head = document.createElement("legend");
-  head.textContent = legend;
-  set.append(head);
+  setText(head, legend);
+  append(set, head);
   const inputs = choices.map(([v, text]) => {
     const [label, input] = field("radio", text);
     input.name = name;
     input.value = v;
     input.checked = v === value;
-    set.append(label);
+    append(set, label);
     return input;
   });
   return [set, inputs];
@@ -218,13 +219,13 @@ function radios(legend, name, choices, value) {
 
 /** The Grid Settings dialog: the style, the spacing, the major lines and the axes. */
 async function askSettings() {
-  const choices = [["none", "None"], ["dots", "Dots"], ["lines", "Lines"]];
-  const [styleSet, styles] = radios("Grid", "grid-style", choices, settings.shown ? settings.style : "none");
+  const choices = [["none", m("None")], ["dots", m("Dots")], ["lines", m("Lines")]];
+  const [styleSet, styles] = radios(m("Grid"), "grid-style", choices, settings.shown ? settings.style : "none");
   const auto = settings.spacing === "auto";
   const [spacingSet, [autoSpacing, fixedSpacing]] = radios(
-    "Spacing",
+    m("Spacing"),
     "grid-spacing",
-    [["auto", "Auto: 1 unit, wider where the grid would be dense"], ["fixed", "Fixed: "]],
+    [["auto", m("Auto: 1 unit, wider where the grid would be dense")], ["fixed", m("Fixed: ")]],
     auto ? "auto" : "fixed",
   );
   // the units of a fixed spacing, after its radio button
@@ -233,17 +234,17 @@ async function askSettings() {
   units.min = "0";
   units.step = "any";
   units.value = auto ? "1" : String(settings.spacing);
-  units.setAttribute("aria-label", "Fixed spacing in units");
-  fixedSpacing.parentElement.append(units, " units");
+  setAttr(units, "aria-label", m("Fixed spacing in units"));
+  append(fixedSpacing.parentElement, units, m(" units"));
   units.addEventListener("input", () => {
     fixedSpacing.checked = true;
   });
-  const [majorLine, major] = field("number", "A major line every ", " lines");
+  const [majorLine, major] = field("number", m("A major line every "), m(" lines"));
   major.min = "2";
   major.max = String(MAX_MAJOR);
   major.step = "1";
   major.value = String(settings.major);
-  const [axesLine, axes] = field("checkbox", "Axes through the origin");
+  const [axesLine, axes] = field("checkbox", m("Axes through the origin"));
   axes.checked = settings.axes;
   const error = document.createElement("p");
   error.className = "dialog-error";
@@ -256,22 +257,22 @@ async function askSettings() {
   sync();
 
   const wrong = (message, input) => {
-    error.textContent = message;
+    setText(error, message);
     error.hidden = false;
     input.focus();
     return undefined;
   };
   const answer = await form({
-    title: "Grid Settings",
+    title: m("Grid Settings"),
     parts: [styleSet, spacingSet, majorLine, axesLine, error],
     focus: styles.find((r) => r.checked),
     answer: () => {
       const spacing = autoSpacing.checked ? "auto" : Number(units.value);
       if (!VALID.spacing(spacing)) {
-        return wrong(`The spacing is a number of units above 0 and at most ${MAX_SPACING}.`, units);
+        return wrong(m`The spacing is a number of units above 0 and at most ${MAX_SPACING}.`, units);
       }
       const every = Number(major.value);
-      if (!VALID.major(every)) return wrong(`A major line comes every 2 to ${MAX_MAJOR} lines, a whole number.`, major);
+      if (!VALID.major(every)) return wrong(m`A major line comes every 2 to ${MAX_MAJOR} lines, a whole number.`, major);
       const style = styles.find((r) => r.checked).value;
       return { shown: style !== "none", ...(style !== "none" && { style }), spacing, major: every, axes: axes.checked };
     },

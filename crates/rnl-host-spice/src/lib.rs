@@ -696,7 +696,7 @@ impl<'a> Reader<'a> {
                     skip_lib = Some(toks[1].to_string());
                 } else if toks.len() >= 3 {
                     let file = unquote(toks[1]);
-                    self.include(&file, Some(toks[2]), no, &fname, path, cur, circ, stack);
+                    self.include(&file, Some(toks[2]), no, &fname, path, cur, circ, stack, true);
                 }
                 continue;
             }
@@ -761,6 +761,7 @@ impl<'a> Reader<'a> {
         cur: LevelId,
         circ: LevelId,
         stack: &[String],
+        explicit: bool,
     ) {
         let full = resolve_include(self.provider, path, target, self.sink, Loc::line(fname, no));
         let key = format!("{}#{}", full, section.unwrap_or("").to_lowercase());
@@ -779,6 +780,7 @@ impl<'a> Reader<'a> {
         };
         let child = self.new_level(LevelKind::File, &name, &display, &full, cur, false, no);
         self.doc.levels[child].section = section.map(String::from);
+        self.doc.levels[child].include_site = explicit.then(|| Loc::line(fname, no));
         let mut st = stack.to_vec();
         st.push(key);
         self.read_file(&full, child, circ, false, &st, section);
@@ -804,7 +806,7 @@ impl<'a> Reader<'a> {
         if first.starts_with(".inc") {
             if let Some(target) = body.split_whitespace().nth(1) {
                 let target = unquote(target);
-                self.include(&target, None, no, fname, path, cur, circ, stack);
+                self.include(&target, None, no, fname, path, cur, circ, stack, true);
             }
             return;
         }
@@ -881,6 +883,31 @@ impl Continued {
 
 /// Read a SPICE document whose main file is `path`.
 pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<HostDocument> {
+    read_with_includes(path, provider, sink, &[])
+}
+
+/// Read additional files as root includes, without altering source text or line numbers.
+pub fn read_with_includes(
+    path: &str,
+    provider: &dyn Provider,
+    sink: &mut Sink,
+    includes: &[String],
+) -> Option<HostDocument> {
+    read_as(path, provider, sink, includes, true)
+}
+
+/// Index a library file as an include: its first line is a statement, not a SPICE title.
+pub fn read_library(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<HostDocument> {
+    read_as(path, provider, sink, &[], false)
+}
+
+fn read_as(
+    path: &str,
+    provider: &dyn Provider,
+    sink: &mut Sink,
+    includes: &[String],
+    main_file: bool,
+) -> Option<HostDocument> {
     let path = normalize(path);
     provider.read(&path)?;
     let main_dir = dirname(&path);
@@ -890,7 +917,11 @@ pub fn read(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Option<Host
     let doc = HostDocument::new(main, dialect());
     let mut r =
         Reader { provider, sink, doc, models: HashMap::new(), names: HashMap::new(), unresolved: Vec::new(), main_dir };
-    r.read_file(&path, 0, 0, true, &[format!("{path}#")], None);
+    r.read_file(&path, 0, 0, main_file, &[format!("{path}#")], None);
+    let fname = file_name(&path);
+    for extra in includes {
+        r.include(extra, None, 1, fname, &path, 0, 0, &[format!("{path}#")], false);
+    }
     finish(&mut r.doc, &r.models, std::mem::take(&mut r.unresolved));
     Some(r.doc)
 }

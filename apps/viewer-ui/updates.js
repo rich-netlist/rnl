@@ -1,3 +1,4 @@
+import { append, m, setText } from "./i18n.js";
 // Help > Check for Updates, on a platform whose shell has `version` and `browse` (the desktop): the
 // newest release of the viewer on GitHub against the version that runs, in a dialog that offers to
 // open the release's page. It looks only when the user asks, never by itself. The shell says the
@@ -15,7 +16,7 @@ export const RELEASES = "https://github.com/rich-netlist/rnl/releases";
 const TAG = "viewer-v";
 /** How long GitHub may take to answer (ms). */
 const WAIT = 15000;
-const TITLE = "Check for Updates";
+const TITLE = m("Check for Updates");
 
 let checking = false;
 
@@ -35,12 +36,12 @@ export async function checkForUpdates() {
     document.body.classList.remove("checking");
   }
   if (found.why !== undefined) {
-    await inform({ title: TITLE, paragraphs: [`The latest version could not be looked up: ${found.why}.`, releasesLink()] });
+    await inform({ title: TITLE, paragraphs: [m`The latest version could not be looked up: ${found.why}.`, releasesLink()] });
     return;
   }
   const { running, newest } = found;
   if (!newest) {
-    await inform({ title: TITLE, paragraphs: ["GitHub lists no release of RNL Viewer yet.", releasesLink()] });
+    await inform({ title: TITLE, paragraphs: [m("GitHub lists no release of RNL Viewer yet."), releasesLink()] });
     return;
   }
   // a version that is not one, which the app's never is, comes before every release
@@ -49,8 +50,8 @@ export async function checkForUpdates() {
     const open = await offer({
       title: TITLE,
       paragraphs: [
-        heading(`RNL Viewer ${newest.version} is available.`),
-        `This is version ${running}. The release's page on GitHub has its installers and what changed.`,
+        heading(m`RNL Viewer ${newest.version} is available.`),
+        m`This is version ${running}. The release's page on GitHub has its installers and what changed.`,
       ],
       action: "Open Release Page",
     });
@@ -58,8 +59,8 @@ export async function checkForUpdates() {
     return;
   }
   const text = order === 0
-    ? `RNL Viewer ${running} is the latest version.`
-    : `RNL Viewer ${running} is newer than the latest release, ${newest.version}.`;
+    ? m`RNL Viewer ${running} is the latest version.`
+    : m`RNL Viewer ${running} is newer than the latest release, ${newest.version}.`;
   await inform({ title: TITLE, paragraphs: [heading(text)] });
 }
 
@@ -157,7 +158,7 @@ export function compareVersions(a, b) {
 /** Open a page of the repository in the default browser; when that fails, say where it is. */
 function openPage(url) {
   Promise.resolve().then(() => shell.browse(url)).catch((e) => {
-    inform({ title: TITLE, paragraphs: [`The page could not be opened: ${e instanceof Error ? e.message : String(e)}.`, url] });
+    inform({ title: TITLE, paragraphs: [m`The page could not be opened: ${e instanceof Error ? e.message : String(e)}.`, url] });
   });
 }
 
@@ -165,7 +166,7 @@ function openPage(url) {
 function heading(text) {
   const p = document.createElement("p");
   p.className = "dialog-name";
-  p.textContent = text;
+  setText(p, text);
   return p;
 }
 
@@ -173,12 +174,12 @@ function heading(text) {
 function releasesLink() {
   const a = document.createElement("a");
   a.href = RELEASES;
-  a.textContent = RELEASES.replace(/^https:\/\//, "");
+  setText(a, RELEASES.replace(/^https:\/\//, ""));
   a.addEventListener("click", (e) => {
     e.preventDefault();
     openPage(RELEASES);
   });
   const p = document.createElement("p");
-  p.append("The releases are listed at ", a, ".");
+  append(p, m("The releases are listed at "), a, ".");
   return p;
 }
