@@ -26,7 +26,11 @@ for (const language of ['zh', 'en']) for (const theme of ['light', 'dark']) for 
     if (process.env.RNL_TIMELINE_SCREENSHOTS && info.project.name === 'chromium') {
       await page.evaluate(() => document.fonts.ready);
       mkdirSync(process.env.RNL_TIMELINE_SCREENSHOTS, { recursive: true });
-      await timeline.screenshot({ path: join(process.env.RNL_TIMELINE_SCREENSHOTS, `${language}-${theme}-${width}.png`) });
+      await timeline.screenshot({
+        path: join(process.env.RNL_TIMELINE_SCREENSHOTS, `${language}-${theme}-${width}.png`),
+        // The full timeline is taller than the viewport; don't let the sticky header cover its first entry.
+        style: '.topbar { visibility: hidden !important; }',
+      });
     }
   });
 }
