@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // Editing the text (decision 0011): the netlist pane can be switched to edit, with a text box for
 // each file of the document, following source navigation. A change is shown as not applied until the user
 // exits editing or chooses Apply and Exit Editing, which builds the Document again from the texts in memory, as
@@ -83,7 +84,7 @@ export function renderEditors() {
       const e = makeEditor(path, doc.files[k].name);
       const was = kept.get(path) || { caret: 0, scroll: 0 };
       editors.set(path, e);
-      source.append(e.el);
+      append(source, e.el);
       e.area.value = edits.textOf(path);
       number(e);
       const caret = Math.min(was.caret, e.area.value.length);
@@ -120,8 +121,8 @@ function makeEditor(path, name) {
   area.autocomplete = "off";
   area.autocapitalize = "off";
   area.wrap = "off";
-  area.setAttribute("aria-label", `Text of ${name}`);
-  el.append(gutter, area);
+  setAttr(area, "aria-label", m`Text of ${name}`);
+  append(el, gutter, area);
   const e = { el, area, gutter, lines: 0, caret: 0, scroll: 0 };
   area.addEventListener("input", () => {
     edits.setText(path, area.value);
@@ -145,7 +146,7 @@ function number(e) {
   if (lines === e.lines) return;
   e.lines = lines;
   e.el.style.setProperty("--line-number-width", `${Math.max(4.5, String(lines).length + 1.4)}em`);
-  e.gutter.textContent = Array.from({ length: lines }, (_, k) => k + 1).join("\n");
+  setText(e.gutter, Array.from({ length: lines }, (_, k) => k + 1).join("\n"));
 }
 
 /** Show the text box of the file at index `f` when the pane is in edit, and no other. */
@@ -196,7 +197,7 @@ export function refreshEditing() {
   const state = $("edit-state");
   state.hidden = !editing;
   state.dataset.state = unapplied.length > 0 ? "unapplied" : dirty.length > 0 ? "unsaved" : "clean";
-  state.textContent = unapplied.length > 0 ? "Changes not applied yet" : dirty.length > 0 ? "Applied, not saved" : "No changes";
+  setText(state, unapplied.length > 0 ? m("Changes not applied yet") : dirty.length > 0 ? m("Applied, not saved") : m("No changes"));
   $("apply-edits").hidden = !editing;
   $("apply-edits").disabled = exiting;
   const name = $("netlist-file");
@@ -205,7 +206,8 @@ export function refreshEditing() {
   setPathText(name, full);
   name.dataset.unsaved = String(dirty.length > 0);
   name.dataset.unapplied = String(unapplied.length > 0);
-  name.title = [full, ...dirty.map(path => `${path}: ${unapplied.includes(path) ? 'changes not applied; ' : ''}not saved`)].join('\n');
+  setAttr(name, "title", dirty.reduce((text, path) => m`${text}
+${path}: ${unapplied.includes(path) ? m("changes not applied; ") : ""}${m("not saved")}`, full));
   const any = dirty.length > 0;
   if (any !== notified) {
     notified = any;
@@ -216,7 +218,7 @@ export function refreshEditing() {
 /** A line in the status bar that goes after a few seconds: what was done. */
 function note(text) {
   const el = $("note");
-  el.textContent = text;
+  setText(el, text);
   el.hidden = text === "";
   clearTimeout(noteTimer);
   if (text) noteTimer = setTimeout(() => note(""), 6000);
@@ -228,13 +230,13 @@ export async function toggleEdit() {
   if (modal()) return;
   if (!editing) {
     if (!doc) {
-      await inform({ title: "Edit Text", paragraphs: ["Open a netlist first: File › Open (Ctrl+O)."] });
+      await inform({ title: m("Edit Text"), paragraphs: [m("Open a netlist first: File › Open (Ctrl+O).")] });
       return;
     }
     if (previewing()) {
       await inform({
-        title: "Edit Text",
-        paragraphs: ["A solve is shown as a preview, which is not edited. Solve › Close Preview shows the netlist again."],
+        title: m("Edit Text"),
+        paragraphs: [m("A solve is shown as a preview, which is not edited. Solve › Close Preview shows the netlist again.")],
       });
       return;
     }
@@ -272,7 +274,7 @@ export async function applyChanges() {
   keepPosition();
   try {
     const ok = edits.unappliedPaths().length === 0 || await applyEdits();
-    if (ok) note("Changes applied; editing closed.");
+    if (ok) note(m("Changes applied; editing closed."));
     return ok;
   } finally {
     exiting = false;
@@ -284,8 +286,8 @@ export async function applyChanges() {
 export async function discardChanges() {
   if (!editing || exiting || modal()) return;
   if (edits.unappliedPaths().length && await decide({
-    title: "Discard Changes",
-    paragraphs: ["Discard the changes that have not been applied and exit editing?"],
+    title: m("Discard Changes"),
+    paragraphs: [m("Discard the changes that have not been applied and exit editing?")],
     action: "Discard Changes",
   }) !== "Discard Changes") return;
   keepPosition();
@@ -315,7 +317,7 @@ export async function save(overwrite = false) {
   if (shell.saveAs && opened && opened.text !== undefined) return saveAs();
   const files = filesToSave();
   if (files.length === 0) {
-    note(edits.dirtyPaths().length === 0 ? "No changes to save." : "");
+    note(edits.dirtyPaths().length === 0 ? m("No changes to save.") : "");
     return true;
   }
   try {
@@ -323,10 +325,12 @@ export async function save(overwrite = false) {
     if (result !== null && typeof result === "object") return changedOnDisk(result.changed);
     edits.markSaved(files.map((f) => f.path));
     refreshEditing();
-    note(result || "Saved.");
+    note(shell.platform === "web"
+      ? files.length === 1 ? m`Downloaded ${files[0].name.split("/").pop()}.` : m`Downloaded ${files.length} files.`
+      : result || m("Saved."));
     return true;
   } catch (e) {
-    await inform({ title: "Save", paragraphs: [`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
+    await inform({ title: m("Save"), paragraphs: [m`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
     return false;
   }
 }
@@ -339,10 +343,10 @@ export async function save(overwrite = false) {
 async function changedOnDisk(names) {
   const many = names.length > 1;
   const choice = await decide({
-    title: "File Changed on Disk",
+    title: m("File Changed on Disk"),
     paragraphs: [
-      `${many ? "These files were" : "This file was"} changed by another program since the viewer read ${many ? "them" : "it"}: ${names.join(", ")}.`,
-      "Nothing was saved. Overwrite writes the text in the viewer over what is on disk; Reload reads the files again and drops the changes made here.",
+      m`${many ? "These files were" : "This file was"} changed by another program since the viewer read ${many ? "them" : "it"}: ${names.join(", ")}.`,
+      m("Nothing was saved. Overwrite writes the text in the viewer over what is on disk; Reload reads the files again and drops the changes made here."),
     ],
     action: "Overwrite",
     others: ["Reload"],
@@ -364,12 +368,12 @@ export async function saveAs() {
   if (currentSource()?.readonly) return false;
   if (!doc || !shell.saveAs || modal()) return false;
   const entry = doc.files[0];
-  const title = "Save As";
+  const title = m("Save As");
   if (!entry) return false;
   if (fileShown !== 0) {
     await inform({
       title,
-      paragraphs: ["Save As saves the netlist that was opened, the first file. An included file is saved where it is with File › Save."],
+      paragraphs: [m("Save As saves the netlist that was opened, the first file. An included file is saved where it is with File › Save.")],
     });
     return false;
   }
@@ -377,7 +381,7 @@ export async function saveAs() {
   if (others.length > 0) {
     await inform({
       title,
-      paragraphs: [`Save the other files with changes first, with File › Save: ${others.map((f) => f.name).join(", ")}.`],
+      paragraphs: [m`Save the other files with changes first, with File › Save: ${others.map((f) => f.name).join(", ")}.`],
     });
     return false;
   }
@@ -386,10 +390,10 @@ export async function saveAs() {
     if (!written) return false;
     edits.markSaved([entry.path]);
     await openSource(written, false);
-    note(`Saved as ${written.name}.`);
+    note(m`Saved as ${written.name}.`);
     return true;
   } catch (e) {
-    await inform({ title, paragraphs: [`The netlist was not saved: ${e instanceof Error ? e.message : String(e)}`] });
+    await inform({ title, paragraphs: [m`The netlist was not saved: ${e instanceof Error ? e.message : String(e)}`] });
     return false;
   }
 }
@@ -407,8 +411,8 @@ export async function confirmLeave(what) {
   const names = files.map((f) => f.name).join(", ");
   const can = shell.platform !== "web" && shell.save;
   const choice = await decide({
-    title: "Changes Not Saved",
-    paragraphs: [`${files.length === 1 ? "This file has" : "These files have"} changes that are not saved: ${names}.`, `Do you want to ${what}?`],
+    title: m("Changes Not Saved"),
+    paragraphs: [m`${files.length === 1 ? "This file has" : "These files have"} changes that are not saved: ${names}.`, m`Do you want to ${what}?`],
     action: can ? "Save" : "Discard Changes",
     others: can ? ["Don't Save"] : [],
   });
@@ -419,7 +423,7 @@ export async function confirmLeave(what) {
 
 /** The window is asked to close (desktop): when it may, the shell quits. */
 export async function closeRequested() {
-  if (await confirmLeave("close the window")) shell.quit();
+  if (await confirmLeave(m("close the window"))) shell.quit();
 }
 
 $("apply-edits").addEventListener("click", () => applyChanges());

@@ -1,3 +1,4 @@
+import { m } from "../i18n.js";
 // The desktop shell: the page inside the RNL Viewer app (apps/desktop), which reads files and builds
 // documents natively and shows the menu bar itself. The only module that uses window.__TAURI__.
 
@@ -16,6 +17,14 @@ let openingDrop = false;
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "desktop",
+  setLanguage: language => invoke("set_ui_language", { language }),
+  async about() {
+    await inform({ title: m("About RNL Viewer"), paragraphs: [
+      `RNL Viewer ${await tauri.app.getVersion()}`,
+      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("nothing is written to a file until you save.")}`,
+      m("The drawing uses Noto Sans SC, copyright 2014–2021 Adobe, under the SIL Open Font License 1.1."),
+    ] });
+  },
   loadSettings: (legacy) => invoke("load_settings", { legacy }),
   saveSetting: (key, value) => invoke("save_setting", { key, value }),
   bundledFiles: () => invoke("bundled_files"),
@@ -53,16 +62,16 @@ export default {
       try {
         const paths = await invoke("dropped_files", { paths: payload.paths });
         if (!paths.length) {
-          await inform({ title: "Open", paragraphs: ["Drop a netlist or RNL package file (.sp, .spi, .spice, .cir, .ckt, .net, .netlist, .inc, .lib, .scs or .rnl)."] });
+          await inform({ title: m("Open"), paragraphs: [m("Drop a netlist or RNL package file (.sp, .spi, .spice, .cir, .ckt, .net, .netlist, .inc, .lib, .scs or .rnl).")] });
           return;
         }
         const path = paths.length === 1 ? paths[0] : await choose({
-          title: "Open Netlist", text: "Choose the dropped file to open.", filter: true,
+          title: m("Open Netlist"), text: m("Choose the dropped file to open."), filter: true,
           items: paths.map((path) => ({ label: path, value: path })),
         });
         if (path) await handler(file(path));
       } catch (error) {
-        await inform({ title: "Open", paragraphs: [`The dropped files could not be opened: ${error.message || error}`] });
+        await inform({ title: m("Open"), paragraphs: [m`The dropped files could not be opened: ${error.message || error}`] });
       } finally {
         openingDrop = false;
       }

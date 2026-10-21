@@ -12,11 +12,10 @@ import { current, doc, path, setDoc } from "./state.js";
 import { backTo, enterRow, enterRoot } from "./subcircuits.js";
 import { $, span, svgElement } from "./util.js";
 import { startLoading, nextPaint } from "./loading.js";
+import { m, setText, setAttr } from "./i18n.js";
 
 const params = new URLSearchParams(location.search);
 const targetOrigin = params.has("origin") ? params.get("origin") : "*";
-const language = navigator.languages.find((value) => /^(zh|en)\b/i.test(value)) || navigator.language;
-const zh = /^zh\b/i.test(language);
 let generation = 0;
 let opening = false;
 let reportedLevel = null;
@@ -70,7 +69,7 @@ function updateLevel() {
     item.textContent = name;
     if (item instanceof HTMLButtonElement) {
       item.type = "button";
-      item.title = zh ? `返回 ${name}` : `Back to ${name}`;
+      setAttr(item, "title", m`Back to ${name}`);
       item.addEventListener("click", (e) => backTo(index, { newWindow: e.shiftKey }));
     } else item.setAttribute("aria-current", "location");
     crumbs.append(item);
@@ -151,18 +150,18 @@ function controls() {
   const toolbar = document.createElement("div");
   toolbar.className = "embed-toolbar";
   toolbar.setAttribute("role", "group");
-  toolbar.setAttribute("aria-label", zh ? "画布工具" : "Canvas tools");
+  setAttr(toolbar, "aria-label", m("Canvas tools"));
   const buttons = [
-    ["fit", zh ? "适应窗口" : "Fit to window", "M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4", fit],
-    ["zoom-in", zh ? "放大" : "Zoom in", "M3 8h10M8 3v10", () => zoomCenter(1.25)],
-    ["zoom-out", zh ? "缩小" : "Zoom out", "M3 8h10", () => zoomCenter(0.8)],
+    ["fit", m("Fit to window"), "M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4", fit],
+    ["zoom-in", m("Zoom in"), "M3 8h10M8 3v10", () => zoomCenter(1.25)],
+    ["zoom-out", m("Zoom out"), "M3 8h10", () => zoomCenter(0.8)],
   ];
   for (const [id, label, drawing, action] of buttons) {
     const button = document.createElement("button");
     button.type = "button";
     button.id = `embed-${id}`;
-    button.title = label;
-    button.setAttribute("aria-label", label);
+    setAttr(button, "title", label);
+    setAttr(button, "aria-label", label);
     const icon = svgElement("svg", { viewBox: "0 0 16 16", "aria-hidden": "true" });
     icon.append(svgElement("path", { d: drawing, fill: "none", stroke: "currentColor", "stroke-width": 1.5,
       "stroke-linecap": "round", "stroke-linejoin": "round" }));
@@ -173,10 +172,10 @@ function controls() {
   crumbs = document.createElement("nav");
   crumbs.id = "embed-path";
   crumbs.hidden = true;
-  crumbs.setAttribute("aria-label", zh ? "层级路径" : "Hierarchy path");
+  setAttr(crumbs, "aria-label", m("Hierarchy path"));
   link = document.createElement("a");
   link.id = "embed-open";
-  link.textContent = "Open in RNL Viewer ↗";
+  setText(link, m("Open in RNL Viewer ↗"));
   link.target = "_blank";
   link.rel = "noopener noreferrer";
   link.hidden = true;
@@ -189,7 +188,7 @@ function controls() {
 
 export async function startEmbed() {
   controls();
-  clearDrawing(zh ? "等待网表。" : "Waiting for a netlist.");
+  clearDrawing(m("Waiting for a netlist."));
   $("canvas").tabIndex = 0;
   try {
     const [version] = await Promise.all([prepareEmbed(), startCommands()]);

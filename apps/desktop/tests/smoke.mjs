@@ -392,6 +392,7 @@ async function drive(app, port, profile, t0, session) {
     return s.doc && s.drawn && !s.busy && s;
   });
   console.log(`drawn ${s.level} in ${Date.now() - t0} ms, at ${s.zoom}`);
+  await page.evaluate(`window.viewer.command('language-en')`);
   same(s.level, TOP, "the level drawn");
   await until("the window's title", () => windowTitle(app.pid) === `${TOP} - RNL Viewer`, 10_000);
   same(await page.evaluate("window.__TAURI__.app.getVersion()"), version, "the running Viewer version");
@@ -438,6 +439,24 @@ async function drive(app, port, profile, t0, session) {
   same(nativeMenu(app.pid), want, "the native menu");
   // a key in the page clears a check mark, and an item chosen in the menu reaches the page
   const at = (id) => find(want, id).at;
+  // Use the real native command, then compare every label and preserve checks/shortcuts.
+  await page.evaluate(`window.localeDocument = window.viewer.doc; window.localeSvg = document.querySelector('#canvas > svg')`);
+  chooseItem(app.pid, at("language-zh"));
+  await until("Chinese UI", () => page.evaluate(`document.documentElement.lang === 'zh-CN' && window.viewer.checked('language-zh')`));
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, "apps/viewer-ui/locales/zh-CN.json"), "utf8"));
+  const translatedMenu = items => items.map(item => {
+    const [label, keys] = item.text.split('\t');
+    return { ...item, text: (catalog[label] || label) + (keys ? '\t' + keys : ''),
+      ...(item.items ? {items: translatedMenu(item.items)} : {}) };
+  });
+  same(nativeMenu(app.pid), translatedMenu(tableMenus({...marks, "language-en":false, "language-zh":true})), "Chinese native menu");
+  same(await page.evaluate(`window.localeDocument === window.viewer.doc && window.localeSvg === document.querySelector('#canvas > svg')`), true, "language change preserves document and drawing");
+  chooseItem(app.pid, at("about"));
+  await until("Chinese About", () => page.evaluate(`document.querySelector('dialog[open] .dialog-title')?.textContent === '关于 RNL Viewer'`));
+  await page.evaluate(`document.querySelector('dialog[open] button').click()`);
+  chooseItem(app.pid, at("language-en"));
+  await until("English UI", () => page.evaluate(`document.documentElement.lang === 'en' && window.viewer.checked('language-en')`));
+  same(nativeMenu(app.pid), want, "restored English native menu");
   chooseItem(app.pid, at("file-associations"));
   await until("the File Associations dialog", () => page.evaluate(`document.querySelector('dialog[open] .dialog-title')?.textContent === 'File Associations'`));
   check(await page.evaluate(`document.querySelector('dialog[open]').textContent.includes('.netlist')`), "file-association help omits .netlist");

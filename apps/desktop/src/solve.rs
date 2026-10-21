@@ -16,7 +16,7 @@ use rnl_cli::FsProvider;
 use rnl_solver::{SolverOptions, OBJECTIVES};
 use rnl_view::Document;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, State, WebviewWindow};
+use tauri::{Emitter, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::files::{self, Edits};
@@ -210,11 +210,16 @@ pub async fn save_solved_copy(window: WebviewWindow, solves: State<'_, Solves>) 
         None => dialog,
     };
     let one = one_file(&run);
+    let title = crate::menu::text(
+        window.app_handle(),
+        if one { "Save Solved Copy As" } else { "Save the Solved Files Into a Folder" },
+    );
+    let dialog = dialog.set_title(title);
     let chosen = tauri::async_runtime::spawn_blocking(move || {
         if one {
-            dialog.set_title("Save Solved Copy As").set_file_name(copy_name(&entry)).blocking_save_file()
+            dialog.set_file_name(copy_name(&entry)).blocking_save_file()
         } else {
-            dialog.set_title("Save the Solved Files Into a Folder").blocking_pick_folder()
+            dialog.blocking_pick_folder()
         }
     })
     .await

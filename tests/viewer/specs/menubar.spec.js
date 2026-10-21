@@ -75,7 +75,7 @@ test.describe("on the web", () => {
         items: [
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-",
           "Background", "Light", "Dark",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Language", "English", "简体中文", "",
           "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Not Drawn5", "Netlist PanelCtrl+B", "ProblemsCtrl+Shift+M",
         ],
       },
@@ -96,7 +96,7 @@ test.describe("on the web", () => {
         Object.defineProperty(Navigator.prototype, "languages", { get: () => list, configurable: true });
       }, languages);
       await viewer.open("04-hierarchy");
-      await viewer.menuTitle("Help").click();
+      await viewer.menuTitle(languages[0].startsWith("zh") ? "帮助" : "Help").click();
       await viewer.menuItem("desktop-viewer").click();
       await expect(page.locator("#menubar .menu-list:visible")).toHaveCount(0);
       return viewer.calls("browse");
@@ -432,6 +432,7 @@ test.describe("with a native menu", () => {
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
       ["toggle-hover-names", true],
+      ["language-en", true], ["language-zh", false],
       ["toggle-auto-include", true],
     ];
     expect(await viewer.calls("setCheck")).toEqual(marks);

@@ -2,11 +2,11 @@
 //! (`apps/viewer-ui/commands.json`), so that the menus and the page's keys cannot drift apart.
 
 use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
 
 use serde::Deserialize;
 use tauri::menu::{
-    AboutMetadata, CheckMenuItem, CheckMenuItemBuilder, IsMenuItem, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu,
-    SubmenuBuilder,
+    CheckMenuItem, CheckMenuItemBuilder, IsMenuItem, Menu, MenuItemBuilder, MenuItemKind, Submenu, SubmenuBuilder,
 };
 use tauri::{AppHandle, Manager, State, Wry};
 
@@ -147,12 +147,55 @@ pub fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let table: Table = serde_json::from_str(COMMANDS).expect("commands.json is a command table");
     let mut checks = HashMap::new();
     let mut menus = Vec::new();
+    let mut labels = Vec::new();
     for (label, entries) in plan(&table, cfg!(windows)) {
-        menus.push(submenu(app, &label, entries, &mut checks)?);
+        menus.push(submenu(app, &label, entries, &mut checks, &mut labels)?);
     }
     app.manage(Checks(checks));
     let items: Vec<&dyn IsMenuItem<Wry>> = menus.iter().map(|s| s as &dyn IsMenuItem<Wry>).collect();
-    Menu::with_items(app, &items)
+    let menu = Menu::with_items(app, &items)?;
+
+    app.manage(Labels(Mutex::new(("en".into(), labels))));
+    Ok(menu)
+}
+
+type LabelList = Vec<(MenuItemKind<Wry>, String)>;
+pub struct Labels(Mutex<(String, LabelList)>);
+static CHINESE: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../viewer-ui/locales/zh-CN.json")).expect("Chinese UI catalog")
+});
+
+fn translated(language: &str, source: &str) -> String {
+    let (label, keys) = source.split_once('\t').map_or((source, None), |(a, b)| (a, Some(b)));
+    let label = if language == "zh-CN" { CHINESE.get(label).map_or(label, String::as_str) } else { label };
+    keys.map_or_else(|| label.to_string(), |keys| format!("{label}\t{keys}"))
+}
+
+/// Change labels in place: command IDs, accelerators, enabled state and check marks stay intact.
+#[tauri::command]
+pub fn set_ui_language(labels: State<'_, Labels>, language: String) -> Result<(), String> {
+    if language != "en" && language != "zh-CN" {
+        return Err("Unsupported UI language".into());
+    }
+    let mut state = labels.0.lock().map_err(|e| e.to_string())?;
+    for (item, source) in &state.1 {
+        let text = translated(&language, source);
+        match item {
+            MenuItemKind::MenuItem(i) => i.set_text(&text),
+            MenuItemKind::Check(i) => i.set_text(&text),
+            MenuItemKind::Submenu(i) => i.set_text(&text),
+            _ => continue,
+        }
+        .map_err(|e| e.to_string())?;
+    }
+    state.0 = language;
+    Ok(())
+}
+
+pub fn text(app: &AppHandle, source: &str) -> String {
+    let labels = app.state::<Labels>();
+    let state = labels.0.lock().unwrap_or_else(|e| e.into_inner());
+    translated(&state.0, source)
 }
 
 /// A menu of the menu bar, or a submenu, with its entries; its check items go into `checks`.
@@ -161,39 +204,50 @@ fn submenu(
     label: &str,
     entries: Vec<Shown>,
     checks: &mut HashMap<String, CheckMenuItem<Wry>>,
+    labels: &mut LabelList,
 ) -> tauri::Result<Submenu<Wry>> {
     let mut menu = SubmenuBuilder::new(app, label);
     for entry in entries {
         menu = match entry {
             Shown::Separator => menu.separator(),
-            Shown::About(text) => menu.item(&PredefinedMenuItem::about(app, Some(&text), Some(about()))?),
-            Shown::Submenu(text, inner) => menu.item(&submenu(app, &text, inner, checks)?),
+            Shown::About(text) => {
+                let item = MenuItemBuilder::with_id("about", &text).build(app)?;
+                labels.push((MenuItemKind::MenuItem(item.clone()), text));
+                menu.item(&item)
+            }
+            Shown::Submenu(text, inner) => menu.item(&submenu(app, &text, inner, checks, labels)?),
             Shown::Item { id, text, accelerator, check: true } => {
-                let mut b = CheckMenuItemBuilder::with_id(&id, text).checked(true);
+                let mut b = CheckMenuItemBuilder::with_id(&id, &text).checked(true);
                 if let Some(a) = accelerator {
                     b = b.accelerator(a);
                 }
                 let item = b.build(app)?;
+                labels.push((MenuItemKind::Check(item.clone()), text));
                 let menu = menu.item(&item);
                 checks.insert(id, item);
                 menu
             }
             Shown::Item { id, text, accelerator, check: false } => {
-                let mut b = MenuItemBuilder::with_id(id, text);
+                let mut b = MenuItemBuilder::with_id(id, &text);
                 if let Some(a) = accelerator {
                     b = b.accelerator(a);
                 }
-                menu.item(&b.build(app)?)
+                let item = b.build(app)?;
+                labels.push((MenuItemKind::MenuItem(item.clone()), text));
+                menu.item(&item)
             }
         };
     }
-    menu.build()
+    let menu = menu.build()?;
+    labels.push((MenuItemKind::Submenu(menu.clone()), label.to_string()));
+    Ok(menu)
 }
 
 /// The About box. Its copyright, which every platform shows, is the notice of the fonts the drawing
 /// is in, which the app embeds with the page (decision 0009, OFL 2).
-fn about() -> AboutMetadata<'static> {
-    AboutMetadata {
+#[cfg(test)]
+fn about() -> tauri::menu::AboutMetadata<'static> {
+    tauri::menu::AboutMetadata {
         name: Some("RNL Viewer".into()),
         version: Some(env!("CARGO_PKG_VERSION").into()),
         comments: Some(
@@ -244,6 +298,13 @@ mod tests {
         serde_json::from_str(COMMANDS).expect("commands.json is a command table")
     }
 
+    #[test]
+    fn translations_keep_shortcuts_and_fall_back_to_english() {
+        assert_eq!(translated("zh-CN", "&Open File...\tCtrl+O"), "打开文件(&O)...\tCtrl+O");
+        assert_eq!(translated("en", "&Open File...\tCtrl+O"), "&Open File...\tCtrl+O");
+        assert_eq!(translated("zh-CN", "untranslated"), "untranslated");
+    }
+
     /// View › Grid: the grid shown or not, by G, which the page always handles; its style, one of
     /// three; the axes; and the dialog of its settings.
     fn grid(show: &str) -> Shown {
@@ -281,6 +342,13 @@ mod tests {
         })
         .collect();
         Shown::Submenu("Side P&anels".into(), entries)
+    }
+
+    fn languages() -> Shown {
+        Shown::Submenu(
+            "&Language".into(),
+            vec![check("language-en", "English", None), check("language-zh", "简体中文", None)],
+        )
     }
 
     /// The Edit menu (decision 0011): switching the text to edit, a check item, and applying its
@@ -397,6 +465,7 @@ mod tests {
                     ),
                     grid("Show &Grid\tG"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
+                    languages(),
                     Shown::Separator,
                     panels(true),
                     check("toggle-netlist", "&Netlist Panel\tCtrl+B", None),
@@ -447,6 +516,7 @@ mod tests {
                     ),
                     grid("Show &Grid"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
+                    languages(),
                     Shown::Separator,
                     panels(false),
                     check("toggle-netlist", "&Netlist Panel", Some("CmdOrCtrl+B")),

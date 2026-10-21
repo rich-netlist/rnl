@@ -1,3 +1,4 @@
+import { setText } from "./i18n.js";
 // Small helpers for building the page.
 
 export const $ = (id) => document.getElementById(id);
@@ -9,7 +10,7 @@ export function clamp(v, lo, hi) {
 export function span(cls, text) {
   const s = document.createElement("span");
   s.className = cls;
-  s.textContent = text;
+  setText(s, text);
   return s;
 }
 
@@ -30,7 +31,7 @@ export async function startSettings(shell) {
   ephemeral = !!shell.embed;
   if (ephemeral) return;
   if (!shell.loadSettings) return;
-  const keys = ["sidebar-width", "sidebar-shown", "side-pane", "problems-height", "problems-shown",
+  const keys = ["language", "sidebar-width", "sidebar-shown", "side-pane", "problems-height", "problems-shown",
     "index-height", "show-failed", "rnl-only", "semantics-only", "symbol-box", "symbol-origin", "symbol-pins", "symbol-labels", "hover-names", "grid-shown", "grid-style", "grid-spacing",
     "grid-major", "grid-axes", "solve-options", "solve-time-limit", "search-paths", "background", "auto-include"];
   const legacy = {};

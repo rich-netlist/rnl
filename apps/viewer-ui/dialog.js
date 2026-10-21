@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // Dialogs in the page's style, for what a shell asks of the user: one of a list, such as the netlist
 // to open; a line of text, such as a URL; several values at once, such as the grid's settings; a
 // message, such as the About box; a message with a button that acts, such as one that opens a
@@ -26,7 +27,7 @@ export function modal() {
  */
 export function choose({ title, text, items, filter = false, action = "Open" }) {
   const d = frame(title, text, action);
-  const box = filter ? textBox("search", "Filter by name") : null;
+  const box = filter ? textBox("search", m("Filter by name")) : null;
   const list = document.createElement("div");
   list.className = "dialog-list";
   list.id = `${d.id}-list`;
@@ -47,15 +48,15 @@ export function choose({ title, text, items, filter = false, action = "Open" }) 
         option.className = "dialog-option";
         option.id = `${list.id}-${k}`;
         option.setAttribute("role", "option");
-        option.textContent = x.label;
-        option.title = x.label;
+        setText(option, x.label);
+        setAttr(option, "title", x.label);
         option.addEventListener("click", () => mark(k));
         option.addEventListener("dblclick", () => d.ok.click());
         return option;
       }),
     );
     const more = matching.length - LIST_MAX;
-    note.textContent = matching.length === 0 ? "Nothing matches." : more > 0 ? `${more} more; type to narrow the list.` : "";
+    setText(note, matching.length === 0 ? m("Nothing matches.") : more > 0 ? m`${more} more; type to narrow the list.` : "");
     note.hidden = !note.textContent;
     d.ok.disabled = matching.length === 0;
     mark(0);
@@ -91,7 +92,7 @@ export function choose({ title, text, items, filter = false, action = "Open" }) 
     box.addEventListener("input", render);
     box.addEventListener("keydown", move);
   }
-  d.body.append(...(box ? [box] : []), list, note);
+  append(d.body, ...(box ? [box] : []), list, note);
   render();
   return d.show(box || list, () => (matching[at] ? matching[at].value : undefined));
 }
@@ -116,11 +117,11 @@ export function ask({ title, text, value = "", placeholder = "", action = "OK", 
   box.addEventListener("input", () => {
     error.hidden = true;
   });
-  d.body.append(box, error);
+  append(d.body, box, error);
   return d.show(box, () => {
     const wrong = check(box.value);
     if (wrong === null) return box.value;
-    error.textContent = wrong;
+    setText(error, wrong);
     error.hidden = false;
     box.focus();
     return undefined;
@@ -145,8 +146,8 @@ export function form({ title, text, parts, answer, focus, action = "OK", wide = 
   if (wide) d.body.parentElement.classList.add("wide");
   const fields = document.createElement("div");
   fields.className = "dialog-form";
-  fields.append(...parts);
-  d.body.append(fields);
+  append(fields, ...parts);
+  append(d.body, fields);
   return d.show(focus || d.ok, answer);
 }
 
@@ -158,7 +159,7 @@ export function form({ title, text, parts, answer, focus, action = "OK", wide = 
  * @returns {Promise<void>}
  */
 export function inform({ title, paragraphs }) {
-  const d = frame(title, "", "Close", false);
+  const d = frame(title, "", m("Close"), false);
   addParagraphs(d.body, paragraphs);
   return d.show(d.ok, () => null).then(() => {});
 }
@@ -195,13 +196,13 @@ export function decide({ title, paragraphs, action, others = [], cancel = "Cance
 /** Add paragraphs to a dialog's body: each a text, or a node to show as it is. */
 function addParagraphs(body, paragraphs) {
   for (const p of paragraphs) {
-    if (typeof p !== "string") {
-      body.append(p);
+    if (p instanceof Node) {
+      append(body, p);
       continue;
     }
     const el = document.createElement("p");
-    el.textContent = p;
-    body.append(el);
+    setText(el, p);
+    append(body, el);
   }
 }
 
@@ -209,10 +210,10 @@ function addParagraphs(body, paragraphs) {
 function textBox(type, placeholder) {
   const box = document.createElement("input");
   box.type = type;
-  box.placeholder = placeholder;
+  setAttr(box, "placeholder", placeholder);
   box.spellcheck = false;
   box.autocomplete = "off";
-  if (type === "search") box.setAttribute("aria-label", placeholder);
+  if (type === "search") setAttr(box, "aria-label", placeholder);
   return box;
 }
 
@@ -232,40 +233,40 @@ function frame(title, text, action, cancel = true, others = []) {
   const head = document.createElement("h2");
   head.className = "dialog-title";
   head.id = id;
-  head.textContent = title;
+  setText(head, title);
   const body = document.createElement("div");
   body.className = "dialog-body";
   if (text) {
     const p = document.createElement("p");
-    p.textContent = text;
-    body.append(p);
+    setText(p, text);
+    append(body, p);
   }
   const buttons = document.createElement("div");
   buttons.className = "dialog-buttons";
   const ok = document.createElement("button");
   ok.type = "button";
   ok.className = "default";
-  ok.textContent = action;
+  setText(ok, m(action));
   if (cancel) {
     const no = document.createElement("button");
     no.type = "button";
-    no.textContent = typeof cancel === "string" ? cancel : "Cancel";
+    setText(no, m(typeof cancel === "string" ? cancel : "Cancel"));
     no.addEventListener("click", () => el.close());
-    buttons.append(no);
+    append(buttons, no);
   }
   let result = null;
   for (const label of others) {
     const other = document.createElement("button");
     other.type = "button";
-    other.textContent = label;
+    setText(other, m(label));
     other.addEventListener("click", () => {
       result = label;
       el.close();
     });
-    buttons.append(other);
+    append(buttons, other);
   }
-  buttons.append(ok);
-  el.append(head, body, buttons);
+  append(buttons, ok);
+  append(el, head, body, buttons);
 
   function show(focus, answer) {
     let answering = false;
@@ -295,7 +296,7 @@ function frame(title, text, action, cancel = true, others = []) {
       }
     });
     const before = document.activeElement;
-    document.body.append(el);
+    append(document.body, el);
     shown += 1;
     el.showModal();
     focus.focus();

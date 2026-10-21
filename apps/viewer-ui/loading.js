@@ -1,6 +1,7 @@
+import { m, setText } from "./i18n.js";
 // Shared by normal opens, rebuilds and embeds. A newer operation owns the indicator, so an older
 // completion or progress event cannot clear or relabel it. There is no invented percentage.
-const stages = { reading: "Reading files…", parsing: "Parsing netlist…", cached: "Using cached drawing…", displaying: "Displaying netlist…" };
+const stages = { reading: m("Reading files…"), parsing: m("Parsing netlist…"), cached: m("Using cached drawing…"), displaying: m("Displaying netlist…") };
 let generation = 0;
 
 /** Give the browser a paint opportunity without stalling a hidden/background iframe. */
@@ -22,7 +23,7 @@ export function startLoading() {
   const setStage = (stage) => {
     if (id !== generation || !(stage in stages)) return;
     el.dataset.stage = stage;
-    document.getElementById("loading-stage").textContent = stages[stage];
+    setText(document.getElementById("loading-stage"), stages[stage]);
   };
   setStage("reading");
   return {

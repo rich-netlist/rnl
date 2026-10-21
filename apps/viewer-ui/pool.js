@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // The Library: session files, one temporary source, ordered desktop PATH groups and built-ins.
 import { inform } from "./dialog.js";
 import { setCheck } from "./commands.js";
@@ -49,9 +50,9 @@ const filePath = (path) => shell.platform === "desktop" ? path.replace(/\\/g, "/
 function button(label, action, title = label) {
   const b = document.createElement("button");
   b.type = "button";
-  b.textContent = label;
-  b.title = title;
-  b.setAttribute("aria-label", title);
+  setText(b, label);
+  setAttr(b, "title", title);
+  setAttr(b, "aria-label", title);
   b.addEventListener("click", action);
   return b;
 }
@@ -96,7 +97,7 @@ export async function sourceOpened(source, doc, add, applied = false) {
 async function update(action, rescan = false, reload = false) {
   if (changing || isLoading()) return;
   changing = true;
-  if (reload) $("library-status").textContent = "Reloading library…";
+  if (reload) setText($("library-status"), m("Reloading library…"));
   $("library-groups").setAttribute("aria-busy", "true");
   try {
     if (await action() === false) return false;
@@ -107,7 +108,7 @@ async function update(action, rescan = false, reload = false) {
     return true;
   } catch (e) {
     render();
-    await inform({ title: "Library", paragraphs: [String(e)] });
+    await inform({ title: m("Library"), paragraphs: [String(e)] });
   } finally {
     changing = false;
     $("library-groups").setAttribute("aria-busy", "false");
@@ -155,7 +156,7 @@ async function scanPaths(reload = false) {
 function span(className, text) {
   const el = document.createElement("span");
   el.className = className;
-  el.textContent = text;
+  setText(el, text);
   return el;
 }
 
@@ -171,12 +172,12 @@ function fileRow(item, kind) {
     navigate({ source: item.source }, { newWindow: e.shiftKey });
   }, item.path || item.name);
   open.className = "pool-open";
-  open.setAttribute("aria-label", `Open ${item.name}`);
-  row.append(open);
+  setAttr(open, "aria-label", m`Open ${item.name}`);
+  append(row, open);
   if (kind === "builtin" || kind === "temporary") {
-    row.append(span("pool-badge", kind === "builtin" ? "read only" : "temporary · not searched"));
+    append(row, span("pool-badge", kind === "builtin" ? m("read only") : m("temporary · not searched")));
   } else if (kind === "files") {
-    row.append(button("Exclude", () => update(() => { items = items.filter((i) => i !== item); }), `Exclude ${item.name}`));
+    append(row, button(m("Exclude"), () => update(() => { items = items.filter((i) => i !== item); }), m`Exclude ${item.name}`));
   }
   return row;
 }
@@ -198,17 +199,17 @@ function group(key, title, files, kind, pathInfo) {
   }, title);
   toggle.className = "lib-toggle";
   toggle.setAttribute("aria-expanded", String(!!expanded.get(key)));
-  toggle.append(span("chevron", ""));
+  append(toggle, span("chevron", ""));
   if (pathInfo) {
     const path = span("lib-path", title);
-    path.title = title;
-    toggle.append(span("lib-ordinal", `PATH ${pathInfo.index + 1}`), path);
-  } else toggle.append(span("lib-title", title));
-  toggle.append(span("lib-count", String(files.length)));
-  head.append(toggle);
+    setAttr(path, "title", title);
+    append(toggle, span("lib-ordinal", `PATH ${pathInfo.index + 1}`), path);
+  } else append(toggle, span("lib-title", title));
+  append(toggle, span("lib-count", String(files.length)));
+  append(head, toggle);
   if (pathInfo) {
     const { index, all } = pathInfo;
-    for (const [label, tooltip, delta] of [["↑", "Move up in PATH", -1], ["↓", "Move down in PATH", 1], ["×", "Remove from PATH", 0]]) {
+    for (const [label, tooltip, delta] of [["↑", m("Move up in PATH"), -1], ["↓", m("Move down in PATH"), 1], ["×", m("Remove from PATH"), 0]]) {
       const act = button(label, () => update(async () => {
         const next = paths();
         if (delta) [next[index], next[index + delta]] = [next[index + delta], next[index]];
@@ -217,37 +218,37 @@ function group(key, title, files, kind, pathInfo) {
       }, true), tooltip);
       act.className = "lib-act";
       act.disabled = delta !== 0 && (index + delta < 0 || index + delta >= all.length);
-      head.append(act);
+      append(head, act);
     }
   }
   list.hidden = !expanded.get(key);
-  for (const item of files) list.append(fileRow(item, kind));
+  for (const item of files) append(list, fileRow(item, kind));
   if (!files.length) {
     const empty = document.createElement("li");
     const error = pathInfo && scanned.get(title)?.error;
     empty.className = error ? "lib-warning" : "lib-empty";
-    empty.textContent = error || (kind === "path" ? "No packages or netlists found." : "No files.");
-    list.append(empty);
+    setText(empty, error || (kind === "path" ? m("No packages or netlists found.") : m("No files.")));
+    append(list, empty);
   }
-  el.append(head, list);
+  append(el, head, list);
   return el;
 }
 
 function render() {
   const groups = $("library-groups");
   groups.replaceChildren();
-  if (temporary) groups.append(fileRow(temporary, "temporary"));
-  groups.append(group("files", "Files", items.filter((i) => !i.builtin), "files"));
+  if (temporary) append(groups, fileRow(temporary, "temporary"));
+  append(groups, group("files", m("Files"), items.filter((i) => !i.builtin), "files"));
   if (shell.pathPackages) paths().forEach((dir, index, all) => {
     const prefix = dir.replace(/\\/g, "/").replace(/\/$/, "") + "/";
     const files = (scanned.get(dir)?.files || []).map((path) => ({
       path, name: path.startsWith(prefix) ? path.slice(prefix.length) : path,
       source: { path, name: path, library: true },
     }));
-    groups.append(group(`path:${dir}`, dir, files, "path", { index, all }));
+    append(groups, group(`path:${dir}`, dir, files, "path", { index, all }));
   });
-  groups.append(group("builtin", "Built-in", items.filter((i) => i.builtin), "builtin"));
-  $("library-status").textContent = libraryErrors.join("\n");
+  append(groups, group("builtin", m("Built-in"), items.filter((i) => i.builtin), "builtin"));
+  setText($("library-status"), libraryErrors.join("\n"));
 }
 
 export async function startPool() {
@@ -263,8 +264,8 @@ export async function startPool() {
   $("include-library").hidden = !shell.includeLibrary;
   $("include-library").addEventListener("click", () => includeFiles("library"));
   $("add-path").hidden = !shell.pathPackages;
-  $("path-note").textContent = shell.pathPackages ? `Settings: ${settingsPath}`
-    : "Browsers cannot search local directories. Include files or folders above; the file pool lasts until this page closes.";
+  setText($("path-note"), shell.pathPackages ? m`Settings: ${settingsPath}`
+    : m("Browsers cannot search local directories. Include files or folders above; the file pool lasts until this page closes."));
   $("add-path").addEventListener("click", () => update(async () => {
     const path = await shell.pickPath();
     if (!path || paths().includes(path)) return false;
@@ -278,7 +279,7 @@ export async function startPool() {
   }));
   window.addEventListener("library-shown", () => { if (!changing && !isLoading()) scanPaths().catch(console.error); });
   window.addEventListener("settings-error", (event) => {
-    $("path-note").textContent = `Settings could not be saved: ${event.detail}`;
+    setText($("path-note"), m`Settings could not be saved: ${event.detail}`);
   });
   render();
   await scanPaths();

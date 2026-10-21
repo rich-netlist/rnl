@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // The text pane: the netlist and the files it includes, highlighted, with the statements that do
 // not take effect marked, and the places of the selected object. Clicking a name or a statement in
 // the text selects its object; double-clicking a subcircuit instance opens it. While a subcircuit
@@ -75,8 +76,8 @@ function decorateLine(f, n, el) {
   el.classList.toggle("in-scope", !!scope && scope.f === f && n >= scope.from && n <= scope.to);
   const reason = notDrawn[f]?.get(n);
   el.classList.toggle("not-drawn", reason !== undefined);
-  if (reason !== undefined) el.title = reason;
-  else el.removeAttribute("title");
+  if (reason !== undefined) setAttr(el, "title", reason);
+  else setAttr(el, "title", null);
   const severity = fileViews[f]?.diagnostics?.get(n);
   for (const kind of ["error", "warning", "hint"]) el.classList.toggle(`d-${kind}`, severity === kind);
 }
@@ -126,8 +127,8 @@ export function clearSource(message) {
   source.replaceChildren();
   const p = document.createElement("p");
   p.className = "placeholder";
-  p.textContent = message;
-  source.append(p);
+  setText(p, message);
+  append(source, p);
 }
 
 export function renderFiles(shown = 0) {
@@ -156,10 +157,10 @@ export function renderFiles(shown = 0) {
     const view = new LineWindow(source, () => lineModel(file, f, spans[f], dialect), (el, n) => decorateLine(f, n, el), folds[f]);
     Object.assign(view, sourceFilters());
     fileViews.push(view);
-    source.append(view.el);
+    append(source, view.el);
   });
   renderEditors();
-  if (doc.files.length === 0) clearSource("This document has no host file to show.");
+  if (doc.files.length === 0) clearSource(m("This document has no host file to show."));
 }
 
 export function showFile(f) {
@@ -170,8 +171,8 @@ export function showFile(f) {
   source.classList.toggle('scoped', !!scope && scope.f === f);
   const origin = $("source-file");
   origin.hidden = true;
-  origin.textContent = doc.files[f].name.split(/[\\/]/).pop();
-  origin.title = doc.files[f].path;
+  setText(origin, doc.files[f].name.split(/[\\/]/).pop());
+  setAttr(origin, "title", doc.files[f].path);
   refreshEditing();
   showEditor(f);
   if (editing) find.close(false);
@@ -246,7 +247,7 @@ export function markUnplaced(i) {
       const lines = doc.objects[o].lines;
       if (!lines) continue;
       const [f, from, to] = lines;
-      for (let n = from; n <= to; n++) notDrawn[f]?.set(n, u.reason ? `Not drawn: ${u.reason}` : "Not drawn: it has no position yet");
+      for (let n = from; n <= to; n++) notDrawn[f]?.set(n, u.reason ? m`Not drawn: ${u.reason}` : m("Not drawn: it has no position yet"));
     }
   }
   for (const [f, view] of fileViews.entries()) view.setInactive(notDrawn[f]);

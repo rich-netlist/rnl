@@ -738,9 +738,13 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   // the server's files are as they were: nothing was written
   expect(fs.readFileSync(path.join(dir, "parts.inc"), "utf8")).toBe(parts);
   // Save downloads the file shown, as the text box holds it
+  await page.evaluate(() => window.viewer.command('language-zh'));
   const [download] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("Control+s")]);
   expect(download.suggestedFilename()).toBe("parts.inc");
   expect(fs.readFileSync(await download.path(), "utf8")).toBe(editedParts);
+  await expect(page.locator("#note")).toHaveText("已下载 parts.inc。");
+  await expect(page.locator('dialog.dialog')).toHaveCount(0);
+  await page.evaluate(() => window.viewer.command('language-en'));
   await expect(page.locator("#note")).toHaveText("Downloaded parts.inc.");
   // the file downloaded is what was read from now on; the netlist's change is still not saved
   await expect(page.locator("#netlist-file[data-unsaved='true']")).toHaveText(/parts\.inc$/);

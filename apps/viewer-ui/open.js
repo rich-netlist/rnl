@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // Opening a document: the shell reads a source and builds its Document, and the page shows it.
 // Reading the same source again keeps the level, the hierarchy path to it while its instances are
 // still there, the view, the selection and the text's scroll. File > Load from Clipboard opens the
@@ -37,7 +38,7 @@ let loading = false;
  */
 export async function openSource(source, keep, edited, fresh = false) {
   if (!source || loading) return;
-  if (!keep && !edited && !(await confirmLeave("open another file"))) return;
+  if (!keep && !edited && !(await confirmLeave(m("open another file")))) return;
   if (loading) return;
   loading = true;
   document.body.classList.add("busy");
@@ -57,14 +58,14 @@ export async function openSource(source, keep, edited, fresh = false) {
   } catch (e) {
     progress.finish();
     if (keep && edited) {
-      await inform({ title: "Rebuild", paragraphs: [`The document could not be rebuilt: ${e}. Your edits are still kept.`] });
+      await inform({ title: m("Rebuild"), paragraphs: [m`The document could not be rebuilt: ${e}. Your edits are still kept.`] });
       return;
     }
     endPreview();
     resetBuffers(null);
     setDoc(null);
-    clearDrawing(`Could not open ${source.name}`);
-    clearSource("The file could not be read.");
+    clearDrawing(m`Could not open ${source.name}`);
+    clearSource(m("The file could not be read."));
     renderHierarchy();
     renderDiagnostics([{ severity: "error", message: String(e), file: "", line: 0, col: 0, origin: "" }]);
     setProblems(true);
@@ -84,7 +85,7 @@ export async function pickAndOpen(kind) {
 
 export async function reload() {
   if (previewing()) solve();
-  else if (lastSource && (await confirmLeave("read the file again"))) openSource(lastSource, true, undefined, true);
+  else if (lastSource && (await confirmLeave(m("read the file again")))) openSource(lastSource, true, undefined, true);
 }
 
 /**
@@ -114,7 +115,7 @@ export async function applyEdits() {
     document.body.classList.remove("busy");
   }
   if (failed !== null) {
-    renderDiagnostics([...doc.diagnostics, { severity: "error", message: `The changes could not be applied: ${failed}`, file: "", line: 0, col: 0, origin: "" }]);
+    renderDiagnostics([...doc.diagnostics, { severity: "error", message: m`The changes could not be applied: ${failed}`, file: "", line: 0, col: 0, origin: "" }]);
     setProblems(true);
   }
   return failed === null;
@@ -148,9 +149,9 @@ export function showBuilt(d, keep) {
 
 /** What a text from the clipboard can be read as, by the extension of the file it is opened as. */
 const KINDS = [
-  ["sp", "SPICE netlist"],
-  ["scs", "Spectre netlist"],
-  ["rnl", "RNL package, checked on its own"],
+  ["sp", m("SPICE netlist")],
+  ["scs", m("Spectre netlist")],
+  ["rnl", m("RNL package, checked on its own")],
 ];
 const PREVIEW_LINES = 200; // the lines of the clipboard's text that its preview shows at most
 
@@ -174,19 +175,19 @@ export function guessKind(text) {
  */
 export async function loadClipboard() {
   if (loading || modal()) return;
-  const title = "Load from Clipboard";
+  const title = m("Load from Clipboard");
   let text;
   try {
-    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error("the browser does not let the page read it");
+    if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error(m("the browser does not let the page read it"));
     text = await navigator.clipboard.readText();
   } catch (e) {
     const why = (e instanceof Error && e.message ? e.message : String(e)).replace(/\.$/, "");
-    const again = "Allow the page to read the clipboard if the browser asks, and choose Load from Clipboard again.";
-    await inform({ title, paragraphs: [`The clipboard could not be read: ${why}.`, again] });
+    const again = m("Allow the page to read the clipboard if the browser asks, and choose Load from Clipboard again.");
+    await inform({ title, paragraphs: [m`The clipboard could not be read: ${why}.`, again] });
     return;
   }
   if (!text.trim()) {
-    await inform({ title, paragraphs: ["The clipboard holds no text to load."] });
+    await inform({ title, paragraphs: [m("The clipboard holds no text to load.")] });
     return;
   }
   const kind = await preview(title, text);
@@ -199,21 +200,20 @@ function preview(title, text) {
   if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
   const warning = document.createElement("p");
   warning.className = "dialog-warning";
-  warning.textContent =
-    "This text from the clipboard will be opened in place of the document shown. Check that it is the netlist you mean to load.";
+  setText(warning, m("This text from the clipboard will be opened in place of the document shown. Check that it is the netlist you mean to load."));
   const box = document.createElement("pre");
   box.className = "clip-preview";
   box.tabIndex = 0;
-  box.setAttribute("aria-label", "The clipboard's text");
-  box.textContent = lines.slice(0, PREVIEW_LINES).join("\n");
+  setAttr(box, "aria-label", m("The clipboard's text"));
+  setText(box, lines.slice(0, PREVIEW_LINES).join("\n"));
   const size = document.createElement("p");
   size.className = "dialog-note";
-  const more = lines.length > PREVIEW_LINES ? `; the first ${PREVIEW_LINES} are shown` : "";
-  size.textContent = `${count(lines.length, "line")}, ${count(text.length, "character")}${more}.`;
+  const more = lines.length > PREVIEW_LINES ? m`; the first ${PREVIEW_LINES} are shown` : "";
+  setText(size, m`${count(lines.length, "line")}, ${count(text.length, "character")}${more}.`);
   const set = document.createElement("fieldset");
   const legend = document.createElement("legend");
-  legend.textContent = "Read it as";
-  set.append(legend);
+  setText(legend, m("Read it as"));
+  append(set, legend);
   const guess = guessKind(text);
   const inputs = KINDS.map(([ext, label]) => {
     const input = document.createElement("input");
@@ -223,13 +223,13 @@ function preview(title, text) {
     input.checked = ext === guess;
     const choice = document.createElement("label");
     choice.className = "dialog-choice";
-    choice.append(input, `${label} (.${ext})`);
-    set.append(choice);
+    append(choice, input, m`${label} (.${ext})`);
+    append(set, choice);
     return input;
   });
   const alone = document.createElement("p");
   alone.className = "dialog-note";
-  alone.textContent = "It is read alone, as clipboard.sp, .scs or .rnl: files that it includes are missing.";
+  setText(alone, m("It is read alone, as clipboard.sp, .scs or .rnl: files that it includes are missing."));
   return form({
     title,
     parts: [warning, box, size, set, alone],
@@ -241,7 +241,7 @@ function preview(title, text) {
 
 /** A number of things, such as "1 line" or "12 lines". */
 function count(n, thing) {
-  return `${n} ${thing}${n === 1 ? "" : "s"}`;
+  return m`${n} ${m(thing + (n === 1 ? "" : "s"))}`;
 }
 
 /** What to keep when the same source is read again. */
@@ -301,7 +301,7 @@ function showDocument(before) {
   showFile(file >= 0 ? file : 0);
 
   if (doc.levels.length === 0) {
-    clearDrawing("Nothing to draw.");
+    clearDrawing(m("Nothing to draw."));
     renderHierarchy();
     return;
   }

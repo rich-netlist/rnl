@@ -265,9 +265,9 @@ async fn save_file_as(
         .dialog()
         .file()
         .set_parent(&window)
-        .set_title("Save As")
+        .set_title(menu::text(window.app_handle(), "Save As"))
         .set_file_name(name)
-        .add_filter("Netlists and packages", &NETLISTS);
+        .add_filter(menu::text(window.app_handle(), "Netlists and packages"), &NETLISTS);
     if let Some(dir) = entry.map(PathBuf::from).and_then(|p| p.parent().map(PathBuf::from)).filter(|d| d.is_dir()) {
         dialog = dialog.set_directory(dir);
     }
@@ -302,11 +302,14 @@ fn finish_startup(window: WebviewWindow, startup: State<'_, startup::Startup>) -
 /// Ask for a file to open; None when the dialog is cancelled.
 #[tauri::command]
 async fn pick_file(window: WebviewWindow) -> Option<String> {
-    let dialog = window.dialog().file().set_parent(&window).add_filter("Netlists and packages", &NETLISTS);
-    let picked =
-        tauri::async_runtime::spawn_blocking(move || dialog.add_filter("All files", &["*"]).blocking_pick_file())
-            .await
-            .ok()??;
+    let dialog = window
+        .dialog()
+        .file()
+        .set_parent(&window)
+        .set_title(menu::text(window.app_handle(), "Open Netlist"))
+        .add_filter(menu::text(window.app_handle(), "Netlists and packages"), &NETLISTS)
+        .add_filter(menu::text(window.app_handle(), "All files"), &["*"]);
+    let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_pick_file()).await.ok()??;
     picked.into_path().ok().map(|p| p.to_string_lossy().into_owned())
 }
 
@@ -402,6 +405,7 @@ fn main() {
             library::update_library,
             menu::set_view_check,
             menu::set_command_enabled,
+            menu::set_ui_language,
             solve::solve_preview,
             solve::solver_defaults,
             solve::check_solver_options,

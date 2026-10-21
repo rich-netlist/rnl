@@ -311,3 +311,11 @@ The **Symbol** sidebar shows the symbol actually used by the parent instance whe
 Source models, syntax checkpoints and rows are prepared only when a file is viewed. Subcircuit blocks have guide lines and +/- gutter buttons, including definitions in unselected library sections. Folding preserves original line numbers and full-source copy; find and diagnostic navigation expand hidden destinations. Virtual scrolling maps visible rows to logical lines. Unchanged reloads keep folds, and edit mode shows the complete buffer at the corresponding source line.
 
 Selecting an existing Library/PATH row reuses its index. Include of a replacement file and Reload Library invalidate definitions; an auto-include pass validates a library's complete definition list only once even when many missing masters come from it.
+
+### UI languages
+
+View > Language switches English / 简体中文 immediately, in both the web page and desktop native menus. The first start follows the system/browser's first preferred language; a user choice is saved with the other viewer settings. Embeds use their isolated settings and system language. Changing language only refreshes bound UI text and attributes: document identities, rendering, unsaved buffers, selection and viewport stay intact.
+
+`i18n.js` uses English source text as a stable catalog key and fallback, with Simplified Chinese in `locales/zh-CN.json`. Mark UI messages with `m("Text")` or a tagged template such as `` m`Open ${filename}` ``. Use `setText`, `append` and `setAttr` to bind the message to a text node or attribute. Keep the outer template marked when nesting translated fragments. `setAttr(node, name, null)` removes an attribute and its binding. The initial static HTML is bound once, before any user document is loaded. Desktop menu labels and native file chooser titles use the same catalog.
+
+Keep action tokens, menu IDs, shell return types, solver options, netlist/source text, filenames and parser/solver diagnostic payloads raw. Translate their surrounding UI only; dialog buttons render a translated label but return the original action token. Do not construct HTML from translated strings. Add catalog entries for new messages and run `i18n.spec.js`, plus the affected UI tests. Real web Save and the desktop smoke test cover the shell boundaries.

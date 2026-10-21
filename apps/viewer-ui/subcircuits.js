@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // The hierarchy path of the level shown, from its root down to it, and the bar above the drawing that
 // shows it. Going down into a subcircuit instance adds the instance to the path; its segments in the
 // bar, the up button and Backspace go back along it, each level with the view it had there and the
@@ -172,31 +173,31 @@ export function updatePath() {
       crumb = document.createElement("span");
       crumb.className = "crumb current";
       crumb.setAttribute("aria-current", "location");
-      name.textContent = title;
-      crumb.append(name);
+      setText(name, title);
+      append(crumb, name);
     } else {
       crumb = document.createElement("button");
       crumb.type = "button";
       crumb.className = "crumb";
-      crumb.title = `Back to ${title}`;
-      crumb.append(span("name", title));
+      setAttr(crumb, "title", m`Back to ${title}`);
+      append(crumb, span("name", title));
       crumb.addEventListener("click", (e) => backTo(d, { newWindow: e.shiftKey }));
     }
     if (s.via !== null) {
-      crumb.append(span("via", s.via));
-      crumb.title += crumb.title ? ` (${s.via})` : `${title}, through ${s.via}`;
+      append(crumb, span("via", s.via));
+      setAttr(crumb, "title", d < path.length - 1 ? m`${m`Back to ${title}`} (${s.via})` : m`${title}, through ${s.via}`);
     }
     // the name and the instance read apart, as they are seen apart
-    if (d < path.length - 1) crumb.setAttribute("aria-label", s.via !== null ? `${title} ${s.via}` : title);
+    if (d < path.length - 1) setAttr(crumb, "aria-label", s.via !== null ? `${title} ${s.via}` : title);
     crumb.dataset.depth = String(d);
     return { crumb, sep: d > 0 ? separator() : null };
   });
   const ellipsis = document.createElement("button");
   ellipsis.type = "button";
   ellipsis.className = "crumb-more";
-  ellipsis.textContent = "…";
-  ellipsis.title = "The levels in between";
-  ellipsis.setAttribute("aria-label", "The levels in between");
+  setText(ellipsis, "…");
+  setAttr(ellipsis, "title", m("The levels in between"));
+  setAttr(ellipsis, "aria-label", m("The levels in between"));
   ellipsis.setAttribute("aria-haspopup", "menu");
   ellipsis.setAttribute("aria-expanded", "false");
   ellipsis.addEventListener("click", (e) => {
@@ -205,7 +206,7 @@ export function updatePath() {
   });
   more = { crumb: ellipsis, sep: separator() };
   if (path.length === 0) {
-    name.textContent = "";
+    setText(name, "");
     bar.replaceChildren(name);
   } else {
     bar.replaceChildren(
@@ -222,8 +223,8 @@ export function updatePath() {
   if (up === null && document.activeElement === $("up")) $("canvas").focus({ preventScroll: true });
   $("up").hidden = up === null;
   if (up !== null) {
-    $("up-name").textContent = up;
-    $("up").title = `Up to ${up} (Ctrl+E or Backspace; Shift opens a new window)`;
+    setText($("up-name"), up);
+    setAttr($("up"), "title", m`Up to ${up} (Ctrl+E or Backspace; Shift opens a new window)`);
   }
   fitPath();
 }
@@ -276,9 +277,9 @@ function openMore(fromKeys) {
       b.setAttribute("role", "menuitem");
       b.dataset.depth = String(d);
       const title = doc.levels[s.level].title;
-      b.append(span("name", title));
-      if (s.via !== null) b.append(span("via", s.via));
-      b.setAttribute("aria-label", s.via !== null ? `${title} ${s.via}` : title);
+      append(b, span("name", title));
+      if (s.via !== null) append(b, span("via", s.via));
+      setAttr(b, "aria-label", s.via !== null ? `${title} ${s.via}` : title);
       b.addEventListener("click", (e) => {
         closeMore();
         backTo(d, { newWindow: e.shiftKey });

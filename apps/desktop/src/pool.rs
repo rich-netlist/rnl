@@ -1,6 +1,6 @@
 //! File selection for the session's library, and enumeration of PATH packages.
 use std::path::Path;
-use tauri::WebviewWindow;
+use tauri::{Manager, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 /// Keep native file drops to actual netlists/packages; directories and unrelated files do not open.
@@ -42,6 +42,8 @@ pub fn folder_files(dir: &Path, out: &mut Vec<String>) -> Result<(), String> {
 #[tauri::command]
 pub async fn pick_pool(window: WebviewWindow, kind: String) -> Result<Vec<String>, String> {
     let dialog = window.dialog().file().set_parent(&window);
+    let filter = crate::menu::text(window.app_handle(), "Netlists and packages");
+    let all = crate::menu::text(window.app_handle(), "All files");
     tauri::async_runtime::spawn_blocking(move || {
         if kind == "folder" || kind == "path" {
             let Some(chosen) = dialog.blocking_pick_folder() else { return Ok(Vec::new()) };
@@ -54,8 +56,8 @@ pub async fn pick_pool(window: WebviewWindow, kind: String) -> Result<Vec<String
             Ok(paths)
         } else {
             dialog
-                .add_filter("Netlists and packages", &super::NETLISTS)
-                .add_filter("All files", &["*"])
+                .add_filter(filter, &super::NETLISTS)
+                .add_filter(all, &["*"])
                 .blocking_pick_files()
                 .unwrap_or_default()
                 .into_iter()

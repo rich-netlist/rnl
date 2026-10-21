@@ -1,3 +1,4 @@
+import { m } from "./i18n.js";
 // Every user action that changes the displayed circuit MUST go through navigate().
 // Rendering/rebuilding a document is not navigation. Targets carry a source, a hierarchy path,
 // and optionally an object to select; Shift sends that same target to another viewer.
@@ -39,8 +40,8 @@ async function newWindow(target) {
   const source = target.source || currentSource();
   // Desktop sessions re-read disk. Pending editor text never becomes a new window's input.
   if (shell.platform === "desktop" && Object.keys(changes(true)).length &&
-      await decide({ title: "New Window", paragraphs: ["新窗口会读取磁盘上的文件，看不到这里还没保存的修改。"],
-        action: "仍然打开", cancel: "取消" }) !== "仍然打开") return;
+      await decide({ title: m("New Window"), paragraphs: [m("The new window reads files from disk and will not see the unsaved changes here.")],
+        action: "Open Anyway", cancel: "Cancel" }) !== "Open Anyway") return;
   const route = target.path || (target.file !== undefined ? path : undefined);
   const object = target.selection == null ? null : doc?.objects[target.selection];
   const via = target.via;
@@ -57,7 +58,7 @@ async function newWindow(target) {
     // Web shells reserve a tab synchronously, before serializing local files loses user activation.
     await shell.newWindow(session, source === currentSource() ? doc : null);
   } catch (e) {
-    await inform({ title: "New Window", paragraphs: [String(e instanceof Error ? e.message : e)] });
+    await inform({ title: m("New Window"), paragraphs: [String(e instanceof Error ? e.message : e)] });
   }
 }
 

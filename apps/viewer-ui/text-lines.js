@@ -1,6 +1,7 @@
 // Prepare line data and lexical checkpoints without constructing offscreen DOM. Syntax state is
 // retained across continued host statements and multi-line RNL comments, so any row can render alone.
 import { hostLine, mark, rnlRange } from "./syntax.js";
+import { m, setAttr } from "./i18n.js";
 
 export function lineModel(file, f, allSpans, dialect) {
   const texts = file.text.split(/\r?\n/);
@@ -128,7 +129,7 @@ function includeLink(row, {file, from, to}) {
   const link = document.createElement('a');
   link.className = 'include-link'; link.dataset.include = String(file);
   link.href = `#source-${file}`;
-  link.title = 'Go to included file (Shift: new window)';
+  setAttr(link, 'title', m('Go to included file (Shift: new window)'));
   link.append(range.extractContents()); range.insertNode(link);
 }
 

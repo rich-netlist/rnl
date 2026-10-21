@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "../i18n.js";
 // The web shell: the page in a browser, served with the core next to it as core/ (apps/web). It opens
 // files the user chooses or drops, a folder, or a URL; reads only the files a document needs, as
 // collect in the core's client asks for them; and builds the Document with the core as WebAssembly in
@@ -27,7 +28,7 @@ if (embed) {
     style.onerror = () => reject(new Error("The embed stylesheet could not be loaded."));
   });
   embedStyle.catch(() => {});
-  document.head.append(style);
+  append(document.head, style);
 }
 
 const core = startCore();
@@ -242,7 +243,7 @@ function parseUrl(text) {
 /** Resolve embed URLs exactly as File > Open URL and ?url= do. */
 export function sourceFromUrl(text) {
   const url = parseUrl(text);
-  if (!url) throw new Error("Give an http or https address, or one relative to this page.");
+  if (!url) throw new Error(m("Give an http or https address, or one relative to this page."));
   return urlSource(url);
 }
 
@@ -287,10 +288,10 @@ function chooseEntry(files, dir, folder) {
     if (entries.length === 1) return Promise.resolve(entries[0]);
     if (offered.length === 1) return Promise.resolve(offered[0]);
   }
-  let text = "Several of the files could be the netlist to open. Which one?";
-  if (folder !== null) text = folder ? `The netlist to open in ${folder}:` : "The netlist to open:";
+  let text = m("Several of the files could be the netlist to open. Which one?");
+  if (folder !== null) text = folder ? m`The netlist to open in ${folder}:` : m("The netlist to open:");
   return choose({
-    title: folder === null ? "Open" : "Open Folder",
+    title: folder === null ? m("Open") : m("Open Folder"),
     text,
     items: offered.map((p) => ({ label: within(p, dir), value: p })),
     filter: folder !== null,
@@ -326,7 +327,7 @@ function publicPackages() {
 async function includeLibrary() {
   const catalog = await publicPackages();
   const packages = catalog.filter((p) => !p.builtin);
-  const selected = await choose({ title: "Include Public Package", text: "Choose a package to add to the file pool.",
+  const selected = await choose({ title: m("Include Public Package"), text: m("Choose a package to add to the file pool."),
     items: packages.map((p) => ({ label: `${p.name} ${p.version} — ${p.description}`, value: p })), filter: true });
   if (!selected) return [];
   return includePackage(selected);
@@ -354,12 +355,12 @@ async function includePackage(selected) {
 /** Ask for a URL, resolved against the page. */
 async function openUrl() {
   const text = await ask({
-    title: "Open URL",
-    text: "The address of a netlist. The files it includes are read from the same server.",
+    title: m("Open URL"),
+    text: m("The address of a netlist. The files it includes are read from the same server."),
     value: lastUrl,
     placeholder: "https://example.org/netlists/top.sp",
     action: "Open",
-    check: (t) => (parseUrl(t) ? null : "Give an http or https address, or one relative to this page."),
+    check: (t) => (parseUrl(t) ? null : m("Give an http or https address, or one relative to this page.")),
   });
   if (text === null) return null;
   const url = parseUrl(text);
@@ -394,7 +395,7 @@ function input(id, folder) {
     }
   });
   el.addEventListener("cancel", () => chosen([]));
-  document.body.append(el);
+  append(document.body, el);
   return el;
 }
 
@@ -456,7 +457,7 @@ document.addEventListener("drop", (e) => {
   const open = opened;
   dropped(entries, files).then(
     (source) => source && open(source),
-    (err) => inform({ title: "Open", paragraphs: [`The dropped files could not be read: ${err.message || err}`] }),
+    (err) => inform({ title: m("Open"), paragraphs: [m`The dropped files could not be read: ${err.message || err}`] }),
   );
 });
 
@@ -502,7 +503,7 @@ function download(name, text) {
   a.href = url;
   a.download = name;
   a.hidden = true;
-  document.body.append(a);
+  append(document.body, a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -520,15 +521,13 @@ async function about() {
   const version = [site.version, site.commit && `(${site.commit})`].filter(Boolean).join(" ");
   const name = document.createElement("p");
   name.className = "dialog-name";
-  name.textContent = version ? `RNL Viewer ${version}` : "RNL Viewer";
+  setText(name, version ? `RNL Viewer ${version}` : "RNL Viewer");
   await inform({
-    title: "About RNL Viewer",
+    title: m("About RNL Viewer"),
     paragraphs: [
       name,
-      "Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; " +
-        "Save downloads the file shown, as no page can write a file where it was read from.",
-      "The RNL core runs in this page as WebAssembly. Files opened from this computer are read here " +
-        "and sent nowhere; a URL's files are fetched from its server.",
+      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("Save downloads the file shown, as no page can write a file where it was read from.")}`,
+      m`${m("The RNL core runs in this page as WebAssembly. Files opened from this computer are read here ")}${m("and sent nowhere; a URL's files are fetched from its server.")}`,
     ],
   });
 }

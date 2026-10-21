@@ -8,6 +8,7 @@
  * @typedef {object} Shell
  * @property {boolean} [embed] The web shell's canvas-only mode, with no persisted preferences.
  * @property {"desktop" | "web"} platform The platform, which picks the commands of commands.json it offers.
+ * @property {(language: "en" | "zh-CN") => Promise<void>} [setLanguage] Update native UI labels, preserving command IDs and state.
  * @property {() => Promise<Record<string, string>>} [bundledFiles] Built-in package texts by path.
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
  * @property {(pkg: {name: string, version: string, path: string}) => Promise<object[]>} [includePackage] Include an exact published package.

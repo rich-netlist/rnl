@@ -1,6 +1,7 @@
 // Large files keep the complete text/model and only a viewport plus overscan in the DOM.
 // Folded/virtual files retain selection in original source coordinates for complete copies.
 import { VirtualSelection } from "./virtual-selection.js";
+import { m, setText, setAttr } from "./i18n.js";
 
 const LIMIT = 1000;
 const OVERSCAN = 40;
@@ -175,8 +176,8 @@ export class LineWindow {
     toggle.hidden = this.filtered;
     toggle.textContent = collapsed ? '+' : '−';
     toggle.setAttribute('aria-expanded', String(!collapsed));
-    toggle.setAttribute('aria-label', `${collapsed ? 'Expand' : 'Collapse'} subcircuit at line ${i + 1}`);
-    toggle.title = `${collapsed ? 'Expand' : 'Collapse'} lines ${i + 1}–${this.folds.get(i) + 1}`;
+    setAttr(toggle, 'aria-label', m`${m(collapsed ? 'Expand' : 'Collapse')} subcircuit at line ${i + 1}`);
+    setAttr(toggle, 'title', m`${m(collapsed ? 'Expand' : 'Collapse')} lines ${i + 1}–${this.folds.get(i) + 1}`);
     el.classList.toggle('subckt-collapsed', collapsed);
   }
 
@@ -201,7 +202,7 @@ export class LineWindow {
       this.empty.className = "placeholder";
       this.el.append(this.empty);
     }
-    this.empty.textContent = this.semanticsOnly ? "No semantic RNL lines in this file." : "No lines match these filters.";
+    setText(this.empty, m(this.semanticsOnly ? "No semantic RNL lines in this file." : "No lines match these filters."));
     this.empty.hidden = !this.filtered || count !== 0;
     const first = this.virtual ? Math.min(Math.max(0, count - 1), Math.max(0, Math.floor((source.scrollTop - 4) / this.height) - OVERSCAN)) : 0;
     const last = this.virtual ? Math.min(count - 1, Math.ceil((source.scrollTop + source.clientHeight) / this.height) + OVERSCAN) : count - 1;

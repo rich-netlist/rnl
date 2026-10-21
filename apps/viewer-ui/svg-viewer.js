@@ -1,3 +1,4 @@
+import { append, m, setAttr } from "./i18n.js";
 // An independent viewport for SVG produced by the RNL renderer. Like the main viewer, pan and
 // zoom change drawing coordinates, never CSS scale; each embedded view owns its input and lifetime.
 import { svgElement } from './util.js';
@@ -6,7 +7,7 @@ export function svgViewer(container, svg, scale) {
   const extent = svg.getAttribute('viewBox').split(/[\s,]+/).map(Number);
   let view, size = {w: 0, h: 0}, press;
   container.tabIndex = 0;
-  container.setAttribute('aria-label', 'Symbol viewer');
+  setAttr(container, 'aria-label', m('Symbol viewer'));
   svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
   const paint = () => {
     if (!view || !size.w || !size.h) return;
@@ -41,20 +42,20 @@ export function svgViewer(container, svg, scale) {
   const controller = new AbortController(), signal = controller.signal;
   const toolbar = document.createElement('div');
   toolbar.className = 'symbol-viewer-tools';
-  toolbar.setAttribute('role', 'group'); toolbar.setAttribute('aria-label', 'Symbol view controls');
+  toolbar.setAttribute('role', 'group'); setAttr(toolbar, 'aria-label', m('Symbol view controls'));
   for (const [name, title, d, action] of [
-    ['fit', 'Reset view', 'M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4', fit],
-    ['zoom-in', 'Zoom in', 'M3 8h10M8 3v10', () => zoom(1.25)],
-    ['zoom-out', 'Zoom out', 'M3 8h10', () => zoom(0.8)],
+    ['fit', m('Reset view'), 'M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4', fit],
+    ['zoom-in', m('Zoom in'), 'M3 8h10M8 3v10', () => zoom(1.25)],
+    ['zoom-out', m('Zoom out'), 'M3 8h10', () => zoom(0.8)],
   ]) {
     const button = document.createElement('button');
-    button.type = 'button'; button.dataset.action = name; button.title = title;
-    button.setAttribute('aria-label', title);
+    button.type = 'button'; button.dataset.action = name; setAttr(button, "title", title);
+    setAttr(button, 'aria-label', title);
     const icon = svgElement('svg', {viewBox: '0 0 16 16', 'aria-hidden': 'true'});
-    icon.append(svgElement('path', {d, fill:'none', stroke:'currentColor', 'stroke-width':1.5}));
-    button.append(icon); button.addEventListener('click', action, {signal}); toolbar.append(button);
+    append(icon, svgElement('path', {d, fill:'none', stroke:'currentColor', 'stroke-width':1.5}));
+    append(button, icon); button.addEventListener('click', action, {signal}); append(toolbar, button);
   }
-  container.append(svg, toolbar);
+  append(container, svg, toolbar);
   container.addEventListener('wheel', e => {
     e.preventDefault(); e.stopPropagation();
     const rect = container.getBoundingClientRect();

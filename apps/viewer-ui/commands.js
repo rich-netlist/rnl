@@ -1,3 +1,4 @@
+import { m, locale, setLanguage, translate } from "./i18n.js";
 // The commands and the keys that run them. Both come from the command table, commands.json, which
 // the desktop viewer also builds its native menu from: the menus, their items and submenus, and per
 // item its id, its label, its keys and the platforms that offer it. A command runs by its id,
@@ -37,7 +38,15 @@ export async function startCommands() {
   shell.onCommand(command);
   setEnabled("descend-new-window", false);
   setEnabled("find-text", false);
+  languageChecks();
 }
+
+function languageChecks() {
+  if (!table) return;
+  setCheck("language-en", locale() === "en");
+  setCheck("language-zh", locale() === "zh-CN");
+}
+window.addEventListener("language-changed", languageChecks);
 
 /**
  * Run a command by its id. Exit and About are the platform's own: the page has nothing to do for
@@ -47,6 +56,9 @@ export function command(id, options = {}) {
   if (!isEnabled(id)) return;
   if (shell?.embed && !["fit", "zoom-in", "zoom-out", "descend", "descend-new-window", "ascend"].includes(id)) return;
   switch (id) {
+    case "language-en":
+    case "language-zh": return setLanguage(id === "language-en" ? "en" : "zh-CN").catch(error =>
+      inform({ title: m("Language"), paragraphs: [m`Could not change language: ${error.message || error}`] }));
     case "new-window": return duplicateWindow();
     case "open": pickAndOpen("file"); break;
     case "include-file": includeFiles("file"); break;
@@ -88,12 +100,12 @@ export function command(id, options = {}) {
     case "descend": return descend(selected, options);
     case "descend-new-window": return descend(selected, { newWindow: true });
     case "ascend": return ascend(options);
-    case "shortcuts": inform({ title: "Keyboard Shortcuts", paragraphs: [
-      "1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Not drawn." + (shell.solve ? " 6: Solve report." : "") + " These keys also expand a collapsed side panel; they do not run while typing.",
-      "E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level.",
-      "Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window.",
-      "Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing.",
-      "Ctrl+F: Find in Netlist, including offscreen text. Enter / Shift+Enter: next / previous match.",
+    case "shortcuts": inform({ title: m("Keyboard Shortcuts"), paragraphs: [
+      m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Not drawn.")}${shell.solve ? m(" 6: Solve report.") : ""}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
+      m("E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level."),
+      m("Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window."),
+      m("Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing."),
+      m("Ctrl+F: Find in Netlist, including offscreen text. Enter / Shift+Enter: next / previous match."),
     ] }); break;
     case "solve": solve(); break;
     case "solve-close": closePreview(); break;
@@ -114,9 +126,8 @@ function about() {
   if (shell.about) shell.about();
   else if (!shell.nativeMenu) {
     const text =
-      "Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; " +
-      "nothing is written to a file until you save.";
-    inform({ title: "About RNL Viewer", paragraphs: [text] });
+      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("nothing is written to a file until you save.")}`;
+    inform({ title: m("About RNL Viewer"), paragraphs: [text] });
   }
 }
 
@@ -166,7 +177,7 @@ function entries(items) {
       gap = shown.length > 0;
       continue;
     }
-    const entry = item.items ? { label: item.label, items: entries(item.items) } : item;
+    const entry = item.items ? { label: translate(item.label), items: entries(item.items) } : { ...item, label: translate(item.label) };
     if (entry.items ? entry.items.length === 0 : !offered(item)) continue;
     if (gap) shown.push("-");
     shown.push(entry);
@@ -177,7 +188,7 @@ function entries(items) {
 
 /** The menus with the entries this platform shows, and no menu left without any. */
 export function menus() {
-  return table.menus.map((m) => ({ label: m.label, items: entries(m.items) })).filter((m) => m.items.length > 0);
+  return table.menus.map((m) => ({ label: translate(m.label), items: entries(m.items) })).filter((m) => m.items.length > 0);
 }
 
 /** The commands among a menu's items, those of its submenus too. */

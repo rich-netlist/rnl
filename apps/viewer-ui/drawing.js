@@ -1,3 +1,4 @@
+import { append, m, setAttr, setText } from "./i18n.js";
 // The drawing: one level at a time, as the SVG the core drew. The view moves by changing the SVG's
 // viewBox; a click selects what it hits, found from the boxes, pins, wires and labels of the level
 // (hits.js), or lists what it hits for the user to choose (picker.js); the pointer resting on an
@@ -38,7 +39,7 @@ let badgeAt = null; // the drawing point of the open badge: a selected subcircui
 const zoomBox = document.createElement("div");
 zoomBox.className = "zoom-box";
 zoomBox.hidden = true;
-canvas.append(zoomBox);
+append(canvas, zoomBox);
 
 /**
  * Draw level `i`, with a view kept for it or else fitted. The hierarchy path that leads to it is set
@@ -49,9 +50,9 @@ export function showLevel(i, keptView) {
   setCurrent(i);
   notice("");
   const lv = doc.levels[i];
-  $("level-kind").textContent = i === 0 ? "top level" : lv.kind === "subckt" ? "subcircuit" : "file level";
-  $("status").textContent = lv.status ? `Not drawn without a solver: ${lv.status}` : "";
-  $("status").title = $("status").textContent;
+  setText($("level-kind"), i === 0 ? m("top level") : lv.kind === "subckt" ? m("subcircuit") : m("file level"));
+  setText($("status"), lv.status ? m`Not drawn without a solver: ${lv.status}` : "");
+  setAttr($("status"), "title", lv.status ? m`Not drawn without a solver: ${lv.status}` : "");
   if (svg) svg.remove();
   svg = null;
   overlay = null;
@@ -70,8 +71,8 @@ export function showLevel(i, keptView) {
     view = null;
     paintGrid(null);
     showPointer();
-    $("zoom").textContent = "";
-    $("empty").textContent = emptyMessage(lv);
+    setText($("zoom"), "");
+    setText($("empty"), emptyMessage(lv));
     $("empty").hidden = false;
     window.dispatchEvent(new Event("viewer-level"));
     return;
@@ -94,10 +95,10 @@ export function showLevel(i, keptView) {
   overlay = document.createElementNS("http://www.w3.org/2000/svg", "g");
   overlay.setAttribute("class", "overlay");
   overlay.setAttribute("pointer-events", "none");
-  el.append(overlay);
+  append(el, overlay);
   $("empty").hidden = true;
   svg = el;
-  canvas.append(svg);
+  append(canvas, svg);
   if (keptView) {
     view = keptView;
     apply();
@@ -113,15 +114,15 @@ export function showLevel(i, keptView) {
  * the netlist's other levels are in the Hierarchy.
  */
 function emptyMessage(lv) {
-  if (lv.unplaced.length > 0) return "Nothing on this level has a position yet, so nothing is drawn.";
-  const none = "This level has no objects, so nothing is drawn.";
-  return doc.levels.length > 1 ? `${none} The subcircuits of this netlist are in the Hierarchy.` : none;
+  if (lv.unplaced.length > 0) return m("Nothing on this level has a position yet, so nothing is drawn.");
+  const none = m("This level has no objects, so nothing is drawn.");
+  return doc.levels.length > 1 ? m`${none} The subcircuits of this netlist are in the Hierarchy.` : none;
 }
 
 /** The line in the status bar that says why this level is shown; showing another level takes it away. */
 export function notice(text) {
   const el = $("notice");
-  el.textContent = text;
+  setText(el, text);
   el.hidden = text === "";
 }
 
@@ -134,18 +135,18 @@ export function clearDrawing(message) {
   svg = null;
   overlay = null;
   view = null;
-  $("empty").textContent = message;
+  setText($("empty"), message);
   $("empty").hidden = false;
   setPath([]);
   updatePath();
-  $("level-kind").textContent = "";
+  setText($("level-kind"), "");
   badgeAt = null;
   positionBadge();
   paintGrid(null);
   showPointer();
-  $("status").textContent = "";
-  $("zoom").textContent = "";
-  $("selection").textContent = "";
+  setText($("status"), "");
+  setText($("zoom"), "");
+  setText($("selection"), "");
   renderUnplaced();
   window.dispatchEvent(new Event("viewer-level"));
 }
@@ -158,7 +159,7 @@ function apply() {
   if (!svg || !view) return;
   size = canvasSize();
   svg.setAttribute("viewBox", `${view.x} ${view.y} ${size.w / view.k} ${size.h / view.k}`);
-  $("zoom").textContent = `${Math.round(view.k * 100)}%`;
+  setText($("zoom"), `${Math.round(view.k * 100)}%`);
   positionBadge();
   paintGrid(view, scale);
   showPointer();
@@ -171,7 +172,7 @@ function apply() {
 function showPointer() {
   const el = $("pointer");
   if (!pointer || !view) {
-    el.textContent = "";
+    setText(el, "");
     return;
   }
   const digits = clamp(Math.ceil(Math.log10(view.k * scale)) - 1, 0, 3);
@@ -179,7 +180,7 @@ function showPointer() {
   const fixed = (v) => (Number(v.toFixed(digits)) || 0).toFixed(digits);
   const x = (view.x + pointer.x / view.k) / scale;
   const y = -(view.y + pointer.y / view.k) / scale;
-  el.textContent = `x ${fixed(x)}, y ${fixed(y)}`;
+  setText(el, `x ${fixed(x)}, y ${fixed(y)}`);
 }
 
 // Compact embeds frame painted ink instead of the renderer's paper margin and font line boxes.
@@ -413,17 +414,17 @@ export function paintDrawingSelection() {
       // the labels of the selected object are marked too, also those whose group is not theirs alone
       const [[x0, y0], [x1, y1]] = h.points;
       const r = svgElement("rect", { x: x0 - 1.5, y: y0 - 1.5, width: x1 - x0 + 3, height: y1 - y0 + 3, class: "label" });
-      overlay.append(r);
+      append(overlay, r);
     } else if (h.kind === "box" && h.objects[0] === selected) {
       const [[x0, y0], [x1, y1]] = h.points;
       if (isInstance && opens(selected) !== null && !badgeAt) badgeAt = [x1, y0];
       const r = svgElement("rect", { x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
       r.setAttribute("vector-effect", "non-scaling-stroke");
-      overlay.append(r);
+      append(overlay, r);
     } else if (h.kind === "pin" && kind === "net") {
       const c = svgElement("circle", { cx: h.points[0][0], cy: h.points[0][1], r: 3.2 });
       c.setAttribute("vector-effect", "non-scaling-stroke");
-      overlay.append(c);
+      append(overlay, c);
     }
   }
   positionBadge();

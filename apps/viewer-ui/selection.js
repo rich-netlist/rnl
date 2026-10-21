@@ -1,3 +1,4 @@
+import { append, m, setText } from "./i18n.js";
 // The selection: an instance, a net or a virtual symbol, followed between drawing and text.
 
 import { current, doc, selected, setSelected } from "./state.js";
@@ -32,11 +33,11 @@ export function select(o, from, options) {
   const sel = $("selection");
   sel.replaceChildren();
   const b = document.createElement("b");
-  b.textContent = obj.name;
+  setText(b, obj.name);
   if (opens(o) !== null) {
-    sel.append(b, ` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · E or Enter opens it; Shift opens a new window`);
+    append(sel, b, m` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · E or Enter opens it; Shift opens a new window`);
   } else {
-    sel.append(b, ` ${obj.kind} in ${obj.level_title}`);
+    append(sel, b, m` ${m(obj.kind)} in ${obj.level_title}`);
   }
 }
 
@@ -46,7 +47,7 @@ export function clearSelection() {
   markSubcircuit(false);
   paintDrawingSelection();
   paintSourceSelection(false);
-  $("selection").textContent = "";
+  setText($("selection"), "");
 }
 
 /** A selected subcircuit instance is marked in its own colour, in the drawing and the text. */

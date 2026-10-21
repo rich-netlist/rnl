@@ -1,3 +1,4 @@
+import { append, m, setText, startI18n } from "./i18n.js";
 // The page of the RNL Viewer, shared by the desktop viewer and the web viewer. Its shell reads a
 // netlist and builds the Document (shell.js); the page shows the drawing, the netlist text, the
 // diagnostics and the subcircuit hierarchy, and follows a selected instance or net between the
@@ -22,13 +23,14 @@ import { finishStartup, stylesReady } from "./startup.js";
 import { current, doc, path, selected } from "./state.js";
 import { renderUnplaced } from "./unplaced.js";
 import { setSemanticsOnly, setRnlOnly } from "./text.js";
-import { $, load, startSettings } from "./util.js";
+import { $, load, save, startSettings } from "./util.js";
 
 /** Load the shell and the command table, then open what the shell has for the start. */
 async function start() {
   await stylesReady;
   const shell = await loadShell();
   await startSettings(shell);
+  await startI18n(shell, load("language", null), value => save("language", value));
   if (shell.embed) {
     const { startEmbed } = await import("./embed.js");
     await startEmbed();
@@ -59,8 +61,8 @@ async function start() {
   {
     const li = document.createElement("li");
     li.className = "nothing";
-    li.textContent = "No file is open.";
-    $("diags").append(li);
+    setText(li, m("No file is open."));
+    append($("diags"), li);
   }
   renderUnplaced();
 
@@ -76,7 +78,7 @@ async function start() {
 
 // a shell may reject with a plain message, as Tauri's invoke does
 start().catch((e) => {
-  $("empty").textContent = e instanceof Error ? e.message : String(e);
+  setText($("empty"), e instanceof Error ? e.message : String(e));
 }).finally(finishStartup);
 
 // A handle for tests and the console, which cannot see into the modules.
