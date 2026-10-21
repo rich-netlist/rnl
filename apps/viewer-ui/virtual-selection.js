@@ -77,7 +77,7 @@ export class VirtualSelection {
     return pos?.line === line ? pos : { line, col: x < code.getBoundingClientRect().left ? 0 : v.model.texts[line].length };
   }
   pointerDown(e) {
-    if (e.button !== 0 || e.pointerType !== "mouse" || !e.target.closest(".ln") || e.target.closest('button')) return;
+    if (e.button !== 0 || e.pointerType !== "mouse" || !e.target.closest(".ln") || e.target.closest('button, a')) return;
     this.syncNative();
     const pos = this.atPoint(e.clientX, e.clientY);
     if (!e.shiftKey || !this.anchor || e.target.closest("[data-obj]")) this.anchor = pos;
@@ -134,8 +134,8 @@ export class VirtualSelection {
   key(e) {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "a") {
       if (!this.view.visible.length) { e.preventDefault(); return; }
-      this.anchor = { line: this.view.semanticsOnly ? this.view.visible[0] : 0, col: 0 };
-      const last = this.view.semanticsOnly ? this.view.visible.at(-1) : this.view.model.texts.length - 1;
+      this.anchor = { line: this.view.filtered ? this.view.visible[0] : 0, col: 0 };
+      const last = this.view.filtered ? this.view.visible.at(-1) : this.view.model.texts.length - 1;
       this.focus = { line: last, col: this.view.model.texts[last].length };
       this.all = true;
       this.paint();
@@ -148,13 +148,13 @@ export class VirtualSelection {
     const texts = this.view.model.texts;
     let a = this.anchor, b = this.focus;
     if (compare(a, b) > 0) [a, b] = [b, a];
-    const indices = this.view.semanticsOnly ? this.view.visible.filter(n => n >= a.line && n <= b.line)
+    const indices = this.view.filtered ? this.view.visible.filter(n => n >= a.line && n <= b.line)
       : Array.from({length: b.line - a.line + 1}, (_, i) => a.line + i);
     const lines = indices.map(n => texts[n]);
     if (!lines.length) return;
     if (lines.length === 1) lines[0] = lines[0].slice(a.col, b.col);
     else { lines[0] = lines[0].slice(a.col); lines[lines.length - 1] = lines.at(-1).slice(0, b.col); }
-    e.clipboardData.setData("text/plain", this.all && !this.view.semanticsOnly ? this.view.model.text : lines.join("\n"));
+    e.clipboardData.setData("text/plain", this.all && !this.view.filtered ? this.view.model.text : lines.join("\n"));
     e.preventDefault();
   }
   destroy() {

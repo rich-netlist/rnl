@@ -30,7 +30,7 @@ pub use catalog::{
 };
 pub use document::{
     Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol, Level, Object,
-    SourceFile, Span, Unplaced, UnplacedDrawing,
+    SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing,
 };
 pub use library::{LibraryIndex, LibraryProvider};
 pub use primitive::{

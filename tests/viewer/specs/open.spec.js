@@ -17,7 +17,7 @@ test("opening shows the drawing, the text and the problems", async ({ page, view
   for (const id of ids) await expect(page.locator(`#canvas > svg [data-id="${id}"]`).first()).toBeAttached();
 
   // the files, the first one shown with all of its lines
-  await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy.sp");
+  await expect(page.locator("#netlist-file")).toHaveText(/04-hierarchy\.sp$/);
   await expect(page.locator("#source-file")).toBeHidden();
   const lines = await page.evaluate(() => window.viewer.doc.files[0].text.split(/\r?\n/).filter((l, i, a) => i < a.length - 1 || l).length);
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);

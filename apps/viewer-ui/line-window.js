@@ -18,6 +18,8 @@ export class LineWindow {
     this.lines = [];
     this.rendered = new Map();
     this.scroll = 0;
+    this.showFailed = true;
+    this.inactive = new Map();
     this.height = parseFloat(getComputedStyle(source).lineHeight) || 19.375;
     this.first = 0;
     this.last = -1;
@@ -72,26 +74,48 @@ export class LineWindow {
     this.positions = new Int32Array(count);
     let end = -1;
     for (let i = 0; i < count; i++) {
-      if (this.semanticsOnly && !this.model.semantics.has(i)) { this.positions[i] = this.visible.length; continue; }
+      if (!this.allows(i)) { this.positions[i] = this.visible.length; continue; }
       if (i <= end) { this.positions[i] = this.visible.length - 1; continue; }
       this.positions[i] = this.visible.length;
       this.visible.push(i);
-      if (!this.semanticsOnly && this.collapsed.has(i)) end = this.folds.get(i);
+      if (!this.filtered && this.collapsed.has(i)) end = this.folds.get(i);
     }
     this.first = 0;
     this.last = -1;
   }
 
-  setSemanticsOnly(enabled) {
-    if (this.semanticsOnly === enabled) return;
-    this.semanticsOnly = enabled;
+  get filtered() { return this.rnlOnly || !this.showFailed; }
+
+  allows(i) {
+    return (!this.rnlOnly || this.model.rnl.has(i)) &&
+      (!this.semanticsOnly || this.model.semantics.has(i)) &&
+      (this.showFailed || (!this.model.failed.has(i) && !this.inactive.has(i + 1)));
+  }
+
+  setInactive(lines) {
+    const same = this.inactive.size === lines.size && [...lines.keys()].every(line => this.inactive.has(line));
+    this.inactive = lines;
+    if (!same && !this.showFailed) this.refilter(true);
+  }
+
+  setFilters(filters) {
+    if (Object.entries(filters).every(([key, value]) => this[key] === value)) return;
+    Object.assign(this, filters);
+    this.refilter();
+  }
+
+  refilter(preserve = false) {
     // Keep unopened auto-includes lazy.
     if (!this._model) return;
+    const scroll = this.el.hidden ? this.scroll : this.source.scrollTop;
+    const anchor = this.lineAt(Math.max(0, Math.floor((scroll - 4 + 1) / this.height)));
+    const offset = Math.max(0, scroll - 4 - this.rowOf(anchor) * this.height);
     this.selection?.clear();
     this.mapLines();
-    this.scroll = 0;
-    if (!this.el.hidden) this.source.scrollTop = 0;
+    this.scroll = preserve ? Math.max(0, 4 + this.rowOf(anchor) * this.height + offset) : 0;
+    // Grow the spacers before restoring scrollTop, which the browser otherwise clamps.
     this.refresh(true);
+    if (!this.el.hidden) { this.source.scrollTop = this.scroll; this.refresh(); }
   }
 
   lineAt(row) { return this.visible?.[Math.max(0, Math.min(this.visible.length - 1, row))] ?? row; }
@@ -148,7 +172,7 @@ export class LineWindow {
       el.querySelector('.no').append(toggle);
     }
     const collapsed = this.collapsed.has(i);
-    toggle.hidden = this.semanticsOnly;
+    toggle.hidden = this.filtered;
     toggle.textContent = collapsed ? '+' : '−';
     toggle.setAttribute('aria-expanded', String(!collapsed));
     toggle.setAttribute('aria-label', `${collapsed ? 'Expand' : 'Collapse'} subcircuit at line ${i + 1}`);
@@ -175,10 +199,10 @@ export class LineWindow {
     if (!this.empty) {
       this.empty = document.createElement("p");
       this.empty.className = "placeholder";
-      this.empty.textContent = "No semantic RNL lines in this file.";
       this.el.append(this.empty);
     }
-    this.empty.hidden = !this.semanticsOnly || count !== 0;
+    this.empty.textContent = this.semanticsOnly ? "No semantic RNL lines in this file." : "No lines match these filters.";
+    this.empty.hidden = !this.filtered || count !== 0;
     const first = this.virtual ? Math.min(Math.max(0, count - 1), Math.max(0, Math.floor((source.scrollTop - 4) / this.height) - OVERSCAN)) : 0;
     const last = this.virtual ? Math.min(count - 1, Math.ceil((source.scrollTop + source.clientHeight) / this.height) + OVERSCAN) : count - 1;
     if (!force && !heightChanged && this.first === this.lineAt(first) && this.last === this.lineAt(last)) return;
@@ -221,7 +245,7 @@ export class LineWindow {
 
   reveal(line, atTop = false) {
     let n = Math.max(0, Math.min(this.model.texts.length - 1, line - 1));
-    if (this.semanticsOnly) {
+    if (this.filtered) {
       if (!this.visible.length) return;
       n = this.lineAt(this.rowOf(n));
     }

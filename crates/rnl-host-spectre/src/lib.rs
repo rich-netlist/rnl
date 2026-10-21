@@ -557,7 +557,17 @@ impl<'a> Reader<'a> {
                         if toks.len() == 2 {
                             skip_section = Some(toks[1].to_string());
                         } else if toks.len() >= 3 {
-                            self.include(&unquote(toks[1]), Some(toks[2]), no, &fname, path, &st, stack, Mode::Spice);
+                            self.include(
+                                &unquote(toks[1]),
+                                Some(toks[2]),
+                                no,
+                                &fname,
+                                path,
+                                &st,
+                                stack,
+                                Mode::Spice,
+                                true,
+                            );
                         }
                         continue;
                     }
@@ -709,6 +719,7 @@ impl<'a> Reader<'a> {
         st: &State,
         stack: &[String],
         parent_mode: Mode,
+        explicit: bool,
     ) {
         let full = resolve_include(self.provider, path, target, self.sink, Loc::line(fname, no));
         let key = format!("{}#{}", full, section.unwrap_or("").to_lowercase());
@@ -730,6 +741,7 @@ impl<'a> Reader<'a> {
         let mut lv = Level::new(LevelKind::File, &name, &display, &full);
         lv.line = no;
         lv.section = section.map(String::from);
+        lv.include_site = explicit.then(|| Loc::line(fname, no));
         let child = self.doc.add_level(lv, Some(st.cur));
         let mut stck = stack.to_vec();
         stck.push(key);
@@ -761,7 +773,7 @@ impl<'a> Reader<'a> {
             "include" => {
                 let target = toks.get(1).map(|t| unquote(t))?;
                 let sec = toks.iter().skip(2).find_map(|t| t.strip_prefix("section=").map(String::from));
-                self.include(&target, sec.as_deref(), no, fname, path, st, stack, Mode::Spectre);
+                self.include(&target, sec.as_deref(), no, fname, path, st, stack, Mode::Spectre, true);
                 return None;
             }
             "library" | "endlibrary" => return None,
@@ -867,7 +879,7 @@ impl<'a> Reader<'a> {
         let first = low.split_whitespace().next().unwrap_or("");
         if first.starts_with(".inc") {
             if let Some(t) = body.split_whitespace().nth(1) {
-                self.include(&unquote(t), None, no, fname, path, st, stack, Mode::Spice);
+                self.include(&unquote(t), None, no, fname, path, st, stack, Mode::Spice, true);
             }
             return;
         }
@@ -1104,7 +1116,7 @@ fn read_as(
     r.read_file(&path, 0, 0, main_file, mode, &[format!("{path}#")], None);
     let st = State { mode, cur: 0, circ: 0, stack: Vec::new() };
     for extra in includes {
-        r.include(extra, None, 1, file_name(&path), &path, &st, &[format!("{path}#")], mode);
+        r.include(extra, None, 1, file_name(&path), &path, &st, &[format!("{path}#")], mode, false);
     }
     r.finish();
     Some(r.doc)

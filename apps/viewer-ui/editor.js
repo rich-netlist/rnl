@@ -13,7 +13,8 @@ import * as edits from "./edits.js";
 import { shell } from "./shell.js";
 import { previewing } from "./solve.js";
 import { doc } from "./state.js";
-import { circuitFile, fileShown, fileViews, showFile, sourceLineHeight, refreshSource, setSemanticsOnly } from "./text.js";
+import { fileShown, fileViews, showFile, sourceLineHeight, refreshSource, setRnlOnly } from "./text.js";
+import { setPathText, sourcePath } from "./source-path.js";
 import { $ } from "./util.js";
 
 const source = $("source");
@@ -186,7 +187,8 @@ export function revealInEditor(f, line) {
 
 /** Show the document's edit state, and tell the shell whether changes are not saved. */
 export function refreshEditing() {
-  $("semantics-only").disabled = editing;
+  $("rnl-only").disabled = editing;
+  $("semantics-only").disabled = editing || !$("rnl-only").checked;
   setEnabled("find-text", !!doc && !editing);
   const unapplied = edits.unappliedPaths();
   const dirty = edits.dirtyPaths();
@@ -198,11 +200,12 @@ export function refreshEditing() {
   $("apply-edits").hidden = !editing;
   $("apply-edits").disabled = exiting;
   const name = $("netlist-file");
-  const file = doc?.files[circuitFile()];
-  name.textContent = file?.name.split(/[\\/]/).pop() || '';
+  const file = doc?.files[fileShown];
+  const full = file ? sourcePath(doc, file) : '';
+  setPathText(name, full);
   name.dataset.unsaved = String(dirty.length > 0);
   name.dataset.unapplied = String(unapplied.length > 0);
-  name.title = [file?.path || '', 'Show the current circuit source', ...dirty.map(path => `${path}: ${unapplied.includes(path) ? 'changes not applied; ' : ''}not saved`)].join('\n');
+  name.title = [full, ...dirty.map(path => `${path}: ${unapplied.includes(path) ? 'changes not applied; ' : ''}not saved`)].join('\n');
   const any = dirty.length > 0;
   if (any !== notified) {
     notified = any;
@@ -236,7 +239,7 @@ export async function toggleEdit() {
       return;
     }
     keepPosition();
-    setSemanticsOnly(false);
+    setRnlOnly(false);
     editing = true;
     setCheck("toggle-edit", true);
     renderEditors();

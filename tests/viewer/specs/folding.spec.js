@@ -22,7 +22,7 @@ test('source navigation can still reach and edit a parameter/model-only include'
   await viewer.open('fold-sections');
   await showSource(page, 'fold-models.inc');
   await expect(page.locator('#source-file')).toHaveText('fold-models.inc');
-  await expect(page.locator('#netlist-file')).toHaveText('fold-sections.sp');
+  await expect(page.locator('#netlist-file')).toHaveText(/fold-models\.inc$/);
   await page.keyboard.press('Control+q');
   await expect(page.locator('#source textarea:visible')).toHaveValue(/\.param bias=1.2/);
 });
@@ -62,7 +62,7 @@ test('editing an include keeps the logical position of a hidden folded root afte
   await page.keyboard.press('Control+q');
   await page.keyboard.press('Control+q');
   await viewer.build(() => page.evaluate(() => window.viewer.command('toggle-auto-include')));
-  await page.locator('#netlist-file').click();
+  await showSource(page, 0);
   expect(await first()).toBe(before);
 });
 
@@ -95,7 +95,7 @@ for (const fixture of ['04-hierarchy', 'inverter-chain', 'virtual']) {
     // Switching files keeps fold state. Reload of unchanged text keeps it too.
     if (await page.evaluate(() => window.viewer.doc.files.length > 1)) {
       await showSource(page, 1);
-      await page.locator('#netlist-file').click();
+      await showSource(page, 0);
       await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     }
     await viewer.build(() => page.evaluate(() => window.viewer.command('reload')));

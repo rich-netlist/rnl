@@ -64,21 +64,24 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
     <div id="pane-netlist" class="pane netlist-pane" role="tabpanel">
       <div class="netlist-head">
       <div id="file-bar" class="file-bar">
-        <button id="netlist-file" class="netlist-file" type="button" title="Show the current circuit source" hidden></button>
+        <span id="netlist-file" class="netlist-file path-text" hidden></span>
+        <div class="netlist-options">
         <span id="edit-state" class="edit-state" role="status" hidden></span>
         <button id="apply-edits" class="apply-edits" type="button" hidden title="Apply the text and exit editing (Ctrl+Enter)">Apply and Exit Editing</button>
         <label class="auto-include-toggle" title="Automatically include uniquely defined missing subcircuits from the Library; report each automatic include in Problems">
           <input id="auto-include" type="checkbox">Auto Include
         </label>
-        <label class="semantics-toggle" title="Show only active RNL lines containing free text. Turn off to see the complete netlist.">
-          <input id="semantics-only" type="checkbox">semantics RNL only
-        </label>
-        <label for="show-failed" class="failed-toggle" title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
+        <span class="rnl-filter-group">
+          <label class="rnl-toggle"><input id="rnl-only" type="checkbox">RNL only</label>
+          <label class="semantics-toggle" title="Within RNL, show only lines containing free text">
+            <input id="semantics-only" type="checkbox" disabled>Semantics only
+          </label>
+        </span>
+        <label for="show-failed" class="failed-toggle" title="Show inactive statements: failed or overridden RNL and netlist statements not drawn">
           <input id="show-failed" class="failed-check" type="checkbox" checked>
           <span class="caption">Failed statements</span>
-          <span class="key"><span class="swatch x-failed" aria-hidden="true"></span><span class="legend">error</span></span>
-          <span class="key"><span class="swatch x-overridden" aria-hidden="true"></span><span class="legend">overridden</span></span>
         </label>
+        </div>
       </div>
       <div id="source-file" class="source-file" hidden></div>
       <div id="netlist-find" class="netlist-find" hidden>

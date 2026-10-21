@@ -244,10 +244,9 @@ document.addEventListener("keydown", (e) => {
     return;
   } else id = keyCommand(e, typing);
   if (id === "find-text" && (typing || !isEnabled(id))) return;
-  // Enter opens a selected subcircuit instance, and presses a button that has the focus; a button
-  // hidden with the focus still on it, until the browser moves the focus, is pressed by nothing
-  const button = e.target instanceof HTMLButtonElement && e.target.getClientRects().length > 0;
-  if ((id === "descend" || id === "descend-new-window") && (button || opens(selected) === null)) return;
+  // Focused buttons and source links retain native Enter activation.
+  const control = e.target.closest('button, a[href]')?.getClientRects().length > 0;
+  if ((id === "descend" || id === "descend-new-window") && (control || opens(selected) === null)) return;
   // Shift modifies navigation, including Ctrl+Shift+E (up) and Shift+Backspace.
   if (!typing && e.shiftKey && e.key === "Backspace" && !ctrl && !e.altKey) id = "ascend";
   if (e.shiftKey && ctrl && e.key.toLowerCase() === "e") id = "ascend";

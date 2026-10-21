@@ -3,9 +3,12 @@ import { current, doc, path } from "./state.js";
 import { colourDrawing } from "./background.js";
 import { lineModel } from "./text-lines.js";
 import { $, load, save, svgElement } from "./util.js";
+import { svgViewer } from './svg-viewer.js';
+import { setPathText, sourcePath } from './source-path.js';
 
 const parts = ["box", "origin", "pins", "labels"];
 let lastDoc, lastKey;
+let destroyPreview;
 const node = (tag, text, cls) => {
   const el = document.createElement(tag);
   if (text !== undefined) el.textContent = text;
@@ -29,6 +32,7 @@ for (const part of parts) $(`symbol-${part}`).addEventListener("change", () => {
 
 export function renderSymbol() {
   if (lastDoc !== doc) {
+    destroyPreview?.(); destroyPreview = null;
     lastDoc = null; lastKey = null;
     $("symbol-detail").replaceChildren();
   }
@@ -42,6 +46,7 @@ export function renderSymbol() {
   for (const part of parts) $(`symbol-${part}`).checked = load(`symbol-${part}`, true);
   displayParts();
   const detail = $("symbol-detail");
+  destroyPreview?.(); destroyPreview = null;
   detail.replaceChildren();
   if (!symbol) {
     detail.append(node("p", !level ? "No circuit is open." : child ? "This instance has no symbol." : "This circuit does not define its own symbol. Descend from a parent instance to inspect the symbol used there.", "placeholder"));
@@ -51,10 +56,6 @@ export function renderSymbol() {
   detail.append(node("p", child ? `${hop.via} in ${doc.levels[parent.level].title} → ${level.title}` : `${level.title} · own symbol`, "symbol-context"));
   detail.append(preview(symbol));
   detail.append(node("p", symbol.origin, "symbol-origin-info"));
-  if (symbol.file) {
-    const last = symbol.first_line + (symbol.source ? symbol.source.split("\n").length - 1 : 0);
-    detail.append(node("p", `${symbol.file} · lines ${symbol.first_line}–${last}`, "symbol-source-location"));
-  }
   const table = node("table", undefined, "symbol-pins-table");
   const head = node("tr");
   for (const title of ["Terminal", "Name", "Direction", "Position"]) head.append(node("th", title));
@@ -74,6 +75,14 @@ export function renderSymbol() {
   for (const l of symbol.labels) labels.append(node("li", `${l.key || "(unkeyed)"} = ${l.text}${l.at ? ` · ${point(l.at)}` : " · automatic position"}`));
   if (!symbol.labels.length) labels.append(node("li", "No labels."));
   detail.append(labels, node("h3", "Definition source"));
+  if (symbol.file) {
+    const file = doc.files.find(f => f.path === symbol.file);
+    const location = node('div', undefined, 'symbol-source-location path-text');
+    setPathText(location, file ? sourcePath(doc, file) : symbol.file);
+    detail.append(location);
+    const last = symbol.first_line + (symbol.source ? symbol.source.split('\n').length - 1 : 0);
+    detail.append(node('p', `Lines ${symbol.first_line}–${last}`, 'symbol-source-lines'));
+  }
   if (symbol.source) {
     const lines = symbol.source.split("\n");
     const model = lineModel({ text: symbol.source, records: [[1, 1, lines.length, [...lines.at(-1)].length]], failed: [] }, 0, [], "none");
@@ -116,7 +125,7 @@ function preview(symbol) {
   const pad = 16;
   svg.setAttribute("viewBox", `${bounds[0]-pad} ${bounds[1]-pad} ${Math.max(1,bounds[2]-bounds[0])+pad*2} ${Math.max(1,bounds[3]-bounds[1])+pad*2}`);
   colourDrawing(svg);
-  wrap.append(svg);
+  destroyPreview = svgViewer(wrap, svg, scale);
   return wrap;
 }
 

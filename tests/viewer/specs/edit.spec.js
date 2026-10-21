@@ -68,7 +68,7 @@ test.describe("on the desktop", () => {
     expect(await checked(page, "toggle-edit")).toBe(true);
     // a text box for each of the two files, the tabs as they were, and the first shown
     await expect(page.locator("#source .editor")).toHaveCount(2);
-    await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy.sp");
+    await expect(page.locator("#netlist-file")).toHaveText(/04-hierarchy\.sp$/);
     expect(await text(page)).toBe((await original(page, "04-hierarchy.sp")).replace(/\r\n/g, "\n"));
     await expect(page.locator("#source .file:not([hidden])")).toHaveCount(0);
     // line numbers beside it, one for each line

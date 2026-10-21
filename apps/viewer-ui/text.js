@@ -4,19 +4,19 @@
 // is drawn, the text outside its definition is dimmed.
 
 import { current, doc, selected } from "./state.js";
-import { clearEditors, editing, focusEditor, refreshEditing, renderEditors, revealInEditor, showEditor } from "./editor.js";
+import { clearEditors, editing, refreshEditing, renderEditors, revealInEditor, showEditor } from "./editor.js";
 import { clearSelection, select } from "./selection.js";
 import { descend, opens } from "./subcircuits.js";
 import { lineModel } from "./text-lines.js";
 import { LineWindow } from "./line-window.js";
 import { TextFind } from "./text-find.js";
 import { $, save } from "./util.js";
+import { navigate } from "./navigation.js";
 
 const app = $("app");
 const source = $("source");
 const netlistPane = $("pane-netlist");
 const fileName = $("netlist-file");
-fileName.addEventListener('click', () => { showFile(circuitFile()); focusEditor(); });
 
 export let fileShown = 0; // the file in the text pane
 // Drawing levels are the main circuit or a subcircuit with its defining file in `lines`.
@@ -31,10 +31,24 @@ const find = new TextFind(() => fileViews[fileShown], n => revealLine(fileShown,
 export function setSemanticsOnly(enabled) {
   $("semantics-only").checked = enabled;
   save("semantics-only", enabled);
-  for (const view of fileViews) view.setSemanticsOnly(enabled);
-  find.changed(true);
+  updateSourceFilters();
 }
 $("semantics-only").addEventListener("change", () => setSemanticsOnly($("semantics-only").checked));
+
+export function setRnlOnly(enabled) {
+  $("rnl-only").checked = enabled;
+  save("rnl-only", enabled);
+  updateSourceFilters();
+}
+$("rnl-only").addEventListener("change", () => setRnlOnly($("rnl-only").checked));
+
+export function updateSourceFilters() {
+  $("semantics-only").disabled = editing || !$("rnl-only").checked;
+  for (const view of fileViews) view.setFilters(sourceFilters());
+  find.changed(true);
+}
+const sourceFilters = () => ({ rnlOnly: $("rnl-only").checked,
+  semanticsOnly: $("rnl-only").checked && $("semantics-only").checked, showFailed: $("show-failed").checked });
 
 /** Edit > Find in Netlist, routed through the shared command table like the other page commands. */
 export async function findInSource() {
@@ -140,7 +154,7 @@ export function renderFiles(shown = 0) {
   doc.files.forEach((file, f) => {
     const dialect = doc.dialect;
     const view = new LineWindow(source, () => lineModel(file, f, spans[f], dialect), (el, n) => decorateLine(f, n, el), folds[f]);
-    view.semanticsOnly = $("semantics-only").checked;
+    Object.assign(view, sourceFilters());
     fileViews.push(view);
     source.append(view.el);
   });
@@ -153,8 +167,9 @@ export function showFile(f) {
   if (fileViews[fileShown] && fileShown !== f) fileViews[fileShown].scroll = source.scrollTop;
   fileViews.forEach((v, k) => { v.el.hidden = k !== f || editing; });
   fileShown = f;
+  source.classList.toggle('scoped', !!scope && scope.f === f);
   const origin = $("source-file");
-  origin.hidden = f === circuitFile();
+  origin.hidden = true;
   origin.textContent = doc.files[f].name.split(/[\\/]/).pop();
   origin.title = doc.files[f].path;
   refreshEditing();
@@ -213,9 +228,9 @@ export function scopeSource(i) {
   const lines = doc && doc.levels[i] ? doc.levels[i].lines : null;
   scope = lines ? { f: lines[0], from: lines[1], to: lines[2] } : null;
   repaintLines();
-  source.classList.toggle("scoped", scope !== null);
+  source.classList.toggle("scoped", scope !== null && scope.f === fileShown);
   refreshEditing();
-  $("source-file").hidden = fileShown === circuitFile();
+  $("source-file").hidden = true;
 }
 
 /**
@@ -234,6 +249,8 @@ export function markUnplaced(i) {
       for (let n = from; n <= to; n++) notDrawn[f]?.set(n, u.reason ? `Not drawn: ${u.reason}` : "Not drawn: it has no position yet");
     }
   }
+  for (const [f, view] of fileViews.entries()) view.setInactive(notDrawn[f]);
+  if (!$("show-failed").checked) find.changed(true);
   repaintLines();
 }
 
@@ -245,6 +262,12 @@ export function revealDefinition(i) {
 }
 
 source.addEventListener("click", (e) => {
+  const link = e.target.closest('a[data-include]');
+  if (link) {
+    e.preventDefault();
+    if (!String(window.getSelection())) navigate({file: Number(link.dataset.include)}, {newWindow: e.shiftKey});
+    return;
+  }
   if (!doc || String(window.getSelection())) return; // selecting text is not a click
   const s = e.target.closest("[data-obj]");
   if (s) {
@@ -259,6 +282,7 @@ source.addEventListener("click", (e) => {
 });
 
 source.addEventListener("dblclick", (e) => {
+  if (e.target.closest('a[data-include]')) { e.preventDefault(); return; }
   if (!doc) return;
   const s = e.target.closest("[data-obj]");
   const ln = e.target.closest(".ln");

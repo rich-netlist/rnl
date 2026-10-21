@@ -3,7 +3,7 @@
 
 import { setCheck } from "./commands.js";
 import { updateHierarchy } from "./hierarchy.js";
-import { revealPending, refreshSource } from "./text.js";
+import { revealPending, refreshSource, updateSourceFilters } from "./text.js";
 import { showUnplaced } from "./unplaced.js";
 import { renderSymbol } from "./symbol.js";
 import { $, clamp, load, save } from "./util.js";
@@ -61,8 +61,8 @@ export function setPane(name) {
 
 export function setShowFailed(shown) {
   $("show-failed").checked = shown;
-  source.classList.toggle("hide-failed", !shown);
   save("show-failed", shown);
+  updateSourceFilters();
 }
 
 $("show-failed").addEventListener("change", () => setShowFailed($("show-failed").checked));
@@ -82,7 +82,7 @@ function sidebarWidthLimits() {
 // a hidden pane has no height yet: its size is taken as it is, and limited once it is shown
 function problemsHeightLimits() {
   if (netlistPane.clientHeight === 0) return [PROBLEMS_MIN, Infinity];
-  const fixed = $("problems-head").offsetHeight + $("file-bar").offsetHeight;
+  const fixed = $("problems-head").offsetHeight + netlistPane.querySelector('.netlist-head').offsetHeight;
   return [PROBLEMS_MIN, Math.max(PROBLEMS_MIN, netlistPane.clientHeight - fixed - SOURCE_MIN)];
 }
 

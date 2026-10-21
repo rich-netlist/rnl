@@ -19,6 +19,7 @@ test("the web core supplies semantic lines and the actual parent symbol", async 
     buffer: fs.readFileSync(path.join(root, 'tests/viewer/inputs/symbol-inspector.sp')),
   }));
   await page.locator('#tab-netlist').click();
+  await page.locator('#rnl-only').check();
   await page.locator('#semantics-only').check();
   expect(await page.locator('#source .file:not([hidden]) .ln').evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([12, 31]);
   await page.evaluate(async () => {
@@ -28,7 +29,7 @@ test("the web core supplies semantic lines and the actual parent symbol", async 
   await page.locator('#tab-symbol').click();
   await expect(page.locator('.symbol-bounds')).toHaveText('Box = [-4, -2, 4, 2]');
   await expect(page.locator('.symbol-definition')).toContainText('width=8');
-  await expect(page.locator('.symbol-source-location')).toContainText('lines 21–26');
+  await expect(page.locator('.symbol-source-lines')).toHaveText('Lines 21–26');
   await page.locator('#symbol-pins').uncheck();
   await expect(page.locator('.symbol-pin-marks')).toBeHidden();
 });
@@ -136,6 +137,46 @@ test("Shift double click opens a subcircuit in a real new tab and pop-up blockin
   await page.getByRole("menuitem", { name: "File", exact: true }).click();
   await page.locator('[data-id="new-window"]').click();
   await expect(page.locator("dialog.dialog")).toContainText("The browser blocked the new viewer tab");
+});
+
+test("include links retain parser context in this tab and a Shift-opened tab", async ({ page }) => {
+  await start(page);
+  await opened(page, () => page.locator('#file-input').setInputFiles({name:'top.sp', mimeType:'text/plain',
+    buffer:Buffer.from('* Top\n.include "models.inc"\nR1 a 0 1k\n.end\n')}));
+  await opened(page, () => page.locator('#include-input').setInputFiles({name:'models.inc', mimeType:'text/plain',
+    buffer:Buffer.from('.param bias=1.2\n.model example d\n')}));
+  await page.locator('#tab-netlist').click();
+  const link = page.locator('#source .file:not([hidden]) .include-link');
+  const popup = page.waitForEvent('popup');
+  await link.click({modifiers:['Shift']});
+  const child = await popup;
+  try {
+    await expect(child.locator('#netlist-file')).toHaveText(/models\.inc$/);
+    await expect(child.locator('#source .file:not([hidden]) .ln').first()).toContainText('.param bias=1.2');
+    expect(await child.evaluate(() => window.viewer.doc.files.length)).toBe(2);
+    await expect(page.locator('#netlist-file')).toHaveText(/top\.sp$/);
+    await link.click();
+    await expect(page.locator('#netlist-file')).toHaveText(/models\.inc$/);
+  } finally { await child.close(); }
+});
+
+for (const [kind, directive, line] of [
+  ['backslash', 'include \\\n  "models.scs"', '3'],
+  ['comment', 'include // explanation\n+ "models.scs"', '3'],
+  ['continued comment', 'include \\\n // explanation\n+ "models.scs"', '4'],
+]) test(`continued Spectre include links point at the filename on its physical line: ${kind}`, async ({page}) => {
+  await start(page);
+  await opened(page, () => page.locator('#file-input').setInputFiles({name:'top.scs',mimeType:'text/plain',
+    buffer:Buffer.from(`simulator lang=spectre\n${directive}\n`)}));
+  await opened(page, () => page.locator('#include-input').setInputFiles({name:'models.scs',mimeType:'text/plain',
+    buffer:Buffer.from('parameters bias=1.2\n')}));
+  await page.locator('#tab-netlist').click();
+  const link = page.locator('#source .include-link');
+  await expect(link).toHaveText('"models.scs"');
+  await expect(link.locator('..').locator('..')).toHaveAttribute('data-line',line);
+  await link.click();
+  await expect(page.locator('#netlist-file')).toHaveText(/models\.scs$/);
+  await expect(page.locator('#source .file:not([hidden]) .ln').first()).toContainText('parameters bias=1.2');
 });
 
 test("Shift Library opens a previous URL with its includes, and the child retains URL pool sources", async ({ page }) => {
@@ -281,7 +322,7 @@ async function showsDocument(page, doc) {
   const groups = doc.levels[0].svg.split("<g data-id=").length - 1;
   await expect(page.locator("#canvas > svg g[data-id]")).toHaveCount(groups);
   // the text: a tab for each file, and the lines of the first
-  await expect(page.locator("#netlist-file")).toHaveText(doc.files[0].name.split("/").pop());
+  await expect(page.locator("#netlist-file")).toHaveText(doc.path);
   const lines = doc.files[0].text.replace(/\r?\n$/, "").split(/\r?\n/).length;
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);
   // Core diagnostics retain their counts; viewer-only package remedies follow the relevant error.
@@ -702,7 +743,7 @@ test("the text edited and applied is built by the core as rnl view builds the sa
   expect(fs.readFileSync(await download.path(), "utf8")).toBe(editedParts);
   await expect(page.locator("#note")).toHaveText("Downloaded parts.inc.");
   // the file downloaded is what was read from now on; the netlist's change is still not saved
-  await expect(page.locator("#netlist-file[data-unsaved='true']")).toHaveText(["top.sp"]);
+  await expect(page.locator("#netlist-file[data-unsaved='true']")).toHaveText(/parts\.inc$/);
 });
 
 

@@ -63,7 +63,7 @@ test("random access preserves multiline syntax, per-file scroll and edit positio
   const included = await lineOf(page, "R2 top tap", 1);
   await reveal(page, 1, included || 1105);
   const other = await first();
-  await page.locator("#netlist-file").click();
+  await showSource(page, 0);
   expect(await first()).toBe(before);
   await page.locator('#tab-hierarchy').click();
   await page.locator('#tab-netlist').click();

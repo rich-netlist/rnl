@@ -93,7 +93,8 @@ test("a subcircuit opened from the index or the tree shows its definition, in it
   await page.locator("#tab-hierarchy").click();
   await page.locator("#index .index-row", { hasText: "rdiv" }).click();
   await expect(page.locator("#level-name")).toHaveText("rdiv");
-  expect(await dimmed(page)).toEqual([[[1, 78]], []]);
+  // The old file is not faded as though it contained the new circuit; source navigation is pending.
+  expect(await dimmed(page)).toEqual([[], []]);
   // the text, hidden behind the hierarchy, shows the definition once it is shown again
   await page.locator("#tab-netlist").click();
   await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");

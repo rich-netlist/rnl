@@ -251,8 +251,12 @@ function snapshot() {
   return {
     level: doc.levels[current] ? doc.levels[current].title : null,
     view,
-    files: doc.files.map((f, k) => ({ path: f.path, text: f.text, scroll: fileViews[k]?.scroll || 0, pendingLine: fileViews[k]?.pendingLine,
-      collapsed: [...(fileViews[k]?.collapsed || [])] })),
+    files: doc.files.map((f, k) => {
+      const v = fileViews[k];
+      return { path: f.path, text: f.text, scroll: v?.scroll || 0,
+        pendingLine: v?.pendingLine ?? (v?._model && v.filtered ? v.lineAt(Math.max(0, Math.floor((v.scroll - 4 + 1) / v.height))) : undefined),
+        collapsed: [...(v?.collapsed || [])] };
+    }),
     file: doc.files[fileShown] ? doc.files[fileShown].path : null,
     selected: sel && { kind: sel.kind, name: sel.name, level: sel.level },
     expanded,

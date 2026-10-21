@@ -49,7 +49,7 @@ export class TextFind {
     const matches = [];
     let yielded = performance.now();
     for (let line = 0; line < view.model.texts.length; line++) {
-      if (view.semanticsOnly && !view.model.semantics.has(line)) continue;
+      if (!view.allows(line)) continue;
       pattern.lastIndex = 0;
       let match;
       while ((match = pattern.exec(view.model.texts[line]))) matches.push({ line, col: match.index, length: match[0].length });

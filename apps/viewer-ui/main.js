@@ -20,7 +20,7 @@ import { loadShell } from "./shell.js";
 import { finishStartup, stylesReady } from "./startup.js";
 import { current, doc, path, selected } from "./state.js";
 import { renderUnplaced } from "./unplaced.js";
-import { setSemanticsOnly } from "./text.js";
+import { setSemanticsOnly, setRnlOnly } from "./text.js";
 import { $, load, startSettings } from "./util.js";
 
 /** Load the shell and the command table, then open what the shell has for the start. */
@@ -41,6 +41,7 @@ async function start() {
   setPane(load("side-pane", "netlist"));
   setShowFailed(load("show-failed", true));
   setSemanticsOnly(load("semantics-only", false));
+  setRnlOnly(load("rnl-only", false));
   // the text is read, not edited, until the user says (editor.js); the native menu starts checked
   setCheck("toggle-edit", false);
   setIndexHeight(load("index-height", 260));

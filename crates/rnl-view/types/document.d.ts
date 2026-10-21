@@ -252,6 +252,10 @@ export type UnplacedDrawing = { svg?: string, primitives?: Array<Primitive> };
 
 export type SourceFile = {
   /**
+   * Explicit include directives and the files the host resolver actually loaded.
+   */
+  includes: Array<SourceInclude>,
+  /**
    * Physical lines containing free text in active, syntactically valid RNL members (1-based).
    */
   semantics: Array<number>,
@@ -278,6 +282,14 @@ export type SourceFile = {
    * line, last column, and 0 when they failed or 1 when a conflict overrode them (7.5).
    */
   failed: Array<[number, number, number, number, number]>,
+};
+
+export type SourceInclude = {
+  line: number,
+  /**
+   * Index in Document.files.
+   */
+  file: number,
 };
 
 export type Object = {

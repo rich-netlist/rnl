@@ -272,9 +272,16 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
   padding: 3px 8px 3px 6px;
   border-bottom: 1px solid var(--line);
 }
-/* One top-file button; controls wrap rather than disappearing beyond the pane. */
-.file-bar { flex-wrap: wrap; gap: 4px; }
-.netlist-file { flex: 1 1 90px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; color: var(--fg); }
+/* A plain path occupies the first row. All controls follow it and wrap in narrow panes. */
+.file-bar { flex-direction: column; align-items: stretch; gap: 4px; }
+.netlist-file { width: 100%; padding: 3px 0; color: var(--fg); }
+.path-text { display: flex; min-width: 0; overflow: hidden; white-space: nowrap; }
+.path-directory { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.path-name { flex: 0 0 auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.netlist-options { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 12px; }
+.rnl-filter-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rnl-filter-group .semantics-toggle { padding-left: 8px; border-left: 1px solid var(--line); }
+.semantics-toggle:has(input:disabled) { opacity: 0.5; }
 .netlist-file[hidden], .source-file[hidden] { display: none; }
 .source-file { padding: 3px 8px; color: var(--muted); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-bottom: 1px solid var(--line); }
 .auto-include-toggle { flex: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; font-size: 12px; color: var(--muted); }
@@ -329,34 +336,9 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 }
 .editor .area:focus { box-shadow: inset 0 0 0 1px var(--accent); }
 
-/* Keep the checkbox and its caption on the same row; the optional legend yields in narrow panes. */
+/* Keep each checkbox and its caption together. */
 .failed-check { flex: none; margin: 0 2px 0 0; accent-color: var(--accent); cursor: pointer; }
-.failed-toggle {
-  display: flex;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
-  align-items: center;
-  min-width: 130px;
-  height: 1.4em;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-}
-/* a line keeps its first item however narrow it is: this one takes no room, so the caption can go */
-.failed-toggle::before { content: ""; height: 1.4em; }
-.failed-toggle .caption { margin-left: 4px; }
-.failed-toggle .key { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
-.failed-toggle .swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  border: 1px solid var(--line);
-}
-.failed-toggle .swatch.x-failed { background: var(--failed-bg); }
-.failed-toggle .swatch.x-overridden { background: var(--overridden-bg); }
+.failed-toggle { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font-size: 12px; white-space: nowrap; cursor: pointer; user-select: none; }
 
 .sub-head {
   display: flex;
@@ -552,9 +534,7 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .s-directive { color: var(--syn-directive); font-weight: 600; }
 .s-punct { color: var(--muted); }
 
-.x-failed { background: var(--failed-bg); }
-.x-overridden { background: var(--overridden-bg); }
-.source.hide-failed .x-failed, .source.hide-failed .x-overridden { background: none; }
+.include-link { color: var(--syn-host); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 
 .obj { cursor: pointer; }
 .obj:hover { text-decoration: underline; text-decoration-color: var(--select); text-underline-offset: 2px; }
@@ -1173,14 +1153,16 @@ button.pool-open:hover { text-decoration: underline; }
 .view-tabs { overflow-x: auto; flex-wrap: wrap; }
 .side-head { height: auto; min-height: 32px; flex: none; }
 .view-tabs button { flex: none; }
-.semantics-toggle, .symbol-options label { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; white-space: nowrap; color: var(--muted); }
-.semantics-toggle input, .symbol-options input { accent-color: var(--accent); cursor: pointer; }
+.rnl-toggle, .semantics-toggle, .symbol-options label { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; white-space: nowrap; color: var(--muted); }
+.rnl-toggle input, .semantics-toggle input, .symbol-options input { accent-color: var(--accent); cursor: pointer; }
 :root { --rnl-line: #edf5ff; --semantic-rnl: #d5e8ff; }
 @media (prefers-color-scheme: dark) {
   :root { --rnl-line: #202d40; --semantic-rnl: #2b4362; }
 }
 .source .ln.rnl-line { background: var(--rnl-line); }
 .source .ln.semantic-rnl { background: var(--semantic-rnl); }
+.source .ln.inactive-line, .source .ln.not-drawn { background: var(--out-of-scope); }
+.source .ln.inactive-line > * { opacity: 0.45; }
 .source .ln.hl-line { box-shadow: inset 3px 0 var(--select); }
 .symbol-pane { min-height: 0; display: flex; flex-direction: column; }
 .symbol-pane[hidden] { display: none; }
@@ -1188,9 +1170,14 @@ button.pool-open:hover { text-decoration: underline; }
 .symbol-detail { overflow: auto; min-height: 0; padding: 12px; }
 .symbol-detail h2 { font: 600 18px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; color: var(--syn-def); margin: 0 0 6px; overflow-wrap: anywhere; }
 .symbol-detail h3 { font-size: 13px; margin: 18px 0 8px; }
-.symbol-context, .symbol-source-location, .symbol-origin-info { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; margin: 6px 0 12px; }
-.symbol-preview { border: 1px solid var(--line); border-radius: 8px; background-color: var(--drawing-background); background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px); background-size: 18px 18px; padding: 10px; }
-.symbol-preview svg { width: 100%; height: 260px; display: block; }
+.symbol-context, .symbol-source-location, .symbol-source-lines, .symbol-origin-info { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; margin: 6px 0 12px; }
+.symbol-preview { position: relative; height: 280px; overflow: hidden; touch-action: none; cursor: grab; border: 1px solid var(--line); border-radius: 8px; background-color: var(--drawing-background); background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px); background-size: 18px 18px; }
+.symbol-preview.panning { cursor: grabbing; }
+.symbol-preview > svg { width: 100%; height: 100%; display: block; user-select: none; }
+.symbol-preview:focus-visible { outline: 1px solid var(--accent); }
+.symbol-viewer-tools { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; }
+.symbol-viewer-tools button { width: 28px; height: 28px; padding: 5px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; }
+.symbol-viewer-tools svg { display: block; width: 16px; height: 16px; }
 .hide-symbol-box .symbol-box-mark, .hide-symbol-origin .symbol-origin-mark, .hide-symbol-pins .symbol-pin-marks,
 .hide-symbol-labels [data-id="symbol-label"] { display: none; }
 .symbol-table-scroll { overflow-x: auto; }

@@ -12,6 +12,11 @@ export function lineModel(file, f, allSpans, dialect) {
   };
   const rnl = new Map(), spans = new Map(), failed = new Map();
   const semantics = new Set((file.semantics || []).map(n => n - 1));
+  const includes = new Map();
+  for (const link of file.includes || []) {
+    const location = includeLocation(texts, link.line - 1);
+    if (location) includes.set(location.line, {...location, file: link.file});
+  }
   const add = (map, i, value) => { if (!map.has(i)) map.set(i, []); map.get(i).push(value); };
   for (const [l0, c0, l1, c1] of file.records) {
     for (let n = l0; n <= l1 && n <= texts.length; n++) {
@@ -64,7 +69,7 @@ export function lineModel(file, f, allSpans, dialect) {
   }
   for (const from of blocks) folds.push([from, texts.length - 1]);
   return {
-    texts, columns, longest, folds, semantics, text: file.text.replace(/\r\n/g, "\n"),
+    texts, columns, longest, folds, semantics, rnl, failed, text: file.text.replace(/\r\n/g, "\n"),
     render(i) {
       const text = texts[i], { cls } = syntax(i, states[i]);
       const fail = new Array(text.length).fill("");
@@ -82,9 +87,49 @@ export function lineModel(file, f, allSpans, dialect) {
       const el = lineElement(text, i + 1, cls, objs.map(o => o ? o.join(" ") : ""), fail);
       el.classList.toggle("rnl-line", rnl.has(i));
       el.classList.toggle("semantic-rnl", semantics.has(i));
+      el.classList.toggle("inactive-line", failed.has(i));
+      if (includes.has(i)) includeLink(el, includes.get(i));
       return el;
     },
   };
+}
+
+// Resolution comes from the host parser. Only locate the written filename here, not its target.
+function includeLocation(texts, line) {
+  const head = /^\s*(?:\.inc\S*|\.lib|include)\b\s*/i.exec(texts[line] || '');
+  if (!head) return null;
+  const spectre = /^\s*include\b/i.test(head[0]);
+  let from = head[0].length;
+  while (line < texts.length) {
+    const tail = texts[line].slice(from);
+    const token = spectre && tail.startsWith('//') ? null : /^("[^"]+"|'[^']+'|[^\s]+)/.exec(tail);
+    if (token && token[0] !== '\\') return {line, from, to:from+token[0].length};
+    // Spectre backslash or SPICE/Spectre '+' continuation: keep the filename's physical line.
+    if (token?.[0] !== '\\' && !/^\s*\+/.test(texts[line+1] || '')) return null;
+    line++;
+    from = /^\s*\+?\s*/.exec(texts[line] || '')[0].length;
+  }
+  return null;
+}
+
+function includeLink(row, {file, from, to}) {
+  const code = row.querySelector('.code');
+  const point = offset => {
+    const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (offset <= node.length) return [node, offset];
+      offset -= node.length;
+    }
+    return [code, code.childNodes.length];
+  };
+  const range = document.createRange();
+  range.setStart(...point(from)); range.setEnd(...point(to));
+  const link = document.createElement('a');
+  link.className = 'include-link'; link.dataset.include = String(file);
+  link.href = `#source-${file}`;
+  link.title = 'Go to included file (Shift: new window)';
+  link.append(range.extractContents()); range.insertNode(link);
 }
 
 /**
