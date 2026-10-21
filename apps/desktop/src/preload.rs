@@ -200,7 +200,10 @@ fn enough_memory() -> bool {
     true
 }
 
-struct BackgroundPriority(bool);
+struct BackgroundPriority {
+    #[cfg(windows)]
+    active: bool,
+}
 impl BackgroundPriority {
     fn new() -> Self {
         #[cfg(windows)]
@@ -208,16 +211,16 @@ impl BackgroundPriority {
             use windows_sys::Win32::System::Threading::{
                 GetCurrentThread, SetThreadPriority, THREAD_MODE_BACKGROUND_BEGIN,
             };
-            Self(unsafe { SetThreadPriority(GetCurrentThread(), THREAD_MODE_BACKGROUND_BEGIN) != 0 })
+            Self { active: unsafe { SetThreadPriority(GetCurrentThread(), THREAD_MODE_BACKGROUND_BEGIN) != 0 } }
         }
         #[cfg(not(windows))]
-        Self(false)
+        Self {}
     }
 }
 impl Drop for BackgroundPriority {
     fn drop(&mut self) {
         #[cfg(windows)]
-        if self.0 {
+        if self.active {
             use windows_sys::Win32::System::Threading::{
                 GetCurrentThread, SetThreadPriority, THREAD_MODE_BACKGROUND_END,
             };
