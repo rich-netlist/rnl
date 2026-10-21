@@ -158,6 +158,8 @@ pub struct Drawings {
     primitives: bool,
 }
 
+mod memory;
+
 /// The unplaced objects of a level: the items to draw, the symbols they are drawn with, and their
 /// names as the Document lists them.
 struct DrawnLevel {

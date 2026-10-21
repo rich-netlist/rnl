@@ -71,6 +71,12 @@ file collection and Worker builds; the desktop shell matches native parsing even
 Completion and errors clear the indicator. Embedded viewers use the same stages, and a late result
 from an older open cannot clear the newer open's indicator. Reduced-motion preferences stop the bar's animation.
 
+The desktop shell keeps a bounded LRU of compiled documents, SVGs and lazy drawings; a hit reports
+**Using cached drawing…**. File > Memory Cache configures its per-window budget (256 MiB by default).
+`shell.build` takes an optional fourth argument `{ fresh }`; Reload sets it to true so F5 always
+rebuilds. The optional `shell.memoryCache(clear)` returns native cache statistics and can clear it.
+The web shell continues building in its Worker and does not expose this native cache setting.
+
 Files over 1,000 lines keep their full text and lexical state but render only the viewport and 40
 overscan rows on each side. Diagnostics, selected statements, scope and not-drawn marks are attached
 to logical lines and reapplied to recycled rows. File switches, hierarchy/Problems jumps, sidebar

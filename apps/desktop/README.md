@@ -82,6 +82,19 @@ level 2 while keeping the desktop shell in the development profile. Large hierar
 spend seconds interpreting their circuits even when the Library's definition index is already warm.
 Release builds retain their usual profile.
 
+Each desktop window keeps a **256 MiB LRU memory cache** of compiled documents, SVG drawings
+and lazy drawings for the Not drawn pane. Switching back to an unchanged file reuses them;
+the least recently used results are evicted first. **File > Memory Cache…** shows its retained
+budget and hit count, changes the limit (0 disables caching), or clears it. An oversized document
+still opens but is not retained. The budget conservatively estimates owned cache data, including
+source snapshots and nested drawing data; the active view and temporary build/IPC buffers are
+additional memory, so this is not a cap on the entire process. Results stay only until the window closes.
+
+A cache hit checks the contents of all observed inputs, including failed reads, and the ordering
+of package/include and Auto Include candidates. File edits, newly available dependencies and
+lookup changes therefore invalidate affected results. F5 bypasses reuse; Reload Library clears
+all results. Explicit Solve operations still run the solver and are not cached.
+
 The menus and their keys come from the page's command table ([`commands.json`](../viewer-ui/README.md#the-command-table)). On Windows the page handles the shortcut keys and the menu only shows them, because the keys reach the WebView first; on macOS and Linux the menu handles them.
 
 The app embeds the page in [`apps/viewer-ui`](../viewer-ui/README.md) when it is built, with the drawing's web fonts in its `fonts/` when `python scripts/fonts.py web` has written them ([Fonts](../viewer-ui/README.md#fonts)); they add 17.3 MB. Without them the drawing falls back on the fonts installed on the computer. The About box gives the fonts' copyright and licence.

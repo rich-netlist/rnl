@@ -79,9 +79,9 @@ impl LibraryIndex {
             }?;
             for lv in &doc.levels {
                 let source = normalize(&lv.path);
-                if !dependencies.contains_key(&source) {
-                    if let Some(text) = files.read(&source) {
-                        dependencies.insert(source, fingerprint(&text));
+                if let std::collections::hash_map::Entry::Vacant(entry) = dependencies.entry(source) {
+                    if let Some(text) = files.read(entry.key()) {
+                        entry.insert(fingerprint(&text));
                     }
                 }
                 if lv.kind == LevelKind::Subckt {
@@ -141,6 +141,142 @@ impl LibraryIndex {
             out.reindex();
         }
         out
+    }
+}
+
+impl LibraryLookup for LibraryIndex {
+    fn candidates(&self, name: &str, case_sensitive: bool) -> Vec<LibraryDefinition> {
+        self.names
+            .get(&name.to_lowercase())
+            .into_iter()
+            .flatten()
+            .filter(|d| !case_sensitive || d.name == name)
+            .cloned()
+            .collect()
+    }
+    fn definitions(&self, path: &str) -> Vec<LibraryDefinition> {
+        self.entries.get(path).map(|e| e.definitions.clone()).unwrap_or_default()
+    }
+}
+
+/// Enables the viewer's opt-in behavior over normal file access. With it off, all reads use the
+/// ordinary host adapter, and there is no library lookup in the parser.
+pub struct LibraryProvider<'a> {
+    pub files: &'a dyn Provider,
+    pub index: &'a LibraryIndex,
+    pub enabled: bool,
+}
+
+impl Provider for LibraryProvider<'_> {
+    fn read(&self, path: &str) -> Option<String> {
+        self.files.read(path)
+    }
+    fn package_files(&self) -> Vec<String> {
+        self.files.package_files()
+    }
+    fn package_candidates(&self, name: &str) -> Vec<String> {
+        self.files.package_candidates(name)
+    }
+    fn include_candidates(&self, name: &str) -> Vec<String> {
+        self.files.include_candidates(name)
+    }
+    fn auto_include(&self) -> Option<&dyn LibraryLookup> {
+        self.enabled.then_some(self.index)
+    }
+}
+
+/// First resolve normal includes. Add uniquely indexed library files until no new dependency can
+/// be resolved. Each pass uses the host reader, so model cards, relative includes and line numbers
+/// retain their normal meaning. Discard intermediate diagnostics; only the final reading is shown.
+pub(crate) fn resolve(
+    path: &str,
+    files: &dyn Provider,
+    sink: &mut Sink,
+    reader: impl Fn(&[String], &mut Sink) -> Option<HostDocument>,
+) -> Option<HostDocument> {
+    let Some(index) = files.auto_include() else { return reader(&[], sink) };
+    let mut extra = Vec::new();
+    let mut conflicts = Vec::new();
+    let mut automatic = Vec::new();
+    let mut attempted = HashSet::new();
+    loop {
+        let mut parsed = Sink::new();
+        let doc = reader(&extra, &mut parsed)?;
+        let mut next = Vec::new();
+        let mut approved = HashSet::new();
+        let mut reserved: HashMap<String, LibraryDefinition> = HashMap::new();
+        for lv in &doc.levels {
+            for inst in &lv.instances {
+                let Some(model) = inst.model.as_deref() else { continue };
+                if !inst.is_subckt || doc.subckt(model).is_some() {
+                    continue;
+                }
+                let key = if inst.case_sensitive { model.to_string() } else { model.to_lowercase() };
+                if !attempted.insert((inst.case_sensitive, key)) {
+                    continue;
+                }
+                let candidates = index.candidates(model, inst.case_sensitive);
+                let loc = Some(Loc::line(&inst.file, inst.line));
+                if candidates.len() > 1 {
+                    let names: Vec<_> = candidates.iter().map(|d| format!("{}:{}", d.source, d.line)).collect();
+                    conflicts.push((model.to_string(), format!("Auto Include: subcircuit {model} has conflicting definitions in {}; add an explicit include to choose one", names.join(", ")), loc));
+                } else if let Some(def) = candidates.first() {
+                    if extra.contains(&def.path) || normalize(path) == def.path {
+                        continue;
+                    }
+                    // A library can define thousands of missing masters. Validate its complete
+                    // definition list once per pass, not once per referenced master (quadratic).
+                    if approved.contains(&def.path) {
+                        automatic.push((model.to_string(), def.source.clone(), loc));
+                        continue;
+                    }
+                    let definitions = index.definitions(&def.path);
+                    let mut own: HashMap<String, LibraryDefinition> = HashMap::new();
+                    let conflict = definitions.iter().find(|d| {
+                        let key = doc.key(&d.name);
+                        let present = doc.subckt(&d.name).is_some_and(|id| {
+                            let existing = &doc.levels[id];
+                            normalize(&existing.path) != d.file || existing.line != d.line
+                        });
+                        let other = reserved.get(&key).or_else(|| own.get(&key));
+                        let duplicate = other.is_some_and(|other| other.file != d.file || other.line != d.line);
+                        own.insert(key, (*d).clone());
+                        present || duplicate
+                    });
+                    if let Some(other) = conflict {
+                        conflicts.push((model.to_string(), format!("Auto Include: {} was not included for subcircuit {model} because its definition of {} conflicts with an existing definition", def.source, other.name), loc));
+                    } else {
+                        approved.insert(def.path.clone());
+                        automatic.push((model.to_string(), def.source.clone(), loc));
+                        for d in definitions {
+                            reserved.insert(doc.key(&d.name), d);
+                        }
+                        if !next.contains(&def.path) {
+                            next.push(def.path.clone());
+                        }
+                    }
+                }
+            }
+        }
+        if !next.is_empty() {
+            extra.extend(next);
+            continue;
+        }
+        *sink = parsed;
+        for (model, message, loc) in conflicts {
+            if doc.subckt(&model).is_none() {
+                sink.warning(message, loc);
+            }
+        }
+        for (model, file, loc) in automatic {
+            let message = if doc.subckt(&model).is_some() {
+                format!("Subcircuit {model} was not included; found in {file} and added by Auto Include")
+            } else {
+                format!("Auto Include could not resolve subcircuit {model} from {file}; reload Library to refresh its definitions")
+            };
+            sink.warning(message, loc);
+        }
+        return Some(doc);
     }
 }
 
@@ -349,141 +485,5 @@ mod tests {
             assert!(host(&files, &index, true, "/top.sp").0.subckt("cell").is_some());
         }
         assert!(!files.reads.borrow().contains_key("/unrelated.inc"));
-    }
-}
-
-impl LibraryLookup for LibraryIndex {
-    fn candidates(&self, name: &str, case_sensitive: bool) -> Vec<LibraryDefinition> {
-        self.names
-            .get(&name.to_lowercase())
-            .into_iter()
-            .flatten()
-            .filter(|d| !case_sensitive || d.name == name)
-            .cloned()
-            .collect()
-    }
-    fn definitions(&self, path: &str) -> Vec<LibraryDefinition> {
-        self.entries.get(path).map(|e| e.definitions.clone()).unwrap_or_default()
-    }
-}
-
-/// Enables the viewer's opt-in behavior over normal file access. With it off, all reads use the
-/// ordinary host adapter, and there is no library lookup in the parser.
-pub struct LibraryProvider<'a> {
-    pub files: &'a dyn Provider,
-    pub index: &'a LibraryIndex,
-    pub enabled: bool,
-}
-
-impl Provider for LibraryProvider<'_> {
-    fn read(&self, path: &str) -> Option<String> {
-        self.files.read(path)
-    }
-    fn package_files(&self) -> Vec<String> {
-        self.files.package_files()
-    }
-    fn package_candidates(&self, name: &str) -> Vec<String> {
-        self.files.package_candidates(name)
-    }
-    fn include_candidates(&self, name: &str) -> Vec<String> {
-        self.files.include_candidates(name)
-    }
-    fn auto_include(&self) -> Option<&dyn LibraryLookup> {
-        self.enabled.then_some(self.index)
-    }
-}
-
-/// First resolve normal includes. Add uniquely indexed library files until no new dependency can
-/// be resolved. Each pass uses the host reader, so model cards, relative includes and line numbers
-/// retain their normal meaning. Discard intermediate diagnostics; only the final reading is shown.
-pub(crate) fn resolve(
-    path: &str,
-    files: &dyn Provider,
-    sink: &mut Sink,
-    reader: impl Fn(&[String], &mut Sink) -> Option<HostDocument>,
-) -> Option<HostDocument> {
-    let Some(index) = files.auto_include() else { return reader(&[], sink) };
-    let mut extra = Vec::new();
-    let mut conflicts = Vec::new();
-    let mut automatic = Vec::new();
-    let mut attempted = HashSet::new();
-    loop {
-        let mut parsed = Sink::new();
-        let doc = reader(&extra, &mut parsed)?;
-        let mut next = Vec::new();
-        let mut approved = HashSet::new();
-        let mut reserved: HashMap<String, LibraryDefinition> = HashMap::new();
-        for lv in &doc.levels {
-            for inst in &lv.instances {
-                let Some(model) = inst.model.as_deref() else { continue };
-                if !inst.is_subckt || doc.subckt(model).is_some() {
-                    continue;
-                }
-                let key = if inst.case_sensitive { model.to_string() } else { model.to_lowercase() };
-                if !attempted.insert((inst.case_sensitive, key)) {
-                    continue;
-                }
-                let candidates = index.candidates(model, inst.case_sensitive);
-                let loc = Some(Loc::line(&inst.file, inst.line));
-                if candidates.len() > 1 {
-                    let names: Vec<_> = candidates.iter().map(|d| format!("{}:{}", d.source, d.line)).collect();
-                    conflicts.push((model.to_string(), format!("Auto Include: subcircuit {model} has conflicting definitions in {}; add an explicit include to choose one", names.join(", ")), loc));
-                } else if let Some(def) = candidates.first() {
-                    if extra.contains(&def.path) || normalize(path) == def.path {
-                        continue;
-                    }
-                    // A library can define thousands of missing masters. Validate its complete
-                    // definition list once per pass, not once per referenced master (quadratic).
-                    if approved.contains(&def.path) {
-                        automatic.push((model.to_string(), def.source.clone(), loc));
-                        continue;
-                    }
-                    let definitions = index.definitions(&def.path);
-                    let mut own: HashMap<String, LibraryDefinition> = HashMap::new();
-                    let conflict = definitions.iter().find(|d| {
-                        let key = doc.key(&d.name);
-                        let present = doc.subckt(&d.name).is_some_and(|id| {
-                            let existing = &doc.levels[id];
-                            normalize(&existing.path) != d.file || existing.line != d.line
-                        });
-                        let other = reserved.get(&key).or_else(|| own.get(&key));
-                        let duplicate = other.is_some_and(|other| other.file != d.file || other.line != d.line);
-                        own.insert(key, (*d).clone());
-                        present || duplicate
-                    });
-                    if let Some(other) = conflict {
-                        conflicts.push((model.to_string(), format!("Auto Include: {} was not included for subcircuit {model} because its definition of {} conflicts with an existing definition", def.source, other.name), loc));
-                    } else {
-                        approved.insert(def.path.clone());
-                        automatic.push((model.to_string(), def.source.clone(), loc));
-                        for d in definitions {
-                            reserved.insert(doc.key(&d.name), d);
-                        }
-                        if !next.contains(&def.path) {
-                            next.push(def.path.clone());
-                        }
-                    }
-                }
-            }
-        }
-        if !next.is_empty() {
-            extra.extend(next);
-            continue;
-        }
-        *sink = parsed;
-        for (model, message, loc) in conflicts {
-            if doc.subckt(&model).is_none() {
-                sink.warning(message, loc);
-            }
-        }
-        for (model, file, loc) in automatic {
-            let message = if doc.subckt(&model).is_some() {
-                format!("Subcircuit {model} was not included; found in {file} and added by Auto Include")
-            } else {
-                format!("Auto Include could not resolve subcircuit {model} from {file}; reload Library to refresh its definitions")
-            };
-            sink.warning(message, loc);
-        }
-        return Some(doc);
     }
 }

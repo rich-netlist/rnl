@@ -70,7 +70,8 @@ export default {
   },
   pick: (kind) => (kind === "file" ? invoke("pick_file").then(file) : Promise.resolve(null)),
   // a file by its path, or text held by the source, with edits to it and its includes
-  build: async (source, edits, progress) => {
+  memoryCache: async (clear = false) => { await flushSettings(); return invoke("memory_cache", { clear }); },
+  build: async (source, edits, progress, { fresh = false } = {}) => {
     await flushSettings();
     await poolReady;
     const autoInclude = load("auto-include", true) === true;
@@ -81,8 +82,8 @@ export default {
     try {
       progress?.("reading");
       return await (source.text === undefined
-        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId, autoInclude })
-        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId, autoInclude }));
+        ? invoke("open_document", { path: source.path, edits: edits || null, pool, requestId, autoInclude, fresh })
+        : invoke("open_text", { name: source.name, text: source.text, edits: edits || null, pool, requestId, autoInclude, fresh }));
     } finally { unlisten?.(); }
   },
   // the drawings of the objects listed without a position, which the app keeps from the last build

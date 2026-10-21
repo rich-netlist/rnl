@@ -1,6 +1,6 @@
 // Shared by normal opens, rebuilds and embeds. A newer operation owns the indicator, so an older
 // completion or progress event cannot clear or relabel it. There is no invented percentage.
-const stages = { reading: "Reading files…", parsing: "Parsing netlist…", displaying: "Displaying netlist…" };
+const stages = { reading: "Reading files…", parsing: "Parsing netlist…", cached: "Using cached drawing…", displaying: "Displaying netlist…" };
 let generation = 0;
 
 /** Give the browser a paint opportunity without stalling a hidden/background iframe. */

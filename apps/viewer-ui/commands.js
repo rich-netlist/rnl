@@ -22,6 +22,7 @@ import { findInSource } from "./text.js";
 import { ascend, descend, opens } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
 import { fileAssociations } from "./file-associations.js";
+import { memoryCache } from "./memory-cache.js";
 import { $ } from "./util.js";
 
 let table = null; // commands.json, once loaded
@@ -56,6 +57,7 @@ export function command(id, options = {}) {
     case "reload": reload(); break;
     case "reload-library": return reloadLibrary();
     case "toggle-auto-include": return toggleAutoInclude();
+    case "memory-cache": return memoryCache();
     case "save": save(); break;
     case "save-as": saveAs(); break;
     case "file-associations": return fileAssociations();

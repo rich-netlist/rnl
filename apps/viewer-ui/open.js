@@ -35,7 +35,7 @@ let loading = false;
  * preview closed shows the text applied); without them the files are read as they are, and the
  * text edited is what they hold.
  */
-export async function openSource(source, keep, edited) {
+export async function openSource(source, keep, edited, fresh = false) {
   if (!source || loading) return;
   if (!keep && !edited && !(await confirmLeave("open another file"))) return;
   if (loading) return;
@@ -45,7 +45,7 @@ export async function openSource(source, keep, edited) {
   try {
     lastSource = source;
     await progress.stage("reading");
-    const d = await shell.build(source, edited, progress.setStage);
+    const d = await shell.build(source, edited, progress.setStage, { fresh });
     await progress.stage("displaying");
     endPreview();
     if (edited) adoptBuffers(d);
@@ -84,7 +84,7 @@ export async function pickAndOpen(kind) {
 
 export async function reload() {
   if (previewing()) solve();
-  else if (lastSource && (await confirmLeave("read the file again"))) openSource(lastSource, true);
+  else if (lastSource && (await confirmLeave("read the file again"))) openSource(lastSource, true, undefined, true);
 }
 
 /**

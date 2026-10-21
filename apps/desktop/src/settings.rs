@@ -76,6 +76,16 @@ pub fn save_setting(state: State<'_, Settings>, key: String, value: Value) -> Re
 }
 
 impl Settings {
+    pub fn cache_limit(&self) -> Result<usize, String> {
+        let state = self.0.lock().map_err(|e| e.to_string())?;
+        let values = &state.as_ref().ok_or("settings have not been loaded")?.1;
+        Ok(values
+            .get("render-cache-mib")
+            .and_then(Value::as_u64)
+            .filter(|n| *n <= 4096)
+            .map_or(crate::build_cache::DEFAULT_LIMIT, |n| n as usize * 1024 * 1024))
+    }
+
     pub fn paths(&self) -> Result<Vec<PathBuf>, String> {
         let state = self.0.lock().map_err(|e| e.to_string())?;
         let values = &state.as_ref().ok_or("settings have not been loaded")?.1;
@@ -89,6 +99,21 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cache_limits_default_validate_and_disable() {
+        for (value, expected) in [
+            (Value::Null, 256),
+            (serde_json::json!(-1), 256),
+            (serde_json::json!(4097), 256),
+            (serde_json::json!(0), 0),
+            (serde_json::json!(128), 128),
+            (serde_json::json!(4096), 4096),
+        ] {
+            let values = Map::from_iter([("render-cache-mib".to_string(), value)]);
+            let settings = Settings(Mutex::new(Some((PathBuf::new(), values))));
+            assert_eq!(settings.cache_limit().unwrap(), expected * 1024 * 1024);
+        }
+    }
     #[test]
     fn independent_writers_preserve_each_others_settings() {
         let dir = std::env::temp_dir().join(format!("rnl-settings-writers-{}", std::process::id()));

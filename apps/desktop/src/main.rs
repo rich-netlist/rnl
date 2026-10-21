@@ -7,6 +7,7 @@
 // Viewer is a GUI application, including local fast/debug builds. The CLI keeps its console.
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+mod build_cache;
 mod core_thread;
 mod files;
 mod library;
@@ -25,7 +26,7 @@ use std::sync::Mutex;
 use core_thread::Core;
 use files::{Edits, Saved, SavedFile};
 use rnl_cli::FsProvider;
-use rnl_view::{BuildOptions, Document, UnplacedDrawing};
+use rnl_view::UnplacedDrawing;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
@@ -109,9 +110,11 @@ async fn open_document(
     path: String,
     edits: Option<Edits>,
     request_id: Option<String>,
-) -> Result<Document, String> {
+    fresh: Option<bool>,
+) -> Result<tauri::ipc::Response, String> {
     let core = core.inner().clone();
     let paths = settings.paths()?;
+    let cache_limit = settings.cache_limit()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let progress_window = window.clone();
@@ -131,15 +134,18 @@ async fn open_document(
             let layered =
                 rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&layered, &progress_window, request_id.as_deref());
-            let (doc, kept) = rnl_view::build_drawn(&entry, &provider, &BuildOptions::default())?;
-            *drawn = Some(kept);
-            Ok::<_, String>(doc)
+            drawn.set_limit(cache_limit);
+            let built = drawn.build(&entry, &provider, fresh.unwrap_or(false))?;
+            if built.hit {
+                provider.cached();
+            }
+            Ok::<_, String>(built)
         })
     })
     .await
     .map_err(|e| e.to_string())???;
     unsaved.set(&window, |state| state.0 = doc.name.clone());
-    Ok(doc)
+    Ok(tauri::ipc::Response::new(doc.json))
 }
 
 /// Draw a netlist held in memory, such as one from the clipboard, as the file `name`, whose
@@ -159,9 +165,11 @@ async fn open_text(
     text: String,
     edits: Option<Edits>,
     request_id: Option<String>,
-) -> Result<Document, String> {
+    fresh: Option<bool>,
+) -> Result<tauri::ipc::Response, String> {
     let core = core.inner().clone();
     let paths = settings.paths()?;
+    let cache_limit = settings.cache_limit()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let progress_window = window.clone();
@@ -176,15 +184,18 @@ async fn open_text(
             let files =
                 rnl_view::LibraryProvider { files: &files, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&files, &progress_window, request_id.as_deref());
-            let (doc, kept) = rnl_view::build_drawn(&entry, &provider, &BuildOptions::default())?;
-            *drawn = Some(kept);
-            Ok::<_, String>(doc)
+            drawn.set_limit(cache_limit);
+            let built = drawn.build(&entry, &provider, fresh.unwrap_or(false))?;
+            if built.hit {
+                provider.cached();
+            }
+            Ok::<_, String>(built)
         })
     })
     .await
     .map_err(|e| e.to_string())???;
     unsaved.set(&window, |state| state.0 = doc.name.clone());
-    Ok(doc)
+    Ok(tauri::ipc::Response::new(doc.json))
 }
 
 /// The drawings of the objects at `items` of `levels[level].unplaced` of the document opened last:
@@ -198,14 +209,31 @@ async fn unplaced_drawings(
     names: Vec<String>,
 ) -> Result<Vec<UnplacedDrawing>, String> {
     let core = core.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || core.run(move |drawn| drawn.unplaced(level, &items, &names)))
+        .await
+        .map_err(|e| e.to_string())??
+}
+
+/// Inspect/configure the bounded cache without changing the document currently displayed.
+#[tauri::command]
+async fn memory_cache(
+    core: State<'_, Core>,
+    settings: State<'_, settings::Settings>,
+    clear: Option<bool>,
+) -> Result<build_cache::Stats, String> {
+    let core = core.inner().clone();
+    let limit = settings.cache_limit()?;
     tauri::async_runtime::spawn_blocking(move || {
-        core.run(move |drawn| match drawn {
-            Some(d) => d.unplaced(level, &items, &names),
-            None => Err("no document has kept drawings".to_string()),
+        core.run(move |cache| {
+            cache.set_limit(limit);
+            if clear.unwrap_or(false) {
+                cache.clear();
+            }
+            cache.stats()
         })
     })
     .await
-    .map_err(|e| e.to_string())??
+    .map_err(|e| e.to_string())?
 }
 
 /// Write the files of the netlist at `entry` that the user chose to save where they were read from,
@@ -354,6 +382,7 @@ fn main() {
             open_document,
             open_text,
             unplaced_drawings,
+            memory_cache,
             save_files,
             save_file_as,
             set_dirty,

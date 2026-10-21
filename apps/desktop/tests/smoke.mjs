@@ -810,6 +810,7 @@ async function filePoolSmoke(page) {
   })()`);
   same(JSON.parse(fs.readFileSync(settings, "utf8"))["search-paths"], [slashed(parts)], "native settings file PATH");
   await autoIncludeSmoke(page, work, parts, pkg);
+  await memoryCacheSmoke(page, work);
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-row')).every(r => !r.textContent.includes('Exclude'))`), "a built-in can be excluded");
   await page.evaluate(`document.querySelector('[data-group="builtin"] .lib-toggle').click()`);
   await page.evaluate(`document.querySelector('[aria-label="Open 0.3/rnl-std.rnl"]').click()`);
@@ -839,6 +840,54 @@ async function filePoolSmoke(page) {
     fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR, "desktop-native-missing-canvas-hint.png"), Buffer.from(image.data, "base64"));
   }
   console.log("The native core bundles only standard packages and offers the public-package website on missing USE-PACKAGE");
+}
+
+async function memoryCacheSmoke(page, work) {
+  const file = path.join(work, 'cache-a.sp');
+  fs.writeFileSync(file, '* a\nRcache a 0 1k\n.end\n');
+  const first = await page.evaluate(`(async () => {
+    const { shell } = await import('./shell.js');
+    await shell.memoryCache(true);
+    const before = await shell.memoryCache();
+    const a = { path: ${JSON.stringify(file)}, name: 'cache-a.sp' };
+    const b = { name: 'cache-b.sp', text: '* b\\nCcache b 0 1p\\n.end\\n' };
+    const cold = await shell.build(a);
+    await shell.build(b);
+    const warm = await shell.build(a);
+    const stats = await shell.memoryCache();
+    if (JSON.stringify(cold) !== JSON.stringify(warm)) throw Error('cache changed the document');
+    const drawings = await shell.unplacedDrawings(0, [0], ['Rcache']);
+    return { before, stats, hasSvg: !!drawings[0].svg };
+  })()`);
+  same(first.stats.hits - first.before.hits, 1, 'native cached switch hit');
+  same(first.stats.misses - first.before.misses, 2, 'native cold builds');
+  check(first.hasSvg && first.stats.used <= first.stats.limit, 'cached drawings or budget are invalid');
+  fs.writeFileSync(file, '* a\nRcache a 0 9k\n.end\n');
+  const changed = await page.evaluate(`(async () => {
+    const { shell } = await import('./shell.js');
+    const a = { path: ${JSON.stringify(file)}, name: 'cache-a.sp' };
+    const doc = await shell.build(a);
+    const changed = await shell.memoryCache();
+    await shell.build(a, undefined, undefined, { fresh: true });
+    const fresh = await shell.memoryCache();
+    await shell.memoryCache(true);
+    const after = await shell.memoryCache();
+    const drawings = await shell.unplacedDrawings(0, [0], ['Rcache']);
+    const { save } = await import('./util.js');
+    await save('render-cache-mib', 0);
+    await shell.build(a);
+    const disabled = await shell.memoryCache();
+    await save('render-cache-mib', 256);
+    await shell.memoryCache();
+    return { text: doc.files[0].text, changed, fresh, after, disabled, hasSvg: !!drawings[0].svg };
+  })()`);
+  check(changed.text.includes('9k'), 'same-size source edit reused old text');
+  same(changed.changed.misses, first.stats.misses + 1, 'source edit did not invalidate the cache');
+  same(changed.fresh.misses, changed.changed.misses + 1, 'forced reload reused the cache');
+  same(changed.after.entries, 0, 'Clear Cache kept entries');
+  check(changed.hasSvg, 'Clear Cache lost current unplaced drawings');
+  same(changed.disabled.used, 0, 'disabled cache retained a result');
+  console.log('Native cache reuses JSON/SVG, restores lazy drawings, detects same-size edits, forces reload and respects clear/disable');
 }
 
 async function autoIncludeSmoke(page, work, parts, pkg) {
