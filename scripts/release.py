@@ -76,7 +76,10 @@ def package(exe, target, out):
             dest = out / f"rnl-{target}.tar.gz"
             with tarfile.open(dest, "w:gz") as archive:
                 for path in files:
-                    archive.add(path, arcname=str(path.relative_to(stage)))
+                    entry = archive.gettarinfo(str(path), arcname=path.relative_to(stage).as_posix())
+                    entry.mode = 0o755 if path.name == "rnl" else 0o644
+                    with path.open("rb") as source:
+                        archive.addfile(entry, source)
     sums(out)
     print(dest)
 

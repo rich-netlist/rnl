@@ -10,6 +10,7 @@
 // examples into samples/, to try the viewer with ?url=samples/cases/04-hierarchy.sp and for tests.
 
 import { publishLibrary } from "./library.mjs";
+import { buildVersions } from "./build-info.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
@@ -69,11 +70,7 @@ cpSync(core, join(out, "core"), { recursive: true, filter: (from) => relative(co
 for (const name of ["embed-demo.html", "embed-demo.js"]) cpSync(join(here, name), join(out, name));
 
 // Viewer versions are independent of the core's workspace version.
-const manifest = readFileSync(join(root, "Cargo.toml"), "utf8");
-const coreVersion = /^\[workspace\.package\][^[]*?^version\s*=\s*"([^"]*)"/m.exec(manifest)?.[1];
-const version = JSON.parse(readFileSync(join(root, "apps", "desktop", "tauri.conf.json"), "utf8")).version;
-const viewerManifest = readFileSync(join(root, "apps", "desktop", "Cargo.toml"), "utf8");
-if (/^version\s*=\s*"([^"]*)"/m.exec(viewerManifest)?.[1] !== version) throw new Error("Viewer manifest and Tauri versions differ");
+const { version, coreVersion } = buildVersions(root);
 let commit = null;
 try {
   commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8", stdio: "pipe" }).trim();

@@ -1,10 +1,13 @@
 """Release gates must reject mismatches before any publishing job can run."""
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
+import tarfile
+import zipfile
 
-from release import validate, versions
+from release import TARGETS, package, validate, versions
 
 
 class ReleaseVersions(unittest.TestCase):
@@ -42,6 +45,29 @@ class ReleaseVersions(unittest.TestCase):
             notes.parent.mkdir(parents=True)
             notes.write_text("Changes\n")
             self.assertEqual(validate(line, require_notes=True, root=self.root), version)
+
+    def test_archives_include_all_licences_and_checksums(self):
+        exe = self.root / "test-executable"
+        exe.write_bytes(b"release packaging fixture")
+        exe.chmod(0o755)
+        for target in TARGETS:
+            out = self.root / target
+            package(exe, target, out)
+            windows = "windows" in target
+            name = f"rnl-{target}" + (".zip" if windows else ".tar.gz")
+            archive = out / name
+            if windows:
+                with zipfile.ZipFile(archive) as contents:
+                    files = {entry: contents.read(entry) for entry in contents.namelist()}
+            else:
+                with tarfile.open(archive) as contents:
+                    files = {entry.name: contents.extractfile(entry).read() for entry in contents.getmembers()}
+                    self.assertTrue(contents.getmember("rnl").mode & 0o111)
+            self.assertEqual(set(files), {"rnl.exe" if windows else "rnl", "LICENSE", "NOTICE.txt",
+                                          "LICENSES/CC0-1.0.txt", "LICENSES/OFL-1.1.txt"})
+            self.assertIn(b"Copyright 2014-2021 Adobe", files["NOTICE.txt"])
+            self.assertEqual((out / "SHA256SUMS.txt").read_text(),
+                             f"{hashlib.sha256(archive.read_bytes()).hexdigest()}  {name}\n")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,14 @@
 # rnl-cli
 
-The `rnl` command.
+The `rnl` command. Download a prebuilt executable from the core Release (`core-vX.Y.Z`),
+or build from source. The CLI and npm package share the workspace version; Viewer and
+language versions are independent. See the [download/checksum guide](../../skills/rnl/references/tools.md#the-rnl-command)
+and [release procedures](../../docs/releases.md). Archives include MIT, CC0 and OFL licences.
+`rnl --version` (also `-V`) prints the core version and build commit, or `unknown` when
+built from a source archive without Git metadata.
 
 ```text
+rnl --version                   print the core version and build commit
 rnl check FILE [options]          print the diagnostics; exit 1 on errors
 rnl render FILE -o DIR [options]  write one SVG per drawing level
 rnl dump FILE [options]           print the effective model and diagnostics as JSON
