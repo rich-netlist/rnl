@@ -42,6 +42,7 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
         <button id="tab-files" type="button" role="tab" aria-controls="pane-files" aria-selected="false">Library</button>
         <button id="tab-netlist" type="button" role="tab" aria-controls="pane-netlist" aria-selected="true">Netlist</button>
         <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false">Hierarchy</button>
+        <button id="tab-symbol" type="button" role="tab" aria-controls="pane-symbol" aria-selected="false">Symbol</button>
         <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" title="The objects of the level shown that are not drawn: those with no position, and devices no symbol can be chosen for">Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
         <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" hidden>Solve</button>
       </nav>
@@ -64,11 +65,13 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
       <div class="netlist-head">
       <div id="file-bar" class="file-bar">
         <button id="netlist-file" class="netlist-file" type="button" title="Show the current circuit source" hidden></button>
-        <button id="choose-source" class="choose-source" type="button" aria-label="Choose source file" title="Choose source file" hidden>▾</button>
         <span id="edit-state" class="edit-state" role="status" hidden></span>
         <button id="apply-edits" class="apply-edits" type="button" hidden title="Apply the text and exit editing (Ctrl+Enter)">Apply and Exit Editing</button>
         <label class="auto-include-toggle" title="Automatically include uniquely defined missing subcircuits from the Library; report each automatic include in Problems">
           <input id="auto-include" type="checkbox">Auto Include
+        </label>
+        <label class="semantics-toggle" title="Show only active RNL lines containing free text. Turn off to see the complete netlist.">
+          <input id="semantics-only" type="checkbox">semantics RNL only
         </label>
         <label for="show-failed" class="failed-toggle" title="Mark the statements that do not take effect: failed with an error, or overridden in a conflict">
           <input id="show-failed" class="failed-check" type="checkbox" checked>
@@ -115,6 +118,15 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
         <nav id="letters" class="letters" aria-label="Initials"></nav>
         <div id="index" class="index-list" role="listbox" aria-label="Subcircuits by name"></div>
       </section>
+    </div>
+    <div id="pane-symbol" class="pane symbol-pane" role="tabpanel" aria-labelledby="tab-symbol" hidden>
+      <div class="symbol-options">
+        <label><input id="symbol-box" type="checkbox" checked>Box</label>
+        <label><input id="symbol-origin" type="checkbox" checked>Origin</label>
+        <label><input id="symbol-pins" type="checkbox" checked>Pins</label>
+        <label><input id="symbol-labels" type="checkbox" checked>Labels</label>
+      </div>
+      <div id="symbol-detail" class="symbol-detail"><p class="placeholder">No circuit is open.</p></div>
     </div>
     <div id="pane-unplaced" class="pane unplaced-pane" role="tabpanel" hidden>
       <div class="sub-head">

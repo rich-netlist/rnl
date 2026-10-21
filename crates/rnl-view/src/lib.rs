@@ -29,7 +29,8 @@ pub use catalog::{
     Terminal,
 };
 pub use document::{
-    Child, Diagnostic, Document, Drawings, Hit, Level, Object, SourceFile, Span, Unplaced, UnplacedDrawing,
+    Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol, Level, Object,
+    SourceFile, Span, Unplaced, UnplacedDrawing,
 };
 pub use library::{LibraryIndex, LibraryProvider};
 pub use primitive::{
@@ -722,8 +723,19 @@ R1 p q 1k
         let d = build("a.sp", &MemoryProvider::new().with("a.sp", NETLIST), &BuildOptions::default()).unwrap();
         let v = serde_json::to_value(&d).unwrap();
         let keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
-        let want =
-            ["path", "name", "dialect", "levels", "diagnostics", "failed", "files", "objects", "spans", "missing"];
+        let want = [
+            "symbols",
+            "path",
+            "name",
+            "dialect",
+            "levels",
+            "diagnostics",
+            "failed",
+            "files",
+            "objects",
+            "spans",
+            "missing",
+        ];
         assert_eq!(keys, want);
         assert_eq!(v["missing"], serde_json::json!([]));
     }
@@ -736,7 +748,9 @@ R1 p q 1k
             let d = build("a.sp", &files, &options).unwrap();
             serde_json::to_value(&d).unwrap()["levels"][0].as_object().unwrap().clone()
         };
-        let keys = |l: &serde_json::Map<String, serde_json::Value>| l.keys().cloned().collect::<Vec<_>>().join(" ");
+        let keys = |l: &serde_json::Map<String, serde_json::Value>| {
+            l.keys().filter(|k| !["ports", "symbol"].contains(&k.as_str())).cloned().collect::<Vec<_>>().join(" ")
+        };
         // by default the SVG and no primitives, as the viewers have read the Document so far
         let default = BuildOptions::default();
         let l = level(default.svg, default.primitives);

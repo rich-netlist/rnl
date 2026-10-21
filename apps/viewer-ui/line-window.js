@@ -57,7 +57,7 @@ export class LineWindow {
       this.el.append(this.before, this.rows, this.after);
       this.after.style.height = `${model.texts.length * this.height}px`;
     } else this.rows = this.el;
-    if (this.virtual || this.folds.size) this.selection = new VirtualSelection(this);
+    this.selection = new VirtualSelection(this);
     if (this.pendingLine !== undefined) this.unfoldTo(this.pendingLine);
     this.mapLines();
     if (this.pendingLine !== undefined) {
@@ -72,13 +72,26 @@ export class LineWindow {
     this.positions = new Int32Array(count);
     let end = -1;
     for (let i = 0; i < count; i++) {
+      if (this.semanticsOnly && !this.model.semantics.has(i)) { this.positions[i] = this.visible.length; continue; }
       if (i <= end) { this.positions[i] = this.visible.length - 1; continue; }
       this.positions[i] = this.visible.length;
       this.visible.push(i);
-      if (this.collapsed.has(i)) end = this.folds.get(i);
+      if (!this.semanticsOnly && this.collapsed.has(i)) end = this.folds.get(i);
     }
     this.first = 0;
     this.last = -1;
+  }
+
+  setSemanticsOnly(enabled) {
+    if (this.semanticsOnly === enabled) return;
+    this.semanticsOnly = enabled;
+    // Keep unopened auto-includes lazy.
+    if (!this._model) return;
+    this.selection?.clear();
+    this.mapLines();
+    this.scroll = 0;
+    if (!this.el.hidden) this.source.scrollTop = 0;
+    this.refresh(true);
   }
 
   lineAt(row) { return this.visible?.[Math.max(0, Math.min(this.visible.length - 1, row))] ?? row; }
@@ -135,6 +148,7 @@ export class LineWindow {
       el.querySelector('.no').append(toggle);
     }
     const collapsed = this.collapsed.has(i);
+    toggle.hidden = this.semanticsOnly;
     toggle.textContent = collapsed ? '+' : '−';
     toggle.setAttribute('aria-expanded', String(!collapsed));
     toggle.setAttribute('aria-label', `${collapsed ? 'Expand' : 'Collapse'} subcircuit at line ${i + 1}`);
@@ -158,6 +172,13 @@ export class LineWindow {
     const height = this.lineHeight(), heightChanged = height !== this.height;
     this.height = height;
     const count = this.visible.length;
+    if (!this.empty) {
+      this.empty = document.createElement("p");
+      this.empty.className = "placeholder";
+      this.empty.textContent = "No semantic RNL lines in this file.";
+      this.el.append(this.empty);
+    }
+    this.empty.hidden = !this.semanticsOnly || count !== 0;
     const first = this.virtual ? Math.min(Math.max(0, count - 1), Math.max(0, Math.floor((source.scrollTop - 4) / this.height) - OVERSCAN)) : 0;
     const last = this.virtual ? Math.min(count - 1, Math.ceil((source.scrollTop + source.clientHeight) / this.height) + OVERSCAN) : count - 1;
     if (!force && !heightChanged && this.first === this.lineAt(first) && this.last === this.lineAt(last)) return;
@@ -171,7 +192,7 @@ export class LineWindow {
       this.rendered.delete(i);
       delete this.lines[i];
     }
-    let at = this.rows.firstChild;
+    let at = this.rows.querySelector('.ln');
     for (let row = first; row <= last; row++) {
       const i = this.visible[row];
       let el = this.rendered.get(i);
@@ -199,7 +220,11 @@ export class LineWindow {
   }
 
   reveal(line, atTop = false) {
-    const n = Math.max(0, Math.min(this.model.texts.length - 1, line - 1));
+    let n = Math.max(0, Math.min(this.model.texts.length - 1, line - 1));
+    if (this.semanticsOnly) {
+      if (!this.visible.length) return;
+      n = this.lineAt(this.rowOf(n));
+    }
     this.expandTo(n);
     const top = this.virtual ? 4 + this.rowOf(n) * this.height : this.lines[n]?.offsetTop;
     if (top === undefined) return;

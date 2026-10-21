@@ -40,7 +40,8 @@ function unplaced() {
 export function renderUnplaced() {
   search.value = "";
   const n = unplaced().length;
-  $("unplaced-tab-count").textContent = n ? ` (${n})` : "";
+  const components = new Set(unplaced().flatMap(u => u.objects).filter(o => doc?.objects[o]?.kind === "instance")).size;
+  $("unplaced-tab-count").textContent = components ? ` (${components})` : "";
   const status = $("status");
   status.classList.toggle("opens-unplaced", n > 0);
   if (n > 0) status.title = "Show the objects that are not drawn";

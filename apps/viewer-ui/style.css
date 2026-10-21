@@ -275,8 +275,7 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 /* One top-file button; controls wrap rather than disappearing beyond the pane. */
 .file-bar { flex-wrap: wrap; gap: 4px; }
 .netlist-file { flex: 1 1 90px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; color: var(--fg); }
-.netlist-file[hidden], .source-file[hidden], .choose-source[hidden] { display: none; }
-.choose-source { flex: none; padding: 1px 5px; }
+.netlist-file[hidden], .source-file[hidden] { display: none; }
 .source-file { padding: 3px 8px; color: var(--muted); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-bottom: 1px solid var(--line); }
 .auto-include-toggle { flex: none; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; font-size: 12px; color: var(--muted); }
 .auto-include-toggle input { accent-color: var(--accent); cursor: pointer; }
@@ -1171,4 +1170,36 @@ button.pool-open:hover { text-decoration: underline; }
 .lib-act:disabled { opacity: 0.35; cursor: default; }
 .lib-empty, .lib-warning { padding: 5px 10px 5px 26px; font-size: 11px; color: var(--muted); }
 .lib-warning { color: var(--warning); }
-.view-tabs { overflow-x: auto; }
+.view-tabs { overflow-x: auto; flex-wrap: wrap; }
+.side-head { height: auto; min-height: 32px; flex: none; }
+.view-tabs button { flex: none; }
+.semantics-toggle, .symbol-options label { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; white-space: nowrap; color: var(--muted); }
+.semantics-toggle input, .symbol-options input { accent-color: var(--accent); cursor: pointer; }
+:root { --rnl-line: #edf5ff; --semantic-rnl: #d5e8ff; }
+@media (prefers-color-scheme: dark) {
+  :root { --rnl-line: #202d40; --semantic-rnl: #2b4362; }
+}
+.source .ln.rnl-line { background: var(--rnl-line); }
+.source .ln.semantic-rnl { background: var(--semantic-rnl); }
+.source .ln.hl-line { box-shadow: inset 3px 0 var(--select); }
+.symbol-pane { min-height: 0; display: flex; flex-direction: column; }
+.symbol-pane[hidden] { display: none; }
+.symbol-options { display: flex; flex-wrap: wrap; gap: 10px; padding: 8px; border-bottom: 1px solid var(--line); }
+.symbol-detail { overflow: auto; min-height: 0; padding: 12px; }
+.symbol-detail h2 { font: 600 18px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; color: var(--syn-def); margin: 0 0 6px; overflow-wrap: anywhere; }
+.symbol-detail h3 { font-size: 13px; margin: 18px 0 8px; }
+.symbol-context, .symbol-source-location, .symbol-origin-info { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; margin: 6px 0 12px; }
+.symbol-preview { border: 1px solid var(--line); border-radius: 8px; background-color: var(--drawing-background); background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px); background-size: 18px 18px; padding: 10px; }
+.symbol-preview svg { width: 100%; height: 260px; display: block; }
+.hide-symbol-box .symbol-box-mark, .hide-symbol-origin .symbol-origin-mark, .hide-symbol-pins .symbol-pin-marks,
+.hide-symbol-labels [data-id="symbol-label"] { display: none; }
+.symbol-table-scroll { overflow-x: auto; }
+.symbol-pins-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.symbol-pins-table th, .symbol-pins-table td { padding: 7px 6px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.symbol-pins-table th { color: var(--muted); background: var(--bg); }
+.symbol-bounds, .symbol-label-list { font: 12px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; overflow-wrap: anywhere; }
+.symbol-label-list { list-style: none; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.symbol-label-list li { border: 1px solid var(--line); border-radius: 12px; padding: 4px 8px; }
+.symbol-definition { border: 1px solid var(--line); border-radius: 6px; padding: 8px 0; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; background: var(--bg); }
+.symbol-definition .ln { min-width: max-content; }
+.symbol-definition .no { width: 4em; }

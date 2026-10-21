@@ -19,6 +19,7 @@ export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 /** The fixtures by name, and the files of the corpus they are built from. */
 export const FILES = {
+  "symbol-inspector": "tests/viewer/inputs/symbol-inspector.sp",
   "fold-sections": "tests/viewer/inputs/fold-sections.sp",
   "missing-canvas-package": "tests/viewer/inputs/missing-canvas-package.sp",
   "virtual-selection": "tests/viewer/inputs/virtual-selection.sp",
@@ -327,6 +328,10 @@ function view(rnl, file, cwd) {
  * writes under `solved` in `dir`; and those of PREVIEWS.
  */
 export function writeFixtures(rnl, dir) {
+  const semantic = ['* large semantic file', 'R1 a 0 1k', '* @RNL { #R1 is here @PLACE(0, 0) }',
+    ...Array(2600).fill('* padding'), '* @RNL { (0, 4) descriptive text @TEXT("hello") }', '.end'];
+  fs.writeFileSync(path.join(dir, 'semantics-virtual.sp'), semantic.join('\n'));
+  fs.writeFileSync(path.join(dir, 'semantics-virtual.json'), view(rnl, 'semantics-virtual.sp', dir));
   // No standard package stylesheet: exercise the renderer's omitted-width default itself.
   fs.writeFileSync(path.join(dir, "view-hairlines.json"), execFileSync(rnl,
     ["view", "tests/viewer/inputs/default-hairlines.sp", "--no-std"], { cwd: root, encoding: "utf8" }));

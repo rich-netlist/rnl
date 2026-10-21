@@ -147,6 +147,7 @@ export function clearDrawing(message) {
   $("zoom").textContent = "";
   $("selection").textContent = "";
   renderUnplaced();
+  window.dispatchEvent(new Event("viewer-level"));
 }
 
 function canvasSize() {

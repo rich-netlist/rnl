@@ -10,21 +10,13 @@ import { descend, opens } from "./subcircuits.js";
 import { lineModel } from "./text-lines.js";
 import { LineWindow } from "./line-window.js";
 import { TextFind } from "./text-find.js";
-import { $ } from "./util.js";
-import { choose } from "./dialog.js";
+import { $, save } from "./util.js";
 
 const app = $("app");
 const source = $("source");
 const netlistPane = $("pane-netlist");
 const fileName = $("netlist-file");
 fileName.addEventListener('click', () => { showFile(circuitFile()); focusEditor(); });
-$("choose-source").addEventListener('click', async () => {
-  const before = doc;
-  if (!before) return;
-  const f = await choose({ title: 'Source Files', action: 'Show', filter: true,
-    items: before.files.map((file, value) => ({ label: file.name, value })) });
-  if (f !== null && doc === before) { showFile(f); focusEditor(); }
-});
 
 export let fileShown = 0; // the file in the text pane
 // Drawing levels are the main circuit or a subcircuit with its defining file in `lines`.
@@ -35,6 +27,14 @@ let pendingReveal = null; // a line to bring into view once the text pane is sho
 let scope = null; // the definition of the subcircuit drawn: { f, from, to }, its file and lines
 let notDrawn = []; // per file: line number -> why its statement is not drawn
 const find = new TextFind(() => fileViews[fileShown], n => revealLine(fileShown, n, false));
+
+export function setSemanticsOnly(enabled) {
+  $("semantics-only").checked = enabled;
+  save("semantics-only", enabled);
+  for (const view of fileViews) view.setSemanticsOnly(enabled);
+  find.changed(true);
+}
+$("semantics-only").addEventListener("change", () => setSemanticsOnly($("semantics-only").checked));
 
 /** Edit > Find in Netlist, routed through the shared command table like the other page commands. */
 export async function findInSource() {
@@ -108,7 +108,6 @@ export function clearSource(message) {
   fileViews = [];
   lineOwners = [];
   fileName.hidden = true;
-  $("choose-source").hidden = true;
   $("source-file").hidden = true;
   source.replaceChildren();
   const p = document.createElement("p");
@@ -132,7 +131,6 @@ export function renderFiles(shown = 0) {
     for (let n = a; n <= b; n++) lineOwners[f].set(n, k);
   });
   fileName.hidden = !doc.files.length;
-  $("choose-source").hidden = doc.files.length < 2;
   const spans = doc.files.map(() => []), folds = doc.files.map(() => []);
   for (const span of doc.spans) spans[span.file]?.push(span);
   for (const level of doc.levels) if (level.lines) {
@@ -142,6 +140,7 @@ export function renderFiles(shown = 0) {
   doc.files.forEach((file, f) => {
     const dialect = doc.dialect;
     const view = new LineWindow(source, () => lineModel(file, f, spans[f], dialect), (el, n) => decorateLine(f, n, el), folds[f]);
+    view.semanticsOnly = $("semantics-only").checked;
     fileViews.push(view);
     source.append(view.el);
   });
@@ -242,6 +241,7 @@ export function markUnplaced(i) {
 export function revealDefinition(i) {
   const lines = doc && doc.levels[i] ? doc.levels[i].lines : null;
   if (lines) revealLine(lines[0], lines[1], false, true);
+  else showFile(0);
 }
 
 source.addEventListener("click", (e) => {

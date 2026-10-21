@@ -32,8 +32,8 @@ export class TextFind {
     this.input.select();
     void this.scan();
   }
-  changed() {
-    if (this.model === this.view()?.model) return;
+  changed(force = false) {
+    if (!force && this.model === this.view()?.model) return;
     this.model = this.view()?.model;
     ++this.version;
     if (!this.bar.hidden) void this.scan();
@@ -49,6 +49,7 @@ export class TextFind {
     const matches = [];
     let yielded = performance.now();
     for (let line = 0; line < view.model.texts.length; line++) {
+      if (view.semanticsOnly && !view.model.semantics.has(line)) continue;
       pattern.lastIndex = 0;
       let match;
       while ((match = pattern.exec(view.model.texts[line]))) matches.push({ line, col: match.index, length: match[0].length });

@@ -13,7 +13,7 @@ import * as edits from "./edits.js";
 import { shell } from "./shell.js";
 import { previewing } from "./solve.js";
 import { doc } from "./state.js";
-import { circuitFile, fileShown, fileViews, showFile, sourceLineHeight, refreshSource } from "./text.js";
+import { circuitFile, fileShown, fileViews, showFile, sourceLineHeight, refreshSource, setSemanticsOnly } from "./text.js";
 import { $ } from "./util.js";
 
 const source = $("source");
@@ -128,6 +128,9 @@ function makeEditor(path, name) {
     refreshEditing();
   });
   area.addEventListener("scroll", () => {
+    // WebKit can deliver a queued scroll after source navigation hides the textarea; its
+    // scrollTop then reads as zero. showEditor already saved the last visible position.
+    if (el.hidden) return;
     gutter.scrollTop = area.scrollTop;
     e.scroll = area.scrollTop;
   });
@@ -183,6 +186,7 @@ export function revealInEditor(f, line) {
 
 /** Show the document's edit state, and tell the shell whether changes are not saved. */
 export function refreshEditing() {
+  $("semantics-only").disabled = editing;
   setEnabled("find-text", !!doc && !editing);
   const unapplied = edits.unappliedPaths();
   const dirty = edits.dirtyPaths();
@@ -232,6 +236,7 @@ export async function toggleEdit() {
       return;
     }
     keepPosition();
+    setSemanticsOnly(false);
     editing = true;
     setCheck("toggle-edit", true);
     renderEditors();

@@ -299,6 +299,10 @@ pub struct SymLabel {
 
 #[derive(Clone, Debug, Default)]
 pub struct SymbolDef {
+    /// The unit executing DEFINE-SYMBOL, not a later binding that aliases its value.
+    pub unit: Option<UnitId>,
+    /// The defining member, in original source coordinates.
+    pub source: Option<(crate::diag::Loc, crate::diag::Loc)>,
     pub pins: Vec<Pin>,
     pub prims: Vec<SymPrim>,
     pub labels: Vec<SymLabel>,

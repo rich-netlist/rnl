@@ -5,6 +5,7 @@ import { setCheck } from "./commands.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { revealPending, refreshSource } from "./text.js";
 import { showUnplaced } from "./unplaced.js";
+import { renderSymbol } from "./symbol.js";
 import { $, clamp, load, save } from "./util.js";
 
 const app = $("app");
@@ -34,8 +35,8 @@ export function setSidebar(shown) {
  */
 export function setPane(name) {
   const view =
-    name === "files" || name === "hierarchy" || name === "unplaced" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
-  const panes = { files: $("pane-files"), netlist: netlistPane, hierarchy: hierarchyPane, unplaced: $("pane-unplaced"), solve: $("pane-solve") };
+    name === "files" || name === "hierarchy" || name === "symbol" || name === "unplaced" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
+  const panes = { files: $("pane-files"), netlist: netlistPane, hierarchy: hierarchyPane, symbol: $("pane-symbol"), unplaced: $("pane-unplaced"), solve: $("pane-solve") };
   for (const [k, el] of Object.entries(panes)) {
     el.hidden = k !== view;
     $(`tab-${k}`).setAttribute("aria-selected", String(k === view));
@@ -53,6 +54,8 @@ export function setPane(name) {
     showUnplaced();
   } else if (view === "files") {
     window.dispatchEvent(new Event("library-shown"));
+  } else if (view === "symbol") {
+    renderSymbol();
   }
 }
 
@@ -147,5 +150,6 @@ $("problems-head").addEventListener("click", () => setProblems(netlistPane.class
 $("tab-files").addEventListener("click", () => setPane("files"));
 $("tab-netlist").addEventListener("click", () => setPane("netlist"));
 $("tab-hierarchy").addEventListener("click", () => setPane("hierarchy"));
+$("tab-symbol").addEventListener("click", () => setPane("symbol"));
 $("tab-unplaced").addEventListener("click", () => setPane("unplaced"));
 $("tab-solve").addEventListener("click", () => setPane("solve"));

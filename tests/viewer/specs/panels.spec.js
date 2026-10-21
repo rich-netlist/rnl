@@ -180,7 +180,8 @@ test("one top filename and both toggles remain reachable in a narrow panel", asy
   await dragSplitter(page, viewer, "#vsplit", { x: 0 });
   await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy.sp");
   await expect(page.locator("#file-tabs")).toHaveCount(0);
-  for (const id of ['netlist-file', 'choose-source', 'auto-include', 'show-failed']) {
+  await expect(page.locator('#choose-source')).toHaveCount(0);
+  for (const id of ['netlist-file', 'auto-include', 'show-failed', 'semantics-only', 'tab-symbol', 'tab-unplaced']) {
     expect(await page.locator(`#${id}`).evaluate(el => {
       const r = el.getBoundingClientRect();
       return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === el;
@@ -205,11 +206,7 @@ test("the filename follows the current circuit and returns to its defining sourc
   await expect(page.locator("#source-file")).toBeHidden();
   await expect(page.locator("#source-file")).toHaveText("04-hierarchy-lib.inc");
   await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy-lib.inc");
-  await page.locator("#choose-source").click();
-  await page.getByRole("option", { name: "04-hierarchy.sp", exact: true }).dblclick();
-  await expect(page.locator("#source-file")).toBeVisible();
-  await expect(page.locator("#source-file")).toHaveText("04-hierarchy.sp");
-  await expect(page.locator("#netlist-file")).toHaveText("04-hierarchy-lib.inc");
+  await expect(page.locator("#choose-source")).toHaveCount(0);
   await page.locator("#netlist-file").click();
   await expect(page.locator("#source-file")).toBeHidden();
   await expect(viewer.line(2)).toHaveText(/subckt rdiv/);

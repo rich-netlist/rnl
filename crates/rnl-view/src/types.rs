@@ -3,6 +3,7 @@
 //! by ts-rs, which the types derive in the tests only. The test fails when a file is not what the
 //! types give; run it with `RNL_BLESS=1` to write the files after a change that is meant.
 
+use crate::{InspectedLabel, InspectedPin, InspectedSymbol};
 use std::path::Path;
 
 use ts_rs::{Config, TS};
@@ -114,6 +115,9 @@ fn all() -> Vec<(String, String)> {
     let cfg = Config::new();
     vec![
         one::<Document>(&cfg),
+        one::<InspectedSymbol>(&cfg),
+        one::<InspectedPin>(&cfg),
+        one::<InspectedLabel>(&cfg),
         one::<Level>(&cfg),
         one::<Hit>(&cfg),
         one::<Child>(&cfg),

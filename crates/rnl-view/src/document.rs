@@ -21,10 +21,15 @@ use serde::Serialize;
 use crate::primitive::{self, Primitive};
 use crate::BuildOptions;
 
+mod symbols;
+pub use symbols::{InspectedLabel, InspectedPin, InspectedSymbol};
+
 /// What a viewer shows of a document, as [`crate::build`] gives it.
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Document {
+    /// Symbols used by subcircuit instances or defined by subcircuits, once per runtime identity.
+    pub symbols: Vec<InspectedSymbol>,
     /// The entry as the frontend named it, for building again.
     pub path: String,
     /// Its file name, for the title bar.
@@ -54,6 +59,10 @@ pub struct Document {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Level {
+    /// Terminal names in subcircuit declaration order.
+    pub ports: Vec<String>,
+    /// The subcircuit's own block symbol, an index into `Document::symbols`.
+    pub symbol: Option<usize>,
     /// The host level drawn, as `Object::level` names it.
     pub host: usize,
     pub title: String,
@@ -237,6 +246,8 @@ fn draw_alone(
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Child {
+    /// The symbol this instance actually uses in its parent, including parent overrides.
+    pub symbol: Option<usize>,
     pub instance: String,
     /// The subcircuit it instantiates, as written.
     pub master: String,
@@ -274,6 +285,8 @@ pub struct Hit {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SourceFile {
+    /// Physical lines containing free text in active, syntactically valid RNL members (1-based).
+    pub semantics: Vec<u32>,
     /// The file as the runtime knows it: relative to the opened file's directory when it is in it
     /// or below, otherwise as the provider names it. With a rooted or absolute entry, the entry's
     /// directory joined with this path (`rnl_runtime::source::join`) is the file in the
@@ -407,7 +420,7 @@ pub(crate) fn document(
             .map(|i| {
                 let master = i.model.clone().unwrap_or_default();
                 let level = r.doc.subckt(&master).and_then(|h| drawn.get(&h).copied());
-                Child { instance: i.name.clone(), master, level }
+                Child { instance: i.name.clone(), master, level, symbol: None }
             })
             .collect();
     }
@@ -419,6 +432,7 @@ pub(crate) fn document(
         }
     }
 
+    let symbols = symbols::inspect(r, &mut levels);
     let diagnostic = |d: &Diag, sink: &Sink| {
         let (file, line, col) = match &d.loc {
             Some(l) => (l.file.clone(), l.line, l.col),
@@ -446,6 +460,7 @@ pub(crate) fn document(
     let diagnostics = r.diagnostics().into_iter().map(|d| diagnostic(d, &r.sink)).collect();
     let (objects, spans) = (ix.objects, ix.spans);
     Document {
+        symbols,
         path: entry.to_string(),
         name: file_name(entry).to_string(),
         dialect: r.doc.dialect.name.clone(),
@@ -465,6 +480,7 @@ fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<Sourc
         .sources
         .iter()
         .map(|(p, text)| SourceFile {
+            semantics: Vec::new(),
             path: p.clone(),
             name: shown(p),
             text: text.clone(),
@@ -483,13 +499,38 @@ fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<Sourc
             let n = rec.text.chars().count();
             let (a, b) = (rec.loc(0), rec.loc(n.saturating_sub(1)));
             f.records.push([a.line, a.col, b.line, b.col]);
+            if let Some(body) = rnl_runtime::syntax::parse_record(&rec.text).body {
+                semantic_lines(&body, rec, &mut f.semantics);
+            }
         }
     }
     for f in &mut files {
         f.records.sort();
         f.records.dedup();
+        f.semantics.sort_unstable();
+        f.semantics.dedup();
     }
     files
+}
+
+fn semantic_lines(set: &rnl_runtime::syntax::SetExpr, rec: &rnl_runtime::host::Record, out: &mut Vec<u32>) {
+    for member in &set.members {
+        if member.error.is_some() {
+            continue;
+        }
+        out.extend(
+            member
+                .free_words
+                .iter()
+                .filter(|(word, _)| word.chars().any(char::is_alphanumeric))
+                .map(|(_, off)| rec.loc(*off).line),
+        );
+        for arg in member.segments.iter().flat_map(|s| &s.args) {
+            if let rnl_runtime::syntax::ObjExpr::Set(body) = &arg.obj {
+                semantic_lines(body, rec, out);
+            }
+        }
+    }
 }
 
 struct Index<'a> {
@@ -685,6 +726,8 @@ impl<'a> Index<'a> {
             });
         }
         Level {
+            ports: self.doc.levels[lv.level].ports.clone(),
+            symbol: None,
             host: lv.level,
             title: lv.title.clone(),
             kind: lv.kind,

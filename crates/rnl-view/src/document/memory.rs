@@ -58,6 +58,13 @@ fn item(it: &ItemView) -> usize {
 }
 fn symbol(s: &SymbolView) -> usize {
     string(&s.name)
+        + optional(&s.package_version)
+        + s.source.as_ref().map_or(0, |(a, b)| string(&a.file) + string(&b.file))
+        + buffer(&s.labels)
+        + s.labels
+            .iter()
+            .map(|l| optional(&l.key) + string(&l.text) + optional(&l.halign) + optional(&l.valign) + style(&l.style))
+            .sum::<usize>()
         + buffer(&s.prims)
         + buffer(&s.pins)
         + buffer(&s.nested)
@@ -69,6 +76,7 @@ fn symbol(s: &SymbolView) -> usize {
             .iter()
             .map(|p| {
                 buffer(&p.points)
+                    + optional(&p.text)
                     + style(&p.style)
                     + optional(&p.halign)
                     + optional(&p.valign)

@@ -12,6 +12,27 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { PICK, root, UNCALLED } from "../fixtures.js";
 
+test("the web core supplies semantic lines and the actual parent symbol", async ({ page }) => {
+  await start(page);
+  await opened(page, () => page.locator('#file-input').setInputFiles({
+    name: 'symbol-inspector.sp', mimeType: 'text/plain',
+    buffer: fs.readFileSync(path.join(root, 'tests/viewer/inputs/symbol-inspector.sp')),
+  }));
+  await page.locator('#tab-netlist').click();
+  await page.locator('#semantics-only').check();
+  expect(await page.locator('#source .file:not([hidden]) .ln').evaluateAll(es => es.map(e => Number(e.dataset.line)))).toEqual([12, 31]);
+  await page.evaluate(async () => {
+    const index = window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === 'Xparent');
+    await (await import('./subcircuits.js')).descend(index);
+  });
+  await page.locator('#tab-symbol').click();
+  await expect(page.locator('.symbol-bounds')).toHaveText('Box = [-4, -2, 4, 2]');
+  await expect(page.locator('.symbol-definition')).toContainText('width=8');
+  await expect(page.locator('.symbol-source-location')).toContainText('lines 21–26');
+  await page.locator('#symbol-pins').uncheck();
+  await expect(page.locator('.symbol-pin-marks')).toBeHidden();
+});
+
 test("Auto Include resolves indexed library subcircuits, warns on conflicts and reloads the library", async ({ page }) => {
   await start(page);
   const cell = ".subckt cell p n\nR1 p n 1k\n.ends\n";

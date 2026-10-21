@@ -11,6 +11,7 @@ export function lineModel(file, f, allSpans, dialect) {
     return starts.get(n)(c);
   };
   const rnl = new Map(), spans = new Map(), failed = new Map();
+  const semantics = new Set((file.semantics || []).map(n => n - 1));
   const add = (map, i, value) => { if (!map.has(i)) map.set(i, []); map.get(i).push(value); };
   for (const [l0, c0, l1, c1] of file.records) {
     for (let n = l0; n <= l1 && n <= texts.length; n++) {
@@ -63,7 +64,7 @@ export function lineModel(file, f, allSpans, dialect) {
   }
   for (const from of blocks) folds.push([from, texts.length - 1]);
   return {
-    texts, columns, longest, folds, text: file.text.replace(/\r\n/g, "\n"),
+    texts, columns, longest, folds, semantics, text: file.text.replace(/\r\n/g, "\n"),
     render(i) {
       const text = texts[i], { cls } = syntax(i, states[i]);
       const fail = new Array(text.length).fill("");
@@ -78,7 +79,10 @@ export function lineModel(file, f, allSpans, dialect) {
           if (!objs[c].includes(s.object)) objs[c].push(s.object);
         }
       }
-      return lineElement(text, i + 1, cls, objs.map(o => o ? o.join(" ") : ""), fail);
+      const el = lineElement(text, i + 1, cls, objs.map(o => o ? o.join(" ") : ""), fail);
+      el.classList.toggle("rnl-line", rnl.has(i));
+      el.classList.toggle("semantic-rnl", semantics.has(i));
+      return el;
     },
   };
 }

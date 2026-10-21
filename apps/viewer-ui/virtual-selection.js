@@ -133,8 +133,9 @@ export class VirtualSelection {
   }
   key(e) {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "a") {
-      this.anchor = { line: 0, col: 0 };
-      const last = this.view.model.texts.length - 1;
+      if (!this.view.visible.length) { e.preventDefault(); return; }
+      this.anchor = { line: this.view.semanticsOnly ? this.view.visible[0] : 0, col: 0 };
+      const last = this.view.semanticsOnly ? this.view.visible.at(-1) : this.view.model.texts.length - 1;
       this.focus = { line: last, col: this.view.model.texts[last].length };
       this.all = true;
       this.paint();
@@ -147,10 +148,13 @@ export class VirtualSelection {
     const texts = this.view.model.texts;
     let a = this.anchor, b = this.focus;
     if (compare(a, b) > 0) [a, b] = [b, a];
-    const lines = texts.slice(a.line, b.line + 1);
+    const indices = this.view.semanticsOnly ? this.view.visible.filter(n => n >= a.line && n <= b.line)
+      : Array.from({length: b.line - a.line + 1}, (_, i) => a.line + i);
+    const lines = indices.map(n => texts[n]);
+    if (!lines.length) return;
     if (lines.length === 1) lines[0] = lines[0].slice(a.col, b.col);
     else { lines[0] = lines[0].slice(a.col); lines[lines.length - 1] = lines.at(-1).slice(0, b.col); }
-    e.clipboardData.setData("text/plain", this.all ? this.view.model.text : lines.join("\n"));
+    e.clipboardData.setData("text/plain", this.all && !this.view.semanticsOnly ? this.view.model.text : lines.join("\n"));
     e.preventDefault();
   }
   destroy() {

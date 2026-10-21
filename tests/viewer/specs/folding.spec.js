@@ -18,10 +18,9 @@ test('unselected library sections can be folded and commented declarations are i
   await expect(viewer.line(9)).toBeVisible();
 });
 
-test('the compact source chooser reaches and edits a parameter/model-only include', async ({ page, viewer }) => {
+test('source navigation can still reach and edit a parameter/model-only include', async ({ page, viewer }) => {
   await viewer.open('fold-sections');
-  await page.getByRole('button', { name: 'Choose source file', exact: true }).click();
-  await page.getByRole('option', { name: 'fold-models.inc', exact: true }).dblclick();
+  await showSource(page, 'fold-models.inc');
   await expect(page.locator('#source-file')).toHaveText('fold-models.inc');
   await expect(page.locator('#netlist-file')).toHaveText('fold-sections.sp');
   await page.keyboard.press('Control+q');
@@ -47,13 +46,18 @@ test('editing an include keeps the logical position of a hidden folded root afte
     a.dispatchEvent(new Event('scroll'));
     return Math.max(0, Math.floor((a.scrollTop - 4 + 1) / height));
   }, original);
-  await page.getByRole('button', { name: 'Choose source file', exact: true }).click();
-  await page.getByRole('option').nth(1).dblclick();
+  await showSource(page, 1);
+  // A queued browser scroll from the now-hidden root must not discard its saved position.
+  await page.locator('#source .editor[hidden] textarea').first().evaluate(a => {
+    a.scrollTop = 0;
+    a.dispatchEvent(new Event('scroll'));
+  });
   const area = page.locator('#source textarea:visible');
   await area.fill((await area.inputValue()) + '\n* changed include\n');
   await viewer.build(() => page.keyboard.press('Control+Enter'));
   // The root can stay lazy during the include's rebuild.
   expect(await page.evaluate(async () => !!(await import('./text.js')).fileViews[0]._model)).toBe(false);
+  expect(await page.evaluate(async () => (await import('./text.js')).fileViews[0].pendingLine)).toBe(before);
   // A second editing session must not overwrite that deferred logical position with a row offset.
   await page.keyboard.press('Control+q');
   await page.keyboard.press('Control+q');
