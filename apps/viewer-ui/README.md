@@ -328,3 +328,34 @@ View > Language switches English / 简体中文 immediately, in both the web pag
 `i18n.js` uses English source text as a stable catalog key and fallback, with Simplified Chinese in `locales/zh-CN.json`. Mark UI messages with `m("Text")` or a tagged template such as `` m`Open ${filename}` ``. Use `setText`, `append` and `setAttr` to bind the message to a text node or attribute. Keep the outer template marked when nesting translated fragments. `setAttr(node, name, null)` removes an attribute and its binding. The initial static HTML is bound once, before any user document is loaded. Desktop menu labels and native file chooser titles use the same catalog.
 
 Keep action tokens, menu IDs, shell return types, solver options, netlist/source text, filenames and parser/solver diagnostic payloads raw. Translate their surrounding UI only; dialog buttons render a translated label but return the original action token. Do not construct HTML from translated strings. Add catalog entries for new messages and run `i18n.spec.js`, plus the affected UI tests. Real web Save and the desktop smoke test cover the shell boundaries.
+
+
+### Idle preloading (desktop)
+
+File > Memory Cache also controls **Preload nearby netlists while idle**, enabled by default.
+After 1.5 seconds without pointer, wheel or keyboard input, the scheduler walks the currently
+shown subcircuit tree breadth first (direct children first), then the Library/PATH netlists.
+It deduplicates cycles/files and limits each plan to 128 candidates. This reads, interprets and
+renders each candidate as an independent entry with the current Auto Include setting: visit
+history and the parent file's includes never supply its scope. Preparation neither navigates nor
+adds hypothetical files to Files. It does not invoke the placement solver or write files.
+
+One separate native compiler runs at a time, using Windows background processing priority.
+Between jobs it rests for at least 1.5 seconds and three times the preceding job's duration,
+targeting roughly 25% of one core across repeated jobs, not a hard instantaneous CPU limit.
+New jobs pause while interacting, hidden, editing, unsaved, solving or displaying a dialog/preview.
+Foreground navigation and library changes invalidate in-flight results. A compiler already
+interpreting can finish at background priority; foreground commands never wait for it.
+
+Completed JSON, SVG and lazy Not drawn data transfer into the existing bounded cache. WStr's
+immutable strings use Arc so the exported drawing model is Send; interpreter contexts remain
+thread-local. Speculation uses spare cache space only and is evicted before visited entries.
+Cache hits still validate complete observed inputs, including missing files, package resolution
+and Auto Include conflicts. Clear/disable, reload and generation checks prevent old work from
+repopulating invalidated results. Cached hits are reactivated only by an actual open.
+
+Speculation pauses below 1 GiB available system memory, skips inputs exceeding min(8 MiB,
+remaining cache budget / 8), and stops the current plan when cache space is exhausted. These
+limits bound retained results and speculative input, not the compiler's transient working set.
+Oversized files still open normally. The web shell continues using its existing Worker; it does
+not expose native PATH preloading or its memory-cache controls.

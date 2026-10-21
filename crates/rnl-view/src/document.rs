@@ -158,8 +158,7 @@ pub struct UnplacedDrawing {
 /// The drawings of the objects that a Document lists without a position, kept to give on request
 /// instead of carried in the Document: a netlist with no positions has every object in the list,
 /// and the page shows a few of them at a time. [`crate::build_drawn`] makes them with the Document.
-/// They hold the items of the runtime's model, which are not `Send`, so a frontend that builds on
-/// one thread keeps them there.
+/// They own only the exported model, so a background compiler may transfer them to a frontend.
 pub struct Drawings {
     levels: Vec<DrawnLevel>,
     render: rnl_render::RenderOptions,

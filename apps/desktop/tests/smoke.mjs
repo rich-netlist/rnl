@@ -850,6 +850,7 @@ async function filePoolSmoke(page) {
   same(JSON.parse(fs.readFileSync(settings, "utf8"))["search-paths"], [slashed(parts)], "native settings file PATH");
   await autoIncludeSmoke(page, work, parts, pkg);
   await memoryCacheSmoke(page, work);
+  await preloadSmoke(page, work);
   check(await page.evaluate(`Array.from(document.querySelectorAll('[data-group="builtin"] .pool-row')).every(r => !r.textContent.includes('Exclude'))`), "a built-in can be excluded");
   await page.evaluate(`document.querySelector('[data-group="builtin"] .lib-toggle').click()`);
   await page.evaluate(`document.querySelector('[aria-label="Open 0.3/rnl-std.rnl"]').click()`);
@@ -966,6 +967,62 @@ async function memoryCacheSmoke(page, work) {
   check(changed.hasSvg, 'Clear Cache lost current unplaced drawings');
   same(changed.disabled.used, 0, 'disabled cache retained a result');
   console.log('Native cache reuses JSON/SVG, restores lazy drawings, detects same-size edits, forces reload and respects clear/disable');
+}
+
+/** The native preloader never activates a document, inherits parent includes, or promotes Files. */
+async function preloadSmoke(page, work) {
+  const child = path.join(work, 'preload-cell.inc'), leaf = path.join(work, 'preload-leaf.inc');
+  fs.writeFileSync(child, '* cell\n.subckt preload_cell p n\nXleaf p n preload_leaf\n.ends\n');
+  fs.writeFileSync(leaf, '* leaf\n.subckt preload_leaf p n\nRleaf p n 1k\n.ends\n');
+  const result = await page.evaluate(`(async () => {
+    const {shell} = await import('./shell.js');
+    const {save} = await import('./util.js');
+    const {poolSnapshot} = await import('./pool.js');
+    const shown = window.viewer.doc;
+    const listed = poolSnapshot().map(i=>i.path);
+    await save('background-preload', true);
+    await save('auto-include', false);
+    await shell.memoryCache(true);
+    await shell.setPool([{path:${JSON.stringify(leaf)}, source:{path:${JSON.stringify(leaf)}}}]);
+    await shell.build({name:'active.sp',text:'* active\\nRactive a 0 1k\\n.end\\n'});
+    const before = await shell.memoryCache();
+    const source = {path:${JSON.stringify(child)}, name:'preload-cell.inc'};
+    const ticket = await window.__TAURI__.core.invoke('preload_ticket');
+    await shell.cancelPreload();
+    const late = await window.__TAURI__.core.invoke('preload_document', {
+      path:source.path, pool:[], autoInclude:false, ticket });
+    let status;
+    for(let i=0;i<30;i++) {
+      status = await shell.preload(source);
+      if(status !== 'busy' && status !== 'cancelled') break;
+      await new Promise(r=>setTimeout(r,100));
+    }
+    const prepared = await shell.memoryCache();
+    const drawn = await shell.unplacedDrawings(0,[0],['Ractive']);
+    const isolated = await shell.build(source);
+    const after = await shell.memoryCache();
+    const noLeaf = isolated.objects.find(o=>o.name==='Xleaf').opens === null;
+    await save('auto-include', true);
+    const automatic = await shell.preload(source);
+    const resolved = await shell.build(source);
+    await save('background-preload', false);
+    const disabled = await shell.preload(source);
+    await save('background-preload', true);
+    return {status,automatic,disabled,late,noLeaf,resolved:resolved.objects.find(o=>o.name==='Xleaf').opens !== null,
+      retained:prepared.prefetched, hit:after.hits-before.hits, misses:after.misses-before.misses,
+      hasSvg:!!drawn[0].svg, sameView:shown===window.viewer.doc,
+      sameLibrary:JSON.stringify(listed)===JSON.stringify(poolSnapshot().map(i=>i.path))};
+  })()`);
+  same(result.status,'ready','native preload completes');
+  same(result.late,'cancelled','a late asynchronous IPC cannot adopt the post-cancel generation');
+  same(result.retained,1,'native cache retains a speculative document');
+  same(result.hit,1,'first independent open uses the preloaded document');
+  same(result.misses,0,'preloaded open did not compile again');
+  check(result.hasSvg && result.sameView && result.sameLibrary,'preloading changed active drawings, view or Files');
+  check(result.noLeaf && result.resolved,'preloading did not respect independent Auto Include scopes');
+  same(result.automatic,'ready','Auto Include uses its own cache key');
+  same(result.disabled,'disabled','preload preference is respected');
+  console.log('Background native compile/SVG reuses its first open, preserves active drawings/Files and isolates Auto Include scopes');
 }
 
 async function autoIncludeSmoke(page, work, parts, pkg) {

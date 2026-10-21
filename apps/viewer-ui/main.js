@@ -5,6 +5,7 @@ import { append, m, setText, startI18n } from "./i18n.js";
 // drawing and the text. Each part is a module of its own (README.md); this one starts the page.
 
 import { startPool } from "./pool.js";
+import { startPreload } from "./preload.js";
 import { setBackground } from "./background.js";
 import { command, isChecked, setCheck, startCommands } from "./commands.js";
 import { closeRequested } from "./editor.js";
@@ -68,6 +69,7 @@ async function start() {
 
   await startCommands();
   await startPool();
+  startPreload();
   if (!shell.nativeMenu) showMenuBar(true);
   if (shell.onOpen) await shell.onOpen((source) => openSource(source, false));
   if (shell.onCloseRequested) shell.onCloseRequested(closeRequested);

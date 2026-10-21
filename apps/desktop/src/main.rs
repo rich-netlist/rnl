@@ -14,6 +14,7 @@ mod library;
 mod load_progress;
 mod menu;
 mod pool;
+mod preload;
 mod session;
 mod settings;
 mod solve;
@@ -112,6 +113,7 @@ async fn open_document(
     request_id: Option<String>,
     fresh: Option<bool>,
 ) -> Result<tauri::ipc::Response, String> {
+    core.preload.cancel();
     let core = core.inner().clone();
     let paths = settings.paths()?;
     let cache_limit = settings.cache_limit()?;
@@ -167,6 +169,7 @@ async fn open_text(
     request_id: Option<String>,
     fresh: Option<bool>,
 ) -> Result<tauri::ipc::Response, String> {
+    core.preload.cancel();
     let core = core.inner().clone();
     let paths = settings.paths()?;
     let cache_limit = settings.cache_limit()?;
@@ -223,10 +226,18 @@ async fn memory_cache(
 ) -> Result<build_cache::Stats, String> {
     let core = core.inner().clone();
     let limit = settings.cache_limit()?;
+    let clear = clear.unwrap_or(false);
+    if clear || !settings.preload_enabled()? {
+        core.preload.cancel();
+    }
+    let preload = core.preload.clone();
     tauri::async_runtime::spawn_blocking(move || {
         core.run(move |cache| {
+            if cache.stats().limit != limit {
+                preload.cancel();
+            }
             cache.set_limit(limit);
-            if clear.unwrap_or(false) {
+            if clear {
                 cache.clear();
             }
             cache.stats()
@@ -382,6 +393,9 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            preload::preload_document,
+            preload::cancel_preload,
+            preload::preload_ticket,
             open_document,
             open_text,
             unplaced_drawings,

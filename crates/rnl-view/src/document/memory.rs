@@ -28,7 +28,7 @@ fn map<K, V>(m: &BTreeMap<K, V>) -> usize {
 
 fn literal(v: &Lit) -> usize {
     match v {
-        Lit::Str(s) => s.as_str().len() + 64, // shared Rc strings counted once per owner (overestimate)
+        Lit::Str(s) => s.as_str().len() + 64, // shared strings counted once per owner (overestimate)
         Lit::Arr(a) => buffer(a) + a.iter().map(literal).sum::<usize>(),
         _ => 0,
     }

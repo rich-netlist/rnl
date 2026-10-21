@@ -2,7 +2,7 @@ import { append, m, setText } from "./i18n.js";
 import { form, inform, modal } from './dialog.js';
 import { isLoading } from './open.js';
 import { shell } from './shell.js';
-import { save } from './util.js';
+import { load, save } from './util.js';
 
 /** File > Memory Cache: a per-window LRU budget, independent of the current drawing. */
 export async function memoryCache() {
@@ -18,8 +18,19 @@ export async function memoryCache() {
     limit.value = String(stats.limit / 1024 / 1024);
     append(label, limit);
     const state = document.createElement('p');
-    const show = s => { setText(state, m`${s.entries} cached document${s.entries === 1 ? '' : 's'} · ${(s.used / 1024 / 1024).toFixed(1)} MiB retained · ${s.hits} cache hits`); };
+    const prepared = document.createElement('p');
+    prepared.hidden = !shell.preload;
+    const show = s => {
+      setText(prepared, m`${s.prefetched || 0} preloaded documents. Uses the same cache budget; starts new jobs only while idle.`);
+      setText(state, m`${s.entries} cached document${s.entries === 1 ? '' : 's'} · ${(s.used / 1024 / 1024).toFixed(1)} MiB retained · ${s.hits} cache hits`);
+    };
     show(stats);
+    const preload = document.createElement('label');
+    preload.className = 'dialog-line';
+    preload.hidden = !shell.preload;
+    const enabled = document.createElement('input');
+    enabled.type = 'checkbox'; enabled.checked = load('background-preload', true) === true;
+    append(preload, enabled, m('Preload nearby netlists while idle'));
     const error = document.createElement('p');
     error.className = 'dialog-error'; error.setAttribute('role', 'alert');
     const clear = document.createElement('button');
@@ -34,11 +45,15 @@ export async function memoryCache() {
     });
     await form({ title: m('Memory Cache'),
       text: m('Reuse compiled netlists and drawings. Least recently used results are removed first. Set 0 to disable caching. This budget excludes the current view and temporary build memory.'),
-      parts: [label, state, clear, error], focus: limit, action: 'Apply',
+      parts: [label, preload, state, prepared, clear, error], focus: limit, action: 'Apply',
       answer: async () => {
         const value = limit.valueAsNumber;
         if (!limit.checkValidity() || !Number.isInteger(value)) { setText(error, m('Enter a whole number from 0 to 4096.')); return; }
-        try { await clearing.catch(() => {}); await save('render-cache-mib', value); await shell.memoryCache(); return true; }
+        try {
+          await clearing.catch(() => {}); await save('render-cache-mib', value);
+          if (shell.preload) await save('background-preload', enabled.checked);
+          await shell.memoryCache(); window.dispatchEvent(new Event('preload-reset')); return true;
+        }
         catch (e) { setText(error, String(e)); }
       },
     });

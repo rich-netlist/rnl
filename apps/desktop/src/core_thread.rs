@@ -1,7 +1,7 @@
 //! The thread that builds the documents. A build keeps the drawings of the objects it lists without
 //! a position ([`rnl_view::build_drawn`]) for the page to ask for as it scrolls; they hold what the
-//! model does, which is not `Send`, so they stay in the thread that built them, and every build and
-//! every request for drawings runs there, one after the other.
+//! model does. Foreground builds and requests for drawings run in order. Speculative builds run
+//! separately and transfer completed owned results to this thread without changing its active view.
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc::{channel, Sender};
@@ -16,6 +16,7 @@ type Job = Box<dyn FnOnce(&mut BuildCache) + Send>;
 #[derive(Clone)]
 pub struct Core {
     jobs: Arc<Mutex<Sender<Job>>>,
+    pub preload: Arc<crate::preload::Control>,
 }
 
 impl Core {
@@ -31,7 +32,7 @@ impl Core {
                 }
             })
             .expect("the core thread could not be started");
-        Core { jobs: Arc::new(Mutex::new(jobs)) }
+        Core { jobs: Arc::new(Mutex::new(jobs)), preload: Arc::default() }
     }
 
     /// Run `job` in the core thread, with its cache and active drawings, and wait for its result:

@@ -7,6 +7,7 @@
 use std::cell::Cell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::diag::DiagId;
 use crate::geom::Orient;
@@ -32,13 +33,15 @@ pub const NOTHING: ObjId = ObjId(2);
 /// read with the aliases of the file that wrote it (16.5).
 #[derive(Clone, Debug, PartialEq)]
 pub struct WStr {
-    pub s: Rc<str>,
+    // Literals also live in the exported drawing model. Atomic ownership lets a completed
+    // model move from a background compiler to a viewer without sharing interpreter state.
+    pub s: Arc<str>,
     pub unit: Option<UnitId>,
 }
 
 impl WStr {
     pub fn new(s: &str, unit: Option<UnitId>) -> WStr {
-        WStr { s: Rc::from(s), unit }
+        WStr { s: Arc::from(s), unit }
     }
 
     pub fn as_str(&self) -> &str {

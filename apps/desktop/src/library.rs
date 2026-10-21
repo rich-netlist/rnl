@@ -23,6 +23,7 @@ pub async fn update_library(
     reload: Option<bool>,
     refresh: Option<Vec<String>>,
 ) -> Result<Vec<String>, String> {
+    core.preload.cancel();
     let library = library.inner().clone();
     let core = core.inner().clone();
     let paths = settings.paths()?;

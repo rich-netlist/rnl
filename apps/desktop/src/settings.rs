@@ -76,6 +76,17 @@ pub fn save_setting(state: State<'_, Settings>, key: String, value: Value) -> Re
 }
 
 impl Settings {
+    pub fn preload_enabled(&self) -> Result<bool, String> {
+        let state = self.0.lock().map_err(|e| e.to_string())?;
+        Ok(state
+            .as_ref()
+            .ok_or("settings have not been loaded")?
+            .1
+            .get("background-preload")
+            .and_then(Value::as_bool)
+            .unwrap_or(true))
+    }
+
     pub fn cache_limit(&self) -> Result<usize, String> {
         let state = self.0.lock().map_err(|e| e.to_string())?;
         let values = &state.as_ref().ok_or("settings have not been loaded")?.1;

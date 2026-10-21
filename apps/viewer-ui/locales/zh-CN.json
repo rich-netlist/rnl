@@ -1,4 +1,6 @@
 {
+  "Preload nearby netlists while idle": "空闲时预加载附近的网表",
+  "{0} preloaded documents. Uses the same cache budget; starts new jobs only while idle.": "已预加载 {0} 个文档。共用缓存上限；操作时暂停安排新任务。",
   "&File": "文件(&F)",
   "&Edit": "编辑(&E)",
   "&View": "视图(&V)",

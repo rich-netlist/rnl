@@ -1,10 +1,10 @@
 //! Per-window LRU of serialized documents and their lazy drawings. A hit checks the complete
 //! observed input: source/package text (including failed reads), lookup order and auto-includes.
-//! Only the core thread owns this cache: Drawings contains non-Send runtime values.
+//! The foreground core owns this cache; completed background builds may be offered to it.
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
 use std::mem::size_of;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, Provider};
 use rnl_view::{BuildOptions, Drawings, UnplacedDrawing};
@@ -117,14 +117,15 @@ impl LibraryLookup for Observed<'_> {
     }
 }
 
-struct Entry {
+pub struct Prepared {
     path: String,
     auto_include: bool,
     inputs: Inputs,
     json: String,
     name: String,
-    drawings: Rc<Drawings>,
+    drawings: Arc<Drawings>,
     bytes: usize,
+    speculative: bool,
 }
 
 pub struct Built {
@@ -140,11 +141,12 @@ pub struct Stats {
     pub entries: usize,
     pub hits: u64,
     pub misses: u64,
+    pub prefetched: usize,
 }
 
 pub struct BuildCache {
-    entries: VecDeque<Entry>, // least recently used first
-    active: Option<Rc<Drawings>>,
+    entries: VecDeque<Prepared>, // least recently used first
+    active: Option<Arc<Drawings>>,
     limit: usize,
     used: usize,
     hits: u64,
@@ -157,7 +159,14 @@ impl Default for BuildCache {
 }
 impl BuildCache {
     pub fn stats(&self) -> Stats {
-        Stats { limit: self.limit, used: self.used, entries: self.entries.len(), hits: self.hits, misses: self.misses }
+        Stats {
+            limit: self.limit,
+            used: self.used,
+            entries: self.entries.len(),
+            hits: self.hits,
+            misses: self.misses,
+            prefetched: self.entries.iter().filter(|e| e.speculative).count(),
+        }
     }
     pub fn clear(&mut self) {
         self.entries = VecDeque::new();
@@ -175,7 +184,8 @@ impl BuildCache {
         }
     }
     fn evict(&mut self) {
-        if let Some(entry) = self.entries.pop_front() {
+        let at = self.entries.iter().position(|e| e.speculative).unwrap_or(0);
+        if let Some(entry) = self.entries.remove(at) {
             self.used -= entry.bytes;
         }
     }
@@ -187,9 +197,10 @@ impl BuildCache {
         let path = normalize(path);
         let automatic = files.auto_include().is_some();
         if let Some(at) = self.entries.iter().position(|e| e.path == path && e.auto_include == automatic) {
-            let entry = self.entries.remove(at).unwrap();
+            let mut entry = self.entries.remove(at).unwrap();
             self.used -= entry.bytes;
             if !fresh && entry.inputs.valid(files) {
+                entry.speculative = false;
                 self.active = Some(entry.drawings.clone());
                 let built = Built { json: entry.json.clone(), name: entry.name.clone(), hit: true };
                 self.used += entry.bytes;
@@ -199,36 +210,68 @@ impl BuildCache {
             }
         }
         self.misses += 1;
+        let entry = Prepared::build(&path, files)?;
+        self.active = Some(entry.drawings.clone());
+        let built = Built { json: entry.json.clone(), name: entry.name.clone(), hit: false };
+        if entry.bytes <= self.limit {
+            while self.used > self.limit - entry.bytes {
+                self.evict();
+            }
+            self.used += entry.bytes;
+            self.entries.push_back(entry);
+        }
+        Ok(built)
+    }
+
+    /// Do not waste background CPU on an already retained entry. Foreground hits still validate
+    /// every dependency, including negative reads and library lookups, before using its result.
+    pub fn contains(&self, path: &str, auto_include: bool) -> bool {
+        let path = normalize(path);
+        self.entries.iter().any(|e| e.path == path && e.auto_include == auto_include)
+    }
+
+    pub fn room(&self) -> usize {
+        self.limit.saturating_sub(self.used)
+    }
+
+    /// Speculation may use spare space, but must never evict a result the user visited (or a
+    /// higher-priority candidate already prepared). It does not change active lazy drawings.
+    pub fn offer(&mut self, mut entry: Prepared) -> bool {
+        if self.contains(&entry.path, entry.auto_include) || entry.bytes > self.room() {
+            return false;
+        }
+        entry.speculative = true;
+        self.used += entry.bytes;
+        self.entries.push_back(entry);
+        true
+    }
+}
+
+impl Prepared {
+    pub fn build(path: &str, files: &dyn Provider) -> Result<Self, String> {
+        let path = normalize(path);
         let observed = Observed { files, inputs: RefCell::new(Inputs::default()) };
         let (doc, drawings) = rnl_view::build_drawn(&path, &observed, &BuildOptions::default())?;
         let json = serde_json::to_string(&doc).map_err(|e| e.to_string())?;
-        let drawings = Rc::new(drawings);
+        let drawings = Arc::new(drawings);
         let inputs = observed.inputs.into_inner();
-        let bytes = 2 * size_of::<Entry>()
+        let bytes = 2 * size_of::<Prepared>()
             + 128
             + string_bytes(&path)
             + string_bytes(&json)
             + string_bytes(&doc.name)
             + inputs.bytes()
             + drawings.retained_bytes();
-        self.active = Some(drawings.clone());
-        if bytes <= self.limit {
-            while self.used > self.limit - bytes {
-                self.evict();
-            }
-            self.entries.shrink_to_fit();
-            self.entries.push_back(Entry {
-                path,
-                auto_include: automatic,
-                inputs,
-                json: json.clone(),
-                name: doc.name.clone(),
-                drawings,
-                bytes,
-            });
-            self.used += bytes;
-        }
-        Ok(Built { json, name: doc.name, hit: false })
+        Ok(Self {
+            path,
+            auto_include: files.auto_include().is_some(),
+            inputs,
+            json,
+            name: doc.name,
+            drawings,
+            bytes,
+            speculative: false,
+        })
     }
 }
 
@@ -243,6 +286,46 @@ mod tests {
             .with("/a.sp", "* a\nR1 a 0 1k\n.end\n")
             .with("/b.sp", "* b\nR2 b 0 2k\n.end\n")
             .with("/c.sp", "* c\nR3 c 0 3k\n.end\n")
+    }
+
+    #[test]
+    fn background_result_moves_threads_without_replacing_active_drawings() {
+        let mut cache = BuildCache::default();
+        cache.build("/a.sp", &files(), false).unwrap();
+        let prepared = std::thread::spawn(|| Prepared::build("/b.sp", &files()).unwrap()).join().unwrap();
+        assert!(cache.offer(prepared));
+        assert_eq!(cache.stats().prefetched, 1);
+        assert!(cache.unplaced(0, &[0], &["R1".into()]).unwrap()[0].svg.is_some());
+        assert!(cache.build("/b.sp", &files(), false).unwrap().hit);
+        assert_eq!(cache.stats().prefetched, 0);
+        assert!(cache.unplaced(0, &[0], &["R2".into()]).unwrap()[0].svg.is_some());
+    }
+
+    #[test]
+    fn speculative_results_cannot_evict_visited_and_are_evicted_first() {
+        let mut cache = BuildCache::default();
+        cache.build("/a.sp", &files(), false).unwrap();
+        let b = Prepared::build("/b.sp", &files()).unwrap();
+        cache.set_limit(cache.used + b.bytes);
+        assert!(cache.offer(b));
+        assert!(!cache.offer(Prepared::build("/c.sp", &files()).unwrap()));
+        assert_eq!(cache.stats().entries, 2);
+        cache.build("/c.sp", &files(), false).unwrap();
+        assert!(cache.contains("/a.sp", false));
+        assert!(!cache.contains("/b.sp", false));
+        assert!(cache.used <= cache.limit);
+    }
+
+    #[test]
+    fn speculative_hit_checks_file_changes_and_fresh_bypasses_it() {
+        let mut cache = BuildCache::default();
+        assert!(cache.offer(Prepared::build("/a.sp", &files()).unwrap()));
+        let changed = files().with("/a.sp", "* a\nR9 a 0 1k\n.end\n");
+        assert!(!cache.build("/a.sp", &changed, false).unwrap().hit);
+        assert!(cache.unplaced(0, &[0], &["R9".into()]).unwrap()[0].svg.is_some());
+        cache.clear();
+        assert!(cache.offer(Prepared::build("/a.sp", &files()).unwrap()));
+        assert!(!cache.build("/a.sp", &files(), true).unwrap().hit);
     }
 
     #[test]

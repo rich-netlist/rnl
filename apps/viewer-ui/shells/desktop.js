@@ -10,6 +10,8 @@ let pool = [];
 let poolReady = Promise.resolve();
 const tauri = window.__TAURI__;
 const invoke = (cmd, args) => tauri.core.invoke(cmd, args);
+let preloadGeneration = 0;
+const cancelPreload = () => { preloadGeneration++; return invoke("cancel_preload"); };
 
 /** A file on disk, named by its path; null for no path. */
 const file = (path) => (path ? { name: path, path } : null);
@@ -40,6 +42,7 @@ export default {
   pickPath: () => invoke("pick_pool", { kind: "path" }).then((paths) => paths[0] || null),
   pathPackages: (dir) => invoke("path_packages", { dir }),
   setPool: (items, reload = false, refresh = []) => {
+    cancelPreload().catch(() => {});
     const paths = items.filter((item) => !item.builtin).map((item) => item.path);
     // PATH packages retain the provider's per-directory precedence. Netlists may also resolve
     // bare includes; both kinds enter the subcircuit index, independently of package lookup.
@@ -86,8 +89,23 @@ export default {
   },
   pick: (kind) => (kind === "file" ? invoke("pick_file").then(file) : Promise.resolve(null)),
   // a file by its path, or text held by the source, with edits to it and its includes
-  memoryCache: async (clear = false) => { await flushSettings(); return invoke("memory_cache", { clear }); },
+  memoryCache: async (clear = false) => {
+    if (clear) await cancelPreload();
+    await flushSettings(); return invoke("memory_cache", { clear });
+  },
+  preloadCandidates: () => pool.map(file),
+  cancelPreload,
+  preload: async source => {
+    const generation = preloadGeneration;
+    await poolReady;
+    await flushSettings();
+    if (generation !== preloadGeneration) return "cancelled";
+    const ticket = await invoke("preload_ticket");
+    if (generation !== preloadGeneration) return "cancelled";
+    return invoke("preload_document", { path: source.path, pool, ticket, autoInclude: load("auto-include", true) === true });
+  },
   build: async (source, edits, progress, { fresh = false } = {}) => {
+    cancelPreload().catch(() => {});
     await flushSettings();
     await poolReady;
     const autoInclude = load("auto-include", true) === true;
@@ -116,6 +134,7 @@ export default {
   browse: (url) => invoke("plugin:opener|open_url", { url }),
   // the Solve menu (decision 0010): solved natively on a thread of the app's, nothing written
   solve: async (source, settings, edits) => {
+    cancelPreload().catch(() => {});
     await flushSettings();
     await poolReady;
     const autoInclude = load("auto-include", true) === true;
