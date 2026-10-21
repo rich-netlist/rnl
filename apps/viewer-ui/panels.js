@@ -1,7 +1,7 @@
 // The side panel and its parts: the view it shows, what is folded, and the sizes the splitters
 // set, all kept through the shell's settings storage for the next start.
 
-import { setCheck } from "./commands.js";
+import { setCheck, setEnabled } from "./commands.js";
 import { updateHierarchy } from "./hierarchy.js";
 import { revealPending, refreshSource, updateSourceFilters } from "./text.js";
 import { showUnplaced } from "./unplaced.js";
@@ -21,10 +21,21 @@ const SOURCE_MIN = 120;
 const INDEX_MIN = 120;
 const TREE_MIN = 100;
 
+// All entry points (tabs, shortcuts, restore and menu) publish the same visible-pane state.
+function syncPanelCommands() {
+  const shown = !app.classList.contains("sidebar-hidden");
+  for (const name of ["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"]) {
+    const tab = $(`tab-${name}`);
+    setCheck(`panel-${name}`, shown && !tab.hidden && tab.getAttribute("aria-selected") === "true");
+  }
+  setEnabled("panel-hide", shown);
+}
+
 export function setSidebar(shown) {
   app.classList.toggle("sidebar-hidden", !shown);
   save("sidebar-shown", shown);
   setCheck("toggle-netlist", shown);
+  syncPanelCommands();
   if (shown) { refreshSource(); revealPending(); }
   else if (sidebar.contains(document.activeElement)) $("show-sidebar").focus({ preventScroll: true });
 }
@@ -38,6 +49,7 @@ export function setPane(name) {
     el.hidden = k !== view;
     $(`tab-${k}`).setAttribute("aria-selected", String(k === view));
   }
+  syncPanelCommands();
   // a solve shown at the next start is not: the netlist's view then
   save("side-pane", view === "solve" ? "netlist" : view);
   if (view === "netlist") {

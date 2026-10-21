@@ -312,6 +312,10 @@ Source models, syntax checkpoints and rows are prepared only when a file is view
 
 Selecting an existing Library/PATH row reuses its index. Include of a replacement file and Reload Library invalidate definitions; an auto-include pass validates a library's complete definition list only once even when many missing masters come from it.
 
+### Side Panels menu
+
+View > Side Panels marks only the currently visible pane with a check. Hide collapses the sidebar, clears all pane marks and is disabled while collapsed. Tabs, number keys and restored layout update this same state. Ctrl+B still toggles the sidebar and Ctrl+Shift+M folds Problems; these are shortcut-only commands, separate from the menu entries in `commands.json`.
+
 ### UI languages
 
 View > Language switches English / 简体中文 immediately, in both the web page and desktop native menus. The first start follows the system/browser's first preferred language; a user choice is saved with the other viewer settings. Embeds use their isolated settings and system language. Changing language only refreshes bound UI text and attributes: document identities, rendering, unsaved buffers, selection and viewport stay intact.

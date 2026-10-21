@@ -276,9 +276,24 @@ pub fn set_view_check(checks: State<'_, Checks>, id: String, checked: bool) {
 }
 
 #[tauri::command]
-pub fn set_command_enabled(app: AppHandle, id: String, enabled: bool) {
-    if let Some(tauri::menu::MenuItemKind::MenuItem(item)) = app.menu().and_then(|menu| menu.get(&id)) {
-        let _ = item.set_enabled(enabled);
+pub fn set_command_enabled(labels: State<'_, Labels>, id: String, enabled: bool) {
+    // Menu::get only searches direct children; Labels retains handles at every submenu depth.
+    let item = labels
+        .0
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .1
+        .iter()
+        .find(|(item, _)| item.id().as_ref() == id.as_str())
+        .map(|(item, _)| item.clone());
+    match item {
+        Some(MenuItemKind::MenuItem(item)) => {
+            let _ = item.set_enabled(enabled);
+        }
+        Some(MenuItemKind::Check(item)) => {
+            let _ = item.set_enabled(enabled);
+        }
+        _ => {}
     }
 }
 
@@ -326,7 +341,7 @@ mod tests {
 
     /// Panel digits are page-handled, so native accelerators cannot intercept text input.
     fn panels(tabbed: bool) -> Shown {
-        let entries = [
+        let mut entries: Vec<_> = [
             ("files", "&Library"),
             ("netlist", "&Netlist"),
             ("hierarchy", "&Hierarchy"),
@@ -338,9 +353,10 @@ mod tests {
         .enumerate()
         .map(|(i, (id, label))| {
             let text = if tabbed { format!("{label}\t{}", i + 1) } else { label.to_string() };
-            item(&format!("panel-{id}"), &text, None)
+            check(&format!("panel-{id}"), &text, None)
         })
         .collect();
+        entries.extend([Shown::Separator, item("panel-hide", "&Hide", None)]);
         Shown::Submenu("Side P&anels".into(), entries)
     }
 
@@ -468,8 +484,6 @@ mod tests {
                     languages(),
                     Shown::Separator,
                     panels(true),
-                    check("toggle-netlist", "&Netlist Panel\tCtrl+B", None),
-                    check("toggle-problems", "&Problems\tCtrl+Shift+M", None),
                 ],
             ),
             solve(true),
@@ -519,8 +533,6 @@ mod tests {
                     languages(),
                     Shown::Separator,
                     panels(false),
-                    check("toggle-netlist", "&Netlist Panel", Some("CmdOrCtrl+B")),
-                    check("toggle-problems", "&Problems", Some("CmdOrCtrl+Shift+M")),
                 ],
             ),
             solve(false),

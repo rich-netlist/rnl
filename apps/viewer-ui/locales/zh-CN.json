@@ -475,5 +475,6 @@
   "Defined in {0}": "定义于 {0}",
   "Package {0}": "包 {0}",
   "Viewer default symbol": "Viewer 默认符号",
-  "Inline symbol": "内联符号"
+  "Inline symbol": "内联符号",
+  "&Hide": "隐藏(&H)"
 }

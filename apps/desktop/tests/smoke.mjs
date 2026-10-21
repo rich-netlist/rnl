@@ -328,6 +328,13 @@ $id = [Win32Menu]::GetMenuItemID($menu, ${at[at.length - 1]})
 [void][Win32Menu]::PostMessage($h, 0x0111, [IntPtr]$id, [IntPtr]::Zero)`);
 }
 
+function itemEnabled(pid, at) {
+  return powershell(`${WIN32}
+$menu = [Win32Menu]::GetMenu((Get-Process -Id ${pid}).MainWindowHandle)
+foreach ($k in @(${at.slice(0, -1).join(", ")})) { $menu = [Win32Menu]::GetSubMenu($menu, $k) }
+([Win32Menu]::GetMenuState($menu, ${at.at(-1)}, 0x400) -band 3) -eq 0`) === "True";
+}
+
 /** The commands of the table, those in its submenus too. */
 const commands = (items) => items.flatMap((item) => (item === "-" ? [] : item.items ? commands(item.items) : [item]));
 
@@ -464,10 +471,22 @@ async function drive(app, port, profile, t0, session) {
   const checked = (id) => find(nativeMenu(app.pid), id).item.checked;
   await press(page, "b", "KeyB", 66, 2);
   await until("the side panel to be hidden", async () => !(await shown(page)).sidebar, 10_000);
-  await until("Netlist Panel's check mark to clear", () => !checked("toggle-netlist"), 10_000);
-  chooseItem(app.pid, at("toggle-netlist"));
+  await until("Netlist pane's check mark to clear", () => !checked("panel-netlist"), 10_000);
+  chooseItem(app.pid, at("panel-netlist"));
   await until("the side panel to be shown", async () => (await shown(page)).sidebar, 10_000);
-  await until("Netlist Panel's check mark", () => checked("toggle-netlist"), 10_000);
+  await until("Netlist pane's check mark", () => checked("panel-netlist"), 10_000);
+  chooseItem(app.pid, at("panel-symbol"));
+  await until("Symbol check mark", () => checked("panel-symbol") && !checked("panel-netlist"));
+  chooseItem(app.pid, at("panel-symbol"));
+  await until("Symbol stays checked when selected again", () => checked("panel-symbol"));
+  chooseItem(app.pid, at("panel-hide"));
+  await until("Hide disabled and every pane unchecked", () => {
+    const menu = nativeMenu(app.pid);
+    return !itemEnabled(app.pid, at("panel-hide")) &&
+      ["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"].every(name => !find(menu, `panel-${name}`).item.checked);
+  });
+  chooseItem(app.pid, at("panel-netlist"));
+  await until("Hide enabled again", () => checked("panel-netlist") && itemEnabled(app.pid, at("panel-hide")));
   await newWindowSmoke(app, page, at);
   const zoom = (await shown(page)).zoom;
   chooseItem(app.pid, at("zoom-in"));

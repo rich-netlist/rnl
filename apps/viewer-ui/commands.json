@@ -74,16 +74,16 @@
         {
           "label": "Side P&anels",
           "items": [
-            { "id": "panel-files", "label": "&Library", "keys": ["1"], "page": true },
-            { "id": "panel-netlist", "label": "&Netlist", "keys": ["2"], "page": true },
-            { "id": "panel-hierarchy", "label": "&Hierarchy", "keys": ["3"], "page": true },
-            { "id": "panel-symbol", "label": "&Symbol", "keys": ["4"], "page": true },
-            { "id": "panel-unplaced", "label": "Not &Drawn", "keys": ["5"], "page": true },
-            { "id": "panel-solve", "label": "S&olve", "keys": ["6"], "page": true, "platforms": ["desktop"] }
+            { "id": "panel-files", "label": "&Library", "keys": ["1"], "page": true, "check": true },
+            { "id": "panel-netlist", "label": "&Netlist", "keys": ["2"], "page": true, "check": true },
+            { "id": "panel-hierarchy", "label": "&Hierarchy", "keys": ["3"], "page": true, "check": true },
+            { "id": "panel-symbol", "label": "&Symbol", "keys": ["4"], "page": true, "check": true },
+            { "id": "panel-unplaced", "label": "Not &Drawn", "keys": ["5"], "page": true, "check": true },
+            { "id": "panel-solve", "label": "S&olve", "keys": ["6"], "page": true, "check": true, "platforms": ["desktop"] },
+            "-",
+            { "id": "panel-hide", "label": "&Hide" }
           ]
-        },
-        { "id": "toggle-netlist", "label": "&Netlist Panel", "keys": ["Ctrl+B"], "check": true },
-        { "id": "toggle-problems", "label": "&Problems", "keys": ["Ctrl+Shift+M"], "check": true }
+        }
       ]
     },
     {
@@ -107,5 +107,9 @@
         { "id": "about", "label": "&About RNL Viewer" }
       ]
     }
+  ],
+  "shortcuts": [
+    { "id": "toggle-netlist", "keys": ["Ctrl+B"] },
+    { "id": "toggle-problems", "keys": ["Ctrl+Shift+M"] }
   ]
 }

@@ -91,6 +91,7 @@ export function command(id, options = {}) {
     case "toggle-hover-names": setHoverNames(!hoverNamesOn()); break;
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
+    case "panel-hide": return setSidebar(false);
     case "panel-files":
     case "panel-netlist":
     case "panel-hierarchy":
@@ -155,7 +156,7 @@ export function isChecked(id) {
   return checks.get(id) === true;
 }
 
-export const isEnabled = (id) => id === "find-text" ? !!doc && !editing : id !== "descend-new-window" || opens(selected) !== null;
+export const isEnabled = (id) => id === "panel-hide" ? !$("app").classList.contains("sidebar-hidden") : id === "find-text" ? !!doc && !editing : id !== "descend-new-window" || opens(selected) !== null;
 export function setEnabled(id, enabled) {
   shell?.setEnabled?.(id, enabled);
 }
@@ -226,7 +227,7 @@ function matches(e, spec) {
 /** The command a key runs, or null. In a text box only keys with Ctrl and function keys count. */
 function keyCommand(e, typing, input) {
   if (!table) return null;
-  for (const m of table.menus) {
+  for (const m of [...table.menus, { items: table.shortcuts || [] }]) {
     for (const item of commandsIn(m.items)) {
       if (!offered(item)) continue;
       for (const spec of item.keys || []) {
