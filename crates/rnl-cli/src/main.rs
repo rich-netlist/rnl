@@ -11,6 +11,7 @@ use rnl_solver::SolverOptions;
 use rnl_view::BuildOptions;
 
 const USAGE: &str = "usage:
+  rnl --version                   print the core version and build commit
   rnl check FILE [options]          print the diagnostics; exit 1 on errors
   rnl render FILE -o DIR [options]  write one SVG per drawing level
   rnl dump FILE [options]           print the effective model and diagnostics as JSON
@@ -190,6 +191,11 @@ fn parse_args() -> Result<Args, String> {
 }
 
 fn main() -> ExitCode {
+    let argv: Vec<_> = std::env::args().skip(1).collect();
+    if argv == ["--version"] || argv == ["-V"] {
+        println!("rnl {} ({})", rnl_cli::CORE_VERSION, rnl_cli::BUILD_COMMIT);
+        return ExitCode::SUCCESS;
+    }
     let args = match parse_args() {
         Ok(a) => a,
         Err(msg) => {

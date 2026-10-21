@@ -39,4 +39,4 @@ jobs:
           revision="${TAG##*-r}"
           git tag -l --format='%(contents)' "$TAG" > "$RUNNER_TEMP/notes.md"
           gh release create "$TAG" release/rnl-* release/SHA256SUMS \
-            --verify-tag --title "RNL ${version}, revision ${revision}" --notes-file "$RUNNER_TEMP/notes.md"
+            --verify-tag --latest=false --title "RNL ${version}, revision ${revision}" --notes-file "$RUNNER_TEMP/notes.md"

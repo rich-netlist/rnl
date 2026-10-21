@@ -63,6 +63,17 @@ Every form is built from the chapters of one commit and names its revision ([dec
 
 Start with the [documentation map](docs/README.md), the [toolchain architecture proposal](docs/rnl-toolchain-architecture.md) (in Chinese), and the [roadmap](docs/roadmap.md). Each component directory has a README that says what it holds and what is still to do.
 
+## Downloading and release lines
+
+The [tools page](https://rich-netlist.github.io/rnl/en/tools.html#cli) offers CLI archives
+for Windows x64, Linux x86_64 and macOS Apple Silicon/Intel after the first core release.
+`rnl --version` prints the core version and build commit; verify downloads against
+`SHA256SUMS.txt`. The CLI and npm share `core-vX.Y.Z`; Viewer uses independent `viewer-vX.Y.Z`
+versions and the language standard keeps `spec-*`. Only the core becomes GitHub latest.
+Historical `runtime-v0.1.0-preview.N` tags were npm-only releases and no longer publish.
+See [release procedures](docs/releases.md) for rehearsal, pending version/dist-tag decisions
+and recovery if npm succeeds before GitHub publication fails.
+
 ## Trying it
 
 ```bash

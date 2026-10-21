@@ -4,16 +4,79 @@ Four ways, from the one an agent can run itself to the ones a person uses. Pick 
 
 | You have | Use | It gives |
 | --- | --- | --- |
-| a shell and a Rust toolchain (1.85 or later) | the `rnl` command, built from source | diagnostics with line numbers, SVG drawings, JSON of the model; the most complete |
+| a shell on Windows x64, Linux x86_64 or macOS | the `rnl` command, downloaded from a core Release (or built from source) | diagnostics with line numbers, SVG drawings, JSON of the model; the most complete |
 | Node 18 or later and a network | the npm package `@rich-netlist/runtime` | the same core as WebAssembly: a Document with diagnostics and an SVG for each level |
 | a person with a browser | the web viewer <https://rich-netlist.github.io/rnl/viewer/> | the drawing, the text and the problems list, with nothing to install |
 | a person on Windows or Linux | the desktop viewer | the same page in an app that reads files where they are, and edits, saves and solves as a preview |
 
-All four are the same core, so they read a file the same way. The language is a draft that changes between versions (0.x makes no promise of compatibility), and so does the toolkit: the npm package is published as previews under the dist-tag `next`.
+All four are the same core, so they read a file the same way. The language is a draft that changes between versions (0.x makes no promise of compatibility), and so does the toolkit. Core releases use `core-vX.Y.Z`: the CLI and npm package share X.Y.Z, independently of Viewer and language versions. Historical npm previews used `runtime-v0.1.0-preview.N`. Until the first core version and npm dist-tag are chosen, install an exact published npm version rather than assuming `next` or `latest`.
 
 ## The `rnl` command
 
-Build it from the repository. There is no installer for it yet.
+### Download a ready-to-run CLI
+
+After the first core release, these fixed links follow the latest core Release. Before it,
+use the source build below. The archives contain the executable, MIT, CC0 and OFL licences
+and a font-metrics copyright notice. They need no Rust installation.
+
+| Platform | Archive |
+| --- | --- |
+| Windows x64 | [rnl-x86_64-pc-windows-msvc.zip](https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-pc-windows-msvc.zip) |
+| Linux x86_64, static musl | [rnl-x86_64-unknown-linux-musl.tar.gz](https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-unknown-linux-musl.tar.gz) |
+| macOS Apple Silicon | [rnl-aarch64-apple-darwin.tar.gz](https://github.com/rich-netlist/rnl/releases/latest/download/rnl-aarch64-apple-darwin.tar.gz) |
+| macOS Intel | [rnl-x86_64-apple-darwin.tar.gz](https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-apple-darwin.tar.gz) |
+
+Windows PowerShell, in an empty download directory (the C runtime is statically linked):
+
+```powershell
+$base = 'https://github.com/rich-netlist/rnl/releases/latest/download'
+$archive = 'rnl-x86_64-pc-windows-msvc.zip'
+Invoke-WebRequest "$base/$archive" -OutFile $archive
+Invoke-WebRequest "$base/SHA256SUMS.txt" -OutFile SHA256SUMS.txt
+$line = @(Get-Content SHA256SUMS.txt | Where-Object { $_.EndsWith("  $archive") })
+if ($line.Count -ne 1) { throw 'Archive checksum is missing or ambiguous' }
+$expected = ($line[0] -split '  ')[0]
+if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw 'SHA256 mismatch' }
+Expand-Archive $archive -DestinationPath rnl-cli
+.\rnl-cli\rnl.exe --version
+.\rnl-cli\rnl.exe check my.sp
+```
+
+Linux or macOS, in an empty download directory:
+
+```bash
+set -eu
+case "$(uname -s):$(uname -m)" in
+  Linux:x86_64) target=x86_64-unknown-linux-musl ;;
+  Darwin:arm64) target=aarch64-apple-darwin ;;
+  Darwin:x86_64) target=x86_64-apple-darwin ;;
+  *) echo 'No prebuilt CLI for this platform; build from source.' >&2; exit 1 ;;
+esac
+base=https://github.com/rich-netlist/rnl/releases/latest/download
+archive=rnl-$target.tar.gz
+curl -fL "$base/$archive" -o "$archive"
+curl -fL "$base/SHA256SUMS.txt" -o SHA256SUMS.txt
+if [ "$(uname -s)" = Darwin ]; then
+  grep "  $archive$" SHA256SUMS.txt | shasum -a 256 -c -
+else
+  grep "  $archive$" SHA256SUMS.txt | sha256sum --check -
+fi
+tar -xzf "$archive"
+if [ "$(uname -s)" = Darwin ] && xattr -p com.apple.quarantine rnl >/dev/null 2>&1; then
+  xattr -d com.apple.quarantine rnl
+fi
+./rnl --version
+./rnl check my.sp
+```
+
+These binaries have no code signature: Windows may show SmartScreen; macOS browser
+downloads may require the quarantine removal above. Verify SHA256 before running. For a
+reproducible installation, use `releases/download/core-vX.Y.Z/` for both files instead of
+`releases/latest/download/`. Linux arm64 currently needs a source build.
+
+### Build from source
+
+With Rust 1.85 or later:
 
 ```bash
 git clone https://github.com/rich-netlist/rnl
@@ -53,7 +116,7 @@ The hint is expected for a file without positions. Without a solver, `render` dr
 The core as WebAssembly, for Node and browsers. It reads the same files, in memory.
 
 ```bash
-npm i @rich-netlist/runtime@next
+npm i @rich-netlist/runtime@X.Y.Z  # replace X.Y.Z with the chosen published core version
 ```
 
 A complete checker, `check.mjs`; run it with `node check.mjs top.sp [outdir]`:

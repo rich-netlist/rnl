@@ -582,6 +582,7 @@ async function about() {
     title: m("About RNL Viewer"),
     paragraphs: [
       name,
+      `RNL core ${site.coreVersion || "?"} (${site.commit || "unknown"})`,
       m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("Save downloads the file shown, as no page can write a file where it was read from.")}`,
       m`${m("The RNL core runs in this page as WebAssembly. Files opened from this computer are read here ")}${m("and sent nowhere; a URL's files are fetched from its server.")}`,
     ],

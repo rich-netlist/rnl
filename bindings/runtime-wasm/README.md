@@ -2,6 +2,14 @@
 
 The shared core as WebAssembly ([decision 0008](../../docs/decisions/0008-shared-core-per-platform-frontends.md)): [`rnl_view::build`](../../crates/rnl-view/README.md), a workspace in and a Document out, [`rnl_edit::write`](../../crates/rnl-edit/README.md), an edit transaction's ops written into a netlist, and [`rnl_view::catalog`](../../crates/rnl-view/README.md#catalog), the symbols, definitions and sets of the packages the core has, behind a small C-style interface over linear memory, with a JSON request in and a JSON response out. The module imports nothing and needs no generated glue, so building it takes only Cargo. JavaScript modules load it, run it in a Worker and collect the files a document needs; the [web viewer](../../apps/web/README.md) uses them.
 
+## Release version
+
+`core-vX.Y.Z` publishes this binding as `@rich-netlist/runtime` at the root workspace version,
+together with the CLI. `publish-runtime.yml` retains its filename for npm OIDC. Historical
+`runtime-v0.1.0-preview.N` triggers are retired. The first core version and npm dist-tag await
+the user's decision; see [release procedures](../../docs/releases.md) for rehearsals and
+failure recovery. Manual runs only produce tested artifacts.
+
 ## Building
 
 ```bash
@@ -19,7 +27,7 @@ does, and puts it with the JavaScript modules into `dist/`, which git ignores an
 A frontend that links the result as a package, such as Analog Canvas with pnpm's `link:`, builds it with the packages it needs and a name for it:
 
 ```bash
-node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --packages DIR --name @rich-netlist/runtime --version 0.1.0-preview.1
+node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --packages DIR --name @rich-netlist/runtime --version X.Y.Z
 ```
 
 `--packages DIR` brings the `.rnl` files of DIR with the build: `packages.js` holds them under `/rnl-bundled/packages`, and the Worker gives them to every request, after the request's own files and package directories. A newer `rnl-std` among them is the standard package at the root (16.3). `--name` and `--version` go into the `package.json`, whose `exports` name `client.js` as the package and `core.js` as `./core`. A named package is not private, and holds the README of [`packages/runtime`](../../packages/runtime/README.md) and the licenses of what it holds: MIT for the code, CC0-1.0 for the standard packages, and OFL-1.1 for the metrics of Noto Sans SC.

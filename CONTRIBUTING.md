@@ -1,5 +1,13 @@
 # Contributing
 
+## Releases
+
+The core (`core-vX.Y.Z`, CLI plus npm), Viewer (`viewer-vX.Y.Z`) and language (`spec-*`)
+have independent versions. Only core releases become GitHub latest. See
+[release procedures](docs/releases.md) for version sources, manual rehearsals, required notes,
+the npm dist-tag decision and recovery after partial publication. Historical `runtime-v*`
+tags no longer publish. Do not push a release tag without release approval.
+
 RNL is at an early draft stage. The language, module boundaries, and package names can still change, so discuss before investing in a large change.
 
 ## Before you start

@@ -10,10 +10,10 @@ It is the same core as the `rnl` command and the desktop viewer, and gives the D
 
 ## Install
 
-Only previews are published for now, under the dist-tag `next`:
+Core releases use the workspace version and `core-vX.Y.Z`, shared with the CLI. Install an exact published version:
 
 ```bash
-npm i @rich-netlist/runtime@next
+npm i @rich-netlist/runtime@X.Y.Z  # replace X.Y.Z with the chosen published core version
 ```
 
 ## Use
@@ -106,8 +106,15 @@ Vite may say that `node:worker_threads` and `node:fs/promises` were left out for
 
 ## Versions
 
-The previews are numbered `0.1.0-preview.N`. They follow the toolkit's `main` branch, and their requests, Documents and snapshots can still change between previews.
+The npm package and CLI share the root workspace version, released together by `core-vX.Y.Z`.
+Viewer and language-standard versions are independent. Versions 0.x may change requests,
+Documents and snapshots. Historical `runtime-v0.1.0-preview.N` tags published npm-only
+previews (through preview.15); that trigger is retired and those versions remain unchanged.
+The first core version and npm dist-tag (`next` or `latest`) are pending the user's decision.
+A bare install follows npm's `latest`, which may still point to an older preview; use an exact
+version until the release decision is applied. See [release procedures](../../docs/releases.md)
+for CI, trusted publishing and partial-publication recovery.
 
 ## License
 
-The JavaScript modules and the code compiled into the module are under the MIT license (`LICENSE`). The package also holds the built-in standard packages and the optional `analog-canvas-extensions` data file, under CC0-1.0, and the metrics of the font Noto Sans SC, copyright 2014-2021 Adobe, under the SIL Open Font License 1.1 (`LICENSES/`).
+The JavaScript modules and the code compiled into the module are under the MIT license (`LICENSE`). The package also holds the built-in standard packages under CC0-1.0, and the metrics of the font Noto Sans SC, copyright 2014-2021 Adobe, under the SIL Open Font License 1.1 (`LICENSES/`).

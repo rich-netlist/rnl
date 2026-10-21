@@ -347,6 +347,11 @@ fn open_default_apps(app: AppHandle) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+fn core_build_info() -> serde_json::Value {
+    serde_json::json!({ "version": rnl_cli::CORE_VERSION, "commit": rnl_cli::BUILD_COMMIT })
+}
+
 fn main() {
     let startup = startup::Startup::new();
     let session = session::read(std::env::args_os().skip(1)).expect("the viewer session could not be read");
@@ -393,6 +398,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            core_build_info,
             preload::preload_document,
             preload::cancel_preload,
             preload::preload_ticket,
@@ -457,20 +463,21 @@ mod tests {
         assert_eq!(file_argument(args(&["--session", "session.json", "a.sp"])), Some("a.sp".into()));
     }
 
-    /// The version in `[workspace.package]` of a Cargo manifest.
+    /// The core's version in `[workspace.package]` of a Cargo manifest.
     fn workspace_version(manifest: &str) -> Option<&str> {
         let section = manifest.split("\n[").find(|s| s.starts_with("workspace.package]"))?;
         let line = section.lines().find(|l| l.trim_start().starts_with("version"))?;
         line.split('"').nth(1)
     }
 
-    /// The app has one version: the one Tauri reports and the installers carry, the crate's, which
-    /// the About box shows, and the toolkit's, which the web viewer's About box shows.
+    /// The app and installers share the Viewer version; core metadata follows the workspace.
     #[test]
     fn one_version() {
         let version = env!("CARGO_PKG_VERSION");
         assert_eq!(config()["version"], version, "tauri.conf.json");
-        assert_eq!(workspace_version(include_str!("../../../Cargo.toml")), Some(version), "the workspace's Cargo.toml");
+        assert_eq!(workspace_version(include_str!("../../../Cargo.toml")), Some(rnl_cli::CORE_VERSION));
+        assert_eq!(super::core_build_info()["version"], rnl_cli::CORE_VERSION);
+        assert_eq!(super::core_build_info()["commit"], rnl_cli::BUILD_COMMIT);
     }
 
     /// The licence that the installers show and install next to the app: the repository's MIT

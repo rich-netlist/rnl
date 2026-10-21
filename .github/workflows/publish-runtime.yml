@@ -1,182 +1,78 @@
-# Publishes the runtime package, the core as WebAssembly with its JavaScript modules, to npm as
-# @rich-netlist/runtime. A pushed tag runtime-v<version> builds the package with build.mjs, its version
-# the tag's without runtime-v and without --packages, as the core bundles the standard packages; tests
-# its modules, checks what npm would get, and publishes it under the dist-tag next, with provenance.
-# Only versions with a pre-release suffix, such as 0.1.0-preview.7, are published for now: a version
-# without one fails.
-#
-# npm takes the publish by trusted publishing (OIDC): the package's settings on npmjs.com name this
-# repository and this workflow file, so no token is used or stored (decision 0003). The build runs in
-# a job of its own, which cannot publish: the publishing job only publishes the tarball the build
-# packed. Run by hand, it builds and checks the package, and publishes it only with dry_run set to
-# false on a runtime-v tag; on a pull request that changes the package, it builds and checks it only.
-#
-# The package job also installs the tarball into a minimal frontend built with Vite
-# (packages/runtime/smoke) and runs it in Chromium, from the build and from the dev server, before
-# anything is published; after a publish, the smoke job does the same with the version from npm.
+# Keep this filename: npm's OIDC trusted publisher is bound to publish-runtime.yml.
 name: Publish runtime
-
 on:
   push:
-    tags: ["runtime-v*"]
-  pull_request:
-    paths:
-      - "packages.lock.json"
-      - "scripts/packages*"
-      - "bindings/runtime-wasm/**"
-      - "packages/runtime/**"
-      - "LICENSE"
-      - "LICENSES/**"
-      - ".github/workflows/publish-runtime.yml"
+    tags: ["core-v*"]
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Build and check the package only; to publish, set it to false and run the workflow on a runtime-v tag"
-        type: boolean
-        default: true
-
 permissions:
   contents: read
-
 concurrency:
-  group: publish-runtime-${{ github.ref }}
+  group: publish-core-${{ github.ref }}
   cancel-in-progress: false
-
-env:
-  CARGO_TERM_COLOR: always
-  CARGO_BUILD_JOBS: 4
-  PACKAGE: "@rich-netlist/runtime"
-
 jobs:
-  package:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      publish: ${{ steps.version.outputs.publish }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # the tag's version without runtime-v; a pull request, or a run on a branch, builds a version
-      # that is never published
-      - name: Download and verify locked public packages
-        working-directory: ${{ github.workspace }}
-        run: python scripts/packages.py download
-      - name: The version
-        id: version
-        env:
-          DRY_RUN: ${{ inputs.dry_run }}
-        run: |
-          publish=false
-          if [ "$GITHUB_REF_TYPE" = tag ] && [[ "$GITHUB_REF_NAME" == runtime-v* ]]; then
-            version="${GITHUB_REF_NAME#runtime-v}"
-            if [ "$GITHUB_EVENT_NAME" = push ] || [ "$DRY_RUN" = false ]; then publish=true; fi
-          elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$DRY_RUN" = false ]; then
-            echo "::error::Publishing by hand needs the run to be on a runtime-v tag, not on $GITHUB_REF_NAME."
-            exit 1
-          else
-            version="0.0.0-check.$GITHUB_RUN_NUMBER"
-          fi
-          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::$version is not a version: major.minor.patch, with a pre-release suffix."
-            exit 1
-          fi
-          if [ -z "${BASH_REMATCH[4]}" ]; then
-            echo "::error::$version has no pre-release suffix. Only previews, such as 0.1.0-preview.7, are published for now, under next."
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "publish=$publish" >> "$GITHUB_OUTPUT"
-          echo "$PACKAGE@$version, published: $publish"
-
-      - name: Install Rust
-        run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-
-      - name: Build the package
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --name "$PACKAGE" --version "$VERSION"
-
-      # the modules of the very files that are published
-      - name: Test the package's modules
-        run: node bindings/runtime-wasm/tests/core.mjs packages/runtime/dist
-
-      - name: Check what npm gets
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: node bindings/runtime-wasm/tests/package.mjs packages/runtime/dist "$VERSION"
-
-      - name: Pack the package, and publish it without publishing
-        working-directory: packages/runtime/dist
-        run: |
-          npm pack --pack-destination "$GITHUB_WORKSPACE"
-          npm publish --dry-run --access public --tag next
-
-      # the package in a frontend built with Vite, installed from the tarball as npm installs it
-      - name: Smoke-test the package with Vite
-        working-directory: packages/runtime/smoke
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          npm ci --no-audit --no-fund
-          npx playwright install --with-deps chromium
-          node smoke.mjs "$GITHUB_WORKSPACE/rich-netlist-runtime-$VERSION.tgz"
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: runtime-${{ steps.version.outputs.version }}
-          path: rich-netlist-runtime-${{ steps.version.outputs.version }}.tgz
-          if-no-files-found: error
-
+  build:
+    uses: ./.github/workflows/core-release.yml
   publish:
-    needs: package
-    if: needs.package.outputs.publish == 'true'
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/core-v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # trusted publishing, and the provenance statement
       id-token: write
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: runtime-${{ needs.package.outputs.version }}
-
+          name: rnl-core-${{ needs.build.outputs.version }}
+          path: assets
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-
-      # trusted publishing needs npm 11.5.1 or later; an exact version, so that what publishes does
-      # not change unseen
-      - name: Install npm 11
+      - name: Require the maintainer's dist-tag decision and verify all files
+        env:
+          DIST_TAG: ${{ vars.CORE_NPM_DIST_TAG }}
         run: |
-          npm install --global npm@11.21.0
-          node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); if (a * 1e6 + b * 1e3 + c < 11005001) { console.error(`npm ${process.argv[1]} cannot publish by trusted publishing`); process.exit(1); } console.log(`npm ${process.argv[1]}`)' "$(npm --version)"
-
+          case "$DIST_TAG" in next|latest) ;; *) echo '::error::Set CORE_NPM_DIST_TAG to next or latest after the release decision.'; exit 1 ;; esac
+          (cd assets && sha256sum --check SHA256SUMS.txt)
+      - name: Install the pinned trusted-publishing npm
+        run: npm install --global npm@11.21.0
       - name: Publish by trusted publishing
         env:
-          VERSION: ${{ needs.package.outputs.version }}
-        run: npm publish "rich-netlist-runtime-$VERSION.tgz" --access public --tag next --provenance
-
-  # the version just published, installed from npm, in the same frontend
+          VERSION: ${{ needs.build.outputs.version }}
+          DIST_TAG: ${{ vars.CORE_NPM_DIST_TAG }}
+        run: npm publish "assets/rich-netlist-runtime-$VERSION.tgz" --access public --tag "$DIST_TAG" --provenance
   smoke:
-    needs: [package, publish]
+    needs: [build, publish]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Download and verify locked public packages
-        working-directory: ${{ github.workspace }}
-        run: python scripts/packages.py download
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - name: Smoke-test the published package with Vite
+      - name: Smoke-test the published package
         working-directory: packages/runtime/smoke
         env:
-          VERSION: ${{ needs.package.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
           node smoke.mjs "@rich-netlist/runtime@$VERSION"
+  release:
+    needs: [build, publish, smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rnl-core-${{ needs.build.outputs.version }}
+          path: assets
+      - name: Publish RNL core as the latest GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          (cd assets && sha256sum --check SHA256SUMS.txt)
+          gh release create "core-v$VERSION" assets/* --repo "$GITHUB_REPOSITORY" \
+            --title "RNL core $VERSION" --notes-file "release-notes/core/$VERSION.md" --latest --verify-tag

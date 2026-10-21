@@ -141,9 +141,11 @@ msiexec /x RNL-Viewer-0.1.3-windows-x64.msi /qn
 
 ## Releasing
 
+See [the three release lines](../../docs/releases.md) for version ownership and manual `candidate_tag` mismatch rehearsals. First-release versions remain subject to the user's decision.
+
 [`viewer-release.yml`](../../.github/workflows/viewer-release.yml) builds and releases the viewer for Windows x64 and Linux x86_64 on GitHub's runners. To release version X.Y.Z:
 
-1. Set the version in `Cargo.toml` and `tauri.conf.json` here and in `[workspace.package]` of the root `Cargo.toml`, which the web viewer's About box shows, and update both lock files (`cargo update --workspace`, here with `--manifest-path apps/desktop/Cargo.toml`). The tests here fail while the three differ.
+1. Set the Viewer version only in `Cargo.toml` and `tauri.conf.json` here, and update the app's own lockfile entry. Leave the root workspace/core version unchanged. The web viewer reads the Viewer version too; both About dialogs also name the core version and build commit. The tests require the two Viewer declarations to match, independently of the core.
 2. Write the release's notes in `release-notes/X.Y.Z.md`.
 3. Push the tag `viewer-vX.Y.Z` of the commit to GitHub.
 
@@ -158,7 +160,7 @@ After both platforms succeed, the workflow verifies each platform's checksums an
 - `RNL-Viewer-X.Y.Z-linux-x86_64.deb`
 - `SHA256SUMS.txt`
 
-The release is not marked as the repository's latest, which stays the language standard's release, so the viewer's releases are told apart by their tags. A version with a prerelease part, such as `0.2.0-rc.1`, makes a prerelease, which Check for Updates passes over. Run by hand from the Actions tab on a branch, the workflow builds and checks both platforms and keeps the platform artifacts and combined six-file artifact; it never publishes. Before pushing a release tag, run it on the intended commit, check both build jobs and the combined checksums, inspect the Linux screenshots, and confirm the versions and notes above. The site only links Linux files when the selected release tag contains the Linux bundle configuration, so earlier Windows-only releases keep valid download links.
+The release uses `--latest=false`; the repository's latest belongs to the core (`core-vX.Y.Z`), so the viewer's releases are told apart by their tags. A version with a prerelease part, such as `0.2.0-rc.1`, makes a prerelease, which Check for Updates passes over. Run by hand from the Actions tab on a branch, the workflow builds and checks both platforms and keeps the platform artifacts and combined six-file artifact; it never publishes. Before pushing a release tag, run it on the intended commit, check both build jobs and the combined checksums, inspect the Linux screenshots, and confirm the versions and notes above. The site only links Linux files when the selected release tag contains the Linux bundle configuration, so earlier Windows-only releases keep valid download links.
 
 ## Checking for updates
 

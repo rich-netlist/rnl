@@ -68,16 +68,19 @@ if (!existsSync(licence)) {
 cpSync(core, join(out, "core"), { recursive: true, filter: (from) => relative(core, from) !== "package.json" });
 for (const name of ["embed-demo.html", "embed-demo.js"]) cpSync(join(here, name), join(out, name));
 
-// What the About box names: the version of the workspace, and the commit when git knows it.
+// Viewer versions are independent of the core's workspace version.
 const manifest = readFileSync(join(root, "Cargo.toml"), "utf8");
-const version = /^\[workspace\.package\][^[]*?^version\s*=\s*"([^"]*)"/m.exec(manifest);
+const coreVersion = /^\[workspace\.package\][^[]*?^version\s*=\s*"([^"]*)"/m.exec(manifest)?.[1];
+const version = JSON.parse(readFileSync(join(root, "apps", "desktop", "tauri.conf.json"), "utf8")).version;
+const viewerManifest = readFileSync(join(root, "apps", "desktop", "Cargo.toml"), "utf8");
+if (/^version\s*=\s*"([^"]*)"/m.exec(viewerManifest)?.[1] !== version) throw new Error("Viewer manifest and Tauri versions differ");
 let commit = null;
 try {
   commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8", stdio: "pipe" }).trim();
 } catch {
   // not a git checkout, or no git: the box names the version only
 }
-writeFileSync(join(out, "about.json"), `${JSON.stringify({ version: version ? version[1] : null, commit }, null, 2)}\n`);
+writeFileSync(join(out, "about.json"), `${JSON.stringify({ version, coreVersion, commit }, null, 2)}\n`);
 writeFileSync(join(out, "viewer-api.json"), JSON.stringify({ rnl: 1, features: API_FEATURES, maxOpenBytes: MAX_OPEN_BYTES }) + "\n");
 
 if (samples) {
