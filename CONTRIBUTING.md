@@ -31,6 +31,11 @@ When you change the Rust crates, `cargo fmt --check`, `cargo clippy --all-target
 
 When you change the pages of the site, edit `site/src/` and write every text in both languages, as described in [`site/README.md`](site/README.md); `python site/build.py --check` must pass.
 
+Every Viewer, standard or core release needs a bilingual `timeline-summary` in its release
+notes before tagging; see the [summary template and checklist](release-notes/README.md).
+The homepage is generated from tags plus `site/src/timeline.json`; add non-release milestones
+there with the actual merge time and source link. Manual entries can override or combine tags.
+
 ## Public packages
 
 From the root of **each checkout or Git worktree**, run:

@@ -18,6 +18,8 @@ on:
       - "packages.lock.json"
       - "scripts/packages*"
       - "site/**"
+      - "apps/desktop/release-notes/**"
+      - "release-notes/**"
       - "spec/**"
       - "scripts/spec/**"
       - "scripts/skill/**"
@@ -40,6 +42,8 @@ on:
       - "packages.lock.json"
       - "scripts/packages*"
       - "site/**"
+      - "apps/desktop/release-notes/**"
+      - "release-notes/**"
       - "spec/**"
       - "scripts/spec/**"
       - "scripts/skill/**"
@@ -61,7 +65,7 @@ on:
   # on a tag, but only main may deploy to github-pages; this run builds main, and its checkout has the
   # new tag.
   workflow_run:
-    workflows: ["Standard release", "Viewer release"]
+    workflows: ["Standard release", "Viewer release", "Publish runtime"]
     types: [completed]
   schedule:
     - cron: "17 2 * * *"
@@ -185,6 +189,7 @@ jobs:
       - name: Check site navigation in Chromium and WebKit
         env:
           RNL_SITE_SCREENSHOTS: ${{ runner.temp }}/package-review
+          RNL_TIMELINE_SCREENSHOTS: ${{ runner.temp }}/package-review/timeline
         run: |
           npm ci --prefix tests/viewer
           node tests/viewer/node_modules/@playwright/test/cli.js install --with-deps chromium webkit

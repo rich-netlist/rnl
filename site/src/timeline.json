@@ -1,0 +1,287 @@
+{
+  "milestones": [
+    {
+      "id": "standard-0.2",
+      "date": "2026-10-14",
+      "title": {
+        "zh": "语言标准 0.2，修订 1",
+        "en": "Language standard 0.2, revision 1"
+      },
+      "description": {
+        "zh": "草稿整理成<a href=\"spec/0.2/\">正式标准</a>：英文为准，附中文版和标准词表；网页、PDF 和 Markdown 都从同一份源生成。",
+        "en": "The draft consolidated into a <a href=\"spec/0.2/\">formal standard</a>: English normative, with a Chinese version and the standard word list; the web pages, PDFs and Markdown are all built from one source."
+      },
+      "url": "spec/0.2/",
+      "link_label": {
+        "zh": "了解更多",
+        "en": "Learn more"
+      },
+      "tags": [
+        "spec-0.2-r1"
+      ]
+    },
+    {
+      "id": "toolkit-0.1",
+      "date": "2026-10-15",
+      "title": {
+        "zh": "工具链 0.1：网页版和桌面版查看器",
+        "en": "Toolkit 0.1: web and desktop viewers"
+      },
+      "description": {
+        "zh": "运行库、SPICE 与 Spectre 适配器、渲染器和 <code>rnl</code> 命令；<a href=\"tools.html\">网页版查看器</a>上线，Windows 桌面版 0.1.0 发布。能打开带 RNL 的网表，画出有坐标的部分。",
+        "en": "The runtime, the SPICE and Spectre adapters, the renderer and the <code>rnl</code> command; <a href=\"tools.html\">the web viewer</a> goes online and the Windows desktop viewer 0.1.0 is released. They open a netlist with RNL and draw what has coordinates."
+      },
+      "url": "tools.html",
+      "link_label": {
+        "zh": "了解更多",
+        "en": "Learn more"
+      },
+      "tags": [
+        "viewer-v0.1.0"
+      ],
+      "start_date": "2026-10-14"
+    },
+    {
+      "id": "npm-preview",
+      "date": "2026-10-17",
+      "title": {
+        "zh": "npm 预览包",
+        "en": "npm preview package"
+      },
+      "description": {
+        "zh": "核心的 WebAssembly 版本以预览版发布到 npm：<code>@rich-netlist/runtime</code>，标签 <code>next</code>。",
+        "en": "The core as WebAssembly is published to npm as a preview: <code>@rich-netlist/runtime</code>, under the tag <code>next</code>."
+      },
+      "url": "https://www.npmjs.com/package/@rich-netlist/runtime",
+      "link_label": {
+        "zh": "了解更多",
+        "en": "Learn more"
+      }
+    },
+    {
+      "id": "standard-0.3",
+      "date": "2026-10-18",
+      "title": {
+        "zh": "语言标准 0.3，修订 1 和 2",
+        "en": "Language standard 0.3, revisions 1 and 2"
+      },
+      "description": {
+        "zh": "求解器要把每个决定都写回文件，让不求解的查看器也能画出同样的图：没有名字可指的对象有编号，自动导线的走法也写回。标准包的 0.3 系列把名字写全；<a href=\"spec/0.3/\">正式标准</a>附中文版，0.2 的文件照样能读。",
+        "en": "The solver must write back every decision it makes, so that a viewer that does not solve draws what it drew: objects that no name reaches have numbers, and the routes of automatic wires are written back. The standard series 0.3 spells its names out in full; the <a href=\"spec/0.3/\">formal standard</a> comes with a Chinese version, and files of 0.2 still read."
+      },
+      "url": "spec/0.3/",
+      "link_label": {
+        "zh": "了解更多",
+        "en": "Learn more"
+      },
+      "tags": [
+        "spec-0.3-r1",
+        "spec-0.3-r2"
+      ]
+    },
+    {
+      "id": "rnl-skill",
+      "date": "2026-10-18",
+      "title": {
+        "zh": "RNL skill 包和“给 agent”页",
+        "en": "The RNL skill package and the page for agents"
+      },
+      "description": {
+        "zh": "写给 AI agent 的 skill 包（Agent Skills 格式）：简明指南、标准包参考、工具说明和例子；本站有了<a href=\"agents.html\">给 agent 的页</a>和 <code>llms.txt</code>。",
+        "en": "A skill package for AI agents (Agent Skills format): a short guide, a reference to the standard packages, notes on the tools and examples; this site has <a href=\"agents.html\">a page for agents</a> and an <code>llms.txt</code>."
+      },
+      "url": "agents.html",
+      "link_label": {
+        "zh": "了解更多",
+        "en": "Learn more"
+      }
+    },
+    {
+      "id": "viewer-0.1.1",
+      "date": "2026-10-18",
+      "title": {
+        "zh": "桌面版查看器 0.1.1",
+        "en": "Desktop viewer 0.1.1"
+      },
+      "description": {
+        "zh": "<a href=\"tools.html\">桌面版</a>能编辑文本、保存，能求解并作为预览显示，还能列出没画出来的元件；读语言 0.3 的文件。",
+        "en": "The <a href=\"tools.html\">desktop viewer</a> edits the text and saves it, solves and shows the result as a preview, and lists the objects that are not drawn; it reads files of language 0.3."
+      },
+      "url": "https://github.com/rich-netlist/rnl/releases/tag/viewer-v0.1.1",
+      "link_label": {
+        "zh": "了解更多",
+        "en": "Learn more"
+      },
+      "tags": [
+        "viewer-v0.1.1"
+      ]
+    },
+    {
+      "id": "public-extensions",
+      "date": "2026-10-19T12:18:08Z",
+      "title": {
+        "zh": "公开扩展包与 SKY130",
+        "en": "Public extensions and SKY130"
+      },
+      "description": {
+        "zh": "<code>eda-style</code> 提供 EDA 原理图符号和外观；SKY130 符号包改名为 <code>pdk-sky130</code>。扩展包按需引入，核心只内置标准包。",
+        "en": "<code>eda-style</code> provides EDA schematic symbols and styling; the SKY130 package is renamed <code>pdk-sky130</code>. Extensions are included explicitly, while the core bundles only the standard packages."
+      },
+      "url": "https://github.com/rich-netlist/rnl/pull/138",
+      "link_label": {
+        "zh": "相关改动",
+        "en": "Related changes"
+      }
+    },
+    {
+      "id": "npm-preview-13-14",
+      "date": "2026-10-19T12:32:40Z",
+      "title": {
+        "zh": "npm 预览包 13 和 14",
+        "en": "npm previews 13 and 14"
+      },
+      "description": {
+        "zh": "<code>@rich-netlist/runtime</code> 发布 <code>0.1.0-preview.13</code> 和 <code>preview.14</code>，继续通过 <code>next</code> 分发核心的 WebAssembly 版本。",
+        "en": "<code>@rich-netlist/runtime</code> publishes <code>0.1.0-preview.13</code> and <code>preview.14</code>, continuing to distribute the WebAssembly core under <code>next</code>."
+      },
+      "url": "https://github.com/rich-netlist/rnl/tree/runtime-v0.1.0-preview.14",
+      "link_label": {
+        "zh": "相关改动",
+        "en": "Related changes"
+      },
+      "tags": [
+        "runtime-v0.1.0-preview.13",
+        "runtime-v0.1.0-preview.14"
+      ]
+    },
+    {
+      "id": "web-embedding",
+      "date": "2026-10-19T16:14:51Z",
+      "title": {
+        "zh": "网页里的交互原理图",
+        "en": "Interactive drawings in other pages"
+      },
+      "description": {
+        "zh": "网页版支持只显示画布的嵌入模式；其他网页可以通过消息接口打开网表、切换层级、缩放和调整背景，不必重新加载。",
+        "en": "The web viewer gains a canvas-only embedding mode. Other pages can open netlists, navigate levels, fit the drawing and change its background through messages without reloading."
+      },
+      "url": "https://github.com/rich-netlist/rnl/pull/140",
+      "link_label": {
+        "zh": "相关改动",
+        "en": "Related changes"
+      }
+    },
+    {
+      "id": "site-navigation-logo-gallery",
+      "date": "2026-10-19T19:14:37Z",
+      "title": {
+        "zh": "网站导航、Logo 和包页面",
+        "en": "Site navigation, logo and package gallery"
+      },
+      "description": {
+        "zh": "网站统一导航和侧栏，包图库按标准系列、扩展和 PDK 分组；Logo 可展开成交互原理图，图库增加原点开关。",
+        "en": "The site gains shared navigation and sidebars, package groups for standard series, extensions and PDKs, an interactive circuit logo, and an origin toggle in the gallery."
+      },
+      "url": "https://github.com/rich-netlist/rnl/pull/141",
+      "link_label": {
+        "zh": "相关改动",
+        "en": "Related changes"
+      },
+      "start_date": "2026-10-19"
+    },
+    {
+      "id": "independent-eda-packages",
+      "date": "2026-10-20T02:56:12Z",
+      "title": {
+        "zh": "符号和外观分成两个公开包",
+        "en": "Separate symbol and style packages"
+      },
+      "description": {
+        "zh": "<code>eda-symbol</code> 提供 137 个原理图符号；独立的 <code>eda-style</code> 为标准、自定义和 EDA 符号统一设置外观，两者可以分别使用。",
+        "en": "<code>eda-symbol</code> supplies 137 schematic symbols; the independent <code>eda-style</code> styles standard, custom and EDA symbols. Either package can be used on its own."
+      },
+      "url": "https://github.com/rich-netlist/rnl/pull/145",
+      "link_label": {
+        "zh": "相关改动",
+        "en": "Related changes"
+      }
+    },
+    {
+      "id": "public-package-catalog",
+      "date": "2026-10-20T10:16:14Z",
+      "title": {
+        "zh": "公开包按清单分发",
+        "en": "Public packages through a catalog"
+      },
+      "description": {
+        "zh": "可选公开包移到 <code>rnl-packages</code> 仓库；查看器和网站按版本清单获取文件并校验 SHA256，标准包仍内置在核心里。",
+        "en": "Optional public packages move to <code>rnl-packages</code>. The viewers and site fetch versioned files from its catalog and verify SHA256; the standard packages remain built into the core."
+      },
+      "url": "https://github.com/rich-netlist/rnl/pull/156",
+      "link_label": {
+        "zh": "相关改动",
+        "en": "Related changes"
+      }
+    },
+    {
+      "id": "complete-viewer-api",
+      "date": "2026-10-20T15:21:45Z",
+      "title": {
+        "zh": "外部网站打开完整 Viewer",
+        "en": "Open the complete Viewer from another site"
+      },
+      "description": {
+        "zh": "完整 Viewer 与嵌入模式共用导入接口，支持网表、URL 和指定版本的公开包；其他网站可打开或复用 Viewer 标签页，并取消被新请求替代的导入。",
+        "en": "The complete Viewer and embedded mode share an import API for netlists, URLs and exact public-package versions. Other sites can open or reuse a Viewer tab and cancel superseded imports."
+      },
+      "url": "https://github.com/rich-netlist/rnl/pull/161",
+      "link_label": {
+        "zh": "相关改动",
+        "en": "Related changes"
+      }
+    },
+    {
+      "id": "viewer-0.1.4-and-npm-15",
+      "date": "2026-10-21T16:23:29Z",
+      "title": {
+        "zh": "桌面版查看器 0.1.4 与 npm 预览包 15",
+        "en": "Desktop viewer 0.1.4 and npm preview 15"
+      },
+      "description": {
+        "zh": "查看器新增中英文界面、Auto Include、编译与绘图缓存和后台预加载；<code>@rich-netlist/runtime</code> 发布 <code>0.1.0-preview.15</code>。",
+        "en": "The Viewer adds English and Chinese UI, Auto Include, compilation and drawing caches, and background preloading; <code>@rich-netlist/runtime</code> publishes <code>0.1.0-preview.15</code>."
+      },
+      "url": "https://github.com/rich-netlist/rnl/releases/tag/viewer-v0.1.4",
+      "link_label": {
+        "zh": "相关改动",
+        "en": "Related changes"
+      },
+      "tags": [
+        "viewer-v0.1.4",
+        "runtime-v0.1.0-preview.15"
+      ]
+    }
+  ],
+  "next": [
+    {
+      "title": {
+        "zh": "语言标准 0.4",
+        "en": "Language standard 0.4"
+      },
+      "description": {
+        "zh": "计划中：按端子个数选符号；新增 <code>@SOLVER-CONFIG</code>。",
+        "en": "Planned: symbols chosen by the number of terminals; the new <code>@SOLVER-CONFIG</code>."
+      }
+    },
+    {
+      "title": {
+        "zh": "求解器优化目标，第二版",
+        "en": "The solver’s objectives, second version"
+      },
+      "description": {
+        "zh": "计划中：标准包里的名字不再写在求解器里，改由配置给出，0.3 的文件里电流方向、地的方向和信号流向这几个目标也就有对象可管。",
+        "en": "Planned: the names of the standard package move out of the solver into its configuration, so that in a file of 0.3 the objectives for current direction, ground direction and signal flow have something to act on."
+      }
+    }
+  ]
+}

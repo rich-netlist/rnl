@@ -16,6 +16,12 @@ CI and release workflows.
 
 `pages.yml` and `spec-release.yml` install pandoc, Typst and the CJK fonts at pinned versions through the local action [`install-spec-tools`](../actions/install-spec-tools/action.yml), which checks the SHA-256 of each download against the one its GitHub release gives.
 
+Pages also rebuilds after **Publish runtime** succeeds, including the independent core
+pipeline when it lands. Its homepage timeline reads release tags and bilingual summaries
+from the release notes, with editorial overrides in `site/src/timeline.json`; see the
+[release summary checklist](../../release-notes/README.md). This adds a site rebuild trigger
+without changing any release workflow's publishing behavior.
+
 Every action is pinned to the commit of its release, with the release in a comment after it, such as `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1`, so that a tag moved later cannot change what runs. To update one, pin the commit its new release's tag names. `publish-runtime.yml` installs npm by an exact version too.
 
 See the [roadmap](../../docs/roadmap.md) for planned work.
