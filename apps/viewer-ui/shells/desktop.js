@@ -4,6 +4,7 @@ import { m } from "../i18n.js";
 
 import { flushSettings, load } from "../util.js";
 import { choose, inform, modal } from "../dialog.js";
+import { sourcePath } from "../source-path.js";
 
 let pool = [];
 let poolReady = Promise.resolve();
@@ -12,11 +13,18 @@ const invoke = (cmd, args) => tauri.core.invoke(cmd, args);
 
 /** A file on disk, named by its path; null for no path. */
 const file = (path) => (path ? { name: path, path } : null);
+const sessionSource = source => source ? { path: source.path, name: source.name,
+  text: source.path && !source.readonly ? undefined : source.text, readonly: source.readonly,
+  temporary: source.temporary } : null;
 let openingDrop = false;
 
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "desktop",
+  sourceForFile(source, document, index) {
+    const f = document.files[index], path = sourcePath(document, f);
+    return path.startsWith('<') ? { path, name: f.name, text: f.text, readonly: true } : file(path);
+  },
   setLanguage: language => invoke("set_ui_language", { language }),
   async about() {
     await inform({ title: m("About RNL Viewer"), paragraphs: [
@@ -44,9 +52,8 @@ export default {
   newWindow: async (session) => {
     await flushSettings();
     return invoke("new_window", { session: { ...session,
-      entry: session.entry ? { path: session.entry.path, name: session.entry.name,
-        text: session.entry.path ? undefined : session.entry.text, readonly: session.entry.readonly,
-        temporary: session.entry.temporary } : null,
+      entry: sessionSource(session.entry),
+      path: session.path.map(step => ({ ...step, entry: sessionSource(step.entry) })),
       pool: session.pool.map((item) => ({ path: item.path, name: item.name, source: { path: item.path, name: item.source.name } })),
     } });
   },

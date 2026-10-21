@@ -8,6 +8,7 @@ import { collect, decodeText, startCore } from "../core/client.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
+import { sourcePath } from "../source-path.js";
 
 /** The extensions of netlists that are opened on their own, listed first as the file to open. */
 const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "scs"];
@@ -36,6 +37,7 @@ const built = new WeakSet(); // the sources built before: building one again rea
 let opened = null; // the page's handler for sources opened without asking, such as dropped files
 let included = null;
 let poolFiles = new Map();
+let poolSources = new Map();
 let poolTexts = new Map();
 let poolReady = Promise.resolve();
 let lastUrl = ""; // the URL opened last, which Open URL offers again
@@ -128,16 +130,26 @@ function within(path, dir) {
  * @param {URL} url
  * @returns {WebSource}
  */
-function urlSource(url) {
+function urlSource(url, cached = null) {
   let served = url; // where the entry was served from when it was last read
   let dir = serverPath(url).split("/").slice(0, -1); // also supports transferred sources read before open
   return {
+    files: cached?.files,
     get url() { return served.href; },
     name: url.href,
     path: serverPath(url),
     async open(again) {
       const got = await fetchBytes(url.href, again);
-      if (!got.bytes) throw new Error(`${url.href} could not be fetched: ${got.why}.`);
+      if (!got.bytes) {
+        const path = serverPath(url), text = await cached?.read(path);
+        if (text != null) {
+          served = url;
+          this.path = path;
+          dir = path.split('/').slice(0, -1);
+          return { path, text };
+        }
+        throw new Error(`${url.href} could not be fetched: ${got.why}.`);
+      }
       served = new URL(got.url || url.href);
       const path = serverPath(served);
       this.path = path;
@@ -147,7 +159,7 @@ function urlSource(url) {
     async read(path, again) {
       if (!path.startsWith("/")) return null; // such as C:/models/x.lib
       const got = await fetchBytes(new URL(relative(dir, path), served).href, again);
-      return got.bytes ? decodeText(got.bytes) : null;
+      return got.bytes ? decodeText(got.bytes) : await cached?.read(path) ?? null;
     },
   };
 }
@@ -535,30 +547,77 @@ async function about() {
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "web",
+  sourceForFile(source, document, index) {
+    const f = document.files[index];
+    // At workspace root the core displays this virtual prefix without its leading slash.
+    const full = sourcePath(document, f).replace(/^<pool>\//, '/<pool>/');
+    const path = full.replace(/^\/<pool>(?=\/)/, '');
+    if (full !== path || source.fromPool && poolSources.has(path)) {
+      return poolSources.get(path) || { ...filesSource(poolFiles, path), fromPool: true };
+    }
+    if (full.startsWith('<')) return { path, name: f.name, text: f.text, readonly: true };
+    // A reader supplies available bytes, never a previously compiled include closure.
+    if (source.url) {
+      const url = new URL(relative(source.path.split('/').slice(0, -1), path), source.url);
+      // Re-read like Open URL, with the session's local bytes available if the server is gone.
+      return urlSource(url, source.files ? filesSource(source.files, path) : null);
+    }
+    const read = source.read || (async () => null);
+    return { path, name: path.slice(1), files: source.files, fromPool: source.fromPool,
+      read, async open(again) {
+        const text = await read(path, again);
+        if (text === null) throw new Error(`${path} could not be read. Open it again.`);
+        return { path, text };
+      } };
+  },
   newWindow(session, doc) {
     return openWebWindow(async () => {
+      // Share descriptors within the handoff, not entire Documents or duplicate folder snapshots.
+      const sources = [], ids = new Map(), snapshots = new Map();
+      const sourceId = async source => {
+        if (!source) return null;
+        if (ids.has(source)) return ids.get(source);
+        const id = sources.length;
+        ids.set(source, id);
+        let files = source.files && snapshots.get(source.files);
+        if (!files) {
+          files = {};
+          for (const [path, read] of source.files || []) files[path] = decodeText(await (await read()).arrayBuffer());
+          if (source.files) snapshots.set(source.files, files);
+        }
+        const descriptor = { name: source.name, path: source.path || `/${source.name}`, url: source.url,
+          temporary: source.temporary, readonly: source.readonly, fromPool: source.fromPool, files };
+        sources.push(descriptor);
+        if (source.text !== undefined) files[descriptor.path] = source.text;
+        return id;
+      };
+      const entryId = await sourceId(session.entry);
+      const route = [];
+      for (const step of session.path) route.push({ ...step, entry: await sourceId(step.entry) });
       const files = {};
-      for (const [path, read] of session.entry?.files || []) files[path] = decodeText(await (await read()).arrayBuffer());
-      if (session.entry?.text !== undefined) files[session.entry.path || `/${session.entry.name}`] = session.entry.text;
+      if (entryId !== null) Object.assign(files, sources[entryId].files);
       // The document contains applied text, never the pending editor buffer.
       if (doc) for (const f of doc.files) files[f.path.startsWith("/") || f.path.startsWith("<bundled>") ? f.path : joined(doc.path.slice(0, doc.path.lastIndexOf("/")), f.path)] = f.text;
       const pool = await Promise.all(session.pool.map(async (item) => ({ path: item.path, name: item.name, url: item.source.url,
         text: files[`/<pool>${item.path}`] ?? files[item.path] ?? decodeText(await (await item.read()).arrayBuffer()) })));
-      const source = session.entry;
-      return { ...session, files, pool, entry: source ? { name: source.name, path: source.path || `/${source.name}`, url: source.url,
-        temporary: source.temporary, readonly: source.readonly, fromPool: source.fromPool } : null };
+      if (entryId !== null) sources[entryId].files = files;
+      return { ...session, pool, sources, entry: entryId, path: route };
     });
   },
   async initialSession() {
     const session = await receiveWebSession();
     if (!session) return null;
-    const files = new Map(Object.entries(session.files || {}).map(([path, text]) => [path, () => new File([text], path)]));
+    const heldFiles = texts => new Map(Object.entries(texts || {}).map(([path, text]) => [path, () => new File([text], path)]));
     session.pool = session.pool.map((item) => {
       const read = () => new File([item.text], item.name);
       return { path: item.path, name: item.name, read, source: sessionSource(new Map([[item.path, read]]),
         { path: item.path, name: item.name, url: item.url, fromPool: !item.url }) };
     });
-    if (session.entry) session.entry = { ...sessionSource(files, session.entry), snapshot: session.files };
+    if (session.sources) {
+      const sources = session.sources.map(({ files, ...entry }) => ({ ...sessionSource(heldFiles(files), entry), snapshot: files }));
+      session.entry = sources[session.entry] || null;
+      session.path = session.path.map(step => ({ ...step, entry: sources[step.entry] }));
+    } else if (session.entry) session.entry = { ...sessionSource(heldFiles(session.files), session.entry), snapshot: session.files };
     return session;
   },
   embed,
@@ -584,6 +643,7 @@ export default {
   },
   setPool(items, reload = false, refresh = []) {
     const next = new Map(items.filter((item) => !item.builtin).map((item) => [item.path, item.read]));
+    poolSources = new Map(items.filter(item => !item.builtin).map(item => [item.path, item.source]));
     poolReady = poolReady.catch(() => {}).then(async () => {
       const texts = new Map();
       const errors = [];

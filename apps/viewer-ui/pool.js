@@ -68,7 +68,7 @@ function addItems(added, refresh = true) {
   }
 }
 
-/** Called only when a root is opened/applied, never when a Netlist include tab is selected. */
+/** Each independently opened entry, including cross-file navigation, joins Files here. */
 export async function sourceOpened(source, doc, add, applied = false) {
   const held = source.temporary || (source.text !== undefined && !source.path && !source.readonly);
   if (held) {

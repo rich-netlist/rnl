@@ -17,6 +17,7 @@
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
  * @property {(dir: string) => Promise<string[]>} [pathPackages] Package and netlist paths in a desktop PATH directory.
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
+ * @property {(source: Source, document: object, file: number) => Source} sourceForFile Re-root at a document file, retaining read capabilities but no compiled include scope.
  * @property {(legacy: object) => Promise<{ path: string, values: object }>} [loadSettings] Native settings and migration.
  * @property {(key: string, value: unknown) => Promise<void>} [saveSetting] Persist a native setting.
  * @property {(session: object, doc?: object) => Promise<unknown>} [newWindow] Open an independent viewer with a session.

@@ -551,8 +551,8 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 
 .obj { cursor: pointer; }
 .obj:hover { text-decoration: underline; text-decoration-color: var(--select); text-underline-offset: 2px; }
-/* background and underline only, so that the pieces of `#M1:d` read as one mark */
-.obj.hl { background: var(--select-text); box-shadow: inset 0 -2px 0 var(--select); }
+/* The name itself changes colour, including the syntax pieces of `#M1:d`. */
+.obj.hl, .obj.hl * { color: var(--select); }
 
 /* ------------------------------------------------------------------ problems */
 

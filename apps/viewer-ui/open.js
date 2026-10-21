@@ -1,6 +1,6 @@
 import { append, m, setAttr, setText } from "./i18n.js";
 // Opening a document: the shell reads a source and builds its Document, and the page shows it.
-// Reading the same source again keeps the level, the hierarchy path to it while its instances are
+// Reading the same source again keeps the level, the visit history to it while its circuits are
 // still there, the view, the selection and the text's scroll. File > Load from Clipboard opens the
 // clipboard's text, once the user has seen it, as a source that holds its text. A solve shown as a
 // preview (solve.js) ends when a source is opened or read again, which shows it as written; while
@@ -21,14 +21,22 @@ import { markDiagnostics, renderDiagnostics } from "./problems.js";
 import { startLevel, uncalledRoots } from "./roots.js";
 import { select } from "./selection.js";
 import { endPreview, previewing, solve } from "./solve.js";
-import { namedPath, restorePath } from "./subcircuits.js";
-import { clearSource, fileShown, fileViews, renderFiles, showFile } from "./text.js";
+import { namedPath, restorePath, visitView } from "./subcircuits.js";
+import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showFile } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
 import { startLoading, nextPaint } from "./loading.js";
 
 let lastSource = null; // what was last opened, also when it failed to open, for reloading
 let loading = false;
+let opening = 0;
+
+/** Embed opens participate in the same ordering as interactive file navigation. */
+export function beginExternalOpen() {
+  const id = ++opening;
+  loading = true;
+  return { finish() { if (id === opening) loading = false; } };
+}
 
 /**
  * Open a source, or read it again with `keep`. Opening another one asks first about changes not
@@ -36,26 +44,35 @@ let loading = false;
  * preview closed shows the text applied); without them the files are read as they are, and the
  * text edited is what they hold.
  */
-export async function openSource(source, keep, edited, fresh = false) {
+export async function openSource(source, keep, edited, fresh = false, navigation = null) {
   if (!source || loading) return;
   if (!keep && !edited && !(await confirmLeave(m("open another file")))) return;
   if (loading) return;
+  const id = ++opening;
   loading = true;
   document.body.classList.add("busy");
   const progress = startLoading();
   try {
-    lastSource = source;
     await progress.stage("reading");
-    const d = await shell.build(source, edited, progress.setStage, { fresh });
+    const d = await shell.build(source, edited, stage => {
+      // A superseded URL read must not start another core build or replace its lazy drawings.
+      if (id !== opening) throw new Error('Opening superseded');
+      progress.setStage(stage);
+    }, { fresh });
+    if (id !== opening) return;
     await progress.stage("displaying");
+    if (id !== opening) return;
+    lastSource = source;
     endPreview();
     if (edited) adoptBuffers(d);
     else resetBuffers(d);
-    showBuilt(d, keep);
+    showBuilt(d, keep, navigation);
     await sourceOpened(source, d, !keep, !!edited);
     await nextPaint();
     return true;
   } catch (e) {
+    if (id !== opening) return;
+    lastSource = source;
     progress.finish();
     if (keep && edited) {
       await inform({ title: m("Rebuild"), paragraphs: [m`The document could not be rebuilt: ${e}. Your edits are still kept.`] });
@@ -72,8 +89,10 @@ export async function openSource(source, keep, edited, fresh = false) {
     await sourceOpened(source, null, false);
   } finally {
     progress.finish();
-    loading = false;
-    document.body.classList.remove("busy");
+    if (id === opening) {
+      loading = false;
+      document.body.classList.remove("busy");
+    }
   }
 }
 
@@ -141,10 +160,10 @@ export function isLoading() {
  * with what reading the same source again keeps: the level, the view, the selection and the text's
  * scroll.
  */
-export function showBuilt(d, keep) {
+export function showBuilt(d, keep, navigation = null) {
   const before = keep && doc ? snapshot() : null;
   setDoc(d);
-  showDocument(before);
+  showDocument(before, navigation);
 }
 
 /** What a text from the clipboard can be read as, by the extension of the file it is opened as. */
@@ -266,7 +285,7 @@ function snapshot() {
   };
 }
 
-function showDocument(before) {
+function showDocument(before, navigation) {
   setSelected(null);
   setEnabled("descend-new-window", false);
   // the trees of the subcircuits that the top level does not call start open, also those that a
@@ -274,7 +293,7 @@ function showDocument(before) {
   const roots = uncalledRoots().map(rootPath);
   const gained = before ? roots.filter((r) => !before.roots.includes(r)) : roots;
   setExpanded(new Set([...(before ? before.expanded : ["0"]), ...gained]));
-  setViewCache(before ? before.viewCache : new Map());
+  setViewCache(before?.viewCache || navigation?.viewCache || new Map());
   const file = before ? doc.files.findIndex((f) => f.path === before.file) : -1;
   renderFiles(file >= 0 ? file : 0);
   const diags = doc.diagnostics.slice();
@@ -305,14 +324,22 @@ function showDocument(before) {
     renderHierarchy();
     return;
   }
-  const kept = before ? doc.levels.findIndex((l) => l.title === before.level) : -1;
+  const wanted = before?.level || navigation?.level;
+  const kept = wanted ? doc.levels.findIndex((l) => l.title === wanted) : -1;
   // the level it was, else the top level, or, when that has no objects, the first subcircuit that
   // nothing calls, with a line that says so
   const start = kept >= 0 ? { level: kept, note: "" } : startLevel();
   // the path by the names of its levels and instances, or else one that starts at the level
-  restorePath(before ? before.path : [], start.level);
-  showLevel(start.level, kept >= 0 ? before.view : null);
+  restorePath(before?.path || navigation?.path || [], start.level);
+  showLevel(start.level, kept >= 0 ? before?.view || visitView() : null);
   notice(start.note);
+
+  if (navigation?.reveal) revealDefinition(start.level);
+  if (navigation?.select) {
+    const s = navigation.select;
+    const o = doc.objects.findIndex(o => o.kind === s.kind && o.name === s.name && o.level_title === s.level);
+    if (o >= 0) select(o, "ascend");
+  }
 
   if (before && before.selected) {
     const s = before.selected;

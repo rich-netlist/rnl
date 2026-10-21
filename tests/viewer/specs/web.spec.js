@@ -63,24 +63,24 @@ test("Auto Include resolves indexed library subcircuits, warns on conflicts and 
   expect(disabled.files).toHaveLength(1);
 });
 
-test("New Window hands local files, applied include text, hierarchy and Library to a new tab", async ({ page }, info) => {
+test("New Window hands local files, applied text, visit history and Library to a new tab", async ({ page }, info) => {
   await start(page);
   const top = '* local top\n.include "part.inc"\nX1 a 0 part\n* @RNL { #X1 @PLACE(0, 0) }\n.end\n';
-  const part = '.subckt part p q\nR1 p q 1k\n.ends\n* @RNL(scope="part") { #R1 @PLACE(0, 0) }\n';
+  const part = '* part\n.subckt part p q\nR1 p q 1k\n.ends\n* @RNL(scope="part") { #R1 @PLACE(0, 0) }\n';
   await page.locator("#file-input").setInputFiles({ name: "top.sp", mimeType: "text/plain", buffer: Buffer.from(top) });
   await shown(page);
   await opened(page, () => page.locator("#include-input").setInputFiles({ name: "part.inc", mimeType: "text/plain", buffer: Buffer.from(part) }));
   await page.locator("#tab-netlist").click();
-  await page.keyboard.press("Control+q");
-  await showSource(page, "part.inc");
-  await page.locator("#source textarea:visible").fill(part.replaceAll("R1", "R7"));
-  await opened(page, () => page.keyboard.press("Control+Enter"));
   await page.evaluate(async () => {
     const { select } = await import('./selection.js');
     select(window.viewer.doc.objects.findIndex((o) => o.name === 'X1'), 'drawing');
   });
-  await page.keyboard.press("e");
+  await page.locator('#canvas').focus();
+  await opened(page, () => page.keyboard.press("e"));
   await expect(page.locator("#level-name")).toHaveText("part");
+  await page.keyboard.press("Control+q");
+  await page.locator("#source textarea:visible").fill(part.replaceAll("R1", "R7"));
+  await opened(page, () => page.keyboard.press("Control+Enter"));
   await page.evaluate(async () => {
     const { select } = await import('./selection.js');
     select(window.viewer.doc.objects.findIndex((o) => o.name === 'R7'), 'drawing');
@@ -139,7 +139,145 @@ test("Shift double click opens a subcircuit in a real new tab and pop-up blockin
   await expect(page.locator("dialog.dialog")).toContainText("The browser blocked the new viewer tab");
 });
 
-test("include links retain parser context in this tab and a Shift-opened tab", async ({ page }) => {
+const visitFiles = {
+  'visit-top.sp': '* top\n.include "cell.inc"\n.include "leaf.inc"\nXcell a 0 cell\n* @RNL { #Xcell @PLACE(0, 0) }\n.end\n',
+  'cell.inc': '* cell\n.subckt cell p n\nXleaf p n leaf\n* @RNL { #Xleaf @PLACE(0, 0) }\n.ends\n',
+  'leaf.inc': '* leaf\n.subckt leaf p n\nRleaf p n 1k\n* @RNL { #Rleaf @PLACE(0, 0) }\n.ends\n',
+};
+const descendNamed = (page, name) => page.evaluate(async name => {
+  const o = window.viewer.doc.objects.findIndex(o => o.kind === 'instance' && o.name === name);
+  await (await import('./subcircuits.js')).descend(o);
+}, name);
+const visitTitles = page => page.locator('#level-path .crumb').evaluateAll(es => es.map(e => e.querySelector('.name, #level-name')?.textContent));
+
+for (const method of ['descend', 'tree', 'index', 'source', 'include']) {
+  test(`cross-file ${method} opens independently, joins Files and starts the correct history`, async ({page}) => {
+    await page.addInitScript(() => localStorage.setItem('auto-include', 'false'));
+    await start(page);
+    await opened(page, () => page.locator('#file-input').setInputFiles(Object.entries(visitFiles).map(([name,text]) =>
+      ({name,mimeType:'text/plain',buffer:Buffer.from(text)}))));
+    await expect(page.locator('#pool-list .pool-row')).toHaveCount(1);
+    await page.evaluate(() => window.viewer.command('zoom-in'));
+    const view = await page.locator('#canvas > svg').getAttribute('viewBox');
+    const child = await opened(page, async () => {
+      if (method === 'descend') return descendNamed(page, 'Xcell');
+      if (method === 'tree' || method === 'index') {
+        await page.locator('#tab-hierarchy').click();
+        return page.locator(method === 'tree' ? '.tree-row[data-path="0/0"]' : '.index-row').filter({hasText:/cell/}).first().click();
+      }
+      await page.locator('#tab-netlist').click();
+      if (method === 'include') return page.locator('.include-link').filter({hasText:'cell.inc'}).click();
+      await showSource(page, 'cell.inc');
+      return page.locator('#source .file:not([hidden]) .obj').filter({hasText:'Xleaf'}).first().click();
+    });
+    expect(child.path).toBe('/cell.inc');
+    expect(child.files.map(f => f.name)).toEqual(['cell.inc']);
+    expect(child.objects.find(o => o.name === 'Xleaf').opens).toBeNull();
+    expect(child.levels.some(l => l.title === 'leaf')).toBe(false);
+    await expect(page.locator('#pool-list .pool-row')).toHaveCount(2);
+    expect(await visitTitles(page)).toEqual(method === 'descend' ? ['visit-top.sp','cell'] : ['cell']);
+    await expect(page.locator('#auto-include')).not.toBeChecked();
+    if (method !== 'descend') { await expect(page.locator('#up')).toBeHidden(); return; }
+    // Reloading changes include scope but keeps visit history. The Library index may resolve leaf.
+    await page.locator('#tab-netlist').click();
+    await opened(page, () => page.locator('#include-input').setInputFiles({ name:'leaf.inc', mimeType:'text/plain', buffer:Buffer.from(visitFiles['leaf.inc']) }));
+    await page.locator('#tab-netlist').click();
+    const auto = await opened(page, () => page.locator('#auto-include').check());
+    expect(auto.objects.find(o => o.name === 'Xleaf').opens).not.toBeNull();
+    expect(auto.diagnostics.some(d => d.message.includes('added by Auto Include'))).toBe(true);
+    await opened(page, () => descendNamed(page, 'Xleaf'));
+    expect(await visitTitles(page)).toEqual(['visit-top.sp','cell','leaf']);
+    await expect(page.locator('#pool-list .pool-row')).toHaveCount(3);
+    await opened(page, () => page.locator('#level-path .crumb[data-depth="0"]').click());
+    expect(await visitTitles(page)).toEqual(['visit-top.sp']);
+    expect(await page.locator('#canvas > svg').getAttribute('viewBox')).toBe(view);
+    expect(await page.evaluate(() => window.viewer.doc.objects[window.viewer.selected].name)).toBe('Xcell');
+    await opened(page, () => descendNamed(page, 'Xcell'));
+    await opened(page, () => page.locator('#up').click());
+    expect(await visitTitles(page)).toEqual(['visit-top.sp']);
+    await page.locator('#tab-files').click();
+    await opened(page, () => page.getByRole('button', {name:'Open cell.inc',exact:true}).click());
+    expect(await visitTitles(page)).toEqual(['cell']);
+  });
+}
+
+test('a URL descent transfers independent scope and visit history to a new window', async ({page, context}) => {
+  await page.addInitScript(() => localStorage.setItem('auto-include', 'false'));
+  await context.route('**/visits/*', route => route.fulfill({contentType:'text/plain', body:visitFiles[new URL(route.request().url()).pathname.split('/').pop()] || ''}));
+  await start(page, '?url=visits/visit-top.sp');
+  await shown(page);
+  await page.evaluate(async () => (await import('./selection.js')).select(window.viewer.doc.objects.findIndex(o => o.name === 'Xcell'), 'drawing'));
+  const popup = page.waitForEvent('popup');
+  await page.keyboard.press('Shift+e');
+  const child = await popup;
+  try {
+    await expect(child.locator('#level-name')).toHaveText('cell');
+    const doc = await shown(child);
+    expect(doc.path).toBe('/visits/cell.inc');
+    expect(doc.files).toHaveLength(1);
+    expect(doc.objects.find(o => o.name === 'Xleaf').opens).toBeNull();
+    expect(await visitTitles(child)).toEqual(['visit-top.sp','cell']);
+    await opened(child, () => child.locator('#up').click());
+    expect(await visitTitles(child)).toEqual(['visit-top.sp']);
+    expect((await child.evaluate(() => window.viewer.doc.files)).length).toBe(3);
+    await opened(child, () => descendNamed(child, 'Xcell'));
+    await opened(child, () => child.evaluate(() => window.viewer.command('reload')));
+    expect(await visitTitles(child)).toEqual(['visit-top.sp','cell']);
+    expect((await child.evaluate(() => window.viewer.doc.files)).length).toBe(1);
+    expect(await visitTitles(page)).toEqual(['visit-top.sp']);
+  } finally { await child.close(); }
+});
+
+test('a transferred URL snapshot can open a child after the server becomes unavailable', async ({page,context}) => {
+  const host=await server({'/top.sp':visitFiles['visit-top.sp'],'/cell.inc':visitFiles['cell.inc'],'/leaf.inc':visitFiles['leaf.inc']});
+  await start(page, '?url='+encodeURIComponent(host+'/top.sp')); await shown(page);
+  const popup=page.waitForEvent('popup');
+  await page.evaluate(()=>window.viewer.command('new-window'));
+  const child=await popup;
+  try {
+    await shown(child);
+    await context.route(host+'/**',route=>route.abort());
+    const d=await opened(child,()=>descendNamed(child,'Xcell'));
+    expect(d.path).toBe('/cell.inc');
+    expect(d.levels.some(l=>l.title==='cell')).toBe(true);
+    expect(await visitTitles(child)).toEqual(['top.sp','cell']);
+  } finally {await child.close();}
+});
+
+test('canceling a dirty cross-file descent preserves the entry and visit history', async ({page}) => {
+  await start(page);
+  await opened(page, () => page.locator('#file-input').setInputFiles(Object.entries(visitFiles).map(([name,text]) =>
+    ({name,mimeType:'text/plain',buffer:Buffer.from(text)}))));
+  await page.locator('#tab-netlist').click();
+  await page.keyboard.press('Control+q');
+  await page.locator('#source textarea:visible').fill(visitFiles['visit-top.sp']+'* pending\n');
+  await page.evaluate(async () => {
+    const {descend}=await import('./subcircuits.js');
+    window.pendingDescent=descend(window.viewer.doc.objects.findIndex(o=>o.name==='Xcell'));
+  });
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.evaluate(()=>window.pendingDescent);
+  expect(await visitTitles(page)).toEqual(['visit-top.sp']);
+  expect(await page.evaluate(()=>window.viewer.doc.path)).toBe('/visit-top.sp');
+  await expect(page.locator('#pool-list .pool-row')).toHaveCount(1);
+  expect(await page.locator('#source textarea:visible').inputValue()).toContain('* pending');
+});
+
+test('independent URL child opens follow redirects for relative includes', async ({page}) => {
+  const host = await server({
+    '/alias/top.sp':'* top\n.include "cell.inc"\nXcell a 0 cell\n.end\n',
+    '/actual/cell.inc':'* cell\n.include "parts.inc"\n.subckt cell p n\nXleaf p n leaf\n.ends\n',
+    '/actual/parts.inc':visitFiles['leaf.inc'],
+  }, {'/alias/cell.inc':'/actual/cell.inc'});
+  await start(page, `?url=${encodeURIComponent(host+'/alias/top.sp')}`);
+  await shown(page);
+  const child = await opened(page, () => descendNamed(page,'Xcell'));
+  expect(child.path).toBe('/actual/cell.inc');
+  expect(child.objects.find(o=>o.name==='Xleaf').opens).not.toBeNull();
+  expect(child.missing).toEqual([]);
+});
+
+test("include links independently open the target in this tab and a Shift-opened tab", async ({ page }) => {
   await start(page);
   await opened(page, () => page.locator('#file-input').setInputFiles({name:'top.sp', mimeType:'text/plain',
     buffer:Buffer.from('* Top\n.include "models.inc"\nR1 a 0 1k\n.end\n')}));
@@ -153,10 +291,12 @@ test("include links retain parser context in this tab and a Shift-opened tab", a
   try {
     await expect(child.locator('#netlist-file')).toHaveText(/models\.inc$/);
     await expect(child.locator('#source .file:not([hidden]) .ln').first()).toContainText('.param bias=1.2');
-    expect(await child.evaluate(() => window.viewer.doc.files.length)).toBe(2);
+    expect(await child.evaluate(() => window.viewer.doc.files.length)).toBe(1);
+    expect(await child.evaluate(() => window.viewer.doc.name)).toBe('models.inc');
     await expect(page.locator('#netlist-file')).toHaveText(/top\.sp$/);
     await link.click();
     await expect(page.locator('#netlist-file')).toHaveText(/models\.inc$/);
+    await expect(page.locator('#up')).toBeHidden();
   } finally { await child.close(); }
 });
 

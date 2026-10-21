@@ -5,7 +5,7 @@ import { clearDrawing, fit, zoomCenter } from "./drawing.js";
 import { resetBuffers } from "./edits.js";
 import { setGrid } from "./grid.js";
 import { setHoverNames } from "./hover.js";
-import { adoptSource, showBuilt } from "./open.js";
+import { adoptSource, beginExternalOpen, showBuilt } from "./open.js";
 import { shell } from "./shell.js";
 import { prepareEmbed, sourceFromUrl } from "./shells/web.js";
 import { current, doc, path, setDoc } from "./state.js";
@@ -53,18 +53,18 @@ function level(name) {
     return null;
   }
   const row = find(0, "0", new Set());
-  if (row) enterRow(row, { newWindow: false });
-  else enterRoot(wanted, { newWindow: false });
+  if (row) return enterRow(row, { newWindow: false });
+  return enterRoot(wanted, { newWindow: false });
 }
 
 function updateLevel() {
   crumbs.replaceChildren();
   // Uncalled subcircuits can be roots of their own: still show their level name below the top.
-  crumbs.hidden = !doc || current === 0;
+  crumbs.hidden = !doc || (current === 0 && path.length < 2);
   if (!doc) return;
   path.forEach((step, index) => {
     if (index) crumbs.append(span("embed-separator", "›"));
-    const name = doc.levels[step.level].title;
+    const name = step.title;
     const item = document.createElement(index === path.length - 1 ? "span" : "button");
     item.textContent = name;
     if (item instanceof HTMLButtonElement) {
@@ -84,6 +84,7 @@ function updateLevel() {
 /** Each open has an identity. Late reads, builds and errors never replace a newer request. */
 async function open(message, initial = false) {
   const request = ++generation;
+  const pending = beginExternalOpen();
   opening = true;
   document.body.classList.add("busy");
   const progress = startLoading();
@@ -107,8 +108,10 @@ async function open(message, initial = false) {
     resetBuffers(built);
     adoptSource(source);
     showBuilt(built, false);
+    pending.finish(); // the initial level may itself independently open a different file
     document.title = `${built.name} - RNL Viewer`;
-    if (initial && params.has("level")) level(params.get("level"));
+    if (initial && params.has("level")) await level(params.get("level"));
+    if (request !== generation) return;
     // A short embed fits visible ink, so its first view needs the drawing's actual font metrics.
     if (getComputedStyle($("canvas")).getPropertyValue("--fit-content").trim() === "1") {
       $("canvas").getBoundingClientRect();
@@ -129,8 +132,8 @@ async function open(message, initial = false) {
     reportedLevel = null;
     send("loaded", {
       name: built.name,
-      levels: built.levels.map((item) => item.title),
-      level: built.levels[current]?.title ?? "",
+      levels: doc.levels.map((item) => item.title),
+      level: doc.levels[current]?.title ?? "",
       errors: errors.length,
       warnings: built.diagnostics.filter((item) => item.severity === "warning").length,
     });
@@ -138,6 +141,7 @@ async function open(message, initial = false) {
   } catch (reason) {
     if (request === generation) error(reason);
   } finally {
+    pending.finish();
     progress.finish();
     if (request === generation) {
       opening = false;
@@ -197,7 +201,7 @@ export async function startEmbed() {
     setGrid({ shown: grid === "dots" || grid === "lines", style: grid === "lines" ? "lines" : "dots" });
     setHoverNames(params.get("names") !== "0");
     window.addEventListener("viewer-level", updateLevel);
-    window.addEventListener("message", (event) => {
+    window.addEventListener("message", async (event) => {
       if (params.has("origin") && event.origin !== targetOrigin) return;
       const message = event.data;
       if (!message || typeof message !== "object" || message.rnl !== 1) return;
@@ -205,7 +209,7 @@ export async function startEmbed() {
         switch (message.type) {
           case "open": void open(message); break;
           case "level":
-            if (typeof message.name === "string") level(message.name);
+            if (typeof message.name === "string") await level(message.name);
             break;
           case "fit": fit(); break;
           case "background":

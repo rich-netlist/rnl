@@ -146,10 +146,10 @@ test("URL preferences are isolated from existing storage and the OS theme", asyn
   await expect(frame.locator("body")).toHaveAttribute("data-background", "dark");
   expect(await frame.evaluate(() => window.viewer.grid)).toMatchObject({ shown: true, style: "lines" });
   expect(await frame.evaluate(() => window.viewer.checked("toggle-hover-names"))).toBe(false);
-  await expect(frame.locator("#embed-path")).toHaveText("04-hierarchy.sp›amp");
+  await expect(frame.locator("#embed-path")).toHaveText("amp");
   expect(await frame.locator("#embed-fit").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(35, 35, 39)");
   await screenshot(page, "embed-dark-subcircuit.png", browserName);
-  await frame.locator("#embed-path button").click();
+  await send(page, { type: "level", name: "04-hierarchy.sp" });
   expect((await waitMessage(page, "level", 2)).name).toBe("04-hierarchy.sp");
   await send(page, { type: "background", value: "light" });
   await expect(frame.locator("body")).toHaveAttribute("data-background", "light");
@@ -183,7 +183,7 @@ test("text and URL opens replace the drawing without reloading; fit and level me
   expect(await frame.locator("#canvas > svg").innerHTML()).not.toBe(first);
   await expect(frame.locator("#embed-open")).toBeVisible();
   await send(page, { type: "level", name: "amp" });
-  await expect(frame.locator("#embed-path")).toHaveText("04-hierarchy.sp›amp");
+  await expect(frame.locator("#embed-path")).toHaveText("amp");
   const fitted = await width(frame);
   await frame.locator("#embed-zoom-in").click();
   await send(page, { type: "fit" });
@@ -286,6 +286,29 @@ for (const fails of [false, true]) {
     expect(await messages(page, "error")).toEqual([]);
   });
 }
+
+test('a later embed open cancels an in-flight cross-file descent', async ({page}) => {
+  const frame = await start(page, {url:hierarchy});
+  await waitMessage(page,'loaded');
+  let release, started;
+  const hold=new Promise(resolve=>{release=resolve;});
+  const requested=new Promise(resolve=>{started=resolve;});
+  await page.route('**/04-hierarchy-lib.inc', async route=>{
+    started(); await hold; await route.continue();
+  });
+  await frame.evaluate(async()=>{
+    const {descend}=await import('./subcircuits.js');
+    window.navigationFinished=false;
+    void descend(window.viewer.doc.objects.findIndex(o=>o.name==='X3')).finally(()=>{window.navigationFinished=true;});
+  });
+  await requested;
+  await send(page,{type:'open',name:'latest.sp',text:text('latest')});
+  expect((await waitMessage(page,'loaded',2)).name).toBe('latest.sp');
+  release();
+  await frame.waitForFunction(()=>window.navigationFinished);
+  expect(await frame.evaluate(()=>window.viewer.doc.name)).toBe('latest.sp');
+  expect(await messages(page,'error')).toEqual([]);
+});
 
 test("iframe resizing preserves the drawing centre and outer arrow keys scroll the parent", async ({ page }) => {
   const frame = await start(page, { url: rc });

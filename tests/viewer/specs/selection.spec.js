@@ -28,6 +28,17 @@ test("clicking a symbol selects its instance and marks its statement and the pla
   expect(lines.length).toBeGreaterThan(2);
   expect(await viewer.markedPlaces()).toEqual(lines);
   await expect(viewer.places(x2).first()).toHaveClass(/\bhl\b/);
+  const highlighted = await viewer.places(x2).first().evaluate(el => {
+    const style = getComputedStyle(el);
+    return { colour: style.color, wanted: style.getPropertyValue('--select').trim(), background: style.backgroundColor, shadow: style.boxShadow };
+  });
+  expect(highlighted.background).toBe('rgba(0, 0, 0, 0)');
+  expect(highlighted.shadow).toBe('none');
+  expect(await viewer.places(x2).first().evaluate(el => {
+    const marker = document.createElement('span'); marker.style.color = 'var(--select)'; el.append(marker);
+    const matches = getComputedStyle(el).color === getComputedStyle(marker).color;
+    marker.remove(); return matches;
+  })).toBe(true);
   // its symbol, its box and the badge that opens it
   expect(await viewer.selectedGroups()).toEqual(await groupsOf(page, x2));
   await expect(page.locator("#canvas > svg .overlay rect:not(.label)")).toHaveCount(1);

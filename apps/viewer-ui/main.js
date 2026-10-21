@@ -92,7 +92,7 @@ window.viewer = {
     return current;
   },
   /**
-   * The hierarchy path to it, from its root: per level, its index and the instance it was reached
+   * Visit history: per level, its index (-1 for another file) and the instance it was reached
    * through, null for the root.
    */
   get path() {

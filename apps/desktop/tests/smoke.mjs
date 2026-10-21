@@ -720,6 +720,7 @@ async function drive(app, port, profile, t0, session) {
 
   await filePoolSmoke(page);
   await nativeDropSmoke(page, app.pid);
+  await independentNavigationSmoke(page);
   same(page.errors, [], "the page's errors");
 }
 
@@ -878,6 +879,45 @@ async function filePoolSmoke(page) {
     fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR, "desktop-native-missing-canvas-hint.png"), Buffer.from(image.data, "base64"));
   }
   console.log("The native core bundles only standard packages and offers the public-package website on missing USE-PACKAGE");
+}
+
+/** File transitions exercise the real disk reader and build cache, not a fixture shell. */
+async function independentNavigationSmoke(page) {
+  const work = path.dirname(netlist);
+  const top = path.join(work, 'visit-top.sp'), cell = path.join(work, 'visit-cell.inc'), leaf = path.join(work, 'visit-leaf.inc');
+  fs.writeFileSync(top, '* visits\n.include "visit-cell.inc"\n.include "visit-leaf.inc"\nXcell a 0 visit_cell\n* @RNL { #Xcell @PLACE(0, 0) }\n.end\n');
+  fs.writeFileSync(cell, '* cell\n.subckt visit_cell p n\nXleaf p n visit_leaf\n* @RNL { #Xleaf @PLACE(0, 0) }\n.ends\n');
+  fs.writeFileSync(leaf, '* leaf\n.subckt visit_leaf p n\nRleaf p n 1k\n* @RNL { #Rleaf @PLACE(0, 0) }\n.ends\n');
+  const result = await page.evaluate(`(async () => {
+    const {openSource} = await import('./open.js');
+    const {descend, ascend, namedPath, backTo} = await import('./subcircuits.js');
+    const {toggleAutoInclude, poolSnapshot} = await import('./pool.js');
+    await toggleAutoInclude(false);
+    await openSource({path:${JSON.stringify(top)},name:'visit-top.sp'},false);
+    await descend(window.viewer.doc.objects.findIndex(o => o.name === 'Xcell'));
+    const v=window.viewer;
+    const isolated={entry:v.doc.path, files:v.doc.files.length, opens:v.doc.objects.find(o => o.name === 'Xleaf').opens,
+      path:namedPath().map(s=>s.title), listed:poolSnapshot().some(i=>i.path.endsWith('/visit-cell.inc'))};
+    await toggleAutoInclude(true);
+    const resolved=v.doc.objects.find(o=>o.name==='Xleaf').opens !== null;
+    await descend(v.doc.objects.findIndex(o=>o.name==='Xleaf'));
+    const deep=namedPath().map(s=>s.title);
+    await backTo(0);
+    const back={path:namedPath().map(s=>s.title),selected:v.doc.objects[v.selected]?.name};
+    await descend(v.doc.objects.findIndex(o=>o.name==='Xcell'));
+    await ascend();
+    return {isolated,resolved,deep,back,entry:v.doc.path};
+  })()`);
+  same(result.isolated.files,1,'child independently reads one disk file');
+  same(result.isolated.opens,null,'parent include definitions are absent with Auto Include off');
+  check(result.isolated.entry.replaceAll('\\','/').endsWith('/visit-cell.inc'),'child did not become the entry');
+  same(result.isolated.listed,true,'visited disk file joins Files');
+  same(result.isolated.path,['visit-top.sp','visit_cell'],'cross-file descent history');
+  same(result.resolved,true,'Auto Include resolves the leaf using the Library index');
+  same(result.deep,['visit-top.sp','visit_cell','visit_leaf'],'deep cross-file history');
+  same(result.back,{path:['visit-top.sp'],selected:'Xcell'},'cross-level breadcrumb jump restores prefix and selection');
+  check(result.entry.replaceAll('\\','/').endsWith('/visit-top.sp'),'ascend did not reopen the top entry');
+  console.log('Cross-file disk navigation isolates includes, adds Library files, and restores visit history');
 }
 
 async function memoryCacheSmoke(page, work) {
