@@ -11,12 +11,17 @@ use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, MemoryPro
 #[derive(Clone)]
 struct Entry {
     definitions: Vec<LibraryDefinition>,
+    /// Definition indexes that require the section selected by this root's include tree.
+    sectioned: HashSet<usize>,
     dependencies: HashMap<String, u64>,
 }
 
 #[derive(Clone, Default)]
 pub struct LibraryIndex {
     entries: BTreeMap<String, Arc<Entry>>,
+    // Standalone readings of the physical definition files reached through library roots.
+    // These are import targets, not additional library roots or a second source of candidates.
+    imports: BTreeMap<String, Arc<Entry>>,
     names: Arc<HashMap<String, Vec<LibraryDefinition>>>,
     dirty: bool,
 }
@@ -34,6 +39,9 @@ impl LibraryIndex {
         let count = self.entries.len();
         self.entries.retain(|_, entry| !entry.dependencies.keys().any(|p| paths.contains(p)));
         self.dirty |= count != self.entries.len();
+        let count = self.imports.len();
+        self.imports.retain(|_, entry| !entry.dependencies.keys().any(|p| paths.contains(p)));
+        self.dirty |= count != self.imports.len();
     }
 
     /// Only new files are read normally. Reload reads every file, packages included. Failed reads
@@ -60,6 +68,7 @@ impl LibraryIndex {
             }
         }
         if self.dirty {
+            self.refresh_imports(files, reload);
             self.reindex();
         }
         errors.sort();
@@ -69,6 +78,7 @@ impl LibraryIndex {
     fn entry(path: &str, files: &dyn Provider) -> Option<Entry> {
         let text = files.read(path)?;
         let mut definitions = Vec::new();
+        let mut sectioned = HashSet::new();
         let mut dependencies = HashMap::from([(path.to_string(), fingerprint(&text))]);
         if !path.to_ascii_lowercase().ends_with(".rnl") {
             let mut sink = Sink::new();
@@ -77,7 +87,7 @@ impl LibraryIndex {
             } else {
                 rnl_host_spice::read_library(path, files, &mut sink)
             }?;
-            for lv in &doc.levels {
+            for (id, lv) in doc.levels.iter().enumerate() {
                 let source = normalize(&lv.path);
                 if let std::collections::hash_map::Entry::Vacant(entry) = dependencies.entry(source) {
                     if let Some(text) = files.read(entry.key()) {
@@ -85,6 +95,14 @@ impl LibraryIndex {
                     }
                 }
                 if lv.kind == LevelKind::Subckt {
+                    let mut ancestor = Some(id);
+                    while let Some(at) = ancestor {
+                        if doc.levels[at].section.is_some() {
+                            sectioned.insert(definitions.len());
+                            break;
+                        }
+                        ancestor = doc.levels[at].parent;
+                    }
                     definitions.push(LibraryDefinition {
                         name: lv.name.clone(),
                         path: path.to_string(),
@@ -95,18 +113,54 @@ impl LibraryIndex {
                 }
             }
         }
-        Some(Entry { definitions, dependencies })
+        Some(Entry { definitions, sectioned, dependencies })
+    }
+
+    fn refresh_imports(&mut self, files: &dyn Provider, reload: bool) {
+        let paths: HashSet<_> = self.entries.values().flat_map(|e| e.definitions.iter().map(|d| &d.file)).collect();
+        let mut imports = BTreeMap::new();
+        for path in paths {
+            let entry = self
+                .entries
+                .get(path)
+                .cloned()
+                .or_else(|| (!reload).then(|| self.imports.get(path).cloned()).flatten())
+                .or_else(|| Self::entry(path, files).map(Arc::new));
+            if let Some(entry) = entry {
+                imports.insert(path.clone(), entry);
+            }
+        }
+        self.imports = imports;
     }
 
     fn reindex(&mut self) {
         let mut names: HashMap<String, Vec<LibraryDefinition>> = HashMap::new();
+        let direct: HashSet<_> = self
+            .imports
+            .iter()
+            .flat_map(|(path, entry)| {
+                entry
+                    .definitions
+                    .iter()
+                    .filter(move |d| d.file == *path)
+                    .map(|d| (d.file.as_str(), d.line, d.name.as_str()))
+            })
+            .collect();
         for entry in self.entries.values() {
-            for def in &entry.definitions {
-                names.entry(def.name.to_lowercase()).or_default().push(def.clone());
+            for (id, def) in entry.definitions.iter().enumerate() {
+                let mut target = def.clone();
+                // An umbrella/testbench can lead us to a definition without being its import
+                // target. Import the defining file directly if it exposes this exact definition
+                // on its own. Otherwise retain the wrapper (e.g. a selected .lib section).
+                if !entry.sectioned.contains(&id) && direct.contains(&(def.file.as_str(), def.line, def.name.as_str()))
+                {
+                    target.path = def.file.clone();
+                }
+                names.entry(def.name.to_lowercase()).or_default().push(target);
             }
         }
         // An included definition reached through several library roots is still one definition.
-        // Prefer the defining file itself when it is also a library item, then stable path order.
+        // Prefer the defining file itself when it is independently importable, then stable path order.
         for definitions in names.values_mut() {
             definitions.sort_by_key(|d| (d.path != d.file, d.path.clone()));
             let mut seen = HashSet::new();
@@ -137,7 +191,12 @@ impl LibraryIndex {
                 out.entries.remove(path);
             }
         }
-        if !changed.is_empty() {
+        let count = out.imports.len();
+        out.imports.retain(|_, entry| {
+            !edits.iter().any(|(p, hash)| entry.dependencies.get(*p).is_some_and(|previous| hash != previous))
+        });
+        if !changed.is_empty() || count != out.imports.len() {
+            out.refresh_imports(files, false);
             out.reindex();
         }
         out
@@ -155,7 +214,7 @@ impl LibraryLookup for LibraryIndex {
             .collect()
     }
     fn definitions(&self, path: &str) -> Vec<LibraryDefinition> {
-        self.entries.get(path).map(|e| e.definitions.clone()).unwrap_or_default()
+        self.imports.get(path).or_else(|| self.entries.get(path)).map(|e| e.definitions.clone()).unwrap_or_default()
     }
 }
 
@@ -413,6 +472,157 @@ mod tests {
         assert_eq!(defs.len(), 1);
         assert_eq!(defs[0].path, "/child.inc");
         assert!(host(&files, &index, true, "/top.sp").0.subckt("cell").is_some());
+    }
+
+    #[test]
+    fn nested_definition_imports_its_own_file_not_the_testbench_that_includes_the_entry() {
+        for spectre in [false, true] {
+            let (top, tb, child, leaf, ext) = if spectre {
+                (
+                    "simulator lang=spectre\nsubckt top (a b)\nX1 (a b) cell\nends top\n",
+                    "include \"top.scs\"\ninclude \"cells/cell.scs\"\nXtb (a b) top\n",
+                    "include \"leaf.scs\"\nsubckt cell (p n)\nX2 (p n) leaf\nends cell\n",
+                    "subckt leaf (p n)\nends leaf\n",
+                    "scs",
+                )
+            } else {
+                (
+                    "* title\n.subckt top a b\nX1 a b cell\n.ends\n",
+                    ".include top.sp\n.include cells/cell.sp\nXtb a b top\n",
+                    ".include leaf.sp\n.subckt cell p n\nX2 p n leaf\n.ends\n",
+                    ".subckt leaf p n\n.ends\n",
+                    "sp",
+                )
+            };
+            let top_path = format!("/top.{ext}");
+            let tb_path = format!("/tb.{ext}");
+            let child_path = format!("/cells/cell.{ext}");
+            let leaf_path = format!("/cells/leaf.{ext}");
+            let files = MemoryProvider::new()
+                .with(&top_path, top)
+                .with(&tb_path, tb)
+                .with(&child_path, child)
+                .with(&leaf_path, leaf);
+            // PATH exposes only the two root files; the cell is discovered through the TB.
+            let index = index(&files, &[&top_path, &tb_path]);
+            let defs = index.candidates("cell", spectre);
+            assert_eq!(defs.len(), 1);
+            assert_eq!(defs[0].path, child_path);
+            assert_eq!(index.definitions(&child_path).len(), 2);
+            let (doc, sink) = host(&files, &index, true, &top_path);
+            assert!(doc.subckt("cell").is_some() && doc.subckt("leaf").is_some());
+            assert!(doc.sources.iter().all(|(path, _)| !path.ends_with(&format!("tb.{ext}"))));
+            assert!(sink.all().iter().all(|d| d.severity == rnl_runtime::diag::Severity::Warning), "{:?}", sink.all());
+            assert_eq!(sink.all().len(), 1);
+            assert!(host(&files, &index, false, &top_path).0.subckt("cell").is_none());
+        }
+    }
+
+    #[test]
+    fn nested_import_checks_collateral_conflicts_in_its_own_include_tree() {
+        let files = MemoryProvider::new()
+            .with("/top.sp", "* title\n.subckt known p n\n.ends\nX1 a 0 cell\n")
+            .with("/tb.sp", ".include cells/cell.sp\n")
+            .with("/cells/cell.sp", ".include other.sp\n.subckt cell p n\n.ends\n")
+            .with("/cells/other.sp", ".subckt known p n\n.ends\n");
+        let index = index(&files, &["/tb.sp"]);
+        let (doc, sink) = host(&files, &index, true, "/top.sp");
+        assert!(doc.subckt("cell").is_none());
+        assert!(sink.all().iter().any(|d| d.message.contains("known conflicts")));
+    }
+
+    #[test]
+    fn a_section_only_definition_keeps_its_selecting_wrapper() {
+        for spectre in [false, true] {
+            let (top, wrapper, sections, ext) = if spectre {
+                ("simulator lang=spectre\nX1 (a b) cell\n",
+                 "include \"cells.scs\" section=tt\n",
+                 "library cells\nsection tt\nsubckt cell (p n)\nends cell\nendsection tt\nsection ff\nsubckt hidden (p n)\nends hidden\nendsection ff\nendlibrary cells\n", "scs")
+            } else {
+                (
+                    "* title\nX1 a b cell\n",
+                    ".lib cells.sp tt\n",
+                    ".lib tt\n.subckt cell p n\n.ends\n.endl tt\n.lib ff\n.subckt hidden p n\n.ends\n.endl ff\n",
+                    "sp",
+                )
+            };
+            let top_path = format!("/top.{ext}");
+            let wrapper_path = format!("/wrapper.{ext}");
+            let files = MemoryProvider::new()
+                .with(&top_path, top)
+                .with(&wrapper_path, wrapper)
+                .with(&format!("/cells.{ext}"), sections);
+            let index = index(&files, &[&wrapper_path]);
+            assert_eq!(index.candidates("cell", spectre)[0].path, wrapper_path);
+            assert!(index.candidates("hidden", spectre).is_empty());
+            let (doc, sink) = host(&files, &index, true, &top_path);
+            assert!(doc.subckt("cell").is_some());
+            assert!(doc.subckt("hidden").is_none());
+            assert!(sink.all().iter().all(|d| d.severity == rnl_runtime::diag::Severity::Warning), "{:?}", sink.all());
+        }
+    }
+
+    #[test]
+    fn a_definition_included_by_a_selected_section_keeps_its_model_context() {
+        for spectre in [false, true] {
+            let (top, wrapper, sections, cell, ext) = if spectre {
+                ("simulator lang=spectre\nX1 (a b) cell\n", "include \"corners.scs\" section=tt\n",
+                 "library corners\nsection tt\nmodel nch bsim4 type=n\ninclude \"cell.scs\"\nendsection tt\nendlibrary corners\n",
+                 "subckt cell (p n)\nM1 (p p n n) nch\nends cell\n", "scs")
+            } else {
+                (
+                    "* title\nX1 a b cell\n",
+                    ".lib corners.sp tt\n",
+                    ".lib tt\n.model nch nmos\n.include cell.sp\n.endl tt\n",
+                    ".subckt cell p n\nM1 p p n n nch\n.ends\n",
+                    "sp",
+                )
+            };
+            let top_path = format!("/top.{ext}");
+            let wrapper_path = format!("/wrapper.{ext}");
+            let files = MemoryProvider::new()
+                .with(&top_path, top)
+                .with(&wrapper_path, wrapper)
+                .with(&format!("/corners.{ext}"), sections)
+                .with(&format!("/cell.{ext}"), cell);
+            let index = index(&files, &[&wrapper_path]);
+            assert_eq!(index.candidates("cell", spectre)[0].path, wrapper_path);
+            let (doc, _) = host(&files, &index, true, &top_path);
+            let cell = &doc.levels[doc.subckt("cell").unwrap()];
+            assert_eq!(cell.instances[0].mtype.as_deref(), Some("nmos"));
+            assert!(!cell.instances[0].model_missing);
+        }
+    }
+
+    #[test]
+    fn nested_import_cache_tracks_edits_refresh_reload_and_library_removal() {
+        let mut files = MemoryProvider::new()
+            .with("/top.sp", "* title\nX1 a b cell\n")
+            .with("/tb.sp", ".include cells/cell.sp\n")
+            .with("/cells/cell.sp", ".subckt cell p n\n.ends\n");
+        let mut index = index(&files, &["/tb.sp"]);
+        let edits = MemoryProvider::new().with("/cells/cell.sp", ".subckt edited p n\n.ends\n");
+        let layered = Layered { layers: vec![&edits, &files] };
+        let overlay = index.with_edits(&edits, &layered);
+        assert!(overlay.candidates("cell", false).is_empty());
+        assert_eq!(overlay.candidates("edited", false)[0].path, "/cells/cell.sp");
+        assert_eq!(overlay.definitions("/cells/cell.sp")[0].name, "edited");
+        assert_eq!(index.candidates("cell", false).len(), 1);
+        files.insert("/cells/cell.sp", ".subckt refreshed p n\n.ends\n");
+        index.invalidate(&["/cells/cell.sp".into()]);
+        index.update(&["/tb.sp".into()], &files, false);
+        assert_eq!(index.candidates("refreshed", false)[0].path, "/cells/cell.sp");
+        assert_eq!(index.definitions("/cells/cell.sp")[0].name, "refreshed");
+        files.files.remove("/cells/cell.sp");
+        index.update(&["/tb.sp".into()], &files, true);
+        assert!(index.candidates("refreshed", false).is_empty());
+        assert!(index.definitions("/cells/cell.sp").is_empty());
+        files.insert("/cells/cell.sp", ".subckt restored p n\n.ends\n");
+        index.update(&["/tb.sp".into()], &files, true);
+        assert_eq!(index.candidates("restored", false).len(), 1);
+        index.update(&[], &files, false);
+        assert!(index.candidates("restored", false).is_empty());
+        assert!(index.imports.is_empty());
     }
 
     #[test]

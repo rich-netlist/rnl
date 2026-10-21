@@ -303,6 +303,8 @@ File > Auto Include and the Netlist checkbox share a persisted setting, on by de
 
 Multiple definitions, including two in the same file, are reported as conflicts rather than chosen by PATH order. Auto Include also refuses a file that would redefine a subcircuit already loaded or selected in the same pass. Explicit includes choose the intended definition; sectioned libraries still require an explicit section selection. An included definition reached through several Library items counts as one definition.
 
+When a Library item discovers a definition through an include, the index also checks and caches the defining file as an independent import target. Auto Include imports that file and its dependencies, rather than the enclosing testbench, so it does not bring unrelated top-level circuits or a back-reference to the opened file into the document. A definition reached through an explicitly selected library section retains the selecting wrapper. These import targets follow the same refresh, reload and applied-edit invalidation as the Library index.
+
 File > Reload Library rescans PATH, rereads all current Library files (packages included), removes stale or unreadable definitions, rebuilds the index and the applied document, and preserves unapplied editor text. Failed reads appear beneath Library. Applied library edits use a document-local index overlay, without contaminating the saved session index. The web shell caches library text and indexes it in its Worker when included; Reload Library rereads available handles and refetches public packages. Browser-selected File objects remain snapshots: reselect changed local files to supply their new contents.
 
 ### Source display and folding

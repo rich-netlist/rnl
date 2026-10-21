@@ -63,6 +63,42 @@ test("Auto Include resolves indexed library subcircuits, warns on conflicts and 
   expect(disabled.files).toHaveLength(1);
 });
 
+test("Auto Include imports the actual nested definition without pulling its testbench into the web document", async ({ page }) => {
+  await start(page);
+  const results = await page.evaluate(async () => {
+    const { startCore } = await import('./core/client.js');
+    const core = startCore();
+    const files = {
+      '/top.scs': 'simulator lang=spectre\nX1 (a b) cell\n// @RNL { #X1 @PLACE(0, 0) }\n',
+      '/tb.scs': 'include "top.scs"\ninclude "cells/cell.scs"\nXtb (a b) cell\n// @RNL { #Xtb @PLACE(0, 0) }\n',
+      '/cells/cell.scs': 'subckt cell (p n)\nR1 (p n) resistor r=1k\nends cell\n',
+    };
+    try {
+      await core.library({ library: { reload: true }, pool: ['/tb.scs'], files });
+      const results = [];
+      // A pool source and an independently opened source use different namespaces.
+      for (const prefix of ['', '/<pool>']) {
+        const request = { entry: '/top.scs', files: {
+          ...Object.fromEntries(Object.entries(files).map(([p, text]) => [prefix + p, text])),
+          '/top.scs': files['/top.scs'],
+        }, pool: [prefix + '/tb.scs'], library_prefix: prefix, auto_include: true, svg: true };
+        results.push({ on: await core.build(request), off: await core.build({ ...request, auto_include: false }) });
+      }
+      return results;
+    } finally { core.terminate(); }
+  });
+  for (const { on, off } of results) {
+    expect(on.files).toHaveLength(2);
+    expect(on.files.some(f => f.path.endsWith('/cell.scs'))).toBe(true);
+    expect(on.files.some(f => f.path.endsWith('tb.scs'))).toBe(false);
+    expect(on.objects.find(o => o.name === 'X1').opens).not.toBeNull();
+    expect(on.diagnostics.filter(d => d.severity === 'error')).toEqual([]);
+    expect(on.diagnostics.some(d => d.message.includes('cells/cell.scs') && d.message.includes('added by Auto Include'))).toBe(true);
+    expect(off.files).toHaveLength(1);
+    expect(off.objects.find(o => o.name === 'X1').opens).toBeNull();
+  }
+});
+
 test("New Window hands local files, applied text, visit history and Library to a new tab", async ({ page }, info) => {
   await start(page);
   const top = '* local top\n.include "part.inc"\nX1 a 0 part\n* @RNL { #X1 @PLACE(0, 0) }\n.end\n';
