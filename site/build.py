@@ -50,6 +50,8 @@ Usage, from the repository root (standard library only, and git for the tags):
 """
 import argparse
 from base64 import b64encode
+from datetime import date, datetime, timedelta, timezone
+from html import escape
 import json
 import os
 import re
@@ -111,10 +113,162 @@ RELEASE = re.compile(r"<!--((?:no-)?(?:linux-)?release)-->(.*?)<!--/\1-->", re.S
 RELEASE_MARK = re.compile(r"<!--/?(?:no-)?(?:linux-)?release-->")
 FIELD = re.compile(r"\{\{(viewer-[a-z-]+)\}\}")
 FIELDS = ("viewer-version", "viewer-tag")
+TIMELINE = "{{timeline}}"
+# Release dates are modern Asia/Shanghai dates (UTC+08:00, without DST).
+SHANGHAI = timezone(timedelta(hours=8))
+RELEASE_VERSION = r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
+TIMELINE_TAG = re.compile(rf"(?:(viewer|core)-v({RELEASE_VERSION})|spec-(\d+\.\d+)-r(\d+))")
+SUMMARY = re.compile(r"<!--\s*timeline-summary\s*\n(.*?)-->", re.S)
 
 
 class BuildError(Exception):
     pass
+
+
+def git_text(*args):
+    try:
+        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True,
+                              encoding="utf-8", check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def timeline_tags():
+    """Annotated tag creation times, or commit times for lightweight tags; no network access."""
+    listed = git_text("for-each-ref", "--format=%(refname:short)%00%(creatordate:iso8601-strict)", "refs/tags")
+    return [{"tag": tag, "date": stamp} for tag, stamp in
+            (line.split("\0", 1) for line in (listed or "").splitlines()) if TIMELINE_TAG.fullmatch(tag)]
+
+
+def timeline_date(value):
+    try:
+        if len(value) == 10:
+            return datetime.combine(date.fromisoformat(value), datetime.min.time(), SHANGHAI)
+        stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            raise ValueError("timestamp needs a timezone")
+        return stamp.astimezone(SHANGHAI)
+    except (ValueError, TypeError) as error:
+        raise BuildError(f"Invalid timeline date {value!r}: {error}") from error
+
+
+def bilingual(value, label):
+    if (not isinstance(value, dict) or set(value) != set(CODES)
+            or any(not isinstance(value[c], str) or not value[c].strip() for c in CODES)):
+        raise BuildError(f"{label} needs nonempty zh and en strings")
+    return value
+
+
+def release_summary(tag):
+    """Prefer the tagged notes; old tags can be backfilled in the checkout without moving tags."""
+    match = TIMELINE_TAG.fullmatch(tag)
+    line, version, _, _ = match.groups()
+    candidates = []
+    if line:
+        path = (f"apps/desktop/release-notes/{version}.md" if line == "viewer"
+                else f"release-notes/core/{version}.md")
+        candidates.append(git_text("show", f"{tag}:{path}") or "")
+        if (ROOT / path).is_file():
+            candidates.append((ROOT / path).read_text(encoding="utf-8"))
+    # Standard releases already take their notes from the annotated tag's message.
+    candidates.append(git_text("for-each-ref", "--format=%(contents)", f"refs/tags/{tag}") or "")
+    for notes in candidates:
+        blocks = SUMMARY.findall(notes)
+        if len(blocks) > 1:
+            raise BuildError(f"{tag}: more than one timeline-summary block")
+        if not blocks:
+            continue
+        try:
+            summary = bilingual(json.loads(blocks[0]), f"{tag} timeline-summary")
+        except ValueError as error:
+            raise BuildError(f"{tag}: invalid timeline-summary JSON: {error}") from error
+        if any("\n" in text or "\r" in text for text in summary.values()):
+            raise BuildError(f"{tag}: timeline-summary must be one paragraph per language")
+        return summary
+    raise BuildError(f"{tag}: missing bilingual timeline-summary in release notes; see release-notes/README.md")
+
+
+def timeline_events(data, tags, summary=release_summary):
+    """Manual milestones override matching tags; sort by Shanghai time, with one latest item."""
+    events = []
+    claimed = set()
+    ids = set()
+    for original in data["milestones"]:
+        event = dict(original)
+        key = event["id"]
+        if key in ids:
+            raise BuildError(f"Duplicate timeline id: {key}")
+        ids.add(key)
+        for tag in event.get("tags", []):
+            if tag in claimed:
+                raise BuildError(f"Timeline tag appears in more than one manual milestone: {tag}")
+            claimed.add(tag)
+        events.append(event)
+    for release_tag in tags:
+        tag = release_tag["tag"]
+        if tag in claimed:
+            continue
+        match = TIMELINE_TAG.fullmatch(tag)
+        if not match:
+            continue
+        line, version, series, revision = match.groups()
+        if line == "viewer":
+            title = {"zh": f"桌面版查看器 {version}", "en": f"Desktop viewer {version}"}
+        elif line == "core":
+            title = {"zh": f"RNL 核心 {version}", "en": f"RNL core {version}"}
+        else:
+            title = {"zh": f"语言标准 {series}，修订 {revision}",
+                     "en": f"Language standard {series}, revision {revision}"}
+        events.append({"id": tag, "date": release_tag["date"], "title": title,
+                       "summary": summary(tag), "url": f"https://github.com/rich-netlist/rnl/releases/tag/{tag}"})
+    for event in events:
+        event["stamp"] = timeline_date(event["date"])
+        bilingual(event["title"], f"{event['id']} title")
+        bilingual(event.get("summary", event.get("description")), f"{event['id']} summary/description")
+        if event.get("start_date") and timeline_date(event["start_date"]) > event["stamp"]:
+            raise BuildError(f"{event['id']}: timeline date range is reversed")
+    return sorted(events, key=lambda event: (event["stamp"], event["id"]))
+
+
+def timeline_html(data=None, tags=None):
+    if data is None:
+        try:
+            data = json.loads((SRC / "timeline.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise BuildError(f"src/timeline.json: {error}") from error
+    events = timeline_events(data, timeline_tags() if tags is None else tags)
+    if not events:
+        raise BuildError("The timeline has no published milestones")
+
+    def localized(values, html=False):
+        return "".join(f"<{code}>{values[code] if html else escape(values[code])}</{code}>" for code in CODES)
+
+    def link(event):
+        url = event.get("url")
+        if not url:
+            return ""
+        if re.search(r'[\s<>"\']', url) or re.match(r"(?:[a-z][a-z0-9+.-]*:|//)", url, re.I) and not url.startswith("https://"):
+            raise BuildError(f"{event['id']}: unsafe timeline URL {url!r}")
+        labels = bilingual(event.get("link_label", {"zh": "发布说明", "en": "Release notes"}), "timeline link label")
+        return f' <a href="{escape(url, quote=True)}">{localized(labels)}</a>'
+
+    rows = []
+    for index, event in enumerate(events):
+        day = event["stamp"].date().isoformat()
+        if event.get("start_date"):
+            start = timeline_date(event["start_date"]).date().isoformat()
+            day = localized({"zh": f"{start} 至 {day}", "en": f"{start} to {day}"})
+        current = ' class="now"' if index == len(events) - 1 else ""
+        # Handwritten descriptions retain their reviewed inline links/code. Release summaries are plain text.
+        description = localized(event.get("summary", event.get("description")), html="summary" not in event)
+        rows.append(f'        <li{current}><time>{day}</time><b>{localized(event["title"])}</b>'
+                    f'<p>{description}{link(event)}</p></li>')
+    rows.append('        <li class="tl-sep"><zh>接下来</zh><en>Next</en></li>')
+    for event in data.get("next", []):
+        title = localized(bilingual(event["title"], "next milestone title"))
+        description = localized(bilingual(event["description"], "next milestone description"), html=True)
+        rows.append(f'        <li class="next"><b>{title}</b><p>{description}</p></li>')
+    return "\n".join(rows)
 
 
 def line_of(text, pos):
@@ -421,6 +575,9 @@ def build(version=None):
     """Build every page in every language, with the files of the desktop viewer's release `version`,
     or None for no release yet, and the pages at the root that lead to them."""
     files = sources()
+    if files["index.html"].count(TIMELINE) != 1:
+        raise BuildError("src/index.html needs exactly one {{timeline}} marker")
+    files["index.html"] = files["index.html"].replace(TIMELINE, timeline_html())
     ex = examples()
     errors = []
     for path, text in files.items():

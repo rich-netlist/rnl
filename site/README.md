@@ -50,6 +50,23 @@ With a release, the build keeps the `<!--release-->` blocks and fills in `{{view
 
 `pages.yml` checks out the whole history, tags included, and runs again after each release of the desktop viewer, so that the published page links to the new files. `--viewer-version` sets the version for a local build or a test, whatever the tags say, and `--viewer-version none` builds the page as before the first release.
 
+## The homepage timeline
+
+`build.py` fills the homepage's `{{timeline}}` marker from `src/timeline.json` and the
+repository's `viewer-v*`, `spec-*-r*` and `core-v*` tags. Shanghai dates come from tag creation
+times (commit times for lightweight tags), and only the latest published milestone gets
+`class="now"`. The existing timeline elements, styles and Next entries are retained.
+
+Release notes carry a bilingual, one-sentence `timeline-summary` JSON block; the
+[release checklist and template](../release-notes/README.md) define the paths and format.
+Manual milestones can claim tags to override or combine them, and hold non-release events
+with their actual PR merge timestamps and source links. Old release summaries can be
+backfilled in the checkout without moving old tags. Core generation is ready for its first
+real tag; an unreleased core is never added just because its workflow exists.
+
+Pages fetches full history and tags, rebuilds after Viewer, standard and runtime/core
+publication, and checks notes changes. The Stage text stays unchanged in this update.
+
 ## The gallery of the standard packages
 
 `packages.html` shows what [`gallery/build.mjs`](gallery/build.mjs) writes into `site/dist/gallery/` from the built-in standard series and the latest [public package catalog](https://rich-netlist.github.io/rnl-packages/catalog.json). The page is built by `build.py` like the others; its data is not, and is the same for both languages.
