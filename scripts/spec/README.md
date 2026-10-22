@@ -1,5 +1,13 @@
 # scripts/spec
 
+The website's locale identities, fonts and interface messages are configured in
+[`site/languages.json`](../../site/languages.json). The publisher shares the same native
+language menu, styling and keyboard behavior as the project site, including the downloaded
+HTML and comparison pages. Menu links keep the version, comparison, query and section.
+Missing interface translations inherit English. A site locale without its own standard
+translation links to the English document; this does not relax the checks of published
+Chinese and English standard sources described below.
+
 Builds every published form of the RNL standard from the chapters in [`spec/`](../../spec/README.md), and checks that they agree ([decision 0007](../../docs/decisions/0007-publishing-the-standard.md)).
 
 ```bash

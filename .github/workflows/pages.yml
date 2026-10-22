@@ -5,7 +5,7 @@
 # and the gallery's data, from libraries/, under gallery/. It publishes on a push to main; after a revision
 # of the standard is released, so that its pages carry the new revision label; and after a release of
 # the desktop viewer, so that the page of the tools links to its files.
-# Pull requests only run the build, which fails when a text is missing one of its languages, when a
+# Pull requests only run the build, which fails when an English source or translation markup is invalid, when a
 # check of the standard fails (decision 0007), when the web viewer does not build, or when the
 # gallery cannot read a package file or draw a symbol.
 # Requires Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
@@ -18,6 +18,7 @@ on:
       - "packages.lock.json"
       - "scripts/packages*"
       - "site/**"
+      - "scripts/site_i18n.py"
       - "apps/desktop/release-notes/**"
       - "release-notes/**"
       - "spec/**"
@@ -42,6 +43,7 @@ on:
       - "packages.lock.json"
       - "scripts/packages*"
       - "site/**"
+      - "scripts/site_i18n.py"
       - "apps/desktop/release-notes/**"
       - "release-notes/**"
       - "spec/**"
@@ -189,6 +191,7 @@ jobs:
       - name: Check site navigation in Chromium and WebKit
         env:
           RNL_SITE_SCREENSHOTS: ${{ runner.temp }}/package-review
+          RNL_I18N_SCREENSHOTS: ${{ runner.temp }}/package-review/language-menu
           RNL_TIMELINE_SCREENSHOTS: ${{ runner.temp }}/package-review/timeline
         run: |
           npm ci --prefix tests/viewer

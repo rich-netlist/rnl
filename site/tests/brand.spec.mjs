@@ -57,7 +57,7 @@ for (const lang of ["zh", "en"]) {
         text.right <= innerWidth && document.documentElement.scrollWidth <= innerWidth;
     });
     expect(fits).toBe(true);
-    for (const width of [641, 720, 721, 768, 900, 901, 1000, 1001]) {
+    for (const width of [641, 760, 761, 768, 960, 961, 1000, 1001]) {
       await page.setViewportSize({ width, height: 1000 });
       expect(await page.locator(".topbar-in").evaluate(el =>
         document.documentElement.scrollWidth <= innerWidth && [...el.children]

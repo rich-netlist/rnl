@@ -79,7 +79,8 @@ test("existing deep links and the full-width introduction hero remain usable", a
   await page.locator(".hero").getByRole("link", { name: "三分钟速览", exact: true }).click();
   await expect(page).toHaveURL(/#overview$/);
   await expect(page.locator('#toc a[href="#overview"]')).toHaveClass("here");
-  await page.locator("[data-lang-link]").click();
+  await page.locator(".language-menu > summary").click();
+  await page.locator('[data-language="en"]').click();
   await expect(page).toHaveURL(/\/en\/#overview$/);
 });
 
@@ -139,7 +140,8 @@ test("gallery: directory categories, search, disclosure, packages, history and s
   await page.goto("/zh/packages.html?series=standard-0.2&package=rnl-std-symbols&q=RNL-STD-SYMBOLS#gallery");
   await expect(page.locator('.gl-group[data-group="standard-0.2"]')).toHaveClass(/here/);
   await expect(page.locator('#gl-nav [data-group="standard-0.2"][data-pkg="rnl-std-symbols"]')).toHaveClass(/here/);
-  await page.locator("[data-lang-link]").click();
+  await page.locator(".language-menu > summary").click();
+  await page.locator('[data-language="en"]').click();
   await expect(page).toHaveURL(/\/en\/packages.html\?series=standard-0.2&q=RNL-STD-SYMBOLS&package=rnl-std-symbols#gallery/);
 });
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="$html-lang$">
+<html lang="$html-lang$" data-locale="$locale-code$">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -32,10 +32,6 @@
   --f-disp: "IBM Plex Sans Condensed", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   --f-mono: "IBM Plex Mono", "Cascadia Mono", "SFMono-Regular", Consolas, "Noto Sans SC", "Microsoft YaHei", monospace;
   color-scheme: light;
-}
-html[lang="en"] {
-  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --f-disp: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -225,22 +221,13 @@ body.only-changes :is(main section, #toc li).diff-same { display: none; }
   }
   #toc.is-open { display: block; }
 }
-@media (max-width: 720px) {
-  .pages, .brand-sub { display: none; }
-  .topbar-in { gap: 10px; }
-  .lang-link { margin-left: auto; }
-}
-/* English page names need more room beside the navigation mark and controls. */
-@media (max-width: 900px) {
-  html[lang="en"] .pages { display: none; }
-  html[lang="en"] .topbar-in { gap: 10px; }
-  html[lang="en"] .lang-link { margin-left: auto; }
-}
 @media print {
   .topbar, #toc, .downloads, .versions, .diffbar { display: none; }
   .layout { display: block; }
   body { background: none; }
 }
+$language-css$
+$locale-css$
 </style>
 </head>
 <body>
@@ -266,7 +253,7 @@ body.only-changes :is(main section, #toc li).diff-same { display: none; }
       <a href="https://github.com/rich-netlist/rnl">GitHub</a>
     </nav>
     <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="$contents-title$" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
-    <a class="lang-link" href="$other-href$" data-keep-hash hreflang="$other-lang$" lang="$other-lang$">$other-label$</a>
+    $language-menu$
     <button class="icon-btn" id="theme-btn" type="button" aria-label="$theme-label$"><svg class="ico"><use href="#i-moon"/></svg></button>
   </div>
   <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
@@ -332,8 +319,9 @@ $endif$
   paint();
 
   // The language switch keeps the reader at the same section
-  document.querySelectorAll("a[data-keep-hash]").forEach(function (a) {
-    a.addEventListener("click", function () { a.href = a.getAttribute("href").split("#")[0] + location.hash; });
+  document.querySelectorAll("a[data-lang-link]").forEach(function (a) {
+    var base = a.getAttribute("href");
+    a.addEventListener("click", function () { a.setAttribute("href", base + location.search + location.hash); });
   });
 
   // Contents: open on narrow screens, mark the section in view
@@ -421,6 +409,9 @@ $endif$
   var only = document.getElementById("diff-only");
   only.addEventListener("change", function () { document.body.classList.toggle("only-changes", only.checked); });
 })();
+</script>
+<script>
+$language-script$
 </script>
 </body>
 </html>

@@ -188,8 +188,11 @@
       (pkg.language !== pkg.version ? '<span class="chip chip-mute">' + fill('<zh>语言 {v}</zh><en>language {v}</en>', { v: esc(pkg.language) }) + '</span>' : '') +
       (group.series ? '' : '<span class="chip chip-warn"><zh>不属于标准系列</zh><en>not in the standard series</en></span>') +
       '</div>';
-    var hasSummary = pkg.summary && (pkg.summary.en !== pkg.description.split('\n\n')[0] || pkg.summary.zh !== pkg.description.split('\n\n')[0]);
-    var sum = hasSummary ? '<zh>' + esc(pkg.summary.zh) + '</zh><en>' + esc(pkg.summary.en) + '</en>' : SUMMARY[pkg.name + ' ' + pkg.version] || SUMMARY[pkg.name];
+    var locale = document.documentElement.getAttribute('data-locale');
+    var translated = pkg.summary && (Object.prototype.hasOwnProperty.call(pkg.summary, locale) ? pkg.summary[locale] : pkg.summary.en);
+    var hasSummary = pkg.summary && typeof translated === 'string' &&
+      (pkg.summary.en !== pkg.description.split('\n\n')[0] || translated !== pkg.description.split('\n\n')[0]);
+    var sum = hasSummary ? esc(translated) : SUMMARY[pkg.name + ' ' + pkg.version] || SUMMARY[pkg.name];
     h += '<p class="gl-sum">' + (sum || esc(pkg.description.split('\n\n')[0])) + '</p>';
     h += '<dl class="gl-meta">';
     var sourcePath = pkg.source ? new URL(pkg.source).pathname.replace(/^\/[^/]+\/[^/]+\/blob\/[^/]+\//, '') : pkg.path;
@@ -490,8 +493,9 @@
     if (state.pkg) params.push('package=' + encodeURIComponent(state.pkg));
     var url = location.pathname + (params.length ? '?' + params.join('&') : '') + location.hash;
     try { if (url !== location.pathname + location.search + location.hash) history[push ? 'pushState' : 'replaceState'](null, '', url); } catch (e) { /* opened from the disk */ }
-    var lang = $('[data-lang-link]');
-    if (lang) lang.setAttribute('href', lang.getAttribute('href').split(/[?#]/)[0] + (params.length ? '?' + params.join('&') : ''));
+    $$('[data-lang-link]').forEach(function (lang) {
+      lang.setAttribute('href', lang.getAttribute('href').split(/[?#]/)[0] + (params.length ? '?' + params.join('&') : ''));
+    });
   }
 
   function readUrl() {

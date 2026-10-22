@@ -76,7 +76,8 @@ test("origin is off by default, accepts old settings and persists across reloads
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".gl-card")).toHaveCount(standard.counts.symbols);
   await checkMarks(page);
-  await page.locator("[data-lang-link]").click();
+  await page.locator(".language-menu > summary").click();
+  await page.locator('[data-language="en"]').click();
   await expect(toggle).toHaveText("Origin");
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".gl-card")).toHaveCount(standard.counts.symbols);

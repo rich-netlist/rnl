@@ -12,9 +12,14 @@ The site also publishes the skill package for agents, at `skill/`, and `llms.txt
 
 **Status:** an explainer, not a specification. The RNL snippets follow the language standard 0.3 and the standard series 0.3 ([`spec/`](../spec/README.md), [`libraries/standard/0.3`](../libraries/standard/README.md)); the pages say so and link to the standard. Every file the pages show reads with `rnl check` in 0.3 without errors, but for the ones that show errors on purpose, and every statement they show reads within a netlist that has its objects. Layouts in the drawings are placed by hand, not produced by a solver, with the pins where the series 0.3 puts them; the symbols of the gallery are drawn by the core.
 
-## One source, two languages
+## One source, extensible locales
 
-Both languages of each page are built from the single source in `src/`. Every piece of text a reader sees is written once per language, next to each other:
+Pages are built from one source in `src/`, using the locale registry in
+[`languages.json`](languages.json) and [`scripts/site_i18n.py`](../scripts/site_i18n.py).
+Only Chinese and English are enabled. The registry owns language codes, native names, URL
+directories, browser-language matching, fonts, navigation breakpoints and shared interface
+messages, including those of the language-standard pages. English is the fallback source.
+Text remains next to its translations:
 
 ```html
 <h2><zh>同一件事，两种做法。</zh><en>Same task, two ways.</en></h2>
@@ -29,13 +34,47 @@ The same markup works in HTML text, attribute values, and JavaScript strings. St
 
 When you edit text:
 
-- Change both blocks of a group together. A group is a `<zh>` block followed by an `<en>` block, with only whitespace between them. A long group can put `<en>` on the next line.
+- Every group ends with its required `<en>` block. Optional translations precede it, in any order, with only whitespace between blocks. Missing translations use the English text; English itself must be present. Duplicate, nested and unclosed language blocks fail the build.
 - An empty block is allowed where one language needs no text, for example `<zh>Host adapter</zh><en></en>` for a gloss the English page does not need.
 - For a phrase with a number or name in it, translate the whole phrase and use a placeholder, as `fill('<zh>交叉 {crossings} 处</zh><en>{crossings} crossings</en>', m)` does in `intro.js`, rather than splitting it into fragments.
-- A link to another page is relative to the page, so it differs between the languages where it leaves them: the web viewer is `viewer/` from a Chinese page and `../viewer/` from an English one, written `href="<zh>viewer/</zh><en>../viewer/</en>"`, as the language switch is.
+- Links to another page are relative to that language's directory. Shared destinations such as the viewer use `../viewer/`. Language menus, fonts, HTML language attributes and primary navigation labels are generated from the registry rather than translated in each template.
 - Code comments are in English and are not translated.
 
-`build.py` refuses to build when a text is missing a language or has a stray language tag, and when Chinese characters reach an English page. Chinese that belongs on every page, such as the language switch or RNL written with the Chinese alias package `rnl-zh`, is marked: in HTML with `lang="zh-CN"` on the element, and in scripts by putting the data between `/*zh-CN*/` and `/*/zh-CN*/`. [`pages.yml`](../.github/workflows/pages.yml) runs the build on every pull request that touches `site/`, so an unpaired text fails the check before it is merged.
+The English source still checks for accidentally leaked Chinese. Intentionally quoted text
+uses an HTML `lang` attribute; Chinese examples in scripts use `/*zh-CN*/` and `/*/zh-CN*/`.
+This check applies to English, so it does not reject another locale's CJK translations.
+
+### Adding a language
+
+Add one entry to `languages` in `languages.json`, for example:
+
+```json
+{"code": "ja", "name": "日本語", "short": "JA"}
+```
+
+This creates `ja/` pages, adds Japanese to every menu and browser-language negotiation,
+and inherits English interface messages, fonts and content. Add translations progressively,
+before the English block, such as `<ja>紹介</ja><en>Introduction</en>`. There is no need to
+add an empty Japanese block to every existing group. An explicit empty block stays empty;
+it means intentional omission, rather than missing translation. Translations of shared UI
+messages go in the entry's `messages`; font settings and `nav_breakpoint` can be overridden.
+Timeline dictionaries follow the same rule: `en` is required, other registered codes are optional.
+
+The `standard` field selects an existing standard-document language; it defaults to `en`.
+A new site locale therefore links to the English standard until a translated standard is
+published. Existing Chinese and English standard sources, translation stamps and formal
+publication checks remain separate from website prose fallback.
+
+The native language menu works without JavaScript; with scripts it also closes on Escape
+or an outside click and remembers the explicit choice. Switching preserves the page,
+query string and current section, including package-gallery filters. The root entry uses
+the saved choice, then supported browser preferences, then English. Old root URLs still
+redirect to their original Chinese pages.
+
+`RNL_SITE_LANGUAGES=/absolute/path/languages.json` selects a temporary registry for local
+checks. Browser tests generate a third-locale fixture in an OS temporary directory and
+remove it afterwards; it is never included in the deployed site. Set `RNL_I18N_SCREENSHOTS`
+to capture the open menu in both languages and themes at 1440px and 390px.
 
 ## The desktop viewer's release
 
@@ -57,7 +96,7 @@ repository's `viewer-v*`, `spec-*-r*` and `core-v*` tags. Shanghai dates come fr
 times (commit times for lightweight tags), and only the latest published milestone gets
 `class="now"`. The existing timeline elements, styles and Next entries are retained.
 
-Release notes carry a bilingual, one-sentence `timeline-summary` JSON block; the
+Release notes carry a one-sentence `timeline-summary` JSON block with English and optional translations; the
 [release checklist and template](../release-notes/README.md) define the paths and format.
 Manual milestones can claim tags to override or combine them, and hold non-release events
 with their actual PR merge timestamps and source links. Old release summaries can be
@@ -222,7 +261,7 @@ Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `
 | `src/assets/toolchain.js` | The toolchain diagram of the page of the tools |
 | `src/assets/glance.js` | The language at a glance, with the 46-keyword reference, and the examples, of the language tour |
 | `src/assets/tour.js` | The interactions of the nine sections of the language tour |
-| `build.py` | Builds every page in both languages, the single-file pages (the gallery has none), and the optional zip; checks the language pairs and the release blocks, and finds the desktop viewer's newest release |
+| `build.py` | Builds every page in the registered locales, the single-file pages (the gallery has none), and the optional zip; checks translation groups and release blocks, and finds the desktop viewer's newest release |
 
 The symbols are drawn for this page and contain no Analog Canvas material. Like other paths outside `spec/`, `docs/`, and the data directories, this directory is licensed under [MIT](../LICENSE).
 
