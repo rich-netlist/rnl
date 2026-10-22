@@ -1,6 +1,5 @@
 """Release download links, including earlier tags that only shipped Windows files."""
 import importlib.util
-import ast
 import json
 import re
 import subprocess
@@ -58,10 +57,7 @@ class SiteNavigation(unittest.TestCase):
     def setUpClass(cls):
         root = Path(__file__).resolve().parents[1]
         cls.template = (root / "scripts/spec/page.html").read_text(encoding="utf-8")
-        # Read the publisher's labels without importing its command-line dependencies.
-        tree = ast.parse((root / "scripts/spec/build.py").read_text(encoding="utf-8"))
-        cls.labels = next(ast.literal_eval(node.value) for node in tree.body
-                          if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "LANGS" for t in node.targets))
+        cls.labels = {code: locale["messages"] for code, locale in build.I18N.locales.items()}
         with patch.object(build, "has_linux_release", return_value=False):
             cls.built = build.build(None)
 

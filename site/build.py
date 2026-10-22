@@ -1,14 +1,15 @@
-"""Build the pages of the project site in every language from the one bilingual source in src/.
+"""Build the static project site in the locales registered in site/languages.json.
 
 In src/, every piece of text a reader sees is written once per language, side by side:
 
     <zh>网表定义电路</zh><en>The netlist defines the circuit</en>
 
 The same markup is used in HTML text, in attribute values and in JavaScript strings. Only
-whitespace may separate the blocks of a group, and every group lists the languages in the order of
-LANGS; a block may be empty where a language needs no text. The build keeps one block of each
-group per language and checks that
-- every <zh> block is followed by an <en> block, with no stray or nested language tags;
+whitespace may separate the blocks of a group. Optional translations precede the required English
+block, which ends the group. An absent translation falls back to English; an explicit empty block
+remains empty. The shared scripts/site_i18n.py registry generates menus, fonts and locale output.
+The build checks that
+- groups have an English source and no duplicate, stray or nested language tags;
 - the English pages contain no Chinese characters, apart from Chinese content meant for every page:
   elements marked lang="zh-CN", and in scripts the blocks between /*zh-CN*/ and /*/zh-CN*/ (RNL
   written with the Chinese alias package, for example).
@@ -64,19 +65,19 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+from site_i18n import LANGUAGES as I18N  # noqa: E402
 SRC = HERE / "src"
 EXAMPLES = HERE / "examples"
 DEFAULT_OUT = HERE / "dist"
 SITE_URL = "https://rich-netlist.github.io/rnl/"
 
-# (language code, output directory). The root of the site leads to the Chinese pages when the browser's
-# first language is Chinese, and otherwise to HOME; the Chinese pages, which were at the root until
-# 2026-10-18, keep their old addresses there, which lead to MOVED.
-LANGS = [("zh", "zh/"), ("en", "en/")]
-CODES = [code for code, _ in LANGS]
+# Locale directories come from the shared registry. Legacy root URLs still lead to Chinese pages.
+LANGS = [(code, code + "/") for code in I18N.codes]
+CODES = I18N.codes
 DIRS = dict(LANGS)
-HOME = DIRS["en"]
-MOVED = DIRS["zh"]
+HOME = DIRS[I18N.default]
+MOVED = DIRS[I18N.legacy]
 
 # Each page and the name of its single-file version; None for a page that has none, such as the
 # gallery of the standard packages, which loads its data from gallery/ (site/gallery/build.mjs), and the
@@ -91,12 +92,10 @@ PAGES = {
 # Pages added after the Chinese pages moved to zh/ have no old address at the root.
 NEW_PAGES = ("agents.html",)
 
-LANG_TAG = re.compile(r"</?(?:%s)>" % "|".join(CODES))
-# One block per language, in LANGS order, separated only by whitespace; a block holds no language tags.
-GROUP = re.compile(r"\s*".join(r"<%s>((?:(?!%s).)*)</%s>" % (c, LANG_TAG.pattern, c) for c in CODES), re.S)
+GROUP = I18N.group
 CJK = re.compile("[%s]" % "".join("%s-%s" % (chr(a), chr(b)) for a, b in
                                   [(0x3000, 0x303F), (0x3400, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF)]))
-ZH_ELEMENT = re.compile(r"<(\w+)\b[^>]*\blang=\"zh[^\"]*\"[^>]*>.*?</\1>", re.S)
+ZH_ELEMENT = re.compile(r"<(\w+)\b[^>]*\blang=\"(?!en(?:-|\"))[^\"]*\"[^>]*>.*?</\1>", re.S)
 ZH_BLOCK = re.compile(r"/\*zh-CN\*/.*?/\*/zh-CN\*/", re.S)
 
 STYLE_TAG = re.compile(r'<link rel="stylesheet" href="assets/([\w.-]+\.css)">')
@@ -152,10 +151,13 @@ def timeline_date(value):
         raise BuildError(f"Invalid timeline date {value!r}: {error}") from error
 
 
-def bilingual(value, label):
-    if (not isinstance(value, dict) or set(value) != set(CODES)
-            or any(not isinstance(value[c], str) or not value[c].strip() for c in CODES)):
-        raise BuildError(f"{label} needs nonempty zh and en strings")
+def localized_values(value, label):
+    try:
+        english = I18N.text(value, I18N.default)
+    except ValueError as error:
+        raise BuildError(f"{label}: {error}") from error
+    if not english.strip():
+        raise BuildError(f"{label} needs a nonempty English source")
     return value
 
 
@@ -179,13 +181,13 @@ def release_summary(tag):
         if not blocks:
             continue
         try:
-            summary = bilingual(json.loads(blocks[0]), f"{tag} timeline-summary")
+            summary = localized_values(json.loads(blocks[0]), f"{tag} timeline-summary")
         except ValueError as error:
             raise BuildError(f"{tag}: invalid timeline-summary JSON: {error}") from error
         if any("\n" in text or "\r" in text for text in summary.values()):
             raise BuildError(f"{tag}: timeline-summary must be one paragraph per language")
         return summary
-    raise BuildError(f"{tag}: missing bilingual timeline-summary in release notes; see release-notes/README.md")
+    raise BuildError(f"{tag}: missing English timeline-summary in release notes; see release-notes/README.md")
 
 
 def timeline_events(data, tags, summary=release_summary):
@@ -213,18 +215,17 @@ def timeline_events(data, tags, summary=release_summary):
             continue
         line, version, series, revision = match.groups()
         if line == "viewer":
-            title = {"zh": f"桌面版查看器 {version}", "en": f"Desktop viewer {version}"}
+            title = {code: I18N.message(code, "timeline_viewer", version=version) for code in CODES}
         elif line == "core":
-            title = {"zh": f"RNL 核心 {version}", "en": f"RNL core {version}"}
+            title = {code: I18N.message(code, "timeline_core", version=version) for code in CODES}
         else:
-            title = {"zh": f"语言标准 {series}，修订 {revision}",
-                     "en": f"Language standard {series}, revision {revision}"}
+            title = {code: I18N.message(code, "timeline_spec", series=series, revision=revision) for code in CODES}
         events.append({"id": tag, "date": release_tag["date"], "title": title,
                        "summary": summary(tag), "url": f"https://github.com/rich-netlist/rnl/releases/tag/{tag}"})
     for event in events:
         event["stamp"] = timeline_date(event["date"])
-        bilingual(event["title"], f"{event['id']} title")
-        bilingual(event.get("summary", event.get("description")), f"{event['id']} summary/description")
+        localized_values(event["title"], f"{event['id']} title")
+        localized_values(event.get("summary", event.get("description")), f"{event['id']} summary/description")
         if event.get("start_date") and timeline_date(event["start_date"]) > event["stamp"]:
             raise BuildError(f"{event['id']}: timeline date range is reversed")
     return sorted(events, key=lambda event: (event["stamp"], event["id"]))
@@ -241,7 +242,7 @@ def timeline_html(data=None, tags=None):
         raise BuildError("The timeline has no published milestones")
 
     def localized(values, html=False):
-        return "".join(f"<{code}>{values[code] if html else escape(values[code])}</{code}>" for code in CODES)
+        return I18N.markup(values, html)
 
     def link(event):
         url = event.get("url")
@@ -249,7 +250,7 @@ def timeline_html(data=None, tags=None):
             return ""
         if re.search(r'[\s<>"\']', url) or re.match(r"(?:[a-z][a-z0-9+.-]*:|//)", url, re.I) and not url.startswith("https://"):
             raise BuildError(f"{event['id']}: unsafe timeline URL {url!r}")
-        labels = bilingual(event.get("link_label", {"zh": "发布说明", "en": "Release notes"}), "timeline link label")
+        labels = localized_values(event.get("link_label", {code: I18N.message(code, "timeline_notes") for code in CODES}), "timeline link label")
         return f' <a href="{escape(url, quote=True)}">{localized(labels)}</a>'
 
     rows = []
@@ -257,16 +258,16 @@ def timeline_html(data=None, tags=None):
         day = event["stamp"].date().isoformat()
         if event.get("start_date"):
             start = timeline_date(event["start_date"]).date().isoformat()
-            day = localized({"zh": f"{start} 至 {day}", "en": f"{start} to {day}"})
+            day = localized({code: I18N.message(code, "timeline_range", start=start, end=day) for code in CODES})
         current = ' class="now"' if index == len(events) - 1 else ""
         # Handwritten descriptions retain their reviewed inline links/code. Release summaries are plain text.
         description = localized(event.get("summary", event.get("description")), html="summary" not in event)
         rows.append(f'        <li{current}><time>{day}</time><b>{localized(event["title"])}</b>'
                     f'<p>{description}{link(event)}</p></li>')
-    rows.append('        <li class="tl-sep"><zh>接下来</zh><en>Next</en></li>')
+    rows.append('        <li class="tl-sep">' + localized({code: I18N.message(code, "timeline_next") for code in CODES}) + '</li>')
     for event in data.get("next", []):
-        title = localized(bilingual(event["title"], "next milestone title"))
-        description = localized(bilingual(event["description"], "next milestone description"), html=True)
+        title = localized(localized_values(event["title"], "next milestone title"))
+        description = localized(localized_values(event["description"], "next milestone description"), html=True)
         rows.append(f'        <li class="next"><b>{title}</b><p>{description}</p></li>')
     return "\n".join(rows)
 
@@ -280,14 +281,7 @@ def blank(m):
 
 
 def check_groups(text, name):
-    """Report every language tag that is not part of a complete group."""
-    rest = GROUP.sub(blank, text)
-    stray = {}
-    for m in LANG_TAG.finditer(rest):
-        stray.setdefault(line_of(rest, m.start()), []).append(m.group(0))
-    shape = "".join("<%s>…</%s>" % (c, c) for c in CODES)
-    return ["%s:%d: %s not part of a complete %s group" % (name, n, " ".join(tags), shape)
-            for n, tags in sorted(stray.items())]
+    return I18N.errors(text, name)
 
 
 def check_release(text, name):
@@ -349,11 +343,11 @@ def has_linux_release(version):
 
 
 def localize(text, index):
-    return GROUP.sub(lambda m: m.group(index + 1), text)
+    return I18N.localize(text, CODES[index])
 
 
 def check_leaks(text, name):
-    """A non-Chinese page must not contain Chinese outside the content marked as Chinese."""
+    """The English source must mark intentionally quoted non-English content."""
     masked = ZH_BLOCK.sub(blank, ZH_ELEMENT.sub(blank, text))
     lines = masked.split("\n")
     bad = sorted({line_of(masked, m.start()) for m in CJK.finditer(masked)})
@@ -429,7 +423,7 @@ def check_examples(files, ex):
         if "ota5t-edits.sp" in ex and needle not in ex["ota5t-edits.sp"]:
             errors.append("examples/ota5t-edits.sp: missing %r from E5_LINES in src/assets/scenes.js" % needle)
     for line in re.findall(r"\{\s*t:\s*'([^']+)'", block(r"var E2_LINES = \[(.*?)\n  \];")):
-        if "<zh>" in line:
+        if I18N.tag.search(line):
             continue
         if "ota5t_tb.sp" in ex and line not in ex["ota5t_tb.sp"]:
             errors.append("examples/ota5t_tb.sp: missing %r from E2_LINES in src/assets/scenes.js" % line)
@@ -476,8 +470,18 @@ def build_language(files, index, version, linux=False):
     of release block are checked for Chinese before the ones that do not apply are dropped."""
     code, prefix = LANGS[index]
     out = {path: localize(text, index) for path, text in files.items()}
+    out = {path: text.replace("{{locale-css}}", I18N.css(code)) for path, text in out.items()}
+    for page in PAGES:
+        tokens = {"html-lang": I18N.locales[code]["html_lang"], "locale-code": code, "font-href": escape(I18N.font_url(code), quote=True),
+                  "language-menu": I18N.menu(code, lambda target: "../" + target + "/" + ("" if page == "index.html" else page)),
+                  "spec-root": "spec/" if I18N.standard(code) == code else "../" + I18N.standard(code) + "/spec/"}
+        tokens.update({"nav-" + key: escape(I18N.message(code, key)) for key in ("intro", "tour", "spec", "packages", "tools", "agents", "pages")})
+        for key, value in tokens.items():
+            out[page] = out[page].replace("{{" + key + "}}", value)
+        if I18N.standard(code) != code:
+            out[page] = re.sub(r'(\shref=")spec/', r'\1../' + I18N.standard(code) + '/spec/', out[page])
     errors = []
-    if code != "zh":
+    if code == I18N.default:
         for path, text in out.items():
             errors += check_leaks(text, "%s (%s)" % (path, code))
     if errors:
@@ -539,22 +543,39 @@ def redirect(target, lang, text):
 
 
 def home():
-    """index.html at the root of the site. It leads to the Chinese pages when the browser's first language
-    is Chinese, zh or zh-CN, zh-TW, zh-Hans and so on, and to the English ones otherwise, HOME, keeping the
-    query and the section of the address; without scripts, to HOME. It names both languages as its
-    alternates, HOME as the default, and links them."""
-    zh, en = DIRS["zh"], DIRS["en"]
-    return ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
-            '<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>Rich Netlist (RNL)</title>\n'
-            '<link rel="alternate" hreflang="zh" href="%s%s">\n<link rel="alternate" hreflang="en" href="%s%s">\n'
-            '<link rel="alternate" hreflang="x-default" href="%s%s">\n'
-            '<script>var first = (navigator.languages && navigator.languages[0]) || navigator.language || "";\n'
-            'var to = /^zh(-|$)/i.test(first) ? "%s" : "%s";\n'
-            'if (location.protocol === "file:") to += "index.html";\n'
-            'location.replace(to + location.search + location.hash);</script>\n'
-            '<noscript><meta http-equiv="refresh" content="0; url=%s"></noscript>\n</head>\n'
-            '<body><p><a href="%s" hreflang="zh" lang="zh-CN">中文</a> · <a href="%s" hreflang="en">English</a></p></body>\n'
-            '</html>\n') % (SITE_URL, zh, SITE_URL, en, SITE_URL, HOME, zh, HOME, HOME, zh, en)
+    """Choose a saved locale, then the browser's supported preferences, then English."""
+    choices = sorted([(match, code) for code in CODES for match in I18N.locales[code]["matches"]],
+                     key=lambda item: len(item[0]), reverse=True)
+    alternates = "\n".join(f'<link rel="alternate" hreflang="{I18N.locales[code]["html_lang"]}" href="{SITE_URL}{DIRS[code]}">'
+                           for code in CODES)
+    links = " · ".join(f'<a href="{DIRS[code]}" hreflang="{I18N.locales[code]["html_lang"]}" lang="{I18N.locales[code]["html_lang"]}">{escape(I18N.locales[code]["name"])}</a>'
+                       for code in CODES)
+    return f'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Rich Netlist (RNL)</title>
+{alternates}
+<link rel="alternate" hreflang="x-default" href="{SITE_URL}{HOME}">
+<script>
+var codes = {json.dumps(CODES)}, choices = {json.dumps(choices)}, selected;
+try {{ selected = localStorage.getItem('rnl-site-language'); }} catch (error) {{}}
+if (codes.indexOf(selected) === -1) {{
+  var preferences = navigator.languages || [navigator.language || ''];
+  selected = {json.dumps(I18N.default)};
+  outer: for (var i = 0; i < preferences.length; i++) {{
+    var language = preferences[i].toLowerCase();
+    for (var j = 0; j < choices.length; j++) {{
+      var match = choices[j][0];
+      if (language === match || language.indexOf(match + '-') === 0) {{ selected = choices[j][1]; break outer; }}
+    }}
+  }}
+}}
+var to = selected + '/';
+if (location.protocol === 'file:') to += 'index.html';
+location.replace(to + location.search + location.hash);
+</script>
+<noscript><meta http-equiv="refresh" content="0; url={HOME}"></noscript></head>
+<body><p>{links}</p></body></html>
+'''
 
 
 def redirects():
@@ -567,7 +588,7 @@ def redirects():
             continue
         for name in (page, single):
             if name and name != "index.html":
-                out[name] = redirect(MOVED + name, "zh-CN", "这一页已移到 " + MOVED + name)
+                out[name] = redirect(MOVED + name, I18N.locales[I18N.legacy]["html_lang"], "这一页已移到 " + MOVED + name)
     return out
 
 
@@ -695,8 +716,8 @@ def main():
     for code, prefix in LANGS:
         for page in PAGES:
             print("  %s: %s" % (code, out / prefix / page))
-    print("  the root leads to %s in a browser whose first language is Chinese, else to %s; the old addresses"
-          " of the Chinese pages lead to %s" % (DIRS["zh"], HOME, MOVED))
+    print("  the root uses a saved language or supported browser preferences, falling back to %s; "
+          "legacy root addresses lead to %s" % (HOME, MOVED))
     if version:
         print("the page of the tools links to the desktop viewer %s (tag viewer-v%s)" % (version, version))
     else:

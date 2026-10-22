@@ -44,12 +44,7 @@
   --f-mono: "IBM Plex Mono", "Cascadia Mono", "SFMono-Regular", Consolas, "Noto Sans SC", monospace;
   color-scheme: light;
 }
-/* Latin pages: IBM Plex Sans for body text, no CJK fallbacks */
-html[lang="en"] {
-  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --f-disp: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", sans-serif;
-  --f-mono: "IBM Plex Mono", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-}
+
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -256,17 +251,6 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
   #toc.is-open { display: block; }
   /* Fixed panels must stretch between their insets so long lists scroll within the viewport. */
   .layout > #toc { align-self: auto; }
-}
-@media (max-width: 720px) {
-  .pages, .brand-sub { display: none; }
-  .topbar-in { gap: 10px; }
-  .lang-link { margin-left: auto; }
-}
-/* English page names need more room beside the navigation mark and controls. */
-@media (max-width: 900px) {
-  html[lang="en"] .pages { display: none; }
-  html[lang="en"] .topbar-in { gap: 10px; }
-  html[lang="en"] .lang-link { margin-left: auto; }
 }
 
 /* ---------- Shared components ---------- */
@@ -1576,3 +1560,5 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .dl-soon .ico { color: var(--signal); margin-top: 3px; }
 .dl-notes { margin-top: 18px; }
 @media (max-width: 760px) { .dl-list li { grid-template-columns: 1fr; } }
+
+{{locale-css}}

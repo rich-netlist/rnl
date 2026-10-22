@@ -18,6 +18,7 @@ on:
       - "packages.lock.json"
       - "scripts/packages*"
       - "site/**"
+      - "scripts/site_i18n.py"
       - "apps/desktop/release-notes/**"
       - "release-notes/**"
       - "spec/**"
@@ -42,6 +43,7 @@ on:
       - "packages.lock.json"
       - "scripts/packages*"
       - "site/**"
+      - "scripts/site_i18n.py"
       - "apps/desktop/release-notes/**"
       - "release-notes/**"
       - "spec/**"
@@ -189,6 +191,7 @@ jobs:
       - name: Check site navigation in Chromium and WebKit
         env:
           RNL_SITE_SCREENSHOTS: ${{ runner.temp }}/package-review
+          RNL_I18N_SCREENSHOTS: ${{ runner.temp }}/package-review/language-menu
           RNL_TIMELINE_SCREENSHOTS: ${{ runner.temp }}/package-review/timeline
         run: |
           npm ci --prefix tests/viewer
