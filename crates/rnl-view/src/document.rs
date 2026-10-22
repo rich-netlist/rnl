@@ -23,6 +23,8 @@ use crate::BuildOptions;
 
 mod symbols;
 pub use symbols::{InspectedLabel, InspectedPin, InspectedSymbol};
+mod usages;
+pub use usages::{Usage, UsageRole};
 
 /// What a viewer shows of a document, as [`crate::build`] gives it.
 #[derive(Serialize, Debug)]
@@ -59,6 +61,8 @@ pub struct Document {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Level {
+    /// All usages in this drawing scope, including semantic usages without a symbol.
+    pub usages: Vec<Usage>,
     /// Terminal names in subcircuit declaration order.
     pub ports: Vec<String>,
     /// The subcircuit's own block symbol, an index into `Document::symbols`.
@@ -433,6 +437,7 @@ pub(crate) fn document(
         }
     }
 
+    usages::inspect_all(r, &mut levels, &mut ix);
     let symbols = symbols::inspect(r, &mut levels);
     let diagnostic = |d: &Diag, sink: &Sink| {
         let (file, line, col) = match &d.loc {
@@ -560,11 +565,38 @@ struct Index<'a> {
     spans: Vec<Span>,
     insts: HashMap<(usize, usize), usize>,
     nets: HashMap<(usize, String), usize>,
+    usages: HashMap<(usize, String), usize>,
 }
 
 impl<'a> Index<'a> {
     fn new(doc: &'a HostDocument, files: &'a HashMap<String, usize>) -> Index<'a> {
-        Index { doc, files, objects: Vec::new(), spans: Vec::new(), insts: HashMap::new(), nets: HashMap::new() }
+        Index {
+            doc,
+            files,
+            objects: Vec::new(),
+            spans: Vec::new(),
+            insts: HashMap::new(),
+            nets: HashMap::new(),
+            usages: HashMap::new(),
+        }
+    }
+
+    fn usage(&mut self, level: usize, id: &str) -> usize {
+        let key = (level, id.to_string());
+        if let Some(&o) = self.usages.get(&key) {
+            return o;
+        }
+        let o = self.objects.len();
+        self.objects.push(Object {
+            kind: "usage",
+            name: id.into(),
+            level,
+            level_title: self.doc.levels[level].title(),
+            lines: None,
+            opens: None,
+        });
+        self.usages.insert(key, o);
+        o
     }
 
     /// The net of a level by the name a statement writes.
@@ -678,15 +710,7 @@ impl<'a> Index<'a> {
             // on a point with no pins. Keep the net on the hit for network highlighting.
             let mut labels = objects.clone();
             if it.kind == "usage" {
-                let usage = self.objects.len();
-                self.objects.push(Object {
-                    kind: "usage",
-                    name: it.object_id.clone(),
-                    level: lv.level,
-                    level_title: self.doc.levels[lv.level].title(),
-                    lines: None,
-                    opens: None,
-                });
+                let usage = self.usage(lv.level, &it.object_id);
                 objects.insert(0, usage);
                 // Preserve clicking a label to select its net; the usage also owns its label.
                 labels.push(usage);
@@ -741,6 +765,7 @@ impl<'a> Index<'a> {
             });
         }
         Level {
+            usages: Vec::new(),
             ports: self.doc.levels[lv.level].ports.clone(),
             symbol: None,
             host: lv.level,
@@ -1398,7 +1423,8 @@ R1 rail out 1k
             let usage = hit.objects[0];
             assert_eq!(d.objects[usage].kind, "usage");
             assert_eq!(d.objects[usage].name, format!("%{name}"));
-            assert_eq!((d.objects[usage].level, d.objects[usage].opens, d.objects[usage].lines), (0, None, None));
+            assert_eq!((d.objects[usage].level, d.objects[usage].opens), (0, None));
+            assert!(d.objects[usage].lines.is_some());
             assert!(!usages.contains(&usage));
             usages.push(usage);
             let nets = if name == "j" { Vec::new() } else { vec![net] };

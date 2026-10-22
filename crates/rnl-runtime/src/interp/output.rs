@@ -1,6 +1,6 @@
 //! From scenes to the effective model the renderer reads (crate::model).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::geom::{Orient, Pt};
 use crate::host::LevelKind;
@@ -246,6 +246,33 @@ impl Interp<'_> {
         points: &[ObjId],
         ids: &HashMap<ObjId, String>,
     ) -> (Vec<ObjectInfo>, Vec<PointInfo>) {
+        // A semantic wrapper can create virtual parts, wires or annotations without having
+        // its own symbol. Track that separately from the symbol of the usage itself.
+        let scene = &self.scenes[s];
+        let mut drawn_usages: HashSet<ObjId> =
+            scene.usages.iter().copied().filter(|a| scene.symbol.contains_key(a)).collect();
+        for &o in scene.wires.iter().chain(&scene.prims).chain(&scene.texts).chain(&scene.routes) {
+            let site = match self.o(o) {
+                ObjData::Wire { site, .. }
+                | ObjData::Prim { site, .. }
+                | ObjData::Text { site, .. }
+                | ObjData::KeyText { site, .. }
+                | ObjData::Route { site, .. } => site,
+                _ => continue,
+            };
+            if let Some(a) = site.as_ref().and_then(|c| c.frame_usage()) {
+                drawn_usages.insert(a);
+            }
+        }
+        for a in drawn_usages.clone() {
+            let mut parent = self.usage(a).parent;
+            while let Some(p) = parent {
+                if !drawn_usages.insert(p) {
+                    break;
+                }
+                parent = self.usage(p).parent;
+            }
+        }
         let mut out = Vec::new();
         for &o in objs {
             let (kind, host) = match self.o(o).clone() {
@@ -305,6 +332,14 @@ impl Interp<'_> {
                 }
             }
             out.push(ObjectInfo {
+                usage_has_drawing: drawn_usages.contains(&o),
+                source: match self.o(o) {
+                    ObjData::Usage(u) => u.site.as_ref().and_then(|c| {
+                        let stmt = c.stmt.as_ref()?;
+                        Some((self.rec_loc(stmt.rec, stmt.start)?, self.rec_loc(stmt.rec, stmt.end.saturating_sub(1))?))
+                    }),
+                    _ => None,
+                },
                 id: ids[&o].clone(),
                 kind,
                 host,

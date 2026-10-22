@@ -78,6 +78,10 @@ export type InspectedLabel = { key: string | null, text: string, at: [number, nu
  */
 export type Level = {
   /**
+   * All usages in this drawing scope, including semantic usages without a symbol.
+   */
+  usages: Array<Usage>,
+  /**
    * Terminal names in subcircuit declaration order.
    */
   ports: Array<string>,
@@ -144,6 +148,41 @@ export type Level = {
    * with its `reason` and no symbol.
    */
   unplaced: Array<Unplaced>,
+};
+
+export type Usage = {
+  object: number,
+  id: string,
+  definition: string,
+  /**
+   * Whether the usage itself is a virtual part with its own symbol.
+   */
+  has_symbol: boolean,
+  /**
+   * Also includes virtual symbols/wires/annotations created inside the usage.
+   */
+  has_drawing: boolean,
+  file: string | null,
+  first_line: number,
+  source: string,
+  roles: Array<UsageRole>,
+};
+
+export type UsageRole = {
+  name: string,
+  /**
+   * References as written by the runtime, including unavailable members.
+   */
+  members: Array<string>,
+  objects: Array<number>,
+  /**
+   * SVG groups to keep at full opacity while focusing this role.
+   */
+  groups: Array<string>,
+  /**
+   * Visible extent in SVG pixels, y down; absent when no member can be displayed.
+   */
+  bounds: [number, number, number, number] | null,
 };
 
 /**

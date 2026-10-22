@@ -27,7 +27,7 @@ export function darkColour(colour) {
 /** Apply the preference to a newly imported drawing or thumbnail, or restore its original colours. */
 export function colourDrawing(svg) {
   for (const el of svg.querySelectorAll("[stroke], [fill]")) {
-    if (el.closest(".overlay")) continue;
+    if (el.closest(".overlay, .usage-overlays, .usage-underlays")) continue;
     if (!originals.has(el)) {
       originals.set(el, ["stroke", "fill"].map((attr) => [attr, el.getAttribute(attr)]));
     }

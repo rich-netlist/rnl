@@ -348,6 +348,10 @@ pub struct BlockSymbol {
 /// gives of it (`notes/rnl-editor-interface` in rnl-dev, 3.5).
 #[derive(Clone, Debug)]
 pub struct ObjectInfo {
+    /// A usage has its own symbol or creates drawing objects in its body/descendants.
+    pub usage_has_drawing: bool,
+    /// The complete statement that creates a usage, inclusive source coordinates.
+    pub source: Option<(crate::diag::Loc, crate::diag::Loc)>,
     /// Its id, unique in the level: `#M1` for an instance, `%gnd1` for an object named in the level,
     /// or, for one without a name of its own, where the statement that made it is,
     /// `@file:line:col`, with `#n` after it when that statement made several.

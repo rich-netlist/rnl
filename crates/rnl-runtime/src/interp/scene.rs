@@ -1043,7 +1043,12 @@ impl Interp<'_> {
                     let l = self.label(obj);
                     return self.fail(ctx, format!("ROUTE takes nets, not {l} (13.7)"), *off);
                 }
-                let r = self.new_obj(ObjData::Route { net: obj, mode: mode.clone(), style: style.clone() });
+                let r = self.new_obj(ObjData::Route {
+                    net: obj,
+                    mode: mode.clone(),
+                    style: style.clone(),
+                    site: Some(Rc::new(ctx.clone())),
+                });
                 self.scenes[s].routes.push(r);
                 self.scenes[s].note_created(r, at, ctx);
                 self.made_routes.push(r);

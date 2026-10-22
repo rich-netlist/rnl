@@ -24,6 +24,7 @@ import { ascend, descend, opens } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
 import { fileAssociations } from "./file-associations.js";
 import { memoryCache } from "./memory-cache.js";
+import { toggleUsages } from "./usages.js";
 import { $ } from "./util.js";
 
 let table = null; // commands.json, once loaded
@@ -89,6 +90,7 @@ export function command(id, options = {}) {
     case "grid-axes":
     case "grid-settings": gridCommand(id); break;
     case "toggle-hover-names": setHoverNames(!hoverNamesOn()); break;
+    case "toggle-usages": return toggleUsages();
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "panel-hide": return setSidebar(false);
@@ -96,13 +98,15 @@ export function command(id, options = {}) {
     case "panel-netlist":
     case "panel-hierarchy":
     case "panel-symbol":
+    case "panel-usages":
     case "panel-unplaced":
     case "panel-solve": return showPane(id.slice("panel-".length));
     case "descend": return descend(selected, options);
     case "descend-new-window": return descend(selected, { newWindow: true });
     case "ascend": return ascend(options);
     case "shortcuts": inform({ title: m("Keyboard Shortcuts"), paragraphs: [
-      m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Not drawn.")}${shell.solve ? m(" 6: Solve report.") : ""}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
+      m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Usage. 6: Not drawn.")}${shell.solve ? m(" 7: Solve report.") : ""}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
+      m("Ctrl+R: Show Usages. F5: Reload the netlist."),
       m("E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level."),
       m("Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window."),
       m("Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing."),
@@ -220,7 +224,7 @@ function matches(e, spec) {
   if (parts.includes("Control")) return e.ctrlKey && !e.metaKey && !e.altKey && e.shiftKey === parts.includes("Shift");
   if (parts.includes("Ctrl")) return ctrl && (!/^[a-z]$/.test(key) || e.shiftKey === parts.includes("Shift"));
   if (key === "e" || key === "enter") return !ctrl && !e.altKey && e.shiftKey === parts.includes("Shift");
-  if (/^[1-6]$/.test(key)) return !ctrl && !e.altKey && !e.shiftKey;
+  if (/^[1-7]$/.test(key)) return !ctrl && !e.altKey && !e.shiftKey;
   return !(ctrl || e.altKey) || !(key.length === 1 || key === "backspace");
 }
 
@@ -259,7 +263,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   let id = null;
-  if (e.key === "F5" || (ctrl && e.key.toLowerCase() === "r")) id = "reload"; // re-read the file, not the page
+  if (e.key === "F5") id = "reload"; // re-read the file, not the page
   else if (e.key === "Escape" && !typing) {
     clearSelection();
     e.preventDefault();

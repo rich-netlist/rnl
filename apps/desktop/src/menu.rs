@@ -346,6 +346,7 @@ mod tests {
             ("netlist", "&Netlist"),
             ("hierarchy", "&Hierarchy"),
             ("symbol", "&Symbol"),
+            ("usages", "&Usage"),
             ("unplaced", "Not &Drawn"),
             ("solve", "S&olve"),
         ]
@@ -481,6 +482,7 @@ mod tests {
                     ),
                     grid("Show &Grid\tG"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
+                    check("toggle-usages", "Show &Usages\tCtrl+R", None),
                     languages(),
                     Shown::Separator,
                     panels(true),
@@ -530,6 +532,7 @@ mod tests {
                     ),
                     grid("Show &Grid"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
+                    check("toggle-usages", "Show &Usages", Some("CmdOrCtrl+R")),
                     languages(),
                     Shown::Separator,
                     panels(false),

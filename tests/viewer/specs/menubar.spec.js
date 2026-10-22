@@ -75,8 +75,8 @@ test.describe("on the web", () => {
         items: [
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-",
           "Background", "Light", "Dark",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Language", "English", "简体中文", "",
-          "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Not Drawn5", "", "Hide",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Language", "English", "简体中文", "",
+          "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "", "Hide",
         ],
       },
     ]);
@@ -425,7 +425,7 @@ test.describe("with a native menu", () => {
       ["background-light", true], ["background-dark", false],
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
-      ["toggle-hover-names", true],
+      ["toggle-hover-names", true], ["toggle-usages", true],
       ["language-en", true], ["language-zh", false],
       ["toggle-auto-include", true],
     ];
@@ -435,7 +435,7 @@ test.describe("with a native menu", () => {
     expect(await viewer.calls("setCheck")).toEqual(expect.arrayContaining([["toggle-netlist", false], ["toggle-problems", false]]));
     expect(await page.evaluate(() => window.fakeShell.checks)).toEqual({
       ...Object.fromEntries(marks), "toggle-netlist": false, "toggle-problems": false,
-      ...Object.fromEntries(["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"].map(name => [`panel-${name}`, false])),
+      ...Object.fromEntries(["files", "netlist", "hierarchy", "symbol", "usages", "unplaced", "solve"].map(name => [`panel-${name}`, false])),
     });
     // Alt and F10 do nothing on the page
     await page.keyboard.press("Alt");

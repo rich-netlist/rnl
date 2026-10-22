@@ -29,7 +29,8 @@ export function select(o, from, options) {
   setSelected(o);
   markSubcircuit(opens(o) !== null);
   paintDrawingSelection();
-  paintSourceSelection(from === "drawing" || from === "ascend");
+  paintSourceSelection(from === "drawing" || from === "ascend" || from === "usage");
+  window.dispatchEvent(new Event("viewer-selection"));
   const sel = $("selection");
   sel.replaceChildren();
   const b = document.createElement("b");
@@ -48,6 +49,7 @@ export function clearSelection() {
   paintDrawingSelection();
   paintSourceSelection(false);
   setText($("selection"), "");
+  window.dispatchEvent(new Event("viewer-selection"));
 }
 
 /** A selected subcircuit instance is marked in its own colour, in the drawing and the text. */

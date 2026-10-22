@@ -6,6 +6,7 @@ import { updateHierarchy } from "./hierarchy.js";
 import { revealPending, refreshSource, updateSourceFilters } from "./text.js";
 import { showUnplaced } from "./unplaced.js";
 import { renderSymbol } from "./symbol.js";
+import { renderUsages } from "./usages.js";
 import { $, clamp, load, save } from "./util.js";
 
 const app = $("app");
@@ -24,7 +25,7 @@ const TREE_MIN = 100;
 // All entry points (tabs, shortcuts, restore and menu) publish the same visible-pane state.
 function syncPanelCommands() {
   const shown = !app.classList.contains("sidebar-hidden");
-  for (const name of ["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"]) {
+  for (const name of ["files", "netlist", "hierarchy", "symbol", "usages", "unplaced", "solve"]) {
     const tab = $(`tab-${name}`);
     setCheck(`panel-${name}`, shown && !tab.hidden && tab.getAttribute("aria-selected") === "true");
   }
@@ -43,8 +44,8 @@ export function setSidebar(shown) {
 /** Select a side-panel view; Solve is available in shells with a solver. */
 export function setPane(name) {
   const view =
-    name === "files" || name === "hierarchy" || name === "symbol" || name === "unplaced" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
-  const panes = { files: $("pane-files"), netlist: netlistPane, hierarchy: hierarchyPane, symbol: $("pane-symbol"), unplaced: $("pane-unplaced"), solve: $("pane-solve") };
+    name === "files" || name === "hierarchy" || name === "symbol" || name === "usages" || name === "unplaced" || (name === "solve" && !$("tab-solve").hidden) ? name : "netlist";
+  const panes = { files: $("pane-files"), netlist: netlistPane, hierarchy: hierarchyPane, symbol: $("pane-symbol"), usages: $("pane-usages"), unplaced: $("pane-unplaced"), solve: $("pane-solve") };
   for (const [k, el] of Object.entries(panes)) {
     el.hidden = k !== view;
     $(`tab-${k}`).setAttribute("aria-selected", String(k === view));
@@ -65,6 +66,8 @@ export function setPane(name) {
     window.dispatchEvent(new Event("library-shown"));
   } else if (view === "symbol") {
     renderSymbol();
+  } else if (view === "usages") {
+    renderUsages();
   }
 }
 
@@ -153,6 +156,8 @@ function splitter(el, axis, sign, get, set, key) {
 splitter($("vsplit"), "x", 1, () => sidebar.getBoundingClientRect().width, setSidebarWidth, "sidebar-width");
 splitter($("hsplit"), "y", -1, () => $("problems-body").getBoundingClientRect().height, setProblemsHeight, "problems-height");
 splitter($("hsplit2"), "y", -1, () => $("index-section").getBoundingClientRect().height, setIndexHeight, "index-height");
+splitter($("usage-split"), "y", 1, () => $("usage-list").getBoundingClientRect().height,
+  px => setSize("--usage-list-h", px, () => [80, Math.max(80, $("pane-usages").clientHeight - 125)]), "usage-list-height");
 
 window.addEventListener("resize", () => {
   setSidebarWidth(sidebar.getBoundingClientRect().width || load("sidebar-width", 420));
@@ -169,5 +174,6 @@ $("tab-files").addEventListener("click", () => setPane("files"));
 $("tab-netlist").addEventListener("click", () => setPane("netlist"));
 $("tab-hierarchy").addEventListener("click", () => setPane("hierarchy"));
 $("tab-symbol").addEventListener("click", () => setPane("symbol"));
+$("tab-usages").addEventListener("click", () => setPane("usages"));
 $("tab-unplaced").addEventListener("click", () => setPane("unplaced"));
 $("tab-solve").addEventListener("click", () => setPane("solve"));

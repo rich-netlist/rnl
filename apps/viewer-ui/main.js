@@ -6,6 +6,7 @@ import { append, m, setText, startI18n } from "./i18n.js";
 
 import { startPool } from "./pool.js";
 import { startPreload } from "./preload.js";
+import { startUsages } from "./usages.js";
 import { setBackground } from "./background.js";
 import { command, isChecked, setCheck, startCommands } from "./commands.js";
 import { closeRequested } from "./editor.js";
@@ -38,6 +39,7 @@ async function start() {
     return;
   }
   setBackground(load("background", "light"));
+  startUsages();
   setSidebarWidth(load("sidebar-width", 420));
   setProblemsHeight(load("problems-height", 180));
   setSidebar(load("sidebar-shown", true));

@@ -93,3 +93,5 @@ RNL_BLESS=1 cargo test -p rnl-view types
 The serde field names are the contract, and the declarations keep them as they are.
 
 See the [roadmap](../../docs/roadmap.md) for planned work.
+
+`Level.usages` lists every usage in that drawing scope, including semantic usages without a symbol. Each entry shares a selectable `Document.objects` identity with its symbol when it has one; it carries the creating statement and its source, the definition name, its own symbol classification, whether it creates drawing objects in its body/descendants, and role references. Roles contain deduplicated selectable members, special wire display groups, and visible extents in SVG pixel coordinates. Set roles, nested semantic usages, quoted references and fragmented wires retain their geometry; shared nested usages are memoized. Unavailable role members keep their references with no extent. The frontend alone assigns display colors and draws usage overlays; exporting usages does not construct a solver problem.

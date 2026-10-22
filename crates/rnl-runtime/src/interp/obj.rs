@@ -588,6 +588,7 @@ pub enum ObjData {
         net: ObjId,
         mode: String,
         style: StyleMap,
+        site: Option<Rc<Ctx>>,
     },
     Prim {
         shape: Shape,

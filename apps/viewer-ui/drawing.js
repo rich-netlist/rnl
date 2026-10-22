@@ -18,6 +18,7 @@ import { descend, opens, updatePath } from "./subcircuits.js";
 import { markUnplaced, scopeSource } from "./text.js";
 import { renderUnplaced } from "./unplaced.js";
 import { $, clamp, svgElement } from "./util.js";
+import { paintUsages, usageAt, usagesAt } from "./usages.js";
 
 const canvas = $("canvas");
 
@@ -68,6 +69,7 @@ export function showLevel(i, keptView) {
   positionBadge();
   scale = lv.scale;
   if (lv.empty) {
+    paintUsages(null, null, groups);
     view = null;
     paintGrid(null);
     showPointer();
@@ -127,6 +129,7 @@ export function notice(text) {
 }
 
 export function clearDrawing(message) {
+  paintUsages(null, null, groups);
   cancelGesture();
   notice("");
   closePicker();
@@ -162,6 +165,7 @@ function apply() {
   setText($("zoom"), `${Math.round(view.k * 100)}%`);
   positionBadge();
   paintGrid(view, scale);
+  paintUsages(svg, view, groups);
   showPointer();
 }
 
@@ -191,7 +195,7 @@ function inkExtent() {
   if (!inverse) return extent;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const el of svg.querySelectorAll("path, circle, ellipse, line, polyline, polygon, rect, text")) {
-    if (el.classList.contains("backdrop") || el.closest(".overlay")) continue;
+    if (el.classList.contains("backdrop") || el.closest(".overlay, .usage-overlays, .usage-underlays")) continue;
     const style = getComputedStyle(el);
     if (style.display === "none" || style.visibility === "hidden" || (style.fill === "none" && style.stroke === "none")) continue;
     let { x, y, width, height } = el.getBBox();
@@ -347,7 +351,7 @@ function endPress(e, cancelled) {
   cancelGesture();
   if (!click) return;
   const { hits, blocked } = hitsAt(doc && doc.levels[current], view, canvasPoint(e));
-  const objects = objectsOf(hits);
+  const objects = hits.length ? objectsOf(hits) : !blocked ? usagesAt(canvasPoint(e)) : [];
   if (e.shiftKey && objects.some((o) => opens(o) !== null)) return; // Shift-double-click leaves this viewer unchanged
   if (objects.length > 1) {
     hideTip();
@@ -362,7 +366,7 @@ function endPress(e, cancelled) {
  */
 function pointOut(e, point) {
   const { hits } = hitsAt(doc && doc.levels[current], view, point);
-  canvas.classList.toggle("over-object", hits.length > 0);
+  canvas.classList.toggle("over-object", hits.length > 0 || usageAt(point) !== null);
   const name = hoverNamesOn() ? nameOf(doc, hits[0]) : null;
   if (name === null) hideTip();
   else showTip(name, e.clientX, e.clientY);
@@ -404,6 +408,7 @@ export function paintDrawingSelection() {
   if (!svg) return;
   for (const g of svg.querySelectorAll(".sel")) g.classList.remove("sel");
   overlay.replaceChildren();
+  paintUsages(svg, view, groups);
   if (selected === null) return;
   const kind = doc.objects[selected].kind;
   const isInstance = kind === "instance";

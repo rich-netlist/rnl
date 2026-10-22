@@ -30,7 +30,7 @@ pub use catalog::{
 };
 pub use document::{
     Child, Diagnostic, Document, Drawings, Hit, InspectedLabel, InspectedPin, InspectedSymbol, Level, Object,
-    SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing,
+    SourceFile, SourceInclude, Span, Unplaced, UnplacedDrawing, Usage, UsageRole,
 };
 pub use library::{LibraryIndex, LibraryProvider};
 pub use primitive::{
@@ -754,21 +754,24 @@ R1 p q 1k
         // by default the SVG and no primitives, as the viewers have read the Document so far
         let default = BuildOptions::default();
         let l = level(default.svg, default.primitives);
-        assert_eq!(keys(&l), "host title kind lines svg scale empty status hits children unplaced");
+        assert_eq!(keys(&l), "usages host title kind lines svg scale empty status hits children unplaced");
         let l = level(true, true);
-        assert_eq!(keys(&l), "host title kind lines svg primitives scale empty status hits children unplaced");
+        assert_eq!(keys(&l), "usages host title kind lines svg primitives scale empty status hits children unplaced");
         assert_eq!(l["scale"], 14.0);
         assert!(l["primitives"].as_array().is_some_and(|p| p.len() > 2));
         assert_eq!(
             keys(&level(false, true)),
-            "host title kind lines primitives scale empty status hits children unplaced"
+            "usages host title kind lines primitives scale empty status hits children unplaced"
         );
-        assert_eq!(keys(&level(false, false)), "host title kind lines scale empty status hits children unplaced");
+        assert_eq!(
+            keys(&level(false, false)),
+            "usages host title kind lines scale empty status hits children unplaced"
+        );
         // the solve status when asked for: the resistor and the capacitor are placed, not turned
         let options = BuildOptions { svg: false, status: true, ..BuildOptions::default() };
         let d = serde_json::to_value(build("a.sp", &files, &options).unwrap()).unwrap();
         let l = d["levels"][0].as_object().unwrap();
-        assert_eq!(keys(l), "host title kind lines scale empty status solve hits children unplaced");
+        assert_eq!(keys(l), "usages host title kind lines scale empty status solve hits children unplaced");
         assert_eq!(l["solve"], "unsolved");
     }
 

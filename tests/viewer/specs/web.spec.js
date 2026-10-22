@@ -17,6 +17,24 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
 });
 
+test('usage inspection and overlay selection work with the real WASM core', async ({ page }) => {
+  await start(page);
+  const doc = await opened(page, () => page.locator('#file-input').setInputFiles({
+    name: 'usage-inspector.sp', mimeType: 'text/plain',
+    buffer: fs.readFileSync(path.join(root, 'tests/viewer/inputs/usage-inspector.sp')),
+  }));
+  const pair = doc.levels[0].usages.find(u => u.id === '%pair1');
+  expect(pair.roles.every(r => r.bounds && r.objects.length)).toBe(true);
+  await page.keyboard.press('5');
+  await page.getByRole('button', { name: '%pair1', exact: true }).click();
+  await expect(page.locator(`#canvas .usage-frame[data-usage="${pair.object}"]`)).toHaveClass(/selected/);
+  await expect(page.locator('.usage-source')).toContainText('%pair1');
+  await page.keyboard.press('Control+r');
+  await expect(page.locator('#canvas .usage-frame')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#canvas .usage-frame')).toHaveCount(0);
+});
+
 test('unkeyed wire net labels have independent colours in the real web core', async ({ page }) => {
   await start(page);
   const doc = await opened(page, () => page.locator('#file-input').setInputFiles({

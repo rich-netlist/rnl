@@ -1,4 +1,5 @@
 :root {
+  --usage-list-h: 240px;
   --bg: #f4f4f2;
   --panel: #fbfbfa;
   --fg: #1d1d1f;
@@ -162,6 +163,34 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 
 .pane { min-height: 0; min-width: 0; }
 .pane[hidden] { display: none; }
+.usages-pane { display: grid; grid-template-rows: minmax(80px, var(--usage-list-h)) 5px minmax(120px, 1fr); grid-template-columns: minmax(0, 1fr); }
+.usage-list, .usage-detail { min-height: 0; overflow: auto; }
+.usage-detail { padding: 12px; }
+.usage-detail h2 { font-size: 14px; margin: 0 0 12px; overflow-wrap: anywhere; }
+.usage-detail h3 { font-size: 13px; margin: 16px 0 8px; }
+.usage-group-head, .usage-row { display: flex; align-items: center; gap: 6px; padding: 3px 10px; }
+.usage-group-head { background: var(--bg); border-bottom: 1px solid var(--line); }
+.usage-expand, .usage-name { flex: 1; min-width: 0; text-align: left; display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+.usage-expand { font-weight: 600; }
+.usage-expand[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+.usage-row { padding-left: 26px; }
+.usage-row.selected { background: var(--select-line); }
+.usage-name { font-family: ui-monospace, Consolas, monospace; }
+.usage-color-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.usage-color-control { display: flex; align-items: center; gap: 10px; }
+.usage-color-control input { width: 42px; height: 28px; padding: 2px; }
+.usage-palette { display: flex; gap: 6px; margin-top: 8px; }
+.usage-palette button { width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 50%; padding: 0; }
+.usage-palette button:hover { outline: 2px solid var(--accent); outline-offset: 2px; }
+.usage-roles { width: 100%; border-collapse: collapse; }
+.usage-roles td { padding: 5px 6px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.usage-roles td:first-child { font-weight: 600; }
+.usage-source { overflow: auto; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; font-size: 12px; }
+.usage-source-file { color: var(--muted); font-size: 12px; }
+.usage-more { margin: 4px 26px; color: var(--accent); }
+.canvas svg .usage-muted { opacity: .5; }
+.usage-overlays { --usage-label-bg: white; }
+body[data-background="dark"] .usage-overlays { --usage-label-bg: black; }
 .netlist-pane {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) 5px auto;
