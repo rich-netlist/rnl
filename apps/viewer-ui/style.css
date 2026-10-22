@@ -37,10 +37,10 @@
   --syn-comment: #6a737d;
   --syn-marker: #a0a0a6;
   --syn-keyword: #7a2fc0;
-  --syn-string: #a3510b;
+  --syn-string: #0b7285;
   --syn-number: #0b7a5a;
   --syn-host: #0b5cad;
-  --syn-def: #b35900;
+  --syn-def: #364fc7;
   --syn-local: #2e7d32;
   --syn-param: #5c5c99;
   --syn-inst: #0b5cad;
@@ -75,10 +75,10 @@
     --syn-comment: #8b949e;
     --syn-marker: #6e6e76;
     --syn-keyword: #c792ea;
-    --syn-string: #e6a26b;
+    --syn-string: #66d9e8;
     --syn-number: #7fd1b0;
     --syn-host: #82b1ff;
-    --syn-def: #f0b46a;
+    --syn-def: #a5b4fc;
     --syn-local: #9ccc65;
     --syn-param: #a9a9e0;
     --syn-inst: #82b1ff;
@@ -583,6 +583,7 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .obj:hover { text-decoration: underline; text-decoration-color: var(--select); text-underline-offset: 2px; }
 /* The name itself changes colour, including the syntax pieces of `#M1:d`. */
 .obj.hl, .obj.hl * { color: var(--select); }
+.obj.hl { text-decoration: underline; text-decoration-color: var(--select); text-underline-offset: 2px; }
 
 /* ------------------------------------------------------------------ problems */
 
