@@ -37,9 +37,9 @@ When you add files or change licensing, run [`reuse lint`](https://reuse.softwar
 
 When you change the Rust crates, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test --workspace` must pass. When a change is meant to alter the results of the [conformance corpus](tests/conformance/README.md), write its expected files again with `RNL_BLESS=1`, or `RNL_BLESS_0_3=1` for the cases of 0.3, and review the difference.
 
-When you change the pages of the site, edit `site/src/` and write every text in both languages, as described in [`site/README.md`](site/README.md); `python site/build.py --check` must pass.
+When you change the pages of the site, edit `site/src/` and provide an English source with optional translations, as described in [`site/README.md`](site/README.md). Missing translations fall back to English; `python site/build.py --check` must pass. Locale identities, shared interface messages and fonts live in `site/languages.json`.
 
-Every Viewer, standard or core release needs a bilingual `timeline-summary` in its release
+Every Viewer, standard or core release needs an English `timeline-summary`, with translations when available, in its release
 notes before tagging; see the [summary template and checklist](release-notes/README.md).
 The homepage is generated from tags plus `site/src/timeline.json`; add non-release milestones
 there with the actual merge time and source link. Manual entries can override or combine tags.

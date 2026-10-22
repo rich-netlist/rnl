@@ -261,7 +261,7 @@ Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `
 | `src/assets/toolchain.js` | The toolchain diagram of the page of the tools |
 | `src/assets/glance.js` | The language at a glance, with the 46-keyword reference, and the examples, of the language tour |
 | `src/assets/tour.js` | The interactions of the nine sections of the language tour |
-| `build.py` | Builds every page in both languages, the single-file pages (the gallery has none), and the optional zip; checks the language pairs and the release blocks, and finds the desktop viewer's newest release |
+| `build.py` | Builds every page in the registered locales, the single-file pages (the gallery has none), and the optional zip; checks translation groups and release blocks, and finds the desktop viewer's newest release |
 
 The symbols are drawn for this page and contain no Analog Canvas material. Like other paths outside `spec/`, `docs/`, and the data directories, this directory is licensed under [MIT](../LICENSE).
 

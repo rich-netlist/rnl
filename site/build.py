@@ -1,6 +1,6 @@
 """Build the static project site in the locales registered in site/languages.json.
 
-In src/, every piece of text a reader sees is written once per language, side by side:
+In src/, English text and its available translations are written side by side:
 
     <zh>网表定义电路</zh><en>The netlist defines the circuit</en>
 
