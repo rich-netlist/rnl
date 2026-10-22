@@ -22,6 +22,10 @@ artifact with a debug CLI byte for byte for `check`, `view` and `render` over bo
 series. The combined `rnl-core-X.Y.Z` artifact contains four archives, the npm tarball and
 `SHA256SUMS.txt`. Individual platform artifacts also have checksums.
 
+PRs and manual rehearsals build, pack and smoke-test the npm package even when that core
+version is already published. The registry publication dry-run runs only for a pushed
+`core-v*` tag; Viewer-only changes do not require a new core version or npm publication.
+
 Windows x64 uses MSVC with `+crt-static` and checks DLL imports for VC++/UCRT dependencies.
 Linux x86_64 uses static musl on Ubuntu 22.04 and checks ELF dependencies and interpreter.
 macOS Apple Silicon and Intel each build and execute on a matching native runner. Linux

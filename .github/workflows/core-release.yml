@@ -121,7 +121,12 @@ jobs:
           node bindings/runtime-wasm/tests/package.mjs packages/runtime/dist "$VERSION"
           cd packages/runtime/dist
           npm pack --pack-destination "$GITHUB_WORKSPACE"
-          npm publish --dry-run --access public
+      # A Viewer-only PR or a manual rehearsal can legitimately reuse an already published core
+      # version. Registry publishability is required only when preparing a real core tag release.
+      - name: Validate npm publication for a core release tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/core-v')
+        working-directory: packages/runtime/dist
+        run: npm publish --dry-run --access public
       - name: Smoke-test the packed package with Vite
         working-directory: packages/runtime/smoke
         env:
