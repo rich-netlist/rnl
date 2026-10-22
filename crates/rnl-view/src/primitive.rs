@@ -759,7 +759,7 @@ mod tests {
     #[test]
     fn the_owners_and_the_colours_are_as_the_types_say() {
         let options = BuildOptions { primitives: true, ..BuildOptions::default() };
-        let (mut named, mut shared, mut opacities) = (0, 0, 0);
+        let (mut named, mut opacities) = (0, 0);
         for f in corpus() {
             let d = crate::build(&f, &Disk, &options).unwrap();
             for level in &d.levels {
@@ -781,10 +781,10 @@ mod tests {
                     } else if numbered("item-") || numbered("wire-") {
                         assert!(ids.contains(&owner), "{f}: {owner}");
                     } else {
-                        // any other text has a name of the diagnostics, which no hit but a label's has
+                        // Scene texts have separate display owners; only label hits can use them.
                         assert!(text && !ids.contains(&owner), "{f}: {p:?}");
                         named += 1;
-                        shared += usize::from(prims.iter().filter(|q| q.owner == owner).count() > 1);
+                        assert_eq!(prims.iter().filter(|q| q.owner == owner).count(), 1, "{f}: {owner}");
                     }
                     let (strokes, fill, color) = match &p.shape {
                         Shape::Path { strokes, fill, .. }
@@ -803,7 +803,7 @@ mod tests {
                 }
             }
         }
-        assert!(named > 100 && shared > 0 && opacities > 0, "{named} {shared} {opacities}");
+        assert!(named > 100 && opacities > 0, "{named} {opacities}");
     }
 
     /// The SVG draws lines and texts, and the renderer lays out texts, as the types' documentation
