@@ -40,7 +40,7 @@ jobs:
         env:
           VERSION: ${{ needs.build.outputs.version }}
           DIST_TAG: ${{ vars.CORE_NPM_DIST_TAG }}
-        run: npm publish "assets/rich-netlist-runtime-$VERSION.tgz" --access public --tag "$DIST_TAG" --provenance
+        run: npm publish "./assets/rich-netlist-runtime-$VERSION.tgz" --access public --tag "$DIST_TAG" --provenance
   smoke:
     needs: [build, publish]
     runs-on: ubuntu-latest
