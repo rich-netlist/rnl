@@ -71,7 +71,7 @@ LANGS = {
     "en": {"suffix": "", "html_lang": "en", "other": "zh", "other_label": "中文", "contents": "Contents",
            "zip_label": "Markdown, chapters", "md_label": "Markdown", "sums_label": "SHA-256 checksums",
            "intro": "Introduction", "tour": "Language tour", "spec": "Standard", "packages": "Packages",
-           "tools": "Tools", "agents": "Agents", "pages": "Pages",
+           "tools": "Tools", "agents": "Agent", "pages": "Pages",
            "guide_note": "This is the short version of the standard: what it takes to read and write RNL files. It is not "
                          "normative; where it differs from the text below, the text below prevails. The same guide is "
                          "part of the [skill package for AI agents]({agents}).",
@@ -94,7 +94,7 @@ LANGS = {
            "only": "Only what changed"},
     "zh": {"suffix": ".zh", "html_lang": "zh-CN", "other": "en", "other_label": "EN", "contents": "目录",
            "zip_label": "Markdown 分章包", "md_label": "Markdown 合订本", "sums_label": "SHA-256 校验值",
-           "intro": "介绍", "tour": "语言导览", "spec": "标准", "packages": "标准包", "tools": "工具", "agents": "给 agent",
+           "intro": "介绍", "tour": "语言导览", "spec": "标准", "packages": "标准包", "tools": "工具", "agents": "Agent",
            "pages": "页面",
            "guide_note": "这是标准的简版：读写 RNL 文件需要知道的东西。它不是正式文本，与下面的正文不一致时，以正文为准。"
                          "同一份指南也在[给 AI agent 的 skill 包]({agents})里。",
