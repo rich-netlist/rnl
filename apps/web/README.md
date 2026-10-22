@@ -279,7 +279,9 @@ hover or keyboard focus.
 
 See the [roadmap](../../docs/roadmap.md) for planned work.
 
-A missing named USE-PACKAGE keeps the core error. When the public index has its exact name and version, the hint offers Include, adds that package to Library, and rebuilds the applied document while preserving edits. Otherwise it points to File › Include Public Package…. Public extensions such as `analog-canvas-extensions` are not built in.
+A missing named USE-PACKAGE keeps the core error and starts a background public-catalog lookup, independently of Auto Include. Only explicit package references qualify; missing symbols and subcircuit definitions never trigger package guesses. One confirmation lists the available packages and adds them to Library only after approval, rebuilding applied text while preserving pending edits. Catalog requests (including configuration/body download) abort after ten seconds; offline failures leave normal viewing/editing and the manual Include hint available. Offers wait until editing and other dialogs finish, are cancelled on navigation, and remember a dismissal for that opened source. Version selection follows the core: exact first, the nearest compatible newer stable version, or the newest when unpinned. Series 0.x require an exact version. Public extensions such as `analog-canvas-extensions` are not built in.
+
+Save downloads the editor's current snapshot, which clears its unsaved mark without changing the browser's original File/URL. Build overlays use a separate source baseline, so Save before Apply, later Library rebuilds and repeated editing keep downloaded edits. Native saves update that source baseline because they write the file. Typing while a save is pending remains unsaved after the earlier snapshot finishes.
 
 ### New windows and navigation keys
 

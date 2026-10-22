@@ -11,7 +11,7 @@
  * @property {(language: "en" | "zh-CN") => Promise<void>} [setLanguage] Update native UI labels, preserving command IDs and state.
  * @property {() => Promise<Record<string, string>>} [bundledFiles] Built-in package texts by path.
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
- * @property {(pkg: {name: string, version: string}) => Promise<object[]>} [includePackage] Include an exact published package.
+ * @property {(pkg: {name: string, version: string}, signal?: AbortSignal) => Promise<object[]>} [includePackage] Include an exact published package.
  * @property {(kind: string) => Promise<object[]>} [include] Include files, a folder or a library package.
  * @property {(items: object[], reload?: boolean, refresh?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.

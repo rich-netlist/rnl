@@ -2,7 +2,7 @@ import { append, m, setAttr, setText } from "./i18n.js";
 // The Library: session files, one temporary source, ordered desktop PATH groups and built-ins.
 import { inform } from "./dialog.js";
 import { setCheck } from "./commands.js";
-import { changes } from "./edits.js";
+import { changes, rebaseSource } from "./edits.js";
 import { currentSource, isLoading, openSource } from "./open.js";
 import { setPane, setSidebar } from "./panels.js";
 import { shell } from "./shell.js";
@@ -13,6 +13,7 @@ let items = [];
 let temporary = null;
 let currentPath = null;
 let changing = false;
+export const isLibraryChanging = () => changing;
 let scanVersion = 0;
 const expanded = new Map([["files", true]]); // session only; never written to settings
 let scanned = new Map();
@@ -74,7 +75,10 @@ export async function sourceOpened(source, doc, add, applied = false) {
   if (held) {
     if (add) temporary = { source, name: source.name || "Pasted text" };
     // Store applied text, so discarded, unapplied editor changes cannot leak into this slot.
-    if (applied && temporary?.source === source && doc) source.text = doc.files[0]?.text ?? source.text;
+    if (applied && temporary?.source === source && doc?.files[0]) {
+      source.text = doc.files[0].text;
+      rebaseSource(doc.files[0].path, source.text);
+    }
     currentPath = null;
   } else {
     const path = filePath(source.path || doc?.path || source.name);
@@ -94,15 +98,17 @@ export async function sourceOpened(source, doc, add, applied = false) {
   render();
 }
 
-async function update(action, rescan = false, reload = false) {
-  if (changing || isLoading()) return;
+async function update(action, rescan = false, reload = false, valid = () => true) {
+  if (changing || isLoading() || !valid()) return false;
   changing = true;
   if (reload) setText($("library-status"), m("Reloading library…"));
   $("library-groups").setAttribute("aria-busy", "true");
   try {
     if (await action() === false) return false;
+    if (!valid()) return false;
     if (rescan) await scanPaths(reload);
     else { await syncPool(reload); render(); }
+    if (!valid()) return false;
     // Rebuild applied text without re-adding an excluded root or dropping pending edits.
     if (currentSource()) await openSource(currentSource(), true, changes(true));
     return true;
@@ -127,12 +133,28 @@ export async function includeFiles(kind) {
 
 /** Include the exact published package offered beneath a missing-package diagnostic. */
 export async function includePublicPackage(pkg) {
+  return includePublicPackages([pkg]);
+}
+
+/** An automatic offer adds all approved packages once, only while its document is still current. */
+export async function includePublicPackages(packages, valid = () => true, signal) {
   if (!shell.includePackage) return;
   return update(async () => {
-    const added = await shell.includePackage(pkg);
+    if (!valid()) return false;
+    const added = [];
+    try {
+      for (const pkg of packages) {
+        if (!valid()) return false;
+        added.push(...await shell.includePackage(pkg, signal));
+      }
+    } catch (error) {
+      if (!valid()) return false;
+      throw error;
+    }
+    if (!valid()) return false;
     if (!added.length) return false;
     addItems(added);
-  });
+  }, false, false, valid);
 }
 
 function paths() {

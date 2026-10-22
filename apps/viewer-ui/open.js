@@ -26,6 +26,7 @@ import { clearSource, fileShown, fileViews, renderFiles, revealDefinition, showF
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
 import { startLoading, nextPaint } from "./loading.js";
+import { offerMissingPackages } from "./package-offers.js";
 
 let lastSource = null; // what was last opened, also when it failed to open, for reloading
 let loading = false;
@@ -97,6 +98,7 @@ export async function openSource(source, keep, edited, fresh = false, navigation
     if (!operation.signal.aborted) {
       loading = false;
       document.body.classList.remove("busy");
+      if (d === doc) void offerMissingPackages(d, source, operation.signal);
     }
   }
 }
@@ -144,6 +146,7 @@ export async function applyEdits() {
     if (!operation.signal.aborted) {
       loading = false;
       document.body.classList.remove("busy");
+      if (d === doc) void offerMissingPackages(d, lastSource, operation.signal);
     }
   }
   if (failed !== null) {

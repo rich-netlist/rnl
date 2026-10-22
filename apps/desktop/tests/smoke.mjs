@@ -643,6 +643,31 @@ async function drive(app, port, profile, t0, session) {
     page.evaluate(`document.querySelectorAll("#netlist-file[data-unsaved='true']").length === 0`),
   );
   same(fs.readFileSync(netlistInclude).equals(includeOnDisk), true, "the include after the netlist was saved");
+  // Saving before applying is different from downloading on the web: the disk source really
+  // changes. Verify the same newly typed USE-PACKAGE sequence against the native reader/cache.
+  const withPackage = saved.replace('@VERSION("0.2")', '@VERSION("0.2"); @USE-PACKAGE(name="rnl-std", version="0.2")');
+  const setEditor = text => page.evaluate(`(() => {
+    const area = document.querySelector('#source .editor:not([hidden]) textarea');
+    area.value = ${JSON.stringify(text.replace(/\r\n/g,'\n'))};
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  chooseItem(app.pid, at("toggle-edit"));
+  await until("the editor before Save then Apply", () => page.evaluate(`!!document.querySelector('#source textarea')`));
+  await setEditor(withPackage);
+  chooseItem(app.pid, at("save"));
+  await until("the unapplied package saved to disk", () => fs.readFileSync(netlist,'utf8') === withPackage);
+  chooseItem(app.pid, at("apply-edits"));
+  await until("the saved package applied natively", () => page.evaluate(`!document.querySelector('#source textarea') &&
+    window.viewer.doc.files[0].text.replace(/\\r\\n/g,'\\n') === ${JSON.stringify(withPackage.replace(/\r\n/g,'\n'))}`));
+  chooseItem(app.pid, at("toggle-edit"));
+  await until("the saved package retained on re-entering editing", () => page.evaluate(`document.querySelector('#source textarea')?.value === ${JSON.stringify(withPackage.replace(/\r\n/g,'\n'))}`));
+  await setEditor(saved);
+  chooseItem(app.pid, at("save"));
+  await until("the original text restored on disk", () => fs.readFileSync(netlist,'utf8') === saved);
+  chooseItem(app.pid, at("apply-edits"));
+  await until("the original text applied again", () => page.evaluate(`!document.querySelector('#source textarea') &&
+    window.viewer.doc.files[0].text.replace(/\\r\\n/g,'\\n') === ${JSON.stringify(saved.replace(/\r\n/g,'\n'))}`));
+  console.log("Save before Apply retained a newly typed USE-PACKAGE with the real native disk reader");
   // another program changes the file after the viewer read it: Save does not write over it, and asks;
   // Overwrite writes the text of the viewer
   chooseItem(app.pid, at("toggle-edit"));

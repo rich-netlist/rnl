@@ -1,4 +1,10 @@
 {
+  "Public package request timed out after 10 seconds.": "公共包请求已在 10 秒后超时。",
+  "Public Packages Found": "找到公共包",
+  "The following explicitly referenced packages are available in the public library:": "在公共资源库中找到了以下显式引用的包：",
+  "Add them to Library and reload the current circuit? Pending edits will be kept.": "是否将这些包加入资源库并重新载入当前电路？尚未应用的编辑会保留。",
+  "Add to Library": "加入资源库",
+  "{0} (requested {1})": "{0}（请求版本 {1}）",
   "&Color Scheme...": "配色方案(&C)...",
   "Color Scheme": "配色方案",
   "Component objects (#)": "元件对象 (#)",

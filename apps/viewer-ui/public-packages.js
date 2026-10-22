@@ -40,3 +40,23 @@ export function latestPackages(packages) {
   }
   return [...selected.values()].sort((a,b) => a.path.localeCompare(b.path));
 }
+
+/** Match the core's named-package lookup: exact, compatible newer, or newest when unpinned. */
+export function matchingPackage(packages, name, version) {
+  const parts = v => v.split('.').map(Number);
+  const order = (a, b) => parts(a.version)[0] - parts(b.version)[0] || parts(a.version)[1] - parts(b.version)[1];
+  const named = packages.filter(p => !p.builtin && p.name === name).sort(order);
+  if (!version) return named.at(-1);
+  const exact = named.find(p => p.version === version);
+  if (exact) return exact;
+  const [major, minor] = parts(version);
+  // Series 0.x are separate incompatible revisions; only stable major series can advance.
+  return major > 0 ? named.find(p => parts(p.version)[0] === major && parts(p.version)[1] > minor) : undefined;
+}
+
+/** Only explicit named USE-PACKAGE failures qualify, never missing symbols, aliases or includes. */
+export function missingPackage(diagnostic) {
+  if (diagnostic.severity !== 'error') return null;
+  const match = /^package (\S+)(?: (\S+))? cannot be found: this USE-PACKAGE fails/.exec(diagnostic.message);
+  return match ? { name: match[1], version: match[2] } : null;
+}

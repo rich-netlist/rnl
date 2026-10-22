@@ -323,7 +323,7 @@ export async function save(overwrite = false) {
   try {
     const result = await shell.save(opened, files, overwrite);
     if (result !== null && typeof result === "object") return changedOnDisk(result.changed);
-    edits.markSaved(files.map((f) => f.path));
+    edits.markSaved(files, shell.platform !== "web");
     refreshEditing();
     note(shell.platform === "web"
       ? files.length === 1 ? m`Downloaded ${files[0].name.split("/").pop()}.` : m`Downloaded ${files.length} files.`
@@ -386,9 +386,10 @@ export async function saveAs() {
     return false;
   }
   try {
-    const written = await shell.saveAs(currentSource(), { path: entry.path, name: entry.name, text: edits.fileText(entry.path) });
+    const file = { path: entry.path, name: entry.name, text: edits.fileText(entry.path) };
+    const written = await shell.saveAs(currentSource(), file);
     if (!written) return false;
-    edits.markSaved([entry.path]);
+    edits.markSaved([file], false); // the old source is unchanged; open the newly written source next
     await openSource(written, false);
     note(m`Saved as ${written.name}.`);
     return true;

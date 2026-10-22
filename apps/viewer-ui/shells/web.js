@@ -372,12 +372,28 @@ function poolItems(files, folder = false) {
 }
 
 let libraryIndex = null;
+const PUBLIC_TIMEOUT = 10000;
+async function publicRequest(read, signal) {
+  const stop = new AbortController();
+  const abort = () => stop.abort();
+  if (signal?.aborted) abort();
+  else signal?.addEventListener('abort', abort, { once: true });
+  const timer = setTimeout(abort, PUBLIC_TIMEOUT);
+  try { return await read(url => fetch(url, { signal: stop.signal })); }
+  catch (error) {
+    if (stop.signal.aborted && !signal?.aborted) throw new Error(m('Public package request timed out after 10 seconds.'));
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
+  }
+}
 function publicPackages() {
-  if (!libraryIndex) libraryIndex = (async () => {
-    const config = await fetch("public-packages.json");
+  if (!libraryIndex) libraryIndex = publicRequest(async fetcher => {
+    const config = await fetcher("public-packages.json");
     const url = new URL(config.ok ? (await config.json()).url : DEFAULT_CATALOG, location.href).href;
-    return (await readCatalog(url)).packages;
-  })().then(packages => {
+    return (await readCatalog(url, fetcher)).packages;
+  }).then(packages => {
     window.dispatchEvent(new CustomEvent("public-package-status", { detail: "" }));
     return packages;
   }).catch((error) => {
@@ -397,12 +413,12 @@ async function includeLibrary() {
   return includePackage(selected);
 }
 
-async function includePackage(selected) {
+async function includePackage(selected, signal) {
   // Re-resolve against the validated catalog rather than trusting an old session descriptor.
   const packages = await publicPackages();
   const pkg = packages.find(p => p.name === selected.name && p.version === selected.version);
   if (!pkg) throw new Error(`Public package ${selected.name} ${selected.version} is unavailable.`);
-  const text = decodeText(await readPublicPackage(pkg));
+  const text = decodeText(await publicRequest(fetcher => readPublicPackage(pkg, fetcher), signal));
   const path = `/library/${pkg.path}`;
   const read = () => new File([text], pkg.name + ".rnl");
   return [{ path, name: `${pkg.name} ${pkg.version}`, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];

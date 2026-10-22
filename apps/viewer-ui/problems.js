@@ -6,6 +6,7 @@ import { markSourceDiagnostics, revealLine } from "./text.js";
 import { $, span } from "./util.js";
 import { shell } from "./shell.js";
 import { includePublicPackage } from "./pool.js";
+import { matchingPackage, missingPackage } from "./public-packages.js";
 
 const SEVERITY_ORDER = { error: 0, warning: 1, hint: 2 };
 let renderVersion = 0;
@@ -52,8 +53,8 @@ new ResizeObserver(scheduleMore).observe(body);
 
 function packageHint(d, version) {
   // Path-based includes and alias failures need different remedies. Keep the core diagnostic intact.
-  const missing = /^package (\S+)(?: (\S+))? cannot be found: this USE-PACKAGE fails/.exec(d.message);
-  if (!missing || d.severity !== "error") return null;
+  const missing = missingPackage(d);
+  if (!missing) return null;
   const li = document.createElement("li");
   li.className = "diag hint package-hint";
   const message = span("msg", m("Look for it in File › Include Public Package…"));
@@ -68,7 +69,7 @@ function packageHint(d, version) {
   } else if (shell.publicPackages) {
     shell.publicPackages().then((packages) => {
       if (version !== renderVersion || !li.isConnected) return;
-      const pkg = packages.find(p => !p.builtin && p.name === missing[1] && p.version === missing[2]);
+      const pkg = matchingPackage(packages, missing.name, missing.version);
       if (!pkg) return;
       setText(message, m("This package is published. "));
       const include = document.createElement("button");
