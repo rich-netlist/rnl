@@ -17,6 +17,30 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
 });
 
+test('unkeyed wire net labels have independent colours in the real web core', async ({ page }) => {
+  await start(page);
+  const doc = await opened(page, () => page.locator('#file-input').setInputFiles({
+    name: 'wire-labels.sp', mimeType: 'text/plain',
+    buffer: fs.readFileSync(path.join(root, 'tests/viewer/inputs/wire-labels.sp')),
+  }));
+  const labels = doc.levels[0].hits.filter(h => h.kind === 'label' && h.objects.length === 1
+    && doc.objects[h.objects[0]].kind === 'net');
+  expect(labels).toHaveLength(2);
+  expect(labels.every(h => h.id)).toBe(true);
+  expect(labels[0].id).not.toBe(labels[1].id);
+  const text = h => page.locator(`#canvas g[data-id=${JSON.stringify(h.id)}] text`).first();
+  for (const background of ['light', 'dark']) {
+    await page.evaluate(b => window.viewer.command(`background-${b}`), background);
+    for (const label of labels) {
+      await page.evaluate(async object => (await import('./selection.js')).select(object, 'drawing'), label.objects[0]);
+      await expect(text(label)).toHaveCSS('fill', 'rgb(232, 89, 12)');
+      for (const other of labels.filter(h => h !== label)) await expect(text(other)).not.toHaveCSS('fill', 'rgb(232, 89, 12)');
+      await page.keyboard.press('Escape');
+      await expect(text(label)).not.toHaveCSS('fill', 'rgb(232, 89, 12)');
+    }
+  }
+});
+
 test("the web core supplies semantic lines and the actual parent symbol", async ({ page }) => {
   await start(page);
   await opened(page, () => page.locator('#file-input').setInputFiles({

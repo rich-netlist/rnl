@@ -168,8 +168,8 @@ export type Hit = {
    */
   objects: Array<number>,
   /**
-   * The `data-id` of the SVG groups that draw it, and the owner of its primitives. A label
-   * has one only when no other text of the level has the same.
+	 * The `data-id` of the SVG groups that draw it, and the owner of its primitives.
+	 * Repeated text ids are disambiguated for the page, so each label has its own groups.
    */
   id: string | null,
   /**

@@ -68,6 +68,7 @@ for (const dir of ["tests/conformance/cases", "tests/conformance/equivalence", "
 if (entries.length < 20) fail(`only ${entries.length} files found under ${root}`);
 // Explicit/default zero widths, double hairlines and the viewer's dark-colour boundary cases.
 entries.push(join(root, "tests/viewer/inputs/view-improvements.sp"));
+entries.push(join(root, "tests/viewer/inputs/wire-labels.sp"));
 const defaultHairlines = join(root, "tests/viewer/inputs/default-hairlines.sp");
 entries.push(defaultHairlines);
 // Independent public geometry and style packages exercise custom fonts and generated terminal markers.
