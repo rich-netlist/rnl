@@ -6,6 +6,24 @@ Skill packages for AI agents, in the [Agent Skills](https://agentskills.io/speci
 | --- | --- |
 | [`rnl/`](rnl/SKILL.md) | The RNL skill: reading, writing, checking and drawing RNL 0.3. `SKILL.md` is what the agent reads first; `references/` holds the short guide to the language, the reference to the standard packages and the notes on the tools; `examples/` holds netlists that read without errors; `LICENSE.md` and `LICENSES/` the terms. |
 
+## Companion: export from Virtuoso
+
+The [`rnl-virtuoso` skill](https://github.com/rich-netlist/rnl-virtuoso/tree/main/skills/rnl-virtuoso)
+exports an existing Virtuoso schematic or library through the `virtuoso` bridge
+skill. It checks the remote installation, reuses a compatible exporter, and asks
+for consent before installing a missing exporter in the user's home. The exporter
+is fetched from its latest upstream release; no exporter or bridge assets are
+included in the skill.
+
+The RNL skill links to this companion for export requests. Its instructions stay
+in the [exporter's repository](https://github.com/rich-netlist/rnl-virtuoso), where
+API and installation changes can be maintained together. There is no mirrored
+`skills/rnl-virtuoso/` here, and it is not included in `rnl-skill.zip`.
+To install it separately, copy the complete upstream `skills/rnl-virtuoso/`
+directory, including `references/` and `agents/`, into the agent's skills directory
+(for example `~/.codex/skills/` or `~/.claude/skills/`). Install/reuse the `virtuoso`
+bridge skill separately as described by that companion.
+
 ## Why here
 
 The package is not a web page (`site/`), and not the standard (`spec/`): it is a folder an agent installs as it is, and `skills/<name>/` is where such folders are kept in repositories that publish them, so that a person can copy one and a tool can find it. The site's pages are built from it, not the other way round.
