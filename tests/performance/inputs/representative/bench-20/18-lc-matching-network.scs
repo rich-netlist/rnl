@@ -1,0 +1,29 @@
+// CC0-1.0 — 18-lc-matching-network.scs: Two-section LC impedance matching network with RF port (Spectre)
+//! 电路说明：小规模两节 LC 阻抗匹配网络（Spectre 方言），含射频输入端口激励（PORT_IN，使用标准 $RF_PORT 符号）、两级串联匹配电感（L1、L2）、三个并联匹配电容构成的雙 Pi 型谐振支路（C1、C2、C3）及终端负载电阻（RL），共 7 个器件。
+//! 视觉验收标准：
+//! 1. 信号流方向：从左到右——射频激励端口（PORT_IN）在最左侧，经串联电感 L1、L2 依次向右传输至终端负载电阻（RL），并联电容 C1、C2、C3 分别接在节点 rf_in、rf_mid、rf_out 与地之间。
+//! 2. 对称对与对称轴：C1 与 C3 关于中间节点（C2）呈 Pi 型结构对称。
+//! 3. 电源与地方向：地网 0 位于最下方（PORT_IN、C1、C2、C3、RL 的负端均朝下接地短线）。
+//! 4. 行与列对齐：串联通路（L1、L2）位于上层信号行；并联支路器件（PORT_IN、C1、C2、C3、RL）位于下层并排水平对齐。
+//! 5. 连线与网络标签：地网 0 采用接地短线，射频信号网（rf_in、rf_mid、rf_out）采用导线（ROUTE）连接。
+simulator lang=spectre
+// @RNL(type="header") { @VERSION("0.3") }
+
+PORT_IN (rf_in 0) port r=50
+C1 (rf_in 0) capacitor c=1.2p
+L1 (rf_in rf_mid) inductor l=2.5n
+C2 (rf_mid 0) capacitor c=2.4p
+L2 (rf_mid rf_out) inductor l=2.5n
+C3 (rf_out 0) capacitor c=1.2p
+RL (rf_out 0) resistor r=50
+
+// @RNL {
+//   {#L1 #L2} @AS $MATCHED;
+//   {#C1 #C3} @AS $MATCHED;
+//   #PORT_IN(source) {#L1 #L2}(chain) #RL(load) @AS $CHAIN;
+//   {#C1:n #C2:n #C3:n #RL:n} @AS $SUPPLY_LOW;
+//
+//   {#PORT_IN #C1 #L1 #C2 #L2 #C3 #RL} @AS $FLOW;
+//
+//   $WIRE_NET_SET @ROUTE
+// }

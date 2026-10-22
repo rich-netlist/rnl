@@ -15,6 +15,9 @@ on:
       - "tests/**"
       - "!tests/viewer/**"
       - "scripts/fonts.py"
+      - "scripts/solver-performance/**"
+      - ".github/workflows/solver-performance.yml"
+      - ".github/workflows/solver-work-diagnostic.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rustfmt.toml"
@@ -29,11 +32,39 @@ on:
       - "tests/**"
       - "!tests/viewer/**"
       - "scripts/fonts.py"
+      - "scripts/solver-performance/**"
+      - ".github/workflows/solver-performance.yml"
+      - ".github/workflows/solver-work-diagnostic.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rustfmt.toml"
       - ".github/workflows/rust.yml"
   workflow_dispatch:
+    inputs:
+      solver_performance:
+        description: Collect optimized solver measurements instead of the standard test jobs
+        type: boolean
+        default: false
+      baseline_sha:
+        description: Fixed public baseline commit (40-character SHA)
+        type: string
+        default: "0e9b63ecc84b87fdaa69b31251ba683b740fb9bf"
+      candidate_sha:
+        description: Optional fixed public candidate commit; empty means baseline only
+        type: string
+        default: ""
+      solver_profile_work:
+        description: Collect only one M04 work diagnostic without a baseline or off rerun
+        type: boolean
+        default: false
+      work_candidate_sha:
+        description: Frozen public candidate for work diagnostic or build only (40-character SHA)
+        type: string
+        default: ""
+      solver_build_only:
+        description: Build one frozen release candidate for download without solver commands
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -44,6 +75,7 @@ env:
 
 jobs:
   test:
+    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
     strategy:
       fail-fast: false
       matrix:
@@ -76,6 +108,7 @@ jobs:
           fi
 
   wasm:
+    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -102,6 +135,7 @@ jobs:
           node bindings/runtime-wasm/tests/equality.mjs --rnl target/debug/rnl --snapshot
 
   fonts:
+    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -116,3 +150,76 @@ jobs:
       # downloads the pinned fonts and fails when crates/rnl-render/fonts/ is not what they give
       - name: The renderer's font metrics are those of the shipped fonts
         run: python scripts/fonts.py metrics --check
+
+  performance-harness:
+    if: github.event_name != 'workflow_dispatch' || (!inputs.solver_performance && !inputs.solver_profile_work && !inputs.solver_build_only)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Fetch only the immutable fixture source commits
+        shell: python
+        run: |
+          import json, subprocess
+          manifest = json.load(open('tests/performance/manifest.json', encoding='utf-8'))
+          for source in ('historical_source', 'library_source'):
+              subprocess.run(['git', 'fetch', '--no-tags', 'origin', manifest[source]['commit']], check=True)
+      - name: Check policies and every historical fixture byte without a solver
+        shell: python
+        run: |
+          import subprocess, sys
+          for test in ('test_inputs.py', 'test_benchmark.py', 'test_work.py'):
+              subprocess.run([sys.executable, 'scripts/solver-performance/'+test], check=True)
+      - name: Prepare and verify the measurement inputs without a solver
+        shell: python
+        run: |
+          import os, subprocess, sys
+          fixtures = os.path.join(os.environ['RUNNER_TEMP'], 'solver-fixtures')
+          subprocess.run([sys.executable, 'scripts/solver-performance/prepare_inputs.py', '--output', fixtures], check=True)
+          subprocess.run([sys.executable, 'scripts/solver-performance/benchmark.py', '--fixtures', fixtures], check=True)
+      - name: Smoke test owned-process completion, timeout and partial evidence
+        if: matrix.os == 'windows-2022'
+        run: python scripts/solver-performance/test_benchmark.py --owned-helper-fixture "${{ runner.temp }}/owned-helper-smoke"
+
+  diagnostic-dispatch-policy:
+    if: github.event_name == 'workflow_dispatch' && (inputs.solver_performance || inputs.solver_profile_work || inputs.solver_build_only)
+    runs-on: ubuntu-latest
+    env:
+      PERFORMANCE: ${{ inputs.solver_performance }}
+      WORK: ${{ inputs.solver_profile_work }}
+      BUILD_ONLY: ${{ inputs.solver_build_only }}
+      WORK_SHA: ${{ inputs.work_candidate_sha }}
+    steps:
+      - name: Reject overlapping diagnostic queues
+        shell: python
+        run: |
+          import os, re
+          if sum(os.environ[key] == "true" for key in ("PERFORMANCE", "WORK", "BUILD_ONLY")) != 1:
+              raise SystemExit("Choose exactly one diagnostic queue")
+          if (os.environ["WORK"] == "true" or os.environ["BUILD_ONLY"] == "true") and not re.fullmatch("[0-9a-f]{40}", os.environ["WORK_SHA"]):
+              raise SystemExit("Work/build-only requires one frozen public candidate SHA")
+
+  solver-performance:
+    needs: diagnostic-dispatch-policy
+    if: github.event_name == 'workflow_dispatch' && inputs.solver_performance
+    uses: ./.github/workflows/solver-performance.yml
+    with:
+      baseline_sha: ${{ inputs.baseline_sha }}
+      candidate_sha: ${{ inputs.candidate_sha }}
+
+  solver-work-diagnostic:
+    needs: diagnostic-dispatch-policy
+    if: github.event_name == 'workflow_dispatch' && (inputs.solver_profile_work || inputs.solver_build_only)
+    uses: ./.github/workflows/solver-work-diagnostic.yml
+    with:
+      candidate_sha: ${{ inputs.work_candidate_sha }}
+      build_only: ${{ inputs.solver_build_only }}

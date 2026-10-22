@@ -1,0 +1,11 @@
+{
+  "stdout_line": "solver options: tolerance=0.000001;grid=1;objectives=current_direction,turns,ground_direction,component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect;beam=4;budget=candidates:256,astar_expansions:200000;time_limit=5",
+  "profile_options_canonical": "tolerance=0.000001;grid=1;objectives=current_direction,turns,ground_direction,component_alignment,distribution,symmetry,terminal_wire_alignment,area,crossings,wire_length,aspect;beam=4;budget=candidates:256,astar_expansions:200000;time_limit=5",
+  "provenance": {
+    "case_id": "t-0.3/T1-rc-lowpass.sp",
+    "sealed_main_profile_head": "7e6735221e39a1b72102ac68a02eec3d2320b8e7",
+    "source_equivalent_squash_main": "0e9b63ecc84b87fdaa69b31251ba683b740fb9bf",
+    "stdout_sha256": "64977a0d3f85dd7b996ceedf0e6617ca87a586effdc4c36f59c9ecad3ae5f6ad",
+    "profile_sha256": "c155d7a37c3305ff9e7be9b4c9f249bb88e22edea710b1873f4e23d404dda0a5"
+  }
+}
