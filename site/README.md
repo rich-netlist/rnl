@@ -94,12 +94,12 @@ for the mark at the frame's edge when needed. Compared with the previous frames,
 - `skill/rnl-skill.zip`, the RNL skill package of [`skills/rnl/`](../skills/rnl/SKILL.md) in the Agent Skills format, and each of its files as plain text under `skill/rnl/`, with `skill/manifest.json` and `skill/SHA256SUMS.txt`;
 - `llms.txt` and `zh/llms.txt`, the plain-text entry that agents look for: what RNL is, how to download and unpack the skill, the files it holds, how to check and draw files, and where the standard is. They are [`src/llms.txt`](src/llms.txt) and [`src/llms.zh.txt`](src/llms.zh.txt) with `{{site}}` and `{{github}}` filled in, and every address in them is absolute.
 
-The page and both `llms` files name every file of the package, so that they cannot fall behind it: `scripts/skill/build.py --check` fails when one does not. The short guide to the language, which the package holds as `references/language.md`, is also the first section of the page of the standard 0.3 ([`scripts/spec`](../scripts/spec/README.md#the-short-guide)); the top bar of every page, of the standard's too, links "For agents".
+The page and both `llms` files name every file of the package, so that they cannot fall behind it: `scripts/skill/build.py --check` fails when one does not. The short guide to the language, which the package holds as `references/language.md`, is also the first section of the page of the standard 0.3 ([`scripts/spec`](../scripts/spec/README.md#the-short-guide)); the top bar of every page, of the standard's too, links "Agent".
 
 ## Building and viewing
 
-All five pages share the standard page's six primary links. The introduction, language tour,
-tools and agents pages put their first-level section links beside the content, below the full-width
+All five pages share the standard page's six primary links and the project's GitHub link, after Agent.
+The introduction, language tour, tools and agents pages put their first-level section links beside the content, below the full-width
 hero. Below 1000px, the top bar's Contents button opens that navigation; choosing an entry closes
 it. `test_build.py` compares both languages' primary links and current-page markers with
 `scripts/spec/page.html` and the publisher's labels, and checks the copied CSS values.
