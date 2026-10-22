@@ -25,6 +25,7 @@ import { checkForUpdates } from "./updates.js";
 import { fileAssociations } from "./file-associations.js";
 import { memoryCache } from "./memory-cache.js";
 import { toggleUsages } from "./usages.js";
+import { netlistColors } from "./netlist-colors.js";
 import { $ } from "./util.js";
 
 let table = null; // commands.json, once loaded
@@ -83,6 +84,7 @@ export function command(id, options = {}) {
     case "zoom-out": zoomCenter(0.8); break;
     case "background-light": setBackground("light"); break;
     case "background-dark": setBackground("dark"); break;
+    case "netlist-colors": return netlistColors();
     case "toggle-grid":
     case "grid-none":
     case "grid-dots":

@@ -73,7 +73,7 @@ test.describe("on the web", () => {
         title: "View",
         letter: "V",
         items: [
-          "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-",
+          "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "Color Scheme...",
           "Background", "Light", "Dark",
           "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Language", "English", "简体中文", "",
           "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "", "Hide",
@@ -357,7 +357,7 @@ test.describe("on the web", () => {
     const shown = page.locator("#menubar .menu-list:visible, #menubar .submenu:visible");
     await page.keyboard.press("Alt+V");
     await expect(viewer.menuItem("fit")).toHaveClass(/\bactive\b/);
-    for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowDown");
+    for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowDown");
     await expect(entry(page, "Grid")).toHaveClass(/\bactive\b/);
     await page.keyboard.press("ArrowRight");
     await expect(grid).toBeVisible();

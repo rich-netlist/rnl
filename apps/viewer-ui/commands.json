@@ -41,6 +41,7 @@
         { "id": "fit", "label": "&Fit to Window", "keys": ["F", "0"] },
         { "id": "zoom-in", "label": "Zoom &In", "keys": ["Ctrl+=", "Ctrl++"], "shown": "Ctrl++" },
         { "id": "zoom-out", "label": "Zoom &Out", "keys": ["Ctrl+-"] },
+        { "id": "netlist-colors", "label": "&Color Scheme..." },
         {
           "label": "&Background",
           "items": [

@@ -476,6 +476,7 @@ mod tests {
                     item("fit", "&Fit to Window\tF", None),
                     item("zoom-in", "Zoom &In\tCtrl++", None),
                     item("zoom-out", "Zoom &Out\tCtrl+-", None),
+                    item("netlist-colors", "&Color Scheme...", None),
                     Shown::Submenu(
                         "&Background".into(),
                         vec![check("background-light", "&Light", None), check("background-dark", "&Dark", None)],
@@ -526,6 +527,7 @@ mod tests {
                     item("fit", "&Fit to Window", Some("F")),
                     item("zoom-in", "Zoom &In", Some("CmdOrCtrl+=")),
                     item("zoom-out", "Zoom &Out", Some("CmdOrCtrl+-")),
+                    item("netlist-colors", "&Color Scheme...", None),
                     Shown::Submenu(
                         "&Background".into(),
                         vec![check("background-light", "&Light", None), check("background-dark", "&Dark", None)],

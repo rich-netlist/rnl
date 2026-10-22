@@ -363,6 +363,12 @@ limits bound retained results and speculative input, not the compiler's transien
 Oversized files still open normally. The web shell continues using its existing Worker; it does
 not expose native PATH preloading or its memory-cache controls.
 
+## Netlist colour scheme
+
+View > Color Scheme opens the twelve Netlist colour categories, each with a hex field and a native colour picker. Valid edits preview immediately; Cancel/Escape restores the previous palette, Save stores one `netlist-colors` object, and Restore Defaults resets the draft until saved. The desktop keeps it in its user settings JSON; the web keeps it in local storage. Invalid or missing saved entries fall back individually to defaults. The palette uses explicit colours independently of the UI theme and never changes the drawing's selection colours.
+
+Component names and `#` references share one colour; host nodes, subcircuit ports and `&` references share another. Parameters, `?role` references and role bindings use the parameter colour; free RNL words have their own category. Numbers, punctuation, directives, comments and unclassified text use Other text. Semantic RNL rows derive a stronger tint from the RNL background, and inactive/scope-excluded rows retain dimming. The same syntax palette is used for symbol definition source and plain editor foreground/background. Applying colours changes CSS variables only, preserving source buffers, virtual rows, scroll position and compiled drawings.
+
 ## Usage inspection
 
 Panel 5 lists only usages of the current drawing scope, grouped by definition with counts and mixed-state visibility checkboxes. Panel 6 is Not drawn; panel 7 is the desktop Solve report. View > Show Usages (Ctrl+R) gates individual visibility without changing the checkboxes. Usages with no drawing objects of their own or inside their bodies default on. Usages with symbols, wires, routes or annotations of their own or in descendants default off, including virtual parts and drawing wrappers such as GROUND_STUB. Selecting a usage in the list or source temporarily forces its overlay on; selecting something else restores the switches. Hidden usages cannot be picked as usages on the drawing: their virtual symbols keep ordinary symbol selection, without a usage frame or focus effect. Reload preserves which selection mode was used. Color and visibility are Viewer display preferences, stored with the source path, scope and runtime identity (up to 2,000 recent entries), not written into RNL.

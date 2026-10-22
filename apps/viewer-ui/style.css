@@ -1,4 +1,16 @@
 :root {
+  --netlist-component: #1A67CC;
+  --netlist-net: #4A0804;
+  --netlist-rnl: #DEF9FF;
+  --netlist-keyword: #AB0187;
+  --netlist-definition: #2B7800;
+  --netlist-local: #22038F;
+  --netlist-string: #6B4E63;
+  --netlist-parameter: #153D75;
+  --netlist-free: #595959;
+  --netlist-text: #000000;
+  --netlist-background: #FFFFFF;
+  --netlist-highlight: #E8590C;
   --usage-list-h: 240px;
   --bg: #f4f4f2;
   --panel: #fbfbfa;
@@ -570,6 +582,8 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .s-string { color: var(--syn-string); }
 .s-number { color: var(--syn-number); }
 .s-host { color: var(--syn-host); }
+.s-net { color: var(--syn-net, var(--syn-host)); }
+.s-free { color: var(--syn-free, var(--fg)); }
 .s-def { color: var(--syn-def); }
 .s-local { color: var(--syn-local); }
 .s-param { color: var(--syn-param); }
@@ -584,6 +598,48 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 /* The name itself changes colour, including the syntax pieces of `#M1:d`. */
 .obj.hl, .obj.hl * { color: var(--select); }
 .obj.hl { text-decoration: underline; text-decoration-color: var(--select); text-underline-offset: 2px; }
+
+/* Netlist colours stay with the configured palette, independent of UI/drawing themes. */
+.source, .symbol-definition {
+  color: var(--netlist-text);
+  background: var(--netlist-background);
+  --syn-host: var(--netlist-component);
+  --syn-inst: var(--netlist-component);
+  --syn-net: var(--netlist-net);
+  --syn-keyword: var(--netlist-keyword);
+  --syn-def: var(--netlist-definition);
+  --syn-local: var(--netlist-local);
+  --syn-string: var(--netlist-string);
+  --syn-param: var(--netlist-parameter);
+  --syn-free: var(--netlist-free);
+  --syn-number: var(--netlist-text);
+  --syn-comment: var(--netlist-text);
+  --syn-marker: var(--netlist-text);
+  --syn-directive: var(--netlist-text);
+  --muted: var(--netlist-text);
+}
+.source, .source.sel-sub {
+  --select: var(--netlist-highlight);
+  --select-line: color-mix(in srgb, var(--netlist-highlight) 8%, transparent);
+  --out-of-scope: color-mix(in srgb, var(--netlist-background) 92%, var(--netlist-text));
+  --rnl-line: var(--netlist-rnl);
+  --semantic-rnl: color-mix(in srgb, var(--netlist-rnl) 90%, var(--netlist-text));
+}
+.source .ln .no, .source .editor .gutter {
+  color: color-mix(in srgb, var(--netlist-text) 50%, var(--netlist-background));
+}
+.source .ln.d-error .no { color: var(--error); }
+.source .ln.d-warning .no { color: var(--warning); }
+.source .ln.d-hint .no { color: var(--hint); }
+.source mark { background: color-mix(in srgb, var(--netlist-highlight) 30%, transparent); }
+
+.netlist-colors { display: flex; flex-direction: column; gap: 6px; }
+.netlist-color-row { display: grid; grid-template-columns: minmax(0, 1fr) 100px 42px; gap: 10px; align-items: center; }
+.netlist-color-row label { min-width: 0; }
+.dialog-body .netlist-color-row .color-hex { width: 100%; font-family: ui-monospace, Consolas, monospace; }
+.dialog-body .netlist-color-row input[type="color"] { width: 42px; height: 30px; padding: 2px; cursor: pointer; }
+.netlist-color-row input[aria-invalid="true"] { border-color: var(--error); }
+.netlist-colors-reset { align-self: flex-start; }
 
 /* ------------------------------------------------------------------ problems */
 
@@ -1233,6 +1289,6 @@ button.pool-open:hover { text-decoration: underline; }
 .symbol-bounds, .symbol-label-list { font: 12px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; overflow-wrap: anywhere; }
 .symbol-label-list { list-style: none; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
 .symbol-label-list li { border: 1px solid var(--line); border-radius: 12px; padding: 4px 8px; }
-.symbol-definition { border: 1px solid var(--line); border-radius: 6px; padding: 8px 0; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; background: var(--bg); }
+.symbol-definition { border: 1px solid var(--line); border-radius: 6px; padding: 8px 0; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; background: var(--netlist-background); }
 .symbol-definition .ln { min-width: max-content; }
 .symbol-definition .no { width: 4em; }
