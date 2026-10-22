@@ -1,8 +1,8 @@
 import {expect, test} from '../viewer.js';
 
 const defaults = {
-  component: '#1A67CC', net: '#4A0804', rnl: '#DEF9FF', keyword: '#AB0187', definition: '#2B7800',
-  local: '#22038F', string: '#6B4E63', parameter: '#153D75', free: '#595959', text: '#000000',
+  component: '#2275E2', net: '#A01008', rnl: '#E1FEE9', keyword: '#000000', definition: '#2B7800',
+  local: '#4B21E4', string: '#895D7C', parameter: '#1D4781', free: '#6B6B6B', text: '#000000',
   background: '#FFFFFF', highlight: '#E8590C',
 };
 const rgb = hex => `rgb(${[1,3,5].map(i => parseInt(hex.slice(i,i+2),16)).join(', ')})`;
@@ -36,6 +36,7 @@ for (const platform of ['web', 'desktop']) {
     await open(page, platform);
     expect(await palette(page)).toEqual(defaults);
     await expect(page.locator('.netlist-color-row input[type=color]')).toHaveCount(12);
+    await expect(page.locator('.dialog-buttons button')).toHaveText(['Restore Defaults', 'Cancel', 'Save']);
     await page.getByRole('button', {name:'Cancel', exact:true}).click();
     await viewer.click('Xparent');
     await expect(page.locator('#source .obj.hl').first()).toHaveCSS('color', rgb(defaults.highlight));

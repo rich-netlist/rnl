@@ -4,15 +4,15 @@ import { form, inform } from "./dialog.js";
 import { load, save } from "./util.js";
 
 export const COLOR_FIELDS = [
-  ["component", "Component objects (#)", "#1A67CC"],
-  ["net", "Net objects (&)", "#4A0804"],
-  ["rnl", "RNL region background", "#DEF9FF"],
-  ["keyword", "RNL keywords", "#AB0187"],
+  ["component", "Component objects (#)", "#2275E2"],
+  ["net", "Net objects (&)", "#A01008"],
+  ["rnl", "RNL region background", "#E1FEE9"],
+  ["keyword", "RNL keywords", "#000000"],
   ["definition", "Definition objects ($)", "#2B7800"],
-  ["local", "Local objects (%)", "#22038F"],
-  ["string", "Strings", "#6B4E63"],
-  ["parameter", "Parameters and roles", "#153D75"],
-  ["free", "Free text", "#595959"],
+  ["local", "Local objects (%)", "#4B21E4"],
+  ["string", "Strings", "#895D7C"],
+  ["parameter", "Parameters and roles", "#1D4781"],
+  ["free", "Free text", "#6B6B6B"],
   ["text", "Other text", "#000000"],
   ["background", "Netlist background", "#FFFFFF"],
   ["highlight", "Selection highlight", "#E8590C"],
@@ -88,7 +88,7 @@ export async function netlistColors() {
     const result = await form({
       title: m("Color Scheme"),
       text: m("Preview changes immediately. Save keeps them; Cancel restores the previous scheme."),
-      parts: [rows, reset], focus: fields[0].text, action: "Save", wide: true,
+      parts: [rows], footer: [reset], focus: fields[0].text, action: "Save", wide: true,
       answer: () => {
         const invalid = fields.find(({ text }) => !hex(text.value));
         if (invalid) { invalid.text.reportValidity(); invalid.text.focus(); return undefined; }

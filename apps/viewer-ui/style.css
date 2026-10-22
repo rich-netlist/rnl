@@ -1,13 +1,13 @@
 :root {
-  --netlist-component: #1A67CC;
-  --netlist-net: #4A0804;
-  --netlist-rnl: #DEF9FF;
-  --netlist-keyword: #AB0187;
+  --netlist-component: #2275E2;
+  --netlist-net: #A01008;
+  --netlist-rnl: #E1FEE9;
+  --netlist-keyword: #000000;
   --netlist-definition: #2B7800;
-  --netlist-local: #22038F;
-  --netlist-string: #6B4E63;
-  --netlist-parameter: #153D75;
-  --netlist-free: #595959;
+  --netlist-local: #4B21E4;
+  --netlist-string: #895D7C;
+  --netlist-parameter: #1D4781;
+  --netlist-free: #6B6B6B;
   --netlist-text: #000000;
   --netlist-background: #FFFFFF;
   --netlist-highlight: #E8590C;
@@ -639,7 +639,6 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .dialog-body .netlist-color-row .color-hex { width: 100%; font-family: ui-monospace, Consolas, monospace; }
 .dialog-body .netlist-color-row input[type="color"] { width: 42px; height: 30px; padding: 2px; cursor: pointer; }
 .netlist-color-row input[aria-invalid="true"] { border-color: var(--error); }
-.netlist-colors-reset { align-self: flex-start; }
 
 /* ------------------------------------------------------------------ problems */
 
