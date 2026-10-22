@@ -320,6 +320,8 @@ export async function startPool() {
 }
 
 export const poolSnapshot = () => items.filter((i) => !i.builtin).slice();
+/** Export includes every built-in, even unused packages, and the clipboard's separate slot. */
+export const librarySnapshot = () => ({ items: items.slice(), temporary: temporary?.source || null });
 export async function restorePool(pool) {
   addItems(pool);
   await syncPool();

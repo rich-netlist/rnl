@@ -10,6 +10,7 @@ import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
 import { sourcePath } from "../source-path.js";
 import { DEFAULT_CATALOG, readCatalog, readPublicPackage, latestPackages } from "../public-packages.js";
+import { libraryZip } from "../zip.js";
 
 /** The extensions of netlists that are opened on their own, listed first as the file to open. */
 const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "scs"];
@@ -569,8 +570,9 @@ async function walk(entry, files) {
 }
 
 /** Hand the browser a text as a file to save under `name`, by a link it follows. */
-function download(name, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+function download(name, content) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
@@ -599,7 +601,7 @@ async function about() {
     paragraphs: [
       name,
       `RNL core ${site.coreVersion || "?"} (${site.commit || "unknown"})`,
-      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("Save downloads the file shown, as no page can write a file where it was read from.")}`,
+      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("Download File downloads the file shown. Download Library exports all library files and built-in packages as a ZIP.")}`,
       m`${m("The RNL core runs in this page as WebAssembly. Files opened from this computer are read here ")}${m("and sent nowhere; a URL's files are fetched from its server.")}`,
     ],
   });
@@ -861,6 +863,28 @@ export default {
   async save(source, files) {
     for (const f of files) download(f.name.split("/").pop(), f.text);
     return files.length === 1 ? `Downloaded ${files[0].name.split("/").pop()}.` : `Downloaded ${files.length} files.`;
+  },
+  async downloadLibrary(files, preparing) {
+    let handle;
+    if (typeof window.showSaveFilePicker === "function") {
+      try {
+        // Request the destination while the menu click still has user activation.
+        handle = await window.showSaveFilePicker({ id: "rnl-library", suggestedName: "rnl-library.zip",
+          types: [{ description: "ZIP", accept: { "application/zip": [".zip"] } }] });
+      } catch (error) {
+        if (error.name === "AbortError") return false;
+        // Sandboxed/embedded pages may expose the API but not permit its use.
+        if (error.name !== "SecurityError" && error.name !== "NotAllowedError") throw error;
+      }
+    }
+    preparing();
+    const blob = await libraryZip(files);
+    if (handle) {
+      const writer = await handle.createWritable();
+      try { await writer.write(blob); await writer.close(); }
+      catch (error) { await writer.abort().catch(() => {}); throw error; }
+    } else download("rnl-library.zip", blob);
+    return true;
   },
   /** The browser asks before a page with changes not saved is left. */
   setDirty(dirty) {

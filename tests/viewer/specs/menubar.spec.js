@@ -65,7 +65,7 @@ test.describe("on the web", () => {
         items: [
           "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
           "Reload Library", "Auto Include",
-          "", "SaveCtrl+S",
+          "", "Download FileCtrl+S", "Download Library",
         ],
       },
       { title: "Edit", letter: "E", items: ["Edit TextCtrl+Q", "Apply and Exit EditingCtrl+Enter", "Discard Changes", "Find in Netlist…Ctrl+F", "", "Open SubcircuitE", "Open Subcircuit in New Window…Shift+E", "Up to Parent LevelCtrl+E"] },
@@ -283,7 +283,7 @@ test.describe("on the web", () => {
     await page.keyboard.press("F10");
     await expect(marked).toHaveText("File");
     await page.keyboard.press("ArrowUp");
-    await expect(viewer.menuItem("save")).toHaveClass(/\bactive\b/);
+    await expect(viewer.menuItem("download-library")).toHaveClass(/\bactive\b/);
     // Escape closes the menu and keeps the title, then leaves the bar
     await page.keyboard.press("Escape");
     await expect(list(page, "File")).toBeHidden();

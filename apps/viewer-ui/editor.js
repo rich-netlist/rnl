@@ -216,12 +216,12 @@ ${path}: ${unapplied.includes(path) ? m("changes not applied; ") : ""}${m("not s
 }
 
 /** A line in the status bar that goes after a few seconds: what was done. */
-function note(text) {
+export function note(text, duration = 6000) {
   const el = $("note");
   setText(el, text);
   el.hidden = text === "";
   clearTimeout(noteTimer);
-  if (text) noteTimer = setTimeout(() => note(""), 6000);
+  if (text && duration > 0) noteTimer = setTimeout(() => note(""), duration);
 }
 
 /** Edit > Edit Text: enter editing, or apply pending text and return to reading. */
@@ -330,7 +330,7 @@ export async function save(overwrite = false) {
       : result || m("Saved."));
     return true;
   } catch (e) {
-    await inform({ title: m("Save"), paragraphs: [m`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
+    await inform({ title: m(shell.platform === "web" ? "Download File" : "Save"), paragraphs: [m`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
     return false;
   }
 }

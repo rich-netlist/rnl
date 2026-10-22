@@ -92,6 +92,8 @@
  *   took it away, is not written, nor are the others: `{ changed }`, the names of those files, for
  *   the user to say. On the web, which cannot write files, download them. Rejects with a message when
  *   it cannot. A shell that offers neither does not save.
+ * @property {(files: {path: string, read: () => Promise<Blob | string> | Blob | string}[], preparing: () => void) => Promise<boolean>} [downloadLibrary]
+ *   Web only: choose a destination, then export the captured library as one ZIP; false on cancel.
  * @property {(source: Source, file: SavedFile) => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.
