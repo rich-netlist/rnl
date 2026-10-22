@@ -45,14 +45,14 @@ export const visitView = () => viewCache.get(key(path));
  * Show the level a path leads to, with the view kept for the path, or else the view shown when the
  * level stays; with `via`, select the instance of that name on it, the one the path was left through.
  */
-export function commitNavigation({ path: next, via, selection, reveal = false }) {
+export function commitNavigation({ path: next, via, selection, selectionUsage, reveal = false }) {
   rememberView();
   const level = next[next.length - 1].level;
   const kept = viewCache.get(key(next)) || (level === current ? view : null);
   setPath(next);
   showLevel(level, kept);
   if (selection === null) clearSelection();
-  else if (selection !== undefined) select(selection, "reload");
+  else if (selection !== undefined) select(selection, "reload", { usage: selectionUsage });
   if (reveal) revealDefinition(level);
   if (via === undefined) return;
   // the instance we came out of stays selected, so the way back down is one Enter away
@@ -90,7 +90,7 @@ export function ascend(options) {
 
 /** Show a level reached otherwise than through an instance, such as by an object of it in the text. */
 export function goTo(level, selection, options) {
-  return navigate({ path: [{ level, via: null }], selection }, options);
+  return navigate({ path: [{ level, via: null }], selection, selectionUsage: options?.usage }, options);
 }
 
 /** A tree pick is a new visit head, not a descent through its displayed ancestors. */

@@ -13,7 +13,7 @@ import { sourceOpened } from "./pool.js";
 import { adoptBuffers, changes, resetBuffers } from "./edits.js";
 import { confirmLeave } from "./editor.js";
 import { shell } from "./shell.js";
-import { current, doc, expanded, selected, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
+import { current, doc, expanded, selected, selectedAsUsage, setDoc, setExpanded, setSelected, setViewCache, viewCache } from "./state.js";
 import { clearDrawing, notice, showLevel, view } from "./drawing.js";
 import { renderHierarchy, rootPath } from "./hierarchy.js";
 import { setProblems } from "./panels.js";
@@ -292,7 +292,7 @@ function snapshot() {
         collapsed: [...(v?.collapsed || [])] };
     }),
     file: doc.files[fileShown] ? doc.files[fileShown].path : null,
-    selected: sel && { kind: sel.kind, name: sel.name, level: sel.level },
+    selected: sel && { kind: sel.kind, name: sel.name, level: sel.level, usage: selectedAsUsage },
     expanded,
     roots: uncalledRoots().map(rootPath),
     path: namedPath(),
@@ -353,12 +353,12 @@ function showDocument(before, navigation) {
   if (navigation?.select) {
     const s = navigation.select;
     const o = doc.objects.findIndex(o => o.kind === s.kind && o.name === s.name && o.level_title === s.level);
-    if (o >= 0) select(o, "ascend");
+    if (o >= 0) select(o, "ascend", { usage: s.usage });
   }
 
   if (before && before.selected) {
     const s = before.selected;
     const o = doc.objects.findIndex((x) => x.kind === s.kind && x.name === s.name && x.level === s.level);
-    if (o >= 0) select(o, "reload");
+    if (o >= 0) select(o, "reload", { usage: s.usage });
   }
 }

@@ -7,7 +7,7 @@ import { changes } from "./edits.js";
 import { currentSource, isLoading, openSource } from "./open.js";
 import { poolSnapshot, restorePool } from "./pool.js";
 import { shell } from "./shell.js";
-import { doc, path, selected, viewCache } from "./state.js";
+import { doc, path, selected, selectedAsUsage, viewCache } from "./state.js";
 import { commitNavigation, namedPath, rememberView } from "./subcircuits.js";
 import { showFile } from "./text.js";
 import { setPane } from "./panels.js";
@@ -43,7 +43,8 @@ function destination(target) {
   if (last) last.entry = entry;
   const object = target.selection == null ? null : doc?.objects[target.selection];
   return { entry, path: route, level: last?.title,
-    select: object ? { kind: object.kind, name: object.name, level: object.level_title }
+    select: object ? { kind: object.kind, name: object.name, level: object.level_title,
+      ...(target.selectionUsage === undefined ? {} : { usage: target.selectionUsage }) }
       : target.via ? { kind: 'instance', name: target.via, level: last?.title } : null,
     reveal: target.reveal, netlist: target.file !== undefined };
 }
@@ -58,7 +59,8 @@ function fileSource(file) {
 
 /** File > New Window keeps the current level and selection. */
 export function duplicateWindow() {
-  return newWindow(destination({ path: path.slice(), selection: selected }));
+  return newWindow(destination({ path: path.slice(), selection: selected,
+    selectionUsage: doc?.objects[selected]?.kind === "usage" ? selectedAsUsage : undefined }));
 }
 
 async function newWindow(visit) {

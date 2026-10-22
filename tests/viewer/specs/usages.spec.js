@@ -103,7 +103,7 @@ for (const platform of ['desktop', 'web']) {
     }, name);
     expect(await opacity('R1')).toBe('1');
     expect(await opacity('R2')).toBe('1');
-    expect(await opacity('R3')).toBe('0.5');
+    expect(await opacity('R3')).toBe('1');
     const label = frame(page, pair.object).locator('.usage-role-label text').first();
     const before = await label.boundingBox();
     const stroke = await box.getAttribute('stroke-width');

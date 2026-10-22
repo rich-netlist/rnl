@@ -22,6 +22,7 @@ export const FILES = {
   "wire-labels": "tests/viewer/inputs/wire-labels.sp",
   "usage-inspector": "tests/viewer/inputs/usage-inspector.sp",
   "usage-anonymous": "tests/viewer/inputs/usage-anonymous.sp",
+  "usage-virtual-roles": "tests/viewer/inputs/usage-virtual-roles.sp",
   "symbol-inspector": "tests/viewer/inputs/symbol-inspector.sp",
   "fold-sections": "tests/viewer/inputs/fold-sections.sp",
   "fold-sections-include": "tests/viewer/inputs/fold-sections.inc",

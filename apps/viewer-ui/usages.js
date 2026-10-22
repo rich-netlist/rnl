@@ -1,6 +1,6 @@
 // Scope-local semantic groups. Display preferences never change the RNL source or its geometry.
 import { append, m, setAttr, setText } from "./i18n.js";
-import { current, doc, selected } from "./state.js";
+import { current, doc, selected, selectedAsUsage } from "./state.js";
 import { select } from "./selection.js";
 import { setCheck } from "./commands.js";
 import { $, load, save, span, svgElement } from "./util.js";
@@ -26,7 +26,13 @@ let layerSelected = null;
 let context = null;
 
 const usages = () => doc?.levels[current]?.usages || [];
-const chosen = () => usages().find(u => u.object === selected);
+const chosen = () => selectedAsUsage ? usages().find(u => u.object === selected) : null;
+const visible = u => shown && setting(u).visible;
+/** Hidden virtual symbols still select as ordinary parts when picked on the drawing. */
+export function usageSelection(object, from) {
+  const u = usages().find(u => u.object === object);
+  return !!u && (from === "usage" || from === "source" || visible(u));
+}
 const keyOf = u => JSON.stringify([doc.path, doc.levels[current].kind, doc.levels[current].title, u.id]);
 function setting(u) {
   if (activeSettings.has(u)) return activeSettings.get(u);
@@ -88,6 +94,7 @@ export function renderUsages() {
   const focused = list.contains(document.activeElement) ? document.activeElement.dataset.focusKey : null;
   list.replaceChildren();
   const all = usages();
+  const inspected = chosen()?.object;
   if (!all.length) append(list, span("placeholder", m("No usages in this circuit.")));
   const groups = new Map();
   for (const u of all) {
@@ -126,12 +133,12 @@ export function renderUsages() {
         const row = document.createElement("div");
         row.className = "usage-row";
         row.dataset.object = String(u.object);
-        row.classList.toggle("selected", u.object === selected);
+        row.classList.toggle("selected", u.object === inspected);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "usage-name";
         button.dataset.focusKey = `usage:${u.id}`;
-        button.setAttribute("aria-pressed", String(u.object === selected));
+        button.setAttribute("aria-pressed", String(u.object === inspected));
         const dot = span("usage-color-dot", "");
         dot.style.background = setting(u).color;
         append(button, dot, u.id);
@@ -212,6 +219,13 @@ function union(bounds) {
   if (!bounds.length) return null;
   return bounds.reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]);
 }
+// Net and terminal roles of a virtual symbol denote its local connections, not every
+// other symbol on the same electrical net. Whole component roles retain their geometry.
+function localSymbol(u) {
+  return u.has_symbol && u.roles.every(r => !r.bounds ||
+    (r.objects.length > 0 && r.objects.every(o => doc.objects[o]?.kind === "net")) ||
+    (r.bounds[0] === r.bounds[2] && r.bounds[1] === r.bounds[3]));
+}
 function badge(text, color, parent, cls) {
   const g = svgElement("g", { class: cls });
   const back = svgElement("rect", { rx: 3, fill: "var(--usage-label-bg)", "fill-opacity": .75 });
@@ -242,21 +256,26 @@ export function paintUsages(svg, view, groups) {
     layer = svgElement("g", { class: "usage-overlays", "pointer-events": "none" });
     append(svg, layer);
     drawing = svg; layerDoc = doc; layerLevel = current; layerRevision = revision; layerSelected = focus;
-    const keep = u ? new Set(u.roles.flatMap(r => r.groups)) : null;
-    if (keep) {
+    const keep = u ? new Set(localSymbol(u) ? [] : u.roles.flatMap(r => r.groups)) : null;
+    if (keep && !localSymbol(u)) {
       const members = new Set(u.roles.flatMap(r => r.objects));
       for (const h of doc.levels[current].hits) if (h.id && h.objects.some(o => members.has(o))) keep.add(h.id);
     }
-    // Retain the usage's own symbol as well when a virtual part is selected.
-    if (keep) for (const h of doc.levels[current].hits) if (h.objects[0] === u.object && h.id) keep.add(h.id);
+    // A virtual symbol is local to one usage; its attached net may span the entire drawing.
+    if (keep) for (const h of doc.levels[current].hits) if (h.objects.includes(u.object) && h.id) keep.add(h.id);
     for (const [id, elements] of groups) for (const g of elements) {
       g.classList.toggle("usage-muted", !!keep && !keep.has(id) && !g.parentElement.closest("[data-id]"));
     }
+    const symbolBounds = new Map();
+    for (const h of doc.levels[current].hits) if (h.kind === "box") {
+      symbolBounds.set(h.objects[0], union(h.points.map(([x, y]) => [x, y, x, y])));
+    }
     frames = [];
-    for (const entry of [...usages()].sort((a, b) => Number(a.object === selected) - Number(b.object === selected))) {
-      const active = entry.object === selected;
-      if (!active && (!shown || !setting(entry).visible)) continue;
-      const bounds = union(entry.roles.map(r => r.bounds).filter(Boolean));
+    for (const entry of [...usages()].sort((a, b) => Number(a.object === focus) - Number(b.object === focus))) {
+      const active = entry.object === focus;
+      if (!active && !visible(entry)) continue;
+      const local = localSymbol(entry);
+      const bounds = local ? symbolBounds.get(entry.object) : union(entry.roles.map(r => r.bounds).filter(Boolean));
       if (!bounds) continue;
       const color = setting(entry).color;
       const group = svgElement("g", { class: `usage-frame${active ? " selected" : ""}`, "data-usage": entry.object });
@@ -267,10 +286,15 @@ export function paintUsages(svg, view, groups) {
       append(group, rect);
       append(layer, group);
       const title = badge(`${entry.definition}: ${entry.id}`, color, group, "usage-title");
+      const pins = active && local && entry.roles.length > 1 ? doc.levels[current].hits.filter(h =>
+        h.kind === "pin" && h.points[0][0] >= bounds[0] && h.points[0][0] <= bounds[2] &&
+        h.points[0][1] >= bounds[1] && h.points[0][1] <= bounds[3]) : [];
       const roles = active ? entry.roles.filter(r => r.bounds).map(r => ({
-        bounds: r.bounds, ...badge(r.name, color, group, "usage-role-label"),
+        bounds: local ? union(pins.filter(p => p.objects.some(o => r.objects.includes(o)))
+          .map(p => [p.points[0][0], p.points[0][1], p.points[0][0], p.points[0][1]])) || bounds : r.bounds,
+        ...badge(r.name, color, group, "usage-role-label"),
       })) : [];
-      frames.push({ entry, bounds, rect, fill, title, roles });
+      frames.push({ entry, bounds, rect, fill, title, roles, active, local });
     }
   }
   layer.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${1 / view.k})`);
@@ -285,9 +309,19 @@ export function paintUsages(svg, view, groups) {
       f.rect.setAttribute(attr, value); f.fill.setAttribute(attr, value);
     }
     placeBadge(f.title, b[0] + 8, b[1], false);
+    const titleVisible = f.active || f.title.width + 16 <= b[2] - b[0];
+    f.title.g.setAttribute("display", titleVisible ? "inline" : "none");
+    if (!titleVisible) f.title.screen = null;
+    const placed = [];
     for (const role of f.roles) {
       const [cx, cy] = project((role.bounds[0] + role.bounds[2]) / 2, (role.bounds[1] + role.bounds[3]) / 2);
-      placeBadge(role, cx, cy, true);
+      let y = cy;
+      placeBadge(role, cx, y, true);
+      // Several virtual roles may share a pin, or have no separate pin geometry.
+      // Keep all their names readable even when their anchors coincide after zooming out.
+      if (f.local) while (placed.some(b => role.screen[0] < b[2] + 2 && role.screen[2] > b[0] - 2 &&
+        role.screen[1] < b[3] + 2 && role.screen[3] > b[1] - 2)) placeBadge(role, cx, y += 20, true);
+      placed.push(role.screen);
     }
   }
 }
@@ -306,6 +340,7 @@ export function usagesAt({ x, y }) {
   const contains = (b, pad = 0) => b && x >= b[0] - pad && x <= b[2] + pad && y >= b[1] - pad && y <= b[3] + pad;
   const hits = [];
   for (const f of [...frames].reverse()) {
+    if (!visible(f.entry)) continue;
     if (contains(f.title.screen) || (contains(f.screen, 4) && !contains([f.screen[0] + 5, f.screen[1] + 5, f.screen[2] - 5, f.screen[3] - 5]))) hits.push(f.entry.object);
   }
   return hits;
