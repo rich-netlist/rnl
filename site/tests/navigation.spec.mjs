@@ -37,7 +37,9 @@ for (const file of files) {
   test(`${file}: primary pages, sticky contents and section tracking`, async ({ page }, info) => {
     await page.goto(`/zh/${file}`);
     await ready(page);
-    await expect(page.locator("nav.pages a")).toHaveCount(6);
+    await expect(page.locator("nav.pages a")).toHaveCount(7);
+    await expect(page.locator("nav.pages a").last()).toHaveText("GitHub");
+    await expect(page.locator("nav.pages a").last()).toHaveAttribute("href", "https://github.com/rich-netlist/rnl");
     await expect(page.locator("nav.pages [aria-current=page]")).toHaveCount(1);
     await expect(page.locator("nav.pages [aria-current=page]")).toHaveAttribute("href", file === "index.html" ? "./" : file);
     if (file === "packages.html") {
@@ -179,7 +181,7 @@ for (const file of ["index.html", "packages.html"]) {
     if (file === "index.html") {
       for (const single of ["intro", "language", "tools"]) {
         await page.goto(`/en/rnl-${single}-standalone.html`);
-        await expect(page.locator("nav.pages a")).toHaveCount(6);
+        await expect(page.locator("nav.pages a")).toHaveCount(7);
         await expect(page.locator("#toc")).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       }

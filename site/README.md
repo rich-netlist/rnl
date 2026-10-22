@@ -81,8 +81,8 @@ The page and both `llms` files name every file of the package, so that they cann
 
 ## Building and viewing
 
-All five pages share the standard page's six primary links. The introduction, language tour,
-tools and agents pages put their first-level section links beside the content, below the full-width
+All five pages share the standard page's six primary links and the project's GitHub link, after Agents.
+The introduction, language tour, tools and agents pages put their first-level section links beside the content, below the full-width
 hero. Below 1000px, the top bar's Contents button opens that navigation; choosing an entry closes
 it. `test_build.py` compares both languages' primary links and current-page markers with
 `scripts/spec/page.html` and the publisher's labels, and checks the copied CSS values.

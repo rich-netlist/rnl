@@ -248,7 +248,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
   html { scroll-padding-top: 66px; }
   .layout { display: block; }
   .toc-btn { display: inline-grid; }
-  .brand-sub { display: none; }  /* the six links of the pages and the buttons do not fit beside it at 768px */
+  .brand-sub { display: none; }  /* Make room for the page links and controls. */
   #toc {
     display: none; position: fixed; z-index: 40; top: 66px; left: 12px; right: 12px; bottom: 12px; max-height: none;
     border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow);
@@ -257,13 +257,13 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
   /* Fixed panels must stretch between their insets so long lists scroll within the viewport. */
   .layout > #toc { align-self: auto; }
 }
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .pages, .brand-sub { display: none; }
   .topbar-in { gap: 10px; }
   .lang-link { margin-left: auto; }
 }
 /* English page names need more room beside the navigation mark and controls. */
-@media (max-width: 800px) {
+@media (max-width: 900px) {
   html[lang="en"] .pages { display: none; }
   html[lang="en"] .topbar-in { gap: 10px; }
   html[lang="en"] .lang-link { margin-left: auto; }
