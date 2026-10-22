@@ -29,8 +29,10 @@ export default {
   },
   setLanguage: language => invoke("set_ui_language", { language }),
   async about() {
+    const core = await invoke("core_build_info");
     await inform({ title: m("About RNL Viewer"), paragraphs: [
       `RNL Viewer ${await tauri.app.getVersion()}`,
+      `RNL core ${core.version} (${core.commit})`,
       m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("nothing is written to a file until you save.")}`,
       m("The drawing uses Noto Sans SC, copyright 2014–2021 Adobe, under the SIL Open Font License 1.1."),
     ] });

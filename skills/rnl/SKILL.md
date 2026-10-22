@@ -2,7 +2,7 @@
 name: rnl
 description: Read, write, check and draw RNL (Rich Netlist) 0.3, the drawing of a schematic written into a SPICE or Spectre netlist as `@RNL` comment records. Use it when a netlist has `* @RNL` or `// @RNL` records or `.rnl` package files, when asked to place, wire, annotate or draw a circuit's schematic from a netlist, to pick symbols or define structures such as a differential pair or a current mirror, or to check a file with `rnl check`, `@rich-netlist/runtime` or the RNL viewers. Covers the language 0.3, the standard packages of series 0.3 and the tools. For exporting Virtuoso schematics or libraries to RNL, routes to the companion rnl-virtuoso skill.
 license: See LICENSE.md (MIT, CC-BY-4.0 and CC0-1.0, by file)
-compatibility: Reading and writing RNL needs no tools. Checking needs the rnl command (Rust 1.85 or later, built from source) or Node 18 or later with the npm package @rich-netlist/runtime.
+compatibility: Reading and writing RNL needs no tools. Checking needs the rnl command (download a core Release executable, or build from source with Rust 1.85 or later) or Node 18 or later with the npm package @rich-netlist/runtime.
 ---
 
 # RNL (Rich Netlist) 0.3
@@ -54,7 +54,7 @@ The record says that M1 and M2 are a differential pair sharing one y, where M5 g
 | --- | --- |
 | [references/language.md](references/language.md) | The short guide to RNL 0.3: how to read and write a file, with examples that read without errors |
 | [references/packages.md](references/packages.md) | The standard packages of series 0.3: packages, definitions with their roles, symbols with their pins, the default symbol rules, sets, and `rnl-zh`. Generated from the package files, so it is in step with them |
-| [references/tools.md](references/tools.md) | Standard Markdown retrieval, checking/rendering tools, web links and page-to-viewer text transfer, and desktop viewer installation and launch |
+| [references/tools.md](references/tools.md) | Standard Markdown retrieval; checking and rendering tools: the `rnl` command downloaded or built from source and the npm package `@rich-netlist/runtime`; web links and page-to-viewer text transfer; and desktop viewer installation and launch |
 | [examples/ota5t.sp](examples/ota5t.sp) | The five-transistor OTA of the standard, in SPICE, with the records of the example above |
 | [examples/ota5t.scs](examples/ota5t.scs) | The same circuit in Spectre, with `//` records |
 | [examples/ota5t-placed.sp](examples/ota5t-placed.sp) | The same circuit with every object placed, so that it is drawn completely |

@@ -18,6 +18,14 @@ fn case(name: &str) -> String {
 }
 
 #[test]
+fn version_names_the_core_and_build_commit() {
+    let (code, out) = rnl(&["--version"]);
+    assert_eq!(code, 0);
+    assert_eq!(out, format!("rnl {} ({})\n", rnl_cli::CORE_VERSION, rnl_cli::BUILD_COMMIT));
+    assert_eq!(rnl(&["-V"]), (code, out));
+}
+
+#[test]
 fn check_reports_what_a_solver_would_have_to_do() {
     let (code, out) = rnl(&["check", &case("10-constraints-and-priority.sp")]);
     let status = out.lines().find(|l| l.starts_with("status ")).expect(&out);

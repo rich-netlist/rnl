@@ -6,22 +6,42 @@
 # smoke-tests the installed app and uninstalls it. A pushed tag viewer-v<version>, the app's version,
 # then makes the GitHub release "RNL Viewer <version>" with the notes of
 # apps/desktop/release-notes/<version>.md, not marked as the repository's latest release, which stays
-# the language standard's. Run by hand, it only builds and keeps the files as the run's artifact.
+# the core's. Run by hand, it only builds and keeps the files as the run's artifact.
 name: Viewer release
 
 on:
   push:
     tags: ["viewer-v*"]
   workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: "Optional viewer-vX.Y.Z to validate without pushing a tag (never publishes)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Reject mismatched versions before either build
+        env:
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          tag="$CANDIDATE_TAG"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then tag="$GITHUB_REF_NAME"; fi
+          args=()
+          if [ -n "$tag" ]; then args+=(--tag "$tag"); fi
+          python scripts/release.py validate viewer --require-notes "${args[@]}"
   build:
+    needs: validate
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -138,6 +158,7 @@ jobs:
         run: node apps/desktop/tests/installers.mjs --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
 
   build-linux:
+    needs: validate
     # Build on the oldest supported Ubuntu, so the AppImage also runs on newer glibc systems.
     runs-on: ubuntu-22.04
     timeout-minutes: 45
@@ -283,7 +304,7 @@ jobs:
       - name: Check the files against their sums
         working-directory: assets
         run: sha256sum --check SHA256SUMS.txt
-      # --latest=false: the repository's latest release stays the language standard's, so anything
+      # --latest=false: the repository's latest release belongs to the core, so anything
       # that looks for the newest viewer filters the releases by the tag's prefix, as Help > Check
       # for Updates does
       - name: Publish the release

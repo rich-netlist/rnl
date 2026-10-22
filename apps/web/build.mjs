@@ -10,6 +10,7 @@
 // examples into samples/, to try the viewer with ?url=samples/cases/04-hierarchy.sp and for tests.
 
 import { publishLibrary } from "./library.mjs";
+import { buildVersions } from "./build-info.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
@@ -68,16 +69,15 @@ if (!existsSync(licence)) {
 cpSync(core, join(out, "core"), { recursive: true, filter: (from) => relative(core, from) !== "package.json" });
 for (const name of ["embed-demo.html", "embed-demo.js"]) cpSync(join(here, name), join(out, name));
 
-// What the About box names: the version of the workspace, and the commit when git knows it.
-const manifest = readFileSync(join(root, "Cargo.toml"), "utf8");
-const version = /^\[workspace\.package\][^[]*?^version\s*=\s*"([^"]*)"/m.exec(manifest);
+// Viewer versions are independent of the core's workspace version.
+const { version, coreVersion } = buildVersions(root);
 let commit = null;
 try {
   commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8", stdio: "pipe" }).trim();
 } catch {
   // not a git checkout, or no git: the box names the version only
 }
-writeFileSync(join(out, "about.json"), `${JSON.stringify({ version: version ? version[1] : null, commit }, null, 2)}\n`);
+writeFileSync(join(out, "about.json"), `${JSON.stringify({ version, coreVersion, commit }, null, 2)}\n`);
 writeFileSync(join(out, "viewer-api.json"), JSON.stringify({ rnl: 1, features: API_FEATURES, maxOpenBytes: MAX_OPEN_BYTES }) + "\n");
 
 if (samples) {

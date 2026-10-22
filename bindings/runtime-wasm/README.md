@@ -2,6 +2,14 @@
 
 The shared core as WebAssembly ([decision 0008](../../docs/decisions/0008-shared-core-per-platform-frontends.md)): [`rnl_view::build`](../../crates/rnl-view/README.md), a workspace in and a Document out, [`rnl_edit::write`](../../crates/rnl-edit/README.md), an edit transaction's ops written into a netlist, and [`rnl_view::catalog`](../../crates/rnl-view/README.md#catalog), the symbols, definitions and sets of the packages the core has, behind a small C-style interface over linear memory, with a JSON request in and a JSON response out. The module imports nothing and needs no generated glue, so building it takes only Cargo. JavaScript modules load it, run it in a Worker and collect the files a document needs; the [web viewer](../../apps/web/README.md) uses them.
 
+## Release version
+
+`core-vX.Y.Z` publishes this binding as `@rich-netlist/runtime` at the root workspace version,
+together with the CLI. `publish-runtime.yml` retains its filename for npm OIDC. Historical
+`runtime-v0.1.0-preview.N` triggers are retired. The first core version and npm dist-tag await
+the user's decision; see [release procedures](../../docs/releases.md) for rehearsals and
+failure recovery. Manual runs only produce tested artifacts.
+
 ## Building
 
 ```bash
@@ -19,7 +27,7 @@ does, and puts it with the JavaScript modules into `dist/`, which git ignores an
 A frontend that links the result as a package, such as Analog Canvas with pnpm's `link:`, builds it with the packages it needs and a name for it:
 
 ```bash
-node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --packages DIR --name @rich-netlist/runtime --version 0.1.0-preview.1
+node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --packages DIR --name @rich-netlist/runtime --version X.Y.Z
 ```
 
 `--packages DIR` brings the `.rnl` files of DIR with the build: `packages.js` holds them under `/rnl-bundled/packages`, and the Worker gives them to every request, after the request's own files and package directories. A newer `rnl-std` among them is the standard package at the root (16.3). `--name` and `--version` go into the `package.json`, whose `exports` name `client.js` as the package and `core.js` as `./core`. A named package is not private, and holds the README of [`packages/runtime`](../../packages/runtime/README.md) and the licenses of what it holds: MIT for the code, CC0-1.0 for the standard packages, and OFL-1.1 for the metrics of Noto Sans SC.
@@ -159,24 +167,30 @@ const { document, files } = await collect(core, { entry: "/top.sp" }, read);
 
 ## Publishing
 
-[`publish-runtime.yml`](../../.github/workflows/publish-runtime.yml) publishes the package to npm as [`@rich-netlist/runtime`](https://www.npmjs.com/package/@rich-netlist/runtime). A pushed tag `runtime-v<version>`, such as `runtime-v0.1.0-preview.7`, builds it as above, its version the tag's and without `--packages`, as the core bundles the standard packages. The workflow then tests its modules with `tests/core.mjs`, checks with [`tests/package.mjs`](tests/package.mjs) what npm gets, and publishes it under the dist-tag `next`, with provenance:
+[`publish-runtime.yml`](../../.github/workflows/publish-runtime.yml) listens to `core-vX.Y.Z`
+and calls `core-release.yml` to build and test all CLI platforms and the npm tarball at the
+workspace version. After every check passes it publishes the tarball as
+[`@rich-netlist/runtime`](https://www.npmjs.com/package/@rich-netlist/runtime), smoke-tests
+that version from npm, then publishes the core's GitHub Release as latest. The repository
+variable `CORE_NPM_DIST_TAG` must be explicitly set to the user-approved `next` or `latest`.
+`runtime-v*` tags no longer trigger publishing, and manual dispatches never publish.
+
+npm trusted publishing remains bound to repository `rich-netlist/rnl` and workflow
+`publish-runtime.yml`, with OIDC and no stored npm token ([decision 0003](../../docs/decisions/0003-npm-scope.md)).
+The filename must not change. Historical npm-only `0.1.0-preview.N` releases remain
+available; new npm versions match the core, independently of Viewer and the language.
+
+Install a chosen published version, replacing X.Y.Z, and configure Vite as above:
 
 ```bash
-git tag runtime-v0.1.0-preview.7
-git push origin runtime-v0.1.0-preview.7
+npm i @rich-netlist/runtime@X.Y.Z
 ```
 
-Only versions with a pre-release suffix are published for now: a tag without one fails. A pull request that changes the package builds and checks it the same way, and so does the workflow run by hand, which publishes only with `dry_run` set to false on a `runtime-v` tag. The build runs in a job of its own, which cannot publish; the publishing job publishes the tarball the build packed.
-
-npm takes the publish by trusted publishing: the package's settings on npmjs.com name the repository `rich-netlist/rnl` and the workflow `publish-runtime.yml`, so the workflow uses and stores no token ([decision 0003](../../docs/decisions/0003-npm-scope.md)). The first two previews, 0.1.0-preview.8 and 0.1.0-preview.9, were published with a one-off token, revoked since.
-
-A frontend installs the previews with
-
-```bash
-npm i @rich-netlist/runtime@next
-```
-
-and sets up Vite as above; installed into `node_modules`, the package needs no `server.fs.allow`.
+The first core version and dist-tag remain undecided. A bare npm install follows npm's
+`latest`, which may still name an older preview. See [release procedures](../../docs/releases.md)
+for manual rehearsals, release approval and the recovery needed if npm succeeds before
+the registry smoke test or GitHub release fails. Neither the build nor validation jobs
+have permission to publish.
 
 ## Tests
 

@@ -9,6 +9,10 @@ pub mod profile;
 pub mod provider;
 pub mod solve;
 
+/// Core version and source revision shared by the CLI and the desktop About dialog.
+pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const BUILD_COMMIT: &str = env!("RNL_BUILD_COMMIT");
+
 use std::path::Path;
 
 use rnl_runtime::diag::Sink;

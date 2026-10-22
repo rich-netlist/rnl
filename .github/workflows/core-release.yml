@@ -1,0 +1,196 @@
+# Builds only. Publication stays in publish-runtime.yml to preserve its npm OIDC identity.
+name: Core release
+on:
+  workflow_call:
+    outputs:
+      version:
+        value: ${{ jobs.validate.outputs.version }}
+  workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: "Optional core-vX.Y.Z to validate without pushing a tag (never publishes)"
+        type: string
+        default: ""
+  pull_request:
+    paths: ["Cargo.*", "crates/**", "bindings/runtime-wasm/**", "packages/runtime/**", "scripts/release.py", "scripts/test_release.py", "release-notes/core/**", "LICENSE*", "LICENSES/**", "apps/desktop/Cargo.toml", "apps/desktop/tauri.conf.json", ".github/workflows/core-release.yml", ".github/workflows/publish-runtime.yml"]
+permissions:
+  contents: read
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Reject mismatched versions and missing notes before any build
+        id: version
+        env:
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          tag="$CANDIDATE_TAG"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then tag="$GITHUB_REF_NAME"; fi
+          args=()
+          if [ -n "$tag" ]; then args+=(--tag "$tag"); fi
+          python scripts/release.py validate core --require-notes "${args[@]}"
+      - name: Test the release gates
+        run: python -m unittest discover -s scripts -p test_release.py -v
+  cli:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, target: x86_64-pc-windows-msvc, exe: rnl.exe}
+          - {os: ubuntu-22.04, target: x86_64-unknown-linux-musl, exe: rnl}
+          - {os: macos-15, target: aarch64-apple-darwin, exe: rnl}
+          - {os: macos-15-intel, target: x86_64-apple-darwin, exe: rnl}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }} && rustup default stable
+      - name: Install musl
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Link the Windows C runtime statically
+        if: runner.os == 'Windows'
+        run: echo 'RUSTFLAGS=-C target-feature=+crt-static' >> "$GITHUB_ENV"
+      - name: Build the CLI
+        run: cargo build --locked --release -p rnl-cli --target ${{ matrix.target }}
+      - name: Check Windows runtime imports
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $dumpbin = & $vswhere -latest -products * -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe' | Select-Object -First 1
+          if (-not $dumpbin) { throw 'dumpbin is missing' }
+          $imports = & $dumpbin /nologo /dependents target\${{ matrix.target }}\release\rnl.exe
+          if ($LASTEXITCODE -ne 0) { throw 'dumpbin failed' }
+          $imports
+          if (($imports -join "`n") -notmatch 'KERNEL32.dll') { throw 'dumpbin listed no dependencies' }
+          if ($imports -match '(?i)(VCRUNTIME|MSVCP|MSVCR|ucrtbase|api-ms-win-crt)[^\s]*\.dll') { throw 'CLI depends on the VC++ runtime' }
+      - name: Verify a static musl executable
+        if: runner.os == 'Linux'
+        run: |
+          exe=target/${{ matrix.target }}/release/rnl
+          file "$exe" | tee "$RUNNER_TEMP/linkage.txt"
+          grep -E 'statically linked|static-pie linked' "$RUNNER_TEMP/linkage.txt"
+          if readelf -l "$exe" | grep -q INTERP; then exit 1; fi
+          if readelf -d "$exe" | grep -q '(NEEDED)'; then exit 1; fi
+      - name: Package and extract exactly what users download
+        run: |
+          python scripts/release.py package --exe target/${{ matrix.target }}/release/${{ matrix.exe }} --target ${{ matrix.target }} --out assets
+          mkdir extracted
+          python -c "import glob,shutil; shutil.unpack_archive(glob.glob('assets/rnl-*')[0], 'extracted')"
+      - name: Smoke-test the extracted CLI
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: python scripts/release.py smoke --exe extracted/${{ matrix.exe }} --version "$VERSION" --commit "$(git rev-parse --short HEAD)"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: core-cli-${{ matrix.target }}
+          path: assets/
+          if-no-files-found: error
+  npm:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download and verify locked public packages
+        run: python scripts/packages.py download
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown && rustup default stable
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Build and test the npm package
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          node bindings/runtime-wasm/build.mjs --out packages/runtime/dist --name @rich-netlist/runtime --version "$VERSION"
+          node bindings/runtime-wasm/tests/core.mjs packages/runtime/dist
+          node bindings/runtime-wasm/tests/package.mjs packages/runtime/dist "$VERSION"
+          cd packages/runtime/dist
+          npm pack --pack-destination "$GITHUB_WORKSPACE"
+          npm publish --dry-run --access public
+      - name: Smoke-test the packed package with Vite
+        working-directory: packages/runtime/smoke
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node smoke.mjs "$GITHUB_WORKSPACE/rich-netlist-runtime-$VERSION.tgz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: core-npm
+          path: rich-netlist-runtime-${{ needs.validate.outputs.version }}.tgz
+          if-no-files-found: error
+  parity:
+    needs: cli
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: core-cli-x86_64-unknown-linux-musl
+          path: downloaded
+      - name: Verify and extract the downloaded release artifact
+        run: |
+          cd downloaded
+          sha256sum --check SHA256SUMS.txt
+          tar -xzf rnl-x86_64-unknown-linux-musl.tar.gz
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Build the reference in debug mode and compare every conformance file
+        run: |
+          cargo build --locked -p rnl-cli
+          python scripts/release.py compare --exe downloaded/rnl --reference target/debug/rnl
+      - name: Generate and check the skill with the downloaded CLI
+        run: |
+          python scripts/packages.py download
+          python scripts/skill/build.py --rnl downloaded/rnl
+          git diff --exit-code -- skills/rnl
+          python scripts/skill/build.py --check --rnl downloaded/rnl
+  assets:
+    needs: [validate, cli, npm, parity]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: core-cli-*
+          path: incoming
+      - name: Verify platform checksums and combine CLI packages
+        run: |
+          mkdir assets
+          for dir in incoming/*; do
+            (cd "$dir" && sha256sum --check SHA256SUMS.txt)
+            find "$dir" -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec cp {} assets/ \;
+          done
+          test "$(find assets -type f | wc -l)" -eq 4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: core-npm
+          path: assets
+      - name: Checksum every archive, including npm
+        run: |
+          python scripts/release.py sums assets
+          (cd assets && sha256sum --check SHA256SUMS.txt)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rnl-core-${{ needs.validate.outputs.version }}
+          path: assets/
+          if-no-files-found: error

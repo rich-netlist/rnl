@@ -1,5 +1,7 @@
 # Documentation map
 
+- [Release procedures](releases.md) cover the independent core, Viewer and language lines, build rehearsals, downloads and publication recovery.
+
 - [Toolchain architecture](rnl-toolchain-architecture.md) (in Chinese) is the proposal for the runtime, solver, viewer/editor, repository layout, and distribution. It records requirements and recommendations, not an implemented system.
 - [Supported profile of standard 0.3 revision 2](supported-profile-0.3.md) records the toolkit’s section-by-section support, limitations and test evidence; the [vocabulary audit](profile-vocabulary-audit.md) covers every standard keyword and parameter.
 - [Roadmap](roadmap.md) is the single list of completed bootstrap work and future milestones.

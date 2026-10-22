@@ -109,6 +109,7 @@
     <li><a href="#viewers"><zh>查看器</zh><en>Viewers</en></a></li>
     <li><a href="#web"><zh>网页版</zh><en>Web</en></a></li>
     <li><a href="#desktop"><zh>桌面版</zh><en>Desktop</en></a></li>
+    <li><a href="#cli"><zh>命令行</zh><en>Command line</en></a></li>
     <li><a href="#toolchain"><zh>工具链</zh><en>Toolchain</en></a></li>
     <li><a href="#licences"><zh>许可</zh><en>Licences</en></a></li>
   </ul>
@@ -334,11 +335,32 @@
   </div>
 </section>
 
-<!-- ===================== 04 Toolchain ===================== -->
+<section id="cli" class="sheet">
+  <div class="wrap">
+    <header class="sheet-head">
+      <p class="sheet-no"><zh>04 · 命令行</zh><en>04 · Command line</en></p>
+      <h2><zh>下载，解包，运行。</zh><en>Download, extract, run.</en></h2>
+      <p class="lead"><zh>用 <code>rnl</code> 检查网表、绘制 SVG 和求解布局。无需安装 Rust；Windows 版也不需要另装 VC++ 运行库。命令行与 npm 包共用核心版本，独立于 Viewer 和语言标准。</zh><en>Use <code>rnl</code> to check netlists, render SVGs and solve layouts. No Rust installation is needed; Windows also needs no separate VC++ runtime. The CLI and npm package share the core version, independently of Viewer and the language standard.</en></p>
+    </header>
+    <div class="panel dl">
+      <div class="ph"><svg class="ico"><use href="#i-term"/></svg><span class="ph-title">RNL core · CLI</span><span class="ph-right"><a class="chip" href="https://github.com/rich-netlist/rnl/releases/latest"><zh>核心发布页</zh><en>Core release</en></a></span></div>
+      <ul class="dl-list">
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-pc-windows-msvc.zip"><svg class="ico"><use href="#i-download"/></svg><span><b>Windows x64</b><code>.zip · MSVC</code></span></a><p><zh>解包后运行 <code>.\rnl.exe --version</code>。</zh><en>Extract, then run <code>.\rnl.exe --version</code>.</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-unknown-linux-musl.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b>Linux x86_64</b><code>.tar.gz · musl</code></span></a><p><zh>静态链接，解包后运行 <code>./rnl --version</code>。</zh><en>Statically linked. Extract, then run <code>./rnl --version</code>.</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-aarch64-apple-darwin.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b>macOS · Apple Silicon</b><code>.tar.gz · arm64</code></span></a><p><zh>适用于 Apple Silicon 芯片的 Mac。</zh><en>For Macs with Apple Silicon.</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-apple-darwin.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b>macOS · Intel</b><code>.tar.gz · x86_64</code></span></a><p><zh>适用于 Intel 芯片的 Mac。</zh><en>For Macs with Intel processors.</en></p></li>
+      </ul>
+    </div>
+    <p><a href="https://github.com/rich-netlist/rnl/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a><zh>：下载后先校验 SHA256，再运行程序。<code>rnl --version</code> 显示核心版本和构建提交；用 <code>rnl check my.sp</code> 检查网表，<code>rnl render my.sp -o svg</code> 导出图。</zh><en>: verify the archive's SHA256 before running it. <code>rnl --version</code> shows the core version and build commit; use <code>rnl check my.sp</code> to check a netlist and <code>rnl render my.sp -o svg</code> to export drawings.</en></p>
+    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>下载链接在首次 <code>core-v*</code> 发布后可用，并始终指向最新核心版本。文件没有代码签名：Windows 可能提示 SmartScreen；macOS 浏览器下载的文件可能需要先执行 <code>xattr -d com.apple.quarantine rnl</code>。Linux arm64 暂需从源码编译。下载、解包和校验命令见 <a href="https://github.com/rich-netlist/rnl/blob/main/skills/rnl/references/tools.md">CLI 使用说明</a>。</zh><en>Downloads become available with the first <code>core-v*</code> release and follow the latest core. Files are unsigned: Windows may show SmartScreen; macOS browser downloads may need <code>xattr -d com.apple.quarantine rnl</code>. Linux arm64 currently needs a source build. See the <a href="https://github.com/rich-netlist/rnl/blob/main/skills/rnl/references/tools.md">CLI guide</a> for download, extraction and checksum commands.</en></span></p>
+  </div>
+</section>
+
+<!-- ===================== 05 Toolchain ===================== -->
 <section id="toolchain" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>04 · 工具链</zh><en>04 · Toolchain</en></p>
+      <p class="sheet-no"><zh>05 · 工具链</zh><en>05 · Toolchain</en></p>
       <h2><zh>RNL 工具链：读、解、画、改。</zh><en>The RNL toolchain: read, solve, draw, edit.</en></h2>
       <p class="lead"><zh>工具链把“读懂 RNL”和“把意图变成坐标”分成独立模块：没有求解器也能看图，需要时再求解。已经有的有：运行库、宿主适配器、渲染器和命令行，上面的两个查看器，还有求解器的第一版，在 <code>rnl solve</code> 和桌面版查看器里。选一条路径看数据怎么流动，点一个模块看它做什么。</zh>
         <en>The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.</en></p>
@@ -386,7 +408,7 @@
 <section id="licences" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>05 · 许可</zh><en>05 · Licences</en></p>
+      <p class="sheet-no"><zh>06 · 许可</zh><en>06 · Licences</en></p>
       <h2><zh>开源，可以自由使用。</zh><en>Open source, free to use.</en></h2>
       <p class="lead"><zh>查看器和整个 RNL 工具链的源代码都在 GitHub 上公开。</zh>
         <en>The source of the viewers and of the whole RNL toolkit is public on GitHub.</en></p>
