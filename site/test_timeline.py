@@ -57,9 +57,9 @@ class Timeline(unittest.TestCase):
         with self.assertRaises(build.BuildError):
             build.timeline_events({"milestones": [milestone(start_date="2026-10-20")]}, [])
 
-    def test_duplicate_manual_tags_and_missing_translations_fail(self):
+    def test_duplicate_manual_tags_and_missing_english_fail(self):
         for events in ([milestone("a", tags=["viewer-v0.1.4"]), milestone("b", tags=["viewer-v0.1.4"])],
-                       [milestone(summary={"en": "Missing Chinese"})]):
+                       [milestone(summary={"zh": "缺少英文"})]):
             with self.subTest(events=events), self.assertRaises(build.BuildError):
                 build.timeline_events({"milestones": events}, [])
 
@@ -118,10 +118,10 @@ class ReleaseSummaries(unittest.TestCase):
             with patch.object(build, "ROOT", root), patch.object(build, "git_text", return_value=None):
                 self.assertEqual(build.release_summary("viewer-v0.1.2")["en"], "Backfilled summary.")
 
-    def test_missing_malformed_and_one_language_summaries_fail(self):
+    def test_missing_malformed_and_missing_english_summaries_fail(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(build, "ROOT", Path(directory)):
             for notes in ("No summary", "<!-- timeline-summary\nnot JSON\n-->",
-                          '<!-- timeline-summary\n{"en":"English only"}\n-->'):
+                          '<!-- timeline-summary\n{"zh":"没有英文"}\n-->'):
                 with self.subTest(notes=notes), patch.object(build, "git_text", return_value=notes):
                     with self.assertRaises(build.BuildError):
                         build.release_summary("spec-0.4-r1")

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="<zh>zh-CN</zh><en>en</en>">
+<html lang="{{html-lang}}" data-locale="{{locale-code}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -9,11 +9,12 @@
 <link rel="alternate" type="text/plain" href="<zh>llms.txt</zh><en>../llms.txt</en>" title="llms.txt">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&<zh>family=Noto+Sans+SC:wght@400;500;700;900</zh><en>family=IBM+Plex+Sans:wght@400;500;600;700</en>&display=swap">
+<link rel="stylesheet" href="{{font-href}}">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
 <link rel="stylesheet" href="assets/intro.css">
+<link rel="stylesheet" href="assets/languages.css">
 <link rel="stylesheet" href="assets/agents.css">
 <script>
   (function () {
@@ -52,17 +53,17 @@
 <header class="topbar">
   <div class="topbar-in">
     <a class="brand" href="./"><span class="brand-logo theme-logo"><img class="logo-light" src="assets/brand/rnl-logo-small.svg" width="24" height="24" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-small-dark.svg" width="24" height="24" alt=""></span><span class="brand-mark">RNL</span><span class="brand-sub">Rich Netlist</span></a>
-    <nav class="pages" aria-label="<zh>页面</zh><en>Pages</en>">
-      <a href="./"><zh>介绍</zh><en>Introduction</en></a>
-      <a href="language.html"><zh>语言导览</zh><en>Language tour</en></a>
-      <a href="spec/"><zh>标准</zh><en>Standard</en></a>
-      <a href="packages.html"><zh>标准包</zh><en>Packages</en></a>
-      <a href="tools.html"><zh>工具</zh><en>Tools</en></a>
-      <a class="is-on" aria-current="page" href="agents.html">Agent</a>
+    <nav class="pages" aria-label="{{nav-pages}}">
+      <a href="./">{{nav-intro}}</a>
+      <a href="language.html">{{nav-tour}}</a>
+      <a href="{{spec-root}}">{{nav-spec}}</a>
+      <a href="packages.html">{{nav-packages}}</a>
+      <a href="tools.html">{{nav-tools}}</a>
+      <a class="is-on" aria-current="page" href="agents.html">{{nav-agents}}</a>
       <a href="https://github.com/rich-netlist/rnl">GitHub</a>
     </nav>
     <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>目录</zh><en>Contents</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
-    <a class="lang-link" href="<zh>../en/agents.html</zh><en>../zh/agents.html</en>" hreflang="<zh>en</zh><en>zh-CN</en>" lang="<zh>en</zh><en>zh-CN</en>" aria-label="<zh>English version</zh><en>中文版</en>" data-lang-link><zh>EN</zh><en>中文</en></a>
+    {{language-menu}}
     <button class="icon-btn" id="theme-btn" type="button" aria-label="<zh>切换配色</zh><en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
   </div>
   <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
@@ -296,6 +297,7 @@
   </div>
 </footer>
 
+<script src="assets/languages.js"></script>
 <script src="assets/common.js"></script>
 <script src="assets/agents.js"></script>
 </body>

@@ -65,54 +65,14 @@ FONTS = {  # preferences; only the families typst finds are passed on
     "mono": ["DejaVu Sans Mono", "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Microsoft YaHei"],
 }
 SITE_URL = "https://rich-netlist.github.io/rnl/"  # the project site; the downloaded page links to it
-FONTS_CSS = ("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600"
-             "&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family={body}&display=swap")
+# Website identity, fonts and interface messages share the site's locale registry.
+sys.path.insert(0, str(HERE.parent))
+from site_i18n import LANGUAGES as I18N, asset as i18n_asset  # noqa: E402
 LANGS = {
-    "en": {"suffix": "", "html_lang": "en", "other": "zh", "other_label": "中文", "contents": "Contents",
-           "zip_label": "Markdown, chapters", "md_label": "Markdown", "sums_label": "SHA-256 checksums",
-           "intro": "Introduction", "tour": "Language tour", "spec": "Standard", "packages": "Packages",
-           "tools": "Tools", "agents": "Agent", "pages": "Pages",
-           "guide_note": "This is the short version of the standard: what it takes to read and write RNL files. It is not "
-                         "normative; where it differs from the text below, the text below prevails. The same guide is "
-                         "part of the [skill package for AI agents]({agents}).",
-           "principles_note": "These are the principles of RNL, the text of [`spec/rich-netlist.md`]"
-                              "(https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.md), shown here to be read "
-                              "with the standard. They are not a part of the standard and are not tied to a version of it; "
-                              "the standard refers to them as “Principles”. The English text is authoritative.",
-           "kicker": "Rich Netlist language standard", "theme_dark": "Switch to dark theme",
-           "theme_light": "Switch to light theme", "site_home": "en/",
-           "body_font": "IBM+Plex+Sans:wght@400;500;600;700",
-           "foot": "The text of the standard is licensed under CC-BY-4.0. The English text is normative.",
-           "files": "Files", "file": "File", "content": "Content", "versions": "Versions: ",
-           "label": "Version {v} · {state} ({date}, {commit})", "released": "revision {n}",
-           "after": "revision {n} + later changes", "draft": "not released", "dirty": " + uncommitted changes",
-           "site_dir": "en/spec/{v}", "site_other": "../../../zh/spec/{v}/",
-           "compare": "compare with {w}", "compare_title": "RNL {v} compared with {w}",
-           "compared": "Compared with {label}:", "added": "added", "removed": "removed",
-           "list_changed": "Changed", "list_added": "Added", "list_removed": "Removed", "front": "beginning",
-           "annex": "Annex {a}", "changes": "Changes", "prev": "Previous change", "next": "Next change",
-           "only": "Only what changed"},
-    "zh": {"suffix": ".zh", "html_lang": "zh-CN", "other": "en", "other_label": "EN", "contents": "目录",
-           "zip_label": "Markdown 分章包", "md_label": "Markdown 合订本", "sums_label": "SHA-256 校验值",
-           "intro": "介绍", "tour": "语言导览", "spec": "标准", "packages": "标准包", "tools": "工具", "agents": "Agent",
-           "pages": "页面",
-           "guide_note": "这是标准的简版：读写 RNL 文件需要知道的东西。它不是正式文本，与下面的正文不一致时，以正文为准。"
-                         "同一份指南也在[给 AI agent 的 skill 包]({agents})里。",
-           "principles_note": "这是 RNL 的设计原则，即 [`spec/rich-netlist.zh.md`]"
-                              "(https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.zh.md) 的原文，放在这里方便和标准一起读。"
-                              "它们不是标准的一部分，也不随标准编版本；标准引用它们时写作“原则”。以英文版为准。",
-           "kicker": "Rich Netlist 语言标准", "theme_dark": "切换到深色", "theme_light": "切换到浅色", "site_home": "zh/",
-           "body_font": "Noto+Sans+SC:wght@400;500;700;900",
-           "foot": "标准文本按 CC-BY-4.0 许可发布。本文是中文译本，以英文版为准。",
-           "files": "文件", "file": "文件", "content": "内容", "versions": "版本：",
-           "label": "{v} 版 · {state}（{date}，{commit}）", "released": "修订 {n}",
-           "after": "修订 {n} 之后的修改", "draft": "未发布", "dirty": " + 未提交的修改",
-           "site_dir": "zh/spec/{v}", "site_other": "../../../en/spec/{v}/",
-           "compare": "与 {w} 对比", "compare_title": "RNL {v} 与 {w} 对比",
-           "compared": "与 {label}对比：", "added": "新增", "removed": "删除",
-           "list_changed": "改动", "list_added": "新增", "list_removed": "删掉", "front": "开头",
-           "annex": "附录 {a}", "changes": "改动", "prev": "上一处改动", "next": "下一处改动",
-           "only": "只看改动"},
+    code: {**I18N.locales[code]["messages"], "suffix": "" if code == "en" else "." + code,
+           "html_lang": I18N.locales[code]["html_lang"], "site_home": code + "/",
+           "site_dir": code + "/spec/{v}", "body_font": I18N.locales[code]["fonts"]["google"]}
+    for code in dict.fromkeys(I18N.standard(code) for code in I18N.codes)
 }
 # The versions whose Chinese pages were published at spec/V/, at the root of the site, until the Chinese
 # pages moved to zh/ on 2026-10-18 (site/build.py); later versions have only the addresses under zh/.
@@ -470,33 +430,35 @@ def version_links(lang: str, v: str, all_versions: list[str], href, compare_href
     return L["versions"] + " · ".join(items)
 
 
-def page_meta(lang: str, title: str, other_href: str, site_root: str) -> dict:
+def page_meta(lang: str, title: str, language_path: str, site_root: str) -> dict:
     """What every page has: its language and title, the top bar, the theme and the foot."""
-    L, other = LANGS[lang], LANGS[lang]["other"]
-    return {"html-lang": L["html_lang"], "pagetitle": title,
-            "other-lang": LANGS[other]["html_lang"], "other-label": L["other_label"], "other-href": other_href,
+    L = LANGS[lang]
+    return {"html-lang": L["html_lang"], "locale-code": lang, "pagetitle": title,
+            "language-menu": I18N.menu(lang, lambda target: site_root + "../" + I18N.standard(target) + "/" + language_path),
+            "locale-css": I18N.css(lang), "language-css": i18n_asset("languages.css"),
+            "language-script": i18n_asset("languages.js"),
             "site-root": site_root, "intro-label": L["intro"], "tour-label": L["tour"], "spec-label": L["spec"],
             "packages-label": L["packages"], "tools-label": L["tools"], "agents-label": L["agents"],
             "pages-label": L["pages"],
             "kicker": L["kicker"],
             "theme-label": L["theme_dark"],
             "theme-dark": L["theme_dark"], "theme-light": L["theme_light"], "foot-note": L["foot"],
-            "font-href": FONTS_CSS.format(body=L["body_font"])}
+            "font-href": I18N.font_url(lang)}
 
 
-def build_html(src: Path, lang: str, v: str, rev: dict, dest: Path, other_href: str, site_root: str,
+def build_html(src: Path, lang: str, v: str, rev: dict, dest: Path, site_root: str,
                links: str, out: Path, work: Path) -> None:
     """The web page. Its downloads are the files of the same build, next to it; site_root is where the
     links of the top bar lead: the site's pages for this language. links is the line of versions."""
     L = LANGS[lang]
     log = work / f"links-{v}-{lang}.tsv"
     log.unlink(missing_ok=True)
-    meta = {**page_meta(lang, f"RNL {v} · {L['kicker']}", other_href, site_root),
+    meta = {**page_meta(lang, f"RNL {v} · {L['kicker']}", f"spec/{v}/", site_root),
             "pdf-href": name(v, lang, ".pdf"), "md-href": name(v, lang, ".md"),
             "zip-href": name(v, lang, "-chapters.zip"), "pdf-size": size(out / name(v, lang, ".pdf")),
             "md-size": size(out / name(v, lang, ".md")), "zip-size": size(out / name(v, lang, "-chapters.zip")),
             "md-label": L["md_label"], "zip-label": L["zip_label"], "sums-label": L["sums_label"]}
-    args = [a for k, val in meta.items() for a in ("-M", f"{k}={val}")]
+    args = [a for k, val in meta.items() for a in ("-V" if k in ("language-menu", "locale-css", "language-css", "language-script") else "-M", f"{k}={val}")]
     if links:  # HTML, so a variable (not escaped) rather than metadata
         args += ["-V", f"versions-html={links}"]
     run(["pandoc", str(src), *common_args(lang, v, rev), "-t", "html5", "--standalone",
@@ -532,7 +494,7 @@ def compare_head(lang: str, w: str, rev_w: dict, summary: dict) -> str:
     return "".join(out)
 
 
-def build_compare(old: dict, new: dict, lang: str, v: str, w: str, revs: dict, dest: Path, other_href: str,
+def build_compare(old: dict, new: dict, lang: str, v: str, w: str, revs: dict, dest: Path,
                   site_root: str, links: str, work: Path) -> dict:
     """The page that compares version v with the earlier version w, from both as pandoc reads them; returns
     the sections that changed, were added and were removed. revs holds the revisions of both."""
@@ -543,9 +505,9 @@ def build_compare(old: dict, new: dict, lang: str, v: str, w: str, revs: dict, d
     src = work / f"{v}-{w}-{lang}.json"
     src.write_text(json.dumps(merged, ensure_ascii=False), encoding="utf-8", newline="\n")
     L = LANGS[lang]
-    meta = {**page_meta(lang, f"{L['compare_title'].format(v=v, w=w)} · {L['kicker']}", other_href, site_root),
+    meta = {**page_meta(lang, f"{L['compare_title'].format(v=v, w=w)} · {L['kicker']}", f"spec/{v}/compare-{w}.html", site_root),
             "changes-label": L["changes"], "prev-label": L["prev"], "next-label": L["next"], "only-label": L["only"]}
-    args = [a for k, val in meta.items() for a in ("-M", f"{k}={val}")]
+    args = [a for k, val in meta.items() for a in ("-V" if k in ("language-menu", "locale-css", "language-css", "language-script") else "-M", f"{k}={val}")]
     args += ["-V", f"compare-html={compare_head(lang, w, revs[w], summary)}"]
     if links:
         args += ["-V", f"versions-html={links}"]
@@ -703,15 +665,14 @@ def main(argv: list[str]) -> int:
                 on_site = SITE_URL + L["site_dir"].format(v=v) + "/"
                 published = version_links(lang, v, all_versions, lambda x: SITE_URL + L["site_dir"].format(v=x) + "/",
                                           lambda w: on_site + f"compare-{w}.html")
-                build_html(src, lang, v, rev, out / name(v, lang, ".html"), name(v, L["other"], ".html"),
+                build_html(src, lang, v, rev, out / name(v, lang, ".html"),
                            SITE_URL + L["site_home"], published, out, work)
                 if args.site:
                     d = args.site / L["site_dir"].format(v=v)
                     d.mkdir(parents=True, exist_ok=True)
                     for ext in (".md", "-chapters.zip") + (() if args.no_pdf else (".pdf",)):
                         shutil.copyfile(out / name(v, lang, ext), d / name(v, lang, ext))
-                    build_html(html_input(spec, v, lang, work, "../../"), lang, v, rev, d / "index.html",
-                               L["site_other"].format(v=v), "../../",
+                    build_html(html_input(spec, v, lang, work, "../../"), lang, v, rev, d / "index.html", "../../",
                                version_links(lang, v, all_versions, lambda x: f"../{x}/",
                                              lambda w: f"compare-{w}.html"), out, work)
                     for w in earlier(all_versions, v):
@@ -719,8 +680,7 @@ def main(argv: list[str]) -> int:
                         page = f"compare-{w}.html"
                         links = version_links(lang, v, all_versions, lambda x: "./" if x == v else f"../{x}/",
                                               lambda x: f"compare-{x}.html", comparing=w)
-                        found = build_compare(doc(w, lang), doc(v, lang), lang, v, w, revs, d / page,
-                                              L["site_other"].format(v=v) + page, "../../", links, work)
+                        found = build_compare(doc(w, lang), doc(v, lang), lang, v, w, revs, d / page, "../../", links, work)
                         print(f"built {v} compared with {w}, {lang}: " +
                               ", ".join(f"{len(found[k])} sections {k}" for k in ("changed", "added", "removed")))
                     write_sums(d)
