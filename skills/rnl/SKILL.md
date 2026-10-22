@@ -1,13 +1,13 @@
 ---
 name: rnl
-description: Read, write, check and draw RNL (Rich Netlist) 0.3, the drawing of a schematic written into a SPICE or Spectre netlist as `@RNL` comment records. Use it when a netlist has `* @RNL` or `// @RNL` records or `.rnl` package files, when asked to place, wire, annotate or draw a circuit's schematic from a netlist, to pick symbols or define structures such as a differential pair or a current mirror, or to check a file with `rnl check`, `@rich-netlist/runtime` or the RNL viewers. Covers the language 0.3, the standard packages of series 0.3 and the tools.
+description: Read, write, check and draw RNL (Rich Netlist) 0.3, the drawing of a schematic written into a SPICE or Spectre netlist as `@RNL` comment records. Use it when a netlist has `* @RNL` or `// @RNL` records or `.rnl` package files, when asked to place, wire, annotate or draw a circuit's schematic from a netlist, to pick symbols or define structures such as a differential pair or a current mirror, or to check a file with `rnl check`, `@rich-netlist/runtime` or the RNL viewers. Covers the language 0.3, the standard packages of series 0.3 and the tools. For exporting Virtuoso schematics or libraries to RNL, routes to the companion rnl-virtuoso skill.
 license: See LICENSE.md (MIT, CC-BY-4.0 and CC0-1.0, by file)
 compatibility: Reading and writing RNL needs no tools. Checking needs the rnl command (Rust 1.85 or later, built from source) or Node 18 or later with the npm package @rich-netlist/runtime.
 ---
 
 # RNL (Rich Netlist) 0.3
 
-RNL is written in the comments of a SPICE or Spectre netlist. It says how the circuit is drawn as a schematic (which symbols, where things go, how wires run, what the parts mean) while the netlist alone defines the circuit. Simulators ignore the comments, so a netlist with RNL records still simulates as before. This skill covers the language **0.3** (the standard, revision 1) and the standard packages of the **series 0.3**; files of 0.2 use other names and are read with the series 0.2.
+RNL is written in the comments of a SPICE or Spectre netlist. It says how the circuit is drawn as a schematic (which symbols, where things go, how wires run, what the parts mean) while the netlist alone defines the circuit. Simulators ignore the comments, so a netlist with RNL records still simulates as before. This skill covers the language **0.3** and the standard packages of the **series 0.3**; files of 0.2 use other names and are read with the series 0.2.
 
 A complete file, one of the standard's own examples, with the model card that a transistor needs to be drawn (a transistor is drawn by the type of its model card, so one whose card the netlist lacks is not drawn):
 
@@ -34,11 +34,11 @@ The record says that M1 and M2 are a differential pair sharing one y, where M5 g
 
 ## How to work
 
-1. **Read [references/language.md](references/language.md) once, all of it**. It is the short guide to the language. For anything it leaves open, the standard decides: <https://rich-netlist.github.io/rnl/en/spec/0.3/> (normative).
+1. **Read [references/language.md](references/language.md) once, all of it**. It is the short guide, not the standard. For normative details, read the complete Markdown directly: prefer `spec/rnl-0.3.md` in an available RNL checkout, otherwise fetch the [English Markdown source](https://raw.githubusercontent.com/rich-netlist/rnl/main/spec/rnl-0.3.md). Search and read the relevant sections there instead of extracting the rendered website. The [Chinese Markdown](https://raw.githubusercontent.com/rich-netlist/rnl/main/spec/rnl-0.3.zh.md) is a translation; English prevails. Use the requested tag/revision when one is specified; source retrieval details are in [references/tools.md](references/tools.md#reading-the-standard-source).
 2. **Look every `$NAME` up in [references/packages.md](references/packages.md)** before you write it: the definitions, symbols and sets of the standard packages, which symbol an instance gets by default, and what the alias package `rnl-zh` is. A name that is not there is an error; do not guess names from other EDA tools or from 0.2 (`$RES` and `$GND` of 0.2 are `$RESISTOR` and `$GROUND` in 0.3).
 3. **Write the records into the netlist's comments** and leave the netlist's own lines alone. A record belongs to the level it is written in: inside a `.subckt` for that subcircuit, outside any for the file's top level. Each line of a record is a whole-line comment: the comment character in column 1 (`*`; in Spectre `//` or `*`), then nothing or one space, then the text. `*@RNL` and an indented `* @RNL` are not record lines and cut the record off.
 4. **Check the file** with a tool of [references/tools.md](references/tools.md) after every change, and fix what it reports until there are no errors and no warnings. A file without positions says in a hint that some objects are left to a solver and not drawn; that is not a problem.
-5. **Draw it** when the user wants to see it: `rnl render FILE -o DIR` writes an SVG for each drawing level, the web viewer at <https://rich-netlist.github.io/rnl/viewer/> opens a file in the browser, and the desktop viewer does the same on Windows. Only what has coordinates is drawn.
+5. **Draw it** when the user wants to see it: `rnl render FILE -o DIR` writes an SVG for each drawing level. The [web viewer](https://rich-netlist.github.io/rnl/viewer/) can open a [link to a hosted netlist or receive text from a web page](references/tools.md#links-that-open-a-specific-netlist); the [desktop viewer](https://rich-netlist.github.io/rnl/en/tools.html#desktop) opens local files on Windows or Linux. An agent can [install and launch it with a file](references/tools.md#installing-and-launching-the-desktop-viewer) when requested. Only what has coordinates is drawn.
 
 ## Rules that save time
 
@@ -54,10 +54,25 @@ The record says that M1 and M2 are a differential pair sharing one y, where M5 g
 | --- | --- |
 | [references/language.md](references/language.md) | The short guide to RNL 0.3: how to read and write a file, with examples that read without errors |
 | [references/packages.md](references/packages.md) | The standard packages of series 0.3: packages, definitions with their roles, symbols with their pins, the default symbol rules, sets, and `rnl-zh`. Generated from the package files, so it is in step with them |
-| [references/tools.md](references/tools.md) | How to check and draw files: the `rnl` command built from source, the npm package `@rich-netlist/runtime`, the web viewer and the desktop viewer |
+| [references/tools.md](references/tools.md) | Standard Markdown retrieval, checking/rendering tools, web links and page-to-viewer text transfer, and desktop viewer installation and launch |
 | [examples/ota5t.sp](examples/ota5t.sp) | The five-transistor OTA of the standard, in SPICE, with the records of the example above |
 | [examples/ota5t.scs](examples/ota5t.scs) | The same circuit in Spectre, with `//` records |
 | [examples/ota5t-placed.sp](examples/ota5t-placed.sp) | The same circuit with every object placed, so that it is drawn completely |
 | [LICENSE.md](LICENSE.md) | The licences of what this package holds |
 
 The project: <https://github.com/rich-netlist/rnl>; its site, with the standard, the gallery of the standard packages and the viewers: <https://rich-netlist.github.io/rnl/en/>.
+
+## Related skills
+
+For exporting an existing Virtuoso schematic or library, use the companion
+[`rnl-virtuoso` skill](https://github.com/rich-netlist/rnl-virtuoso/blob/main/skills/rnl-virtuoso/SKILL.md).
+Read the installed skill if available; otherwise obtain its
+[complete skill directory](https://github.com/rich-netlist/rnl-virtuoso/tree/main/skills/rnl-virtuoso),
+including its linked references. Its instructions are maintained with the
+exporter. After export, use this RNL skill to check, edit or draw the result.
+
+The companion uses the existing `virtuoso` bridge skill and reuses a compatible
+remote exporter. If the exporter is missing, obtain the user's consent before
+installing the latest [upstream release](https://github.com/rich-netlist/rnl-virtuoso/releases/latest)
+in their remote home directory, unless already authorized. Neither skill bundles
+the exporter or bridge.
