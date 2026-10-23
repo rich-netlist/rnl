@@ -67,7 +67,7 @@ try {
   await observe('sidebar-hidden',r=>!r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r,0.03));
   key('b','using command down');
   await observe('sidebar-restored',r=>r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r));
-  menu('Help','Check for Updates');
+  menu('Help','Check for Updates...');
   await observe('updates',r=>/Check for Updates/.test(text(r)) && /latest|newer|available|no release|could not/i.test(text(r)));
   osa('tell application "System Events" to key code 53');
   key('q','using control down');
