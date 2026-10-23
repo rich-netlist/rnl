@@ -22,7 +22,10 @@ const signature=spawnSync('codesign',['-dvv',app],{encoding:'utf8'});
 fs.writeFileSync(path.join(output,'signature.txt'),signature.stdout+signature.stderr);
 assert.match(signature.stderr,/Signature=adhoc/,'The shipped bundle must be ad-hoc signed.');
 const osa=script=>execFileSync('osascript',['-e',script],{encoding:'utf8',timeout:15000});
-const key=(key,modifiers='')=>osa(`tell application "System Events" to keystroke ${JSON.stringify(key)} ${modifiers}`);
+const key=(key,modifiers='')=>osa(`tell application "System Events"
+  set frontmost of (first application process whose bundle identifier is "io.github.rich-netlist.viewer") to true
+  keystroke ${JSON.stringify(key)} ${modifiers}
+end tell`);
 const menu=(name,item)=>osa(`tell application "System Events" to tell (first application process whose bundle identifier is "io.github.rich-netlist.viewer")
   click menu item ${JSON.stringify(item)} of menu 1 of menu bar item ${JSON.stringify(name)} of menu bar 1
 end tell`);
@@ -73,7 +76,19 @@ try {
   key('q','using control down');
   await observe('editing',r=>/Apply and Exit/.test(text(r)));
   key('a','using command down'); key('c','using command down');
-  assert.match(execFileSync('pbpaste',{encoding:'utf8'}),/Two-stage buffer/,'Native Cmd+A/C must select/copy the source.');
+  let copied='';
+  const clipboardEnd=Date.now()+5000;
+  while(Date.now()<clipboardEnd) {
+    copied=execFileSync('pbpaste',{encoding:'utf8'});
+    if(/Two-stage buffer/.test(copied)) break;
+    await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  fs.writeFileSync(path.join(output,'copied-source.txt'),copied);
+  if(!/Two-stage buffer/.test(copied)) {
+    fs.writeFileSync(path.join(output,'edit-menu.txt'),osa('tell application "System Events" to tell (first application process whose bundle identifier is "io.github.rich-netlist.viewer") to get name of every menu item of menu 1 of menu bar item "Edit" of menu bar 1'));
+    execFileSync(observer,[path.join(output,'copy-failed.png')]);
+  }
+  assert.match(copied,/Two-stage buffer/,'Native Cmd+A/C must select/copy the source.');
   key('q','using control down');
   await observe('reading',drawn);
   // A second LaunchServices open reaches an already-running app, as Finder's Open With does.
