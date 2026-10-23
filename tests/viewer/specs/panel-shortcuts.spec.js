@@ -2,6 +2,78 @@ import { expect, test } from "../viewer.js";
 
 const panes = ["files", "netlist", "hierarchy", "symbol", "usages", "unplaced", "solve"];
 
+for (const [resource, platform, key, pane] of [
+  ["main.js", "web", "6", "unplaced"],
+  ["commands.json", "web", "6", "unplaced"],
+  ["commands.json", "desktop", "7", "solve"],
+  ["commands.json", "web", "7", "unplaced"],
+]) {
+  test(`${platform}: startup preserves panel shortcut ${key} while ${resource} is loading`, async ({ page, viewer }) => {
+    let release;
+    const ready = new Promise(resolve => release = resolve);
+    await page.route(`**/${resource}`, async route => { await ready; await route.continue(); });
+    await page.goto(`${process.env.RNL_VIEWER_URL}/?shell=fake&platform=${platform}&open=04-hierarchy`, { waitUntil: "commit" });
+    // startup.js is independent of the main module graph and the command table.
+    await page.waitForFunction(() => document.getElementById("viewer-style")?.rel === "stylesheet");
+    await page.keyboard.press("1");
+    await page.keyboard.press("6");
+    await page.keyboard.press(key);
+    // Modified/composing keys and actual text input must not replace that request.
+    await page.keyboard.press("Control+3");
+    await page.keyboard.press("Shift+4");
+    await page.locator("body").dispatchEvent("keydown", { key: "5", isComposing: true });
+    await page.evaluate(() => {
+      const input = document.createElement("input");
+      input.id = "startup-test-input";
+      document.body.append(input);
+      input.focus();
+    });
+    await page.keyboard.type("123");
+    await expect(page.locator("#startup-test-input")).toHaveValue("123");
+    await page.locator("#startup-test-input").evaluate(el => el.remove());
+    release();
+    await viewer.started();
+    await viewer.idle();
+    await expect(page.locator("#startup")).toHaveCount(0);
+    await expect(page.locator(`#pane-${pane}`)).toBeVisible();
+    await expect(page.locator(`#tab-${pane}`)).toBeFocused();
+    expect(await viewer.calls("solve")).toEqual([]);
+    await page.keyboard.press("3");
+    await expect(page.locator("#pane-hierarchy")).toBeVisible();
+  });
+}
+
+test("a later panel key wins while the native startup handoff is pending", async ({ page, viewer }) => {
+  await page.addInitScript(() => {
+    window.__TAURI__ = {
+      app: { getVersion: async () => "0.2.0" },
+      core: { invoke: () => new Promise(resolve => { window.finishNativeHandoff = resolve; }) },
+    };
+  });
+  await page.route("**/shells/desktop.js", route => route.fulfill({
+    contentType: "text/javascript", body: "export { default } from './fake.js';",
+  }));
+  let release;
+  const ready = new Promise(resolve => release = resolve);
+  await page.route("**/main.js", async route => { await ready; await route.continue(); });
+  await page.goto(`${process.env.RNL_VIEWER_URL}/?platform=desktop&open=04-hierarchy`, { waitUntil: "commit" });
+  await page.waitForFunction(() => document.getElementById("viewer-style")?.rel === "stylesheet");
+  await page.keyboard.press("6");
+  release();
+  await viewer.started();
+  await viewer.idle();
+  await page.waitForFunction(() => window.finishNativeHandoff && !document.body.classList.contains("starting"));
+  await page.keyboard.press("3");
+  await expect(page.locator("#pane-hierarchy")).toBeVisible();
+  await page.evaluate(async () => {
+    window.finishNativeHandoff();
+    // A paint opportunity lets the pending startup continuation finish too.
+    await new Promise(requestAnimationFrame);
+  });
+  await expect(page.locator("#pane-hierarchy")).toBeVisible();
+  await expect(page.locator("#tab-hierarchy")).toBeFocused();
+});
+
 for (const platform of ["desktop", "web"]) {
   test(`${platform}: digits select panes and reopen the collapsed sidebar without rebuilding`, async ({ page, viewer }) => {
     await viewer.open("04-hierarchy", { platform });

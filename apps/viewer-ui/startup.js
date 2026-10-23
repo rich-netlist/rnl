@@ -2,6 +2,21 @@
 // Use each platform's existing metadata rather than keeping another version number in the page.
 import { nextPaint } from "./loading.js";
 
+// The command table and even the main module graph may still be loading when a user presses a
+// panel number. Keep a bounded recency list so an unavailable panel (web Solve) cannot discard
+// the last usable request. Run it once the initial layout is visible.
+const panelKeys = new Set();
+function rememberPanelKey(event) {
+  if (!document.body.classList.contains("starting") || new URLSearchParams(location.search).get("embed") === "1") return;
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229 ||
+      event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !/^[1-7]$/.test(event.key)) return;
+  if (!(event.target instanceof Element) || event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), dialog')) return;
+  panelKeys.delete(event.key);
+  panelKeys.add(event.key);
+  event.preventDefault();
+}
+document.addEventListener("keydown", rememberPanelKey);
+
 // These stylesheets do not block the HTML startup screen's first paint. Activate each as it
 // arrives, and initialize layout only after the main stylesheet has loaded. Fonts are optional.
 function styleReady(id, required) {
@@ -42,8 +57,14 @@ function revealNativePage() {
 if (window.__TAURI__) void named.then(revealNativePage).catch(() => {});
 
 /** Reveal the viewer after startup, including when startup reports an error. */
-export async function finishStartup() {
+export async function finishStartup(runPanelShortcut) {
   document.getElementById("startup")?.remove();
   document.body.classList.remove("starting");
+  document.removeEventListener("keydown", rememberPanelKey);
+  const keys = [...panelKeys].reverse();
+  panelKeys.clear();
+  // Replay in the same task as enabling normal keys: a later key must always win, even while
+  // the native handoff IPC is pending.
+  if (keys.length) runPanelShortcut?.(keys);
   await revealNativePage();
 }

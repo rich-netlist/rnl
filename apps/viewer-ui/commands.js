@@ -248,6 +248,14 @@ function keyCommand(e, typing, input) {
   return null;
 }
 
+/** Run the most recent available early panel key through the real command table. */
+export function runStartupShortcuts(keys) {
+  for (const key of keys) {
+    const id = keyCommand(new KeyboardEvent("keydown", { key }), false, false);
+    if (id) { command(id); return; }
+  }
+}
+
 document.addEventListener("keydown", (e) => {
   if (shell?.embed && !document.hasFocus()) return;
   if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
