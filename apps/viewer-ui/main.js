@@ -9,7 +9,7 @@ import { startPreload } from "./preload.js";
 import { startUsages } from "./usages.js";
 import { startNetlistColors } from "./netlist-colors.js";
 import { setBackground } from "./background.js";
-import { command, isChecked, setCheck, startCommands } from "./commands.js";
+import { command, isChecked, runStartupShortcuts, setCheck, startCommands } from "./commands.js";
 import { closeRequested } from "./editor.js";
 import { dirtyPaths, unappliedPaths } from "./edits.js";
 import { gridState, setGrid } from "./grid.js";
@@ -90,7 +90,7 @@ async function start() {
 // a shell may reject with a plain message, as Tauri's invoke does
 start().catch((e) => {
   setText($("empty"), e instanceof Error ? e.message : String(e));
-}).finally(finishStartup);
+}).finally(() => finishStartup(runStartupShortcuts));
 
 // A handle for tests and the console, which cannot see into the modules.
 window.viewer = {
