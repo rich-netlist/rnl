@@ -1,6 +1,6 @@
 // Drive the actual Linux binary through WebKitGTK's native WebDriver, as tauri-driver does:
 // https://github.com/tauri-apps/tauri/blob/dev/crates/tauri-driver/src/server.rs
-// Node 22+, webkit2gtk-driver and xdotool; run under dbus-run-session and xvfb-run.
+// Node 22+, webkit2gtk-driver, xdotool and ImageMagick; run under dbus-run-session and xvfb-run.
 // No build, plugins or test-only code in the app. --exe accepts an AppImage or an installed binary.
 //   dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --exe PATH
 import assert from "node:assert/strict";
@@ -94,6 +94,7 @@ try {
         drawn: !!svg && svg.getBoundingClientRect().width > 0 && svg.childElementCount > 0,
         levels: v?.doc?.levels.map(l => l.title),
         busy: document.body.classList.contains("busy"),
+        starting: document.body.classList.contains("starting"), startup: !!document.getElementById("startup"),
         errors: [...document.querySelectorAll("#diags .error")].map(e => e.textContent),
         empty: document.getElementById("empty")?.textContent
       };`, args: [] });
@@ -102,28 +103,55 @@ try {
   assert.equal(last.level, sample);
   assert.ok(last.levels.includes("amp"), "The sample's subcircuit was not loaded.");
   assert.deepEqual(last.errors, [], "The sample opened with errors.");
+  fs.writeFileSync(path.join(output,`${path.basename(exe)}-dom-ready.json`),JSON.stringify(last,null,2));
+  const windows = await until("the visible window's title", () =>
+    execFileSync("xdotool", ["search", "--onlyvisible", "--name", `^${sample} - RNL Viewer$`], { encoding:"utf8" }));
+  const windowId = windows.trim().split(/\s+/)[0];
+  assert.ok(windowId, "There is no visible viewer window.");
+  let first = true;
   // A valid DOM can still be invisible. Wait for the startup handoff, then require pixels
   // in the tab text, source and schematic. Borders and the grid do not satisfy this check.
   await until("painted tab, source and schematic pixels", async () => {
+    // The WebView occupies the client window below GTK's native menu. Crop the real X
+    // framebuffer to that viewport; do not let a successful WebKit snapshot mask a blank window.
+    const viewport = await request("POST", `/session/${session}/execute/sync`, {
+      script:'return {width:innerWidth,height:innerHeight};',args:[] });
+    const geometry = Object.fromEntries(execFileSync('xdotool',['getwindowgeometry','--shell',windowId],{encoding:'utf8'})
+      .trim().split('\n').map(line=>line.split('=')));
+    const width=Number(geometry.WIDTH), height=Math.round(viewport.height*width/viewport.width);
+    const x=Number(geometry.X), y=Number(geometry.Y)+Number(geometry.HEIGHT)-height;
+    const nativePath=path.join(output,`${path.basename(exe)}-x11.png`);
+    const crop=`${width}x${height}${x < 0 ? '' : '+'}${x}${y < 0 ? '' : '+'}${y}`;
+    execFileSync('import',['-window','root','-crop',crop,'+repage',nativePath],{timeout:5000});
+    const native = fs.readFileSync(nativePath).toString('base64');
     const screenshot = await request("GET", `/session/${session}/screenshot`);
     fs.writeFileSync(path.join(output, `${path.basename(exe)}.png`), Buffer.from(screenshot, "base64"));
     const visual = await request("POST", `/session/${session}/execute/sync`, {
       script:`return (${screenshotEvidence.toString()})(${JSON.stringify(screenshot)});`, args:[] });
-    fs.writeFileSync(path.join(output, `${path.basename(exe)}-pixels.json`), JSON.stringify(visual,null,2));
+    const nativeVisual = await request("POST", `/session/${session}/execute/sync`, {
+      script:`return (${screenshotEvidence.toString()})(${JSON.stringify(native)});`,args:[] });
+    const evidence={webkit:visual,x11:nativeVisual};
+    fs.writeFileSync(path.join(output, `${path.basename(exe)}-pixels.json`), JSON.stringify(evidence,null,2));
+    if(first) {
+      fs.copyFileSync(nativePath,path.join(output,`${path.basename(exe)}-initial-x11.png`));
+      fs.writeFileSync(path.join(output,`${path.basename(exe)}-initial-webkit.png`),Buffer.from(screenshot,'base64'));
+      fs.writeFileSync(path.join(output,`${path.basename(exe)}-initial-pixels.json`),JSON.stringify(evidence,null,2));
+      first=false;
+    }
     assertPainted(visual);
+    assertPainted(nativeVisual);
     return true;
   });
-  // An actual visible X11 window, in addition to the WebView's rendered DOM.
-  const windows = await until("the visible window's title", () =>
-    execFileSync("xdotool", ["search", "--onlyvisible", "--name", `^${sample} - RNL Viewer$`], { encoding: "utf8" }));
-  assert.ok(windows.trim(), "There is no visible viewer window.");
   assert.deepEqual(fs.readFileSync(path.join(temp, sample)), original, "Opening the sample wrote to it.");
   console.log(`${path.basename(exe)}: visible window, sample and include loaded, SVG drawn, no errors.`);
 } finally {
   if (session) {
     try {
-      const screenshot = await request("GET", `/session/${session}/screenshot`);
-      fs.writeFileSync(path.join(output, `${path.basename(exe)}.png`), Buffer.from(screenshot, "base64"));
+      const screenshotPath=path.join(output,`${path.basename(exe)}.png`);
+      if(!fs.existsSync(screenshotPath)) {
+        const screenshot = await request("GET", `/session/${session}/screenshot`);
+        fs.writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
+      }
     } catch (e) { console.error("Screenshot:", e.message); }
     await request("DELETE", `/session/${session}`).catch((e) => console.error("Session cleanup:", e.message));
   }
