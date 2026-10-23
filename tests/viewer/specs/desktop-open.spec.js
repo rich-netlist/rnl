@@ -8,6 +8,11 @@ async function nativeDrop(page, viewer, fixture = "04-hierarchy") {
     window.nativeInvokes = [];
     window.nativeOpened = [];
     window.__TAURI__ = {
+      event: { listen: async (name, handler) => {
+        window.nativeEvents ||= {};
+        window.nativeEvents[name] = handler;
+        return () => {};
+      } },
       core: { invoke: async (command, args) => {
         window.nativeInvokes.push([command, args]);
         if (command === "dropped_files") return window.nativePaths;
@@ -78,6 +83,25 @@ test("a drop asks before leaving unapplied edits, and Cancel retains the text", 
   expect(await viewer.builds()).toBe(builds);
   await expect(area).toHaveValue(edited);
   expect(await page.evaluate(() => window.viewer.edits.unapplied)).toEqual(["edit.sp"]);
+});
+
+test("Finder opens preserve absolute paths and ask before leaving unapplied edits", async ({page,viewer})=>{
+  await nativeDrop(page,viewer,'edit');
+  await page.evaluate(()=>window.viewer.command('toggle-edit'));
+  const area=page.locator('#source textarea:visible');
+  const edited=(await area.inputValue())+'\n* pending edit';
+  await area.fill(edited);
+  const builds=await viewer.builds();
+  const path='/Users/test/网表 文件/放大器.scs';
+  await page.evaluate(path=>{
+    window.nativePaths=[path]; window.nativeEvents['opened-files']({payload:[path]});
+  },path);
+  const dialog=page.locator('dialog.dialog');
+  await expect(dialog).toContainText('open another file');
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(area).toHaveValue(edited);
+  expect(await viewer.builds()).toBe(builds);
+  expect(await page.evaluate(()=>window.nativeOpened)).toEqual([{path,name:path}]);
 });
 
 test("unsupported files show an explanation and a busy viewer ignores drops", async ({ page, viewer }) => {
