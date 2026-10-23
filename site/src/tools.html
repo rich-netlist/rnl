@@ -111,6 +111,7 @@
     <li><a href="#web"><zh>网页版</zh><en>Web</en></a></li>
     <li><a href="#desktop"><zh>桌面版</zh><en>Desktop</en></a></li>
     <li><a href="#cli"><zh>命令行</zh><en>Command line</en></a></li>
+    <li><a href="#virtuoso"><zh>Virtuoso 导出</zh><en>Virtuoso</en></a></li>
     <li><a href="#toolchain"><zh>工具链</zh><en>Toolchain</en></a></li>
     <li><a href="#licences"><zh>许可</zh><en>Licences</en></a></li>
   </ul>
@@ -374,11 +375,29 @@
   </div>
 </section>
 
-<!-- ===================== 05 Toolchain ===================== -->
+<!-- ===================== 05 Virtuoso export ===================== -->
+<section id="virtuoso" class="sheet">
+  <div class="wrap">
+    <header class="sheet-head">
+      <p class="sheet-no"><zh>05 · Virtuoso 导出</zh><en>05 · Virtuoso export</en></p>
+      <h2><zh>把 Virtuoso 原理图导出成 RNL。</zh><en>Export Virtuoso schematics to RNL.</en></h2>
+      <p class="lead"><zh><code>rnl-virtuoso</code> 在 Virtuoso 的原理图编辑器里加 <b>RNL → Export RNL...</b>，在 CIW 里加 <b>File → Export → RNL...</b>。可以导出单个 cell 或整个库，保留层次、自定义 block 符号、位置、朝向、导线和总线，图用 <code>eda-symbol</code> 和 <code>eda-style</code> 两个包画。</zh><en><code>rnl-virtuoso</code> adds <b>RNL → Export RNL...</b> to Virtuoso’s schematic editor and <b>File → Export → RNL...</b> to the CIW. It exports one cell or a whole library, keeping hierarchy, custom block symbols, placement, orientation, wires and buses, and draws with the <code>eda-symbol</code> and <code>eda-style</code> packages.</en></p>
+    </header>
+    <div class="panel dl">
+      <div class="ph"><svg class="ico"><use href="#i-term"/></svg><span class="ph-title">rnl-virtuoso</span><span class="ph-right"><a class="chip" href="https://github.com/rich-netlist/rnl-virtuoso"><zh>代码仓库</zh><en>Repository</en></a></span></div>
+      <ul class="dl-list">
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl-virtuoso/releases/latest"><svg class="ico"><use href="#i-download"/></svg><span><b>Linux x86-64</b><code>.tar.gz</code></span></a><p><zh>在发布页下载，解包到装 Virtuoso 的主机上；需要该主机上 Cadence 自带的导出程序和许可。</zh><en>Download it from the releases page and extract it on the Virtuoso host; Cadence’s own exporters and their licences are needed there.</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl-virtuoso#install"><svg class="ico"><use href="#i-book"/></svg><span><b><zh>安装与使用</zh><en>Install and use</en></b><code>README</code></span></a><p><zh>安装步骤、菜单用法和选项都写在它的 README 里（<a href="https://github.com/rich-netlist/rnl-virtuoso/blob/main/README.zh.md">中文</a>）。</zh><en>The steps, the menus and the options are in its README (<a href="https://github.com/rich-netlist/rnl-virtuoso/blob/main/README.zh.md">also in Chinese</a>).</en></p></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 06 Toolchain ===================== -->
 <section id="toolchain" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>05 · 工具链</zh><en>05 · Toolchain</en></p>
+      <p class="sheet-no"><zh>06 · 工具链</zh><en>06 · Toolchain</en></p>
       <h2><zh>RNL 工具链：读、解、画、改。</zh><en>The RNL toolchain: read, solve, draw, edit.</en></h2>
       <p class="lead"><zh>工具链把“读懂 RNL”和“把意图变成坐标”分成独立模块：没有求解器也能看图，需要时再求解。已经有的有：运行库、宿主适配器、渲染器和命令行，上面的两个查看器，还有求解器的第一版，在 <code>rnl solve</code> 和桌面版查看器里。选一条路径看数据怎么流动，点一个模块看它做什么。</zh>
         <en>The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.</en></p>
@@ -422,11 +441,11 @@
   </div>
 </section>
 
-<!-- ===================== 05 Licences ===================== -->
+<!-- ===================== 07 Licences ===================== -->
 <section id="licences" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>06 · 许可</zh><en>06 · Licences</en></p>
+      <p class="sheet-no"><zh>07 · 许可</zh><en>07 · Licences</en></p>
       <h2><zh>开源，可以自由使用。</zh><en>Open source, free to use.</en></h2>
       <p class="lead"><zh>查看器和整个 RNL 工具链的源代码都在 GitHub 上公开。</zh>
         <en>The source of the viewers and of the whole RNL toolkit is public on GitHub.</en></p>
