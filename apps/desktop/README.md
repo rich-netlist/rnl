@@ -257,7 +257,7 @@ system fonts lack Chinese glyphs. Native Latin fonts and monospace metrics remai
 font files are shipped, and the schematic renderer and its output are unchanged. The browser loads
 only the existing Unicode slices needed by the visible text.
 
-GTK native menus and system file dialogs cannot use web fonts. On Debian/Ubuntu, install
+GTK native menus, native tooltips (including HTML title tooltips) and system file dialogs cannot use web fonts. On Debian/Ubuntu, install
 `sudo apt install fonts-noto-cjk` and restart the application for Chinese native menus and dialogs.
 The AppImage uses the host's native fonts too. The deb does not add a mandatory font dependency.
 

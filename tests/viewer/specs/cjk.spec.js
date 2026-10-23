@@ -70,3 +70,31 @@ test('virtual line width remains conservative with CJK fallback and a recycled w
   expect(widths.extent).toBeGreaterThanOrEqual(widths.actual);
   expect(widths.recycled).toBeGreaterThanOrEqual(widths.actual);
 });
+
+test('symbol details, clipboard previews and web menus share the CJK fallback', async ({page,viewer},info)=>{
+  await viewer.open('symbol-inspector');
+  await page.evaluate(async()=>{
+    window.viewer.command('language-zh');
+    const level=window.viewer.doc.levels.findIndex(l=>l.title==='leaf');
+    (await import('./subcircuits.js')).enterRoot(level);
+  });
+  await page.keyboard.press('4');
+  await expect(page.locator('.symbol-detail h2')).toBeVisible();
+  const symbol=await page.evaluate(cjkEvidence);
+  assertCjk(symbol,process.env.RNL_NO_SYSTEM_CJK==='1');
+  expect(symbol.some(e=>e.selector==='.symbol-definition')).toBe(true);
+  await viewer.menuTitle('视图').click();
+  const menu=await page.evaluate(cjkEvidence);
+  assertCjk(menu,process.env.RNL_NO_SYSTEM_CJK==='1');
+  expect(menu.some(e=>e.selector==='.menu-item')).toBe(true);
+  await page.keyboard.press('Escape');
+  await page.evaluate(()=>{
+    navigator.clipboard.readText=async()=>'* 中文网表电路\nR1 输入 输出 1k\n.end';
+    window.viewer.command('load-clipboard');
+  });
+  await expect(page.locator('.clip-preview')).toBeVisible();
+  const clipboard=await page.evaluate(cjkEvidence);
+  assertCjk(clipboard,process.env.RNL_NO_SYSTEM_CJK==='1');
+  expect(clipboard.some(e=>e.selector==='.clip-preview')).toBe(true);
+  await info.attach('cjk-surfaces.json',{body:JSON.stringify({symbol,menu,clipboard},null,2),contentType:'application/json'});
+});

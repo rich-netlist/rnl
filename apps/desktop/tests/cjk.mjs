@@ -12,7 +12,8 @@ export async function cjkEvidence() {
     return ctx.getImageData(0,0,256,64).data;
   };
   const results = [];
-  for (const selector of ['#tab-netlist', '#source', 'dialog .dialog-title', '.symbol-detail h2', '.menu-item']) {
+  for (const selector of ['#tab-netlist', '#source', 'dialog .dialog-title', '.symbol-detail h2',
+    '.symbol-definition', '.clip-preview', '.dialog-option', '.settings-text', '.usage-name', '.menu-item']) {
     const el = document.querySelector(selector);
     if (!el) continue;
     const s = getComputedStyle(el);
