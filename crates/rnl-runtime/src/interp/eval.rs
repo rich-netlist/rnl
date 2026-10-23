@@ -4,7 +4,7 @@
 //! drawing level. A failed statement yields a failed object (7.2); what depends on it fails too.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::diag::{DiagId, Extra, Severity};
@@ -25,6 +25,9 @@ pub enum Stop {
     Fail(Option<DiagId>),
     /// A rule written at an upper level reached an object of that level (10.5).
     LocalRef,
+    /// A rule whose selection has `recursive=false`, evaluated in a level below the one it is written
+    /// in: it takes effect only there (10.4), and gives this level nothing, without a warning.
+    OwnLevel,
     /// A statement that needs a circuit, read where there is none (a package, an included file level).
     NoCircuit,
 }
@@ -275,6 +278,27 @@ impl<'p> Interp<'p> {
                     o.name.clone()
                 }
             }
+        }
+    }
+
+    /// Whether `id` is, or holds, a selection with `recursive=false` written in a level other than
+    /// that of the scene `s`: a rule that takes it takes effect only in the level it is written in
+    /// (10.4), as the selection itself selects nothing elsewhere.
+    pub(crate) fn own_level_only(&self, id: ObjId, s: SceneId, seen: &mut HashSet<ObjId>) -> bool {
+        if id == LEVEL || !seen.insert(id) {
+            return false;
+        }
+        let ObjData::Set(set) = self.o(id) else { return false };
+        match &set.kind {
+            SetKind::Select { params, writer, scope, .. } => {
+                let w = &self.units[*writer];
+                let elsewhere = w.kind == UnitKind::Level && w.level != Some(self.scenes[s].level);
+                (elsewhere && params.get("recursive").and_then(Lit::boolean) == Some(false))
+                    || self.own_level_only(*scope, s, seen)
+            }
+            SetKind::Union { source } => self.own_level_only(*source, s, seen),
+            SetKind::Plain => set.items.iter().any(|(o, _)| self.own_level_only(*o, s, seen)),
+            SetKind::Gen { .. } => false,
         }
     }
 
@@ -619,6 +643,7 @@ impl<'p> Interp<'p> {
             return match v {
                 Memo::Val(v) => Ok(*v),
                 Memo::LocalRef => Err(Stop::LocalRef),
+                Memo::OwnLevel => Err(Stop::OwnLevel),
             };
         }
         if self.in_progress.contains(&skey) {
@@ -658,6 +683,10 @@ impl<'p> Interp<'p> {
             Err(Stop::LocalRef) => {
                 self.memo.insert(skey, Memo::LocalRef);
                 return Err(Stop::LocalRef);
+            }
+            Err(Stop::OwnLevel) => {
+                self.memo.insert(skey, Memo::OwnLevel);
+                return Err(Stop::OwnLevel);
             }
             Err(Stop::NoCircuit) => return Err(Stop::NoCircuit),
             Err(Stop::Fail(d)) => self.new_obj(ObjData::Failed(d)),
@@ -753,6 +782,14 @@ impl<'p> Interp<'p> {
         if let Some((p, s)) = piped {
             args.push(ArgV { obj: p, role: None, role_quoted: false, sel: s, off: seg.start, explicit: false });
         }
+        // a rule whose selection takes effect only in its own level does nothing below it (10.4),
+        // before what else it names, which may be host objects of that level
+        let own_level = |it: &Self, args: &[ArgV]| {
+            ctx.scene.is_some_and(|s| args.iter().any(|a| it.own_level_only(a.obj, s, &mut HashSet::new())))
+        };
+        if seg.call.is_some() && own_level(self, &args) {
+            return Err(Stop::OwnLevel);
+        }
         let kw0 = seg.call.as_ref().map(|c| self.kw(&c.kw, ctx.unit));
         for a in &seg.args {
             if let Some(k) = &kw0 {
@@ -778,6 +815,9 @@ impl<'p> Interp<'p> {
                 off: a.start,
                 explicit: matches!(a.obj, ObjExpr::Set(_)),
             });
+            if seg.call.is_some() && own_level(self, &args[args.len() - 1..]) {
+                return Err(Stop::OwnLevel);
+            }
         }
         let Some(call) = &seg.call else {
             if args.len() == 1 {
@@ -961,7 +1001,7 @@ impl<'p> Interp<'p> {
             nested.borrow_mut().insert((p, n), Nested::Val(v));
         }
         let r = match r {
-            Err(Stop::LocalRef) | Err(Stop::NoCircuit) => return r,
+            Err(Stop::LocalRef) | Err(Stop::OwnLevel) | Err(Stop::NoCircuit) => return r,
             other => other,
         };
         self.nested_memo.insert(key, r.clone());

@@ -1134,7 +1134,7 @@ impl Interp<'_> {
         let val = match r {
             Ok(v) => v,
             Err(Stop::Fail(dg)) => self.new_obj(ObjData::Failed(dg)),
-            Err(Stop::LocalRef) => self.new_obj(ObjData::Failed(None)),
+            Err(Stop::LocalRef) | Err(Stop::OwnLevel) => self.new_obj(ObjData::Failed(None)),
             Err(Stop::NoCircuit) => return Err(Stop::NoCircuit),
         };
         self.tm_memo.insert(key, val);
@@ -1263,6 +1263,7 @@ impl Interp<'_> {
                     self.err(&sctx, "this statement cannot be written in a symbol body (9.2.2)", m.start);
                 }
                 Err(Stop::LocalRef) => return Err(Stop::LocalRef),
+                Err(Stop::OwnLevel) => return Err(Stop::OwnLevel),
             }
         }
         Ok(())
