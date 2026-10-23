@@ -265,6 +265,8 @@ jobs:
         if: runner.os == 'Linux'
         timeout-minutes: 5
         env:
+          FONTCONFIG_FILE: ${{ github.workspace }}/apps/desktop/tests/fontconfig-no-cjk.conf
+          RNL_NO_SYSTEM_CJK: "1"
           SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-linux
         run: dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --exe apps/desktop/target/debug/rnl-viewer
       - name: Keep the Linux smoke-test screenshots

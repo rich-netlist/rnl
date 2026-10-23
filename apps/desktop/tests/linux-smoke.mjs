@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { screenshotEvidence, assertPainted } from "./visual.mjs";
+import { cjkEvidence, assertCjk } from "./cjk.mjs";
 
 assert.equal(process.platform, "linux", "The Linux smoke test must run on Linux.");
 const exeIndex = process.argv.indexOf("--exe");
@@ -143,6 +144,30 @@ try {
     return true;
   });
   assert.deepEqual(fs.readFileSync(path.join(temp, sample)), original, "Opening the sample wrote to it.");
+  // The corpus has Chinese comments. Switch all web UI text to Chinese, verify the actual
+  // glyph raster against the shipped font, and retain before/after frames from this binary.
+  const execute = script => request('POST', `/session/${session}/execute/sync`, {script, args:[]});
+  await execute('window.viewer.command("language-zh");');
+  await execute('return document.fonts.ready.then(() => true);');
+  const cjk = await execute(`return (${cjkEvidence.toString()})();`);
+  fs.writeFileSync(path.join(output, `${path.basename(exe)}-cjk.json`), JSON.stringify(cjk,null,2));
+  assertCjk(cjk, process.env.RNL_NO_SYSTEM_CJK === '1');
+  // Negative control: remove only the new fallback from the live styles, with the same
+  // binary, sample, rendering core and system fonts. This must fail on the fontless runner.
+  await execute(`window.cjkStyles = [];
+    for (const sheet of document.styleSheets) for (const rule of sheet.cssRules) {
+      if (rule.style?.fontFamily.includes('Noto Sans SC')) {
+        window.cjkStyles.push([rule,rule.style.fontFamily]);
+        rule.style.fontFamily = rule.style.fontFamily.replace(/,\\s*["']?Noto Sans SC["']?/g,'');
+      }
+    }`);
+  const before = await execute(`return (${cjkEvidence.toString()})();`);
+  fs.writeFileSync(path.join(output, `${path.basename(exe)}-cjk-before.json`), JSON.stringify(before,null,2));
+  fs.writeFileSync(path.join(output, `${path.basename(exe)}-cjk-before.png`), Buffer.from(await request('GET', `/session/${session}/screenshot`),'base64'));
+  if (process.env.RNL_NO_SYSTEM_CJK === '1') assert.throws(() => assertCjk(before,true));
+  await execute('for (const [rule,font] of window.cjkStyles) rule.style.fontFamily=font;');
+  await execute('return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))));');
+  fs.writeFileSync(path.join(output, `${path.basename(exe)}-cjk-after.png`), Buffer.from(await request('GET', `/session/${session}/screenshot`),'base64'));
   console.log(`${path.basename(exe)}: visible window, sample and include loaded, SVG drawn, no errors.`);
 } finally {
   if (session) {

@@ -223,6 +223,8 @@ jobs:
         timeout-minutes: 5
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          FONTCONFIG_FILE: ${{ github.workspace }}/apps/desktop/tests/fontconfig-no-cjk.conf
+          RNL_NO_SYSTEM_CJK: "1"
           SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-linux
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
@@ -233,6 +235,8 @@ jobs:
         timeout-minutes: 5
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          FONTCONFIG_FILE: ${{ github.workspace }}/apps/desktop/tests/fontconfig-no-cjk.conf
+          RNL_NO_SYSTEM_CJK: "1"
           SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-linux
         run: |
           deb="$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.deb"

@@ -62,6 +62,15 @@ jobs:
         run: npm ci
       - name: Install the browsers and what they need
         run: npx playwright install --with-deps chromium webkit
+      - name: Write the pinned fonts and isolate system font coverage
+        working-directory: ${{ github.workspace }}
+        run: |
+          pip install fonttools==4.58.0 brotli==1.2.0
+          python scripts/fonts.py web
+          echo "FONTCONFIG_FILE=$GITHUB_WORKSPACE/apps/desktop/tests/fontconfig-no-cjk.conf" >> "$GITHUB_ENV"
+          echo "RNL_NO_SYSTEM_CJK=1" >> "$GITHUB_ENV"
+          FONTCONFIG_FILE="$GITHUB_WORKSPACE/apps/desktop/tests/fontconfig-no-cjk.conf" fc-list :lang=zh | tee "$RUNNER_TEMP/system-cjk-fonts.txt"
+          test ! -s "$RUNNER_TEMP/system-cjk-fonts.txt"
       # the web server builds the web viewer's site and serves it; the global setup builds the rnl
       # command and writes the fixtures
       - name: Test the page and the web viewer in Chromium, Firefox and WebKit
