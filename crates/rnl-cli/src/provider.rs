@@ -28,10 +28,7 @@ pub fn path_str(p: &Path) -> String {
 impl Provider for FsProvider {
     fn read(&self, path: &str) -> Option<String> {
         let bytes = std::fs::read(path).ok()?;
-        Some(match String::from_utf8(bytes) {
-            Ok(s) => s.strip_prefix('\u{feff}').map(String::from).unwrap_or(s),
-            Err(e) => e.into_bytes().iter().map(|&b| b as char).collect(), // Latin-1
-        })
+        Some(crate::codec::decode(&bytes))
     }
 
     /// The package directories given on the command line (16.2).

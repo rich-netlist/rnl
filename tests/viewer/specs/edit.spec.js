@@ -546,3 +546,18 @@ test.describe("on the web", () => {
     expect(menus.find(([label]) => label === "&File")[1]).toContain("save");
   });
 });
+
+
+test("desktop UTF-8 save commands carry the explicit choice through overwrite and Save As", async ({ page, viewer }) => {
+  await open(viewer, page);
+  await rename(page);
+  await page.evaluate(() => (window.fakeShell.changedOnDisk = ["edit.sp"]));
+  await page.evaluate(() => window.viewer.command("save-utf8"));
+  await dialog(page).getByRole("button", { name: "Overwrite" }).click();
+  await expect(dialog(page)).toHaveCount(0);
+  await expect(page.locator("#note")).toHaveText("Saved edit.sp.");
+  expect(await page.evaluate(() => window.fakeShell.encodings)).toEqual([["save", "utf8"], ["save", "utf8"]]);
+  await page.evaluate(() => (window.fakeShell.savedAs = { name: "/copies/utf8.sp", fixture: "edit-changed" }));
+  await viewer.build(() => page.evaluate(() => window.viewer.command("save-as-utf8")));
+  expect(await page.evaluate(() => window.fakeShell.encodings.at(-1))).toEqual(["saveAs", "utf8"]);
+});

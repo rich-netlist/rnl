@@ -218,9 +218,15 @@ pub enum TermKey {
 }
 
 impl TermKey {
-    pub fn same(&self, o: &TermKey) -> bool {
+    pub fn same(&self, o: &TermKey, case_sensitive: bool) -> bool {
         match (self, o) {
-            (TermKey::Name(a), TermKey::Name(b)) => a.eq_ignore_ascii_case(b),
+            (TermKey::Name(a), TermKey::Name(b)) => {
+                if case_sensitive {
+                    a == b
+                } else {
+                    a.eq_ignore_ascii_case(b)
+                }
+            }
             (TermKey::Num(a), TermKey::Num(b)) => a == b,
             _ => false,
         }
@@ -306,14 +312,31 @@ pub struct SymbolDef {
     pub unit: Option<UnitId>,
     /// The defining member, in original source coordinates.
     pub source: Option<(crate::diag::Loc, crate::diag::Loc)>,
+    /// Original definition of a host-specific pin view; absent on reusable definitions.
+    pub original: Option<ObjId>,
     pub pins: Vec<Pin>,
     pub prims: Vec<SymPrim>,
+    /// Declaration positions shared by primitives and nested usages.
+    pub prim_order: Vec<usize>,
+    pub usage_order: Vec<usize>,
     pub labels: Vec<SymLabel>,
     /// Usages drawn in the symbol (9.2.7).
     pub usages: Vec<ObjId>,
     pub bbox: Option<[f64; 4]>,
     /// The renderer's own default for objects without a symbol (9.2.6).
     pub default: bool,
+}
+
+impl SymbolDef {
+    pub fn push_prim(&mut self, prim: SymPrim) {
+        self.prim_order.push(self.prims.len() + self.usages.len());
+        self.prims.push(prim);
+    }
+
+    pub fn push_usage(&mut self, usage: ObjId) {
+        self.usage_order.push(self.prims.len() + self.usages.len());
+        self.usages.push(usage);
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -3,9 +3,11 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use rnl_cli::codec::{decode, encode, OutputEncoding};
 use rnl_cli::solve::{SolveOptions, Target, WallClock};
 use rnl_cli::{dump, FsProvider};
 use rnl_runtime::diag::{Severity, Sink};
+use rnl_runtime::source::{Layered, MemoryProvider, Provider};
 use rnl_runtime::{Interpretation, Options};
 use rnl_solver::SolverOptions;
 use rnl_view::BuildOptions;
@@ -21,7 +23,7 @@ const USAGE: &str = "usage:
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
-  rnl strip-generated FILE -o OUT   write FILE without its type=\"generated\" records
+  rnl strip-generated FILE -o OUT [options] write FILE without its type=\"generated\" records
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
 FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl); catalog takes none.
@@ -69,6 +71,9 @@ solve options (the levels are read without their type=\"generated\" records; -o 
   solve exits with 1 when an error was reported, once the files are written: one of the netlist as a
   solver reads it, whose number it gives on the standard error as rnl check --no-generated counts
   them, or one of the solver
+saving options (solve and strip-generated only):
+  --encoding MODE     preserve (default) or utf8; UTF-8 adds a BOM only to protect leading U+FEFF
+                      copied includes that are not rewritten retain their original bytes
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
 catalog options (the packages are those of --package-dir and the bundled ones, each read as rnl
@@ -105,6 +110,7 @@ struct Args {
     /// `--package`: the names `catalog` lists; every name when there are none.
     packages: Vec<String>,
     all_versions: bool,
+    encoding: OutputEncoding,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -133,6 +139,7 @@ fn parse_args() -> Result<Args, String> {
     let mut all_versions = false;
     let mut overlays = rnl_view::OverlayOptions::default();
     let mut overlay_args = false;
+    let mut encoding = None;
     while let Some(a) = it.next() {
         match a.as_str() {
             "--usages" => {
@@ -181,6 +188,8 @@ fn parse_args() -> Result<Args, String> {
             "--parts" => parts = Some(it.next().ok_or("--parts needs a list, such as host,model")?),
             "--package" => packages.push(it.next().ok_or("--package needs a name, such as rnl-std-basic")?),
             "--all-versions" => all_versions = true,
+            "--encoding" => encoding = Some(it.next().ok_or("--encoding needs preserve or utf8")?.parse()?),
+            _ if a.starts_with("--encoding=") => encoding = Some(a[11..].parse()?),
             _ if a.starts_with('-') => return Err(format!("unknown option {a}\n{USAGE}")),
             _ => file = Some(PathBuf::from(a)),
         }
@@ -192,6 +201,9 @@ fn parse_args() -> Result<Args, String> {
         return Err("overlay options are options of render".into());
     }
     overlays.validate()?;
+    if encoding.is_some() && !matches!(command.as_str(), "solve" | "strip-generated") {
+        return Err("--encoding is only for solve and strip-generated".into());
+    }
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
         ("catalog", None) => PathBuf::new(),
@@ -222,6 +234,7 @@ fn parse_args() -> Result<Args, String> {
         parts,
         packages,
         all_versions,
+        encoding: encoding.unwrap_or_default(),
     })
 }
 
@@ -402,13 +415,40 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         }
         "strip-generated" => {
             let out = args.out.clone().ok_or("strip-generated needs -o OUT")?;
+            // Preserve the origin of the text actually read, not the adapter's display name
+            // (which can be a basename). Disk wins over an exact virtual-package lookup.
+            let entry = rnl_cli::path_str(&args.file);
+            let (original, input) = match std::fs::read(&args.file) {
+                Ok(bytes) => {
+                    let text = decode(&bytes);
+                    (Some(bytes), text)
+                }
+                Err(e) => {
+                    let text = if args.file.exists() { None } else { rnl_cli::bundled().read(&entry) };
+                    let text = text.ok_or_else(|| format!("cannot read {}: {e}", args.file.display()))?;
+                    (None, text)
+                }
+            };
+            // A real file can have the virtual package's relative name on Unix. The shared
+            // reader reserves the <bundled> prefix, so use a physical absolute path for disk
+            // sources. Do not canonicalize: relative includes retain the entered directory.
+            let read_path = if original.is_some() {
+                std::path::absolute(&args.file).map_err(|e| format!("cannot resolve {}: {e}", args.file.display()))?
+            } else {
+                args.file.clone()
+            };
+            // Read the captured entry, so a file changed or removed during parsing cannot change
+            // which encoding belongs to its text. Includes still use the normal disk provider.
+            let held = MemoryProvider::new().with(&rnl_cli::path_str(&read_path), &input);
+            let files = Layered { layers: vec![&held, &provider] };
             let mut sink = Sink::new();
-            let doc = rnl_cli::read_host(&args.file, args.dialect.as_deref(), &provider, &mut sink)?;
+            let doc = rnl_cli::read_host(&read_path, args.dialect.as_deref(), &files, &mut sink)?;
             let main = doc.main().file.clone();
-            // the text as the adapter read it, so a bundled package file can be stripped too
             let text = doc.source(&main).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
             let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);
-            std::fs::write(&out, stripped).map_err(|e| e.to_string())?;
+            let bytes = encode(original.as_deref(), &stripped, args.encoding)
+                .map_err(|e| format!("{}: {e}", args.file.display()))?;
+            std::fs::write(&out, bytes).map_err(|e| e.to_string())?;
             Ok(ExitCode::SUCCESS)
         }
         "write" => {
@@ -493,7 +533,7 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
     for line in rnl_cli::solve::lines(&run, args.report) {
         println!("{line}");
     }
-    let writing = rnl_cli::solve::write(&run, &target);
+    let writing = rnl_cli::solve::write_with_encoding(&run, &target, args.encoding);
     for path in &writing.written {
         println!("wrote {}", rnl_cli::path_str(path));
     }

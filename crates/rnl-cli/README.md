@@ -64,6 +64,9 @@ solve options (the levels are read without their type="generated" records; -o or
   solve exits with 1 when an error was reported, once the files are written: one of the netlist as a
   solver reads it, whose number it gives on the standard error as rnl check --no-generated counts
   them, or one of the solver
+saving options (solve and strip-generated only):
+  --encoding MODE     preserve (default) or utf8; UTF-8 adds a BOM only to protect leading U+FEFF
+                      copied includes that are not rewritten retain their original bytes
 snapshot options:
   --parts LIST        the parts to give, of drawing, host and model; host,model by default
 catalog options (the packages are those of --package-dir and the bundled ones, each read as rnl
@@ -101,7 +104,7 @@ With `--previous`, each level also has `previous`, the decisions of its record o
 
 A level whose file, or a file above it, declares a language version that the reading does not interpret is not solved: no RNL of that file is read, and the file is kept as it is (16.1), so nothing is written into it, and the level's line says so and why. A file of 0.3 is read as every file is.
 
-One of `-o DIR` and `--in-place` is needed. `-o DIR` writes each file a level was written into under DIR, by its name relative to the directory of FILE; a file outside that directory, such as one included from `../`, has no name there, which is an error, and nothing is written. So that the files under DIR read as the files solved do, the other files the document reads from the directory of FILE, such as an include of models or a package named by `path=` (16.2), are copied there as they are; a file it reads from outside that directory is not copied, and a warning names it. `--in-place` writes the files over themselves. A file is written in the encoding it was read in: UTF-8, with its byte order mark when it had one, or Latin-1.
+One of `-o DIR` and `--in-place` is needed. `-o DIR` writes each file a level was written into under DIR, by its name relative to the directory of FILE; a file outside that directory, such as one included from `../`, has no name there, which is an error, and nothing is written. So that the files under DIR read as the files solved do, the other files the document reads from the directory of FILE, such as an include of models or a package named by `path=` (16.2), are copied there as they are; a file it reads from outside that directory is not copied, and a warning names it. `--in-place` writes the files over themselves. A file is written in the encoding it was read in: UTF-8, with its byte order mark when it had one, or Latin-1. When a Latin-1 file would need a character Latin-1 cannot hold, nothing is written and the error names the character; `--encoding utf8` writes such files as UTF-8 instead. `strip-generated` follows the same rule ([output encoding](../../docs/output-encoding.md)).
 
 `--solver-options` gives settings over the solver's defaults, `key=value` pairs separated by `;` as the solver's canonical text writes them, such as `beam=2;grid=none;objectives=signal_flow,area+wire_length*2;budget=candidates:16`; an unknown key, a key given twice or a value that does not read is an error. The canonical text of the options used is printed first; its digest is the second segment of the hash (17), the first being the digest of the level's input, which is what a viewer compares.
 

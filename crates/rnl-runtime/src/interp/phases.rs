@@ -343,10 +343,34 @@ impl Interp<'_> {
     }
 
     fn set_symbol(&mut self, s: SceneId, o: ObjId, sym: ObjId) {
+        let sym = if self.host_case(o) { sym } else { self.fold_symbol_pins(sym) };
         if !self.scenes[s].symbol.contains_key(&o) {
             self.symbol_order.entry(s).or_default().push(o);
         }
         self.scenes[s].symbol.insert(o, sym);
+    }
+
+    /// The defining file does not decide how terminal names match. Retain both `P` and `p`
+    /// in a reusable definition; SPICE owners fold them only when taking their symbol.
+    pub(crate) fn fold_symbol_pins(&mut self, sym: ObjId) -> ObjId {
+        if let Some(&folded) = self.folded_symbols.get(&sym) {
+            return folded;
+        }
+        let mut view = self.symbol(sym).clone();
+        let pins = std::mem::take(&mut view.pins);
+        for pin in &pins {
+            super::kw::add_pin_with_case(&mut view, pin.clone(), false);
+        }
+        let folded = if view.pins == pins {
+            sym
+        } else {
+            view.original = Some(sym);
+            let folded = self.new_obj(ObjData::Symbol(Box::new(view)));
+            self.objs[folded.0 as usize].name = self.objs[sym.0 as usize].name.clone();
+            folded
+        };
+        self.folded_symbols.insert(sym, folded);
+        folded
     }
 
     pub(crate) fn member_draw_error(&mut self, s: SceneId, list: char, k: usize, f: &Fact, member: ObjId) {
@@ -371,7 +395,7 @@ impl Interp<'_> {
         let mut sym = SymbolDef { default: true, ..SymbolDef::default() };
         let mut dashed = StyleMap::new();
         dashed.insert("linestyle".into(), Lit::Str(WStr::new("dashed", None)));
-        sym.prims.push(SymPrim {
+        sym.push_prim(SymPrim {
             shape: Shape::Rectangle,
             points: vec![(-2.0, -h / 2.0), (2.0, h / 2.0)],
             params: PrimParams::default(),
@@ -387,7 +411,7 @@ impl Interp<'_> {
                     label: name.clone(),
                     dir: Some(dir),
                 });
-                sym.prims.push(SymPrim {
+                sym.push_prim(SymPrim {
                     shape: Shape::Line,
                     points: vec![(x0, y), (x1, y)],
                     params: PrimParams::default(),

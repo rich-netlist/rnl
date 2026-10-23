@@ -327,6 +327,12 @@
     {
       "severity": "hint",
       "file": "10-numbers-and-rewrite.sp",
+      "line": 2,
+      "col": 4
+    },
+    {
+      "severity": "hint",
+      "file": "10-numbers-and-rewrite.sp",
       "line": 1,
       "col": 0
     }

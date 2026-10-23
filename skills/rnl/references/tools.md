@@ -162,6 +162,8 @@ The hint is expected for a file without positions. Without a solver, `render` dr
 
 `rnl solve FILE -o DIR` places what has no position and writes the answer back as `type="generated"` records, in files under DIR. It is a first solver: its result can differ from one run to the next when it hits its time limit, and a person should look at it before keeping it.
 
+`rnl solve` and `rnl strip-generated` write each file in the encoding it was read in: UTF-8, or Latin-1 for a file that is not valid UTF-8. If the written text needs a character Latin-1 cannot hold, they write nothing and name the character; add `--encoding utf8` to write UTF-8 instead.
+
 ## The npm package `@rich-netlist/runtime`
 
 The core as WebAssembly, for Node and browsers. It reads the same files, in memory.

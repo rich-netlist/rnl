@@ -132,6 +132,7 @@ impl Interp<'_> {
 
     /// A symbol's name as a reference writes it: `$NMOS`, or `%amp` for one named in a level.
     fn symbol_name(&self, sym: ObjId) -> String {
+        let sym = self.symbol(sym).original.unwrap_or(sym);
         let name = &self.objs[sym.0 as usize].name;
         if name.is_empty() || name.starts_with('$') {
             self.label(sym)
@@ -198,6 +199,7 @@ impl Interp<'_> {
     }
 
     fn symbol_origin_version(&self, sym: ObjId) -> (SymbolOrigin, Option<String>) {
+        let sym = self.symbol(sym).original.unwrap_or(sym);
         if self.symbol(sym).default {
             return (SymbolOrigin::None, None);
         }
@@ -440,7 +442,7 @@ impl Interp<'_> {
         let sd = self.symbol(sym).clone();
         let bbox = match sd.bbox {
             Some(b) => b,
-            None => self.symbol_extent(sym, 0),
+            None => self.symbol_extent(sym),
         };
         let (origin, package_version) = self.symbol_origin_version(sym);
         out.push(SymbolView {
@@ -473,7 +475,9 @@ impl Interp<'_> {
         let prims = sd
             .prims
             .iter()
-            .map(|p| SymbolPrim {
+            .enumerate()
+            .map(|(i, p)| SymbolPrim {
+                order: sd.prim_order[i],
                 text: p.text.as_ref().and_then(|t| t.text.as_ref().map(|s| s.as_str().to_string())),
                 shape: p.shape,
                 points: p.points.clone(),
@@ -502,16 +506,9 @@ impl Interp<'_> {
             })
             .collect();
         let mut nested = Vec::new();
-        for a in &sd.usages {
-            let u = self.usage(*a).clone();
-            let Some(inner) = u.sym_symbol else { continue };
-            if !matches!(self.o(inner), ObjData::Symbol(_)) {
-                continue;
-            }
-            let Some((_, pt)) = u.roles.first() else { continue };
-            let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(*pt).clone() else { continue };
+        for (i, inner, at, orient) in self.symbol_children(sym) {
             let ik = self.symbol_view(inner, table, out);
-            nested.push(NestedView { symbol: ik, at: (x, y), orient: u.sym_orient });
+            nested.push(NestedView { order: sd.usage_order[i], symbol: ik, at, orient });
         }
         out[k].prims = prims;
         out[k].pins = pins;
@@ -519,8 +516,28 @@ impl Interp<'_> {
         k
     }
 
-    /// The extent of a symbol's graphics, text excluded, with the symbols drawn in it (9.2.3).
-    pub(crate) fn symbol_extent(&self, sym: ObjId, depth: usize) -> [f64; 4] {
+    /// The same drawable nested usages for geometry, extents and fixed-text paths. Keep the
+    /// usage index as well as the filtered order, for consumers that track declaration order.
+    pub(crate) fn symbol_children(&self, sym: ObjId) -> Vec<(usize, ObjId, Pt, Orient)> {
+        self.symbol(sym)
+            .usages
+            .iter()
+            .enumerate()
+            .filter_map(|(index, a)| {
+                let u = self.usage(*a);
+                let (Some(inner), Some((_, pt))) = (u.sym_symbol, u.roles.first()) else { return None };
+                if !matches!(self.o(inner), ObjData::Symbol(_)) {
+                    return None;
+                }
+                let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(*pt) else { return None };
+                Some((index, inner, (*x, *y), u.sym_orient))
+            })
+            .collect()
+    }
+
+    /// The extent of all symbol graphics, text excluded (9.2.3). DEFINE-SYMBOL validates
+    /// the graph and reports the shared nesting limit; no traversal silently truncates it.
+    pub(crate) fn symbol_extent(&self, sym: ObjId) -> [f64; 4] {
         let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
         fn add(b: &mut [f64; 4], p: (f64, f64)) {
             b[0] = b[0].min(p.0);
@@ -540,22 +557,11 @@ impl Interp<'_> {
                 add(&mut b, q);
             }
         }
-        if depth < 8 {
-            for a in &sd.usages {
-                let u = self.usage(*a);
-                let (Some(inner), Some((_, pt))) = (u.sym_symbol, u.roles.first()) else { continue };
-                if !matches!(self.o(inner), ObjData::Symbol(_)) {
-                    continue;
-                }
-                let ObjData::Point { x: Some(x), y: Some(y), .. } = self.o(*pt) else { continue };
-                let ib = self.symbol_extent(inner, depth + 1);
-                if ib[0] > ib[2] {
-                    continue;
-                }
-                for c in [(ib[0], ib[1]), (ib[0], ib[3]), (ib[2], ib[1]), (ib[2], ib[3])] {
-                    let d = u.sym_orient.apply(c);
-                    add(&mut b, (x + d.0, y + d.1));
-                }
+        for (_, inner, at, orient) in self.symbol_children(sym) {
+            let ib = self.symbol_extent(inner);
+            for c in [(ib[0], ib[1]), (ib[0], ib[3]), (ib[2], ib[1]), (ib[2], ib[3])] {
+                let d = orient.apply(c);
+                add(&mut b, (at.0 + d.0, at.1 + d.1));
             }
         }
         if b[0] > b[2] {
@@ -577,11 +583,7 @@ impl Interp<'_> {
         owner: ObjId,
         prefix: &str,
         out: &mut BTreeMap<String, Vec<markup::Line>>,
-        depth: usize,
     ) {
-        if depth > 8 {
-            return;
-        }
         let sd = self.symbol(sym).clone();
         for (k, p) in sd.prims.iter().enumerate() {
             if p.shape != Shape::Text {
@@ -591,15 +593,8 @@ impl Interp<'_> {
             let expanded = self.expand_text(s, &t, owner);
             out.insert(format!("{prefix}{k}"), markup::parse(&expanded));
         }
-        let mut n = 0;
-        for a in &sd.usages {
-            let u = self.usage(*a).clone();
-            let Some(inner) = u.sym_symbol else { continue };
-            if !matches!(self.o(inner), ObjData::Symbol(_)) {
-                continue;
-            }
-            self.symbol_texts(s, inner, owner, &format!("{prefix}{n}/"), out, depth + 1);
-            n += 1;
+        for (n, (_, inner, _, _)) in self.symbol_children(sym).into_iter().enumerate() {
+            self.symbol_texts(s, inner, owner, &format!("{prefix}{n}/"), out);
         }
     }
 
@@ -618,7 +613,7 @@ impl Interp<'_> {
     ) -> ItemView {
         let si = self.symbol_view(sym, table, symbols);
         let mut texts = BTreeMap::new();
-        self.symbol_texts(s, sym, o, "", &mut texts, 0);
+        self.symbol_texts(s, sym, o, "", &mut texts);
         let (kind, host) = match self.o(o).clone() {
             ObjData::Inst { idx, .. } => ("instance", vec![idx]),
             ObjData::Bundle { members, .. } => (
@@ -983,6 +978,7 @@ impl Interp<'_> {
         }
         let key = self.doc.key(&level.name);
         let sym = self.block_symbols.get(&key)?.values().max_by(|a, b| a.0.cmp(&b.0))?.1;
+        let sym = if level.case_sensitive { sym } else { self.fold_symbol_pins(sym) };
         let mut views = Vec::new();
         let k = self.symbol_view(sym, &mut HashMap::new(), &mut views);
         let mut view = views[k].clone();

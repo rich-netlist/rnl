@@ -417,8 +417,9 @@ impl<'a> Reader<'a> {
         // a `.subckt` read in SPICE mode whose `+` lines add ports, until its parameters begin
         let mut subckt_more: Option<LevelId> = None;
         let mut continued = rnl_host_spice::Continued::default();
+        let mut regions = rnl_host_spice::regions::Regions::default();
         let mut in_section = section.is_none();
-        let mut skip_section: Option<String> = None;
+        let mut skip_section: Option<(String, u32)> = None;
         // a region written to be encrypted, while in it: the line that opens it, and the warning
         // for a record there (2.2)
         let mut protect: Option<(u32, &str)> = None;
@@ -427,30 +428,54 @@ impl<'a> Reader<'a> {
         let mut spice = (mode == Mode::Spice).then_some(0);
         let n = lines.len();
         let mut idx = 0usize;
+        let mut ended = false;
+        let mut compatibility_hint = false;
         while idx < n {
             spice_mode(&mut spice, st.mode, idx as u32, &fname, &mut self.doc.spice_mode);
             let raw = lines[idx];
             let no = idx as u32 + 1;
             idx += 1;
             let stripped = raw.trim();
+            if !compatibility_hint {
+                compatibility_hint =
+                    rnl_host_spice::hint_comment_compatibility(raw, st.mode == Mode::Spectre, &fname, no, self.sink);
+            }
             if no == 1 {
                 if raw.contains("@RNL") {
                     self.sink.warning("the first line of a file is not read as RNL (2.2)", Some(Loc::line(&fname, 1)));
                 }
                 // the main file's first line is a title; an included file has none (S1 p51, p89)
+                // Encryption pragmas are meaningful even on a file's first comment line.
+                if raw.trim_start().starts_with("//") {
+                    regions.skip(raw, no, false, main, &fname, self.sink);
+                }
                 if main || raw.starts_with('*') || raw.starts_with("//") {
                     continue;
                 }
             }
+            if ended {
+                if raw.contains("@RNL") {
+                    self.sink
+                        .warning("RNL after `.end` of the main file is not read (2.2)", Some(Loc::line(&fname, no)));
+                }
+                continue;
+            }
             // library sections (Spectre `section`, SPICE `.lib`)
             if section.is_some() || skip_section.is_some() {
-                let low = stripped.to_lowercase();
+                // A section may set a different language from the surrounding file.
+                let card = if stripped.starts_with('.') {
+                    rnl_host_spice::strip_inline_comment(stripped)
+                } else {
+                    strip_comment(stripped)
+                };
+                let low = card.to_lowercase();
                 let words: Vec<&str> = low.split_whitespace().collect();
                 let first = words.first().copied().unwrap_or("");
-                if let Some(name) = &skip_section {
+                if let Some((name, start)) = &skip_section {
                     if (first == "endsection" || first == ".endl")
                         && words.get(1).is_none_or(|w| w.eq_ignore_ascii_case(name))
                     {
+                        self.doc.unselected_sections.push((level, *start, no));
                         skip_section = None;
                     } else if raw.contains("@RNL") {
                         self.sink.warning(
@@ -473,6 +498,23 @@ impl<'a> Reader<'a> {
                             Some(Loc::line(&fname, no)),
                         );
                     }
+                    continue;
+                }
+            }
+            if regions.skip(raw, no, st.mode == Mode::Spectre, main, &fname, self.sink) {
+                self.flush(&mut run, &fname, st.cur);
+                subckt_more = None;
+                if let Some((pl, pt)) = pending.take() {
+                    self.spice_statement(&pt, pl, &fname, path, &mut st, stack);
+                }
+                continue;
+            }
+            if st.mode == Mode::Spectre && section.is_none() {
+                let card = strip_comment(stripped);
+                let words: Vec<&str> = card.split_whitespace().collect();
+                if words.first() == Some(&"section") && words.len() == 2 {
+                    self.flush(&mut run, &fname, st.cur);
+                    skip_section = Some((words[1].to_string(), no));
                     continue;
                 }
             }
@@ -541,7 +583,7 @@ impl<'a> Reader<'a> {
                     ".end" => {
                         if main {
                             self.doc.levels[level].end_line = no;
-                            break;
+                            ended = true;
                         }
                         continue;
                     }
@@ -553,9 +595,10 @@ impl<'a> Reader<'a> {
                         continue;
                     }
                     ".lib" => {
-                        let toks: Vec<&str> = stripped.split_whitespace().collect();
+                        let card = rnl_host_spice::strip_inline_comment(stripped);
+                        let toks: Vec<&str> = card.split_whitespace().collect();
                         if toks.len() == 2 {
-                            skip_section = Some(toks[1].to_string());
+                            skip_section = Some((toks[1].to_string(), no));
                         } else if toks.len() >= 3 {
                             self.include(
                                 &unquote(toks[1]),
@@ -614,6 +657,15 @@ impl<'a> Reader<'a> {
                     stmt.pop();
                     if idx < n {
                         stmt.push(' ');
+                        if !compatibility_hint {
+                            compatibility_hint = rnl_host_spice::hint_comment_compatibility(
+                                lines[idx],
+                                true,
+                                &fname,
+                                idx as u32 + 1,
+                                self.sink,
+                            );
+                        }
                         stmt.push_str(&strip_comment(lines[idx].trim()));
                         last = idx as u32 + 1;
                         idx += 1;
@@ -622,6 +674,15 @@ impl<'a> Reader<'a> {
                 }
                 if idx < n && lines[idx].trim_start().starts_with('+') {
                     stmt.push(' ');
+                    if !compatibility_hint {
+                        compatibility_hint = rnl_host_spice::hint_comment_compatibility(
+                            lines[idx],
+                            true,
+                            &fname,
+                            idx as u32 + 1,
+                            self.sink,
+                        );
+                    }
                     stmt.push_str(&strip_comment(lines[idx].trim_start()[1..].trim()));
                     last = idx as u32 + 1;
                     idx += 1;
@@ -629,13 +690,15 @@ impl<'a> Reader<'a> {
                 }
                 break;
             }
-            let _ = last;
+            if last != no && regions.skip(&stmt, no, true, main, &fname, self.sink) {
+                continue;
+            }
             match stmt.split_whitespace().next() {
-                Some("protect") => {
+                Some("protect" | "prot") => {
                     protect.get_or_insert((no, PROTECTED));
                     continue;
                 }
-                Some("unprotect") => {
+                Some("unprotect" | "unprot") => {
                     if let Some((start, _)) = protect.take() {
                         self.doc.protected.push((fname.clone(), start, no));
                     }
@@ -652,6 +715,10 @@ impl<'a> Reader<'a> {
         if let Some((pl, pt)) = pending.take() {
             self.spice_statement(&pt, pl, &fname, path, &mut st, stack);
         }
+        self.doc.excluded.extend(regions.finish(&fname, n as u32 + 1, self.sink));
+        if let Some((_, start)) = skip_section {
+            self.doc.unselected_sections.push((level, start, n as u32 + 1));
+        }
         if let Some((start, _)) = protect {
             self.doc.protected.push((fname.clone(), start, n as u32 + 1));
         }
@@ -661,6 +728,12 @@ impl<'a> Reader<'a> {
         }
         if !st.stack.is_empty() {
             self.sink.error("a subcircuit has no `ends`", Some(Loc::line(&fname, n as u32)));
+        }
+        if let Some(name) = section.filter(|_| self.doc.levels[level].section_lines.is_none()) {
+            self.sink.error(
+                format!("the selected library section {name} was not found; no records can be written there (2.2)"),
+                Some(Loc::line(&fname, 1)),
+            );
         }
         if self.doc.levels[level].end_line == 0 {
             self.doc.levels[level].end_line = n as u32 + 1;

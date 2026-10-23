@@ -51,6 +51,8 @@ impl Layer {
 /// A graphic of a symbol in local coordinates.
 #[derive(Clone, Debug)]
 pub struct SymbolPrim {
+    /// Position among this symbol's primitives and nested usages (9.2.1).
+    pub order: usize,
     /// Original fixed text, before substituting an instance's parameters.
     pub text: Option<String>,
     pub shape: Shape,
@@ -75,6 +77,8 @@ pub struct PinView {
 /// A symbol drawn inside another (9.2.7).
 #[derive(Clone, Debug)]
 pub struct NestedView {
+    /// Position among this symbol's primitives and nested usages (9.2.1).
+    pub order: usize,
     pub symbol: usize,
     pub at: Pt,
     pub orient: Orient,

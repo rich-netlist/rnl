@@ -80,12 +80,12 @@
  *   `options`, written as `rnl solve --solver-options` takes them: null when it does, else what is
  *   wrong, in the solver's words. Offered with `solve`.
  * @property {() => void} [cancelSolve] Stop the solve under way.
- * @property {() => Promise<string | null>} [saveSolved] Save a copy of the last solve shown where the
+ * @property {(encoding?: "preserve" | "utf8") => Promise<string | null>} [saveSolved] Save a copy of the last solve shown where the
  *   user says, never over a file that was read: what was saved, in a sentence, or null when the
  *   user cancelled. Rejects with a message when it cannot.
  * @property {(handler: (step: SolveStep) => void) => void} [onSolveProgress] Call `handler` with each
  *   level as the solve under way begins it.
- * @property {(source: Source, files: SavedFile[], overwrite?: boolean) => Promise<string | { changed: string[] }>} [save]
+ * @property {(source: Source, files: SavedFile[], overwrite?: boolean, encoding?: "preserve" | "utf8") => Promise<string | { changed: string[] }>} [save]
  *   Write the text of the files where they were read from, which the user has asked for with File >
  *   Save (decision 0011): a sentence that says what was saved. Unless `overwrite`, a file that is no
  *   longer what it was when it was read (`SavedFile.read`), because another program changed it or
@@ -94,7 +94,7 @@
  *   it cannot. A shell that offers neither does not save.
  * @property {(files: {path: string, read: () => Promise<Blob | string> | Blob | string}[], preparing: () => void) => Promise<boolean>} [downloadLibrary]
  *   Web only: choose a destination, then export the captured library as one ZIP; false on cancel.
- * @property {(source: Source, file: SavedFile) => Promise<Source | null>} [saveAs] Ask where to save the
+ * @property {(source: Source, file: SavedFile, encoding?: "preserve" | "utf8") => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.
  * @property {(dirty: boolean) => void} [setDirty] Tell the platform that files have changes that are not

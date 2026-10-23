@@ -9,6 +9,8 @@ on:
     paths:
       - "packages.lock.json"
       - "scripts/packages*"
+      - "spec/rnl-words-0.3.json"
+      - "spec/rnl-words.schema.json"
       - "crates/**"
       - "bindings/**"
       - "libraries/**"
@@ -26,6 +28,8 @@ on:
     paths:
       - "packages.lock.json"
       - "scripts/packages*"
+      - "spec/rnl-words-0.3.json"
+      - "spec/rnl-words.schema.json"
       - "crates/**"
       - "bindings/**"
       - "libraries/**"

@@ -2235,5 +2235,12 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "09-buses-and-bundles.sp",
+      "line": 3,
+      "col": 4
+    }
+  ]
 }

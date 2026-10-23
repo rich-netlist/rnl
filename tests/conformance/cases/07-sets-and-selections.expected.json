@@ -2121,5 +2121,12 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "07-sets-and-selections.sp",
+      "line": 2,
+      "col": 4
+    }
+  ]
 }

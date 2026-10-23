@@ -456,6 +456,12 @@
     {
       "severity": "hint",
       "file": "09-include-without-header.sp",
+      "line": 3,
+      "col": 4
+    },
+    {
+      "severity": "hint",
+      "file": "09-include-without-header.sp",
       "line": 1,
       "col": 0
     },

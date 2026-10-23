@@ -928,5 +928,12 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "01-terminal-names.sp",
+      "line": 2,
+      "col": 8
+    }
+  ]
 }

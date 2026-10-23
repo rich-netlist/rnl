@@ -22,8 +22,15 @@ test("opening shows the drawing, the text and the problems", async ({ page, view
   const lines = await page.evaluate(() => window.viewer.doc.files[0].text.split(/\r?\n/).filter((l, i, a) => i < a.length - 1 || l).length);
   await expect(page.locator("#source .file:not([hidden]) .ln")).toHaveCount(lines);
   await expect(viewer.line(49)).toHaveText(/X1 a b vdd 0 amp/);
-  await expect(page.locator("#counts")).toHaveText("none");
-  await expect(page.locator("#diags")).toHaveText("No errors, warnings or hints.");
+  // The fixture's first non-ASCII host comment is at line 3, column 4.
+  await expect(page.locator("#counts")).toHaveText("1 hint");
+  await expect(page.locator("#diags li.diag")).toHaveCount(1);
+  const hint = page.locator("#diags li.diag.hint");
+  await expect(hint.locator(".msg")).toHaveText(
+    "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)",
+  );
+  await expect(hint.locator(".loc")).toHaveText("04-hierarchy.sp:3:4");
+  await expect(viewer.line(3)).toHaveClass(/\bd-hint\b/);
 
   // the other file
   await showSource(page, "04-hierarchy-lib.inc");

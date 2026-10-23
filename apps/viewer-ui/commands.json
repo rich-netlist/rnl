@@ -19,6 +19,8 @@
         { "id": "save", "label": "&Download File", "keys": ["Ctrl+S"], "platforms": ["web"] },
         { "id": "download-library", "label": "Download Librar&y", "platforms": ["web"] },
         { "id": "save-as", "label": "Save &As...", "platforms": ["desktop"] },
+        { "id": "save-utf8", "label": "Save Changes Using UTF-8", "platforms": ["desktop"] },
+        { "id": "save-as-utf8", "label": "Save As UTF-8...", "platforms": ["desktop"] },
         "-",
         { "id": "file-associations", "label": "File &Associations...", "platforms": ["desktop"], "windowsOnly": true },
         { "id": "exit", "label": "E&xit", "platforms": ["desktop"] }
@@ -99,6 +101,7 @@
         { "id": "solve-close", "label": "&Close Preview", "platforms": ["desktop"] },
         "-",
         { "id": "solve-save", "label": "Save Solved &Copy As...", "keys": ["Ctrl+Shift+S"], "platforms": ["desktop"] },
+        { "id": "solve-save-utf8", "label": "Save Solved Copy As UTF-8...", "platforms": ["desktop"] },
         "-",
         { "id": "solve-settings", "label": "S&ettings...", "platforms": ["desktop"] }
       ]

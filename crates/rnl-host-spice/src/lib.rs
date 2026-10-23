@@ -9,6 +9,8 @@
 //! A carrier is a whole-line comment with `*` in column 1 followed by a space, or a bare `*`
 //! (2.2). The first line of every file is a title and never a carrier.
 
+pub mod regions;
+
 use std::collections::{HashMap, HashSet};
 
 use rnl_runtime::diag::{Loc, Sink};
@@ -22,6 +24,58 @@ const PROTECTED: &str = "RNL between `.prot` and `.unprot` is read, but it is go
 /// The SPICE dialect: names ignore case; ngspice's `gnd` is ground (6.3).
 pub fn dialect() -> Dialect {
     Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec!["gnd".into()] }
+}
+
+/// Advisory only: these generic adapters do not identify a verified simulator/version.
+/// Return whether this line supplied the file's compatibility hint (standard 3.1).
+/// `slash_comments` selects Spectre comments; otherwise use SPICE's `;`/`$` comments.
+/// Quoted strings and SPICE braced expressions are host code, not comment text.
+pub fn hint_comment_compatibility(raw: &str, slash_comments: bool, file: &str, line: u32, sink: &mut Sink) -> bool {
+    let chars: Vec<char> = raw.chars().collect();
+    let first = chars.iter().position(|c| !c.is_whitespace()).unwrap_or(chars.len());
+    let mut comment = None;
+    if chars.get(first) == Some(&'*') || (slash_comments && chars.get(first..first + 2) == Some(&['/', '/'])) {
+        comment = Some(first);
+    } else {
+        let mut quote = None;
+        let mut braces = 0usize;
+        let mut k = 0;
+        while k < chars.len() {
+            let c = chars[k];
+            if let Some(q) = quote {
+                if c == '\\' {
+                    k += 2;
+                    continue;
+                }
+                if c == q {
+                    quote = None;
+                }
+            } else if c == '"' || (!slash_comments && c == '\'') {
+                quote = Some(c);
+            } else if !slash_comments && c == '{' {
+                braces += 1;
+            } else if !slash_comments && c == '}' {
+                braces = braces.saturating_sub(1);
+            } else if braces == 0
+                && (k == 0 || chars[k - 1].is_whitespace())
+                && (if slash_comments { c == '/' && chars.get(k + 1) == Some(&'/') } else { c == ';' || c == '$' })
+            {
+                comment = Some(k);
+                break;
+            }
+            k += 1;
+        }
+    }
+    let Some(column) =
+        comment.and_then(|start| chars[start..].iter().position(|c| !c.is_ascii()).map(|at| start + at + 1))
+    else {
+        return false;
+    };
+    sink.hint(
+        "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)",
+        Some(Loc::new(file, line, column as u32)),
+    );
+    true
 }
 
 /// The adapter's default DEVICE table: terminal names by element letter (6.12).
@@ -540,29 +594,37 @@ impl<'a> Reader<'a> {
         let mut circ = circ;
         let mut sub_stack: Vec<(LevelId, LevelId)> = Vec::new();
         let mut run: Vec<CarrierLine> = Vec::new();
-        let mut in_control = false;
+        let mut regions = regions::Regions::default();
         // the line of the `.prot` of a region written to be encrypted, while in it (2.2)
         let mut protect: Option<u32> = None;
         let mut ended = false;
+        let mut compatibility_hint = false;
         let mut pending: Option<Pending> = None;
         // a `.subckt` whose `+` lines add ports, until its parameters begin
         let mut subckt_more: Option<LevelId> = None;
         let mut continued = Continued::default();
         // `.lib` sections: inside the selected one when reading a section; skipping an unselected one
         let mut in_section = section.is_none();
-        let mut skip_lib: Option<String> = None;
+        let mut skip_lib: Option<(String, u32)> = None;
 
         for (idx, raw) in lines.iter().enumerate() {
             let no = idx as u32 + 1;
             let raw = raw.trim_end_matches('\r');
             let stripped = raw.trim();
             let low = stripped.to_lowercase();
+            if !compatibility_hint {
+                compatibility_hint = hint_comment_compatibility(raw, false, &fname, no, self.sink);
+            }
             if no == 1 {
                 if raw.contains("@RNL") {
                     self.sink.warning(
                         "the first line of a file is a title and is not read as RNL (2.2)",
                         Some(Loc::line(&fname, 1)),
                     );
+                }
+                // Encryption pragmas are meaningful even on a file's first comment line.
+                if raw.trim_start().starts_with("//") {
+                    regions.skip(raw, no, false, main, &fname, self.sink);
                 }
                 if main || raw.starts_with('*') {
                     continue;
@@ -577,11 +639,13 @@ impl<'a> Reader<'a> {
             }
             // `.lib` section bookkeeping (2.2: an unselected section is not read)
             if !in_section || skip_lib.is_some() {
-                let toks: Vec<&str> = stripped.split_whitespace().collect();
+                let card = strip_inline_comment(stripped);
+                let toks: Vec<&str> = card.split_whitespace().collect();
                 let is_lib = toks.first().is_some_and(|t| t.eq_ignore_ascii_case(".lib"));
                 let is_endl = toks.first().is_some_and(|t| t.eq_ignore_ascii_case(".endl"));
-                if let Some(name) = &skip_lib {
+                if let Some((name, start)) = &skip_lib {
                     if is_endl && toks.get(1).is_none_or(|t| t.eq_ignore_ascii_case(name)) {
+                        self.doc.unselected_sections.push((level, *start, no));
                         skip_lib = None;
                     } else if raw.contains("@RNL") {
                         self.sink.warning(
@@ -602,12 +666,11 @@ impl<'a> Reader<'a> {
                 }
                 continue;
             }
-            if in_control {
-                if raw.contains("@RNL") {
-                    self.sink.warning("RNL inside `.control` is not read (2.2)", Some(Loc::line(&fname, no)));
-                }
-                if low.starts_with(".endc") {
-                    in_control = false;
+            if regions.skip(raw, no, false, main, &fname, self.sink) {
+                self.flush_run(&mut run, &fname, cur);
+                subckt_more = None;
+                if let Some(p) = pending.take() {
+                    self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
                 }
                 continue;
             }
@@ -675,10 +738,6 @@ impl<'a> Reader<'a> {
                 }
                 continue;
             }
-            if first == ".control" {
-                in_control = true;
-                continue;
-            }
             if first == ".prot" || first == ".protect" {
                 protect.get_or_insert(no);
                 continue;
@@ -690,10 +749,11 @@ impl<'a> Reader<'a> {
                 continue;
             }
             if first == ".lib" {
-                let toks: Vec<&str> = stripped.split_whitespace().collect();
+                let card = strip_inline_comment(stripped);
+                let toks: Vec<&str> = card.split_whitespace().collect();
                 if toks.len() == 2 {
                     // a section definition met while reading the file as a whole: not selected
-                    skip_lib = Some(toks[1].to_string());
+                    skip_lib = Some((toks[1].to_string(), no));
                 } else if toks.len() >= 3 {
                     let file = unquote(toks[1]);
                     self.include(&file, Some(toks[2]), no, &fname, path, cur, circ, stack, true);
@@ -729,11 +789,21 @@ impl<'a> Reader<'a> {
         if let Some(p) = pending.take() {
             self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
         }
+        self.doc.excluded.extend(regions.finish(&fname, lines.len() as u32 + 1, self.sink));
+        if let Some((_, start)) = skip_lib {
+            self.doc.unselected_sections.push((level, start, lines.len() as u32 + 1));
+        }
         if let Some(start) = protect {
             self.doc.protected.push((fname.clone(), start, lines.len() as u32 + 1));
         }
         if !sub_stack.is_empty() {
             self.sink.error("a subcircuit has no `.ends`", Some(Loc::line(&fname, lines.len() as u32)));
+        }
+        if let Some(name) = section.filter(|_| self.doc.levels[level].section_lines.is_none()) {
+            self.sink.error(
+                format!("the selected library section {name} was not found; no records can be written there (2.2)"),
+                Some(Loc::line(&fname, 1)),
+            );
         }
         if self.doc.levels[level].end_line == 0 {
             self.doc.levels[level].end_line = lines.len() as u32 + 1;
@@ -1298,5 +1368,29 @@ mod tests {
         // a card named in a different case, and one defined after the element, are found
         let (insts, _) = read_all("* t\nM1 d g s b NCH\nJ1 d g s Jn\n.model nch nmos\n.model JN njf\n.end\n");
         assert!(insts.iter().all(|i| !i.model_missing), "{:?}", insts.iter().map(|i| &i.name).collect::<Vec<_>>());
+    }
+}
+
+#[cfg(test)]
+mod comment_advice_tests {
+    use super::*;
+
+    #[test]
+    fn compatibility_detection_distinguishes_comments_from_host_names_and_strings() {
+        for (line, slash, expected) in [
+            ("Rä a b 1k", false, false),
+            ("R1 a b '中文 $ still an expression'", false, false),
+            ("R1 a b {中文 ; still an expression}", false, false),
+            ("include \"中文 // still a path\"", true, false),
+            ("R1 a b 1k ; 中文", false, true),
+            ("R1 a b 1k $ 中文", false, true),
+            ("R1 (a b) resistor r=1k // 中文", true, true),
+            ("  * 中文", false, true),
+            ("// ASCII only", true, false),
+        ] {
+            let mut sink = Sink::new();
+            assert_eq!(hint_comment_compatibility(line, slash, "test", 1, &mut sink), expected, "{line}");
+            assert_eq!(sink.all().len(), usize::from(expected));
+        }
     }
 }

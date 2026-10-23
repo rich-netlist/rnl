@@ -865,6 +865,12 @@
   ],
   "diagnostics": [
     {
+      "severity": "hint",
+      "file": "19-set-cycles.sp",
+      "line": 3,
+      "col": 4
+    },
+    {
       "severity": "error",
       "file": "19-set-cycles.sp",
       "line": 23,

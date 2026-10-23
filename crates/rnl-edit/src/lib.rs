@@ -130,10 +130,20 @@ pub fn write(request: &WriteRequest) -> Result<String, String> {
     for (&level, &k) in &first_op {
         record_line(&doc, level, &request.netlist).map_err(|(a, b)| {
             let (what, title) = (ops[k].op.name(), doc.levels[level].title());
-            format!(
-                "op {k} ({what}): {title} lies in a region written to be encrypted, lines {a} to {b}, where a record \
-                 is gone once the region is encrypted (2.2)"
-            )
+            let file_level = doc.file_level(level);
+            let selected = &doc.levels[file_level];
+            if selected.section.is_some() && selected.section_lines.is_none() {
+                format!("op {k} ({what}): the selected library section {} was not found (2.2)", selected.section.as_deref().unwrap())
+            } else if doc.excluded.iter().any(|(f, x, y)| f == &file && (*x, *y) == (a, b))
+                || doc.unselected_sections.iter().any(|(l, x, y)| *l == file_level && (*x, *y) == (a, b)) {
+
+                format!("op {k} ({what}): {title} lies in a host region excluded from writing, lines {a} to {b} (2.2)")
+            } else {
+                format!(
+                    "op {k} ({what}): {title} lies in a region written to be encrypted, lines {a} to {b}, where a record \
+                     is gone once the region is encrypted (2.2)"
+                )
+            }
         })?;
     }
 

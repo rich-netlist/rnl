@@ -1732,6 +1732,12 @@
     {
       "severity": "hint",
       "file": "05-definitions.sp",
+      "line": 2,
+      "col": 4
+    },
+    {
+      "severity": "hint",
+      "file": "05-definitions.sp",
       "line": 21,
       "col": 7
     }

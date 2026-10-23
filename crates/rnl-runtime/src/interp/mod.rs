@@ -186,12 +186,16 @@ pub struct Interp<'p> {
     pub(crate) tm_memo: HashMap<(usize, ObjId), ObjId>,
     pub(crate) tm_in_progress: HashSet<(usize, ObjId)>,
     pub(crate) node_memo: HashMap<(&'static str, usize, usize, usize), ObjId>,
+    /// Active symbol-body expansions; a limit failure invalidates only the active chain.
+    pub(crate) symbol_expansions: Vec<Option<DiagId>>,
     pub(crate) rules: Rules,
     /// The members of each unit that are rules, as `rule_members` took them last.
     pub(crate) rule_members: HashMap<UnitId, RuleMembers>,
     pub(crate) block_symbols: HashMap<String, BTreeMap<MemberKey, (Pos, ObjId)>>,
     pub(crate) scenes: Vec<Scene>,
     pub(crate) symbol_order: HashMap<SceneId, Vec<ObjId>>,
+    /// Pin views for case-insensitive hosts, shared by all owners of the definition.
+    pub(crate) folded_symbols: HashMap<ObjId, ObjId>,
     /// Where each set made of other sets is made (5.2.2).
     pub(crate) made_at: HashMap<ObjId, cycles::MadeAt>,
     /// Per scene (`None`: before any), the latest made source of the edits there that make a set
@@ -313,11 +317,13 @@ impl<'p> Interp<'p> {
             tm_memo: HashMap::new(),
             tm_in_progress: HashSet::new(),
             node_memo: HashMap::new(),
+            symbol_expansions: Vec::new(),
             rules: Rules::default(),
             rule_members: HashMap::new(),
             block_symbols: HashMap::new(),
             scenes: Vec::new(),
             symbol_order: HashMap::new(),
+            folded_symbols: HashMap::new(),
             made_at: HashMap::new(),
             later_sources: HashMap::new(),
             closing: HashMap::new(),
@@ -391,6 +397,8 @@ impl<'p> Interp<'p> {
             let ids: Vec<RecId> = recs.into_iter().map(|r| it.add_record(r, unit)).collect();
             it.unit_recs.push(ids);
         }
+        // Versions precede every other header declaration, including packages and aliases.
+        it.read_file_versions();
         for lv in 0..it.doc.levels.len() {
             let u = it.level_unit[lv];
             it.read_unit(u);
@@ -436,6 +444,7 @@ impl<'p> Interp<'p> {
             // checked on its own (2.7): the package and what its references bring in (16.2)
             let chain = EffKey::Alone(pm);
             self.set_home(chain);
+            self.check_free_words();
             let eff = self.eff(chain);
             let name = self.units[pm].pkg_name.clone();
             let brought: Vec<UnitId> =
@@ -455,6 +464,7 @@ impl<'p> Interp<'p> {
                 self.set_home(EffKey::Level(lv));
             }
         }
+        self.check_free_words();
         let packages: Vec<UnitId> = (0..self.units.len())
             .filter(|&i| self.units[i].kind == UnitKind::Package && !self.units[i].embedded)
             .collect();

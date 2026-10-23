@@ -205,6 +205,13 @@ impl Words {
         self.by_name.get(name).map(|&i| &self.keywords[i])
     }
 
+    /// Fixed parameters accepted by AS/ATTACH in addition to a definition's own parameters.
+    pub fn usage_params(&self) -> Vec<ParamSpec> {
+        let mut priority = self.keyword("PRIORITY").expect("PRIORITY signature").param_list()[0].clone();
+        priority.required = false;
+        vec![priority]
+    }
+
     pub fn is_keyword(&self, name: &str) -> bool {
         self.by_name.contains_key(name)
     }

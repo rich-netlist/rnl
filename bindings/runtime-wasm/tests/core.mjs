@@ -96,7 +96,19 @@ test("the same request gives the same Document every time", async () => {
   const request = { entry: "/w/16-ties.sp", files: { "/w/16-ties.sp": await readFile(path, "utf8") } };
   const first = core.build(request);
   for (let k = 0; k < 6; k++) assert.deepEqual(core.build(request), first);
-  assert.ok(first.diagnostics.some((d) => d.message.includes("did you mean $ABCV?")));
+  assert.deepEqual(
+    first.diagnostics.map(({ severity, file, line, col, message }) => [severity, file, line, col, message]),
+    [
+      [
+        "hint",
+        "16-ties.sp",
+        2,
+        4,
+        "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)",
+      ],
+      ["error", "16-ties.sp", 32, 21, "$ABCZ cannot be found, did you mean $ABCV? (6.6)"],
+    ],
+  );
 });
 
 test("a panic is thrown with its message, and a new instance answers", { skip: !panics && "no test-panic feature" }, () => {

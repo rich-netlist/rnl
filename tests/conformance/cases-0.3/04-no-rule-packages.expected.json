@@ -390,6 +390,12 @@
     {
       "severity": "hint",
       "file": "04-no-rule-packages.scs",
+      "line": 2,
+      "col": 4
+    },
+    {
+      "severity": "hint",
+      "file": "04-no-rule-packages.scs",
       "line": 1,
       "col": 0
     },

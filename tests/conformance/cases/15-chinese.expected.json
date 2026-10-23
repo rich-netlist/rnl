@@ -2705,5 +2705,18 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "15-chinese.sp",
+      "line": 2,
+      "col": 4
+    },
+    {
+      "severity": "warning",
+      "file": "15-chinese.sp",
+      "line": 67,
+      "col": 5
+    }
+  ]
 }

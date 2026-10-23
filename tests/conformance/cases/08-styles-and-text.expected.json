@@ -2189,6 +2189,12 @@
   ],
   "diagnostics": [
     {
+      "severity": "hint",
+      "file": "08-styles-and-text.sp",
+      "line": 3,
+      "col": 4
+    },
+    {
       "severity": "warning",
       "file": "08-styles-and-text.sp",
       "line": 57,

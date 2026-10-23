@@ -221,6 +221,12 @@
     {
       "severity": "hint",
       "file": "06-subcircuit.sp",
+      "line": 10,
+      "col": 16
+    },
+    {
+      "severity": "hint",
+      "file": "06-subcircuit.sp",
       "line": 1,
       "col": 0
     }
