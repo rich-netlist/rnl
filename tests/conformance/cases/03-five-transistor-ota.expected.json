@@ -2906,6 +2906,12 @@
     {
       "severity": "hint",
       "file": "03-five-transistor-ota.sp",
+      "line": 2,
+      "col": 4
+    },
+    {
+      "severity": "hint",
+      "file": "03-five-transistor-ota.sp",
       "line": 36,
       "col": 5
     }

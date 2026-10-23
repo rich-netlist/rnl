@@ -428,12 +428,18 @@ impl<'a> Reader<'a> {
         let mut spice = (mode == Mode::Spice).then_some(0);
         let n = lines.len();
         let mut idx = 0usize;
+        let mut ended = false;
+        let mut compatibility_hint = false;
         while idx < n {
             spice_mode(&mut spice, st.mode, idx as u32, &fname, &mut self.doc.spice_mode);
             let raw = lines[idx];
             let no = idx as u32 + 1;
             idx += 1;
             let stripped = raw.trim();
+            if !compatibility_hint {
+                compatibility_hint =
+                    rnl_host_spice::hint_comment_compatibility(raw, st.mode == Mode::Spectre, &fname, no, self.sink);
+            }
             if no == 1 {
                 if raw.contains("@RNL") {
                     self.sink.warning("the first line of a file is not read as RNL (2.2)", Some(Loc::line(&fname, 1)));
@@ -446,6 +452,13 @@ impl<'a> Reader<'a> {
                 if main || raw.starts_with('*') || raw.starts_with("//") {
                     continue;
                 }
+            }
+            if ended {
+                if raw.contains("@RNL") {
+                    self.sink
+                        .warning("RNL after `.end` of the main file is not read (2.2)", Some(Loc::line(&fname, no)));
+                }
+                continue;
             }
             // library sections (Spectre `section`, SPICE `.lib`)
             if section.is_some() || skip_section.is_some() {
@@ -570,7 +583,7 @@ impl<'a> Reader<'a> {
                     ".end" => {
                         if main {
                             self.doc.levels[level].end_line = no;
-                            break;
+                            ended = true;
                         }
                         continue;
                     }
@@ -644,6 +657,15 @@ impl<'a> Reader<'a> {
                     stmt.pop();
                     if idx < n {
                         stmt.push(' ');
+                        if !compatibility_hint {
+                            compatibility_hint = rnl_host_spice::hint_comment_compatibility(
+                                lines[idx],
+                                true,
+                                &fname,
+                                idx as u32 + 1,
+                                self.sink,
+                            );
+                        }
                         stmt.push_str(&strip_comment(lines[idx].trim()));
                         last = idx as u32 + 1;
                         idx += 1;
@@ -652,6 +674,15 @@ impl<'a> Reader<'a> {
                 }
                 if idx < n && lines[idx].trim_start().starts_with('+') {
                     stmt.push(' ');
+                    if !compatibility_hint {
+                        compatibility_hint = rnl_host_spice::hint_comment_compatibility(
+                            lines[idx],
+                            true,
+                            &fname,
+                            idx as u32 + 1,
+                            self.sink,
+                        );
+                    }
                     stmt.push_str(&strip_comment(lines[idx].trim_start()[1..].trim()));
                     last = idx as u32 + 1;
                     idx += 1;

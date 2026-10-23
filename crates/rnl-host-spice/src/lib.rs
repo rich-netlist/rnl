@@ -26,6 +26,58 @@ pub fn dialect() -> Dialect {
     Dialect { name: "spice".into(), case_sensitive: false, ground_aliases: vec!["gnd".into()] }
 }
 
+/// Advisory only: these generic adapters do not identify a verified simulator/version.
+/// Return whether this line supplied the file's compatibility hint (standard 3.1).
+/// `slash_comments` selects Spectre comments; otherwise use SPICE's `;`/`$` comments.
+/// Quoted strings and SPICE braced expressions are host code, not comment text.
+pub fn hint_comment_compatibility(raw: &str, slash_comments: bool, file: &str, line: u32, sink: &mut Sink) -> bool {
+    let chars: Vec<char> = raw.chars().collect();
+    let first = chars.iter().position(|c| !c.is_whitespace()).unwrap_or(chars.len());
+    let mut comment = None;
+    if chars.get(first) == Some(&'*') || (slash_comments && chars.get(first..first + 2) == Some(&['/', '/'])) {
+        comment = Some(first);
+    } else {
+        let mut quote = None;
+        let mut braces = 0usize;
+        let mut k = 0;
+        while k < chars.len() {
+            let c = chars[k];
+            if let Some(q) = quote {
+                if c == '\\' {
+                    k += 2;
+                    continue;
+                }
+                if c == q {
+                    quote = None;
+                }
+            } else if c == '"' || (!slash_comments && c == '\'') {
+                quote = Some(c);
+            } else if !slash_comments && c == '{' {
+                braces += 1;
+            } else if !slash_comments && c == '}' {
+                braces = braces.saturating_sub(1);
+            } else if braces == 0
+                && (k == 0 || chars[k - 1].is_whitespace())
+                && (if slash_comments { c == '/' && chars.get(k + 1) == Some(&'/') } else { c == ';' || c == '$' })
+            {
+                comment = Some(k);
+                break;
+            }
+            k += 1;
+        }
+    }
+    let Some(column) =
+        comment.and_then(|start| chars[start..].iter().position(|c| !c.is_ascii()).map(|at| start + at + 1))
+    else {
+        return false;
+    };
+    sink.hint(
+        "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)",
+        Some(Loc::new(file, line, column as u32)),
+    );
+    true
+}
+
 /// The adapter's default DEVICE table: terminal names by element letter (6.12).
 pub fn default_terminals(letter: char) -> Option<Vec<String>> {
     let names: &[&str] = match letter {
@@ -546,6 +598,7 @@ impl<'a> Reader<'a> {
         // the line of the `.prot` of a region written to be encrypted, while in it (2.2)
         let mut protect: Option<u32> = None;
         let mut ended = false;
+        let mut compatibility_hint = false;
         let mut pending: Option<Pending> = None;
         // a `.subckt` whose `+` lines add ports, until its parameters begin
         let mut subckt_more: Option<LevelId> = None;
@@ -559,6 +612,9 @@ impl<'a> Reader<'a> {
             let raw = raw.trim_end_matches('\r');
             let stripped = raw.trim();
             let low = stripped.to_lowercase();
+            if !compatibility_hint {
+                compatibility_hint = hint_comment_compatibility(raw, false, &fname, no, self.sink);
+            }
             if no == 1 {
                 if raw.contains("@RNL") {
                     self.sink.warning(
@@ -1312,5 +1368,29 @@ mod tests {
         // a card named in a different case, and one defined after the element, are found
         let (insts, _) = read_all("* t\nM1 d g s b NCH\nJ1 d g s Jn\n.model nch nmos\n.model JN njf\n.end\n");
         assert!(insts.iter().all(|i| !i.model_missing), "{:?}", insts.iter().map(|i| &i.name).collect::<Vec<_>>());
+    }
+}
+
+#[cfg(test)]
+mod comment_advice_tests {
+    use super::*;
+
+    #[test]
+    fn compatibility_detection_distinguishes_comments_from_host_names_and_strings() {
+        for (line, slash, expected) in [
+            ("Rä a b 1k", false, false),
+            ("R1 a b '中文 $ still an expression'", false, false),
+            ("R1 a b {中文 ; still an expression}", false, false),
+            ("include \"中文 // still a path\"", true, false),
+            ("R1 a b 1k ; 中文", false, true),
+            ("R1 a b 1k $ 中文", false, true),
+            ("R1 (a b) resistor r=1k // 中文", true, true),
+            ("  * 中文", false, true),
+            ("// ASCII only", true, false),
+        ] {
+            let mut sink = Sink::new();
+            assert_eq!(hint_comment_compatibility(line, slash, "test", 1, &mut sink), expected, "{line}");
+            assert_eq!(sink.all().len(), usize::from(expected));
+        }
     }
 }

@@ -349,6 +349,12 @@
   ],
   "diagnostics": [
     {
+      "severity": "hint",
+      "file": "16-ties.sp",
+      "line": 2,
+      "col": 4
+    },
+    {
       "severity": "error",
       "file": "16-ties.sp",
       "line": 32,

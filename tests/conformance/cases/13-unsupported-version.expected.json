@@ -20,6 +20,12 @@
   ],
   "diagnostics": [
     {
+      "severity": "hint",
+      "file": "13-unsupported-version.sp",
+      "line": 2,
+      "col": 8
+    },
+    {
       "severity": "error",
       "file": "13-unsupported-version.sp",
       "line": 5,

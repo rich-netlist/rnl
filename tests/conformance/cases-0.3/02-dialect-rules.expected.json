@@ -975,6 +975,12 @@
     {
       "severity": "hint",
       "file": "02-dialect-rules.scs",
+      "line": 2,
+      "col": 8
+    },
+    {
+      "severity": "hint",
+      "file": "02-dialect-rules.scs",
       "line": 1,
       "col": 0
     },

@@ -202,5 +202,12 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "02-numbers-wires-text.scs",
+      "line": 10,
+      "col": 17
+    }
+  ]
 }

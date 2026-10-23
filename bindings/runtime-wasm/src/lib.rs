@@ -774,8 +774,25 @@ R1 a 0 1k
             assert_eq!(answer(request.clone()), first);
         }
         let d = &first["document"];
-        let hint = d["diagnostics"].as_array().unwrap().iter().find_map(|d| d["message"].as_str());
-        assert_eq!(hint, Some("$ABCZ cannot be found, did you mean $ABCV? (6.6)"));
+        let diagnostics: Vec<_> = d["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| json!([d["severity"], d["file"], d["line"], d["col"], d["message"]]))
+            .collect();
+        assert_eq!(
+            diagnostics,
+            [
+                json!([
+                    "hint",
+                    "16-ties.sp",
+                    2,
+                    4,
+                    "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)"
+                ]),
+                json!(["error", "16-ties.sp", 32, 21, "$ABCZ cannot be found, did you mean $ABCV? (6.6)"]),
+            ]
+        );
         let lines: Vec<&Value> = d["files"][0]["failed"].as_array().unwrap().iter().map(|f| &f[0]).collect();
         // the statement that failed, then the overridden ones in the order they are written
         assert_eq!(lines, [32, 25, 26, 27, 28, 29, 30]);

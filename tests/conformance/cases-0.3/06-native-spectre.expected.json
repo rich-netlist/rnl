@@ -5295,6 +5295,12 @@
     {
       "severity": "hint",
       "file": "06-native-spectre.scs",
+      "line": 2,
+      "col": 8
+    },
+    {
+      "severity": "hint",
+      "file": "06-native-spectre.scs",
       "line": 1,
       "col": 0
     }

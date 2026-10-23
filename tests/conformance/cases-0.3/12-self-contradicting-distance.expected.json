@@ -474,6 +474,12 @@
   ],
   "diagnostics": [
     {
+      "severity": "hint",
+      "file": "12-self-contradicting-distance.sp",
+      "line": 2,
+      "col": 15
+    },
+    {
       "severity": "error",
       "file": "12-self-contradicting-distance.sp",
       "line": 11,

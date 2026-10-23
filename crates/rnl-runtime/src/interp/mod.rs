@@ -444,6 +444,7 @@ impl<'p> Interp<'p> {
             // checked on its own (2.7): the package and what its references bring in (16.2)
             let chain = EffKey::Alone(pm);
             self.set_home(chain);
+            self.check_free_words();
             let eff = self.eff(chain);
             let name = self.units[pm].pkg_name.clone();
             let brought: Vec<UnitId> =
@@ -463,6 +464,7 @@ impl<'p> Interp<'p> {
                 self.set_home(EffKey::Level(lv));
             }
         }
+        self.check_free_words();
         let packages: Vec<UnitId> = (0..self.units.len())
             .filter(|&i| self.units[i].kind == UnitKind::Package && !self.units[i].embedded)
             .collect();

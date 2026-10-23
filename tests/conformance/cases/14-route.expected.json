@@ -2084,5 +2084,12 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "14-route.sp",
+      "line": 2,
+      "col": 9
+    }
+  ]
 }

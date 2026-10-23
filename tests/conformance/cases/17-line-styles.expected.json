@@ -2216,5 +2216,12 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "17-line-styles.sp",
+      "line": 2,
+      "col": 4
+    }
+  ]
 }

@@ -992,5 +992,12 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "01-rc-lowpass.sp",
+      "line": 2,
+      "col": 4
+    }
+  ]
 }

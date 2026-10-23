@@ -9,7 +9,7 @@ identical to that tag. No standard text is changed.
 
 The toolkit implements all **46 standard keywords and their 98 fixed parameters**,
 as well as the record fields, style properties and other standard words. This does
-**not** make it fully conformant: encoding, bundle-correspondence and advisory
+**not** make it fully conformant: encoding and bundle-correspondence
 limitations remain below. Language 0.2 is also read for compatibility;
 new solver/editor output uses 0.3, with a standard-package pin when upgrading 0.2.
 
@@ -78,6 +78,7 @@ supported files and preserves unsupported source text.
 | 2.8 (F-02) | Repeated known record-head fields are diagnosed once and treated as absent; the body and other fields survive. Ordinary keyword duplicates still fail their member. Classification and writeback use the same absent-field rule. | `header.rs::{repeated_record_head_fields_are_absent_without_losing_the_body,a_repeated_head_field_keeps_other_fields_and_keyword_duplicates_still_fail}` |
 | F-05, 5.3, Annex A | CI compares actual runtime vocabulary with the published list; handler defaults and structured rules are checked by execution, and unhandled schema fields fail. | [`vocabulary_parity.rs`](../crates/rnl-cli/tests/vocabulary_parity.rs); detailed scope in the vocabulary appendix |
 | 16.1 (F-03) | Supported explicit include versions restart inheritance below unsupported files. Unread files contribute no RNL declarations or packages; supported ancestors remain visible. | [`include_versions.rs`](../crates/rnl-cli/tests/include_versions.rs), including selected library sections and child-only writeback |
+| F-08, 2.2, 3.1, 3.3, 7.6 | Generic hosts give located non-ASCII comment compatibility hints; free-word advice sees forward/inherited/package names; Spectre SPICE mode warns on ignored RNL after the main `.end`. | [`advisory_diagnostics.rs`](../crates/rnl-cli/tests/advisory_diagnostics.rs); host `comment_advice_tests` |
 | 2.4, 3.5 | A record head separated from `@RNL` by whitespace/comment fails the whole record. | `syntax.rs::tests::a_record_head_separated_from_the_entry_fails_the_whole_record` |
 | 3.7 | Out-of-range numeric conversion reports an implementation limit instead of infinity or silently becoming zero. | `syntax.rs::tests::out_of_range_numbers_fail_the_member_without_becoming_infinite_or_zero` |
 | 5.3, 6.4, 9.2.4 | PIN validates every bus member and integral positive terminal index; SELECT-TERMINAL rejects invalid terminal types. | [`profile_validation.rs`](../crates/rnl-cli/tests/profile_validation.rs) |
@@ -120,7 +121,6 @@ The linked matrices contain the exact source anchors.
 | --- | --- | --- |
 | P1 | **Encoding preservation (F-04, 3.1).** CLI writing can silently change Latin-1 to UTF-8 when new characters do not fit; strip-generated directly writes decoded text. | `solve.rs::encode_as` has an explicit UTF-8 fallback (even tested as current behavior). Desktop encoding checks differ. A consistent refusal/conversion policy needs an API decision. |
 | P2 | **Bundle terminal correspondence (11.8).** Heterogeneous members use first-member terminal ordinals, not name-based correspondence when names/orders differ. | The crash is fixed; the broader mapping remains partial and needs regression cases for differing names/orders. |
-| P3 | **Advisory diagnostics (F-08).** Non-ASCII simulator validation, some forward-name typo hints and Spectre SPICE-mode post-`.end` warnings are incomplete. | SHOULD/advisory behavior; see the foundations matrix, distinct from mandatory interpretation failures. |
 | P3 | **Optional-value coverage.** Several optional values and negative combinations still lack dedicated behavioral assertions. | F-05 vocabulary parity is now maintained in CI; it does not establish complete semantic conformance or exhaust the cross product of parameters and contexts. |
 
 ## Decisions and standard questions

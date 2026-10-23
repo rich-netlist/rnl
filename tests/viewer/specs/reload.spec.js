@@ -99,6 +99,14 @@ test("a reading that fails is shown, and the next one shows the document from it
   await viewer.build(() => page.keyboard.press("F5"));
   await expect(page.locator("#level-name")).toHaveText(TOP);
   await expect(page.locator("#canvas > svg")).toHaveCount(1);
-  await expect(page.locator("#counts")).toHaveText("none");
+  // The fixture's first non-ASCII host comment is at line 3, column 4.
+  await expect(page.locator("#counts")).toHaveText("1 hint");
+  await expect(page.locator("#diags li.diag")).toHaveCount(1);
+  const hint = page.locator("#diags li.diag.hint");
+  await expect(hint.locator(".msg")).toHaveText(
+    "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)",
+  );
+  await expect(hint.locator(".loc")).toHaveText("04-hierarchy.sp:3:4");
+  await expect(viewer.line(3)).toHaveClass(/\bd-hint\b/);
   await viewer.selected(null);
 });

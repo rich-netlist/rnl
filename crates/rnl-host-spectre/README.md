@@ -13,3 +13,17 @@ Reads Spectre netlists into an `rnl_runtime::host::HostDocument`.
 A Spectre netlist and its SPICE translation with the same records give the same effective model; [`tests/conformance/equivalence`](../../tests/conformance/README.md) checks this.
 
 See the [roadmap](../../docs/roadmap.md) for planned work.
+
+## Non-ASCII comment compatibility (standard 3.1)
+
+The set of simulator/version combinations verified by this adapter for non-ASCII host
+comments is currently **empty**. This is a generic structural adapter, and neither a
+SPICE/Spectre language marker nor a filename identifies the simulator version that will
+run the netlist. Reading Unicode successfully in the toolkit is not simulator validation.
+
+The adapter emits one hint per file, at the first non-ASCII character found in a whole-line
+or inline host comment. This includes ordinary comments, not just RNL records. Quoted
+host strings and SPICE braced expressions are not mistaken for comments. The hint does
+not reject the input or change its drawing. Imported pure-RNL packages are not simulator
+input and are not subject to this host-comment hint. This conservative policy can be
+narrowed when a frontend supplies a simulator/version and there is recorded verification.

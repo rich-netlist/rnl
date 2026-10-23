@@ -1747,5 +1747,12 @@
       "unplaced": []
     }
   ],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "severity": "hint",
+      "file": "02-cs-amplifier.sp",
+      "line": 2,
+      "col": 4
+    }
+  ]
 }

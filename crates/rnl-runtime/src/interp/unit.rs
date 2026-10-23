@@ -3,7 +3,7 @@
 //! A unit has its own name table. Reading a unit parses its records, reads the header record
 //! (version, aliases, terminal names, root packages) and collects the members of the others.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::diag::{Extra, Loc, Severity};
@@ -715,7 +715,6 @@ impl Interp<'_> {
                     header: header.clone(),
                 });
                 self.declare(u, Some(rec), k, false, m, &header);
-                self.free_word_warnings(u, rec, m);
                 // USE-PACKAGE written in the level (16.2)
                 if m.segments.len() == 1 {
                     if let Some(call) = &m.segments[0].call {
@@ -777,28 +776,56 @@ impl Interp<'_> {
         None
     }
 
-    /// 3.3 recommended warning: a free word equal to an instance, an RNL name or a keyword.
-    fn free_word_warnings(&mut self, u: UnitId, rec: RecId, m: &Member) {
-        if m.free_words.is_empty() {
+    /// Check free text only once all forward names, scope records and effective packages are
+    /// known. This consults the same visibility rules as references, without evaluating them.
+    pub(crate) fn check_free_words(&mut self) {
+        for u in 0..self.units.len() {
+            if !self.units[u].ok {
+                continue;
+            }
+            let members: Vec<_> = self.units[u].members.iter().chain(&self.units[u].scope_members).cloned().collect();
+            for m in members {
+                if let Some(rec) = m.rec {
+                    self.free_word_warnings(u, rec, &m.m, &HashSet::new(), &HashSet::new());
+                }
+            }
+        }
+    }
+
+    /// 3.3 recommended warning: a free word equal to an instance, a visible RNL name or keyword.
+    fn free_word_warnings(
+        &mut self,
+        u: UnitId,
+        rec: RecId,
+        m: &Member,
+        local: &HashSet<String>,
+        defining: &HashSet<String>,
+    ) {
+        if m.error.is_some() {
             return;
         }
-        let insts: Vec<String> = match self.units[u].level {
-            Some(lv) if self.units[u].kind == UnitKind::Level => {
-                self.doc.levels[lv].instances.iter().map(|i| i.name.to_lowercase()).collect()
-            }
-            _ => Vec::new(),
-        };
         let fu = self.file_unit(u);
-        let alias_kws: Vec<String> = fu
-            .map(|f| self.units[f].aliases.keys().filter_map(|a| a.strip_prefix('@').map(String::from)).collect())
-            .unwrap_or_default();
+        let aliases = fu.map(|f| self.units[f].aliases.clone()).unwrap_or_default();
         let pkg = self.units[u].pkg().to_string();
         for (word, off) in &m.free_words {
-            let what = if insts.contains(&word.to_lowercase()) {
+            let instance = self.units[u].level.filter(|_| self.units[u].kind == UnitKind::Level).is_some_and(|lv| {
+                self.doc.levels[lv].instances.iter().any(|i| {
+                    if i.case_sensitive {
+                        i.name == *word
+                    } else {
+                        i.name.eq_ignore_ascii_case(word)
+                    }
+                })
+            });
+            let dollar = aliases.get(&format!("${word}")).and_then(|a| a.strip_prefix('$')).unwrap_or(word);
+            let what = if instance {
                 Some(format!("instance #{word}"))
-            } else if words().is_keyword(word) || alias_kws.contains(word) {
+            } else if words().is_keyword(word) || aliases.contains_key(&format!("@{word}")) {
                 Some(format!("keyword @{word}"))
-            } else if self.units[u].names.keys().any(|(_p, n)| n == word) {
+            } else if local.contains(word)
+                || self.lookup_unit('%', word, u, defining.contains(word), None).is_some()
+                || self.lookup_unit('$', dollar, u, defining.contains(dollar), None).is_some()
+            {
                 Some("an RNL name".to_string())
             } else {
                 None
@@ -811,6 +838,62 @@ impl Interp<'_> {
                     Some(loc),
                     &pkg,
                 );
+            }
+        }
+        for (index, segment) in m.segments.iter().enumerate() {
+            let keyword = segment.call.as_ref().map(|c| self.kw(&c.kw, u));
+            // Inline package bodies have their own unit and are checked there. Its private
+            // names must not leak into this enclosing lexical scope.
+            if keyword.as_deref() == Some("USE-PACKAGE") {
+                continue;
+            }
+            let mut nested = local.clone();
+            let mut hidden = defining.clone();
+            if matches!(keyword.as_deref(), Some("DEFINE" | "DEFINE-SYMBOL" | "DEFINE-STYLE")) {
+                // A definition's own binding is not visible inside its body (6.9); an outer
+                // binding with that spelling can still be visible through lookup_unit.
+                for binding in m.binds.iter().filter(|b| b.after == index) {
+                    nested.remove(&binding.name);
+                    hidden.insert(binding.name.clone());
+                }
+            }
+            if keyword.as_deref() == Some("DEFINE") {
+                if let Some(params) = segment.call.as_ref().and_then(|c| c.params.as_ref()) {
+                    for parameter in &params.named {
+                        if !matches!(self.word(&parameter.name, u).as_str(), "roles" | "parameters") {
+                            continue;
+                        }
+                        if let Value::Arr(items) = &parameter.value {
+                            for item in items {
+                                let name = match item {
+                                    Value::Str(name) => Some(name),
+                                    Value::Arr(pair) => {
+                                        pair.first()
+                                            .and_then(|v| if let Value::Str(name) = v { Some(name) } else { None })
+                                    }
+                                    _ => None,
+                                };
+                                if let Some(name) = name {
+                                    nested.insert(name.trim_matches(['{', '}']).to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            for arg in &segment.args {
+                if let ObjExpr::Set(body) = &arg.obj {
+                    let mut visible = nested.clone();
+                    visible.extend(
+                        body.members
+                            .iter()
+                            .filter(|m| m.error.is_none())
+                            .flat_map(|m| m.binds.iter().map(|b| b.name.clone())),
+                    );
+                    for member in &body.members {
+                        self.free_word_warnings(u, rec, member, &visible, &hidden);
+                    }
+                }
             }
         }
     }
