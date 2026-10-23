@@ -146,8 +146,7 @@ test('symbol labels switch live and obsolete source tooltips stay removed after 
   await expect(line).not.toHaveAttribute('title');
   await page.keyboard.press('4');
   await expect(page.locator('.symbol-label-list')).toContainText('automatic position');
-  // Capture the initialized viewport, after svgViewer's first ResizeObserver fit.
-  await page.locator('.symbol-preview').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await viewer.symbolFitted();
   const svg=await page.locator('.symbol-preview > svg').getAttribute('viewBox');
   await language(page,'zh');
   await expect(page.locator('.symbol-label-list')).toContainText('自动位置');

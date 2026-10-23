@@ -108,6 +108,21 @@ class Viewer {
     });
   }
 
+  /**
+   * Wait until the Symbol panel's preview has fitted its drawing: it does so in a ResizeObserver
+   * callback, which an engine may deliver a few frames after the panel is shown, and until then the
+   * view box is the drawing's own extent, not the shape of the preview.
+   */
+  async symbolFitted() {
+    await this.page.waitForFunction(() => {
+      const preview = document.querySelector(".symbol-preview");
+      const svg = preview?.querySelector(":scope > svg");
+      if (!svg) return false;
+      const [, , w, h] = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+      return preview.clientHeight > 0 && Math.abs(w * preview.clientHeight - h * preview.clientWidth) <= 1e-6 * w * preview.clientHeight;
+    });
+  }
+
   /** The page point of a point of the drawing shown, in its own units, as a click there hits it. */
   async point(u, v) {
     await this.settled();
