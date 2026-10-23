@@ -535,7 +535,72 @@ impl Interp<'_> {
 
     // ------------------------------------------------------------------ reading a unit
 
+    /// Discover file versions before interpreting any file's header or body (16.1).
+    /// Only the first correctly placed header contributes a version. Includes inherit the
+    /// nearest declared version, but an explicit version starts a new boundary.
+    pub(crate) fn read_file_versions(&mut self) {
+        let files: Vec<_> =
+            (0..self.doc.levels.len()).filter(|&lv| self.doc.levels[lv].kind == LevelKind::File).collect();
+        let mut declarations = HashMap::new();
+        for &lv in &files {
+            let u = self.level_unit[lv];
+            let Some(&rec) = self.unit_recs[u].first() else { continue };
+            if self.after_a_record_of_its_file(u, rec) {
+                continue;
+            }
+            // This scan is deliberately not cached: the remaining record is later parsed
+            // with the file's discovered version, not the including file's syntax rules.
+            let ast = syntax::parse_record(&self.recs[rec].text);
+            if ast.error.is_some()
+                || ast.header.as_ref().and_then(|h| h.get("type")) != Some(&Value::Str("header".into()))
+            {
+                continue;
+            }
+            let Some(body) = &ast.body else { continue };
+            let call = body.members.iter().find_map(|m| {
+                if m.error.is_some() || m.segments.len() != 1 || m.bind().is_some() {
+                    return None;
+                }
+                let seg = &m.segments[0];
+                seg.call.as_ref().filter(|c| c.kw == "VERSION").map(|c| (seg, c))
+            });
+            let Some((seg, call)) = call else { continue };
+            let Ok(params) = params_by_name("VERSION", call.params.as_ref(), true, str::to_string) else { continue };
+            if !seg.args.is_empty() {
+                continue;
+            }
+            if let Some(Value::Str(version)) = params.get("version") {
+                self.units[u].version = version.clone();
+                declarations.insert(lv, self.recs[rec].loc(call.start));
+            }
+        }
+        for lv in files {
+            let u = self.level_unit[lv];
+            let version = self.version_of(Some(u));
+            if !READ_VERSIONS.contains(&version.as_str()) {
+                self.units[u].ok = false;
+                let loc = declarations.remove(&lv).unwrap_or_else(|| {
+                    Loc::line(
+                        &self.doc.levels[lv].file,
+                        self.doc.levels[lv].section_lines.map_or(1, |(start, _)| start + 1),
+                    )
+                });
+                let reads = READ_VERSIONS.join(" and ");
+                self.sink.error(
+                    format!("unsupported version {version}: no RNL of this file is interpreted (16.1; this implementation reads {reads})"),
+                    Some(loc),
+                );
+            }
+        }
+    }
+
     pub(crate) fn read_unit(&mut self, u: UnitId) {
+        if self.units[u].kind == UnitKind::Level && self.units[u].level.is_some_and(|lv| !self.file_ok(lv)) {
+            // An unread file contributes no names, rules, aliases, DEVICE declarations or
+            // packages. Supported ancestors still contribute through the host hierarchy.
+            self.units[u].ok = false;
+            return;
+        }
         let level_kind = self.unit_level_kind(u);
         let is_file_level = matches!(level_kind, Some(LevelKind::File) | Some(LevelKind::Package));
         let pkg = self.units[u].pkg().to_string();
@@ -1705,22 +1770,23 @@ impl Interp<'_> {
         }
     }
 
-    /// Is no file on the way up from this level of an unsupported version (16.1)?
+    /// Is the effective version of this level's own file supported (16.1)?
     pub(crate) fn file_ok(&self, level: LevelId) -> bool {
         self.unsupported_file(level).is_none()
     }
 
-    /// The file level on the way up from this level, itself included, that is of an unsupported
-    /// version (16.1), with the version it declares: no RNL of it is interpreted, nor of the
-    /// levels in it.
+    /// The declaration supplying an unsupported version to this level's file. An explicit
+    /// supported version stops inheritance, even below an unsupported ancestor. A file
+    /// without a declaration inherits; subcircuits follow the file containing their text.
     pub(crate) fn unsupported_file(&self, level: LevelId) -> Option<(LevelId, String)> {
-        let mut lv = Some(level);
-        while let Some(l) = lv {
-            let unit = &self.units[self.level_unit[l]];
-            if self.doc.levels[l].kind == LevelKind::File && !unit.ok {
-                return Some((l, unit.version.clone()));
+        let mut fu = self.file_unit(self.level_unit[level]);
+        while let Some(u) = fu {
+            let unit = &self.units[u];
+            let lv = unit.level?;
+            if !unit.version.is_empty() {
+                return (!READ_VERSIONS.contains(&unit.version.as_str())).then(|| (lv, unit.version.clone()));
             }
-            lv = self.doc.levels[l].parent;
+            fu = self.doc.levels[lv].parent.and_then(|p| self.file_unit(self.level_unit[p]));
         }
         None
     }

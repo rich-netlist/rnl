@@ -50,9 +50,9 @@
 //! orientations tie. `rnl solve` exits with 1 when any error was reported, of the netlist as a
 //! solver reads it ([`SolveRun::errors`]) or of the solver, once the files are written.
 //!
-//! A level whose file, or a file above it, declares a language version that the reading does not
+//! A level whose own file has an effective language version that the reading does not
 //! interpret is not solved: none of the RNL of that file is read, and the file is kept as it is
-//! (16.1), so nothing is written into it.
+//! (16.1), so nothing is written into it. An explicitly supported include resumes interpretation.
 //!
 //! A tool writes only 0.3 (16.1): a file of 0.2 that `rnl solve` writes a record into is raised to
 //! 0.3, and its levels are solved again as they read in 0.3 ([`solve_with_clock`],

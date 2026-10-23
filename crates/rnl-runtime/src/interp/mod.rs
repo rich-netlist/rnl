@@ -397,6 +397,8 @@ impl<'p> Interp<'p> {
             let ids: Vec<RecId> = recs.into_iter().map(|r| it.add_record(r, unit)).collect();
             it.unit_recs.push(ids);
         }
+        // Versions precede every other header declaration, including packages and aliases.
+        it.read_file_versions();
         for lv in 0..it.doc.levels.len() {
             let u = it.level_unit[lv];
             it.read_unit(u);
