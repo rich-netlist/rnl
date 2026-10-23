@@ -249,3 +249,18 @@ New windows are independent processes started with `--session FILE`; the one-use
 
 File > Reload Library rereads every session Library file and package, rescans PATH, and rebuilds the subcircuit index. PATH lists recognized netlists (`.sp`, `.spi`, `.spice`, `.cir`, `.ckt`, `.net`, `.netlist`, `.inc`, `.lib`, `.scs`) alongside `.rnl` packages, directly and in numeric version directories. File > Auto Include and the Netlist checkbox enable indexed lookup of undefined subcircuits; unique matches produce warnings in Problems. The switch is saved, defaults on, and also applies to Solve. Conflicting definitions require an explicit include. No include statements are written to source files by this option.
 Optional public packages are maintained in [rnl-packages](https://github.com/rich-netlist/rnl-packages) and are not bundled with the desktop viewer. Download and verify them, then include the files in Library or a PATH directory. The missing `analog-canvas-extensions` hint remains unchanged; a desktop catalog picker is outside this change.
+
+## Chinese fonts on Linux
+
+The shared web UI and netlist editor fall back to the bundled, pinned Noto Sans SC web fonts when
+system fonts lack Chinese glyphs. Native Latin fonts and monospace metrics remain in use; no new
+font files are shipped, and the schematic renderer and its output are unchanged. The browser loads
+only the existing Unicode slices needed by the visible text.
+
+GTK native menus, native tooltips (including HTML title tooltips) and system file dialogs cannot use web fonts. On Debian/Ubuntu, install
+`sudo apt install fonts-noto-cjk` and restart the application for Chinese native menus and dialogs.
+The AppImage uses the host's native fonts too. The deb does not add a mandatory font dependency.
+
+Linux smoke tests use a Latin-only Fontconfig profile. They compare the UI/source glyph raster
+with the bundled Noto glyphs, reject the missing-glyph negative control, and retain Chinese
+before/after screenshots alongside the native-window and WebKit painted-content checks.

@@ -18,6 +18,10 @@ on:
         description: "Optional viewer-vX.Y.Z to validate without pushing a tag (never publishes)"
         type: string
         default: ""
+      measure_font_sizes:
+        description: "Also rebuild without the UI font fallback to measure package size differences"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -156,6 +160,18 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: node apps/desktop/tests/installers.mjs --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
+      - name: Measure the Windows font-fix package sizes
+        if: inputs.measure_font_sizes
+        env:
+          FONT_SIZE_ASSETS: ${{ runner.temp }}/assets
+          FONT_SIZE_OUTPUT: ${{ runner.temp }}/font-sizes/windows.json
+        run: node apps/desktop/tests/font-sizes.mjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && inputs.measure_font_sizes
+        with:
+          name: viewer-font-sizes-windows
+          path: ${{ runner.temp }}/font-sizes/
+          if-no-files-found: error
 
   build-linux:
     needs: validate
@@ -186,7 +202,7 @@ jobs:
       - name: Install the Linux build and smoke-test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev patchelf libfuse2 webkit2gtk-driver xvfb xdotool dbus-x11 imagemagick
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev fonts-dejavu-core patchelf libfuse2 webkit2gtk-driver xvfb xdotool dbus-x11 imagemagick
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -223,6 +239,8 @@ jobs:
         timeout-minutes: 5
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          FONTCONFIG_FILE: ${{ github.workspace }}/apps/desktop/tests/fontconfig-no-cjk.conf
+          RNL_NO_SYSTEM_CJK: "1"
           SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-linux
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
@@ -233,6 +251,8 @@ jobs:
         timeout-minutes: 5
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          FONTCONFIG_FILE: ${{ github.workspace }}/apps/desktop/tests/fontconfig-no-cjk.conf
+          RNL_NO_SYSTEM_CJK: "1"
           SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-linux
         run: |
           deb="$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.deb"
@@ -245,6 +265,12 @@ jobs:
           trap - EXIT
           test ! -e /usr/bin/rnl-viewer
           test ! -e "/usr/share/applications/RNL Viewer.desktop"
+      - name: Measure the Linux font-fix package sizes
+        if: inputs.measure_font_sizes
+        env:
+          FONT_SIZE_ASSETS: ${{ runner.temp }}/assets
+          FONT_SIZE_OUTPUT: ${{ runner.temp }}/smoke-linux/linux-font-sizes.json
+        run: node apps/desktop/tests/font-sizes.mjs
       - name: Keep the Linux smoke-test screenshots
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

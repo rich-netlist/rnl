@@ -109,7 +109,7 @@ body {
   grid-template-columns: minmax(0, 1fr);
   background: var(--bg);
   color: var(--fg);
-  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif, "Noto Sans SC";
   overflow: hidden;
 }
 
@@ -187,7 +187,7 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 .usage-expand[aria-expanded="true"] .chevron { transform: rotate(90deg); }
 .usage-row { padding-left: 26px; }
 .usage-row.selected { background: var(--select-line); }
-.usage-name { font-family: ui-monospace, Consolas, monospace; }
+.usage-name { font-family: ui-monospace, Consolas, monospace, "Noto Sans SC"; }
 .usage-color-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
 .usage-color-control { display: flex; align-items: center; gap: 10px; }
 .usage-color-control input { width: 42px; height: 28px; padding: 2px; }
@@ -521,17 +521,20 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
   cursor: default;
 }
 
+/* Web fonts follow the generic families: keep native Latin/monospace metrics and use the
+   already shipped Noto slices only for glyphs missing from the system (notably CJK on Linux). */
+
 /* ------------------------------------------------------------------ netlist text */
 
 .source {
   position: relative;
   overflow: auto;
   min-height: 0;
-  font: 12.5px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace;
+  font: 12.5px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace, "Noto Sans SC";
   tab-size: 8;
 }
 .source .placeholder {
-  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif, "Noto Sans SC";
   color: var(--muted);
   padding: 8px 12px;
   margin: 0;
@@ -562,7 +565,7 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .ln.subckt-line .code { box-shadow: inset 1px 0 var(--line); }
 .ln.subckt-start .code { box-shadow: inset 1px 0 var(--line), inset 0 1px var(--line); }
 .ln.subckt-end .code { box-shadow: inset 1px 0 var(--line), inset 0 -1px var(--line); }
-.fold-toggle { position: absolute; right: 1px; top: 2px; width: 14px; height: 14px; padding: 0; border: 1px solid var(--line); border-radius: 2px; font: 12px/12px monospace; color: var(--muted); background: var(--panel); cursor: pointer; }
+.fold-toggle { position: absolute; right: 1px; top: 2px; width: 14px; height: 14px; padding: 0; border: 1px solid var(--line); border-radius: 2px; font: 12px/12px monospace, "Noto Sans SC"; color: var(--muted); background: var(--panel); cursor: pointer; }
 .fold-toggle:focus-visible { outline: 1px solid var(--accent); }
 .ln.subckt-collapsed .code::after { content: '  …'; color: var(--muted); }
 .ln.hl-line { background: var(--select-line); }
@@ -636,7 +639,7 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .netlist-colors { display: flex; flex-direction: column; gap: 6px; }
 .netlist-color-row { display: grid; grid-template-columns: minmax(0, 1fr) 100px 42px; gap: 10px; align-items: center; }
 .netlist-color-row label { min-width: 0; }
-.dialog-body .netlist-color-row .color-hex { width: 100%; font-family: ui-monospace, Consolas, monospace; }
+.dialog-body .netlist-color-row .color-hex { width: 100%; font-family: ui-monospace, Consolas, monospace, "Noto Sans SC"; }
 .dialog-body .netlist-color-row input[type="color"] { width: 42px; height: 30px; padding: 2px; cursor: pointer; }
 .netlist-color-row input[aria-invalid="true"] { border-color: var(--error); }
 
@@ -1082,7 +1085,7 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .dialog-option {
   height: 22px;
   padding: 0 10px;
-  font: 12.5px/22px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace;
+  font: 12.5px/22px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace, "Noto Sans SC";
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1099,7 +1102,7 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
   margin: 0;
   padding: 6px 8px;
   overflow: auto;
-  font: 12px/1.45 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace;
+  font: 12px/1.45 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace, "Noto Sans SC";
   white-space: pre;
   overflow-wrap: normal;
   tab-size: 8;
@@ -1125,7 +1128,7 @@ body.menubar-shown { grid-template-rows: auto minmax(0, 1fr) auto; }
 .settings-label .name { min-width: 8em; }
 .dialog-body .dialog-form .settings-label input[type="number"] { width: 9em; }
 .settings-hint { color: var(--muted); font-size: 12px; }
-.settings-text { color: var(--muted); font-size: 12px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.settings-text { color: var(--muted); font-size: 12px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace, "Noto Sans SC"; }
 .settings-restore { padding: 3px 12px; border-color: var(--line); background: var(--tab); }
 .dialog-body hr { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid var(--line); }
 .objective-list { display: flex; flex-direction: column; margin: 4px 0 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 4px; }
@@ -1271,7 +1274,7 @@ button.pool-open:hover { text-decoration: underline; }
 .symbol-pane[hidden] { display: none; }
 .symbol-options { display: flex; flex-wrap: wrap; gap: 10px; padding: 8px; border-bottom: 1px solid var(--line); }
 .symbol-detail { overflow: auto; min-height: 0; padding: 12px; }
-.symbol-detail h2 { font: 600 18px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; color: var(--syn-def); margin: 0 0 6px; overflow-wrap: anywhere; }
+.symbol-detail h2 { font: 600 18px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace, "Noto Sans SC"; color: var(--syn-def); margin: 0 0 6px; overflow-wrap: anywhere; }
 .symbol-detail h3 { font-size: 13px; margin: 18px 0 8px; }
 .symbol-context, .symbol-source-location, .symbol-source-lines, .symbol-origin-info { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; margin: 6px 0 12px; }
 .symbol-preview { position: relative; height: 280px; overflow: hidden; touch-action: none; cursor: grab; border: 1px solid var(--line); border-radius: 8px; background-color: var(--drawing-background); background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px); background-size: 18px 18px; }
@@ -1287,9 +1290,9 @@ button.pool-open:hover { text-decoration: underline; }
 .symbol-pins-table { border-collapse: collapse; width: 100%; font-size: 12px; }
 .symbol-pins-table th, .symbol-pins-table td { padding: 7px 6px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .symbol-pins-table th { color: var(--muted); background: var(--bg); }
-.symbol-bounds, .symbol-label-list { font: 12px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; overflow-wrap: anywhere; }
+.symbol-bounds, .symbol-label-list { font: 12px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace, "Noto Sans SC"; overflow-wrap: anywhere; }
 .symbol-label-list { list-style: none; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
 .symbol-label-list li { border: 1px solid var(--line); border-radius: 12px; padding: 4px 8px; }
-.symbol-definition { border: 1px solid var(--line); border-radius: 6px; padding: 8px 0; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; background: var(--netlist-background); }
+.symbol-definition { border: 1px solid var(--line); border-radius: 6px; padding: 8px 0; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace, "Noto Sans SC"; background: var(--netlist-background); }
 .symbol-definition .ln { min-width: max-content; }
 .symbol-definition .no { width: 4em; }

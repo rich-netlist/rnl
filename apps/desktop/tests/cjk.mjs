@@ -1,0 +1,49 @@
+// Runs in the real WebView or browser. Compare rasterized glyphs, rather than accepting
+// document.fonts.check (which also succeeds when a font has no Chinese glyphs).
+export async function cjkEvidence() {
+  const text = "中文网表电路";
+  await document.fonts.load('32px "Noto Sans SC"', text);
+  await document.fonts.ready;
+  const raster = (font, sample = text) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 64;
+    const ctx = canvas.getContext('2d', {willReadFrequently:true});
+    ctx.font = font; ctx.fillText(sample, 4, 44);
+    return ctx.getImageData(0,0,256,64).data;
+  };
+  const results = [];
+  for (const selector of ['#tab-netlist', '#source', 'dialog .dialog-title', '.symbol-detail h2',
+    '.symbol-definition', '.clip-preview', '.dialog-option', '.settings-text', '.usage-name', '.menu-item']) {
+    const el = document.querySelector(selector);
+    if (!el) continue;
+    const s = getComputedStyle(el);
+    const prefix = `${s.fontStyle} ${s.fontWeight} 32px `;
+    // Headers can request semibold/bold slices not yet used by their ASCII names. Wait
+    // for this exact weight/style before comparing, rather than measuring a swap frame.
+    await document.fonts.load(prefix + '"Noto Sans SC"', text);
+    await document.fonts.load(prefix + s.fontFamily, text);
+    const actual = raster(prefix + s.fontFamily);
+    const reference = raster(prefix + '"Noto Sans SC"');
+    const missing = raster(prefix + '"RNL nonexistent font", monospace');
+    const latin = raster(prefix + s.fontFamily, '0iMW.()');
+    const oldLatin = raster(prefix + s.fontFamily.replace(/,\s*["']?Noto Sans SC["']?/g,''), '0iMW.()');
+    let ink=0, referenceDifference=0, missingDifference=0, latinDifference=0;
+    for (let i=3; i<actual.length; i+=4) {
+      if (actual[i]) ink++;
+      referenceDifference += Math.abs(actual[i]-reference[i]);
+      missingDifference += Math.abs(actual[i]-missing[i]);
+      latinDifference += Math.abs(latin[i]-oldLatin[i]);
+    }
+    results.push({selector, family:s.fontFamily, ink, referenceDifference, missingDifference, latinDifference});
+  }
+  return results;
+}
+
+export function assertCjk(evidence, noSystemCjk = false) {
+  if (evidence.length < 2) throw new Error('No source and UI font evidence.');
+  for (const result of evidence) {
+    if (result.ink < 500 || result.latinDifference !== 0 || (noSystemCjk && (result.referenceDifference !== 0 || result.missingDifference < 1000))) {
+      throw new Error(`Chinese glyphs were not painted with the bundled font: ${JSON.stringify(result)}`);
+    }
+  }
+}
