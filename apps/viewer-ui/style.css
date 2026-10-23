@@ -1,4 +1,17 @@
 :root {
+  --netlist-component: #2275E2;
+  --netlist-net: #A01008;
+  --netlist-rnl: #E1FEE9;
+  --netlist-keyword: #000000;
+  --netlist-definition: #2B7800;
+  --netlist-local: #4B21E4;
+  --netlist-string: #895D7C;
+  --netlist-parameter: #1D4781;
+  --netlist-free: #6B6B6B;
+  --netlist-text: #000000;
+  --netlist-background: #FFFFFF;
+  --netlist-highlight: #E8590C;
+  --usage-list-h: 240px;
   --bg: #f4f4f2;
   --panel: #fbfbfa;
   --fg: #1d1d1f;
@@ -36,10 +49,10 @@
   --syn-comment: #6a737d;
   --syn-marker: #a0a0a6;
   --syn-keyword: #7a2fc0;
-  --syn-string: #a3510b;
+  --syn-string: #0b7285;
   --syn-number: #0b7a5a;
   --syn-host: #0b5cad;
-  --syn-def: #b35900;
+  --syn-def: #364fc7;
   --syn-local: #2e7d32;
   --syn-param: #5c5c99;
   --syn-inst: #0b5cad;
@@ -74,10 +87,10 @@
     --syn-comment: #8b949e;
     --syn-marker: #6e6e76;
     --syn-keyword: #c792ea;
-    --syn-string: #e6a26b;
+    --syn-string: #66d9e8;
     --syn-number: #7fd1b0;
     --syn-host: #82b1ff;
-    --syn-def: #f0b46a;
+    --syn-def: #a5b4fc;
     --syn-local: #9ccc65;
     --syn-param: #a9a9e0;
     --syn-inst: #82b1ff;
@@ -162,6 +175,35 @@ button.icon { padding: 0 6px; font-size: 16px; line-height: 20px; color: var(--m
 
 .pane { min-height: 0; min-width: 0; }
 .pane[hidden] { display: none; }
+.usages-pane { display: grid; grid-template-rows: minmax(80px, var(--usage-list-h)) 5px minmax(120px, 1fr); grid-template-columns: minmax(0, 1fr); }
+.usage-list, .usage-detail { min-height: 0; overflow: auto; }
+.usage-detail { padding: 12px; }
+.usage-detail h2 { font-size: 14px; margin: 0 0 12px; overflow-wrap: anywhere; }
+.usage-detail h3 { font-size: 13px; margin: 16px 0 8px; }
+.usage-group-head, .usage-row { display: flex; align-items: center; gap: 6px; padding: 3px 10px; }
+.usage-group-head { background: var(--bg); border-bottom: 1px solid var(--line); }
+.usage-expand, .usage-name { flex: 1; min-width: 0; text-align: left; display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+.usage-expand { font-weight: 600; }
+.usage-expand[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+.usage-row { padding-left: 26px; }
+.usage-row.selected { background: var(--select-line); }
+.usage-name { font-family: ui-monospace, Consolas, monospace; }
+.usage-color-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.usage-color-control { display: flex; align-items: center; gap: 10px; }
+.usage-color-control input { width: 42px; height: 28px; padding: 2px; }
+.usage-palette { display: flex; gap: 6px; margin-top: 8px; }
+.usage-palette button { width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 50%; padding: 0; }
+.usage-palette button:hover { outline: 2px solid var(--accent); outline-offset: 2px; }
+.usage-roles { width: 100%; border-collapse: collapse; }
+.usage-roles td { padding: 5px 6px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.usage-roles td:first-child { font-weight: 600; }
+.usage-source { overflow: auto; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; font-size: 12px; }
+.usage-source-file { color: var(--muted); font-size: 12px; }
+.usage-more { margin: 4px 26px; color: var(--accent); }
+.canvas svg .usage-muted [stroke] { stroke: var(--usage-muted-stroke); }
+.canvas svg .usage-muted [fill] { fill: var(--usage-muted-fill); }
+.usage-overlays { --usage-label-bg: white; }
+body[data-background="dark"] .usage-overlays { --usage-label-bg: black; }
 .netlist-pane {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) 5px auto;
@@ -540,6 +582,8 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .s-string { color: var(--syn-string); }
 .s-number { color: var(--syn-number); }
 .s-host { color: var(--syn-host); }
+.s-net { color: var(--syn-net, var(--syn-host)); }
+.s-free { color: var(--syn-free, var(--fg)); }
 .s-def { color: var(--syn-def); }
 .s-local { color: var(--syn-local); }
 .s-param { color: var(--syn-param); }
@@ -553,6 +597,48 @@ body[data-background="dark"] .unplaced-row .thumb { background: var(--drawing-ba
 .obj:hover { text-decoration: underline; text-decoration-color: var(--select); text-underline-offset: 2px; }
 /* The name itself changes colour, including the syntax pieces of `#M1:d`. */
 .obj.hl, .obj.hl * { color: var(--select); }
+.obj.hl { text-decoration: underline; text-decoration-color: var(--select); text-underline-offset: 2px; }
+
+/* Netlist colours stay with the configured palette, independent of UI/drawing themes. */
+.source, .symbol-definition {
+  color: var(--netlist-text);
+  background: var(--netlist-background);
+  --syn-host: var(--netlist-component);
+  --syn-inst: var(--netlist-component);
+  --syn-net: var(--netlist-net);
+  --syn-keyword: var(--netlist-keyword);
+  --syn-def: var(--netlist-definition);
+  --syn-local: var(--netlist-local);
+  --syn-string: var(--netlist-string);
+  --syn-param: var(--netlist-parameter);
+  --syn-free: var(--netlist-free);
+  --syn-number: var(--netlist-text);
+  --syn-comment: var(--netlist-text);
+  --syn-marker: var(--netlist-text);
+  --syn-directive: var(--netlist-text);
+  --muted: var(--netlist-text);
+}
+.source, .source.sel-sub {
+  --select: var(--netlist-highlight);
+  --select-line: color-mix(in srgb, var(--netlist-highlight) 8%, transparent);
+  --out-of-scope: color-mix(in srgb, var(--netlist-background) 92%, var(--netlist-text));
+  --rnl-line: var(--netlist-rnl);
+  --semantic-rnl: color-mix(in srgb, var(--netlist-rnl) 90%, var(--netlist-text));
+}
+.source .ln .no, .source .editor .gutter {
+  color: color-mix(in srgb, var(--netlist-text) 50%, var(--netlist-background));
+}
+.source .ln.d-error .no { color: var(--error); }
+.source .ln.d-warning .no { color: var(--warning); }
+.source .ln.d-hint .no { color: var(--hint); }
+.source mark { background: color-mix(in srgb, var(--netlist-highlight) 30%, transparent); }
+
+.netlist-colors { display: flex; flex-direction: column; gap: 6px; }
+.netlist-color-row { display: grid; grid-template-columns: minmax(0, 1fr) 100px 42px; gap: 10px; align-items: center; }
+.netlist-color-row label { min-width: 0; }
+.dialog-body .netlist-color-row .color-hex { width: 100%; font-family: ui-monospace, Consolas, monospace; }
+.dialog-body .netlist-color-row input[type="color"] { width: 42px; height: 30px; padding: 2px; cursor: pointer; }
+.netlist-color-row input[aria-invalid="true"] { border-color: var(--error); }
 
 /* ------------------------------------------------------------------ problems */
 
@@ -1202,6 +1288,6 @@ button.pool-open:hover { text-decoration: underline; }
 .symbol-bounds, .symbol-label-list { font: 12px ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; overflow-wrap: anywhere; }
 .symbol-label-list { list-style: none; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
 .symbol-label-list li { border: 1px solid var(--line); border-radius: 12px; padding: 4px 8px; }
-.symbol-definition { border: 1px solid var(--line); border-radius: 6px; padding: 8px 0; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; background: var(--bg); }
+.symbol-definition { border: 1px solid var(--line); border-radius: 6px; padding: 8px 0; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace; background: var(--netlist-background); }
 .symbol-definition .ln { min-width: max-content; }
 .symbol-definition .no { width: 4em; }

@@ -1,5 +1,5 @@
 import { showSource } from "../viewer.js";
-// Reading the document again, by F5 or Ctrl+R: the level, the view, the selection, the views left on
+// Reading the document again, by F5: the level, the view, the selection, the views left on
 // other levels, the folded branches of the tree, the file shown and its scroll stay, also when the
 // file has changed; a reading that fails is shown, and the next one shows the document again.
 
@@ -11,7 +11,7 @@ test.beforeEach(async ({ viewer }) => {
   await viewer.open("04-hierarchy");
 });
 
-test("F5 and Ctrl+R read the document again and keep the level, the view and the selection", async ({ page, viewer }) => {
+test("F5 reads the document again and keep the level, the view and the selection", async ({ page, viewer }) => {
   await viewer.click("X2");
   await page.keyboard.press("Enter");
   await expect(page.locator("#level-name")).toHaveText("amp");
@@ -20,7 +20,7 @@ test("F5 and Ctrl+R read the document again and keep the level, the view and the
   await viewer.selected("instance M1 in amp");
   const view = await viewer.viewBox();
 
-  for (const key of ["F5", "Control+R", "Control+Shift+R"]) {
+  for (const key of ["F5", "Control+F5", "Shift+F5"]) {
     await viewer.build(() => page.keyboard.press(key));
     await expect(page.locator("#level-name")).toHaveText("amp");
     expect(await viewer.viewBox()).toBe(view);

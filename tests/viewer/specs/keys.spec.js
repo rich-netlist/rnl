@@ -50,7 +50,7 @@ test("a key with Ctrl and a letter counts only with the Shift it names", async (
   const changes = (await viewer.calls("setCheck")).slice(start);
   expect(changes.filter(([id]) => !id.startsWith("panel-"))).toEqual([["toggle-netlist", false], ["toggle-problems", false]]);
   expect(changes.filter(([id]) => id.startsWith("panel-"))).toEqual(
-    ["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"].map(name => [`panel-${name}`, false]),
+    ["files", "netlist", "hierarchy", "symbol", "usages", "unplaced", "solve"].map(name => [`panel-${name}`, false]),
   );
 });
 

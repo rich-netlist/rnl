@@ -62,6 +62,9 @@ for (const [platform, query] of Object.entries(PLATFORMS)) {
       await viewer.selected(`instance C1 in ${TOP}`);
       await expect(marks(page)).toHaveCount(2);
       expect(await viewer.selectedGroups()).toEqual(["#C1::name", "#C1::value", "item-2"]);
+      for (const key of ['name', 'value']) {
+        await expect(page.locator(`#canvas g[data-id="#C1::${key}"] text`).first()).toHaveCSS('fill', 'rgb(232, 89, 12)');
+      }
       // the marks are over the labels' places, and the labels are in the selection colour
       const label = await viewer.labelWhere("#C1::name");
       const [first] = await marks(page).evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
@@ -73,6 +76,10 @@ for (const [platform, query] of Object.entries(PLATFORMS)) {
       await viewer.selected(`instance R1 in ${TOP}`);
       await expect(marks(page)).toHaveCount(2);
       expect(await viewer.selectedGroups()).toEqual(["#R1::name", "#R1::value", "item-0"]);
+      await page.evaluate(() => window.viewer.command('background-dark'));
+      for (const key of ['name', 'value']) {
+        await expect(page.locator(`#canvas g[data-id="#R1::${key}"] text`).first()).toHaveCSS('fill', 'rgb(232, 89, 12)');
+      }
       await page.keyboard.press("Escape");
       await expect(marks(page)).toHaveCount(0);
       await expect(page.locator("#canvas svg g.sel")).toHaveCount(0);
@@ -105,8 +112,54 @@ for (const [platform, query] of Object.entries(PLATFORMS)) {
       await page.mouse.click(p.x, p.y);
       await viewer.selected("net vdd in 04-hierarchy.sp");
       await expect(marks(page)).toHaveCount(3);
-      // the labels of the supply symbols have no group of their own: the marks are what shows them
-      expect(await viewer.selectedGroups()).not.toContain("%s::name");
+      // Repeated unnamed usages still need independent text groups, so selecting VDD must
+      // recolour its labels without marking labels belonging to another net.
+      const ids = await page.evaluate((o) => window.viewer.doc.levels[window.viewer.level].hits
+        .filter((h) => h.kind === "label" && h.objects.includes(o)).map((h) => h.id), vdd);
+      expect(ids.every(Boolean)).toBe(true);
+      expect(new Set(ids).size).toBe(labels);
+      const text = (id) => page.locator(`#canvas svg g[data-id=${JSON.stringify(id)}] text`).first();
+      const original = await page.evaluate((ids) => [...document.querySelectorAll('#canvas svg g[data-id] text')]
+        .filter((el) => !ids.includes(el.parentElement.getAttribute('data-id')))
+        .map((el) => getComputedStyle(el).fill), ids);
+      for (const id of ids) await expect(text(id)).toHaveCSS('fill', 'rgb(232, 89, 12)');
+      await page.keyboard.press('Escape');
+      for (const id of ids) await expect(text(id)).not.toHaveCSS('fill', 'rgb(232, 89, 12)');
+      const same = await page.evaluate((ids) => [...document.querySelectorAll('#canvas svg g[data-id] text')]
+        .filter((el) => !ids.includes(el.parentElement.getAttribute('data-id')))
+        .map((el) => getComputedStyle(el).fill), ids);
+      expect(same).toEqual(original);
+      await page.evaluate(() => window.viewer.command('background-dark'));
+      await page.mouse.click(p.x, p.y);
+      await viewer.selected("net vdd in 04-hierarchy.sp");
+      for (const id of ids) await expect(text(id)).toHaveCSS('fill', 'rgb(232, 89, 12)');
     });
+  });
+
+  test(`unkeyed wire labels recolour only their own net, ${platform}`, async ({ page, viewer }) => {
+    await viewer.open('wire-labels', query);
+    const ids = await page.evaluate(() => Object.fromEntries(window.viewer.doc.levels[window.viewer.level].hits
+      .filter(h => h.kind === 'label' && h.objects.length === 1 && window.viewer.doc.objects[h.objects[0]].kind === 'net')
+      .map(h => [window.viewer.doc.objects[h.objects[0]].name, h.id])));
+    expect(ids.in).toBeTruthy();
+    expect(ids.out).toBeTruthy();
+    expect(ids.in).not.toBe(ids.out);
+    const text = net => page.locator(`#canvas g[data-id=${JSON.stringify(ids[net])}] text`).first();
+    for (const background of ['light', 'dark']) {
+      await page.evaluate(b => window.viewer.command(`background-${b}`), background);
+      const original = await Promise.all(['in', 'out'].map(net => text(net).evaluate(t => getComputedStyle(t).fill)));
+      await viewer.click('in', 'wire');
+      await viewer.selected('net in in wire-labels.sp');
+      await expect(text('in')).toHaveCSS('fill', 'rgb(232, 89, 12)');
+      await expect(text('out')).toHaveCSS('fill', original[1]);
+      await page.keyboard.press('Escape');
+      const point = await viewer.labelWhere(ids.out);
+      await page.mouse.click(point.x, point.y);
+      await viewer.selected('net out in wire-labels.sp');
+      await expect(text('out')).toHaveCSS('fill', 'rgb(232, 89, 12)');
+      await expect(text('in')).toHaveCSS('fill', original[0]);
+      await page.keyboard.press('Escape');
+      for (const [i, net] of ['in', 'out'].entries()) await expect(text(net)).toHaveCSS('fill', original[i]);
+    }
   });
 }

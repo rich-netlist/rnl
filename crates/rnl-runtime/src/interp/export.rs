@@ -304,7 +304,7 @@ impl Interp<'_> {
         if !route_objs.is_empty() {
             let terms = self.route_terms(s);
             for r in route_objs {
-                let ObjData::Route { net, mode, style } = self.o(r).clone() else { continue };
+                let ObjData::Route { net, mode, style, .. } = self.o(r).clone() else { continue };
                 let mut pins = Vec::new();
                 let mut seen: HashSet<(ObjId, u32)> = HashSet::new();
                 for &(ow, t, i) in terms.get(&net).into_iter().flatten() {

@@ -1,12 +1,12 @@
 import { expect, test } from "../viewer.js";
 
-const panes = ["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"];
+const panes = ["files", "netlist", "hierarchy", "symbol", "usages", "unplaced", "solve"];
 
 for (const platform of ["desktop", "web"]) {
   test(`${platform}: digits select panes and reopen the collapsed sidebar without rebuilding`, async ({ page, viewer }) => {
     await viewer.open("04-hierarchy", { platform });
     const builds = await viewer.builds();
-    const offered = platform === "desktop" ? panes : panes.slice(0, 5);
+    const offered = platform === "desktop" ? panes : panes.slice(0, 6);
     for (const [i, pane] of offered.entries()) {
       await page.keyboard.press("Control+B");
       await expect(page.locator("#sidebar")).toBeHidden();
@@ -21,7 +21,7 @@ for (const platform of ["desktop", "web"]) {
     if (platform === "desktop") {
       await expect(page.locator("#solve-report")).toContainText("Run Solve (F9)");
     } else {
-      await page.keyboard.press("6");
+      await page.keyboard.press("7");
       await expect(page.locator("#tab-solve")).toBeHidden();
       await expect(page.locator("#pane-unplaced")).toBeVisible();
     }
@@ -33,7 +33,7 @@ for (const platform of ["desktop", "web"]) {
 test("opening Not drawn from a collapsed sidebar fills its first page immediately", async ({ page, viewer }) => {
   await viewer.open("unplaced", { platform: "desktop" });
   await page.keyboard.press("Control+B");
-  await page.keyboard.press("5");
+  await page.keyboard.press("6");
   await expect(page.locator("#unplaced-list .unplaced-row")).toHaveCount(20);
   await expect(page.locator("#unplaced-list .unplaced-row").first()).toBeVisible();
 });
@@ -45,8 +45,8 @@ test("digits preserve text input, modifiers, dialogs and IME composition", async
   await expect(page.locator("#show-failed")).toBeChecked();
   const search = page.locator("#search");
   await search.focus();
-  await page.keyboard.type("123456");
-  await expect(search).toHaveValue("123456");
+  await page.keyboard.type("1234567");
+  await expect(search).toHaveValue("1234567");
   await expect(page.locator("#pane-hierarchy")).toBeVisible();
   // Hiding the sidebar while its input is focused must not leave focus in a hidden input.
   await page.keyboard.press("Control+B");
@@ -56,12 +56,12 @@ test("digits preserve text input, modifiers, dialogs and IME composition", async
   const editor = page.locator("#source textarea:visible");
   await expect(editor).toBeFocused();
   await page.keyboard.press("Control+a");
-  await page.keyboard.type("123456");
-  await expect(editor).toHaveValue("123456");
+  await page.keyboard.type("1234567");
+  await expect(editor).toHaveValue("1234567");
   await expect(page.locator("#pane-netlist")).toBeVisible();
   await page.locator("#tab-netlist").focus();
   for (const modifiers of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }, { shiftKey: true }, { isComposing: true }]) {
-    for (const key of ["1", "3", "4", "5", "6"]) {
+    for (const key of ["1", "3", "4", "5", "6", "7"]) {
       await page.locator("#tab-netlist").dispatchEvent("keydown", { key, ...modifiers });
       await expect(page.locator("#pane-netlist")).toBeVisible();
     }
@@ -69,7 +69,7 @@ test("digits preserve text input, modifiers, dialogs and IME composition", async
   await page.evaluate(() => window.viewer.command("shortcuts"));
   const dialog = page.locator("dialog.dialog");
   await expect(dialog).toBeVisible();
-  await page.keyboard.type("13456");
+  await page.keyboard.type("134567");
   await expect(page.locator("#pane-netlist")).toBeVisible();
   await dialog.getByRole("button", { name: "Close" }).click();
 });
@@ -84,7 +84,7 @@ test("digits switch from lists and the symbol viewer, and native menu commands o
   await page.keyboard.press("4");
   await expect(page.locator("#pane-symbol")).toBeVisible();
   await page.locator(".symbol-preview").focus();
-  await page.keyboard.press("5");
+  await page.keyboard.press("6");
   await expect(page.locator("#pane-unplaced")).toBeVisible();
   await page.keyboard.press("Control+B");
   await page.evaluate(() => window.fakeShell.menu("panel-solve"));

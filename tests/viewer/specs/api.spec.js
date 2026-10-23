@@ -105,6 +105,37 @@ test("superseded requests finish explicitly and late reads cannot replace the la
   expect(await page.evaluate(() => messages.some(m => m.type === "loaded" && m.requestId === "slow"))).toBe(false);
 });
 
+test('an approved package finishing its Library index cannot cancel a newer API open',async({page})=>{
+  const viewer=await launch(page);
+  const missing=fs.readFileSync(new URL('../inputs/missing-canvas-package.sp',import.meta.url));
+  await viewer.locator('#file-input').setInputFiles({name:'missing.sp',mimeType:'text/plain',buffer:missing});
+  const prompt=viewer.getByRole('dialog',{name:'Public Packages Found'});
+  await expect(prompt).toBeVisible();
+  await viewer.evaluate(async()=>{
+    const shell=(await import('./shells/web.js')).default, original=shell.setPool;
+    let held=false;
+    shell.setPool=async(...args)=>{
+      const result=await original(...args);
+      if (!held && args[0].some(item=>item.name==='analog-canvas-extensions 0.1')) {
+        held=true;window.packageIndexBlocked=true;
+        await new Promise(resolve=>{window.finishPackageIndex=resolve;});
+      }
+      return result;
+    };
+  });
+  await prompt.getByRole('button',{name:'Add to Library',exact:true}).click();
+  await expect.poll(()=>viewer.evaluate(()=>!!window.packageIndexBlocked)).toBe(true);
+  let incoming;
+  await viewer.route('**/newer-api.sp',route=>{incoming=route;});
+  await send(page,{type:'open',requestId:'newer',url:'newer-api.sp'});
+  await expect.poll(()=>!!incoming).toBe(true);
+  await viewer.evaluate(()=>window.finishPackageIndex());
+  await incoming.fulfill({body:circuit('newer')});
+  await result(page,'newer','loaded');
+  await expect(viewer).toHaveTitle('newer-api.sp - RNL Viewer');
+  expect(await page.evaluate(()=>messages.some(m=>m.type==='error' && m.requestId==='newer'))).toBe(false);
+});
+
 test("token, origin and window identity reject unrelated opens; package failures retain the document", async ({ page }) => {
   const viewer = await launch(page);
   await send(page, { type: "open", requestId: "valid", name: "valid.sp", text: circuit("valid") });

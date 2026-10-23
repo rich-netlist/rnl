@@ -24,10 +24,22 @@ export function darkColour(colour) {
   return "#" + rgb.map((c) => Math.round((c + shift) * 255).toString(16).padStart(2, "0")).join("") + full.slice(6);
 }
 
+/** Shift RGB toward white/light or black/dark, preserving the drawing's alpha. */
+function mutedColour(colour) {
+  const named = { white: "#ffffff", black: "#000000" };
+  colour = named[colour] || colour;
+  if (!/^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i.test(colour)) return colour;
+  const hex = colour.slice(1);
+  const full = hex.length <= 4 ? [...hex].map(c => c + c).join("") : hex;
+  const target = dark ? 0 : 255;
+  return "#" + [0, 2, 4].map(i => Math.round((parseInt(full.slice(i, i + 2), 16) + target) / 2)
+    .toString(16).padStart(2, "0")).join("") + full.slice(6);
+}
+
 /** Apply the preference to a newly imported drawing or thumbnail, or restore its original colours. */
 export function colourDrawing(svg) {
   for (const el of svg.querySelectorAll("[stroke], [fill]")) {
-    if (el.closest(".overlay")) continue;
+    if (el.closest(".overlay, .usage-overlays, .usage-underlays")) continue;
     if (!originals.has(el)) {
       originals.set(el, ["stroke", "fill"].map((attr) => [attr, el.getAttribute(attr)]));
     }
@@ -35,7 +47,10 @@ export function colourDrawing(svg) {
       if (colour === null) continue;
       // Selection leaves white paper alone, but ink turned white by Dark is still ink.
       if (attr === "fill") el.classList.toggle("highlight-fill", !["none", "#ffffff", "white"].includes(colour));
-      el.setAttribute(attr, dark ? darkColour(colour) : colour);
+      const display = dark ? darkColour(colour) : colour;
+      el.setAttribute(attr, display);
+      // Prepare focus colours while loading/recolouring; a selection only toggles group classes.
+      el.style.setProperty(`--usage-muted-${attr}`, mutedColour(display));
     }
   }
 }

@@ -43,8 +43,9 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
         <button id="tab-netlist" type="button" role="tab" aria-controls="pane-netlist" aria-selected="true" aria-keyshortcuts="2"><span class="tab-key" aria-hidden="true">2</span>Netlist</button>
         <button id="tab-hierarchy" type="button" role="tab" aria-controls="pane-hierarchy" aria-selected="false" aria-keyshortcuts="3"><span class="tab-key" aria-hidden="true">3</span>Hierarchy</button>
         <button id="tab-symbol" type="button" role="tab" aria-controls="pane-symbol" aria-selected="false" aria-keyshortcuts="4"><span class="tab-key" aria-hidden="true">4</span>Symbol</button>
-        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" aria-keyshortcuts="5" title="The objects of the level shown that are not drawn: those with no position, and devices no symbol can be chosen for"><span class="tab-key" aria-hidden="true">5</span>Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
-        <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" aria-keyshortcuts="6" hidden><span class="tab-key" aria-hidden="true">6</span>Solve</button>
+        <button id="tab-usages" type="button" role="tab" aria-controls="pane-usages" aria-selected="false" aria-keyshortcuts="5"><span class="tab-key" aria-hidden="true">5</span>Usage</button>
+        <button id="tab-unplaced" type="button" role="tab" aria-controls="pane-unplaced" aria-selected="false" aria-keyshortcuts="6" title="The objects of the level shown that are not drawn: those with no position, and devices no symbol can be chosen for"><span class="tab-key" aria-hidden="true">6</span>Not drawn<span id="unplaced-tab-count" class="tab-count"></span></button>
+        <button id="tab-solve" type="button" role="tab" aria-controls="pane-solve" aria-selected="false" aria-keyshortcuts="7" hidden><span class="tab-key" aria-hidden="true">7</span>Solve</button>
       </nav>
       <button id="hide-sidebar" class="icon" type="button" title="Hide the side panel (Ctrl+B)" aria-label="Hide the side panel">&#x2039;</button>
     </div>
@@ -130,6 +131,11 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
         <label><input id="symbol-labels" type="checkbox" checked>Labels</label>
       </div>
       <div id="symbol-detail" class="symbol-detail"><p class="placeholder">No circuit is open.</p></div>
+    </div>
+    <div id="pane-usages" class="pane usages-pane" role="tabpanel" aria-labelledby="tab-usages" hidden>
+      <div id="usage-list" class="usage-list" aria-label="Usages of the current circuit"></div>
+      <div id="usage-split" class="hsplit" role="separator" aria-orientation="horizontal" title="Drag to resize"></div>
+      <section id="usage-detail" class="usage-detail"><p class="placeholder">Select a usage to inspect it.</p></section>
     </div>
     <div id="pane-unplaced" class="pane unplaced-pane" role="tabpanel" hidden>
       <div class="sub-head">

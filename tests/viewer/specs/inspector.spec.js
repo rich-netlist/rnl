@@ -82,7 +82,7 @@ test('symbol viewport keeps application shortcuts available', async ({page,viewe
   await preview.focus();
   await viewer.build(() => page.keyboard.press('F5'));
   await preview.focus();
-  await viewer.build(() => page.keyboard.press('Control+r'));
+  await viewer.build(() => page.keyboard.press('F5'));
 });
 
 test('symbol follows parent assignment, package source and direct subcircuit entry', async ({ page, viewer }) => {

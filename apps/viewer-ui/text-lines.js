@@ -32,27 +32,30 @@ export function lineModel(file, f, allSpans, dialect) {
         to: n === l1 ? unit(n, c1) : texts[n - 1].length, kind: overridden ? "overridden" : "failed" });
     }
   }
-  function syntax(i, flags) {
+  function syntax(i, flags, stack = "") {
     const text = texts[i], cls = new Array(text.length).fill("");
-    const state = { comment: !!(flags & 2) };
+    const state = { comment: !!(flags & 2), stack };
     let joined = false;
     if (i === 0 && f === 0 && dialect === "spice") mark(cls, 0, text.length, "comment");
     else if (rnl.has(i)) {
       hostLine(text, cls, false, rnl.get(i));
       for (const r of rnl.get(i)) {
-        if (r.first) state.comment = false;
+        if (r.first) { state.comment = false; state.stack = ""; }
         rnlRange(text, r.from, Math.min(r.to, text.length), r.first, cls, state);
       }
     } else joined = hostLine(text, cls, !!(flags & 1) || /^\s*\+/.test(text), null);
-    return { cls, flags: (joined ? 1 : 0) | (state.comment ? 2 : 0) };
+    return { cls, flags: (joined ? 1 : 0) | (state.comment ? 2 : 0), stack: state.stack };
   }
   const states = new Uint8Array(texts.length);
+  const stacks = new Map();
   const folds = [], blocks = [];
-  let flags = 0, longest = "", columns = 0;
+  let flags = 0, stack = "", longest = "", columns = 0;
   for (let i = 0; i < texts.length; i++) {
     states[i] = flags;
-    const lex = syntax(i, flags);
+    if (stack) stacks.set(i, stack);
+    const lex = syntax(i, flags, stack);
     flags = lex.flags;
+    stack = lex.stack;
     const text = texts[i];
     // Also mark definitions in library sections that the host did not select. Reuse lexical
     // state so comments, RNL records and continuation lines cannot open/close a block.
@@ -72,7 +75,7 @@ export function lineModel(file, f, allSpans, dialect) {
   return {
     texts, columns, longest, folds, semantics, rnl, failed, text: file.text.replace(/\r\n/g, "\n"),
     render(i) {
-      const text = texts[i], { cls } = syntax(i, states[i]);
+      const text = texts[i], { cls } = syntax(i, states[i], stacks.get(i));
       const fail = new Array(text.length).fill("");
       for (const r of failed.get(i) || []) {
         for (let c = r.from; c < r.to && c < text.length; c++) if (fail[c] !== "failed") fail[c] = r.kind;
@@ -80,6 +83,7 @@ export function lineModel(file, f, allSpans, dialect) {
       const objs = new Array(text.length).fill(null);
       for (const s of (spans.get(i) || []).slice().sort((a, b) => a.len - b.len)) {
         const from = unit(i + 1, s.col - 1), to = unit(i + 1, s.col - 1 + s.len);
+        if (s.kind === "node" || s.kind === "port") mark(cls, from, to, "net");
         for (let c = from; c < to; c++) {
           if (!objs[c]) objs[c] = [];
           if (!objs[c].includes(s.object)) objs[c].push(s.object);

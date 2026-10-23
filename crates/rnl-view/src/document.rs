@@ -6,7 +6,7 @@
 //! them: where the netlist names an instance or one of its nodes, where a record refers to one,
 //! and what on each drawing stands for one (a symbol's box, a pin, a wire).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rnl_runtime::diag::{Diag, Sink};
 use rnl_runtime::geom::{Orient, Pt};
@@ -23,6 +23,8 @@ use crate::BuildOptions;
 
 mod symbols;
 pub use symbols::{InspectedLabel, InspectedPin, InspectedSymbol};
+mod usages;
+pub use usages::{Usage, UsageRole};
 
 /// What a viewer shows of a document, as [`crate::build`] gives it.
 #[derive(Serialize, Debug)]
@@ -59,6 +61,8 @@ pub struct Document {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Level {
+    /// All usages in this drawing scope, including semantic usages without a symbol.
+    pub usages: Vec<Usage>,
     /// Terminal names in subcircuit declaration order.
     pub ports: Vec<String>,
     /// The subcircuit's own block symbol, an index into `Document::symbols`.
@@ -270,8 +274,8 @@ pub struct Hit {
     /// associated net, or nets. The first object is what clicking the hit selects. A usage's
     /// label keeps its net first, so clicking a net label continues to select the net.
     pub objects: Vec<usize>,
-    /// The `data-id` of the SVG groups that draw it, and the owner of its primitives. A label
-    /// has one only when no other text of the level has the same.
+    /// The `data-id` of the SVG groups that draw it, and the owner of its primitives.
+    /// Repeated text ids are disambiguated for the page, so each label has its own groups.
     pub id: Option<String>,
     /// The name a netlist gives a usage, such as a ground or a port, for the box of one that has a
     /// name (`%gnd1`: "gnd1"); a viewer names an instance or a net by `objects`. Absent for the
@@ -433,6 +437,7 @@ pub(crate) fn document(
         }
     }
 
+    usages::inspect_all(r, &mut levels, &mut ix);
     let symbols = symbols::inspect(r, &mut levels);
     let diagnostic = |d: &Diag, sink: &Sink| {
         let (file, line, col) = match &d.loc {
@@ -560,11 +565,38 @@ struct Index<'a> {
     spans: Vec<Span>,
     insts: HashMap<(usize, usize), usize>,
     nets: HashMap<(usize, String), usize>,
+    usages: HashMap<(usize, String), usize>,
 }
 
 impl<'a> Index<'a> {
     fn new(doc: &'a HostDocument, files: &'a HashMap<String, usize>) -> Index<'a> {
-        Index { doc, files, objects: Vec::new(), spans: Vec::new(), insts: HashMap::new(), nets: HashMap::new() }
+        Index {
+            doc,
+            files,
+            objects: Vec::new(),
+            spans: Vec::new(),
+            insts: HashMap::new(),
+            nets: HashMap::new(),
+            usages: HashMap::new(),
+        }
+    }
+
+    fn usage(&mut self, level: usize, id: &str) -> usize {
+        let key = (level, id.to_string());
+        if let Some(&o) = self.usages.get(&key) {
+            return o;
+        }
+        let o = self.objects.len();
+        self.objects.push(Object {
+            kind: "usage",
+            name: id.into(),
+            level,
+            level_title: self.doc.levels[level].title(),
+            lines: None,
+            opens: None,
+        });
+        self.usages.insert(key, o);
+        o
     }
 
     /// The net of a level by the name a statement writes.
@@ -678,15 +710,7 @@ impl<'a> Index<'a> {
             // on a point with no pins. Keep the net on the hit for network highlighting.
             let mut labels = objects.clone();
             if it.kind == "usage" {
-                let usage = self.objects.len();
-                self.objects.push(Object {
-                    kind: "usage",
-                    name: it.object_id.clone(),
-                    level: lv.level,
-                    level_title: self.doc.levels[lv.level].title(),
-                    lines: None,
-                    opens: None,
-                });
+                let usage = self.usage(lv.level, &it.object_id);
                 objects.insert(0, usage);
                 // Preserve clicking a label to select its net; the usage also owns its label.
                 labels.push(usage);
@@ -719,13 +743,9 @@ impl<'a> Index<'a> {
             });
         }
         // a label stands for what it is attached to, and for nothing when that cannot be selected:
-        // a click on it is then not a click on whatever is under it. Its group is its own only when
-        // no other text has the same id.
+        // a click on it is then not a click on whatever is under it. with_page_ids gives each
+        // text its own groups, including labels of repeated unnamed usages.
         let boxes = rnl_render::text_boxes(lv, &render);
-        let mut same_id: HashMap<&str, usize> = HashMap::new();
-        for t in &lv.texts {
-            *same_id.entry(t.id.as_str()).or_default() += 1;
-        }
         for (t, bbox) in lv.texts.iter().zip(boxes) {
             let (true, Some([x0, y0, x1, y1])) = (t.attach.is_some(), bbox) else { continue };
             let objects = match &t.target {
@@ -736,16 +756,16 @@ impl<'a> Index<'a> {
                 Some(TextTarget::Net(n)) => vec![self.net(lv.level, n)],
                 None => Vec::new(),
             };
-            let alone = same_id[t.id.as_str()] == 1;
             hits.push(Hit {
                 kind: "label",
                 points: vec![px((x0.min(x1), y0.max(y1))), px((x0.max(x1), y0.min(y1)))],
                 objects,
-                id: alone.then(|| t.id.clone()),
+                id: Some(t.id.clone()),
                 name: None,
             });
         }
         Level {
+            usages: Vec::new(),
             ports: self.doc.levels[lv.level].ports.clone(),
             symbol: None,
             host: lv.level,
@@ -880,14 +900,32 @@ fn net_labels(it: &ItemView, sym: &SymbolView) -> Vec<TextView> {
 
 /// A level with its items and wires named for the page, "item-K" and "wire-K" by their index. The
 /// model names them for people ("a wire"); the page needs each SVG group and primitive to say
-/// which one it draws.
-pub(crate) fn with_page_ids(lv: &LevelView) -> LevelView {
-    let mut lv = lv.clone();
+/// which one it draws. Repeated text ids also get separate display ids; unique source ids stay
+/// unchanged, and the runtime's object ids and attachment targets are untouched.
+pub(crate) fn with_page_ids(source: &LevelView) -> LevelView {
+    let mut lv = source.clone();
     for (k, it) in lv.items.iter_mut().enumerate() {
         it.id = format!("item-{k}");
     }
     for (k, w) in lv.wires.iter_mut().enumerate() {
         w.id = format!("wire-{k}");
+    }
+    let mut counts = HashMap::<&str, usize>::new();
+    for t in &source.texts {
+        *counts.entry(&t.id).or_default() += 1;
+    }
+    if counts.len() == lv.texts.len() {
+        return lv;
+    }
+    let mut used: HashSet<String> = counts.keys().map(|id| (*id).to_owned()).collect();
+    for (k, t) in lv.texts.iter_mut().enumerate() {
+        if counts[t.id.as_str()] > 1 {
+            let mut id = format!("text-{k}");
+            while !used.insert(id.clone()) {
+                id.push('_');
+            }
+            t.id = id;
+        }
     }
     lv
 }
@@ -1143,20 +1181,24 @@ C1 b 0 1p
     }
 
     #[test]
-    fn labels_of_equal_ids_have_no_group_of_their_own() {
+    fn labels_with_repeated_runtime_ids_get_independent_display_groups() {
         // the supply symbols of the corpus: four unnamed usages, whose labels are all `%s::name`
         let d = load(&case("03-five-transistor-ota.sp")).unwrap();
         let level = &d.levels[0];
-        let on_vdd = |kind: &str| {
-            let hits = level.hits.iter();
-            hits.filter(|h| {
-                h.kind == kind && h.objects.iter().any(|o| d.objects[*o].kind == "net" && d.objects[*o].name == "vdd")
-            })
-            .collect::<Vec<&Hit>>()
-        };
+        let is_vdd = |h: &Hit| h.objects.iter().any(|o| d.objects[*o].kind == "net" && d.objects[*o].name == "vdd");
+        let on_vdd = |kind: &str| level.hits.iter().filter(|h| h.kind == kind && is_vdd(h)).collect::<Vec<&Hit>>();
         let vdd = on_vdd("label");
         assert!(vdd.len() >= 3, "{vdd:?}");
-        assert!(vdd.iter().all(|h| h.id.is_none()), "{vdd:?}");
+        let ids: HashSet<_> = vdd.iter().map(|h| h.id.as_deref().expect("label group")).collect();
+        assert_eq!(ids.len(), vdd.len());
+        let svg = level.svg.as_deref().unwrap();
+        for id in &ids {
+            assert!(svg.contains(&format!("data-id=\"{id}\"")), "{id}");
+        }
+        // A different net must not share any of the VDD labels' display groups.
+        for h in level.hits.iter().filter(|h| h.kind == "label" && !is_vdd(h)) {
+            assert!(!ids.contains(h.id.as_deref().expect("label group")));
+        }
         // Each still stands for the net, as well as its own independently selectable usage.
         assert_eq!(vdd.len(), on_vdd("box").len());
         // the supply symbols have no name of their own, the ports of the netlist have
@@ -1183,6 +1225,44 @@ C1 b 0 1p
             "the ports of the netlist have their names"
         );
         assert!(named.iter().all(|(_, nets)| nets.len() == 1), "{named:?}");
+    }
+
+    #[test]
+    fn unkeyed_wire_labels_get_separate_groups_for_each_net() {
+        let files = rnl_runtime::source::MemoryProvider::new()
+            .with("wire-labels.sp", include_str!("../../../tests/viewer/inputs/wire-labels.sp"));
+        let d = crate::build("wire-labels.sp", &files, &BuildOptions::default()).unwrap();
+        let level = &d.levels[0];
+        let labels: Vec<_> = level
+            .hits
+            .iter()
+            .filter(|h| h.kind == "label" && h.objects.len() == 1 && d.objects[h.objects[0]].kind == "net")
+            .collect();
+        assert_eq!(labels.len(), 2);
+        let ids: HashSet<_> = labels.iter().map(|h| h.id.as_deref().expect("net label group")).collect();
+        assert_eq!(ids.len(), 2);
+        for id in ids {
+            assert!(level.svg.as_deref().unwrap().contains(&format!("data-id=\"{id}\"")));
+        }
+    }
+
+    #[test]
+    fn display_text_ids_avoid_existing_ids_and_preserve_model_identity() {
+        let r = crate::interpret(&case("03-five-transistor-ota.sp"), None, &Disk, &Default::default()).unwrap();
+        let mut level = r.model.levels[0].clone();
+        level.texts[0].id = "text-1".into();
+        level.texts[1].id = "repeated".into();
+        level.texts[2].id = "repeated".into();
+        let page = with_page_ids(&level);
+        assert_eq!(page.texts[0].id, "text-1");
+        let ids: HashSet<_> = page.texts.iter().map(|t| &t.id).collect();
+        assert_eq!(ids.len(), page.texts.len());
+        for (original, displayed) in level.texts.iter().zip(&page.texts) {
+            assert_eq!(original.object_id, displayed.object_id);
+            assert_eq!(original.attach, displayed.attach);
+            assert_eq!(original.anchor, displayed.anchor);
+        }
+        assert_eq!(level.texts[1].id, "repeated");
     }
 
     #[test]
@@ -1343,7 +1423,8 @@ R1 rail out 1k
             let usage = hit.objects[0];
             assert_eq!(d.objects[usage].kind, "usage");
             assert_eq!(d.objects[usage].name, format!("%{name}"));
-            assert_eq!((d.objects[usage].level, d.objects[usage].opens, d.objects[usage].lines), (0, None, None));
+            assert_eq!((d.objects[usage].level, d.objects[usage].opens), (0, None));
+            assert!(d.objects[usage].lines.is_some());
             assert!(!usages.contains(&usage));
             usages.push(usage);
             let nets = if name == "j" { Vec::new() } else { vec![net] };

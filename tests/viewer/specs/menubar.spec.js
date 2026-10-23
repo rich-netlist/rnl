@@ -65,7 +65,7 @@ test.describe("on the web", () => {
         items: [
           "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
           "Reload Library", "Auto Include",
-          "", "SaveCtrl+S",
+          "", "Download FileCtrl+S", "Download Library",
         ],
       },
       { title: "Edit", letter: "E", items: ["Edit TextCtrl+Q", "Apply and Exit EditingCtrl+Enter", "Discard Changes", "Find in Netlist…Ctrl+F", "", "Open SubcircuitE", "Open Subcircuit in New Window…Shift+E", "Up to Parent LevelCtrl+E"] },
@@ -73,10 +73,10 @@ test.describe("on the web", () => {
         title: "View",
         letter: "V",
         items: [
-          "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-",
+          "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "Color Scheme...",
           "Background", "Light", "Dark",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Language", "English", "简体中文", "",
-          "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Not Drawn5", "", "Hide",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Language", "English", "简体中文", "",
+          "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "", "Hide",
         ],
       },
     ]);
@@ -283,7 +283,7 @@ test.describe("on the web", () => {
     await page.keyboard.press("F10");
     await expect(marked).toHaveText("File");
     await page.keyboard.press("ArrowUp");
-    await expect(viewer.menuItem("save")).toHaveClass(/\bactive\b/);
+    await expect(viewer.menuItem("download-library")).toHaveClass(/\bactive\b/);
     // Escape closes the menu and keeps the title, then leaves the bar
     await page.keyboard.press("Escape");
     await expect(list(page, "File")).toBeHidden();
@@ -357,7 +357,7 @@ test.describe("on the web", () => {
     const shown = page.locator("#menubar .menu-list:visible, #menubar .submenu:visible");
     await page.keyboard.press("Alt+V");
     await expect(viewer.menuItem("fit")).toHaveClass(/\bactive\b/);
-    for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowDown");
+    for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowDown");
     await expect(entry(page, "Grid")).toHaveClass(/\bactive\b/);
     await page.keyboard.press("ArrowRight");
     await expect(grid).toBeVisible();
@@ -425,7 +425,7 @@ test.describe("with a native menu", () => {
       ["background-light", true], ["background-dark", false],
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
-      ["toggle-hover-names", true],
+      ["toggle-hover-names", true], ["toggle-usages", true],
       ["language-en", true], ["language-zh", false],
       ["toggle-auto-include", true],
     ];
@@ -435,7 +435,7 @@ test.describe("with a native menu", () => {
     expect(await viewer.calls("setCheck")).toEqual(expect.arrayContaining([["toggle-netlist", false], ["toggle-problems", false]]));
     expect(await page.evaluate(() => window.fakeShell.checks)).toEqual({
       ...Object.fromEntries(marks), "toggle-netlist": false, "toggle-problems": false,
-      ...Object.fromEntries(["files", "netlist", "hierarchy", "symbol", "unplaced", "solve"].map(name => [`panel-${name}`, false])),
+      ...Object.fromEntries(["files", "netlist", "hierarchy", "symbol", "usages", "unplaced", "solve"].map(name => [`panel-${name}`, false])),
     });
     // Alt and F10 do nothing on the page
     await page.keyboard.press("Alt");

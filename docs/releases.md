@@ -22,6 +22,10 @@ artifact with a debug CLI byte for byte for `check`, `view` and `render` over bo
 series. The combined `rnl-core-X.Y.Z` artifact contains four archives, the npm tarball and
 `SHA256SUMS.txt`. Individual platform artifacts also have checksums.
 
+PRs and manual rehearsals build, pack and smoke-test the npm package even when that core
+version is already published. The registry publication dry-run runs only for a pushed
+`core-v*` tag; Viewer-only changes do not require a new core version or npm publication.
+
 Windows x64 uses MSVC with `+crt-static` and checks DLL imports for VC++/UCRT dependencies.
 Linux x86_64 uses static musl on Ubuntu 22.04 and checks ELF dependencies and interpreter.
 macOS Apple Silicon and Intel each build and execute on a matching native runner. Linux
@@ -39,7 +43,8 @@ tag, **never publishes**. Core release also runs as a PR check for relevant chan
 ## Publish the core, after the user's release decision
 
 1. Confirm the version and the npm dist-tag. The user chose (2026-10-22) core 0.2.0 as the
-   first core release, npm `latest`, and Viewer 0.1.5 as the next Viewer version.
+   first core release and npm `latest`. The user chose (2026-10-23) Viewer 0.2.0 as the next
+   independent Viewer release; preparing it does not publish a new core version.
 2. Update the chosen core version and locks, rename/write `release-notes/core/X.Y.Z.md`, and
    set repository variable `CORE_NPM_DIST_TAG` to the agreed `next` or `latest`. Publication
    fails if this variable is absent or has another value. Do not infer a dist-tag from SemVer.

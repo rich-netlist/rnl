@@ -7,6 +7,7 @@ import { showSource } from "../viewer.js";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
@@ -15,6 +16,48 @@ import { publicPackageDir, publicPackagesAvailable } from "../../../scripts/pack
 const hasPublicPackages = publicPackagesAvailable();
 test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
+});
+
+test('usage inspection and overlay selection work with the real WASM core', async ({ page }) => {
+  await start(page);
+  const doc = await opened(page, () => page.locator('#file-input').setInputFiles({
+    name: 'usage-inspector.sp', mimeType: 'text/plain',
+    buffer: fs.readFileSync(path.join(root, 'tests/viewer/inputs/usage-inspector.sp')),
+  }));
+  const pair = doc.levels[0].usages.find(u => u.id === '%pair1');
+  expect(pair.roles.every(r => r.bounds && r.objects.length)).toBe(true);
+  await page.keyboard.press('5');
+  await page.getByRole('button', { name: '%pair1', exact: true }).click();
+  await expect(page.locator(`#canvas .usage-frame[data-usage="${pair.object}"]`)).toHaveClass(/selected/);
+  await expect(page.locator('.usage-source')).toContainText('%pair1');
+  await page.keyboard.press('Control+r');
+  await expect(page.locator('#canvas .usage-frame')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#canvas .usage-frame')).toHaveCount(0);
+});
+
+test('unkeyed wire net labels have independent colours in the real web core', async ({ page }) => {
+  await start(page);
+  const doc = await opened(page, () => page.locator('#file-input').setInputFiles({
+    name: 'wire-labels.sp', mimeType: 'text/plain',
+    buffer: fs.readFileSync(path.join(root, 'tests/viewer/inputs/wire-labels.sp')),
+  }));
+  const labels = doc.levels[0].hits.filter(h => h.kind === 'label' && h.objects.length === 1
+    && doc.objects[h.objects[0]].kind === 'net');
+  expect(labels).toHaveLength(2);
+  expect(labels.every(h => h.id)).toBe(true);
+  expect(labels[0].id).not.toBe(labels[1].id);
+  const text = h => page.locator(`#canvas g[data-id=${JSON.stringify(h.id)}] text`).first();
+  for (const background of ['light', 'dark']) {
+    await page.evaluate(b => window.viewer.command(`background-${b}`), background);
+    for (const label of labels) {
+      await page.evaluate(async object => (await import('./selection.js')).select(object, 'drawing'), label.objects[0]);
+      await expect(text(label)).toHaveCSS('fill', 'rgb(232, 89, 12)');
+      for (const other of labels.filter(h => h !== label)) await expect(text(other)).not.toHaveCSS('fill', 'rgb(232, 89, 12)');
+      await page.keyboard.press('Escape');
+      await expect(text(label)).not.toHaveCSS('fill', 'rgb(232, 89, 12)');
+    }
+  }
 });
 
 test("the web core supplies semantic lines and the actual parent symbol", async ({ page }) => {
@@ -932,6 +975,150 @@ test("the text edited and applied is built by the core as rnl view builds the sa
 });
 
 
+test("Save before Apply retains a newly typed USE-PACKAGE through repeated edit and library rebuilds", async ({ page }) => {
+  await start(page);
+  const original = '* save before apply\n* @RNL(type="header") { @VERSION("0.3") }\nR1 a 0 1k\n.end\n';
+  const edited = original.replace('@VERSION("0.3")', '@VERSION("0.3"); @USE-PACKAGE(name="save-regression", version="0.1")');
+  await opened(page, () => page.locator('#file-input').setInputFiles({name:'save-first.sp',mimeType:'text/plain',buffer:Buffer.from(original)}));
+  await page.keyboard.press('Control+q');
+  const area = page.locator('#source .editor:not([hidden]) textarea');
+  await area.fill(edited);
+  const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
+  expect(fs.readFileSync(await download.path(),'utf8')).toBe(edited);
+  await expect(page.locator('#note')).toHaveText('Downloaded save-first.sp.');
+  expect(await page.evaluate(() => window.viewer.doc.files[0].text)).toBe(original);
+  const applied = await opened(page, () => page.keyboard.press('Control+q'));
+  expect(applied.files[0].text).toBe(edited);
+  expect(applied.diagnostics.some(d => d.message.includes('package save-regression 0.1 cannot be found'))).toBe(true);
+  expect(await page.evaluate(() => window.viewer.edits)).toEqual({unsaved:[],unapplied:[]});
+  await page.keyboard.press('Control+q');
+  await expect(area).toHaveValue(edited);
+  await page.keyboard.press('Control+q');
+  await expect(area).toHaveCount(0);
+  const rebuilt = await opened(page, () => page.evaluate(() => window.viewer.command('reload-library')));
+  expect(rebuilt.files[0].text).toBe(edited);
+});
+
+async function mockPackageCatalog(page, versions = ['0.1'], names = ['offer-test']) {
+  const packages = names.flatMap(name => versions.map(version => {
+    const text = `@RNL(type="header") { @VERSION("0.3"); @PACKAGE(name="${name}", version="${version}") }\n`;
+    const relative = `mock/${name}-${version}.rnl`;
+    return {name,version,path:relative,url:relative,kind:'extension',summary:{en:'Test package',zh:'测试包'},
+      sha256:createHash('sha256').update(text).digest('hex'),text};
+  }));
+  for (const pkg of packages) await page.route(`**/public-packages/${pkg.url}`, route => route.fulfill({body:pkg.text}));
+  const catalog = {schemaVersion:1,packages:packages.map(({text,...pkg})=>pkg)};
+  await page.route('**/public-packages/catalog.json',route=>route.fulfill({json:catalog}));
+  return catalog;
+}
+const packageTop = reference => `* package offers\n* @RNL(type="header") { @VERSION("0.3"); ${reference} }\nR1 a 0 1k\n.end\n`;
+const packageFile = (text, name='offer.sp') => ({name,mimeType:'text/plain',buffer:Buffer.from(text)});
+
+test('clipboard Save then Apply can subsequently return to the original text',async({page})=>{
+  await start(page);
+  const original='* clipboard source baseline\nR1 a 0 1k\n.end\n';
+  const edited=original.replace('1k','2k');
+  await page.evaluate(text=>{navigator.clipboard.readText=async()=>text;window.viewer.command('load-clipboard');},original);
+  await opened(page,()=>page.getByRole('dialog').getByRole('button',{name:'Load',exact:true}).click());
+  await page.keyboard.press('Control+q');
+  const area=page.locator('#source .editor:not([hidden]) textarea');
+  await area.fill(edited);
+  await Promise.all([page.waitForEvent('download'),page.keyboard.press('Control+s')]);
+  await expect(page.locator('#note')).toHaveText('Downloaded clipboard.sp.');
+  const first=await opened(page,()=>page.keyboard.press('Control+q'));
+  expect(first.files[0].text).toBe(edited);
+  await page.keyboard.press('Control+q');
+  await area.fill(original);
+  const restored=await opened(page,()=>page.keyboard.press('Control+q'));
+  expect(restored.files[0].text).toBe(original);
+  expect(await page.evaluate(()=>window.viewer.edits.unapplied)).toEqual([]);
+});
+
+test('automatic package offers wait for an existing manual Library download',async({page})=>{
+  const catalog=await mockPackageCatalog(page,['0.1'],['offer-test','offer-other']);
+  let catalogRequest, downloadRequest;
+  await page.route('**/public-packages/catalog.json',route=>{catalogRequest=route;});
+  await page.route('**/public-packages/mock/offer-other-0.1.rnl',route=>{downloadRequest=route;});
+  await start(page);
+  await opened(page,()=>page.locator('#file-input').setInputFiles(packageFile(packageTop('@USE-PACKAGE(name="offer-test", version="0.1")'))));
+  await page.evaluate(()=>window.viewer.command('include-library'));
+  await catalogRequest.fulfill({json:catalog});
+  const chooser=page.getByRole('dialog',{name:'Include Public Package'});
+  await chooser.locator('input[type=search]').fill('offer-other');
+  await chooser.locator('input[type=search]').press('Enter');
+  await expect.poll(()=>!!downloadRequest).toBe(true);
+  // Allow a full automatic-offer polling interval while the manual download stays blocked.
+  await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,350)));
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await downloadRequest.fallback();
+  const prompt=page.getByRole('dialog',{name:'Public Packages Found'});
+  await expect(prompt).toBeVisible();
+  const built=await opened(page,()=>prompt.getByRole('button',{name:'Add to Library',exact:true}).click());
+  expect(built.diagnostics.filter(d=>d.severity==='error')).toEqual([]);
+});
+
+for (const auto of [false,true]) test(`public package offers are independent of Auto Include (${auto}) and batch duplicate references`, async ({page}) => {
+  await page.addInitScript(auto => localStorage.setItem('auto-include',JSON.stringify(auto)),auto);
+  await mockPackageCatalog(page,['0.1'],['offer-test','offer-other']);
+  await start(page);
+  const text = packageTop('@USE-PACKAGE(name="offer-test", version="0.1"); @USE-PACKAGE(name="offer-test", version="0.1"); @USE-PACKAGE(name="offer-other", version="0.1")');
+  await opened(page,()=>page.locator('#file-input').setInputFiles(packageFile(text)));
+  const prompt=page.getByRole('dialog',{name:'Public Packages Found'});
+  await expect(prompt).toBeVisible();
+  await expect(prompt.locator('li')).toHaveText(['offer-test 0.1','offer-other 0.1']);
+  const built=await opened(page,()=>prompt.getByRole('button',{name:'Add to Library',exact:true}).click());
+  expect(built.diagnostics.filter(d=>d.severity==='error')).toEqual([]);
+  await page.locator('#tab-files').click();
+  for (const name of ['offer-test','offer-other']) await expect(page.getByRole('button',{name:`Exclude ${name} 0.1`,exact:true})).toBeVisible();
+});
+
+test('public package offers choose the newest unpinned version and remember Cancel across Library rebuilds',async({page})=>{
+  await mockPackageCatalog(page,['0.1','0.2']);
+  await start(page);
+  await opened(page,()=>page.locator('#file-input').setInputFiles(packageFile(packageTop('@USE-PACKAGE(name="offer-test")'))));
+  const prompt=page.getByRole('dialog',{name:'Public Packages Found'});
+  await expect(prompt.locator('li')).toHaveText(['offer-test 0.2']);
+  await prompt.getByRole('button',{name:'Cancel',exact:true}).click();
+  await opened(page,()=>page.evaluate(()=>window.viewer.command('reload-library')));
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.package-hint button')).toHaveText('Include');
+});
+
+test('unresolved symbols do not offer packages and delayed catalog results cannot affect a different file',async({page})=>{
+  const catalog=await mockPackageCatalog(page);
+  let pending;
+  await page.route('**/public-packages/catalog.json',route=>{pending=route;});
+  await start(page);
+  await opened(page,()=>page.locator('#file-input').setInputFiles(packageFile(packageTop('@USE-PACKAGE(name="offer-test", version="0.1")'))));
+  const plain='* no package reference\nR1 a 0 1k\n* @RNL { #R1 @SET-SYMBOL $MISSING_SYMBOL }\n.end\n';
+  await opened(page,()=>page.locator('#file-input').setInputFiles(packageFile(plain,'other.sp')));
+  await pending.fulfill({json:catalog});
+  await page.evaluate(async()=>{await (await import('./shells/web.js')).default.publicPackages();});
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.package-hint')).toHaveCount(0);
+  await page.locator('#tab-files').click();
+  await expect(page.getByRole('button',{name:'Exclude offer-test 0.1',exact:true})).toHaveCount(0);
+});
+
+test('a stalled public catalog times out after ten seconds while viewing and editing continue',async({page})=>{
+  const catalog=await mockPackageCatalog(page);
+  let pending;
+  await page.route('**/public-packages/catalog.json',route=>{pending=route;});
+  await start(page);
+  const text=packageTop('@USE-PACKAGE(name="offer-test", version="0.1")');
+  await opened(page,()=>page.locator('#file-input').setInputFiles(packageFile(text)));
+  await expect(page.locator('body')).not.toHaveClass(/busy/);
+  await page.keyboard.press('Control+q');
+  const area=page.locator('#source .editor:not([hidden]) textarea');
+  await area.fill(text+'* typed while offline\n');
+  await opened(page,()=>page.keyboard.press('Control+q'));
+  expect(await page.evaluate(()=>window.viewer.doc.files[0].text)).toContain('* typed while offline');
+  await expect(page.locator('#public-package-status')).toContainText('timed out after 10 seconds',{timeout:15000});
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await pending.fulfill({json:catalog}).catch(()=>{});
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
 test("Include File resolves a package with a different filename and Exclude removes it from search", async ({ page }) => {
   await start(page);
   await page.locator("#file-input").setInputFiles({ name: "top.sp", mimeType: "text/plain", buffer: Buffer.from(
@@ -978,6 +1165,9 @@ test("a missing published Canvas package offers Include and rebuilds; other vers
   const before = await opened(page, () => page.locator("#file-input").setInputFiles({ name: "canvas.sp", mimeType: "text/plain", buffer: source }));
   expect(before.diagnostics.some(d => d.message.includes("package analog-canvas-extensions 0.1 cannot be found"))).toBe(true);
   await expect(page.locator(".package-hint")).toContainText("This package is published.");
+  const prompt = page.getByRole('dialog', { name: 'Public Packages Found' });
+  await expect(prompt).toBeVisible();
+  await prompt.getByRole('button', { name: 'Cancel', exact: true }).click();
   if (process.env.RNL_PACKAGE_SCREENSHOTS && info.project.name === "chromium") {
     await page.screenshot({ path: path.join(process.env.RNL_PACKAGE_SCREENSHOTS, "web-missing-canvas-include.png") });
   }

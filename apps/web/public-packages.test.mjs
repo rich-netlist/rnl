@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { readCatalog, readPublicPackage, latestPackages, sha256, validateCatalog } from '../viewer-ui/public-packages.js';
+import { readCatalog, readPublicPackage, latestPackages, matchingPackage, missingPackage, sha256, validateCatalog } from '../viewer-ui/public-packages.js';
 const bytes = new TextEncoder().encode('a public package\r\n');
 const pkg = { name: 'example', version: '0.1', kind: 'extension', summary: { zh: '简介', en: 'Summary' },
   path: 'example/example.rnl', url: 'packages/example.rnl', sha256: await sha256(bytes) };
@@ -24,4 +24,19 @@ test('latest selection compares the two numeric version parts and keeps names se
 test('the npm manifest no longer exports optional public package data', () => {
   const manifest = JSON.parse(readFileSync(new URL('../../bindings/runtime-wasm/js/package.json', import.meta.url)));
   assert.equal(manifest.exports['./packages/analog-canvas-extensions.rnl'], undefined);
+});
+
+test('missing named dependencies follow core version rules without guessing from symbol errors', () => {
+  const packages = ['0.1','0.2','1.3','1.5','2.0'].map(version => ({...pkg,version}));
+  assert.equal(matchingPackage(packages, 'example', '0.1').version, '0.1');
+  assert.equal(matchingPackage(packages, 'example', '0.3'), undefined);
+  assert.equal(matchingPackage(packages, 'example', '1.2').version, '1.3');
+  assert.equal(matchingPackage(packages, 'example', '1.9'), undefined);
+  assert.equal(matchingPackage(packages, 'example').version, '2.0');
+  assert.equal(matchingPackage(packages, 'other'), undefined);
+  const diagnostic = message => ({severity:'error',message});
+  assert.deepEqual(missingPackage(diagnostic('package example 0.1 cannot be found: this USE-PACKAGE fails (16.2)')), {name:'example',version:'0.1'});
+  assert.deepEqual(missingPackage(diagnostic('package example cannot be found: this USE-PACKAGE fails (16.2)')), {name:'example',version:undefined});
+  for (const message of ['$MISSING cannot be found (6.6)', 'package example 0.1 cannot be found: this reference fails (16.2)',
+    'the included file example.rnl cannot be found']) assert.equal(missingPackage(diagnostic(message)), null);
 });

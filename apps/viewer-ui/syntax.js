@@ -3,7 +3,7 @@
 
 const KEYWORD_CHAR = /[\p{L}\p{N}_-]/u;
 const NAME_CHAR = /[\p{L}\p{N}_.\-/]/u;
-const REF_CLASS = { "#": "host", "&": "host", "$": "def", "%": "local", "?": "local" };
+const REF_CLASS = { "#": "host", "&": "net", "$": "def", "%": "local", "?": "param" };
 const SPECTRE_WORDS = new Set([
   "simulator", "subckt", "ends", "inline", "model", "include", "ahdl_include", "parameters", "global",
   "section", "endsection", "library", "endlibrary", "statistics", "real",
@@ -39,8 +39,14 @@ export function hostLine(text, cls, cont, records) {
     return false;
   }
   let end = text.length;
+  let quoted = null;
   for (let k = 0; k < text.length; k++) {
     const c = text[k];
+    if (quoted) {
+      if (c === quoted) { if (text[k + 1] === quoted) k++; else quoted = null; }
+      continue;
+    }
+    if (c === '"' || c === "'") { quoted = c; continue; }
     if (c === ";" || (c === "$" && (k === 0 || /\s/.test(text[k - 1]))) || (c === "/" && text[k + 1] === "/")) {
       end = k;
       break;
@@ -70,12 +76,26 @@ export function hostLine(text, cls, cont, records) {
       mark(cls, start, start + eq, "param");
     }
   }
+  // Host quoted expressions and filenames use the same string colour as RNL strings.
+  for (let at = lead; at < end; at++) if (text[at] === '"' || text[at] === "'") {
+    const quote = text[at];
+    let to = at + 1;
+    while (to < end) {
+      if (text[to++] === quote) { if (text[to] === quote) to++; else break; }
+    }
+    mark(cls, at, to, "string");
+    at = to - 1;
+  }
   return text.slice(0, end).trimEnd().endsWith("\\");
 }
 
-/** Highlight the record characters [from, to) of a line; `state` carries an open comment. */
+/** Highlight a record range, retaining comments and delimiter context across physical lines. */
 export function rnlRange(text, from, to, first, cls, state) {
   let i = from;
+  // Newlines/carrier markers break the adjacency required for role parentheses. An already
+  // open role, point or subscript can still continue onto the next physical line.
+  let after = "";
+  state.stack ||= "";
   mark(cls, from, to, "");
   if (!first) {
     // the carrier's comment marker on a later line of the record
@@ -98,6 +118,8 @@ export function rnlRange(text, from, to, first, cls, state) {
       continue;
     }
     const c = text[i];
+    const previous = after;
+    after = "";
     if (text.startsWith("/*", i)) {
       state.comment = true;
       mark(cls, i, i + 2, "comment");
@@ -124,6 +146,7 @@ export function rnlRange(text, from, to, first, cls, state) {
     if (c === "@") {
       const j = run(text, i + 1, to, KEYWORD_CHAR);
       mark(cls, i, j, "keyword");
+      after = "keyword";
       i = j;
       continue;
     }
@@ -131,14 +154,58 @@ export function rnlRange(text, from, to, first, cls, state) {
       let j = i + 1;
       if (text[j] === '"') {
         j++;
-        while (j < to && text[j] !== '"') j++;
-        j++;
+        while (j < to) {
+          if (text[j++] === '"') { if (text[j] === '"') j++; else break; }
+        }
       } else {
         j = run(text, j, to, NAME_CHAR);
       }
       mark(cls, i, j, REF_CLASS[c]);
+      // A terminal name belongs to the reference, not to the surrounding free prose.
+      if (text[j] === ":") {
+        mark(cls, j, j + 1, "punct");
+        const terminal = ++j;
+        if (text[j] === '"') {
+          j++;
+          while (j < to) {
+            if (text[j++] === '"') { if (text[j] === '"') j++; else break; }
+          }
+        } else j = run(text, j, to, NAME_CHAR);
+        mark(cls, terminal, j, "net");
+      }
+      after = "object";
       i = j;
       continue;
+    }
+    // Closing a reference's subscript resumes that reference; :terminal / ::sub-object
+    // can follow it, and role parentheses must touch the final object character.
+    if (c === ":" && previous === "object") {
+      const start = i + (text[i + 1] === ":" ? 2 : 1);
+      let j = start;
+      if (text[j] === '"') {
+        j++;
+        while (j < to) {
+          if (text[j++] === '"') { if (text[j] === '"') j++; else break; }
+        }
+      } else j = run(text, j, to, NAME_CHAR);
+      if (j > start) {
+        mark(cls, i, start, "punct");
+        mark(cls, start, j, "net");
+        after = "object";
+        i = j;
+        continue;
+      }
+    }
+    if (c === "(") state.stack += previous === "object" ? "r" : previous === "keyword" ? "k" : "p";
+    else if (c === "{") state.stack += "b";
+    else if (c === "[" || c === "<") state.stack += previous === "object" ? "s" : "a";
+    else if (")}]>".includes(c) && state.stack) {
+      const kind = state.stack.at(-1);
+      if ((c === ")" && "rkp".includes(kind)) || (c === "}" && kind === "b") ||
+          ((c === "]" || c === ">") && "sa".includes(kind))) {
+        state.stack = state.stack.slice(0, -1);
+        if ("pbs".includes(kind)) after = "object";
+      }
     }
     if (/[0-9]/.test(c) || ((c === "-" || c === ".") && /[0-9]/.test(text[i + 1] || ""))) {
       let j = i + 1;
@@ -156,7 +223,7 @@ export function rnlRange(text, from, to, first, cls, state) {
     if (j > i) {
       let k = j;
       while (k < to && text[k] === " ") k++;
-      if (text[k] === "=" && text[k + 1] !== ">") mark(cls, i, j, "param");
+      mark(cls, i, j, state.stack.endsWith("r") || (text[k] === "=" && text[k + 1] !== ">") ? "param" : "free");
       i = j;
       continue;
     }

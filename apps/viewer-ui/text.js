@@ -65,7 +65,9 @@ export function paintSourceSelection(reveal) {
   repaintLines();
   if (!reveal || selected === null || !doc) return;
   const spans = doc.spans.filter((s) => s.object === selected);
-  const target = spans.find((s) => s.kind === "name") || spans.find((s) => s.file === fileShown) || spans[0];
+  const lines = doc.objects[selected].lines;
+  const target = spans.find((s) => s.kind === "name") || spans.find((s) => s.file === fileShown) || spans[0]
+    || (lines ? { file: lines[0], line: lines[1] } : null);
   if (target) revealLine(target.file, target.line, false);
 }
 

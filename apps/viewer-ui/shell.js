@@ -11,7 +11,7 @@
  * @property {(language: "en" | "zh-CN") => Promise<void>} [setLanguage] Update native UI labels, preserving command IDs and state.
  * @property {() => Promise<Record<string, string>>} [bundledFiles] Built-in package texts by path.
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.
- * @property {(pkg: {name: string, version: string}) => Promise<object[]>} [includePackage] Include an exact published package.
+ * @property {(pkg: {name: string, version: string}, signal?: AbortSignal) => Promise<object[]>} [includePackage] Include an exact published package.
  * @property {(kind: string) => Promise<object[]>} [include] Include files, a folder or a library package.
  * @property {(items: object[], reload?: boolean, refresh?: string[]) => Promise<string[]> | void} [setPool] Replace and index the search pool; reload rereads all files, refresh replaces named entries. Returns read errors.
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
@@ -92,6 +92,8 @@
  *   took it away, is not written, nor are the others: `{ changed }`, the names of those files, for
  *   the user to say. On the web, which cannot write files, download them. Rejects with a message when
  *   it cannot. A shell that offers neither does not save.
+ * @property {(files: {path: string, read: () => Promise<Blob | string> | Blob | string}[], preparing: () => void) => Promise<boolean>} [downloadLibrary]
+ *   Web only: choose a destination, then export the captured library as one ZIP; false on cancel.
  * @property {(source: Source, file: SavedFile) => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.

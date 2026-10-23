@@ -1,10 +1,10 @@
 // The text the user edits (decision 0011): per file of the document, what the file was when it was
-// read, what the editor holds now, and what the Document shown was built from. The editor
+// read, the last saved snapshot, what the editor holds now, and what the Document was built from. The editor
 // (editor.js) changes the text; a change is not applied to the Document until the user says so, and
 // not saved to the file until the user says that. Text is kept with its line ends as `\n`, as a text
 // box gives it, and written with the line ends the file had.
 
-/** @type {Map<string, { name: string, original: string, text: string, applied: string, eol: string }>} */
+/** @type {Map<string, { name: string, original: string, base: string, text: string, applied: string, eol: string }>} */
 const buffers = new Map(); // by the file's path in the Document
 
 /** A text with its line ends as `\n`. */
@@ -20,7 +20,7 @@ function eolOf(text) {
 /** A buffer for a file of a Document, whose text is as it was read. */
 function add(file) {
   const text = lf(file.text);
-  buffers.set(file.path, { name: file.name, original: text, text, applied: text, eol: eolOf(file.text) });
+  buffers.set(file.path, { name: file.name, original: text, base: text, text, applied: text, eol: eolOf(file.text) });
 }
 
 /** The text of a buffer as a file has it: with the line ends the file had. */
@@ -42,6 +42,12 @@ export function adoptBuffers(doc) {
     if (b) b.applied = lf(file.text);
     else add(file);
   }
+}
+
+/** A temporary source now reads applied in-memory text, without changing its saved snapshot. */
+export function rebaseSource(path, text) {
+  const b = buffers.get(path);
+  if (b) b.base = lf(text);
 }
 
 /** Whether there is a buffer for the file. */
@@ -87,14 +93,14 @@ export function unappliedPaths() {
 }
 
 /**
- * The texts that differ from what was read, by path, for a shell to build or solve over the files:
+ * The texts that differ from the underlying source, by path, for a shell to build or solve over it:
  * those the editor holds now (`applied` false), or those applied to the Document shown.
  */
 export function changes(applied) {
   const out = {};
   for (const [path, b] of buffers) {
     const text = applied ? b.applied : b.text;
-    if (text !== b.original) out[path] = written(b, text);
+    if (text !== b.base) out[path] = written(b, text);
   }
   return out;
 }
@@ -105,11 +111,17 @@ export function isDirty(path) {
   return b !== undefined && b.text !== b.original;
 }
 
-/** What was written to disk, or downloaded, is what was read from now on. */
-export function markSaved(paths) {
-  for (const path of paths) {
-    const b = buffers.get(path);
-    if (b) b.original = b.text;
+/**
+ * Record the snapshot actually saved, not later typing during an asynchronous save. A browser
+ * download clears the unsaved mark but does not replace the File/URL the next build will read.
+ */
+export function markSaved(files, writtenToSource) {
+  for (const file of files) {
+    const b = buffers.get(file.path);
+    if (b) {
+      b.original = lf(file.text);
+      if (writtenToSource) b.base = b.original;
+    }
   }
 }
 

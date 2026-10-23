@@ -78,6 +78,10 @@ export type InspectedLabel = { key: string | null, text: string, at: [number, nu
  */
 export type Level = {
   /**
+   * All usages in this drawing scope, including semantic usages without a symbol.
+   */
+  usages: Array<Usage>,
+  /**
    * Terminal names in subcircuit declaration order.
    */
   ports: Array<string>,
@@ -146,6 +150,41 @@ export type Level = {
   unplaced: Array<Unplaced>,
 };
 
+export type Usage = {
+  object: number,
+  id: string,
+  definition: string,
+  /**
+   * Whether the usage itself is a virtual part with its own symbol.
+   */
+  has_symbol: boolean,
+  /**
+   * Also includes virtual symbols/wires/annotations created inside the usage.
+   */
+  has_drawing: boolean,
+  file: string | null,
+  first_line: number,
+  source: string,
+  roles: Array<UsageRole>,
+};
+
+export type UsageRole = {
+  name: string,
+  /**
+   * References as written by the runtime, including unavailable members.
+   */
+  members: Array<string>,
+  objects: Array<number>,
+  /**
+   * SVG groups to keep at full opacity while focusing this role.
+   */
+  groups: Array<string>,
+  /**
+   * Visible extent in SVG pixels, y down; absent when no member can be displayed.
+   */
+  bounds: [number, number, number, number] | null,
+};
+
 /**
  * Something on a drawing that stands for objects.
  */
@@ -168,8 +207,8 @@ export type Hit = {
    */
   objects: Array<number>,
   /**
-   * The `data-id` of the SVG groups that draw it, and the owner of its primitives. A label
-   * has one only when no other text of the level has the same.
+   * The `data-id` of the SVG groups that draw it, and the owner of its primitives.
+   * Repeated text ids are disambiguated for the page, so each label has its own groups.
    */
   id: string | null,
   /**

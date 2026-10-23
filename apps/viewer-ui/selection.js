@@ -7,6 +7,7 @@ import { goTo, opens } from "./subcircuits.js";
 import { paintSourceSelection } from "./text.js";
 import { $ } from "./util.js";
 import { setEnabled } from "./commands.js";
+import { usageSelection } from "./usages.js";
 
 const canvas = $("canvas");
 const source = $("source");
@@ -23,13 +24,14 @@ export function select(o, from, options) {
   // starting there
   if (from === "source" && (!doc.levels[current] || doc.levels[current].host !== obj.level)) {
     const k = doc.levels.findIndex((l) => l.host === obj.level);
-    if (k >= 0) return goTo(k, o, options);
+    if (k >= 0) return goTo(k, o, { ...options, usage: obj.kind === "usage" });
   }
   if (options?.newWindow) return;
-  setSelected(o);
+  setSelected(o, options?.usage ?? usageSelection(o, from));
   markSubcircuit(opens(o) !== null);
   paintDrawingSelection();
-  paintSourceSelection(from === "drawing" || from === "ascend");
+  paintSourceSelection(from === "drawing" || from === "ascend" || from === "usage");
+  window.dispatchEvent(new Event("viewer-selection"));
   const sel = $("selection");
   sel.replaceChildren();
   const b = document.createElement("b");
@@ -48,6 +50,7 @@ export function clearSelection() {
   paintDrawingSelection();
   paintSourceSelection(false);
   setText($("selection"), "");
+  window.dispatchEvent(new Event("viewer-selection"));
 }
 
 /** A selected subcircuit instance is marked in its own colour, in the drawing and the text. */
