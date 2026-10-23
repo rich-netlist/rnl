@@ -299,6 +299,8 @@
     if (!(ratio > 0)) return;
     svg.style.width = (naturalWidth * ratio) + 'px';
     svg.style.height = (naturalHeight * ratio) + 'px';
+    /* The mark's size follows the svg's scale: update it now, not on the observer's next turn */
+    fitOrigin(svg);
     var badge = $('.gl-fit', figure.parentElement);
     badge.hidden = ratio >= 1;
     badge.textContent = fill('<zh>缩小显示 ×{r}</zh><en>Shown at ×{r}</en>', { r: ratio.toFixed(2) });

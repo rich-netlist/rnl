@@ -43,10 +43,13 @@ for (const width of [1440, 390]) {
         return errors;
       });
       expect(outside, group.id).toEqual([]);
-      const markerSizes = await page.locator(".gl-fig .g-origin-mark, .gl-thumb .g-origin-mark").evaluateAll(marks => marks.map(mark => {
+      // The page resizes marks from a ResizeObserver, after the card fit; wait until they settle.
+      const readMarkers = () => page.locator(".gl-fig .g-origin-mark, .gl-thumb .g-origin-mark").evaluateAll(marks => marks.map(mark => {
         const m = mark.getScreenCTM();
         return { symbol: mark.closest("[data-sym]").dataset.sym, size: 10 * Math.hypot(m.a,m.b) };
       }));
+      await expect.poll(async () => (await readMarkers()).every(marker => Math.abs(marker.size - 10) < 0.005), { message: group.id }).toBe(true);
+      const markerSizes = await readMarkers();
       expect(markerSizes.length).toBeGreaterThanOrEqual(group.counts.symbols);
       for (const marker of markerSizes) expect(marker.size, `${group.id}: ${marker.symbol}`).toBeCloseTo(10, 2);
       const ratios = await page.locator(".gl-card").evaluateAll(cards => cards.map(card => {
