@@ -5,6 +5,8 @@ import { readFileSync, writeFileSync, mkdtempSync, realpathSync, rmSync } from '
 import { preparePublicPackageFixture, root } from '../scripts/packages.mjs';
 
 export default function setup() {
+  const specs = process.argv.filter(arg => /\.spec\.mjs$/.test(arg));
+  if (specs.length && specs.every(spec => /macos-downloads\.spec\.mjs$/.test(spec))) return;
   const fixture = preparePublicPackageFixture();
   execFileSync(process.execPath, ['site/gallery/build.mjs'], {
     cwd: root, stdio: 'inherit',

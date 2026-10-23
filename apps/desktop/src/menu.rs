@@ -242,6 +242,22 @@ fn submenu(
     labels: &mut LabelList,
 ) -> tauri::Result<Submenu<Wry>> {
     let mut menu = SubmenuBuilder::new(app, label);
+    #[cfg(target_os = "macos")]
+    if label == "&Edit" {
+        // WKWebView's responder actions need native Edit items for standard Cmd+C/V/X/A.
+        use tauri::menu::PredefinedMenuItem;
+        for item in [
+            PredefinedMenuItem::undo(app, None)?,
+            PredefinedMenuItem::redo(app, None)?,
+            PredefinedMenuItem::cut(app, None)?,
+            PredefinedMenuItem::copy(app, None)?,
+            PredefinedMenuItem::paste(app, None)?,
+            PredefinedMenuItem::select_all(app, None)?,
+        ] {
+            menu = menu.item(&item);
+        }
+        menu = menu.separator();
+    }
     for entry in entries {
         menu = match entry {
             Shown::Separator => menu.separator(),

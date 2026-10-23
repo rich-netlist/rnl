@@ -71,9 +71,9 @@ try {
   execFileSync('open',['-a',app,sample]);
   await observe('finder-return',drawn);
   osa('tell application "System Events" to tell appearance preferences to set dark mode to true');
-  await observe('dark',drawn);
+  await observe('dark',r=>drawn(r) && r.footerBrightness<0.3);
   osa('tell application "System Events" to tell appearance preferences to set dark mode to false');
-  await observe('light',drawn);
+  await observe('light',r=>drawn(r) && r.footerBrightness>0.7);
   const settings=path.join(os.homedir(),'Library/Application Support/io.github.rich-netlist.viewer/settings.json');
   assert.ok(fs.existsSync(settings),'Settings must use the macOS application support directory.');
   fs.copyFileSync(settings,path.join(output,'settings.json'));

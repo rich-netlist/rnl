@@ -70,7 +70,7 @@ sudo apt remove rnl-viewer
 sha256sum --check --ignore-missing SHA256SUMS.txt
 ```
 
-Both Linux formats accept a netlist path after the executable, or **File › Open File** after launch. The AppImage needs no installation; remove that file to uninstall it. macOS packages remain future work; build from source there.
+Both Linux formats accept a netlist path after the executable, or **File › Open File** after launch. The AppImage needs no installation; remove that file to uninstall it. macOS installation is described below under macOS downloads and installation.
 
 From the repository root:
 
@@ -144,7 +144,7 @@ msiexec /x RNL-Viewer-0.1.3-windows-x64.msi /qn
 
 See [the three release lines](../../docs/releases.md) for version ownership and manual `candidate_tag` mismatch rehearsals. First-release versions remain subject to the user's decision.
 
-[`viewer-release.yml`](../../.github/workflows/viewer-release.yml) builds and releases the viewer for Windows x64 and Linux x86_64 on GitHub's runners. To release version X.Y.Z:
+[`viewer-release.yml`](../../.github/workflows/viewer-release.yml) builds and releases the viewer for Windows x64, Linux x86_64, macOS Apple Silicon and Intel on GitHub's runners. To release version X.Y.Z:
 
 1. Set the Viewer version only in `Cargo.toml` and `tauri.conf.json` here, and update the app's own lockfile entry. Leave the root workspace/core version unchanged. The web viewer reads the Viewer version too; both About dialogs also name the core version and build commit. The tests require the two Viewer declarations to match, independently of the core.
 2. Write the release's notes in `release-notes/X.Y.Z.md`.

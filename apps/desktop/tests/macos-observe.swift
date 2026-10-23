@@ -46,6 +46,7 @@ for y in Int(Double(height)*0.12)..<Int(Double(height)*0.88) {
 }
 let result: [String:Any] = ["pid":app.processIdentifier,"window":id,
     "title":window[kCGWindowName as String] as? String ?? "", "width":width,"height":height,
-    "circuitInk":ink,"circuitDensity":Double(ink)/Double(total),"words":words]
+    "circuitInk":ink,"circuitDensity":Double(ink)/Double(total),"words":words,
+    "footerBrightness":NSBitmapImageRep(cgImage:image).colorAt(x:10,y:height-10)!.usingColorSpace(.deviceRGB)!.redComponent]
 let json=try JSONSerialization.data(withJSONObject:result,options:[.sortedKeys])
 print(String(data:json,encoding:.utf8)!)
