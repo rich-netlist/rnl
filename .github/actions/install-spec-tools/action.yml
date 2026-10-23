@@ -1,11 +1,38 @@
 # Installs what scripts/spec/build.py needs besides Python: pinned pandoc and Typst, and the CJK fonts
 # for the Chinese PDF (decision 0007). Used by pages.yml and spec-release.yml.
+# The fonts are the six files the PDF uses (Noto Sans, Serif and Sans Mono CJK SC, regular and bold)
+# from the pinned noto-cjk tags on GitHub, checked by SHA-256 and kept by actions/cache. They used to
+# come from the Ubuntu package fonts-noto-cjk, whose mirror stalled for over 15 minutes on 2026-10-23.
 name: Install the tools of the standard's build
 description: pandoc, Typst and Noto CJK fonts, at pinned versions
 
 runs:
   using: composite
   steps:
+    - id: fonts
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.local/share/fonts/noto-cjk
+        key: noto-cjk-${{ hashFiles('.github/actions/install-spec-tools/action.yml') }}
+    - if: steps.fonts.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        curl_net=(--connect-timeout 30 --speed-limit 1024 --speed-time 30 --max-time 600 --retry 5 --retry-delay 5 --retry-all-errors)
+        dir="$HOME/.local/share/fonts/noto-cjk"
+        mkdir -p "$dir"
+        base=https://github.com/notofonts/noto-cjk/raw
+        # path under the repository at its tag, then the SHA-256 of the file
+        while read -r path sha; do
+          curl -fsSL "${curl_net[@]}" -o "$dir/$(basename "$path")" "$base/$path"
+          echo "$sha  $dir/$(basename "$path")" | sha256sum --check --strict
+        done <<'EOF'
+        Sans2.004/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf 2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b
+        Sans2.004/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Bold.otf b5f0d1a190a7f9b43c310a8850630af12553df32c4c050543f9059732d9b4c0a
+        Sans2.004/Sans/Mono/NotoSansMonoCJKsc-Regular.otf ec04cc376b34887cedbdf84074e2e226ed2761eeabdcb9173fc1dd7bfd153ef7
+        Sans2.004/Sans/Mono/NotoSansMonoCJKsc-Bold.otf a452fedfc0619e43e080b7b861ce34cbd3ec4fbcea495bf8c402a5a02a5dcbdc
+        Serif2.003/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Regular.otf 2a2eae2628df83556c54018c41e20fa532c1b862c5256ae8b3f23feb918d12ca
+        Serif2.003/Serif/OTF/SimplifiedChinese/NotoSerifCJKsc-Bold.otf 8af07d4b6c2e82bcc72a30e066eaf295f11b9424f4aad2eaa9fe0e9c3b38fc73
+        EOF
     - shell: bash
       # the SHA-256 of each download, as its GitHub release gives it, which the file must have
       env:
@@ -22,7 +49,7 @@ runs:
         curl -fsSL "${curl_net[@]}" -o "$RUNNER_TEMP/pandoc.deb" \
           "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb"
         echo "$PANDOC_SHA256  $RUNNER_TEMP/pandoc.deb" | sha256sum --check --strict
-        sudo apt-get "${apt_net[@]}" install -y -q "$RUNNER_TEMP/pandoc.deb" fonts-noto-cjk
+        sudo apt-get "${apt_net[@]}" install -y -q "$RUNNER_TEMP/pandoc.deb"
         curl -fsSL "${curl_net[@]}" -o "$RUNNER_TEMP/typst.tar.xz" \
           "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz"
         echo "$TYPST_SHA256  $RUNNER_TEMP/typst.tar.xz" | sha256sum --check --strict
@@ -30,3 +57,6 @@ runs:
         sudo install "$RUNNER_TEMP/typst-x86_64-unknown-linux-musl/typst" /usr/local/bin/typst
         pandoc --version | head -n 1
         typst --version
+        for family in "Noto Serif CJK SC" "Noto Sans CJK SC" "Noto Sans Mono CJK SC"; do
+          typst fonts | grep -qx "$family" || { echo "::error::Typst does not find $family"; exit 1; }
+        done
