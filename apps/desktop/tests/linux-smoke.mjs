@@ -11,6 +11,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { screenshotEvidence, assertPainted } from "./visual.mjs";
 
 assert.equal(process.platform, "linux", "The Linux smoke test must run on Linux.");
 const exeIndex = process.argv.indexOf("--exe");
@@ -101,6 +102,17 @@ try {
   assert.equal(last.level, sample);
   assert.ok(last.levels.includes("amp"), "The sample's subcircuit was not loaded.");
   assert.deepEqual(last.errors, [], "The sample opened with errors.");
+  // A valid DOM can still be invisible. Wait for the startup handoff, then require pixels
+  // in the tab text, source and schematic. Borders and the grid do not satisfy this check.
+  await until("painted tab, source and schematic pixels", async () => {
+    const screenshot = await request("GET", `/session/${session}/screenshot`);
+    fs.writeFileSync(path.join(output, `${path.basename(exe)}.png`), Buffer.from(screenshot, "base64"));
+    const visual = await request("POST", `/session/${session}/execute/sync`, {
+      script:`return (${screenshotEvidence.toString()})(${JSON.stringify(screenshot)});`, args:[] });
+    fs.writeFileSync(path.join(output, `${path.basename(exe)}-pixels.json`), JSON.stringify(visual,null,2));
+    assertPainted(visual);
+    return true;
+  });
   // An actual visible X11 window, in addition to the WebView's rendered DOM.
   const windows = await until("the visible window's title", () =>
     execFileSync("xdotool", ["search", "--onlyvisible", "--name", `^${sample} - RNL Viewer$`], { encoding: "utf8" }));
