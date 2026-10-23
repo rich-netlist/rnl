@@ -6,7 +6,7 @@ A minimal frontend built with Vite that installs `@rich-netlist/runtime` as npm 
 cd packages/runtime/smoke
 npm ci
 node smoke.mjs ../../../rich-netlist-runtime-0.1.0-preview.9.tgz
-node smoke.mjs @rich-netlist/runtime@next
+node smoke.mjs @rich-netlist/runtime@latest
 ```
 
 The argument is what npm installs: a tarball that `npm pack` wrote, or a version on npm. `smoke.mjs` installs it without saving it, builds the page with Vite ([`vite.config.js`](vite.config.js) has the two settings of the package's README), checks that the build has the Worker and the module, and opens the build and then the dev server in Chromium. The page, [`main.js`](main.js), builds a netlist of 0.3 that draws a symbol of `analog-canvas-extensions` and writes an edit into a netlist; the test requires no error, a level drawn with its SVG, and the edit written.
