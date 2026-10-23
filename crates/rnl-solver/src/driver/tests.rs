@@ -2182,7 +2182,9 @@ fn a_symbol_without_a_name_on_no_net_drawn_is_left_free() {
 /// are not drawn, the axes of `$MIRROR_PAIR` and the middle point of `$TAIL_CENTER` (T3, T4, corpus
 /// 03 and 15) and a point aligned on x only (corpus 10), on y (11.1), and the ports that rules
 /// make, which the record names (10.5), on nets that nothing draws: no pin of an element on them
-/// is known to the solver, which places them as before (`crate::structure::ObjectInfo::left_free`).
+/// is known to the solver, which places them as before (`crate::structure::ObjectInfo::left_free`);
+/// in the files of 0.3 too, now that their `$IO_PORT` is told a port by its drawing, where it was an
+/// element of the rows.
 /// What it leaves free is the bus label of corpus 09, on a wire (13.3), and the ground without a
 /// name of the subcircuit of 0.3/09, on a net that nothing draws; the solution gives it no
 /// orientation either, and nothing that the candidate puts beside a pin is left free.
@@ -2220,15 +2222,34 @@ fn nothing_is_placed_where_only_the_witness_puts_it() {
     assert_eq!(
         unheld,
         [
+            ("02-dialect-rules.scs / cell", 2),
+            ("02-dialect-rules.scs / mid", 2),
+            ("02-dialect-rules.scs / spsub", 2),
+            ("03-written-rules.sp / resistor", 2),
             ("04-no-rule-packages.scs / cell", 2),
             ("06-symbols.sp / shapes", 2),
+            ("07-virtuoso-netlist.scs / inv", 2),
             ("08-styles-and-text.sp / opamp", 3),
             ("09-buses-and-bundles.sp / dff", 3),
             ("09-buses-and-bundles.sp / reg4", 1),
             ("09-include-without-header.sp / divider", 2),
             ("12-diagnostics.sp / sub", 2),
+            ("13-numbering-order.sp / cell", 2),
+            ("14-numbering-first-name.sp / first_p", 1),
+            ("14-numbering-first-name.sp / first_q", 1),
+            ("15-numbering-stale-and-errors.sp / stale_sub", 1),
+            ("18-dialect-switch.scs / box_cell", 2),
+            ("18-dialect-switch.scs / sub_dropped", 2),
+            ("18-dialect-switch.scs / sub_inc", 2),
+            ("18-dialect-switch.scs / sub_kept", 2),
+            ("18-dialect-switch.scs / sub_sec_scs", 2),
+            ("18-dialect-switch.scs / sub_sec_sp", 2),
             ("19-header-and-lib-versions.sp / sub_02", 2),
+            ("19-header-and-lib-versions.sp / sub_03", 2),
+            ("19-header-and-lib-versions.sp / sub_late", 2),
             ("19-set-cycles.sp / cell", 2),
+            ("21-scope-bindings.sp / cell", 2),
+            ("23-generation-set-difference.sp / cell", 1),
             ("inverter-chain.scs / inv", 1),
             ("inverter-chain.sp / inv", 1),
         ]
