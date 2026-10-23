@@ -91,6 +91,9 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        (github.event.workflow_run.name != 'Viewer release' || github.event.workflow_run.event == 'push'))
     runs-on: ubuntu-latest
+    # A build normally takes 5 to 10 minutes; with slow downloads, successful builds have taken up to
+    # 70. A hung build fails here instead of running for GitHub's default of six hours.
+    timeout-minutes: 90
     permissions:
       contents: read
       pages: read
@@ -115,7 +118,9 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_packages.py'
           python3 site/build.py
 
+      # Normally under half a minute, about 12 with slow downloads; one run hung here for over 1.5 hours.
       - uses: ./.github/actions/install-spec-tools
+        timeout-minutes: 15
 
       # Checks every version of the standard in spec/, then writes the pages and downloads of each:
       # site/dist/zh/spec/<version>/ (Chinese) and site/dist/en/spec/<version>/ (English), with the pages
