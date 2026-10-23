@@ -186,6 +186,8 @@ pub struct Interp<'p> {
     pub(crate) tm_memo: HashMap<(usize, ObjId), ObjId>,
     pub(crate) tm_in_progress: HashSet<(usize, ObjId)>,
     pub(crate) node_memo: HashMap<(&'static str, usize, usize, usize), ObjId>,
+    /// Active symbol-body expansions; a limit failure invalidates only the active chain.
+    pub(crate) symbol_expansions: Vec<Option<DiagId>>,
     pub(crate) rules: Rules,
     /// The members of each unit that are rules, as `rule_members` took them last.
     pub(crate) rule_members: HashMap<UnitId, RuleMembers>,
@@ -313,6 +315,7 @@ impl<'p> Interp<'p> {
             tm_memo: HashMap::new(),
             tm_in_progress: HashSet::new(),
             node_memo: HashMap::new(),
+            symbol_expansions: Vec::new(),
             rules: Rules::default(),
             rule_members: HashMap::new(),
             block_symbols: HashMap::new(),

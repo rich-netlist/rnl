@@ -756,7 +756,7 @@ impl Interp<'_> {
         let sd = self.symbol(sym).clone();
         ProblemSymbol {
             name: self.label(sym),
-            bbox: sd.bbox.unwrap_or_else(|| self.symbol_extent(sym, 0)),
+            bbox: sd.bbox.unwrap_or_else(|| self.symbol_extent(sym)),
             box_written: sd.bbox.is_some(),
             default: sd.default,
             pins: sd

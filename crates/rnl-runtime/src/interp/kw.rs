@@ -1,7 +1,7 @@
 //! The keywords (standard chapters 9–15): what each statement creates or adds.
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::geom::Orient;
@@ -13,6 +13,8 @@ use super::eval::{get, ArgV, Stop, R};
 use super::obj::*;
 use super::scene::{TargetOp, Task};
 use super::Interp;
+
+const MAX_SYMBOL_LEVELS: usize = 64;
 
 /// ORDER, DISTANCE: the one `direction` parameter as (axis, sense) (14.3, 14.5).
 pub fn direction(d: &str) -> Option<(char, &'static str)> {
@@ -302,6 +304,19 @@ impl Interp<'_> {
         }
         let p = self.params(kw, seg, ctx, &sig_params(kw), None, false, None)?;
         let body = self.body_arg(kw, args, seg, ctx)?;
+        // A graph check after evaluation cannot protect the call stack while uncached,
+        // forward references are still expanding their definitions.
+        if body.is_some() && self.symbol_expansions.len() >= MAX_SYMBOL_LEVELS {
+            let id = self.err(
+                ctx,
+                format!("symbol expansion exceeds this implementation's limit of {MAX_SYMBOL_LEVELS} active symbol bodies (9.2.7)"),
+                seg.start,
+            );
+            for failure in &mut self.symbol_expansions {
+                failure.get_or_insert(id);
+            }
+            return Err(Stop::Fail(Some(id)));
+        }
         let sym = self.new_obj(ObjData::Symbol(Box::default()));
         self.symbol_mut(sym).unit = Some(ctx.unit);
         let start = member
@@ -330,7 +345,20 @@ impl Interp<'_> {
         }
         if let Some(body) = body {
             let defining = self.defining_for(ctx, seg, member);
-            self.eval_symbol_body(sym, &body, ctx, defining)?;
+            self.symbol_expansions.push(None);
+            let evaluated = self.eval_symbol_body(sym, &body, ctx, defining);
+            // Restore the active stack before propagating any Result exit. Tolerant member
+            // recovery must not turn the truncated active chain into successful symbols.
+            let limit_error = self.symbol_expansions.pop().unwrap();
+            let evaluated = limit_error.map_or(evaluated, |id| Err(Stop::Fail(Some(id))));
+            if let Err(error) = evaluated {
+                self.node_memo.remove(&key);
+                return Err(error);
+            }
+            if let Err(error) = self.check_symbol_graph(sym, ctx, seg.start) {
+                self.node_memo.remove(&key);
+                return Err(error);
+            }
             let usages = self.symbol(sym).usages.clone();
             for a in usages {
                 let u = self.usage(a).clone();
@@ -343,6 +371,39 @@ impl Interp<'_> {
         }
         self.unnamed_definition_warning(ctx, seg, member);
         Ok((sym, false))
+    }
+
+    /// Reject unsupported graphs before any renderer or solver can consume them. The limit
+    /// includes the outer symbol and is shared by graphics, fixed text and inferred extents.
+    fn check_symbol_graph(&mut self, root: ObjId, ctx: &Ctx, off: usize) -> R<()> {
+        let mut pending = vec![(root, false)];
+        let mut active = HashSet::new();
+        let mut depths: HashMap<ObjId, usize> = HashMap::new();
+        while let Some((sym, finish)) = pending.pop() {
+            if depths.contains_key(&sym) {
+                continue;
+            }
+            let children = self.symbol_children(sym);
+            if finish {
+                active.remove(&sym);
+                let depth = 1 + children.iter().map(|(_, child, _, _)| depths[child]).max().unwrap_or(0);
+                if depth > MAX_SYMBOL_LEVELS {
+                    return self.fail(
+                        ctx,
+                        format!("nested symbols exceed this implementation's limit of {MAX_SYMBOL_LEVELS} symbol levels (9.2.7)"),
+                        off,
+                    );
+                }
+                depths.insert(sym, depth);
+            } else {
+                if !active.insert(sym) {
+                    return self.fail(ctx, "nested symbols form a cycle (9.2.7)", off);
+                }
+                pending.push((sym, true));
+                pending.extend(children.into_iter().rev().map(|(_, child, _, _)| (child, false)));
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn symbol(&self, id: ObjId) -> &SymbolDef {

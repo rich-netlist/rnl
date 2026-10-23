@@ -40,9 +40,10 @@ This is the central TODO list. A checked box means work present in this reposito
 - [x] Assemble a conformance corpus for language standard 0.2 ([`tests/conformance/`](../tests/conformance/README.md)): 19 cases with their expected effective models and diagnostic places, and 3 circuits written in both SPICE and Spectre.
 - [x] Audit the toolkit against published language standard 0.3 revision 2 and its complete word list; record implemented behavior, partial support, implementation choices and remaining gaps in the [supported profile](supported-profile-0.3.md) and [vocabulary audit](profile-vocabulary-audit.md).
 - [x] Add [dedicated 0.3 roundtrip cases](../tests/roundtrip/README.md): numbered objects, wire rewrites, text, generated-usage priorities, SPICE/Spectre carriers and subcircuit placement, with reviewed records/effective models and repeated-write stability checks.
-- [ ] Close the [remaining 0.3 profile gaps](supported-profile-0.3.md#remaining-issues-in-priority-order): excluded host regions, per-file version isolation, encoding preservation, nested-symbol extents, case-distinct named pins and heterogeneous bundle terminal correspondence; extend advisory and vocabulary-parity coverage.
+- [ ] Close the [remaining 0.3 profile gaps](supported-profile-0.3.md#remaining-issues-in-priority-order): excluded host regions, per-file version isolation, encoding preservation, case-distinct named pins and heterogeneous bundle terminal correspondence; extend advisory and vocabulary-parity coverage.
 - [x] Recover duplicate record-head fields locally (0.3 §2.8), including solver classification and metadata reads, while preserving ordinary keyword duplicate errors.
 - [x] Preserve one declaration order for symbol graphics, fixed text and nested drawing usages through repeated fragment inclusion and rendering (0.3 sections 9.2.1, 9.2.7, 11.6); exercise overlap and more than 100 primitives in symbol_drawing_order.rs.
+- [x] Keep geometry, inferred bounds and fixed text consistent through nested symbols; replace silent depth-8 cutoffs with graph validation and a reported 64-symbol-level implementation limit before output; a separate 64-active-body guard bounds uncached forward expansion and preserves independent recovery (deep_symbols.rs).
 
 ## Reading and rendering
 

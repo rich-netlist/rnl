@@ -49,7 +49,7 @@ is distinguished from the 24 cases of 0.3 and dedicated 0.3 regression tests.
   merging edits into records already present. The solver's generated-record replacement
   is a separate supported path. This audit does not claim a complete editor.
 - UTF-8 (including BOM) and Latin-1 input are supported by the CLI provider. Arbitrary host
-  encodings, arbitrary precision numbers and unbounded nested-symbol extents are not.
+  encodings and arbitrary precision numbers are not. Symbols support up to 64 symbol levels, including the outer symbol; deeper graphs fail with an explicit diagnostic before rendering or solver export. Uncached definition expansion is separately limited to 64 active symbol bodies, including fragment dependencies; hitting that limit fails the active chain and leaves subsequent independent definitions usable.
   Numeric conversion uses binary64; overflow and underflow to zero now fail explicitly.
 
 ## Corrections and regression evidence
@@ -69,6 +69,7 @@ is distinguished from the 24 cases of 0.3 and dedicated 0.3 regression tests.
 ## Subsequent focused corrections
 
 - **Symbol declaration order (9.2.1, 9.2.7, 11.6):** graphics, fixed text and nested symbols now carry one declaration position through inclusion and rendering. The [regressions](../crates/rnl-cli/tests/symbol_drawing_order.rs) check repeated fragment inclusion, transformed symbols, SVG order and more than 100 primitives.
+- **Deep nested symbols (9.2.3, 9.2.7, 13.3):** geometry, inferred bounds and fixed text traverse the same accepted nested usages. The silent depth-8 cutoffs are removed. Definition validation reports cycles and the implementation limit of 64 symbol levels; this limit includes the outer symbol and applies equally with explicit and inferred boxes. [Regressions](../crates/rnl-cli/tests/deep_symbols.rs) cover 13 transformed wrappers, expanded fixed text, model/solver bounds, explicit boxes, the accepted boundary and error recovery beyond it. A separate pre-expansion guard bounds uncached forward references; reverse-declared chains of 64, 65, 256 and 1,000 levels check the boundary, direct outermost use and subsequent independent definitions.
 
 ## Remaining issues, in priority order
 
@@ -84,7 +85,6 @@ The linked matrices contain the exact source anchors.
 | P1 | **Encoding preservation (F-04, 3.1).** CLI writing can silently change Latin-1 to UTF-8 when new characters do not fit; strip-generated directly writes decoded text. | `solve.rs::encode_as` has an explicit UTF-8 fallback (even tested as current behavior). Desktop encoding checks differ. A consistent refusal/conversion policy needs an API decision. |
 | P2 | **Case-distinct named pins (3.6, 9.2.4).** Symbol pin-key merging collapses `P` and `p` before Spectre terminal matching. | A CLI probe of a symbol with two such named pins retained only one; numeric pins avoid this collision. Name-key merging must be reconciled with reuse across host dialects. |
 | P2 | **Bundle terminal correspondence (11.8).** Heterogeneous members use first-member terminal ordinals, not name-based correspondence when names/orders differ. | The crash is fixed; the broader mapping remains partial and needs regression cases for differing names/orders. |
-| P2 | **Deep nested symbols (9.2.3, 9.2.7, 13.3).** Extent/text traversals stop around depth 8 while geometry continues. | A valid deeper symbol can lose fixed text and inferred bounds silently. Explicit `box=` avoids extent inference but does not restore missing text. |
 | P3 | **Advisory diagnostics (F-08).** Non-ASCII simulator validation, some forward-name typo hints and Spectre SPICE-mode post-`.end` warnings are incomplete. | SHOULD/advisory behavior; see the foundations matrix, distinct from mandatory interpretation failures. |
 | P3 | **Coverage/parity assurance (F-05).** Runtime signatures still embed the differently shaped 0.2 data plus 0.3 additions; no maintained automatic parity check covers the published 0.3 vocabulary and output rules. | This audit found no missing keyword/parameter, but it does not prevent future drift. Several optional values/negative combinations lack dedicated assertions. |
 
