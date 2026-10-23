@@ -157,6 +157,12 @@ impl<'a> Reading<'a> {
             .expect("the state of a type is of that type")
     }
 
+    /// The files, by their names in the document, that a format other than `name` reads: what
+    /// the format `name` leaves alone when it finishes.
+    pub fn others(&self, name: &str) -> HashSet<String> {
+        self.doc.file_formats.iter().filter(|f| f.format != name).map(|f| f.file.clone()).collect()
+    }
+
     /// Whether the file `file`, by its name in the document, is read by the format `name`.
     pub fn is_of(&self, file: &str, name: &str) -> bool {
         self.doc.file_format(file).map_or(self.doc.dialect.name == name, |f| f.format == name)

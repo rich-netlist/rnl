@@ -1006,12 +1006,14 @@ fn read_as(
 /// [`Reading::card`] finds it.
 fn finish(cx: &mut Reading) {
     let State { models, unresolved } = std::mem::take(cx.state::<State>());
+    // the elements of the files of other formats are theirs to finish
+    let others = cx.others("spice");
     if !cx.foreign_cards("spice") {
         for (lv, k, plain) in unresolved {
             resolve_nodes(&mut cx.doc.levels[lv].instances[k], &plain, &models);
         }
         for lv in &mut cx.doc.levels {
-            for inst in &mut lv.instances {
+            for inst in lv.instances.iter_mut().filter(|i| !others.contains(&i.file)) {
                 // a type the adapter gave (a transmission line) stands; else the model card's
                 if !inst.is_subckt && inst.mtype.is_none() {
                     inst.mtype = inst.model.as_ref().and_then(|m| models.get(&m.to_lowercase()).cloned());
@@ -1033,7 +1035,7 @@ fn finish(cx: &mut Reading) {
     let mut typed = Vec::new();
     for (l, lv) in cx.doc.levels.iter().enumerate() {
         for (k, inst) in lv.instances.iter().enumerate() {
-            if !inst.is_subckt && inst.mtype.is_none() && inst.model.is_some() && cx.is_of(&inst.file, "spice") {
+            if !inst.is_subckt && inst.mtype.is_none() && inst.model.is_some() && !others.contains(&inst.file) {
                 typed.push((l, k));
             }
         }

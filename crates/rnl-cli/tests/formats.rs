@@ -112,7 +112,7 @@ fn a_spectre_netlist_includes_a_spice_file() {
     // `.subckt AMP` of the SPICE file ignores case, so Spectre's `amp` finds it; at the file level,
     // `gnd` of the SPICE file is ground, that of the Spectre file is not
     let top = "// top\nsimulator lang=spectre\ninclude \"parts.inc\"\nX2 (a b) amp\nR8 (n1 gnd) resistor r=1k\n";
-    let parts = "* parts\n.subckt AMP p n\nR1 p n 1k\n.ends\nR9 n1 gnd 1k\n";
+    let parts = "* parts\n.subckt AMP p n\nR1 p n 1k\n.ends\nR9 n1 gnd 1k\nI5 n1 0 1m\n";
     let files = MemoryProvider::new().with("/w/top.scs", top).with("/w/parts.inc", parts);
     let d = build("/w/top.scs", &files, &[("/w/parts.inc", "spice")]);
     assert_eq!(
@@ -122,6 +122,11 @@ fn a_spectre_netlist_includes_a_spice_file() {
     let amp = d.levels.iter().position(|l| l.title == "AMP").unwrap();
     assert_eq!(d.objects.iter().find(|o| o.name == "X2").unwrap().opens, Some(amp));
     let (doc, _) = host("/w/top.scs", &files, &[("/w/parts.inc", "spice")]);
+    // the SPICE file's elements are SPICE's: no Spectre master for a current source (10.1)
+    let i5 = doc.levels[0].instances.iter().find(|i| i.name == "I5").unwrap();
+    assert_eq!((i5.model.as_deref(), i5.letter), (None, Some('I')));
+    let r8 = doc.levels[0].instances.iter().find(|i| i.name == "R8").unwrap();
+    assert_eq!(r8.model.as_deref(), Some("resistor"));
     assert_eq!(doc.net_key_in(0, "gnd", "parts.inc"), "0");
     assert_eq!(doc.net_key_in(0, "gnd", "top.scs"), "gnd");
     // the nets of the main file's circuit compare by Spectre's rules, by case

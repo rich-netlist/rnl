@@ -1011,6 +1011,8 @@ impl Reader<'_, '_> {
 fn finish(cx: &mut Reading) {
     let Kept { models, spice_models, pending_spice } = std::mem::take(cx.state::<Kept>());
     let mixed = cx.foreign_cards("spectre");
+    // the instances of the files of other formats are theirs to finish
+    let others = cx.others("spectre");
     // The model cards of both languages, by lower case name, with the type of each: a `.model`
     // card of SPICE and a `model` statement of Spectre are the same to an instance of either
     // language, since a file may hold both (`simulator lang=`).
@@ -1034,7 +1036,7 @@ fn finish(cx: &mut Reading) {
     for lv in 0..cx.doc.levels.len() {
         for k in 0..cx.doc.levels[lv].instances.len() {
             let inst = &cx.doc.levels[lv].instances[k];
-            if mixed && !cx.is_of(&inst.file, "spectre") {
+            if others.contains(&inst.file) {
                 continue;
             }
             let loc = Loc::line(&inst.file, inst.line);
