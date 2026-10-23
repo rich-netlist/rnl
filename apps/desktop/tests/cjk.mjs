@@ -18,6 +18,10 @@ export async function cjkEvidence() {
     if (!el) continue;
     const s = getComputedStyle(el);
     const prefix = `${s.fontStyle} ${s.fontWeight} 32px `;
+    // Headers can request semibold/bold slices not yet used by their ASCII names. Wait
+    // for this exact weight/style before comparing, rather than measuring a swap frame.
+    await document.fonts.load(prefix + '"Noto Sans SC"', text);
+    await document.fonts.load(prefix + s.fontFamily, text);
     const actual = raster(prefix + s.fontFamily);
     const reference = raster(prefix + '"Noto Sans SC"');
     const missing = raster(prefix + '"RNL nonexistent font", monospace');
