@@ -10,6 +10,8 @@ use super::{Index, Level, Span};
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Usage {
+    /// Shared frame and label anchors in SVG pixels; absent when no member is drawn.
+    pub frame: Option<crate::UsageFrame>,
     pub object: usize,
     pub id: String,
     pub definition: String,
@@ -199,7 +201,7 @@ fn inspect(lv: &LevelView, level: &Level, ix: &mut Index<'_>, source_lines: &Has
                     }
                 }
             }
-            let roles = o
+            let roles: Vec<UsageRole> = o
                 .attach
                 .iter()
                 .map(|(name, a)| {
@@ -215,7 +217,21 @@ fn inspect(lv: &LevelView, level: &Level, ix: &mut Index<'_>, source_lines: &Has
                     }
                 })
                 .collect();
+            let local = o.symbol.is_some()
+                && roles.iter().all(|r| {
+                    r.bounds.is_none_or(|b| {
+                        (!r.objects.is_empty() && r.objects.iter().all(|i| ix.objects[*i].kind == "net"))
+                            || (b[0] == b[2] && b[1] == b[3])
+                    })
+                });
             Usage {
+                frame: crate::overlays::usage_frame(
+                    object,
+                    local,
+                    &roles,
+                    &level.hits,
+                    &format!("{}: {}", o.definition.as_deref().unwrap_or_default(), o.id),
+                ),
                 object,
                 id: o.id.clone(),
                 definition: o.definition.clone().unwrap_or_default(),

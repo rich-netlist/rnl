@@ -19,6 +19,7 @@ export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 /** The fixtures by name, and the files of the corpus they are built from. */
 export const FILES = {
+  "usage-current": "tests/viewer/inputs/usage-current.sp",
   "wire-labels": "tests/viewer/inputs/wire-labels.sp",
   "usage-inspector": "tests/viewer/inputs/usage-inspector.sp",
   "usage-anonymous": "tests/viewer/inputs/usage-anonymous.sp",

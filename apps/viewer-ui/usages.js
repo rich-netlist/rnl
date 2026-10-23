@@ -11,6 +11,8 @@ const MAX_PREFERENCES = 2000;
 let preferences = new Map();
 const activeSettings = new WeakMap();
 let shown = true;
+let currentsShown = false;
+let currentLayer = null;
 let revision = 0;
 const collapsed = new Set();
 const expandedLarge = new Set();
@@ -66,6 +68,8 @@ export function startUsages() {
   preferences = new Map(Object.entries(load("usage-preferences", {})).filter(([, v]) =>
     v && /^#[0-9a-f]{6}$/i.test(v.color) && typeof v.visible === "boolean").slice(-MAX_PREFERENCES));
   shown = load("usages-shown", true) !== false;
+  currentsShown = load("currents-shown", false) === true;
+  setCheck("toggle-currents", currentsShown);
   setCheck("toggle-usages", shown);
   const height = Math.max(80, Math.min(800, Number(load("usage-list-height", 240)) || 240));
   document.documentElement.style.setProperty("--usage-list-h", `${height}px`);
@@ -75,6 +79,13 @@ export function toggleUsages() {
   shown = !shown;
   save("usages-shown", shown);
   setCheck("toggle-usages", shown);
+  revision++;
+  repaint();
+}
+export function toggleCurrents() {
+  currentsShown = !currentsShown;
+  save("currents-shown", currentsShown);
+  setCheck("toggle-currents", currentsShown);
   revision++;
   repaint();
 }
@@ -215,32 +226,27 @@ function renderDetail() {
   append(detail, title, colorRow, palette, roleHead, table, sourceHead, file, source);
 }
 
-function union(bounds) {
-  if (!bounds.length) return null;
-  return bounds.reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]);
-}
 // Net and terminal roles of a virtual symbol denote its local connections, not every
 // other symbol on the same electrical net. Whole component roles retain their geometry.
 function localSymbol(u) {
-  return u.has_symbol && u.roles.every(r => !r.bounds ||
-    (r.objects.length > 0 && r.objects.every(o => doc.objects[o]?.kind === "net")) ||
-    (r.bounds[0] === r.bounds[2] && r.bounds[1] === r.bounds[3]));
+  return u.frame?.local ?? false;
 }
-function badge(text, color, parent, cls) {
+function badge(text, color, parent, cls, width) {
   const g = svgElement("g", { class: cls });
   const back = svgElement("rect", { rx: 3, fill: "var(--usage-label-bg)", "fill-opacity": .75 });
   const label = svgElement("text", { fill: color, "font-size": 13, "font-family": "system-ui, sans-serif", "dominant-baseline": "central" });
   label.textContent = text;
+  if (width > 0) { label.setAttribute("textLength", width); label.setAttribute("lengthAdjust", "spacingAndGlyphs"); }
   append(g, back, label);
   append(parent, g);
-  return { g, back, label };
+  return { g, back, label, width };
 }
 
 /** Draw in screen pixels inside the scene SVG: the inverse view transform cancels its zoom. */
 export function paintUsages(svg, view, groups) {
   context = [svg, view, groups];
   if (!svg || !view) {
-    frames = []; layer?.remove(); underlay?.remove(); underlay = layer = null;
+    frames = []; layer?.remove(); underlay?.remove(); currentLayer?.remove(); underlay = layer = currentLayer = null;
     drawing = layerDoc = null; layerLevel = -1; layerRevision = -1; layerSelected = null; context = null;
     return;
   }
@@ -249,6 +255,14 @@ export function paintUsages(svg, view, groups) {
   const rebuild = drawing !== svg || layerDoc !== doc || layerLevel !== current ||
     layerRevision !== revision || layerSelected !== focus;
   if (rebuild) {
+    currentLayer?.remove();
+    currentLayer = svgElement("g", { class: "current-overlays", "pointer-events": "none",
+      fill: "none", stroke: "#d9480f", "stroke-width": 8 / 3, "stroke-linecap": "round", "stroke-linejoin": "round" });
+    if (currentsShown) for (const c of doc.levels[current].currents || []) {
+      const [a, b, h, j] = c.points;
+      append(currentLayer, svgElement("path", { class: "current-arrow", "data-terminal": c.terminal,
+        "data-direction": c.direction, d: `M${a} L${b} M${h} L${b} L${j}` }));
+    }
     layer?.remove();
     underlay?.remove();
     underlay = svgElement("g", { class: "usage-underlays", "pointer-events": "none" });
@@ -266,16 +280,12 @@ export function paintUsages(svg, view, groups) {
     for (const [id, elements] of groups) for (const g of elements) {
       g.classList.toggle("usage-muted", !!keep && !keep.has(id) && !g.parentElement.closest("[data-id]"));
     }
-    const symbolBounds = new Map();
-    for (const h of doc.levels[current].hits) if (h.kind === "box") {
-      symbolBounds.set(h.objects[0], union(h.points.map(([x, y]) => [x, y, x, y])));
-    }
     frames = [];
     for (const entry of [...usages()].sort((a, b) => Number(a.object === focus) - Number(b.object === focus))) {
       const active = entry.object === focus;
       if (!active && !visible(entry)) continue;
       const local = localSymbol(entry);
-      const bounds = local ? symbolBounds.get(entry.object) : union(entry.roles.map(r => r.bounds).filter(Boolean));
+      const bounds = entry.frame?.bounds;
       if (!bounds) continue;
       const color = setting(entry).color;
       const group = svgElement("g", { class: `usage-frame${active ? " selected" : ""}`, "data-usage": entry.object });
@@ -285,17 +295,14 @@ export function paintUsages(svg, view, groups) {
         "stroke-width": active ? 16 / 3 : 8 / 3, "stroke-dasharray": "1 5", "stroke-linecap": "round", rx: 10 });
       append(group, rect);
       append(layer, group);
-      const title = badge(`${entry.definition}: ${entry.id}`, color, group, "usage-title");
-      const pins = active && local && entry.roles.length > 1 ? doc.levels[current].hits.filter(h =>
-        h.kind === "pin" && h.points[0][0] >= bounds[0] && h.points[0][0] <= bounds[2] &&
-        h.points[0][1] >= bounds[1] && h.points[0][1] <= bounds[3]) : [];
-      const roles = active ? entry.roles.filter(r => r.bounds).map(r => ({
-        bounds: local ? union(pins.filter(p => p.objects.some(o => r.objects.includes(o)))
-          .map(p => [p.points[0][0], p.points[0][1], p.points[0][0], p.points[0][1]])) || bounds : r.bounds,
-        ...badge(r.name, color, group, "usage-role-label"),
+      const title = badge(`${entry.definition}: ${entry.id}`, color, group, "usage-title", entry.frame.title_width);
+      const roles = active ? entry.roles.map((r, i) => ({ ...r, anchor: entry.frame.roles[i], width: entry.frame.role_widths[i] })).filter(r => r.anchor).map(r => ({
+        anchor: r.anchor,
+        ...badge(r.name, color, group, "usage-role-label", r.width),
       })) : [];
       frames.push({ entry, bounds, rect, fill, title, roles, active, local });
     }
+    append(svg, currentLayer);
   }
   layer.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${1 / view.k})`);
   underlay.setAttribute("transform", layer.getAttribute("transform"));
@@ -303,25 +310,17 @@ export function paintUsages(svg, view, groups) {
   for (const f of frames) {
     const [x, y] = project(f.bounds[0], f.bounds[1]);
     const [right, bottom] = project(f.bounds[2], f.bounds[3]);
-    const b = [x - 12, y - 12, right + 12, bottom + 12];
+    const b = [x, y, right, bottom];
     f.screen = b;
     for (const [attr, value] of Object.entries({ x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1] })) {
       f.rect.setAttribute(attr, value); f.fill.setAttribute(attr, value);
     }
-    placeBadge(f.title, b[0] + 8, b[1], false);
+    placeBadge(f.title, ...project(...f.entry.frame.title), false);
     const titleVisible = f.active || f.title.width + 16 <= b[2] - b[0];
     f.title.g.setAttribute("display", titleVisible ? "inline" : "none");
     if (!titleVisible) f.title.screen = null;
-    const placed = [];
     for (const role of f.roles) {
-      const [cx, cy] = project((role.bounds[0] + role.bounds[2]) / 2, (role.bounds[1] + role.bounds[3]) / 2);
-      let y = cy;
-      placeBadge(role, cx, y, true);
-      // Several virtual roles may share a pin, or have no separate pin geometry.
-      // Keep all their names readable even when their anchors coincide after zooming out.
-      if (f.local) while (placed.some(b => role.screen[0] < b[2] + 2 && role.screen[2] > b[0] - 2 &&
-        role.screen[1] < b[3] + 2 && role.screen[3] > b[1] - 2)) placeBadge(role, cx, y += 20, true);
-      placed.push(role.screen);
+      placeBadge(role, ...project(...role.anchor), true);
     }
   }
 }

@@ -75,7 +75,7 @@ test.describe("on the web", () => {
         items: [
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "Color Scheme...",
           "Background", "Light", "Dark",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Language", "English", "简体中文", "",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Show Current Directions", "Language", "English", "简体中文", "",
           "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "", "Hide",
         ],
       },
@@ -425,7 +425,7 @@ test.describe("with a native menu", () => {
       ["background-light", true], ["background-dark", false],
       ["toggle-netlist", true], ["toggle-problems", true], ["toggle-edit", false],
       ["toggle-grid", true], ["grid-none", false], ["grid-dots", true], ["grid-lines", false], ["grid-axes", false],
-      ["toggle-hover-names", true], ["toggle-usages", true],
+      ["toggle-hover-names", true], ["toggle-usages", true], ["toggle-currents", false],
       ["language-en", true], ["language-zh", false],
       ["toggle-auto-include", true],
     ];

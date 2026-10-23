@@ -35,6 +35,11 @@ view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
   --status            give each level its solve status: fixed, unsolved, solved or stale
+render options (inspection only; all disabled by default):
+  --usages MODE       usage frames: semantic (no drawing of their own) or all
+  --currents          show in/out terminal currents, including explicit subcircuit port symbols
+  --usage-roles       show role labels on enabled usage frames
+  --overlay-style FILE  JSON: palette, width, dashes, current_color; independent of RNL styles
 problem options (the levels are read without their type="generated" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  key=value;... over the solver's defaults, as for solve: the options the hash covers

@@ -21,6 +21,8 @@ export type {
   LibraryRequest,
   Literal,
   Op,
+  OverlayOptions,
+  OverlayStyle,
   Point,
   Request,
   Run,

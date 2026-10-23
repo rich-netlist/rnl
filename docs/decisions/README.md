@@ -21,3 +21,4 @@ Decisions made before this log started, including those from the first architect
 | [0011](0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md) | The viewers edit the text, and write a file only when the user has edited it and saves it | accepted |
 | [0012](0012-public-packages-use-an-immutable-catalog.md) | Optional public packages use a separate repository and an immutable catalog | accepted; implementation under review |
 | [0013](0013-independent-release-lines.md) | Core, Viewer and language standard have independent releases; latest belongs to core | accepted; initial versions and npm dist-tag pending |
+| [0014](0014-inspection-overlay-geometry.md) | Shared inspection overlay geometry, with frontend styling and optional SVG export | proposed; implementation under review |

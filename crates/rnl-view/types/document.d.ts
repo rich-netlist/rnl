@@ -78,6 +78,10 @@ export type InspectedLabel = { key: string | null, text: string, at: [number, nu
  */
 export type Level = {
   /**
+   * Optional inspection geometry in SVG pixels (y down), independent of display styles.
+   */
+  currents: Array<CurrentArrow>,
+  /**
    * All usages in this drawing scope, including semantic usages without a symbol.
    */
   usages: Array<Usage>,
@@ -151,6 +155,10 @@ export type Level = {
 };
 
 export type Usage = {
+  /**
+   * Shared frame and label anchors in SVG pixels; absent when no member is drawn.
+   */
+  frame: UsageFrame | null,
   object: number,
   id: string,
   definition: string,
@@ -183,6 +191,31 @@ export type UsageRole = {
    * Visible extent in SVG pixels, y down; absent when no member can be displayed.
    */
   bounds: [number, number, number, number] | null,
+};
+
+export type UsageFrame = {
+  bounds: [number, number, number, number],
+  title: [number, number],
+  title_width: number,
+  role_widths: Array<number>,
+  /**
+   * Role anchors in declaration order; absent for roles with no visible geometry.
+   */
+  roles: Array<[number, number] | null>,
+  /**
+   * A virtual symbol's roles refer to its local connections.
+   */
+  local: boolean,
+};
+
+export type CurrentArrow = {
+  terminal: string,
+  direction: string,
+  pin: [number, number],
+  /**
+   * Tail, tip and the two arrowhead corners, in SVG pixels with y down.
+   */
+  points: [[number, number], [number, number], [number, number], [number, number]],
 };
 
 /**

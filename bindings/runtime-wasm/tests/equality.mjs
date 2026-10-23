@@ -70,6 +70,7 @@ if (entries.length < 20) fail(`only ${entries.length} files found under ${root}`
 entries.push(join(root, "tests/viewer/inputs/view-improvements.sp"));
 entries.push(join(root, "tests/viewer/inputs/wire-labels.sp"));
 entries.push(join(root, "tests/viewer/inputs/usage-inspector.sp"));
+entries.push(join(root, "tests/viewer/inputs/usage-current.sp"));
 const defaultHairlines = join(root, "tests/viewer/inputs/default-hairlines.sp");
 entries.push(defaultHairlines);
 // Independent public geometry and style packages exercise custom fonts and generated terminal markers.

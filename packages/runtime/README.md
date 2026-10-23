@@ -33,6 +33,31 @@ core.terminate();
 
 `@rich-netlist/runtime/core` loads the module in the calling thread instead, and `@rich-netlist/runtime/worker` is the Worker itself. The requests, the Document, the snapshot and the catalog are declared in the package's TypeScript files. The [binding's README](https://github.com/rich-netlist/rnl/tree/main/bindings/runtime-wasm#readme) describes the requests, `collect` for a frontend's own file access, and `decodeText`.
 
+## Inspection overlays
+
+Every Document gives `levels[].usages[].frame` (bounds, title and role anchors/widths)
+and `levels[].currents` (terminal, direction, pin and arrow points), in SVG pixels
+with y down. These geometry records contain no colors, strokes or visibility settings.
+The SVG has no inspection overlays unless requested:
+
+```js
+const document = await core.build({ entry: "/top.sp", files, overlays: {
+  usages: "semantic", // "none" (default), "semantic" or "all"
+  currents: true,    // false by default; unspecified currents produce no arrow
+  roles: true,       // false by default; labels on enabled usage frames
+  style: { palette: ["#4263eb", "#2f9e44"], width: 2, dashes: [1, 5], current_color: "#d9480f" }
+} });
+```
+
+Styles are independent of RNL `@SET-STYLE`; omitted properties use deterministic renderer
+defaults. Colors are hex (`#RGB`, `#RRGGBB`, `#RRGGBBAA`), the palette is nonempty,
+width is positive, and dash lengths are positive (an empty array means solid).
+Palette assignment follows usage order, including hidden usages. Current arrows are solid.
+The same options work with lazy builds and a snapshot's drawing. Disabling overlays returns
+the original SVG bytes. Viewers may render the geometry with their own styling/preferences.
+Declaration currents (`#:port`) use explicitly drawn `$IO_PORT` usages on the port's net;
+`in` points from the tag into the circuit. A port with no such symbol has no arrow.
+
 ## Optional Canvas package
 
 Fetch the exact package record from the public catalog, verify its raw bytes, and explicitly add the decoded text to `files` and its path to `pool`:
