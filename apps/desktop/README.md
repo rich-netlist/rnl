@@ -165,6 +165,54 @@ After all platforms succeed, the workflow verifies each platform's checksums and
 
 The release uses `--latest=false`; the repository's latest belongs to the core (`core-vX.Y.Z`), so the viewer's releases are told apart by their tags. A version with a prerelease part, such as `0.2.0-rc.1`, makes a prerelease, which Check for Updates passes over. Run by hand from the Actions tab on a branch, the workflow builds and checks all platforms and keeps the platform artifacts and combined eight-file artifact; it never publishes. Before pushing a release tag, run it on the intended commit, check every build job and the combined checksums, inspect the Linux screenshots, and confirm the versions and notes above. The site only links Linux files when the selected release tag contains the Linux bundle configuration, so earlier Windows-only releases keep valid download links.
 
+## macOS downloads and installation
+
+macOS 13 or newer is the configured minimum. Apple Silicon (`macos-arm64.dmg`) and Intel
+(`macos-x86_64.dmg`) have separate native builds, exercised on macOS 15 runners of each architecture.
+Download from the [tools page](https://rich-netlist.github.io/rnl/en/tools.html#desktop) or a
+`viewer-v` release. Older release tags do not offer Mac packages.
+
+Open the DMG for your chip, drag **RNL Viewer** into **Applications**, then eject it.
+These packages carry an ad-hoc signature (`codesign` identity `-`), without an Apple Developer ID
+or notarization. If macOS blocks a trusted download, use **System Settings > Privacy & Security >
+Open Anyway**, or run the following and open the app again:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/RNL Viewer.app"
+```
+
+CI copies the app from the actual DMG, verifies its ad-hoc signature and architecture, sets and
+removes a quarantine attribute with that command, then launches it through LaunchServices.
+This proves the terminal workaround for the tested package; it does not prove notarization or
+exercise the interactive Gatekeeper approval UI.
+
+Use Finder's **Open With > RNL Viewer** for `.sp`, `.scs` and the other supported extensions;
+**Get Info > Open with > Change All** sets a default if desired. Cold and already-running Finder
+open events are supported. Drops use the existing native Tauri file-drop handler and keep absolute
+paths for includes. Most menu shortcuts use **Cmd** (Open, Save, sidebar, Apply); **Control+Q**
+uses the physical Control key for Edit Text, while **Cmd+Q** quits with unsaved-edit confirmation.
+About and Quit live in the application menu. Help > Check for Updates uses the same explicit
+GitHub release check as the other desktop platforms. System dark mode changes the UI; the drawing
+background remains separately configurable.
+
+Settings live at `~/Library/Application Support/io.github.rich-netlist.viewer/settings.json`.
+To uninstall, quit and move `/Applications/RNL Viewer.app` to Trash. Delete the settings directory
+only if you also want to remove preferences. Verify the downloaded DMG with `shasum -a 256`
+and the release's combined `SHA256SUMS.txt`.
+
+The macOS smoke uses WindowServer screenshots and Vision OCR of schematic labels in the drawing
+region, with pixel density checks that reject blank/solid screenshots. It retains cold/warm file
+opens, About, native Cmd/Control shortcuts, settings, and light/dark screenshots as Actions artifacts.
+It does not inject a test API into the released WebView. The minimum OS is not a claim that every
+older macOS 13/14 point release was exercised: native CI runs on macOS 15.
+
+The native drop bridge is covered in Chromium/WebKit, including Unicode paths and unsaved-edit
+confirmation. The CI smoke uses menus, keys and LaunchServices; a physical drag from Finder is
+not automated and remains a manual Mac acceptance check. To repeat native observations of a
+retained Apple Silicon release DMG without rebuilding, dispatch Desktop viewer on the branch with
+`macos_smoke_run_id` set to its Viewer release run ID. The evidence records that binary's source
+commit. This diagnostic cannot publish a release or refresh Pages.
+
 ## Checking for updates
 
 **Help › Check for Updates**, which only the desktop offers, looks for a newer release when it is chosen, never by itself. The page ([`updates.js`](../viewer-ui/updates.js)) asks GitHub's API for the repository's 30 newest releases, `https://api.github.com/repos/rich-netlist/rnl/releases?per_page=30`. Of those tagged `viewer-v` and a version, neither drafts nor prereleases, it takes the one with the highest version and compares it with the app's by Semantic Versioning. A newer one is offered with a button that opens its release page in the default browser; otherwise the dialog says that this is the latest version, or why the latest could not be looked up, with a link to the releases. GitHub answers 60 requests an hour from one address without an account.
@@ -251,44 +299,3 @@ New windows are independent processes started with `--session FILE`; the one-use
 
 File > Reload Library rereads every session Library file and package, rescans PATH, and rebuilds the subcircuit index. PATH lists recognized netlists (`.sp`, `.spi`, `.spice`, `.cir`, `.ckt`, `.net`, `.netlist`, `.inc`, `.lib`, `.scs`) alongside `.rnl` packages, directly and in numeric version directories. File > Auto Include and the Netlist checkbox enable indexed lookup of undefined subcircuits; unique matches produce warnings in Problems. The switch is saved, defaults on, and also applies to Solve. Conflicting definitions require an explicit include. No include statements are written to source files by this option.
 Optional public packages are maintained in [rnl-packages](https://github.com/rich-netlist/rnl-packages) and are not bundled with the desktop viewer. Download and verify them, then include the files in Library or a PATH directory. The missing `analog-canvas-extensions` hint remains unchanged; a desktop catalog picker is outside this change.
-
-## macOS downloads and installation
-
-macOS 13 or newer is the configured minimum. Apple Silicon (`macos-arm64.dmg`) and Intel
-(`macos-x86_64.dmg`) have separate native builds, exercised on macOS 15 runners of each architecture.
-Download from the [tools page](https://rich-netlist.github.io/rnl/en/tools.html#desktop) or a
-`viewer-v` release. Older release tags do not offer Mac packages.
-
-Open the DMG for your chip, drag **RNL Viewer** into **Applications**, then eject it.
-These packages carry an ad-hoc signature (`codesign` identity `-`), without an Apple Developer ID
-or notarization. If macOS blocks a trusted download, use **System Settings > Privacy & Security >
-Open Anyway**, or run the following and open the app again:
-
-```sh
-xattr -dr com.apple.quarantine "/Applications/RNL Viewer.app"
-```
-
-CI copies the app from the actual DMG, verifies its ad-hoc signature and architecture, sets and
-removes a quarantine attribute with that command, then launches it through LaunchServices.
-This proves the terminal workaround for the tested package; it does not prove notarization or
-exercise the interactive Gatekeeper approval UI.
-
-Use Finder's **Open With > RNL Viewer** for `.sp`, `.scs` and the other supported extensions;
-**Get Info > Open with > Change All** sets a default if desired. Cold and already-running Finder
-open events are supported. Drops use the existing native Tauri file-drop handler and keep absolute
-paths for includes. Most menu shortcuts use **Cmd** (Open, Save, sidebar, Apply); **Control+Q**
-uses the physical Control key for Edit Text, while **Cmd+Q** quits with unsaved-edit confirmation.
-About and Quit live in the application menu. Help > Check for Updates uses the same explicit
-GitHub release check as the other desktop platforms. System dark mode changes the UI; the drawing
-background remains separately configurable.
-
-Settings live at `~/Library/Application Support/io.github.rich-netlist.viewer/settings.json`.
-To uninstall, quit and move `/Applications/RNL Viewer.app` to Trash. Delete the settings directory
-only if you also want to remove preferences. Verify the downloaded DMG with `shasum -a 256`
-and the release's combined `SHA256SUMS.txt`.
-
-The macOS smoke uses WindowServer screenshots and Vision OCR of schematic labels in the drawing
-region, with pixel density checks that reject blank/solid screenshots. It retains cold/warm file
-opens, About, native Cmd/Control shortcuts, settings, and light/dark screenshots as Actions artifacts.
-It does not inject a test API into the released WebView. The minimum OS is not a claim that every
-older macOS 13/14 point release was exercised: native CI runs on macOS 15.

@@ -106,6 +106,11 @@ try {
   fs.copyFileSync(settings,path.join(output,'settings.json'));
   assert.deepEqual(fs.readFileSync(sample),original,'Opening the sample must not write it.');
   key('q','using command down');
+  const quitEnd=Date.now()+10000;
+  while(Date.now()<quitEnd && spawnSync('pgrep',['-x','rnl-viewer']).status===0) {
+    await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  assert.equal(spawnSync('pgrep',['-x','rnl-viewer']).status,1,'Cmd+Q must exit before cleanup kills any process.');
   console.log('Packaged app: ad-hoc signature, cold/warm Finder opens, real schematic pixels/OCR, menus, Cmd/Control keys, settings and dark/light screenshots passed.');
 } finally {
   spawnSync('pkill',['-x','rnl-viewer']);
