@@ -1,6 +1,6 @@
 # viewer
 
-Browser tests of the viewers' shared page, [`apps/viewer-ui`](../../apps/viewer-ui/README.md), in Chromium, Firefox and WebKit with [Playwright Test](https://playwright.dev). The page runs as it is, with a fake shell in place of the desktop's or the web's: the shell opens Documents that `rnl view` built natively before the tests, records what the page asks of it, and does what a test tells it. The tests use the page through its UI, with the mouse and the keyboard, and read the DOM and the debug handle `window.viewer`. They wait for conditions, never for a time.
+Browser tests of the viewers' shared page, [`apps/viewer-ui`](../../apps/viewer-ui/README.md), in Chromium, Firefox and WebKit (CI runs Chromium and WebKit) with [Playwright Test](https://playwright.dev). The page runs as it is, with a fake shell in place of the desktop's or the web's: the shell opens Documents that `rnl view` built natively before the tests, records what the page asks of it, and does what a test tells it. The tests use the page through its UI, with the mouse and the keyboard, and read the DOM and the debug handle `window.viewer`. They wait for conditions, never for a time.
 
 They also smoke-test the web viewer, [`apps/web`](../../apps/web/README.md): its site as `build.mjs` makes it with the samples, served by `serve.mjs`, with the web shell and the real core as WebAssembly in its Worker ([The web viewer](#the-web-viewer)).
 
@@ -25,7 +25,7 @@ npx playwright test --project long --no-deps   # the long file alone
 npx playwright test                            # all four, long last
 ```
 
-In CI, [`viewer.yml`](../../.github/workflows/viewer.yml) installs Rust with the WebAssembly target and Playwright's three browsers with what they need (`npx playwright install --with-deps`), and runs all three projects in them. To look at the page with the fake shell outside the tests, `node server.js [PORT]` builds the fixtures and serves them, for example at `http://127.0.0.1:PORT/?shell=fake&open=04-hierarchy`.
+In CI, [`viewer.yml`](../../.github/workflows/viewer.yml) installs Rust with the WebAssembly target and Playwright's Chromium and WebKit with what they need (`npx playwright install --with-deps chromium webkit`), and runs the chromium and webkit projects, two workers at a time; the firefox project runs only locally. To look at the page with the fake shell outside the tests, `node server.js [PORT]` builds the fixtures and serves them, for example at `http://127.0.0.1:PORT/?shell=fake&open=04-hierarchy`.
 
 ## Files
 

@@ -175,7 +175,7 @@ jobs:
             case "$format" in
               unbundled) exe="$RUNNER_TEMP/diagnostic-binaries/rnl-viewer";;
               appimage) exe="$(find "$RUNNER_TEMP/diagnostic-binaries" -name '*.AppImage' -print -quit)";;
-              deb) sudo apt-get install -y "$RUNNER_TEMP/diagnostic-binaries/"*.deb; exe=/usr/bin/rnl-viewer;;
+              deb) sudo apt-get install -y --no-install-recommends "$RUNNER_TEMP/diagnostic-binaries/"*.deb; exe=/usr/bin/rnl-viewer;;
             esac
             for mode in default no-compositing no-dmabuf software x11-only native-default native-software; do
               flags=()
