@@ -59,8 +59,8 @@ C1 out VSS 10n
 R1 in out 10k
 * @RNL(author="test") {
 *   #R1 @SET-SYMBOL $RES => @PLACE(19, -16) => @ORIENT("R90");
-*   #C1 @PLACE(29, -22);
-*   $GND @ATTACH &VSS(p) => @SET-SYMBOL $GROUND => @PLACE(10, -25) => %gnd1;
+*   #C1 @PLACE(29, -22) => @ORIENT("R0");
+*   $GND @ATTACH &VSS(p) => @SET-SYMBOL $GROUND => @PLACE(10, -25) => @ORIENT("R0") => %gnd1;
 *   %j1 = (11, 2);
 *   $JUNCTION @ATTACH %j1;
 *   &VSS @REMOVE-FROM $PORT_FILL_SET;
@@ -712,4 +712,26 @@ fn the_editor_explains_when_a_conditional_subcircuit_has_no_safe_write_place() {
         write(&request("spice", net, ops)).unwrap_err(),
         "op 0 (set): cell lies in a host region excluded from writing, lines 2 to 6 (2.2)"
     );
+}
+
+#[test]
+fn an_orientation_given_is_written_r0_too() {
+    // without an ORIENT the solver chooses the orientation (11.2): an R0 given is a decision, and is
+    // written; an orientation not given is not
+    let net = "* title
+R1 a 0 1k
+R2 a 0 1k
+.end
+";
+    let ops = json!([
+        {"level": "file", "op": "set", "object": "#R1", "at": [0, 0], "orient": "R0"},
+        {"level": "file", "op": "set", "object": "#R2", "at": [4, 0]}
+    ]);
+    let out = write(&request("spice", net, ops)).unwrap();
+    assert!(out.contains("*   #R1 @PLACE(0, 0) => @ORIENT(\"R0\");
+*   #R2 @PLACE(4, 0)
+"), "{out}");
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    assert!(r.diagnostics().iter().all(|d| d.severity != Severity::Error), "{:?}", r.diagnostics());
 }

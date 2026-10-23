@@ -150,13 +150,14 @@ fn pin(p: &PinOp) -> String {
     format!("{} @PIN({})", point(p.at), params.join(", "))
 }
 
-/// The facts of a position: `@PLACE` and `@ORIENT`, the default orientation R0 left out.
+/// The facts of a position: `@PLACE` and `@ORIENT`. An orientation given is written, R0 too: without
+/// an ORIENT the orientation is the solver's to choose (11.2), not R0.
 fn placed(at: &Option<Point>, orient: &Option<String>) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(p) = at {
         out.push(format!("@PLACE{}", point(*p)));
     }
-    if let Some(o) = orient.as_deref().filter(|o| *o != "R0") {
+    if let Some(o) = orient {
         out.push(format!("@ORIENT({})", quote(o)));
     }
     out
