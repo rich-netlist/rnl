@@ -9,8 +9,8 @@ identical to that tag. No standard text is changed.
 
 The toolkit implements all **46 standard keywords and their 98 fixed parameters**,
 as well as the record fields, style properties and other standard words. This does
-**not** make it fully conformant: the host-region, error-recovery,
-encoding and drawing limitations below remain. Language 0.2 is also read for compatibility;
+**not** make it fully conformant: encoding, bundle-correspondence and advisory
+limitations remain below. Language 0.2 is also read for compatibility;
 new solver/editor output uses 0.3, with a standard-package pin when upgrading 0.2.
 
 ## How to read the evidence
@@ -36,7 +36,10 @@ is distinguished from the 24 cases of 0.3 and dedicated 0.3 regression tests.
 - Parsing, names, sets/selections, definitions/packages/aliases, numbered references,
   appearance and constraint evaluation have implemented paths, with the exceptions in
   the matrices. SPICE and Spectre adapters are partial netlist readers; they are not
-  complete simulator parsers.
+  complete simulator parsers. The [host-region profile](host-regions.md) implements
+  exclusion and safe write placement for the documented script, foreign-language,
+  title, preprocessing, encryption and library forms; unresolved syntax is explicitly
+  bounded there.
 - The renderer/view layer displays explicit positions, symbols, wires, text and diagnostics.
   Rendering defaults, font metrics and placement of text left free are implementation
   policy; a view is not a proof that a solver has satisfied all constraints.
@@ -90,6 +93,22 @@ supported files and preserves unsupported source text.
 - **Deep nested symbols (9.2.3, 9.2.7, 13.3):** geometry, inferred bounds and fixed text traverse the same accepted nested usages. The silent depth-8 cutoffs are removed. Definition validation reports cycles and the implementation limit of 64 symbol levels; this limit includes the outer symbol and applies equally with explicit and inferred boxes. [Regressions](../crates/rnl-cli/tests/deep_symbols.rs) cover 13 transformed wrappers, expanded fixed text, model/solver bounds, explicit boxes, the accepted boundary and error recovery beyond it. A separate pre-expansion guard bounds uncached forward references; reverse-declared chains of 64, 65, 256 and 1,000 levels check the boundary, direct outermost use and subsequent independent definitions.
 - **Named symbol pins (3.6, 6.4, 9.2.4, 9.2.7):** reusable symbols preserve exact terminal spelling. The owning instance decides matching: Spectre and RNL roles are case sensitive; SPICE, including SPICE mode inside a Spectre file, merges case variants with the later pin winning. A cached host-specific pin view preserves other bus members and the original symbol identity. Subcircuit block-symbol metadata uses its host level case rule; owner-free package catalogs retain exact definition keys. [Regressions](../crates/rnl-cli/tests/symbol_pin_case.rs) verify separate nets/wire endpoints, partial bus overrides and reuse of one SPICE-defined symbol by both host modes.
 
+## Host-region follow-up
+
+F-01 (§2.2) is supported within the [documented host-region profile](host-regions.md).
+Both readers now exclude scripts/Verilog, Spectre reliability and encrypted envelopes,
+WRspice job-title lines, inactive or unresolved preprocessing branches, and unselected
+libraries. Literal-selected branches remain readable; unknown conditions give a warning.
+The shared writeback policy avoids those regions, including EOF inside an unfinished
+block, and keeps selected-library output inside the selected section.
+
+Regression evidence: [`host_regions.rs`](../crates/rnl-cli/tests/host_regions.rs) and
+`rnl-edit::tests::{editor_records_and_headers_stay_outside_unterminated_host_regions,
+the_editor_explains_when_a_conditional_subcircuit_has_no_safe_write_place}`.
+The manuals, editions, exact supported delimiters and unresolved simulator syntax are
+listed in the host-region profile. This adds no claim of full preprocessor or simulator
+support.
+
 ## Remaining issues, in priority order
 
 These are open work, not silently accepted extensions. The [roadmap](roadmap.md) remains
@@ -99,7 +118,6 @@ The linked matrices contain the exact source anchors.
 
 | Priority | Remaining issue | Evidence / practical limit |
 | --- | --- | --- |
-| P1 | **Excluded host regions (F-01, 2.2).** RNL inside Spectre `reliability {}` or SPICE `.verilog` is read; `.newjob` titles and preprocessing are not comprehensively classified. | CLI probes drew text inside both excluded regions. Host adapters need context-aware shielding and write-placement policy. |
 | P1 | **Encoding preservation (F-04, 3.1).** CLI writing can silently change Latin-1 to UTF-8 when new characters do not fit; strip-generated directly writes decoded text. | `solve.rs::encode_as` has an explicit UTF-8 fallback (even tested as current behavior). Desktop encoding checks differ. A consistent refusal/conversion policy needs an API decision. |
 | P2 | **Bundle terminal correspondence (11.8).** Heterogeneous members use first-member terminal ordinals, not name-based correspondence when names/orders differ. | The crash is fixed; the broader mapping remains partial and needs regression cases for differing names/orders. |
 | P3 | **Advisory diagnostics (F-08).** Non-ASCII simulator validation, some forward-name typo hints and Spectre SPICE-mode post-`.end` warnings are incomplete. | SHOULD/advisory behavior; see the foundations matrix, distinct from mandatory interpretation failures. |

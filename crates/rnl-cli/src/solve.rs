@@ -536,6 +536,29 @@ fn pass(
             match record_line(&r.doc, p.level, &text) {
                 // a level whose own text lies in a region written to be encrypted has no place for a
                 // record that is not gone once the region is encrypted (2.2): nothing is written for it
+                Err(_)
+                    if r.doc.levels[r.doc.file_level(p.level)].section.is_some()
+                        && r.doc.levels[r.doc.file_level(p.level)].section_lines.is_none() =>
+                {
+                    written.notes.push(format!(
+                        "the record is not written: the selected library section {} was not found in {} (2.2)",
+                        r.doc.levels[r.doc.file_level(p.level)].section.as_deref().unwrap(),
+                        file_name(&host.file)
+                    ));
+                }
+                Err((a, b))
+                    if r.doc.excluded.iter().any(|(f, x, y)| f == &host.file && (*x, *y) == (a, b))
+                        || r.doc
+                            .unselected_sections
+                            .iter()
+                            .any(|(l, x, y)| *l == r.doc.file_level(p.level) && (*x, *y) == (a, b)) =>
+                {
+                    written.notes.push(format!(
+                        "the record is not written: {} lies in a host region excluded from writing, lines {a} to {b} of {} (2.2)",
+                        p.title,
+                        file_name(&host.file)
+                    ));
+                }
                 Err((a, b)) => written.notes.push(format!(
                     "the record is not written: {} lies in a region written to be encrypted, lines {a} to {b} of {}, \
                      where a record is gone once the region is encrypted (2.2)",

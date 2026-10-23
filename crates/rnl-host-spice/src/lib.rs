@@ -9,6 +9,8 @@
 //! A carrier is a whole-line comment with `*` in column 1 followed by a space, or a bare `*`
 //! (2.2). The first line of every file is a title and never a carrier.
 
+pub mod regions;
+
 use std::collections::{HashMap, HashSet};
 
 use rnl_runtime::diag::{Loc, Sink};
@@ -540,7 +542,7 @@ impl<'a> Reader<'a> {
         let mut circ = circ;
         let mut sub_stack: Vec<(LevelId, LevelId)> = Vec::new();
         let mut run: Vec<CarrierLine> = Vec::new();
-        let mut in_control = false;
+        let mut regions = regions::Regions::default();
         // the line of the `.prot` of a region written to be encrypted, while in it (2.2)
         let mut protect: Option<u32> = None;
         let mut ended = false;
@@ -550,7 +552,7 @@ impl<'a> Reader<'a> {
         let mut continued = Continued::default();
         // `.lib` sections: inside the selected one when reading a section; skipping an unselected one
         let mut in_section = section.is_none();
-        let mut skip_lib: Option<String> = None;
+        let mut skip_lib: Option<(String, u32)> = None;
 
         for (idx, raw) in lines.iter().enumerate() {
             let no = idx as u32 + 1;
@@ -563,6 +565,10 @@ impl<'a> Reader<'a> {
                         "the first line of a file is a title and is not read as RNL (2.2)",
                         Some(Loc::line(&fname, 1)),
                     );
+                }
+                // Encryption pragmas are meaningful even on a file's first comment line.
+                if raw.trim_start().starts_with("//") {
+                    regions.skip(raw, no, false, main, &fname, self.sink);
                 }
                 if main || raw.starts_with('*') {
                     continue;
@@ -577,11 +583,13 @@ impl<'a> Reader<'a> {
             }
             // `.lib` section bookkeeping (2.2: an unselected section is not read)
             if !in_section || skip_lib.is_some() {
-                let toks: Vec<&str> = stripped.split_whitespace().collect();
+                let card = strip_inline_comment(stripped);
+                let toks: Vec<&str> = card.split_whitespace().collect();
                 let is_lib = toks.first().is_some_and(|t| t.eq_ignore_ascii_case(".lib"));
                 let is_endl = toks.first().is_some_and(|t| t.eq_ignore_ascii_case(".endl"));
-                if let Some(name) = &skip_lib {
+                if let Some((name, start)) = &skip_lib {
                     if is_endl && toks.get(1).is_none_or(|t| t.eq_ignore_ascii_case(name)) {
+                        self.doc.unselected_sections.push((level, *start, no));
                         skip_lib = None;
                     } else if raw.contains("@RNL") {
                         self.sink.warning(
@@ -602,12 +610,11 @@ impl<'a> Reader<'a> {
                 }
                 continue;
             }
-            if in_control {
-                if raw.contains("@RNL") {
-                    self.sink.warning("RNL inside `.control` is not read (2.2)", Some(Loc::line(&fname, no)));
-                }
-                if low.starts_with(".endc") {
-                    in_control = false;
+            if regions.skip(raw, no, false, main, &fname, self.sink) {
+                self.flush_run(&mut run, &fname, cur);
+                subckt_more = None;
+                if let Some(p) = pending.take() {
+                    self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
                 }
                 continue;
             }
@@ -675,10 +682,6 @@ impl<'a> Reader<'a> {
                 }
                 continue;
             }
-            if first == ".control" {
-                in_control = true;
-                continue;
-            }
             if first == ".prot" || first == ".protect" {
                 protect.get_or_insert(no);
                 continue;
@@ -690,10 +693,11 @@ impl<'a> Reader<'a> {
                 continue;
             }
             if first == ".lib" {
-                let toks: Vec<&str> = stripped.split_whitespace().collect();
+                let card = strip_inline_comment(stripped);
+                let toks: Vec<&str> = card.split_whitespace().collect();
                 if toks.len() == 2 {
                     // a section definition met while reading the file as a whole: not selected
-                    skip_lib = Some(toks[1].to_string());
+                    skip_lib = Some((toks[1].to_string(), no));
                 } else if toks.len() >= 3 {
                     let file = unquote(toks[1]);
                     self.include(&file, Some(toks[2]), no, &fname, path, cur, circ, stack, true);
@@ -729,11 +733,21 @@ impl<'a> Reader<'a> {
         if let Some(p) = pending.take() {
             self.statement(&p.text, p.line, &fname, path, cur, circ, stack);
         }
+        self.doc.excluded.extend(regions.finish(&fname, lines.len() as u32 + 1, self.sink));
+        if let Some((_, start)) = skip_lib {
+            self.doc.unselected_sections.push((level, start, lines.len() as u32 + 1));
+        }
         if let Some(start) = protect {
             self.doc.protected.push((fname.clone(), start, lines.len() as u32 + 1));
         }
         if !sub_stack.is_empty() {
             self.sink.error("a subcircuit has no `.ends`", Some(Loc::line(&fname, lines.len() as u32)));
+        }
+        if let Some(name) = section.filter(|_| self.doc.levels[level].section_lines.is_none()) {
+            self.sink.error(
+                format!("the selected library section {name} was not found; no records can be written there (2.2)"),
+                Some(Loc::line(&fname, 1)),
+            );
         }
         if self.doc.levels[level].end_line == 0 {
             self.doc.levels[level].end_line = lines.len() as u32 + 1;

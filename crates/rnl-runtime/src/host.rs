@@ -218,6 +218,16 @@ pub struct HostDocument {
     /// open closes after the last line of the file. Records there are read, with a warning, but
     /// they are gone once the region is encrypted, so tools do not write there (2.2).
     pub protected: Vec<(String, u32, u32)>,
+    /// Host regions where new records must not be written (2.2), classified by the adapters:
+    /// control/foreign-language blocks, preprocessing regions and host title lines. Each span
+    /// excludes insertion after its opening line through its closing line (inclusive); an
+    /// unterminated region closes one past EOF. Existing RNL in known active conditional
+    /// branches can be read, but new records go outside the conditional.
+    pub excluded: Vec<(String, u32, u32)>,
+    /// Unselected library sections for a particular reading of a file. A whole-file reading
+    /// skips these spans, but another file level may explicitly select the same section.
+    /// The level is the reading's file level, not the subcircuit currently being parsed.
+    pub unselected_sections: Vec<(LevelId, u32, u32)>,
     /// The regions that a reading in Spectre's dialect reads in SPICE mode, where `//` is no
     /// comment and only `*` carries (2.2): the file, the line after which the mode holds, that of
     /// the `simulator lang=spice` or of the `.lib` section that switches to it, 0 in a file that
@@ -235,6 +245,8 @@ impl HostDocument {
             globals: HashSet::new(),
             sources: Vec::new(),
             protected: Vec::new(),
+            excluded: Vec::new(),
+            unselected_sections: Vec::new(),
             spice_mode: Vec::new(),
         }
     }
@@ -247,6 +259,32 @@ impl HostDocument {
     /// of `file`, or what is written in before that line, as the lines that open and close it.
     pub fn protected_at(&self, file: &str, line: u32) -> Option<(u32, u32)> {
         self.protected.iter().find(|(f, a, b)| f == file && *a < line && line <= *b).map(|(_, a, b)| (*a, *b))
+    }
+
+    /// A region where inserting RNL before `line` is unsafe: a plaintext protection region or
+    /// one of the adapter's excluded host regions. Overlapping regions return the outer start.
+    pub fn unwritable_at(&self, file: &str, line: u32) -> Option<(u32, u32)> {
+        self.protected
+            .iter()
+            .chain(&self.excluded)
+            .filter(|(f, a, b)| f == file && *a < line && line <= *b)
+            .map(|(_, a, b)| (*a, *b))
+            .min_by_key(|(a, _)| *a)
+    }
+
+    /// An unsafe insertion position for the reading containing `level`. Script, conditional
+    /// and protection spans always apply; unselected library spans apply only to that reading.
+    pub fn unwritable_in(&self, level: LevelId, line: u32) -> Option<(u32, u32)> {
+        let file_level = self.file_level(level);
+        self.unwritable_at(&self.levels[file_level].file, line)
+            .into_iter()
+            .chain(
+                self.unselected_sections
+                    .iter()
+                    .filter(|(l, a, b)| *l == file_level && *a < line && line <= *b)
+                    .map(|(_, a, b)| (*a, *b)),
+            )
+            .min_by_key(|(a, _)| *a)
     }
 
     /// Whether the line `line` of `file`, or what is written in before that line, is read in SPICE

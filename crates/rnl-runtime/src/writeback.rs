@@ -311,7 +311,9 @@ pub fn append_record(doc: &HostDocument, level: LevelId, text: &str, record: &st
 /// The line before which text added to the end of a level goes (17).
 fn end_of(doc: &HostDocument, level: LevelId, lines: &Lines) -> u32 {
     let lv = &doc.levels[level];
-    if lv.end_line > 0 {
+    if let Some((_, end)) = lv.section_lines {
+        end
+    } else if lv.end_line > 0 {
         lv.end_line
     } else {
         lines.lines.len() as u32 + 1
@@ -325,16 +327,22 @@ fn end_of(doc: &HostDocument, level: LevelId, lines: &Lines) -> u32 {
 /// region instead, and before the subcircuit written in the level that holds that place, at the
 /// last place of the level's own text above the end that lies in no region. A level without one,
 /// such as a subcircuit whose `.subckt` lies in a region, gives that region, as the lines that open
-/// and close it ([`HostDocument::protected`]).
+/// and close it ([`HostDocument::unwritable_at`]). Other excluded host regions follow the same
+/// rule, including unterminated scripts/foreign languages, preprocessing and job-title lines.
 pub fn record_line(doc: &HostDocument, level: LevelId, text: &str) -> Result<u32, (u32, u32)> {
     let lv = &doc.levels[level];
+    let file = &doc.levels[doc.file_level(level)];
+    if file.section.is_some() && file.section_lines.is_none() {
+        return Err((1, Lines::new(text).lines.len() as u32 + 1));
+    }
     // the first place of its own text: after its `.subckt`; line 2 of a file, as line 1 is not read
-    let first = if lv.kind == LevelKind::Subckt { lv.line + 1 } else { 2 };
+    let first =
+        if lv.kind == LevelKind::Subckt { lv.line + 1 } else { lv.section_lines.map_or(2, |(start, _)| start + 1) };
     free_place(doc, level, end_of(doc, level, &Lines::new(text)), first)
 }
 
 /// The last place of the own text of `level`, at the line `at` or above it, that lies in no region
-/// written to be encrypted (2.2) and in no subcircuit written in `level`, given as the line that
+/// excluded from writing (2.2) and in no subcircuit written in `level`, given as the line that
 /// text added there goes before; `first` is the first place of that text. A region that begins
 /// above `first` gives an error with its lines, as [`record_line`] says.
 fn free_place(doc: &HostDocument, level: LevelId, mut at: u32, first: u32) -> Result<u32, (u32, u32)> {
@@ -346,7 +354,7 @@ fn free_place(doc: &HostDocument, level: LevelId, mut at: u32, first: u32) -> Re
         .filter(|s| s.kind == LevelKind::Subckt && s.file == lv.file)
         .collect();
     loop {
-        if let Some((open, close)) = doc.protected_at(&lv.file, at) {
+        if let Some((open, close)) = doc.unwritable_in(level, at) {
             if open < first {
                 return Err((open, close));
             }
@@ -505,15 +513,17 @@ pub fn move_header_for(doc: &HostDocument, level: LevelId, text: &str, version: 
 /// written at the end of `level` (17), or before a region written to be encrypted that the end
 /// lies in ([`record_line`]), would come before it, as [`replace_generated_with_header`] says, and
 /// the carrier it has where it goes, which records written with it follow (2.2); None when it
-/// stays where it is, or has no place to go out of such a region.
+/// stays where it is, or has no place to go out of such a region. The target reading controls
+/// both the header and its destination, even when another reading takes the physical file whole.
 fn header_move(doc: &HostDocument, level: LevelId, text: &str, version: &str) -> Option<(Vec<Edit>, &'static str)> {
     let file = &doc.levels[level].file;
     let at = record_line(doc, level, text).ok()?;
-    let header = first_header(doc, file, Some(doc.file_level(level))).filter(|h| span(h).0 .0 >= at)?;
+    let file_level = Some(doc.file_level(level));
+    let header = first_header(doc, file, file_level).filter(|h| span(h).0 .0 >= at)?;
     let marker = carrier(doc, file, text);
-    let to = top(doc, file, text, marker)
+    let to = top(doc, file, file_level, text, marker)
         .or_else(|| subckt_start(doc, level).map(|line| Top { line, marker, bare: false }))
-        .and_then(|to| to.kept(doc, file))?;
+        .and_then(|to| to.kept(doc, file, file_level))?;
     // the version it gets where it is goes with it
     Some((moved_header(header, version, to), to.marker))
 }
@@ -537,7 +547,8 @@ fn subckt_start(doc: &HostDocument, level: LevelId) -> Option<u32> {
         at = lv.parent;
     }
     let (start, outer) = (start.filter(|&line| line > 0)?, at?);
-    free_place(doc, outer, start, 2).ok()
+    let first = doc.levels[outer].section_lines.map_or(2, |(start, _)| start + 1);
+    free_place(doc, outer, start, first).ok()
 }
 
 /// The changes that move a header record to `to`, carried by its marker, with VERSION when it has
@@ -689,7 +700,8 @@ fn header_edits(
                 let at = first.loc(brace);
                 Edit::Text(at.line, at.col as usize, s)
             });
-            let edit = edit.filter(|e| doc.protected_at(file, e.at().0).is_none());
+            let top = file_records(doc, file, at).0;
+            let edit = edit.filter(|e| unwritable(doc, file, top, e.at().0).is_none());
             return (edit.into_iter().collect(), marker);
         }
         None if headers_of(doc, file, at) => return (Vec::new(), marker),
@@ -714,7 +726,7 @@ fn new_header(
     marker: &'static str,
     record: impl FnOnce(&'static str) -> String,
 ) -> Option<(Edit, &'static str)> {
-    let to = top(doc, file, text, marker).and_then(|to| to.kept(doc, file))?;
+    let to = top(doc, file, None, text, marker).and_then(|to| to.kept(doc, file, None))?;
     Some((to.edit(carried(&record(to.marker), to.marker)), to.marker))
 }
 
@@ -797,7 +809,7 @@ fn raise_edit(doc: &HostDocument, level: LevelId, text: &str, pin: bool) -> Opti
         None if doc.levels[level].section.is_some() => return None,
         None => new_header(doc, file, text, marker, |_| format!("@RNL(type=\"header\") {{ {raised}}}"))?.0,
     };
-    if doc.protected_at(file, edit.at().0).is_some() {
+    if doc.unwritable_in(level, edit.at().0).is_some() {
         return None;
     }
     Some(edit)
@@ -959,6 +971,15 @@ fn names_in(members: &[std::rc::Rc<crate::syntax::Member>], out: &mut Vec<(&'sta
     }
 }
 
+/// File-wide header operations use the whole-file reading when one exists; a targeted
+/// section operation uses its own file level. Both retain the physical host exclusions.
+fn unwritable(doc: &HostDocument, file: &str, top: Option<LevelId>, line: u32) -> Option<(u32, u32)> {
+    match top {
+        Some(level) => doc.unwritable_in(level, line),
+        None => doc.unwritable_at(file, line),
+    }
+}
+
 /// Where a header record written at the top of a file goes: before the line `line`, 1-based,
 /// carried by `marker`, after the bare marker when `bare`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -970,10 +991,36 @@ struct Top {
 
 impl Top {
     /// Where the reading keeps a header written there (2.2): None in a region written to be
-    /// encrypted, and carried by `*` in its stead where the reading is in SPICE mode.
-    fn kept(self, doc: &HostDocument, file: &str) -> Option<Top> {
+    /// encrypted, and carried by `*` in its stead where the reading is in SPICE mode. The
+    /// target file level `at` also bounds a library-section move; None selects the file-wide reading.
+    fn kept(self, doc: &HostDocument, file: &str, at: Option<LevelId>) -> Option<Top> {
         let marker = in_mode(doc, file, self.line, self.marker);
-        doc.protected_at(file, self.line).is_none().then_some(Top { marker, ..self })
+        let mut line = self.line;
+        let mut below_first = false;
+        let (top, records) = file_records(doc, file, at);
+        while let Some((open, close)) = unwritable(doc, file, top, line) {
+            if open < 2 || below_first {
+                below_first = true;
+                // An encrypted envelope may start on the first comment line. Its first safe
+                // header position is after the closing pragma, if it closes before EOF and
+                // no existing record would precede the new header there.
+                let past = doc.source(file)?.lines().count() as u32 + 1;
+                if close >= past || records.iter().any(|(_, r)| r.lines.0 <= close) {
+                    return None;
+                }
+                line = close + 1;
+            } else {
+                line = open;
+            }
+        }
+        if top.is_some_and(|level| {
+            let lv = &doc.levels[level];
+            lv.section.is_some() && lv.section_lines.is_none_or(|(start, end)| line <= start || line > end)
+        }) {
+            return None;
+        }
+        let marker = in_mode(doc, file, line, marker);
+        Some(Top { line, marker, ..self })
     }
 
     /// The change that writes these lines, each behind the marker already, there.
@@ -992,10 +1039,11 @@ impl Top {
 /// bare marker first before a statement on the first line of an included file. In a file that is not a `.scs` file, carried by `//`, whose
 /// first statement is `simulator lang=spectre`, after that statement and the lines that continue
 /// it, when no record comes before it; otherwise above it, in SPICE mode, where only `*` is a
-/// comment (2.2), carried by `*`. None for a file read only through library sections: its line 2
-/// lies outside each of them, and is not read (2.2).
-fn top(doc: &HostDocument, file: &str, text: &str, marker: &'static str) -> Option<Top> {
-    if file_records(doc, file, None).0.is_some_and(|top| doc.levels[top].section.is_some()) {
+/// comment (2.2), carried by `*`. None for a selected library-section reading: a file-wide
+/// top position need not lie inside that section, even when another reading takes the file whole (2.2).
+/// `at` names the target file level, or None selects the file-wide reading.
+fn top(doc: &HostDocument, file: &str, at: Option<LevelId>, text: &str, marker: &'static str) -> Option<Top> {
+    if file_records(doc, file, at).0.is_some_and(|top| doc.levels[top].section.is_some()) {
         return None;
     }
     let lines = Lines::new(text);
@@ -1279,6 +1327,7 @@ mod tests {
             "* models\n.lib tt\nR0 a 0 1k\n.subckt s a b\nR1 a b 1k\n.ends\n* @RNL(type=\"header\") { }\n.endl tt\n";
         let mut d = doc(lib, "models.lib", "*");
         d.levels[0].section = Some("tt".into());
+        d.levels[0].section_lines = Some((2, 8));
         let out = replace_generated_with_header(&d, 1, lib, "@RNL(type=\"generated\") {}", "0.2");
         let want =
             "* models\n.lib tt\nR0 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.subckt s a b\nR1 a b 1k\n\
@@ -1436,6 +1485,7 @@ mod tests {
         let mut d = doc("* t\n.end\n", "a.sp", "*");
         let mut tt = Level::new(LevelKind::File, "models.lib (tt)", "models.lib", "models.lib");
         tt.section = Some("tt".into());
+        tt.section_lines = Some((2, 6));
         d.add_level(tt, Some(0));
         let lib = "* models\n.lib tt\n.subckt pair a b\nR1 a b 1k\n.ends\n.endl tt\n";
         assert_eq!(with_header(&d, "models.lib", lib, "0.2"), lib);
@@ -1511,6 +1561,7 @@ mod tests {
                    * @RNL(type=\"header\") { }\n.endl tt\n";
         let mut d = doc(lib, "models.lib", "*");
         d.levels[0].section = Some("tt".into());
+        d.levels[0].section_lines = Some((2, 10));
         let out = replace_generated_with_header(&d, 1, lib, "@RNL(type=\"generated\") {}", "0.2");
         let want =
             "* models\n.lib tt\nR0 a 0 1k\n* @RNL(type=\"header\") { @VERSION(\"0.2\") }\n.prot\n.subckt s a b\n\

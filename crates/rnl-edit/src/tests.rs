@@ -685,3 +685,31 @@ fn several_items_of_add_to_and_remove_from_are_one_set() {
         r.diagnostics().iter().filter(|d| d.severity != Severity::Hint).map(|d| r.sink.render(d)).collect();
     assert!(loud.is_empty(), "{out}\n{}", loud.join("\n"));
 }
+
+#[test]
+fn editor_records_and_headers_stay_outside_unterminated_host_regions() {
+    for (dialect, source, opening) in [
+        ("spice", "* title\nR1 a 0 1k\n.verilog\nmodule unfinished;", ".verilog"),
+        ("spice", "* title\nR1 a 0 1k\n.exec\nprint unfinished", ".exec"),
+        ("spectre", "// title\nR1 (a 0) resistor r=1k\nrel reliability {\n", "rel reliability"),
+        ("spectre", "// title\nR1 (a 0) resistor r=1k\n#ifdef EXTERNAL\n", "#ifdef"),
+    ] {
+        let ops = json!([{"level": "file", "op": "set", "object": "#R1", "at": [1, 2]}]);
+        let out = write(&request(dialect, source, ops)).unwrap();
+        assert!(out.find("@VERSION").unwrap() < out.find(opening).unwrap(), "{out}");
+        assert!(out.find("@PLACE").unwrap() < out.find(opening).unwrap(), "{out}");
+        let files = MemoryProvider::new().with(entry(dialect), &out);
+        let doc = rnl_view::read_host(entry(dialect), Some(dialect), &files, &mut Sink::new()).unwrap();
+        assert_eq!(doc.main().records.len(), 2, "{out}");
+    }
+}
+
+#[test]
+fn the_editor_explains_when_a_conditional_subcircuit_has_no_safe_write_place() {
+    let net = "* title\n.if 1\n.subckt cell a b\nR1 a b 1k\n.ends cell\n.endif\n";
+    let ops = json!([{"level": "subckt:cell", "op": "set", "object": "#R1", "at": [0, 0]}]);
+    assert_eq!(
+        write(&request("spice", net, ops)).unwrap_err(),
+        "op 0 (set): cell lies in a host region excluded from writing, lines 2 to 6 (2.2)"
+    );
+}
