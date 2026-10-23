@@ -1,4 +1,34 @@
 import { expect, test } from "../viewer.js";
+import { screenshotEvidence, assertPainted } from "../../../apps/desktop/tests/visual.mjs";
+
+test("native smoke pixel checks reject missing content even with a valid DOM and painted grid", async ({ page, viewer }) => {
+  await viewer.open("04-hierarchy");
+  await expect(page.locator('#startup')).toHaveCount(0);
+  const evidence = async () => page.evaluate(screenshotEvidence, (await page.screenshot()).toString('base64'));
+  assertPainted(await evidence());
+  await page.emulateMedia({colorScheme:'dark'});
+  assertPainted(await evidence());
+  for (const selector of ['.view-tabs button', '#source .code', '#source', '#canvas > svg']) {
+    const sheet = await page.addStyleTag({content:`${selector} {visibility:hidden !important}`});
+    try {
+      await expect(page.locator('#canvas > svg')).toHaveCount(1);
+      const blank = await evidence();
+      expect(() => assertPainted(blank)).toThrow(/Screenshot has no painted content/);
+    } finally { await sheet.evaluate(el => el.remove()); }
+  }
+  // The DOM can report visible while a compositor supplies a flat layer of the wrong colour.
+  const solid = await page.evaluate(async png => {
+    const c=document.createElement('canvas'); c.width=innerWidth; c.height=innerHeight;
+    const image=new Image(); image.src=`data:image/png;base64,${png}`; await image.decode();
+    const ctx=c.getContext('2d'); ctx.drawImage(image,0,0,c.width,c.height);
+    const r=document.getElementById('source').getBoundingClientRect();
+    ctx.fillStyle='#232327'; ctx.fillRect(r.x,r.y,r.width,r.height);
+    return c.toDataURL('image/png').split(',')[1];
+  }, (await page.screenshot()).toString('base64'));
+  const blank = await page.evaluate(screenshotEvidence, solid);
+  expect(blank.regions.find(r=>r.selector==='#source').density).toBeGreaterThan(0.6);
+  expect(() => assertPainted(blank)).toThrow(/Screenshot has no painted content in #source/);
+});
 
 test("loading reports stages without a percentage and clears when the document is painted", async ({ page, viewer }) => {
   await viewer.open();

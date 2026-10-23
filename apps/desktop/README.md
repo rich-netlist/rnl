@@ -178,11 +178,27 @@ node apps/desktop/tests/smoke.mjs [--port PORT] [--no-build | --exe PATH]
 
 The app runs with a WebView2 profile of its own in a temporary directory, so the layout kept in your profile is left as it was, and is stopped by its process ID. The test fails at once when the app ends early, and a step fails when the page stops answering; when the WebView's DevTools port does not answer, it says what there is of the WebView: its processes, with their arguments, and its profile. `--exe` starts the app at PATH instead of building one, such as `target/release/rnl-viewer.exe` or an installed app. The page itself is tested in three browsers against a fake shell in [`tests/viewer`](../../tests/viewer/README.md).
 
-On Linux, install `webkit2gtk-driver`, `xvfb`, `xdotool` and `dbus-x11`, build the app, and run:
+On Linux, install `webkit2gtk-driver`, `xvfb`, `xdotool`, `dbus-x11` and `imagemagick`, build the app, and run:
 
 ```bash
 dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --exe apps/desktop/target/debug/rnl-viewer
 ```
+
+Both native smoke tests require painted tab labels, source text and schematic pixels, after the
+startup/loading overlays clear. The Linux test checks both a WebKit snapshot and the real X11
+framebuffer cropped to the WebView, saving the initial and accepted frames plus pixel evidence.
+The grid, borders and a flat background cannot satisfy the checks.
+
+For a release investigation, manually run `desktop.yml` with `linux_diagnostics=true`.
+This skips the regular desktop test matrix and runs only diagnostics: released 0.1.2/0.1.3/0.1.4
+AppImages, plus a CI-built release executable, AppImage and installed deb from the same commit.
+Each gets 1/3/10-second X11 and WebKit captures, DOM/computed styles and rAF counts under default,
+compositing-disabled, DMABUF-disabled and software-rendering environments. Separate X11-only and
+ordinary native launches control for WebDriver/snapshot effects. Capture failures are retained
+instead of preventing the other observations. `diagnostic_binary_run_id` reuses the exact binaries
+from an earlier diagnostic run, including their source commit, and skips the historical matrix.
+The diagnostic jobs only upload artifacts; they cannot publish. They also compare the original
+DOM-only smoke test at the investigation's starting commit with the painted-content gate.
 
 This test uses WebKitGTK's native WebDriver directly, with the same capabilities and automation environment as Tauri's driver. It opens a temporary copy of `04-hierarchy.sp` and its include, checks the visible window's title, the rendered SVG, the loaded `amp` subcircuit and the absence of document errors, and checks the netlist was not written. It builds nothing and also accepts a release AppImage or an installed binary. Set `SMOKE_OUTPUT_DIR` to keep screenshots. CI runs it against the debug app in `desktop.yml` and both packaged forms in `viewer-release.yml`.
 

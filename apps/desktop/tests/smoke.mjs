@@ -402,6 +402,17 @@ async function drive(app, port, profile, t0, session) {
   await page.evaluate(`window.viewer.command('language-en')`);
   same(s.level, TOP, "the level drawn");
   await until("the window's title", () => windowTitle(app.pid) === `${TOP} - RNL Viewer`, 10_000);
+  await until("painted tab, source and schematic pixels", async () => {
+    const {screenshotEvidence, assertPainted} = await import('./visual.mjs');
+    const {data} = await page.send("Page.captureScreenshot", {format:"png"});
+    const visual = await page.evaluate(`(${screenshotEvidence.toString()})(${JSON.stringify(data)})`);
+    if (process.env.SMOKE_OUTPUT_DIR) {
+      fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR,"native-startup.png"),Buffer.from(data,"base64"));
+      fs.writeFileSync(path.join(process.env.SMOKE_OUTPUT_DIR,"native-startup-pixels.json"),JSON.stringify(visual,null,2));
+    }
+    assertPainted(visual);
+    return true;
+  });
   same(await page.evaluate("window.__TAURI__.app.getVersion()"), version, "the running Viewer version");
   await page.evaluate(`(async () => {
     (await import('./panels.js')).setPane('netlist');

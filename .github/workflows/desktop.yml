@@ -30,15 +30,183 @@ on:
       - ".github/workflows/desktop.yml"
       - ".github/workflows/viewer-release.yml"
   workflow_dispatch:
+    inputs:
+      linux_diagnostics:
+        description: "Only diagnose Linux rendering; skip the regular desktop test matrix (never publishes)"
+        type: boolean
+        default: false
+      diagnostic_binary_run_id:
+        description: "Diagnostics only: reuse diagnostic-linux-binaries from this run instead of rebuilding"
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: 4
 
 jobs:
+  # Manual-only observation of released binaries. This job cannot create tags or releases.
+  diagnose-history:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_diagnostics && inputs.diagnostic_binary_run_id == ''
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Install native capture and WebKit automation
+        run: |
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y webkit2gtk-driver xvfb xdotool dbus-x11 imagemagick libfuse2 libayatana-appindicator3-1
+          dpkg-query -W '*webkit*' '*mesa*' > "$RUNNER_TEMP/linux-versions.txt"
+      - name: Observe three released AppImages at 1, 3 and 10 seconds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/history"
+          cp "$RUNNER_TEMP/linux-versions.txt" "$RUNNER_TEMP/history/"
+          for version in 0.1.2 0.1.3 0.1.4; do
+            gh release download "viewer-v$version" --pattern '*linux-x86_64.AppImage' --dir "$RUNNER_TEMP/binaries/$version"
+            exe="$RUNNER_TEMP/binaries/$version/RNL-Viewer-$version-linux-x86_64.AppImage"
+            chmod +x "$exe"
+            for mode in default no-compositing no-dmabuf software x11-only native-default native-software; do
+              flags=()
+              case "$mode" in
+                no-compositing) flags+=(WEBKIT_DISABLE_COMPOSITING_MODE=1);;
+                no-dmabuf) flags+=(WEBKIT_DISABLE_DMABUF_RENDERER=1);;
+                software) flags+=(LIBGL_ALWAYS_SOFTWARE=1);;
+                x11-only) flags+=(LIBGL_ALWAYS_SOFTWARE=1 DIAGNOSTIC_X11_ONLY=1);;
+                native-default) flags+=(DIAGNOSTIC_NATIVE=1);;
+                native-software) flags+=(LIBGL_ALWAYS_SOFTWARE=1 DIAGNOSTIC_NATIVE=1);;
+              esac
+              out="$RUNNER_TEMP/history/$version/$mode"
+              dbus-run-session -- xvfb-run -a -s '-screen 0 1280x1024x24' env "${flags[@]}" SMOKE_OUTPUT_DIR="$out" node apps/desktop/tests/linux-diagnostic.mjs --exe "$exe" || echo "Probe failed; inspect $out"
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: linux-render-history
+          path: ${{ runner.temp }}/history/
+          retention-days: 14
+
+  diagnose-current:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_diagnostics
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Install Linux build, capture and automation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev patchelf libfuse2 webkit2gtk-driver xvfb xdotool dbus-x11 imagemagick
+      - name: Install Rust
+        if: inputs.diagnostic_binary_run_id == ''
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Write the web fonts
+        if: inputs.diagnostic_binary_run_id == ''
+        run: pip install fonttools==4.58.0 brotli==1.2.0 && python scripts/fonts.py web
+      - name: Build release binary and packages from the same commit (CI only)
+        if: inputs.diagnostic_binary_run_id == ''
+        working-directory: apps/desktop
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: npm ci && npx tauri build --bundles appimage,deb
+      - name: Retain the exact unbundled executable and packages for repeat probes
+        if: inputs.diagnostic_binary_run_id == ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/diagnostic-binaries"
+          cp apps/desktop/target/release/rnl-viewer "$RUNNER_TEMP/diagnostic-binaries/"
+          cp apps/desktop/target/release/bundle/appimage/*.AppImage "$RUNNER_TEMP/diagnostic-binaries/"
+          cp apps/desktop/target/release/bundle/deb/*.deb "$RUNNER_TEMP/diagnostic-binaries/"
+          git rev-parse HEAD > "$RUNNER_TEMP/diagnostic-binaries/commit.txt"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: inputs.diagnostic_binary_run_id == ''
+        with:
+          name: diagnostic-linux-binaries
+          path: ${{ runner.temp }}/diagnostic-binaries/
+          retention-days: 14
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: inputs.diagnostic_binary_run_id != ''
+        with:
+          name: diagnostic-linux-binaries
+          path: ${{ runner.temp }}/diagnostic-binaries/
+          run-id: ${{ inputs.diagnostic_binary_run_id }}
+          github-token: ${{ github.token }}
+      - name: Observe unbundled, AppImage and Debian release variants
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/current"
+          cp "$RUNNER_TEMP/diagnostic-binaries/commit.txt" "$RUNNER_TEMP/current/commit.txt"
+          chmod +x "$RUNNER_TEMP/diagnostic-binaries/rnl-viewer" "$RUNNER_TEMP/diagnostic-binaries/"*.AppImage
+          dpkg-query -W '*webkit*' '*mesa*' > "$RUNNER_TEMP/current/linux-versions.txt"
+          fc-list :lang=zh family > "$RUNNER_TEMP/current/cjk-fonts.txt"
+          fc-match 'monospace:lang=zh' > "$RUNNER_TEMP/current/monospace-zh.txt"
+          for format in unbundled appimage deb; do
+            case "$format" in
+              unbundled) exe="$RUNNER_TEMP/diagnostic-binaries/rnl-viewer";;
+              appimage) exe="$(find "$RUNNER_TEMP/diagnostic-binaries" -name '*.AppImage' -print -quit)";;
+              deb) sudo apt-get install -y "$RUNNER_TEMP/diagnostic-binaries/"*.deb; exe=/usr/bin/rnl-viewer;;
+            esac
+            for mode in default no-compositing no-dmabuf software x11-only native-default native-software; do
+              flags=()
+              case "$mode" in
+                no-compositing) flags+=(WEBKIT_DISABLE_COMPOSITING_MODE=1);;
+                no-dmabuf) flags+=(WEBKIT_DISABLE_DMABUF_RENDERER=1);;
+                software) flags+=(LIBGL_ALWAYS_SOFTWARE=1);;
+                x11-only) flags+=(LIBGL_ALWAYS_SOFTWARE=1 DIAGNOSTIC_X11_ONLY=1);;
+                native-default) flags+=(DIAGNOSTIC_NATIVE=1);;
+                native-software) flags+=(LIBGL_ALWAYS_SOFTWARE=1 DIAGNOSTIC_NATIVE=1);;
+              esac
+              out="$RUNNER_TEMP/current/$format/$mode"
+              dbus-run-session -- xvfb-run -a -s '-screen 0 1280x1024x24' env "${flags[@]}" SMOKE_OUTPUT_DIR="$out" node apps/desktop/tests/linux-diagnostic.mjs --exe "$exe" || echo "Probe failed; inspect $out"
+            done
+          done
+      - name: Compare the original DOM-only smoke with the painted-content gate
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          # The unmodified smoke test in main when this investigation began (#174).
+          git show e4e2214499c00fdc8040c7b08323094d0fd48325:apps/desktop/tests/linux-smoke.mjs > apps/desktop/tests/linux-smoke-legacy.mjs
+          for format in unbundled appimage deb; do
+            case "$format" in
+              unbundled) exe="$RUNNER_TEMP/diagnostic-binaries/rnl-viewer";;
+              appimage) exe="$(find "$RUNNER_TEMP/diagnostic-binaries" -name '*.AppImage' -print -quit)";;
+              deb) exe=/usr/bin/rnl-viewer;;
+            esac
+            for test in legacy pixels; do
+              script=apps/desktop/tests/linux-smoke.mjs
+              if [ "$test" = legacy ]; then script=apps/desktop/tests/linux-smoke-legacy.mjs; fi
+              out="$RUNNER_TEMP/current/readiness/$format/$test"
+              dbus-run-session -- xvfb-run -a -s '-screen 0 1280x1024x24' env SMOKE_OUTPUT_DIR="$out" node "$script" --exe "$exe"
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: linux-render-current
+          path: ${{ runner.temp }}/current/
+          retention-days: 14
+
   test:
+    if: ${{ !inputs.linux_diagnostics }}
     strategy:
       fail-fast: false
       matrix:
@@ -48,7 +216,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install the WebView build dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev webkit2gtk-driver xvfb xdotool dbus-x11
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev webkit2gtk-driver xvfb xdotool dbus-x11 imagemagick
       - name: Install Rust
         run: rustup toolchain install stable --profile minimal --component rustfmt,clippy && rustup default stable
       - name: Install Python for the web fonts
