@@ -60,8 +60,13 @@ try {
   await observe('sidebar-hidden',r=>!r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r));
   key('b','using command down');
   await observe('sidebar-restored',r=>r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r));
+  menu('Help','Check for Updates');
+  await observe('updates',r=>/Check for Updates/.test(text(r)) && /latest|newer|available|no release|could not/i.test(text(r)));
+  osa('tell application "System Events" to key code 53');
   key('q','using control down');
   await observe('editing',r=>/Apply and Exit/.test(text(r)));
+  key('a','using command down'); key('c','using command down');
+  assert.match(execFileSync('pbpaste',{encoding:'utf8'}),/Two-stage buffer/,'Native Cmd+A/C must select/copy the source.');
   key('q','using control down');
   await observe('reading',drawn);
   // A second LaunchServices open reaches an already-running app, as Finder's Open With does.
