@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "category": "DeveloperTool",
+    "shortDescription": "Open, draw and solve Rich Netlist circuits",
+    "macOS": { "minimumSystemVersion": "13.0", "signingIdentity": "-" },
+    "fileAssociations": [
+      {
+        "ext": ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "inc", "lib", "scs", "rnl"],
+        "name": "Netlists and RNL packages",
+        "role": "Editor"
+      }
+    ]
+  }
+}

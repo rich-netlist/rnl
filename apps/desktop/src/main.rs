@@ -12,6 +12,8 @@ mod core_thread;
 mod files;
 mod library;
 mod load_progress;
+#[cfg(target_os = "macos")]
+mod macos;
 mod menu;
 mod pool;
 mod preload;
@@ -324,6 +326,15 @@ fn finish_startup(window: WebviewWindow, startup: State<'_, startup::Startup>) -
     startup.finish(&window)
 }
 
+/// The file listener and initial document are ready, independently of the early native paint handoff.
+#[tauri::command]
+fn open_events_ready(app: AppHandle) {
+    #[cfg(target_os = "macos")]
+    macos::ready(&app);
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
 /// Ask for a file to open; None when the dialog is cancelled.
 #[tauri::command]
 async fn pick_file(window: WebviewWindow) -> Option<String> {
@@ -340,7 +351,13 @@ async fn pick_file(window: WebviewWindow) -> Option<String> {
 
 /// The file named on the command line, if any.
 #[tauri::command]
-fn initial_file() -> Option<String> {
+fn initial_file(app: AppHandle) -> Option<String> {
+    #[cfg(target_os = "macos")]
+    if let Some(path) = macos::initial(&app) {
+        return Some(path);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
     let arg = file_argument(std::env::args_os().skip(1))?;
     let path = std::path::absolute(PathBuf::from(arg)).ok()?;
     Some(path.to_string_lossy().into_owned())
@@ -384,7 +401,10 @@ fn main() {
             window.additional_browser_args = Some(format!("{WEBVIEW_ARGS} {DEVTOOLS_SWITCH}{port}"));
         }
     }
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.manage(macos::OpenedFiles::default());
+    builder
         .plugin(tauri_plugin_dialog::init())
         // opens a release's page for Help > Check for Updates; the capability limits it to the repository's
         .plugin(tauri_plugin_opener::init())
@@ -425,6 +445,7 @@ fn main() {
             set_dirty,
             quit,
             finish_startup,
+            open_events_ready,
             pick_file,
             initial_file,
             open_default_apps,
@@ -446,8 +467,16 @@ fn main() {
             solve::cancel_solve,
             solve::save_solved_copy
         ])
-        .run(context)
-        .expect("the viewer window could not be started");
+        .build(context)
+        .expect("the viewer window could not be started")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = event {
+                macos::opened(app, urls);
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }
 
 #[cfg(test)]

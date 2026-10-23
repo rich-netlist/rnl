@@ -97,6 +97,37 @@ class SiteNavigation(unittest.TestCase):
 
 
 class ReleaseDownloads(unittest.TestCase):
+    def test_macos_requires_app_and_dmg_in_the_selected_tag(self):
+        for targets, expected in [(["app", "dmg"], True), (["dmg"], False), (["nsis", "msi"], False)]:
+            with self.subTest(targets=targets), patch.object(build.subprocess, "run", return_value=SimpleNamespace(stdout=json.dumps({"bundle": {"targets": targets}}))) as run:
+                self.assertEqual(build.has_macos_release("0.2.0"), expected)
+                self.assertEqual(run.call_args.args[0], ["git", "show", "viewer-v0.2.0:apps/desktop/tauri.macos.conf.json"])
+        with patch.object(build.subprocess, "run", side_effect=subprocess.CalledProcessError(128, "git")):
+            self.assertFalse(build.has_macos_release("0.1.4"))
+        with patch.object(build.subprocess, "run") as run:
+            self.assertFalse(build.has_macos_release(None))
+            run.assert_not_called()
+
+    def test_bilingual_macos_links_are_independent_of_linux_and_absent_from_old_tags(self):
+        for version, macos in [("0.2.0", True), ("0.1.4", False), (None, False)]:
+            for linux in [True, False]:
+                with self.subTest(version=version, macos=macos, linux=linux), patch.object(build, "has_macos_release", return_value=macos), patch.object(build, "has_linux_release", return_value=linux):
+                    pages = build.build(version)
+                    for language in ["en", "zh"]:
+                        html = pages[f"{language}/tools.html"]
+                        self.assertEqual("-macos-arm64.dmg\"" in html, macos)
+                        self.assertEqual("-macos-x86_64.dmg\"" in html, macos)
+                        self.assertNotIn("<!--macos-release-->", html)
+                        self.assertNotIn("{{viewer-", html)
+                        if macos:
+                            self.assertIn("xattr -dr com.apple.quarantine", html)
+                            self.assertIn("Library/Application Support/", html)
+
+    def test_macos_blocks_obey_the_release_markup_rules(self):
+        self.assertEqual(build.check_release("<!--macos-release-->{{viewer-tag}}<!--/macos-release-->", "test"), [])
+        self.assertTrue(build.check_release("<!--macos-release-->{{viewer-tag}}", "test"))
+        self.assertTrue(build.check_release("<!--no-macos-release-->{{viewer-tag}}<!--/no-macos-release-->", "test"))
+
     def test_linux_requires_both_packages_in_the_selected_tag(self):
         for targets, expected in [(["appimage", "deb"], True), (["nsis", "msi"], False), (["deb"], False)]:
             config = SimpleNamespace(stdout=json.dumps({"bundle": {"targets": targets}}))

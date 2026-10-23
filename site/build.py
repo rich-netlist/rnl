@@ -108,8 +108,8 @@ VIEWER_TAG = re.compile(r"viewer-v(\d+)\.(\d+)\.(\d+)")
 VERSION = re.compile(r"\d+\.\d+\.\d+")
 # The parts of a page kept with a release of the desktop viewer, or without one, and the fields
 # filled in from the release.
-RELEASE = re.compile(r"<!--((?:no-)?(?:linux-)?release)-->(.*?)<!--/\1-->", re.S)
-RELEASE_MARK = re.compile(r"<!--/?(?:no-)?(?:linux-)?release-->")
+RELEASE = re.compile(r"<!--((?:no-)?(?:(?:linux|macos)-)?release)-->(.*?)<!--/\1-->", re.S)
+RELEASE_MARK = re.compile(r"<!--/?(?:no-)?(?:(?:linux|macos)-)?release-->")
 FIELD = re.compile(r"\{\{(viewer-[a-z-]+)\}\}")
 FIELDS = ("viewer-version", "viewer-tag")
 TIMELINE = "{{timeline}}"
@@ -299,17 +299,18 @@ def check_release(text, name):
         if m.group(1) not in FIELDS:
             errors.append("%s:%d: {{%s}} is not a field; the fields are %s"
                           % (name, line_of(text, m.start()), m.group(1), ", ".join("{{%s}}" % f for f in FIELDS)))
-    kept = RELEASE.sub(lambda m: blank(m) if m.group(1) in ("release", "linux-release") else m.group(0), text)
+    kept = RELEASE.sub(lambda m: blank(m) if m.group(1) in ("release", "linux-release", "macos-release") else m.group(0), text)
     for m in FIELD.finditer(kept):
         errors.append("%s:%d: {{%s}} outside a <!--release--> block" % (name, line_of(kept, m.start()), m.group(1)))
     return errors
 
 
-def release(text, version, linux=False):
+def release(text, version, linux=False, macos=False):
     """Keep the release blocks that apply to `version`, None for no release, with the fields filled in."""
     with_release = version is not None
     enabled = {"release": with_release, "no-release": not with_release,
-               "linux-release": with_release and linux, "no-linux-release": not (with_release and linux)}
+               "linux-release": with_release and linux, "no-linux-release": not (with_release and linux),
+               "macos-release": with_release and macos, "no-macos-release": not (with_release and macos)}
     text = RELEASE.sub(lambda m: m.group(2) if enabled[m.group(1)] else "", text)
     if not with_release:
         return text
@@ -338,6 +339,19 @@ def has_linux_release(version):
             ["git", "show", f"viewer-v{version}:apps/desktop/tauri.linux.conf.json"],
             cwd=ROOT, capture_output=True, text=True, check=True)
         return set(json.loads(config.stdout)["bundle"]["targets"]) >= {"appimage", "deb"}
+    except (OSError, subprocess.CalledProcessError, ValueError, KeyError, TypeError):
+        return False
+
+
+def has_macos_release(version):
+    """Older tags must not acquire links to Mac artifacts that were never built."""
+    if version is None:
+        return False
+    try:
+        config = subprocess.run(
+            ["git", "show", f"viewer-v{version}:apps/desktop/tauri.macos.conf.json"],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        return set(json.loads(config.stdout)["bundle"]["targets"]) >= {"app", "dmg"}
     except (OSError, subprocess.CalledProcessError, ValueError, KeyError, TypeError):
         return False
 
@@ -465,7 +479,7 @@ def check_examples_rnl(rnl):
     return errors
 
 
-def build_language(files, index, version, linux=False):
+def build_language(files, index, version, linux=False, macos=False):
     """Return {relative path: text} for one language, including the standalone pages. Both kinds
     of release block are checked for Chinese before the ones that do not apply are dropped."""
     code, prefix = LANGS[index]
@@ -486,7 +500,7 @@ def build_language(files, index, version, linux=False):
             errors += check_leaks(text, "%s (%s)" % (path, code))
     if errors:
         raise BuildError("\n".join(errors))
-    out = {path: release(text, version, linux) for path, text in out.items()}
+    out = {path: release(text, version, linux, macos) for path, text in out.items()}
     for page, single in PAGES.items():
         out[page] = out[page].replace("<!doctype html>\n", "<!doctype html>\n" + NOTICE, 1)
         if single:
@@ -608,8 +622,9 @@ def build(version=None):
         raise BuildError("\n".join(errors))
     result = {}
     linux = has_linux_release(version)
+    macos = has_macos_release(version)
     for index, (code, prefix) in enumerate(LANGS):
-        for path, text in build_language(files, index, version, linux).items():
+        for path, text in build_language(files, index, version, linux, macos).items():
             result[prefix + path] = text
         # Brand images are copied verbatim; only prose and scripts need localization.
         for path in sorted((SRC / "assets").rglob("*")):

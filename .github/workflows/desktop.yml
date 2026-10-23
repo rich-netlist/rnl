@@ -39,6 +39,10 @@ on:
         description: "Diagnostics only: reuse diagnostic-linux-binaries from this run instead of rebuilding"
         type: string
         default: ""
+      macos_smoke_run_id:
+        description: "Only observe the retained macos-arm64 DMG from this Viewer release run; no rebuild"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -48,6 +52,14 @@ env:
   CARGO_BUILD_JOBS: 4
 
 jobs:
+  observe-macos:
+    if: github.event_name == 'workflow_dispatch' && inputs.macos_smoke_run_id != ''
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/macos-smoke.yml
+    with:
+      release_run_id: ${{ inputs.macos_smoke_run_id }}
   # Manual-only observation of released binaries. This job cannot create tags or releases.
   diagnose-history:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_diagnostics && inputs.diagnostic_binary_run_id == ''
@@ -206,7 +218,7 @@ jobs:
           retention-days: 14
 
   test:
-    if: ${{ !inputs.linux_diagnostics }}
+    if: ${{ !inputs.linux_diagnostics && !inputs.macos_smoke_run_id }}
     strategy:
       fail-fast: false
       matrix:
@@ -234,7 +246,6 @@ jobs:
       - name: Tests
         run: cargo test --manifest-path apps/desktop/Cargo.toml
       - name: Install Node for the smoke test
-        if: runner.os == 'Windows' || runner.os == 'Linux'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -276,6 +287,26 @@ jobs:
           name: desktop-linux-smoke
           path: ${{ runner.temp }}/smoke-linux/
           if-no-files-found: ignore
+          retention-days: 14
+      - name: Bundle the debug Mac app
+        if: runner.os == 'macOS'
+        working-directory: apps/desktop
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+        run: npm ci && npx tauri build --debug --bundles app
+      - name: macOS smoke test
+        if: runner.os == 'macOS'
+        timeout-minutes: 12
+        env:
+          SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-macos
+        run: node apps/desktop/tests/macos-smoke.mjs --app "apps/desktop/target/debug/bundle/macos/RNL Viewer.app"
+      - name: Keep the macOS native screenshots and OCR
+        if: always() && runner.os == 'macOS'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-macos-smoke
+          path: ${{ runner.temp }}/smoke-macos/
+          if-no-files-found: error
           retention-days: 14
       # the installers' test runs in viewer-release.yml only
       - name: Check the scripts of the page and of the app's tests

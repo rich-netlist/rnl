@@ -202,6 +202,7 @@ jobs:
         env:
           RNL_SITE_SCREENSHOTS: ${{ runner.temp }}/package-review
           RNL_I18N_SCREENSHOTS: ${{ runner.temp }}/package-review/language-menu
+          RNL_MACOS_SCREENSHOTS: ${{ runner.temp }}/package-review/macos
           RNL_TIMELINE_SCREENSHOTS: ${{ runner.temp }}/package-review/timeline
         run: |
           npm ci --prefix tests/viewer

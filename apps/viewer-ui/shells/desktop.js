@@ -66,6 +66,19 @@ export default {
   initial: () => invoke("initial_file").then(file),
   fileAssociations: () => invoke("open_default_apps"),
   async onOpen(handler) {
+    // Finder's initial file is held by Rust until initial_file/finish_startup; later Open
+    // With events use the same filter, chooser and unsaved-edit flow as native drops.
+    let pending = Promise.resolve();
+    await tauri.event.listen('opened-files', ({payload}) => {
+      pending = pending.catch(() => {}).then(async () => {
+        const paths = await invoke('dropped_files', {paths:payload});
+        const path = paths.length === 1 ? paths[0] : paths.length ? await choose({
+          title:m('Open Netlist'), text:m('Choose the dropped file to open.'), filter:true,
+          items:paths.map(path=>({label:path,value:path})),
+        }) : null;
+        if (path) await handler(file(path));
+      });
+    });
     await tauri.webview.getCurrentWebview().onDragDropEvent(async ({ payload }) => {
       const blocked = openingDrop || modal() || document.body.classList.contains("busy");
       document.body.classList.toggle("dropping", !blocked && ["enter", "over"].includes(payload.type));

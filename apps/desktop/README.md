@@ -70,7 +70,7 @@ sudo apt remove rnl-viewer
 sha256sum --check --ignore-missing SHA256SUMS.txt
 ```
 
-Both Linux formats accept a netlist path after the executable, or **File › Open File** after launch. The AppImage needs no installation; remove that file to uninstall it. macOS packages remain future work; build from source there.
+Both Linux formats accept a netlist path after the executable, or **File › Open File** after launch. The AppImage needs no installation; remove that file to uninstall it. macOS installation is described below under macOS downloads and installation.
 
 From the repository root:
 
@@ -144,7 +144,7 @@ msiexec /x RNL-Viewer-0.1.3-windows-x64.msi /qn
 
 See [the three release lines](../../docs/releases.md) for version ownership and manual `candidate_tag` mismatch rehearsals. First-release versions remain subject to the user's decision.
 
-[`viewer-release.yml`](../../.github/workflows/viewer-release.yml) builds and releases the viewer for Windows x64 and Linux x86_64 on GitHub's runners. To release version X.Y.Z:
+[`viewer-release.yml`](../../.github/workflows/viewer-release.yml) builds and releases the viewer for Windows x64, Linux x86_64, macOS Apple Silicon and Intel on GitHub's runners. To release version X.Y.Z:
 
 1. Set the Viewer version only in `Cargo.toml` and `tauri.conf.json` here, and update the app's own lockfile entry. Leave the root workspace/core version unchanged. The web viewer reads the Viewer version too; both About dialogs also name the core version and build commit. The tests require the two Viewer declarations to match, independently of the core.
 2. Write the release's notes in `release-notes/X.Y.Z.md`.
@@ -152,16 +152,66 @@ See [the three release lines](../../docs/releases.md) for version ownership and 
 
 The workflow stops when the tag is not the app's version or the notes are missing. On Windows it builds with MSVC, checks with `dumpbin` that the executable imports no `WebView2Loader.dll`, smoke-tests the executable alone in a directory, installs each installer silently, smoke-tests the installed app and uninstalls it. On Linux it builds the AppImage and deb, smoke-tests the AppImage alone in a directory under Xvfb, installs the deb, smoke-tests `/usr/bin/rnl-viewer`, uninstalls it and checks that the binary and desktop entry are gone. The tests use a D-Bus session, software rendering and isolated profiles, and keep screenshots as Actions artifacts.
 
-After both platforms succeed, the workflow verifies each platform's checksums and writes one combined `SHA256SUMS.txt`. The GitHub release *RNL Viewer X.Y.Z* contains six files:
+After all platforms succeed, the workflow verifies each platform's checksums and writes one combined `SHA256SUMS.txt`. The GitHub release *RNL Viewer X.Y.Z* contains eight files:
 
 - `RNL-Viewer-X.Y.Z-windows-x64-setup.exe`
 - `RNL-Viewer-X.Y.Z-windows-x64.msi`
 - `RNL-Viewer-X.Y.Z-windows-x64.exe`
 - `RNL-Viewer-X.Y.Z-linux-x86_64.AppImage`
 - `RNL-Viewer-X.Y.Z-linux-x86_64.deb`
+- `RNL-Viewer-X.Y.Z-macos-arm64.dmg`
+- `RNL-Viewer-X.Y.Z-macos-x86_64.dmg`
 - `SHA256SUMS.txt`
 
-The release uses `--latest=false`; the repository's latest belongs to the core (`core-vX.Y.Z`), so the viewer's releases are told apart by their tags. A version with a prerelease part, such as `0.2.0-rc.1`, makes a prerelease, which Check for Updates passes over. Run by hand from the Actions tab on a branch, the workflow builds and checks both platforms and keeps the platform artifacts and combined six-file artifact; it never publishes. Before pushing a release tag, run it on the intended commit, check both build jobs and the combined checksums, inspect the Linux screenshots, and confirm the versions and notes above. The site only links Linux files when the selected release tag contains the Linux bundle configuration, so earlier Windows-only releases keep valid download links.
+The release uses `--latest=false`; the repository's latest belongs to the core (`core-vX.Y.Z`), so the viewer's releases are told apart by their tags. A version with a prerelease part, such as `0.2.0-rc.1`, makes a prerelease, which Check for Updates passes over. Run by hand from the Actions tab on a branch, the workflow builds and checks all platforms and keeps the platform artifacts and combined eight-file artifact; it never publishes. Before pushing a release tag, run it on the intended commit, check every build job and the combined checksums, inspect the Linux screenshots, and confirm the versions and notes above. The site only links Linux files when the selected release tag contains the Linux bundle configuration, so earlier Windows-only releases keep valid download links.
+
+## macOS downloads and installation
+
+macOS 13 or newer is the configured minimum. Apple Silicon (`macos-arm64.dmg`) and Intel
+(`macos-x86_64.dmg`) have separate native builds, exercised on macOS 15 runners of each architecture.
+Download from the [tools page](https://rich-netlist.github.io/rnl/en/tools.html#desktop) or a
+`viewer-v` release. Older release tags do not offer Mac packages.
+
+Open the DMG for your chip, drag **RNL Viewer** into **Applications**, then eject it.
+These packages carry an ad-hoc signature (`codesign` identity `-`), without an Apple Developer ID
+or notarization. If macOS blocks a trusted download, use **System Settings > Privacy & Security >
+Open Anyway**, or run the following and open the app again:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/RNL Viewer.app"
+```
+
+CI copies the app from the actual DMG, verifies its ad-hoc signature and architecture, sets and
+removes a quarantine attribute with that command, then launches it through LaunchServices.
+This proves the terminal workaround for the tested package; it does not prove notarization or
+exercise the interactive Gatekeeper approval UI.
+
+Use Finder's **Open With > RNL Viewer** for `.sp`, `.scs` and the other supported extensions;
+**Get Info > Open with > Change All** sets a default if desired. Cold and already-running Finder
+open events are supported. Drops use the existing native Tauri file-drop handler and keep absolute
+paths for includes. Most menu shortcuts use **Cmd** (Open, Save, sidebar, Apply); **Control+Q**
+uses the physical Control key for Edit Text, while **Cmd+Q** quits with unsaved-edit confirmation.
+About and Quit live in the application menu. Help > Check for Updates uses the same explicit
+GitHub release check as the other desktop platforms. System dark mode changes the UI; the drawing
+background remains separately configurable.
+
+Settings live at `~/Library/Application Support/io.github.rich-netlist.viewer/settings.json`.
+To uninstall, quit and move `/Applications/RNL Viewer.app` to Trash. Delete the settings directory
+only if you also want to remove preferences. Verify the downloaded DMG with `shasum -a 256`
+and the release's combined `SHA256SUMS.txt`.
+
+The macOS smoke uses WindowServer screenshots and Vision OCR of schematic labels in the drawing
+region, with pixel density checks that reject blank/solid screenshots. It retains cold/warm file
+opens, About, native Cmd/Control shortcuts, settings, and light/dark screenshots as Actions artifacts.
+It does not inject a test API into the released WebView. The minimum OS is not a claim that every
+older macOS 13/14 point release was exercised: native CI runs on macOS 15.
+
+The native drop bridge is covered in Chromium/WebKit, including Unicode paths and unsaved-edit
+confirmation. The CI smoke uses menus, keys and LaunchServices; a physical drag from Finder is
+not automated and remains a manual Mac acceptance check. To repeat native observations of a
+retained Apple Silicon release DMG without rebuilding, dispatch Desktop viewer on the branch with
+`macos_smoke_run_id` set to its Viewer release run ID. The evidence records that binary's source
+commit. This diagnostic cannot publish a release or refresh Pages.
 
 ## Checking for updates
 
@@ -234,7 +284,7 @@ The app runs on the WebView2 Runtime, which Windows 10 and 11 come with and the 
 | `release-notes/` | The notes of each release, by version, which the release workflow publishes. |
 | `icons/` | The application icon. |
 
-This directory is a Cargo workspace of its own, so the WebView dependencies stay out of the library crates' builds; [`desktop.yml`](../../.github/workflows/desktop.yml) builds it on Linux, Windows and macOS, and [`viewer-release.yml`](../../.github/workflows/viewer-release.yml) releases it for Windows and Linux.
+This directory is a Cargo workspace of its own, so the WebView dependencies stay out of the library crates' builds; [`desktop.yml`](../../.github/workflows/desktop.yml) builds it on Linux, Windows and macOS, and [`viewer-release.yml`](../../.github/workflows/viewer-release.yml) releases it for Windows, Linux and macOS.
 
 The viewer calls the shared Rust core natively, through `rnl-view`, as [decision 0008](../../docs/decisions/0008-shared-core-per-platform-frontends.md) decides; the [web viewer](../web/README.md) calls the same core through WebAssembly and shares the page in [`apps/viewer-ui`](../viewer-ui/README.md).
 

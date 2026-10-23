@@ -1543,6 +1543,10 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .samples { margin-top: 0; }
 .note code { font-size: .88em; overflow-wrap: anywhere; }
 .dl { overflow: hidden; }
+.macos-notes { padding: 18px; border-top: 1px solid var(--line); }
+.macos-notes p { font: 400 14.5px/1.65 var(--f-body); color: var(--ink-2); margin: 0 0 12px; }
+.macos-notes p:last-child { margin-bottom: 0; }
+.macos-notes code { font-size: .88em; overflow-wrap: anywhere; }
 .ph a.chip { color: var(--signal); text-decoration: none; }
 .ph a.chip:hover { border-color: var(--signal); }
 .dl-list { list-style: none; margin: 0; padding: 0; }
