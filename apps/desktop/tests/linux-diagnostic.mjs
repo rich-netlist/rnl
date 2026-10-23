@@ -20,6 +20,27 @@ const sample = "04-hierarchy.sp";
 for (const name of [sample, "04-hierarchy-lib.inc"]) {
   fs.copyFileSync(path.join(root, "tests/conformance/cases", name), path.join(temp, name));
 }
+// A control without WebDriver, injected JavaScript, rAF observers, or WebKit snapshots.
+// This is what an ordinary user launch paints into the X server.
+if (process.env.DIAGNOSTIC_NATIVE === '1') {
+  const fd = fs.openSync(path.join(output,'process.log'),'w');
+  const app = spawn(exe,[path.join(temp,sample)],{detached:true,stdio:['ignore',fd,fd],env:{...process.env,
+    XDG_CONFIG_HOME:path.join(temp,'config'),XDG_DATA_HOME:path.join(temp,'data'),XDG_CACHE_HOME:path.join(temp,'cache')}});
+  const opened=Date.now();
+  try {
+    const times=[];
+    for(const seconds of [1,3,10]) {
+      await new Promise(r=>setTimeout(r,Math.max(0,opened+seconds*1000-Date.now())));
+      execFileSync('import',['-window','root',path.join(output,`${seconds}s-x11.png`)]);
+      times.push({seconds,elapsedMs:Date.now()-opened,exitCode:app.exitCode});
+    }
+    fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({exe,native:true,times},null,2));
+  } finally {
+    if(app.pid) {try{process.kill(-app.pid,'SIGKILL');}catch(e){if(e.code!=='ESRCH')throw e;}}
+    fs.closeSync(fd); fs.rmSync(temp,{recursive:true,force:true});
+  }
+  process.exit(0);
+}
 const server = net.createServer().listen(0, "127.0.0.1");
 await once(server, "listening");
 const port = server.address().port;
@@ -34,10 +55,10 @@ const driver = spawn("WebKitWebDriver", [`--port=${port}`, "--host=127.0.0.1"], 
 let session;
 const results = [];
 const began = Date.now();
-async function request(method, route, body) {
+async function request(method, route, body, timeout = 15_000) {
   const response = await fetch(`http://127.0.0.1:${port}${route}`, {
     method, headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(60_000),
+    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(timeout),
   });
   const result = await response.json();
   assert.ok(response.ok && !result.value?.error, JSON.stringify(result));
@@ -86,8 +107,14 @@ try {
     fs.writeFileSync(path.join(output, `${seconds}s.json`), JSON.stringify(state, null, 2));
     // Capture the actual X screen before asking WebKit to snapshot (a snapshot may trigger paint).
     execFileSync("import", ["-window", "root", path.join(output, `${seconds}s-x11.png`)]);
-    fs.writeFileSync(path.join(output, `${seconds}s-webkit.png`),
-      Buffer.from(await request("GET", `/session/${session}/screenshot`), "base64"));
+    if (process.env.DIAGNOSTIC_X11_ONLY !== '1') {
+      try {
+        fs.writeFileSync(path.join(output, `${seconds}s-webkit.png`),
+          Buffer.from(await request("GET", `/session/${session}/screenshot`, undefined, 5000), "base64"));
+      } catch(e) {
+        fs.writeFileSync(path.join(output, `${seconds}s-snapshot-error.txt`), String(e));
+      }
+    }
     delete state.html;
     results.push(state);
     console.log(`${path.basename(exe)} at ${seconds}s: ${JSON.stringify(state)}`);
@@ -96,7 +123,7 @@ try {
   fs.writeFileSync(path.join(output, "summary.json"), JSON.stringify({exe, elapsedMs:Date.now()-began,
     environment:Object.fromEntries(Object.entries(process.env).filter(([k]) => /WEBKIT|LIBGL|DISPLAY|APPIMAGE/.test(k))),
     results}, null, 2));
-  if (session) await request("DELETE", `/session/${session}`).catch(console.error);
+  if (session) await request("DELETE", `/session/${session}`, undefined, 3000).catch(console.error);
   if (driver.pid) { try { process.kill(-driver.pid, "SIGKILL"); } catch (e) { if (e.code !== "ESRCH") throw e; } }
   fs.closeSync(log);
   fs.rmSync(temp, { recursive:true, force:true });
