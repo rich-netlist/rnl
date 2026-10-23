@@ -1,4 +1,4 @@
-# Tests the viewers' shared page in apps/viewer-ui in Chromium, Firefox and WebKit with Playwright,
+# Tests the viewers' shared page in apps/viewer-ui in Chromium and WebKit with Playwright,
 # against a fake shell that serves Documents the rnl command built natively, and smoke-tests the web
 # viewer of apps/web, its site built with the core as WebAssembly (tests/viewer).
 name: Viewer page
@@ -79,7 +79,7 @@ jobs:
           test ! -s "$RUNNER_TEMP/system-cjk-fonts.txt"
       # the web server builds the web viewer's site and serves it; the global setup builds the rnl
       # command and writes the fixtures
-      - name: Test the page and the web viewer in Chromium, Firefox and WebKit
+      - name: Test the page and the web viewer in Chromium and WebKit
         env:
           CJK_ONLY: ${{ inputs.cjk_only }}
         run: |

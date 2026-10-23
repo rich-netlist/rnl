@@ -257,8 +257,11 @@ jobs:
         run: |
           deb="$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-linux-x86_64.deb"
           package=$(dpkg-deb --field "$deb" Package)
+          # the Chinese font is only recommended; the smoke test runs without it, as the UI's own
+          # fallback must work without a system CJK font
+          test "$(dpkg-deb --field "$deb" Recommends)" = "fonts-noto-cjk"
           trap 'sudo apt-get remove -y "$package"' EXIT
-          sudo apt-get install -y "$deb"
+          sudo apt-get install -y --no-install-recommends "$deb"
           test -f "/usr/share/applications/RNL Viewer.desktop"
           dbus-run-session -- xvfb-run -a node apps/desktop/tests/linux-smoke.mjs --exe /usr/bin/rnl-viewer
           sudo apt-get remove -y "$package"
