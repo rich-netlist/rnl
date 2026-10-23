@@ -198,15 +198,29 @@ jobs:
         run: |
           python scripts/packages.py fixture
           echo "RNL_PACKAGE_CATALOG=$GITHUB_WORKSPACE/.rnl-packages/fixture/catalog.json" >> "$GITHUB_ENV"
+      # The browsers' system packages (--with-deps, about 120 MB for WebKit) come from the runner's Ubuntu
+      # mirror, which has stalled for most of an hour twice (2026-10-23). apt gives up on a stalled download
+      # after 30 s and retries, which lets it move on to another mirror; a step that still hangs fails
+      # after 20 minutes instead of waiting for the job's limit. Normally the install takes about 1 minute.
+      - name: Install the browsers for the site checks
+        timeout-minutes: 20
+        run: |
+          sudo tee /etc/apt/apt.conf.d/80-rnl-network <<'CONF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          CONF
+          npm ci --prefix tests/viewer
+          node tests/viewer/node_modules/@playwright/test/cli.js install --with-deps chromium webkit
+      # Normally about 5 minutes.
       - name: Check site navigation in Chromium and WebKit
+        timeout-minutes: 25
         env:
           RNL_SITE_SCREENSHOTS: ${{ runner.temp }}/package-review
           RNL_I18N_SCREENSHOTS: ${{ runner.temp }}/package-review/language-menu
           RNL_MACOS_SCREENSHOTS: ${{ runner.temp }}/package-review/macos
           RNL_TIMELINE_SCREENSHOTS: ${{ runner.temp }}/package-review/timeline
         run: |
-          npm ci --prefix tests/viewer
-          node tests/viewer/node_modules/@playwright/test/cli.js install --with-deps chromium webkit
           node --test scripts/brand.test.mjs
           node tests/viewer/node_modules/@playwright/test/cli.js test --config site/playwright.config.mjs
 
