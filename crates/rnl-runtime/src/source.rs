@@ -199,10 +199,11 @@ impl Provider for Layered<'_> {
     fn auto_include(&self) -> Option<&dyn LibraryLookup> {
         self.layers.iter().find_map(|p| p.auto_include())
     }
-    /// The key of the first layer: the layers are views of one workspace, which compares paths
-    /// one way.
+    /// The key of the last layer, the workspace under the others: the layers above it hold texts
+    /// in memory over its files, such as edits, and the workspace's file system says how its paths
+    /// compare.
     fn path_key(&self, path: &str) -> String {
-        self.layers.first().map_or_else(|| path.to_string(), |p| p.path_key(path))
+        self.layers.last().map_or_else(|| path.to_string(), |p| p.path_key(path))
     }
     fn read(&self, path: &str) -> Option<String> {
         self.layers.iter().find_map(|p| p.read(path))

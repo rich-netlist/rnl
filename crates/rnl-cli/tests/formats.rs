@@ -250,6 +250,19 @@ fn paths_compare_as_the_provider_compares_them_through_its_wrappers() {
 }
 
 #[test]
+fn paths_compare_as_the_workspace_under_the_texts_in_memory_compares_them() {
+    // edits in memory over a file system that ignores case, as the desktop layers them: the key
+    // is the file system's
+    let top = "* top\n.include \"Models.SCS\"\nX1 a 0 amp\n.end\n";
+    let disk = NoCase(MemoryProvider::new().with("/w/models.scs", CELLS));
+    let edits = MemoryProvider::new().with("/w/top.sp", top);
+    let files = rnl_runtime::source::Layered { layers: vec![&edits, &disk] };
+    assert_eq!(files.path_key("/W/Models.SCS"), "/w/models.scs");
+    let d = build("/w/top.sp", &files, &[("/W/models.scs", "spectre")]);
+    assert_eq!(formats_of(&d)[1], ("Models.SCS", Some("spectre"), Some("spice")));
+}
+
+#[test]
 fn the_library_index_reads_its_files_with_their_formats() {
     // a `.scs` file written in SPICE: as Spectre, it defines nothing
     let files = MemoryProvider::new()

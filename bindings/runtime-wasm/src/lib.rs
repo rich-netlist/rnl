@@ -783,16 +783,8 @@ C1 a 0 1p
     fn formats_are_set_by_path_listed_and_detected() {
         // a SPICE netlist whose include is written in Spectre's language
         let files = json!({
-            "/w/top.sp": "* top
-.include \"cells.scs\"
-X1 a 0 amp
-.end
-",
-            "/w/cells.scs": "simulator lang=spectre
-subckt amp (p n)
-R1 (p n) resistor r=1k
-ends amp
-",
+            "/w/top.sp": "* top\n.include \"cells.scs\"\nX1 a 0 amp\n.end\n",
+            "/w/cells.scs": "simulator lang=spectre\nsubckt amp (p n)\nR1 (p n) resistor r=1k\nends amp\n",
         });
         let v = answer(json!({ "entry": "/w/top.sp", "files": files, "formats": { "/w/cells.scs": "spectre" } }));
         let d = &v["document"];
@@ -805,26 +797,19 @@ ends amp
         let v = answer(json!({ "entry": "/w/top.sp", "files": files, "formats": { "/w/cells.scs": "cdl" } }));
         assert_eq!(v["error"], "unknown format \"cdl\" for /w/cells.scs; the formats are spice, spectre");
         // the list, and the format of files by path and text
-        let v = answer(json!({ "formats": { "detect": { "/w/a.inc": "* a
-", "/w/b.lib": "simulator lang=spectre
-" } } }));
+        let v =
+            answer(json!({ "formats": { "detect": { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n" } } }));
         assert_eq!(v["formats"]["list"], serde_json::to_value(rnl_view::formats()).unwrap());
         assert_eq!(v["formats"]["detected"], json!({ "/w/a.inc": "spice", "/w/b.lib": "spectre" }));
         assert_eq!(answer(json!({ "formats": {} }))["formats"]["detected"], json!({}));
         // the library index reads with them: a `.scs` file written in SPICE defines its subcircuit
-        let lib = json!({ "/lib/cells.scs": ".subckt cell p n
-R1 p n 1k
-.ends
-" });
+        let lib = json!({ "/lib/cells.scs": ".subckt cell p n\nR1 p n 1k\n.ends\n" });
         let update = |formats: Value| {
             answer(
                 json!({ "library": { "reload": true }, "pool": ["/lib/cells.scs"], "files": lib, "formats": formats }),
             )
         };
-        let top = json!({ "/top.sp": "* top
-X1 a 0 cell
-.end
-", "/lib/cells.scs": lib["/lib/cells.scs"] });
+        let top = json!({ "/top.sp": "* top\nX1 a 0 cell\n.end\n", "/lib/cells.scs": lib["/lib/cells.scs"] });
         let build = |formats: Value| {
             let request = json!({ "entry": "/top.sp", "files": top, "pool": ["/lib/cells.scs"], "auto_include": true, "formats": formats });
             answer(request)["document"]["levels"].as_array().unwrap().iter().any(|l| l["title"] == "cell")
