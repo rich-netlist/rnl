@@ -16,6 +16,7 @@ RNL is at an early draft stage. The language, module boundaries, and package nam
 - Keep status explicit. A draft stays labeled as a draft, a proposal as a proposal, and nothing is described as implemented or verified unless it is.
 - Record a settled project decision as a new numbered file in [`docs/decisions/`](docs/decisions/README.md). Do not rewrite an accepted record; supersede it with a new one.
 - Keep the [roadmap](docs/roadmap.md) as the single list of open and completed work.
+- Open every pull request against `main`. A pull request stacked on another branch merges into that branch, not into `main`; the check [`pr-base.yml`](.github/workflows/pr-base.yml) fails it until its base is `main`.
 
 ## License of contributions
 

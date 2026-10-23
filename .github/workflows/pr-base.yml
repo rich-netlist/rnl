@@ -1,0 +1,27 @@
+# Fails a pull request whose base is not main. Changes reach main only through pull requests into
+# main: a pull request stacked on another branch merges into that branch, and its change never
+# reaches main unless it is retargeted. GitHub has no setting that limits the base of a pull request
+# without also blocking pushes to the other branches, so this check makes such a pull request fail at
+# once and say what to do. It runs again when the base is changed.
+name: Pull request base
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+
+permissions: {}
+
+jobs:
+  base:
+    name: Base is main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main as the base
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ "$BASE" != "main" ]; then
+            echo "::error::This pull request targets '$BASE', not main. Pull requests here merge only into main: change its base to main, and for a stacked change, once the pull request below it has merged."
+            exit 1
+          fi
+          echo "The base is main."
