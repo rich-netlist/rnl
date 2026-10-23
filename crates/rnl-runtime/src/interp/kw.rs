@@ -727,16 +727,7 @@ impl Interp<'_> {
         // parameters: the definition's parameter list plus `priority` (9.4, 14.8)
         let mut pspec: Vec<ParamSpec> =
             d.params.iter().map(|(n, _)| ParamSpec { name: n.clone(), ty: ParamType::Any, required: false }).collect();
-        pspec.push(ParamSpec {
-            name: "priority".into(),
-            ty: ParamType::Enum(
-                ["disabled", "low", "normal", "high"]
-                    .iter()
-                    .map(|s| crate::words::Literal::Str(s.to_string()))
-                    .collect(),
-            ),
-            required: false,
-        });
+        pspec.extend(words().usage_params());
         let order: Vec<String> = d.params.iter().map(|(n, _)| n.clone()).collect();
         let p = self.params(kw, seg, ctx, &pspec, Some(&order), false, Some(&resolve))?;
         // its own priority=; in a file of 0.3 the default of the record head gives an AS or ATTACH
