@@ -167,7 +167,7 @@ for (const platform of ['desktop', 'web']) {
       }, u.object);
       const [a, b] = await Promise.all(bounds.map(([x, y]) => viewer.point(x, y)));
       const box = await frame(page, u.object).locator(':scope > rect').boundingBox();
-      const pad = 8 / 3; // Core bounds include padding; browser boxes add half the selected stroke.
+      const pad = 4 / 3; // Core bounds include padding; browser boxes add half the selected 2pt stroke.
       for (const [actual, expected] of [[box.x, a.x - pad], [box.y, a.y - pad], [box.width, b.x - a.x + pad * 2], [box.height, b.y - a.y + pad * 2]]) {
         expect(Math.abs(actual - expected)).toBeLessThan(.1);
       }
@@ -217,7 +217,7 @@ for (const platform of ['desktop', 'web']) {
     const r = route.frame.bounds;
     const [a, b] = await Promise.all([viewer.point(r[0], r[1]), viewer.point(r[2], r[3])]);
     const rect = await frame(page, route.object).locator(':scope > rect').boundingBox();
-    expect(Math.abs(rect.width - (b.x - a.x + 16 / 3))).toBeLessThan(.1);
+    expect(Math.abs(rect.width - (b.x - a.x + 8 / 3))).toBeLessThan(.1);
     const label = await frame(page, route.object).locator('.usage-role-label').boundingBox();
     expect(Math.abs(label.x + label.width / 2 - (a.x + b.x) / 2)).toBeLessThan(.1);
   });

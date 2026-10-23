@@ -289,10 +289,11 @@ export function paintUsages(svg, view, groups) {
       if (!bounds) continue;
       const color = setting(entry).color;
       const group = svgElement("g", { class: `usage-frame${active ? " selected" : ""}`, "data-usage": entry.object });
-      const fill = svgElement("rect", { class: "usage-fill", "data-usage": entry.object, fill: color, "fill-opacity": active ? .4 : .2, rx: 10 });
+      const fill = svgElement("rect", { class: "usage-fill", "data-usage": entry.object, fill: color, "fill-opacity": active ? .2 : .1, rx: 10 });
       append(underlay, fill);
-      const rect = svgElement("rect", { fill: "none", "fill-opacity": active ? .4 : .2, stroke: color,
-        "stroke-width": active ? 16 / 3 : 8 / 3, "stroke-dasharray": "1 5", "stroke-linecap": "round", rx: 10 });
+      // Overlay coordinates are CSS pixels: 1pt = 4/3px, independent of drawing zoom.
+      const rect = svgElement("rect", { fill: "none", stroke: color,
+        "stroke-width": active ? 8 / 3 : 4 / 3, "stroke-dasharray": "1 5", "stroke-linecap": "round", rx: 10 });
       append(group, rect);
       append(layer, group);
       const title = badge(`${entry.definition}: ${entry.id}`, color, group, "usage-title", entry.frame.title_width);

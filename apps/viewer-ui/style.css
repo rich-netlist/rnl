@@ -1229,7 +1229,9 @@ body.dropping::after {
 .pool-list { list-style: none; margin: 0; padding: 0; }
 .pool-row { display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 26px; }
 .pool-row.current { background: var(--select-text); }
-.pool-open { flex: 1; min-width: 0; overflow-wrap: anywhere; text-align: left; }
+.pool-open { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; }
+/* Keep leading separators in place while RTL puts the ellipsis before the path. */
+.pool-open::before { content: "\200e"; }
 button.pool-open { background: transparent; border: 0; color: inherit; cursor: pointer; }
 button.pool-open:hover { text-decoration: underline; }
 .pool-badge { font-size: 10px; color: var(--muted); max-width: 80px; }
