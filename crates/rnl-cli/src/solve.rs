@@ -689,22 +689,9 @@ pub struct Writing {
     pub error: Option<String>,
 }
 
-/// The byte order mark of UTF-8.
-const BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
-
-/// A text written back as its file was, which [`crate::FsProvider`] read: with the byte order
-/// mark again when the file began with one, and in Latin-1 when it was not UTF-8 and every
-/// character of the text is one of Latin-1. Otherwise UTF-8.
-pub fn encode_as(original: Option<&[u8]>, text: &str) -> Vec<u8> {
-    match original {
-        Some(bytes) if std::str::from_utf8(bytes).is_err() && text.chars().all(|c| u32::from(c) < 0x100) => {
-            text.chars().map(|c| u32::from(c) as u8).collect()
-        }
-        Some(bytes) if bytes.starts_with(&BOM) && !text.as_bytes().starts_with(&BOM) => {
-            [&BOM[..], text.as_bytes()].concat()
-        }
-        _ => text.as_bytes().to_vec(),
-    }
+/// Encode in the source encoding, refusing an unrepresentable character (§3.1).
+pub fn encode_as(original: Option<&[u8]>, text: &str) -> Result<Vec<u8>, String> {
+    crate::codec::encode(original, text, crate::codec::OutputEncoding::Preserve)
 }
 
 /// Writes the files of a run where `target` says, creating the directories they need: the files
@@ -714,9 +701,30 @@ pub fn encode_as(original: Option<&[u8]>, text: &str) -> Vec<u8> {
 /// file it cannot write, and says what it wrote before. Nothing is written when a file solved
 /// has no place under `DIR` ([`destinations`]).
 pub fn write(run: &SolveRun, target: &Target) -> Writing {
+    write_with_encoding(run, target, crate::codec::OutputEncoding::Preserve)
+}
+
+/// Write with the explicit encoding choice. Encoding is checked for every rewritten file before
+/// any write; untouched includes copied into a directory keep their original bytes.
+pub fn write_with_encoding(run: &SolveRun, target: &Target, encoding: crate::codec::OutputEncoding) -> Writing {
     let mut out = Writing::default();
     let to = match destinations(run, target) {
         Ok(to) => to,
+        Err(e) => {
+            out.error = Some(e);
+            return out;
+        }
+    };
+    let encoded: Result<Vec<Vec<u8>>, String> = run
+        .files
+        .iter()
+        .map(|f| {
+            crate::codec::encode_file(Some(Path::new(&f.path)), &f.text, encoding)
+                .map_err(|e| format!("{}: {e}", f.path))
+        })
+        .collect();
+    let encoded = match encoded {
+        Ok(encoded) => encoded,
         Err(e) => {
             out.error = Some(e);
             return out;
@@ -730,12 +738,9 @@ pub fn write(run: &SolveRun, target: &Target) -> Writing {
             None => Ok(()),
         }
     };
-    for (f, path) in run.files.iter().zip(to) {
-        let original = std::fs::read(&f.path).ok();
-        let done = make_parent(&path).and_then(|()| {
-            std::fs::write(&path, encode_as(original.as_deref(), &f.text))
-                .map_err(|e| format!("cannot write {}: {e}", path.display()))
-        });
+    for (bytes, path) in encoded.iter().zip(to) {
+        let done = make_parent(&path)
+            .and_then(|()| std::fs::write(&path, bytes).map_err(|e| format!("cannot write {}: {e}", path.display())));
         if let Err(e) = done {
             out.error = Some(e);
             return out;
@@ -1185,14 +1190,14 @@ mod tests {
     fn a_text_is_written_back_in_the_encoding_of_its_file() {
         let text = "* a \u{b5}A\n.end\n";
         // UTF-8, with and without its byte order mark
-        assert_eq!(encode_as(None, text), text.as_bytes());
-        assert_eq!(encode_as(Some(b"* old\n"), text), text.as_bytes());
-        let marked = [&BOM[..], b"* old\n"].concat();
-        assert_eq!(encode_as(Some(&marked), text), [&BOM[..], text.as_bytes()].concat());
+        assert_eq!(encode_as(None, text).unwrap(), text.as_bytes());
+        assert_eq!(encode_as(Some(b"* old\n"), text).unwrap(), text.as_bytes());
+        let marked = [b"\xef\xbb\xbf".as_slice(), b"* old\n"].concat();
+        assert_eq!(encode_as(Some(&marked), text).unwrap(), [b"\xef\xbb\xbf".as_slice(), text.as_bytes()].concat());
         // Latin-1, as long as every character is one of it
         let latin1 = b"* old \xb5A\n";
-        assert_eq!(encode_as(Some(latin1), text), b"* a \xb5A\n.end\n");
+        assert_eq!(encode_as(Some(latin1), text).unwrap(), b"* a \xb5A\n.end\n");
         let wide = "* \u{3a9}\n";
-        assert_eq!(encode_as(Some(latin1), wide), wide.as_bytes());
+        assert!(encode_as(Some(latin1), wide).unwrap_err().contains("Latin-1"));
     }
 }

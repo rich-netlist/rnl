@@ -70,7 +70,7 @@ test.describe("on the desktop", () => {
       const table = await (await fetch("commands.json")).json();
       return table.menus.find((m) => m.label === "&Solve").items.filter((i) => i !== "-").map((i) => [i.id, i.label]);
     });
-    expect(solve.map(([id]) => id)).toEqual(["solve", "solve-close", "solve-save", "solve-settings"]);
+    expect(solve.map(([id]) => id)).toEqual(["solve", "solve-close", "solve-save", "solve-save-utf8", "solve-settings"]);
     expect(solve.at(-1)).toEqual(["solve-settings", "S&ettings..."]);
   });
 

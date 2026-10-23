@@ -171,7 +171,8 @@ const solving = {
     if (held) held.reject("the solve was cancelled");
     held = null;
   },
-  async saveSolved() {
+  async saveSolved(encoding) {
+    (fake.encodings ||= []).push(["saveSolved", encoding]);
     fake.calls.push(["saveSolved"]);
     const fail = fake.saveFail;
     fake.saveFail = null;
@@ -295,7 +296,8 @@ export default {
     fake.calls.push(["browse", url]);
   },
   /** Decision 0011: Save writes the files and says so; on the desktop Save As asks where; the platform is told of changes not saved. */
-  async save(src, files, overwrite) {
+  async save(src, files, overwrite, encoding) {
+    (fake.encodings ||= []).push(["save", encoding]);
     fake.calls.push(["save", src.name]);
     fake.overwrites.push(overwrite === true);
     if (fake.changedOnDisk !== null && overwrite !== true) {
@@ -312,7 +314,8 @@ export default {
   },
   ...(platform === "desktop"
     ? {
-        async saveAs(src, file) {
+        async saveAs(src, file, encoding) {
+          (fake.encodings ||= []).push(["saveAs", encoding]);
           fake.calls.push(["saveAs", src.name]);
           fake.writesAs.push(file);
           const fail = fake.writeFail;

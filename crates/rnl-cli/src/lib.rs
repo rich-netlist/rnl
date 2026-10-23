@@ -2,6 +2,7 @@
 //! files, such as dialect detection, the bundled packages and the level status, comes from
 //! `rnl-view`; the solver is `rnl-solver`. The conformance tests use them too.
 
+pub mod codec;
 pub mod dump;
 pub mod preview;
 pub mod problem;

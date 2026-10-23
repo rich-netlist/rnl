@@ -252,10 +252,22 @@ async fn memory_cache(
 /// said to `overwrite`, a file that is not what it was when it was read is not written, nor are the
 /// others; the names of those files are given back.
 #[tauri::command]
-async fn save_files(entry: String, files: Vec<SavedFile>, overwrite: Option<bool>) -> Result<Saved, String> {
+async fn save_files(
+    entry: String,
+    files: Vec<SavedFile>,
+    overwrite: Option<bool>,
+    encoding: Option<rnl_cli::codec::OutputEncoding>,
+) -> Result<Saved, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let entry = std::path::absolute(&entry).map_err(|e| format!("{entry}: {e}"))?;
-        files::save_all(&entry.to_string_lossy(), &files, overwrite.unwrap_or(false))
+        match encoding.unwrap_or_default() {
+            rnl_cli::codec::OutputEncoding::Preserve => {
+                files::save_all(&entry.to_string_lossy(), &files, overwrite.unwrap_or(false))
+            }
+            choice => {
+                files::save_all_with_encoding(&entry.to_string_lossy(), &files, overwrite.unwrap_or(false), choice)
+            }
+        }
     })
     .await
     .map_err(|e| e.to_string())?
@@ -270,6 +282,7 @@ async fn save_file_as(
     entry: Option<String>,
     name: String,
     text: String,
+    encoding: Option<rnl_cli::codec::OutputEncoding>,
 ) -> Result<Option<String>, String> {
     let name = name.rsplit(['/', '\\']).next().unwrap_or("netlist.sp").to_string();
     let mut dialog = window
@@ -279,15 +292,16 @@ async fn save_file_as(
         .set_title(menu::text(window.app_handle(), "Save As"))
         .set_file_name(name)
         .add_filter(menu::text(window.app_handle(), "Netlists and packages"), &NETLISTS);
-    if let Some(dir) = entry.map(PathBuf::from).and_then(|p| p.parent().map(PathBuf::from)).filter(|d| d.is_dir()) {
+    if let Some(dir) =
+        entry.as_ref().map(PathBuf::from).and_then(|p| p.parent().map(PathBuf::from)).filter(|d| d.is_dir())
+    {
         dialog = dialog.set_directory(dir);
     }
     let chosen =
         tauri::async_runtime::spawn_blocking(move || dialog.blocking_save_file()).await.map_err(|e| e.to_string())?;
     let Some(chosen) = chosen else { return Ok(None) };
     let to = chosen.into_path().map_err(|e| e.to_string())?;
-    let bytes = files::encode(std::fs::read(&to).ok().as_deref(), &text)?;
-    std::fs::write(&to, bytes).map_err(|e| format!("{}: {e}", to.display()))?;
+    files::save_as(entry.as_deref().map(std::path::Path::new), &to, &text, encoding.unwrap_or_default())?;
     Ok(Some(to.to_string_lossy().into_owned()))
 }
 

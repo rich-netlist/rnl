@@ -141,3 +141,12 @@ test.describe("on the desktop", () => {
     await expect(page.locator("#tab-solve")).toBeVisible();
   });
 });
+
+
+test("desktop solved-copy UTF-8 command carries an explicit choice", async ({ page, viewer }) => {
+  await viewer.open(T4, DESKTOP);
+  await solve(page);
+  await page.evaluate(() => window.viewer.command("solve-save-utf8"));
+  await expect(dialog(page)).toContainText("Saved the solved copy");
+  expect(await page.evaluate(() => window.fakeShell.encodings)).toEqual([["saveSolved", "utf8"]]);
+});

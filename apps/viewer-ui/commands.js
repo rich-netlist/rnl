@@ -76,6 +76,8 @@ export function command(id, options = {}) {
     case "save": save(); break;
     case "download-library": return downloadLibrary();
     case "save-as": saveAs(); break;
+    case "save-utf8": save(false, "utf8"); break;
+    case "save-as-utf8": saveAs("utf8"); break;
     case "file-associations": return fileAssociations();
     case "toggle-edit": toggleEdit(); break;
     case "apply-edits": applyChanges(); break;
@@ -120,6 +122,7 @@ export function command(id, options = {}) {
     case "solve": solve(); break;
     case "solve-close": closePreview(); break;
     case "solve-save": saveSolved(); break;
+    case "solve-save-utf8": saveSolved("utf8"); break;
     case "solve-settings": settings(); break;
     case "check-updates": checkForUpdates(); break;
     case "about": about(); break;

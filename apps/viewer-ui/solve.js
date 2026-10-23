@@ -109,7 +109,7 @@ export function endPreview() {
 }
 
 /** Solve > Save Solved Copy As: a copy of the solve shown, where the user says. */
-export async function saveSolved() {
+export async function saveSolved(encoding = "preserve") {
   if (!shell || !shell.saveSolved || modal()) return;
   const title = m("Save Solved Copy");
   if (!shown) {
@@ -117,7 +117,7 @@ export async function saveSolved() {
     return;
   }
   try {
-    const said = await shell.saveSolved();
+    const said = await shell.saveSolved(encoding);
     if (said) await inform({ title, paragraphs: [said, m("The files that were opened are unchanged.")] });
   } catch (e) {
     await inform({ title, paragraphs: [m`The copy was not saved: ${e instanceof Error ? e.message : String(e)}`] });

@@ -18,8 +18,8 @@ use rnl_view::{BuildOptions, Document};
 use serde::Serialize;
 
 use crate::solve::{
-    conflicts, describe_fact, fact_what, lines, solve_watched, statement_name, write, Progress, SolveOptions, SolveRun,
-    SolvedFile, Target, Writing,
+    conflicts, describe_fact, fact_what, lines, solve_watched, statement_name, write_with_encoding, Progress,
+    SolveOptions, SolveRun, SolvedFile, Target, Writing,
 };
 
 /// A solve held in memory: what a copy of it saves, the netlist drawn as solved, and the report.
@@ -307,6 +307,15 @@ pub const OVER_A_FILE_READ: &str = "a copy is never saved over a file that was r
 /// relative to the file solved. Refused, with nothing written, when a file of the copy would be
 /// one that was read, the file solved or any other, and when there is nothing to save.
 pub fn save_copy(copy: &Copy, to: &Path) -> Result<Writing, String> {
+    save_copy_with_encoding(copy, to, crate::codec::OutputEncoding::Preserve)
+}
+
+/// Save the copy with the user's explicit output encoding; other safety checks are unchanged.
+pub fn save_copy_with_encoding(
+    copy: &Copy,
+    to: &Path,
+    encoding: crate::codec::OutputEncoding,
+) -> Result<Writing, String> {
     let run = &copy.run();
     if run.files.is_empty() {
         return Err("the solve wrote no file: there is nothing to save".to_string());
@@ -319,12 +328,12 @@ pub fn save_copy(copy: &Copy, to: &Path) -> Result<Writing, String> {
             return Err(OVER_A_FILE_READ.to_string());
         }
         let f = &run.files[0];
-        let original = std::fs::read(&f.path).ok();
+        let bytes = crate::codec::encode_file(Some(Path::new(&f.path)), &f.text, encoding)
+            .map_err(|e| format!("{}: {e}", f.path))?;
         if let Some(parent) = to.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent).map_err(|e| format!("cannot make {}: {e}", parent.display()))?;
         }
-        std::fs::write(to, crate::solve::encode_as(original.as_deref(), &f.text))
-            .map_err(|e| format!("cannot write {}: {e}", to.display()))?;
+        std::fs::write(to, bytes).map_err(|e| format!("cannot write {}: {e}", to.display()))?;
         return Ok(Writing { written: vec![to.to_path_buf()], ..Writing::default() });
     }
     // every file of the folder, written and copied, before any is written
@@ -335,7 +344,7 @@ pub fn save_copy(copy: &Copy, to: &Path) -> Result<Writing, String> {
     if places.iter().any(|p| over(p)) {
         return Err(OVER_A_FILE_READ.to_string());
     }
-    let writing = write(run, &target);
+    let writing = write_with_encoding(run, &target, encoding);
     match &writing.error {
         Some(e) => Err(e.clone()),
         None => Ok(writing),

@@ -9,8 +9,8 @@ identical to that tag. No standard text is changed.
 
 The toolkit implements all **46 standard keywords and their 98 fixed parameters**,
 as well as the record fields, style properties and other standard words. This does
-**not** make it fully conformant: encoding and bundle-correspondence
-limitations remain below. Language 0.2 is also read for compatibility;
+**not** make it fully conformant: the documented host/numeric boundaries, deferred
+bundle correspondence and incomplete optional-combination coverage remain. Language 0.2 is also read for compatibility;
 new solver/editor output uses 0.3, with a standard-package pin when upgrading 0.2.
 
 ## How to read the evidence
@@ -51,9 +51,31 @@ is distinguished from the 24 cases of 0.3 and dedicated 0.3 regression tests.
 - `rnl-edit` writes new netlists without existing RNL records and explicitly refuses
   merging edits into records already present. The solver's generated-record replacement
   is a separate supported path. This audit does not claim a complete editor.
-- UTF-8 (including BOM) and Latin-1 input are supported by the CLI provider. Arbitrary host
-  encodings and arbitrary precision numbers are not. Symbols support up to 64 symbol levels, including the outer symbol; deeper graphs fail with an explicit diagnostic before rendering or solver export. Uncached definition expansion is separately limited to 64 active symbol bodies, including fragment dependencies; hitting that limit fails the active chain and leaves subsequent independent definitions usable.
-  Numeric conversion uses binary64; overflow and underflow to zero now fail explicitly.
+- UTF-8 (including BOM) and Latin-1 input and native output use the shared
+  [encoding policy](output-encoding.md). Saving preserves the source encoding by default;
+  an unrepresentable Latin-1 character fails before any batch write. Explicit UTF-8
+  conversion is available in the CLI and desktop. Other host encodings and arbitrary
+  precision numbers are not supported. Numeric conversion uses binary64; overflow
+  and underflow to zero fail explicitly.
+- Symbols support up to 64 symbol levels, including the outer symbol; deeper graphs
+  fail with an explicit diagnostic before rendering or solver export. Uncached
+  definition expansion is separately limited to 64 active symbol bodies, including
+  fragment dependencies; hitting that limit fails the active chain and leaves
+  subsequent independent definitions usable.
+
+### Non-ASCII host-comment compatibility (3.1)
+
+The simulator/version verification matrix is currently empty:
+
+| Adapter | Simulator/version pairs verified for non-ASCII comments |
+| --- | --- |
+| Generic SPICE | None |
+| Spectre, including its SPICE mode | None |
+
+UTF-8/Latin-1 decoding support does not establish acceptance by any simulator.
+The adapters emit a located compatibility hint once per file containing non-ASCII
+host-comment text and preserve the input and drawing. The F-08 regressions verify
+this toolkit behavior; they do not claim simulator compatibility.
 
 ### File-version boundaries (16.1)
 
@@ -110,17 +132,30 @@ The manuals, editions, exact supported delimiters and unresolved simulator synta
 listed in the host-region profile. This adds no claim of full preprocessor or simulator
 support.
 
+## Encoding preservation follow-up (F-04)
+
+CLI solve, strip-generated and desktop save/copy paths now share the same codec and
+refusal/conversion policy. Default output preserves UTF-8 BOM state or Latin-1;
+`--encoding utf8` and the desktop commands explicitly named UTF-8 opt into conversion.
+UTF-8 output adds an encoding BOM when necessary to protect leading text U+FEFF on
+reopening, including conversion and edits to unmarked sources; otherwise conversion
+uses no BOM.
+Save As uses the source encoding, and an encoding error is checked before any file in
+a batch is written. Strip-generated snapshots the actual source, with disk taking
+precedence over exact bundled-package lookup. Missing named disk sources fail preserve
+mode; tracked clipboard sources remain UTF-8. See [output encoding](output-encoding.md)
+for API, UI and regression evidence in `tests/encoding.rs` and desktop `files.rs`.
+
 ## Remaining issues, in priority order
 
-These are open work, not silently accepted extensions. The [roadmap](roadmap.md) remains
-the central work list. P1 denotes wrong interpretation or file-preservation risk; P2
-is a bounded semantic/geometry defect; P3 is advisory behavior or assurance coverage.
-The linked matrices contain the exact source anchors.
+The requested implementation fixes above are complete within their documented
+boundaries. The remaining table distinguishes the explicitly deferred standard
+question from additional behavioral test coverage. The [roadmap](roadmap.md)
+remains the central work list; the matrices provide source and regression anchors.
 
 | Priority | Remaining issue | Evidence / practical limit |
 | --- | --- | --- |
-| P1 | **Encoding preservation (F-04, 3.1).** CLI writing can silently change Latin-1 to UTF-8 when new characters do not fit; strip-generated directly writes decoded text. | `solve.rs::encode_as` has an explicit UTF-8 fallback (even tested as current behavior). Desktop encoding checks differ. A consistent refusal/conversion policy needs an API decision. |
-| P2 | **Bundle terminal correspondence (11.8).** Heterogeneous members use first-member terminal ordinals, not name-based correspondence when names/orders differ. | The crash is fixed; the broader mapping remains partial and needs regression cases for differing names/orders. |
+| Deferred to 0.4 | **Bundle terminal correspondence (11.8).** Heterogeneous members continue to use first-member terminal ordinals. | The crash is fixed. Name-versus-position correspondence is explicitly left to language 0.4 clarification; these fixes preserve current behavior. |
 | P3 | **Optional-value coverage.** Several optional values and negative combinations still lack dedicated behavioral assertions. | F-05 vocabulary parity is now maintained in CI; it does not establish complete semantic conformance or exhaust the cross product of parameters and contexts. |
 
 ## Decisions and standard questions
@@ -135,7 +170,7 @@ The linked matrices contain the exact source anchors.
    as a whole. Authored records and host text outside that replacement must be preserved.
 3. **Bundle mapping and computed boxes:** specify the desired behavior for absent/differently
    named terminals in heterogeneous bundles, and whether conservative curve boxes satisfy
-   the computed-box wording. Keep these questions separate from the confirmed panic and
+   the computed-box wording. Keep these questions separate from the corrected panic and
    nested-order defects.
 4. **Prose/vocabulary alignment:** WIRE accepts a wire for rewriting in 13.1 while the
    signature's net slot is typed as net; PIN's terminal type also accepts arrays as specified
@@ -160,5 +195,7 @@ regressions and run the Rust CI gates):
 
 All cargo operations run serially with `CARGO_BUILD_JOBS=4`, without `--release`, after
 checking for other cargo/rustc processes and at least 8 GiB of free physical memory.
-The WebAssembly builds use the repository's documented `wasm` profile. Browser tests
-are outside this change; no Playwright/browser installation is needed for these checks.
+The WebAssembly builds use the repository's documented `wasm` profile. The initial
+audit did not include browser tests. F-04 adds focused desktop save-command tests to
+the shared viewer suite; its commands and encoding regressions are listed in the
+[output policy](output-encoding.md#regression-evidence).
