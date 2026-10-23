@@ -46,6 +46,7 @@ use unit::{Header, Place, Unit, UnitKind};
 pub enum Memo {
     Val(ObjId),
     LocalRef,
+    OwnLevel,
 }
 
 /// The members of a unit that are rules, in order, with the unit's numbers of members and rules
@@ -567,9 +568,11 @@ impl<'p> Interp<'p> {
             let r =
                 self.eval_member_at(w.u, w.m.rec, w.m.k, w.m.embedded, &w.m.m, Some(s), w.m.header.clone(), None, "");
             // a selection whose scope is this level's host objects is just empty below (10.3);
-            // the 10.5 warning is for the other roles of a generating AS or ATTACH
+            // the 10.5 warning is for the other roles of a generating AS or ATTACH, not for any
+            // other rule, which is a statement for the objects it selects (10.4)
             if matches!(r, Err(Stop::LocalRef))
                 && self.units[w.u].level != Some(lv)
+                && self.generation_rule(&w.m.m, w.u)
                 && !self.scoped_selection(&w.m.m, w.u)
             {
                 let at = w.m.m.segments.first().map(|sg| sg.start).unwrap_or(w.m.m.start);
@@ -630,6 +633,14 @@ impl<'p> Interp<'p> {
         let ms = Rc::new(ms);
         self.rule_members.insert(u, (counts, ms.clone()));
         ms
+    }
+
+    /// Whether a rule is a generation rule: one that applies a definition with AS or ATTACH (10.4).
+    fn generation_rule(&self, m: &crate::syntax::Member, u: UnitId) -> bool {
+        m.segments
+            .iter()
+            .filter_map(|sg| sg.call.as_ref())
+            .any(|c| matches!(self.kw(&c.kw, u).as_str(), "AS" | "ATTACH"))
     }
 
     fn scoped_selection(&self, m: &crate::syntax::Member, u: UnitId) -> bool {
