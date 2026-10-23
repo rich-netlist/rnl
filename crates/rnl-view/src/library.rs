@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use rnl_runtime::diag::{Loc, Sink};
+use rnl_runtime::host::format::Reading;
 use rnl_runtime::host::{HostDocument, LevelKind};
 use rnl_runtime::source::{normalize, LibraryDefinition, LibraryLookup, MemoryProvider, Provider};
 
@@ -24,6 +25,9 @@ pub struct LibraryIndex {
     imports: BTreeMap<String, Arc<Entry>>,
     names: Arc<HashMap<String, Vec<LibraryDefinition>>>,
     dirty: bool,
+    /// The formats set for files by path ([`crate::BuildOptions::formats`]), that the library
+    /// files and their includes are read with ([`LibraryIndex::set_formats`]).
+    formats: BTreeMap<String, String>,
 }
 
 fn fingerprint(text: &str) -> u64 {
@@ -33,6 +37,24 @@ fn fingerprint(text: &str) -> u64 {
 }
 
 impl LibraryIndex {
+    /// Read the library files with the formats set for files by path, as a build reads them
+    /// ([`crate::BuildOptions::formats`]); call it before [`LibraryIndex::update`]. The files whose
+    /// format changed, and those that read them, are read again at the next update. A format name
+    /// that is not known leaves its file as if none were set.
+    pub fn set_formats(&mut self, formats: BTreeMap<String, String>) {
+        if formats == self.formats {
+            return;
+        }
+        let changed: Vec<String> = formats
+            .keys()
+            .chain(self.formats.keys())
+            .filter(|p| formats.get(*p) != self.formats.get(*p))
+            .map(|p| p.replace('\\', "/"))
+            .collect();
+        self.formats = formats;
+        self.invalidate(&changed);
+    }
+
     /// Replacing an existing Library item also invalidates roots that include that item.
     pub fn invalidate(&mut self, paths: &[String]) {
         let paths: HashSet<_> = paths.iter().map(|p| normalize(p)).collect();
@@ -56,7 +78,7 @@ impl LibraryIndex {
             if !reload && self.entries.contains_key(path) {
                 continue;
             }
-            match Self::entry(path, files) {
+            match Self::entry(path, files, &self.formats) {
                 Some(entry) => {
                     self.dirty = true;
                     self.entries.insert(path.clone(), Arc::new(entry));
@@ -75,18 +97,18 @@ impl LibraryIndex {
         errors
     }
 
-    fn entry(path: &str, files: &dyn Provider) -> Option<Entry> {
+    fn entry(path: &str, files: &dyn Provider, formats: &BTreeMap<String, String>) -> Option<Entry> {
         let text = files.read(path)?;
         let mut definitions = Vec::new();
         let mut sectioned = HashSet::new();
         let mut dependencies = HashMap::from([(path.to_string(), fingerprint(&text))]);
         if !path.to_ascii_lowercase().ends_with(".rnl") {
             let mut sink = Sink::new();
-            let doc = if super::is_spectre(path, &text, None) {
-                rnl_host_spectre::read_library(path, files, &mut sink)
-            } else {
-                rnl_host_spice::read_library(path, files, &mut sink)
-            }?;
+            // a library file is read on its own, by its format, its first line a statement
+            let set = crate::formats::known_formats(formats, files);
+            let main = crate::formats::main_format(path, &text, None, &set, files);
+            let doc =
+                crate::formats::with(main, &set, files, |f| Reading::read(path, files, &mut sink, f, &[], false))?;
             for (id, lv) in doc.levels.iter().enumerate() {
                 let source = normalize(&lv.path);
                 if let std::collections::hash_map::Entry::Vacant(entry) = dependencies.entry(source) {
@@ -125,7 +147,7 @@ impl LibraryIndex {
                 .get(path)
                 .cloned()
                 .or_else(|| (!reload).then(|| self.imports.get(path).cloned()).flatten())
-                .or_else(|| Self::entry(path, files).map(Arc::new));
+                .or_else(|| Self::entry(path, files, &self.formats).map(Arc::new));
             if let Some(entry) = entry {
                 imports.insert(path.clone(), entry);
             }
@@ -185,7 +207,7 @@ impl LibraryIndex {
             })
             .collect();
         for path in &changed {
-            if let Some(entry) = Self::entry(path, files) {
+            if let Some(entry) = Self::entry(path, files, &self.formats) {
                 out.entries.insert(path.clone(), Arc::new(entry));
             } else {
                 out.entries.remove(path);
@@ -242,6 +264,9 @@ impl Provider for LibraryProvider<'_> {
     fn auto_include(&self) -> Option<&dyn LibraryLookup> {
         self.enabled.then_some(self.index)
     }
+    fn path_key(&self, path: &str) -> String {
+        self.files.path_key(path)
+    }
 }
 
 /// First resolve normal includes. Add uniquely indexed library files until no new dependency can
@@ -267,7 +292,7 @@ pub(crate) fn resolve(
         for lv in &doc.levels {
             for inst in &lv.instances {
                 let Some(model) = inst.model.as_deref() else { continue };
-                if !inst.is_subckt || doc.subckt(model).is_some() {
+                if !inst.is_subckt || doc.subckt_of(inst).is_some() {
                     continue;
                 }
                 let key = if inst.case_sensitive { model.to_string() } else { model.to_lowercase() };

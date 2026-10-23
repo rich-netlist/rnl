@@ -231,7 +231,11 @@ impl Interp<'_> {
                 let inst = self.inst_of(base).clone();
                 if inst.is_subckt {
                     if let Some(m) = &inst.model {
-                        let key = self.doc.key(m);
+                        // the subcircuit it names, by the rules of its file; its blocks by its name
+                        let key = match self.doc.subckt_of(&inst) {
+                            Some(sub) => self.doc.key(&self.doc.levels[sub].name),
+                            None => self.doc.key(m),
+                        };
                         if let Some(blocks) = self.block_symbols.get(&key) {
                             for (p, sym) in blocks.values() {
                                 let mut pp = vec![PosElem::Int(1)];

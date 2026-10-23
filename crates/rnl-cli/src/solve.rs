@@ -71,6 +71,7 @@
 //! what the command prints of the levels.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -95,6 +96,8 @@ use crate::provider::path_str;
 pub struct SolveOptions {
     /// "spice" or "spectre", instead of guessing from the file.
     pub dialect: Option<String>,
+    /// The formats set for files by path (`rnl_view::BuildOptions::formats`).
+    pub formats: BTreeMap<String, String>,
     /// Use the standard package implicitly at the root (16.3).
     pub std: bool,
     /// Only the level with this title: a subcircuit name, or the file name.
@@ -106,7 +109,13 @@ pub struct SolveOptions {
 
 impl Default for SolveOptions {
     fn default() -> SolveOptions {
-        SolveOptions { dialect: None, std: true, level: None, solver: SolverOptions::default() }
+        SolveOptions {
+            dialect: None,
+            formats: BTreeMap::new(),
+            std: true,
+            level: None,
+            solver: SolverOptions::default(),
+        }
     }
 }
 
@@ -356,7 +365,8 @@ pub fn solve_watched(
     }
     // the files as they were read, raised
     let entry = path_str(file);
-    let original = rnl_view::interpret(&entry, options.dialect.as_deref(), files, &options.runtime())?;
+    let original =
+        rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, files, &options.runtime())?;
     let mut raised = Vec::new();
     let mut texts: Vec<(String, String)> = Vec::new();
     let mut paths: Vec<(&String, &String)> = Vec::new();
@@ -448,7 +458,7 @@ fn pass(
     let mut wants: Vec<Want> = Vec::new();
     let read = |memory: &MemoryProvider| -> Result<Interpretation, String> {
         let both = Layered { layers: vec![memory, &files] };
-        rnl_view::interpret(&entry, options.dialect.as_deref(), &both, &runtime)
+        rnl_view::interpret_with(&entry, options.dialect.as_deref(), &options.formats, &both, &runtime)
     };
     let first = read(&memory)?;
     let errors = first.diagnostics().iter().filter(|d| d.severity == Severity::Error).count();

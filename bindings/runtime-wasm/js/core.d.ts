@@ -4,10 +4,10 @@
 // next to this file.
 
 import type { Catalog } from "./catalog.js";
-import type { Document, UnplacedDrawing } from "./document.js";
+import type { Document, FormatInfo, UnplacedDrawing } from "./document.js";
 import type { Snapshot } from "./snapshot.js";
 
-export type { Catalog, Document, Snapshot, UnplacedDrawing };
+export type { Catalog, Document, FormatInfo, Snapshot, UnplacedDrawing };
 
 /** Inspection SVG export styles, independent of RNL language styles. */
 export interface OverlayStyle {
@@ -41,8 +41,15 @@ export interface Request {
   library_prefix?: string;
   /** Applied overrides, by canonical library path. */
   library_edits?: Record<string, string>;
-  /** The dialect, instead of guessing it from the entry. */
+  /** The format of the entry, instead of guessing it from the entry. */
   dialect?: "spice" | "spectre";
+  /**
+   * The format set for files, by path as in `files`: only those the user set, each a name of
+   * `FormatInfo.name`. A file not among them is read as the entry when it is included. An unknown
+   * name fails the build, so leave out the names the core does not list. The library index reads
+   * its files with them too.
+   */
+  formats?: Record<string, string>;
   /** Use the standard package at the root (16.3); true when not given. */
   std?: boolean;
   /**
@@ -242,6 +249,20 @@ export interface LibraryRequest {
   library: { reload?: boolean; refresh?: string[] };
   pool: string[];
   files: Record<string, string>;
+  /** The format set for files by path, as a build's `formats`: the index reads its files with them. */
+  formats?: Record<string, string>;
+}
+
+/** What to list: the formats, and the format each file of `detect`, by path and text, has when none is set. */
+export interface FormatsRequest {
+  formats: { detect?: Record<string, string> };
+}
+
+/** What a formats request answers. */
+export interface FormatList {
+  list: FormatInfo[];
+  /** The format of each file of `detect`, by its path. */
+  detected: Record<string, string>;
 }
 
 /** The core, loaded. */
@@ -258,9 +279,11 @@ export interface Core {
   drawings(request: DrawingsRequest | string): UnplacedDrawing[];
   /** Update the viewer library index; returns read errors. */
   library(request: LibraryRequest | string): string[];
+  /** The formats a file can be read with, and the format each file of `detect` has when none is set. */
+  formats(request: FormatsRequest | string): FormatList;
   /** The core's answer as it gives it; throws only when the core stops. */
   respond(
-    request: Request | WriteRequest | CatalogRequest | DrawingsRequest | LibraryRequest | string,
+    request: Request | WriteRequest | CatalogRequest | DrawingsRequest | LibraryRequest | FormatsRequest | string,
   ):
     | { document: Document }
     | { snapshot: Snapshot }
@@ -268,6 +291,7 @@ export interface Core {
     | { catalog: Catalog }
     | { drawings: UnplacedDrawing[] }
     | { library: string[] }
+    | { formats: FormatList }
     | { error: string };
 }
 
@@ -275,4 +299,6 @@ export interface Core {
 export function loadCore(wasm: string | URL | Response | BufferSource | WebAssembly.Module): Promise<Core>;
 
 /** A request as the JSON text the core reads. */
-export function requestText(request: Request | WriteRequest | CatalogRequest | DrawingsRequest | LibraryRequest): string;
+export function requestText(
+  request: Request | WriteRequest | CatalogRequest | DrawingsRequest | LibraryRequest | FormatsRequest,
+): string;

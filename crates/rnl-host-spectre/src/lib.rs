@@ -13,12 +13,13 @@
 //! Names compare by case (3.6). A backslash escapes the next character of a name, so
 //! `D\<3\>` is read as `D<3>` (6.11). Only `0` is ground.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use rnl_runtime::diag::{Loc, Sink};
+use rnl_runtime::host::format::{Card, FileRead, Format, Formats, Reading};
 use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
 use rnl_runtime::records::{scan_run, CarrierLine};
-use rnl_runtime::source::{dirname, normalize, relative_to, resolve_include, Provider};
+use rnl_runtime::source::Provider;
 
 /// A record in a region written to be encrypted (2.2): Spectre's `protect … unprotect`, and
 /// `.prot … .unprot` in SPICE mode.
@@ -362,17 +363,59 @@ struct Model {
     params: Vec<(String, String)>,
 }
 
-struct Reader<'a> {
-    provider: &'a dyn Provider,
-    sink: &'a mut Sink,
-    doc: HostDocument,
+/// The Spectre format: Spectre's adapter. It claims a `.scs` file, and one with a
+/// `simulator lang=spectre` among its first 50 lines, as the PDKs write their model libraries.
+pub struct Spectre;
+
+/// What the Spectre format keeps across its files while they are read.
+#[derive(Default)]
+struct Kept {
+    /// The `model` statements, by name.
     models: HashMap<String, Model>,
+    /// The type of each `.model` card read in SPICE mode, by lower case name.
     spice_models: HashMap<String, String>,
-    /// The [`Level::name_key`]s of each level's instances, to find a name defined twice without
-    /// looking through the level's instances.
-    names: HashMap<LevelId, HashSet<String>>,
+    /// The elements read in SPICE mode whose nodes wait for the model names: level, index, plain tokens.
     pending_spice: Vec<(LevelId, usize, Vec<String>)>,
-    main_dir: String,
+}
+
+impl Format for Spectre {
+    fn name(&self) -> &'static str {
+        "spectre"
+    }
+
+    fn title(&self) -> &'static str {
+        "Spectre"
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &["scs"]
+    }
+
+    fn dialect(&self) -> Dialect {
+        dialect()
+    }
+
+    fn claims(&self, path: &str, text: &str) -> bool {
+        file_name(path).to_lowercase().rsplit_once('.').is_some_and(|(stem, e)| !stem.is_empty() && e == "scs")
+            || text.lines().take(50).any(|l| {
+                let l = l.trim().to_lowercase();
+                l.starts_with("simulator") && l.contains("lang") && l.contains("spectre")
+            })
+    }
+
+    fn read_file(&self, cx: &mut Reading, file: &FileRead) {
+        let mode = start_mode(file.path);
+        Reader { cx }.read_file(file.path, file.level, file.circ, file.main, mode, file.stack, file.section);
+    }
+
+    fn finish(&self, cx: &mut Reading) {
+        finish(cx);
+    }
+}
+
+/// Reads the Spectre files of a reading.
+struct Reader<'r, 'a> {
+    cx: &'r mut Reading<'a>,
 }
 
 struct State {
@@ -382,17 +425,7 @@ struct State {
     stack: Vec<(LevelId, LevelId, Mode)>,
 }
 
-impl<'a> Reader<'a> {
-    /// A file's name in the document: relative to the main file's directory when it is in it or
-    /// below, the root included, else its path.
-    fn display(&self, path: &str) -> String {
-        let p = normalize(path);
-        match relative_to(&p, &self.main_dir) {
-            Some(rest) => rest.to_string(),
-            None => p,
-        }
-    }
-
+impl Reader<'_, '_> {
     /// Read one file. `section`: read only this library section.
     #[allow(clippy::too_many_arguments)]
     fn read_file(
@@ -405,10 +438,10 @@ impl<'a> Reader<'a> {
         stack: &[String],
         section: Option<&str>,
     ) {
-        let Some(text) = self.provider.read(path) else { return };
-        let fname = self.display(path);
-        if !self.doc.sources.iter().any(|(f, _)| *f == fname) {
-            self.doc.sources.push((fname.clone(), text.clone()));
+        let Some(text) = self.cx.provider.read(path) else { return };
+        let fname = self.cx.display(path);
+        if !self.cx.doc.sources.iter().any(|(f, _)| *f == fname) {
+            self.cx.doc.sources.push((fname.clone(), text.clone()));
         }
         let lines: Vec<&str> = text.lines().map(|l| l.trim_end_matches('\r')).collect();
         let mut st = State { mode, cur: level, circ, stack: Vec::new() };
@@ -431,23 +464,25 @@ impl<'a> Reader<'a> {
         let mut ended = false;
         let mut compatibility_hint = false;
         while idx < n {
-            spice_mode(&mut spice, st.mode, idx as u32, &fname, &mut self.doc.spice_mode);
+            spice_mode(&mut spice, st.mode, idx as u32, &fname, &mut self.cx.doc.spice_mode);
             let raw = lines[idx];
             let no = idx as u32 + 1;
             idx += 1;
             let stripped = raw.trim();
             if !compatibility_hint {
                 compatibility_hint =
-                    rnl_host_spice::hint_comment_compatibility(raw, st.mode == Mode::Spectre, &fname, no, self.sink);
+                    rnl_host_spice::hint_comment_compatibility(raw, st.mode == Mode::Spectre, &fname, no, self.cx.sink);
             }
             if no == 1 {
                 if raw.contains("@RNL") {
-                    self.sink.warning("the first line of a file is not read as RNL (2.2)", Some(Loc::line(&fname, 1)));
+                    self.cx
+                        .sink
+                        .warning("the first line of a file is not read as RNL (2.2)", Some(Loc::line(&fname, 1)));
                 }
                 // the main file's first line is a title; an included file has none (S1 p51, p89)
                 // Encryption pragmas are meaningful even on a file's first comment line.
                 if raw.trim_start().starts_with("//") {
-                    regions.skip(raw, no, false, main, &fname, self.sink);
+                    regions.skip(raw, no, false, main, &fname, self.cx.sink);
                 }
                 if main || raw.starts_with('*') || raw.starts_with("//") {
                     continue;
@@ -455,7 +490,8 @@ impl<'a> Reader<'a> {
             }
             if ended {
                 if raw.contains("@RNL") {
-                    self.sink
+                    self.cx
+                        .sink
                         .warning("RNL after `.end` of the main file is not read (2.2)", Some(Loc::line(&fname, no)));
                 }
                 continue;
@@ -475,10 +511,10 @@ impl<'a> Reader<'a> {
                     if (first == "endsection" || first == ".endl")
                         && words.get(1).is_none_or(|w| w.eq_ignore_ascii_case(name))
                     {
-                        self.doc.unselected_sections.push((level, *start, no));
+                        self.cx.doc.unselected_sections.push((level, *start, no));
                         skip_section = None;
                     } else if raw.contains("@RNL") {
-                        self.sink.warning(
+                        self.cx.sink.warning(
                             "RNL in a library section that is not selected is not read (2.2)",
                             Some(Loc::line(&fname, no)),
                         );
@@ -489,11 +525,11 @@ impl<'a> Reader<'a> {
                     let opens = (first == "section" || first == ".lib") && words.len() == 2;
                     if opens && section.is_some_and(|s| s.eq_ignore_ascii_case(words[1])) {
                         in_section = true;
-                        self.doc.levels[level].section_lines.get_or_insert((no, 0));
+                        self.cx.doc.levels[level].section_lines.get_or_insert((no, 0));
                         // each section sets its own language; it starts in SPICE mode (S1 p498)
                         st.mode = if first == "section" { Mode::Spectre } else { Mode::Spice };
                     } else if raw.contains("@RNL") {
-                        self.sink.warning(
+                        self.cx.sink.warning(
                             "RNL outside the selected library section is not read (2.2)",
                             Some(Loc::line(&fname, no)),
                         );
@@ -501,7 +537,7 @@ impl<'a> Reader<'a> {
                     continue;
                 }
             }
-            if regions.skip(raw, no, st.mode == Mode::Spectre, main, &fname, self.sink) {
+            if regions.skip(raw, no, st.mode == Mode::Spectre, main, &fname, self.cx.sink) {
                 self.flush(&mut run, &fname, st.cur);
                 subckt_more = None;
                 if let Some((pl, pt)) = pending.take() {
@@ -530,17 +566,17 @@ impl<'a> Reader<'a> {
                     // in SPICE mode, a comment line within a statement, as the SPICE adapter says (2.2)
                     let within = pending.is_some() || subckt_more.is_some();
                     if st.mode == Mode::Spice && within && continued.after(&lines, idx - 1) {
-                        self.sink.warning(rnl_host_spice::COMMENT_IN_A_STATEMENT, Some(Loc::line(&fname, no)));
+                        self.cx.sink.warning(rnl_host_spice::COMMENT_IN_A_STATEMENT, Some(Loc::line(&fname, no)));
                     }
                     if let Some((_, warning)) = protect.filter(|_| rest.contains("@RNL")) {
-                        self.sink.warning(warning, Some(Loc::line(&fname, no)));
+                        self.cx.sink.warning(warning, Some(Loc::line(&fname, no)));
                     }
                     run.push(CarrierLine { line: no, content: rest.to_string(), col });
                     continue;
                 }
                 self.flush(&mut run, &fname, st.cur);
                 if raw.contains("@RNL") {
-                    self.sink.warning(
+                    self.cx.sink.warning(
                         "no space after the comment marker: this line is not a carrier and its @RNL is not a record entry (2.2)",
                         Some(Loc::line(&fname, no)),
                     );
@@ -552,7 +588,7 @@ impl<'a> Reader<'a> {
                 continue;
             }
             if raw.contains("@RNL") {
-                self.sink.warning(
+                self.cx.sink.warning(
                     "@RNL in an end-of-line comment or a host statement is host text (2.2)",
                     Some(Loc::line(&fname, no)),
                 );
@@ -566,7 +602,7 @@ impl<'a> Reader<'a> {
                         let toks = rnl_host_spice::subckt_tokens(cont);
                         let toks: Vec<&str> = toks.iter().map(String::as_str).collect();
                         let (ports, params) = rnl_host_spice::subckt_ports(&toks);
-                        self.doc.levels[sub].ports.extend(ports);
+                        self.cx.doc.levels[sub].ports.extend(ports);
                         if params {
                             subckt_more = None;
                         }
@@ -582,7 +618,7 @@ impl<'a> Reader<'a> {
                 match first {
                     ".end" => {
                         if main {
-                            self.doc.levels[level].end_line = no;
+                            self.cx.doc.levels[level].end_line = no;
                             ended = true;
                         }
                         continue;
@@ -590,7 +626,7 @@ impl<'a> Reader<'a> {
                     ".endl" => {
                         if section.is_some() {
                             in_section = false;
-                            self.doc.levels[level].close_section(no);
+                            self.cx.doc.levels[level].close_section(no);
                         }
                         continue;
                     }
@@ -600,17 +636,8 @@ impl<'a> Reader<'a> {
                         if toks.len() == 2 {
                             skip_section = Some((toks[1].to_string(), no));
                         } else if toks.len() >= 3 {
-                            self.include(
-                                &unquote(toks[1]),
-                                Some(toks[2]),
-                                no,
-                                &fname,
-                                path,
-                                &st,
-                                stack,
-                                Mode::Spice,
-                                true,
-                            );
+                            let target = unquote(toks[1]);
+                            self.cx.include(&target, Some(toks[2]), no, &fname, path, st.cur, st.circ, stack, true);
                         }
                         continue;
                     }
@@ -624,7 +651,7 @@ impl<'a> Reader<'a> {
                         continue;
                     }
                     ".ends" => {
-                        self.doc.levels[st.cur].end_line = no;
+                        self.cx.doc.levels[st.cur].end_line = no;
                         self.close_subckt(&mut st);
                         continue;
                     }
@@ -640,7 +667,7 @@ impl<'a> Reader<'a> {
                     }
                     ".unprot" | ".unprotect" => {
                         if let Some((start, _)) = protect.take() {
-                            self.doc.protected.push((fname.clone(), start, no));
+                            self.cx.doc.protected.push((fname.clone(), start, no));
                         }
                         continue;
                     }
@@ -663,7 +690,7 @@ impl<'a> Reader<'a> {
                                 true,
                                 &fname,
                                 idx as u32 + 1,
-                                self.sink,
+                                self.cx.sink,
                             );
                         }
                         stmt.push_str(&strip_comment(lines[idx].trim()));
@@ -680,7 +707,7 @@ impl<'a> Reader<'a> {
                             true,
                             &fname,
                             idx as u32 + 1,
-                            self.sink,
+                            self.cx.sink,
                         );
                     }
                     stmt.push_str(&strip_comment(lines[idx].trim_start()[1..].trim()));
@@ -690,7 +717,7 @@ impl<'a> Reader<'a> {
                 }
                 break;
             }
-            if last != no && regions.skip(&stmt, no, true, main, &fname, self.sink) {
+            if last != no && regions.skip(&stmt, no, true, main, &fname, self.cx.sink) {
                 continue;
             }
             match stmt.split_whitespace().next() {
@@ -700,7 +727,7 @@ impl<'a> Reader<'a> {
                 }
                 Some("unprotect" | "unprot") => {
                     if let Some((start, _)) = protect.take() {
-                        self.doc.protected.push((fname.clone(), start, no));
+                        self.cx.doc.protected.push((fname.clone(), start, no));
                     }
                     continue;
                 }
@@ -708,45 +735,45 @@ impl<'a> Reader<'a> {
             }
             if self.spectre_statement(&stmt, no, &fname, path, &mut st, stack, section) == Some(true) {
                 in_section = false;
-                self.doc.levels[level].close_section(no);
+                self.cx.doc.levels[level].close_section(no);
             }
         }
         self.flush(&mut run, &fname, st.cur);
         if let Some((pl, pt)) = pending.take() {
             self.spice_statement(&pt, pl, &fname, path, &mut st, stack);
         }
-        self.doc.excluded.extend(regions.finish(&fname, n as u32 + 1, self.sink));
+        self.cx.doc.excluded.extend(regions.finish(&fname, n as u32 + 1, self.cx.sink));
         if let Some((_, start)) = skip_section {
-            self.doc.unselected_sections.push((level, start, n as u32 + 1));
+            self.cx.doc.unselected_sections.push((level, start, n as u32 + 1));
         }
         if let Some((start, _)) = protect {
-            self.doc.protected.push((fname.clone(), start, n as u32 + 1));
+            self.cx.doc.protected.push((fname.clone(), start, n as u32 + 1));
         }
-        spice_mode(&mut spice, st.mode, idx as u32, &fname, &mut self.doc.spice_mode);
+        spice_mode(&mut spice, st.mode, idx as u32, &fname, &mut self.cx.doc.spice_mode);
         if let Some(from) = spice {
-            self.doc.spice_mode.push((fname.clone(), from, n as u32 + 1));
+            self.cx.doc.spice_mode.push((fname.clone(), from, n as u32 + 1));
         }
         if !st.stack.is_empty() {
-            self.sink.error("a subcircuit has no `ends`", Some(Loc::line(&fname, n as u32)));
+            self.cx.sink.error("a subcircuit has no `ends`", Some(Loc::line(&fname, n as u32)));
         }
-        if let Some(name) = section.filter(|_| self.doc.levels[level].section_lines.is_none()) {
-            self.sink.error(
+        if let Some(name) = section.filter(|_| self.cx.doc.levels[level].section_lines.is_none()) {
+            self.cx.sink.error(
                 format!("the selected library section {name} was not found; no records can be written there (2.2)"),
                 Some(Loc::line(&fname, 1)),
             );
         }
-        if self.doc.levels[level].end_line == 0 {
-            self.doc.levels[level].end_line = n as u32 + 1;
+        if self.cx.doc.levels[level].end_line == 0 {
+            self.cx.doc.levels[level].end_line = n as u32 + 1;
         }
-        self.doc.levels[level].close_section(n as u32 + 1);
+        self.cx.doc.levels[level].close_section(n as u32 + 1);
     }
 
     fn flush(&mut self, run: &mut Vec<CarrierLine>, fname: &str, level: LevelId) {
         if run.is_empty() {
             return;
         }
-        let recs = scan_run(run, fname, self.sink);
-        self.doc.levels[level].records.extend(recs);
+        let recs = scan_run(run, fname, self.cx.sink);
+        self.cx.doc.levels[level].records.extend(recs);
         run.clear();
     }
 
@@ -764,11 +791,10 @@ impl<'a> Reader<'a> {
         let mut lv = Level::new(LevelKind::Subckt, name, fname, path);
         lv.circuit = true;
         lv.line = no;
-        lv.case_sensitive = spectre || self.doc.dialect.case_sensitive;
+        lv.case_sensitive = spectre || self.cx.doc.rules(fname).case_sensitive;
         lv.ports = ports;
-        let id = self.doc.add_level(lv, Some(st.cur));
-        let key = self.doc.key(name);
-        self.doc.subckts.insert(key, id);
+        let id = self.cx.doc.add_level(lv, Some(st.cur));
+        self.cx.doc.add_subckt(id);
         st.stack.push((st.cur, st.circ, st.mode));
         st.cur = id;
         st.circ = id;
@@ -779,46 +805,6 @@ impl<'a> Reader<'a> {
             st.cur = c;
             st.circ = k;
         }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn include(
-        &mut self,
-        target: &str,
-        section: Option<&str>,
-        no: u32,
-        fname: &str,
-        path: &str,
-        st: &State,
-        stack: &[String],
-        parent_mode: Mode,
-        explicit: bool,
-    ) {
-        let full = resolve_include(self.provider, path, target, self.sink, Loc::line(fname, no));
-        let key = format!("{}#{}", full, section.unwrap_or("").to_lowercase());
-        if stack.contains(&key) {
-            self.sink.error(format!("the include of {target} forms a cycle"), Some(Loc::line(fname, no)));
-            return;
-        }
-        if self.provider.read(&full).is_none() {
-            self.sink.error(format!("the included file {target} cannot be found"), Some(Loc::line(fname, no)));
-            return;
-        }
-        let mode = start_mode(&full);
-        let _ = parent_mode; // the mode comes back after the include (S1 p89)
-        let display = self.display(&full);
-        let name = match section {
-            Some(s) => format!("{} ({s})", file_name(&display)),
-            None => file_name(&display).to_string(),
-        };
-        let mut lv = Level::new(LevelKind::File, &name, &display, &full);
-        lv.line = no;
-        lv.section = section.map(String::from);
-        lv.include_site = explicit.then(|| Loc::line(fname, no));
-        let child = self.doc.add_level(lv, Some(st.cur));
-        let mut stck = stack.to_vec();
-        stck.push(key);
-        self.read_file(&full, child, st.circ, false, mode, &stck, section);
     }
 
     /// One Spectre statement; returns Some(true) at the end of the selected section.
@@ -846,7 +832,8 @@ impl<'a> Reader<'a> {
             "include" => {
                 let target = toks.get(1).map(|t| unquote(t))?;
                 let sec = toks.iter().skip(2).find_map(|t| t.strip_prefix("section=").map(String::from));
-                self.include(&target, sec.as_deref(), no, fname, path, st, stack, Mode::Spectre, true);
+                // the mode comes back after the include (S1 p89)
+                self.cx.include(&target, sec.as_deref(), no, fname, path, st.cur, st.circ, stack, true);
                 return None;
             }
             "library" | "endlibrary" => return None,
@@ -854,8 +841,7 @@ impl<'a> Reader<'a> {
             "endsection" => return Some(section.is_some()),
             "global" => {
                 for t in toks.iter().skip(1) {
-                    let k = self.doc.net_key(t);
-                    self.doc.globals.insert(k);
+                    self.cx.doc.add_global(t, fname);
                 }
                 return None;
             }
@@ -868,14 +854,26 @@ impl<'a> Reader<'a> {
                         .filter_map(|t| t.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
                         .collect();
                     // binned models `nch.1`, `nch.2` stand for `nch`, and an instance may write either
+                    let mtype = family(&master).and_then(|f| family_type(f, &params));
+                    let mut names = vec![name.clone()];
                     if let Some((b, k)) = name.rsplit_once('.') {
                         if !b.is_empty() && !k.is_empty() && k.chars().all(|c| c.is_ascii_digit()) {
-                            self.models
-                                .entry(b.to_string())
-                                .or_insert_with(|| Model { master: master.clone(), params: params.clone() });
+                            names.push(b.to_string());
                         }
                     }
-                    self.models.entry(name).or_insert(Model { master, params });
+                    for n in names {
+                        let card = Card {
+                            name: n.clone(),
+                            mtype: mtype.clone(),
+                            format: "spectre",
+                            case_sensitive: true,
+                            file: fname.to_string(),
+                            line: no,
+                        };
+                        self.cx.add_card(card, false);
+                        let model = Model { master: master.clone(), params: params.clone() };
+                        self.cx.state::<Kept>().models.entry(n).or_insert(model);
+                    }
                 }
                 return None;
             }
@@ -892,7 +890,7 @@ impl<'a> Reader<'a> {
                 return None;
             }
             "ends" => {
-                self.doc.levels[st.cur].end_line = no;
+                self.cx.doc.levels[st.cur].end_line = no;
                 self.close_subckt(st);
                 return None;
             }
@@ -952,25 +950,35 @@ impl<'a> Reader<'a> {
         let first = low.split_whitespace().next().unwrap_or("");
         if first.starts_with(".inc") {
             if let Some(t) = body.split_whitespace().nth(1) {
-                self.include(&unquote(t), None, no, fname, path, st, stack, Mode::Spice, true);
+                self.cx.include(&unquote(t), None, no, fname, path, st.cur, st.circ, stack, true);
             }
             return;
         }
         if first == ".model" {
-            rnl_host_spice::register_model(&mut self.spice_models, &body);
+            let models = &mut self.cx.state::<Kept>().spice_models;
+            rnl_host_spice::register_model(models, &body);
+            let cards: Vec<(String, Option<String>)> = rnl_host_spice::card_names(&body)
+                .into_iter()
+                .map(|n| (n.clone(), models.get(&n.to_lowercase()).cloned()))
+                .collect();
+            for (k, (name, mtype)) in cards.into_iter().enumerate() {
+                // a card read in SPICE mode is found by any case, as the SPICE adapter finds it
+                let card =
+                    Card { name, mtype, format: "spectre", case_sensitive: false, file: fname.to_string(), line: no };
+                self.cx.add_card(card, k == 0);
+            }
             return;
         }
         if first == ".global" {
             for t in body.split_whitespace().skip(1) {
-                let k = self.doc.net_key(t);
-                self.doc.globals.insert(k);
+                self.cx.doc.add_global(t, fname);
             }
             return;
         }
         if body.starts_with('.') {
             return;
         }
-        let Some(el) = rnl_host_spice::parse_element(&body, fname, no, self.sink) else { return };
+        let Some(el) = rnl_host_spice::parse_element(&body, fname, no, self.cx.sink) else { return };
         let needs = rnl_host_spice::needs_models(el.inst.letter);
         self.add_instance(el.inst, st, fname, no, if needs { Some(el.plain) } else { None });
     }
@@ -978,87 +986,128 @@ impl<'a> Reader<'a> {
     /// Add an instance to the circuit `st.circ`, read through the file level of `st.cur` (2.8, 6.1).
     fn add_instance(&mut self, mut inst: Instance, st: &State, fname: &str, no: u32, plain: Option<Vec<String>>) {
         let circ = st.circ;
-        if !self.doc.levels[circ].circuit {
+        if !self.cx.doc.levels[circ].circuit {
             return;
         }
-        inst.file_level = Some(self.doc.file_level(st.cur));
-        let lv = &mut self.doc.levels[circ];
-        if !self.names.entry(circ).or_default().insert(lv.name_key(&inst.name)) {
-            self.sink.error(format!("instance {} is defined twice", inst.name), Some(Loc::line(fname, no)));
+        inst.file_level = Some(self.cx.doc.file_level(st.cur));
+        let lv = &mut self.cx.doc.levels[circ];
+        if !self.cx.names.entry(circ).or_default().insert(lv.name_key(&inst.name)) {
+            self.cx.sink.error(format!("instance {} is defined twice", inst.name), Some(Loc::line(fname, no)));
             return;
         }
         inst.order = lv.instances.len();
         lv.instances.push(inst);
         if let Some(p) = plain {
             let k = lv.instances.len() - 1;
-            self.pending_spice.push((circ, k, p));
+            self.cx.state::<Kept>().pending_spice.push((circ, k, p));
         }
     }
+}
 
-    /// After every file is read: what each master is (6.12, 10.1, 13.6).
-    fn finish(&mut self) {
-        // The model cards of both languages, by lower case name, with the type of each: a `.model`
-        // card of SPICE and a `model` statement of Spectre are the same to an instance of either
-        // language, since a file may hold both (`simulator lang=`).
-        let mut cards: HashMap<String, String> = self.spice_models.clone();
-        for (name, m) in &self.models {
-            if let Some(ty) = family(&m.master).and_then(|f| family_type(f, &m.params)) {
-                cards.entry(name.to_lowercase()).or_insert(ty);
+/// After every file is read: what each master of the Spectre files is (6.12, 10.1, 13.6). When
+/// files of other formats have model cards too, a model name is any card's, found as
+/// [`Reading::card`] finds it: by case from a statement in Spectre mode, without from one in SPICE
+/// mode, as each finds a card of its own file.
+fn finish(cx: &mut Reading) {
+    let Kept { models, spice_models, pending_spice } = std::mem::take(cx.state::<Kept>());
+    let mixed = cx.foreign_cards("spectre");
+    // The model cards of both languages, by lower case name, with the type of each: a `.model`
+    // card of SPICE and a `model` statement of Spectre are the same to an instance of either
+    // language, since a file may hold both (`simulator lang=`).
+    let mut cards: HashMap<String, String> = spice_models;
+    for (name, m) in &models {
+        if let Some(ty) = family(&m.master).and_then(|f| family_type(f, &m.params)) {
+            cards.entry(name.to_lowercase()).or_insert(ty);
+        }
+    }
+    if mixed {
+        // a name of another format's card tells nodes from a model name too
+        for (_, _, plain) in &pending_spice {
+            for t in plain.iter().filter(|t| cx.is_card(t)) {
+                cards.entry(t.to_lowercase()).or_default();
             }
         }
-        for (lv, k, plain) in std::mem::take(&mut self.pending_spice) {
-            rnl_host_spice::resolve_nodes(&mut self.doc.levels[lv].instances[k], &plain, &cards);
-        }
-        for lv in 0..self.doc.levels.len() {
-            for k in 0..self.doc.levels[lv].instances.len() {
-                let inst = &self.doc.levels[lv].instances[k];
-                if inst.letter.is_some() {
-                    // an element read in SPICE mode
-                    let letter = inst.letter;
-                    let inst = &mut self.doc.levels[lv].instances[k];
-                    if !inst.is_subckt && inst.mtype.is_none() {
-                        inst.mtype = inst.model.as_ref().and_then(|m| cards.get(&m.to_lowercase()).cloned());
+    }
+    for (lv, k, plain) in pending_spice {
+        rnl_host_spice::resolve_nodes(&mut cx.doc.levels[lv].instances[k], &plain, &cards);
+    }
+    for lv in 0..cx.doc.levels.len() {
+        for k in 0..cx.doc.levels[lv].instances.len() {
+            let inst = &cx.doc.levels[lv].instances[k];
+            if mixed && !cx.is_of(&inst.file, "spectre") {
+                continue;
+            }
+            let loc = Loc::line(&inst.file, inst.line);
+            if inst.letter.is_some() {
+                // an element read in SPICE mode
+                let letter = inst.letter;
+                let mtype = match (&inst.model, inst.is_subckt || inst.mtype.is_some()) {
+                    (Some(m), false) if mixed => {
+                        let m = m.clone();
+                        Some(cx.card(&m, false, loc).and_then(|c| c.mtype))
                     }
-                    // one that names no model card is the primitive of Spectre it equals, which the
-                    // rule package of Spectre, the only one of a Spectre file, draws
-                    if inst.model.is_none() {
-                        inst.model = letter.and_then(spectre_master).map(String::from);
-                    }
-                    continue;
-                }
-                let master = inst.model.clone().unwrap_or_default();
-                let (terms, value_param, mtype, is_subckt) = if master == SWITCH {
-                    (Some((0..inst.nodes.len()).map(|k| format!("t{k}")).collect()), None, None, false)
-                } else if let Some((_, t, v)) = PRIMITIVES.iter().find(|(m, _, _)| *m == master) {
-                    // one without terminal names, a transmission line, has none to give
-                    let names = (!t.is_empty()).then(|| t.iter().map(|s| s.to_string()).collect::<Vec<_>>());
-                    (names, v.map(String::from), None, false)
-                } else if let Some(m) = self.models.get(&master) {
-                    match family(&m.master) {
-                        Some(f) => (family_terminals(f), family_value(f), family_type(f, &m.params), false),
-                        None => (None, None, None, false),
-                    }
-                } else if let Some(ty) = cards.get(&master.to_lowercase()) {
-                    // a card of SPICE's, `.model pch_spice pmos`, named by an instance of Spectre's
-                    (type_terminals(ty), type_value(ty), Some(ty.clone()), false)
-                } else if self.doc.subckts.contains_key(&master) {
-                    (None, None, None, true)
-                } else {
-                    // neither a primitive nor a model card: a subcircuit defined elsewhere, such as a PDK device (6.4)
-                    (None, None, None, true)
+                    (Some(m), false) => Some(cards.get(&m.to_lowercase()).cloned()),
+                    _ => None,
                 };
-                let inst = &mut self.doc.levels[lv].instances[k];
-                inst.default_terminals = terms;
-                inst.mtype = mtype;
-                inst.is_subckt = is_subckt;
-                let param =
-                    |inst: &Instance, name: &str| inst.params.iter().find(|(p, _)| p == name).map(|(_, v)| v.clone());
-                if let Some(vp) = value_param {
-                    inst.value = param(inst, &vp);
-                } else if master == "bsource" {
-                    // the value of a behavioural source is its voltage or its current
-                    inst.value = param(inst, "v").or_else(|| param(inst, "i"));
+                let inst = &mut cx.doc.levels[lv].instances[k];
+                if let Some(mtype) = mtype {
+                    inst.mtype = mtype;
                 }
+                // one that names no model card is the primitive of Spectre it equals, which the
+                // rule package of Spectre, the only one of a Spectre file, draws
+                if inst.model.is_none() {
+                    inst.model = letter.and_then(spectre_master).map(String::from);
+                }
+                continue;
+            }
+            let master = inst.model.clone().unwrap_or_default();
+            let primitive = PRIMITIVES.iter().find(|(m, _, _)| *m == master);
+            let (terms, value_param, mtype, is_subckt) = if master == SWITCH {
+                (Some((0..inst.nodes.len()).map(|k| format!("t{k}")).collect()), None, None, false)
+            } else if let Some((_, t, v)) = primitive {
+                // one without terminal names, a transmission line, has none to give
+                let names = (!t.is_empty()).then(|| t.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+                (names, v.map(String::from), None, false)
+            } else if mixed {
+                match cx.card(&master, true, loc) {
+                    Some(c) if c.format == "spectre" && models.contains_key(&c.name) => {
+                        let m = &models[&c.name];
+                        match family(&m.master) {
+                            Some(f) => (family_terminals(f), family_value(f), family_type(f, &m.params), false),
+                            None => (None, None, None, false),
+                        }
+                    }
+                    Some(c) => match c.mtype {
+                        Some(ty) => (type_terminals(&ty), type_value(&ty), Some(ty), false),
+                        None => (None, None, None, false),
+                    },
+                    // neither a primitive nor a model card: a subcircuit, of the netlist or not (6.4)
+                    None => (None, None, None, true),
+                }
+            } else if let Some(m) = models.get(&master) {
+                match family(&m.master) {
+                    Some(f) => (family_terminals(f), family_value(f), family_type(f, &m.params), false),
+                    None => (None, None, None, false),
+                }
+            } else if let Some(ty) = cards.get(&master.to_lowercase()) {
+                // a card of SPICE's, `.model pch_spice pmos`, named by an instance of Spectre's
+                (type_terminals(ty), type_value(ty), Some(ty.clone()), false)
+            } else {
+                // neither a primitive nor a model card: a subcircuit, defined in the netlist or
+                // elsewhere, such as a PDK device (6.4)
+                (None, None, None, true)
+            };
+            let inst = &mut cx.doc.levels[lv].instances[k];
+            inst.default_terminals = terms;
+            inst.mtype = mtype;
+            inst.is_subckt = is_subckt;
+            let param =
+                |inst: &Instance, name: &str| inst.params.iter().find(|(p, _)| p == name).map(|(_, v)| v.clone());
+            if let Some(vp) = value_param {
+                inst.value = param(inst, &vp);
+            } else if master == "bsource" {
+                // the value of a behavioural source is its voltage or its current
+                inst.value = param(inst, "v").or_else(|| param(inst, "i"));
             }
         }
     }
@@ -1160,6 +1209,7 @@ pub fn read_library(path: &str, provider: &dyn Provider, sink: &mut Sink) -> Opt
     read_as(path, provider, sink, &[], false)
 }
 
+/// Read every file of the netlist with the Spectre format.
 fn read_as(
     path: &str,
     provider: &dyn Provider,
@@ -1167,32 +1217,9 @@ fn read_as(
     includes: &[String],
     main_file: bool,
 ) -> Option<HostDocument> {
-    let path = normalize(path);
-    provider.read(&path)?;
-    let main_dir = dirname(&path);
-    let fname = file_name(&path).to_string();
-    let mut main = Level::new(LevelKind::File, fname.clone(), fname, path.clone());
-    main.circuit = true;
-    main.case_sensitive = true;
-    let doc = HostDocument::new(main, dialect());
-    let mode = start_mode(&path);
-    let mut r = Reader {
-        provider,
-        sink,
-        doc,
-        models: HashMap::new(),
-        spice_models: HashMap::new(),
-        names: HashMap::new(),
-        pending_spice: Vec::new(),
-        main_dir,
-    };
-    r.read_file(&path, 0, 0, main_file, mode, &[format!("{path}#")], None);
-    let st = State { mode, cur: 0, circ: 0, stack: Vec::new() };
-    for extra in includes {
-        r.include(extra, None, 1, file_name(&path), &path, &st, &[format!("{path}#")], mode, false);
-    }
-    r.finish();
-    Some(r.doc)
+    let list: [&dyn Format; 1] = [&Spectre];
+    let formats = Formats { list: &list, choose: &|_, _, _| (0, 0) };
+    Reading::read(path, provider, sink, &formats, includes, main_file)
 }
 
 #[cfg(test)]

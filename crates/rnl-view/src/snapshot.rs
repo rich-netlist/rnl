@@ -90,6 +90,11 @@ pub struct FileRef {
     pub path: String,
     /// As shown.
     pub name: String,
+    /// The format the file was read with, as the Document's `SourceFile::format`: only when the
+    /// netlist's files are of more than one format, or the request set a format for some.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub format: Option<String>,
 }
 
 /// A drawing level.
@@ -416,10 +421,16 @@ fn level_id(doc: &HostDocument, lv: usize) -> String {
     }
 }
 
-/// The snapshot of an interpretation, with its Document.
-pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, options: &Options) -> Snapshot {
-    let files: Vec<FileRef> =
-        document.files.iter().map(|f| FileRef { path: f.path.clone(), name: f.name.clone() }).collect();
+/// The snapshot of an interpretation, with its Document; `set`, the request set formats for files.
+pub(crate) fn snapshot(r: &Interpretation, document: Document, parts: Parts, options: &Options, set: bool) -> Snapshot {
+    // each file's format, only when they are not all one or some was set, so that a snapshot of a
+    // netlist of one format is what it has been
+    let formats = set || r.doc.mixed();
+    let files: Vec<FileRef> = document
+        .files
+        .iter()
+        .map(|f| FileRef { path: f.path.clone(), name: f.name.clone(), format: f.format.clone().filter(|_| formats) })
+        .collect();
     let file_index: HashMap<&str, usize> =
         document.files.iter().enumerate().map(|(k, f)| (f.path.as_str(), k)).collect();
     let levels = r
@@ -487,6 +498,13 @@ fn revision(r: &Interpretation, options: &Options) -> String {
     field(b"rnl-revision/1");
     field(r.doc.dialect.name.as_bytes());
     field(reading.as_bytes());
+    // the format of each file, only when they are not all one, so that the revision of a netlist
+    // of one format is what it has been
+    if r.doc.mixed() {
+        let mut formats: Vec<String> = r.doc.file_formats.iter().map(|f| format!("{}={}", f.file, f.format)).collect();
+        formats.sort();
+        field(format!("formats {}", formats.join("\n")).as_bytes());
+    }
     for (name, text) in &files {
         field(name.as_bytes());
         field(text.as_bytes());
@@ -499,8 +517,10 @@ fn revision(r: &Interpretation, options: &Options) -> String {
 fn host_nets(doc: &HostDocument, lv: usize) -> Vec<(String, String)> {
     let level = &doc.levels[lv];
     let mut out: Vec<(String, String)> = Vec::new();
-    for written in level.ports.iter().chain(level.instances.iter().flat_map(|i| i.nodes.iter())) {
-        let key = doc.net_key(written);
+    let ports = level.ports.iter().map(|p| (p, &level.file));
+    let nodes = level.instances.iter().flat_map(|i| i.nodes.iter().map(move |n| (n, &i.file)));
+    for (written, file) in ports.chain(nodes) {
+        let key = doc.net_key_in(lv, written, file);
         if !out.iter().any(|(k, _)| *k == key) {
             let shown = if key == "0" { "0".to_string() } else { written.clone() };
             out.push((key, shown));
@@ -512,14 +532,14 @@ fn host_nets(doc: &HostDocument, lv: usize) -> Vec<(String, String)> {
 fn host(doc: &HostDocument, lv: &LevelView) -> HostLevel {
     let level = &doc.levels[lv.level];
     let nets = host_nets(doc, lv.level);
-    let net_id = |written: &str| {
-        let key = doc.net_key(written);
+    let net_id = |written: &str, file: &str| {
+        let key = doc.net_key_in(lv.level, written, file);
         let shown = nets.iter().find(|(k, _)| *k == key).map(|(_, s)| s.as_str()).unwrap_or(written);
         format!("&{}", quoted(shown))
     };
-    let port_keys: Vec<String> = level.ports.iter().map(|p| doc.net_key(p)).collect();
+    let port_keys: Vec<String> = level.ports.iter().map(|p| doc.net_key_in(lv.level, p, &level.file)).collect();
     HostLevel {
-        ports: level.ports.iter().map(|p| net_id(p)).collect(),
+        ports: level.ports.iter().map(|p| net_id(p, &level.file)).collect(),
         instances: level
             .instances
             .iter()
@@ -535,7 +555,7 @@ fn host(doc: &HostDocument, lv: &LevelView) -> HostLevel {
                     .map(|(k, node)| HostTerminal {
                         n: k as u32 + 1,
                         name: lv.terminal_names.get(i).and_then(|names| names.get(k).cloned().flatten()),
-                        net: net_id(node),
+                        net: net_id(node, &inst.file),
                     })
                     .collect(),
             })
@@ -544,7 +564,7 @@ fn host(doc: &HostDocument, lv: &LevelView) -> HostLevel {
             .iter()
             .map(|(key, shown)| HostNet {
                 id: format!("&{}", quoted(shown)),
-                global: key == "0" || doc.globals.contains(key),
+                global: doc.is_global(lv.level, key),
                 port: port_keys.contains(key),
             })
             .collect(),

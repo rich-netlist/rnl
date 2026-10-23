@@ -17,7 +17,10 @@
  * @property {Record<string, string>} [files] The texts of the workspace by path, the entry's among them.
  * @property {string[]} [package_dirs] The directories, among the paths of `files`, whose packages are
  *   found by name.
- * @property {"spice" | "spectre"} [dialect] The dialect, instead of guessing it from the entry.
+ * @property {"spice" | "spectre"} [dialect] The format of the entry, instead of guessing it from the entry.
+ * @property {Record<string, string>} [formats] The format set for files, by path as in `files`: only
+ *   those the user set. A file not among them is read as the entry when it is included; an unknown
+ *   name fails the build. The library index reads its files with them too.
  * @property {boolean} [std] Use the standard package at the root; true when not given.
  * @property {string} [std_version] The version of the standard package at the root, whatever the
  *   files' language version, such as "0.2"; by the language version when not given.
@@ -81,6 +84,14 @@
  */
 
 /**
+ * What to list: the formats a file can be read with, and the format each file of `detect`, by path
+ * and text, has when none is set for it.
+ *
+ * @typedef {object} FormatsRequest
+ * @property {{ detect?: Record<string, string> }} formats
+ */
+
+/**
  * The core, loaded.
  *
  * @typedef {object} Core
@@ -98,7 +109,9 @@
  *   request names, `{ svg?, primitives? }` each, in order (`UnplacedDrawing` of document.d.ts).
  *   Throws an Error with the core's message when no build kept drawings, when an object is not
  *   there, or when `names` are not those of that build.
- * @property {(request: {library: {reload?: boolean, refresh?: string[]}, pool: string[], files: Record<string, string>} | string) => string[]} library Update the viewer library index; returns read errors.
+ * @property {(request: {library: {reload?: boolean, refresh?: string[]}, pool: string[], files: Record<string, string>, formats?: Record<string, string>} | string) => string[]} library Update the viewer library index, reading its files with the formats set for them; returns read errors.
+ * @property {(request: FormatsRequest | string) => { list: object[], detected: Record<string, string> }} formats
+ *   The formats a file can be read with, and the format each file of `detect` has when none is set.
  * @property {(request: Request | WriteRequest | CatalogRequest | DrawingsRequest | string) => object} respond
  *   The core's answer as it gives it: `{ document }`, `{ snapshot }`, `{ written }`, `{ catalog }`,
  *   `{ drawings }` or `{ error }`. Throws only when the core stops.
@@ -114,6 +127,7 @@ const ASKS = {
   catalog: "a catalog request",
   drawings: "a drawings request",
   library: "a library update",
+  formats: "a formats request",
 };
 const REPLACEMENT = String.fromCharCode(0xfffd);
 
@@ -190,6 +204,7 @@ export async function loadCore(wasm) {
     catalog: (request) => part(request, "catalog"),
     drawings: (request) => part(request, "drawings"),
     library: (request) => part(request, "library"),
+    formats: (request) => part(request, "formats"),
   };
 }
 
