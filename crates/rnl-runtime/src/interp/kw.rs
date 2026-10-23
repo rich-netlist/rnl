@@ -1137,7 +1137,7 @@ impl Interp<'_> {
             ctx_origin: ctx.origin.clone(),
         };
         let a = self.new_obj(ObjData::Usage(Box::new(u)));
-        self.symbol_mut(symbol).usages.push(a);
+        self.symbol_mut(symbol).push_usage(a);
         Ok((a, false))
     }
 
@@ -1358,7 +1358,7 @@ impl Interp<'_> {
                 }
             }
             let symbol = ctx.frame.as_ref().unwrap().borrow().symbol.unwrap();
-            self.symbol_mut(symbol).prims.push(SymPrim {
+            self.symbol_mut(symbol).push_prim(SymPrim {
                 shape,
                 points: local,
                 params: params.clone(),
@@ -1458,7 +1458,7 @@ impl Interp<'_> {
                     return self.fail(ctx, "a text attached to a point takes no key= (13.3)", call_start);
                 }
                 let d = off.unwrap_or((0.0, 0.0));
-                self.symbol_mut(symbol).prims.push(SymPrim {
+                self.symbol_mut(symbol).push_prim(SymPrim {
                     shape: Shape::Text,
                     points: vec![(x + d.0, y + d.1)],
                     params: PrimParams::default(),
@@ -2115,6 +2115,9 @@ pub(crate) fn merge_symbol(sym: &mut SymbolDef, other: &SymbolDef) {
     for pin in &other.pins {
         add_pin(sym, pin.clone());
     }
+    let offset = sym.prims.len() + sym.usages.len();
+    sym.prim_order.extend(other.prim_order.iter().map(|n| offset + n));
+    sym.usage_order.extend(other.usage_order.iter().map(|n| offset + n));
     sym.prims.extend(other.prims.iter().cloned());
     sym.labels.extend(other.labels.iter().cloned());
     sym.usages.extend(other.usages.iter().cloned());

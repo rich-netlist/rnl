@@ -371,7 +371,7 @@ impl Interp<'_> {
         let mut sym = SymbolDef { default: true, ..SymbolDef::default() };
         let mut dashed = StyleMap::new();
         dashed.insert("linestyle".into(), Lit::Str(WStr::new("dashed", None)));
-        sym.prims.push(SymPrim {
+        sym.push_prim(SymPrim {
             shape: Shape::Rectangle,
             points: vec![(-2.0, -h / 2.0), (2.0, h / 2.0)],
             params: PrimParams::default(),
@@ -387,7 +387,7 @@ impl Interp<'_> {
                     label: name.clone(),
                     dir: Some(dir),
                 });
-                sym.prims.push(SymPrim {
+                sym.push_prim(SymPrim {
                     shape: Shape::Line,
                     points: vec![(x0, y), (x1, y)],
                     params: PrimParams::default(),

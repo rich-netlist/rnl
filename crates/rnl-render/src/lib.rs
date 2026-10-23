@@ -546,7 +546,7 @@ impl Out {
         for (k, p) in sym.prims.iter().enumerate() {
             let st = merged(own, &p.style);
             let gpts: Vec<Pt> = p.points.iter().map(|q| place(base, code, *q)).collect();
-            let key = sub(order, k as f64);
+            let key = sub(order, p.order as f64);
             if p.shape == Shape::Text {
                 let lines = texts.get(&format!("{path}{k}")).cloned().unwrap_or_default();
                 self.text(
@@ -573,6 +573,8 @@ impl Out {
         // pin names: shown by this viewer just inside the pin, past the pin's lead when a line of
         // the symbol runs from the pin inwards, so that a block's names are inside its body (9.2.4
         // leaves it to the viewer)
+        let labels_after =
+            sym.prims.iter().map(|p| p.order).chain(sym.nested.iter().map(|n| n.order)).max().map_or(0, |n| n + 1);
         for (k, pin) in sym.pins.iter().enumerate() {
             let (Some(label), Some(dir)) = (&pin.label, pin.dir) else { continue };
             let inward = match dir {
@@ -627,7 +629,7 @@ impl Out {
                 0.0,
                 &st,
                 layer,
-                sub(order, 200.0 + k as f64),
+                sub(order, (labels_after + k) as f64),
                 code,
             );
         }
@@ -642,7 +644,7 @@ impl Out {
                 n.orient.then(code),
                 own,
                 layer,
-                &sub(order, 100.0 + k as f64),
+                &sub(order, n.order as f64),
                 texts,
                 &format!("{path}{k}/"),
             );

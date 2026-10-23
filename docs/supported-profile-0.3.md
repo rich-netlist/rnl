@@ -66,6 +66,10 @@ is distinguished from the 24 cases of 0.3 and dedicated 0.3 regression tests.
 | 9.2.5 | A Bezier arrow uses the next distinct control point when the adjacent control coincides with its endpoint. | `rnl-render/src/lib.rs::tests::bezier_arrows_skip_coincident_control_points` |
 | 11.8 | Shorter members of a heterogeneous bundle no longer cause out-of-bounds node access. Existing positional correspondence is retained; see the open name-correspondence issue below. | `profile_semantics.rs::a_shorter_bundle_member_contributes_only_its_existing_terminals` |
 
+## Subsequent focused corrections
+
+- **Symbol declaration order (9.2.1, 9.2.7, 11.6):** graphics, fixed text and nested symbols now carry one declaration position through inclusion and rendering. The [regressions](../crates/rnl-cli/tests/symbol_drawing_order.rs) check repeated fragment inclusion, transformed symbols, SVG order and more than 100 primitives.
+
 ## Remaining issues, in priority order
 
 These are open work, not silently accepted extensions. The [roadmap](roadmap.md) remains
@@ -78,7 +82,6 @@ The linked matrices contain the exact source anchors.
 | P1 | **Excluded host regions (F-01, 2.2).** RNL inside Spectre `reliability {}` or SPICE `.verilog` is read; `.newjob` titles and preprocessing are not comprehensively classified. | CLI probes drew text inside both excluded regions. Host adapters need context-aware shielding and write-placement policy. |
 | P1 | **Unsupported ancestor version (F-03, 16.1).** An unsupported main-file version suppresses a supported included file too. | A 0.3 child's text draws when read directly but disappears beneath a 9.9 parent. Fix requires isolating version, inherited names/packages and diagnostics at file boundaries. |
 | P1 | **Encoding preservation (F-04, 3.1).** CLI writing can silently change Latin-1 to UTF-8 when new characters do not fit; strip-generated directly writes decoded text. | `solve.rs::encode_as` has an explicit UTF-8 fallback (even tested as current behavior). Desktop encoding checks differ. A consistent refusal/conversion policy needs an API decision. |
-| P2 | **Nested-symbol drawing order (9.2.1, 9.2.7, 11.6).** Separate primitive/nested arrays lose their declaration interleaving. | Renderer assigns ordinary order `k`, nested order `100+k`; requires carrying a common ordering through the symbol model and renderer. |
 | P2 | **Case-distinct named pins (3.6, 9.2.4).** Symbol pin-key merging collapses `P` and `p` before Spectre terminal matching. | A CLI probe of a symbol with two such named pins retained only one; numeric pins avoid this collision. Name-key merging must be reconciled with reuse across host dialects. |
 | P2 | **Bundle terminal correspondence (11.8).** Heterogeneous members use first-member terminal ordinals, not name-based correspondence when names/orders differ. | The crash is fixed; the broader mapping remains partial and needs regression cases for differing names/orders. |
 | P2 | **Deep nested symbols (9.2.3, 9.2.7, 13.3).** Extent/text traversals stop around depth 8 while geometry continues. | A valid deeper symbol can lose fixed text and inferred bounds silently. Explicit `box=` avoids extent inference but does not restore missing text. |
