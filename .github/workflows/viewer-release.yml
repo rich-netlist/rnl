@@ -300,7 +300,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/assets" "$RUNNER_TEMP/installed" "$RUNNER_TEMP/dmg"
           cp apps/desktop/target/$TARGET/release/bundle/dmg/*.dmg "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-macos-$ARCH.dmg"
-          hdiutil attach "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-macos-$ARCH.dmg" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg"
+          printf 'Y\n' | hdiutil attach "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-macos-$ARCH.dmg" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg"
           trap 'hdiutil detach "$RUNNER_TEMP/dmg"' EXIT
           ditto "$RUNNER_TEMP/dmg/RNL Viewer.app" "$RUNNER_TEMP/installed/RNL Viewer.app"
           hdiutil detach "$RUNNER_TEMP/dmg"
