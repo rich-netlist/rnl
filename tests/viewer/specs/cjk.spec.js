@@ -1,11 +1,13 @@
 import { test, expect } from '../viewer.js';
 import { cjkEvidence, assertCjk } from '../../../apps/desktop/tests/cjk.mjs';
 
-test('Chinese UI and source use real glyphs; mixed text keeps native selection and editor positions', async ({page,viewer}) => {
+test('Chinese UI and source use real glyphs; mixed text keeps native selection and editor positions', async ({page,viewer},info) => {
   await viewer.open('04-hierarchy');
   await page.evaluate(() => window.viewer.command('language-zh'));
   const evidence = await page.evaluate(cjkEvidence);
   assertCjk(evidence, process.env.RNL_NO_SYSTEM_CJK === '1');
+  await info.attach('font-requests.json',{body:JSON.stringify(await page.evaluate(()=>performance.getEntriesByType('resource')
+    .filter(r=>r.name.includes('/fonts/')).map(r=>({name:r.name.split('/fonts/')[1],bytes:r.decodedBodySize}))),null,2),contentType:'application/json'});
   await page.evaluate(()=>window.viewer.command('grid-settings'));
   const dialogEvidence = await page.evaluate(cjkEvidence);
   assertCjk(dialogEvidence, process.env.RNL_NO_SYSTEM_CJK === '1');

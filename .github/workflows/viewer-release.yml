@@ -18,6 +18,10 @@ on:
         description: "Optional viewer-vX.Y.Z to validate without pushing a tag (never publishes)"
         type: string
         default: ""
+      measure_font_sizes:
+        description: "Also rebuild without the UI font fallback to measure package size differences"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -156,6 +160,18 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: node apps/desktop/tests/installers.mjs --msi "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-windows-x64.msi"
+      - name: Measure the Windows font-fix package sizes
+        if: inputs.measure_font_sizes
+        env:
+          FONT_SIZE_ASSETS: ${{ runner.temp }}/assets
+          FONT_SIZE_OUTPUT: ${{ runner.temp }}/font-sizes/windows.json
+        run: node apps/desktop/tests/font-sizes.mjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && inputs.measure_font_sizes
+        with:
+          name: viewer-font-sizes-windows
+          path: ${{ runner.temp }}/font-sizes/
+          if-no-files-found: error
 
   build-linux:
     needs: validate
@@ -249,6 +265,12 @@ jobs:
           trap - EXIT
           test ! -e /usr/bin/rnl-viewer
           test ! -e "/usr/share/applications/RNL Viewer.desktop"
+      - name: Measure the Linux font-fix package sizes
+        if: inputs.measure_font_sizes
+        env:
+          FONT_SIZE_ASSETS: ${{ runner.temp }}/assets
+          FONT_SIZE_OUTPUT: ${{ runner.temp }}/smoke-linux/linux-font-sizes.json
+        run: node apps/desktop/tests/font-sizes.mjs
       - name: Keep the Linux smoke-test screenshots
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
