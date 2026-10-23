@@ -40,8 +40,14 @@ async function observe(label,check) {
   throw new Error(`Timed out: ${label}: ${JSON.stringify(last)}`);
 }
 const text=r=>r.words.map(w=>w.text).join(' ');
-const drawn=r=>r.circuitInk>200 && r.circuitDensity<0.35 &&
-  r.words.some(w=>w.x>0.38 && /amp/.test(w.text)) && r.words.some(w=>w.x>0.38 && /X[12]/.test(w.text));
+const drawn=(r,left=0.38)=>{
+  const labels=r.words.filter(w=>w.x>left), amps=labels.filter(w=>/\bamp\b/.test(w.text));
+  // X1/X2 are only ~10 pixels high on the runner's 1024px desktop and Vision can omit them.
+  // Two separated stage names plus the input source prove the schematic independently of source text.
+  return r.circuitInk>200 && r.circuitDensity<0.35 && amps.length>=2 &&
+    Math.max(...amps.map(w=>w.x))-Math.min(...amps.map(w=>w.x))>0.08 &&
+    labels.some(w=>/\bVin\b/.test(w.text)) && labels.some(w=>/\bVdd\b|\bX3\b/.test(w.text));
+};
 
 try {
   // This is the documented terminal workaround, applied to the installed bundle, not its build tree.
@@ -57,7 +63,7 @@ try {
   osa('tell application "System Events" to key code 53');
   // Cmd+B belongs to the native menu; physical Control+Q edits, leaving Cmd+Q to Quit.
   key('b','using command down');
-  await observe('sidebar-hidden',r=>!r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r));
+  await observe('sidebar-hidden',r=>!r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r,0.03));
   key('b','using command down');
   await observe('sidebar-restored',r=>r.words.some(w=>w.x<0.35 && /Netlist/.test(w.text)) && drawn(r));
   menu('Help','Check for Updates');
