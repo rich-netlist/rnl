@@ -2,6 +2,10 @@
 
 This is the central TODO list. A checked box means work present in this repository, not a claim that a product feature works.
 
+- [x] Share usage frame/role and terminal-current inspection geometry across native/WASM,
+  optional CLI/npm SVG export and Viewer preferences; release pending separate approval.
+  [Design under review](decisions/0014-inspection-overlay-geometry.md).
+
 ## Bootstrap
 
 - [x] Create the independent directory map and documentation entry points.

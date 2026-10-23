@@ -67,6 +67,7 @@
         },
         { "id": "toggle-hover-names", "label": "Show &Names on Hover", "check": true },
         { "id": "toggle-usages", "label": "Show &Usages", "keys": ["Ctrl+R"], "check": true },
+        { "id": "toggle-currents", "label": "Show Current &Directions", "check": true },
         {
           "label": "&Language",
           "items": [

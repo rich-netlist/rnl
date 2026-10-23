@@ -8,6 +8,7 @@
  * What to build: the workspace and how. Fields the core does not know are ignored.
  *
  * @typedef {object} Request
+ * @property {import('./core.js').OverlayOptions} [overlays] Optional usage/current SVG inspection overlays.
  * @property {string[]} [pool] Explicit temporary files searched before package directories.
  * @property {boolean} [auto_include] Resolve unique undefined subcircuits through the viewer library index.
  * @property {string} [library_prefix] Internal namespace prefix for indexed pool paths.
@@ -38,6 +39,7 @@
  * The netlist is the entry; the other fields are a Request's.
  *
  * @typedef {object} WriteRequest
+ * @property {import('./core.js').OverlayOptions} [overlays] Inspection SVG export options.
  * @property {{ dialect: "spice" | "spectre", netlist: string, author: string, ops: object[], file?: string }} write
  *   The netlist, without RNL records, its dialect, the author of the records, the ops as the
  *   editor interface draft writes them, and the name the netlist is saved under when it is known,

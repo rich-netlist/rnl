@@ -518,6 +518,7 @@
   "usage": "用例",
   "&Usage": "用例(&U)",
   "Show &Usages": "显示用例(&U)",
+  "Show Current &Directions": "显示电流方向(&D)",
   "Color": "颜色",
   "Show more ({0} of {1})": "显示更多（已显示 {0} / {1}）",
   "Roles": "角色",

@@ -7,7 +7,9 @@
 mod catalog;
 mod document;
 mod library;
+pub mod overlays;
 mod primitive;
+pub use overlays::{CurrentArrow, OverlayOptions, OverlayStyle, UsageFrame, UsageMode};
 mod snapshot;
 #[cfg(test)]
 mod types;
@@ -749,7 +751,11 @@ R1 p q 1k
             serde_json::to_value(&d).unwrap()["levels"][0].as_object().unwrap().clone()
         };
         let keys = |l: &serde_json::Map<String, serde_json::Value>| {
-            l.keys().filter(|k| !["ports", "symbol"].contains(&k.as_str())).cloned().collect::<Vec<_>>().join(" ")
+            l.keys()
+                .filter(|k| !["ports", "symbol", "currents"].contains(&k.as_str()))
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" ")
         };
         // by default the SVG and no primitives, as the viewers have read the Document so far
         let default = BuildOptions::default();

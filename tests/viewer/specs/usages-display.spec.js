@@ -162,11 +162,12 @@ for (const platform of ['desktop', 'web']) {
       await row(page, name).getByRole('button').click();
       const bounds = await page.evaluate(object => {
         const v = window.viewer;
-        return v.doc.levels[v.level].hits.find(h => h.kind === 'box' && h.objects[0] === object).points;
+        const b = v.doc.levels[v.level].usages.find(u => u.object === object).frame.bounds;
+        return [[b[0], b[1]], [b[2], b[3]]];
       }, u.object);
       const [a, b] = await Promise.all(bounds.map(([x, y]) => viewer.point(x, y)));
       const box = await frame(page, u.object).locator(':scope > rect').boundingBox();
-      const pad = 12 + 8 / 3; // Bounding boxes include half of the selected 4pt stroke.
+      const pad = 8 / 3; // Core bounds include padding; browser boxes add half the selected stroke.
       for (const [actual, expected] of [[box.x, a.x - pad], [box.y, a.y - pad], [box.width, b.x - a.x + pad * 2], [box.height, b.y - a.y + pad * 2]]) {
         expect(Math.abs(actual - expected)).toBeLessThan(.1);
       }
@@ -213,10 +214,10 @@ for (const platform of ['desktop', 'web']) {
       .filter(g => g.dataset.id === id).every(g => !g.classList.contains('usage-muted'))), route.roles[0].groups);
     expect(wireFocus.length).toBeGreaterThan(0);
     expect(wireFocus.every(Boolean)).toBe(true);
-    const r = route.roles[0].bounds;
+    const r = route.frame.bounds;
     const [a, b] = await Promise.all([viewer.point(r[0], r[1]), viewer.point(r[2], r[3])]);
     const rect = await frame(page, route.object).locator(':scope > rect').boundingBox();
-    expect(Math.abs(rect.width - (b.x - a.x + 24 + 16 / 3))).toBeLessThan(.1);
+    expect(Math.abs(rect.width - (b.x - a.x + 16 / 3))).toBeLessThan(.1);
     const label = await frame(page, route.object).locator('.usage-role-label').boundingBox();
     expect(Math.abs(label.x + label.width / 2 - (a.x + b.x) / 2)).toBeLessThan(.1);
   });

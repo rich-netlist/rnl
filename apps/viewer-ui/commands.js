@@ -24,7 +24,7 @@ import { ascend, descend, opens } from "./subcircuits.js";
 import { checkForUpdates } from "./updates.js";
 import { fileAssociations } from "./file-associations.js";
 import { memoryCache } from "./memory-cache.js";
-import { toggleUsages } from "./usages.js";
+import { toggleUsages, toggleCurrents } from "./usages.js";
 import { netlistColors } from "./netlist-colors.js";
 import { downloadLibrary } from "./library-download.js";
 import { $ } from "./util.js";
@@ -95,6 +95,7 @@ export function command(id, options = {}) {
     case "grid-settings": gridCommand(id); break;
     case "toggle-hover-names": setHoverNames(!hoverNamesOn()); break;
     case "toggle-usages": return toggleUsages();
+    case "toggle-currents": return toggleCurrents();
     case "toggle-netlist": setSidebar($("app").classList.contains("sidebar-hidden")); break;
     case "toggle-problems": setProblems($("pane-netlist").classList.contains("problems-folded")); break;
     case "panel-hide": return setSidebar(false);

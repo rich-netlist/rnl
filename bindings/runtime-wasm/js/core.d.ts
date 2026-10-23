@@ -9,8 +9,24 @@ import type { Snapshot } from "./snapshot.js";
 
 export type { Catalog, Document, Snapshot, UnplacedDrawing };
 
+/** Inspection SVG export styles, independent of RNL language styles. */
+export interface OverlayStyle {
+  palette?: string[];
+  width?: number;
+  dashes?: number[];
+  current_color?: string;
+}
+export interface OverlayOptions {
+  usages?: "none" | "semantic" | "all";
+  currents?: boolean;
+  roles?: boolean;
+  style?: OverlayStyle;
+}
+
 /** What to build: the workspace and how. Fields the core does not know are ignored. */
 export interface Request {
+  /** Opt-in SVG overlays. Level.usages[].frame and Level.currents always give geometry. */
+  overlays?: OverlayOptions;
   /** The path of the file to open, as the frontend names it, such as `/w/top.sp`. */
   entry: string;
   /** The texts of the workspace by path, the entry's among them. */
@@ -159,6 +175,7 @@ export interface SymbolPin {
 
 /** What to write: an edit transaction's ops into its netlist, and how to build what was written. */
 export interface WriteRequest {
+  overlays?: OverlayOptions;
   write: {
     dialect: "spice" | "spectre";
     /** The netlist, without RNL records. */

@@ -889,7 +889,42 @@ impl Interp<'_> {
             });
         }
         let packages = self.level_packages(lv);
+        let mut currents = Vec::new();
+        let mut effective: HashMap<ObjId, (Pos, String)> = HashMap::new();
+        let mut current_order = Vec::new();
+        for (p, t, direction) in &self.scenes[s].currents {
+            if let Some(best) = effective.get_mut(t) {
+                if *p > best.0 {
+                    *best = (p.clone(), direction.clone());
+                }
+            } else {
+                current_order.push(*t);
+                effective.insert(*t, (p.clone(), direction.clone()));
+            }
+        }
+        for t in current_order {
+            let (_, direction) = effective.remove(&t).unwrap();
+            if direction == "unspecified" {
+                continue;
+            }
+            let ObjData::Term { owner, .. } = self.o(t).clone() else { continue };
+            let port_net = matches!(self.o(owner), ObjData::LevelObj { .. })
+                .then(|| self.term_nets(s, t).first().map(|n| self.ref_id(s, *n, &ids)))
+                .flatten();
+            let dir = self.pin_for(s, owner, t).and_then(|k| {
+                let sym = self.scenes[s].symbol.get(&owner)?;
+                turned(self.symbol(*sym).pins[k].dir, self.orientation(s, owner))
+            });
+            currents.push(CurrentView {
+                terminal: self.ref_id(s, t, &ids),
+                direction,
+                at: self.point_of(s, t),
+                dir,
+                port_net,
+            });
+        }
         LevelView {
+            currents,
             level: lv,
             title: level.title(),
             kind: if level.kind == LevelKind::Subckt { "subckt" } else { "file" },

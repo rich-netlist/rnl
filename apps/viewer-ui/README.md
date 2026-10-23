@@ -1,5 +1,12 @@
 # viewer-ui
 
+Usage frame and role geometry now comes from the shared core (`Usage.frame`), projected
+into the view without recomputing member bounds or label placement. Frame padding is fixed
+in SVG coordinates; labels and interaction strokes retain their screen size. Colors,
+visibility, selection and saved usage preferences remain frontend choices. View > Show
+Current Directions displays `Level.currents` arrows, starts off, and persists independently
+of Show Usages. Declaration ports use explicitly drawn `$IO_PORT` usages on the port net.
+
 During startup the shared page shows **RNL Viewer**, with the version below it, until its shell,
 settings and initial document are ready. `startup.js` reads the version independently of the main
 module graph, from Tauri on desktop or the web build's `about.json`. Startup errors reveal the

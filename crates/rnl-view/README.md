@@ -1,5 +1,13 @@
 # rnl-view
 
+Optional inspection geometry is always included as `Level.usages[].frame` and `Level.currents`
+in SVG pixels with y down. `overlays::svg(level, &OverlayOptions)` exports it in separate
+`usage-underlays`, `usage-overlays` and `current-overlays` groups; `overlays::apply` applies
+export options to a Document. Defaults keep the original SVG bytes. Geometry has no style
+fields, does not change hits/primitives and has no effect on solver problems. See the
+[npm options](../../packages/runtime/README.md#inspection-overlays) and
+[design record](../../docs/decisions/0014-inspection-overlay-geometry.md).
+
 The core interface of [decision 0008](../../docs/decisions/0008-shared-core-per-platform-frontends.md): a workspace in, a Document out. The desktop viewer and `rnl view` call it natively; the [web viewer](../../apps/web/README.md) calls it through WebAssembly.
 
 ```rust

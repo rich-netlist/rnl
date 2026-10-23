@@ -39,6 +39,11 @@ view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
   --status            give each level its solve status: fixed, unsolved, solved or stale
+render options (inspection only; all disabled by default):
+  --usages MODE       usage frames: semantic (no drawing of their own) or all
+  --currents          show in/out terminal currents, including explicit subcircuit port symbols
+  --usage-roles       show role labels on enabled usage frames
+  --overlay-style FILE  JSON: palette, width, dashes, current_color; independent of RNL styles
 problem options (the levels are read without their type=\"generated\" records):
   --level TITLE       only the level with this title: a subcircuit name, or the file name
   --solver-options S  key=value;... over the solver's defaults, as for solve: the options the hash covers
@@ -75,6 +80,7 @@ write:
   draft writes them; --dialect (spice by default) and --author NAME give the fields it leaves out";
 
 struct Args {
+    overlays: rnl_view::OverlayOptions,
     command: String,
     file: PathBuf,
     out: Option<PathBuf>,
@@ -125,8 +131,32 @@ fn parse_args() -> Result<Args, String> {
     let mut parts = None;
     let mut packages = Vec::new();
     let mut all_versions = false;
+    let mut overlays = rnl_view::OverlayOptions::default();
+    let mut overlay_args = false;
     while let Some(a) = it.next() {
         match a.as_str() {
+            "--usages" => {
+                overlay_args = true;
+                overlays.usages = match it.next().as_deref() {
+                    Some("all") => rnl_view::UsageMode::All,
+                    Some("semantic") => rnl_view::UsageMode::Semantic,
+                    _ => return Err("--usages needs all or semantic".into()),
+                };
+            }
+            "--currents" => {
+                overlay_args = true;
+                overlays.currents = true;
+            }
+            "--usage-roles" => {
+                overlay_args = true;
+                overlays.roles = true;
+            }
+            "--overlay-style" => {
+                overlay_args = true;
+                let path = it.next().ok_or("--overlay-style needs a JSON file")?;
+                let text = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
+                overlays.style = serde_json::from_str(&text).map_err(|e| format!("{path}: {e}"))?;
+            }
             "-o" | "--out" => out = Some(PathBuf::from(it.next().ok_or("-o needs a path")?)),
             "--package-dir" => package_dirs.push(PathBuf::from(it.next().ok_or("--package-dir needs a directory")?)),
             "--path" => {
@@ -158,6 +188,10 @@ fn parse_args() -> Result<Args, String> {
     if profile.is_some() && command != "solve" {
         return Err("--profile is an option of solve".into());
     }
+    if overlay_args && command != "render" {
+        return Err("overlay options are options of render".into());
+    }
+    overlays.validate()?;
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
         ("catalog", None) => PathBuf::new(),
@@ -165,6 +199,7 @@ fn parse_args() -> Result<Args, String> {
         (_, file) => file.ok_or(USAGE)?,
     };
     Ok(Args {
+        overlays,
         command,
         file,
         out,
@@ -323,11 +358,23 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         }
         "render" => {
             let r = interpret(args, &provider)?;
+            let overlays = if args.overlays.usages != rnl_view::UsageMode::None || args.overlays.currents {
+                Some(rnl_view::build(
+                    &args.file.to_string_lossy(),
+                    &provider,
+                    &BuildOptions { dialect: args.dialect.clone(), runtime: options(args), ..BuildOptions::default() },
+                )?)
+            } else {
+                None
+            };
             let out = args.out.clone().ok_or("render needs -o DIR")?;
             std::fs::create_dir_all(&out).map_err(|e| e.to_string())?;
             let stem = args.file.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "out".into());
             for (k, lv) in r.model.levels.iter().enumerate() {
-                let svg = rnl_render::svg(lv, &rnl_render::RenderOptions::default());
+                let svg = match &overlays {
+                    Some(d) => rnl_view::overlays::svg(&d.levels[k], &args.overlays)?,
+                    None => rnl_render::svg(lv, &rnl_render::RenderOptions::default()),
+                };
                 let name = if k == 0 { format!("{stem}.svg") } else { format!("{stem}.{}.svg", sanitize(&lv.title)) };
                 std::fs::write(out.join(&name), svg).map_err(|e| e.to_string())?;
                 println!("{}", out.join(&name).display());

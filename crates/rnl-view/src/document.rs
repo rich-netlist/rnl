@@ -61,6 +61,8 @@ pub struct Document {
 #[derive(Serialize, Debug)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Level {
+    /// Optional inspection geometry in SVG pixels (y down), independent of display styles.
+    pub currents: Vec<crate::CurrentArrow>,
     /// All usages in this drawing scope, including semantic usages without a symbol.
     pub usages: Vec<Usage>,
     /// Terminal names in subcircuit declaration order.
@@ -765,6 +767,7 @@ impl<'a> Index<'a> {
             });
         }
         Level {
+            currents: crate::overlays::currents(lv, render.scale),
             usages: Vec::new(),
             ports: self.doc.levels[lv.level].ports.clone(),
             symbol: None,

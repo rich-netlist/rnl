@@ -11,6 +11,35 @@ Choose a checker or renderer for validation, and a viewer when the user wants to
 
 All four are the same core, so they read a file the same way. The language is a draft that changes between versions (0.x makes no promise of compatibility), and so does the toolkit. Core releases use `core-vX.Y.Z`: the CLI and npm package share X.Y.Z, independently of Viewer and language versions. Historical npm previews used `runtime-v0.1.0-preview.N`. Until the first core version and npm dist-tag are chosen, install an exact published npm version rather than assuming `next` or `latest`.
 
+## Optional inspection overlays
+
+In a core build containing this feature, request shared usage frames and terminal currents:
+
+```sh
+rnl render circuit.sp -o drawings --usages semantic --currents
+rnl render circuit.sp -o drawings --usages all --usage-roles --currents --overlay-style overlays.json
+```
+
+`semantic` shows only usages with no drawing of their own or in descendants; `all`
+includes virtual symbols and drawing wrappers. All export overlays default off, preserving
+the original SVG bytes. These are inspection aids, independent of language styles and solver
+constraints. An optional JSON style file accepts `palette` (nonempty hex colors), `width`
+(positive SVG pixels), `dashes` (positive dash/gap lengths; `[]` for solid) and
+`current_color` (hex); omitted fields keep fixed renderer defaults. For example:
+
+```json
+{"palette":["#4263eb","#2f9e44"],"width":2,"dashes":[1,5],"current_color":"#d9480f"}
+```
+
+The npm request accepts `overlays: {usages: "all", currents: true, roles: true, style: {...}}`.
+The Document always supplies style-free `levels[].usages[].frame` and `levels[].currents`
+geometry in SVG pixels (y down), with identical native/WASM results. In/out arrows follow
+oriented terminal exits; unspecified or unplaced/directionless pins have none. Declaration
+ports use explicit `$IO_PORT` symbols on the port net: `in` points into the circuit from the tag.
+Viewer keeps its own usage colors, visibility and selection preferences. View > Show Current
+Directions starts off and remembers its state. These changes arrive in the next separately
+approved core/Viewer releases; no release is implied by the source changes.
+
 ## Reading the standard source
 
 The full normative Markdown is `spec/rnl-0.3.md` in the RNL repository. Read that

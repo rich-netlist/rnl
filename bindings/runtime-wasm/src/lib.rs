@@ -37,6 +37,9 @@ use serde::{Deserialize, Serialize};
 /// frontend can ask for options an older core does not have yet.
 #[derive(Deserialize, Debug)]
 pub struct Request {
+    /// Optional inspection SVG export; geometry is always available in the Document.
+    #[serde(default)]
+    pub overlays: Option<rnl_view::OverlayOptions>,
     /// The path of the file to open, as the frontend names it (see [`rnl_view::build`]).
     pub entry: String,
     /// Explicit temporary files, searched before package directories.
@@ -112,6 +115,8 @@ pub struct PartsRequest {
 /// `entry` and `dialect`: the netlist is the entry, in the dialect of the write.
 #[derive(Deserialize, Debug)]
 pub struct WriteRequest {
+    #[serde(default)]
+    pub overlays: Option<rnl_view::OverlayOptions>,
     pub write: rnl_edit::WriteRequest,
     /// Further files, such as the packages of `package_dirs`.
     #[serde(default)]
@@ -317,13 +322,25 @@ pub fn respond(request: &[u8]) -> Response {
     if let Some(p) = request.parts {
         let parts = Parts { drawing: p.drawing, host: p.host, model: p.model };
         return match rnl_view::snapshot(&request.entry, &files, &options, parts) {
-            Ok(s) => Response::Snapshot(Box::new(s)),
+            Ok(mut s) => {
+                if let (Some(d), Some(o)) = (&mut s.drawing, &request.overlays) {
+                    if let Err(e) = rnl_view::overlays::apply(d, o) {
+                        return Response::Error(e);
+                    }
+                }
+                Response::Snapshot(Box::new(s))
+            }
             Err(e) => Response::Error(e),
         };
     }
     if request.lazy_unplaced {
         return match rnl_view::build_drawn(&request.entry, &files, &options) {
-            Ok((d, drawn)) => {
+            Ok((mut d, drawn)) => {
+                if let Some(o) = &request.overlays {
+                    if let Err(e) = rnl_view::overlays::apply(&mut d, o) {
+                        return Response::Error(e);
+                    }
+                }
                 DRAWN.with(|slot| *slot.borrow_mut() = Some(drawn));
                 Response::Document(Box::new(d))
             }
@@ -331,7 +348,14 @@ pub fn respond(request: &[u8]) -> Response {
         };
     }
     match rnl_view::build(&request.entry, &files, &options) {
-        Ok(d) => Response::Document(Box::new(d)),
+        Ok(mut d) => {
+            if let Some(o) = &request.overlays {
+                if let Err(e) = rnl_view::overlays::apply(&mut d, o) {
+                    return Response::Error(e);
+                }
+            }
+            Response::Document(Box::new(d))
+        }
         Err(e) => Response::Error(e),
     }
 }
@@ -423,7 +447,14 @@ fn write(request: WriteRequest) -> Response {
         status: request.status,
     };
     match rnl_view::build(&entry, &files, &options) {
-        Ok(document) => Response::Written(Box::new(Written { text, document })),
+        Ok(mut document) => {
+            if let Some(o) = &request.overlays {
+                if let Err(e) = rnl_view::overlays::apply(&mut document, o) {
+                    return Response::Error(e);
+                }
+            }
+            Response::Written(Box::new(Written { text, document }))
+        }
         Err(e) => Response::Error(e),
     }
 }

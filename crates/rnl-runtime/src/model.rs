@@ -272,6 +272,8 @@ pub struct ConstraintView {
 
 #[derive(Clone, Debug, Default)]
 pub struct LevelView {
+    /// Effective terminal currents for inspection only; no solver or drawing semantics.
+    pub currents: Vec<CurrentView>,
     /// The host level drawn: its index in the host document's levels.
     pub level: usize,
     pub title: String,
@@ -315,6 +317,16 @@ pub struct LevelView {
     /// The packages in effect at the level, one of each name, in the order of their places:
     /// those at the root first (16.2, 16.3).
     pub packages: Vec<LevelPackage>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CurrentView {
+    pub terminal: String,
+    pub direction: String,
+    pub at: Option<Pt>,
+    pub dir: Option<u16>,
+    /// A declaration port has no scene position; viewers may use an explicit port symbol.
+    pub port_net: Option<String>,
 }
 
 /// A package in effect at a drawing level (16.2, 16.3).
