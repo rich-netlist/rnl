@@ -44,7 +44,8 @@ tag, **never publishes**. Core release also runs as a PR check for relevant chan
 
 1. Confirm the version and the npm dist-tag. The user chose (2026-10-22) core 0.2.0 as the
    first core release and npm `latest`. The user chose (2026-10-23) Viewer 0.2.0 as the next
-   independent Viewer release; preparing it does not publish a new core version.
+   independent Viewer release; preparing it does not publish a new core version. The user chose
+   (2026-10-23) core 0.3.0 and Viewer 0.3.0, released together, with npm `latest`.
 2. Update the chosen core version and locks, rename/write `release-notes/core/X.Y.Z.md`, and
    set repository variable `CORE_NPM_DIST_TAG` to the agreed `next` or `latest`. Publication
    fails if this variable is absent or has another value. Do not infer a dist-tag from SemVer.
