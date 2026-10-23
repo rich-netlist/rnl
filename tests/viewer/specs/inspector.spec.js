@@ -97,6 +97,7 @@ test('symbol follows parent assignment, package source and direct subcircuit ent
   await expect(page.locator('.symbol-pins-table tbody tr')).toHaveCount(2);
   await expect(page.locator('.symbol-label-list')).toContainText('${name}');
   const preview = page.locator('.symbol-preview > svg');
+  await viewer.symbolFitted();
   const fitted = await preview.getAttribute('viewBox');
   const main = await page.locator('#canvas > svg').getAttribute('viewBox');
   await page.locator('[data-action="zoom-in"]').click();
