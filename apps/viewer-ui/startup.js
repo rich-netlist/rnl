@@ -67,4 +67,7 @@ export async function finishStartup(runPanelShortcut) {
   // the native handoff IPC is pending.
   if (keys.length) runPanelShortcut?.(keys);
   await revealNativePage();
+  // The native surface is handed over much earlier, while this module graph is still loading.
+  // Finder events must stay queued until the listener and initial document have both started.
+  if (window.__TAURI__) await window.__TAURI__.core.invoke("open_events_ready");
 }

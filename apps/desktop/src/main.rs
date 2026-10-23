@@ -323,9 +323,16 @@ fn quit(app: AppHandle) {
 /// The initialized page is ready to replace the native Windows startup surface.
 #[tauri::command]
 fn finish_startup(window: WebviewWindow, startup: State<'_, startup::Startup>) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    macos::ready(window.app_handle());
     startup.finish(&window)
+}
+
+/// The file listener and initial document are ready, independently of the early native paint handoff.
+#[tauri::command]
+fn open_events_ready(app: AppHandle) {
+    #[cfg(target_os = "macos")]
+    macos::ready(&app);
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
 }
 
 /// Ask for a file to open; None when the dialog is cancelled.
@@ -438,6 +445,7 @@ fn main() {
             set_dirty,
             quit,
             finish_startup,
+            open_events_ready,
             pick_file,
             initial_file,
             open_default_apps,
