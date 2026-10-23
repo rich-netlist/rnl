@@ -14,12 +14,16 @@ runs:
         TYPST_VERSION: "0.15.1"
         TYPST_SHA256: a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c
       run: |
-        sudo apt-get update -q
-        curl -fsSL -o "$RUNNER_TEMP/pandoc.deb" \
+        # A stalled mirror or download is abandoned after 30 s without data and retried, instead of
+        # hanging until the calling job's timeout; the checksums still decide what is installed.
+        apt_net=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+        curl_net=(--connect-timeout 30 --speed-limit 1024 --speed-time 30 --max-time 600 --retry 5 --retry-delay 5 --retry-all-errors)
+        sudo apt-get "${apt_net[@]}" update -q
+        curl -fsSL "${curl_net[@]}" -o "$RUNNER_TEMP/pandoc.deb" \
           "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-1-amd64.deb"
         echo "$PANDOC_SHA256  $RUNNER_TEMP/pandoc.deb" | sha256sum --check --strict
-        sudo apt-get install -y -q "$RUNNER_TEMP/pandoc.deb" fonts-noto-cjk
-        curl -fsSL -o "$RUNNER_TEMP/typst.tar.xz" \
+        sudo apt-get "${apt_net[@]}" install -y -q "$RUNNER_TEMP/pandoc.deb" fonts-noto-cjk
+        curl -fsSL "${curl_net[@]}" -o "$RUNNER_TEMP/typst.tar.xz" \
           "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz"
         echo "$TYPST_SHA256  $RUNNER_TEMP/typst.tar.xz" | sha256sum --check --strict
         tar -xJ -C "$RUNNER_TEMP" -f "$RUNNER_TEMP/typst.tar.xz"
