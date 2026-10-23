@@ -306,7 +306,7 @@ jobs:
           hdiutil detach "$RUNNER_TEMP/dmg"
           trap - EXIT
           codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/installed/RNL Viewer.app"
-          lipo -verify_arch "$ARCH" "$RUNNER_TEMP/installed/RNL Viewer.app/Contents/MacOS/rnl-viewer"
+          lipo "$RUNNER_TEMP/installed/RNL Viewer.app/Contents/MacOS/rnl-viewer" -verify_arch "$ARCH"
           cd "$RUNNER_TEMP/assets"
           shasum -a 256 RNL-Viewer-* > SHA256SUMS.txt
           shasum -a 256 --check SHA256SUMS.txt
@@ -324,6 +324,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
           name: rnl-viewer-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}
           path: ${{ runner.temp }}/assets/
