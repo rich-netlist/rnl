@@ -103,6 +103,37 @@ fn plan(table: &Table, windows: bool) -> Vec<(String, Vec<Shown>)> {
         .collect()
 }
 
+/// macOS reserves the first menu for the application. Quit still uses our unsaved-edit flow.
+#[cfg(any(target_os = "macos", test))]
+fn macos_plan(table: &Table) -> Vec<(String, Vec<Shown>)> {
+    let mut menus = plan(table, false);
+    for (_, entries) in &mut menus {
+        entries.retain(|entry| {
+            !matches!(entry, Shown::About(_)) && !matches!(entry, Shown::Item { id, .. } if id == "exit")
+        });
+        while matches!(entries.last(), Some(Shown::Separator)) {
+            entries.pop();
+        }
+    }
+    menus.insert(
+        0,
+        (
+            "RNL Viewer".into(),
+            vec![
+                Shown::About("About RNL Viewer".into()),
+                Shown::Separator,
+                Shown::Item {
+                    id: "exit".into(),
+                    text: "Quit RNL Viewer".into(),
+                    accelerator: Some("CmdOrCtrl+Q".into()),
+                    check: false,
+                },
+            ],
+        ),
+    );
+    menus
+}
+
 /// The entries of a menu or a submenu as this platform shows them, as [`plan`] says; a submenu with
 /// nothing to show is left out.
 fn entries(items: &[Entry], windows: bool) -> Vec<Shown> {
@@ -148,7 +179,11 @@ pub fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let mut checks = HashMap::new();
     let mut menus = Vec::new();
     let mut labels = Vec::new();
-    for (label, entries) in plan(&table, cfg!(windows)) {
+    #[cfg(target_os = "macos")]
+    let planned = macos_plan(&table);
+    #[cfg(not(target_os = "macos"))]
+    let planned = plan(&table, cfg!(windows));
+    for (label, entries) in planned {
         menus.push(submenu(app, &label, entries, &mut checks, &mut labels)?);
     }
     app.manage(Checks(checks));
@@ -318,6 +353,24 @@ mod tests {
         assert_eq!(translated("zh-CN", "&Open File...\tCtrl+O"), "打开文件(&O)...\tCtrl+O");
         assert_eq!(translated("en", "&Open File...\tCtrl+O"), "&Open File...\tCtrl+O");
         assert_eq!(translated("zh-CN", "untranslated"), "untranslated");
+    }
+
+    #[test]
+    fn macos_has_one_application_about_and_quit_and_keeps_control_q_for_editing() {
+        let menus = macos_plan(&table());
+        assert_eq!(menus[0].0, "RNL Viewer");
+        assert_eq!(
+            menus[0].1,
+            vec![
+                Shown::About("About RNL Viewer".into()),
+                Shown::Separator,
+                item("exit", "Quit RNL Viewer", Some("CmdOrCtrl+Q"))
+            ]
+        );
+        assert!(menus[1..].iter().all(|(_, items)| items
+            .iter()
+            .all(|entry| !matches!(entry, Shown::About(_)) && !matches!(entry, Shown::Item {id,..} if id == "exit"))));
+        assert!(menus.iter().any(|(_, items)| items.contains(&check("toggle-edit", "&Edit Text", Some("Ctrl+Q")))));
     }
 
     /// View › Grid: the grid shown or not, by G, which the page always handles; its style, one of

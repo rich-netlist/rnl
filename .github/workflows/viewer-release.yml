@@ -260,26 +260,96 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  build-macos:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, arch: arm64, target: aarch64-apple-darwin}
+          - {os: macos-15-intel, arch: x86_64, target: x86_64-apple-darwin}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The version
+        id: version
+        run: echo "version=$(python3 -c 'import json; print(json.load(open("apps/desktop/tauri.conf.json"))["version"])')" >> "$GITHUB_OUTPUT"
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }} && rustup default stable
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Write the pinned web fonts
+        run: pip install fonttools==4.58.0 brotli==1.2.0 && python scripts/fonts.py web
+      - name: Build the ad-hoc signed app and DMG
+        working-directory: apps/desktop
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+        run: npm ci && npx tauri build --target ${{ matrix.target }} --bundles app,dmg
+      - name: Name the release DMG and install from that exact image
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/assets" "$RUNNER_TEMP/installed" "$RUNNER_TEMP/dmg"
+          cp apps/desktop/target/$TARGET/release/bundle/dmg/*.dmg "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-macos-$ARCH.dmg"
+          hdiutil attach "$RUNNER_TEMP/assets/RNL-Viewer-$VERSION-macos-$ARCH.dmg" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg"
+          trap 'hdiutil detach "$RUNNER_TEMP/dmg"' EXIT
+          ditto "$RUNNER_TEMP/dmg/RNL Viewer.app" "$RUNNER_TEMP/installed/RNL Viewer.app"
+          hdiutil detach "$RUNNER_TEMP/dmg"
+          trap - EXIT
+          codesign --verify --deep --strict --verbose=2 "$RUNNER_TEMP/installed/RNL Viewer.app"
+          lipo -verify_arch "$ARCH" "$RUNNER_TEMP/installed/RNL Viewer.app/Contents/MacOS/rnl-viewer"
+          cd "$RUNNER_TEMP/assets"
+          shasum -a 256 RNL-Viewer-* > SHA256SUMS.txt
+          shasum -a 256 --check SHA256SUMS.txt
+      - name: Smoke-test the installed Mac app with native pixels and OCR
+        timeout-minutes: 12
+        env:
+          SMOKE_OUTPUT_DIR: ${{ runner.temp }}/smoke-macos
+        run: node apps/desktop/tests/macos-smoke.mjs --app "$RUNNER_TEMP/installed/RNL Viewer.app"
+      - name: Keep the macOS smoke evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rnl-viewer-macos-${{ matrix.arch }}-smoke
+          path: ${{ runner.temp }}/smoke-macos/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rnl-viewer-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}
+          path: ${{ runner.temp }}/assets/
+          if-no-files-found: error
+          retention-days: 14
+
   assets:
-    needs: [build, build-linux]
+    needs: [build, build-linux, build-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: rnl-viewer-${{ needs.build.outputs.version }}-*
           path: incoming
-      - name: Verify both platforms and combine their checksums
+      - name: Verify all platforms and combine their checksums
         env:
           VERSION: ${{ needs.build.outputs.version }}
         run: |
           mkdir assets
-          for platform in windows-x64 linux-x86_64; do
+          for platform in windows-x64 linux-x86_64 macos-arm64 macos-x86_64; do
             dir="incoming/rnl-viewer-$VERSION-$platform"
             (cd "$dir" && sha256sum --check SHA256SUMS.txt)
             find "$dir" -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec cp {} assets/ \;
           done
           cd assets
-          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 5
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 7
           sha256sum RNL-Viewer-* > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
