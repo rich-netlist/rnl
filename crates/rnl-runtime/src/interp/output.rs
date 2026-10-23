@@ -132,6 +132,7 @@ impl Interp<'_> {
 
     /// A symbol's name as a reference writes it: `$NMOS`, or `%amp` for one named in a level.
     fn symbol_name(&self, sym: ObjId) -> String {
+        let sym = self.symbol(sym).original.unwrap_or(sym);
         let name = &self.objs[sym.0 as usize].name;
         if name.is_empty() || name.starts_with('$') {
             self.label(sym)
@@ -198,6 +199,7 @@ impl Interp<'_> {
     }
 
     fn symbol_origin_version(&self, sym: ObjId) -> (SymbolOrigin, Option<String>) {
+        let sym = self.symbol(sym).original.unwrap_or(sym);
         if self.symbol(sym).default {
             return (SymbolOrigin::None, None);
         }
@@ -976,6 +978,7 @@ impl Interp<'_> {
         }
         let key = self.doc.key(&level.name);
         let sym = self.block_symbols.get(&key)?.values().max_by(|a, b| a.0.cmp(&b.0))?.1;
+        let sym = if level.case_sensitive { sym } else { self.fold_symbol_pins(sym) };
         let mut views = Vec::new();
         let k = self.symbol_view(sym, &mut HashMap::new(), &mut views);
         let mut view = views[k].clone();

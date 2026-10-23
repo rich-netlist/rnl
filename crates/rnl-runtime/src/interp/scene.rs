@@ -435,7 +435,7 @@ impl Interp<'_> {
         }
     }
 
-    fn host_case(&self, owner: ObjId) -> bool {
+    pub(crate) fn host_case(&self, owner: ObjId) -> bool {
         match self.o(owner) {
             ObjData::Usage(_) => true,
             ObjData::Inst { .. } => self.inst_of(owner).case_sensitive,

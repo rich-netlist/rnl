@@ -2165,8 +2165,12 @@ pub(crate) fn ptr_seg(seg: &Segment) -> usize {
 
 /// A terminal is drawn by one pin: the later pin takes it (9.2.4, 9.2.7).
 pub(crate) fn add_pin(sym: &mut SymbolDef, pin: Pin) {
+    add_pin_with_case(sym, pin, true);
+}
+
+pub(crate) fn add_pin_with_case(sym: &mut SymbolDef, pin: Pin, case_sensitive: bool) {
     for old in sym.pins.iter_mut() {
-        old.terms.retain(|t| !pin.terms.iter().any(|n| t.same(n)));
+        old.terms.retain(|t| !pin.terms.iter().any(|n| t.same(n, case_sensitive)));
     }
     sym.pins.retain(|q| !q.terms.is_empty());
     sym.pins.push(pin);
