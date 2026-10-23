@@ -236,13 +236,13 @@
     <div class="facts tools-facts tools-four">
       <div class="fact">
         <h3><svg class="ico"><use href="#i-cpu"/></svg><code>rnl</code></h3>
-        <p><zh>从源码构建（Rust 1.85 或更新）：<code>cargo build --release -p rnl-cli</code>。<code>rnl check FILE</code> 打印诊断，有错误时退出码为 1；<code>rnl render FILE -o DIR</code> 为每一层写 SVG。最完整，也是 CI 用的那个。</zh>
-          <en>Built from source (Rust 1.85 or later): <code>cargo build --release -p rnl-cli</code>. <code>rnl check FILE</code> prints the diagnostics and exits 1 on errors; <code>rnl render FILE -o DIR</code> writes an SVG for each level. The most complete, and the one the CI uses.</en></p>
+        <p><zh>下载最新核心发布里 Windows、Linux 或 macOS 的压缩包，也可以从源码构建（Rust 1.85 或更新）：<code>cargo build --release -p rnl-cli</code>。<code>rnl check FILE</code> 打印诊断，有错误时退出码为 1；<code>rnl render FILE -o DIR</code> 为每一层写 SVG。最完整，也是 CI 用的那个。</zh>
+          <en>Download the archive for Windows, Linux or macOS from the latest core release, or build it from source (Rust 1.85 or later): <code>cargo build --release -p rnl-cli</code>. <code>rnl check FILE</code> prints the diagnostics and exits 1 on errors; <code>rnl render FILE -o DIR</code> writes an SVG for each level. The most complete, and the one the CI uses.</en></p>
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-netlist"/></svg>npm</h3>
-        <p><zh><code>npm i @rich-netlist/runtime@next</code>（Node 18 或更新）：同一个核心编译成 WebAssembly，给出诊断和每层的 SVG。预览版，发布在 dist-tag <code>next</code> 下。</zh>
-          <en><code>npm i @rich-netlist/runtime@next</code> (Node 18 or later): the same core as WebAssembly, giving the diagnostics and an SVG for each level. A preview, published under the dist-tag <code>next</code>.</en></p>
+        <p><zh><code>npm i @rich-netlist/runtime</code>（Node 18 或更新）：同一个核心编译成 WebAssembly，给出诊断和每层的 SVG。版本号和 <code>rnl</code> 命令相同，随核心一起发布。</zh>
+          <en><code>npm i @rich-netlist/runtime</code> (Node 18 or later): the same core as WebAssembly, giving the diagnostics and an SVG for each level. It has the version of the <code>rnl</code> command and is released with the core.</en></p>
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-globe"/></svg><zh>网页版</zh><en>Web viewer</en></h3>

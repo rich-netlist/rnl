@@ -6,7 +6,7 @@ RNL 写在电路网表的注释里，描述电路怎样画成原理图、各部�
 
 **网站：[rich-netlist.github.io/rnl/zh](https://rich-netlist.github.io/rnl/zh/)**，有[写给电路设计者的介绍](https://rich-netlist.github.io/rnl/zh/)、[语言导览](https://rich-netlist.github.io/rnl/zh/language.html)、[语言标准 0.3](https://rich-netlist.github.io/rnl/zh/spec/0.3/)、画出每个符号的[标准包图库](https://rich-netlist.github.io/rnl/zh/packages.html)和[查看器](https://rich-netlist.github.io/rnl/zh/tools.html)：一个[在浏览器里用](https://rich-netlist.github.io/rnl/viewer/)，一个供 Windows 下载。每页都有英文版。
 
-**状态：** 本仓库存放 RNL 语言标准 0.3 版（现在是第 2 修订，取代 0.2 版，工具仍能读 0.2 版的文件）及其原则、项目文档，以及 RNL 工具链，目前是它的第一版 0.1。工具链读取带 RNL 记录的 SPICE 和 Spectre 网表，报告诊断，生成有效模型，画出有坐标的部分，并能把记录写回网表。附带 `rnl` 命令；0.3 和 0.2 两个系列的标准包及其符号，以及 0.3 系列没有画的 Analog Canvas 符号的包；教 AI agent 读、写、检查和绘制 RNL 的 skill 包（[`skills/rnl`](skills/README.md)）；还有求解器（[`crates/rnl-solver`](crates/rnl-solver/README.md)），`rnl solve` 用它给没有坐标的部分排位、走线，并把求解器的记录写进文件的副本或原文件。求解器还没有 WebAssembly 绑定，它的优化目标第二版正在做。原理图由一个共享核心决定（[决定 0008](docs/decisions/0008-shared-core-per-platform-frontends.md)）：它用随附的字体排字（[决定 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)），原生运行和编译成 WebAssembly 运行得到的结果完全相同（[`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)）；后者已作为预览版发布到 npm，即 `@rich-netlist/runtime@next`（[`packages/runtime`](packages/runtime/README.md)）。两个查看器共用一个页面显示这些结果（[`apps/viewer-ui`](apps/viewer-ui/README.md)）：Windows 桌面版（[`apps/desktop`](apps/desktop/README.md)，已发布 0.1.1 版）和网页版（[`apps/web`](apps/web/README.md)）；它们打开网表，画出各层，显示网表文本、诊断和层次结构，在原理图和文本之间跟随选中的实例或网络，列出没画出来的对象（没有位置的，以及找不到模型卡的晶体管），还能改文本、应用后重画：桌面版保存时写回文件，网页版保存时下载（[决定 0011](docs/decisions/0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md)）。桌面版还能求解，结果作为预览，可以另存求解副本（[决定 0010](docs/decisions/0010-desktop-viewer-solves-as-a-preview.md)）。还没有拖动器件的编辑器。语言的 0.x 各版本之间不承诺兼容。
+**状态：** 本仓库存放 RNL 语言标准 0.3 版（现在是第 2 修订，取代 0.2 版，工具仍能读 0.2 版的文件）及其原则、项目文档，以及 RNL 工具链。工具链分两条线发布（[发版线](docs/releases.md)）：核心，即 `rnl` 命令和 npm 包，现在是 0.2.0；RNL Viewer 现在是 0.2.0。工具链读取带 RNL 记录的 SPICE 和 Spectre 网表，报告诊断，生成有效模型，画出有坐标的部分，并能把记录写回网表。附带 `rnl` 命令；0.3 和 0.2 两个系列的标准包及其符号，以及 0.3 系列没有画的 Analog Canvas 符号的包；教 AI agent 读、写、检查和绘制 RNL 的 skill 包（[`skills/rnl`](skills/README.md)）；还有求解器（[`crates/rnl-solver`](crates/rnl-solver/README.md)），`rnl solve` 用它给没有坐标的部分排位、走线，并把求解器的记录写进文件的副本或原文件。求解器还没有 WebAssembly 绑定，它的优化目标第二版正在做。原理图由一个共享核心决定（[决定 0008](docs/decisions/0008-shared-core-per-platform-frontends.md)）：它用随附的字体排字（[决定 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)），原生运行和编译成 WebAssembly 运行得到的结果完全相同（[`bindings/runtime-wasm`](bindings/runtime-wasm/README.md)）；后者已发布到 npm，即 `@rich-netlist/runtime`（[`packages/runtime`](packages/runtime/README.md)）。两个查看器共用一个页面显示这些结果（[`apps/viewer-ui`](apps/viewer-ui/README.md)）：Windows 和 Linux 桌面版（[`apps/desktop`](apps/desktop/README.md)）和网页版（[`apps/web`](apps/web/README.md)）；它们打开网表，画出各层，显示网表文本、诊断和层次结构，在原理图和文本之间跟随选中的实例或网络，列出没画出来的对象（没有位置的，以及找不到模型卡的晶体管），还能改文本、应用后重画：桌面版保存时写回文件，网页版保存时下载（[决定 0011](docs/decisions/0011-viewers-edit-the-text-and-write-only-what-the-user-saves.md)）。桌面版还能求解，结果作为预览，可以另存求解副本（[决定 0010](docs/decisions/0010-desktop-viewer-solves-as-a-preview.md)）。还没有拖动器件的编辑器。语言的 0.x 各版本之间不承诺兼容。
 
 本文是 [README.md](README.md) 的中文版，两者不一致时以英文版为准。仓库里的文档大多只有英文；有中文的是语言标准、原则、工具链架构提案和网站。
 
@@ -65,6 +65,15 @@ M5 tail vbias vss  vss nch W=4u L=1u
 
 建议从[文档地图](docs/README.md)、[工具链架构提案](docs/rnl-toolchain-architecture.md)（中文）和[路线图](docs/roadmap.md)读起。每个组件目录里都有一份 README，说明它现在有什么、还有什么要做。
 
+## 下载和发版线
+
+[工具页](https://rich-netlist.github.io/rnl/zh/tools.html#cli)和最新的核心发布提供 `rnl` 命令的压缩包：
+Windows x64、Linux x86_64，以及 Apple 芯片和 Intel 芯片的 macOS。`rnl --version` 打印核心版本和构建时的提交；
+下载后用 `SHA256SUMS.txt` 校验。命令行和 npm 包共用 `core-vX.Y.Z`；Viewer 用自己的 `viewer-vX.Y.Z`，
+语言标准沿用 `spec-*`。只有核心的发布是 GitHub 上的 latest。以前的 `runtime-v0.1.0-preview.N`
+只发布 npm，现在不再触发发布。npm 上每个核心版本都发到 dist-tag `latest`。演练、发布，以及 npm 已发出而
+GitHub 发布失败时怎么恢复，见[发版流程](docs/releases.md)。
+
 ## 试用
 
 ```bash
@@ -72,7 +81,7 @@ cargo run --release -p rnl-cli -- check tests/conformance/cases/03-five-transist
 cargo run --release -p rnl-cli -- render tests/conformance/cases/03-five-transistor-ota.sp -o target/svg
 ```
 
-其他命令见 [`crates/rnl-cli`](crates/rnl-cli/README.md)。Windows 桌面版的安装包在[发布页](https://github.com/rich-netlist/rnl/releases)（最新的 `viewer-v…` 标签），核心在 npm 上：`npm i @rich-netlist/runtime@next`。要从源码运行桌面版（比如在 macOS 或 Linux 上），并用它打开网表：
+其他命令见 [`crates/rnl-cli`](crates/rnl-cli/README.md)。桌面版的 Windows x64 和 Linux x86_64 安装包在[发布页](https://github.com/rich-netlist/rnl/releases)（最新的 `viewer-v…` 标签），核心在 npm 上：`npm i @rich-netlist/runtime`。要从源码运行桌面版（比如在 macOS 或 Linux 上），并用它打开网表：
 
 ```bash
 cargo run --manifest-path apps/desktop/Cargo.toml -- tests/conformance/cases/03-five-transistor-ota.sp

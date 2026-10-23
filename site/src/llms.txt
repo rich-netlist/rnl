@@ -31,10 +31,10 @@ If you cannot unpack or write files, read the files below as they are; they are 
 
 ## Check and draw what you write
 
-- The `rnl` command, built from source (Rust 1.85 or later): `git clone {{github}}`, then `cargo build --release -p rnl-cli`; `rnl check FILE` prints the diagnostics and exits 1 on errors, `rnl render FILE -o DIR` writes an SVG for each drawing level.
-- The npm package `@rich-netlist/runtime` (dist-tag `next`, Node 18 or later): the same core as WebAssembly; a complete checker script is in references/tools.md.
+- The `rnl` command: download the archive for Windows, Linux or macOS from the latest core release ({{github}}/releases/latest), or build it from source (Rust 1.85 or later): `git clone {{github}}`, then `cargo build --release -p rnl-cli`; `rnl check FILE` prints the diagnostics and exits 1 on errors, `rnl render FILE -o DIR` writes an SVG for each drawing level.
+- The npm package `@rich-netlist/runtime` (`npm i @rich-netlist/runtime`, Node 18 or later): the same core as WebAssembly; a complete checker script is in references/tools.md.
 - The web viewer, for a person with a browser: {{site}}viewer/
-- The desktop viewer for Windows: {{github}}/releases
+- The desktop viewer for Windows and Linux: the newest `viewer-v…` release at {{github}}/releases
 
 ## The language and the packages
 
