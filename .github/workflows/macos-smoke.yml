@@ -1,7 +1,7 @@
 # Repeat native observation against an exact retained DMG; no rebuild, tag, release or Pages trigger.
 name: Mac viewer smoke
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       release_run_id:
         description: "Viewer release run containing the macos-arm64 artifact to observe"

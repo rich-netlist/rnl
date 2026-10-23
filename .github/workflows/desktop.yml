@@ -39,6 +39,10 @@ on:
         description: "Diagnostics only: reuse diagnostic-linux-binaries from this run instead of rebuilding"
         type: string
         default: ""
+      macos_smoke_run_id:
+        description: "Only observe the retained macos-arm64 DMG from this Viewer release run; no rebuild"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -48,6 +52,14 @@ env:
   CARGO_BUILD_JOBS: 4
 
 jobs:
+  observe-macos:
+    if: github.event_name == 'workflow_dispatch' && inputs.macos_smoke_run_id != ''
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/macos-smoke.yml
+    with:
+      release_run_id: ${{ inputs.macos_smoke_run_id }}
   # Manual-only observation of released binaries. This job cannot create tags or releases.
   diagnose-history:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_diagnostics && inputs.diagnostic_binary_run_id == ''
@@ -206,7 +218,7 @@ jobs:
           retention-days: 14
 
   test:
-    if: ${{ !inputs.linux_diagnostics }}
+    if: ${{ !inputs.linux_diagnostics && !inputs.macos_smoke_run_id }}
     strategy:
       fail-fast: false
       matrix:
