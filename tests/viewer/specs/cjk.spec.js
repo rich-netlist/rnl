@@ -98,3 +98,33 @@ test('symbol details, clipboard previews and web menus share the CJK fallback', 
   expect(clipboard.some(e=>e.selector==='.clip-preview')).toBe(true);
   await info.attach('cjk-surfaces.json',{body:JSON.stringify({symbol,menu,clipboard},null,2),contentType:'application/json'});
 });
+
+test('record web font transfer before and after the fallback on a Chinese sample', async ({page,viewer},info)=>{
+  test.skip(process.env.RNL_NO_SYSTEM_CJK!=='1','Transfer differences need the Latin-only Linux font profile.');
+  const result={};
+  for(const enabled of [false,true]) {
+    await page.route('**/style.css',async route=>{
+      const response=await route.fetch();
+      const body=await response.text();
+      await route.fulfill({response,body:enabled ? body : body.replaceAll(', "Noto Sans SC"','')});
+    });
+    await viewer.open('15-chinese');
+    await page.evaluate(()=>window.viewer.command('language-zh'));
+    await page.waitForFunction(()=>!!document.getElementById('viewer-fonts').sheet);
+    await page.evaluate(async()=>{
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+      await document.fonts.ready;
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+    });
+    result[enabled?'after':'before']=await page.evaluate(()=>{
+      const files=new Map(performance.getEntriesByType('resource').filter(r=>r.name.includes('/fonts/') && r.name.endsWith('.woff2'))
+        .map(r=>[r.name.split('/fonts/')[1],r.decodedBodySize]));
+      return {bytes:[...files.values()].reduce((a,b)=>a+b,0),files:Object.fromEntries(files)};
+    });
+    await page.unroute('**/style.css');
+  }
+  result.delta=result.after.bytes-result.before.bytes;
+  expect(result.before.bytes).toBeGreaterThan(0); // the unchanged Chinese schematic already uses Noto
+  expect(result.delta).toBeGreaterThan(0); // UI/source add slices; no new font payload is shipped
+  await info.attach('web-font-transfer.json',{body:JSON.stringify(result,null,2),contentType:'application/json'});
+});
