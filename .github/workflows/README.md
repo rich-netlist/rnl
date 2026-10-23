@@ -16,7 +16,7 @@ CI and release workflows.
 | [`pr-base.yml`](pr-base.yml) | Fails every pull request whose base is not `main`, and runs again when the base changes. A pull request stacked on another branch merges into that branch, so its change would never reach `main`; retarget it to `main` once the pull request below it has merged. |
 | [`web.yml`](web.yml) | Builds the web viewer in [`apps/web`](../../apps/web/README.md) on Linux: the web fonts with [`scripts/fonts.py`](../../scripts/README.md), the core as WebAssembly and the site with the samples; checks every script of the site with `node --check`, and that the site is served with the MIME types a browser needs. Runs on pushes to `main` and on pull requests that touch the web viewer, the page, the bindings, the crates, the standard library, the font script or the conformance corpus, which gives the samples. |
 
-`pages.yml` and `spec-release.yml` install pandoc, Typst and the CJK fonts at pinned versions through the local action [`install-spec-tools`](../actions/install-spec-tools/action.yml), which checks the SHA-256 of each download against the one its GitHub release gives.
+`pages.yml` and `spec-release.yml` install pandoc, Typst and the CJK fonts at pinned versions through the local action [`install-spec-tools`](../actions/install-spec-tools/action.yml), which checks the SHA-256 of each download against the one its GitHub release gives. Its apt and curl calls give up on a stalled connection after 30 seconds and retry, up to five times.
 
 Pages also rebuilds after **Publish runtime** succeeds, including the independent core
 pipeline when it lands. Its homepage timeline reads release tags and localized summaries with English fallback
