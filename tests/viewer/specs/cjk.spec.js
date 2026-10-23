@@ -2,7 +2,7 @@ import { test, expect } from '../viewer.js';
 import { cjkEvidence, assertCjk } from '../../../apps/desktop/tests/cjk.mjs';
 
 test('Chinese UI and source use real glyphs; mixed text keeps native selection and editor positions', async ({page,viewer},info) => {
-  await viewer.open('04-hierarchy');
+  await viewer.open('15-chinese');
   await page.evaluate(() => window.viewer.command('language-zh'));
   const evidence = await page.evaluate(cjkEvidence);
   assertCjk(evidence, process.env.RNL_NO_SYSTEM_CJK === '1');
@@ -52,4 +52,21 @@ test('Chinese UI and source use real glyphs; mixed text keeps native selection a
   expect(await editor.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
   await page.evaluate(()=>window.viewer.command('language-en'));
   expect(await page.locator('#canvas > svg').evaluate(el=>el.outerHTML)).toBe(svg);
+});
+
+test('virtual line width remains conservative with CJK fallback and a recycled wide row', async ({page,viewer})=>{
+  await viewer.open('15-chinese');
+  const widths=await page.evaluate(async()=>{
+    const {lineModel}=await import('./text-lines.js');
+    const {LineWindow}=await import('./line-window.js');
+    const source=document.getElementById('source');
+    const text=['* abc中文\t电路 XYZ'.repeat(100),...Array(1200).fill('* 中文')].join('\n');
+    const view=new LineWindow(source,()=>lineModel({text,records:[],failed:[]},0,[],'spice'),()=>{});
+    source.replaceChildren(view.el); view.el.hidden=false; view.refresh();
+    const row=view.el.querySelector('.ln'), actual=row.scrollWidth, extent=view.el.scrollWidth;
+    source.scrollTop=20000; view.refresh();
+    return {actual,extent,recycled:view.el.scrollWidth,estimated:view.model.columns};
+  });
+  expect(widths.extent).toBeGreaterThanOrEqual(widths.actual);
+  expect(widths.recycled).toBeGreaterThanOrEqual(widths.actual);
 });
