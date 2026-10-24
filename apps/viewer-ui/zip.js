@@ -29,24 +29,35 @@ function archivePath(path) {
   }).join("/");
 }
 
-/** Entries have { path, read }, whose reader returns a string, Blob or Uint8Array. */
-export async function libraryZip(files) {
-  if (files.length >= 65535) throw new Error("The library has too many files for a ZIP archive (maximum 65534).");
-  const bodies = [], directory = [], used = new Set();
-  const paths = files.map(file => archivePath(file.path));
-  const directories = new Set();
+/**
+ * The names the files at `paths` get in an archive, in their order: relative, portable, and distinct
+ * even where a file system ignores case. Names that are already such are kept, so the names given
+ * back give themselves again.
+ */
+export function archiveNames(paths) {
+  const names = paths.map(archivePath), used = new Set(), directories = new Set();
   // Reserve every required directory before naming files, independent of input order. A file
   // called lib.sp must be renamed when another entry needs lib.sp/ as a directory.
-  for (const path of paths) {
+  for (const path of names) {
     for (let at = path.indexOf("/"); at >= 0; at = path.indexOf("/", at + 1)) directories.add(path.slice(0, at).toLowerCase());
   }
-  let offset = 0, directorySize = 0;
-  for (const [index, file] of files.entries()) {
-    let name = paths[index];
-    if (!name) throw new Error("An archive file has no name.");
+  return names.map((name, index) => {
+    if (!name) throw new Error(`An archive file has no name: ${paths[index]}`);
     const base = name, dot = name.lastIndexOf(".") > name.lastIndexOf("/") ? name.lastIndexOf(".") : name.length;
     for (let suffix = 2; used.has(name.toLowerCase()) || directories.has(name.toLowerCase()); suffix++) name = `${base.slice(0, dot)} (${suffix})${base.slice(dot)}`;
     used.add(name.toLowerCase());
+    return name;
+  });
+}
+
+/** Entries have { path, read }, whose reader returns a string, Blob or Uint8Array. */
+export async function libraryZip(files) {
+  if (files.length >= 65535) throw new Error("The library has too many files for a ZIP archive (maximum 65534).");
+  const bodies = [], directory = [];
+  const names = archiveNames(files.map(file => file.path));
+  let offset = 0, directorySize = 0;
+  for (const [index, file] of files.entries()) {
+    const name = names[index];
     const encoded = encoder.encode(name);
     if (encoded.length > 65535) throw new Error(`The archive path is too long: ${file.path}`);
     let value;
@@ -85,4 +96,54 @@ export async function libraryZip(files) {
   record.setUint32(12, directorySize, true);
   record.setUint32(16, offset, true);
   return new Blob([...bodies, ...directory, end], { type: "application/zip" });
+}
+
+/**
+ * The files of a ZIP archive, by name: each reads its bytes, inflated when they were deflated (the
+ * browser's DecompressionStream), and checked against its CRC-32. Directories are left out; ZIP64,
+ * encryption and other methods are refused with a message that says so.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {Map<string, { size: number, read: () => Promise<Uint8Array> }>}
+ */
+export function readZip(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let end = -1;
+  for (let at = bytes.length - 22; at >= Math.max(0, bytes.length - 22 - 65535); at--) {
+    if (view.getUint32(at, true) === 0x06054b50) { end = at; break; }
+  }
+  if (end < 0) throw new Error("The file is not a ZIP archive.");
+  const count = view.getUint16(end + 10, true);
+  let at = view.getUint32(end + 16, true);
+  if (count === 0xffff || at === MAX) throw new Error("ZIP64 archives are not supported.");
+  const files = new Map();
+  const latin1 = new TextDecoder("latin1"), utf8 = new TextDecoder();
+  for (let i = 0; i < count; i++) {
+    if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) throw new Error("The ZIP archive's directory is damaged.");
+    const flags = view.getUint16(at + 8, true), method = view.getUint16(at + 10, true);
+    const crc = view.getUint32(at + 16, true), packed = view.getUint32(at + 20, true), size = view.getUint32(at + 24, true);
+    const nameLength = view.getUint16(at + 28, true), extra = view.getUint16(at + 30, true), comment = view.getUint16(at + 32, true);
+    const local = view.getUint32(at + 42, true);
+    const rawName = bytes.subarray(at + 46, at + 46 + nameLength);
+    const name = (flags & 0x800 ? utf8 : latin1).decode(rawName).replaceAll("\\", "/");
+    at += 46 + nameLength + extra + comment;
+    if (name.endsWith("/")) continue;
+    if (flags & 1) throw new Error(`${name} is encrypted.`);
+    if (method !== 0 && method !== 8) throw new Error(`${name} is compressed in a way this viewer does not read (method ${method}).`);
+    files.set(name, { size, read: async () => {
+      if (view.getUint32(local, true) !== 0x04034b50) throw new Error(`${name}: the ZIP archive is damaged.`);
+      const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+      const body = bytes.subarray(start, start + packed);
+      const data = method === 0 ? body.slice() : await inflate(body);
+      if (data.length !== size || await crc32(data) !== crc) throw new Error(`${name}: the ZIP archive is damaged.`);
+      return data;
+    } });
+  }
+  return files;
+}
+
+async function inflate(body) {
+  if (typeof DecompressionStream !== "function") throw new Error("This browser cannot read compressed ZIP archives.");
+  const stream = new Blob([body]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
 }

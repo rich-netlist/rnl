@@ -77,7 +77,11 @@ export function showManifestBar(external) {
  * no subcircuit of is told, and the level shown stays.
  */
 export function showManifestLevel(source) {
-  const wanted = new URLSearchParams(location.search).get("level") ?? source?.external?.level;
+  return showLevel(new URLSearchParams(location.search).get("level") ?? source?.external?.level);
+}
+
+/** Show the level named `wanted`, as a manifest names it (a project's too): a subcircuit's name or "(top)". */
+export function showLevel(wanted) {
   if (!wanted || !doc) return;
   if (wanted === "(top)") return enterRoot(0, { here: true });
   const level = doc.levels.findIndex((l) => l.kind === "subckt" && l.title === wanted);

@@ -96,8 +96,22 @@
  *   took it away, is not written, nor are the others: `{ changed }`, the names of those files, for
  *   the user to say. On the web, which cannot write files, download them. Rejects with a message when
  *   it cannot. A shell that offers neither does not save.
- * @property {(files: {path: string, read: () => Promise<Blob | string> | Blob | string}[], preparing: () => void) => Promise<boolean>} [downloadLibrary]
- *   Web only: choose a destination, then export the captured library as one ZIP; false on cancel.
+ * @property {(name: string, build: () => Promise<Blob>) => Promise<string | false>} [saveProject]
+ *   Save Project (desktop) or Download Project (web), project.js: ask where (the web where the browser
+ *   lets it), then write the archive `build` gives, named `name`; what was written, or false on cancel.
+ * @property {() => Promise<{ name: string, path?: string, bytes: Uint8Array } | null>} [pickProject]
+ *   Open Project: the archive the user chooses, or null.
+ * @property {(picked: object, manifest: object) => Promise<string | null>} [projectRoot] Where the
+ *   project's files go, the workspace directory its manifest's paths are under, ending in "/": a
+ *   folder the desktop asks for (and asks before replacing files there), or the web's /<name>/.
+ * @property {(read: object, picked: object) => Promise<{ source: Source, items: object[] }> | { source: Source, items: object[] }} [projectSource]
+ *   A project read (manifest.js loadManifest): put its files where the shell reads them, and give the
+ *   source of its entry and its pool as Library items.
+ * @property {(path: string) => Promise<Uint8Array>} [readFile] Desktop: the bytes of a file on disk.
+ * @property {{ projectBytes?: number }} [projectLimits] Web: the largest project it opens, smaller than the desktop's.
+ * @property {() => Promise<{ name: string, text: string } | null>} [pickManifest] Web: the manifest file the user chooses.
+ * @property {(json: object, name: string) => Source} [sourceFromManifestJson] Web: the source of a manifest a file gave.
+ * @property {(name: string, text: string) => Promise<void>} [saveManifest] Web: download a manifest of links.
  * @property {(source: Source, file: SavedFile, encoding?: "preserve" | "utf8") => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.
