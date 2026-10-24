@@ -39,9 +39,9 @@ options:
                       files that do not pin one. rnl solve does not take it
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
   --dialect NAME      the format of FILE, spice or spectre, instead of guessing from it
-  --format PATH=NAME  read the file PATH with the format NAME, spice or spectre, PATH named as an
-                      include of FILE resolves it: relative to the current directory as FILE is,
-                      or absolute; repeatable. The files given none are read as FILE is
+  --format PATH=NAME  read the file PATH with the format NAME, spice or spectre; repeatable. PATH is
+                      relative to the current directory or absolute, as FILE may be; one that the
+                      netlist does not read is warned of. The files given none are read as FILE is
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -226,6 +226,7 @@ fn parse_args() -> Result<Args, String> {
         }
         (_, file) => file.ok_or(USAGE)?,
     };
+    let formats = formats.into_iter().map(|(path, name)| (format_path(&path, &file), name)).collect();
     Ok(Args {
         overlays,
         command,
@@ -286,8 +287,65 @@ fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, Strin
     rnl_cli::interpret_file_with(&args.file, args.dialect.as_deref(), &args.formats, provider, &options(args))
 }
 
+/// The path of a `--format` as the reading names the files of `file`: an include resolves against
+/// the directory of `file`, relative when `file` is and absolute when it is, so the path is made
+/// absolute for an absolute `file`, and relative to the current directory, when it is in it, for a
+/// relative one.
+fn format_path(path: &str, file: &std::path::Path) -> String {
+    let p = PathBuf::from(path);
+    let p = if file.is_absolute() {
+        std::path::absolute(&p).unwrap_or(p)
+    } else {
+        let cwd = std::env::current_dir().ok();
+        match cwd.as_deref().and_then(|d| p.strip_prefix(d).ok()) {
+            Some(rest) => rest.to_path_buf(),
+            None => p,
+        }
+    };
+    rnl_cli::path_str(&p)
+}
+
+/// Check the `--format`s before a command reads FILE: an unknown format name is an error, a package
+/// file (`.rnl`) included, and each path that FILE's netlist does not read is warned of, as it
+/// sets nothing.
+fn check_formats(args: &Args, provider: &FsProvider) -> Result<(), String> {
+    if args.formats.is_empty() || matches!(args.command.as_str(), "catalog" | "formats" | "write") {
+        return Ok(());
+    }
+    let names: Vec<String> = rnl_view::formats().into_iter().map(|f| f.name).collect();
+    if let Some((path, name)) = args.formats.iter().find(|(_, name)| !names.contains(name)) {
+        return Err(format!("unknown format \"{name}\" for {path}; the formats are {}", names.join(", ")));
+    }
+    let package = args.file.extension().is_some_and(|e| e.eq_ignore_ascii_case("rnl"));
+    let read: Vec<String> = if package {
+        Vec::new()
+    } else {
+        let mut sink = Sink::new();
+        let doc = rnl_view::read_host_with(
+            &args.file.to_string_lossy(),
+            args.dialect.as_deref(),
+            &args.formats,
+            provider,
+            &mut sink,
+        )?;
+        doc.levels
+            .iter()
+            .filter(|l| l.kind == rnl_runtime::host::LevelKind::File)
+            .map(|l| provider.path_key(&rnl_runtime::source::normalize(&l.path)))
+            .collect()
+    };
+    for (path, name) in &args.formats {
+        let key = provider.path_key(&rnl_runtime::source::normalize(path));
+        if !read.contains(&key) {
+            eprintln!("rnl: warning: --format {path}={name}: {} reads no such file", args.file.display());
+        }
+    }
+    Ok(())
+}
+
 fn run(args: &Args) -> Result<ExitCode, String> {
     let provider = FsProvider::new(&args.package_dirs).with_search_paths(&args.search_paths);
+    check_formats(args, &provider)?;
     match args.command.as_str() {
         "check" => {
             let r = interpret(args, &provider)?;
@@ -477,7 +535,10 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             let files = Layered { layers: vec![&held, &provider] };
             let mut sink = Sink::new();
             let read = read_path.to_string_lossy();
-            let doc = rnl_view::read_host_with(&read, args.dialect.as_deref(), &args.formats, &files, &mut sink)?;
+            // the entry read by its absolute path, the formats' paths so too
+            let formats: BTreeMap<String, String> =
+                args.formats.iter().map(|(p, f)| (format_path(p, &read_path), f.clone())).collect();
+            let doc = rnl_view::read_host_with(&read, args.dialect.as_deref(), &formats, &files, &mut sink)?;
             let main = doc.main().file.clone();
             let text = doc.source(&main).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
             let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);

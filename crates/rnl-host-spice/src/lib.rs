@@ -1043,7 +1043,7 @@ fn finish(cx: &mut Reading) {
     for (l, k) in typed {
         let inst = &cx.doc.levels[l].instances[k];
         let (m, loc) = (inst.model.clone().unwrap_or_default(), Loc::line(&inst.file, inst.line));
-        let mtype = cx.card(&m, false, loc).and_then(|c| c.mtype);
+        let mtype = cx.card(&m, false, loc).one().and_then(|c| c.mtype);
         cx.doc.levels[l].instances[k].mtype = mtype;
     }
 }

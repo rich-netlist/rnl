@@ -58,6 +58,26 @@ pub struct Card {
     pub line: u32,
 }
 
+/// What a name finds among the definitions of every format ([`Reading::card`]).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Found<T> {
+    /// None of that name.
+    Missing,
+    One(T),
+    /// More than one, none spelt as written: the name is not unique, and names none of them.
+    NotUnique,
+}
+
+impl<T> Found<T> {
+    /// The one found.
+    pub fn one(self) -> Option<T> {
+        match self {
+            Found::One(t) => Some(t),
+            _ => None,
+        }
+    }
+}
+
 /// How each file of a reading is read: the formats there are, and the one of each file by its
 /// path and text.
 pub struct Formats<'a> {
@@ -274,17 +294,17 @@ impl<'a> Reading<'a> {
         }
     }
 
-    /// The model card that a reference to `name`, written at `loc`, finds ([`Reading::card_candidates`]);
-    /// None when none does, and an error when more than one does.
-    pub fn card(&mut self, name: &str, case_sensitive: bool, loc: Loc) -> Option<Card> {
-        let found = self.card_candidates(name, case_sensitive);
+    /// The model card that a reference to `name`, written at `loc`, finds
+    /// ([`Reading::card_candidates`]); when more than one does, an error, and none of them.
+    pub fn card(&mut self, name: &str, case_sensitive: bool, loc: Loc) -> Found<Card> {
+        let mut found = self.card_candidates(name, case_sensitive);
         if found.len() > 1 {
             let at: Vec<String> = found.iter().map(|c| format!("{}:{}", c.file, c.line)).collect();
             self.sink
                 .error(format!("the model name {name} is not unique: model cards at {}", at.join(", ")), Some(loc));
-            return None;
+            return Found::NotUnique;
         }
-        found.into_iter().next()
+        found.pop().map_or(Found::Missing, Found::One)
     }
 
     /// An instance naming a subcircuit that more than one definition, in files of different

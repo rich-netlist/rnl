@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 
 use rnl_runtime::diag::{Loc, Sink};
-use rnl_runtime::host::format::{Card, FileRead, Format, Formats, Reading};
+use rnl_runtime::host::format::{Card, FileRead, Format, Formats, Found, Reading};
 use rnl_runtime::host::{file_name, Dialect, HostDocument, Instance, Level, LevelId, LevelKind};
 use rnl_runtime::records::{scan_run, CarrierLine};
 use rnl_runtime::source::Provider;
@@ -1046,7 +1046,7 @@ fn finish(cx: &mut Reading) {
                 let mtype = match (&inst.model, inst.is_subckt || inst.mtype.is_some()) {
                     (Some(m), false) if mixed => {
                         let m = m.clone();
-                        Some(cx.card(&m, false, loc).and_then(|c| c.mtype))
+                        Some(cx.card(&m, false, loc).one().and_then(|c| c.mtype))
                     }
                     (Some(m), false) => Some(cards.get(&m.to_lowercase()).cloned()),
                     _ => None,
@@ -1072,19 +1072,21 @@ fn finish(cx: &mut Reading) {
                 (names, v.map(String::from), None, false)
             } else if mixed {
                 match cx.card(&master, true, loc) {
-                    Some(c) if c.format == "spectre" && models.contains_key(&c.name) => {
+                    Found::One(c) if c.format == "spectre" && models.contains_key(&c.name) => {
                         let m = &models[&c.name];
                         match family(&m.master) {
                             Some(f) => (family_terminals(f), family_value(f), family_type(f, &m.params), false),
                             None => (None, None, None, false),
                         }
                     }
-                    Some(c) => match c.mtype {
+                    Found::One(c) => match c.mtype {
                         Some(ty) => (type_terminals(&ty), type_value(&ty), Some(ty), false),
                         None => (None, None, None, false),
                     },
+                    // the name of more than one card is none of them, and no subcircuit either
+                    Found::NotUnique => (None, None, None, false),
                     // neither a primitive nor a model card: a subcircuit, of the netlist or not (6.4)
-                    None => (None, None, None, true),
+                    Found::Missing => (None, None, None, true),
                 }
             } else if let Some(m) = models.get(&master) {
                 match family(&m.master) {

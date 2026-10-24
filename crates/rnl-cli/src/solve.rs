@@ -277,6 +277,9 @@ impl Provider for Noting<'_> {
     fn auto_include(&self) -> Option<&dyn rnl_runtime::source::LibraryLookup> {
         self.files.auto_include()
     }
+    fn path_key(&self, path: &str) -> String {
+        self.files.path_key(path)
+    }
     fn read(&self, path: &str) -> Option<String> {
         let text = self.files.read(path)?;
         let path = normalize(path);

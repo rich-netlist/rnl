@@ -468,6 +468,25 @@ impl HostDocument {
         }
     }
 
+    /// The key of a level's name, by the rules of the file it is written in: that of
+    /// [`HostDocument::key`] in a file of the main file's dialect, and qualified by the dialect in a
+    /// file of another, so that two subcircuits that one dialect tells apart keep two keys.
+    pub fn level_key(&self, level: LevelId) -> String {
+        let rules = self.level_rules(level);
+        let key = dialect_key(rules, &self.levels[level].name);
+        if rules.name == self.dialect.name {
+            self.key(&self.levels[level].name)
+        } else {
+            format!("{}\u{0}{key}", rules.name)
+        }
+    }
+
+    /// Whether `name`, written in RNL, names the level `level`: compared by the rules of the file
+    /// the level is written in, as a reference to an object is (3.6).
+    pub fn names_level(&self, level: LevelId, name: &str) -> bool {
+        same(&self.levels[level].name, name, self.level_rules(level).case_sensitive)
+    }
+
     /// The subcircuit named `name`, compared as the main file's dialect compares names.
     pub fn subckt(&self, name: &str) -> Option<LevelId> {
         self.subckt_for(name, self.dialect.case_sensitive)

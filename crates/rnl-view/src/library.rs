@@ -28,6 +28,9 @@ pub struct LibraryIndex {
     /// The formats set for files by path ([`crate::BuildOptions::formats`]), that the library
     /// files and their includes are read with ([`LibraryIndex::set_formats`]).
     formats: BTreeMap<String, String>,
+    /// The paths whose format changed since the last update, as set: the entries that read them
+    /// are read again, the paths compared by the key of the files they are read from.
+    reformat: Vec<String>,
 }
 
 fn fingerprint(text: &str) -> u64 {
@@ -45,14 +48,24 @@ impl LibraryIndex {
         if formats == self.formats {
             return;
         }
-        let changed: Vec<String> = formats
-            .keys()
-            .chain(self.formats.keys())
-            .filter(|p| formats.get(*p) != self.formats.get(*p))
-            .map(|p| p.replace('\\', "/"))
-            .collect();
+        let changed = formats.keys().chain(self.formats.keys()).filter(|p| formats.get(*p) != self.formats.get(*p));
+        let changed: Vec<String> = changed.map(|p| normalize(&p.replace('\\', "/"))).collect();
+        self.reformat.extend(changed);
         self.formats = formats;
-        self.invalidate(&changed);
+    }
+
+    /// Drop the entries that read a file whose format changed ([`LibraryIndex::set_formats`]),
+    /// its path and theirs compared by [`Provider::path_key`] of `files`.
+    fn drop_reformatted(&mut self, files: &dyn Provider) {
+        if self.reformat.is_empty() {
+            return;
+        }
+        let keys: HashSet<String> = self.reformat.drain(..).map(|p| files.path_key(&p)).collect();
+        let reads = |entry: &Entry| entry.dependencies.keys().any(|p| keys.contains(&files.path_key(p)));
+        let count = self.entries.len() + self.imports.len();
+        self.entries.retain(|_, entry| !reads(entry));
+        self.imports.retain(|_, entry| !reads(entry));
+        self.dirty |= count != self.entries.len() + self.imports.len();
     }
 
     /// Replacing an existing Library item also invalidates roots that include that item.
@@ -69,6 +82,7 @@ impl LibraryIndex {
     /// Only new files are read normally. Reload reads every file, packages included. Failed reads
     /// remove stale definitions and are reported to the caller; subsequent updates may retry them.
     pub fn update(&mut self, paths: &[String], files: &dyn Provider, reload: bool) -> Vec<String> {
+        self.drop_reformatted(files);
         let paths: HashSet<_> = paths.iter().map(|p| normalize(p)).collect();
         let count = self.entries.len();
         self.entries.retain(|p, _| paths.contains(p));
@@ -292,7 +306,9 @@ pub(crate) fn resolve(
         for lv in &doc.levels {
             for inst in &lv.instances {
                 let Some(model) = inst.model.as_deref() else { continue };
-                if !inst.is_subckt || doc.subckt_of(inst).is_some() {
+                // a name some definition has, or more than one, is no subcircuit to look for
+                let found = doc.subckt_candidates(model, doc.rules(&inst.file).case_sensitive);
+                if !inst.is_subckt || !found.is_empty() {
                     continue;
                 }
                 let key = if inst.case_sensitive { model.to_string() } else { model.to_lowercase() };

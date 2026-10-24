@@ -168,6 +168,40 @@ fn a_name_found_in_files_of_another_format_is_not_unique_when_two_are() {
 }
 
 #[test]
+fn subcircuits_one_format_tells_apart_keep_their_own_block_symbols() {
+    // `Amp` and `amp` of a Spectre file, under a SPICE netlist whose own names ignore case
+    let top = "* top\n.include \"cells.scs\"\nX1 a 0 Amp\nX2 b 0 amp\n.end\n";
+    let cells = "simulator lang=spectre\nsubckt Amp (p n)\n// @RNL { # @SET-SYMBOL $RESISTOR }\nends Amp\n\
+                 subckt amp (p n)\n// @RNL { # @SET-SYMBOL $CAPACITOR }\nends amp\n";
+    let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/cells.scs", cells);
+    let options = BuildOptions { formats: set(&[("/w/cells.scs", "spectre")]), ..BuildOptions::default() };
+    let parts = Parts { drawing: false, host: false, model: true };
+    let s = serde_json::to_value(rnl_view::snapshot("/w/top.sp", &files, &options, parts).unwrap()).unwrap();
+    let model = &s["levels"][0]["model"];
+    let symbol = |id: &str| {
+        let object = model["objects"].as_array().unwrap().iter().find(|o| o["id"] == id).unwrap();
+        let symbol = &object["symbol"]["value"];
+        let found = model["symbols"].as_array().unwrap().iter().find(|x| &x["id"] == symbol).unwrap();
+        found["name"].as_str().unwrap().to_string()
+    };
+    assert_eq!((symbol("#X1"), symbol("#X2")), ("$RESISTOR".to_string(), "$CAPACITOR".to_string()));
+}
+
+#[test]
+fn a_model_name_that_is_not_unique_makes_no_subcircuit() {
+    // two cards found without case, `Nch` of the Spectre file's SPICE mode and `NCH` of the SPICE
+    // file, neither spelt as the Spectre instance writes it
+    let top = "* top\n.include \"models.scs\"\n.model NCH nmos\n.end\n";
+    let models = "simulator lang=spice\n.model Nch nmos\nsimulator lang=spectre\nM9 (d g 0 0) nch\n";
+    let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/models.scs", models);
+    let (doc, sink) = host("/w/top.sp", &files, &[("/w/models.scs", "spectre")]);
+    let m9 = doc.levels[0].instances.iter().find(|i| i.name == "M9").unwrap();
+    assert_eq!((m9.is_subckt, m9.mtype.as_deref()), (false, None));
+    let said: Vec<&str> = sink.all().iter().map(|d| d.message.as_str()).collect();
+    assert!(said.contains(&"the model name nch is not unique: model cards at models.scs:2, top.sp:3"), "{said:?}");
+}
+
+#[test]
 fn model_cards_are_found_across_formats() {
     // SPICE's devices name Spectre's model cards, by any case; Spectre's names SPICE's card
     let top = "* top\n.include \"models.scs\"\n.include \"spice.inc\"\nM1 d g 0 0 nch\nM2 d g 0 0 Nmix\nM3 d g 0 0 nmix\n.end\n";
@@ -317,6 +351,16 @@ fn the_command_line_sets_formats_and_lists_them() {
         (code, err.trim()),
         (2, format!("rnl: unknown format \"verilog\" for {cells}; the formats are spice, spectre").as_str())
     );
+    // a path the netlist does not read sets nothing, and is warned of, by its path made absolute
+    // as FILE is; the check reads cells.scs as SPICE then, as before, which it is not
+    let (_, _, err) = rnl(&["check", &top, "--format", "nowhere.inc=spectre"]);
+    assert!(err.contains("nowhere.inc=spectre:") && err.contains("reads no such file"), "{err}");
+    // a package file checks the names too
+    let package = rnl_cli::path_str(&dir.join("p.rnl"));
+    std::fs::write(&package, "@RNL(type=\"header\") { @VERSION(\"0.3\"); @PACKAGE(name=\"p\", version=\"1.0\")}\n")
+        .unwrap();
+    let (code, _, err) = rnl(&["check", &package, "--format", "x.inc=bogus"]);
+    assert_eq!((code, err.contains("unknown format \"bogus\"")), (2, true), "{err}");
     let (code, out, _) = rnl(&["formats"]);
     assert_eq!(code, 0);
     let list: serde_json::Value = serde_json::from_str(&out).unwrap();

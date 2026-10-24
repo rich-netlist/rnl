@@ -378,7 +378,7 @@ pub fn applies_to(doc: &HostDocument, written_in: LevelId, rec: &Record, level: 
         Some(target) => {
             let lv = &doc.levels[level];
             lv.kind == LevelKind::Subckt
-                && doc.key(&lv.name) == doc.key(&target)
+                && doc.names_level(level, &target)
                 && doc.ancestors(level).contains(&written_in)
         }
     }

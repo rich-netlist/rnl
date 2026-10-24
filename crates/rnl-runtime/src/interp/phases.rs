@@ -233,7 +233,7 @@ impl Interp<'_> {
                     if let Some(m) = &inst.model {
                         // the subcircuit it names, by the rules of its file; its blocks by its name
                         let key = match self.doc.subckt_of(&inst) {
-                            Some(sub) => self.doc.key(&self.doc.levels[sub].name),
+                            Some(sub) => self.doc.level_key(sub),
                             None => self.doc.key(m),
                         };
                         if let Some(blocks) = self.block_symbols.get(&key) {
