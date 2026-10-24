@@ -642,6 +642,9 @@ pub enum ObjData {
         failed: bool,
         site: Option<Rc<Ctx>>,
         off: usize,
+        /// The last TEXT that gave it a layer written for its object itself, not for what a
+        /// selection reached (10.4), and where; none when only rules gave it layers.
+        direct: Option<(Rc<Ctx>, usize)>,
     },
     Usage(Box<UsageData>),
     Bundle {

@@ -1583,7 +1583,14 @@ impl Interp<'_> {
 
     fn set_text_off(&mut self, t: ObjId, off: usize) {
         match self.om(t) {
-            ObjData::Text { off: o, .. } | ObjData::KeyText { off: o, .. } => *o = off,
+            ObjData::Text { off: o, .. } => *o = off,
+            ObjData::KeyText { off: o, direct, .. } => {
+                *o = off;
+                // a TEXT written for the object itself, as this one is, is the last direct one
+                if let Some((_, d)) = direct {
+                    *d = off;
+                }
+            }
             _ => {}
         }
     }

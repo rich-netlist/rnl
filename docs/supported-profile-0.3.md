@@ -158,6 +158,32 @@ remains the central work list; the matrices provide source and regression anchor
 | Deferred to 0.4 | **Bundle terminal correspondence (11.8).** Heterogeneous members continue to use first-member terminal ordinals. | The crash is fixed. Name-versus-position correspondence is explicitly left to language 0.4 clarification; these fixes preserve current behavior. |
 | P3 | **Optional-value coverage.** Several optional values and negative combinations still lack dedicated behavioral assertions. | F-05 vocabulary parity is now maintained in CI; it does not establish complete semantic conformance or exhaust the cross product of parameters and contexts. |
 
+## Deliberate departures from the text of 0.3
+
+The user decided these for the core, ahead of the language; the published 0.3 text is unchanged,
+and the language line takes them up for 0.4.
+
+1. **Each file in its own format** (core 0.4.0,
+   [#199](https://github.com/rich-netlist/rnl/pull/199),
+   [#204](https://github.com/rich-netlist/rnl/pull/204)). Each file of a netlist is read by the
+   adapter of its own format, SPICE or Spectre, set by path or detected by the file's suffix and
+   first lines; the main file does not decide it for the files it includes.
+   - 16.3 says the files of a SPICE netlist are all of the SPICE dialect: a `.scs` file that a
+     SPICE netlist includes is now read as Spectre.
+   - The table of 2.2 counts a file that a Spectre netlist includes, with no `.scs` suffix and no
+     `simulator lang=spectre` at its start, as Spectre's SPICE mode: it is now read by the SPICE
+     adapter, so its names ignore case, `gnd` is ground and its elements name no Spectre primitive.
+   - Names that compare across files of two formats (3.6) follow a rule the text does not have: by
+     case only when both the reference and the definition compare names so, a definition spelt as
+     written first, more than one an error.
+2. **A rule's TEXT where it has no drawing meaning** (core 0.4.1). A TEXT that a rule gives what a
+   selection reaches (10.4), landing on a usage without a symbol or a terminal without a pin, does
+   nothing and gives no diagnostic; 13.3 says it fails. A TEXT written for the object itself still
+   fails. It is what 8.3 says of SET-STYLE on a semantic usage, and for the same reason: the rules of
+   `rnl-std-no-labels`, `# @SELECT-USAGE => @TEXT("", key="name")` and the like, reach the usages
+   of structures such as `$MIRRORED`, which have no symbol, and failed in every file that uses the
+   package and writes a structure.
+
 ## Decisions and standard questions
 
 1. **Generated objects (10.5, 14.8):** standard fills exclude objects written explicitly;
