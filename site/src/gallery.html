@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><zh>RNL 图库 · Rich Netlist</zh><en>RNL gallery · Rich Netlist</en></title>
-<meta name="description" content="<zh>用 RNL 画出原理图的电路例子：点开一个，就在网页版查看器里看它。图库是 GitHub 上的一张列表，新条目合并几分钟后就出现。</zh>
-  <en>Circuits drawn with RNL: open one to look at it in the web viewer. The gallery is a list on GitHub, and a new entry shows up minutes after it is merged.</en>">
+<meta name="description" content="<zh>用 RNL 画出原理图的案例：点开一个，就在网页版查看器里看它。图库是 GitHub 上的一张列表，新条目合并几分钟后就出现。</zh>
+  <en>Examples drawn with RNL: open one to look at it in the web viewer. The gallery is a list on GitHub, and a new entry shows up minutes after it is merged.</en>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{{font-href}}">
@@ -71,8 +71,8 @@
     <div class="hero-copy">
       <p class="eyebrow"><span>RICH NETLIST · GALLERY</span></p>
       <h1 id="gallery-title" class="tour-h1"><zh>图库</zh><en>Gallery</en></h1>
-      <p class="thesis"><zh>一些公开的 RNL 案例，各自按自己的许可证公开。</zh><en>Some public RNL examples, each published under its own licence.</en></p>
-      <p class="lead"><a href="https://github.com/rich-netlist/rnl-gallery#readme"><zh>怎样贡献：见 rnl-gallery 的 README</zh><en>How to contribute: the rnl-gallery README</en></a></p>
+      <p class="thesis"><zh>一些 RNL 案例，按各自许可证公开。</zh><en>Some RNL examples, published under their own licences.</en></p>
+      <p class="lead"><a href="https://github.com/rich-netlist/rnl-gallery#readme"><zh>如何贡献</zh><en>How to contribute</en></a></p>
     </div>
   </div>
 </section>
@@ -84,17 +84,13 @@
         <svg class="ico"><use href="#i-search"/></svg>
         <input id="cg-q" type="search" autocomplete="off" spellcheck="false" placeholder="<zh>搜索图库</zh><en>Search the gallery</en>" aria-label="<zh>搜索标题、说明、作者</zh><en>Search titles, descriptions and authors</en>">
       </label>
-      <p class="toc-title"><zh>贡献</zh><en>Contribute</en></p>
-      <ul>
-        <li><a href="https://github.com/rich-netlist/rnl-gallery#readme"><zh>rnl-gallery 的 README</zh><en>The rnl-gallery README</en></a></li>
-      </ul>
+      <div class="cg-tagbox" id="cg-tags" role="group" aria-label="<zh>按标签筛选</zh><en>Filter by tag</en>" hidden></div>
+      <p class="cg-contribute"><a href="https://github.com/rich-netlist/rnl-gallery#readme"><zh>如何贡献</zh><en>How to contribute</en></a></p>
     </nav>
     <div class="gl-content">
       <header class="gl-heading">
-        <h2 id="cg-title"><zh>电路例子</zh><en>Circuit examples</en></h2>
         <p id="cg-counts" aria-live="polite"></p>
       </header>
-      <div class="cg-tags" id="cg-tags" role="group" aria-label="<zh>按标签筛选</zh><en>Filter by tag</en>" hidden></div>
       <div class="gl-main" id="cg-main" aria-live="polite">
         <p class="gl-status" id="cg-status"><zh>正在载入……</zh><en>Loading…</en></p>
         <noscript><p class="gl-status"><zh>这一页要用 JavaScript 显示图库。列表在 <a href="https://github.com/rich-netlist/rnl-gallery/tree/main/entries">GitHub 的 rnl-gallery 仓库</a>里。</zh><en>This page needs JavaScript to show the gallery. The list is in the <a href="https://github.com/rich-netlist/rnl-gallery/tree/main/entries">rnl-gallery repository on GitHub</a>.</en></p></noscript>

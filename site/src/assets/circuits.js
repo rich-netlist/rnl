@@ -90,12 +90,12 @@
     saveUrl();
   }
 
-  function tagButton(tag, count) {
+  /* A tag on a card: a button that chooses it */
+  function tagButton(tag) {
     var b = el('button', 'cg-tag', tagLabel(tag));
     b.type = 'button';
     b.setAttribute('data-tag', tag);
     b.setAttribute('aria-pressed', state.tags.indexOf(tag) >= 0 ? 'true' : 'false');
-    if (count !== undefined) b.appendChild(el('small', '', String(count)));
     b.addEventListener('click', function () { toggleTag(tag); });
     return b;
   }
@@ -145,7 +145,7 @@
     var tags = tagsOf(entry);
     if (tags.length) {
       var row = el('p', 'cg-tagrow');
-      tags.forEach(function (t) { var b = tagButton(t); b.classList.add('cg-tag-sm'); row.appendChild(b); });
+      tags.forEach(function (t) { row.appendChild(tagButton(t)); });
       body.appendChild(row);
     }
     if (!href) body.appendChild(el('p', 'cg-note', fill('<zh>这个设计有多个文件，查看器还不能一次打开它；先看缩略图和来源。</zh><en>This design has several files, which the viewer cannot open in one go yet; see the thumbnail and the source.</en>')));
@@ -153,7 +153,8 @@
     return article;
   }
 
-  /* The tags of all entries, most used first; the ones asked for stay in the bar even when no entry has them */
+  /* The tags of all entries under the search box, most used first, each a check box with the number of entries that
+     have it; the ones asked for stay in the list even when no entry has them. Together they are an intersection. */
   function renderTagBar() {
     var count = {};
     state.entries.forEach(function (e) { tagsOf(e).forEach(function (t) { count[t] = (count[t] || 0) + 1; }); });
@@ -161,7 +162,18 @@
     var names = Object.keys(count).sort(function (a, b) { return count[b] - count[a] || (a < b ? -1 : 1); });
     tagBar.textContent = '';
     tagBar.hidden = !names.length;
-    names.forEach(function (t) { tagBar.appendChild(tagButton(t, count[t])); });
+    names.forEach(function (t) {
+      var label = el('label', 'cg-check');
+      var box = el('input');
+      box.type = 'checkbox';
+      box.checked = state.tags.indexOf(t) >= 0;
+      box.setAttribute('data-tag', t);
+      box.addEventListener('change', function () { toggleTag(t); });
+      label.appendChild(box);
+      label.appendChild(el('span', 'cg-check-name', tagLabel(t)));
+      label.appendChild(el('small', '', String(count[t])));
+      tagBar.appendChild(label);
+    });
     if (state.tags.length) {
       var clear = el('button', 'cg-clear', fill('<zh>清除标签</zh><en>Clear tags</en>'));
       clear.type = 'button';

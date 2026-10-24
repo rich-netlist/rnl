@@ -80,28 +80,30 @@ test('gallery: search by title, description and author keeps ?q= and the languag
   await expect(page.locator('.cg-card')).toHaveAttribute('data-id', 'ota-single');
 });
 
-test('gallery: tags filter, several at once, and stay in the address', async ({ page }) => {
+test('gallery: tags are check boxes under the search, several at once, and stay in the address', async ({ page }) => {
   await serve(page);
   await page.goto('/en/gallery.html');
-  const bar = page.locator('#cg-tags');
-  // most used first, then by name; a tag that is not of the right form is not shown
-  await expect(bar.locator('.cg-tag')).toHaveText(['hierarchical3', 'custom-tag1', 'mixed-signal1', 'opamp1', 'OTA1', 'PLL1']);
-  await bar.locator('[data-tag="pll"]').click();
+  const box = page.locator('#cg-tags');
+  const tag = name => box.locator(`input[data-tag="${name}"]`);
+  // most used first, then by name, each with the number of entries; a tag that is not of the right form is not shown
+  await expect(box.locator('label')).toHaveText(['hierarchical3', 'custom-tag1', 'mixed-signal1', 'opamp1', 'OTA1', 'PLL1']);
+  await tag('pll').check();
   await expect(page.locator('.cg-card')).toHaveCount(1);
   await expect(page.locator('.cg-card')).toHaveAttribute('data-id', 'pll-multi');
   await expect(page).toHaveURL(/\/en\/gallery\.html\?tag=pll$/);
   // several tags: an entry has to have all of them
-  await bar.locator('[data-tag="hierarchical"]').click();
+  await tag('hierarchical').check();
   await expect(page.locator('.cg-card')).toHaveCount(1);
   await expect(page).toHaveURL(/\?tag=pll&tag=hierarchical$/);
-  await bar.locator('[data-tag="pll"]').click();
+  await tag('pll').uncheck();
   await expect(page.locator('.cg-card')).toHaveCount(3);
-  await bar.locator('[data-tag="opamp"]').click();
+  await tag('opamp').check();
   await expect(page.locator('.cg-card')).toHaveAttribute('data-id', 'ota-single');
   await expect(page.locator('[data-lang-link]').first()).toHaveAttribute('href', /gallery\.html\?tag=hierarchical&tag=opamp$/);
   // a tag on a card does the same, and works with the search
   await page.locator('.cg-card[data-id="ota-single"] [data-tag="ota"]').click();
   await expect(page).toHaveURL(/\?tag=hierarchical&tag=opamp&tag=ota$/);
+  await expect(tag('ota')).toBeChecked();
   await page.locator('#cg-q').fill('grace');
   await expect(page.locator('#cg-main')).toContainText('Nothing found');
   await expect(page).toHaveURL(/\?q=grace&tag=hierarchical&tag=opamp&tag=ota$/);
@@ -110,11 +112,15 @@ test('gallery: tags filter, several at once, and stay in the address', async ({ 
   await expect(page.locator('.cg-clear')).toHaveCount(0);
   // from the address, in the other language; an unknown tag stays chosen, a malformed one is dropped
   await page.goto('/zh/gallery.html?tag=opamp&tag=ota&tag=BAD%20TAG');
-  await expect(bar.locator('[aria-pressed="true"]')).toHaveText(['运放1', 'OTA1']);
+  await expect(box.locator('input:checked')).toHaveCount(2);
+  await expect(box.locator('label:has(input:checked)')).toHaveText(['运放1', 'OTA1']);
   await expect(page.locator('.cg-card')).toHaveCount(1);
   await page.goto('/en/gallery.html?tag=nosuch');
-  await expect(bar.locator('[data-tag="nosuch"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(tag('nosuch')).toBeChecked();
   await expect(page.locator('#cg-main')).toContainText('Nothing found');
+  // nothing says "circuit examples" any more, and the page has one way to learn how to contribute
+  await expect(page.locator('#gallery')).not.toContainText('Circuit examples');
+  await expect(page.getByRole('link', { name: 'How to contribute' })).toHaveCount(2);
 });
 
 test('gallery: when the data cannot be read', async ({ page, context }) => {

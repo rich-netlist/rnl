@@ -29,19 +29,24 @@ a.cg-fig:focus-visible, .cg-title a:focus-visible { outline: 2px solid var(--sig
 .cg-notice.cg-warn { border-color: color-mix(in srgb, var(--warn) 35%, transparent); background: var(--warn-2); color: var(--ink-2); }
 .cg-notice.cg-error { border-color: color-mix(in srgb, var(--err) 35%, transparent); background: var(--err-2); color: var(--ink-2); }
 
-.cg-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 20px; }
+.cg-tagbox { display: flex; flex-direction: column; gap: 2px; margin: 0 0 22px; }
+.cg-check { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 4px; border-radius: 5px; cursor: pointer; font-size: 14px; color: var(--ink-2); }
+.cg-check:hover { background: var(--panel); color: var(--ink); }
+.cg-check input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--signal); cursor: pointer; }
+.cg-check-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cg-check small { flex: none; color: var(--ink-3); font: 500 11.5px var(--f-mono); }
+.cg-contribute { margin: 0 0 8px; font-size: 14px; }
+#toc .cg-contribute a { padding-left: 4px; color: var(--signal); text-decoration: underline; font-weight: 500; }
 .cg-tag {
-  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; cursor: pointer;
-  border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink-2); font: 500 13px var(--f-body);
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink-2); font: 500 12px var(--f-body);
 }
-.cg-tag small { color: var(--ink-3); font: 500 11.5px var(--f-mono); }
 .cg-tag:hover { color: var(--ink); border-color: var(--ink-3); }
 .cg-tag[aria-pressed="true"] { color: var(--signal); border-color: var(--signal); background: var(--signal-2); }
 .cg-tag:focus-visible, .cg-clear:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
-.cg-clear { height: 30px; padding: 0 10px; border: 0; background: transparent; color: var(--ink-3); font: 13px var(--f-body); cursor: pointer; text-decoration: underline; }
+.cg-clear { align-self: flex-start; height: 28px; padding: 0 4px; margin-top: 4px; border: 0; background: transparent; color: var(--ink-3); font: 13px var(--f-body); cursor: pointer; text-decoration: underline; }
 .cg-clear:hover { color: var(--ink); }
 .cg-tagrow { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 0; }
-.cg-tag-sm { height: 22px; padding: 0 8px; font-size: 12px; }
 
 @media (max-width: 640px) {
   .cg-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
