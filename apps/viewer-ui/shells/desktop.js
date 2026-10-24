@@ -3,7 +3,7 @@ import { m } from "../i18n.js";
 // documents natively and shows the menu bar itself. The only module that uses window.__TAURI__.
 
 import { flushSettings, load } from "../util.js";
-import { choose, inform, modal } from "../dialog.js";
+import { choose, decide, inform, modal } from "../dialog.js";
 import { sourcePath } from "../source-path.js";
 import { fileFormats } from "../formats.js";
 
@@ -23,6 +23,9 @@ const sessionSource = source => source ? { path: source.path, name: source.name,
   text: source.path && !source.readonly ? undefined : source.text, readonly: source.readonly,
   temporary: source.temporary } : null;
 let openingDrop = false;
+// the project archive this window opened or saved last, where Save Project offers to save again
+let lastProject = null;
+const writeBytes = (path, bytes) => invoke("write_bytes", bytes, { headers: { path: encodeURIComponent(path) } });
 
 /** @type {import("../shell.js").Shell} */
 export default {
@@ -193,6 +196,38 @@ export default {
     invoke("save_file_as", { entry: source.path || null, name: saved.name, text: saved.text, encoding }).then(file),
   setDirty(dirty) {
     invoke("set_dirty", { dirty }).catch(() => {});
+  },
+  // projects (project.js): the page makes and reads the archive; the app asks where, and reads and writes the bytes
+  readFile: async (path) => new Uint8Array(await invoke("read_bytes", { path })),
+  async saveProject(name, build) {
+    const path = await invoke("pick_project_save", { name, last: lastProject });
+    if (!path) return false;
+    await writeBytes(path, new Uint8Array(await (await build()).arrayBuffer()));
+    lastProject = path;
+    return path;
+  },
+  async pickProject() {
+    const path = await invoke("pick_project");
+    if (!path) return null;
+    return { name: path.split(/[\\/]/).pop(), path, bytes: new Uint8Array(await invoke("read_bytes", { path })) };
+  },
+  /** The folder to open a project in, which the user chooses; files of the project already there are replaced only when the user says. */
+  async projectRoot(picked, manifest) {
+    const folder = await invoke("pick_project_folder", { near: picked.path });
+    if (!folder) return null;
+    const existing = await invoke("existing_files", { root: folder, paths: manifest.files.map((f) => f.path) });
+    if (existing.length) {
+      const shown = existing.slice(0, 5).join(", ") + (existing.length > 5 ? m`, and ${existing.length - 5} more` : "");
+      const choice = await decide({ title: m("Open Project"), paragraphs: [m`The folder already has files of this project: ${shown}.`, m("Replace them?")], action: "Replace" });
+      if (choice !== "Replace") return null;
+    }
+    return `${folder.replace(/\\/g, "/").replace(/\/$/, "")}/`;
+  },
+  /** Write a project read into its folder: its entry, and its pool as Library files. */
+  async projectSource(read, picked) {
+    for (const [path, bytes] of Object.entries(read.bytes)) await writeBytes(path, bytes);
+    lastProject = picked.path;
+    return { source: file(read.entry), items: read.pool.map((path) => ({ path, name: path, source: file(path) })) };
   },
   onCloseRequested(handler) {
     tauri.event.listen("close-requested", () => handler());

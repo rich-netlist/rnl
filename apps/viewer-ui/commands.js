@@ -26,7 +26,7 @@ import { fileAssociations } from "./file-associations.js";
 import { memoryCache } from "./memory-cache.js";
 import { toggleUsages, toggleCurrents } from "./usages.js";
 import { netlistColors } from "./netlist-colors.js";
-import { downloadLibrary } from "./library-download.js";
+import { downloadManifest, openManifest, openProject, saveProject } from "./project.js";
 import { $ } from "./util.js";
 
 let table = null; // commands.json, once loaded
@@ -74,7 +74,10 @@ export function command(id, options = {}) {
     case "toggle-auto-include": return toggleAutoInclude();
     case "memory-cache": return memoryCache();
     case "save": save(); break;
-    case "download-library": return downloadLibrary();
+    case "save-project": return saveProject();
+    case "open-project": return openProject();
+    case "download-manifest": return downloadManifest();
+    case "load-manifest": return openManifest();
     case "save-as": saveAs(); break;
     case "save-utf8": save(false, "utf8"); break;
     case "save-as-utf8": saveAs("utf8"); break;

@@ -45,13 +45,13 @@ export function beginOpenOperation() {
  * Open a source, or read it again with `keep`. Opening another one asks first about changes not
  * saved. `edited` are texts to build over the files, by the path the Document names them by (a
  * preview closed shows the text applied); without them the files are read as they are, and the
- * text edited is what they hold.
+ * text edited is what they hold. `confirmed` when the user was asked already (Open Project).
  */
-export async function openSource(source, keep, edited, fresh = false, navigation = null, signal = null) {
+export async function openSource(source, keep, edited, fresh = false, navigation = null, signal = null, confirmed = false) {
   if (!source || loading) return;
   // Initial API level selection is part of its import, not a competing user navigation.
   const operation = signal ? { signal } : beginOpenOperation();
-  if (!keep && !edited && !(await confirmLeave(m("open another file"), operation.signal))) return;
+  if (!keep && !edited && !confirmed && !(await confirmLeave(m("open another file"), operation.signal))) return;
   if (operation.signal.aborted) return;
   if (loading) return;
   loading = true;

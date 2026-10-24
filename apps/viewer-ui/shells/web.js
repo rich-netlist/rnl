@@ -5,14 +5,13 @@ import { append, m, setAttr, setText } from "../i18n.js";
 // module Workers. Each candidate keeps its own lazy drawings until the page accepts it.
 
 import { collect, decodeText, startCore } from "../core/client.js";
-import { readManifest } from "../core/manifest.js";
+import { loadManifest, readManifest } from "../manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
 import { sourcePath } from "../source-path.js";
-import { fileFormats } from "../formats.js";
+import { chooseFormat, fileFormats } from "../formats.js";
 import { DEFAULT_CATALOG, readCatalog, readPublicPackage, latestPackages } from "../public-packages.js";
-import { libraryZip } from "../zip.js";
 
 /** The extensions of netlists that are opened on their own, listed first as the file to open. */
 const NETLISTS = ["sp", "spi", "spice", "cir", "ckt", "net", "netlist", "scs"];
@@ -155,28 +154,30 @@ function filesSource(files, entry) {
 }
 
 /**
- * Files by an external manifest (core/manifest.js), such as the RNL gallery writes: its files
- * and packages, fetched and checked against their SHA-256, under /<id>/ in the workspace;
- * the pool a bare include searches, in the order of the manifest's search paths; read only. Each
- * open reads the manifest and its files again, so Reload (F5) does too. `external` holds what was
- * read, for the Library, the source bar and the level (manifest-bar.js).
+ * Files by an external manifest (manifest.js), such as the RNL gallery writes, or a manifest of
+ * links: its files, fetched and checked against their SHA-256, under /<id>/ in the workspace; its
+ * pool, in its order; read only. Each open reads the manifest (at `url`, or `json` as a file gave
+ * it) and its files again, so Reload (F5) does too. `external` holds what was read, for the Library,
+ * the source bar and the level (manifest-bar.js).
  *
- * @param {URL} url
+ * @param {URL | null} url
+ * @param {object | null} json
  */
-function manifestSource(url) {
+function manifestSource(url, json = null, name = null) {
   const source = {
-    name: url.href,
-    path: `/${url.pathname.split("/").pop() || "manifest.json"}`,
+    name: url?.href ?? name,
+    path: `/${url ? url.pathname.split("/").pop() || "manifest.json" : name}`,
     readonly: true,
-    manifest: url.href,
+    manifest: url?.href ?? null,
     external: null,
     snapshot: {},
     pool: [],
     async open(_again, progress) {
-      const read = await readManifest(url.href, {
-        onProgress: (done, total) => progress?.({ stage: "fetching", done, total }),
-      });
-      Object.assign(source, { external: { ...read, manifest: url.href }, snapshot: read.files, pool: read.pool, path: read.entry,
+      const onProgress = (done, total) => progress?.({ stage: "fetching", done, total });
+      const read = url ? await readManifest(url.href, { onProgress }) : await loadManifest(json, { onProgress });
+      // the formats it gives are chosen as the user chooses them, once: a later choice, or Reload, keeps the user's
+      if (!source.external) for (const [path, format] of Object.entries(read.formats)) await chooseFormat(path, format, { session: true });
+      Object.assign(source, { external: { ...read, manifest: url?.href ?? null }, snapshot: read.files, pool: read.pool, path: read.entry,
         name: read.entry.slice(read.id.length + 2) });
       return { path: read.entry, text: read.files[read.entry] };
     },
@@ -247,6 +248,11 @@ function urlSource(url, cached = null) {
     get url() { return served.href; },
     name: url.href,
     path: serverPath(url),
+    /** The address of a file of this source by its workspace path: the entry's, or one it includes. */
+    address(path) {
+      if (!path.startsWith("/")) return null;
+      return path === this.path ? served.href : new URL(relative(dir, path), served).href;
+    },
     async open(again) {
       const got = await fetchBytes(url.href, again);
       if (!got.bytes) {
@@ -388,6 +394,9 @@ export function sourceFromManifest(text) {
   return manifestSource(url);
 }
 
+/** The source of a manifest a file gave (File > Load Manifest), named `name`. */
+export const sourceFromManifestJson = (json, name) => manifestSource(null, json, name);
+
 /** Warm the actual Worker/core before announcing that messages can be handled. */
 export async function prepareViewer() {
   const prepared = spare ??= warmCore();
@@ -507,7 +516,7 @@ async function includePackage(selected, signal) {
   const text = decodeText(await publicRequest(fetcher => readPublicPackage(pkg, fetcher), signal));
   const path = `/library/${pkg.path}`;
   const read = () => new File([text], pkg.name + ".rnl");
-  return [{ path, name: `${pkg.name} ${pkg.version}`, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];
+  return [{ path, name: `${pkg.name} ${pkg.version}`, url: pkg.url, read, source: { ...filesSource(new Map([[path, read]]), path), fromPool: true } }];
 }
 
 /** Ask for a URL, resolved against the page. */
@@ -533,21 +542,25 @@ async function openUrl() {
 const fileInput = embed ? null : input("file-input", false);
 const folderInput = embed ? null : input("folder-input", true);
 const includeInput = embed ? null : input("include-input", false);
+// a project's archive, and a manifest of links: one file each, opened only through their commands
+const projectInput = embed ? null : input("project-input", false, ".zip,application/zip");
+const manifestInput = embed ? null : input("manifest-input", false, ".json,application/json");
 let waiting = null; // resolves the chooser shown with the files chosen
 
-/** A hidden file input in the page, for files or, with `folder`, a folder. */
-function input(id, folder) {
+/** A hidden file input in the page, for files or, with `folder`, a folder; with `accept`, one file of those types. */
+function input(id, folder, accept = null) {
   const el = document.createElement("input");
   el.type = "file";
   el.id = id;
-  el.multiple = true;
+  el.multiple = !accept;
+  if (accept) el.accept = accept;
   el.webkitdirectory = folder;
   el.hidden = true;
   el.addEventListener("change", () => {
     const files = [...el.files];
     el.value = "";
     if (waiting) chosen(files);
-    else if (!modal()) {
+    else if (!modal() && !accept) {
       if ((folder || id === "include-input") && included) included(poolItems(files, folder));
       else if (opened) openFiles(files).then((source) => source && opened(source));
     }
@@ -686,7 +699,7 @@ async function about() {
     paragraphs: [
       name,
       `RNL core ${site.coreVersion || "?"} (${site.commit || "unknown"})`,
-      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("Download File downloads the file shown. Download Library exports all library files and built-in packages as a ZIP.")}`,
+      m`${m("Draws netlists with Rich Netlist (RNL) records. The text can be edited and its changes applied; ")}${m("Download File downloads the file shown. Download Project saves the library's files and how they are set up as a ZIP, which Open Project reads again.")}`,
       m`${m("The RNL core runs in this page as WebAssembly. Files opened from this computer are read here ")}${m("and sent nowhere; a URL's files are fetched from its server.")}`,
     ],
   });
@@ -978,12 +991,13 @@ export default {
     for (const f of files) download(f.name.split("/").pop(), f.text);
     return files.length === 1 ? `Downloaded ${files[0].name.split("/").pop()}.` : `Downloaded ${files.length} files.`;
   },
-  async downloadLibrary(files, preparing) {
+  /** Download Project: the archive `build` gives, where the browser lets the user choose, else as a download. */
+  async saveProject(name, build) {
     let handle;
     if (typeof window.showSaveFilePicker === "function") {
       try {
         // Request the destination while the menu click still has user activation.
-        handle = await window.showSaveFilePicker({ id: "rnl-library", suggestedName: "rnl-library.zip",
+        handle = await window.showSaveFilePicker({ id: "rnl-project", suggestedName: name,
           types: [{ description: "ZIP", accept: { "application/zip": [".zip"] } }] });
       } catch (error) {
         if (error.name === "AbortError") return false;
@@ -991,14 +1005,36 @@ export default {
         if (error.name !== "SecurityError" && error.name !== "NotAllowedError") throw error;
       }
     }
-    preparing();
-    const blob = await libraryZip(files);
+    const blob = await build();
     if (handle) {
       const writer = await handle.createWritable();
       try { await writer.write(blob); await writer.close(); }
       catch (error) { await writer.abort().catch(() => {}); throw error; }
-    } else download("rnl-library.zip", blob);
-    return true;
+    } else download(name, blob);
+    return name;
+  },
+  /** A manifest file the user chooses (File > Load Manifest): its name and text, or null. */
+  async pickManifest() {
+    const [file] = await chooseFiles(manifestInput);
+    return file ? { name: file.name, text: await file.text() } : null;
+  },
+  sourceFromManifestJson,
+  /** Download Manifest: the manifest of links, as a download. */
+  async saveManifest(name, text) {
+    download(name, new Blob([text], { type: "application/json" }));
+  },
+  /** A project's archive the user chooses: its name and bytes, or null. */
+  async pickProject() {
+    const [file] = await chooseFiles(projectInput);
+    return file ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : null;
+  },
+  /** A project's files go in the workspace under its archive's name, as a folder's do. */
+  projectRoot: (picked) => `/${picked.name.replace(/\.zip$/i, "").replace(/[\\/]/g, "_") || "project"}/`,
+  /** The entry of a project read (project.js), and its pool as Library files; each sees all its files, as a folder's do. */
+  projectSource(read) {
+    const all = new Map(Object.entries(read.bytes).map(([path, bytes]) => [path, () => new File([bytes], path.split("/").pop())]));
+    const items = read.pool.map((path) => ({ path, name: path.slice(1), read: all.get(path), source: { ...filesSource(all, path), fromPool: true } }));
+    return { source: filesSource(all, read.entry), items };
   },
   /** The browser asks before a page with changes not saved is left. */
   setDirty(dirty) {

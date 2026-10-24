@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
-import { checkManifest, ManifestError, MANIFEST_LIMITS, readManifest } from "../js/manifest.js";
+import { checkManifest, loadManifest, ManifestError, MANIFEST_LIMITS, readManifest, writeManifest } from "../js/manifest.js";
 
 const BASE = "https://raw.githubusercontent.com/someone/design/0123456789abcdef0123456789abcdef01234567/examples/amp/";
 const sha = (text) => createHash("sha256").update(text).digest("hex");
@@ -97,19 +97,85 @@ test("the checks refuse what a manifest must not hold", () => {
   const refused = (change, pattern) => assert.throws(() => checkManifest(manifest(change)), pattern);
   const file = (path, size = 1) => ({ path, sha256: "a".repeat(64), size });
   refused({ format: 2 }, /update the viewer/);
-  refused({ base: "https://example.test/design/" }, /raw\.githubusercontent\.com/);
+  refused({ base: "ftp://example.test/design/" }, /base must be the https address of a directory/);
+  refused({ base: "https://example.test/design" }, /base must be the https address of a directory/);
+  refused({ base: "http://example.test/design/" }, /base must be the https address of a directory/);
+  // http only on this computer, as a page in development has
+  assert.equal(checkManifest(manifest({ base: "http://localhost:8080/design/" })).base, "http://localhost:8080/design/");
+  assert.equal(checkManifest(manifest({ base: "http://127.0.0.1/design/" })).base, "http://127.0.0.1/design/");
   refused({ id: "../x" }, /id must be/);
-  refused({ entry: "../top.scs" }, /leaves the commit/);
+  refused({ entry: "../top.scs" }, /leaves the manifest.s files/);
   refused({ entry: "/top.scs" }, /not a relative path/);
   refused({ entry: "missing.scs" }, /not among the manifest's files/);
   refused({ files: [...manifest().files, manifest().files[0]] }, /twice/);
   refused({ files: Array.from({ length: MANIFEST_LIMITS.files + 1 }, (_, i) => file(`f${i}.sp`)) }, /more than 300/);
   refused({ files: [file("top.scs", MANIFEST_LIMITS.fileBytes + 1)] }, /bytes, more than/);
   refused({ files: Array.from({ length: 11 }, (_, i) => file(i ? `f${i}.sp` : "top.scs", MANIFEST_LIMITS.fileBytes)), pool: [] }, /files hold .* bytes, more than/);
-  refused({ files: [file("top.scs"), { ...file(".packages/x/1/x.rnl"), url: "https://example.test/x.rnl" }], pool: [] }, /not on raw GitHub/);
+  refused({ files: [file("top.scs"), { ...file(".packages/x/1/x.rnl"), url: "file:///x.rnl" }], pool: [] }, /not an https address/);
+  refused({ formats: { "missing.scs": "spectre" } }, /not among the manifest's files/);
+  refused({ formats: { "top.scs": 3 } }, /not a format's name/);
+  refused({ paths: [{ path: "../lib" }] }, /leaves the manifest's files/);
+  refused({ settings: { autoInclude: "yes" } }, /autoInclude/);
+  // without a base, every file needs a url, unless the manifest is in an archive
+  const unaddressed = manifest({ base: undefined });
+  assert.throws(() => checkManifest(unaddressed), /no url, and the manifest no base/);
+  assert.equal(checkManifest(unaddressed, { archive: true }).files.length, 5);
+  // an id is not needed: the entry's name is it then
+  assert.equal(checkManifest(manifest({ id: undefined, entry: "top.scs" })).id, "top");
   refused({ pool: ["lib/none.rnl"] }, /not among the manifest's files/);
-  refused({ pool: ["lib/../top.scs"] }, /leaves the commit/);
+  refused({ pool: ["lib/../top.scs"] }, /leaves the manifest.s files/);
   refused({ pool: ["lib/pdk.rnl", "lib/pdk.rnl"] }, /pool lists a file twice/);
   // no pool is an empty one
   assert.deepEqual(checkManifest(manifest({ pool: undefined })).pool, []);
+});
+
+test("a project's manifest reads its files from the archive, with their formats, paths and settings", async () => {
+  const archive = Object.fromEntries(Object.entries(FILES).map(([path, text]) => [path, new TextEncoder().encode(text)]));
+  archive[".packages/eda-style/1.0/eda-style.rnl"] = new TextEncoder().encode(PACKAGE);
+  const json = manifest({ base: undefined, id: undefined, formats: { "cells/amp.scs": "spectre" }, paths: [{ path: "models", subfolders: true }], settings: { autoInclude: false } });
+  const fetches = [];
+  const read = await loadManifest(json, { readFile: async (path) => archive[path] ?? null, root: "D:/work/amp/", fetch: async (url) => { fetches.push(url); } });
+  assert.equal(fetches.length, 0, "nothing is fetched, not even a file with a url");
+  assert.equal(read.entry, "D:/work/amp/top.scs");
+  assert.deepEqual(read.formats, { "D:/work/amp/cells/amp.scs": "spectre" });
+  assert.deepEqual(read.paths, [{ path: "D:/work/amp/models", subfolders: true }]);
+  assert.deepEqual(read.settings, { autoInclude: false });
+  assert.deepEqual(read.bytes["D:/work/amp/models/nmos.lib"], archive["models/nmos.lib"]);
+  delete archive["lib/pdk.rnl"];
+  await assert.rejects(loadManifest(json, { readFile: async (path) => archive[path] ?? null }), (error) => error.file === "lib/pdk.rnl" && /not in the archive/.test(error.message));
+});
+
+test("writeManifest gives a manifest that reads back to the same files", async () => {
+  const encode = (text) => new TextEncoder().encode(text);
+  const written = await writeManifest({ archive: true, entry: "top.scs", level: "(top)", pool: ["models/nmos.lib"], formats: { "top.scs": "spectre" },
+    settings: { autoInclude: true }, files: Object.entries(FILES).map(([path, text]) => ({ path, bytes: encode(text) })) });
+  assert.equal(written.format, 1);
+  assert.equal(written.files[0].sha256, sha(FILES["top.scs"]));
+  assert.equal("paths" in written, false);
+  const read = await loadManifest(JSON.parse(JSON.stringify(written)), { readFile: async (path) => encode(FILES[path]) });
+  assert.equal(read.files["/top/cells/amp.scs"], FILES["cells/amp.scs"]);
+  assert.deepEqual(read.formats, { "/top/top.scs": "spectre" });
+  // a manifest of links needs a url for every file
+  await assert.rejects(writeManifest({ entry: "top.scs", files: [{ path: "top.scs", bytes: encode("x") }] }), /no url/);
+  const links = await writeManifest({ entry: "top.scs", files: [{ path: "top.scs", bytes: encode("x"), url: "https://example.test/top.scs" }] });
+  assert.equal(links.files[0].url, "https://example.test/top.scs");
+});
+
+test("a file is decoded as client.js decodeText decodes it: UTF-8 without a BOM, else Latin-1", async () => {
+  const { decodeText } = await import("../js/client.js");
+  const samples = [
+    [0xef, 0xbb, 0xbf, 0x2a, 0x20, 0x41], // UTF-8 with a BOM
+    [0xef, 0xbb, 0xbf, 0xef, 0xbb, 0xbf, 0x41], // a BOM, then U+FEFF as text
+    [0xe7, 0x94, 0xb5, 0xe8, 0xb7, 0xaf], // UTF-8: 电路
+    [0x2a, 0x20, 0xb5, 0xe7, 0xc2, 0xb7], // GBK / GB18030: * 电路, read as Latin-1
+    [0x63, 0x61, 0x66, 0xe9], // Latin-1: café
+    [0x41, 0xc3, 0x28, 0x42], // a byte UTF-8 does not allow there
+    [0xff, 0xfe, 0x41, 0x00], // a UTF-16 BOM, which is not read as UTF-16
+    [],
+  ].map((b) => new Uint8Array(b));
+  for (const bytes of samples) {
+    const json = { format: 1, id: "d", entry: "a.sp", files: [{ path: "a.sp", sha256: sha(bytes), size: bytes.length }] };
+    const read = await loadManifest(json, { readFile: async () => bytes });
+    assert.equal(read.files["/d/a.sp"], decodeText(bytes));
+  }
 });

@@ -491,6 +491,37 @@ export async function startPool() {
 }
 
 export const poolSnapshot = () => items.filter((i) => !i.builtin).slice();
+/** The desktop's PATH directories in their order: each with whether its sub-folders are searched, and its files. */
+export const pathGroups = () => shell.pathPackages
+  ? paths().map((dir) => ({ dir, subfolders: deepPaths().has(dir), files: (scanned.get(dir)?.files || []).slice() }))
+  : [];
+
+/**
+ * Put a project's files in the Library in place of its Files (project.js), with the formats chosen
+ * for some of them and its settings, before its entry is opened: nothing is built here. False when
+ * the Library is busy.
+ */
+export async function setProjectFiles(added, formats = {}, settings = {}) {
+  if (changing) return false;
+  changing = true;
+  try {
+    items = items.filter((i) => i.builtin);
+    temporary = null;
+    external = null;
+    addItems(added);
+    // the project's own formats win over choices kept for these files, for this page: the settings keep the user's
+    for (const [path, name] of Object.entries(formats)) await chooseFormat(filePath(path), name, { session: true });
+    if (typeof settings.autoInclude === "boolean" && settings.autoInclude !== (load("auto-include", true) === true)) {
+      await save("auto-include", settings.autoInclude);
+      showAutoInclude();
+    }
+    await syncPool();
+    render();
+    return true;
+  } finally {
+    changing = false;
+  }
+}
 /** Export includes every built-in, even unused packages, and the clipboard's separate slot. */
 export const librarySnapshot = () => ({ items: items.slice(), temporary: temporary?.source || null });
 export async function restorePool(pool) {
