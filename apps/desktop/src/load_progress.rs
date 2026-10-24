@@ -24,6 +24,9 @@ impl<'a> LoadingProvider<'a> {
 }
 
 impl Provider for LoadingProvider<'_> {
+    fn path_key(&self, path: &str) -> String {
+        self.inner.path_key(path)
+    }
     fn auto_include(&self) -> Option<&dyn rnl_runtime::source::LibraryLookup> {
         self.inner.auto_include()
     }

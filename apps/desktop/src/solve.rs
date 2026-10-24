@@ -129,12 +129,17 @@ pub async fn solve_preview(
     text: Option<String>,
     settings: Option<Settings>,
     edits: Option<Edits>,
+    formats: Option<crate::formats::Formats>,
 ) -> Result<Solved, String> {
     let paths = preferences.paths()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
     let in_memory = path.is_none();
-    let options = SolveOptions { solver: settings.unwrap_or_default().solver()?, ..SolveOptions::default() };
+    let options = SolveOptions {
+        solver: settings.unwrap_or_default().solver()?,
+        formats: formats.unwrap_or_default(),
+        ..SolveOptions::default()
+    };
     let stop = Arc::new(AtomicBool::new(false));
     if let Some(before) = solves.running.lock().map_err(|e| e.to_string())?.replace(stop.clone()) {
         before.store(true, Ordering::Relaxed);

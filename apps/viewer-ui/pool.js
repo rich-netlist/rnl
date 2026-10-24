@@ -8,6 +8,8 @@ import { setPane, setSidebar } from "./panels.js";
 import { shell } from "./shell.js";
 import { navigate } from "./navigation.js";
 import { $, load, save, settingsPath } from "./util.js";
+import { chooseFormat, chosenFormat, formatInfo, formatList, setFormatList } from "./formats.js";
+import { sourcePath } from "./source-path.js";
 
 let items = [];
 let temporary = null;
@@ -19,6 +21,12 @@ const expanded = new Map([["files", true]]); // session only; never written to s
 let scanned = new Map();
 let libraryErrors = [];
 const refreshPaths = new Set();
+// the host files of the document shown, by Library path: the format each is read in and the one it
+// would be without the user's choice (SourceFile.format, default_format); its includes, after the first
+let shownFormats = new Map();
+let shownIncludes = [];
+// the default formats of Library files that the document shown does not read, as the shell detects them
+const detected = new Map();
 
 async function syncPool(reload = false) {
   const all = [...items];
@@ -69,8 +77,24 @@ function addItems(added, refresh = true) {
   }
 }
 
+/** Keep the formats of the host files of `doc`, by their Library paths, for the format chips. */
+function documentFormats(doc) {
+  if (!doc) return;
+  setFormatList(doc.formats);
+  shownFormats = new Map();
+  shownIncludes = [];
+  doc.files.forEach((file, index) => {
+    if (!file.format) return;
+    const path = filePath(sourcePath(doc, file).replace(/^\/?<pool>(?=\/)/, ""));
+    const entry = { path, name: file.name, format: file.format, auto: file.default_format };
+    shownFormats.set(path, entry);
+    if (index > 0) shownIncludes.push(entry);
+  });
+}
+
 /** Each independently opened entry, including cross-file navigation, joins Files here. */
 export async function sourceOpened(source, doc, add, applied = false) {
+  documentFormats(doc);
   const held = source.temporary || (source.text !== undefined && !source.path && !source.readonly);
   if (held) {
     if (add) temporary = { source, name: source.name || "Pasted text" };
@@ -182,6 +206,93 @@ function span(className, text) {
   return el;
 }
 
+const isPackage = (path) => /\.rnl$/i.test(path || "");
+
+/**
+ * The format chip of the file at `path`: the format it is read in, muted while it reads by default and
+ * solid when the user chose it, which opens the menu of the core's formats. A file that the document
+ * shown does not read shows its detected default, once the shell has detected it.
+ */
+function formatChip(path, name) {
+  const shown = shownFormats.get(path);
+  const chosen = chosenFormat(path);
+  const auto = shown ? shown.auto : detected.get(path);
+  const current = chosen && formatInfo(chosen) ? chosen : shown ? shown.format : auto;
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "format-chip";
+  chip.dataset.format = current || "";
+  chip.classList.toggle("chosen", !!chosen);
+  setText(chip, formatInfo(current)?.title || current || "…");
+  setAttr(chip, "aria-haspopup", "menu");
+  setAttr(chip, "title", chosen ? m("Parse format: chosen by you") : m("Parse format: detected automatically"));
+  setAttr(chip, "aria-label", m`Parse format of ${name}: ${formatInfo(current)?.title || current || ""}`);
+  chip.disabled = !formatList().length || (!shown && !auto);
+  chip.addEventListener("click", () => formatMenu(chip, path, chosen, auto));
+  if (!shown && !detected.has(path) && shell.detectFormat) {
+    detected.set(path, undefined);
+    shell.detectFormat(path).then((format) => { detected.set(path, format); render(); }, () => detected.delete(path));
+  }
+  return chip;
+}
+
+/** The menu of a format chip: Automatic, with the format it detects, then each format of the core. */
+function formatMenu(chip, path, chosen, auto) {
+  document.querySelector(".format-menu")?.remove();
+  const menu = document.createElement("div");
+  menu.className = "format-menu";
+  menu.setAttribute("role", "menu");
+  const close = () => { menu.remove(); document.removeEventListener("pointerdown", outside, true); };
+  const outside = (e) => { if (!menu.contains(e.target) && e.target !== chip) close(); };
+  const choose = (name) => {
+    close();
+    chip.focus();
+    if ((name || undefined) === chosen) return;
+    update(async () => { await chooseFormat(path, name); });
+  };
+  const entries = [[null, m`Automatic (${formatInfo(auto)?.title || auto || "?"})`], ...formatList().map((f) => [f.name, f.title])];
+  for (const [name, label] of entries) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "format-item";
+    item.setAttribute("role", "menuitemradio");
+    item.setAttribute("aria-checked", String((name || undefined) === chosen));
+    item.dataset.format = name || "";
+    // the check mark is drawn apart from the name, which screen readers read with aria-checked
+    const check = span("format-check", (name || undefined) === chosen ? "✓" : "");
+    check.setAttribute("aria-hidden", "true");
+    append(item, check, span("format-label", label));
+    item.addEventListener("click", () => choose(name));
+    append(menu, item);
+  }
+  menu.addEventListener("keydown", (e) => {
+    const items = [...menu.querySelectorAll(".format-item")];
+    const at = items.indexOf(document.activeElement);
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); chip.focus(); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault(); e.stopPropagation();
+      items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+    }
+  });
+  chip.after(menu);
+  const rect = chip.getBoundingClientRect();
+  menu.style.top = `${rect.bottom + 2}px`;
+  menu.style.left = `${Math.max(4, rect.right - menu.offsetWidth)}px`;
+  document.addEventListener("pointerdown", outside, true);
+  (menu.querySelector('[aria-checked="true"]') || menu.firstElementChild).focus();
+}
+
+/** A file that the netlist shown includes, under the row of the file opened, with its format chip. */
+function includeRow(entry) {
+  const row = document.createElement("li");
+  row.className = "pool-include"; // not a .pool-row: it opens nothing and counts as no Library file
+  row.dataset.path = entry.path;
+  const name = span("pool-include-name", entry.name);
+  setAttr(name, "title", entry.path);
+  append(row, name, formatChip(entry.path, entry.name));
+  return row;
+}
+
 function fileRow(item, kind) {
   const row = document.createElement(kind === "temporary" ? "div" : "li");
   row.className = "pool-row";
@@ -196,6 +307,7 @@ function fileRow(item, kind) {
   open.className = "pool-open";
   setAttr(open, "aria-label", m`Open ${item.name}`);
   append(row, open);
+  if ((kind === "files" || kind === "path") && !isPackage(item.path)) append(row, formatChip(item.path, item.name));
   if (kind === "builtin" || kind === "temporary") {
     append(row, span("pool-badge", kind === "builtin" ? m("read only") : m("temporary · not searched")));
   } else if (kind === "files") {
@@ -244,7 +356,10 @@ function group(key, title, files, kind, pathInfo) {
     }
   }
   list.hidden = !expanded.get(key);
-  for (const item of files) append(list, fileRow(item, kind));
+  for (const item of files) {
+    append(list, fileRow(item, kind));
+    if (kind === "files" && item.path === currentPath) for (const entry of shownIncludes) append(list, includeRow(entry));
+  }
   if (!files.length) {
     const empty = document.createElement("li");
     const error = pathInfo && scanned.get(title)?.error;
@@ -275,6 +390,8 @@ function render() {
 
 export async function startPool() {
   showAutoInclude();
+  // the core's formats, before the first build, which gives only the choices whose names it lists
+  try { setFormatList(await shell.formats?.()); } catch { /* the first Document lists them */ }
   $("auto-include").addEventListener("change", (e) => toggleAutoInclude(e.target.checked));
   if (shell.bundledFiles) {
     const bundled = await shell.bundledFiles();

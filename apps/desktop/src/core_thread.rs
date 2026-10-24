@@ -60,7 +60,7 @@ mod tests {
     fn build(core: &Core) -> Vec<String> {
         core.run(|drawn| {
             let files = MemoryProvider::new().with("/a.sp", TEXT);
-            let built = drawn.build("/a.sp", &files, false).unwrap();
+            let built = drawn.build("/a.sp", &files, &Default::default(), false).unwrap();
             let doc: serde_json::Value = serde_json::from_str(&built.json).unwrap();
             doc["levels"][0]["unplaced"]
                 .as_array()
