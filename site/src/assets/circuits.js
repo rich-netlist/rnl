@@ -50,6 +50,16 @@
     return String(Object.prototype.hasOwnProperty.call(texts, locale) ? texts[locale] : texts.en || '');
   }
 
+  /* The authors of an entry: a name, or a list of {name, url}; a link is kept only when it is an https address */
+  function authorsOf(entry) {
+    var a = entry.author;
+    if (typeof a === 'string') return a ? [{ name: a }] : [];
+    if (!Array.isArray(a)) return [];
+    return a.filter(function (x) { return x && typeof x.name === 'string' && x.name; }).map(function (x) {
+      return { name: x.name, url: typeof x.url === 'string' && /^https:\/\/[^\s"<>]+$/.test(x.url) ? x.url : null };
+    });
+  }
+
   function tagLabel(tag) { return Object.prototype.hasOwnProperty.call(TAGS, tag) ? TAGS[tag] : tag; }
   function tagsOf(entry) {
     return Array.isArray(entry.tags) ? entry.tags.filter(function (t) { return typeof t === 'string' && /^[a-z0-9][a-z0-9-]{0,31}$/.test(t); }) : [];
@@ -71,7 +81,7 @@
   }
 
   function haystack(entry) {
-    return [pick(entry.title), (entry.title || {}).en, pick(entry.description), (entry.description || {}).en, entry.author, entry.license, entry.source && entry.source.repo, tagsOf(entry).join(' ')].join(' ').toLowerCase();
+    return [pick(entry.title), (entry.title || {}).en, pick(entry.description), (entry.description || {}).en, authorsOf(entry).map(function (a) { return a.name; }).join(' '), entry.license, entry.source && entry.source.repo, tagsOf(entry).join(' ')].join(' ').toLowerCase();
   }
 
   function matches(entry) {
@@ -128,7 +138,18 @@
     if (href) { var a = el('a', '', title); a.href = href; a.target = '_blank'; a.rel = 'noopener'; h.appendChild(a); } else h.textContent = title;
     body.appendChild(h);
     body.appendChild(el('p', 'cg-desc', pick(entry.description)));
-    body.appendChild(el('p', 'cg-by', entry.author || ''));
+    var by = el('p', 'cg-by');
+    authorsOf(entry).forEach(function (author, i) {
+      if (i) by.appendChild(document.createTextNode(', '));
+      if (author.url) {
+        var who = el('a', '', author.name);
+        who.href = author.url;
+        who.target = '_blank';
+        who.rel = 'noopener noreferrer';
+        by.appendChild(who);
+      } else by.appendChild(document.createTextNode(author.name));
+    });
+    body.appendChild(by);
 
     var meta = el('p', 'cg-meta');
     if (entry.license) meta.appendChild(el('span', 'chip', entry.license));

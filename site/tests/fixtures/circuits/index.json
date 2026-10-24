@@ -43,7 +43,19 @@
       "description": {
         "en": "A hierarchical PLL in many files, with a long description that goes on for several lines so that the clamp on the card has something to cut: charge pump, loop filter, dividers, a voltage-controlled oscillator and the blocks around them."
       },
-      "author": "Grace",
+      "author": [
+        {
+          "name": "Grace",
+          "url": "https://example.com/grace"
+        },
+        {
+          "name": "Hopper"
+        },
+        {
+          "name": "Danger",
+          "url": "javascript:window.__xss=3"
+        }
+      ],
       "license": "MIT",
       "source": {
         "repo": "example/pll",

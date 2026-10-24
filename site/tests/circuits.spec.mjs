@@ -49,6 +49,12 @@ for (const language of ['en', 'zh']) {
     await expect(multi.locator('.cg-note')).toBeVisible();
     await expect(multi.locator('.cg-files')).toContainText('83');
     await expect(multi.locator('.cg-title')).toHaveText('Phase-locked loop');
+    // authors: a list in order, a name with an https link is a link that opens a new tab, any other link is dropped
+    await expect(multi.locator('.cg-by')).toHaveText('Grace, Hopper, Danger');
+    await expect(multi.locator('.cg-by a')).toHaveCount(1);
+    await expect(multi.locator('.cg-by a')).toHaveAttribute('href', 'https://example.com/grace');
+    await expect(multi.locator('.cg-by a')).toHaveAttribute('target', '_blank');
+    await expect(multi.locator('.cg-by a')).toHaveAttribute('rel', 'noopener noreferrer');
 
     // a missing thumbnail falls back to the name; text from the index is text, never markup
     const broken = page.locator('.cg-card[data-id="broken-thumb"]');
