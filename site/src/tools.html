@@ -88,7 +88,7 @@
         <p class="lead"><zh>RNL 工具链带两个查看器：网页版不用安装，打开就能用；桌面版给 Windows 10、11 和 Linux。它们读带 RNL 记录的网表，画成原理图，也能改网表的文本，应用后重画。网页版保存时下载文件；桌面版把文件写回原处，还能求解，结果作为预览显示，不写进文件。</zh>
           <en>The RNL toolkit comes with two viewers: the web viewer, with nothing to install, and the desktop viewer for Windows 10 and 11, Linux and macOS. They read netlists with RNL records and draw them as schematics, and they edit the netlist’s text and draw it again when you apply the changes. The web viewer saves by downloading the file; the desktop viewer writes it back where it was read, and it also solves, showing the result as a preview that writes nothing into the files.</en></p>
         <div class="cta">
-          <a class="btn btn-primary" href="../viewer/"><svg class="ico"><use href="#i-globe"/></svg><zh>打开网页版</zh><en>Open the web viewer</en></a>
+          <a class="btn btn-primary" href="../viewer/" target="_blank" rel="noopener"><svg class="ico"><use href="#i-globe"/></svg><zh>打开网页版</zh><en>Open the web viewer</en></a>
           <a class="btn" href="#desktop"><svg class="ico"><use href="#i-download"/></svg><zh>下载桌面版</zh><en>Download the desktop viewer</en></a>
         </div>
       </div>
@@ -199,7 +199,7 @@
         <en>The web viewer is a static web page, with the RNL core compiled to WebAssembly running inside it. It opens files or a whole folder from your computer, or a netlist on the web; files dropped on the page open too.</en></p>
     </header>
 
-    <a class="tour-cta tool-cta" href="../viewer/">
+    <a class="tour-cta tool-cta" href="../viewer/" target="_blank" rel="noopener">
       <span class="tour-cta-ico"><svg class="ico"><use href="#i-globe"/></svg></span>
       <span class="tour-cta-body"><b><zh>打开网页版查看器</zh><en>Open the web viewer</en></b><span class="mono">rich-netlist.github.io/rnl/viewer/</span></span>
       <svg class="ico tour-cta-arrow"><use href="#i-arrow"/></svg>
@@ -209,9 +209,9 @@
     <p class="sub-lead"><zh>例子来自 RNL 的一致性测试语料，和网页版一起发布。点一个，查看器就会打开它。</zh>
       <en>The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.</en></p>
     <ol class="tour-map samples">
-      <li><a href="../viewer/?url=samples/cases/04-hierarchy.sp"><span class="n">04</span><b><zh>层次</zh><en>Hierarchy</en></b><span><zh>两级缓冲器：每个子电路一张图，在上一层画成方块符号，另有一个 include 进来的文件。</zh><en>A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.</en></span></a></li>
-      <li><a href="../viewer/?url=samples/cases/15-chinese.sp"><span class="n">15</span><b><zh>中文</zh><en>Chinese</en></b><span><zh>五管运放，RNL 用中文代称包 rnl-zh 写成，图上的标注也是中文。</zh><en>A five-transistor OTA written with the Chinese alias package rnl-zh, with Chinese labels in the drawing.</en></span></a></li>
-      <li><a href="../viewer/?url=samples/cases/17-line-styles.sp"><span class="n">17</span><b><zh>线型</zh><en>Line styles</en></b><span><zh>每种线型画在每种图形上：虚线、点线、粗线和双线，画在矩形、圆、椭圆、圆弧和曲线上，也画在导线上。</zh><en>Every line style on every kind of shape: dashed, dotted, bold and double lines on rectangles, circles, ellipses, arcs and curves, and on a wire.</en></span></a></li>
+      <li><a href="../viewer/?url=samples/cases/04-hierarchy.sp" target="_blank" rel="noopener"><span class="n">04</span><b><zh>层次</zh><en>Hierarchy</en></b><span><zh>两级缓冲器：每个子电路一张图，在上一层画成方块符号，另有一个 include 进来的文件。</zh><en>A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.</en></span></a></li>
+      <li><a href="../viewer/?url=samples/cases/15-chinese.sp" target="_blank" rel="noopener"><span class="n">15</span><b><zh>中文</zh><en>Chinese</en></b><span><zh>五管运放，RNL 用中文代称包 rnl-zh 写成，图上的标注也是中文。</zh><en>A five-transistor OTA written with the Chinese alias package rnl-zh, with Chinese labels in the drawing.</en></span></a></li>
+      <li><a href="../viewer/?url=samples/cases/17-line-styles.sp" target="_blank" rel="noopener"><span class="n">17</span><b><zh>线型</zh><en>Line styles</en></b><span><zh>每种线型画在每种图形上：虚线、点线、粗线和双线，画在矩形、圆、椭圆、圆弧和曲线上，也画在导线上。</zh><en>Every line style on every kind of shape: dashed, dotted, bold and double lines on rectangles, circles, ellipses, arcs and curves, and on a wire.</en></span></a></li>
     </ol>
 
     <div class="facts">
@@ -234,11 +234,11 @@
 
     <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>网页版也能改文本、应用后重画，见<a href="#viewers">上面</a>。网页写不了它读进来的文件，所以 File › Save 是下载：下载当前显示的文件，换行照旧，编码是 UTF-8。求解只有桌面版有，网页版没有 Solve 菜单。</zh>
       <en>The web viewer edits the text and draws it again when the changes are applied, as <a href="#viewers">above</a>. A page cannot write the files it read, so File › Save is a download: of the file shown, with the line ends it had, in UTF-8. Only the desktop viewer solves; the web viewer has no Solve menu.</en></span></p>
-    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>网址里也可以带上要打开的网表，方便把链接发给别人：<a href="../viewer/?url=https://raw.githubusercontent.com/rich-netlist/rnl/main/tests/conformance/cases/04-hierarchy.sp"><code>viewer/?url=https://raw.githubusercontent.com/…/04-hierarchy.sp</code></a> 打开 GitHub 上的一份网表，连同它 include 的文件。</zh>
-      <en>The viewer’s address can name the netlist to open, so a link can be shared: <a href="../viewer/?url=https://raw.githubusercontent.com/rich-netlist/rnl/main/tests/conformance/cases/04-hierarchy.sp"><code>viewer/?url=https://raw.githubusercontent.com/…/04-hierarchy.sp</code></a> opens a netlist on GitHub with the file it includes.</en></span></p>
+    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>网址里也可以带上要打开的网表，方便把链接发给别人：<a href="../viewer/?url=https://raw.githubusercontent.com/rich-netlist/rnl/main/tests/conformance/cases/04-hierarchy.sp" target="_blank" rel="noopener"><code>viewer/?url=https://raw.githubusercontent.com/…/04-hierarchy.sp</code></a> 打开 GitHub 上的一份网表，连同它 include 的文件。</zh>
+      <en>The viewer’s address can name the netlist to open, so a link can be shared: <a href="../viewer/?url=https://raw.githubusercontent.com/rich-netlist/rnl/main/tests/conformance/cases/04-hierarchy.sp" target="_blank" rel="noopener"><code>viewer/?url=https://raw.githubusercontent.com/…/04-hierarchy.sp</code></a> opens a netlist on GitHub with the file it includes.</en></span></p>
     <h3 class="sub-h" id="embedding"><zh>嵌入其他网页</zh><en>Embedding in another page</en></h3>
-    <p><zh>用 <code>viewer/?embed=1</code> 在 iframe 中显示只有画布的交互查看器，通过 postMessage 切换网表、层级和背景，无需重新加载。见 <a href="https://github.com/rich-netlist/rnl/blob/main/apps/web/README.md#embedding">嵌入接口与示例</a>，或打开<a href="../viewer/embed-demo.html">演示页</a>。</zh>
-      <en>Use <code>viewer/?embed=1</code> in an iframe for a canvas-only interactive viewer. Switch netlists, levels and backgrounds through postMessage without reloading. See the <a href="https://github.com/rich-netlist/rnl/blob/main/apps/web/README.md#embedding">embedding API and example</a>, or try the <a href="../viewer/embed-demo.html">demo</a>.</en></p>
+    <p><zh>用 <code>viewer/?embed=1</code> 在 iframe 中显示只有画布的交互查看器，通过 postMessage 切换网表、层级和背景，无需重新加载。见 <a href="https://github.com/rich-netlist/rnl/blob/main/apps/web/README.md#embedding">嵌入接口与示例</a>，或打开<a href="../viewer/embed-demo.html" target="_blank" rel="noopener">演示页</a>。</zh>
+      <en>Use <code>viewer/?embed=1</code> in an iframe for a canvas-only interactive viewer. Switch netlists, levels and backgrounds through postMessage without reloading. See the <a href="https://github.com/rich-netlist/rnl/blob/main/apps/web/README.md#embedding">embedding API and example</a>, or try the <a href="../viewer/embed-demo.html" target="_blank" rel="noopener">demo</a>.</en></p>
     <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>这里的网页版按 main 分支的最新提交构建，Help › About 显示它的版本和提交；Help › Desktop Viewer 回到这一页。</zh>
       <en>The web viewer here is built from the newest commit of the main branch; Help › About names its version and commit, and Help › Desktop Viewer leads back to this page.</en></span></p>
   </div>

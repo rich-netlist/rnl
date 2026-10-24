@@ -106,7 +106,7 @@
     var article = el('article', 'cg-card');
     article.setAttribute('data-id', entry.id);
     var fig = el(href ? 'a' : 'div', 'cg-fig');
-    if (href) { fig.href = href; fig.setAttribute('aria-label', title); }
+    if (href) { fig.href = href; fig.target = '_blank'; fig.rel = 'noopener'; fig.setAttribute('aria-label', title); }
     var src = entry.thumb && thumbUrl(entry.thumb.path);
     if (src) {
       var img = el('img');
@@ -125,7 +125,7 @@
 
     var body = el('div', 'cg-body');
     var h = el('h3', 'cg-title');
-    if (href) { var a = el('a', '', title); a.href = href; h.appendChild(a); } else h.textContent = title;
+    if (href) { var a = el('a', '', title); a.href = href; a.target = '_blank'; a.rel = 'noopener'; h.appendChild(a); } else h.textContent = title;
     body.appendChild(h);
     body.appendChild(el('p', 'cg-desc', pick(entry.description)));
     body.appendChild(el('p', 'cg-by', entry.author || ''));
