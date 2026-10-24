@@ -3,15 +3,20 @@ import { append, locale, m, setAttr, setText } from "./i18n.js";
 // that says where they come from, with what the manifest gives of its title, author and source, and
 // the level the manifest names.
 import { notice } from "./drawing.js";
-import { currentSource } from "./open.js";
 import { doc } from "./state.js";
 import { enterRoot } from "./subcircuits.js";
 import { $ } from "./util.js";
 
-/** Show the bar of `source` when it was opened by a manifest that gives a title, an author or a source; else hide it. */
-export function showManifestBar(source) {
+// the manifest whose bar is shown, for a change of language
+let shownExternal = null;
+
+/**
+ * Show the bar of `external`, the manifest the file shown belongs to (pool.js), when it gives a
+ * title, an author or a source; with null, or a manifest that gives none of them, hide it.
+ */
+export function showManifestBar(external) {
   const bar = $("manifest-bar");
-  const external = source?.external;
+  shownExternal = external;
   const { repo, commit, url } = external?.source || {};
   const title = external && ((locale() === "zh-CN" && external.title?.zh) || external.title?.en);
   const shown = !!(title || external?.author || (repo && commit));
@@ -61,6 +66,5 @@ export function showManifestLevel(source) {
 }
 
 window.addEventListener("language-changed", () => {
-  const bar = document.getElementById("manifest-bar");
-  if (bar && !bar.hidden) showManifestBar(currentSource());
+  if (document.getElementById("manifest-bar")) showManifestBar(shownExternal);
 });

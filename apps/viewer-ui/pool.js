@@ -97,8 +97,10 @@ function documentFormats(doc) {
 
 /** Each independently opened entry, including cross-file navigation, joins Files here. */
 export async function sourceOpened(source, doc, add, applied = false) {
-  showManifestBar(source);
   if (source?.external && source.external !== external) { external = source.external; expanded.set("external", true); }
+  // the bar stays while the file shown is one of the manifest's, whichever opened it, and goes with another file
+  const shown = source?.path || doc?.path;
+  showManifestBar(source?.external || (external && shown && (shown in external.files || external.pool.includes(shown)) ? external : null));
   documentFormats(doc);
   const held = source.temporary || (source.text !== undefined && !source.path && !source.readonly);
   if (held) {

@@ -1438,3 +1438,25 @@ test("an embedded canvas opens the files of a manifest by ?manifest=", async ({ 
   await expect(page.locator("#manifest-bar")).toBeHidden();
   await expect.poll(() => page.evaluate(() => window.viewer?.doc?.levels[window.viewer.level]?.title)).toBe("amp");
 });
+
+test("the bar stays while a file of the manifest is shown, goes with another file, and comes back with one of its files", async ({ page }) => {
+  await manifestRoutes(page, demoManifest({ level: "(top)" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  const bar = page.locator("#manifest-bar");
+  await expect(bar).toBeVisible();
+  await page.locator("#tab-files").click();
+  const group = page.locator('.lib-group[data-group="external"]');
+  // another file of the manifest, opened from the Library
+  await opened(page, () => group.locator(".pool-open", { hasText: /^cells\/amp\.sp$/ }).click());
+  expect(await page.evaluate(() => window.viewer.doc.path)).toBe("/demo/cells/amp.sp");
+  await expect(bar).toBeVisible();
+  await expect(bar.locator(".manifest-title")).toHaveText("Manifest demo");
+  // a file of the computer has nothing to do with the manifest
+  await opened(page, () => page.locator("#file-input").setInputFiles({ name: "local.sp", mimeType: "text/plain", buffer: Buffer.from("* local\nR1 a 0 1k\n.end\n") }));
+  await expect(bar).toBeHidden();
+  // and the manifest's entry again
+  await opened(page, () => group.locator(".pool-open", { hasText: /^top\.sp$/ }).click());
+  await expect(bar).toBeVisible();
+  await expect(bar.locator(".manifest-source")).toHaveText("Source: someone/design@0123456");
+});
