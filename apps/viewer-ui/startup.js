@@ -16,6 +16,12 @@ function rememberPanelKey(event) {
   event.preventDefault();
 }
 document.addEventListener("keydown", rememberPanelKey);
+// Those that the inline script of index.html kept before this module ran, earliest first.
+document.removeEventListener("keydown", window.rnlEarlyKeyListener);
+for (const key of window.rnlEarlyKeys || []) {
+  panelKeys.delete(key);
+  panelKeys.add(key);
+}
 
 // These stylesheets do not block the HTML startup screen's first paint. Activate each as it
 // arrives, and initialize layout only after the main stylesheet has loaded. Fonts are optional.
@@ -56,8 +62,11 @@ function revealNativePage() {
 // painted, so it can show the shared file-loading stages while the main graph initializes.
 if (window.__TAURI__) void named.then(revealNativePage).catch(() => {});
 
-/** Reveal the viewer after startup, including when startup reports an error. */
-export async function finishStartup(runPanelShortcut) {
+/**
+ * Reveal the viewer once its panels, menus and keys work, before the core and the first document,
+ * and run the last panel key pressed until then. Calling it again does nothing more.
+ */
+export async function revealViewer(runPanelShortcut) {
   document.getElementById("startup")?.remove();
   document.body.classList.remove("starting");
   document.removeEventListener("keydown", rememberPanelKey);
@@ -67,6 +76,11 @@ export async function finishStartup(runPanelShortcut) {
   // the native handoff IPC is pending.
   if (keys.length) runPanelShortcut?.(keys);
   await revealNativePage();
+}
+
+/** Finish startup, once the first document has been asked for, including when startup reports an error. */
+export async function finishStartup(runPanelShortcut) {
+  await revealViewer(runPanelShortcut);
   // The native surface is handed over much earlier, while this module graph is still loading.
   // Finder events must stay queued until the listener and initial document have both started.
   if (window.__TAURI__) await window.__TAURI__.core.invoke("open_events_ready");

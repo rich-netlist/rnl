@@ -22,7 +22,7 @@ import {
 } from "./panels.js";
 import { loadShell } from "./shell.js";
 import { startSolvePanel } from "./solve.js";
-import { finishStartup, stylesReady } from "./startup.js";
+import { finishStartup, revealViewer, stylesReady } from "./startup.js";
 import { current, doc, path, selected } from "./state.js";
 import { renderUnplaced } from "./unplaced.js";
 import { setSemanticsOnly, setRnlOnly } from "./text.js";
@@ -72,6 +72,7 @@ async function start() {
   renderUnplaced();
 
   await startCommands();
+  // the Library's files, without waiting for the core to index them (each build waits for that)
   await startPool();
   startPreload();
   if (!shell.nativeMenu) showMenuBar(true);
@@ -82,6 +83,10 @@ async function start() {
     await startFullViewerApi();
     return;
   }
+  // The panels, the menus, their keys and the ways to open a file work from here. The core
+  // (WebAssembly on the web, slow where a browser runs it without JIT) and the first document
+  // follow, the document with its own loading stages, so a panel key never waits for them.
+  void revealViewer(runStartupShortcuts);
   const session = await shell.initialSession?.();
   if (session) await restoreSession(session);
   else await openSource(await shell.initial(), false);

@@ -556,7 +556,7 @@ mod tests {
                     grid("Show &Grid\tG"),
                     check("toggle-hover-names", "Show &Names on Hover", None),
                     check("toggle-usages", "Show &Usages\tCtrl+R", None),
-                    check("toggle-currents", "Show Current &Directions", None),
+                    check("toggle-currents", "Show Current &Directions\tShift+R", None),
                     languages(),
                     Shown::Separator,
                     panels(true),
