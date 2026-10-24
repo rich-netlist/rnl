@@ -1785,7 +1785,7 @@ impl Interp<'_> {
         let level = self.units[u].level.filter(|_| self.units[u].kind == super::unit::UnitKind::Level);
         match level {
             Some(lv) if ctx.frame.is_none() && self.doc.levels[lv].kind == crate::host::LevelKind::Subckt => {
-                let name = self.doc.key(&self.doc.levels[lv].name);
+                let name = self.doc.level_key(lv);
                 let (rec, k) = match &ctx.member_key {
                     MemberKey::M { rec, k, .. } => (*rec as i64, *k as i64),
                     _ => (0, 0),

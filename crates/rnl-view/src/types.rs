@@ -4,7 +4,7 @@
 //! types give; run it with `RNL_BLESS=1` to write the files after a change that is meant.
 
 use crate::{CurrentArrow, UsageFrame};
-use crate::{InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
+use crate::{FormatInfo, InspectedLabel, InspectedPin, InspectedSymbol, SourceInclude, Usage, UsageRole};
 use std::path::Path;
 
 use ts_rs::{Config, TS};
@@ -130,6 +130,7 @@ fn all() -> Vec<(String, String)> {
         one::<UnplacedDrawing>(&cfg),
         one::<SourceFile>(&cfg),
         one::<SourceInclude>(&cfg),
+        one::<FormatInfo>(&cfg),
         one::<Object>(&cfg),
         one::<Span>(&cfg),
         one::<Diagnostic>(&cfg),

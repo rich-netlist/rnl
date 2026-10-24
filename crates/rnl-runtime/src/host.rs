@@ -3,6 +3,11 @@
 //! The model is dialect-neutral: adapters for SPICE, Spectre or another host fill it in, and the
 //! runtime never parses netlist syntax itself. Levels follow the text: the main file level is the
 //! top circuit, every included file has a file level, every subcircuit definition is a level.
+//!
+//! Each file is read by the adapter of its format ([`format`]), so the files of one document can
+//! be of several dialects; names compare by the rules of the file they are written in.
+
+pub mod format;
 
 use std::collections::{HashMap, HashSet};
 
@@ -206,11 +211,25 @@ pub struct Dialect {
 pub struct HostDocument {
     /// levels[0] is the main file level.
     pub levels: Vec<Level>,
+    /// The dialect of the main file's format.
     pub dialect: Dialect,
-    /// Subcircuit key -> level.
+    /// The dialect of each file read, by its name in the document, when its format is not that of
+    /// the main file: the names it writes compare by its rules ([`HostDocument::rules`]).
+    pub file_dialects: HashMap<String, Dialect>,
+    /// The format each file was read with, by its name in the document, in the order read
+    /// ([`format::Reading`]); none in a document that no reading made.
+    pub file_formats: Vec<FileFormat>,
+    /// Subcircuit key -> level, for the subcircuits written in files of the main file's dialect.
     pub subckts: HashMap<String, LevelId>,
-    /// Global net keys (`.global`, Spectre `global`), with `0` implied.
+    /// The subcircuits written in files of another dialect, in the order read;
+    /// [`HostDocument::add_subckt`] keeps the last of each name as their dialect compares names.
+    pub foreign_subckts: Vec<LevelId>,
+    /// Global net keys (`.global`, Spectre `global`), with `0` implied, of the files of the main
+    /// file's dialect.
     pub globals: HashSet<String>,
+    /// The global nets declared in files of another dialect: the key by that dialect, and whether
+    /// it compares names by case.
+    pub foreign_globals: Vec<(String, bool)>,
     /// File name -> text, for display and writeback.
     pub sources: Vec<(String, String)>,
     /// The regions written to be encrypted, SPICE's `.prot … .unprot` and Spectre's `protect …
@@ -241,8 +260,12 @@ impl HostDocument {
         HostDocument {
             levels: vec![main],
             dialect,
+            file_dialects: HashMap::new(),
+            file_formats: Vec::new(),
             subckts: HashMap::new(),
+            foreign_subckts: Vec::new(),
             globals: HashSet::new(),
+            foreign_globals: Vec::new(),
             sources: Vec::new(),
             protected: Vec::new(),
             excluded: Vec::new(),
@@ -288,10 +311,142 @@ impl HostDocument {
     }
 
     /// Whether the line `line` of `file`, or what is written in before that line, is read in SPICE
-    /// mode, where only `*` is a comment (2.2): in a document of Spectre's dialect, in the regions
-    /// of [`HostDocument::spice_mode`]; in a document of another dialect, everywhere.
+    /// mode, where only `*` is a comment (2.2): in a file of Spectre's dialect, in the regions of
+    /// [`HostDocument::spice_mode`]; in a file of another dialect, everywhere.
     pub fn in_spice_mode(&self, file: &str, line: u32) -> bool {
-        self.dialect.name != "spectre" || self.spice_mode.iter().any(|(f, a, b)| f == file && *a < line && line <= *b)
+        self.rules(file).name != "spectre"
+            || self.spice_mode.iter().any(|(f, a, b)| f == file && *a < line && line <= *b)
+    }
+
+    /// The dialect of the file `file`, by its name in the document: that of its format, the main
+    /// file's unless the file is of another.
+    pub fn rules(&self, file: &str) -> &Dialect {
+        self.file_dialects.get(file).unwrap_or(&self.dialect)
+    }
+
+    /// The dialect of the file a level is written in, whose rules its names compare by: a
+    /// subcircuit's nets compare by the rules of the file that writes its `.subckt`, the main file
+    /// level's by the main file's.
+    pub fn level_rules(&self, level: LevelId) -> &Dialect {
+        self.rules(&self.levels[level].file)
+    }
+
+    /// Whether the files of the document are of more than one dialect.
+    pub fn mixed(&self) -> bool {
+        self.file_dialects.values().any(|d| d.name != self.dialect.name)
+    }
+
+    /// The format a file was read with, by its name in the document.
+    pub fn file_format(&self, file: &str) -> Option<&FileFormat> {
+        self.file_formats.iter().find(|f| f.file == file)
+    }
+
+    /// The key a name is compared by in the level `level`, by the rules of its file.
+    pub fn key_in(&self, level: LevelId, name: &str) -> String {
+        dialect_key(self.level_rules(level), name)
+    }
+
+    /// The key of a net of the level `level` written as `name` in the file `written`: compared by
+    /// the rules of the level's file, and merged into `0` when it is a ground alias by the rules of
+    /// the file that writes it, so that `gnd` is ground in a statement of a SPICE file only (6.3).
+    pub fn net_key_in(&self, level: LevelId, name: &str, written: &str) -> String {
+        let at = self.rules(written);
+        if at.ground_aliases.iter().any(|g| dialect_key(at, g) == dialect_key(at, name)) {
+            return "0".to_string();
+        }
+        self.key_in(level, name)
+    }
+
+    /// Whether the net of the level `level` whose key is `key` is global: `0`, or a global net
+    /// declared in a file of the main file's dialect or of another, compared without case when
+    /// either the level's dialect or the declaring one compares names so.
+    pub fn is_global(&self, level: LevelId, key: &str) -> bool {
+        if key == "0" || self.globals.contains(key) {
+            return true;
+        }
+        let cs = self.level_rules(level).case_sensitive;
+        let main = self.dialect.case_sensitive;
+        (cs != main && self.globals.iter().any(|g| same(g, key, cs && main)))
+            || self.foreign_globals.iter().any(|(g, gcs)| same(g, key, cs && *gcs))
+    }
+
+    /// Declare the global net `name`, written in the file `file` (`.global`, Spectre `global`).
+    pub fn add_global(&mut self, name: &str, file: &str) {
+        let rules = self.rules(file);
+        if rules.name == self.dialect.name {
+            let k = self.net_key(name);
+            self.globals.insert(k);
+        } else {
+            let entry = (dialect_key(rules, name), rules.case_sensitive);
+            self.foreign_globals.push(entry);
+        }
+    }
+
+    /// Register the subcircuit `level` by its name, as the dialect of its file compares names: a
+    /// later definition of the same name in a file of that dialect stands for it.
+    pub fn add_subckt(&mut self, level: LevelId) {
+        let lv = &self.levels[level];
+        let rules = self.rules(&lv.file);
+        if rules.name == self.dialect.name {
+            let key = self.key(&lv.name);
+            self.subckts.insert(key, level);
+            return;
+        }
+        let (name, dialect, cs) = (lv.name.clone(), rules.name.clone(), rules.case_sensitive);
+        let levels = &self.levels;
+        let rules_of = |l: LevelId| self.file_dialects.get(&levels[l].file).map_or(&self.dialect.name, |d| &d.name);
+        let kept: Vec<LevelId> = self
+            .foreign_subckts
+            .iter()
+            .copied()
+            .filter(|&other| !(*rules_of(other) == dialect && same(&levels[other].name, &name, cs)))
+            .collect();
+        self.foreign_subckts = kept;
+        self.foreign_subckts.push(level);
+    }
+
+    /// The subcircuits that a reference to `name`, from a file whose names compare by case or not,
+    /// finds: those of the same name, compared by case only when both the reference and the
+    /// definition compare names so. When one of them is spelt as the reference writes it, that one
+    /// alone; else all, so that more than one is a name that is not unique.
+    pub fn subckt_candidates(&self, name: &str, case_sensitive: bool) -> Vec<LevelId> {
+        if self.foreign_subckts.is_empty() && case_sensitive == self.dialect.case_sensitive {
+            return self.subckts.get(&self.key(name)).copied().into_iter().collect();
+        }
+        let mut found: Vec<LevelId> = if case_sensitive == self.dialect.case_sensitive {
+            self.subckts.get(&self.key(name)).copied().into_iter().collect()
+        } else {
+            let mut v: Vec<LevelId> =
+                self.subckts.values().copied().filter(|&l| same(&self.levels[l].name, name, false)).collect();
+            v.sort_unstable();
+            v
+        };
+        for &l in &self.foreign_subckts {
+            if same(&self.levels[l].name, name, case_sensitive && self.level_rules(l).case_sensitive) {
+                found.push(l);
+            }
+        }
+        let exact: Vec<LevelId> = found.iter().copied().filter(|&l| self.levels[l].name == name).collect();
+        if exact.len() == 1 {
+            exact
+        } else {
+            found
+        }
+    }
+
+    /// The subcircuit that a reference to `name`, from a file whose names compare by case or not,
+    /// names: the one of [`HostDocument::subckt_candidates`]; None when there is none, or more.
+    pub fn subckt_for(&self, name: &str, case_sensitive: bool) -> Option<LevelId> {
+        match self.subckt_candidates(name, case_sensitive).as_slice() {
+            [one] => Some(*one),
+            _ => None,
+        }
+    }
+
+    /// The subcircuit an instance names, by the rules of the file it is written in.
+    pub fn subckt_of(&self, inst: &Instance) -> Option<LevelId> {
+        let name = inst.model.as_deref()?;
+        self.subckt_for(name, self.rules(&inst.file).case_sensitive)
     }
 
     /// The key a name is compared by in this dialect.
@@ -313,8 +468,28 @@ impl HostDocument {
         }
     }
 
+    /// The key of a level's name, by the rules of the file it is written in: that of
+    /// [`HostDocument::key`] in a file of the main file's dialect, and qualified by the dialect in a
+    /// file of another, so that two subcircuits that one dialect tells apart keep two keys.
+    pub fn level_key(&self, level: LevelId) -> String {
+        let rules = self.level_rules(level);
+        let key = dialect_key(rules, &self.levels[level].name);
+        if rules.name == self.dialect.name {
+            self.key(&self.levels[level].name)
+        } else {
+            format!("{}\u{0}{key}", rules.name)
+        }
+    }
+
+    /// Whether `name`, written in RNL, names the level `level`: compared by the rules of the file
+    /// the level is written in, as a reference to an object is (3.6).
+    pub fn names_level(&self, level: LevelId, name: &str) -> bool {
+        same(&self.levels[level].name, name, self.level_rules(level).case_sensitive)
+    }
+
+    /// The subcircuit named `name`, compared as the main file's dialect compares names.
     pub fn subckt(&self, name: &str) -> Option<LevelId> {
-        self.subckts.get(&self.key(name)).copied()
+        self.subckt_for(name, self.dialect.case_sensitive)
     }
 
     /// The file level whose text holds `level`: `level` itself when it is a file level, else the
@@ -380,6 +555,31 @@ impl HostDocument {
         }
         id
     }
+}
+
+/// The format a file was read with ([`HostDocument::file_formats`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FileFormat {
+    /// The file's name in the document.
+    pub file: String,
+    /// The name of the format that read it ([`format::Format::name`]).
+    pub format: String,
+    /// The format it is read with when none is set for it.
+    pub default: String,
+}
+
+/// The key a name is compared by in a dialect: as written, or in lower case.
+pub fn dialect_key(dialect: &Dialect, name: &str) -> String {
+    if dialect.case_sensitive {
+        name.to_string()
+    } else {
+        name.to_lowercase()
+    }
+}
+
+/// Whether two names are the same: as written, or in lower case.
+fn same(a: &str, b: &str, case_sensitive: bool) -> bool {
+    a == b || (!case_sensitive && a.to_lowercase() == b.to_lowercase())
 }
 
 /// The last component of a `/`-separated path.

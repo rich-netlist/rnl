@@ -1,5 +1,6 @@
 //! `rnl`: check, draw and solve Rich Netlist documents.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -23,10 +24,11 @@ const USAGE: &str = "usage:
   rnl preview FILE [options]        print the solve as the desktop viewer previews it, as JSON; writes nothing
   rnl snapshot FILE [options]       print the editor interface's snapshot, as JSON
   rnl catalog [options]             print the symbols, definitions and sets of the packages, as JSON
+  rnl formats                       print the formats a file can be read with, as JSON
   rnl strip-generated FILE -o OUT [options] write FILE without its type=\"generated\" records
   rnl write REQUEST.json -o OUT     write an edit transaction's ops into its netlist
 
-FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl); catalog takes none.
+FILE is a SPICE netlist, a Spectre netlist (.scs) or a package file (.rnl); catalog and formats take none.
 options:
   --path DIR          search packages and bare include filenames here; repeatable
   --package-dir DIR   look for packages in DIR as well (16.2); repeatable
@@ -36,7 +38,10 @@ options:
                       record still comes first (16.3), and V not found is an error only for the
                       files that do not pin one. rnl solve does not take it
   --no-generated      read the netlist without its type=\"generated\" records, as a solver does (2.8)
-  --dialect NAME      spice or spectre, instead of guessing from the file
+  --dialect NAME      the format of FILE, spice or spectre, instead of guessing from it
+  --format PATH=NAME  read the file PATH with the format NAME, spice or spectre; repeatable. PATH is
+                      relative to the current directory or absolute, as FILE may be; one that the
+                      netlist does not read is warned of. The files given none are read as FILE is
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -95,6 +100,8 @@ struct Args {
     std_version: Option<String>,
     generated: bool,
     dialect: Option<String>,
+    /// `--format`: the formats set for files by path.
+    formats: BTreeMap<String, String>,
     svg: bool,
     primitives: bool,
     status: bool,
@@ -127,6 +134,7 @@ fn parse_args() -> Result<Args, String> {
     let mut std_version = None;
     let mut generated = true;
     let mut dialect = None;
+    let mut formats = BTreeMap::new();
     let (mut svg, mut primitives, mut status) = (true, false, false);
     let mut level = None;
     let mut previous = false;
@@ -175,6 +183,12 @@ fn parse_args() -> Result<Args, String> {
             "--std-version" => std_version = Some(it.next().ok_or("--std-version needs a version, such as 0.2")?),
             "--no-generated" => generated = false,
             "--dialect" => dialect = Some(it.next().ok_or("--dialect needs spice or spectre")?),
+            "--format" => {
+                let set = it.next().ok_or("--format needs PATH=NAME, such as models.inc=spectre")?;
+                let (path, name) =
+                    set.rsplit_once('=').ok_or("--format needs PATH=NAME, such as models.inc=spectre")?;
+                formats.insert(path.to_string(), name.to_string());
+            }
             "--no-svg" => svg = false,
             "--primitives" => primitives = true,
             "--status" => status = true,
@@ -206,10 +220,13 @@ fn parse_args() -> Result<Args, String> {
     }
     // the catalog reads the package directories and the bundled packages, not a file
     let file = match (command.as_str(), file) {
-        ("catalog", None) => PathBuf::new(),
-        ("catalog", Some(f)) => return Err(format!("rnl catalog takes no FILE, not {}\n{USAGE}", f.display())),
+        ("catalog" | "formats", None) => PathBuf::new(),
+        (c @ ("catalog" | "formats"), Some(f)) => {
+            return Err(format!("rnl {c} takes no FILE, not {}\n{USAGE}", f.display()))
+        }
         (_, file) => file.ok_or(USAGE)?,
     };
+    let formats = formats.into_iter().map(|(path, name)| (format_path(&path, &file), name)).collect();
     Ok(Args {
         overlays,
         command,
@@ -221,6 +238,7 @@ fn parse_args() -> Result<Args, String> {
         std_version,
         generated,
         dialect,
+        formats,
         svg,
         primitives,
         status,
@@ -266,11 +284,68 @@ fn options(args: &Args) -> Options {
 }
 
 fn interpret(args: &Args, provider: &FsProvider) -> Result<Interpretation, String> {
-    rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), provider, &options(args))
+    rnl_cli::interpret_file_with(&args.file, args.dialect.as_deref(), &args.formats, provider, &options(args))
+}
+
+/// The path of a `--format` as the reading names the files of `file`: an include resolves against
+/// the directory of `file`, relative when `file` is and absolute when it is, so the path is made
+/// absolute for an absolute `file`, and relative to the current directory, when it is in it, for a
+/// relative one.
+fn format_path(path: &str, file: &std::path::Path) -> String {
+    let p = PathBuf::from(path);
+    let p = if file.is_absolute() {
+        std::path::absolute(&p).unwrap_or(p)
+    } else {
+        let cwd = std::env::current_dir().ok();
+        match cwd.as_deref().and_then(|d| p.strip_prefix(d).ok()) {
+            Some(rest) => rest.to_path_buf(),
+            None => p,
+        }
+    };
+    rnl_cli::path_str(&p)
+}
+
+/// Check the `--format`s before a command reads FILE: an unknown format name is an error, a package
+/// file (`.rnl`) included, and each path that FILE's netlist does not read is warned of, as it
+/// sets nothing.
+fn check_formats(args: &Args, provider: &FsProvider) -> Result<(), String> {
+    if args.formats.is_empty() || matches!(args.command.as_str(), "catalog" | "formats" | "write") {
+        return Ok(());
+    }
+    let names: Vec<String> = rnl_view::formats().into_iter().map(|f| f.name).collect();
+    if let Some((path, name)) = args.formats.iter().find(|(_, name)| !names.contains(name)) {
+        return Err(format!("unknown format \"{name}\" for {path}; the formats are {}", names.join(", ")));
+    }
+    let package = args.file.extension().is_some_and(|e| e.eq_ignore_ascii_case("rnl"));
+    let read: Vec<String> = if package {
+        Vec::new()
+    } else {
+        let mut sink = Sink::new();
+        let doc = rnl_view::read_host_with(
+            &args.file.to_string_lossy(),
+            args.dialect.as_deref(),
+            &args.formats,
+            provider,
+            &mut sink,
+        )?;
+        doc.levels
+            .iter()
+            .filter(|l| l.kind == rnl_runtime::host::LevelKind::File)
+            .map(|l| provider.path_key(&rnl_runtime::source::normalize(&l.path)))
+            .collect()
+    };
+    for (path, name) in &args.formats {
+        let key = provider.path_key(&rnl_runtime::source::normalize(path));
+        if !read.contains(&key) {
+            eprintln!("rnl: warning: --format {path}={name}: {} reads no such file", args.file.display());
+        }
+    }
+    Ok(())
 }
 
 fn run(args: &Args) -> Result<ExitCode, String> {
     let provider = FsProvider::new(&args.package_dirs).with_search_paths(&args.search_paths);
+    check_formats(args, &provider)?;
     match args.command.as_str() {
         "check" => {
             let r = interpret(args, &provider)?;
@@ -299,10 +374,11 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 .map_err(|e| format!("--solver-options: {e}"))?
                 .canonical();
             let options = Options { std: args.std, std_version: args.std_version.clone(), ..Options::solver() };
+            let (file, dialect) = (args.file.to_string_lossy(), args.dialect.as_deref());
             let (r, previous) = if args.previous {
-                rnl_view::read_previous(&args.file.to_string_lossy(), args.dialect.as_deref(), &provider, &options)?
+                rnl_view::read_previous_with(&file, dialect, &args.formats, &provider, &options)?
             } else {
-                (rnl_cli::interpret_file(&args.file, args.dialect.as_deref(), &provider, &options)?, Vec::new())
+                (rnl_cli::interpret_file_with(&args.file, dialect, &args.formats, &provider, &options)?, Vec::new())
             };
             let levels: Vec<_> = r
                 .problems
@@ -329,6 +405,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
         "view" => {
             let options = BuildOptions {
                 dialect: args.dialect.clone(),
+                formats: args.formats.clone(),
                 runtime: options(args),
                 svg: args.svg,
                 primitives: args.primitives,
@@ -351,6 +428,7 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             }
             let options = BuildOptions {
                 dialect: args.dialect.clone(),
+                formats: args.formats.clone(),
                 runtime: options(args),
                 svg: args.svg,
                 primitives: args.primitives,
@@ -358,6 +436,10 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             };
             let snapshot = rnl_view::snapshot(&args.file.to_string_lossy(), &provider, &options, parts)?;
             println!("{}", serde_json::to_string_pretty(&snapshot).unwrap());
+            Ok(ExitCode::SUCCESS)
+        }
+        "formats" => {
+            println!("{}", serde_json::to_string_pretty(&rnl_view::formats()).unwrap());
             Ok(ExitCode::SUCCESS)
         }
         "catalog" => {
@@ -375,7 +457,12 @@ fn run(args: &Args) -> Result<ExitCode, String> {
                 Some(rnl_view::build(
                     &args.file.to_string_lossy(),
                     &provider,
-                    &BuildOptions { dialect: args.dialect.clone(), runtime: options(args), ..BuildOptions::default() },
+                    &BuildOptions {
+                        dialect: args.dialect.clone(),
+                        formats: args.formats.clone(),
+                        runtime: options(args),
+                        ..BuildOptions::default()
+                    },
                 )?)
             } else {
                 None
@@ -405,8 +492,13 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             let solver = SolverOptions::default()
                 .with_overrides(args.solver_options.as_deref().unwrap_or(""))
                 .map_err(|e| format!("--solver-options: {e}"))?;
-            let options =
-                SolveOptions { dialect: args.dialect.clone(), std: args.std, level: args.level.clone(), solver };
+            let options = SolveOptions {
+                dialect: args.dialect.clone(),
+                formats: args.formats.clone(),
+                std: args.std,
+                level: args.level.clone(),
+                solver,
+            };
             let entry = rnl_cli::path_str(&args.file);
             let shown = rnl_cli::preview::preview(&entry, &provider, &options, &WallClock::new(), &|_| true)?;
             let out = serde_json::json!({ "document": shown.document, "report": shown.report });
@@ -442,7 +534,11 @@ fn run(args: &Args) -> Result<ExitCode, String> {
             let held = MemoryProvider::new().with(&rnl_cli::path_str(&read_path), &input);
             let files = Layered { layers: vec![&held, &provider] };
             let mut sink = Sink::new();
-            let doc = rnl_cli::read_host(&read_path, args.dialect.as_deref(), &files, &mut sink)?;
+            let read = read_path.to_string_lossy();
+            // the entry read by its absolute path, the formats' paths so too
+            let formats: BTreeMap<String, String> =
+                args.formats.iter().map(|(p, f)| (format_path(p, &read_path), f.clone())).collect();
+            let doc = rnl_view::read_host_with(&read, args.dialect.as_deref(), &formats, &files, &mut sink)?;
             let main = doc.main().file.clone();
             let text = doc.source(&main).ok_or_else(|| format!("cannot read {}", args.file.display()))?;
             let stripped = rnl_runtime::writeback::strip_generated(&doc, &main, text);
@@ -498,7 +594,13 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
         .map_err(|e| format!("--solver-options: {e}"))?;
     // the groups of the facts of priority low are sought only for their hints (8.5, 7.6)
     let solver = SolverOptions { hints_for_low: args.report, ..solver };
-    let options = SolveOptions { dialect: args.dialect.clone(), std: args.std, level: args.level.clone(), solver };
+    let options = SolveOptions {
+        dialect: args.dialect.clone(),
+        formats: args.formats.clone(),
+        std: args.std,
+        level: args.level.clone(),
+        solver,
+    };
     let profile_clock = args
         .profile
         .as_ref()

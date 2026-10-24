@@ -60,6 +60,10 @@ pub struct Request {
     pub package_dirs: Vec<String>,
     /// "spice" or "spectre", instead of guessing from the entry.
     pub dialect: Option<String>,
+    /// The format set for files, by path as in `files` ([`rnl_view::BuildOptions::formats`]); the
+    /// library index reads its files with them too.
+    #[serde(default)]
+    pub formats: BTreeMap<String, String>,
     /// Use the standard package at the root (16.3); true when not given.
     #[serde(default = "yes")]
     pub std: bool,
@@ -189,8 +193,29 @@ pub struct DrawingsQuery {
     pub names: Vec<String>,
 }
 
+/// What to list: the formats a file can be read with, and the format each of `detect`, by path
+/// and text, has when none is set for it ([`rnl_view::detect_format`]).
+#[derive(Deserialize, Debug)]
+pub struct FormatsRequest {
+    pub formats: FormatsQuery,
+}
+
+#[derive(Deserialize, Debug, Default)]
+pub struct FormatsQuery {
+    #[serde(default)]
+    pub detect: BTreeMap<String, String>,
+}
+
+/// What a [`FormatsRequest`] answers.
+#[derive(Serialize, Debug)]
+pub struct FormatList {
+    pub list: Vec<rnl_view::FormatInfo>,
+    /// The format of each file of `detect`, by its path.
+    pub detected: BTreeMap<String, String>,
+}
+
 /// The answer to a request: `{"document": ...}`, `{"snapshot": ...}`, `{"written": ...}`,
-/// `{"catalog": ...}`, `{"drawings": ...}` or `{"error": "..."}`.
+/// `{"catalog": ...}`, `{"drawings": ...}`, `{"formats": ...}` or `{"error": "..."}`.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Response {
@@ -205,6 +230,8 @@ pub enum Response {
     Catalog(Box<Catalog>),
     /// The drawings a [`DrawingsRequest`] asks for, one for each object it names, in order.
     Drawings(Vec<UnplacedDrawing>),
+    /// The formats a [`FormatsRequest`] asks for.
+    Formats(Box<FormatList>),
     /// Why there is none: the request is not a [`Request`], a [`WriteRequest`], a
     /// [`CatalogRequest`] or a [`DrawingsRequest`], the entry cannot be read, an op cannot be
     /// written, or no build kept the drawings asked for.
@@ -219,7 +246,8 @@ thread_local! {
 }
 
 /// Answer a request given as JSON: a write when it has a `write` field, a catalog when it has a
-/// `catalog` field, drawings when it has a `drawings` field, else a build.
+/// `catalog` field, drawings when it has a `drawings` field, the formats when it has a `formats`
+/// field and no `entry`, else a build.
 pub fn respond(request: &[u8]) -> Response {
     let invalid = |e: serde_json::Error| Response::Error(format!("the request is not valid: {e}"));
     let value: serde_json::Value = match serde_json::from_slice(request) {
@@ -234,6 +262,9 @@ pub fn respond(request: &[u8]) -> Response {
             pool: Vec<String>,
             #[serde(default)]
             files: BTreeMap<String, String>,
+            /// The formats set for files by path, as a build's ([`Request::formats`]).
+            #[serde(default)]
+            formats: BTreeMap<String, String>,
         }
         #[derive(Deserialize)]
         struct Query {
@@ -252,6 +283,7 @@ pub fn respond(request: &[u8]) -> Response {
                 let files = rnl_runtime::source::FilePool { files: &files, paths: &pool };
                 Response::Library(LIBRARY.with(|index| {
                     let mut index = index.borrow_mut();
+                    index.set_formats(update.formats);
                     index.invalidate(&update.library.refresh);
                     index.update(&pool, &files, update.library.reload)
                 }))
@@ -274,6 +306,21 @@ pub fn respond(request: &[u8]) -> Response {
     if value.get("drawings").is_some() {
         return match serde_json::from_value::<DrawingsRequest>(value) {
             Ok(d) => drawings(d.drawings),
+            Err(e) => invalid(e),
+        };
+    }
+    // a build sets formats too: a request for the list has no entry
+    if value.get("formats").is_some() && value.get("entry").is_none() {
+        return match serde_json::from_value::<FormatsRequest>(value) {
+            Ok(f) => {
+                let detected = f
+                    .formats
+                    .detect
+                    .iter()
+                    .map(|(p, t)| (p.clone(), rnl_view::detect_format(p, t).to_string()))
+                    .collect();
+                Response::Formats(Box::new(FormatList { list: rnl_view::formats(), detected }))
+            }
             Err(e) => invalid(e),
         };
     }
@@ -305,8 +352,13 @@ pub fn respond(request: &[u8]) -> Response {
         files: request.library_edits.into_iter().map(|(p, t)| (normalize(&p), t)).collect(),
         package_dirs: Vec::new(),
     };
+    // the index reads the canonical paths, as the formats set for them name them
+    let prefix = request.library_prefix.as_str();
+    let set = request.formats.iter().map(|(p, f)| (p.strip_prefix(prefix).unwrap_or(p).to_string(), f.clone()));
+    let index_formats: BTreeMap<String, String> = set.collect();
     let index = LIBRARY.with(|index| {
         let mut index = index.borrow_mut();
+        index.set_formats(index_formats);
         index.update(&canonical, &pool, false);
         index.with_edits(&edits, &pool)
     });
@@ -314,6 +366,7 @@ pub fn respond(request: &[u8]) -> Response {
     let files = AutoLibrary { files: &files, index: &lookup, enabled: request.auto_include };
     let options = BuildOptions {
         dialect: request.dialect,
+        formats: request.formats,
         runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
@@ -369,6 +422,9 @@ impl Provider for PoolNamespace<'_> {
     fn read(&self, path: &str) -> Option<String> {
         self.files.read(&format!("{}{path}", self.prefix))
     }
+    fn path_key(&self, path: &str) -> String {
+        self.files.path_key(path)
+    }
 }
 struct NamespacedIndex<'a> {
     index: &'a rnl_view::LibraryIndex,
@@ -414,6 +470,9 @@ impl Provider for AutoLibrary<'_> {
     fn auto_include(&self) -> Option<&dyn LibraryLookup> {
         self.enabled.then_some(self.index)
     }
+    fn path_key(&self, path: &str) -> String {
+        self.files.path_key(path)
+    }
 }
 
 /// The drawings of the objects a request names, from the last build that kept them.
@@ -441,6 +500,7 @@ fn write(request: WriteRequest) -> Response {
     let files = MemoryProvider { files, package_dirs: request.package_dirs };
     let options = BuildOptions {
         dialect: Some(request.write.dialect),
+        formats: BTreeMap::new(),
         runtime: Options { std: request.std, std_version: request.std_version.clone(), ..Options::default() },
         svg: request.svg,
         primitives: request.primitives,
@@ -717,6 +777,47 @@ C1 a 0 1p
         assert_eq!(reloaded["document"]["files"].as_array().unwrap().len(), 2);
         let removed = build("cell", &replacement, true);
         assert_eq!(removed["document"]["files"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn formats_are_set_by_path_listed_and_detected() {
+        // a SPICE netlist whose include is written in Spectre's language
+        let files = json!({
+            "/w/top.sp": "* top\n.include \"cells.scs\"\nX1 a 0 amp\n.end\n",
+            "/w/cells.scs": "simulator lang=spectre\nsubckt amp (p n)\nR1 (p n) resistor r=1k\nends amp\n",
+        });
+        let v = answer(json!({ "entry": "/w/top.sp", "files": files, "formats": { "/w/cells.scs": "spectre" } }));
+        let d = &v["document"];
+        assert_eq!((&d["files"][1]["format"], &d["files"][1]["default_format"]), (&json!("spectre"), &json!("spice")));
+        assert!(d["levels"].as_array().unwrap().iter().any(|l| l["title"] == "amp"));
+        assert_eq!(d["formats"], serde_json::to_value(rnl_view::formats()).unwrap());
+        // without it, as before; an unknown name is the request's error
+        let v = answer(json!({ "entry": "/w/top.sp", "files": files }));
+        assert_eq!(v["document"]["files"][1]["format"], "spice");
+        let v = answer(json!({ "entry": "/w/top.sp", "files": files, "formats": { "/w/cells.scs": "cdl" } }));
+        assert_eq!(v["error"], "unknown format \"cdl\" for /w/cells.scs; the formats are spice, spectre");
+        // the list, and the format of files by path and text
+        let v =
+            answer(json!({ "formats": { "detect": { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n" } } }));
+        assert_eq!(v["formats"]["list"], serde_json::to_value(rnl_view::formats()).unwrap());
+        assert_eq!(v["formats"]["detected"], json!({ "/w/a.inc": "spice", "/w/b.lib": "spectre" }));
+        assert_eq!(answer(json!({ "formats": {} }))["formats"]["detected"], json!({}));
+        // the library index reads with them: a `.scs` file written in SPICE defines its subcircuit
+        let lib = json!({ "/lib/cells.scs": ".subckt cell p n\nR1 p n 1k\n.ends\n" });
+        let update = |formats: Value| {
+            answer(
+                json!({ "library": { "reload": true }, "pool": ["/lib/cells.scs"], "files": lib, "formats": formats }),
+            )
+        };
+        let top = json!({ "/top.sp": "* top\nX1 a 0 cell\n.end\n", "/lib/cells.scs": lib["/lib/cells.scs"] });
+        let build = |formats: Value| {
+            let request = json!({ "entry": "/top.sp", "files": top, "pool": ["/lib/cells.scs"], "auto_include": true, "formats": formats });
+            answer(request)["document"]["levels"].as_array().unwrap().iter().any(|l| l["title"] == "cell")
+        };
+        assert_eq!(update(json!({})), json!({ "library": [] }));
+        assert!(!build(json!({})));
+        update(json!({ "/lib/cells.scs": "spice" }));
+        assert!(build(json!({ "/lib/cells.scs": "spice" })));
     }
 
     #[test]

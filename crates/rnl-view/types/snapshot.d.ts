@@ -67,6 +67,11 @@ export type FileRef = {
    * As shown.
    */
   name: string,
+  /**
+   * The format the file was read with, as the Document's `SourceFile::format`: only when the
+   * netlist's files are of more than one format, or the request set a format for some.
+   */
+  format?: string,
 };
 
 /**
