@@ -1429,6 +1429,7 @@ test("a file of a manifest whose SHA-256 does not match is named and nothing ope
   await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}&level=amp`);
   await shown(page);
   await expect.poll(() => page.evaluate(() => window.viewer.doc.levels[window.viewer.level].title)).toBe("amp");
+  expect(await page.evaluate(() => window.viewer.doc.path)).toBe("/demo/top.sp");
 });
 
 test("an embedded canvas opens the files of a manifest by ?manifest=", async ({ page }) => {
@@ -1437,6 +1438,7 @@ test("an embedded canvas opens the files of a manifest by ?manifest=", async ({ 
   await expect(page.locator("#canvas > svg")).toBeVisible();
   await expect(page.locator("#manifest-bar")).toBeHidden();
   await expect.poll(() => page.evaluate(() => window.viewer?.doc?.levels[window.viewer.level]?.title)).toBe("amp");
+  expect(await page.evaluate(() => window.viewer.doc.path)).toBe("/demo/top.sp");
 });
 
 test("the bar stays while a file of the manifest is shown, goes with another file, and comes back with one of its files", async ({ page }) => {
@@ -1478,4 +1480,17 @@ test("the bar names a manifest's authors in their order, each with an https addr
   if (process.env.RNL_REVIEW_DIR && test.info().project.name === "chromium") {
     await page.screenshot({ path: path.join(process.env.RNL_REVIEW_DIR, "manifest-authors.png"), clip: { x: 420, y: 0, width: 780, height: 120 } });
   }
+});
+
+test("a manifest's level defined in an included file is shown in the entry's document, with all it includes", async ({ page }) => {
+  await manifestRoutes(page, demoManifest({ level: "amp" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  await expect.poll(() => page.evaluate(() => window.viewer.doc.levels[window.viewer.level].title)).toBe("amp");
+  const doc = await page.evaluate(() => window.viewer.doc);
+  // the entry stays the document: amp is entered there, not opened from cells/amp.sp alone
+  expect(doc.path).toBe("/demo/top.sp");
+  expect(doc.files.map((f) => f.name)).toEqual(expect.arrayContaining(["top.sp", "cells/amp.sp", "lib/models.inc"]));
+  expect(doc.levels[await page.evaluate(() => window.viewer.level)].kind).toBe("subckt");
+  await expect(page).toHaveTitle(/^top\.sp/);
 });

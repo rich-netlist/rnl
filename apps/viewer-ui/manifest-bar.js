@@ -79,13 +79,14 @@ export function showManifestBar(external) {
 export function showManifestLevel(source) {
   const wanted = new URLSearchParams(location.search).get("level") ?? source?.external?.level;
   if (!wanted || !doc) return;
-  if (wanted === "(top)") return enterRoot(0);
+  if (wanted === "(top)") return enterRoot(0, { here: true });
   const level = doc.levels.findIndex((l) => l.kind === "subckt" && l.title === wanted);
   if (level < 0) {
     notice(m`The netlist has no level ${wanted}; the level shown is the default one.`);
     return;
   }
-  return enterRoot(level);
+  // in the entry's document, with all it includes, even when an included file defines the subcircuit
+  return enterRoot(level, { here: true });
 }
 
 window.addEventListener("language-changed", () => {
