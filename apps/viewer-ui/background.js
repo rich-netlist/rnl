@@ -67,7 +67,8 @@ function drawingHighlights() {
     canvas.style.setProperty(`--drawing-${name}`, dark ? darkColour(colour) : colour);
   }
 }
-window.addEventListener("highlight-colors", drawingHighlights);
+// globalThis: scripts/brand.test.mjs reads these colour rules in Node, which has no window
+globalThis.addEventListener?.("highlight-colors", drawingHighlights);
 
 export function setBackground(mode, { persist = true } = {}) {
   dark = mode === "dark";
