@@ -619,10 +619,15 @@ fn solve(args: &Args, provider: &FsProvider) -> Result<ExitCode, String> {
             rnl_cli::profile::ProfileClock::new(path)
         })
         .transpose()?;
-    let result = match &profile_clock {
+    let reuse_stats = rnl_cli::state_reuse::StateReuseStats::from_env()?;
+    let reuse_observer = reuse_stats.as_ref().map(|s| s.clone() as rnl_solver::profile::StateReuseHandle);
+    let result = rnl_solver::profile::with_state_reuse_observer(reuse_observer, || match &profile_clock {
         Some(clock) => rnl_cli::solve::solve_with_clock(&args.file, provider, &options, clock),
         None => rnl_cli::solve::solve(&args.file, provider, &options),
-    };
+    });
+    if let Some(stats) = &reuse_stats {
+        stats.finish()?;
+    }
     if let Some(clock) = &profile_clock {
         clock.finish(result.is_ok())?;
     }

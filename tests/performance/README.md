@@ -45,7 +45,7 @@ incomplete profiles must still be identified as such.
 
 ## Manual entry point
 
-Use **Actions → Rust → Run workflow**. All three special-mode switches default
+Use **Actions → Rust → Run workflow**. All four special-mode switches default
 to false. Enable exactly one of the following modes and provide full, immutable
 40-character public `rich-netlist/rnl` commit SHAs:
 
@@ -54,6 +54,59 @@ to false. Enable exactly one of the following modes and provide full, immutable
 | `solver_performance=true` | `baseline_sha`, optional `candidate_sha` | Build, then collect the representative/adaptive matrix |
 | `solver_profile_work=true` | `work_candidate_sha` | Build, then collect M04 once with `--profile-work` |
 | `solver_build_only=true` | `work_candidate_sha` | Build one downloadable optimized CLI; no solver invocation |
+| `solver_m04_pair=true` | `baseline_sha`, `candidate_sha`, `pair_tool_sha`, `pair_authorization_token` | Fixed same-run M04 prototype comparison; at most ten starts with external ten-second caps |
+
+### M04 prototype: the only authorized bounded queue
+
+The M04 prototype campaign uses **only** `solver_m04_pair`. Do not enable the
+full collection, work diagnostic, or build-only switch alongside it. The
+root coordinator must first bind the two full public source SHAs, the dispatch
+commit as `pair_tool_sha`, the input/default-options identities, and a new
+explicit `M04-...` execution token. A tool checkout mismatch, missing token,
+overlapping mode or Actions rerun is rejected before any solver command.
+
+Both release builds complete on the same `windows-2022` job before measurement.
+The fixed serial order is M04 baseline/candidate once, then two additional M04
+baseline/candidate pairs, T4 baseline/candidate once and PFD baseline/candidate
+once. **The first candidate M04 TIMEOUT stops the queue after two starts.**
+Only its COMPLETE result unlocks the remaining eight; no synthetic inputs,
+profile commands, retries or 120-second runs are in this queue. Every created
+solver counts, including failures. Before creation a reservation is written;
+an uncertain creation consumes its reservation and stops the queue. The wrapper
+uses a fresh output directory and refuses Actions reruns; the coordinator must
+also account for starts across runs before authorizing any new dispatch.
+
+Each command has an external ten-second wall cap from CreateProcess through
+owned-tree exit and CLI writeback, including owned-process setup. Compilation,
+resource gates and environment preparation before CreateProcess are excluded.
+The solver's default search budgets, objectives and internal `time_limit` are
+unchanged; that internal setting is not the external wall cap. Late exits are
+TIMEOUT, even if output exists. COMPLETE additionally requires normal exit,
+valid generated output, the pinned default options and elapsed time at most ten
+seconds. TIMEOUT remains a censored failure, never pass, skip or unsat.
+
+All COMPLETE results for the same input, including repeated observations, are
+compared as actual product bytes. Any byte or default-option difference stops
+further starts and preserves the first differing file/offset. Partial output
+is retained but never compared as complete equality. If baseline times out and
+candidate completes, the remaining authorized queue may run, while their output
+equivalence remains unknown until both have COMPLETE evidence.
+
+The candidate sets `RNL_STATE_REUSE_STATS` to its own JSONL file. Its counters,
+state-save/restore clocks and writes are included in candidate wall time; no
+extra calibration or diagnostic run is permitted. Only finished placement
+rounds emit records, so timeout evidence can be partial or absent. Unknown
+statistics remain unknown. The baseline does not set this variable, and neither
+side uses `--profile` or `--profile-work`.
+
+Artifacts `solver-m04-pair-binaries-RUN_ID-1` and
+`solver-m04-pair-RUN_ID-1` retain the authorization, both EXEs/build receipts,
+selected input/library bytes, options identities, fixed plan, pre-dispatch
+ledger, actual creation/cleanup receipts, stdout/stderr, partial or complete
+products, counters, elapsed times, comparisons and final stop reason. Binaries
+are uploaded before measurement and the full evidence upload uses `always()`.
+The 14-day retention applies. A green collection records evidence, and does not
+by itself mean the candidate passed ten seconds or preserved unknown outputs.
 
 Before merge, the existing Rust workflow can dispatch this branch explicitly:
 
@@ -145,6 +198,7 @@ git fetch --no-tags origin 0e9b63ecc84b87fdaa69b31251ba683b740fb9bf
 python scripts/solver-performance/test_inputs.py
 python scripts/solver-performance/test_benchmark.py
 python scripts/solver-performance/test_work.py
+python scripts/solver-performance/test_pair.py
 python scripts/solver-performance/prepare_inputs.py --output NEW_DIRECTORY_OUTSIDE_REPOSITORY
 python scripts/solver-performance/benchmark.py --fixtures NEW_DIRECTORY_OUTSIDE_REPOSITORY
 ```

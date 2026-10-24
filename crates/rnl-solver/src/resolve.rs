@@ -351,7 +351,7 @@ struct Search {
 }
 
 /// Values of literals that cannot hold together while the units of `facts` are in.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Nogood {
     lits: Vec<Tag>,
     facts: Vec<Tag>,
@@ -412,7 +412,83 @@ pub(crate) struct Resolver<'a> {
     pub(crate) nodes: u64,
 }
 
+/// A complete, owned state at the end of an add, before any coordinate consumer. Unlike Saved,
+/// this includes the basis, rows, values, forms, undo trail and the original logical pivot cost.
+/// It cannot contain a deadline; only the caller's fixed-cap relation resolutions may use it.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ResolverSnapshot {
+    caps: Caps,
+    sx: [Simplex<Tag>; 2],
+    classes: OrientClasses,
+    geometry: Geometry,
+    touched: [BTreeSet<PointId>; 2],
+    centres_on: [BTreeSet<usize>; 2],
+    choices: Vec<(usize, usize)>,
+    nogoods: Vec<Nogood>,
+    kept: Vec<usize>,
+    held: BTreeMap<Held, u32>,
+    base: [usize; 2],
+    nodes: u64,
+}
+
+impl ResolverSnapshot {
+    /// The caller must first prove all definitions and attempted units of this prefix identical.
+    /// The restored state is independent of the saved one, including every rational and bound.
+    pub(crate) fn restore<'a>(&self, model: &'a Model) -> Resolver<'a> {
+        Resolver {
+            model,
+            limits: Limits::Caps(self.caps),
+            sx: self.sx.clone(),
+            classes: self.classes.clone(),
+            geometry: self.geometry.clone(),
+            touched: self.touched.clone(),
+            centres_on: self.centres_on.clone(),
+            choices: self.choices.clone(),
+            nogoods: self.nogoods.clone(),
+            kept: self.kept.clone(),
+            held: self.held.clone(),
+            base: self.base,
+            nodes: self.nodes,
+        }
+    }
+}
+
 impl<'a> Resolver<'a> {
+    /// Deep-copy every field. Exhaustive destructuring makes adding resolver state require an
+    /// explicit snapshot decision. A Time resolution is deliberately ineligible.
+    pub(crate) fn snapshot(&self) -> Option<ResolverSnapshot> {
+        let Resolver {
+            model: _,
+            limits,
+            sx,
+            classes,
+            geometry,
+            touched,
+            centres_on,
+            choices,
+            nogoods,
+            kept,
+            held,
+            base,
+            nodes,
+        } = self;
+        let Limits::Caps(caps) = limits else { return None };
+        Some(ResolverSnapshot {
+            caps: *caps,
+            sx: sx.clone(),
+            classes: classes.clone(),
+            geometry: geometry.clone(),
+            touched: touched.clone(),
+            centres_on: centres_on.clone(),
+            choices: choices.clone(),
+            nogoods: nogoods.clone(),
+            kept: kept.clone(),
+            held: held.clone(),
+            base: *base,
+            nodes: *nodes,
+        })
+    }
+
     /// A resolution with nothing taken in yet, every object at the origin with R0.
     pub(crate) fn new(model: &'a Model, n_objects: usize, limits: Limits<'a>) -> Resolver<'a> {
         let mut sx = [Simplex::new(), Simplex::new()];

@@ -304,6 +304,42 @@ pub(crate) struct Model {
 const MAX_DEPTH: usize = 16;
 
 impl Model {
+    /// Whether rebinding a saved prefix preserves every definition and variable number. Units
+    /// are checked separately, including every attempted (also rejected) prefix unit. Future
+    /// units have not been read yet. Keep this destructuring exhaustive so a new model field
+    /// cannot silently escape the compatibility check.
+    pub(crate) fn same_definitions(&self, other: &Model) -> bool {
+        let Model {
+            tol,
+            exact,
+            left_out,
+            vars,
+            points,
+            centres,
+            centre_index,
+            units: _,
+            origin_point,
+            oriented,
+            own,
+            object_points,
+            wire_points,
+            route_points,
+        } = self;
+        tol == &other.tol
+            && exact == &other.exact
+            && left_out == &other.left_out
+            && vars == &other.vars
+            && points == &other.points
+            && centres == &other.centres
+            && centre_index == &other.centre_index
+            && origin_point == &other.origin_point
+            && oriented == &other.oriented
+            && own == &other.own
+            && object_points == &other.object_points
+            && wire_points == &other.wire_points
+            && route_points == &other.route_points
+    }
+
     /// The model of a problem, with the tolerance `tol` (11.7).
     pub(crate) fn new(problem: &LevelProblem, tol: Q) -> Model {
         Model::with_exact(problem, tol, BTreeSet::new(), BTreeSet::new())

@@ -71,7 +71,7 @@ use crate::resolve::{Geometry, Resolver, Tag};
 use crate::route::CLEARANCE;
 use crate::search::{
     orientation_relations, relations, relations_by_pairs, row_pairs, up, with_relations, Candidate, RelKind, Relation,
-    RowPair, Tagged,
+    RelationReuse, RowPair, Tagged,
 };
 use crate::simplex::{LinExpr, Rel, Simplex, Var};
 use crate::structure::{Drawn, Role, Structure};
@@ -143,6 +143,7 @@ pub(crate) fn place(
     // the rows apart as wholes in the first LP, then pair by pair (quality review SE-4)
     let mut pairs: Option<Vec<RowPair>> = None;
     let mut row_rounds = 0;
+    let mut feasibility = RelationReuse::new();
     loop {
         let mut rels = orient.clone();
         rels.extend(separations.iter().cloned());
@@ -150,7 +151,7 @@ pub(crate) fn place(
             None => relations(s, c, &actual, options),
             Some(pairs) => relations_by_pairs(s, c, &actual, options, pairs),
         });
-        let (geometry, kept, undecided, optimised) = with_relations(s, &rels, work, |r, model, t| {
+        let (geometry, kept, undecided, optimised) = feasibility.with_relations(s, &rels, work, |r, model, t| {
             let (g, optimised) = optimise(r, model, s, options);
             (g, t.kept.clone(), t.undecided, optimised)
         });

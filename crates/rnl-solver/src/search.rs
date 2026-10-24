@@ -62,6 +62,9 @@ use crate::simplex::LinExpr;
 use crate::structure::{FreeClass, PinKey, PortKind, Role, Source, Structure};
 use crate::{SolverOptions, Work};
 
+mod reuse;
+pub(crate) use reuse::RelationReuse;
+
 /// The gap between neighbours in a row, and between blocks, in units.
 pub(crate) const HGAP: i64 = 2;
 /// The gap between neighbouring rows.
