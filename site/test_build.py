@@ -180,12 +180,12 @@ class SiteExamples(unittest.TestCase):
         for name in ("ota5t.sp", "ota5t-zh.sp", "ota5t-edits.sp", "ota5t-resolved.sp", "ota5t_tb.sp"):
             self.assertIn(f"examples/{name}", pages)
         for lang, label in (("zh", "在查看器中打开"), ("en", "Open in viewer")):
-            self.assertIn(f'href="../viewer/?url=samples/site/ota5t.sp">{label}</a>', pages[f"{lang}/index.html"])
+            self.assertIn(f'href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/index.html"])
             self.assertIn(
                 f'href="{build.SITE_URL}viewer/?url=samples/site/ota5t.sp">{label}</a>',
                 pages[f"{lang}/rnl-intro-standalone.html"],
             )
-            self.assertIn(f'href="../viewer/?url=samples/site/ota5t.sp">{label}</a>', pages[f"{lang}/language.html"])
+            self.assertIn(f'href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/language.html"])
             self.assertIn(f'href="../viewer/?url=samples/site/ota5t_tb.sp"', pages[f"{lang}/language.html"])
 
     def test_check_examples_detects_drift_between_scenes_and_examples(self):
