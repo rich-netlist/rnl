@@ -290,6 +290,41 @@ impl Interp<'_> {
             }
         }
         self.warn_undrawn(s);
+        self.hint_undefined(s);
+    }
+
+    /// One hint for each subcircuit that instances of the level name, that no file read defines,
+    /// and that they are drawn with the renderer's stand-in box for, as no rule or package gives
+    /// them a symbol (6.4, 9.2.6): a missing include is told, a PDK device with a symbol is not.
+    fn hint_undefined(&mut self, s: SceneId) {
+        let mut by_master: Vec<(String, Vec<ObjId>)> = Vec::new();
+        for o in self.scenes[s].insts.clone() {
+            if !self.scenes[s].default_symbol.contains(&o) {
+                continue;
+            }
+            let inst = self.inst_of(o);
+            let Some(master) = inst.model.clone().filter(|_| inst.is_subckt) else { continue };
+            if self.doc.subckt_of(inst).is_some() {
+                continue;
+            }
+            match by_master.iter_mut().find(|(m, _)| *m == master) {
+                Some((_, v)) => v.push(o),
+                None => by_master.push((master, vec![o])),
+            }
+        }
+        for (master, insts) in by_master {
+            let names: Vec<String> = insts.iter().map(|o| self.inst_of(*o).name.clone()).collect();
+            let first = self.inst_of(insts[0]).clone();
+            let shown = names.iter().take(8).cloned().collect::<Vec<_>>().join(", ");
+            let more = if names.len() > 8 { format!(" and {} more", names.len() - 8) } else { String::new() };
+            let verb = if names.len() == 1 { "is" } else { "are" };
+            self.sink.hint(
+                format!(
+                    "no file read defines the subcircuit {master}, so {shown}{more} {verb} drawn as a box of its terminals; an include may be missing (6.4, 9.2.6)"
+                ),
+                Some(Loc::line(first.file.clone(), first.line.max(1))),
+            );
+        }
     }
 
     /// One warning for each model card that devices of the level name and the netlist lacks: they
