@@ -130,6 +130,7 @@ jobs:
         run: |
           node bindings/runtime-wasm/build.mjs --features test-panic --out target/wasm-test
           node bindings/runtime-wasm/tests/core.mjs target/wasm-test
+          node --test bindings/runtime-wasm/tests/manifest.test.mjs
       - name: Build the CLI
         run: cargo build -p rnl-cli
       - name: Native and WebAssembly builds give identical Documents and snapshots

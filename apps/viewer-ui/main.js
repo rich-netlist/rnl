@@ -16,6 +16,7 @@ import { gridState, setGrid } from "./grid.js";
 import { setHoverNames } from "./hover.js";
 import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
+import { showManifestLevel } from "./manifest-bar.js";
 import { restoreSession } from "./navigation.js";
 import {
   setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
@@ -89,7 +90,12 @@ async function start() {
   void revealViewer(runStartupShortcuts);
   const session = await shell.initialSession?.();
   if (session) await restoreSession(session);
-  else await openSource(await shell.initial(), false);
+  else {
+    const initial = await shell.initial();
+    await openSource(initial, false);
+    // files opened by a manifest open on the level it, or the address, names
+    if (initial?.external) await showManifestLevel(initial);
+  }
 }
 
 // a shell may reject with a plain message, as Tauri's invoke does

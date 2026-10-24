@@ -8,6 +8,7 @@ import { setPane, setSidebar } from "./panels.js";
 import { shell } from "./shell.js";
 import { navigate } from "./navigation.js";
 import { $, load, save, settingsPath } from "./util.js";
+import { showManifestBar } from "./manifest-bar.js";
 import { chooseFormat, chosenFormat, formatInfo, formatList, setFormatList } from "./formats.js";
 import { sourcePath } from "./source-path.js";
 
@@ -21,6 +22,8 @@ const expanded = new Map([["files", true]]); // session only; never written to s
 let scanned = new Map();
 let libraryErrors = [];
 const refreshPaths = new Set();
+// the files of the external manifest opened last (?manifest=): they stay listed, read only, while the page is open
+let external = null;
 // the host files of the document shown, by Library path: the format each is read in and the one it
 // would be without the user's choice (SourceFile.format, default_format); its includes, after the first
 let shownFormats = new Map();
@@ -94,6 +97,10 @@ function documentFormats(doc) {
 
 /** Each independently opened entry, including cross-file navigation, joins Files here. */
 export async function sourceOpened(source, doc, add, applied = false) {
+  if (source?.external && source.external !== external) { external = source.external; expanded.set("external", true); }
+  // the bar stays while the file shown is one of the manifest's, whichever opened it, and goes with another file
+  const shown = source?.path || doc?.path;
+  showManifestBar(source?.external || (external && shown && (shown in external.files || external.pool.includes(shown)) ? external : null));
   documentFormats(doc);
   const held = source.temporary || (source.text !== undefined && !source.path && !source.readonly);
   if (held) {
@@ -336,8 +343,8 @@ function fileRow(item, kind) {
   setAttr(open, "aria-label", m`Open ${item.name}`);
   append(row, open);
   if ((kind === "files" || kind === "path") && !isPackage(item.path)) append(row, formatChip(item.path, item.name));
-  if (kind === "builtin" || kind === "temporary") {
-    append(row, span("pool-badge", kind === "builtin" ? m("read only") : m("temporary · not searched")));
+  if (kind === "builtin" || kind === "temporary" || kind === "external") {
+    append(row, span("pool-badge", kind === "temporary" ? m("temporary · not searched") : m("read only")));
   } else if (kind === "files") {
     append(row, button(m("Exclude"), () => update(() => { items = items.filter((i) => i !== item); }), m`Exclude ${item.name}`));
   }
@@ -421,6 +428,11 @@ function render() {
     }));
     append(groups, group(`path:${dir}`, dir, files, "path", { index, all, deep: deep.has(dir) }));
   });
+  if (external && shell.externalFile) {
+    const root = `/${external.id}/`;
+    const files = Object.keys(external.files).sort().map((path) => ({ path, name: path.slice(root.length), source: shell.externalFile(external, path) }));
+    append(groups, group("external", m`From external manifest · ${external.id} · read only`, files, "external"));
+  }
   append(groups, group("builtin", m("Built-in"), items.filter((i) => i.builtin), "builtin"));
   setText($("library-status"), libraryErrors.join("\n"));
 }

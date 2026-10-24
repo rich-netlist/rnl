@@ -1,0 +1,8 @@
+@RNL(type="header") {
+  @VERSION("0.3");
+  @PACKAGE(name="demo-remote", version="2.0")
+}
+A package the manifest lists by name, version, address and SHA-256.
+@RNL {
+  $remote_style = @DEFINE-STYLE(linecolor="#6a1b9a") {}
+}

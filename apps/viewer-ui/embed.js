@@ -89,7 +89,7 @@ async function open(source, packages, isCurrent, initial, message, signal) {
   link.hidden = true;
   let built;
   try {
-    const url = message.url ?? null;
+    const url = message.url ?? null, manifest = message.manifest ?? null;
     await progress.stage("reading");
     built = await shell.build(source, undefined, progress.setStage, packages, signal);
     if (!isCurrent()) return;
@@ -101,7 +101,9 @@ async function open(source, packages, isCurrent, initial, message, signal) {
     adoptSource(source);
     showBuilt(built, false);
     document.title = `${built.name} - RNL Viewer`;
-    if (initial && params.has("level")) await level(params.get("level"), signal);
+    // the address's level first; else the manifest's, where "(top)" is the level it opens on
+    const wanted = (initial && params.get("level")) || source.external?.level;
+    if (wanted && wanted !== "(top)") await level(wanted, signal);
     if (!isCurrent()) return;
     // A short embed fits visible ink, so its first view needs the drawing's actual font metrics.
     if (getComputedStyle($("canvas")).getPropertyValue("--fit-content").trim() === "1") {
@@ -112,10 +114,11 @@ async function open(source, packages, isCurrent, initial, message, signal) {
     fit();
     await nextPaint();
     if (!isCurrent()) return;
-    if (url !== null) {
+    if (url !== null || manifest !== null) {
       const full = new URL(location.href);
       full.searchParams.delete("embed");
-      full.searchParams.set("url", url);
+      full.searchParams.delete(url !== null ? "manifest" : "url");
+      full.searchParams.set(url !== null ? "url" : "manifest", url ?? manifest);
       link.href = full.href;
       link.hidden = false;
     }
@@ -208,6 +211,7 @@ export async function startEmbed() {
         }
     } });
     if (params.has("url")) void api.open({ url: params.get("url") }, true);
+    else if (params.has("manifest")) void api.open({ manifest: params.get("manifest") }, true);
   } catch (reason) {
     error(reason);
     // Initialization can fail before the shared API has announced readiness.
