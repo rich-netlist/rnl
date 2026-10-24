@@ -4,7 +4,7 @@ import { test, expect } from "../../tests/viewer/node_modules/@playwright/test/i
 import { readFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-const files = ["index.html", "language.html", "packages.html", "tools.html", "agents.html"];
+const files = ["index.html", "language.html", "packages.html", "gallery.html", "tools.html", "agents.html"];
 const index = JSON.parse(readFileSync(new URL("../dist/gallery/index.js", import.meta.url), "utf8").match(/^RNLGallery.index\((.*)\);/s)[1]);
 const review = process.env.RNL_SITE_SCREENSHOTS;
 const pageErrors = new WeakMap();
@@ -24,6 +24,7 @@ async function capture(page, name, project) {
 
 test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
+  await page.route("https://rich-netlist.github.io/rnl-gallery/**", route => route.abort());
   pageErrors.set(page, []);
   page.on("pageerror", error => pageErrors.get(page).push(error.message));
   await page.addInitScript(() => localStorage.setItem("rnl-intro-theme", "light"));
@@ -37,7 +38,7 @@ for (const file of files) {
   test(`${file}: primary pages, sticky contents and section tracking`, async ({ page }, info) => {
     await page.goto(`/zh/${file}`);
     await ready(page);
-    await expect(page.locator("nav.pages a")).toHaveCount(7);
+    await expect(page.locator("nav.pages a")).toHaveCount(8);
     await expect(page.locator("nav.pages a").last()).toHaveText("GitHub");
     await expect(page.locator("nav.pages a").last()).toHaveAttribute("href", "https://github.com/rich-netlist/rnl");
     await expect(page.locator("nav.pages [aria-current=page]")).toHaveCount(1);
@@ -50,7 +51,7 @@ for (const file of files) {
     // Put the start of the layout immediately below the sticky top bar.
     await page.evaluate(() => window.scrollTo(0, document.querySelector(".layout").getBoundingClientRect().top + scrollY - 58));
     await expect.poll(() => page.locator("#toc").evaluate(el => Math.round(el.getBoundingClientRect().top))).toBe(59);
-    if (file !== "packages.html") {
+    if (file !== "packages.html" && file !== "gallery.html") {
       const links = page.locator('#toc a[href^="#"]');
       const target = await links.nth(1).getAttribute("href");
       await links.nth(1).click();
@@ -183,7 +184,7 @@ for (const file of ["index.html", "packages.html"]) {
     if (file === "index.html") {
       for (const single of ["intro", "language", "tools"]) {
         await page.goto(`/en/rnl-${single}-standalone.html`);
-        await expect(page.locator("nav.pages a")).toHaveCount(7);
+        await expect(page.locator("nav.pages a")).toHaveCount(8);
         await expect(page.locator("#toc")).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       }
