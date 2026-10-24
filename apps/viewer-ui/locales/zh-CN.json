@@ -549,5 +549,18 @@
   "{0} at commit {1}": "{0}，提交 {1}",
   "The netlist has no level {0}; the level shown is the default one.": "网表里没有 {0} 这一层；显示的是默认的那一层。",
   "From external manifest · {0} · read only": "来自外部清单 · {0} · 只读",
-  "Where these files come from": "这些文件的来源"
+  "Where these files come from": "这些文件的来源",
+  "Export Ima&ge": "导出图像(&G)",
+  "Export &SVG...": "导出 SVG(&S)...",
+  "Export &PNG...": "导出 PNG(&P)...",
+  "Export Image": "导出图像",
+  "Export SVG": "导出 SVG",
+  "Export PNG": "导出 PNG",
+  "Open a netlist first.": "请先打开一个网表。",
+  "The core gave no drawing for this level.": "核心没有给出这一层的图。",
+  "The drawing has no size.": "这张图没有尺寸。",
+  "The browser could not make the PNG.": "浏览器无法生成 PNG。",
+  "Drawing the image…": "正在生成图像…",
+  "Exported {0}.": "已导出 {0}。",
+  "Could not export the image: {0}": "无法导出图像：{0}"
 }

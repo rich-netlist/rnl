@@ -98,6 +98,11 @@
  *   it cannot. A shell that offers neither does not save.
  * @property {(files: {path: string, read: () => Promise<Blob | string> | Blob | string}[], preparing: () => void) => Promise<boolean>} [downloadLibrary]
  *   Web only: choose a destination, then export the captured library as one ZIP; false on cancel.
+ * @property {(request: { doc: object, level: number, title: string, overlays: object, source: Source, edits: Object<string, string> }) => Promise<string>} [exportSvg]
+ *   File > Export Image (export-image.js): the core's SVG of `levels[level]` of `doc`, the Document
+ *   shown, with `overlays` (rnl_view::OverlayOptions), built again from what `doc` was built from.
+ * @property {(name: string, blob: Blob, kind: "svg" | "png") => Promise<string | null>} [saveImage]
+ *   Save the image: the web downloads it, the desktop asks where; what was written, or null on cancel.
  * @property {(source: Source, file: SavedFile, encoding?: "preserve" | "utf8") => Promise<Source | null>} [saveAs] Ask where to save the
  *   text of the netlist that was opened, write it there, and give the source of the file written; null
  *   when the user cancels. Rejects with a message when it cannot. Only the desktop offers it.

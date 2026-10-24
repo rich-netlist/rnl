@@ -2,13 +2,15 @@
 //! instance or a net between the drawing and the text. It can edit the text, build it again from the
 //! texts in memory, and write the files the user changed when the user saves them (decision 0011);
 //! it can solve the netlist as a preview, and save a solved copy where the user says (decision
-//! 0010). It writes no file otherwise, and as opened, objects without a position are not drawn.
+//! 0010); it exports an image of a level where the user says (export.rs). It writes no file
+//! otherwise, and as opened, objects without a position are not drawn.
 
 // Viewer is a GUI application, including local fast/debug builds. The CLI keeps its console.
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod build_cache;
 mod core_thread;
+mod export;
 mod files;
 mod formats;
 mod library;
@@ -462,6 +464,8 @@ fn main() {
             pool::dropped_files,
             pool::bundled_files,
             pool::path_packages,
+            export::export_svg,
+            export::save_image,
             library::update_library,
             formats::formats,
             formats::detect_format,

@@ -7,6 +7,9 @@ export const DARK_LIGHTNESS_THRESHOLD = 0.25;
 let dark = false;
 const originals = new WeakMap();
 
+/** Whether the drawing is shown on the dark background. */
+export const isDark = () => dark;
+
 export const darkLightness = (lightness) => lightness < DARK_LIGHTNESS_THRESHOLD ? 1 - lightness : lightness;
 
 /** RNL colours are CSS hex, with optional alpha. Reflect HSL L, retaining hue, saturation and alpha. */
