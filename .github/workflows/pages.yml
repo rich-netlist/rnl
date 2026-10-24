@@ -212,11 +212,13 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/apt-debs
-          key: apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles('tests/viewer/package-lock.json') }}
+          key: apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles('tests/viewer/package-lock.json') }}-full
           restore-keys: |
+            apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles('tests/viewer/package-lock.json') }}-
             apt-debs-${{ steps.apt.outputs.image }}-
             apt-debs-
       - name: Install the browsers for the site checks
+        id: install
         timeout-minutes: 30
         run: |
           sudo tee /etc/apt/apt.conf.d/80-rnl-network <<'CONF'
@@ -239,12 +241,17 @@ jobs:
           count=$(ls ~/apt-debs/*.deb 2>/dev/null | wc -l)
           echo "Keeping $count packages"
           echo "count=$count" >> "$GITHUB_OUTPUT"
+          # A complete set takes the exact key the next run looks for; what a failed install left is only a
+          # fallback, under a key of its own, so that a later successful run can store the complete set.
+          base="apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles('tests/viewer/package-lock.json') }}"
+          if [ "${{ steps.install.outcome }}" = success ]; then echo "key=$base-full" >> "$GITHUB_OUTPUT"
+          else echo "key=$base-partial-${{ github.run_id }}" >> "$GITHUB_OUTPUT"; fi
       - name: Save the browsers' system packages
         if: always() && steps.apt-keep.outputs.count != '' && steps.apt-keep.outputs.count != '0'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/apt-debs
-          key: apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles('tests/viewer/package-lock.json') }}
+          key: ${{ steps.apt-keep.outputs.key }}
       # Normally about 5 minutes.
       - name: Check site navigation in Chromium and WebKit
         timeout-minutes: 25
