@@ -1,10 +1,11 @@
 # site
 
-Five static pages, in Chinese and English, for circuit designers who have not worked on EDA tooling:
+Six static pages, in Chinese and English, for circuit designers who have not worked on EDA tooling:
 
 - `index.html`, the introduction: what RNL is, the problem it addresses, the goal, before/after scenarios, where things stand (the released milestones and what comes next, with an FAQ), and the ways on to the other pages. It is short on purpose; what it once held has moved ([Sections that moved](#sections-that-moved)).
 - `language.html`, the language tour: the language at a glance (the anatomy of a statement, the keyword families, how a level takes effect), nine hands-on sections on the parts of the language the introduction does not unpack (standard sentences and Chinese, definitions, the standard package's defaults, sets and selections, wires, text, orientation, priority, the header record), and a few examples.
 - `tools.html`, the page of the tools: what the viewers of the first toolkit, 0.1, do; the web viewer, with a few samples to open in it; the desktop viewer for Windows and Linux, with the files of its newest release; the toolchain, its modules and how data flows through them; and the licences.
+- `gallery.html`, the gallery of circuits: a list of designs in public GitHub repositories, each shown by a thumbnail and opened in the web viewer. The page holds no data: it reads `index.json` and the thumbnails from the GitHub Pages of [rnl-gallery](https://github.com/rich-netlist/rnl-gallery), where its checks write them ([The circuit gallery](#the-circuit-gallery)).
 - `agents.html`, the entry for AI agents: how to get the RNL skill package and install it, what is in it, and how to check and draw the files an agent writes ([For agents](#for-agents)).
 - `packages.html`, the gallery of the standard packages: every package in [`libraries/`](../libraries/README.md), with what it is for, what it references and its text, every symbol as the core draws it, with its pins and box, and the rules that give elements their symbols ([The gallery](#the-gallery-of-the-standard-packages)).
 
@@ -126,6 +127,15 @@ coordinates as `origin`; the page keeps the cross at 10 screen pixels, its strok
 for the mark at the frame's edge when needed. Compared with the previous frames, only
 `rnl-std-virtual 0.2`'s `$CURRENT_ARROW_SYM` expands to include an outside origin.
 
+## The circuit gallery
+
+`gallery.html` is a page of cards, one per entry of [rnl-gallery](https://github.com/rich-netlist/rnl-gallery): a thumbnail of the design, its title, description and author, its licence and the repository and commit it is read from. Unlike the gallery of the standard packages, nothing of it is built with the site: [`circuits.js`](src/assets/circuits.js) fetches `https://rich-netlist.github.io/rnl-gallery/index.json` (with `cache: "no-cache"`, so that the browser asks again every time and a new entry shows up when rnl-gallery has published it, a few minutes after its merge) and the thumbnails it names. It reads nothing else: no GitHub API, no netlists.
+
+- **What is trusted.** The index is the work of reviewed pull requests, but the page treats it as data: titles, descriptions and authors are set as text, a thumbnail must be `thumbs/….png` of that site, a manifest `manifests/….json`, a source link a github.com address, a viewer address a raw.githubusercontent.com one.
+- **Opening an entry.** A design of one file opens in the web viewer with `../viewer/?url=<raw address>`, and its `level` when it has one. A design of several files is opened by the viewer from its manifest, `?manifest=`, which the viewer does not do yet: `MANIFEST` in `circuits.js` is `false` until it does, and such a card shows its thumbnail, its source and a note.
+- **When it cannot be read.** An index that does not come within eight seconds or answers with an error leaves the message and a link to the repository; if the browser holds one it has read before, that is shown, with a note. An index of a newer `format` than the page knows asks for a reload.
+- **Tests.** [`tests/circuits.spec.mjs`](tests/circuits.spec.mjs) answers the requests to rnl-gallery from [`tests/fixtures/circuits/`](tests/fixtures/circuits) and checks the cards, the addresses, that nothing from the index is shown as markup, the search with `?q=` and the language switch, the failures, and the layout in both themes at 1440px and 390px. `RNL_CIRCUITS_SCREENSHOTS` saves those eight screenshots.
+
 ## For agents
 
 `agents.html` and the files it links make the entry for AI agents. The page is built by `build.py` like the others, from `src/agents.html`, with its own `assets/agents.css` and `assets/agents.js` (the copy buttons of the sentence to give an agent and of the commands); like the gallery it has no single-file version, and it has no old address at the root of the site (`NEW_PAGES`). What it links is not written by `build.py` but by [`scripts/skill/build.py --site`](../skills/README.md), which `pages.yml` runs:
@@ -137,7 +147,7 @@ The page and both `llms` files name every file of the package, so that they cann
 
 ## Building and viewing
 
-All five pages share the standard page's six primary links and the project's GitHub link, after Agent.
+All six pages share the standard page's seven primary links and the project's GitHub link, after Agent.
 The introduction, language tour, tools and agents pages put their first-level section links beside the content, below the full-width
 hero. Below 1000px, the top bar's Contents button opens that navigation; choosing an entry closes
 it. `test_build.py` compares both languages' primary links and current-page markers with
@@ -245,6 +255,8 @@ Both languages sit one level below the root, `zh/` and `en/`, alike. The root, `
 | `src/agents.html` | The entry for AI agents: structure and text |
 | `src/llms.txt`, `src/llms.zh.txt` | The plain-text entry for agents, English and Chinese, which `scripts/skill/build.py --site` writes to `llms.txt` and `zh/llms.txt` |
 | `src/assets/agents.css`, `src/assets/agents.js` | Styles and copy buttons of the page for agents, on top of `intro.css` and `common.js` |
+| `src/gallery.html` | The circuit gallery: structure and text |
+| `src/assets/circuits.js`, `src/assets/circuits.css` | The circuit gallery: reading rnl-gallery's index, the cards, the search; their styles on top of `gallery.css` |
 | `src/assets/gallery.js` | The gallery: loading the data, the groups, search, the packages and their statements, the symbol cards and the details of a symbol, what each package is for |
 | `src/assets/gallery.css` | Styles of the gallery, on top of `intro.css`, with the colours of the core's drawings mapped to the theme |
 | `gallery/build.mjs` | Builds the gallery's data from standard files and verified public catalog downloads, with the symbols drawn by the core as WebAssembly |

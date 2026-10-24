@@ -87,10 +87,11 @@ PAGES = {
     "language.html": "rnl-language-standalone.html",
     "tools.html": "rnl-tools-standalone.html",
     "packages.html": None,
+    "gallery.html": None,
     "agents.html": None,
 }
 # Pages added after the Chinese pages moved to zh/ have no old address at the root.
-NEW_PAGES = ("agents.html",)
+NEW_PAGES = ("agents.html", "gallery.html")
 
 GROUP = I18N.group
 CJK = re.compile("[%s]" % "".join("%s-%s" % (chr(a), chr(b)) for a, b in
@@ -489,7 +490,7 @@ def build_language(files, index, version, linux=False, macos=False):
         tokens = {"html-lang": I18N.locales[code]["html_lang"], "locale-code": code, "font-href": escape(I18N.font_url(code), quote=True),
                   "language-menu": I18N.menu(code, lambda target: "../" + target + "/" + ("" if page == "index.html" else page)),
                   "spec-root": "spec/" if I18N.standard(code) == code else "../" + I18N.standard(code) + "/spec/"}
-        tokens.update({"nav-" + key: escape(I18N.message(code, key)) for key in ("intro", "tour", "spec", "packages", "tools", "agents", "pages")})
+        tokens.update({"nav-" + key: escape(I18N.message(code, key)) for key in ("intro", "tour", "spec", "packages", "gallery", "tools", "agents", "pages")})
         for key, value in tokens.items():
             out[page] = out[page].replace("{{" + key + "}}", value)
         if I18N.standard(code) != code:
