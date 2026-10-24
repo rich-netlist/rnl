@@ -50,6 +50,8 @@ const expected = [
   "core.d.ts",
   "core.js",
   "document.d.ts",
+  "manifest.d.ts",
+  "manifest.js",
   "package.json",
   "packages.js",
   "rnl_runtime_wasm.wasm",

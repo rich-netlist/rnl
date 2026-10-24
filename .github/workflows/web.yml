@@ -69,7 +69,7 @@ jobs:
         run: pip install fonttools brotli && python scripts/fonts.py web
       - name: Build the site, with the samples
         run: |
-          node --test apps/web/build-info.test.mjs apps/web/library.test.mjs apps/web/edits.test.mjs apps/web/public-packages.test.mjs apps/web/zip.test.mjs
+          node --test apps/web/build-info.test.mjs apps/web/library.test.mjs apps/web/edits.test.mjs apps/web/public-packages.test.mjs apps/web/zip.test.mjs bindings/runtime-wasm/tests/manifest.test.mjs
           node apps/web/build.mjs --samples
           node --input-type=module -e 'import assert from "node:assert/strict"; import {readFileSync} from "node:fs"; import {buildVersions} from "./apps/web/build-info.mjs"; const about=JSON.parse(readFileSync("apps/web/dist/about.json")); const expected=buildVersions(process.cwd()); assert.equal(about.version,expected.version); assert.equal(about.coreVersion,expected.coreVersion); assert.match(about.commit,/^[0-9a-f]+$/); console.log(about);'
       - name: Serve the site
