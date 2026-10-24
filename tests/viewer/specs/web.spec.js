@@ -1460,3 +1460,22 @@ test("the bar stays while a file of the manifest is shown, goes with another fil
   await expect(bar).toBeVisible();
   await expect(bar.locator(".manifest-source")).toHaveText("Source: someone/design@0123456");
 });
+
+test("the bar names a manifest's authors in their order, each with an https address as a link", async ({ page }) => {
+  await manifestRoutes(page, demoManifest({ level: "(top)", author: [
+    { name: "Ada", url: "https://example.org/ada" }, { name: "Bob" }, { name: "Eve", url: "javascript:alert(1)" },
+  ] }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  const authors = page.locator("#manifest-bar .manifest-author");
+  await expect(authors).toHaveText("Ada, Bob, Eve");
+  const links = authors.locator("a");
+  await expect(links).toHaveCount(1);
+  await expect(links).toHaveText("Ada");
+  await expect(links).toHaveAttribute("href", "https://example.org/ada");
+  await expect(links).toHaveAttribute("target", "_blank");
+  await expect(links).toHaveAttribute("rel", "noopener noreferrer");
+  if (process.env.RNL_REVIEW_DIR && test.info().project.name === "chromium") {
+    await page.screenshot({ path: path.join(process.env.RNL_REVIEW_DIR, "manifest-authors.png"), clip: { x: 420, y: 0, width: 780, height: 120 } });
+  }
+});

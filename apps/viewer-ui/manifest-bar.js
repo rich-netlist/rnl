@@ -11,6 +11,17 @@ import { $ } from "./util.js";
 let shownExternal = null;
 
 /**
+ * The authors a manifest names, `[{ name, url }]`: it gives a list of `{ name, url? }` (or of names),
+ * or one name; a url is kept only when it is an https address.
+ */
+function authors(author) {
+  const list = Array.isArray(author) ? author : author ? [author] : [];
+  return list.map((a) => (typeof a === "string" ? { name: a } : { name: a?.name, url: a?.url }))
+    .filter((a) => typeof a.name === "string" && a.name.trim())
+    .map((a) => ({ name: a.name, url: typeof a.url === "string" && /^https:\/\//i.test(a.url) ? a.url : null }));
+}
+
+/**
  * Show the bar of `external`, the manifest the file shown belongs to (pool.js), when it gives a
  * title, an author or a source; with null, or a manifest that gives none of them, hide it.
  */
@@ -19,7 +30,8 @@ export function showManifestBar(external) {
   shownExternal = external;
   const { repo, commit, url } = external?.source || {};
   const title = external && ((locale() === "zh-CN" && external.title?.zh) || external.title?.en);
-  const shown = !!(title || external?.author || (repo && commit));
+  const people = authors(external?.author);
+  const shown = !!(title || people.length || (repo && commit));
   bar.hidden = !shown;
   bar.replaceChildren();
   if (!shown) return;
@@ -29,11 +41,22 @@ export function showManifestBar(external) {
     setText(name, title);
     append(bar, name);
   }
-  if (external.author) {
-    const author = document.createElement("span");
-    author.className = "manifest-author";
-    setText(author, external.author);
-    append(bar, author);
+  if (people.length) {
+    // the names in their order, separated by commas; a name with an address links to it
+    const line = document.createElement("span");
+    line.className = "manifest-author";
+    people.forEach((person, k) => {
+      if (k) append(line, document.createTextNode(", "));
+      const name = document.createElement(person.url ? "a" : "span");
+      if (person.url) {
+        name.href = person.url;
+        name.target = "_blank";
+        name.rel = "noopener noreferrer";
+      }
+      setText(name, person.name);
+      append(line, name);
+    });
+    append(bar, line);
   }
   if (repo && commit) {
     const link = document.createElement("a");
