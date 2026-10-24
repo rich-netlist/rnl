@@ -17,6 +17,10 @@
  * @property {() => Promise<string | null>} [pickPath] Pick a desktop search directory.
  * @property {(dir: string) => Promise<string[]>} [pathPackages] Package and netlist paths in a desktop PATH directory.
  * @property {(source: Source) => object} [poolItem] A web source's entry as a searchable file.
+ * @property {() => Promise<Array<{name: string, title: string, extensions: string[], fallback: boolean}>>} [formats] The core's parse formats, in its order, for the Library's format menus before a Document lists them.
+ * @property {(path: string) => Promise<string>} [detectFormat] The format the core detects for a Library file that the document shown does not read.
+ * @property {(path: string) => string} [formatKey] The key a file's format choice is kept by: its path folded where the platform ignores case, or the address of a file a server served.
+ * @property {(path: string) => boolean} [keepsFormat] Whether a format chosen for the file is kept in the settings; otherwise only while the page is open. True when absent.
  * @property {(source: Source, document: object, file: number) => Source} sourceForFile Re-root at a document file, retaining read capabilities but no compiled include scope.
  * @property {() => Source[]} [preloadCandidates] Library/PATH sources eligible for background compilation.
  * @property {(source: Source) => Promise<string>} [preload] Prepare an independent file without activating its document. Returns ready/cached/full/paused/busy/cancelled/skipped/disabled.

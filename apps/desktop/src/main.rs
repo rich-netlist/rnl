@@ -10,6 +10,7 @@
 mod build_cache;
 mod core_thread;
 mod files;
+mod formats;
 mod library;
 mod load_progress;
 #[cfg(target_os = "macos")]
@@ -114,6 +115,7 @@ async fn open_document(
     edits: Option<Edits>,
     request_id: Option<String>,
     fresh: Option<bool>,
+    formats: Option<formats::Formats>,
 ) -> Result<tauri::ipc::Response, String> {
     core.preload.cancel();
     let core = core.inner().clone();
@@ -121,6 +123,7 @@ async fn open_document(
     let cache_limit = settings.cache_limit()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
+    let formats = formats.unwrap_or_default();
     let progress_window = window.clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
         core.run(move |drawn| {
@@ -139,7 +142,7 @@ async fn open_document(
                 rnl_view::LibraryProvider { files: &layered, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&layered, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
-            let built = drawn.build(&entry, &provider, fresh.unwrap_or(false))?;
+            let built = drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?;
             if built.hit {
                 provider.cached();
             }
@@ -170,6 +173,7 @@ async fn open_text(
     edits: Option<Edits>,
     request_id: Option<String>,
     fresh: Option<bool>,
+    formats: Option<formats::Formats>,
 ) -> Result<tauri::ipc::Response, String> {
     core.preload.cancel();
     let core = core.inner().clone();
@@ -177,6 +181,7 @@ async fn open_text(
     let cache_limit = settings.cache_limit()?;
     let library = library.snapshot()?;
     let pool = pool.unwrap_or_default();
+    let formats = formats.unwrap_or_default();
     let progress_window = window.clone();
     let doc = tauri::async_runtime::spawn_blocking(move || {
         core.run(move |drawn| {
@@ -190,7 +195,7 @@ async fn open_text(
                 rnl_view::LibraryProvider { files: &files, index: &index, enabled: auto_include.unwrap_or(false) };
             let provider = load_progress::LoadingProvider::new(&files, &progress_window, request_id.as_deref());
             drawn.set_limit(cache_limit);
-            let built = drawn.build(&entry, &provider, fresh.unwrap_or(false))?;
+            let built = drawn.build(&entry, &provider, &formats, fresh.unwrap_or(false))?;
             if built.hit {
                 provider.cached();
             }
@@ -458,6 +463,8 @@ fn main() {
             pool::bundled_files,
             pool::path_packages,
             library::update_library,
+            formats::formats,
+            formats::detect_format,
             menu::set_view_check,
             menu::set_command_enabled,
             menu::set_ui_language,

@@ -1238,6 +1238,16 @@ body.dropping::after {
 button.pool-open { background: transparent; border: 0; color: inherit; cursor: pointer; }
 button.pool-open:hover { text-decoration: underline; }
 .pool-badge { font-size: 10px; color: var(--muted); max-width: 80px; }
+.format-chip { flex: none; font-size: 10px; line-height: 1; padding: 2px 6px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; }
+.format-chip.chosen { border-color: var(--accent); background: var(--accent); color: var(--panel); }
+.format-chip:disabled { cursor: default; opacity: 0.6; }
+.format-menu { position: fixed; z-index: 30; display: flex; flex-direction: column; min-width: 140px; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: 0 4px 14px rgb(0 0 0 / 18%); }
+.format-item { padding: 5px 10px 5px 24px; border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; cursor: pointer; position: relative; }
+.format-item:hover, .format-item:focus-visible { background: var(--select-text); outline: none; }
+.format-check { position: absolute; left: 8px; }
+.pool-include { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 42px; font-size: 12px; }
+.pool-include-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; direction: rtl; text-align: left; color: var(--muted); }
+.pool-include-name::before { content: "\200e"; }
 .pool-note { font-size: 11px; color: var(--muted); margin: 4px 10px 10px; overflow-wrap: anywhere; }
 .pool-temporary { padding-left: 10px; border-bottom: 1px solid var(--line); }
 .pool-temporary .pool-open { font-style: italic; }
