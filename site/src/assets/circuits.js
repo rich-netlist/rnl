@@ -20,8 +20,22 @@
   var KEY = 'rnl-gallery-index';
   var locale = document.documentElement.getAttribute('data-locale');
 
-  var state = { entries: [], q: '' };
-  var main, counts;
+  /* The suggested tags of rnl-gallery, in this page's language; any other tag shows as it is written */
+  var TAGS = {
+    amplifier: '<zh>放大器</zh><en>amplifier</en>', opamp: '<zh>运放</zh><en>opamp</en>', ota: 'OTA',
+    comparator: '<zh>比较器</zh><en>comparator</en>', bandgap: '<zh>带隙基准</zh><en>bandgap</en>',
+    reference: '<zh>基准</zh><en>reference</en>', bias: '<zh>偏置</zh><en>bias</en>', ldo: 'LDO',
+    power: '<zh>电源</zh><en>power</en>', oscillator: '<zh>振荡器</zh><en>oscillator</en>',
+    vco: '<zh>压控振荡器</zh><en>VCO</en>', pll: '<zh>锁相环</zh><en>PLL</en>', adc: 'ADC', 'sar-adc': 'SAR ADC', dac: 'DAC',
+    filter: '<zh>滤波器</zh><en>filter</en>', 'switched-capacitor': '<zh>开关电容</zh><en>switched-capacitor</en>',
+    'mixed-signal': '<zh>混合信号</zh><en>mixed-signal</en>', digital: '<zh>数字</zh><en>digital</en>',
+    rf: '<zh>射频</zh><en>RF</en>', lna: 'LNA', mixer: '<zh>混频器</zh><en>mixer</en>',
+    hierarchical: '<zh>层次化</zh><en>hierarchical</en>', 'transistor-level': '<zh>晶体管级</zh><en>transistor-level</en>',
+    'virtuoso-export': '<zh>Virtuoso 导出</zh><en>Virtuoso export</en>'
+  };
+
+  var state = { entries: [], q: '', tags: [] };
+  var main, counts, tagBar;
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -34,6 +48,11 @@
   function pick(texts) {
     if (!texts || typeof texts !== 'object') return '';
     return String(Object.prototype.hasOwnProperty.call(texts, locale) ? texts[locale] : texts.en || '');
+  }
+
+  function tagLabel(tag) { return Object.prototype.hasOwnProperty.call(TAGS, tag) ? TAGS[tag] : tag; }
+  function tagsOf(entry) {
+    return Array.isArray(entry.tags) ? entry.tags.filter(function (t) { return typeof t === 'string' && /^[a-z0-9][a-z0-9-]{0,31}$/.test(t); }) : [];
   }
 
   /* What an entry may point to: the paths and addresses the index is allowed to give */
@@ -52,14 +71,33 @@
   }
 
   function haystack(entry) {
-    return [pick(entry.title), (entry.title || {}).en, pick(entry.description), (entry.description || {}).en, entry.author, entry.license, entry.source && entry.source.repo].join(' ').toLowerCase();
+    return [pick(entry.title), (entry.title || {}).en, pick(entry.description), (entry.description || {}).en, entry.author, entry.license, entry.source && entry.source.repo, tagsOf(entry).join(' ')].join(' ').toLowerCase();
   }
 
   function matches(entry) {
+    var have = tagsOf(entry);
+    if (!state.tags.every(function (t) { return have.indexOf(t) >= 0; })) return false;
     var words = state.q.toLowerCase().split(/\s+/).filter(Boolean);
     if (!words.length) return true;
     var text = haystack(entry);
     return words.every(function (w) { return text.indexOf(w) >= 0; });
+  }
+
+  function toggleTag(tag) {
+    var at = state.tags.indexOf(tag);
+    if (at >= 0) state.tags.splice(at, 1); else state.tags.push(tag);
+    render();
+    saveUrl();
+  }
+
+  function tagButton(tag, count) {
+    var b = el('button', 'cg-tag', tagLabel(tag));
+    b.type = 'button';
+    b.setAttribute('data-tag', tag);
+    b.setAttribute('aria-pressed', state.tags.indexOf(tag) >= 0 ? 'true' : 'false');
+    if (count !== undefined) b.appendChild(el('small', '', String(count)));
+    b.addEventListener('click', function () { toggleTag(tag); });
+    return b;
   }
 
   function card(entry) {
@@ -104,9 +142,32 @@
       meta.appendChild(link);
     }
     body.appendChild(meta);
+    var tags = tagsOf(entry);
+    if (tags.length) {
+      var row = el('p', 'cg-tagrow');
+      tags.forEach(function (t) { var b = tagButton(t); b.classList.add('cg-tag-sm'); row.appendChild(b); });
+      body.appendChild(row);
+    }
     if (!href) body.appendChild(el('p', 'cg-note', fill('<zh>这个设计有多个文件，查看器还不能一次打开它；先看缩略图和来源。</zh><en>This design has several files, which the viewer cannot open in one go yet; see the thumbnail and the source.</en>')));
     article.appendChild(body);
     return article;
+  }
+
+  /* The tags of all entries, most used first; the ones asked for stay in the bar even when no entry has them */
+  function renderTagBar() {
+    var count = {};
+    state.entries.forEach(function (e) { tagsOf(e).forEach(function (t) { count[t] = (count[t] || 0) + 1; }); });
+    state.tags.forEach(function (t) { if (!count[t]) count[t] = 0; });
+    var names = Object.keys(count).sort(function (a, b) { return count[b] - count[a] || (a < b ? -1 : 1); });
+    tagBar.textContent = '';
+    tagBar.hidden = !names.length;
+    names.forEach(function (t) { tagBar.appendChild(tagButton(t, count[t])); });
+    if (state.tags.length) {
+      var clear = el('button', 'cg-clear', fill('<zh>清除标签</zh><en>Clear tags</en>'));
+      clear.type = 'button';
+      clear.addEventListener('click', function () { state.tags = []; render(); saveUrl(); });
+      tagBar.appendChild(clear);
+    }
   }
 
   function render() {
@@ -121,9 +182,9 @@
       shown.forEach(function (e) { grid.appendChild(card(e)); });
       main.appendChild(grid);
     }
-    counts.textContent = fill('<zh>{n} 个条目</zh><en>{n} entries</en>', { n: shown.length }) +
-      (shown.length !== state.entries.length ? fill('<zh>，共 {t} 个</zh><en> of {t}</en>', { t: state.entries.length }) : '');
-    $('#tb-count').textContent = String(state.entries.length);
+    renderTagBar();
+    counts.textContent = state.entries.length ? fill('<zh>{n} 个条目</zh><en>{n} entries</en>', { n: shown.length }) +
+      (shown.length !== state.entries.length ? fill('<zh>，共 {t} 个</zh><en> of {t}</en>', { t: state.entries.length }) : '') : '';
   }
 
   function notice(text, kind) {
@@ -173,24 +234,34 @@
         p.appendChild(a);
         main.appendChild(p);
         counts.textContent = '';
-        $('#tb-count').textContent = '–';
       }
     });
   }
 
+  /* The search and the tags are in the address (?q=…&tag=a&tag=b), so that a view can be shared */
+  function query() {
+    var parts = [];
+    if (state.q) parts.push('q=' + encodeURIComponent(state.q));
+    state.tags.forEach(function (t) { parts.push('tag=' + encodeURIComponent(t)); });
+    return parts.length ? '?' + parts.join('&') : '';
+  }
+
   function saveUrl() {
-    var url = location.pathname + (state.q ? '?q=' + encodeURIComponent(state.q) : '') + location.hash;
+    var url = location.pathname + query() + location.hash;
     try { if (url !== location.pathname + location.search + location.hash) history.replaceState(null, '', url); } catch (e) { /* opened from the disk */ }
     document.querySelectorAll('[data-lang-link]').forEach(function (lang) {
-      lang.setAttribute('href', lang.getAttribute('href').split(/[?#]/)[0] + (state.q ? '?q=' + encodeURIComponent(state.q) : ''));
+      lang.setAttribute('href', lang.getAttribute('href').split(/[?#]/)[0] + query());
     });
   }
 
   function boot() {
     main = $('#cg-main');
     counts = $('#cg-counts');
+    tagBar = $('#cg-tags');
     var input = $('#cg-q');
-    state.q = new URLSearchParams(location.search).get('q') || '';
+    var params = new URLSearchParams(location.search);
+    state.q = params.get('q') || '';
+    state.tags = params.getAll('tag').filter(function (t, i, all) { return /^[a-z0-9][a-z0-9-]{0,31}$/.test(t) && all.indexOf(t) === i; });
     input.value = state.q;
     input.addEventListener('input', P.debounce(function () {
       state.q = input.value.trim();

@@ -68,21 +68,11 @@
 
 <section class="hero tour-hero gl-hero" id="top" aria-labelledby="gallery-title">
   <div class="wrap">
-    <div class="hero-grid">
-      <div class="hero-copy">
-        <p class="eyebrow"><span>RICH NETLIST · GALLERY</span><span class="chip chip-warn"><zh>草案 · 刚开始收录</zh><en>Draft · just started</en></span></p>
-        <h1 id="gallery-title" class="tour-h1"><zh>图库</zh><en>Gallery</en></h1>
-        <p class="thesis"><zh>画好的电路：点开一个，就在查看器里看它。</zh><en>Drawn circuits: open one and look at it in the viewer.</en></p>
-        <p class="lead"><zh>图库是一张列表。每个条目指向 GitHub 上某个公开仓库里的某一个提交，设计本身不复制到这里；点开就用<a href="../viewer/">网页版查看器</a>读那个提交里的文件。列表放在 <a href="https://github.com/rich-netlist/rnl-gallery">rnl-gallery</a> 仓库里，新条目合并几分钟后就出现在这一页上，网站不用重新发布。想加一个设计，提一个 PR 就行，设计的作者不用做任何事。</zh>
-          <en>The gallery is a list. Each entry points to one commit in a public GitHub repository; nothing of the design is copied here, and opening it reads that commit’s files in the <a href="../viewer/">web viewer</a>. The list is kept in the <a href="https://github.com/rich-netlist/rnl-gallery">rnl-gallery</a> repository, and a new entry shows up on this page minutes after it is merged, with no new release of the site. To add a design, open a pull request; its author does not have to do anything.</en></p>
-      </div>
-      <dl class="titleblock" aria-label="<zh>图库概况</zh><en>Gallery facts</en>">
-        <div class="tb-main"><dt><zh>条目</zh><en>Entries</en></dt><dd id="tb-count">…</dd></div>
-        <div><dt><zh>列表</zh><en>List</en></dt><dd><a class="mono" href="https://github.com/rich-netlist/rnl-gallery">rnl-gallery</a></dd></div>
-        <div><dt><zh>来源</zh><en>Sources</en></dt><dd><zh>GitHub 上的公开仓库，固定在一个提交</zh><en>public GitHub repositories, each at one commit</en></dd></div>
-        <div><dt><zh>打开</zh><en>Opens in</en></dt><dd><zh>网页版查看器</zh><en>the web viewer</en></dd></div>
-        <div><dt><zh>缩略图</zh><en>Thumbnails</en></dt><dd><zh>提交时由 RNL 核心画出</zh><en>drawn by the RNL core when an entry is added</en></dd></div>
-      </dl>
+    <div class="hero-copy">
+      <p class="eyebrow"><span>RICH NETLIST · GALLERY</span></p>
+      <h1 id="gallery-title" class="tour-h1"><zh>图库</zh><en>Gallery</en></h1>
+      <p class="thesis"><zh>一些公开的 RNL 案例，各自按自己的许可证公开。</zh><en>Some public RNL examples, each published under its own licence.</en></p>
+      <p class="lead"><a href="https://github.com/rich-netlist/rnl-gallery#readme"><zh>怎样贡献：见 rnl-gallery 的 README</zh><en>How to contribute: the rnl-gallery README</en></a></p>
     </div>
   </div>
 </section>
@@ -94,12 +84,9 @@
         <svg class="ico"><use href="#i-search"/></svg>
         <input id="cg-q" type="search" autocomplete="off" spellcheck="false" placeholder="<zh>搜索图库</zh><en>Search the gallery</en>" aria-label="<zh>搜索标题、说明、作者</zh><en>Search titles, descriptions and authors</en>">
       </label>
-      <p class="toc-title"><zh>加入图库</zh><en>Add a design</en></p>
+      <p class="toc-title"><zh>贡献</zh><en>Contribute</en></p>
       <ul>
-        <li><a href="https://github.com/rich-netlist/rnl-gallery/blob/main/CONTRIBUTING.md"><zh>怎样加一个设计</zh><en>How to add a design</en></a></li>
-        <li><a href="https://github.com/rich-netlist/rnl-gallery#licences"><zh>接受的许可证</zh><en>Accepted licences</en></a></li>
-        <li><a href="https://github.com/rich-netlist/rnl-gallery"><zh>rnl-gallery 仓库</zh><en>The rnl-gallery repository</en></a></li>
-        <li><a href="https://github.com/rich-netlist/rnl-gallery/issues"><zh>撤下条目、提问题</zh><en>Take down an entry, ask</en></a></li>
+        <li><a href="https://github.com/rich-netlist/rnl-gallery#readme"><zh>rnl-gallery 的 README</zh><en>The rnl-gallery README</en></a></li>
       </ul>
     </nav>
     <div class="gl-content">
@@ -107,6 +94,7 @@
         <h2 id="cg-title"><zh>电路例子</zh><en>Circuit examples</en></h2>
         <p id="cg-counts" aria-live="polite"></p>
       </header>
+      <div class="cg-tags" id="cg-tags" role="group" aria-label="<zh>按标签筛选</zh><en>Filter by tag</en>" hidden></div>
       <div class="gl-main" id="cg-main" aria-live="polite">
         <p class="gl-status" id="cg-status"><zh>正在载入……</zh><en>Loading…</en></p>
         <noscript><p class="gl-status"><zh>这一页要用 JavaScript 显示图库。列表在 <a href="https://github.com/rich-netlist/rnl-gallery/tree/main/entries">GitHub 的 rnl-gallery 仓库</a>里。</zh><en>This page needs JavaScript to show the gallery. The list is in the <a href="https://github.com/rich-netlist/rnl-gallery/tree/main/entries">rnl-gallery repository on GitHub</a>.</en></p></noscript>
@@ -121,16 +109,15 @@
   <div class="wrap foot-grid">
     <div>
       <span class="brand-mark">RNL</span>
-      <p><zh>这一页的数据不在网站里：它读 <a href="https://rich-netlist.github.io/rnl-gallery/">rnl-gallery 的 GitHub Pages</a> 上的索引和缩略图，所以图库不跟着网站发布。每个设计仍按它自己仓库的许可证；图库只为许可证允许的仓库生成缩略图。</zh>
-        <en>The data of this page is not in the site: it reads the index and the thumbnails from <a href="https://rich-netlist.github.io/rnl-gallery/">rnl-gallery’s GitHub Pages</a>, so the gallery does not follow the site’s releases. Each design stays under the licence of its own repository; the gallery makes thumbnails only for repositories whose licence allows it.</en></p>
+      <p><zh>这一页读 <a href="https://rich-netlist.github.io/rnl-gallery/">rnl-gallery 的 GitHub Pages</a> 上的索引和缩略图。每个设计按它自己仓库的许可证。</zh>
+        <en>This page reads the index and the thumbnails from <a href="https://rich-netlist.github.io/rnl-gallery/">rnl-gallery’s GitHub Pages</a>. Each design is under the licence of its own repository.</en></p>
     </div>
     <div>
       <h4><zh>另见</zh><en>See also</en></h4>
       <ul>
-        <li><a href="../viewer/"><zh>网页版查看器</zh><en>Web viewer</en></a><zh>：把网表画成原理图</zh><en>: draw a netlist as a schematic</en></li>
-        <li><a href="packages.html"><zh>标准包</zh><en>Packages</en></a><zh>：每个符号画出来的样子和定义原文</zh><en>: every symbol as it is drawn, and the text that defines it</en></li>
-        <li><a href="language.html"><zh>语言导览</zh><en>Language tour</en></a><zh>：九个可以动手试的小节</zh><en>: nine hands-on sections</en></li>
-        <li><a href="https://github.com/rich-netlist/rnl-gallery"><zh>rnl-gallery 仓库</zh><en>The rnl-gallery repository</en></a><zh>：列表和检查</zh><en>: the list and its checks</en></li>
+        <li><a href="../viewer/"><zh>网页版查看器</zh><en>Web viewer</en></a></li>
+        <li><a href="packages.html"><zh>标准包</zh><en>Packages</en></a></li>
+        <li><a href="https://github.com/rich-netlist/rnl-gallery"><zh>rnl-gallery 仓库</zh><en>The rnl-gallery repository</en></a></li>
       </ul>
     </div>
   </div>

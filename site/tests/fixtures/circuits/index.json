@@ -28,7 +28,12 @@
         "path": "thumbs/ota-single.11111111.png",
         "width": 320,
         "height": 240
-      }
+      },
+      "tags": [
+        "opamp",
+        "ota",
+        "hierarchical"
+      ]
     },
     {
       "id": "pll-multi",
@@ -53,7 +58,12 @@
         "path": "thumbs/pll-multi.22222222.png",
         "width": 320,
         "height": 240
-      }
+      },
+      "tags": [
+        "pll",
+        "mixed-signal",
+        "hierarchical"
+      ]
     },
     {
       "id": "broken-thumb",
@@ -79,7 +89,12 @@
         "path": "thumbs/missing.33333333.png",
         "width": 320,
         "height": 240
-      }
+      },
+      "tags": [
+        "hierarchical",
+        "custom-tag",
+        "BAD TAG"
+      ]
     }
   ]
 }
