@@ -199,19 +199,52 @@ jobs:
           python scripts/packages.py fixture
           echo "RNL_PACKAGE_CATALOG=$GITHUB_WORKSPACE/.rnl-packages/fixture/catalog.json" >> "$GITHUB_ENV"
       # The browsers' system packages (--with-deps, about 120 MB for WebKit) come from the runner's Ubuntu
-      # mirror, which has stalled for most of an hour twice (2026-10-23). apt gives up on a stalled download
-      # after 30 s and retries, which lets it move on to another mirror; a step that still hangs fails
-      # after 20 minutes instead of waiting for the job's limit. Normally the install takes about 1 minute.
+      # mirror, which was slow for 15 to 50 minutes in several runs on 2026-10-23 and 24, in bursts that apt's
+      # timeouts do not catch. So the downloaded .deb files are kept between runs by actions/cache, keyed by
+      # the runner image and the Playwright lock file; a run installs from them and downloads only what
+      # changed. They are kept even when the install fails, so a slow run still moves the next one forward.
+      # A run with nothing cached can take a quarter of an hour on a slow mirror; normally it takes 1 minute.
+      - name: Name the cache of the browsers' system packages
+        id: apt
+        run: echo "image=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+      - name: Restore the browsers' system packages
+        id: apt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-debs
+          key: apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles('tests/viewer/package-lock.json') }}
+          restore-keys: |
+            apt-debs-${{ steps.apt.outputs.image }}-
+            apt-debs-
       - name: Install the browsers for the site checks
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: |
           sudo tee /etc/apt/apt.conf.d/80-rnl-network <<'CONF'
           Acquire::Retries "5";
           Acquire::http::Timeout "30";
           Acquire::https::Timeout "30";
           CONF
+          if ls ~/apt-debs/*.deb >/dev/null 2>&1; then
+            sudo cp -n ~/apt-debs/*.deb /var/cache/apt/archives/
+            echo "Restored $(ls ~/apt-debs/*.deb | wc -l) cached packages"
+          fi
           npm ci --prefix tests/viewer
           node tests/viewer/node_modules/@playwright/test/cli.js install --with-deps chromium webkit
+      - name: Keep the downloaded system packages
+        id: apt-keep
+        if: always() && steps.apt-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/apt-debs
+          cp -n /var/cache/apt/archives/*.deb ~/apt-debs/ 2>/dev/null || true
+          count=$(ls ~/apt-debs/*.deb 2>/dev/null | wc -l)
+          echo "Keeping $count packages"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+      - name: Save the browsers' system packages
+        if: always() && steps.apt-keep.outputs.count != '' && steps.apt-keep.outputs.count != '0'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-debs
+          key: apt-debs-${{ steps.apt.outputs.image }}-${{ hashFiles('tests/viewer/package-lock.json') }}
       # Normally about 5 minutes.
       - name: Check site navigation in Chromium and WebKit
         timeout-minutes: 25
