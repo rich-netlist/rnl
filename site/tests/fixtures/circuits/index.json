@@ -30,9 +30,9 @@
         "height": 240
       },
       "tags": [
-        "opamp",
-        "ota",
-        "hierarchical"
+        "Op-amp",
+        "OTA",
+        "Hierarchical"
       ]
     },
     {
@@ -72,9 +72,9 @@
         "height": 240
       },
       "tags": [
-        "pll",
-        "mixed-signal",
-        "hierarchical"
+        "PLL",
+        "Mixed-signal",
+        "Hierarchical"
       ]
     },
     {
@@ -104,8 +104,8 @@
       },
       "tags": [
         "hierarchical",
-        "custom-tag",
-        "BAD TAG"
+        "Custom tag",
+        "BAD_TAG"
       ]
     }
   ]

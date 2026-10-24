@@ -14,26 +14,10 @@
   var DATA = 'https://rich-netlist.github.io/rnl-gallery/';
   var VIEWER = '../viewer/';
   /* An entry of one file opens in the web viewer with ?url=; an entry of several files with ?manifest=, the address
-     of its manifest, from which the viewer reads all of its files. MANIFEST says the viewer does (it does since core
-     and viewer 0.4.0); with false such an entry would show its thumbnail and its source only. */
-  var MANIFEST = true;
+     of its manifest, from which the viewer reads all of its files. */
   var TIMEOUT = 8000;
   var KEY = 'rnl-gallery-index';
   var locale = document.documentElement.getAttribute('data-locale');
-
-  /* The suggested tags of rnl-gallery, in this page's language; any other tag shows as it is written */
-  var TAGS = {
-    amplifier: '<zh>放大器</zh><en>amplifier</en>', opamp: '<zh>运放</zh><en>opamp</en>', ota: 'OTA',
-    comparator: '<zh>比较器</zh><en>comparator</en>', bandgap: '<zh>带隙基准</zh><en>bandgap</en>',
-    reference: '<zh>基准</zh><en>reference</en>', bias: '<zh>偏置</zh><en>bias</en>', ldo: 'LDO',
-    power: '<zh>电源</zh><en>power</en>', oscillator: '<zh>振荡器</zh><en>oscillator</en>',
-    vco: '<zh>压控振荡器</zh><en>VCO</en>', pll: '<zh>锁相环</zh><en>PLL</en>', adc: 'ADC', 'sar-adc': 'SAR ADC', dac: 'DAC',
-    filter: '<zh>滤波器</zh><en>filter</en>', 'switched-capacitor': '<zh>开关电容</zh><en>switched-capacitor</en>',
-    'mixed-signal': '<zh>混合信号</zh><en>mixed-signal</en>', digital: '<zh>数字</zh><en>digital</en>',
-    rf: '<zh>射频</zh><en>RF</en>', lna: 'LNA', mixer: '<zh>混频器</zh><en>mixer</en>',
-    hierarchical: '<zh>层次化</zh><en>hierarchical</en>', 'transistor-level': '<zh>晶体管级</zh><en>transistor-level</en>',
-    'virtuoso-export': '<zh>Virtuoso 导出</zh><en>Virtuoso export</en>'
-  };
 
   var state = { entries: [], q: '', tags: [] };
   var main, counts, tagBar;
@@ -61,9 +45,39 @@
     });
   }
 
-  function tagLabel(tag) { return Object.prototype.hasOwnProperty.call(TAGS, tag) ? TAGS[tag] : tag; }
+  /* A tag is written as it is to be shown ("180nm CMOS", "PLL"): it is shown so in every language, and compared by its key,
+     which ignores case and turns spaces into hyphens (180nm-cmos), so that PLL and pll are one tag */
+  var TAG = /^[A-Za-z0-9](?:[A-Za-z0-9.+\/-]| (?! ))*$/;
+  function tagKey(tag) { return tag.toLowerCase().replace(/ /g, '-'); }
+  /* The written forms of the tags of all entries, by key: the one most entries use is the label (the first seen when equal) */
+  var written = {};
+  function tagLabel(key) { return written[key] ? written[key].label : key; }
+  function collectLabels() {
+    var seen = {};
+    state.entries.forEach(function (e) {
+      (Array.isArray(e.tags) ? e.tags : []).forEach(function (t) {
+        if (typeof t !== 'string' || t.length > 32 || !TAG.test(t) || / $/.test(t)) return;
+        var k = tagKey(t);
+        var forms = seen[k] || (seen[k] = { order: [], count: {} });
+        if (!forms.count[t]) { forms.count[t] = 0; forms.order.push(t); }
+        forms.count[t]++;
+      });
+    });
+    written = {};
+    Object.keys(seen).forEach(function (k) {
+      var best = seen[k].order.reduce(function (a, b) { return seen[k].count[b] > seen[k].count[a] ? b : a; });
+      written[k] = { label: best };
+    });
+  }
+  /* The keys of the tags of an entry, each once, in the order written */
   function tagsOf(entry) {
-    return Array.isArray(entry.tags) ? entry.tags.filter(function (t) { return typeof t === 'string' && /^[a-z0-9][a-z0-9-]{0,31}$/.test(t); }) : [];
+    var keys = [];
+    (Array.isArray(entry.tags) ? entry.tags : []).forEach(function (t) {
+      if (typeof t !== 'string' || t.length > 32 || !TAG.test(t) || / $/.test(t)) return;
+      var k = tagKey(t);
+      if (keys.indexOf(k) < 0) keys.push(k);
+    });
+    return keys;
   }
 
   /* What an entry may point to: the paths and addresses the index is allowed to give */
@@ -77,12 +91,12 @@
     var v = entry.viewer || {};
     var level = typeof v.level === 'string' && v.level ? '&level=' + encodeURIComponent(v.level) : '';
     if (rawUrl(v.url)) return VIEWER + '?url=' + encodeURIComponent(v.url) + level;
-    if (MANIFEST && v.manifest && manifestUrl(v.manifest)) return VIEWER + '?manifest=' + encodeURIComponent(manifestUrl(v.manifest));
+    if (v.manifest && manifestUrl(v.manifest)) return VIEWER + '?manifest=' + encodeURIComponent(manifestUrl(v.manifest));
     return null;
   }
 
   function haystack(entry) {
-    return [pick(entry.title), (entry.title || {}).en, pick(entry.description), (entry.description || {}).en, authorsOf(entry).map(function (a) { return a.name; }).join(' '), entry.license, entry.source && entry.source.repo, tagsOf(entry).join(' ')].join(' ').toLowerCase();
+    return [pick(entry.title), (entry.title || {}).en, pick(entry.description), (entry.description || {}).en, authorsOf(entry).map(function (a) { return a.name; }).join(' '), entry.license, entry.source && entry.source.repo, tagsOf(entry).map(tagLabel).join(' ')].join(' ').toLowerCase();
   }
 
   function matches(entry) {
@@ -170,7 +184,6 @@
       tags.forEach(function (t) { row.appendChild(tagButton(t)); });
       body.appendChild(row);
     }
-    if (!href) body.appendChild(el('p', 'cg-note', fill('<zh>这个设计有多个文件，查看器还不能一次打开它；先看缩略图和来源。</zh><en>This design has several files, which the viewer cannot open in one go yet; see the thumbnail and the source.</en>')));
     article.appendChild(body);
     return article;
   }
@@ -178,10 +191,14 @@
   /* The tags of all entries under the search box, most used first, each a check box with the number of entries that
      have it; the ones asked for stay in the list even when no entry has them. Together they are an intersection. */
   function renderTagBar() {
+    collectLabels();
     var count = {};
     state.entries.forEach(function (e) { tagsOf(e).forEach(function (t) { count[t] = (count[t] || 0) + 1; }); });
     state.tags.forEach(function (t) { if (!count[t]) count[t] = 0; });
-    var names = Object.keys(count).sort(function (a, b) { return count[b] - count[a] || (a < b ? -1 : 1); });
+    var names = Object.keys(count).sort(function (a, b) {
+      var la = tagLabel(a).toLowerCase(), lb = tagLabel(b).toLowerCase();
+      return count[b] - count[a] || (la < lb ? -1 : la > lb ? 1 : 0);
+    });
     tagBar.textContent = '';
     tagBar.hidden = !names.length;
     names.forEach(function (t) {
@@ -205,6 +222,7 @@
   }
 
   function render() {
+    collectLabels();
     var shown = state.entries.filter(matches);
     main.textContent = '';
     if (!state.entries.length) {
@@ -295,7 +313,7 @@
     var input = $('#cg-q');
     var params = new URLSearchParams(location.search);
     state.q = params.get('q') || '';
-    state.tags = params.getAll('tag').filter(function (t, i, all) { return /^[a-z0-9][a-z0-9-]{0,31}$/.test(t) && all.indexOf(t) === i; });
+    state.tags = params.getAll('tag').map(function (t) { return tagKey(t.trim()); }).filter(function (t, i, all) { return /^[a-z0-9][a-z0-9.+\/-]{0,31}$/.test(t) && all.indexOf(t) === i; });
     input.value = state.q;
     input.addEventListener('input', P.debounce(function () {
       state.q = input.value.trim();
