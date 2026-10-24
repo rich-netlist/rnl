@@ -416,20 +416,21 @@ rnl/
 │  └─ wasm/                    # WASM 绑定入口：runtime + 渲染器；solver 单独入口
 ├─ packages/
 │  ├─ runtime/                 # npm 接口与生成类型
-│  ├─ solver/                  # npm 求解接口与 Worker 封装
-│  ├─ viewer/                  # 图元绘制与浏览
-│  └─ editor/                  # 编辑工具、事务接口与轻量 router
+│  ├─ solver/                  # npm 求解接口与 Worker 封装（计划，目录未建）
+│  ├─ viewer/                  # 图元绘制与浏览（计划，目录未建）
+│  └─ editor/                  # 编辑工具、事务接口与轻量 router（计划，目录未建）
 ├─ libraries/
 │  └─ standard/                # 标准 RNL 符号库
 ├─ apps/
 │  ├─ web/                     # 参考 Web 应用
 │  └─ desktop/                 # Tauri 应用
-├─ tests/
-│  ├─ conformance/             # 语言一致性、跨方言等价
-│  ├─ roundtrip/               # 读取、修改、写回
-│  └─ integration/             # 求解到显示与编辑
-└─ examples/
+└─ tests/
+   ├─ conformance/             # 语言一致性、跨方言等价
+   ├─ roundtrip/               # 读取、修改、写回
+   └─ integration/             # 求解到显示与编辑
 ```
+
+> 2026-10-25 补注：原计划的顶层 `examples/` 一直只有说明文件，已删除；示例在 `site/examples/`、`skills/rnl/examples/` 和 rnl-gallery 里。
 
 > 已由[决定 0008](decisions/0008-shared-core-per-platform-frontends.md) 补充：`crates/` 下还有 `rnl-view/`，即核心接口：输入工作区（各文件的文本），输出 Document；桌面、CLI 和 Web 前端都通过它取得要显示的内容。
 

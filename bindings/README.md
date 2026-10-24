@@ -5,6 +5,5 @@ Entry points to the shared core for platforms that do not call Rust natively ([d
 | Binding | |
 | --- | --- |
 | [`runtime-wasm`](runtime-wasm/README.md) | The core as WebAssembly: a JSON request in, a Document out, through a small C-style interface with no generated glue; and the JavaScript modules that load it, run it in a Worker and collect the files a document needs. CI requires that its Documents are those of the native build. |
-| [`solver-wasm`](solver-wasm/README.md) | Future WebAssembly binding of the optional solver. |
 
-See the [roadmap](../docs/roadmap.md) for planned work.
+A WebAssembly binding of the optional solver is future work, and has no directory here yet. See the [roadmap](../docs/roadmap.md) for planned work.
