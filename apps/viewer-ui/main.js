@@ -16,7 +16,7 @@ import { gridState, setGrid } from "./grid.js";
 import { setHoverNames } from "./hover.js";
 import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
-import { showGalleryLevel } from "./gallery.js";
+import { showManifestLevel } from "./manifest-bar.js";
 import { restoreSession } from "./navigation.js";
 import {
   setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
@@ -93,8 +93,8 @@ async function start() {
   else {
     const initial = await shell.initial();
     await openSource(initial, false);
-    // a gallery design opens on the level its manifest, or the address, names
-    if (initial?.gallery) await showGalleryLevel(initial);
+    // files opened by a manifest open on the level it, or the address, names
+    if (initial?.external) await showManifestLevel(initial);
   }
 }
 

@@ -547,8 +547,7 @@
   "Fetching files… {0} / {1}": "正在获取文件… {0} / {1}",
   "Source: {0}@{1}": "来源：{0}@{1}",
   "{0} at commit {1}": "{0}，提交 {1}",
-  "Back to the gallery": "返回图库",
-  "This design has no level {0}; the level shown is the default one.": "这个设计没有层 {0}，显示的是默认层。",
-  "From the gallery · {0} · read only": "来自图库 · {0} · 只读",
-  "Where this design comes from": "这个设计的来源"
+  "The netlist has no level {0}; the level shown is the default one.": "网表里没有 {0} 这一层；显示的是默认的那一层。",
+  "From external manifest · {0} · read only": "来自外部清单 · {0} · 只读",
+  "Where these files come from": "这些文件的来源"
 }

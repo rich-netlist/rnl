@@ -18,7 +18,7 @@ body.embed[data-background="dark"] {
   --accent: #8fb4e6;
   color-scheme: dark;
 }
-.embed #menubar, .embed #sidebar, .embed #vsplit, .embed .statusbar, .embed .level-bar, .embed .gallery-bar { display: none; }
+.embed #menubar, .embed #sidebar, .embed #vsplit, .embed .statusbar, .embed .level-bar, .embed .manifest-bar { display: none; }
 .embed #app { grid-template-columns: minmax(0, 1fr); }
 .embed .drawing { grid-column: 1; grid-template-rows: minmax(0, 1fr); }
 .embed .drawing > .canvas { grid-row: 1; }

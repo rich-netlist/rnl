@@ -1,6 +1,7 @@
-// A gallery manifest (format 1) read into what a build of the core takes: the texts of its files by
-// workspace path, its pool in the manifest's order, its entry and its level. The web viewer's `?manifest=` and the gallery's thumbnails in
-// Node read a manifest with this one module, so that both draw the same Document.
+// A manifest (format 1) read into what a build of the core takes: the texts of its files by
+// workspace path, its pool in the manifest's order, its entry and its level. The web viewer's
+// `?manifest=` and tools in Node, such as the thumbnails of the RNL gallery, which writes such
+// manifests, read a manifest with this one module, so that both draw the same Document.
 //
 // A manifest names a commit of a public GitHub repository: its files are fetched from `base`, raw
 // GitHub, each checked against the SHA-256 of its bytes; a file with a `url` of its own, a package of
@@ -9,7 +10,7 @@ import { decodeText } from "./client.js";
 
 /** The manifest format this module reads. */
 export const MANIFEST_FORMAT = 1;
-/** At most this many files, this many bytes in one file and this many in all, as the gallery's CI allows. */
+/** At most this many files, this many bytes in one file and this many in all. */
 export const MANIFEST_LIMITS = Object.freeze({ files: 300, fileBytes: 2 * 1024 * 1024, bytes: 20 * 1024 * 1024 });
 const FILES_BASE = "https://raw.githubusercontent.com/";
 const URL_BASES = [FILES_BASE, "https://rich-netlist.github.io/rnl-packages/"];

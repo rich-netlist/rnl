@@ -1321,29 +1321,29 @@ test("temporary package is absent from include and USE-PACKAGE lookup; applied t
   expect((await page.evaluate(() => window.viewer.doc)).files[0].text).toContain("R2 b 0 2k");
 });
 
-// ---- gallery designs by manifest (?manifest=, core/manifest.js) ----
+// ---- files by an external manifest (?manifest=, core/manifest.js) ----
 
-const GALLERY_BASE = "https://raw.githubusercontent.com/someone/design/0123456789abcdef0123456789abcdef01234567/";
-const GALLERY_MANIFEST = "https://gallery.test/designs/demo.json";
-const GALLERY_TREE = "https://github.com/someone/design/tree/0123456789abcdef0123456789abcdef01234567/examples/demo";
-const GALLERY_REMOTE = "https://rich-netlist.github.io/rnl-packages/demo-remote/2.0/demo-remote.rnl";
-const galleryDir = path.join(root, "tests/viewer/inputs/gallery");
-const galleryFiles = ["top.sp", "cells/amp.sp", "lib/models.inc", "pkg/demo-local.rnl"];
+const MANIFEST_BASE = "https://raw.githubusercontent.com/someone/design/0123456789abcdef0123456789abcdef01234567/";
+const MANIFEST_URL = "https://manifests.test/designs/demo.json";
+const MANIFEST_TREE = "https://github.com/someone/design/tree/0123456789abcdef0123456789abcdef01234567/examples/demo";
+const MANIFEST_REMOTE = "https://rich-netlist.github.io/rnl-packages/demo-remote/2.0/demo-remote.rnl";
+const manifestDir = path.join(root, "tests/viewer/inputs/manifest");
+const manifestFiles = ["top.sp", "cells/amp.sp", "lib/models.inc", "pkg/demo-local.rnl"];
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 /** The fixture design's manifest, with `change` over it. */
-function galleryManifest(change = {}) {
-  const remote = fs.readFileSync(path.join(root, "tests/viewer/inputs/gallery-remote.rnl"));
+function demoManifest(change = {}) {
+  const remote = fs.readFileSync(path.join(root, "tests/viewer/inputs/manifest-remote.rnl"));
   return {
-    format: 1, id: "demo", title: { en: "Gallery demo", zh: "图库示例" }, author: "someone",
-    source: { repo: "someone/design", commit: "0123456789abcdef0123456789abcdef01234567", url: GALLERY_TREE },
-    license: "MIT", base: GALLERY_BASE, entry: "top.sp", level: "amp",
+    format: 1, id: "demo", title: { en: "Manifest demo", zh: "清单示例" }, author: "someone",
+    source: { repo: "someone/design", commit: "0123456789abcdef0123456789abcdef01234567", url: MANIFEST_TREE },
+    license: "MIT", base: MANIFEST_BASE, entry: "top.sp", level: "amp",
     files: [
-      ...galleryFiles.map((file) => {
-        const bytes = fs.readFileSync(path.join(galleryDir, file));
+      ...manifestFiles.map((file) => {
+        const bytes = fs.readFileSync(path.join(manifestDir, file));
         return { path: file, sha256: sha256(bytes), size: bytes.length };
       }),
-      { path: ".packages/demo-remote/2.0/demo-remote.rnl", sha256: sha256(remote), size: remote.length, url: GALLERY_REMOTE },
+      { path: ".packages/demo-remote/2.0/demo-remote.rnl", sha256: sha256(remote), size: remote.length, url: MANIFEST_REMOTE },
     ],
     // a bare include and a package by name look in the pool, in its order
     pool: ["lib/models.inc", "pkg/demo-local.rnl", ".packages/demo-remote/2.0/demo-remote.rnl"],
@@ -1352,42 +1352,43 @@ function galleryManifest(change = {}) {
 }
 
 /** Serve the manifest, its files from raw GitHub and the remote package; count the manifest's fetches. */
-async function galleryRoutes(page, manifest, served = {}) {
+async function manifestRoutes(page, manifest, served = {}) {
   const counts = { manifest: 0 };
-  await page.route(GALLERY_MANIFEST, (route) => {
+  await page.route(MANIFEST_URL, (route) => {
     counts.manifest += 1;
     return route.fulfill({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify(manifest) });
   });
-  await page.route(`${GALLERY_BASE}**`, (route) => {
+  await page.route(`${MANIFEST_BASE}**`, (route) => {
     const file = new URL(route.request().url()).pathname.split("/").slice(4).join("/");
-    const body = served[file] ?? (galleryFiles.includes(file) ? fs.readFileSync(path.join(galleryDir, file)) : null);
+    const body = served[file] ?? (manifestFiles.includes(file) ? fs.readFileSync(path.join(manifestDir, file)) : null);
     return body === null ? route.fulfill({ status: 404, body: "missing" })
       : route.fulfill({ status: 200, contentType: "text/plain", headers: { "Access-Control-Allow-Origin": "*" }, body });
   });
-  await page.route(GALLERY_REMOTE, (route) => route.fulfill({ status: 200, contentType: "text/plain",
-    headers: { "Access-Control-Allow-Origin": "*" }, body: fs.readFileSync(path.join(root, "tests/viewer/inputs/gallery-remote.rnl")) }));
+  await page.route(MANIFEST_REMOTE, (route) => route.fulfill({ status: 200, contentType: "text/plain",
+    headers: { "Access-Control-Allow-Origin": "*" }, body: fs.readFileSync(path.join(root, "tests/viewer/inputs/manifest-remote.rnl")) }));
   return counts;
 }
 
-test("?manifest= opens a gallery design: its files, search path and packages, its level, the source bar and a read-only Library group", async ({ page }) => {
+test("?manifest= opens the files of a manifest: its pool and packages, its level, the source bar and a read-only Library group", async ({ page }) => {
   // "(top)": the top level of the entry; a level in another file opens that file, as the next tests show
-  const counts = await galleryRoutes(page, galleryManifest({ level: "(top)" }));
-  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(GALLERY_MANIFEST)}`);
+  const counts = await manifestRoutes(page, demoManifest({ level: "(top)" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
   const doc = await shown(page);
   // the relative include, the bare one on the search path and both packages are found
   expect(doc.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
   expect(doc.files.map((f) => f.name)).toEqual(expect.arrayContaining(["top.sp", "cells/amp.sp", "lib/models.inc"]));
   expect(await page.evaluate(() => window.viewer.level)).toBe(0);
-  const bar = page.locator("#gallery-bar");
+  const bar = page.locator("#manifest-bar");
   await expect(bar).toBeVisible();
-  await expect(bar.locator(".gallery-title")).toHaveText("Gallery demo");
+  await expect(bar.locator(".manifest-title")).toHaveText("Manifest demo");
   await expect(bar).toContainText("someone");
-  await expect(bar.locator(".gallery-source")).toHaveText("Source: someone/design@0123456");
-  await expect(bar.locator(".gallery-source")).toHaveAttribute("href", GALLERY_TREE);
-  await expect(bar.locator(".gallery-back")).toHaveAttribute("href", "https://rich-netlist.github.io/rnl/en/gallery.html");
+  await expect(bar.locator(".manifest-source")).toHaveText("Source: someone/design@0123456");
+  await expect(bar.locator(".manifest-source")).toHaveAttribute("href", MANIFEST_TREE);
+  // the source is the bar's only link
+  await expect(bar.locator("a")).toHaveCount(1);
   await page.locator("#tab-files").click();
-  const group = page.locator('.lib-group[data-group="gallery"]');
-  await expect(group.locator(".lib-title")).toHaveText("From the gallery · demo · read only");
+  const group = page.locator('.lib-group[data-group="external"]');
+  await expect(group.locator(".lib-title")).toHaveText("From external manifest · demo · read only");
   await expect(group.locator(".pool-open")).toHaveText([".packages/demo-remote/2.0/demo-remote.rnl", "cells/amp.sp", "lib/models.inc", "pkg/demo-local.rnl", "top.sp"]);
   await expect(group.getByRole("button", { name: /Exclude/ })).toHaveCount(0);
   // read only: the text cannot be edited
@@ -1395,11 +1396,10 @@ test("?manifest= opens a gallery design: its files, search path and packages, it
   await expect(page.locator("#source textarea")).toHaveCount(0);
   // Chinese: the title and the way back follow the language
   await page.evaluate(() => window.viewer.command("language-zh"));
-  await expect(bar.locator(".gallery-title")).toHaveText("图库示例");
-  await expect(bar.locator(".gallery-back")).toHaveAttribute("href", "https://rich-netlist.github.io/rnl/zh/gallery.html");
+  await expect(bar.locator(".manifest-title")).toHaveText("清单示例");
   await page.evaluate(() => window.viewer.command("language-en"));
   if (process.env.RNL_REVIEW_DIR && test.info().project.name === "chromium") {
-    await page.screenshot({ path: path.join(process.env.RNL_REVIEW_DIR, "gallery-manifest.png") });
+    await page.screenshot({ path: path.join(process.env.RNL_REVIEW_DIR, "external-manifest.png") });
   }
   // Reload reads the manifest again
   const before = counts.manifest;
@@ -1407,28 +1407,34 @@ test("?manifest= opens a gallery design: its files, search path and packages, it
   expect(counts.manifest).toBe(before + 1);
 });
 
-test("a gallery file whose SHA-256 does not match is named and nothing opens; a missing level is told", async ({ page }) => {
-  await galleryRoutes(page, galleryManifest(), { "cells/amp.sp": "* changed\n" });
-  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(GALLERY_MANIFEST)}`);
+test("a file of a manifest whose SHA-256 does not match is named and nothing opens; a missing level is told", async ({ page }) => {
+  await manifestRoutes(page, demoManifest(), { "cells/amp.sp": "* changed\n" });
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
   await expect(page.locator("#diags .diag.error .msg")).toContainText("cells/amp.sp");
   expect(await page.evaluate(() => window.viewer.doc)).toBeNull();
-  await expect(page.locator("#gallery-bar")).toBeHidden();
+  await expect(page.locator("#manifest-bar")).toBeHidden();
 
   await page.unrouteAll();
-  await galleryRoutes(page, galleryManifest({ level: "nothing" }));
-  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(GALLERY_MANIFEST)}`);
+  await manifestRoutes(page, demoManifest({ level: "nothing" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
   await shown(page);
   await expect(page.locator("#notice")).toContainText("no level nothing");
+  // a manifest with no title, author or source has no bar
+  await page.unrouteAll();
+  await manifestRoutes(page, demoManifest({ title: undefined, author: undefined, source: undefined }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  await expect(page.locator("#manifest-bar")).toBeHidden();
   // ?level= wins over the manifest's
-  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(GALLERY_MANIFEST)}&level=amp`);
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}&level=amp`);
   await shown(page);
   await expect.poll(() => page.evaluate(() => window.viewer.doc.levels[window.viewer.level].title)).toBe("amp");
 });
 
-test("an embedded canvas opens a gallery design by ?manifest=", async ({ page }) => {
-  await galleryRoutes(page, galleryManifest());
-  await page.goto(`${process.env.RNL_WEB_URL}/index.html?embed=1&manifest=${encodeURIComponent(GALLERY_MANIFEST)}`);
+test("an embedded canvas opens the files of a manifest by ?manifest=", async ({ page }) => {
+  await manifestRoutes(page, demoManifest());
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?embed=1&manifest=${encodeURIComponent(MANIFEST_URL)}`);
   await expect(page.locator("#canvas > svg")).toBeVisible();
-  await expect(page.locator("#gallery-bar")).toBeHidden();
+  await expect(page.locator("#manifest-bar")).toBeHidden();
   await expect.poll(() => page.evaluate(() => window.viewer?.doc?.levels[window.viewer.level]?.title)).toBe("amp");
 });

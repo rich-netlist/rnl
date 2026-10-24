@@ -119,20 +119,20 @@ const drawings = await core.drawings({
 
 The request is about the last build that had `lazy_unplaced`, and is refused, with a message, when no build did, when an object is not there, or when the names are those of another build.
 
-## Gallery manifests
+## Manifests
 
-`@rich-netlist/runtime/manifest` reads a design of the RNL gallery by its manifest (format 1), as the web viewer's `?manifest=` does: it fetches the files from the commit the manifest names on raw GitHub, checks each against its SHA-256, and gives what a build takes.
+`@rich-netlist/runtime/manifest` reads the files a manifest (format 1) lists, as the web viewer's `?manifest=` does, such as the manifests the RNL gallery writes: it fetches the files from the commit the manifest names on raw GitHub, checks each against its SHA-256, and gives what a build takes.
 
 ```js
 import { startCore } from "@rich-netlist/runtime";
 import { readManifest } from "@rich-netlist/runtime/manifest";
 
-const design = await readManifest("https://example.org/gallery/amp.json", { onProgress: (done, total) => {} });
+const design = await readManifest("https://example.org/manifests/amp.json", { onProgress: (done, total) => {} });
 const core = startCore();
 const document = await core.build({ entry: design.entry, files: design.files, pool: design.pool });
 ```
 
-`files` holds the text of every file by its path under `/<id>/`, `pool` the manifest's pool in its order, and `level` the level the design opens on, a subcircuit's name or `"(top)"`. Files are fetched from the manifest's `base`, or from their own `url` (public packages, from raw GitHub or the package site), and their bytes checked before they are decoded. A file that does not match its SHA-256 or cannot be fetched rejects with a `ManifestError` whose `file` names it. The manifest's `base` must be on `https://raw.githubusercontent.com/`, and its files at most 300, 2 MB each and 20 MB in all. Node 18 and later, and browsers, are supported.
+`files` holds the text of every file by its path under `/<id>/`, `pool` the manifest's pool in its order, and `level` the level the files open on, a subcircuit's name or `"(top)"`. Files are fetched from the manifest's `base`, or from their own `url` (public packages, from raw GitHub or the package site), and their bytes checked before they are decoded. A file that does not match its SHA-256 or cannot be fetched rejects with a `ManifestError` whose `file` names it. The manifest's `base` must be on `https://raw.githubusercontent.com/`, and its files at most 300, 2 MB each and 20 MB in all. Node 18 and later, and browsers, are supported.
 
 ## Vite
 

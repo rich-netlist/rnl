@@ -2,7 +2,7 @@ import { m, setText } from "./i18n.js";
 // Shared by normal opens, rebuilds and embeds. A newer operation owns the indicator, so an older
 // completion or progress event cannot clear or relabel it. There is no invented percentage.
 const stages = { reading: m("Reading files…"), parsing: m("Parsing netlist…"), cached: m("Using cached drawing…"), displaying: m("Displaying netlist…") };
-// a stage with a count, such as a gallery design's files fetched: { stage: "fetching", done, total }
+// a stage with a count, such as the files of a manifest fetched: { stage: "fetching", done, total }
 const counted = { fetching: (done, total) => m`Fetching files… ${done} / ${total}` };
 let generation = 0;
 

@@ -20,15 +20,15 @@ The web viewer: the page of the RNL viewers ([`apps/viewer-ui`](../viewer-ui/REA
 
 Text is decoded as `rnl` decodes it, UTF-8 or else Latin-1, so a document is the one `rnl view` and the desktop viewer give for the same files, but for the paths that name them. Files opened from the computer are named in the workspace as `/NAME`, and a folder's as `/FOLDER/SUB/NAME`; a URL's files by their paths on the server that served the netlist, after any redirect, such as `/netlists/a/top.sp`, or `/top.sp` at its root, so that a URL that redirects opens as the one it redirects to. A netlist served at a directory's address is named after the directory, or after the server at its root, such as `/example.org`. The workspace has nothing above its root: an include such as `../x.inc` of a file opened from the computer is missing, not a file of that name opened with it.
 
-## Gallery designs
+## External manifests
 
-`?manifest=ADDRESS` opens a design of the [gallery](https://rich-netlist.github.io/rnl/en/gallery.html) by its manifest, which the gallery's CI writes for a commit of a public GitHub repository; `?url=` is unchanged, and the page takes one or the other. The reading is `core/manifest.js` (`bindings/runtime-wasm/js/manifest.js`, also `@rich-netlist/runtime/manifest`), which the gallery's thumbnails use too:
+`?manifest=ADDRESS` opens the files an external manifest lists, at a commit of a public GitHub repository, such as the manifests the [RNL gallery](https://rich-netlist.github.io/rnl/en/gallery.html) writes; `?url=` is unchanged, and the page takes one or the other. The reading is `core/manifest.js` (`bindings/runtime-wasm/js/manifest.js`, also `@rich-netlist/runtime/manifest`), which tools in Node can use too:
 
 - The manifest is format 1; a newer format asks for a newer viewer. Its `base` must be a directory of `https://raw.githubusercontent.com/`, its paths relative without `..`, and its files at most 300, 2 MB each and 20 MB in all.
 - Every file is fetched from `base`, six at a time, with the count shown while it loads, and its bytes checked against its SHA-256 before they are decoded; a file that does not match, is missing or cannot be fetched stops the opening, and the error names it. A file with a `url` of its own, a public package under `.packages/`, comes from that address instead, on raw GitHub or the public package site, checked the same way, without asking.
-- The files go under `/<id>/` in the workspace, read only, and the Library lists them in a group of their own, *From the gallery · id · read only*, with their directories. The manifest's `pool` is the build's pool, in its order: a bare include falls back to it by file name, and a package by name is found in it first; relative includes resolve as usual.
+- The files go under `/<id>/` in the workspace, read only, and the Library lists them in a group of their own, *From external manifest · id · read only*, with their directories. The manifest's `pool` is the build's pool, in its order: a bare include falls back to it by file name, and a package by name is found in it first; relative includes resolve as usual.
 - The document opens on the manifest's `level`, a subcircuit's name or "(top)" for the netlist's own level, or on `?level=` when the address gives one; a subcircuit the netlist has not is told, and the default level is shown. A subcircuit defined in another file opens that file, as other cross-file navigation does.
-- A slim bar above the drawing names the design, its author and its source, `repo@commit` linked to the manifest's `source.url`, with a link back to the gallery in the page's language.
+- A slim bar above the drawing shows what the manifest gives of its title (in the page's language), its author and its source, `repo@commit` linked to the manifest's `source.url`; a manifest that gives none of them has no bar.
 - Reload (F5) fetches the manifest and the files again.
 
 In an embedded canvas, `?embed=1&manifest=` and the `open` message's `manifest` field (instead of `url`) do the same, without the bar and the Library.
@@ -122,7 +122,7 @@ or native settings. The ordinary web viewer and desktop viewer keep their usual 
 | --- | --- | --- | --- |
 | `embed` | `1` | Normal viewer | Use the canvas-only web viewer. |
 | `url` | Netlist URL | None | Open a file, with includes relative to its served URL. |
-| `manifest` | Gallery manifest URL | None | Open a gallery design by its manifest ([Gallery designs](#gallery-designs)); not with `url`. |
+| `manifest` | Manifest URL | None | Open the files of an external manifest ([External manifests](#external-manifests)); not with `url`. |
 | `level` | Subcircuit name | Automatic, as when opening normally | Initial level. |
 | `background` | `light`, `dark` | `light` | Drawing background, as in View › Background; also colours the floating controls. |
 | `grid` | `dots`, `lines`, `off` | `off` | Canvas grid. |

@@ -1,4 +1,4 @@
-/** A gallery manifest read into what a build of the core takes (manifest.js). */
+/** A manifest read into what a build of the core takes (manifest.js). */
 
 /** The manifest format this module reads. */
 export declare const MANIFEST_FORMAT: 1;
@@ -11,7 +11,7 @@ export declare class ManifestError extends Error {
   constructor(message: string, file?: string | null);
 }
 
-/** A gallery manifest, format 1, as the gallery's CI writes it. */
+/** A manifest, format 1, such as the RNL gallery's CI writes. */
 export interface Manifest {
   format: 1;
   id: string;

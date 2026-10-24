@@ -155,11 +155,11 @@ function filesSource(files, entry) {
 }
 
 /**
- * A design of the gallery, by its manifest (core/manifest.js): its files and packages, fetched from
- * the commit the manifest names and checked against their SHA-256, under /<id>/ in the workspace;
+ * Files by an external manifest (core/manifest.js), such as the RNL gallery writes: its files
+ * and packages, fetched and checked against their SHA-256, under /<id>/ in the workspace;
  * the pool a bare include searches, in the order of the manifest's search paths; read only. Each
- * open reads the manifest and its files again, so Reload (F5) does too. `gallery` holds what was
- * read, for the Library, the source bar and the level (gallery.js).
+ * open reads the manifest and its files again, so Reload (F5) does too. `external` holds what was
+ * read, for the Library, the source bar and the level (manifest-bar.js).
  *
  * @param {URL} url
  */
@@ -169,14 +169,14 @@ function manifestSource(url) {
     path: `/${url.pathname.split("/").pop() || "manifest.json"}`,
     readonly: true,
     manifest: url.href,
-    gallery: null,
+    external: null,
     snapshot: {},
     pool: [],
     async open(_again, progress) {
       const read = await readManifest(url.href, {
         onProgress: (done, total) => progress?.({ stage: "fetching", done, total }),
       });
-      Object.assign(source, { gallery: { ...read, manifest: url.href }, snapshot: read.files, pool: read.pool, path: read.entry,
+      Object.assign(source, { external: { ...read, manifest: url.href }, snapshot: read.files, pool: read.pool, path: read.entry,
         name: read.entry.slice(read.id.length + 2) });
       return { path: read.entry, text: read.files[read.entry] };
     },
@@ -185,16 +185,16 @@ function manifestSource(url) {
   return source;
 }
 
-/** Another file of a gallery design, as cross-file navigation opens it: read only, from what was read. */
-function galleryFile(gallery, path) {
+/** Another file of an external manifest, as cross-file navigation opens it: read only, from what was read. */
+function externalFile(external, path) {
   return {
-    name: path.slice(gallery.id.length + 2), path, readonly: true, manifest: gallery.manifest, gallery,
-    snapshot: gallery.files, pool: gallery.pool,
+    name: path.slice(external.id.length + 2), path, readonly: true, manifest: external.manifest, external,
+    snapshot: external.files, pool: external.pool,
     async open() {
-      if (gallery.files[path] === undefined) throw new Error(`${path.slice(1)} is not among the gallery design's files.`);
-      return { path, text: gallery.files[path] };
+      if (external.files[path] === undefined) throw new Error(`${path.slice(1)} is not among the manifest's files.`);
+      return { path, text: external.files[path] };
     },
-    read: async (file) => gallery.files[file] ?? null,
+    read: async (file) => external.files[file] ?? null,
   };
 }
 
@@ -381,7 +381,7 @@ export function sourceFromUrl(text) {
   return urlSource(url);
 }
 
-/** The gallery design of a manifest at an http or https address, or one relative to this page. */
+/** The files of a manifest at an http or https address, or one relative to this page. */
 export function sourceFromManifest(text) {
   const url = parseUrl(text);
   if (!url) throw new Error(m("Give an http or https address, or one relative to this page."));
@@ -715,7 +715,7 @@ export default {
       return poolSources.get(path) || { ...filesSource(poolFiles, path), fromPool: true };
     }
     if (full.startsWith('<')) return { path, name: f.name, text: f.text, readonly: true };
-    if (source.gallery) return galleryFile(source.gallery, path);
+    if (source.external) return externalFile(source.external, path);
     // A reader supplies available bytes, never a previously compiled include closure.
     if (source.url) {
       const url = new URL(relative(source.path.split('/').slice(0, -1), path), source.url);
@@ -824,12 +824,12 @@ export default {
     return poolReady;
   },
   onInclude(handler) { included = handler; },
-  // another file of a gallery design, opened from the Library
-  galleryFile,
+  // another file of an external manifest, opened from the Library
+  externalFile,
   nativeMenu: false,
   /**
-   * The URL that `?url=` names in the page's address, resolved against the page; or the gallery
-   * design that `?manifest=` names.
+   * The URL that `?url=` names in the page's address, resolved against the page; or the files of
+   * the manifest that `?manifest=` names.
    */
   initial() {
     const params = new URLSearchParams(location.search);
@@ -880,7 +880,7 @@ export default {
       files[entry.path] = entry.text;
       Object.assign(files, source.snapshot || {});
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
-      // a gallery design's search paths first, in its order, then the Library's files
+      // a manifest's pool first, in its order, then the Library's files
       const request = { entry: entry.path, files, pool: [...(source.pool || []), ...[...library.texts.keys()].map(poolPath)], svg: true, primitives: false, lazy_unplaced: true,
         auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
         formats: requestFormats(source.url ? new URL(source.url).origin : null, poolPath),

@@ -253,16 +253,15 @@ body[data-background="dark"] .usage-overlays { --usage-label-bg: black; }
   background: var(--bg);
 }
 .level-bar { position: relative; padding-left: 4px; }
-/* the bar of a gallery design (gallery.js), between the level bar and the drawing; rows fixed, as it is mostly hidden */
+/* the bar of files opened by a manifest (manifest-bar.js), between the level bar and the drawing; rows fixed, as it is mostly hidden */
 .drawing > .level-bar { grid-row: 1; }
-.drawing > .gallery-bar { grid-row: 2; }
+.drawing > .manifest-bar { grid-row: 2; }
 .drawing > .canvas { grid-row: 3; }
-.gallery-bar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 4px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--panel); }
-.gallery-bar[hidden] { display: none; }
-.gallery-title { color: var(--fg); font-weight: 600; }
-.gallery-source, .gallery-back { color: var(--accent); text-decoration: none; }
-.gallery-source:hover, .gallery-back:hover { text-decoration: underline; }
-.gallery-back { margin-left: auto; }
+.manifest-bar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 4px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--panel); }
+.manifest-bar[hidden] { display: none; }
+.manifest-title { color: var(--fg); font-weight: 600; }
+.manifest-source { color: var(--accent); text-decoration: none; }
+.manifest-source:hover { text-decoration: underline; }
 /* the hierarchy path of the level shown (subcircuits.js): a segment per level, each but the root's
    with the instance it was reached through, and the level shown last; the others go back to theirs */
 .level-path { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; }

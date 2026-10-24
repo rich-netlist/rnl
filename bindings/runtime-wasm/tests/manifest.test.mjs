@@ -1,4 +1,4 @@
-// The gallery manifest reader (js/manifest.js) with a fetch of its own: what it gives a build, its
+// The manifest reader (js/manifest.js) with a fetch of its own: what it gives a build, its
 // checks, and the file each error names. Needs no WebAssembly build.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -93,7 +93,7 @@ test("missing files, a missing manifest and a package that does not match are to
     (error) => error.file === ".packages/eda-style/1.0/eda-style.rnl");
 });
 
-test("the checks refuse what the gallery's CI never writes", () => {
+test("the checks refuse what a manifest must not hold", () => {
   const refused = (change, pattern) => assert.throws(() => checkManifest(manifest(change)), pattern);
   const file = (path, size = 1) => ({ path, sha256: "a".repeat(64), size });
   refused({ format: 2 }, /update the viewer/);
