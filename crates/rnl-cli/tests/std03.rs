@@ -759,8 +759,10 @@ fn a_solve_puts_the_tails_under_the_middle_and_leaves_nothing_unsolved() {
 #[test]
 fn a_solve_of_0_3_spaces_symbols_from_their_pins() {
     // $NMOS and $RESISTOR both have their vertical pins at y = ±2 and box y1 = -2, y2 = 2, so a
-    // bottom-to-top distance of at least 2 places their origins 6 grid steps apart and routes a
-    // straight wire between #M1:d and #RD:n
+    // bottom-to-top distance of at least 2 would place their origins 6 grid steps apart; with the
+    // supply and the ground told by their drawing, #RD and #M1 are rows of the current depth, kept
+    // apart so that #M1's name stays clear of #RD's body, 8 apart, and the wire between #M1:d and
+    // #RD:n is still straight
     let body = ".model nch nmos level=1\nM1 out in 0 0 nch W=4u L=1u\nRD vdd out 5k\nVDD vdd 0 1.8\n\
                 VIN in 0 DC 0.6 AC 1\n* @RNL {\n*   # @SELECT-INSTANCE(model=\"nch\") => @SET-SYMBOL $NMOS;\n\
                 *   {#RD #M1} @ALIGN(\"x\");\n*   #M1 #RD @DISTANCE(\"bottom-to-top\", min=2);\n\
@@ -775,7 +777,7 @@ fn a_solve_of_0_3_spaces_symbols_from_their_pins() {
     let lv = level(&r, "t.sp");
     let at = |id: &str| lv.objects.iter().find(|o| o.id == id).and_then(|o| o.at).unwrap();
     assert_eq!(at("#RD").0, at("#M1").0);
-    assert_eq!(at("#RD").1 - at("#M1").1, 6.0);
+    assert_eq!(at("#RD").1 - at("#M1").1, 8.0);
     assert!(run.files[0].text.contains("&out @WIRE(mode=\"straight\") {#M1:d #RD:n}"), "{}", run.files[0].text);
 }
 

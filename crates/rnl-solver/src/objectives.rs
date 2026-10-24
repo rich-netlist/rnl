@@ -76,9 +76,11 @@ pub(crate) enum Scope {
 /// What an objective needs from the level to have anything to measure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Need {
-    /// A supply symbol: `$SUPPLY`, which `$SUPPLY_STUB` makes.
+    /// A supply symbol: one attached to a net or a terminal that hangs above its pin, such as
+    /// `$SUPPLY` and the one `$SUPPLY_STUB` makes (`crate::structure::hang`).
     Supply,
-    /// A ground symbol: `$GND`, which `$GND_STUB` makes.
+    /// A ground symbol: one attached to a net or a terminal that hangs below its pin, such as
+    /// `$GROUND` and the one `$GROUND_STUB` makes (`crate::structure::hang`).
     Ground,
     /// A port whose kind, input or output, can be told from what it connects to.
     PortKinds,
@@ -342,8 +344,8 @@ fn inert_reason(o: Objective, inputs: &Inputs) -> Option<String> {
         .iter()
         .filter(|n| !inputs.has(**n))
         .map(|n| match n {
-            Need::Supply => "no supply symbol ($SUPPLY or $SUPPLY_STUB)",
-            Need::Ground => "no ground symbol ($GND or $GND_STUB)",
+            Need::Supply => "no supply symbol (a symbol attached to a net or a terminal that hangs above its pin)",
+            Need::Ground => "no ground symbol (a symbol attached to a net or a terminal that hangs below its pin)",
             Need::PortKinds => "no port whose kind, input or output, can be told",
             Need::Wires => "nothing drawn as wires (no ROUTE and no wire)",
             Need::Templates => "no routing templates",
