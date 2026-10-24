@@ -120,6 +120,8 @@ test("the checks refuse what a manifest must not hold", () => {
   const unaddressed = manifest({ base: undefined });
   assert.throws(() => checkManifest(unaddressed), /no url, and the manifest no base/);
   assert.equal(checkManifest(unaddressed, { archive: true }).files.length, 5);
+  // a caller that holds less gives smaller limits: a web page's project
+  assert.throws(() => checkManifest(unaddressed, { archive: true, limits: { projectBytes: 10 } }), /bytes, more than 10\./);
   // an id is not needed: the entry's name is it then
   assert.equal(checkManifest(manifest({ id: undefined, entry: "top.scs" })).id, "top");
   refused({ pool: ["lib/none.rnl"] }, /not among the manifest's files/);

@@ -108,6 +108,7 @@
  *   A project read (manifest.js loadManifest): put its files where the shell reads them, and give the
  *   source of its entry and its pool as Library items.
  * @property {(path: string) => Promise<Uint8Array>} [readFile] Desktop: the bytes of a file on disk.
+ * @property {{ projectBytes?: number }} [projectLimits] Web: the largest project it opens, smaller than the desktop's.
  * @property {() => Promise<{ name: string, text: string } | null>} [pickManifest] Web: the manifest file the user chooses.
  * @property {(json: object, name: string) => Source} [sourceFromManifestJson] Web: the source of a manifest a file gave.
  * @property {(name: string, text: string) => Promise<void>} [saveManifest] Web: download a manifest of links.

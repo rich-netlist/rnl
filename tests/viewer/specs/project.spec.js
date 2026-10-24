@@ -289,6 +289,15 @@ test('Open Project refuses an archive without a manifest, and one whose file doe
     'z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("rnl-project.json",json.dumps(m)); z.writestr("top.sp","* TOP\\n"); z.close()'].join('\n'), tampered]);
   await choose(page, 'open-project', 'project-input', tampered);
   await expect(dialog).toContainText('top.sp does not match the SHA-256 the manifest lists.');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  // a project larger than the web's WebAssembly core holds is for the desktop viewer
+  const large = path.join(test.info().outputDir, 'large.zip');
+  execFileSync('python', ['-c', [
+    'import sys,zipfile,json',
+    'm={"format":1,"entry":"top.sp","files":[{"path":"top.sp","sha256":"0"*64,"size":300*1024*1024}]}',
+    'z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("rnl-project.json",json.dumps(m)); z.close()'].join('\n'), large]);
+  await choose(page, 'open-project', 'project-input', large);
+  await expect(dialog).toContainText('The project holds 300 MB, more than this page opens (256 MB). Open it in the desktop viewer.');
 });
 
 test('Download Manifest gives the files by their addresses, which Load Manifest opens again', async ({ page }) => {

@@ -83,10 +83,12 @@ interface ReadOptions {
   concurrency?: number;
   /** The workspace directory of the files, ending in "/"; `/<id>/` by default. */
   root?: string;
+  /** Some of MANIFEST_LIMITS replaced, for a caller that holds less (a web page opens smaller projects). */
+  limits?: Partial<typeof MANIFEST_LIMITS>;
 }
 
 /** Check a manifest and give it normalized; `archive` when it was read from a project's archive. Throws a ManifestError. */
-export declare function checkManifest(manifest: unknown, options?: { archive?: boolean }): Manifest & {
+export declare function checkManifest(manifest: unknown, options?: { archive?: boolean; limits?: Partial<typeof MANIFEST_LIMITS> }): Manifest & {
   id: string; level: string | null; pool: string[]; formats: Record<string, string>; paths: { path: string; subfolders: boolean }[];
   settings: { autoInclude?: boolean };
 };

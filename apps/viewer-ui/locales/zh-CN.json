@@ -577,5 +577,6 @@
   "The folder already has files of this project: {0}.": "这个文件夹里已经有本工程的文件：{0}。",
   "Replace them?": "要替换它们吗？",
   "Replace": "替换",
-  "Download File downloads the file shown. Download Project saves the library's files and how they are set up as a ZIP, which Open Project reads again.": "下载文件会下载当前显示的文件；下载工程会把资源库的文件和它们的配置打包成 ZIP，用“打开工程”可以再读回来。"
+  "Download File downloads the file shown. Download Project saves the library's files and how they are set up as a ZIP, which Open Project reads again.": "下载文件会下载当前显示的文件；下载工程会把资源库的文件和它们的配置打包成 ZIP，用“打开工程”可以再读回来。",
+  "The project holds {0} MB, more than this page opens ({1} MB). Open it in the desktop viewer.": "这个工程有 {0} MB，超过网页版能打开的大小（{1} MB）。请用桌面版打开。"
 }

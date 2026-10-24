@@ -43,7 +43,7 @@ A project, a gallery design and a manifest of links have one manifest format, fo
 
 - **Download Project** (web) and **Save Project** (desktop) write the archive. The desktop's files lose the directory all of them are in, so that includes between them resolve where the project is opened.
 - **Open Project** reads the archive, checks every file against the manifest, and makes the project's pool the Library's files, with the formats and settings it gives; its entry opens at its level. The web keeps the files under `/<name>/` in the page; the desktop asks for a folder to write them in, starting where the archive is, and asks before replacing files there; its Save Project then offers to save to the archive it opened. Opening a project does not change the desktop's PATH.
-- A project's archive holds at most 5000 files and 1 GiB, and a file may be larger than a fetched manifest allows.
+- A project's archive holds at most 5000 files and 1 GiB, and a file may be larger than a fetched manifest allows. The web opens projects of at most 256 MB, as its WebAssembly core holds a project's texts several times over; a larger one is to be opened in the desktop viewer.
 
 ## File pool and search paths
 

@@ -1028,6 +1028,9 @@ export default {
     const [file] = await chooseFiles(projectInput);
     return file ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : null;
   },
+  // a project's texts go to the WebAssembly core in one request, which holds them several times over:
+  // a web page opens smaller projects than the desktop does
+  projectLimits: { projectBytes: 256 * 1024 * 1024 },
   /** A project's files go in the workspace under its archive's name, as a folder's do. */
   projectRoot: (picked) => `/${picked.name.replace(/\.zip$/i, "").replace(/[\\/]/g, "_") || "project"}/`,
   /** The entry of a project read (project.js), and its pool as Library files; each sees all its files, as a folder's do. */

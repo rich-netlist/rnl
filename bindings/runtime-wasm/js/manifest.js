@@ -85,9 +85,12 @@ function defaultId(entry) {
 
 /**
  * Check a manifest and give it in the form the rest of this module reads. `archive` says that it was
- * read from a project's archive, whose files are in the archive: they need no address then.
+ * read from a project's archive, whose files are in the archive: they need no address then. `limits`
+ * replaces some of MANIFEST_LIMITS, as a caller that holds less needs: a web page's WebAssembly core
+ * holds a project's texts several times over, so it opens smaller projects than the desktop does.
  */
-export function checkManifest(manifest, { archive = false } = {}) {
+export function checkManifest(manifest, { archive = false, limits = {} } = {}) {
+  const limit = { ...MANIFEST_LIMITS, ...limits };
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) throw new ManifestError("The manifest is not a JSON object.");
   if (typeof manifest.format !== "number") throw new ManifestError("The manifest has no format.");
   if (manifest.format > MANIFEST_FORMAT) {
@@ -103,13 +106,13 @@ export function checkManifest(manifest, { archive = false } = {}) {
     throw new ManifestError(`The manifest's base must be the https address of a directory, ending in '/': ${JSON.stringify(base)}`);
   }
   if (!Array.isArray(manifest.files) || !manifest.files.length) throw new ManifestError("The manifest lists no files.");
-  const most = archive ? MANIFEST_LIMITS.projectFiles : MANIFEST_LIMITS.files;
+  const most = archive ? limit.projectFiles : limit.files;
   if (manifest.files.length > most) throw new ManifestError(`The manifest lists ${manifest.files.length} files, more than ${most}.`);
   const files = manifest.files.map((file) => {
     const path = relativePath(file?.path, "A file's path");
     if (typeof file.sha256 !== "string" || !SHA256.test(file.sha256.toLowerCase())) throw new ManifestError(`${path} has no SHA-256.`, path);
     if (!Number.isSafeInteger(file.size) || file.size < 0) throw new ManifestError(`${path} has no size.`, path);
-    if (!archive && file.size > MANIFEST_LIMITS.fileBytes) throw new ManifestError(`${path} has ${file.size} bytes, more than ${MANIFEST_LIMITS.fileBytes}.`, path);
+    if (!archive && file.size > limit.fileBytes) throw new ManifestError(`${path} has ${file.size} bytes, more than ${limit.fileBytes}.`, path);
     if (file.url !== undefined && (typeof file.url !== "string" || !address(file.url))) {
       throw new ManifestError(`${path} has a url that is not an https address: ${JSON.stringify(file.url)}`, path);
     }
@@ -119,7 +122,7 @@ export function checkManifest(manifest, { archive = false } = {}) {
   const listed = new Set(files.map((file) => file.path));
   if (listed.size !== files.length) throw new ManifestError("The manifest lists a file twice.");
   const bytes = files.reduce((sum, file) => sum + file.size, 0);
-  const total = archive ? MANIFEST_LIMITS.projectBytes : MANIFEST_LIMITS.bytes;
+  const total = archive ? limit.projectBytes : limit.bytes;
   if (bytes > total) throw new ManifestError(`The manifest's files hold ${bytes} bytes, more than ${total}.`);
   const entryPath = relativePath(entry, "The entry");
   if (!listed.has(entryPath)) throw new ManifestError(`The entry ${entryPath} is not among the manifest's files.`, entryPath);
@@ -192,7 +195,8 @@ async function inParallel(items, limit, work) {
  * is given (the manifest is in a project's archive; it gives the bytes, or null for a file the archive
  * lacks), else from its `url`, else from `base` joined with its path, with `fetch`, the global one by
  * default. `onProgress(done, total)` follows the files read; `signal` stops it; `root` is the
- * workspace directory of the files, `/<id>/` by default. The result's paths are under `root`:
+ * workspace directory of the files, `/<id>/` by default; `limits`, as checkManifest takes them. The
+ * result's paths are under `root`:
  * - `files`: the text of every file, by path, decoded after its bytes were checked; `bytes`: the bytes;
  *   `urls`: the address of each, its `url` or `base` joined with its path, or null for neither;
  * - `pool`: the manifest's pool, in its order, where a bare include and a package by name are
@@ -203,8 +207,8 @@ async function inParallel(items, limit, work) {
  *   `id`, `title`, `description`, `author`, `source` and `license` as it gives them.
  * Rejects with a ManifestError that names the file, when a file is the trouble.
  */
-export async function loadManifest(json, { fetch = globalThis.fetch, readFile, onProgress, signal, concurrency = 6, root } = {}) {
-  const manifest = checkManifest(json, { archive: !!readFile });
+export async function loadManifest(json, { fetch = globalThis.fetch, readFile, onProgress, signal, concurrency = 6, root, limits } = {}) {
+  const manifest = checkManifest(json, { archive: !!readFile, limits });
   root ??= `/${manifest.id}/`;
   const total = manifest.files.length;
   let done = 0;

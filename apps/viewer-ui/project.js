@@ -179,11 +179,17 @@ export async function openProject() {
     let json;
     try { json = JSON.parse(new TextDecoder().decode(await listed.read())); }
     catch { throw new Error(m`${PROJECT_MANIFEST} is not JSON.`); }
-    checkManifest(json, { archive: true });
+    const limits = shell.projectLimits;
+    const size = Array.isArray(json.files) ? json.files.reduce((sum, file) => sum + (Number(file?.size) || 0), 0) : 0;
+    if (limits?.projectBytes && size > limits.projectBytes) {
+      const mb = (bytes) => Math.ceil(bytes / (1024 * 1024));
+      throw new Error(m`The project holds ${mb(size)} MB, more than this page opens (${mb(limits.projectBytes)} MB). Open it in the desktop viewer.`);
+    }
+    checkManifest(json, { archive: true, limits });
     if (!(await confirmLeave(m("open a project")))) return;
     const root = await shell.projectRoot(picked, json, archive);
     if (!root) return;
-    const read = await loadManifest(json, { root, readFile: async (path) => (archive.has(path) ? archive.get(path).read() : null) });
+    const read = await loadManifest(json, { root, limits, readFile: async (path) => (archive.has(path) ? archive.get(path).read() : null) });
     const { source, items } = await shell.projectSource(read, picked);
     if (!(await setProjectFiles(items, read.formats, read.settings))) return;
     setSidebar(true);
