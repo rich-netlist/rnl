@@ -262,40 +262,48 @@ export function runStartupShortcuts(keys) {
   }
 }
 
+/** Tell `?debug=keys` (index.html) what became of a key; nothing without it. */
+const note = (e, what) => window.rnlKeyNote?.(e, what);
+
 document.addEventListener("keydown", (e) => {
-  if (shell?.embed && !document.hasFocus()) return;
-  if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+  if (shell?.embed && !document.hasFocus()) return note(e, "embed without focus");
+  if (e.defaultPrevented || e.isComposing || e.keyCode === 229) {
+    return note(e, e.defaultPrevented ? "taken before the page's handler" : "composing (IME)");
+  }
   const ctrl = e.ctrlKey || e.metaKey;
   const input = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target.isContentEditable || !!e.target.closest("select");
   const textInput = input && !e.target.matches('input[type="checkbox"], input[type="radio"]');
   const typing = input || !!e.target.closest('[role="listbox"], [role="tree"], #tree, #index, #unplaced-list');
   if (e.key === "Escape" && cancelGesture()) {
     e.preventDefault();
-    return;
+    return note(e, "cancelled a gesture");
   }
   const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
   // Lists, menus, editors and controls retain their own navigation. Body and the drawing pan.
   if (direction && !typing && !ctrl && !e.altKey &&
       (e.target === document.body || e.target === $("canvas"))) {
     if (pan(...direction, e.shiftKey ? 0.3 : 0.1)) e.preventDefault();
-    return;
+    return note(e, "panned");
   }
   let id = null;
   if (e.key === "F5") id = "reload"; // re-read the file, not the page
   else if (e.key === "Escape" && !typing) {
     clearSelection();
     e.preventDefault();
-    return;
+    return note(e, "cleared the selection");
   } else id = keyCommand(e, typing, textInput);
-  if (id === "find-text" && (typing || !isEnabled(id))) return;
+  if (id === "find-text" && (typing || !isEnabled(id))) return note(e, "find not available");
   // Focused buttons and source links retain native Enter activation.
   const control = e.target.closest('button, a[href]')?.getClientRects().length > 0;
-  if ((id === "descend" || id === "descend-new-window") && (control || opens(selected) === null)) return;
+  if ((id === "descend" || id === "descend-new-window") && (control || opens(selected) === null)) return note(e, "nothing to open");
   // Shift modifies navigation, including Ctrl+Shift+E (up) and Shift+Backspace.
   if (!typing && e.shiftKey && e.key === "Backspace" && !ctrl && !e.altKey) id = "ascend";
   if (e.shiftKey && ctrl && e.key.toLowerCase() === "e") id = "ascend";
   if (id) {
     e.preventDefault();
+    note(e, `ran ${id}`);
     command(id, { newWindow: e.shiftKey });
+  } else {
+    note(e, !table ? "command table not loaded" : textInput ? "typing in a text box" : typing ? "in a list (typing)" : "no command for this key");
   }
 });

@@ -14,6 +14,7 @@ function rememberPanelKey(event) {
   panelKeys.delete(event.key);
   panelKeys.add(event.key);
   event.preventDefault();
+  window.rnlKeyNote?.(event, "kept until startup ends");
 }
 document.addEventListener("keydown", rememberPanelKey);
 // Those that the inline script of index.html kept before this module ran, earliest first.

@@ -340,6 +340,7 @@ document.addEventListener(
     } else {
       return;
     }
+    window.rnlKeyNote?.(e, "taken by the menu bar");
     e.preventDefault();
     e.stopPropagation();
   },
