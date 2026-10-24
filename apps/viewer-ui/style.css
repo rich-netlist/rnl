@@ -36,6 +36,8 @@
   --select-line: rgba(232, 89, 12, 0.08);
   --out-of-scope: #ececee; /* the lines outside the subcircuit drawn */
   --select-fill: rgba(232, 89, 12, 0.07);
+  /* the rectangle a right drag zooms to: the plain highlight, whatever is selected */
+  --zoom-box-fill: var(--select-fill);
   /* the selection when it is a subcircuit instance, which can be opened */
   --sub: #c2255c;
   --sub-text: rgba(194, 37, 92, 0.18);
@@ -450,11 +452,12 @@ button.crumb:hover:not(:disabled) { color: var(--fg); }
 }
 .canvas.over-object { cursor: pointer; }
 .canvas.dragging { cursor: grabbing; }
+/* Not var(--select): a selected subcircuit instance turns that into its own colour (.sel-sub). */
 .zoom-box {
   position: absolute;
   z-index: 4;
-  border: 1px solid var(--select);
-  background: var(--select-fill);
+  border: 1px solid var(--drawing-select);
+  background: var(--zoom-box-fill);
   pointer-events: none;
 }
 .zoom-box[hidden] { display: none; }
