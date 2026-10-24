@@ -182,7 +182,7 @@ class SiteExamples(unittest.TestCase):
         for lang, label in (("zh", "在查看器中打开"), ("en", "Open in viewer")):
             self.assertIn(f'href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/index.html"])
             self.assertIn(
-                f'href="{build.SITE_URL}viewer/?url=samples/site/ota5t.sp">{label}</a>',
+                f'href="{build.SITE_URL}viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener">{label}</a>',
                 pages[f"{lang}/rnl-intro-standalone.html"],
             )
             self.assertIn(f'href="../viewer/?url=samples/site/ota5t.sp" target="_blank" rel="noopener">{label}</a>', pages[f"{lang}/language.html"])
