@@ -25,7 +25,7 @@ You keep the copyright in your contribution. By submitting it, you license it un
 | Path | Your contribution is licensed under |
 | --- | --- |
 | `spec/`, `docs/` | CC-BY-4.0 |
-| `libraries/`, `tests/`, `examples/` | CC0-1.0, which waives your rights as far as the law allows |
+| `libraries/`, `tests/` | CC0-1.0, which waives your rights as far as the law allows |
 | Everything else, including code | MIT |
 
 By submitting a contribution you also confirm that you have the right to license it this way. No separate sign-off or contributor agreement is required.

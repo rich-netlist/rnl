@@ -13,9 +13,9 @@ path = ["spec/**", "docs/**"]
 SPDX-FileCopyrightText = "2026 many-question"
 SPDX-License-Identifier = "CC-BY-4.0"
 
-# Data: standard libraries, test corpora, and examples.
+# Data: standard libraries and test corpora.
 [[annotations]]
-path = ["libraries/**", "tests/**", "examples/**"]
+path = ["libraries/**", "tests/**"]
 SPDX-FileCopyrightText = "2026 many-question"
 SPDX-License-Identifier = "CC0-1.0"
 

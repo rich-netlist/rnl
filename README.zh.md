@@ -56,7 +56,6 @@ M5 tail vbias vss  vss nch W=4u L=1u
 | [`apps/`](apps/README.md) | 桌面版和网页版查看器，以及两者共用的页面。 |
 | [`libraries/`](libraries/README.md) | 外部数据库：0.3 和 0.2 两个系列的标准包及其符号、中文代称包，以及 `analog-canvas-extensions`。 |
 | [`tests/`](tests/README.md) | 一致性测试语料、求解器的用例，以及查看器的浏览器测试；专门的往返用例是将来的工作。 |
-| [`examples/`](examples/README.md) | 将来的示例文档。 |
 | [`skills/`](skills/README.md) | 给 AI agent 的 skill 包：RNL skill，教 agent 读、写、检查和绘制 RNL 0.3，随网站发布，入口是[给 agent 的页面](https://rich-netlist.github.io/rnl/zh/agents.html)。 |
 | [`scripts/`](scripts/README.md) | 项目维护脚本：生成标准的各种发布形式、构建和检查 skill 包，以及随核心附带的字体。 |
 | [`.github/workflows/`](.github/workflows/README.md) | CI 工作流：项目网站、标准、桌面版查看器和 npm 包的发布、Rust 工作区、skill 包、查看器及其浏览器测试。 |
@@ -107,7 +106,7 @@ node apps/web/serve.mjs
 | --- | --- | --- |
 | 其余一切，包括代码、配置和顶层文件 | 下面没有列出的全部路径 | [MIT](LICENSE) |
 | 规范文本和项目文档 | `spec/`、`docs/` | [CC-BY-4.0](LICENSES/CC-BY-4.0.txt) |
-| 数据：标准库、测试语料和示例 | `libraries/`、`tests/`、`examples/` | [CC0-1.0](LICENSES/CC0-1.0.txt) |
+| 数据：标准库和测试语料 | `libraries/`、`tests/` | [CC0-1.0](LICENSES/CC0-1.0.txt) |
 | 随核心附带的字体 Noto Sans SC 的度量数据，版权 2014-2021 Adobe（[决定 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)） | `crates/rnl-render/fonts/noto-sans-sc.metrics` | [OFL-1.1](LICENSES/OFL-1.1.txt) |
 
 [`REUSE.toml`](REUSE.toml) 记录了这一对应关系，由 `reuse lint` 检查。从 Analog Canvas 迁来的文档由其版权人以 CC-BY-4.0 在这里发布；Analog Canvas 里冻结的副本仍按该仓库的 AGPL-3.0 许可。见[决定 0002](docs/decisions/0002-licenses.md)。

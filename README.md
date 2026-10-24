@@ -54,7 +54,6 @@ Every form is built from the chapters of one commit and names its revision ([dec
 | [`apps/`](apps/README.md) | The desktop and web viewers, and the page they share. |
 | [`libraries/`](libraries/README.md) | External data libraries: the standard packages of the series 0.3 and 0.2 with their symbols, the Chinese alias packages, and `analog-canvas-extensions`. |
 | [`tests/`](tests/README.md) | Conformance corpus, cases for the solver, and browser tests of the viewers; dedicated roundtrip cases are future work. |
-| [`examples/`](examples/README.md) | Future example documents. |
 | [`skills/`](skills/README.md) | Skill packages for AI agents: the RNL skill, which teaches an agent to read, write, check and draw RNL 0.3, published on the site with an entry for agents ([For agents](https://rich-netlist.github.io/rnl/en/agents.html)). |
 | [`scripts/`](scripts/README.md) | Maintenance scripts: the build of the standard's published forms, the build and check of the skill package, and the fonts shipped with the core. |
 | [`.github/workflows/`](.github/workflows/README.md) | CI workflows: the project site, the releases of the standard, of the desktop viewer and of the npm package, the Rust workspace, the skill package, the viewers and their browser tests. |
@@ -107,7 +106,7 @@ The [roadmap](docs/roadmap.md) is the list, and says what is done and what is no
 | --- | --- | --- |
 | Everything else, including code, configuration, and top-level files | everything not listed below | [MIT](LICENSE) |
 | Specification text and project documentation | `spec/`, `docs/` | [CC-BY-4.0](LICENSES/CC-BY-4.0.txt) |
-| Data: standard libraries, test corpora, and examples | `libraries/`, `tests/`, `examples/` | [CC0-1.0](LICENSES/CC0-1.0.txt) |
+| Data: standard libraries and test corpora | `libraries/`, `tests/` | [CC0-1.0](LICENSES/CC0-1.0.txt) |
 | The metrics of the fonts shipped with the core, Noto Sans SC, copyright 2014-2021 Adobe ([decision 0009](docs/decisions/0009-fonts-shipped-with-the-core.md)) | `crates/rnl-render/fonts/noto-sans-sc.metrics` | [OFL-1.1](LICENSES/OFL-1.1.txt) |
 
 [`REUSE.toml`](REUSE.toml) records this mapping, and `reuse lint` checks it. The documents migrated from Analog Canvas are published here under CC-BY-4.0 by their copyright holder; the frozen copies in Analog Canvas remain under that repository's AGPL-3.0 license. See [decision 0002](docs/decisions/0002-licenses.md).
