@@ -19,8 +19,10 @@ a.cg-fig:focus-visible, .cg-title a:focus-visible { outline: 2px solid var(--sig
 .cg-title { margin: 0; font: 700 16.5px/1.35 var(--f-body); overflow-wrap: anywhere; }
 .cg-title a { color: var(--ink); text-decoration: none; }
 .cg-title a:hover { color: var(--signal); text-decoration: underline; }
-.cg-desc { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.cg-desc { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 6; line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .cg-by { margin: 0; font-size: 12.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.cg-by a { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--line); }
+.cg-by a:hover { color: var(--signal); }
 .cg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 2px 0 0; font-size: 12.5px; color: var(--ink-3); }
 .cg-src { font: 12px var(--f-mono); color: var(--ink-3); text-decoration: none; overflow-wrap: anywhere; }
 .cg-src:hover { color: var(--signal); text-decoration: underline; }

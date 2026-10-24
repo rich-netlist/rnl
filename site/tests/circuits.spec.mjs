@@ -43,12 +43,20 @@ for (const language of ['en', 'zh']) {
     await expect(single.locator('a.cg-src')).toHaveText('example/ota@aaaaaaa');
     await expect.poll(() => single.locator('img').evaluate(img => img.complete && img.naturalWidth)).toBe(320);
 
-    // several files wait for the viewer's manifest: thumbnail, source and a note, no link into the viewer
+    // several files open from their manifest, by its address, in a new tab
     const multi = page.locator('.cg-card[data-id="pll-multi"]');
-    await expect(multi.locator('a.cg-fig, .cg-title a')).toHaveCount(0);
-    await expect(multi.locator('.cg-note')).toBeVisible();
+    const manifest = `../viewer/?manifest=${encodeURIComponent(DATA + 'manifests/pll-multi.json')}`;
+    await expect(multi.locator('a.cg-fig')).toHaveAttribute('href', manifest);
+    await expect(multi.locator('.cg-title a')).toHaveAttribute('href', manifest);
+    await expect(multi.locator('.cg-note')).toHaveCount(0);
     await expect(multi.locator('.cg-files')).toContainText('83');
     await expect(multi.locator('.cg-title')).toHaveText('Phase-locked loop');
+    // authors: a list in order, a name with an https link is a link that opens a new tab, any other link is dropped
+    await expect(multi.locator('.cg-by')).toHaveText('Grace, Hopper, Danger');
+    await expect(multi.locator('.cg-by a')).toHaveCount(1);
+    await expect(multi.locator('.cg-by a')).toHaveAttribute('href', 'https://example.com/grace');
+    await expect(multi.locator('.cg-by a')).toHaveAttribute('target', '_blank');
+    await expect(multi.locator('.cg-by a')).toHaveAttribute('rel', 'noopener noreferrer');
 
     // a missing thumbnail falls back to the name; text from the index is text, never markup
     const broken = page.locator('.cg-card[data-id="broken-thumb"]');
@@ -80,13 +88,14 @@ test('gallery: search by title, description and author keeps ?q= and the languag
   await expect(page.locator('.cg-card')).toHaveAttribute('data-id', 'ota-single');
 });
 
-test('gallery: tags are check boxes under the search, several at once, and stay in the address', async ({ page }) => {
+test('gallery: tags are check boxes under the search, shown as written, several at once, and stay in the address', async ({ page }) => {
   await serve(page);
   await page.goto('/en/gallery.html');
   const box = page.locator('#cg-tags');
-  const tag = name => box.locator(`input[data-tag="${name}"]`);
-  // most used first, then by name, each with the number of entries; a tag that is not of the right form is not shown
-  await expect(box.locator('label')).toHaveText(['hierarchical3', 'custom-tag1', 'mixed-signal1', 'opamp1', 'OTA1', 'PLL1']);
+  const tag = key => box.locator(`input[data-tag="${key}"]`);
+  // most used first, then by name, each with the number of entries; the form most entries use is the label
+  // (Hierarchical, not hierarchical); a tag that is not of the right form (BAD_TAG) is not shown
+  await expect(box.locator('label')).toHaveText(['Hierarchical3', 'Custom tag1', 'Mixed-signal1', 'Op-amp1', 'OTA1', 'PLL1']);
   await tag('pll').check();
   await expect(page.locator('.cg-card')).toHaveCount(1);
   await expect(page.locator('.cg-card')).toHaveAttribute('data-id', 'pll-multi');
@@ -97,23 +106,27 @@ test('gallery: tags are check boxes under the search, several at once, and stay 
   await expect(page).toHaveURL(/\?tag=pll&tag=hierarchical$/);
   await tag('pll').uncheck();
   await expect(page.locator('.cg-card')).toHaveCount(3);
-  await tag('opamp').check();
+  await tag('op-amp').check();
   await expect(page.locator('.cg-card')).toHaveAttribute('data-id', 'ota-single');
-  await expect(page.locator('[data-lang-link]').first()).toHaveAttribute('href', /gallery\.html\?tag=hierarchical&tag=opamp$/);
-  // a tag on a card does the same, and works with the search
+  await expect(page.locator('[data-lang-link]').first()).toHaveAttribute('href', /gallery\.html\?tag=hierarchical&tag=op-amp$/);
+  // a tag on a card does the same, and works with the search; a space in a tag is a hyphen in the address
   await page.locator('.cg-card[data-id="ota-single"] [data-tag="ota"]').click();
-  await expect(page).toHaveURL(/\?tag=hierarchical&tag=opamp&tag=ota$/);
+  await expect(page).toHaveURL(/\?tag=hierarchical&tag=op-amp&tag=ota$/);
   await expect(tag('ota')).toBeChecked();
   await page.locator('#cg-q').fill('grace');
   await expect(page.locator('#cg-main')).toContainText('Nothing found');
-  await expect(page).toHaveURL(/\?q=grace&tag=hierarchical&tag=opamp&tag=ota$/);
+  await expect(page).toHaveURL(/\?q=grace&tag=hierarchical&tag=op-amp&tag=ota$/);
   await page.locator('.cg-clear').click();
   await expect(page.locator('.cg-card')).toHaveCount(1);
   await expect(page.locator('.cg-clear')).toHaveCount(0);
-  // from the address, in the other language; an unknown tag stays chosen, a malformed one is dropped
-  await page.goto('/zh/gallery.html?tag=opamp&tag=ota&tag=BAD%20TAG');
+  await page.locator('#cg-q').fill('');
+  await tag('custom-tag').check();
+  await expect(page).toHaveURL(/\?tag=custom-tag$/);
+  await expect(page.locator('.cg-card')).toHaveAttribute('data-id', 'broken-thumb');
+  // from the address, in the other language (tags are not translated), in any case; an unknown tag stays chosen
+  await page.goto('/zh/gallery.html?tag=Op-amp&tag=OTA&tag=BAD%20TAG!');
   await expect(box.locator('input:checked')).toHaveCount(2);
-  await expect(box.locator('label:has(input:checked)')).toHaveText(['运放1', 'OTA1']);
+  await expect(box.locator('label:has(input:checked)')).toHaveText(['Op-amp1', 'OTA1']);
   await expect(page.locator('.cg-card')).toHaveCount(1);
   await page.goto('/en/gallery.html?tag=nosuch');
   await expect(tag('nosuch')).toBeChecked();
@@ -121,6 +134,8 @@ test('gallery: tags are check boxes under the search, several at once, and stay 
   // nothing says "circuit examples" any more, and the page has one link to learn how to contribute
   await expect(page.locator('#gallery')).not.toContainText('Circuit examples');
   await expect(page.getByRole('link', { name: 'How to contribute' })).toHaveCount(1);
+  // a card that opens in the viewer has no note about several files
+  await expect(page.locator('.cg-note')).toHaveCount(0);
 });
 
 test('gallery: when the data cannot be read', async ({ page, context }) => {
