@@ -132,7 +132,7 @@ const core = startCore();
 const document = await core.build({ entry: design.entry, files: design.files, pool: design.pool });
 ```
 
-`files` holds every file and package by its path under `/<id>/`, `pool` the files of the manifest's search paths in order and then its packages, and `level` the level the design opens on. A file that does not match its SHA-256 or cannot be fetched rejects with a `ManifestError` whose `file` names it. The manifest's `base` must be on `https://raw.githubusercontent.com/`, and its files at most 300 and 20 MB in all. Node 18 and later, and browsers, are supported.
+`files` holds the text of every file by its path under `/<id>/`, `pool` the manifest's pool in its order, and `level` the level the design opens on, a subcircuit's name or `"(top)"`. Files are fetched from the manifest's `base`, or from their own `url` (public packages, from raw GitHub or the package site), and their bytes checked before they are decoded. A file that does not match its SHA-256 or cannot be fetched rejects with a `ManifestError` whose `file` names it. The manifest's `base` must be on `https://raw.githubusercontent.com/`, and its files at most 300, 2 MB each and 20 MB in all. Node 18 and later, and browsers, are supported.
 
 ## Vite
 

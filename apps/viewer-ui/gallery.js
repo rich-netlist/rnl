@@ -32,7 +32,8 @@ export function showGalleryBar(source) {
   if (repo && commit) {
     const link = document.createElement("a");
     link.className = "gallery-source";
-    link.href = url ? `${url.replace(/\/$/, "")}/tree/${commit}` : `https://github.com/${repo}/tree/${commit}`;
+    // the manifest's url links the design's directory at that commit
+    link.href = url || `https://github.com/${repo}/tree/${commit}`;
     link.target = "_blank";
     link.rel = "noopener";
     setText(link, m`Source: ${repo}@${commit.slice(0, 7)}`);
@@ -47,14 +48,15 @@ export function showGalleryBar(source) {
 }
 
 /**
- * Show the level a gallery design names: `?level=` in the address first, then its manifest's;
- * "(top)" is the top level. A name the netlist has no level of is told, and the level shown stays.
+ * Show the level a gallery design names: `?level=` in the address first, then its manifest's: a
+ * subcircuit's name, or "(top)" for the netlist's own level. A name the netlist has no subcircuit of
+ * is told, and the level shown stays.
  */
 export function showGalleryLevel(source) {
   const wanted = new URLSearchParams(location.search).get("level") ?? source?.gallery?.level;
   if (!wanted || !doc) return;
   if (wanted === "(top)") return enterRoot(0);
-  const level = doc.levels.findIndex((l) => l.title === wanted);
+  const level = doc.levels.findIndex((l) => l.kind === "subckt" && l.title === wanted);
   if (level < 0) {
     notice(m`This design has no level ${wanted}; the level shown is the default one.`);
     return;

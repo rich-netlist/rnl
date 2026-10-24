@@ -1325,6 +1325,7 @@ test("temporary package is absent from include and USE-PACKAGE lookup; applied t
 
 const GALLERY_BASE = "https://raw.githubusercontent.com/someone/design/0123456789abcdef0123456789abcdef01234567/";
 const GALLERY_MANIFEST = "https://gallery.test/designs/demo.json";
+const GALLERY_TREE = "https://github.com/someone/design/tree/0123456789abcdef0123456789abcdef01234567/examples/demo";
 const GALLERY_REMOTE = "https://rich-netlist.github.io/rnl-packages/demo-remote/2.0/demo-remote.rnl";
 const galleryDir = path.join(root, "tests/viewer/inputs/gallery");
 const galleryFiles = ["top.sp", "cells/amp.sp", "lib/models.inc", "pkg/demo-local.rnl"];
@@ -1335,13 +1336,17 @@ function galleryManifest(change = {}) {
   const remote = fs.readFileSync(path.join(root, "tests/viewer/inputs/gallery-remote.rnl"));
   return {
     format: 1, id: "demo", title: { en: "Gallery demo", zh: "图库示例" }, author: "someone",
-    source: { repo: "someone/design", commit: "0123456789abcdef0123456789abcdef01234567", url: "https://github.com/someone/design" },
-    license: "MIT", base: GALLERY_BASE, entry: "top.sp", paths: ["lib"], level: "amp",
-    files: galleryFiles.map((file) => {
-      const bytes = fs.readFileSync(path.join(galleryDir, file));
-      return { path: file, sha256: sha256(bytes), size: bytes.length };
-    }),
-    packages: [{ path: "pkg/demo-local.rnl" }, { name: "demo-remote", version: "2.0", url: GALLERY_REMOTE, sha256: sha256(remote) }],
+    source: { repo: "someone/design", commit: "0123456789abcdef0123456789abcdef01234567", url: GALLERY_TREE },
+    license: "MIT", base: GALLERY_BASE, entry: "top.sp", level: "amp",
+    files: [
+      ...galleryFiles.map((file) => {
+        const bytes = fs.readFileSync(path.join(galleryDir, file));
+        return { path: file, sha256: sha256(bytes), size: bytes.length };
+      }),
+      { path: ".packages/demo-remote/2.0/demo-remote.rnl", sha256: sha256(remote), size: remote.length, url: GALLERY_REMOTE },
+    ],
+    // a bare include and a package by name look in the pool, in its order
+    pool: ["lib/models.inc", "pkg/demo-local.rnl", ".packages/demo-remote/2.0/demo-remote.rnl"],
     ...change,
   };
 }
@@ -1378,7 +1383,7 @@ test("?manifest= opens a gallery design: its files, search path and packages, it
   await expect(bar.locator(".gallery-title")).toHaveText("Gallery demo");
   await expect(bar).toContainText("someone");
   await expect(bar.locator(".gallery-source")).toHaveText("Source: someone/design@0123456");
-  await expect(bar.locator(".gallery-source")).toHaveAttribute("href", "https://github.com/someone/design/tree/0123456789abcdef0123456789abcdef01234567");
+  await expect(bar.locator(".gallery-source")).toHaveAttribute("href", GALLERY_TREE);
   await expect(bar.locator(".gallery-back")).toHaveAttribute("href", "https://rich-netlist.github.io/rnl/en/gallery.html");
   await page.locator("#tab-files").click();
   const group = page.locator('.lib-group[data-group="gallery"]');

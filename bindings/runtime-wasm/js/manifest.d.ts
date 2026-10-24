@@ -2,8 +2,8 @@
 
 /** The manifest format this module reads. */
 export declare const MANIFEST_FORMAT: 1;
-/** At most this many files, and this many bytes in all. */
-export declare const MANIFEST_LIMITS: Readonly<{ files: number; bytes: number }>;
+/** At most this many files, this many bytes in one file and this many in all. */
+export declare const MANIFEST_LIMITS: Readonly<{ files: number; fileBytes: number; bytes: number }>;
 
 /** What is wrong with a manifest or one of its files; `file` names that file when there is one. */
 export declare class ManifestError extends Error {
@@ -16,18 +16,23 @@ export interface Manifest {
   format: 1;
   id: string;
   title?: { en: string; zh?: string };
+  description?: { en: string; zh?: string };
   author?: string;
-  source?: { repo: string; commit: string; url: string };
+  /** `url` links the design's directory at `commit`. */
+  source?: { repo: string; commit: string; url?: string };
   license?: string;
   /** A directory of https://raw.githubusercontent.com/ at one commit, ending in `/`. */
   base: string;
   /** The netlist to open, relative to `base`. */
   entry: string;
-  /** Directories relative to `base` that a bare include searches, in order. */
-  paths?: string[];
-  files: { path: string; sha256: string; size: number }[];
-  packages?: ({ path: string } | { name: string; version: string; url: string; sha256: string })[];
-  /** The level to show: a subcircuit's name, or "(top)". */
+  /**
+   * Each file relative to `base`, with the SHA-256 and size of its bytes; a file with a `url` (a
+   * package of the public catalog, under `.packages/`) is fetched from there instead.
+   */
+  files: { path: string; sha256: string; size: number; url?: string }[];
+  /** Files of `files`, in the order a bare include and a package by name look for them: a build's `pool`. */
+  pool?: string[];
+  /** The level to show: a subcircuit's name, or "(top)" for the netlist's own. */
   level?: string;
 }
 
@@ -35,22 +40,21 @@ export interface Manifest {
 export interface ManifestRead {
   id: string;
   title: Manifest["title"] | null;
+  description: Manifest["description"] | null;
   author: string | null;
   source: Manifest["source"] | null;
   license: string | null;
   /** The path to open. */
   entry: string;
   level: string | null;
-  /** The text of every file and package, by path. */
+  /** The text of every file, by path. */
   files: Record<string, string>;
-  /** The files of each search path in order, then the packages: a build's `pool`. */
+  /** The manifest's pool, in its order: a build's `pool`. */
   pool: string[];
-  /** The paths of the packages, in the manifest's order. */
-  packages: string[];
 }
 
 /** Check a manifest and give it normalized; throws a ManifestError. */
-export declare function checkManifest(manifest: unknown): Manifest & { level: string | null; paths: string[] };
+export declare function checkManifest(manifest: unknown): Manifest & { level: string | null; pool: string[] };
 
 /** Read the manifest at `url` and its files, each checked against its SHA-256. */
 export declare function readManifest(

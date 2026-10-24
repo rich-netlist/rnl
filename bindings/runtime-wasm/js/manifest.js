@@ -1,19 +1,18 @@
 // A gallery manifest (format 1) read into what a build of the core takes: the texts of its files by
-// workspace path, the pool that a bare include searches in the order of the manifest's `paths`, its
-// packages, its entry and its level. The web viewer's `?manifest=` and the gallery's thumbnails in
+// workspace path, its pool in the manifest's order, its entry and its level. The web viewer's `?manifest=` and the gallery's thumbnails in
 // Node read a manifest with this one module, so that both draw the same Document.
 //
 // A manifest names a commit of a public GitHub repository: its files are fetched from `base`, raw
-// GitHub, each checked against its SHA-256; nothing else is fetched but the packages it lists, from
-// raw GitHub or the public package catalog's site.
+// GitHub, each checked against the SHA-256 of its bytes; a file with a `url` of its own, a package of
+// the public catalog under `.packages/`, is fetched from raw GitHub or the catalog's site.
 import { decodeText } from "./client.js";
 
 /** The manifest format this module reads. */
 export const MANIFEST_FORMAT = 1;
-/** At most this many files, and this many bytes in all, as the gallery's CI allows. */
-export const MANIFEST_LIMITS = Object.freeze({ files: 300, bytes: 20 * 1024 * 1024 });
+/** At most this many files, this many bytes in one file and this many in all, as the gallery's CI allows. */
+export const MANIFEST_LIMITS = Object.freeze({ files: 300, fileBytes: 2 * 1024 * 1024, bytes: 20 * 1024 * 1024 });
 const FILES_BASE = "https://raw.githubusercontent.com/";
-const PACKAGE_BASES = [FILES_BASE, "https://rich-netlist.github.io/rnl-packages/"];
+const URL_BASES = [FILES_BASE, "https://rich-netlist.github.io/rnl-packages/"];
 const ID = /^[A-Za-z0-9_.-]{1,64}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 
@@ -27,15 +26,14 @@ export class ManifestError extends Error {
 }
 
 /** A relative path inside the manifest's commit: no `..`, no root, no empty part, no backslash. */
-function relativePath(path, what, directory = false) {
-  if (typeof path !== "string" || (!directory && !path) || path.includes("\\") || path.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(path)) {
+function relativePath(path, what) {
+  if (typeof path !== "string" || !path || path.includes("\\") || path.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(path)) {
     throw new ManifestError(`${what} is not a relative path: ${JSON.stringify(path)}`, typeof path === "string" ? path : null);
   }
-  const parts = path.split("/").filter((part, i, all) => !(directory && part === "" && i === all.length - 1));
-  if (path && parts.some((part) => part === "" || part === "." || part === "..")) {
+  if (path.split("/").some((part) => part === "" || part === "." || part === "..")) {
     throw new ManifestError(`${what} leaves the commit or has an empty part: ${JSON.stringify(path)}`, path);
   }
-  return parts.join("/");
+  return path;
 }
 
 /** Check a manifest and give it in the form the rest of this module reads. */
@@ -61,7 +59,11 @@ export function checkManifest(manifest) {
     const path = relativePath(file?.path, "A file's path");
     if (typeof file.sha256 !== "string" || !SHA256.test(file.sha256.toLowerCase())) throw new ManifestError(`${path} has no SHA-256.`, path);
     if (!Number.isSafeInteger(file.size) || file.size < 0) throw new ManifestError(`${path} has no size.`, path);
-    return { path, sha256: file.sha256.toLowerCase(), size: file.size };
+    if (file.size > MANIFEST_LIMITS.fileBytes) throw new ManifestError(`${path} has ${file.size} bytes, more than ${MANIFEST_LIMITS.fileBytes}.`, path);
+    if (file.url !== undefined && (typeof file.url !== "string" || !URL_BASES.some((prefix) => file.url.startsWith(prefix)))) {
+      throw new ManifestError(`${path} is not on raw GitHub or the public package site: ${JSON.stringify(file.url)}`, path);
+    }
+    return { path, sha256: file.sha256.toLowerCase(), size: file.size, ...(file.url !== undefined && { url: file.url }) };
   });
   const listed = new Set(files.map((file) => file.path));
   if (listed.size !== files.length) throw new ManifestError("The manifest lists a file twice.");
@@ -69,24 +71,15 @@ export function checkManifest(manifest) {
   if (bytes > MANIFEST_LIMITS.bytes) throw new ManifestError(`The manifest's files hold ${bytes} bytes, more than ${MANIFEST_LIMITS.bytes}.`);
   const entryPath = relativePath(entry, "The entry");
   if (!listed.has(entryPath)) throw new ManifestError(`The entry ${entryPath} is not among the manifest's files.`, entryPath);
-  const paths = (manifest.paths ?? []).map((dir) => relativePath(dir, "A search path", true));
-  const packages = (manifest.packages ?? []).map((pkg) => {
-    if (pkg && typeof pkg.path === "string") {
-      const path = relativePath(pkg.path, "A package's path");
-      if (!listed.has(path)) throw new ManifestError(`The package ${path} is not among the manifest's files.`, path);
-      return { path };
-    }
-    const { name, version, url, sha256 } = pkg ?? {};
-    const label = `${name} ${version}`;
-    if (typeof name !== "string" || typeof version !== "string" || !name || !version) throw new ManifestError("A package has neither a path nor a name and a version.");
-    if (typeof url !== "string" || !PACKAGE_BASES.some((prefix) => url.startsWith(prefix))) {
-      throw new ManifestError(`The package ${label} is not on raw GitHub or the public package site: ${JSON.stringify(url)}`, label);
-    }
-    if (typeof sha256 !== "string" || !SHA256.test(sha256.toLowerCase())) throw new ManifestError(`The package ${label} has no SHA-256.`, label);
-    return { name, version, url, sha256: sha256.toLowerCase() };
+  if (manifest.pool !== undefined && !Array.isArray(manifest.pool)) throw new ManifestError("The manifest's pool is not a list.");
+  const pool = (manifest.pool ?? []).map((path) => {
+    const file = relativePath(path, "A path of the pool");
+    if (!listed.has(file)) throw new ManifestError(`The pool's ${file} is not among the manifest's files.`, file);
+    return file;
   });
+  if (new Set(pool).size !== pool.length) throw new ManifestError("The manifest's pool lists a file twice.");
   if (level !== undefined && typeof level !== "string") throw new ManifestError("The manifest's level is not a name.");
-  return { ...manifest, id, base, entry: entryPath, level: level ?? null, files, paths, packages };
+  return { ...manifest, id, base, entry: entryPath, level: level ?? null, files, pool };
 }
 
 async function sha256Hex(bytes) {
@@ -126,23 +119,15 @@ async function inParallel(items, limit, work) {
   return out;
 }
 
-/** Whether `path` is a file a search path names: directly in it, or in a version folder of it, as PATH. */
-function inDirectory(path, dir) {
-  const rest = dir ? (path.startsWith(`${dir}/`) ? path.slice(dir.length + 1) : null) : path;
-  if (rest === null) return false;
-  const parts = rest.split("/");
-  return parts.length === 1 || (parts.length === 2 && /^\d+(\.\d+)*$/.test(parts[0]));
-}
-
 /**
  * Read the manifest at `url` and its files. `fetch` defaults to the global one; `onProgress(done,
  * total)` follows the files fetched; `signal` stops it. The result's paths are under `/<id>/`, the
  * manifest's own directory in the workspace:
- * - `files`: the text of every file and package, by path;
- * - `pool`: the files of each search path in order, then the packages, as a bare include and a
- *   package by name are looked for in them;
- * - `packages`: the paths of the packages; `entry`: the path to open; `level`: the level to show, or
- *   null; and the manifest's `id`, `title`, `author`, `source` and `license` as it gives them.
+ * - `files`: the text of every file, by path, decoded after its bytes were checked;
+ * - `pool`: the manifest's pool, in its order, where a bare include and a package by name are
+ *   looked for;
+ * - `entry`: the path to open; `level`: the level to show, a subcircuit's name or "(top)", or null;
+ *   and the manifest's `id`, `title`, `description`, `author`, `source` and `license` as it gives them.
  * Rejects with a ManifestError that names the file, when a file is the trouble.
  */
 export async function readManifest(url, { fetch = globalThis.fetch, onProgress, signal, concurrency = 6 } = {}) {
@@ -162,49 +147,38 @@ export async function readManifest(url, { fetch = globalThis.fetch, onProgress, 
   }
   const manifest = checkManifest(parsed);
   const root = `/${manifest.id}/`;
-  const remote = manifest.packages.filter((pkg) => pkg.url);
-  const total = manifest.files.length + remote.length;
+  const total = manifest.files.length;
   let done = 0;
   onProgress?.(done, total);
-  const count = () => onProgress?.(++done, total);
   const files = {};
-  let bytes = 0;
-  await inParallel(manifest.files, concurrency, async (file) => {
-    const data = await fetchChecked(fetch, new URL(file.path, manifest.base).href, { ...file, name: file.path, signal });
-    files[root + file.path] = decodeText(data);
-    count();
-  });
-  const packages = [];
-  await inParallel(remote, concurrency, async (pkg) => {
-    const data = await fetchChecked(fetch, pkg.url, { sha256: pkg.sha256, name: `${pkg.name} ${pkg.version}`, signal });
-    bytes += data.length;
-    if (bytes > MANIFEST_LIMITS.bytes) throw new ManifestError(`The manifest's packages hold more than ${MANIFEST_LIMITS.bytes} bytes.`);
-    const path = `${root}.packages/${pkg.name}/${pkg.version}/${pkg.url.split("/").pop() || `${pkg.name}.rnl`}`;
-    files[path] = decodeText(data);
-    count();
-  });
-  // in the manifest's order of packages, the listed files' and the fetched ones'
-  for (const pkg of manifest.packages) {
-    if (pkg.path) packages.push(root + pkg.path);
-    else packages.push(Object.keys(files).find((path) => path.startsWith(`${root}.packages/${pkg.name}/${pkg.version}/`)));
+  // the first file that fails stops the fetches still running, as the caller's signal does
+  const stop = new AbortController();
+  const stopAll = () => stop.abort(signal?.reason);
+  signal?.addEventListener("abort", stopAll, { once: true });
+  try {
+    await inParallel(manifest.files, concurrency, async (file) => {
+      if (stop.signal.aborted) return;
+      const data = await fetchChecked(fetch, file.url ?? new URL(file.path, manifest.base).href, { ...file, name: file.path, signal: stop.signal });
+      files[root + file.path] = decodeText(data);
+      onProgress?.(++done, total);
+    });
+  } catch (error) {
+    if (signal?.aborted) throw signal.reason ?? error;
+    if (!stop.signal.aborted) stop.abort();
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", stopAll);
   }
-  const pool = [];
-  for (const dir of manifest.paths) {
-    for (const file of manifest.files) {
-      if (inDirectory(file.path, dir) && !pool.includes(root + file.path)) pool.push(root + file.path);
-    }
-  }
-  for (const path of packages) if (!pool.includes(path)) pool.push(path);
   return {
     id: manifest.id,
     title: manifest.title ?? null,
+    description: manifest.description ?? null,
     author: manifest.author ?? null,
     source: manifest.source ?? null,
     license: manifest.license ?? null,
     entry: root + manifest.entry,
     level: manifest.level,
     files,
-    pool,
-    packages,
+    pool: manifest.pool.map((path) => root + path),
   };
 }
