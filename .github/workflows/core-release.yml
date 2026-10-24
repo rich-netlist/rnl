@@ -127,13 +127,25 @@ jobs:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/core-v')
         working-directory: packages/runtime/dist
         run: npm publish --dry-run --access public
+      # The browsers' system packages come from the runner's Ubuntu mirror, which stalled for most of an hour
+      # twice on 2026-10-23: apt gives up on a stalled download after 30 s and retries, and a hung install
+      # fails after 20 minutes.
+      - name: Install the browser for the smoke test
+        working-directory: packages/runtime/smoke
+        timeout-minutes: 20
+        run: |
+          sudo tee /etc/apt/apt.conf.d/80-rnl-network <<'CONF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          CONF
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
       - name: Smoke-test the packed package with Vite
         working-directory: packages/runtime/smoke
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          npm ci --no-audit --no-fund
-          npx playwright install --with-deps chromium
           node smoke.mjs "$GITHUB_WORKSPACE/rich-netlist-runtime-$VERSION.tgz"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

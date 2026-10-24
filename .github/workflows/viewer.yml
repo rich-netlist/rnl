@@ -65,8 +65,18 @@ jobs:
           node-version: 24
       - name: Install Playwright
         run: npm ci
+      # The browsers' system packages come from the runner's Ubuntu mirror, which stalled for most of an hour
+      # twice on 2026-10-23: apt gives up on a stalled download after 30 s and retries, and a hung install
+      # fails after 20 minutes.
       - name: Install the browsers and what they need
-        run: npx playwright install --with-deps chromium webkit
+        timeout-minutes: 20
+        run: |
+          sudo tee /etc/apt/apt.conf.d/80-rnl-network <<'CONF'
+          Acquire::Retries "5";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          CONF
+          npx playwright install --with-deps chromium webkit
       - name: Write the pinned fonts and isolate system font coverage
         working-directory: ${{ github.workspace }}
         run: |
