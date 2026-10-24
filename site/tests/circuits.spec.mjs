@@ -43,10 +43,12 @@ for (const language of ['en', 'zh']) {
     await expect(single.locator('a.cg-src')).toHaveText('example/ota@aaaaaaa');
     await expect.poll(() => single.locator('img').evaluate(img => img.complete && img.naturalWidth)).toBe(320);
 
-    // several files wait for the viewer's manifest: thumbnail, source and a note, no link into the viewer
+    // several files open from their manifest, by its address, in a new tab
     const multi = page.locator('.cg-card[data-id="pll-multi"]');
-    await expect(multi.locator('a.cg-fig, .cg-title a')).toHaveCount(0);
-    await expect(multi.locator('.cg-note')).toBeVisible();
+    const manifest = `../viewer/?manifest=${encodeURIComponent(DATA + 'manifests/pll-multi.json')}`;
+    await expect(multi.locator('a.cg-fig')).toHaveAttribute('href', manifest);
+    await expect(multi.locator('.cg-title a')).toHaveAttribute('href', manifest);
+    await expect(multi.locator('.cg-note')).toHaveCount(0);
     await expect(multi.locator('.cg-files')).toContainText('83');
     await expect(multi.locator('.cg-title')).toHaveText('Phase-locked loop');
     // authors: a list in order, a name with an https link is a link that opens a new tab, any other link is dropped

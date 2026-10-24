@@ -13,9 +13,10 @@
 
   var DATA = 'https://rich-netlist.github.io/rnl-gallery/';
   var VIEWER = '../viewer/';
-  /* Whether the web viewer opens an entry of several files from its manifest (?manifest=). Until it does, such an
-     entry shows its thumbnail and its source only. An entry of one file opens with ?url=. */
-  var MANIFEST = false;
+  /* An entry of one file opens in the web viewer with ?url=; an entry of several files with ?manifest=, the address
+     of its manifest, from which the viewer reads all of its files. MANIFEST says the viewer does (it does since core
+     and viewer 0.4.0); with false such an entry would show its thumbnail and its source only. */
+  var MANIFEST = true;
   var TIMEOUT = 8000;
   var KEY = 'rnl-gallery-index';
   var locale = document.documentElement.getAttribute('data-locale');
