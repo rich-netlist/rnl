@@ -351,7 +351,11 @@ export async function startPool() {
     shell.publicPackages().catch(() => {});
   }
   render();
-  await scanPaths();
+  // The desktop's PATH must be scanned before the first build. The web has no PATH, and its index
+  // waits for the core, as every build waits for the index itself (shell.setPool): startup need not.
+  const scanning = scanPaths();
+  if (shell.pathPackages) await scanning;
+  else scanning.catch((e) => console.error(e));
 }
 
 export const poolSnapshot = () => items.filter((i) => !i.builtin).slice();
