@@ -346,8 +346,8 @@ test("a formats request lists the formats and detects files, through the core an
     "/w/top.sp": '* top\n.include "cells.scs"\nX1 a 0 amp\n.end\n',
     "/w/cells.scs": "simulator lang=spectre\nsubckt amp (p n)\nR1 (p n) resistor r=1k\nends amp\n",
   };
-  const d = core.build({ entry: "/w/top.sp", files, formats: { "/w/cells.scs": "spectre" } });
-  assert.deepEqual(d.files.map((x) => [x.format, x.default_format]), [["spice", "spice"], ["spectre", "spice"]]);
+  const d = core.build({ entry: "/w/top.sp", files, formats: { "/w/cells.scs": "spice" } });
+  assert.deepEqual(d.files.map((x) => [x.format, x.default_format]), [["spice", "spice"], ["spice", "spectre"]]);
   assert.deepEqual(d.formats, f.list);
   assert.throws(() => core.formats(untitled), /the request is not a formats request/);
   const worker = startCore();

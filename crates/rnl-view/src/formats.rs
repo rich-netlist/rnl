@@ -1,9 +1,8 @@
 //! The formats a netlist's files can be read with, and the choice of each file's.
 //!
 //! A frontend lists the formats ([`formats`]) and may set one for a file by its path
-//! ([`crate::BuildOptions::formats`]). A file whose format is not set is read as the main file is
-//! when it is included, and by [`detect_format`] when it is the main file or a library file read on
-//! its own.
+//! ([`crate::BuildOptions::formats`]). A file whose format is not set is read by [`detect_format`],
+//! the main file by the dialect a frontend gives before it.
 
 use std::collections::BTreeMap;
 
@@ -110,18 +109,19 @@ fn chosen(path: &str, set: &[(String, usize)], files: &dyn Provider) -> Option<u
 
 /// Read with the formats of `FORMATS`: the main file with `main`, whose default is `main_default`
 /// ([`main_format`]), each included file whose format is set with that one, and every other
-/// included file as the main file is read, its default.
+/// included file by its own path and text ([`detect_format`]), its default.
 pub(crate) fn with<T>(
     (main, main_default): (usize, usize),
     set: &[(String, usize)],
     files: &dyn Provider,
     read: impl FnOnce(&Formats) -> T,
 ) -> T {
-    let choose = |path: &str, _text: &str, is_main: bool| {
+    let choose = |path: &str, text: &str, is_main: bool| {
         if is_main {
             (main, main_default)
         } else {
-            (chosen(path, set, files).unwrap_or(main), main)
+            let default = detected(path, text);
+            (chosen(path, set, files).unwrap_or(default), default)
         }
     };
     let list: &[&dyn Format] = &FORMATS;

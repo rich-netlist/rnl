@@ -786,14 +786,15 @@ C1 a 0 1p
             "/w/top.sp": "* top\n.include \"cells.scs\"\nX1 a 0 amp\n.end\n",
             "/w/cells.scs": "simulator lang=spectre\nsubckt amp (p n)\nR1 (p n) resistor r=1k\nends amp\n",
         });
-        let v = answer(json!({ "entry": "/w/top.sp", "files": files, "formats": { "/w/cells.scs": "spectre" } }));
+        let v = answer(json!({ "entry": "/w/top.sp", "files": files, "formats": { "/w/cells.scs": "spice" } }));
         let d = &v["document"];
-        assert_eq!((&d["files"][1]["format"], &d["files"][1]["default_format"]), (&json!("spectre"), &json!("spice")));
-        assert!(d["levels"].as_array().unwrap().iter().any(|l| l["title"] == "amp"));
+        assert_eq!((&d["files"][1]["format"], &d["files"][1]["default_format"]), (&json!("spice"), &json!("spectre")));
+        assert!(!d["levels"].as_array().unwrap().iter().any(|l| l["title"] == "amp"));
         assert_eq!(d["formats"], serde_json::to_value(rnl_view::formats()).unwrap());
-        // without it, as before; an unknown name is the request's error
+        // without it, by its own suffix; an unknown name is the request's error
         let v = answer(json!({ "entry": "/w/top.sp", "files": files }));
-        assert_eq!(v["document"]["files"][1]["format"], "spice");
+        assert_eq!(v["document"]["files"][1]["format"], "spectre");
+        assert!(v["document"]["levels"].as_array().unwrap().iter().any(|l| l["title"] == "amp"));
         let v = answer(json!({ "entry": "/w/top.sp", "files": files, "formats": { "/w/cells.scs": "cdl" } }));
         assert_eq!(v["error"], "unknown format \"cdl\" for /w/cells.scs; the formats are spice, spectre");
         // the list, and the format of files by path and text
