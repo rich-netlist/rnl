@@ -25,6 +25,13 @@
         { "id": "save-utf8", "label": "Save Changes Using UTF-8", "platforms": ["desktop"] },
         { "id": "save-as-utf8", "label": "Save As UTF-8...", "platforms": ["desktop"] },
         { "id": "save-project", "label": "Save Pro&ject...", "platforms": ["desktop"] },
+        {
+          "label": "Export Ima&ge",
+          "items": [
+            { "id": "export-svg", "label": "Export &SVG..." },
+            { "id": "export-png", "label": "Export &PNG..." }
+          ]
+        },
         "-",
         { "id": "file-associations", "label": "File &Associations...", "platforms": ["desktop"], "windowsOnly": true },
         { "id": "exit", "label": "E&xit", "platforms": ["desktop"] }

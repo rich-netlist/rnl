@@ -538,6 +538,10 @@ mod tests {
                     item("save-utf8", "Save Changes Using UTF-8", None),
                     item("save-as-utf8", "Save As UTF-8...", None),
                     item("save-project", "Save Pro&ject...", None),
+                    Shown::Submenu(
+                        "Export Ima&ge".into(),
+                        vec![item("export-svg", "Export &SVG...", None), item("export-png", "Export &PNG...", None)],
+                    ),
                     Shown::Separator,
                     item("file-associations", "File &Associations...", None),
                     item("exit", "E&xit", None),
@@ -595,6 +599,10 @@ mod tests {
                     item("save-utf8", "Save Changes Using UTF-8", None),
                     item("save-as-utf8", "Save As UTF-8...", None),
                     item("save-project", "Save Pro&ject...", None),
+                    Shown::Submenu(
+                        "Export Ima&ge".into(),
+                        vec![item("export-svg", "Export &SVG...", None), item("export-png", "Export &PNG...", None)],
+                    ),
                     Shown::Separator,
                     item("exit", "E&xit", None),
                 ],

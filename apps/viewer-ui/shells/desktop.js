@@ -197,6 +197,15 @@ export default {
   setDirty(dirty) {
     invoke("set_dirty", { dirty }).catch(() => {});
   },
+  // File > Export Image: the core draws the level again, with the overlays, from what the document shown was built from
+  exportSvg: async ({ level, title, overlays, source, edits }) => {
+    await flushSettings();
+    await poolReady;
+    const args = { level, title, overlays, edits: edits || null, pool, autoInclude: load("auto-include", true) === true, formats: fileFormats() };
+    return invoke("export_svg", source.text === undefined ? { ...args, path: source.path } : { ...args, name: source.name, text: source.text });
+  },
+  saveImage: async (name, blob, kind) =>
+    invoke("save_image", new Uint8Array(await blob.arrayBuffer()), { headers: { name: encodeURIComponent(name), kind } }),
   // projects (project.js): the page makes and reads the archive; the app asks where, and reads and writes the bytes
   readFile: async (path) => new Uint8Array(await invoke("read_bytes", { path })),
   async saveProject(name, build) {

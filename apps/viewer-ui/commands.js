@@ -27,6 +27,7 @@ import { memoryCache } from "./memory-cache.js";
 import { toggleUsages, toggleCurrents } from "./usages.js";
 import { netlistColors } from "./netlist-colors.js";
 import { downloadManifest, openManifest, openProject, saveProject } from "./project.js";
+import { exportImage } from "./export-image.js";
 import { $ } from "./util.js";
 
 let table = null; // commands.json, once loaded
@@ -79,6 +80,8 @@ export function command(id, options = {}) {
     case "download-manifest": return downloadManifest();
     case "load-manifest": return openManifest();
     case "save-as": saveAs(); break;
+    case "export-svg": return exportImage("svg");
+    case "export-png": return exportImage("png");
     case "save-utf8": save(false, "utf8"); break;
     case "save-as-utf8": saveAs("utf8"); break;
     case "file-associations": return fileAssociations();

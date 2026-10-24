@@ -48,6 +48,18 @@ function setting(u) {
   return value;
 }
 function persist() { save("usage-preferences", Object.fromEntries(preferences)); }
+
+/**
+ * What the drawing shows of the level shown's overlays, for File > Export Image: whether usages and
+ * current directions are shown, and each usage's visibility and colour, by its object.
+ */
+export function overlayChoices() {
+  return {
+    usages: shown,
+    currents: currentsShown,
+    each: new Map(usages().map((u) => [u.object, { visible: visible(u), color: setting(u).color }])),
+  };
+}
 function remember(u) {
   const key = keyOf(u);
   preferences.delete(key);

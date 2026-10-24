@@ -65,7 +65,7 @@ test.describe("on the web", () => {
         items: [
           "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Open Project...", "Load Manifest...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
           "Reload Library", "Auto Include",
-          "", "Download FileCtrl+S", "Download Project...", "Download Manifest...",
+          "", "Download FileCtrl+S", "Download Project...", "Download Manifest...", "Export Image", "Export SVG...", "Export PNG...",
         ],
       },
       { title: "Edit", letter: "E", items: ["Edit TextCtrl+Q", "Apply and Exit EditingCtrl+Enter", "Discard Changes", "Find in Netlist…Ctrl+F", "", "Open SubcircuitE", "Open Subcircuit in New Window…Shift+E", "Up to Parent LevelCtrl+E"] },
@@ -283,7 +283,7 @@ test.describe("on the web", () => {
     await page.keyboard.press("F10");
     await expect(marked).toHaveText("File");
     await page.keyboard.press("ArrowUp");
-    await expect(viewer.menuItem("download-manifest")).toHaveClass(/\bactive\b/);
+    await expect(entry(page, "Export Image")).toHaveClass(/\bactive\b/);
     // Escape closes the menu and keeps the title, then leaves the bar
     await page.keyboard.press("Escape");
     await expect(list(page, "File")).toBeHidden();

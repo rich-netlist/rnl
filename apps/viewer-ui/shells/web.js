@@ -46,6 +46,8 @@ function warmCore() {
 let core = null; // only the displayed document's lazy drawing provider
 let spare = warmCore();
 const pendingCores = new Set(); // candidates building or waiting to be accepted
+// the request each Document was built from, with the files collected: Export Image builds it again with overlays
+const builtRequests = new WeakMap();
 const candidates = new WeakMap();
 function replenishCore() {
   if (!spare && pendingCores.size === 0) spare = warmCore();
@@ -933,7 +935,7 @@ export default {
         if (signal?.aborted) throw new Error("superseded");
         progress?.("parsing"); return buildingCore.build(request);
       } };
-      let { document: doc } = await collect(builder, request, read);
+      let { document: doc, files: collected } = await collect(builder, request, read);
       if (embed) {
         // Embeds have no Library controls. Resolve named public dependencies with the same
         // catalog and verification as Include Public Package; keep downloads request-local.
@@ -956,10 +958,11 @@ export default {
             changed = true;
           }
           if (!changed) break;
-          ({ document: doc } = await collect(builder, request, read));
+          ({ document: doc, files: collected } = await collect(builder, request, read));
         }
       }
       candidates.set(doc, buildingCore);
+      builtRequests.set(doc, { ...request, files: collected });
       servedFiles = source.url
         ? { origin: new URL(source.url).origin, paths: new Set(doc.files.filter((f) => f.format).map((f) => sourcePath(doc, f)).filter((p) => !p.startsWith("/<"))) }
         : { origin: null, paths: new Set() };
@@ -1046,6 +1049,24 @@ export default {
     const all = new Map(Object.entries(read.bytes).map(([path, bytes]) => [path, () => new File([bytes], path.split("/").pop())]));
     const items = read.pool.map((path) => ({ path, name: path.slice(1), read: all.get(path), source: { ...filesSource(all, path), fromPool: true } }));
     return { source: filesSource(all, read.entry), items };
+  },
+  /**
+   * The SVG of `levels[level]` of `doc`, the Document shown, with `overlays` (File > Export Image):
+   * the core builds its request again, with the files it was built from, on the core that holds it.
+   */
+  async exportSvg({ doc: shown, level, title, overlays }) {
+    const request = builtRequests.get(shown);
+    const worker = candidates.get(shown) ?? core;
+    if (!request || !worker) throw new Error("This document was not built in this page: open it again and export.");
+    const built = await worker.build({ ...request, lazy_unplaced: false, overlays });
+    const svg = built.levels[level]?.title === title ? built.levels[level].svg : null;
+    if (!svg) throw new Error(`The level ${title} is not where the document shown has it: open it again and export.`);
+    return svg;
+  },
+  /** Export Image: the image, as a download. */
+  async saveImage(name, blob) {
+    download(name, blob);
+    return name;
   },
   /** The browser asks before a page with changes not saved is left. */
   setDirty(dirty) {
