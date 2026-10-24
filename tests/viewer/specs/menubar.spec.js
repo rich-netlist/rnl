@@ -75,7 +75,7 @@ test.describe("on the web", () => {
         items: [
           "Fit to WindowF", "Zoom InCtrl++", "Zoom OutCtrl+-", "Color Scheme...",
           "Background", "Light", "Dark",
-          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Show Current Directions", "Language", "English", "简体中文", "",
+          "Grid", "Show GridG", "", "None", "Dots", "Lines", "", "Axes", "", "Grid Settings...", "Show Names on Hover", "Show UsagesCtrl+R", "Show Current DirectionsShift+R", "Language", "English", "简体中文", "",
           "Side Panels", "Library1", "Netlist2", "Hierarchy3", "Symbol4", "Usage5", "Not Drawn6", "", "Hide",
         ],
       },

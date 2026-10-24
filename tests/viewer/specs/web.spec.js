@@ -18,6 +18,22 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://rich-netlist.github.io/rnl-packages/**", route => route.abort());
 });
 
+test("panel keys work at once while the WebAssembly core is still loading", async ({ page }) => {
+  // a browser that runs WebAssembly without JIT takes long to have the core ready
+  let release;
+  const ready = new Promise(resolve => release = resolve);
+  await page.route("**/*.wasm", async route => { await ready; await route.continue(); });
+  await page.goto(`${process.env.RNL_WEB_URL}/?url=samples/cases/04-hierarchy.sp`);
+  await expect(page.locator("#startup")).toHaveCount(0);
+  await page.keyboard.press("3");
+  await expect(page.locator("#pane-hierarchy")).toBeVisible();
+  await page.keyboard.press("1");
+  await expect(page.locator("#pane-files")).toBeVisible();
+  release();
+  await expect(page).toHaveTitle(/^04-hierarchy\.sp/);
+  await expect(page.locator("#pane-files")).toBeVisible();
+});
+
 test('usage inspection and overlay selection work with the real WASM core', async ({ page }) => {
   await start(page);
   const doc = await opened(page, () => page.locator('#file-input').setInputFiles({

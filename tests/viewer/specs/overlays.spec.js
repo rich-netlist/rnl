@@ -39,7 +39,9 @@ for (const platform of ['web', 'desktop']) {
     await page.keyboard.press('Shift+R');
     await expect(page.locator('.current-arrow')).toHaveCount(0);
     // a capital R typed in the netlist's find box is text
+    await page.keyboard.press('2');
     await page.keyboard.press('Control+f');
+    await expect(page.locator('#netlist-query')).toBeFocused();
     await page.keyboard.press('Shift+R');
     await expect(page.locator('#netlist-query')).toHaveValue('R');
     await expect(page.locator('.current-arrow')).toHaveCount(0);

@@ -43,6 +43,46 @@ for (const [resource, platform, key, pane] of [
   });
 }
 
+for (const platform of ["web", "desktop"]) {
+  test(`${platform}: panel keys work at once while the core is still building the first document`, async ({ page, viewer }) => {
+    let release;
+    const ready = new Promise(resolve => release = resolve);
+    // the fixture is what the shell's core gives: holding it holds the first document's build
+    await page.route("**/fixtures/04-hierarchy.json", async route => { await ready; await route.continue(); });
+    await page.goto(`${process.env.RNL_VIEWER_URL}/?shell=fake&platform=${platform}&open=04-hierarchy`, { waitUntil: "commit" });
+    await viewer.started();
+    await expect(page.locator("#startup")).toHaveCount(0);
+    expect(await page.evaluate(() => window.viewer.doc)).toBeNull();
+    await page.keyboard.press("3");
+    await expect(page.locator("#pane-hierarchy")).toBeVisible();
+    await page.keyboard.press("1");
+    await expect(page.locator("#pane-files")).toBeVisible();
+    release();
+    await viewer.idle();
+    expect(await page.evaluate(() => window.viewer.doc?.name)).toBeTruthy();
+    await expect(page.locator("#pane-files")).toBeVisible();
+  });
+}
+
+test("a panel key pressed before startup.js arrives still runs once the viewer has started", async ({ page, viewer }) => {
+  let release;
+  const ready = new Promise(resolve => release = resolve);
+  await page.route("**/startup.js", async route => { await ready; await route.continue(); });
+  await page.goto(`${process.env.RNL_VIEWER_URL}/?shell=fake&open=04-hierarchy`, { waitUntil: "commit" });
+  await page.waitForSelector("#startup");
+  await page.keyboard.press("6");
+  await page.keyboard.press("Shift+4");
+  await page.keyboard.press("3");
+  release();
+  await viewer.started();
+  await viewer.idle();
+  await expect(page.locator("#startup")).toHaveCount(0);
+  await expect(page.locator("#pane-hierarchy")).toBeVisible();
+  // the inline listener is gone once startup.js has taken over
+  await page.keyboard.press("2");
+  await expect(page.locator("#pane-netlist")).toBeVisible();
+});
+
 test("a later panel key wins while the native startup handoff is pending", async ({ page, viewer }) => {
   await page.addInitScript(() => {
     window.__TAURI__ = {

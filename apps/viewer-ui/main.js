@@ -22,7 +22,7 @@ import {
 } from "./panels.js";
 import { loadShell } from "./shell.js";
 import { startSolvePanel } from "./solve.js";
-import { finishStartup, stylesReady } from "./startup.js";
+import { finishStartup, revealViewer, stylesReady } from "./startup.js";
 import { current, doc, path, selected } from "./state.js";
 import { renderUnplaced } from "./unplaced.js";
 import { setSemanticsOnly, setRnlOnly } from "./text.js";
@@ -72,9 +72,13 @@ async function start() {
   renderUnplaced();
 
   await startCommands();
+  if (!shell.nativeMenu) showMenuBar(true);
+  // The panels, the menus and their keys work from here. The Library, the core (WebAssembly on the
+  // web, which can take long where a browser runs it without JIT) and the first document follow,
+  // the document with its own loading stages, so a panel key never waits for them.
+  void revealViewer(runStartupShortcuts);
   await startPool();
   startPreload();
-  if (!shell.nativeMenu) showMenuBar(true);
   if (shell.onOpen) await shell.onOpen((source) => openSource(source, false));
   if (shell.onCloseRequested) shell.onCloseRequested(closeRequested);
   if (shell.platform === "web" && new URLSearchParams(location.search).get("api") === "1") {

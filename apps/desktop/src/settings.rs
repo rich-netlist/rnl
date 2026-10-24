@@ -176,7 +176,7 @@ mod tests {
         let flat = std::env::temp_dir().join(format!("rnl-subfolders-flat-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&flat);
         for i in 0..SUBFOLDER_LIMIT + 3 {
-            std::fs::create_dir_all(flat.join(format!("{i:04}"))).unwrap();
+            std::fs::create_dir_all(flat.join(format!("d{i:04}"))).unwrap();
         }
         let (found, more) = subfolders(&flat);
         assert_eq!((found.len(), more), (SUBFOLDER_LIMIT, true));

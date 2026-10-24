@@ -26,6 +26,19 @@ body.starting > #app, body.starting > .menubar, body.starting > .statusbar { vis
 <link id="viewer-fonts" rel="preload" as="style" href="fonts/fonts.css">
 </head>
 <body class="starting">
+<script>
+// Panel number keys pressed before startup.js runs, which on a slow network can take seconds: it
+// adopts them (startup.js), and the last usable one runs once the viewer has started.
+window.rnlEarlyKeys = [];
+window.rnlEarlyKeyListener = function (event) {
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229 ||
+      event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !/^[1-7]$/.test(event.key)) return;
+  if (!(event.target instanceof Element) || event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), dialog')) return;
+  window.rnlEarlyKeys.push(event.key);
+  event.preventDefault();
+};
+if (new URLSearchParams(location.search).get("embed") !== "1") document.addEventListener("keydown", window.rnlEarlyKeyListener);
+</script>
 <div id="startup" class="startup" role="status" aria-label="Loading RNL Viewer">
   <strong>RNL Viewer</strong>
   <small id="startup-version"></small>
