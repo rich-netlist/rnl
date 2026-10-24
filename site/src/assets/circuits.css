@@ -1,0 +1,51 @@
+/* RNL circuit gallery (gallery.html). Builds on intro.css and gallery.css (the layout, the search box, the status line). */
+
+.cg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.cg-card {
+  display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel);
+}
+.cg-card:hover { border-color: var(--ink-3); box-shadow: var(--shadow); }
+/* The thumbnails are drawn on white paper, so they stay white in the dark theme, like a sheet on a table */
+.cg-fig {
+  display: flex; align-items: center; justify-content: center; aspect-ratio: 4 / 3; overflow: hidden;
+  border-bottom: 1px solid var(--line); background: #fff; color: #5f6368; text-decoration: none;
+}
+.cg-fig img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.cg-nothumb { padding: 16px; text-align: center; font: 600 14px/1.4 var(--f-mono); background: var(--panel-2); color: var(--ink-3); }
+.cg-nothumb-text { overflow-wrap: anywhere; }
+a.cg-fig:focus-visible, .cg-title a:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cg-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 14px; min-width: 0; }
+.cg-title { margin: 0; font: 700 16.5px/1.35 var(--f-body); overflow-wrap: anywhere; }
+.cg-title a { color: var(--ink); text-decoration: none; }
+.cg-title a:hover { color: var(--signal); text-decoration: underline; }
+.cg-desc { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.cg-by { margin: 0; font-size: 12.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.cg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 2px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.cg-src { font: 12px var(--f-mono); color: var(--ink-3); text-decoration: none; overflow-wrap: anywhere; }
+.cg-src:hover { color: var(--signal); text-decoration: underline; }
+.cg-note { margin: 4px 0 0; padding: 6px 10px; border: 1px dashed var(--line); border-radius: 6px; font-size: 12.5px; line-height: 1.55; color: var(--ink-3); }
+.cg-notice { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+.cg-notice.cg-warn { border-color: color-mix(in srgb, var(--warn) 35%, transparent); background: var(--warn-2); color: var(--ink-2); }
+.cg-notice.cg-error { border-color: color-mix(in srgb, var(--err) 35%, transparent); background: var(--err-2); color: var(--ink-2); }
+
+.cg-tagbox { display: flex; flex-direction: column; gap: 2px; margin: 0 0 22px; }
+.cg-check { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 4px; border-radius: 5px; cursor: pointer; font-size: 14px; color: var(--ink-2); }
+.cg-check:hover { background: var(--panel); color: var(--ink); }
+.cg-check input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--signal); cursor: pointer; }
+.cg-check-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cg-check small { flex: none; color: var(--ink-3); font: 500 11.5px var(--f-mono); }
+.cg-tag {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink-2); font: 500 12px var(--f-body);
+}
+.cg-tag:hover { color: var(--ink); border-color: var(--ink-3); }
+.cg-tag[aria-pressed="true"] { color: var(--signal); border-color: var(--signal); background: var(--signal-2); }
+.cg-tag:focus-visible, .cg-clear:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cg-clear { align-self: flex-start; height: 28px; padding: 0 4px; margin-top: 4px; border: 0; background: transparent; color: var(--ink-3); font: 13px var(--f-body); cursor: pointer; text-decoration: underline; }
+.cg-clear:hover { color: var(--ink); }
+.cg-tagrow { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 0; }
+
+@media (max-width: 640px) {
+  .cg-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}

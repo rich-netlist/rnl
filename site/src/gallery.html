@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="{{html-lang}}" data-locale="{{locale-code}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><zh>RNL 图库 · Rich Netlist</zh><en>RNL gallery · Rich Netlist</en></title>
+<meta name="description" content="<zh>用 RNL 画出原理图的案例：点开一个，就在网页版查看器里看它。图库是 GitHub 上的一张列表，新条目合并几分钟后就出现。</zh>
+  <en>Examples drawn with RNL: open one to look at it in the web viewer. The gallery is a list on GitHub, and a new entry shows up minutes after it is merged.</en>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="{{font-href}}">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="assets/intro.css">
+<link rel="stylesheet" href="assets/languages.css">
+<link rel="stylesheet" href="assets/gallery.css">
+<link rel="stylesheet" href="assets/circuits.css">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('rnl-intro-theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body class="gl-page cg-page">
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.3"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.6v.3"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/></symbol>
+  <symbol id="i-git" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7v10"/><path d="M18 10c0 4-6 3-12 7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+</svg>
+
+<a class="skip" href="#main"><zh>跳到正文</zh><en>Skip to content</en></a>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="./"><span class="brand-logo theme-logo"><img class="logo-light" src="assets/brand/rnl-logo-small.svg" width="24" height="24" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-small-dark.svg" width="24" height="24" alt=""></span><span class="brand-mark">RNL</span><span class="brand-sub">Rich Netlist</span></a>
+    <nav class="pages" aria-label="{{nav-pages}}">
+      <a href="./">{{nav-intro}}</a>
+      <a href="language.html">{{nav-tour}}</a>
+      <a href="{{spec-root}}">{{nav-spec}}</a>
+      <a href="packages.html">{{nav-packages}}</a>
+      <a class="is-on" aria-current="page" href="gallery.html">{{nav-gallery}}</a>
+      <a href="tools.html">{{nav-tools}}</a>
+      <a href="agents.html">{{nav-agents}}</a>
+      <a href="https://github.com/rich-netlist/rnl">GitHub</a>
+    </nav>
+    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>目录</zh><en>Contents</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
+    {{language-menu}}
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="<zh>切换配色</zh><en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
+  </div>
+  <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
+</header>
+
+<main id="main">
+
+<section class="hero tour-hero gl-hero" id="top" aria-labelledby="gallery-title">
+  <div class="wrap">
+    <div class="hero-copy">
+      <p class="eyebrow"><span>RICH NETLIST · GALLERY</span></p>
+      <h1 id="gallery-title" class="tour-h1"><zh>图库</zh><en>Gallery</en></h1>
+      <p class="thesis"><zh>一些 RNL 案例，按各自许可证公开。</zh><en>Some RNL examples, published under their own licences.</en></p>
+      <p class="lead"><a href="https://github.com/rich-netlist/rnl-gallery#readme"><zh>如何贡献</zh><en>How to contribute</en></a></p>
+    </div>
+  </div>
+</section>
+
+<section id="gallery" class="sheet gl-sheet" aria-label="<zh>图库</zh><en>Gallery</en>">
+  <div class="layout">
+    <nav id="toc" aria-label="<zh>图库导航</zh><en>Gallery navigation</en>">
+      <label class="gl-search">
+        <svg class="ico"><use href="#i-search"/></svg>
+        <input id="cg-q" type="search" autocomplete="off" spellcheck="false" placeholder="<zh>搜索图库</zh><en>Search the gallery</en>" aria-label="<zh>搜索标题、说明、作者</zh><en>Search titles, descriptions and authors</en>">
+      </label>
+      <div class="cg-tagbox" id="cg-tags" role="group" aria-label="<zh>按标签筛选</zh><en>Filter by tag</en>" hidden></div>
+    </nav>
+    <div class="gl-content">
+      <header class="gl-heading">
+        <p id="cg-counts" aria-live="polite"></p>
+      </header>
+      <div class="gl-main" id="cg-main" aria-live="polite">
+        <p class="gl-status" id="cg-status"><zh>正在载入……</zh><en>Loading…</en></p>
+        <noscript><p class="gl-status"><zh>这一页要用 JavaScript 显示图库。列表在 <a href="https://github.com/rich-netlist/rnl-gallery/tree/main/entries">GitHub 的 rnl-gallery 仓库</a>里。</zh><en>This page needs JavaScript to show the gallery. The list is in the <a href="https://github.com/rich-netlist/rnl-gallery/tree/main/entries">rnl-gallery repository on GitHub</a>.</en></p></noscript>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-grid">
+    <div>
+      <span class="brand-mark">RNL</span>
+      <p><zh>这一页读 <a href="https://rich-netlist.github.io/rnl-gallery/">rnl-gallery 的 GitHub Pages</a> 上的索引和缩略图。每个设计按它自己仓库的许可证。</zh>
+        <en>This page reads the index and the thumbnails from <a href="https://rich-netlist.github.io/rnl-gallery/">rnl-gallery’s GitHub Pages</a>. Each design is under the licence of its own repository.</en></p>
+    </div>
+    <div>
+      <h4><zh>另见</zh><en>See also</en></h4>
+      <ul>
+        <li><a href="../viewer/" target="_blank" rel="noopener"><zh>网页版查看器</zh><en>Web viewer</en></a></li>
+        <li><a href="packages.html"><zh>标准包</zh><en>Packages</en></a></li>
+        <li><a href="https://github.com/rich-netlist/rnl-gallery"><zh>rnl-gallery 仓库</zh><en>The rnl-gallery repository</en></a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/languages.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/circuits.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+{
+  "format": 1,
+  "generated": "2026-10-24T00:00:00Z",
+  "entries": [
+    {
+      "id": "ota-single",
+      "title": {
+        "en": "Five-transistor OTA",
+        "zh": "五管 OTA"
+      },
+      "description": {
+        "en": "A placed OTA in one file.",
+        "zh": "一个文件里的 OTA。"
+      },
+      "author": "Ada",
+      "license": "CC0-1.0",
+      "source": {
+        "repo": "example/ota",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "url": "https://github.com/example/ota/tree/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "files": 1,
+      "viewer": {
+        "url": "https://raw.githubusercontent.com/example/ota/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/ota.sp",
+        "level": "ota"
+      },
+      "thumb": {
+        "path": "thumbs/ota-single.11111111.png",
+        "width": 320,
+        "height": 240
+      },
+      "tags": [
+        "opamp",
+        "ota",
+        "hierarchical"
+      ]
+    },
+    {
+      "id": "pll-multi",
+      "title": {
+        "en": "Phase-locked loop"
+      },
+      "description": {
+        "en": "A hierarchical PLL in many files, with a long description that goes on for several lines so that the clamp on the card has something to cut: charge pump, loop filter, dividers, a voltage-controlled oscillator and the blocks around them."
+      },
+      "author": "Grace",
+      "license": "MIT",
+      "source": {
+        "repo": "example/pll",
+        "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "url": "https://github.com/example/pll/tree/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "files": 83,
+      "viewer": {
+        "manifest": "manifests/pll-multi.json"
+      },
+      "thumb": {
+        "path": "thumbs/pll-multi.22222222.png",
+        "width": 320,
+        "height": 240
+      },
+      "tags": [
+        "pll",
+        "mixed-signal",
+        "hierarchical"
+      ]
+    },
+    {
+      "id": "broken-thumb",
+      "title": {
+        "en": "<img src=x onerror=\"window.__xss=1\">Entry whose thumbnail is missing",
+        "zh": "缩略图缺失的条目"
+      },
+      "description": {
+        "en": "<b>Text</b>, never markup."
+      },
+      "author": "<script>window.__xss=2</script>",
+      "license": "Apache-2.0",
+      "source": {
+        "repo": "example/broken",
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "url": "https://github.com/example/broken/tree/cccccccccccccccccccccccccccccccccccccccc"
+      },
+      "files": 2,
+      "viewer": {
+        "url": "https://raw.githubusercontent.com/example/broken/cccccccccccccccccccccccccccccccccccccccc/top.sp"
+      },
+      "thumb": {
+        "path": "thumbs/missing.33333333.png",
+        "width": 320,
+        "height": 240
+      },
+      "tags": [
+        "hierarchical",
+        "custom-tag",
+        "BAD TAG"
+      ]
+    }
+  ]
+}
