@@ -19,6 +19,7 @@
   "Other text": "其他文本",
   "Netlist background": "网表区背景",
   "Selection highlight": "选中高亮",
+  "Subcircuit selection highlight (drawing)": "子电路选中高亮（画图区）",
   "{0} color picker": "{0}调色板",
   "Enter a six-digit hex color, such as #1A67CC.": "请输入六位十六进制颜色，例如 #1A67CC。",
   "Preview changes immediately. Save keeps them; Cancel restores the previous scheme.": "修改即时预览；保存后保留，取消则恢复原配色。",

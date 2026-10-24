@@ -1,4 +1,6 @@
-// One netlist palette, independent of the UI theme and the drawing's colours.
+// One netlist palette, independent of the UI theme and the drawing's colours, and beside its
+// selection highlight the drawing's second one: the colour of a selected subcircuit instance, which
+// can be opened. The drawing lightens it on a dark background, as it does its first highlight.
 import { append, m, setAttr, setText } from "./i18n.js";
 import { form, inform } from "./dialog.js";
 import { load, save } from "./util.js";
@@ -16,6 +18,7 @@ export const COLOR_FIELDS = [
   ["text", "Other text", "#000000"],
   ["background", "Netlist background", "#FFFFFF"],
   ["highlight", "Selection highlight", "#E8590C"],
+  ["subcircuit", "Subcircuit selection highlight (drawing)", "#C2255C"],
 ];
 export const DEFAULT_COLORS = Object.freeze(Object.fromEntries(COLOR_FIELDS.map(([key, , value]) => [key, value])));
 const KEY = "netlist-colors";
@@ -29,7 +32,15 @@ function normalized(value) {
 }
 function apply(value) {
   current = { ...value };
-  for (const [key, color] of Object.entries(current)) document.documentElement.style.setProperty(`--netlist-${key}`, color);
+  const root = document.documentElement.style;
+  for (const [key, color] of Object.entries(current)) root.setProperty(`--netlist-${key}`, color);
+  // The drawing's subcircuit colour and its fill; the stylesheet's own when the default is kept.
+  if (current.subcircuit === DEFAULT_COLORS.subcircuit) { root.removeProperty("--sub"); root.removeProperty("--sub-fill"); }
+  else {
+    root.setProperty("--sub", current.subcircuit);
+    root.setProperty("--sub-fill", `color-mix(in srgb, ${current.subcircuit} 6%, transparent)`);
+  }
+  window.dispatchEvent(new Event("highlight-colors"));
 }
 export function startNetlistColors() { apply(normalized(load(KEY, null))); }
 

@@ -3,7 +3,7 @@ import {expect, test} from '../viewer.js';
 const defaults = {
   component: '#2275E2', net: '#A01008', rnl: '#E1FEE9', keyword: '#000000', definition: '#2B7800',
   local: '#4B21E4', string: '#895D7C', parameter: '#1D4781', free: '#6B6B6B', text: '#000000',
-  background: '#FFFFFF', highlight: '#E8590C',
+  background: '#FFFFFF', highlight: '#E8590C', subcircuit: '#C2255C',
 };
 const rgb = hex => `rgb(${[1,3,5].map(i => parseInt(hex.slice(i,i+2),16)).join(', ')})`;
 const box = (page, key) => page.locator(`#netlist-color-${key}`);
@@ -23,7 +23,7 @@ const stored = (page, platform) => page.evaluate(platform => platform === 'deskt
 
 for (const platform of ['web', 'desktop']) {
   const settings = {platform, ...(platform === 'desktop' ? {settings:'1'} : {})};
-  test(`${platform}: the twelve defaults colour real syntax and remain independent of UI and drawing themes`, async ({page, viewer}) => {
+  test(`${platform}: the thirteen defaults colour real syntax and remain independent of UI and drawing themes`, async ({page, viewer}) => {
     await viewer.open('symbol-inspector', settings);
     const styles = {'.s-host':'component', '.s-inst':'component', '.s-net':'net', '.s-keyword':'keyword',
       '.s-def':'definition', '.s-local':'local', '.s-string':'string', '.s-param':'parameter', '.s-free':'free', '.s-number':'text'};
@@ -35,7 +35,9 @@ for (const platform of ['web', 'desktop']) {
     }
     await open(page, platform);
     expect(await palette(page)).toEqual(defaults);
-    await expect(page.locator('.netlist-color-row input[type=color]')).toHaveCount(12);
+    await expect(page.locator('.netlist-color-row input[type=color]')).toHaveCount(13);
+    // the two highlights stand together
+    expect((await palette(page).then(Object.keys)).slice(-2)).toEqual(['highlight', 'subcircuit']);
     await expect(page.locator('.dialog-buttons button')).toHaveText(['Restore Defaults', 'Cancel', 'Save']);
     await page.getByRole('button', {name:'Cancel', exact:true}).click();
     await viewer.click('Xparent');
@@ -101,6 +103,48 @@ for (const platform of ['web', 'desktop']) {
     await expect.poll(()=>stored(page,platform)).toEqual(defaults);
     await page.reload(); await viewer.started(); await viewer.idle();
     await expect(page.locator('#source .s-net').first()).toHaveCSS('color',rgb(defaults.net));
+  });
+}
+
+for (const background of ['light', 'dark']) {
+  test(`${background}: the second highlight colours a selected subcircuit on the drawing, not the netlist nor the zoom rectangle`, async ({page, viewer}, info) => {
+    if (background === 'dark') await page.emulateMedia({colorScheme: 'dark'});
+    await viewer.open('symbol-inspector');
+    if (background === 'dark') await page.evaluate(() => window.viewer.command('background-dark'));
+    const drawingSub = () => page.locator('#canvas').evaluate(c => getComputedStyle(c).getPropertyValue('--drawing-sub').trim());
+    const before = await drawingSub();
+    await open(page, 'web');
+    await expect(page.getByLabel('Subcircuit selection highlight (drawing)', {exact: true})).toHaveValue(defaults.subcircuit);
+    if (process.env.RNL_REVIEW_DIR && info.project.name === 'chromium') {
+      await page.getByRole('dialog').screenshot({path: `${process.env.RNL_REVIEW_DIR}/second-highlight-scheme-${background}.png`});
+    }
+    await box(page, 'subcircuit').fill('#1C7C54');
+    // previewed at once on the drawing, lightened on a dark background as the first highlight is
+    await expect.poll(drawingSub).not.toBe(before);
+    if (background === 'light') expect(await drawingSub()).toBe('#1C7C54');
+    await page.getByRole('button', {name: 'Save', exact: true}).click();
+    await viewer.click('Xparent');
+    await expect(page.locator('#canvas')).toHaveClass(/sel-sub/);
+    const stroke = await page.locator('#canvas g.sel [stroke]:not([stroke=none])').first().evaluate(e => getComputedStyle(e).stroke);
+    const expected = await page.locator('#canvas').evaluate((c, colour) => {
+      const probe = document.createElement('span'); probe.style.color = colour; c.append(probe);
+      const value = getComputedStyle(probe).color; probe.remove(); return value;
+    }, await drawingSub());
+    expect(stroke).toBe(expected);
+    // the netlist keeps its own highlight
+    await expect(page.locator('#source .obj.hl').first()).toHaveCSS('color', rgb(defaults.highlight));
+    // a right drag's rectangle keeps the plain highlight
+    const r = await page.locator('#canvas').boundingBox();
+    await page.mouse.move(r.x + r.width * 0.2, r.y + r.height * 0.3);
+    await page.mouse.down({button: 'right'});
+    await page.mouse.move(r.x + r.width * 0.6, r.y + r.height * 0.6, {steps: 5});
+    const border = await page.locator('.zoom-box').evaluate(e => getComputedStyle(e).borderTopColor);
+    const plain = await page.locator('#canvas').evaluate(c => {
+      const probe = document.createElement('span'); probe.style.color = getComputedStyle(c).getPropertyValue('--drawing-select'); c.append(probe);
+      const value = getComputedStyle(probe).color; probe.remove(); return value;
+    });
+    await page.mouse.up({button: 'right'});
+    expect(border).toBe(plain);
   });
 }
 
