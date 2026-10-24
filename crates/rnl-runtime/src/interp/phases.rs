@@ -818,15 +818,24 @@ impl Interp<'_> {
             }
         }
         for t in self.scenes[s].texts.clone() {
-            let (att, from_symbol, site, off) = match self.o(t) {
-                ObjData::Text { attach, from_symbol, site, off, .. } => (*attach, *from_symbol, site.clone(), *off),
-                ObjData::KeyText { attach, from_symbol, site, off, .. } => (*attach, *from_symbol, site.clone(), *off),
+            // `by_rule`: only rules gave the text, a TEXT for what a selection reached (10.4); one
+            // that lands on a usage without a symbol or a terminal without a pin does nothing then,
+            // and says nothing, as SET-STYLE does on a semantic usage (8.3), such as the rules of
+            // rnl-std-no-labels on the usages of structures; written for the object, it fails
+            let (att, from_symbol, site, off, by_rule) = match self.o(t) {
+                ObjData::Text { attach, from_symbol, site, off, generated, .. } => {
+                    (*attach, *from_symbol, site.clone(), *off, *generated)
+                }
+                ObjData::KeyText { attach, from_symbol, site, off, generated, direct, .. } => match direct {
+                    Some((c, o)) => (*attach, *from_symbol, Some(c.clone()), *o, false),
+                    None => (*attach, *from_symbol, site.clone(), *off, *generated),
+                },
                 _ => continue,
             };
             let mut failed = false;
             match self.o(att).clone() {
                 ObjData::Usage(_) if !self.scenes[s].symbol.contains_key(&att) && !from_symbol => {
-                    if site.is_some() {
+                    if site.is_some() && !by_rule {
                         let l = self.label(att);
                         self.diag_site(
                             Severity::Error,
@@ -838,7 +847,7 @@ impl Interp<'_> {
                     failed = true;
                 }
                 ObjData::Term { .. } if !self.has_pin(s, att) => {
-                    if site.is_some() {
+                    if site.is_some() && !by_rule {
                         let l = self.label(att);
                         self.diag_site(
                             Severity::Error,

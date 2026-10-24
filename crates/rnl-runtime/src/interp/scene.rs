@@ -598,6 +598,7 @@ impl Interp<'_> {
             failed: false,
             site: None,
             off: 0,
+            direct: None,
         });
         self.scenes[s].keytexts.insert((obj, key.to_string()), k);
         k
@@ -762,9 +763,12 @@ impl Interp<'_> {
                 }
                 if let Some(k) = &key {
                     let kt = self.scene_keytext(s, att, k);
-                    if let ObjData::KeyText { layers, site: ks, generated: g, .. } = self.om(kt) {
+                    if let ObjData::KeyText { layers, site: ks, generated: g, direct, .. } = self.om(kt) {
                         // its place in the order of writing, where a later segment is later (5.5)
                         layers.push((order_pos(&at, &ctx.segments), items, style));
+                        if !generated {
+                            *direct = site.clone().map(|c| (c, 0));
+                        }
                         *ks = site;
                         *g = generated;
                     }
