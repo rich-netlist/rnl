@@ -1428,6 +1428,7 @@ test("a gallery file whose SHA-256 does not match is named and nothing opens; a 
 test("an embedded canvas opens a gallery design by ?manifest=", async ({ page }) => {
   await galleryRoutes(page, galleryManifest());
   await page.goto(`${process.env.RNL_WEB_URL}/index.html?embed=1&manifest=${encodeURIComponent(GALLERY_MANIFEST)}`);
-  await expect(page.locator("#canvas > svg")).toHaveCount(1);
+  await expect(page.locator("#canvas > svg")).toBeVisible();
+  await expect(page.locator("#gallery-bar")).toBeHidden();
   await expect.poll(() => page.evaluate(() => window.viewer?.doc?.levels[window.viewer.level]?.title)).toBe("amp");
 });
