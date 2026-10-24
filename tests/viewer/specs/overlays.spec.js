@@ -28,6 +28,27 @@ for (const platform of ['web', 'desktop']) {
     await expect(page.locator('.current-arrow')).toHaveCount(0);
   });
 
+  test(`${platform}: Shift+R shows and hides the current directions; R alone and typing do not`, async ({page, viewer}) => {
+    await viewer.open('usage-current', {platform});
+    await page.locator('#canvas').click({position: {x: 5, y: 5}});
+    await page.keyboard.press('Shift+R');
+    await expect(page.locator('.current-arrow')).toHaveCount(7);
+    expect(await page.evaluate(() => window.viewer.checked('toggle-currents'))).toBe(true);
+    await page.keyboard.press('r');
+    await expect(page.locator('.current-arrow')).toHaveCount(7);
+    await page.keyboard.press('Shift+R');
+    await expect(page.locator('.current-arrow')).toHaveCount(0);
+    // a capital R typed in the netlist's find box is text
+    await page.keyboard.press('Control+f');
+    await page.keyboard.press('Shift+R');
+    await expect(page.locator('#netlist-query')).toHaveValue('R');
+    await expect(page.locator('.current-arrow')).toHaveCount(0);
+    if (platform === 'web') {
+      await viewer.menuTitle('View').click();
+      await expect(page.locator('.menu-item[data-id="toggle-currents"]')).toContainText('Shift+R');
+    }
+  });
+
   test(`${platform}: Viewer projects core frames and current paths exactly like CLI`, async ({page, viewer}, info) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rnl-overlay-browser-'));
     try {

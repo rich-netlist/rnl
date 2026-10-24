@@ -113,7 +113,7 @@ export function command(id, options = {}) {
     case "ascend": return ascend(options);
     case "shortcuts": inform({ title: m("Keyboard Shortcuts"), paragraphs: [
       m`${m`${m("1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Usage. 6: Not drawn.")}${shell.solve ? m(" 7: Solve report.") : ""}`}${m(" These keys also expand a collapsed side panel; they do not run while typing.")}`,
-      m("Ctrl+R: Show Usages. F5: Reload the netlist."),
+      m("Ctrl+R: Show Usages. Shift+R: Show Current Directions. F5: Reload the netlist."),
       m("E or Enter: Open Subcircuit. Ctrl+E or Backspace: Up to Parent Level."),
       m("Shift+E or Shift+Enter: Open Subcircuit in New Window. Hold Shift during any circuit navigation to open its target in a new window."),
       m("Ctrl+Q: Edit Text (the physical Control key on macOS too). Ctrl+Enter: Apply and Exit Editing."),
@@ -232,6 +232,8 @@ function matches(e, spec) {
   if (parts.includes("Control")) return e.ctrlKey && !e.metaKey && !e.altKey && e.shiftKey === parts.includes("Shift");
   if (parts.includes("Ctrl")) return ctrl && (!/^[a-z]$/.test(key) || e.shiftKey === parts.includes("Shift"));
   if (key === "e" || key === "enter") return !ctrl && !e.altKey && e.shiftKey === parts.includes("Shift");
+  // A letter written with Shift, such as Shift+R, needs it, so that the bare letter stays free.
+  if (parts.includes("Shift") && /^[a-z]$/.test(key)) return !ctrl && !e.altKey && e.shiftKey;
   if (/^[1-7]$/.test(key)) return !ctrl && !e.altKey && !e.shiftKey;
   return !(ctrl || e.altKey) || !(key.length === 1 || key === "backspace");
 }

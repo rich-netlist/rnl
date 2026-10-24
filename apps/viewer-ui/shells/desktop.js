@@ -42,7 +42,8 @@ export default {
   bundledFiles: () => invoke("bundled_files"),
   include: async (kind) => (await invoke("pick_pool", { kind })).map((path) => ({ path, name: path, source: file(path) })),
   pickPath: () => invoke("pick_pool", { kind: "path" }).then((paths) => paths[0] || null),
-  pathPackages: (dir) => invoke("path_packages", { dir }),
+  // a PATH directory's files, with those of its sub-folders when it was added with them
+  pathPackages: (dir, subfolders = false) => invoke("path_packages", { dir, subfolders }),
   setPool: (items, reload = false, refresh = []) => {
     cancelPreload().catch(() => {});
     const paths = items.filter((item) => !item.builtin).map((item) => item.path);

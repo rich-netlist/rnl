@@ -108,7 +108,10 @@
   "Include File…": "加入文件…",
   "Include Folder…": "加入文件夹…",
   "Include Public Package…": "加入公共包…",
-  "Add PATH Directory…": "添加 PATH 目录…",
+  "Add PATH…": "添加 PATH…",
+  "Add PATH with Sub-folders…": "添加 PATH（含子目录）…",
+  "with sub-folders": "含子目录",
+  "Only the first {0} sub-folders are searched; add deeper folders as PATH entries of their own.": "只搜索前 {0} 个子目录；更深的目录请单独加入 PATH。",
   "Files here are searched for packages and includes, in this order.": "按此处顺序查找包和包含文件。",
   "Apply and Exit Editing": "应用并退出编辑",
   "Auto Include": "自动包含",
@@ -535,5 +538,5 @@
   "Generated usage; no source statement is available.": "自动生成的用例，没有可用的源语句。",
   "1: Library. 2: Netlist. 3: Hierarchy. 4: Symbol. 5: Usage. 6: Not drawn.": "1：资源库。2：网表。3：层级。4：符号。5：用例。6：未绘制。",
   " 7: Solve report.": " 7：求解报告。",
-  "Ctrl+R: Show Usages. F5: Reload the netlist.": "Ctrl+R：显示用例。F5：重新加载网表。"
+  "Ctrl+R: Show Usages. Shift+R: Show Current Directions. F5: Reload the netlist.": "Ctrl+R：显示用例。Shift+R：显示电流方向。F5：重新加载网表。"
 }

@@ -208,10 +208,12 @@ export default {
     },
     ...(platform === "desktop" ? {
       pickPath: async () => fake.path || null,
-      pathPackages: async (dir) => {
-        fake.calls.push(["pathPackages", dir]);
+      // a directory alone gives its files; with its sub-folders, `deepPackages` and `truncated` say what
+      pathPackages: async (dir, subfolders = false) => {
+        fake.calls.push(subfolders ? ["pathPackages", dir, "subfolders"] : ["pathPackages", dir]);
         if (fake.pathErrors[dir]) throw fake.pathErrors[dir];
-        return fake.packages[dir] || [];
+        if (!subfolders) return fake.packages[dir] || [];
+        return { files: fake.deepPackages?.[dir] || fake.packages[dir] || [], truncated: !!fake.truncated?.[dir] };
       },
     } : { includeLibrary: async () => [] }),
   } : {}),

@@ -162,11 +162,39 @@ function paths() {
   return Array.isArray(value) ? value.filter((p) => typeof p === "string") : [];
 }
 
+/** The PATH directories added with their sub-folders, which lookup searches too (desktop settings). */
+function deepPaths() {
+  const value = load("search-paths-subfolders", []);
+  return new Set(Array.isArray(value) ? value.filter((p) => typeof p === "string") : []);
+}
+
+/** Keep `search-paths-subfolders` to the PATH directories `next` still has. */
+async function saveDeepPaths(next, add = null) {
+  const deep = [...deepPaths(), ...(add ? [add] : [])].filter((dir, i, all) => next.includes(dir) && all.indexOf(dir) === i);
+  await save("search-paths-subfolders", deep);
+}
+
+/** Add a PATH directory, with its sub-folders when `subfolders`; one already there gains them. */
+const addPath = (subfolders) => update(async () => {
+  const path = await shell.pickPath();
+  if (!path) return false;
+  const known = paths().includes(path);
+  if (known && (!subfolders || deepPaths().has(path))) return false;
+  const next = known ? paths() : [...paths(), path];
+  if (!known) await save("search-paths", next);
+  await saveDeepPaths(next, subfolders ? path : null);
+}, true);
+
 async function scanPaths(reload = false) {
   if (!shell.pathPackages) { await syncPool(reload); render(); return; }
   const version = ++scanVersion;
+  const deep = deepPaths();
   const results = await Promise.all(paths().map(async (dir) => {
-    try { return [dir, { files: await shell.pathPackages(dir) }]; }
+    try {
+      // an array from a shell that lists a directory alone, or { files, truncated }
+      const found = await shell.pathPackages(dir, deep.has(dir));
+      return [dir, Array.isArray(found) ? { files: found } : { files: found.files, truncated: found.truncated }];
+    }
     catch (e) { return [dir, { files: [], error: String(e) }]; }
   }));
   if (version !== scanVersion) return;
@@ -226,6 +254,7 @@ function group(key, title, files, kind, pathInfo) {
     const path = span("lib-path", title);
     setAttr(path, "title", title);
     append(toggle, span("lib-ordinal", `PATH ${pathInfo.index + 1}`), path);
+    if (pathInfo.deep) append(toggle, span("lib-deep", m("with sub-folders")));
   } else append(toggle, span("lib-title", title));
   append(toggle, span("lib-count", String(files.length)));
   append(head, toggle);
@@ -237,6 +266,7 @@ function group(key, title, files, kind, pathInfo) {
         if (delta) [next[index], next[index + delta]] = [next[index + delta], next[index]];
         else next.splice(index, 1);
         await save("search-paths", next);
+        if (!delta) await saveDeepPaths(next);
       }, true), tooltip);
       act.className = "lib-act";
       act.disabled = delta !== 0 && (index + delta < 0 || index + delta >= all.length);
@@ -244,6 +274,12 @@ function group(key, title, files, kind, pathInfo) {
     }
   }
   list.hidden = !expanded.get(key);
+  if (pathInfo && scanned.get(title)?.truncated) {
+    const note = document.createElement("li");
+    note.className = "lib-warning";
+    setText(note, m`Only the first ${500} sub-folders are searched; add deeper folders as PATH entries of their own.`);
+    append(list, note);
+  }
   for (const item of files) append(list, fileRow(item, kind));
   if (!files.length) {
     const empty = document.createElement("li");
@@ -261,13 +297,14 @@ function render() {
   groups.replaceChildren();
   if (temporary) append(groups, fileRow(temporary, "temporary"));
   append(groups, group("files", m("Files"), items.filter((i) => !i.builtin), "files"));
+  const deep = deepPaths();
   if (shell.pathPackages) paths().forEach((dir, index, all) => {
     const prefix = dir.replace(/\\/g, "/").replace(/\/$/, "") + "/";
     const files = (scanned.get(dir)?.files || []).map((path) => ({
       path, name: path.startsWith(prefix) ? path.slice(prefix.length) : path,
       source: { path, name: path, library: true },
     }));
-    append(groups, group(`path:${dir}`, dir, files, "path", { index, all }));
+    append(groups, group(`path:${dir}`, dir, files, "path", { index, all, deep: deep.has(dir) }));
   });
   append(groups, group("builtin", m("Built-in"), items.filter((i) => i.builtin), "builtin"));
   setText($("library-status"), libraryErrors.join("\n"));
@@ -288,11 +325,9 @@ export async function startPool() {
   $("add-path").hidden = !shell.pathPackages;
   setText($("path-note"), shell.pathPackages ? m`Settings: ${settingsPath}`
     : m("Browsers cannot search local directories. Include files or folders above; the file pool lasts until this page closes."));
-  $("add-path").addEventListener("click", () => update(async () => {
-    const path = await shell.pickPath();
-    if (!path || paths().includes(path)) return false;
-    await save("search-paths", [...paths(), path]);
-  }, true));
+  $("add-path-subfolders").hidden = !shell.pathPackages;
+  $("add-path").addEventListener("click", () => addPath(false));
+  $("add-path-subfolders").addEventListener("click", () => addPath(true));
   shell.onInclude?.((added) => update(() => {
     if (!added.length) return false;
     addItems(added);
