@@ -29,11 +29,16 @@ export const formatList = () => list;
 /** The format named `name`, from the list; undefined for a name the core does not offer. */
 export const formatInfo = (name) => list.find((f) => f.name === name);
 
-/** The user's choice for the file at `path`, or undefined when it reads by default. */
-export function chosenFormat(path) {
-  const k = key(path);
-  const name = session.has(k) ? session.get(k) : stored()[k];
-  return typeof name === "string" ? name : undefined;
+/**
+ * The user's choice for the file at `path`, or undefined when it reads by default; `url`, the file's
+ * address when it has one, finds a choice kept by it while the file is not in the document shown.
+ */
+export function chosenFormat(path, url = null) {
+  for (const k of url ? [key(path), url] : [key(path)]) {
+    const name = session.has(k) ? session.get(k) : stored()[k];
+    if (typeof name === "string") return name;
+  }
+  return undefined;
 }
 
 /**
@@ -50,11 +55,16 @@ export function fileFormats() {
 
 /**
  * Choose the format of the file at `path`, or with null its default again. The choice is kept in the
- * settings when the shell can name the file again later (`shell.keepsFormat`), else for this page only.
+ * settings when the shell can name the file again later (`shell.keepsFormat`), else for this page only;
+ * `{ session: true }` keeps it for this page only, as a project's formats are (project.js).
  */
-export async function chooseFormat(path, name) {
+export async function chooseFormat(path, name, { session: only = false } = {}) {
   const k = key(path);
   session.delete(k);
+  if (only) {
+    if (name) session.set(k, name);
+    return;
+  }
   const kept = shell.keepsFormat ? shell.keepsFormat(path) : true;
   const next = stored();
   if (name && kept) next[k] = name;

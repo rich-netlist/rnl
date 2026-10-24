@@ -230,6 +230,23 @@ export default {
         if (!subfolders) return fake.packages[dir] || [];
         return { files: fake.deepPackages?.[dir] || fake.packages[dir] || [], truncated: !!fake.truncated?.[dir] };
       },
+      // projects (project.js): the files on `disk`, the archive saved, the one to open and where it goes
+      readFile: async (path) => {
+        fake.calls.push(["readFile", path]);
+        if (fake.disk?.[path] === undefined) throw new Error(`${path}: there is no such file`);
+        return new TextEncoder().encode(fake.disk[path]);
+      },
+      saveProject: async (name, build) => {
+        fake.savedProject = { name, bytes: Array.from(new Uint8Array(await (await build()).arrayBuffer())) };
+        return `C:/saved/${name}`;
+      },
+      pickProject: async () => fake.project ? { name: fake.project.name, path: `C:/projects/${fake.project.name}`, bytes: new Uint8Array(fake.project.bytes) } : null,
+      projectRoot: async () => fake.projectRoot ?? null,
+      projectSource: async (read) => {
+        fake.written = Object.keys(read.bytes);
+        return { source: { name: read.entry, path: read.entry, fixture: "04-hierarchy" },
+          items: read.pool.map((path) => ({ path, name: path, source: { path, name: path } })) };
+      },
     } : { includeLibrary: async () => [] }),
   } : {}),
   ...(params.has("settings") ? {

@@ -4,8 +4,11 @@ import { sourcePath } from "./source-path.js";
 const canonical = path => path.replace(/^\/?<pool>(?=\/)/, "");
 const temporaryPath = source => `<temporary>/${source.name || "clipboard.sp"}`;
 
-/** Lazy archive entries. Folder selections retain unreferenced files; loaded URL includes are local snapshots. */
-export function libraryFiles({ items, temporary }, source, document, editedText, otherEdits = {}) {
+/**
+ * Lazy archive entries. Folder selections retain unreferenced files; loaded URL includes are local
+ * snapshots. `readPath` reads a file that its item gives no reader for, such as one on the desktop's disk.
+ */
+export function libraryFiles({ items, temporary }, source, document, editedText, otherEdits = {}, readPath = null) {
   const files = new Map(), folders = new Set(), raw = new Set();
   const add = (path, read, original = false) => {
     path = canonical(path);
@@ -27,7 +30,7 @@ export function libraryFiles({ items, temporary }, source, document, editedText,
       add(item.path, () => text);
     } else {
       const original = owner.files?.get(item.path);
-      add(item.path, original || item.read, !!original);
+      add(item.path, original || item.read || (readPath && (() => readPath(item.path))), !!original);
     }
   }
   if (temporary) {

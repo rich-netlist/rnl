@@ -63,9 +63,9 @@ test.describe("on the web", () => {
         title: "File",
         letter: "F",
         items: [
-          "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
+          "New Window", "Open File...Ctrl+O", "Include File...", "Include Folder...", "Include Public Package…", "Open URL...", "Open Project...", "Load Manifest...", "Load from Clipboard...Ctrl+Shift+V", "ReloadF5",
           "Reload Library", "Auto Include",
-          "", "Download FileCtrl+S", "Download Library", "Export Image", "Export SVG...", "Export PNG...",
+          "", "Download FileCtrl+S", "Download Project...", "Download Manifest...", "Export Image", "Export SVG...", "Export PNG...",
         ],
       },
       { title: "Edit", letter: "E", items: ["Edit TextCtrl+Q", "Apply and Exit EditingCtrl+Enter", "Discard Changes", "Find in Netlist…Ctrl+F", "", "Open SubcircuitE", "Open Subcircuit in New Window…Shift+E", "Up to Parent LevelCtrl+E"] },

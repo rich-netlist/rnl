@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { libraryZip } from '../viewer-ui/zip.js';
+import { archiveNames, libraryZip, readZip } from '../viewer-ui/zip.js';
 import { libraryFiles } from '../viewer-ui/library-files.js';
 
 // An independent ZIP implementation checks headers, Unicode names, body sizes and CRCs.
@@ -118,4 +118,29 @@ test('files and directories with the same path can all be extracted, in either i
     assert.equal(text(out, 'temporary (2)'), '/temporary');
     assert.equal(text(out, 'temporary/clipboard.sp'), '<temporary>/clipboard.sp');
   }
+});
+
+test('readZip reads what libraryZip writes, and archive names give themselves again', async () => {
+  const binary = new Uint8Array(70000).map((_, i) => (i * 7) % 256);
+  const files = [{ path: '/project/电路.sp', read: () => '* 网表\n' },{ path: '/data.bin', read: () => binary }, { path: '/lib.sp', read: () => 'x' }, { path: '/lib.sp/a.sp', read: () => 'y' }];
+  const names = archiveNames(files.map(f => f.path));
+  assert.deepEqual(archiveNames(names), names);
+  const read = readZip(new Uint8Array(await (await libraryZip(files)).arrayBuffer()));
+  assert.deepEqual([...read.keys()], names);
+  assert.equal(new TextDecoder().decode(await read.get('project/电路.sp').read()), '* 网表\n');
+  assert.deepEqual(await read.get('data.bin').read(), binary);
+});
+
+test('readZip inflates deflated entries written by another tool and refuses a damaged archive', async () => {
+  const bytes = execFileSync('python', ['-c',
+    'import sys,io,zipfile; b=io.BytesIO(); z=zipfile.ZipFile(b,"w",zipfile.ZIP_DEFLATED); z.writestr("dir/","");' +
+    'z.writestr("dir/top.sp","* top\\n"*500); z.writestr("ünï.inc","x"); z.close(); sys.stdout.buffer.write(b.getvalue())']);
+  const read = readZip(new Uint8Array(bytes));
+  assert.deepEqual([...read.keys()], ['dir/top.sp', 'ünï.inc']);
+  assert.equal(new TextDecoder().decode(await read.get('dir/top.sp').read()), '* top\n'.repeat(500));
+  const damaged = new Uint8Array(bytes);
+  const at = Buffer.from(damaged).indexOf('dir/top.sp') + 10;
+  damaged[at + 3] ^= 0xff;
+  await assert.rejects(readZip(damaged).get('dir/top.sp').read(), /damaged|invalid|incorrect/i);
+  assert.throws(() => readZip(new Uint8Array([1, 2, 3])), /not a ZIP archive/);
 });

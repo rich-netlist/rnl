@@ -526,6 +526,7 @@ mod tests {
                     item("open", "&Open File...\tCtrl+O", None),
                     item("include-file", "&Include File...", None),
                     item("include-folder", "Include &Folder...", None),
+                    item("open-project", "Open Projec&t...", None),
                     item("load-clipboard", "Load from &Clipboard...\tCtrl+Shift+V", None),
                     item("reload", "&Reload\tF5", None),
                     item("reload-library", "Reload &Library", None),
@@ -536,6 +537,7 @@ mod tests {
                     item("save-as", "Save &As...", None),
                     item("save-utf8", "Save Changes Using UTF-8", None),
                     item("save-as-utf8", "Save As UTF-8...", None),
+                    item("save-project", "Save Pro&ject...", None),
                     Shown::Submenu(
                         "Export Ima&ge".into(),
                         vec![item("export-svg", "Export &SVG...", None), item("export-png", "Export &PNG...", None)],
@@ -585,6 +587,7 @@ mod tests {
                     item("open", "&Open File...", Some("CmdOrCtrl+O")),
                     item("include-file", "&Include File...", None),
                     item("include-folder", "Include &Folder...", None),
+                    item("open-project", "Open Projec&t...", None),
                     item("load-clipboard", "Load from &Clipboard...", Some("CmdOrCtrl+Shift+V")),
                     item("reload", "&Reload", Some("F5")),
                     item("reload-library", "Reload &Library", None),
@@ -595,6 +598,7 @@ mod tests {
                     item("save-as", "Save &As...", None),
                     item("save-utf8", "Save Changes Using UTF-8", None),
                     item("save-as-utf8", "Save As UTF-8...", None),
+                    item("save-project", "Save Pro&ject...", None),
                     Shown::Submenu(
                         "Export Ima&ge".into(),
                         vec![item("export-svg", "Export &SVG...", None), item("export-png", "Export &PNG...", None)],
