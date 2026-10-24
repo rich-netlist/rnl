@@ -48,9 +48,12 @@ for (const file of files) {
       await expect(page.locator(".gl-card").first()).toBeVisible();
     }
     await page.locator(".layout").scrollIntoViewIfNeeded();
-    // Put the start of the layout immediately below the sticky top bar.
-    await page.evaluate(() => window.scrollTo(0, document.querySelector(".layout").getBoundingClientRect().top + scrollY - 58));
-    await expect.poll(() => page.locator("#toc").evaluate(el => Math.round(el.getBoundingClientRect().top))).toBe(59);
+    // The gallery page's list is short, and empty here (its data is not served): too short to scroll the layout up under the top bar.
+    if (file !== "gallery.html") {
+      // Put the start of the layout immediately below the sticky top bar.
+      await page.evaluate(() => window.scrollTo(0, document.querySelector(".layout").getBoundingClientRect().top + scrollY - 58));
+      await expect.poll(() => page.locator("#toc").evaluate(el => Math.round(el.getBoundingClientRect().top))).toBe(59);
+    }
     if (file !== "packages.html" && file !== "gallery.html") {
       const links = page.locator('#toc a[href^="#"]');
       const target = await links.nth(1).getAttribute("href");
