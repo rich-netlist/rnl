@@ -118,9 +118,9 @@ test('gallery: tags are check boxes under the search, several at once, and stay 
   await page.goto('/en/gallery.html?tag=nosuch');
   await expect(tag('nosuch')).toBeChecked();
   await expect(page.locator('#cg-main')).toContainText('Nothing found');
-  // nothing says "circuit examples" any more, and the page has one way to learn how to contribute
+  // nothing says "circuit examples" any more, and the page has one link to learn how to contribute
   await expect(page.locator('#gallery')).not.toContainText('Circuit examples');
-  await expect(page.getByRole('link', { name: 'How to contribute' })).toHaveCount(2);
+  await expect(page.getByRole('link', { name: 'How to contribute' })).toHaveCount(1);
 });
 
 test('gallery: when the data cannot be read', async ({ page, context }) => {
