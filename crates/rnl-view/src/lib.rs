@@ -75,8 +75,8 @@ pub struct BuildOptions {
     /// The format of the entry, "spice" or "spectre", instead of guessing from it.
     pub dialect: Option<String>,
     /// The format set for files, by path as the frontend names them, as it names the entry: only
-    /// those the user set. A file not among them is read as the main file is when it is included,
-    /// and by [`detect_format`] when it is the entry. An unknown format name fails the build; a
+    /// those the user set. A file not among them is read by [`detect_format`], by its suffix and
+    /// its first lines, and the entry by `dialect` before them. An unknown format name fails the build; a
     /// file the netlist does not read is left alone. Paths compare by [`Provider::path_key`].
     pub formats: BTreeMap<String, String>,
     /// The runtime's options, such as using the standard package at the root (16.3), or reading
@@ -230,8 +230,8 @@ type Formats<'f> = (Option<&'f str>, &'f BTreeMap<String, String>);
 /// No format set for any file.
 static NONE_SET: BTreeMap<String, String> = BTreeMap::new();
 
-/// Read a host document, each file with the adapter of its format: the entry's, by `dialect` or
-/// by [`detect_format`], and every file it includes as the entry. The bundled packages are layered
+/// Read a host document, each file with the adapter of its format: the entry's by `dialect` or by
+/// [`detect_format`], and every file it includes by [`detect_format`]. The bundled packages are layered
 /// under `files`, so an entry among them can be read as well.
 pub fn read_host(
     entry: &str,

@@ -45,7 +45,7 @@ export interface Request {
   dialect?: "spice" | "spectre";
   /**
    * The format set for files, by path as in `files`: only those the user set, each a name of
-   * `FormatInfo.name`. A file not among them is read as the entry when it is included. An unknown
+   * `FormatInfo.name`. A file not among them is read by its own suffix and first lines. An unknown
    * name fails the build, so leave out the names the core does not list. The library index reads
    * its files with them too.
    */

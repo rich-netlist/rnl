@@ -507,7 +507,7 @@
           {
             "id": "#I1",
             "subckt": false,
-            "master": "isource",
+            "master": null,
             "terminals": [
               {
                 "n": 1,
@@ -524,7 +524,7 @@
           {
             "id": "#R1",
             "subckt": false,
-            "master": "resistor",
+            "master": null,
             "terminals": [
               {
                 "n": 1,
@@ -1153,11 +1153,13 @@
   "files": [
     {
       "path": "02-dialect-rules.scs",
-      "name": "02-dialect-rules.scs"
+      "name": "02-dialect-rules.scs",
+      "format": "spectre"
     },
     {
       "path": "02-dialect-rules-sp.inc",
-      "name": "02-dialect-rules-sp.inc"
+      "name": "02-dialect-rules-sp.inc",
+      "format": "spice"
     }
   ]
 }

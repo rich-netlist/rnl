@@ -332,12 +332,23 @@ pub(crate) fn resolve(
                     }
                     let definitions = index.definitions(&def.path);
                     let mut own: HashMap<String, LibraryDefinition> = HashMap::new();
+                    // in a netlist whose files are of several formats, a library definition, whose
+                    // format the index does not keep, clashes with any of the same name in any case:
+                    // one format or the other may find both, and nothing is to change what a
+                    // reference finds without saying so
+                    let mixed = doc.mixed();
+                    let key_of = |name: &str| if mixed { name.to_lowercase() } else { doc.key(name) };
                     let conflict = definitions.iter().find(|d| {
-                        let key = doc.key(&d.name);
-                        let present = doc.subckt(&d.name).is_some_and(|id| {
-                            let existing = &doc.levels[id];
+                        let key = key_of(&d.name);
+                        let other_place = |id: &usize| {
+                            let existing = &doc.levels[*id];
                             normalize(&existing.path) != d.file || existing.line != d.line
-                        });
+                        };
+                        let present = if mixed {
+                            doc.subckt_candidates(&d.name, false).iter().any(other_place)
+                        } else {
+                            doc.subckt(&d.name).as_ref().is_some_and(other_place)
+                        };
                         let other = reserved.get(&key).or_else(|| own.get(&key));
                         let duplicate = other.is_some_and(|other| other.file != d.file || other.line != d.line);
                         own.insert(key, (*d).clone());
@@ -349,7 +360,7 @@ pub(crate) fn resolve(
                         approved.insert(def.path.clone());
                         automatic.push((model.to_string(), def.source.clone(), loc));
                         for d in definitions {
-                            reserved.insert(doc.key(&d.name), d);
+                            reserved.insert(key_of(&d.name), d);
                         }
                         if !next.contains(&def.path) {
                             next.push(def.path.clone());

@@ -41,7 +41,9 @@ options:
   --dialect NAME      the format of FILE, spice or spectre, instead of guessing from it
   --format PATH=NAME  read the file PATH with the format NAME, spice or spectre; repeatable. PATH is
                       relative to the current directory or absolute, as FILE may be; one that the
-                      netlist does not read is warned of. The files given none are read as FILE is
+                      netlist does not read is warned of. A file given none is read by its own
+                      suffix and first lines, a .scs file or one with simulator lang=spectre as
+                      Spectre, and FILE by --dialect before them
 view options:
   --primitives        give each level's primitives, in scene units with y up
   --no-svg            leave out each level's SVG
@@ -296,10 +298,15 @@ fn format_path(path: &str, file: &std::path::Path) -> String {
     let p = if file.is_absolute() {
         std::path::absolute(&p).unwrap_or(p)
     } else {
-        let cwd = std::env::current_dir().ok();
-        match cwd.as_deref().and_then(|d| p.strip_prefix(d).ok()) {
-            Some(rest) => rest.to_path_buf(),
-            None => p,
+        // the current directory compared as the file system compares paths, by case or not
+        let key = |p: &std::path::Path| rnl_cli::FsProvider::new(&[]).path_key(&rnl_cli::path_str(p));
+        let cwd = std::env::current_dir().map(|d| format!("{}/", key(&d).trim_end_matches('/')));
+        match cwd {
+            Ok(dir) if key(&p).starts_with(&dir) => {
+                let skip = rnl_cli::path_str(&p).chars().take(dir.chars().count()).map(char::len_utf8).sum::<usize>();
+                PathBuf::from(&rnl_cli::path_str(&p)[skip..])
+            }
+            _ => p,
         }
     };
     rnl_cli::path_str(&p)

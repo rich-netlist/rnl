@@ -19,7 +19,7 @@
  *   found by name.
  * @property {"spice" | "spectre"} [dialect] The format of the entry, instead of guessing it from the entry.
  * @property {Record<string, string>} [formats] The format set for files, by path as in `files`: only
- *   those the user set. A file not among them is read as the entry when it is included; an unknown
+ *   those the user set. A file not among them is read by its own suffix and first lines; an unknown
  *   name fails the build. The library index reads its files with them too.
  * @property {boolean} [std] Use the standard package at the root; true when not given.
  * @property {string} [std_version] The version of the standard package at the root, whatever the

@@ -1,7 +1,9 @@
-//! Each file of a netlist read with the adapter of its format (the plan of file formats, PR 1a).
+//! Each file of a netlist read with the adapter of its format (the plan of file formats, PR 1a and
+//! 1b).
 //!
 //! A frontend sets the format of a file by its path (`BuildOptions::formats`, `--format`); a file
-//! with none is read as the main file is, as before. Each file's names follow its format's rules:
+//! with none is read by its own suffix and first lines (`detect_format`), the main file by
+//! `dialect` before them. Each file's names follow its format's rules:
 //! a subcircuit, a model card or a global net of one format is found from another, by case only
 //! when both the reference and the definition compare names so, a definition spelt as written
 //! first, more than one an error. The nets of a circuit compare by the rules of the file that
@@ -67,12 +69,64 @@ fn a_file_is_spectre_by_its_suffix_or_its_simulator_statement() {
 }
 
 #[test]
-fn without_a_format_set_every_file_is_read_as_the_main_file() {
-    // as before: the Spectre file that a SPICE netlist includes is read as SPICE
+fn without_a_format_set_each_file_is_read_by_its_own() {
+    // the `.scs` file that a SPICE netlist includes is Spectre, by its suffix (plan 4.1)
     let files = MemoryProvider::new().with("/w/top.sp", TOP).with("/w/cells.scs", CELLS);
     let d = build("/w/top.sp", &files, &[]);
-    assert_eq!(formats_of(&d), [("top.sp", Some("spice"), Some("spice")), ("cells.scs", Some("spice"), Some("spice"))]);
-    assert!(!d.levels.iter().any(|l| l.title == "amp"));
+    assert_eq!(
+        formats_of(&d),
+        [("top.sp", Some("spice"), Some("spice")), ("cells.scs", Some("spectre"), Some("spectre"))]
+    );
+    assert!(d.levels.iter().any(|l| l.title == "amp"));
+    assert!(errors(&d).is_empty(), "{:?}", d.diagnostics);
+}
+
+#[test]
+fn a_model_library_is_spectre_by_its_simulator_statement() {
+    // as the PDKs write their model libraries: not `.scs`, and `simulator lang=spectre` at the top
+    let top = "* top\n.include \"models.lib\"\nM1 d g 0 0 nch\n.end\n";
+    let lib = "* models\nsimulator lang=spectre\nmodel nch bsim4 type=n\n";
+    let files = MemoryProvider::new().with("/w/top.sp", top).with("/w/models.lib", lib);
+    let (doc, _) = host("/w/top.sp", &files, &[]);
+    let m1 = &doc.levels[0].instances[0];
+    assert_eq!((m1.mtype.as_deref(), m1.model_missing), (Some("nmos"), false));
+    assert_eq!(doc.file_format("models.lib").map(|f| f.format.as_str()), Some("spectre"));
+}
+
+#[test]
+fn the_spice_file_a_spectre_netlist_includes_is_read_as_spice() {
+    // plan 4.2: the names of its subcircuit ignore case, `gnd` is ground, its elements name no
+    // Spectre master, and a `simulator lang=spectre` after its first 50 lines switches nothing
+    let filler = "* filler\n".repeat(50);
+    let top = "// top\nsimulator lang=spectre\ninclude \"parts.inc\"\n";
+    let parts = format!(
+        "* parts\n.subckt sp a b\nR1 a gnd 1k\nr1 a b 1k\n.ends\n{filler}simulator lang=spectre\n// @RNL {{ #R1 @PLACE(0, 0) }}\n"
+    );
+    let files = MemoryProvider::new().with("/w/top.scs", top).with("/w/parts.inc", &parts);
+    let (doc, sink) = host("/w/top.scs", &files, &[]);
+    assert_eq!(doc.file_format("parts.inc").map(|f| f.format.as_str()), Some("spice"));
+    let said: Vec<&str> = sink.all().iter().map(|d| d.message.as_str()).collect();
+    assert!(said.contains(&"element r1 is defined twice"), "{said:?}");
+    let sp = doc.levels.iter().position(|l| l.name == "sp").unwrap();
+    let r1 = &doc.levels[sp].instances[0];
+    assert_eq!((r1.model.as_deref(), doc.net_key_in(sp, "GND", "parts.inc")), (None, "0".to_string()));
+    // `//` is no comment of SPICE's, so no record is read after the switch
+    assert!(doc.levels.iter().all(|l| l.records.is_empty()));
+}
+
+#[test]
+fn the_dialect_names_the_main_files_format_only() {
+    // plan 4.4: `--dialect spectre` reads top.sp as Spectre, and the file it includes by its own
+    let files = MemoryProvider::new()
+        .with("/w/top.sp", "// t\nsimulator lang=spectre\ninclude \"a.inc\"\nr1 (a 0) resistor r=1k\n")
+        .with("/w/a.inc", "* a\nR2 a 0 1k\n");
+    let options = BuildOptions { dialect: Some("spectre".into()), ..BuildOptions::default() };
+    let d = rnl_view::build("/w/top.sp", &files, &options).unwrap();
+    assert_eq!(formats_of(&d), [("top.sp", Some("spectre"), Some("spectre")), ("a.inc", Some("spice"), Some("spice"))]);
+    // and a format set for it reads it as Spectre, as the dialect used to
+    let options = BuildOptions { formats: set(&[("/w/a.inc", "spectre")]), ..options };
+    let d = rnl_view::build("/w/top.sp", &files, &options).unwrap();
+    assert_eq!(formats_of(&d)[1], ("a.inc", Some("spectre"), Some("spice")));
 }
 
 #[test]
@@ -81,7 +135,7 @@ fn a_spice_netlist_includes_a_spectre_file() {
     let d = build("/w/top.sp", &files, &[("/w/cells.scs", "spectre")]);
     assert_eq!(
         formats_of(&d),
-        [("top.sp", Some("spice"), Some("spice")), ("cells.scs", Some("spectre"), Some("spice"))]
+        [("top.sp", Some("spice"), Some("spice")), ("cells.scs", Some("spectre"), Some("spectre"))]
     );
     assert!(errors(&d).is_empty(), "{:?}", d.diagnostics);
     // Spectre's statements are read, the record in `//` too
@@ -100,7 +154,9 @@ fn a_spice_netlist_includes_a_spectre_file() {
 
 #[test]
 fn a_snapshot_of_one_format_has_no_formats_of_files() {
-    let files = MemoryProvider::new().with("/w/top.sp", TOP).with("/w/cells.scs", CELLS);
+    let top = "* top\n.include \"parts.inc\"\nX1 a 0 amp\n.end\n";
+    let files =
+        MemoryProvider::new().with("/w/top.sp", top).with("/w/parts.inc", ".subckt amp p n\nR1 p n 1k\n.ends\n");
     let parts = Parts { drawing: false, host: false, model: false };
     let s = rnl_view::snapshot("/w/top.sp", &files, &BuildOptions::default(), parts).unwrap();
     let s = serde_json::to_value(s).unwrap();
@@ -117,7 +173,7 @@ fn a_spectre_netlist_includes_a_spice_file() {
     let d = build("/w/top.scs", &files, &[("/w/parts.inc", "spice")]);
     assert_eq!(
         formats_of(&d),
-        [("top.scs", Some("spectre"), Some("spectre")), ("parts.inc", Some("spice"), Some("spectre"))]
+        [("top.scs", Some("spectre"), Some("spectre")), ("parts.inc", Some("spice"), Some("spice"))]
     );
     let amp = d.levels.iter().position(|l| l.title == "AMP").unwrap();
     assert_eq!(d.objects.iter().find(|o| o.name == "X2").unwrap().opens, Some(amp));
@@ -235,8 +291,10 @@ fn rnl_is_written_into_each_file_with_its_own_marker() {
     let text = |f: &str| doc.source(f).unwrap().to_string();
     assert_eq!(rnl_runtime::writeback::carrier(&doc, "top.sp", &text("top.sp")), "*");
     assert_eq!(rnl_runtime::writeback::carrier(&doc, "cells.scs", &text("cells.scs")), "//");
-    // the same files read as SPICE, as before: `*` for both
+    // as its format by default; read as SPICE, `*` for both
     let (doc, _) = host("/w/top.sp", &files, &[]);
+    assert_eq!(rnl_runtime::writeback::carrier(&doc, "cells.scs", &text("cells.scs")), "//");
+    let (doc, _) = host("/w/top.sp", &files, &[("/w/cells.scs", "spice")]);
     assert_eq!(rnl_runtime::writeback::carrier(&doc, "cells.scs", &text("cells.scs")), "*");
 }
 
@@ -258,8 +316,8 @@ fn an_unknown_format_fails_the_build_and_a_file_not_read_is_left_alone() {
     let options = BuildOptions { formats: set(&[("/w/cells.scs", "verilog")]), ..BuildOptions::default() };
     let err = rnl_view::build("/w/top.sp", &files, &options).unwrap_err();
     assert_eq!(err, "unknown format \"verilog\" for /w/cells.scs; the formats are spice, spectre");
-    let d = build("/w/top.sp", &files, &[("/w/elsewhere.inc", "spectre"), ("/w/./sub/../cells.scs", "spectre")]);
-    assert_eq!(formats_of(&d)[1].1, Some("spectre"));
+    let d = build("/w/top.sp", &files, &[("/w/elsewhere.inc", "spectre"), ("/w/./sub/../cells.scs", "spice")]);
+    assert_eq!(formats_of(&d)[1].1, Some("spice"));
 }
 
 /// A file system that ignores case: its files under lower case paths, and its key of a path.
@@ -283,9 +341,9 @@ fn paths_compare_as_the_provider_compares_them_through_its_wrappers() {
     let pool = FilePool { files: &files, paths: &paths };
     let index = LibraryIndex::default();
     let library = LibraryProvider { files: &pool, index: &index, enabled: false };
-    let d = build("/w/top.sp", &library, &[("/W/models.scs", "spectre")]);
-    assert_eq!(formats_of(&d)[1], ("Models.SCS", Some("spectre"), Some("spice")));
-    assert!(d.levels.iter().any(|l| l.title == "amp"));
+    let d = build("/w/top.sp", &library, &[("/W/models.scs", "spice")]);
+    assert_eq!(formats_of(&d)[1], ("Models.SCS", Some("spice"), Some("spectre")));
+    assert!(!d.levels.iter().any(|l| l.title == "amp"));
 }
 
 #[test]
@@ -297,8 +355,8 @@ fn paths_compare_as_the_workspace_under_the_texts_in_memory_compares_them() {
     let edits = MemoryProvider::new().with("/w/top.sp", top);
     let files = rnl_runtime::source::Layered { layers: vec![&edits, &disk] };
     assert_eq!(files.path_key("/W/Models.SCS"), "/w/models.scs");
-    let d = build("/w/top.sp", &files, &[("/W/models.scs", "spectre")]);
-    assert_eq!(formats_of(&d)[1], ("Models.SCS", Some("spectre"), Some("spice")));
+    let d = build("/w/top.sp", &files, &[("/W/models.scs", "spice")]);
+    assert_eq!(formats_of(&d)[1], ("Models.SCS", Some("spice"), Some("spectre")));
 }
 
 #[test]
@@ -321,6 +379,26 @@ fn the_library_index_reads_its_files_with_their_formats() {
     assert_eq!(formats_of(&d)[1].1, Some("spice"));
 }
 
+#[test]
+fn auto_include_adds_no_library_that_would_change_what_a_reference_finds() {
+    // the review of PR 1a: a Spectre netlist's `amp`, which the SPICE file's `AMP` finds; a library
+    // of `foo`, which that file also needs, and of `AMP`, which would take `AMP` from `amp`
+    let top = "// top\nsimulator lang=spectre\nsubckt amp (p n)\nends amp\ninclude \"parts.inc\"\n";
+    let parts = "* parts\nX3 a b AMP\nX4 a b foo\n";
+    let lib = "* cells\n.subckt foo p n\n.ends\n.subckt AMP p n\n.ends\n";
+    let files = MemoryProvider::new().with("/w/top.scs", top).with("/w/parts.inc", parts).with("/lib/cells.inc", lib);
+    let paths = vec!["/lib/cells.inc".to_string()];
+    let mut index = LibraryIndex::default();
+    assert!(index.update(&paths, &files, false).is_empty());
+    let library = LibraryProvider { files: &files, index: &index, enabled: true };
+    let d = build("/w/top.scs", &library, &[]);
+    assert!(d.files.iter().all(|f| f.name != "/lib/cells.inc"), "{:?}", formats_of(&d));
+    let amp = d.levels.iter().position(|l| l.title == "amp").unwrap();
+    assert_eq!(d.objects.iter().find(|o| o.name == "X3").unwrap().opens, Some(amp));
+    let warned = d.diagnostics.iter().any(|x| x.message.contains("was not included for subcircuit foo"));
+    assert!(warned, "{:?}", d.diagnostics);
+}
+
 fn rnl(args: &[&str]) -> (i32, String, String) {
     let out = Command::new(env!("CARGO_BIN_EXE_rnl")).args(args).output().unwrap();
     let text = |b: &[u8]| String::from_utf8_lossy(b).replace("\r\n", "\n");
@@ -335,14 +413,14 @@ fn the_command_line_sets_formats_and_lists_them() {
     std::fs::write(dir.join("cells.scs"), CELLS).unwrap();
     let top = rnl_cli::path_str(&dir.join("top.sp"));
     let cells = rnl_cli::path_str(&dir.join("cells.scs"));
-    let (code, out, err) = rnl(&["view", &top, "--no-svg", "--format", &format!("{cells}=spectre")]);
+    let (code, out, err) = rnl(&["view", &top, "--no-svg", "--format", &format!("{cells}=spice")]);
     assert_eq!(code, 0, "{err}");
     let d: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert_eq!((&d["files"][1]["format"], &d["files"][1]["default_format"]), (&"spectre".into(), &"spice".into()));
-    // without it, as before
+    assert_eq!((&d["files"][1]["format"], &d["files"][1]["default_format"]), (&"spice".into(), &"spectre".into()));
+    // without it, by its own
     let (_, out, _) = rnl(&["view", &top, "--no-svg"]);
     let d: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert_eq!(d["files"][1]["format"], "spice");
+    assert_eq!(d["files"][1]["format"], "spectre");
     // check reads with it too: the Spectre file's subcircuit is found
     let (code, out, _) = rnl(&["check", &top, "--format", &format!("{cells}=spectre")]);
     assert_eq!(code, 0, "{out}");
@@ -352,7 +430,7 @@ fn the_command_line_sets_formats_and_lists_them() {
         (2, format!("rnl: unknown format \"verilog\" for {cells}; the formats are spice, spectre").as_str())
     );
     // a path the netlist does not read sets nothing, and is warned of, by its path made absolute
-    // as FILE is; the check reads cells.scs as SPICE then, as before, which it is not
+    // as FILE is
     let (_, _, err) = rnl(&["check", &top, "--format", "nowhere.inc=spectre"]);
     assert!(err.contains("nowhere.inc=spectre:") && err.contains("reads no such file"), "{err}");
     // a package file checks the names too
