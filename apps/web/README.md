@@ -20,6 +20,19 @@ The web viewer: the page of the RNL viewers ([`apps/viewer-ui`](../viewer-ui/REA
 
 Text is decoded as `rnl` decodes it, UTF-8 or else Latin-1, so a document is the one `rnl view` and the desktop viewer give for the same files, but for the paths that name them. Files opened from the computer are named in the workspace as `/NAME`, and a folder's as `/FOLDER/SUB/NAME`; a URL's files by their paths on the server that served the netlist, after any redirect, such as `/netlists/a/top.sp`, or `/top.sp` at its root, so that a URL that redirects opens as the one it redirects to. A netlist served at a directory's address is named after the directory, or after the server at its root, such as `/example.org`. The workspace has nothing above its root: an include such as `../x.inc` of a file opened from the computer is missing, not a file of that name opened with it.
 
+## Gallery designs
+
+`?manifest=ADDRESS` opens a design of the [gallery](https://rich-netlist.github.io/rnl/en/gallery.html) by its manifest, which the gallery's CI writes for a commit of a public GitHub repository; `?url=` is unchanged, and the page takes one or the other. The reading is `core/manifest.js` (`bindings/runtime-wasm/js/manifest.js`, also `@rich-netlist/runtime/manifest`), which the gallery's thumbnails use too:
+
+- The manifest is format 1; a newer format asks for a newer viewer. Its `base` must be a directory of `https://raw.githubusercontent.com/`, its paths relative without `..`, and its files at most 300 and 20 MB in all.
+- Every file is fetched from `base`, six at a time, with the count shown while it loads, and checked against its SHA-256; a file that does not match, is missing or cannot be fetched stops the opening, and the error names it. Packages listed by name and version come from raw GitHub or the public package site, checked the same way, without asking.
+- The files go under `/<id>/` in the workspace, read only, and the Library lists them in a group of their own, *From the gallery · id · read only*, with their directories. A bare include searches the manifest's `paths` in order, each directory's own files and version folders, as the desktop's PATH; relative includes resolve as usual.
+- The document opens on the manifest's `level` ("(top)" for the top level), or on `?level=` when the address gives one; a level the netlist has not is told, and the default one is shown.
+- A slim bar above the drawing names the design, its author and its source, `repo@commit` linked to the commit, with a link back to the gallery in the page's language.
+- Reload (F5) fetches the manifest and the files again.
+
+In an embedded canvas, `?embed=1&manifest=` and the `open` message's `manifest` field (instead of `url`) do the same, without the bar and the Library.
+
 ## File pool and search paths
 
 The first sidebar tab, **Library**, groups the session's searchable files. Opening a file with Open File, a drop, the command line (desktop), or `?url=` (web) also adds it to **Files**, without duplicates. **Include File** adds selected netlists or `.rnl` packages; **Include Folder** recursively adds files with netlist/package extensions (`sp`, `spi`, `spice`, `cir`, `ckt`, `net`, `netlist`, `inc`, `lib`, `scs`, `rnl`), preserving their directories. Click a pooled file to open it. **Exclude** removes it from the search pool, without deleting the file or closing an already open document. Pool changes rebuild the current document while keeping edited text and the view; edits not yet applied remain unapplied.
@@ -109,6 +122,7 @@ or native settings. The ordinary web viewer and desktop viewer keep their usual 
 | --- | --- | --- | --- |
 | `embed` | `1` | Normal viewer | Use the canvas-only web viewer. |
 | `url` | Netlist URL | None | Open a file, with includes relative to its served URL. |
+| `manifest` | Gallery manifest URL | None | Open a gallery design by its manifest ([Gallery designs](#gallery-designs)); not with `url`. |
 | `level` | Subcircuit name | Automatic, as when opening normally | Initial level. |
 | `background` | `light`, `dark` | `light` | Drawing background, as in View › Background; also colours the floating controls. |
 | `grid` | `dots`, `lines`, `off` | `off` | Canvas grid. |
@@ -119,7 +133,7 @@ Send object messages to the iframe's `contentWindow`, each with `rnl: 1`:
 
 | `type` | Other fields | Effect |
 | --- | --- | --- |
-| `open` | `text` and `name` (e.g. `amp.sp`), or `url`; optional `requestId`, `packages` | Replace the netlist without reloading. The filename determines its dialect. |
+| `open` | `text` and `name` (e.g. `amp.sp`), `url`, or `manifest`; optional `requestId`, `packages` | Replace the netlist without reloading. The filename determines its dialect. |
 | `level` | `name` | Display that level. |
 | `fit` | None | Fit the drawing to the iframe. |
 | `background` | `value`: `light` or `dark` | Change this page's drawing and floating controls' background without saving a user preference. |

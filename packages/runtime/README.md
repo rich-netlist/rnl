@@ -119,6 +119,21 @@ const drawings = await core.drawings({
 
 The request is about the last build that had `lazy_unplaced`, and is refused, with a message, when no build did, when an object is not there, or when the names are those of another build.
 
+## Gallery manifests
+
+`@rich-netlist/runtime/manifest` reads a design of the RNL gallery by its manifest (format 1), as the web viewer's `?manifest=` does: it fetches the files from the commit the manifest names on raw GitHub, checks each against its SHA-256, and gives what a build takes.
+
+```js
+import { startCore } from "@rich-netlist/runtime";
+import { readManifest } from "@rich-netlist/runtime/manifest";
+
+const design = await readManifest("https://example.org/gallery/amp.json", { onProgress: (done, total) => {} });
+const core = startCore();
+const document = await core.build({ entry: design.entry, files: design.files, pool: design.pool });
+```
+
+`files` holds every file and package by its path under `/<id>/`, `pool` the files of the manifest's search paths in order and then its packages, and `level` the level the design opens on. A file that does not match its SHA-256 or cannot be fetched rejects with a `ManifestError` whose `file` names it. The manifest's `base` must be on `https://raw.githubusercontent.com/`, and its files at most 300 and 20 MB in all. Node 18 and later, and browsers, are supported.
+
 ## Vite
 
 A frontend built with Vite needs three settings:

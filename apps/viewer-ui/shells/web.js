@@ -5,6 +5,7 @@ import { append, m, setAttr, setText } from "../i18n.js";
 // module Workers. Each candidate keeps its own lazy drawings until the page accepts it.
 
 import { collect, decodeText, startCore } from "../core/client.js";
+import { readManifest } from "../core/manifest.js";
 import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
@@ -150,6 +151,50 @@ function filesSource(files, entry) {
       return { path: entry, text: await read(entry) };
     },
     read,
+  };
+}
+
+/**
+ * A design of the gallery, by its manifest (core/manifest.js): its files and packages, fetched from
+ * the commit the manifest names and checked against their SHA-256, under /<id>/ in the workspace;
+ * the pool a bare include searches, in the order of the manifest's search paths; read only. Each
+ * open reads the manifest and its files again, so Reload (F5) does too. `gallery` holds what was
+ * read, for the Library, the source bar and the level (gallery.js).
+ *
+ * @param {URL} url
+ */
+function manifestSource(url) {
+  const source = {
+    name: url.href,
+    path: `/${url.pathname.split("/").pop() || "manifest.json"}`,
+    readonly: true,
+    manifest: url.href,
+    gallery: null,
+    snapshot: {},
+    pool: [],
+    async open(_again, progress) {
+      const read = await readManifest(url.href, {
+        onProgress: (done, total) => progress?.({ stage: "fetching", done, total }),
+      });
+      Object.assign(source, { gallery: { ...read, manifest: url.href }, snapshot: read.files, pool: read.pool, path: read.entry,
+        name: read.entry.slice(read.id.length + 2) });
+      return { path: read.entry, text: read.files[read.entry] };
+    },
+    read: async (path) => source.snapshot[path] ?? null,
+  };
+  return source;
+}
+
+/** Another file of a gallery design, as cross-file navigation opens it: read only, from what was read. */
+function galleryFile(gallery, path) {
+  return {
+    name: path.slice(gallery.id.length + 2), path, readonly: true, manifest: gallery.manifest, gallery,
+    snapshot: gallery.files, pool: gallery.pool,
+    async open() {
+      if (gallery.files[path] === undefined) throw new Error(`${path.slice(1)} is not among the gallery design's files.`);
+      return { path, text: gallery.files[path] };
+    },
+    read: async (file) => gallery.files[file] ?? null,
   };
 }
 
@@ -334,6 +379,13 @@ export function sourceFromUrl(text) {
   const url = parseUrl(text);
   if (!url) throw new Error(m("Give an http or https address, or one relative to this page."));
   return urlSource(url);
+}
+
+/** The gallery design of a manifest at an http or https address, or one relative to this page. */
+export function sourceFromManifest(text) {
+  const url = parseUrl(text);
+  if (!url) throw new Error(m("Give an http or https address, or one relative to this page."));
+  return manifestSource(url);
 }
 
 /** Warm the actual Worker/core before announcing that messages can be handled. */
@@ -663,6 +715,7 @@ export default {
       return poolSources.get(path) || { ...filesSource(poolFiles, path), fromPool: true };
     }
     if (full.startsWith('<')) return { path, name: f.name, text: f.text, readonly: true };
+    if (source.gallery) return galleryFile(source.gallery, path);
     // A reader supplies available bytes, never a previously compiled include closure.
     if (source.url) {
       const url = new URL(relative(source.path.split('/').slice(0, -1), path), source.url);
@@ -771,10 +824,22 @@ export default {
     return poolReady;
   },
   onInclude(handler) { included = handler; },
+  // another file of a gallery design, opened from the Library
+  galleryFile,
   nativeMenu: false,
-  /** The URL that `?url=` names in the page's address, resolved against the page. */
+  /**
+   * The URL that `?url=` names in the page's address, resolved against the page; or the gallery
+   * design that `?manifest=` names.
+   */
   initial() {
-    const given = new URLSearchParams(location.search).get("url");
+    const params = new URLSearchParams(location.search);
+    if (params.has("manifest")) {
+      if (params.has("url")) return Promise.reject(new Error("The page takes ?url= or ?manifest=, not both."));
+      const url = parseUrl(params.get("manifest"));
+      if (!url) return Promise.reject(new Error(`The page cannot open ?manifest=${params.get("manifest")}: it is not an http or https address.`));
+      return Promise.resolve(manifestSource(url));
+    }
+    const given = params.get("url");
     if (!given) return Promise.resolve(null);
     const url = parseUrl(given);
     if (!url) return Promise.reject(new Error(`The page cannot open ?url=${given}: it is not an http or https address.`));
@@ -803,7 +868,7 @@ export default {
     try {
       progress?.("reading");
       const held = source.text !== undefined;
-      const entry = held ? { path: source.path || `/${source.name}`, text: source.text } : await source.open(again);
+      const entry = held ? { path: source.path || `/${source.name}`, text: source.text } : await source.open(again, progress);
       const dir = entry.path.slice(0, entry.path.lastIndexOf("/"));
       const files = {};
       // An independently opened source owns its relative paths. Put the pool in a separate
@@ -815,7 +880,8 @@ export default {
       files[entry.path] = entry.text;
       Object.assign(files, source.snapshot || {});
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
-      const request = { entry: entry.path, files, pool: [...library.texts.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true,
+      // a gallery design's search paths first, in its order, then the Library's files
+      const request = { entry: entry.path, files, pool: [...(source.pool || []), ...[...library.texts.keys()].map(poolPath)], svg: true, primitives: false, lazy_unplaced: true,
         auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
         formats: requestFormats(source.url ? new URL(source.url).origin : null, poolPath),
         library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {

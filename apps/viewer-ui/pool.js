@@ -8,6 +8,7 @@ import { setPane, setSidebar } from "./panels.js";
 import { shell } from "./shell.js";
 import { navigate } from "./navigation.js";
 import { $, load, save, settingsPath } from "./util.js";
+import { showGalleryBar } from "./gallery.js";
 import { chooseFormat, chosenFormat, formatInfo, formatList, setFormatList } from "./formats.js";
 import { sourcePath } from "./source-path.js";
 
@@ -21,6 +22,8 @@ const expanded = new Map([["files", true]]); // session only; never written to s
 let scanned = new Map();
 let libraryErrors = [];
 const refreshPaths = new Set();
+// the design of the gallery opened last (?manifest=): its files stay listed, read only, while the page is open
+let gallery = null;
 // the host files of the document shown, by Library path: the format each is read in and the one it
 // would be without the user's choice (SourceFile.format, default_format); its includes, after the first
 let shownFormats = new Map();
@@ -94,6 +97,8 @@ function documentFormats(doc) {
 
 /** Each independently opened entry, including cross-file navigation, joins Files here. */
 export async function sourceOpened(source, doc, add, applied = false) {
+  showGalleryBar(source);
+  if (source?.gallery && source.gallery !== gallery) { gallery = source.gallery; expanded.set("gallery", true); }
   documentFormats(doc);
   const held = source.temporary || (source.text !== undefined && !source.path && !source.readonly);
   if (held) {
@@ -336,8 +341,8 @@ function fileRow(item, kind) {
   setAttr(open, "aria-label", m`Open ${item.name}`);
   append(row, open);
   if ((kind === "files" || kind === "path") && !isPackage(item.path)) append(row, formatChip(item.path, item.name));
-  if (kind === "builtin" || kind === "temporary") {
-    append(row, span("pool-badge", kind === "builtin" ? m("read only") : m("temporary · not searched")));
+  if (kind === "builtin" || kind === "temporary" || kind === "gallery") {
+    append(row, span("pool-badge", kind === "temporary" ? m("temporary · not searched") : m("read only")));
   } else if (kind === "files") {
     append(row, button(m("Exclude"), () => update(() => { items = items.filter((i) => i !== item); }), m`Exclude ${item.name}`));
   }
@@ -421,6 +426,11 @@ function render() {
     }));
     append(groups, group(`path:${dir}`, dir, files, "path", { index, all, deep: deep.has(dir) }));
   });
+  if (gallery && shell.galleryFile) {
+    const root = `/${gallery.id}/`;
+    const files = Object.keys(gallery.files).sort().map((path) => ({ path, name: path.slice(root.length), source: shell.galleryFile(gallery, path) }));
+    append(groups, group("gallery", m`From the gallery · ${gallery.id} · read only`, files, "gallery"));
+  }
   append(groups, group("builtin", m("Built-in"), items.filter((i) => i.builtin), "builtin"));
   setText($("library-status"), libraryErrors.join("\n"));
 }
