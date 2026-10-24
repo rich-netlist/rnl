@@ -336,6 +336,28 @@ test("a catalog request lists the packages, through the core and through the Wor
   }
 });
 
+test("a formats request lists the formats and detects files, through the core and through the Worker", async () => {
+  const request = { formats: { detect: { "/w/a.inc": "* a\n", "/w/b.lib": "simulator lang=spectre\n" } } };
+  const f = core.formats(request);
+  assert.deepEqual(f.list.map((x) => [x.name, x.title, x.fallback]), [["spice", "SPICE", true], ["spectre", "Spectre", false]]);
+  assert.deepEqual(f.detected, { "/w/a.inc": "spice", "/w/b.lib": "spectre" });
+  // a build that sets a file's format is a build, not a formats request
+  const files = {
+    "/w/top.sp": '* top\n.include "cells.scs"\nX1 a 0 amp\n.end\n',
+    "/w/cells.scs": "simulator lang=spectre\nsubckt amp (p n)\nR1 (p n) resistor r=1k\nends amp\n",
+  };
+  const d = core.build({ entry: "/w/top.sp", files, formats: { "/w/cells.scs": "spice" } });
+  assert.deepEqual(d.files.map((x) => [x.format, x.default_format]), [["spice", "spice"], ["spice", "spectre"]]);
+  assert.deepEqual(d.formats, f.list);
+  assert.throws(() => core.formats(untitled), /the request is not a formats request/);
+  const worker = startCore();
+  try {
+    assert.deepEqual(await worker.formats(request), f);
+  } finally {
+    worker.terminate();
+  }
+});
+
 test("decodeText reads bytes as rnl reads a file", () => {
   const encoded = (text) => new TextEncoder().encode(text);
   // UTF-8, without a byte order mark at the start

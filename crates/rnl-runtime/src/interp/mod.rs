@@ -660,17 +660,16 @@ impl<'p> Interp<'p> {
             if self.units[u].scope_records.is_empty() {
                 continue;
             }
-            let below: HashSet<String> = self
+            let below: Vec<usize> = self
                 .doc
                 .descendants(lv)
-                .iter()
-                .map(|d| &self.doc.levels[*d])
-                .filter(|l| l.kind == LevelKind::Subckt)
-                .map(|l| self.doc.key(&l.name))
+                .into_iter()
+                .filter(|d| self.doc.levels[*d].kind == LevelKind::Subckt)
                 .collect();
             for (rec, _ast, header) in self.units[u].scope_records.clone() {
                 let target = header.scope.clone().unwrap_or_default();
-                if !below.contains(&self.doc.key(&target)) {
+                // each subcircuit by the rules of the file it is written in
+                if !below.iter().any(|&d| self.doc.names_level(d, &target)) {
                     let loc = self.rec_loc(Some(rec), 0);
                     self.sink.error(format!("scope=\"{target}\" finds no subcircuit below this level: the statements of the record fail (2.6)"), loc);
                     let n = self.recs[rec].text.chars().count();

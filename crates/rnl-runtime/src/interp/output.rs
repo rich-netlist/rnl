@@ -976,7 +976,7 @@ impl Interp<'_> {
         if level.kind != LevelKind::Subckt {
             return None;
         }
-        let key = self.doc.key(&level.name);
+        let key = self.doc.level_key(lv);
         let sym = self.block_symbols.get(&key)?.values().max_by(|a, b| a.0.cmp(&b.0))?.1;
         let sym = if level.case_sensitive { sym } else { self.fold_symbol_pins(sym) };
         let mut views = Vec::new();

@@ -16,7 +16,16 @@
 // have no position, which it keeps and gives on request (`unplacedDrawings`), the fixture having
 // them; a solve's Document carries them, as the desktop's does.
 
+import { fileFormats } from "../formats.js";
+import { sourcePath } from "../source-path.js";
+
 const params = new URLSearchParams(location.search);
+// the core's parse formats, as Document.formats lists them
+const FORMATS = [
+  { name: "spice", title: "SPICE", extensions: [], fallback: true },
+  { name: "spectre", title: "Spectre", extensions: ["scs"], fallback: false },
+];
+const detect = (path) => (/\.scs$/i.test(path) ? "spectre" : "spice");
 const platform = params.get("platform") === "desktop" ? "desktop" : "web";
 
 /** A source: a fixture, by its name or as { name, fixture }; null for nothing. */
@@ -88,6 +97,12 @@ const fake = {
   },
   /** The edits each build was given, in order: undefined for a build of the files as they are. */
   buildEdits: [],
+  /** The format choices each build was given, in order, `{ path: format }`, as the shell sends them. */
+  buildFormats: [],
+  /** The default formats `detectFormat` gives, by path; otherwise by the `.scs` extension. */
+  detected: {},
+  /** Whether a format chosen for a file is kept in the settings (`keepsFormat`); true by default. */
+  keepsFormat: true,
   /** The edits each solve was given, in order. */
   solveEdits: [],
   /** The files each Save was asked to write, in order: [{ path, name, text }, ...]. */
@@ -232,6 +247,9 @@ export default {
   } : {}),
   platform,
   nativeMenu: platform === "desktop",
+  formats: async () => { fake.calls.push(["formats"]); return FORMATS; },
+  detectFormat: async (path) => { fake.calls.push(["detectFormat", path]); return fake.detected[path] ?? detect(path); },
+  keepsFormat: () => fake.keepsFormat,
   ...(platform === "desktop" ? { version, ...solving } : {}),
   async initial() {
     fake.calls.push(["initial"]);
@@ -245,6 +263,8 @@ export default {
   async build(src, edits) {
     fake.calls.push(src.text === undefined ? ["build", src.name] : ["build", src.name, src.text]);
     fake.buildEdits.push(edits);
+    const formats = fileFormats();
+    fake.buildFormats.push(formats);
     const [fail, name] = [fake.fail, fake.next || src.fixture || (params.has("pool") ? "04-hierarchy" : undefined)];
     fake.fail = null;
     fake.next = null;
@@ -258,6 +278,13 @@ export default {
       document.files[0].text = edits?.[document.files[0].path] ?? src.text;
     }
     for (const file of document.files) if (edits?.[file.path] !== undefined) file.text = edits[file.path];
+    // the formats a core gives: each host file's default and, where the build was given one, the choice
+    document.formats ??= FORMATS;
+    for (const file of document.files) {
+      if (file.format === null || /\.rnl$/i.test(file.path)) { file.format = file.default_format = null; continue; }
+      file.default_format ??= file.format ?? detect(file.path);
+      file.format = formats[sourcePath(document, file)] ?? file.default_format;
+    }
     if (!fake.carry) {
       kept = document.levels.map((level) => ({
         names: level.unplaced.map((u) => u.name),

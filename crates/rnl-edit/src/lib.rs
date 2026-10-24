@@ -90,8 +90,10 @@ pub fn entry(dialect: &str) -> &'static str {
 /// An op that cannot be written refuses the whole request, with the reason.
 pub fn write(request: &WriteRequest) -> Result<String, String> {
     let dialect = request.dialect.as_str();
-    if dialect != "spice" && dialect != "spectre" {
-        return Err(format!("dialect \"{dialect}\" is not spice or spectre"));
+    let formats = rnl_view::formats();
+    if !formats.iter().any(|f| f.name == dialect) {
+        let names: Vec<&str> = formats.iter().map(|f| f.name.as_str()).collect();
+        return Err(format!("dialect \"{dialect}\" is not {}", names.join(" or ")));
     }
     let ops: Vec<LevelOp> = request.ops.iter().enumerate().map(|(k, v)| ops::parse(k, v)).collect::<Result<_, _>>()?;
 

@@ -43,6 +43,14 @@ pub trait Provider {
     fn auto_include(&self) -> Option<&dyn LibraryLookup> {
         None
     }
+
+    /// The key a path is compared by when a frontend sets something for a file by its path, such
+    /// as its format: the path itself, or as a file system that ignores case compares it, such as
+    /// in lower case. Both the path a frontend gives and the one the reading resolves, from an
+    /// include written in another case, go through it. A provider that wraps another gives its key.
+    fn path_key(&self, path: &str) -> String {
+        path.to_string()
+    }
 }
 
 /// Explicit files in a viewer's temporary file pool. Their original paths stay intact, so
@@ -55,6 +63,9 @@ pub struct FilePool<'a> {
 impl Provider for FilePool<'_> {
     fn auto_include(&self) -> Option<&dyn LibraryLookup> {
         self.files.auto_include()
+    }
+    fn path_key(&self, path: &str) -> String {
+        self.files.path_key(path)
     }
     fn read(&self, path: &str) -> Option<String> {
         self.files.read(path)
@@ -187,6 +198,12 @@ pub struct Layered<'a> {
 impl Provider for Layered<'_> {
     fn auto_include(&self) -> Option<&dyn LibraryLookup> {
         self.layers.iter().find_map(|p| p.auto_include())
+    }
+    /// The key of the last layer, the workspace under the others: the layers above it hold texts
+    /// in memory over its files, such as edits, and the workspace's file system says how its paths
+    /// compare.
+    fn path_key(&self, path: &str) -> String {
+        self.layers.last().map_or_else(|| path.to_string(), |p| p.path_key(path))
     }
     fn read(&self, path: &str) -> Option<String> {
         self.layers.iter().find_map(|p| p.read(path))

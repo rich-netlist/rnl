@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 
 use rnl_runtime::diag::{Diag, Sink};
 use rnl_runtime::geom::{Orient, Pt};
-use rnl_runtime::host::{file_name, HostDocument, LevelKind};
+use rnl_runtime::host::{dialect_key, file_name, HostDocument, LevelKind};
 use rnl_runtime::interp::obj::{Lit, WStr};
 use rnl_runtime::markup;
 use rnl_runtime::model::{ItemView, Layer, LevelView, RefTarget, Style, SymbolView, TextTarget, TextView};
@@ -19,7 +19,7 @@ use rnl_runtime::Interpretation;
 use serde::Serialize;
 
 use crate::primitive::{self, Primitive};
-use crate::BuildOptions;
+use crate::{BuildOptions, FormatInfo};
 
 mod symbols;
 pub use symbols::{InspectedLabel, InspectedPin, InspectedSymbol};
@@ -36,8 +36,10 @@ pub struct Document {
     pub path: String,
     /// Its file name, for the title bar.
     pub name: String,
-    /// "spice" or "spectre".
+    /// The format of the main file, "spice" or "spectre".
     pub dialect: String,
+    /// The formats a file can be read with, as `rnl_view::formats` lists them.
+    pub formats: Vec<FormatInfo>,
     pub levels: Vec<Level>,
     pub diagnostics: Vec<Diagnostic>,
     /// Why the document could not be interpreted at all, such as an unsupported language version.
@@ -303,6 +305,11 @@ pub struct SourceFile {
     pub path: String,
     /// The file as shown: relative to the opened file's directory when it is inside it.
     pub name: String,
+    /// The format the file was read with, a name of `Document::formats`; none for a package file.
+    pub format: Option<String>,
+    /// The format the file is read with when none is set for it, as a frontend shows its
+    /// automatic choice; none for a package file.
+    pub default_format: Option<String>,
     pub text: String,
     /// Where each record is: first line, first column, last line, last column (1-based, inclusive).
     pub records: Vec<[u32; 4]>,
@@ -426,7 +433,7 @@ pub(crate) fn document(
             .filter(|i| i.is_subckt)
             .map(|i| {
                 let master = i.model.clone().unwrap_or_default();
-                let level = r.doc.subckt(&master).and_then(|h| drawn.get(&h).copied());
+                let level = r.doc.subckt_of(i).and_then(|h| drawn.get(&h).copied());
                 Child { instance: i.name.clone(), master, level, symbol: None }
             })
             .collect();
@@ -434,8 +441,7 @@ pub(crate) fn document(
     for (&(lv, i), &o) in &ix.insts {
         let inst = &r.doc.levels[lv].instances[i];
         if inst.is_subckt {
-            let master = inst.model.as_deref().unwrap_or_default();
-            ix.objects[o].opens = r.doc.subckt(master).and_then(|h| drawn.get(&h).copied());
+            ix.objects[o].opens = r.doc.subckt_of(inst).and_then(|h| drawn.get(&h).copied());
         }
     }
 
@@ -472,6 +478,7 @@ pub(crate) fn document(
         path: entry.to_string(),
         name: file_name(entry).to_string(),
         dialect: r.doc.dialect.name.clone(),
+        formats: crate::formats(),
         levels,
         diagnostics,
         failed: r.model.failed.clone(),
@@ -500,6 +507,8 @@ fn source_files(doc: &HostDocument, shown: &dyn Fn(&str) -> String) -> Vec<Sourc
             semantics: Vec::new(),
             path: p.clone(),
             name: shown(p),
+            format: doc.file_format(p).map(|f| f.format.clone()),
+            default_format: doc.file_format(p).map(|f| f.default.clone()),
             text: text.clone(),
             records: Vec::new(),
             failed: Vec::new(),
@@ -601,9 +610,16 @@ impl<'a> Index<'a> {
         o
     }
 
-    /// The net of a level by the name a statement writes.
+    /// The net of a level by the name a statement of its own file writes.
     fn net(&mut self, level: usize, written: &str) -> usize {
-        let key = self.doc.net_key(written);
+        let file = self.doc.levels[level].file.clone();
+        self.net_in(level, written, &file)
+    }
+
+    /// The net of a level by the name a statement of the file `file` writes: compared as the
+    /// runtime compares it ([`HostDocument::net_key_in`]).
+    fn net_in(&mut self, level: usize, written: &str, file: &str) -> usize {
+        let key = self.doc.net_key_in(level, written, file);
         self.net_by_key(level, &key, written)
     }
 
@@ -648,30 +664,42 @@ impl<'a> Index<'a> {
                 if let Some(t) = tokens.first() {
                     self.spans.push(Span { object, file: f, line: t.line, col: t.col, len: t.len, kind: "name" });
                 }
-                self.nodes(lv, f, &tokens, 1, &inst.nodes, "node");
+                self.nodes(lv, f, &inst.file, &tokens, 1, &inst.nodes, "node");
             }
             if level.kind == LevelKind::Subckt && level.line > 0 {
                 if let Some(&f) = self.files.get(&level.file) {
                     if let Some((_, tokens)) = statement(&lines[f], level.line as usize - 1) {
                         // `.subckt NAME ports…`, `subckt NAME (ports…)` or `inline subckt NAME …`
                         let skip = if tokens.first().is_some_and(|t| t.text == "inline") { 3 } else { 2 };
-                        self.nodes(lv, f, &tokens, skip, &level.ports, "port");
+                        self.nodes(lv, f, &level.file, &tokens, skip, &level.ports, "port");
                     }
                 }
             }
         }
     }
 
-    /// The tokens from `from` on that name `nodes`, in order.
-    fn nodes(&mut self, lv: usize, file: usize, tokens: &[Token], from: usize, nodes: &[String], kind: &'static str) {
+    /// The tokens from `from` on that name `nodes`, in order, in a statement of the file `written`,
+    /// the `file`th of the Document.
+    #[allow(clippy::too_many_arguments)]
+    fn nodes(
+        &mut self,
+        lv: usize,
+        file: usize,
+        written: &str,
+        tokens: &[Token],
+        from: usize,
+        nodes: &[String],
+        kind: &'static str,
+    ) {
+        let rules = self.doc.rules(written);
         let mut j = from;
         for node in nodes {
-            let key = self.doc.key(node);
-            while j < tokens.len() && self.doc.key(&tokens[j].text) != key {
+            let key = dialect_key(rules, node);
+            while j < tokens.len() && dialect_key(rules, &tokens[j].text) != key {
                 j += 1;
             }
             let Some(t) = tokens.get(j) else { break };
-            let object = self.net(lv, node);
+            let object = self.net_in(lv, node, written);
             self.spans.push(Span { object, file, line: t.line, col: t.col, len: t.len, kind });
             j += 1;
         }

@@ -22,6 +22,7 @@ pub async fn update_library(
     pool: Vec<String>,
     reload: Option<bool>,
     refresh: Option<Vec<String>>,
+    formats: Option<crate::formats::Formats>,
 ) -> Result<Vec<String>, String> {
     core.preload.cancel();
     let library = library.inner().clone();
@@ -34,6 +35,8 @@ pub async fn update_library(
         let refresh = refresh.unwrap_or_default();
         let reload = reload.unwrap_or(false);
         index.invalidate(&refresh);
+        // a file whose format changed, and those that include it, are read again
+        index.set_formats(formats.unwrap_or_default());
         let errors = index.update(&pool, &files, reload);
         drop(index);
         if reload {

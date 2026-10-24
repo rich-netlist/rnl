@@ -20,9 +20,13 @@ export type Document = {
    */
   name: string,
   /**
-   * "spice" or "spectre".
+   * The format of the main file, "spice" or "spectre".
    */
   dialect: string,
+  /**
+   * The formats a file can be read with, as `rnl_view::formats` lists them.
+   */
+  formats: Array<FormatInfo>,
   levels: Array<Level>,
   diagnostics: Array<Diagnostic>,
   /**
@@ -344,6 +348,15 @@ export type SourceFile = {
    * The file as shown: relative to the opened file's directory when it is inside it.
    */
   name: string,
+  /**
+   * The format the file was read with, a name of `Document::formats`; none for a package file.
+   */
+  format: string | null,
+  /**
+   * The format the file is read with when none is set for it, as a frontend shows its
+   * automatic choice; none for a package file.
+   */
+  default_format: string | null,
   text: string,
   /**
    * Where each record is: first line, first column, last line, last column (1-based, inclusive).
@@ -362,6 +375,28 @@ export type SourceInclude = {
    * Index in Document.files.
    */
   file: number,
+};
+
+/**
+ * A format a file can be read with, as `formats` lists them.
+ */
+export type FormatInfo = {
+  /**
+   * Its name, as settings and requests give it, such as "spice".
+   */
+  name: string,
+  /**
+   * Its name as shown, such as "SPICE".
+   */
+  title: string,
+  /**
+   * The suffixes of the files it reads when none is set, lower case and without the dot.
+   */
+  extensions: Array<string>,
+  /**
+   * The format of a file that no other format claims: exactly one has it.
+   */
+  fallback: boolean,
 };
 
 export type Object = {

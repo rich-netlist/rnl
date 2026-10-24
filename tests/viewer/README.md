@@ -67,6 +67,7 @@ It implements the Shell of [`shell.js`](../../apps/viewer-ui/shell.js). A source
 | `menu(id)` | Choose a command in the platform's menu. |
 | `optionsError` | On the desktop: what the solver says is wrong with the settings it is asked to check (`checkSolverOptions`), null when they will do. |
 | `buildEdits`, `solveEdits` | The edits each build and each solve was given, in order; undefined for a build of the files as they are. |
+| `buildFormats`, `detected`, `keepsFormat` | The format choices each build was given, `{ path: format }`, in order, which the shell's Document then reads its files in; the defaults `detectFormat` gives by path, else by the `.scs` extension; and whether a choice is kept in the settings, true by default. A fixture without the core's format fields gets them: the two formats, and each host file's default by its extension. |
 | `changedOnDisk`, `overwrites` | The names of files that another program changed since they were read, which the next Save, unless it overwrites, reports instead of writing; and whether each Save was to overwrite. |
 | `writes`, `writesAs`, `writeFail`, `savedAs` | The files each Save and each Save As (desktop) was asked to write, a message the next one rejects with, and what the next Save As gives: a source, or null when the user cancels. |
 | `requestClose()` | Ask the page to close the window, as the desktop does while changes are not saved. |

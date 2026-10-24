@@ -1892,7 +1892,21 @@ impl Interp<'_> {
             let above = self.doc.ancestors(lv);
             for (depth, a) in above.iter().enumerate() {
                 let au = self.level_unit[*a];
-                let Some(ks) = self.units[au].scope_index.get(&key).cloned() else { continue };
+                // the records whose scope= names it, by the rules of the file it is written in:
+                // in a netlist of one dialect, those of its key
+                let ks: Vec<usize> = if self.doc.mixed() {
+                    let records = &self.units[au].scope_records;
+                    let named = |i: &usize| records[*i].2.scope.as_deref().is_some_and(|t| self.doc.names_level(lv, t));
+                    let mut ks: Vec<usize> =
+                        self.units[au].scope_index.values().flatten().copied().filter(named).collect();
+                    ks.sort_unstable();
+                    ks
+                } else {
+                    match self.units[au].scope_index.get(&key) {
+                        Some(ks) => ks.clone(),
+                        None => continue,
+                    }
+                };
                 let place = -((above.len() - depth) as i64);
                 for i in ks {
                     let (rec, ast, header) = self.units[au].scope_records[i].clone();

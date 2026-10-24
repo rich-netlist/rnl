@@ -210,7 +210,7 @@ pub fn carrier(doc: &HostDocument, file: &str, text: &str) -> &'static str {
             }
         }
     }
-    let spectre_mode = doc.dialect.name == "spectre"
+    let spectre_mode = doc.rules(file).name == "spectre"
         && (file.to_lowercase().ends_with(".scs")
             || text.lines().take(5).any(|l| l.trim().to_lowercase().starts_with("simulator") && l.contains("spectre")));
     if spectre_mode {
@@ -378,7 +378,7 @@ pub fn applies_to(doc: &HostDocument, written_in: LevelId, rec: &Record, level: 
         Some(target) => {
             let lv = &doc.levels[level];
             lv.kind == LevelKind::Subckt
-                && doc.key(&lv.name) == doc.key(&target)
+                && doc.names_level(level, &target)
                 && doc.ancestors(level).contains(&written_in)
         }
     }
@@ -1048,7 +1048,7 @@ fn top(doc: &HostDocument, file: &str, at: Option<LevelId>, text: &str, marker: 
     }
     let lines = Lines::new(text);
     let main = doc.levels.first().is_some_and(|l| l.file == file);
-    let spectre = doc.dialect.name == "spectre";
+    let spectre = doc.rules(file).name == "spectre";
     let mut marker = marker;
     if spectre && marker == "//" && !file.to_lowercase().ends_with(".scs") {
         match after_spectre_switch(&lines, usize::from(main)) {

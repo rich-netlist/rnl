@@ -9,6 +9,7 @@ import { ask, choose, inform, modal } from "../dialog.js";
 import { openWebWindow, receiveWebSession } from "../window-session.js";
 import { load } from "../util.js";
 import { sourcePath } from "../source-path.js";
+import { fileFormats } from "../formats.js";
 import { DEFAULT_CATALOG, readCatalog, readPublicPackage, latestPackages } from "../public-packages.js";
 import { libraryZip } from "../zip.js";
 
@@ -67,11 +68,43 @@ async function indexLibrary(worker, snapshot) {
   const refresh = previous ? [...snapshot.texts].filter(([p, text]) =>
     previous.texts.has(p) && previous.texts.get(p) !== text).map(([p]) => p) : [];
   const errors = await worker.library({ library: { reload: previous?.epoch !== snapshot.epoch, refresh },
-    pool: [...snapshot.texts.keys()], files: Object.fromEntries(snapshot.texts) });
+    pool: [...snapshot.texts.keys()], files: Object.fromEntries(snapshot.texts), formats: requestFormats(servedFiles.origin) });
   indexedLibraries.set(worker, snapshot);
   return errors;
 }
 let lastUrl = ""; // the URL opened last, which Open URL offers again
+// The files of the document shown that a server served, by their workspace paths, and its origin: the
+// format chosen for one of them is kept by its address, as the page can read it again; a file chosen
+// from the computer is named by its name alone, so its choice lasts only while the page is open.
+let servedFiles = { origin: null, paths: new Set() };
+
+/**
+ * The format choices to give a request, by workspace path: those kept by the address of a file of
+ * `origin` become its path on that server, and each also goes under the name of the pool, as
+ * `poolPath` gives it, since a Library file is read under either.
+ */
+function requestFormats(origin, poolPath = (path) => path) {
+  const out = {};
+  for (const [key, name] of Object.entries(fileFormats())) {
+    let path = key;
+    if (/^https?:/i.test(key)) {
+      const url = new URL(key);
+      if (url.origin !== origin) continue;
+      path = serverPath(url);
+    }
+    out[path] = name;
+    out[poolPath(path)] = name;
+  }
+  return out;
+}
+
+/** A core to ask what needs no document: the one shown, or the warm spare. */
+async function someCore() {
+  if (core) return core;
+  spare ??= warmCore();
+  await spare.ready;
+  return spare.worker;
+}
 
 /**
  * A source of this shell: files chosen or dropped, a folder, or a URL. The page's sources that hold
@@ -610,6 +643,17 @@ async function about() {
 /** @type {import("../shell.js").Shell} */
 export default {
   platform: "web",
+  // the core's parse formats, the one it detects for a Library file the document shown does not read,
+  // and the key a choice is kept by: the address of a file a server served, else its path
+  formats: async () => (await (await someCore()).formats({ formats: {} })).list,
+  async detectFormat(path) {
+    await poolReady;
+    const text = poolTexts.get(path);
+    if (text === undefined) throw new Error(`${path} is not in the Library`);
+    return (await (await someCore()).formats({ formats: { detect: { [path]: text } } })).detected[path];
+  },
+  formatKey: (path) => servedFiles.paths.has(path) ? new URL(path, servedFiles.origin).href : path,
+  keepsFormat: (path) => servedFiles.paths.has(path),
   sourceForFile(source, document, index) {
     const f = document.files[index];
     // At workspace root the core displays this virtual prefix without its leading slash.
@@ -773,6 +817,7 @@ export default {
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
       const request = { entry: entry.path, files, pool: [...library.texts.keys()].map(poolPath), svg: true, primitives: false, lazy_unplaced: true,
         auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
+        formats: requestFormats(source.url ? new URL(source.url).origin : null, poolPath),
         library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {
           const full = joined(dir, path);
           return [full.replace(/^\/<pool>(?=\/)/, ""), text];
@@ -828,6 +873,9 @@ export default {
         }
       }
       candidates.set(doc, buildingCore);
+      servedFiles = source.url
+        ? { origin: new URL(source.url).origin, paths: new Set(doc.files.filter((f) => f.format).map((f) => sourcePath(doc, f)).filter((p) => !p.startsWith("/<"))) }
+        : { origin: null, paths: new Set() };
       return doc;
     } catch (e) {
       buildingCore?.terminate();
