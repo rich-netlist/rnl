@@ -65,7 +65,7 @@ class SiteNavigation(unittest.TestCase):
         pages = list(build.PAGES)
         for lang in ("zh", "en"):
             expected = self.template.replace("$site-root$", "./")
-            for field, label in (("intro", "intro"), ("tour", "tour"), ("spec", "spec"), ("packages", "packages"), ("tools", "tools"), ("agents", "agents")):
+            for field, label in (("intro", "intro"), ("tour", "tour"), ("spec", "spec"), ("packages", "packages"), ("gallery", "gallery"), ("tools", "tools"), ("agents", "agents")):
                 expected = expected.replace(f"${field}-label$", self.labels[lang][label])
             expected = Navigation(expected).pages
             for link in expected:
