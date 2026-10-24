@@ -1328,7 +1328,7 @@ const MANIFEST_URL = "https://manifests.test/designs/demo.json";
 const MANIFEST_TREE = "https://github.com/someone/design/tree/0123456789abcdef0123456789abcdef01234567/examples/demo";
 const MANIFEST_REMOTE = "https://rich-netlist.github.io/rnl-packages/demo-remote/2.0/demo-remote.rnl";
 const manifestDir = path.join(root, "tests/viewer/inputs/manifest");
-const manifestFiles = ["top.sp", "cells/amp.sp", "lib/models.inc", "pkg/demo-local.rnl"];
+const manifestFiles = ["top.sp", "cells/amp.sp", "cells/stage.sp", "lib/models.inc", "pkg/demo-local.rnl"];
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 /** The fixture design's manifest, with `change` over it. */
@@ -1389,7 +1389,7 @@ test("?manifest= opens the files of a manifest: its pool and packages, its level
   await page.locator("#tab-files").click();
   const group = page.locator('.lib-group[data-group="external"]');
   await expect(group.locator(".lib-title")).toHaveText("From external manifest · demo · read only");
-  await expect(group.locator(".pool-open")).toHaveText([".packages/demo-remote/2.0/demo-remote.rnl", "cells/amp.sp", "lib/models.inc", "pkg/demo-local.rnl", "top.sp"]);
+  await expect(group.locator(".pool-open")).toHaveText([".packages/demo-remote/2.0/demo-remote.rnl", "cells/amp.sp", "cells/stage.sp", "lib/models.inc", "pkg/demo-local.rnl", "top.sp"]);
   await expect(group.getByRole("button", { name: /Exclude/ })).toHaveCount(0);
   // read only: the text cannot be edited
   await page.evaluate(() => window.viewer.command("toggle-edit"));
@@ -1493,4 +1493,23 @@ test("a manifest's level defined in an included file is shown in the entry's doc
   expect(doc.files.map((f) => f.name)).toEqual(expect.arrayContaining(["top.sp", "cells/amp.sp", "lib/models.inc"]));
   expect(doc.levels[await page.evaluate(() => window.viewer.level)].kind).toBe("subckt");
   await expect(page).toHaveTitle(/^top\.sp/);
+});
+
+test("the files of a manifest are searched as the Library's: Auto Include finds a subcircuit for a file opened alone", async ({ page }) => {
+  await manifestRoutes(page, demoManifest({ level: "(top)" }));
+  await page.goto(`${process.env.RNL_WEB_URL}/index.html?manifest=${encodeURIComponent(MANIFEST_URL)}`);
+  await shown(page);
+  expect(await page.evaluate(() => document.getElementById("auto-include").checked)).toBe(true);
+  const defined = () => page.evaluate(() => {
+    const doc = window.viewer.doc;
+    return doc.levels.flatMap((l) => l.children).filter((c) => c.master === "amp").map((c) => c.level !== null);
+  });
+  // a file of the manifest that uses amp without including it, opened from the Library
+  await page.locator("#tab-files").click();
+  await opened(page, () => page.locator('.lib-group[data-group="external"] .pool-open', { hasText: /^cells\/stage\.sp$/ }).click());
+  expect(await page.evaluate(() => window.viewer.doc.path)).toBe("/demo/cells/stage.sp");
+  expect(await defined()).toEqual([true]);
+  // a file of the computer that uses amp: the manifest's files are searched for it too
+  await opened(page, () => page.locator("#file-input").setInputFiles({ name: "local.sp", mimeType: "text/plain", buffer: Buffer.from("* local\nX9 a b amp\n.end\n") }));
+  expect(await defined()).toEqual([true]);
 });
