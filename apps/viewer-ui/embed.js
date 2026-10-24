@@ -53,8 +53,8 @@ function level(name, signal) {
     return null;
   }
   const row = find(0, "0", new Set());
-  if (row) return enterRow(row, { newWindow: false, signal });
-  return enterRoot(wanted, { newWindow: false, signal });
+  if (row) return enterRow(row, { newWindow: false, signal, here: true });
+  return enterRoot(wanted, { newWindow: false, signal, here: true });
 }
 
 function updateLevel() {

@@ -262,6 +262,8 @@ body[data-background="dark"] .usage-overlays { --usage-label-bg: black; }
 .manifest-title { color: var(--fg); font-weight: 600; }
 .manifest-source { color: var(--accent); text-decoration: none; }
 .manifest-source:hover { text-decoration: underline; }
+.manifest-author a { color: inherit; text-decoration: underline dotted; }
+.manifest-author a:hover { color: var(--accent); }
 /* the hierarchy path of the level shown (subcircuits.js): a segment per level, each but the root's
    with the instance it was reached through, and the level shown last; the others go back to theirs */
 .level-path { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; }

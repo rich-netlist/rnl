@@ -105,10 +105,15 @@ export function enterRow(row, options = {}) {
   return enterRoot(next.at(-1).level, options);
 }
 
-/** Show a level as the root of the path, as the subcircuit index does. */
+/**
+ * Show a level as the root of the path, as the subcircuit index does: a subcircuit defined in an
+ * included file opens that file, as a document of its own; with `options.here` it is shown in the
+ * document shown, with all it includes, as a level named by a manifest or an embedding page is.
+ */
 export function enterRoot(level, options = {}) {
   if (same([{ level, via: null }], path) && !options.newWindow) return;
-  return navigate({ path: [{ level, via: null }], reveal: true }, options);
+  const step = options.here ? { level, via: null, entry: currentSource() } : { level, via: null };
+  return navigate({ path: [step], reveal: true }, options);
 }
 
 /**

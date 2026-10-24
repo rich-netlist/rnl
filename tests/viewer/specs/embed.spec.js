@@ -373,10 +373,12 @@ for (const identified of [false, true]) test(`cross-file navigation supersedes a
   expect((await messages(page, 'level')).at(-1).name).toBe('rdiv');
 });
 
-test('initial cross-file level selection belongs to the embed import', async ({ page }) => {
+test('initial cross-file level selection belongs to the embed import, in the netlist with all it includes', async ({ page }) => {
   const frame = await start(page, { url: hierarchy, level: 'rdiv' });
   expect(await waitMessage(page, 'loaded')).toMatchObject({ name: '04-hierarchy.sp', level: 'rdiv' });
-  expect(await frame.evaluate(() => window.viewer.doc.name)).toBe('04-hierarchy-lib.inc');
+  // rdiv is defined in the included file, and shown in the netlist that includes it, not in that file alone
+  expect(await frame.evaluate(() => window.viewer.doc.name)).toBe('04-hierarchy.sp');
+  expect(await frame.evaluate(() => window.viewer.doc.levels[window.viewer.level].title)).toBe('rdiv');
   expect(await messages(page, 'error')).toEqual([]);
   await expect(frame.locator('body')).not.toHaveClass(/busy/);
 });
