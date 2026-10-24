@@ -336,7 +336,8 @@ mod tests {
         let mut cache = BuildCache::default();
         let built = cache.build("/W/Top.sp", &layered, &formats, false).unwrap();
         let doc: serde_json::Value = serde_json::from_str(&built.json).unwrap();
-        let included = doc["files"].as_array().unwrap().iter().find(|f| f["path"].as_str().unwrap().ends_with("odels.SCS"));
+        let included =
+            doc["files"].as_array().unwrap().iter().find(|f| f["path"].as_str().unwrap().ends_with("odels.SCS"));
         assert_eq!(included.map(|f| f["format"].clone()), Some(serde_json::json!("spice")), "{doc:#}");
     }
 

@@ -115,6 +115,8 @@ fn read_bounded(reader: impl Read, limit: usize) -> std::io::Result<Option<Strin
 }
 
 #[tauri::command]
+// Tauri injects the managed state alongside the separate IPC arguments.
+#[allow(clippy::too_many_arguments)]
 pub async fn preload_document(
     core: State<'_, Core>,
     settings: State<'_, Settings>,
@@ -144,7 +146,8 @@ pub async fn preload_document(
         let entry = std::path::absolute(&path).map_err(|e| e.to_string())?.to_string_lossy().into_owned();
         let (key, chosen) = (entry.clone(), formats.clone());
         // A speculative snapshot must never restore an older global cache budget.
-        let (cached, room) = core.run(move |cache| (cache.contains(&key, auto_include, &chosen), cache.room().min(limit)))?;
+        let (cached, room) =
+            core.run(move |cache| (cache.contains(&key, auto_include, &chosen), cache.room().min(limit)))?;
         if !running.control.current(running.generation) {
             return Ok("cancelled".into());
         }
