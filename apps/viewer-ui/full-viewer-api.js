@@ -60,7 +60,7 @@ export async function startFullViewerApi() {
     else if (message.type === "level" && typeof message.name === "string") {
       const level = doc?.levels.findIndex(l => l.title === message.name) ?? -1;
       if (level < 0) throw new Error(`Unknown level: ${message.name}`);
-      return enterRoot(level, { newWindow: false });
+      return enterRoot(level, { newWindow: false, here: true });
     }
   } });
 }

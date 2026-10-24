@@ -894,7 +894,15 @@ export default {
       Object.assign(files, source.snapshot || {});
       for (const [path, text] of Object.entries(edits || {})) files[joined(dir, path)] = text;
       // a manifest's pool first, in its order, then the Library's files
-      const request = { entry: entry.path, files, pool: [...(source.pool || []), ...[...library.texts.keys()].map(poolPath)], svg: true, primitives: false, lazy_unplaced: true,
+      const pool = [...(source.pool || []), ...[...library.texts.keys()].map(poolPath)];
+      // the files of a manifest are indexed as the Library's are, for Auto Include, from the build
+      // that opens it on: the Library has them only after it (pool.js)
+      for (const [path, text] of Object.entries(source.external?.files || {})) {
+        if (library.texts.has(path) || files[poolPath(path)] !== undefined) continue;
+        files[poolPath(path)] = text;
+        pool.push(poolPath(path));
+      }
+      const request = { entry: entry.path, files, pool, svg: true, primitives: false, lazy_unplaced: true,
         auto_include: load("auto-include", true) === true, library_prefix: source.fromPool ? "" : "/<pool>",
         formats: requestFormats(source.url ? new URL(source.url).origin : null, poolPath),
         library_edits: Object.fromEntries(Object.entries(edits || {}).map(([path, text]) => {

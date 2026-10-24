@@ -37,6 +37,16 @@ async function syncPool(reload = false) {
   for (const { files } of scanned.values()) for (const path of files) {
     if (!seen.has(path)) { all.push({ path, searchPath: true, source: { path, name: path } }); seen.add(path); }
   }
+  // the files of an external manifest are searched as the Library's are: for bare includes, packages
+  // by name and Auto Include, by any file opened; its pool first, in its order
+  if (external && shell.externalFile) {
+    for (const path of [...external.pool, ...Object.keys(external.files)]) {
+      if (seen.has(path) || external.files[path] === undefined) continue;
+      const text = external.files[path];
+      all.push({ path, external: true, read: () => new File([text], path.split("/").pop()), source: shell.externalFile(external, path) });
+      seen.add(path);
+    }
+  }
   const refresh = [...refreshPaths];
   refreshPaths.clear();
   try { libraryErrors = await shell.setPool?.(all, reload, refresh) || []; }
@@ -97,7 +107,12 @@ function documentFormats(doc) {
 
 /** Each independently opened entry, including cross-file navigation, joins Files here. */
 export async function sourceOpened(source, doc, add, applied = false) {
-  if (source?.external && source.external !== external) { external = source.external; expanded.set("external", true); }
+  if (source?.external && source.external !== external) {
+    external = source.external;
+    expanded.set("external", true);
+    // its files join the Library's search; the build that opened it searched them already (shells/web.js)
+    syncPool().catch((e) => console.error(e));
+  }
   // the bar stays while the file shown is one of the manifest's, whichever opened it, and goes with another file
   const shown = source?.path || doc?.path;
   showManifestBar(source?.external || (external && shown && (shown in external.files || external.pool.includes(shown)) ? external : null));

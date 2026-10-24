@@ -26,7 +26,8 @@ export interface Manifest {
   id?: string;
   title?: { en: string; zh?: string };
   description?: { en: string; zh?: string };
-  author?: string;
+  /** Its authors in their order, a url (https) each may have; one name alone is read as a list of it. */
+  author?: { name: string; url?: string }[] | string;
   /** `url` links the design's directory at `commit`. */
   source?: { repo: string; commit: string; url?: string };
   license?: string;
@@ -56,7 +57,7 @@ export interface ManifestRead {
   id: string;
   title: Manifest["title"] | null;
   description: Manifest["description"] | null;
-  author: string | null;
+  author: Manifest["author"] | null;
   source: Manifest["source"] | null;
   license: string | null;
   /** The path to open. */
@@ -116,7 +117,7 @@ export declare function writeManifest(options: {
   id?: string;
   title?: Manifest["title"];
   description?: Manifest["description"];
-  author?: string;
+  author?: Manifest["author"];
   source?: Manifest["source"];
   license?: string;
   base?: string;
