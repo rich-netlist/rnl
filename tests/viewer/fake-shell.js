@@ -209,7 +209,7 @@ async function version() {
 // letters accented and made 40% longer, in brackets ［…］, its placeholders, its shortcut after a tab
 // and its & kept. A text of the interface that no catalog has shows as plain English among them, and
 // one that a longer language would not fit shows so (decision 0015).
-const PSEUDO = { code: "qps-ploc", lang: "qps", name: "Pseudo", matches: [] };
+const PSEUDO = { code: "qps-ploc", lang: "qps", name: "Pseudo", english: "Pseudo", matches: [] };
 const ACCENTS = Object.fromEntries([..."abcdefghijklmnopqrstuvwxyz"].map((c, i) => [c, [..."áƀçðéƒĝĥíĵķĺɱñóþǫŕšţúṽŵẋýž"][i]]));
 export function pseudo(text) {
   const [label, keys] = text.split("\t");

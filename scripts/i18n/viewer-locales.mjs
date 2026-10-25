@@ -16,13 +16,14 @@ const registry = (root) => JSON.parse(readFileSync(join(root, "i18n", "languages
 /**
  * The languages of the interface, in the registry's order: `code`, the code the viewers know it by and
  * save in their settings, such as zh-CN; `lang`, the registry's, such as zh; `name`, its name in itself;
- * `matches`, the first parts of the browser languages that ask for it.
+ * `matches`, the first parts of the browser languages that ask for it; `english`, its name in English, the
+ * registry's `names.en`, else its own, for what is said in English about it.
  */
 export function uiLanguages(root) {
   const config = registry(root);
   const english = config.languages.find((entry) => entry.code === config.default);
   return [
-    { code: english.code, lang: english.code, name: english.name, matches: english.matches || [english.code] },
+    { code: english.code, lang: english.code, name: english.name, english: english.name, matches: english.matches || [english.code] },
     ...config.languages
       .filter((entry) => entry.code !== config.default && entry.status === "published"
         && existsSync(join(root, "i18n", entry.code, "viewer.json")))
@@ -30,6 +31,7 @@ export function uiLanguages(root) {
         code: entry.codes?.viewer || entry.code,
         lang: entry.code,
         name: entry.names?.viewer || entry.name,
+        english: entry.names?.en || entry.name,
         matches: entry.matches || [entry.code],
       })),
   ];
