@@ -136,7 +136,8 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
       <div class="netlist-head">
       <div id="file-bar" class="file-bar">
         <span id="netlist-file" class="netlist-file path-text" hidden></span>
-        <div class="netlist-options">
+        <button id="netlist-options-button" class="netlist-options-button" type="button" aria-expanded="false" aria-controls="netlist-options">Options</button>
+        <div id="netlist-options" class="netlist-options">
         <span id="edit-state" class="edit-state" role="status" hidden></span>
         <button id="apply-edits" class="apply-edits" type="button" hidden title="Apply the text and exit editing (Ctrl+Enter)">Apply and Exit Editing</button>
         <label class="auto-include-toggle" title="Automatically include uniquely defined missing subcircuits from the Library; report each automatic include in Problems">
@@ -257,7 +258,13 @@ if (new URLSearchParams(location.search).get("embed") !== "1") document.addEvent
   <span id="solve-status" class="solve-status" hidden><span id="solve-step"></span><button id="solve-cancel" class="solve-cancel" type="button" hidden>Cancel</button></span>
   <span id="pointer" class="pointer" title="Where the pointer is on the drawing, in units with y up"></span>
   <span id="zoom" class="zoom"></span>
+  <button id="show-in-netlist" class="page-link" type="button" disabled>View in Netlist</button>
+  <button id="show-in-drawing" class="page-link" type="button" disabled>View in Drawing</button>
 </footer>
+<nav id="page-switch" class="page-switch" role="tablist" aria-label="Pages">
+  <button id="page-drawing" type="button" role="tab" aria-selected="true">Schematic</button>
+  <button id="page-panel" type="button" role="tab" aria-selected="false">Panel</button>
+</nav>
 <div id="hover-tip" class="hover-tip" role="tooltip" hidden></div>
 <div id="pick-list" class="pick-list" role="listbox" tabindex="-1" aria-label="Objects at this point" hidden></div>
 <script type="module" src="startup.js"></script>

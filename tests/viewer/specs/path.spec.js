@@ -354,9 +354,9 @@ test("a long path keeps the level shown in a narrow bar, and leaves the levels b
   await expect(menu).toBeHidden();
   expect(await segments(page)).toEqual(shown);
 
-  // narrower still, the root gives way too, and the level shown stays (not upright, which puts the
-  // side panel under the drawing and gives the bar the whole width)
-  await page.setViewportSize({ width: 400, height: 400 });
+  // narrower still, the root gives way too, and the level shown stays (a phone's width: the drawing
+  // is a page of its own, and the bar as wide as the screen)
+  await page.setViewportSize({ width: 180, height: 400 });
   await expect.poll(() => segments(page)).toEqual(["leaf XL2"]);
   await expect.poll(fits).toBe(true);
   await more.click();

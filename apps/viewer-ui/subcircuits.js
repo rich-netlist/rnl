@@ -74,12 +74,14 @@ export function descend(o, options) {
   const obj = doc.objects[o];
   // the instance is on the level shown, or on one that the path is cut back to or starts at
   const at = doc.levels[current].host === obj.level ? current : doc.levels.findIndex((l) => l.host === obj.level);
+  if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
   return navigate({ path: at < 0 ? [{ level, via: null }] : [...cutTo(at), { level, via: obj.name }], selection: null, reveal: true }, options);
 }
 
 /** Go back along the path to its level at `depth`. */
 export function backTo(depth, options) {
   if (depth < 0 || depth >= path.length - 1) return;
+  if (!options?.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
   return navigate({ path: path.slice(0, depth + 1), via: path[depth + 1].via }, options);
 }
 
@@ -111,6 +113,8 @@ export function enterRow(row, options = {}) {
  * document shown, with all it includes, as a level named by a manifest or an embedding page is.
  */
 export function enterRoot(level, options = {}) {
+  // a phone shows the drawing also for the level it shows already
+  if (!options.newWindow) window.dispatchEvent(new Event("viewer-navigate"));
   if (same([{ level, via: null }], path) && !options.newWindow) return;
   const step = options.here ? { level, via: null, entry: currentSource() } : { level, via: null };
   return navigate({ path: [step], reveal: true }, options);

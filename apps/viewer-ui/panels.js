@@ -3,7 +3,9 @@
 
 import { setCheck, setEnabled } from "./commands.js";
 import { updateHierarchy } from "./hierarchy.js";
-import { revealPending, refreshSource, updateSourceFilters } from "./text.js";
+import { paintSourceSelection, revealPending, refreshSource, updateSourceFilters } from "./text.js";
+import { showSelection } from "./drawing.js";
+import { selected } from "./state.js";
 import { showUnplaced } from "./unplaced.js";
 import { renderSymbol } from "./symbol.js";
 import { renderUsages } from "./usages.js";
@@ -17,10 +19,17 @@ const hierarchyPane = $("pane-hierarchy");
 
 const SIDEBAR_MIN = 220;
 const DRAWING_MIN = 280;
-// upright and narrow, as style.css says: the side panel is under the drawing, its handle sets its height
-export const upright = matchMedia("(max-width: 1023px) and (max-aspect-ratio: 4/5)");
-// a touch screen lying down and low, a phone's: the side panel beside the drawing, narrow, folded at start
-export const lowTouch = matchMedia("(pointer: coarse) and (max-height: 500px)");
+// a phone, narrow, or a touch screen's low, as style.css says (a low window of a mouse keeps its
+// side panel): the drawing and the side panel are two pages of the screen, and the bar at the bottom
+// switches them; the side panel shown is the panel's page
+export const phone = matchMedia("(max-width: 599px), (pointer: coarse) and (max-height: 499px)");
+// upright and narrow, and no phone (a tablet held upright, a narrow window): the side panel is under
+// the drawing, its handle sets its height
+const uprightScreen = matchMedia("(max-width: 1023px) and (max-aspect-ratio: 4/5)");
+// an embedded viewer keeps its one canvas, whatever its size
+const embedded = () => document.body.classList.contains("embed");
+export const upright = { get matches() { return !embedded() && uprightScreen.matches && !phone.matches; } };
+const onPhone = () => !embedded() && phone.matches;
 const CANVAS_MIN = 80; // the drawing keeps a strip of this many pixels above the side panel
 const HANDLE = 24; // the handle between them
 const PROBLEMS_MIN = 60;
@@ -41,11 +50,22 @@ function syncPanelCommands() {
 
 export function setSidebar(shown) {
   app.classList.toggle("sidebar-hidden", !shown);
-  save("sidebar-shown", shown);
+  // a phone's page is not kept: it starts on the drawing
+  if (!onPhone()) save("sidebar-shown", shown);
   setCheck("toggle-netlist", shown);
   syncPanelCommands();
+  showPage();
   if (shown) { refreshSource(); revealPending(); }
-  else if (sidebar.contains(document.activeElement)) $("show-sidebar").focus({ preventScroll: true });
+  else if (sidebar.contains(document.activeElement)) $(onPhone() ? "page-panel" : "show-sidebar").focus({ preventScroll: true });
+}
+
+/** Mark the page a phone shows, "drawing" or "panel", on the app and in the bar that switches them. */
+function showPage() {
+  const page = !onPhone() ? null : app.classList.contains("sidebar-hidden") ? "drawing" : "panel";
+  if (page) app.dataset.page = page;
+  else delete app.dataset.page;
+  $("page-drawing").setAttribute("aria-selected", String(page === "drawing"));
+  $("page-panel").setAttribute("aria-selected", String(page === "panel"));
 }
 
 /** Select a side-panel view; Solve is available in shells with a solver. */
@@ -104,8 +124,6 @@ export function setProblems(shown) {
 
 function sidebarWidthLimits() {
   const w = window.innerWidth;
-  // a phone lying down keeps most of its width for the drawing
-  if (lowTouch.matches) return [SIDEBAR_MIN, Math.max(SIDEBAR_MIN, w * 0.3)];
   return [SIDEBAR_MIN, Math.max(SIDEBAR_MIN, Math.min(w * 0.75, w - DRAWING_MIN))];
 }
 
@@ -131,7 +149,7 @@ function problemsHeightLimits() {
 
 /** Fit the problems to the netlist's pane again, at the height they were last given. */
 function fitProblems() {
-  if (!netlistPane.hidden && !netlistPane.classList.contains("problems-folded")) setProblemsHeight(load("problems-height", 180));
+  if (!netlistPane.hidden && !netlistPane.classList.contains("problems-folded")) setSize("--problems-h", problemsWanted, problemsHeightLimits);
 }
 
 function indexHeightLimits() {
@@ -148,7 +166,12 @@ function setSize(name, px, limits) {
 }
 
 export const setSidebarWidth = (px) => setSize("--sidebar-w", px, sidebarWidthLimits);
-export const setProblemsHeight = (px) => setSize("--problems-h", px, problemsHeightLimits);
+// the height last given to the problems, which a pane too short for it cuts, until it is taller again
+let problemsWanted = 180;
+export const setProblemsHeight = (px) => {
+  problemsWanted = px;
+  return setSize("--problems-h", px, problemsHeightLimits);
+};
 export const setIndexHeight = (px) => setSize("--index-h", px, indexHeightLimits);
 export const setPanelHeight = (px) => {
   const v = setSize("--panel-h", px, panelHeightLimits);
@@ -173,7 +196,12 @@ function layOut() {
   if (upright.matches) setPanelHeight(load("panel-height", firstPanelHeight()));
   else fitProblems();
 }
-upright.addEventListener("change", layOut);
+uprightScreen.addEventListener("change", layOut);
+// a phone shows the drawing when it becomes one, and the side panel as it was kept when it is one no more
+phone.addEventListener("change", () => {
+  setSidebar(onPhone() ? false : load("sidebar-shown", true));
+  layOut();
+});
 layOut();
 requestAnimationFrame(layOut);
 // until the handle is dragged, the first height follows the page as it settles and as it is resized
@@ -231,14 +259,30 @@ splitter($("usage-split"), "y", 1, () => $("usage-list").getBoundingClientRect()
 
 window.addEventListener("resize", () => {
   if (upright.matches && !app.classList.contains("sidebar-hidden")) setPanelHeight(sidebar.getBoundingClientRect().height);
-  else if (!upright.matches) setSidebarWidth(sidebar.getBoundingClientRect().width || load("sidebar-width", 420));
-  if (!netlistPane.hidden && !netlistPane.classList.contains("problems-folded")) {
-    setProblemsHeight($("problems-body").getBoundingClientRect().height);
-  }
+  else if (!upright.matches && !onPhone()) setSidebarWidth(sidebar.getBoundingClientRect().width || load("sidebar-width", 420));
+  fitProblems();
   if (!hierarchyPane.hidden) setIndexHeight($("index-section").getBoundingClientRect().height);
 });
 
 $("hide-sidebar").addEventListener("click", () => setSidebar(false));
+// a phone's pages: the bar switches them, each as it was left; a link in the status bar shows the
+// selection on the other; opening a file, or a level from the hierarchy, shows the drawing
+$("page-drawing").addEventListener("click", () => setSidebar(false));
+$("page-panel").addEventListener("click", () => setSidebar(true));
+$("show-in-netlist").addEventListener("click", () => {
+  showPane("netlist");
+  paintSourceSelection(true);
+});
+$("show-in-drawing").addEventListener("click", () => {
+  setSidebar(false);
+  showSelection();
+});
+window.addEventListener("viewer-selection", () => {
+  $("show-in-netlist").disabled = $("show-in-drawing").disabled = selected === null;
+});
+window.addEventListener("viewer-navigate", () => {
+  if (onPhone()) setSidebar(false);
+});
 $("show-sidebar").addEventListener("click", () => setSidebar(true));
 $("problems-head").addEventListener("click", () => setProblems(netlistPane.classList.contains("problems-folded")));
 // a tab of the side panel folded to its tabs unfolds it
@@ -252,3 +296,9 @@ $("tab-symbol").addEventListener("click", () => setPane("symbol"));
 $("tab-usages").addEventListener("click", () => setPane("usages"));
 $("tab-unplaced").addEventListener("click", () => setPane("unplaced"));
 $("tab-solve").addEventListener("click", () => setPane("solve"));
+
+// a phone's netlist keeps its options behind a button, to leave the netlist its lines
+$("netlist-options-button").addEventListener("click", () => {
+  const open = $("file-bar").classList.toggle("options-open");
+  $("netlist-options-button").setAttribute("aria-expanded", String(open));
+});

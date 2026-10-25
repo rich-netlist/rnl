@@ -182,6 +182,8 @@ export function showBuilt(d, keep, navigation = null) {
   const before = keep && doc ? snapshot() : null;
   setDoc(d);
   showDocument(before, navigation);
+  // a file opened, not one read again: a phone shows its drawing
+  if (!keep) window.dispatchEvent(new Event("viewer-navigate"));
 }
 
 /** What a text from the clipboard can be read as, by the extension of the file it is opened as. */

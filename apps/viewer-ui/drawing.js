@@ -269,6 +269,20 @@ export function showView({ center, scale }) {
   apply();
 }
 
+/** Bring the selection into the middle of the view, zoomed out as far as it needs to be all in it. */
+export function showSelection() {
+  cancelGesture();
+  if (!svg || !view || selected === null) return;
+  const points = doc.levels[current].hits.filter((h) => h.objects.includes(selected)).flatMap((h) => h.points);
+  if (!points.length) return;
+  const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), x1 = Math.max(...xs), y1 = Math.max(...ys);
+  const { w, h } = canvasSize();
+  const k = clamp(Math.min(view.k, (w - 2 * FIT_MARGIN) / (x1 - x0 || 1), (h - 2 * FIT_MARGIN) / (y1 - y0 || 1)), MIN_ZOOM, MAX_ZOOM);
+  view = { k, x: (x0 + x1) / 2 - w / (2 * k), y: (y0 + y1) / 2 - h / (2 * k) };
+  apply();
+}
+
 /** Zoom by `factor` keeping the drawing point under (px, py), in canvas pixels, in place. */
 function zoomAt(px, py, factor) {
   cancelGesture();
