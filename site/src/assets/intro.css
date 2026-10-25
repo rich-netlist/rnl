@@ -1279,7 +1279,7 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .note { margin-top: 18px; display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--ink-2); max-width: 60em; }
 .note .ico { color: var(--signal); margin-top: 3px; }
 /* a page not wholly in its language says so, below its hero (site_i18n.py, decision 0015); quieter when only parts are missing */
-.translation-notice .note { margin-block: 18px 0; max-width: none; }
+.translation-notice .note { margin-block: 0 24px; max-width: none; }
 .translation-notice.is-partial .note, .translation-notice.is-partial .note .ico { color: var(--ink-3); }
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
