@@ -2,7 +2,7 @@
 
 The start for anyone who translates RNL, or maintains one of its languages: what there is to translate, how far each language is, and how a language is added or brought up to date.
 
-English is the project's only core language ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). New content may be published in English alone. Every other language, Chinese included, is a translation that follows the English; wherever a translation has no text, the English is shown. A missing or stale translation is reported, and never fails a check or a build.
+English is the project's only core language ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). New content may be published in English alone. Every other language is a translation that follows the English; wherever a translation has no text, the English is shown. A missing or stale translation is reported, and never fails a check or a build.
 
 | File | Content |
 | --- | --- |
