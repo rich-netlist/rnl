@@ -2,8 +2,6 @@
 // the view, two pinch it around their middle, a tap selects what a click selects, a double tap does
 // what a double click does, and none of it scrolls or zooms the page itself. A laptop with a touch
 // screen keeps its mouse. How the fingers are made: tests/viewer/README.md#mobile.
-//
-// What the page does not do yet is marked test.fixme, until the Viewer's touch support lands.
 
 import { canvasMiddle, expect, over, pageMoved, test, under, UNMOVED, view } from "../mobile.js";
 
@@ -42,7 +40,7 @@ test.describe("on a phone", () => {
     await viewer.selected(null);
   });
 
-  test.fixme("a finger that moves a few pixels while it taps still selects", async ({ page, viewer, fingers }) => {
+  test("a finger that moves a few pixels while it taps still selects", async ({ page, viewer, fingers }) => {
     // a fingertip is not still: a press that moves less than about 10 pixels is a tap
     const at = await viewer.where("X2");
     await fingers.press(at);
@@ -52,7 +50,7 @@ test.describe("on a phone", () => {
     await viewer.selected(`instance X2 in ${TOP}`);
   });
 
-  test.fixme("two fingers spread and pinched zoom around their middle", async ({ page, viewer, fingers }) => {
+  test("two fingers spread and pinched zoom around their middle", async ({ page, viewer, fingers }) => {
     const middle = await canvasMiddle(page);
     for (const [from, to] of [[60, 180], [180, 90]]) {
       const before = await view(page);
@@ -70,7 +68,7 @@ test.describe("on a phone", () => {
     expect(await pageMoved(page)).toEqual(UNMOVED);
   });
 
-  test.fixme("two fingers that move together drag the drawing while they pinch", async ({ page, viewer, fingers }) => {
+  test("two fingers that move together drag the drawing while they pinch", async ({ page, viewer, fingers }) => {
     const middle = await canvasMiddle(page);
     const point = await under(page, middle);
     const shift = { x: 50, y: -40 };
@@ -78,7 +76,7 @@ test.describe("on a phone", () => {
     near(await over(page, point), { x: middle.x + shift.x, y: middle.y + shift.y }, 2);
   });
 
-  test.fixme("a finger lifted from a pinch leaves the other dragging, with no jump", async ({ page, viewer, fingers }) => {
+  test("a finger lifted from a pinch leaves the other dragging, with no jump", async ({ page, viewer, fingers }) => {
     const middle = await canvasMiddle(page);
     const left = { x: middle.x - 40, y: middle.y };
     const right = { x: middle.x + 40, y: middle.y };
@@ -102,15 +100,14 @@ test.describe("on a phone", () => {
     await viewer.selected(null);
   });
 
-  test.fixme("two fingers that tap select nothing", async ({ page, viewer, fingers }) => {
+  test("two fingers that tap select nothing", async ({ page, viewer, fingers }) => {
     const at = await viewer.where("X2");
     await fingers.press(at, { x: at.x + 30, y: at.y });
     await fingers.lift();
     await viewer.selected(null);
   });
 
-  test("a double tap on an empty place fits the drawing", async ({ page, viewer, fingers, browserName }) => {
-    test.fixme(browserName === "webkit", "WebKit makes no dblclick of two taps: the page has to tell a double tap itself");
+  test("a double tap on an empty place fits the drawing", async ({ page, viewer, fingers }) => {
     const fitted = await viewer.viewBox();
     await page.evaluate(() => window.viewer.command("zoom-in"));
     await page.evaluate(() => window.viewer.command("zoom-in"));
@@ -119,8 +116,7 @@ test.describe("on a phone", () => {
     await expect.poll(() => viewer.viewBox()).toBe(fitted);
   });
 
-  test("a double tap on a subcircuit instance opens it, once", async ({ page, viewer, fingers, browserName }) => {
-    test.fixme(browserName === "webkit", "WebKit makes no dblclick of two taps: the page has to tell a double tap itself");
+  test("a double tap on a subcircuit instance opens it, once", async ({ page, viewer, fingers }) => {
     await fingers.doubleTap(await viewer.where("X3"));
     await expect(page.locator("#level-name")).toHaveText("rdiv");
     await expect(page.locator("#up-name")).toHaveText(TOP);
@@ -140,6 +136,18 @@ test.describe("on a phone", () => {
     await fingers.pinch(middle, 200, 50);
     await fingers.doubleTap(await viewer.empty());
     await expect.poll(() => pageMoved(page)).toEqual(UNMOVED);
+  });
+
+  test("a tap flashes no highlight of the browser's, anywhere on the page", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "WebKit on a desktop has no tap highlight to read; a real iPhone is looked at by hand");
+    // a phone's browser marks what a tap is on with this colour, a light blue in Chrome, unless the page says not to
+    const flashing = await page.evaluate(() =>
+      [document.body, ...document.body.querySelectorAll("*")]
+        .filter((e) => getComputedStyle(e).getPropertyValue("-webkit-tap-highlight-color") !== "rgba(0, 0, 0, 0)")
+        .map((e) => e.tagName.toLowerCase() + (e.id ? `#${e.id}` : ""))
+        .slice(0, 10),
+    );
+    expect(flashing).toEqual([]);
   });
 
   test("a long press on the drawing opens no menu and selects no text", async ({ page, viewer, fingers }) => {
@@ -189,7 +197,7 @@ test.describe("on a laptop with a touch screen", () => {
     await viewer.selected(`instance X2 in ${TOP}`);
   });
 
-  test.fixme("two fingers pinch the drawing, and the wheel zooms after them", async ({ page, viewer, fingers }) => {
+  test("two fingers pinch the drawing, and the wheel zooms after them", async ({ page, viewer, fingers }) => {
     const middle = await canvasMiddle(page);
     const before = await view(page);
     await fingers.pinch(middle, 80, 160);

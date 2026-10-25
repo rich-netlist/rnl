@@ -11,6 +11,7 @@ import { usageSelection } from "./usages.js";
 
 const canvas = $("canvas");
 const source = $("source");
+const touch = matchMedia("(pointer: coarse)");
 
 /**
  * Select an object. `from` is "drawing", "source", "reload", "ascend" or "list" (an object not
@@ -37,7 +38,9 @@ export function select(o, from, options) {
   const b = document.createElement("b");
   setText(b, obj.name);
   if (opens(o) !== null) {
-    append(sel, b, m` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · E or Enter opens it; Shift opens a new window`);
+    append(sel, b, touch.matches
+      ? m` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · a double tap opens it`
+      : m` instance of ${doc.levels[obj.opens].title} in ${obj.level_title} · E or Enter opens it; Shift opens a new window`);
   } else {
     append(sel, b, m` ${m(obj.kind)} in ${obj.level_title}`);
   }

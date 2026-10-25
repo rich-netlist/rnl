@@ -1,13 +1,12 @@
 // The page on a phone and a tablet (the projects mobile-chromium and mobile-webkit). On a phone,
 // upright or lying down, the drawing and the side panel are two pages, each the whole screen above a
-// low switch bar, `#page-switch`: switching keeps each page as it was, Show in Netlist and Show in
-// Drawing go from one to the other, and opening a level or a file goes to the drawing. On a tablet
-// upright the side panel is below the drawing, folds to its tabs and drags taller or lower; lying
-// down it is beside the drawing. Everywhere the controls are big enough for a finger, the menus open
-// with a tap and fit on the screen, the netlist shows lines of the file, and the page never scrolls
-// sideways. A narrow desktop window keeps its mouse (tests/viewer/README.md#mobile).
-//
-// What the page does not do yet is marked test.fixme, until the Viewer's layout for small screens lands.
+// low switch bar, `#page-switch` (lying down, at the end of the status bar's row): switching keeps
+// each page as it was, Show in Netlist and Show in Drawing go from one to the other, and opening a
+// level or a file goes to the drawing. On a tablet upright the side panel is below the drawing, folds
+// to its tabs and drags taller or lower; lying down it is beside the drawing. Everywhere the controls
+// are big enough for a finger, the menus open with a tap and fit on the screen, the netlist shows
+// lines of the file, and the page never scrolls sideways. A narrow desktop window keeps its mouse
+// (tests/viewer/README.md#mobile).
 
 import { canvasMiddle, expect, pageMoved, test, UNMOVED } from "../mobile.js";
 
@@ -115,13 +114,12 @@ function netlistLines(page) {
  * Drawing there. Nothing goes under the bar; the side panel's buttons and handle of a wider screen
  * are not there; `#app` names the page in `data-page`; and the page does not move.
  */
-async function twoPages(page) {
+async function twoPages(page, { lyingDown = false } = {}) {
   const size = page.viewportSize();
   const bar = page.locator("#page-switch");
   await expect(bar).toBeVisible();
   const b = await box(bar);
   expect(Math.abs(b.y + b.height - size.height)).toBeLessThanOrEqual(1);
-  expect(Math.abs(b.width - size.width)).toBeLessThanOrEqual(1);
   expect(b.height).toBeLessThanOrEqual(SWITCH_BAR);
   bigEnough(await boxes(bar.locator("[role=tab]")), TARGET, ROW);
   for (const sel of ["#hide-sidebar", "#show-sidebar", "#vsplit"]) await expect(page.locator(sel), sel).toBeHidden();
@@ -129,6 +127,16 @@ async function twoPages(page) {
     const r = await box(page.locator(sel));
     expect(r.y + r.height, sel).toBeLessThanOrEqual(b.y + 0.5);
   };
+  // the status bar above the switch bar, both as wide as the screen; lying down they share the
+  // bottom row, the switch at its end
+  const status = async () => {
+    const r = await box(page.locator(".statusbar"));
+    if (!lyingDown) return above(".statusbar");
+    expect(Math.abs(r.y + r.height - size.height)).toBeLessThanOrEqual(1);
+    expect(r.x + r.width).toBeLessThanOrEqual(b.x + 1);
+  };
+  if (lyingDown) expect(Math.abs(b.x + b.width - size.width)).toBeLessThanOrEqual(1);
+  else expect(Math.abs(b.width - size.width)).toBeLessThanOrEqual(1);
 
   await expect(page.locator("#page-drawing")).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#app")).toHaveAttribute("data-page", "drawing");
@@ -138,7 +146,7 @@ async function twoPages(page) {
   const canvas = await box(page.locator("#canvas"));
   expect(Math.abs(canvas.width - size.width)).toBeLessThanOrEqual(1);
   await above("#canvas");
-  await above(".statusbar");
+  await status();
 
   await toPage(page, "panel");
   await expect(page.locator("#page-drawing")).toHaveAttribute("aria-selected", "false");
@@ -149,7 +157,7 @@ async function twoPages(page) {
   const panel = await box(page.locator("#sidebar"));
   expect(Math.abs(panel.width - size.width)).toBeLessThanOrEqual(1);
   await above("#sidebar");
-  await above(".statusbar");
+  await status();
   expect(await pageMoved(page)).toEqual(UNMOVED);
 }
 
@@ -172,11 +180,11 @@ test.describe("on a phone held upright", () => {
     expect(await netlistLines(page)).toBeGreaterThanOrEqual(5);
   });
 
-  test.fixme("the drawing and the side panel are two pages, each the whole screen above a low switch bar", async ({ page }) => {
+  test("the drawing and the side panel are two pages, each the whole screen above a low switch bar", async ({ page }) => {
     await twoPages(page);
   });
 
-  test.fixme("switching pages keeps the view, the selection, the panel's view and where the netlist is scrolled", async ({ page, viewer, fingers }) => {
+  test("switching pages keeps the view, the selection, the panel's view and where the netlist is scrolled", async ({ page, viewer, fingers }) => {
     await fingers.tap(await viewer.where("X2"));
     await fingers.pinch(await viewer.where("X2"), 60, 120);
     const view = await viewer.viewBox();
@@ -197,7 +205,7 @@ test.describe("on a phone held upright", () => {
     await expect(page.locator("#pane-hierarchy")).toBeVisible();
   });
 
-  test.fixme("Show in Netlist shows the statement of what the drawing has selected, on the panel's page", async ({ page, viewer, fingers }) => {
+  test("Show in Netlist shows the statement of what the drawing has selected, on the panel's page", async ({ page, viewer, fingers }) => {
     // the netlist at its top, where X2's statement is not
     await toPage(page, "panel");
     await page.locator("#source").evaluate((e) => (e.scrollTop = 0));
@@ -213,7 +221,7 @@ test.describe("on a phone held upright", () => {
     await expect.poll(() => viewer.within(viewer.line(50))).toBe(true);
   });
 
-  test.fixme("Show in Drawing shows what the netlist has selected, on the drawing's page", async ({ page, viewer, fingers }) => {
+  test("Show in Drawing shows what the netlist has selected, on the drawing's page", async ({ page, viewer, fingers }) => {
     // the view moved away from X2
     const r = await box(page.locator("#canvas"));
     const middle = await canvasMiddle(page);
@@ -231,7 +239,7 @@ test.describe("on a phone held upright", () => {
     await viewer.where("X2");
   });
 
-  test.fixme("opening a level from the panel's page, or a file, goes to the drawing's page", async ({ page, viewer }) => {
+  test("opening a level from the panel's page, or a file, goes to the drawing's page", async ({ page, viewer }) => {
     await showView(page, "hierarchy");
     await page.locator("#index .index-row", { hasText: "rdiv" }).tap();
     await expect(page.locator("#level-name")).toHaveText("rdiv");
@@ -245,7 +253,7 @@ test.describe("on a phone held upright", () => {
     await expect(page.locator("#canvas")).toBeVisible();
   });
 
-  test.fixme("the side panel's commands go to the panel's page, and hiding the side panel to the drawing's", async ({ page }) => {
+  test("the side panel's commands go to the panel's page, and hiding the side panel to the drawing's", async ({ page }) => {
     await page.evaluate(() => window.viewer.command("panel-hierarchy"));
     await expect(page.locator("#app")).toHaveAttribute("data-page", "panel");
     await expect(page.locator("#pane-hierarchy")).toBeVisible();
@@ -254,7 +262,7 @@ test.describe("on a phone held upright", () => {
     await expect(page.locator("#canvas")).toBeVisible();
   });
 
-  test.fixme("the netlist's options fold behind a button, which a tap opens", async ({ page }) => {
+  test("the netlist's options fold behind a button, which a tap opens", async ({ page }) => {
     await showView(page, "netlist");
     await expect(page.locator("#auto-include")).toBeHidden();
     const button = page.locator("#netlist-options-button");
@@ -263,7 +271,7 @@ test.describe("on a phone held upright", () => {
     await expect(page.locator("#auto-include")).toBeVisible();
   });
 
-  test.fixme("the menu titles, the side panel's tabs and the buttons are big enough for a finger", async ({ page, viewer, fingers }) => {
+  test("the menu titles, the side panel's tabs and the buttons are big enough for a finger", async ({ page, viewer, fingers }) => {
     bigEnough(await boxes(page.locator("#menubar .menu-title")), TARGET, TARGET);
     // the open badge of a selected subcircuit instance and the up button of a level below
     await fingers.tap(await viewer.where("X3"));
@@ -298,7 +306,7 @@ test.describe("on a phone held upright", () => {
     }
   });
 
-  test.fixme("the menus' items are big enough for a finger, and a submenu fits on the screen", async ({ page, viewer }) => {
+  test("the menus' items are big enough for a finger, and a submenu fits on the screen", async ({ page, viewer }) => {
     const size = page.viewportSize();
     await viewer.menuTitle("View").tap();
     bigEnough(await boxes(page.locator("#menubar .menu-list .menu-item")), TARGET, ROW);
@@ -312,8 +320,7 @@ test.describe("on a phone held upright", () => {
     await expect(page.locator("body")).toHaveAttribute("data-background", "dark");
   });
 
-  test("a tap on a menu item runs its command", async ({ page, viewer, browserName }) => {
-    test.fixme(browserName === "webkit", "WebKit sends no click after a pointerdown whose default is prevented, as a menu item's is");
+  test("a tap on a menu item runs its command", async ({ page, viewer }) => {
     const fitted = await viewer.viewBox();
     await viewer.menuTitle("View").tap();
     await viewer.menuItem("zoom-in").tap();
@@ -325,7 +332,7 @@ test.describe("on a phone held upright", () => {
     await barsFit(page);
   });
 
-  test.fixme("the status bar fits in the screen's width with an object selected, which it names", async ({ page, viewer, fingers }) => {
+  test("the status bar fits in the screen's width with an object selected, which it names", async ({ page, viewer, fingers }) => {
     await fingers.tap(await viewer.where("X3"));
     await viewer.selected(`instance X3 in ${TOP}`);
     await barsFit(page);
@@ -346,10 +353,10 @@ test.describe("on a phone lying down", () => {
     expect(await pageMoved(page)).toEqual(UNMOVED);
   });
 
-  test.fixme("the drawing and the side panel are two pages here too, and the drawing has half the height", async ({ page }) => {
+  test("the drawing and the side panel are two pages here too, the switch bar beside the status bar, and the drawing has half the height", async ({ page }) => {
     const size = page.viewportSize();
     expect((await box(page.locator("#canvas"))).height).toBeGreaterThanOrEqual(0.5 * size.height);
-    await twoPages(page);
+    await twoPages(page, { lyingDown: true });
   });
 });
 
@@ -370,7 +377,7 @@ test.describe("on a tablet upright", () => {
     expect(await netlistLines(page)).toBeGreaterThanOrEqual(5);
   });
 
-  test.fixme("the side panel is below the drawing, as wide as the screen, with no switch of pages, and the drawing is no lower than it", async ({ page }) => {
+  test("the side panel is below the drawing, as wide as the screen, with no switch of pages, and the drawing is no lower than it", async ({ page }) => {
     const size = page.viewportSize();
     await expect(page.locator("#page-switch")).toBeHidden();
     const [canvas, panel] = [await box(page.locator("#canvas")), await box(page.locator("#sidebar"))];
@@ -381,7 +388,7 @@ test.describe("on a tablet upright", () => {
     expect(canvas.height).toBeGreaterThanOrEqual(panel.height - 1);
   });
 
-  test.fixme("the side panel folds to its tabs, a tap on a tab unfolds it, and the drawing takes the room", async ({ page }) => {
+  test("the side panel folds to its tabs, a tap on a tab unfolds it, and the drawing takes the room", async ({ page }) => {
     const size = page.viewportSize();
     const open = await box(page.locator("#sidebar"));
     await page.locator("#hide-sidebar").tap();
@@ -396,7 +403,7 @@ test.describe("on a tablet upright", () => {
     expect(await pageMoved(page)).toEqual(UNMOVED);
   });
 
-  test.fixme("a finger drags the side panel's handle up and down, within limits, and the height is kept", async ({ page, viewer, fingers }) => {
+  test("a finger drags the side panel's handle up and down, within limits, and the height is kept", async ({ page, viewer, fingers }) => {
     const size = page.viewportSize();
     const handle = page.locator("#vsplit");
     await expect(handle).toBeVisible();
@@ -422,7 +429,7 @@ test.describe("on a tablet upright", () => {
     expect(await pageMoved(page)).toEqual(UNMOVED);
   });
 
-  test.fixme("the controls are big enough for a finger", async ({ page }) => {
+  test("the controls are big enough for a finger", async ({ page }) => {
     bigEnough(await boxes(page.locator("#menubar .menu-title")), TARGET, TARGET);
     bigEnough(await boxes(page.locator(".view-tabs [role=tab]")), TARGET, TARGET);
   });
@@ -439,7 +446,7 @@ test.describe("on a tablet lying down", () => {
     expect(await pageMoved(page)).toEqual(UNMOVED);
   });
 
-  test.fixme("the side panel is beside the drawing, with no switch of pages, and the controls are big enough for a finger", async ({ page }) => {
+  test("the side panel is beside the drawing, with no switch of pages, and the controls are big enough for a finger", async ({ page }) => {
     const size = page.viewportSize();
     await expect(page.locator("#page-switch")).toBeHidden();
     const [canvas, panel] = [await box(page.locator("#canvas")), await box(page.locator("#sidebar"))];
@@ -466,7 +473,7 @@ test.describe("in a narrow desktop window", () => {
     await expect.poll(async () => (await viewer.viewBox()).split(" ").map(Number)[2]).toBeLessThan(before[2]);
   });
 
-  test.fixme("the mouse switches between the drawing's page and the panel's", async ({ page }) => {
+  test("the mouse switches between the drawing's page and the panel's", async ({ page }) => {
     await page.locator("#page-panel").click();
     await expect(page.locator("#sidebar")).toBeVisible();
     await expect(page.locator("#canvas")).toBeHidden();

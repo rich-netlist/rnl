@@ -26,6 +26,11 @@ const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 50;
 const FIT_MARGIN = 24; // pixels around the drawing when it is fitted
 const CLICK_SLOP = 4; // pixels a press may move and still be a click
+const TOUCH_SLOP = 10; // a fingertip is not still: pixels a touch may move and still be a tap
+const DOUBLE_TAP_MS = 350; // a second tap this soon, and near, is a double tap
+const DOUBLE_TAP_PX = 30;
+// a double click this soon after a touch is the browser's of two taps, which the page told itself
+const TOUCH_CLICK_MS = 800;
 const BADGE_GAP = 4; // CSS pixels from the box's top-right corner to the badge's bottom-left
 let svg = null; // the <svg> element of the level drawn
 let overlay = null; // the selection marks drawn over it
@@ -35,6 +40,12 @@ export let view = null; // the view: top-left corner in drawing units, and pixel
 let scale = 1; // drawing units (SVG pixels) per unit of the scene: the level's scale, from the Document
 let size = { w: 0, h: 0 }; // the canvas size the view was last applied to
 let press = null; // a mouse press on the drawing: where, and whether it became a drag
+// the fingers on the drawing, by pointer id, each where it is; and the touch they make: where its
+// first finger went down, whether it moved past a tap or ever had two fingers, and the last tap
+const fingers = new Map();
+let touch = null;
+let lastTap = null;
+let touchedAt = -Infinity;
 let pointer = null; // where the pointer is on the canvas, in its pixels, while it is over it
 let badgeAt = null; // the drawing point of the open badge: a selected subcircuit's box corner
 const zoomBox = document.createElement("div");
@@ -258,6 +269,20 @@ export function showView({ center, scale }) {
   apply();
 }
 
+/** Bring the selection into the middle of the view, zoomed out as far as it needs to be all in it. */
+export function showSelection() {
+  cancelGesture();
+  if (!svg || !view || selected === null) return;
+  const points = doc.levels[current].hits.filter((h) => h.objects.includes(selected)).flatMap((h) => h.points);
+  if (!points.length) return;
+  const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), x1 = Math.max(...xs), y1 = Math.max(...ys);
+  const { w, h } = canvasSize();
+  const k = clamp(Math.min(view.k, (w - 2 * FIT_MARGIN) / (x1 - x0 || 1), (h - 2 * FIT_MARGIN) / (y1 - y0 || 1)), MIN_ZOOM, MAX_ZOOM);
+  view = { k, x: (x0 + x1) / 2 - w / (2 * k), y: (y0 + y1) / 2 - h / (2 * k) };
+  apply();
+}
+
 /** Zoom by `factor` keeping the drawing point under (px, py), in canvas pixels, in place. */
 function zoomAt(px, py, factor) {
   cancelGesture();
@@ -316,6 +341,7 @@ canvas.addEventListener(
 );
 
 canvas.addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "touch") { touchDown(e); return; }
   if (!view || press || ![0, 1, 2].includes(e.button)) return;
   e.preventDefault();
   hideTip();
@@ -325,6 +351,7 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 
 canvas.addEventListener("pointermove", (e) => {
+  if (e.pointerType === "touch") { touchMove(e); return; }
   pointer = canvasPoint(e);
   showPointer();
   if (!press || e.pointerId !== press.id) {
@@ -369,7 +396,11 @@ function endPress(e, cancelled) {
     }
   }
   cancelGesture();
-  if (!click) return;
+  if (click) clickAt(e);
+}
+
+/** A click, or a tap, at the event's point: select what is there, or ask which, or clear the selection. */
+function clickAt(e) {
   const { hits, blocked } = hitsAt(doc && doc.levels[current], view, canvasPoint(e));
   const objects = hits.length ? objectsOf(hits) : !blocked ? usagesAt(canvasPoint(e)) : [];
   if (e.shiftKey && objects.some((o) => opens(o) !== null)) return; // Shift-double-click leaves this viewer unchanged
@@ -380,20 +411,94 @@ function endPress(e, cancelled) {
   else if (!blocked) clearSelection();
 }
 
+/** A double click, or a double tap: open the subcircuit instance there, or else fit the drawing. */
+function doubleAt(e) {
+  const box = boxAt(doc && doc.levels[current], view, canvasPoint(e));
+  const o = box ? box.objects.find((k) => opens(k) !== null) : undefined;
+  if (o !== undefined) descend(o, { newWindow: e.shiftKey });
+  else fit();
+}
+
+/**
+ * Touch (pointerType "touch"), as a phone or a tablet gives it: one finger drags the drawing once it
+ * has moved more than TOUCH_SLOP, two zoom it around their middle as they spread or pinch and drag it
+ * as their middle moves, a third is let be. A touch that neither moved nor ever had two fingers is a
+ * tap, which does what a click does; two taps soon and near each other a double tap, which does
+ * what a double click does, once: the page tells it, as WebKit makes no double click of taps.
+ */
+function touchDown(e) {
+  e.preventDefault();
+  if (!view || fingers.size >= 2) return;
+  hideTip();
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* a pointer the page did not make */ }
+  fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (fingers.size === 1) touch = { x0: e.clientX, y0: e.clientY, moved: false, multi: false };
+  else touch.multi = true;
+}
+
+function touchMove(e) {
+  const finger = fingers.get(e.pointerId);
+  if (!finger || !view) return;
+  const before = [...fingers.values()].map((f) => ({ ...f }));
+  finger.x = e.clientX;
+  finger.y = e.clientY;
+  const after = [...fingers.values()];
+  const r = canvas.getBoundingClientRect();
+  if (after.length === 1) {
+    if (!touch.moved && Math.hypot(e.clientX - touch.x0, e.clientY - touch.y0) <= TOUCH_SLOP) return;
+    // the first move past a tap drags from where the finger went down, so the drawing stays under it
+    const from = touch.moved ? before[0] : { x: touch.x0, y: touch.y0 };
+    touch.moved = true;
+    view = { ...view, x: view.x - (e.clientX - from.x) / view.k, y: view.y - (e.clientY - from.y) / view.k };
+  } else {
+    touch.moved = true;
+    const middle = (fs) => ({ x: (fs[0].x + fs[1].x) / 2 - r.left, y: (fs[0].y + fs[1].y) / 2 - r.top });
+    const distance = (fs) => Math.hypot(fs[0].x - fs[1].x, fs[0].y - fs[1].y);
+    const [m0, m1] = [middle(before), middle(after)];
+    const [d0, d1] = [distance(before), distance(after)];
+    // the point under the fingers' middle goes with it, at the zoom their distance gives
+    const ux = view.x + m0.x / view.k, uy = view.y + m0.y / view.k;
+    const k = d0 > 0 ? clamp(view.k * (d1 / d0), MIN_ZOOM, MAX_ZOOM) : view.k;
+    view = { k, x: ux - m1.x / k, y: uy - m1.y / k };
+  }
+  apply();
+}
+
+function touchUp(e, cancelled) {
+  if (!fingers.delete(e.pointerId)) return;
+  if (canvas.hasPointerCapture?.(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+  touchedAt = performance.now();
+  if (fingers.size) return;
+  const tap = touch && !touch.moved && !touch.multi && !cancelled;
+  touch = null;
+  hideTip();
+  if (!tap) { lastTap = null; return; }
+  const now = performance.now();
+  if (lastTap && now - lastTap.time < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < DOUBLE_TAP_PX) {
+    lastTap = null;
+    doubleAt(e);
+    return;
+  }
+  lastTap = { time: now, x: e.clientX, y: e.clientY };
+  clickAt(e);
+}
+
 /**
  * The pointer moved over the drawing with no button down: the cursor says whether a click selects
  * something, and, if names are shown on hover, the box beside the pointer names what it rests on.
  */
 function pointOut(e, point) {
+  // a move the browser makes of a tap names nothing: a finger does not hover
+  if (performance.now() - touchedAt < TOUCH_CLICK_MS) { hideTip(); return; }
   const { hits } = hitsAt(doc && doc.levels[current], view, point);
   canvas.classList.toggle("over-object", hits.length > 0 || usageAt(point) !== null);
   const name = hoverNamesOn() ? nameOf(doc, hits[0]) : null;
   if (name === null) hideTip();
   else showTip(name, e.clientX, e.clientY);
 }
-canvas.addEventListener("pointerup", (e) => endPress(e, false));
-canvas.addEventListener("pointercancel", (e) => endPress(e, true));
-canvas.addEventListener("lostpointercapture", (e) => endPress(e, true));
+canvas.addEventListener("pointerup", (e) => (e.pointerType === "touch" ? touchUp(e, false) : endPress(e, false)));
+canvas.addEventListener("pointercancel", (e) => (e.pointerType === "touch" ? touchUp(e, true) : endPress(e, true)));
+canvas.addEventListener("lostpointercapture", (e) => (e.pointerType === "touch" ? touchUp(e, true) : endPress(e, true)));
 window.addEventListener("blur", cancelGesture);
 canvas.addEventListener("pointerleave", () => {
   pointer = null;
@@ -403,13 +508,11 @@ canvas.addEventListener("pointerleave", () => {
 // no autoscroll on the middle button, no page menu on the drawing
 canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-// a double click opens a subcircuit instance, and fits the drawing anywhere else
+// a double click opens a subcircuit instance, and fits the drawing anywhere else; one the browser
+// makes of two taps is left out, as the page told the double tap itself
 canvas.addEventListener("dblclick", (e) => {
-  if (e.target.closest("#enter-badge")) return;
-  const box = boxAt(doc && doc.levels[current], view, canvasPoint(e));
-  const o = box ? box.objects.find((k) => opens(k) !== null) : undefined;
-  if (o !== undefined) descend(o, { newWindow: e.shiftKey });
-  else fit();
+  if (e.target.closest("#enter-badge") || performance.now() - touchedAt < TOUCH_CLICK_MS) return;
+  doubleAt(e);
 });
 
 // keep the middle of the view in place when the window or a panel changes size
