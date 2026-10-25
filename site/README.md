@@ -71,7 +71,12 @@ An `incubating` language, or one without a `status`, is built only by `python si
 other page does, nor does the root's browser-language negotiation. Pages CI builds without the
 flag, so it is not deployed. Once it may be shown (the thresholds are in
 [`i18n/README.md`](../i18n/README.md)), its `status` becomes `published`: every menu offers it, the
-root leads browsers that ask for it there, and the site publishes its pages. Either way it
+root leads browsers that ask for it there, and the site publishes its pages. A language translated
+by AI and not yet reviewed by a native speaker has `"ai_translated": true` in its entry: every page
+of it says so under its top bar, where each page has its `{{ai-translation-notice}}` marker, in
+English (`lang="en"`), with a link that opens an issue on the repository titled with the language
+and the page, the messages `ai_translated` and `report_issue` of the registry's English, which no
+language translates. Either way it
 inherits English interface messages, fonts and content. Add translations progressively,
 in its catalogs as above; there is no need to list every group. Translations of the shared UI
 messages go in `i18n/<lang>/site/messages.json`, keyed by the names of the messages in the

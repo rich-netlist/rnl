@@ -1,7 +1,7 @@
 # 0015. English is the only core language; every other language, Chinese included, is a translation
 
 - Date: 2026-10-25
-- Status: accepted; point 8 amended on 2026-10-25: the notices are in English; points 3 and 9 amended on 2026-10-25: the READMEs are in English only
+- Status: accepted; point 8 amended on 2026-10-25: the notices are in English; points 3 and 9 amended on 2026-10-25: the READMEs are in English only; point 8 amended on 2026-10-25: a language translated by AI may be shown with a notice
 
 ## Context
 
@@ -35,6 +35,7 @@ The user asked that the project now plan for keeping its languages up over time,
 7. **The standard.** The English text remains normative. A translation of the standard is published as a form of a release, the PDF and the combined Markdown, only when every part of it is complete and in line with the English. The site shows the Chinese pages of the standard as they are. A chapter whose English has changed since it was translated carries a notice that it may differ from the English and that the English prevails. Version 0.2 is frozen and gets no new translations.
 8. **When a language is shown.**
    - A language is `published` when the site's navigation, introduction and page for agents are fully translated, the other pages at least 80% and the viewers at least 95%, and a native speaker named in the registry has reviewed it. A draft may be made by machine translation or by an AI model; it is shown only after that review. Chinese meets this today and stays shown.
+   - A language translated by AI may also be shown before a native speaker has reviewed it, when its entry says `"ai_translated": true`. The user decided so as no native reviewer was at hand for the languages Gemini drafted, other than Chinese, and asked that their pages say so at the top. Every page of such a language says, under its top bar, that it was translated from English by AI and may contain errors, with a link that opens an issue about that page. A native speaker's review removes the field and the notice. Like the other notices, it is in English.
    - A page of a published language that is less than 80% translated is shown in English, with a notice that the page is not yet translated.
    - A page between 80% and 100% is shown translated, with the English where the translation is missing, and a notice that part of it is not yet translated.
    - These notices, as every notice of the system, such as that of point 7, are in English, in every language, Chinese included. The user decided so on reading the first draft, which had them in each language: they are all in English, since by the principle a notice in Chinese was itself a fault; and they asked that the project be checked for Chinese embedded elsewhere. Their texts are therefore no translatable message.

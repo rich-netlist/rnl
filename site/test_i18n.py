@@ -231,6 +231,32 @@ class Catalogs(unittest.TestCase):
             self.assertEqual(registry.message("ja", "tools"), "ツール")
             self.assertEqual(registry.message("ja", "language_menu"), registry.message("en", "language_menu"))
 
+    def test_a_language_translated_by_ai_says_so_at_the_top_of_every_page(self):
+        config = third_language()
+        config["languages"][-1].update(names={"en": "Japanese"}, ai_translated=True)
+        registry = Languages(config)
+        notice = registry.ai_notice("ja", "tools.html")
+        self.assertIn('<div class="ai-notice" lang="en">', notice)  # in English, as every notice about translation
+        self.assertIn("Translated from English by AI; it may contain errors.", notice)
+        self.assertIn('href="https://github.com/rich-netlist/rnl/issues/new?labels=translation&amp;'
+                      'title=Translation%20%28Japanese%29%3A%20tools.html&amp;body=Page%3A%20https%3A//rich-netlist.github.io/rnl/ja/tools.html', notice)
+        self.assertIn(">Report an issue</a>", notice)
+        self.assertEqual(registry.ai_notice("zh", "tools.html"), "")  # Chinese is reviewed
+        self.assertEqual(registry.ai_notice("en", "tools.html"), "")
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            (directory / "languages.json").write_text(json.dumps(config), encoding="utf-8")
+            third_messages(directory)
+            env = dict(os.environ, RNL_SITE_LANGUAGES=str(directory / "languages.json"), PYTHONDONTWRITEBYTECODE="1")
+            subprocess.run([sys.executable, "site/build.py", "--out", str(directory / "dist")], cwd=ROOT,
+                           env=env, check=True, capture_output=True, text=True)
+            for name in build.PAGES:
+                ja = (directory / "dist/ja" / name).read_text(encoding="utf-8")
+                self.assertEqual(ja.count('class="ai-notice"'), 1, name)
+                self.assertLess(ja.index("</header>"), ja.index('class="ai-notice"'))  # under the top bar
+                for lang in ("en", "zh"):
+                    self.assertNotIn('class="ai-notice"', (directory / "dist" / lang / name).read_text(encoding="utf-8"))
+
     def test_notices_of_pages_not_wholly_translated_are_in_english(self):
         """As every notice of the system, in every language, Chinese included (decision 0015)."""
         config = third_language()

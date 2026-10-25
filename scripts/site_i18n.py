@@ -8,6 +8,7 @@ beside the English comes first (decision 0015, i18n/README.md). Where one Englis
 ways, its block names a context, <en ctx=NAME>, and the catalog's key is NAME|English.
 """
 from collections import Counter
+from urllib.parse import quote
 from html import escape
 import json
 import os
@@ -20,6 +21,8 @@ CONFIG = ROOT / "i18n/languages.json"
 # wholly, is shown translated, with the English where its translation is missing (decision 0015).
 SHOWN_IN_ENGLISH_BELOW = 0.8
 HELP_URL = "https://github.com/rich-netlist/rnl/blob/main/i18n/README.md"
+ISSUE_URL = "https://github.com/rich-netlist/rnl/issues/new"
+SITE_URL = "https://rich-netlist.github.io/rnl/"
 PLACEHOLDER = re.compile(r"\{\{?[a-z][a-z0-9_-]*\}?\}")
 MARKUP_TAG = re.compile(r"<(/?[a-zA-Z][a-zA-Z0-9]*)\b")
 HREF = re.compile(r"\bhref=\"([^\"]*)\"")
@@ -243,6 +246,20 @@ class Languages:
         return (f'\n<div class="wrap translation-notice{" is-partial" if partial else ""}" lang="{self.locales[self.default]["html_lang"]}">'
                 f'<p class="note"><svg class="ico"><use href="#i-info"/></svg><span>{escape(text)} '
                 f'<a href="{HELP_URL}">{escape(self.message(self.default, "help_translate"))}</a></span></p></div>')
+
+    def ai_notice(self, code, page):
+        """The notice at the top of every page of a language translated by AI and not yet reviewed by a
+        native speaker, `"ai_translated": true` in its entry, or "": that the page was translated from
+        English by AI and may contain errors, with a link that opens an issue about this page. In English,
+        as every notice about translation itself (decision 0015)."""
+        if code == self.default or not self.entries[code].get("ai_translated"):
+            return ""
+        title = f"Translation ({self.english_name(code)}): {page}"
+        body = f"Page: {SITE_URL}{code}/{page}\n\nWhat is wrong, and what it should say:\n"
+        url = f"{ISSUE_URL}?labels=translation&title={quote(title)}&body={quote(body)}"
+        return (f'\n<div class="ai-notice" lang="{self.locales[self.default]["html_lang"]}"><p class="wrap">'
+                f'<svg class="ico"><use href="#i-info"/></svg><span>{escape(self.message(self.default, "ai_translated"))} '
+                f'<a href="{escape(url, quote=True)}">{escape(self.message(self.default, "report_issue"))}</a></span></p></div>')
 
     def markup(self, values, html=False):
         self.text(values, self.default)

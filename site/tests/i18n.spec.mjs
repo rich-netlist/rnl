@@ -98,11 +98,16 @@ test('third locale inherits English content and switches without changing source
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(page.locator('.hero')).toContainText('A netlist you can simulate');
   await expect(page.locator('nav.pages a').first()).toHaveText('ホーム');
+  // translated by AI: a notice under the top bar, in English, with a link to report an error on this page
+  await expect(page.locator('.ai-notice')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('.ai-notice')).toContainText('Translated from English by AI; it may contain errors.');
+  await expect(page.locator('.ai-notice a')).toHaveAttribute('href', /^https:\/\/github\.com\/rich-netlist\/rnl\/issues\/new\?labels=translation&title=Translation%20%28Japanese%29%3A%20index\.html&/);
   await expect(page.locator('#status .tl')).toContainText('Release notes');
   await page.locator('.language-menu > summary').click();
   await expect(page.locator('[data-lang-link]')).toHaveCount(3);
   await page.locator('[data-language="zh"]').click();
   await expect(page).toHaveURL(/\/i18n-fixture\/zh\/\?review=1#status$/);
+  await expect(page.locator('.ai-notice')).toHaveCount(0);
   await page.goto('/i18n-fixture/');
   await expect(page).toHaveURL(/\/i18n-fixture\/zh\/$/);
   await page.goto('/i18n-fixture/ja/packages.html');
