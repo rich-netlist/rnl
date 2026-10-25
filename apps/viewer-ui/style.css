@@ -1321,3 +1321,46 @@ button.pool-open:hover { text-decoration: underline; }
 .symbol-definition { border: 1px solid var(--line); border-radius: 6px; padding: 8px 0; overflow: auto; font: 12px/1.55 ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei UI", monospace, "Noto Sans SC"; background: var(--netlist-background); }
 .symbol-definition .ln { min-width: max-content; }
 .symbol-definition .no { width: 4em; }
+
+/* ------------------------------------------------------------------ small screens and touch */
+
+/* a submenu under its entry, where the screen has room on neither side of it (menubar.js) */
+.submenu.inline { position: static; width: auto; min-width: 0; margin: 0 8px 4px 16px; box-shadow: none; }
+/* the status bar keeps the zoom; a long name of the selection is cut short */
+.statusbar .selection { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
+
+/*
+ * Upright and narrow (a phone, a tablet held upright, a narrow window): the side panel under the
+ * drawing, as wide as the screen, its handle between them; folded, only its tabs show, and a tap on
+ * one unfolds it (panels.js). Its height is --panel-h, which the handle sets.
+ */
+@media (max-width: 1023px) and (max-aspect-ratio: 4/5) {
+  .app, .app.sidebar-hidden { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(80px, 1fr) 24px var(--panel-h, 33vh); }
+  .drawing { grid-column: 1; grid-row: 1; }
+  .vsplit { grid-column: 1; grid-row: 2; display: grid; place-items: center; cursor: row-resize; border-width: 1px 0; touch-action: none; }
+  .vsplit::after { content: ""; width: 44px; height: 4px; border-radius: 2px; background: var(--muted); opacity: 0.5; }
+  .sidebar { grid-column: 1; grid-row: 3; }
+  .app.sidebar-hidden { grid-template-rows: minmax(80px, 1fr) 0 auto; }
+  .app.sidebar-hidden .sidebar { display: grid; grid-template-rows: auto; }
+  .app.sidebar-hidden .sidebar > :not(.side-head) { display: none; }
+  .app.sidebar-hidden #hide-sidebar, .app.sidebar-hidden #show-sidebar { display: none; }
+  .view-tabs { flex-wrap: nowrap; }
+  .side-head { height: auto; min-height: 32px; }
+}
+
+/* a finger is bigger than a pointer: the controls a finger presses, the rows of the menus and lists */
+@media (pointer: coarse) {
+  .menubar { height: auto; min-height: 44px; }
+  .menu-title { min-height: 44px; min-width: 44px; padding: 0 12px; }
+  .menu-list .menu-item { min-height: 40px; }
+  .side-head { height: auto; min-height: 44px; }
+  .view-tabs { flex-wrap: nowrap; align-self: stretch; }
+  .view-tabs button { min-height: 44px; min-width: 44px; }
+  #hide-sidebar, #show-sidebar { min-width: 44px; min-height: 44px; }
+  .problems-head { min-height: 44px; }
+  .level-bar { height: auto; min-height: 44px; }
+  .up-button { min-height: 44px; min-width: 44px; }
+  .enter-badge { width: 32px; height: 32px; }
+  .enter-badge svg { width: 20px; height: 20px; }
+}
+.menu-list.scrolls { overflow-y: auto; }

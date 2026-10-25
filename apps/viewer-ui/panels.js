@@ -17,6 +17,12 @@ const hierarchyPane = $("pane-hierarchy");
 
 const SIDEBAR_MIN = 220;
 const DRAWING_MIN = 280;
+// upright and narrow, as style.css says: the side panel is under the drawing, its handle sets its height
+export const upright = matchMedia("(max-width: 1023px) and (max-aspect-ratio: 4/5)");
+// a touch screen lying down and low, a phone's: the side panel beside the drawing, narrow, folded at start
+export const lowTouch = matchMedia("(pointer: coarse) and (max-height: 500px)");
+const CANVAS_MIN = 80; // the drawing keeps a strip of this many pixels above the side panel
+const HANDLE = 24; // the handle between them
 const PROBLEMS_MIN = 60;
 const SOURCE_MIN = 120;
 const INDEX_MIN = 120;
@@ -97,7 +103,19 @@ export function setProblems(shown) {
 
 function sidebarWidthLimits() {
   const w = window.innerWidth;
+  // a phone lying down keeps most of its width for the drawing
+  if (lowTouch.matches) return [SIDEBAR_MIN, Math.max(SIDEBAR_MIN, w * 0.3)];
   return [SIDEBAR_MIN, Math.max(SIDEBAR_MIN, Math.min(w * 0.75, w - DRAWING_MIN))];
+}
+
+// the side panel under the drawing: at least its tabs, and at most what leaves the drawing its strip
+function panelHeightLimits() {
+  // no layout yet: the height is taken as it is, and limited once there is one
+  if (app.clientHeight === 0) return [0, Infinity];
+  const tabs = sidebar.querySelector(".side-head").offsetHeight || 44;
+  const drawing = document.querySelector(".drawing"), canvas = $("canvas");
+  const around = drawing && canvas ? drawing.clientHeight - canvas.clientHeight : 0;
+  return [tabs, Math.max(tabs, app.clientHeight - HANDLE - around - CANVAS_MIN)];
 }
 
 // a hidden pane has no height yet: its size is taken as it is, and limited once it is shown
@@ -123,11 +141,31 @@ function setSize(name, px, limits) {
 export const setSidebarWidth = (px) => setSize("--sidebar-w", px, sidebarWidthLimits);
 export const setProblemsHeight = (px) => setSize("--problems-h", px, problemsHeightLimits);
 export const setIndexHeight = (px) => setSize("--index-h", px, indexHeightLimits);
+export const setPanelHeight = (px) => setSize("--panel-h", px, panelHeightLimits);
 
-/** Drag a splitter: `axis` "x" or "y"; `get` the size when the drag starts; `set` the new size. */
+/** Lay the side panel out for the screen: under the drawing when upright, its handle then horizontal. */
+function layOut() {
+  $("vsplit").setAttribute("aria-orientation", upright.matches ? "horizontal" : "vertical");
+  if (upright.matches) setPanelHeight(load("panel-height", Math.round(window.innerHeight / 3)));
+}
+upright.addEventListener("change", layOut);
+layOut();
+requestAnimationFrame(layOut);
+
+/**
+ * Drag a splitter: `axis` "x" or "y"; `get` the size when the drag starts; `set` the new size; or a
+ * function `axis` that gives all of them, as `[axis, sign, get, set, key]`, when the drag starts.
+ */
 function splitter(el, axis, sign, get, set, key) {
   el.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
+    if (typeof axis === "function") return splitWith(el, e, ...axis());
+    splitWith(el, e, axis, sign, get, set, key);
+  });
+}
+
+function splitWith(el, e, axis, sign, get, set, key) {
+  {
     e.preventDefault();
     el.setPointerCapture(e.pointerId);
     el.classList.add("active");
@@ -150,17 +188,21 @@ function splitter(el, axis, sign, get, set, key) {
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", up);
-  });
+  }
 }
 
-splitter($("vsplit"), "x", 1, () => sidebar.getBoundingClientRect().width, setSidebarWidth, "sidebar-width");
+// beside the drawing the handle sets the panel's width; under it, its height
+splitter($("vsplit"), () => (upright.matches
+  ? ["y", -1, () => sidebar.getBoundingClientRect().height, setPanelHeight, "panel-height"]
+  : ["x", 1, () => sidebar.getBoundingClientRect().width, setSidebarWidth, "sidebar-width"]));
 splitter($("hsplit"), "y", -1, () => $("problems-body").getBoundingClientRect().height, setProblemsHeight, "problems-height");
 splitter($("hsplit2"), "y", -1, () => $("index-section").getBoundingClientRect().height, setIndexHeight, "index-height");
 splitter($("usage-split"), "y", 1, () => $("usage-list").getBoundingClientRect().height,
   px => setSize("--usage-list-h", px, () => [80, Math.max(80, $("pane-usages").clientHeight - 125)]), "usage-list-height");
 
 window.addEventListener("resize", () => {
-  setSidebarWidth(sidebar.getBoundingClientRect().width || load("sidebar-width", 420));
+  if (upright.matches && !app.classList.contains("sidebar-hidden")) setPanelHeight(sidebar.getBoundingClientRect().height);
+  else if (!upright.matches) setSidebarWidth(sidebar.getBoundingClientRect().width || load("sidebar-width", 420));
   if (!netlistPane.hidden && !netlistPane.classList.contains("problems-folded")) {
     setProblemsHeight($("problems-body").getBoundingClientRect().height);
   }
@@ -170,6 +212,10 @@ window.addEventListener("resize", () => {
 $("hide-sidebar").addEventListener("click", () => setSidebar(false));
 $("show-sidebar").addEventListener("click", () => setSidebar(true));
 $("problems-head").addEventListener("click", () => setProblems(netlistPane.classList.contains("problems-folded")));
+// a tab of the side panel folded to its tabs unfolds it
+sidebar.querySelector(".view-tabs").addEventListener("click", () => {
+  if (app.classList.contains("sidebar-hidden")) setSidebar(true);
+}, true);
 $("tab-files").addEventListener("click", () => setPane("files"));
 $("tab-netlist").addEventListener("click", () => setPane("netlist"));
 $("tab-hierarchy").addEventListener("click", () => setPane("hierarchy"));

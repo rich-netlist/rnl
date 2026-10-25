@@ -19,7 +19,7 @@ import { openSource } from "./open.js";
 import { showManifestLevel } from "./manifest-bar.js";
 import { restoreSession } from "./navigation.js";
 import {
-  setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth,
+  setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth, lowTouch,
 } from "./panels.js";
 import { loadShell } from "./shell.js";
 import { startSolvePanel } from "./solve.js";
@@ -45,7 +45,9 @@ async function start() {
   startUsages();
   setSidebarWidth(load("sidebar-width", 420));
   setProblemsHeight(load("problems-height", 180));
-  setSidebar(load("sidebar-shown", true));
+  // a phone lying down starts with the drawing alone; the side panel is a tap away
+  if (lowTouch.matches) document.getElementById("app").classList.add("sidebar-hidden");
+  else setSidebar(load("sidebar-shown", true));
   setProblems(load("problems-shown", true));
   startSolvePanel();
   setPane(load("side-pane", "netlist"));
