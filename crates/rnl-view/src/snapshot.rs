@@ -286,6 +286,12 @@ pub struct ObjectView {
     /// role is left empty.
     #[cfg_attr(test, ts(type = "Record<string, string | [number, number] | (string | [number, number])[]> | null"))]
     pub attach: Option<Map<String, Value>>,
+    /// A usage's parameters as the statement that applies it writes them, each value of the type it
+    /// is written in (a string, a number, a truth value, or a list of them); the definition's
+    /// defaults are not among them. Only for a usage that writes some.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional, type = "Record<string, string | number | boolean | unknown[]>"))]
+    pub params: Option<Map<String, Value>>,
     /// The id of its symbol in `symbols`.
     pub symbol: Slot<String>,
     /// Its registration point; null when it has none yet.
@@ -682,6 +688,7 @@ fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
                 .definition
                 .as_ref()
                 .map(|_| o.attach.iter().map(|(role, a)| (role.clone(), attached(a))).collect()),
+            params: (!o.params.is_empty()).then(|| o.params.iter().map(|(n, v)| (n.clone(), lit(v))).collect()),
             symbol: Slot::of(o.symbol.as_ref().and_then(symbol_id)),
             at: Slot::of(o.at.map(xy)),
             orient: Slot::of(Some(o.orient.as_str().to_string())),

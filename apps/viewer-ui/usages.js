@@ -87,6 +87,16 @@ export function startUsages() {
   document.documentElement.style.setProperty("--usage-list-h", `${height}px`);
   renderUsages();
 }
+/**
+ * Show or hide usages and current directions as a manifest's display settings say (display.js):
+ * for this page only, not kept in the settings.
+ */
+export function showOverlays({ usages, currents }) {
+  if (typeof usages === "boolean") { shown = usages; setCheck("toggle-usages", shown); }
+  if (typeof currents === "boolean") { currentsShown = currents; setCheck("toggle-currents", currentsShown); }
+  revision++;
+  repaint();
+}
 export function toggleUsages() {
   shown = !shown;
   save("usages-shown", shown);

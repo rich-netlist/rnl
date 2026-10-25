@@ -381,6 +381,9 @@ pub struct ObjectInfo {
     pub definition: Option<String>,
     /// A usage's roles in order, with what each is attached to.
     pub attach: Vec<(String, Attach)>,
+    /// A usage's parameters as the statement that applies it writes them, in the order of the
+    /// definition; the definition's defaults are not among them (9.3).
+    pub params: Vec<(String, Lit)>,
     /// The symbol it is drawn with.
     pub symbol: Option<SymbolInfo>,
     pub at: Option<Pt>,

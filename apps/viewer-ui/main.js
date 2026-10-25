@@ -17,6 +17,7 @@ import { setHoverNames } from "./hover.js";
 import { showMenuBar } from "./menubar.js";
 import { openSource } from "./open.js";
 import { showManifestLevel } from "./manifest-bar.js";
+import { offerDisplay } from "./display.js";
 import { restoreSession } from "./navigation.js";
 import {
   setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth, lowTouch,
@@ -96,7 +97,13 @@ async function start() {
     const initial = await shell.initial();
     await openSource(initial, false);
     // files opened by a manifest open on the level it, or the address, names
-    if (initial?.external) await showManifestLevel(initial);
+    if (initial?.external) {
+      await showManifestLevel(initial);
+      // and the display settings it proposes, which the user chooses to apply or not
+      const external = initial.external;
+      await offerDisplay(external.display, initial.manifest || external.id, external.displayIgnored,
+        (path) => path in external.files || external.pool.includes(path));
+    }
   }
 }
 

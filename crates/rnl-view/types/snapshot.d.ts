@@ -318,6 +318,12 @@ export type ObjectView = {
    */
   attach: Record<string, string | [number, number] | (string | [number, number])[]> | null,
   /**
+   * A usage's parameters as the statement that applies it writes them, each value of the type it
+   * is written in (a string, a number, a truth value, or a list of them); the definition's
+   * defaults are not among them. Only for a usage that writes some.
+   */
+  params?: Record<string, string | number | boolean | unknown[]>,
+  /**
    * The id of its symbol in `symbols`.
    */
   symbol: Slot<string>,

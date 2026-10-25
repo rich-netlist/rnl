@@ -50,6 +50,20 @@ export interface Manifest {
   paths?: { path: string; subfolders?: boolean }[];
   /** The Library's settings. */
   settings?: { autoInclude?: boolean };
+  /** Display settings proposed to the viewer. */
+  display?: DisplaySettings;
+}
+
+/** Display settings a manifest proposes; a viewer asks before it applies them, for its page or window only. */
+export interface DisplaySettings {
+  /** The view of `level`: fitted to the window, or centred on a point of the drawing at a scale. */
+  view?: { fit: true } | { center: [number, number]; scale: number };
+  background?: "light" | "dark";
+  /** Colours by the viewer's names (component, net, rnl, keyword, definition, local, string, parameter, free, text, background, highlight, subcircuit). */
+  colors?: Record<string, string>;
+  usages?: boolean;
+  currents?: boolean;
+  grid?: "none" | "dots" | "lines";
 }
 
 /** A manifest read: every path is under `root`, `/<id>/` by default. */
@@ -75,6 +89,10 @@ export interface ManifestRead {
   formats: Record<string, string>;
   paths: { path: string; subfolders: boolean }[];
   settings: { autoInclude?: boolean };
+  /** The display settings of the shapes this module reads; empty when none. */
+  display: DisplaySettings;
+  /** The names of the display settings left out, of another shape or unknown. */
+  displayIgnored: string[];
 }
 
 interface ReadOptions {
@@ -112,6 +130,7 @@ export declare function writeManifest(options: {
   level?: string | null;
   paths?: { path: string; subfolders?: boolean }[];
   settings?: { autoInclude?: boolean };
+  display?: DisplaySettings;
   /** The files go in the archive with the manifest (a project). */
   archive?: boolean;
   id?: string;

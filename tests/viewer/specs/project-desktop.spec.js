@@ -35,7 +35,9 @@ test("desktop: Save Project keeps paths relative to the files' directory, PATH c
     await restorePool([{ path: extra, name: extra, source: { path: extra, name: extra } }]);
     await (await import("./formats.js")).chooseFormat(extra, "spectre");
   }, { extra });
-  await page.evaluate(() => window.viewer.command("save-project"));
+  await page.evaluate(() => { window.viewer.command("save-project"); });
+  await page.locator("#write-display").waitFor();
+  await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => page.evaluate(() => !!window.fakeShell.savedProject)).toBe(true);
   const saved = await page.evaluate(() => window.fakeShell.savedProject);
   const files = unzip(saved.bytes);

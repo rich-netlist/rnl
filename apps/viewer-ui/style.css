@@ -1322,6 +1322,10 @@ button.pool-open:hover { text-decoration: underline; }
 .symbol-definition .ln { min-width: max-content; }
 .symbol-definition .no { width: 4em; }
 
+/* the display settings a manifest proposes, and the box that writes them into one (display.js) */
+.display-setting { display: flex; align-items: flex-start; gap: 8px; text-align: left; }
+.dialog-body .display-setting input[type="checkbox"] { width: auto; flex: none; margin: 2px 0 0; padding: 0; }
+
 /* ------------------------------------------------------------------ small screens and touch */
 
 /* a submenu under its entry, where the screen has room on neither side of it (menubar.js) */

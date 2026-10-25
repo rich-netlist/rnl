@@ -249,6 +249,26 @@ export function fit() {
   apply();
 }
 
+/**
+ * The view as a manifest records it (export of a project's display settings): the point at the
+ * centre of the canvas, in the drawing's units, and the pixels per unit; null with no drawing.
+ */
+export function viewCentre() {
+  if (!view) return null;
+  const { w, h } = canvasSize();
+  return { center: [view.x + w / (2 * view.k), view.y + h / (2 * view.k)], scale: view.k };
+}
+
+/** Show the drawing centred on `center`, in its units, at `scale` pixels per unit, as a manifest names a view. */
+export function showView({ center, scale }) {
+  cancelGesture();
+  if (!svg) return;
+  const { w, h } = canvasSize();
+  const k = clamp(scale, MIN_ZOOM, MAX_ZOOM);
+  view = { k, x: center[0] - w / (2 * k), y: center[1] - h / (2 * k) };
+  apply();
+}
+
 /** Zoom by `factor` keeping the drawing point under (px, py), in canvas pixels, in place. */
 function zoomAt(px, py, factor) {
   cancelGesture();

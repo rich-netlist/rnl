@@ -141,8 +141,8 @@ export function ask({ title, text, value = "", placeholder = "", action = "OK", 
  *   the dialog wider, for a text to read, and lets its body scroll. `footer` controls appear before Cancel.
  * @returns {Promise<any>} What `answer` gave, or null when the dialog is cancelled.
  */
-export function form({ title, text, parts, answer, focus, action = "OK", wide = false, footer = [] }) {
-  const d = frame(title, text, action);
+export function form({ title, text, parts, answer, focus, action = "OK", wide = false, footer = [], cancel = "Cancel" }) {
+  const d = frame(title, text, action, cancel);
   if (wide) d.body.parentElement.classList.add("wide");
   const fields = document.createElement("div");
   fields.className = "dialog-form";
