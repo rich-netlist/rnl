@@ -4,7 +4,7 @@
   "Skip to content": "跳到正文",
   "Switch color theme": "切换配色",
   "Translation status": "翻译进度",
-  "English is the source of every text of RNL; every other language, Chinese included, is a translation that follows it.": "RNL 的每一段文字都以英文为源；其他语言，包括中文，都是跟着英文走的译文。",
+  "English is the source of every text of RNL; every other language is a translation that follows it.": "RNL 的每一段文字都以英文为源；其他语言都是跟着英文走的译文。",
   "This report was made from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">the list of what there is to translate</a> when the site was built; every pull request gets the same one. To translate a language or bring one up to date, start from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.": "这份报告在构建网站时按<a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">要翻译的内容清单</a>生成，每个 PR 也会附上同样一份。要翻译一种语言或把它补到最新，从 <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a> 开始。",
   "How far each language is": "各语言的进度",
   "The report is in English, as the texts it counts are. A missing translation shows the English; a stale one was made from an English text that has changed since.": "报告用英文写成，和它所统计的原文一样。缺译文的地方显示英文；标为 stale（过时）的译文，是照着后来改过的英文翻的。",

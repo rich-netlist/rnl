@@ -22,7 +22,7 @@ The registry owns language codes, native names, URL directories, browser-languag
 navigation breakpoints and the English of the shared interface messages, including those of the
 language-standard pages.
 
-English is the site's only core language, and every other language, Chinese included, is a translation ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). `src/` holds the English, each text a group that the build translates:
+English is the site's only core language, and every other language is a translation ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). `src/` holds the English, each text a group that the build translates:
 
 ```html
 <h2><en>Same task, two ways.</en></h2>
