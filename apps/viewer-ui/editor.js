@@ -345,7 +345,8 @@ async function changedOnDisk(names, encoding) {
   const choice = await decide({
     title: m("File Changed on Disk"),
     paragraphs: [
-      m`${many ? "These files were" : "This file was"} changed by another program since the viewer read ${many ? "them" : "it"}: ${names.join(", ")}.`,
+      many ? m`These files were changed by another program since the viewer read them: ${names.join(", ")}.`
+        : m`This file was changed by another program since the viewer read it: ${names.join(", ")}.`,
       m("Nothing was saved. Overwrite writes the text in the viewer over what is on disk; Reload reads the files again and drops the changes made here."),
     ],
     action: tr("Overwrite"),
@@ -414,7 +415,8 @@ export async function confirmLeave(what, signal) {
   const choice = await decide({
     signal,
     title: m("Changes Not Saved"),
-    paragraphs: [m`${files.length === 1 ? "This file has" : "These files have"} changes that are not saved: ${names}.`, m`Do you want to ${what}?`],
+    paragraphs: [files.length === 1 ? m`This file has changes that are not saved: ${names}.` : m`These files have changes that are not saved: ${names}.`,
+      m`Do you want to ${what}?`],
     action: can ? tr("Save") : tr("Discard Changes"),
     others: can ? [tr("Don't Save")] : [],
   });

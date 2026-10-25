@@ -188,6 +188,7 @@ function group(parent, heading, items, open = true) {
 const STATUS_ORDER = ["failed", "discarded", "undecided", "kept"];
 // what became of a fact (8.5), as a line and a count name it
 const STATUS_WORDS = { failed: tr("failed"), discarded: tr("discarded"), undecided: tr("undecided"), kept: tr("kept") };
+const STATUS_COUNTS = { failed: tr("{0} failed"), discarded: tr("{0} discarded"), undecided: tr("{0} undecided") };
 const STATUS_HEADINGS = {
   failed: m("Failed: they contradict themselves (8.5, 7.6)"),
   discarded: m("Discarded in the order of 8.5"),
@@ -236,7 +237,7 @@ function renderReport(report) {
   const n = (s) => report.levels.reduce((k, l) => k + l.facts.filter((f) => f.status === s).length, 0);
   for (const [s, cls] of [["failed", "n-error"], ["discarded", "n-warning"], ["undecided", "n-warning"]]) {
     const k = n(s);
-    if (k) append(counts, span(cls, m`${k} ${m(STATUS_WORDS[s])}`));
+    if (k) append(counts, span(cls, m(STATUS_COUNTS[s], k)));
   }
   if (counts.childElementCount === 0) append(counts, span("none", m("every fact kept")));
 }

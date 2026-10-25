@@ -69,7 +69,7 @@ async function newWindow(visit) {
   // Desktop sessions re-read disk. Pending editor text never becomes a new window's input.
   if (shell.platform === "desktop" && Object.keys(changes(true)).length &&
       await decide({ title: m("New Window"), paragraphs: [m("The new window reads files from disk and will not see the unsaved changes here.")],
-        action: tr("Open Anyway"), cancel: "Cancel" }) !== "Open Anyway") return;
+        action: tr("Open Anyway"), cancel: tr("Cancel") }) !== "Open Anyway") return;
   const session = {
     ...visit,
     pool: poolSnapshot(),
