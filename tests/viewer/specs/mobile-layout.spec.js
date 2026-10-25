@@ -109,9 +109,11 @@ function netlistLines(page) {
 
 /**
  * Expect a phone's two pages: a low switch bar at the foot of the screen, as wide as it, with a
- * switch for each page big enough for a finger; the drawing's page first, the drawing as wide as the
- * screen and the side panel hidden; then the panel's page, the side panel as wide as the screen and
- * the drawing hidden. Neither goes under the bar, and the page does not move.
+ * switch for each page big enough for a finger, and the status bar above it on both pages; the
+ * drawing's page first, the drawing as wide as the screen, the side panel hidden and Show in Netlist
+ * there; then the panel's page, the side panel as wide as the screen, the drawing hidden and Show in
+ * Drawing there. Nothing goes under the bar; the side panel's buttons and handle of a wider screen
+ * are not there; `#app` names the page in `data-page`; and the page does not move.
  */
 async function twoPages(page) {
   const size = page.viewportSize();
@@ -122,19 +124,32 @@ async function twoPages(page) {
   expect(Math.abs(b.width - size.width)).toBeLessThanOrEqual(1);
   expect(b.height).toBeLessThanOrEqual(SWITCH_BAR);
   bigEnough(await boxes(bar.locator("[role=tab]")), TARGET, ROW);
+  for (const sel of ["#hide-sidebar", "#show-sidebar", "#vsplit"]) await expect(page.locator(sel), sel).toBeHidden();
+  const above = async (sel) => {
+    const r = await box(page.locator(sel));
+    expect(r.y + r.height, sel).toBeLessThanOrEqual(b.y + 0.5);
+  };
 
   await expect(page.locator("#page-drawing")).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#app")).toHaveAttribute("data-page", "drawing");
   await expect(page.locator("#sidebar")).toBeHidden();
+  await expect(page.locator("#show-in-netlist")).toBeVisible();
+  await expect(page.locator("#show-in-drawing")).toBeHidden();
   const canvas = await box(page.locator("#canvas"));
   expect(Math.abs(canvas.width - size.width)).toBeLessThanOrEqual(1);
-  expect(canvas.y + canvas.height).toBeLessThanOrEqual(b.y + 0.5);
+  await above("#canvas");
+  await above(".statusbar");
 
   await toPage(page, "panel");
   await expect(page.locator("#page-drawing")).toHaveAttribute("aria-selected", "false");
+  await expect(page.locator("#app")).toHaveAttribute("data-page", "panel");
   await expect(page.locator("#canvas")).toBeHidden();
+  await expect(page.locator("#show-in-drawing")).toBeVisible();
+  await expect(page.locator("#show-in-netlist")).toBeHidden();
   const panel = await box(page.locator("#sidebar"));
   expect(Math.abs(panel.width - size.width)).toBeLessThanOrEqual(1);
-  expect(panel.y + panel.height).toBeLessThanOrEqual(b.y + 0.5);
+  await above("#sidebar");
+  await above(".statusbar");
   expect(await pageMoved(page)).toEqual(UNMOVED);
 }
 
@@ -187,8 +202,10 @@ test.describe("on a phone held upright", () => {
     await toPage(page, "panel");
     await page.locator("#source").evaluate((e) => (e.scrollTop = 0));
     await toPage(page, "drawing");
-    await expect(page.locator("#show-in-netlist")).toBeVisible();
+    // there is nothing to show until something is selected
+    await expect(page.locator("#show-in-netlist")).toBeDisabled();
     await fingers.tap(await viewer.where("X2"));
+    await expect(page.locator("#show-in-netlist")).toBeEnabled();
     await page.locator("#show-in-netlist").tap();
     await expect(page.locator("#page-panel")).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#pane-netlist")).toBeVisible();
@@ -203,6 +220,7 @@ test.describe("on a phone held upright", () => {
     await fingers.drag(middle, { x: middle.x + r.width, y: middle.y });
     await expect(viewer.where("X2")).rejects.toThrow(/outside the view/);
     await toPage(page, "panel");
+    await expect(page.locator("#show-in-drawing")).toBeDisabled();
     const x2 = await viewer.object("instance", "X2", TOP);
     await viewer.places(x2).first().tap();
     await viewer.selected(`instance X2 in ${TOP}`);
@@ -227,6 +245,24 @@ test.describe("on a phone held upright", () => {
     await expect(page.locator("#canvas")).toBeVisible();
   });
 
+  test.fixme("the side panel's commands go to the panel's page, and hiding the side panel to the drawing's", async ({ page }) => {
+    await page.evaluate(() => window.viewer.command("panel-hierarchy"));
+    await expect(page.locator("#app")).toHaveAttribute("data-page", "panel");
+    await expect(page.locator("#pane-hierarchy")).toBeVisible();
+    await page.evaluate(() => window.viewer.command("panel-hide"));
+    await expect(page.locator("#app")).toHaveAttribute("data-page", "drawing");
+    await expect(page.locator("#canvas")).toBeVisible();
+  });
+
+  test.fixme("the netlist's options fold behind a button, which a tap opens", async ({ page }) => {
+    await showView(page, "netlist");
+    await expect(page.locator("#auto-include")).toBeHidden();
+    const button = page.locator("#netlist-options-button");
+    bigEnough(await boxes(button), TARGET, TARGET);
+    await button.tap();
+    await expect(page.locator("#auto-include")).toBeVisible();
+  });
+
   test.fixme("the menu titles, the side panel's tabs and the buttons are big enough for a finger", async ({ page, viewer, fingers }) => {
     bigEnough(await boxes(page.locator("#menubar .menu-title")), TARGET, TARGET);
     // the open badge of a selected subcircuit instance and the up button of a level below
@@ -238,6 +274,8 @@ test.describe("on a phone held upright", () => {
     await showView(page, "netlist");
     bigEnough(await boxes(page.locator(".view-tabs [role=tab]")), TARGET, TARGET);
     bigEnough(await boxes(page.locator("#problems-head")), TARGET, TARGET);
+    // the tabs' number keys are for a keyboard
+    await expect(page.locator(".view-tabs .tab-key").first()).toBeHidden();
   });
 
   test("every menu opens with a tap and fits on the screen, and a tap elsewhere only closes it", async ({ page, viewer, fingers }) => {
@@ -291,6 +329,8 @@ test.describe("on a phone held upright", () => {
     await fingers.tap(await viewer.where("X3"));
     await viewer.selected(`instance X3 in ${TOP}`);
     await barsFit(page);
+    // and how to open it is said for a finger, not for keys
+    await expect(page.locator("#selection")).not.toContainText("Enter");
   });
 });
 
