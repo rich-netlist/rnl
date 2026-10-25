@@ -77,7 +77,7 @@ The browser cannot access arbitrary local directories. The note at the bottom of
 node apps/web/build.mjs
 ```
 
-builds the core with [`bindings/runtime-wasm/build.mjs`](../../bindings/runtime-wasm/README.md#building) and puts the site into `apps/web/dist/`, which git ignores: the page from `apps/viewer-ui` without its README, its `package.json` and the desktop shell; the binding's modules and the WebAssembly module in `core/`; and `about.json`, with the independent Viewer `version` from the desktop manifests, the workspace `coreVersion` and the build `commit` for the About box. It needs Rust with the `wasm32-unknown-unknown` target and Node 18 or later, and no npm packages.
+builds the core with [`bindings/runtime-wasm/build.mjs`](../../bindings/runtime-wasm/README.md#building) and puts the site into `apps/web/dist/`, which git ignores: the page from `apps/viewer-ui` without its README, its `package.json` and the desktop shell; the binding's modules and the WebAssembly module in `core/`; `locales/`, the languages of the interface and their catalogs from [`i18n/`](../../i18n/README.md), which the page reads (`languages.json`, `<code>.json`); and `about.json`, with the independent Viewer `version` from the desktop manifests, the workspace `coreVersion` and the build `commit` for the About box. It needs Rust with the `wasm32-unknown-unknown` target and Node 18 or later, and no npm packages.
 
 The page's `fonts/`, the drawing's web fonts ([decision 0009](../../docs/decisions/0009-fonts-shipped-with-the-core.md)), comes with it when it is there. Write it first, with Python 3, fontTools and brotli:
 

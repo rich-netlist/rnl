@@ -29,6 +29,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runtimeVersion } from "./webview2.mjs";
+import { uiCatalog, uiLanguages } from "../../../scripts/i18n/viewer-locales.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const manifest = path.join(root, "apps", "desktop", "Cargo.toml");
@@ -353,7 +354,9 @@ function tableMenus(marks) {
       }
       let next;
       if (item.items) {
-        const inner = entries(item.items);
+        // the Language menu lists English and then the languages of i18n/, as the app is built (build.rs)
+        const inner = entries(item.languages ? [...item.items, ...uiLanguages(root).slice(1)
+          .map((l) => ({ id: `language-${l.lang}`, label: l.name, check: true }))] : item.items);
         if (inner.length === 0) continue;
         next = { text: item.label, separator: false, checked: false, items: inner };
       } else {
@@ -461,7 +464,7 @@ async function drive(app, port, profile, t0, session) {
   await page.evaluate(`window.localeDocument = window.viewer.doc; window.localeSvg = document.querySelector('#canvas > svg')`);
   chooseItem(app.pid, at("language-zh"));
   await until("Chinese UI", () => page.evaluate(`document.documentElement.lang === 'zh-CN' && window.viewer.checked('language-zh')`));
-  const catalog = JSON.parse(fs.readFileSync(path.join(root, "apps/viewer-ui/locales/zh-CN.json"), "utf8"));
+  const catalog = uiCatalog(root, "zh-CN");
   const translatedMenu = items => items.map(item => {
     const [label, keys] = item.text.split('\t');
     return { ...item, text: (catalog[label] || label) + (keys ? '\t' + keys : ''),

@@ -11,6 +11,8 @@ on:
     paths:
       - "apps/desktop/**"
       - "apps/viewer-ui/**"
+      - "i18n/**"
+      - "scripts/i18n/viewer-locales.mjs"
       - "crates/**"
       - "libraries/**"
       - "scripts/fonts.py"
@@ -22,6 +24,8 @@ on:
     paths:
       - "apps/desktop/**"
       - "apps/viewer-ui/**"
+      - "i18n/**"
+      - "scripts/i18n/viewer-locales.mjs"
       - "crates/**"
       - "libraries/**"
       - "scripts/fonts.py"

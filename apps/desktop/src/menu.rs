@@ -13,6 +13,9 @@ use tauri::{AppHandle, Manager, State, Wry};
 /// The command table: the menus, their items, and the keys of the items.
 const COMMANDS: &str = include_str!("../../viewer-ui/commands.json");
 
+// UI_LANGUAGES, the languages of the interface besides English, from i18n/ (build.rs, decision 0015)
+include!(concat!(env!("OUT_DIR"), "/ui_languages.rs"));
+
 /// This platform, as the command table names it: an item that names its platforms is only shown
 /// when they include this one.
 const PLATFORM: &str = "desktop";
@@ -27,6 +30,9 @@ struct Table {
 struct TableMenu {
     label: String,
     items: Vec<Entry>,
+    /// Whether it lists the languages: its items, English, and then each of [`UI_LANGUAGES`].
+    #[serde(default)]
+    languages: bool,
 }
 
 /// A menu entry: a submenu, which has entries of its own, a command, or `"-"` for a separator.
@@ -147,7 +153,17 @@ fn entries(items: &[Entry], windows: bool) -> Vec<Shown> {
             }
             Entry::Submenu(menu) => match entries(&menu.items, windows) {
                 inner if inner.is_empty() => continue,
-                inner => Shown::Submenu(menu.label.clone(), inner),
+                mut inner => {
+                    if menu.languages {
+                        inner.extend(UI_LANGUAGES.iter().map(|(code, _, name, _, _)| Shown::Item {
+                            id: format!("language-{code}"),
+                            text: (*name).into(),
+                            accelerator: None,
+                            check: true,
+                        }));
+                    }
+                    Shown::Submenu(menu.label.clone(), inner)
+                }
             },
             Entry::Command(c) if c.platforms.as_ref().is_some_and(|p| !p.iter().any(|p| p == PLATFORM)) => continue,
             Entry::Command(c) if c.windows_only && !windows => continue,
@@ -196,20 +212,28 @@ pub fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
 type LabelList = Vec<(MenuItemKind<Wry>, String)>;
 pub struct Labels(Mutex<(String, LabelList)>);
-static CHINESE: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("../../viewer-ui/locales/zh-CN.json")).expect("Chinese UI catalog")
+/// The catalog of each language of the interface, by the code the page knows it by, without the
+/// entries that have no translation yet (null).
+static CATALOGS: LazyLock<HashMap<&str, HashMap<String, String>>> = LazyLock::new(|| {
+    UI_LANGUAGES
+        .iter()
+        .map(|(_, code, _, _, json)| {
+            let catalog: HashMap<String, Option<String>> = serde_json::from_str(json).expect("a UI catalog");
+            (*code, catalog.into_iter().filter_map(|(key, text)| Some((key, text?))).collect())
+        })
+        .collect()
 });
 
 fn translated(language: &str, source: &str) -> String {
     let (label, keys) = source.split_once('\t').map_or((source, None), |(a, b)| (a, Some(b)));
-    let label = if language == "zh-CN" { CHINESE.get(label).map_or(label, String::as_str) } else { label };
+    let label = CATALOGS.get(language).and_then(|catalog| catalog.get(label)).map_or(label, String::as_str);
     keys.map_or_else(|| label.to_string(), |keys| format!("{label}\t{keys}"))
 }
 
 /// Change labels in place: command IDs, accelerators, enabled state and check marks stay intact.
 #[tauri::command]
 pub fn set_ui_language(labels: State<'_, Labels>, language: String) -> Result<(), String> {
-    if language != "en" && language != "zh-CN" {
+    if language != "en" && !CATALOGS.contains_key(language.as_str()) {
         return Err("Unsupported UI language".into());
     }
     let mut state = labels.0.lock().map_err(|e| e.to_string())?;
@@ -225,6 +249,31 @@ pub fn set_ui_language(labels: State<'_, Labels>, language: String) -> Result<()
     }
     state.0 = language;
     Ok(())
+}
+
+/// A language of the interface, as the page takes it (i18n.js): the code it knows it by, the code of
+/// i18n/languages.json, its name in itself, and the first parts of the system languages that ask for it.
+#[derive(serde::Serialize)]
+pub struct UiLanguage {
+    code: &'static str,
+    lang: &'static str,
+    name: &'static str,
+    matches: &'static [&'static str],
+}
+
+/// The languages of the interface, English first.
+#[tauri::command]
+pub fn ui_languages() -> Vec<UiLanguage> {
+    let english = UiLanguage { code: "en", lang: "en", name: "English", matches: &["en"] };
+    std::iter::once(english)
+        .chain(UI_LANGUAGES.iter().map(|&(lang, code, name, matches, _)| UiLanguage { code, lang, name, matches }))
+        .collect()
+}
+
+/// The catalog of a language of the interface, {English: translation}.
+#[tauri::command]
+pub fn ui_catalog(language: String) -> Result<HashMap<String, String>, String> {
+    CATALOGS.get(language.as_str()).cloned().ok_or_else(|| format!("No UI catalog for {language}"))
 }
 
 pub fn text(app: &AppHandle, source: &str) -> String {

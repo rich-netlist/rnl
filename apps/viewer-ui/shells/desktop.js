@@ -35,6 +35,9 @@ export default {
     return path.startsWith('<') ? { path, name: f.name, text: f.text, readonly: true } : file(path);
   },
   setLanguage: language => invoke("set_ui_language", { language }),
+  // the languages the app was built with, from i18n/ (apps/desktop/build.rs)
+  uiLanguages: () => invoke("ui_languages"),
+  uiCatalog: language => invoke("ui_catalog", { language }),
   // the core's parse formats, and the one it detects for a file the document shown does not read
   formats: () => invoke("formats"),
   detectFormat: (path) => invoke("detect_format", { path }),

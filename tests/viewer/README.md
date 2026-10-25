@@ -58,6 +58,7 @@ It implements the Shell of [`shell.js`](../../apps/viewer-ui/shell.js). A source
 | `fail-start=MESSAGE` | Reject the question of what to open at start with the plain message, as Tauri's invoke does. |
 | `platform=desktop` | Offer the desktop's commands with a native menu, so that the page shows no menu bar, and what Help > Check for Updates needs (`updates`); otherwise the web's. |
 | `version=VERSION` | The version of the app that runs, for Help > Check for Updates; 0.1.0 by default. |
+| `pseudo` | Offer, besides the languages of `i18n/`, a pseudo language, `qps-ploc`, whose catalog writes every text of the others with accented letters, 40% longer, in brackets ［…］: a text of the interface that no catalog has shows as plain English among them (decision 0015). |
 
 `window.fakeShell` holds what the page asked and what the shell does next:
 

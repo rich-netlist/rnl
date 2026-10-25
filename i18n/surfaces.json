@@ -123,7 +123,7 @@
         "html": "apps/viewer-ui/index.html",
         "rust": ["apps/desktop/src/*.rs"]
       },
-      "translation": {"zh": "apps/viewer-ui/locales/zh-CN.json", "*": "i18n/{lang}/viewer.json"},
+      "translation": "i18n/{lang}/viewer.json",
       "keep": ["RNL Viewer"],
       "owner": "viewer",
       "notes": "The scan finds the texts written in m(\"…\"), m`…`, tr(\"…\") (a text that m() translates where it is shown, through a variable), the labels of commands.json, the static text of index.html and the desktop app's menu::text(…, \"…\"). Every text of the interface is written in one of these forms, so a catalog entry the scan does not find is one the interface no longer has."
@@ -132,9 +132,8 @@
       "id": "viewer-other",
       "title": "Other texts of the viewers",
       "kind": "untracked",
-      "where": "the title of a project manifest (only its en and zh are read, apps/viewer-ui/manifest-bar.js); about 30 error messages returned by the desktop app's Rust code, shown as they are",
-      "owner": "viewer",
-      "notes": "Step 2 of decision 0015."
+      "where": "about 30 error messages returned by the desktop app's Rust code, shown as they are",
+      "owner": "viewer"
     },
     {
       "id": "installers",

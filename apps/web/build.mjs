@@ -17,6 +17,7 @@ import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { API_FEATURES, MAX_OPEN_BYTES } from "../viewer-ui/viewer-api-contract.js";
+import { writeLocales } from "../../scripts/i18n/viewer-locales.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
@@ -50,6 +51,9 @@ rmSync(out, { recursive: true, force: true });
 // Node read the scripts as modules, and the desktop shell. Its fonts/ comes with it.
 const leftOut = new Set(["README.md", "package.json", join("shells", "desktop.js")]);
 cpSync(page, out, { recursive: true, filter: (from) => !leftOut.has(relative(page, from)) });
+// The languages of the interface and their catalogs, from i18n/ (decision 0015), which the page reads
+// from locales/ (i18n.js).
+writeLocales(root, join(out, "locales"));
 const fonts = existsSync(join(out, "fonts", "fonts.css"));
 if (!fonts) {
   console.warn("no web fonts in apps/viewer-ui/fonts/, so texts fall back on sans-serif: write them with python scripts/fonts.py web");
