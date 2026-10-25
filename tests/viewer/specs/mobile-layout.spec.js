@@ -72,6 +72,18 @@ test.describe("on a phone held upright", () => {
     }
   });
 
+  test("the netlist shows lines of the file beside the problems, at the side panel's first size", async ({ page }) => {
+    await expect(page.locator("#problems-body")).toBeVisible();
+    const shown = await page.evaluate(() => {
+      const r = document.getElementById("source").getBoundingClientRect();
+      return [...document.querySelectorAll("#source .file:not([hidden]) .ln")].filter((e) => {
+        const b = e.getBoundingClientRect();
+        return b.height > 0 && b.top >= r.top - 0.5 && b.bottom <= r.bottom + 0.5;
+      }).length;
+    });
+    expect(shown).toBeGreaterThanOrEqual(5);
+  });
+
   test.fixme("the side panel is below the drawing, as wide as the screen, and the drawing is no lower than it", async ({ page }) => {
     const size = page.viewportSize();
     const [canvas, panel] = [await box(page.locator("#canvas")), await box(page.locator("#sidebar"))];
