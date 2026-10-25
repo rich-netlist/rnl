@@ -48,8 +48,9 @@ tag, **never publishes**. Core release also runs as a PR check for relevant chan
    (2026-10-23) core 0.3.0 and Viewer 0.3.0, released together, with npm `latest`, and then
    Viewer 0.3.1 with the macOS packages and the Linux Chinese font fallback, keeping core 0.3.0. The user
    chose (2026-10-24) core 0.4.0 and Viewer 0.4.0, released together, with npm `latest`;
-   (2026-10-25) core 0.4.1 and Viewer 0.4.1, released together, with npm `latest`; and
-   (2026-10-25) core 0.5.0 and Viewer 0.5.0, released together, with npm `latest`.
+   (2026-10-25) core 0.4.1 and Viewer 0.4.1, released together, with npm `latest`;
+   (2026-10-25) core 0.5.0 and Viewer 0.5.0, released together, with npm `latest`; and
+   (2026-10-25) core 0.5.1 alone, with npm `latest`; Viewer stays 0.5.0.
 2. Update the chosen core version and locks, rename/write `release-notes/core/X.Y.Z.md`, and
    set repository variable `CORE_NPM_DIST_TAG` to the agreed `next` or `latest`. Publication
    fails if this variable is absent or has another value. Do not infer a dist-tag from SemVer.
