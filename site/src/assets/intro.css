@@ -271,9 +271,10 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
 .chip {
   display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 1px 9px;
   border-radius: 999px; border: 1px solid var(--line); background: var(--panel);
-  font: 500 12.5px/1.4 var(--f-body); color: var(--ink-2); white-space: nowrap;
+  font: 500 12.5px/1.4 var(--f-body); color: var(--ink-2); white-space: nowrap; max-width: 100%;
 }
 .chip .ico { width: 14px; height: 14px; }
+@media (max-width: 640px) { .chip { white-space: normal; } }
 .chip-rnl { color: var(--markup); border-color: var(--markup-line); background: var(--markup-2); }
 .chip-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: var(--ok-2); }
 .chip-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); background: var(--warn-2); }
@@ -282,7 +283,7 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
 .chip-mute { color: var(--ink-3); }
 
 .seg {
-  display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2);
+  display: inline-flex; flex-wrap: wrap; max-width: 100%; padding: 3px; gap: 2px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2);
 }
 .seg button {
   height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-2);
@@ -412,7 +413,7 @@ button.hero-logo { padding: 0; border: 0; background: none; cursor: pointer; }
 .hero-note b { color: var(--ink); font-weight: 600; }
 
 @media (max-width: 1000px) {
-  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+  .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .titleblock { max-width: 520px; }
   .hero-demo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
   .hd-file { grid-column: 1 / -1; order: -1; }
@@ -669,7 +670,7 @@ button.hero-logo { padding: 0; border: 0; background: none; cursor: pointer; }
   .hub-col { display: contents; }
   .hub-wires { display: none; }
 }
-@media (max-width: 520px) { .hub { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .hub { grid-template-columns: minmax(0, 1fr); } }
 
 /* Step-by-step refinement demo */
 .journey { margin-top: 18px; }
@@ -1280,7 +1281,7 @@ html[lang="en"] .fam { grid-template-columns: 108px 1fr; }
 /* ---------- Language tour ---------- */
 
 .tour-hero { padding-block: 44px 64px; }
-.tour-h1 { margin: 16px 0 0; font: 700 clamp(44px, 7vw, 84px)/1.05 var(--f-disp); letter-spacing: -.01em; }
+.tour-h1 { margin: 16px 0 0; font: 700 clamp(44px, 7vw, 84px)/1.05 var(--f-disp); letter-spacing: -.01em; overflow-wrap: anywhere; }
 html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; letter-spacing: .02em; }
 .tour-map { list-style: none; margin: 34px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .tour-map a {
