@@ -47,10 +47,12 @@ const COLOUR = /^#[0-9a-f]{6}$/i;
 /**
  * The display settings a manifest proposes, as a viewer offers them to apply (`display`): the view
  * of its level, `{ fit: true }` or `{ center: [x, y], scale }` in the drawing's units and pixels per
- * unit; the `background`, "light" or "dark"; `colors`, by the viewer's names, each "#RRGGBB";
+ * unit; the `background`, "light" or "dark"; `colors`, by the viewer's names, each "#RRGGBB", in
+ * either case, as the manifest writes it;
  * whether `usages` and `currents` are shown; the `grid`, "none", "dots" or "lines". One of these of
- * another shape is left out; one this module does not know is kept as it is, for a newer viewer and
- * so that writing the manifest again loses nothing. Both are named in `ignored`, so that a manifest
+ * another shape is left out of `display`; one this module does not know is kept in it as it is, for
+ * a newer viewer and so that writing the manifest again loses nothing, and no viewer applies it.
+ * `ignored` names both, what this viewer will not apply, so that it can say so and a manifest
  * written for a newer viewer still opens.
  */
 function displaySettings(display) {
@@ -72,7 +74,7 @@ function displaySettings(display) {
       if (value && typeof value === "object" && !Array.isArray(value)) {
         const colors = Object.entries(value).filter(([, c]) => typeof c === "string" && COLOUR.test(c));
         for (const [name] of Object.entries(value)) if (!colors.some(([n]) => n === name)) ignored.push(`colors.${name}`);
-        if (colors.length) out.colors = Object.fromEntries(colors.map(([n, c]) => [n, c.toUpperCase()]));
+        if (colors.length) out.colors = Object.fromEntries(colors);
         ok = true;
       }
     } else if (key === "usages" || key === "currents") {
@@ -251,7 +253,8 @@ async function inParallel(items, limit, work) {
  * - `entry`: the path to open; `level`: the level to show, a subcircuit's name or "(top)", or null;
  * - `paths`: the search paths it records, `[{ path, subfolders }]`; `settings`;
  * - `display`: the display settings it proposes (displaySettings), which a viewer asks before it
- *   applies, and `displayIgnored`, the names of those it left out; and the manifest's `id`, `title`,
+ *   applies, and `displayIgnored`, the names of those it will not apply, of another shape (left out of
+ *   `display`) or unknown (kept in it); and the manifest's `id`, `title`,
  *   `description`, `author`, `source` and `license` as it gives them.
  * Rejects with a ManifestError that names the file, when a file is the trouble.
  */
