@@ -24,6 +24,7 @@ export const lowTouch = matchMedia("(pointer: coarse) and (max-height: 500px)");
 const CANVAS_MIN = 80; // the drawing keeps a strip of this many pixels above the side panel
 const HANDLE = 24; // the handle between them
 const PROBLEMS_MIN = 60;
+const PROBLEMS_LEAST = 24; // a pane too short for both keeps the netlist, and a row of the problems
 const SOURCE_MIN = 120;
 const INDEX_MIN = 120;
 const TREE_MIN = 100;
@@ -118,11 +119,19 @@ function panelHeightLimits() {
   return [tabs, Math.max(tabs, app.clientHeight - HANDLE - around - CANVAS_MIN)];
 }
 
-// a hidden pane has no height yet: its size is taken as it is, and limited once it is shown
+// a hidden pane has no height yet: its size is taken as it is, and limited once it is shown; a short
+// one, as under the drawing on a phone, gives the netlist its least before the problems theirs
 function problemsHeightLimits() {
   if (netlistPane.clientHeight === 0) return [PROBLEMS_MIN, Infinity];
-  const fixed = $("problems-head").offsetHeight + netlistPane.querySelector('.netlist-head').offsetHeight;
-  return [PROBLEMS_MIN, Math.max(PROBLEMS_MIN, netlistPane.clientHeight - fixed - SOURCE_MIN)];
+  const fixed = $("problems-head").offsetHeight + netlistPane.querySelector('.netlist-head').offsetHeight + $("hsplit").offsetHeight;
+  const room = netlistPane.clientHeight - fixed - SOURCE_MIN;
+  const lo = clamp(room, PROBLEMS_LEAST, PROBLEMS_MIN);
+  return [lo, Math.max(lo, room)];
+}
+
+/** Fit the problems to the netlist's pane again, at the height they were last given. */
+function fitProblems() {
+  if (!netlistPane.hidden && !netlistPane.classList.contains("problems-folded")) setProblemsHeight(load("problems-height", 180));
 }
 
 function indexHeightLimits() {
@@ -141,16 +150,36 @@ function setSize(name, px, limits) {
 export const setSidebarWidth = (px) => setSize("--sidebar-w", px, sidebarWidthLimits);
 export const setProblemsHeight = (px) => setSize("--problems-h", px, problemsHeightLimits);
 export const setIndexHeight = (px) => setSize("--index-h", px, indexHeightLimits);
-export const setPanelHeight = (px) => setSize("--panel-h", px, panelHeightLimits);
+export const setPanelHeight = (px) => {
+  const v = setSize("--panel-h", px, panelHeightLimits);
+  fitProblems();
+  return v;
+};
+
+/**
+ * The side panel's first height under the drawing: a little less than half the room the two share,
+ * so that the drawing has the larger part, and at most two fifths of the screen, as on a tablet.
+ */
+function firstPanelHeight() {
+  const drawing = document.querySelector(".drawing"), canvas = $("canvas");
+  const around = drawing && canvas ? drawing.clientHeight - canvas.clientHeight : 0;
+  if (!app.clientHeight) return Math.round(window.innerHeight / 3);
+  return Math.floor(Math.min((app.clientHeight - HANDLE - around) * 0.48, window.innerHeight * 0.4));
+}
 
 /** Lay the side panel out for the screen: under the drawing when upright, its handle then horizontal. */
 function layOut() {
   $("vsplit").setAttribute("aria-orientation", upright.matches ? "horizontal" : "vertical");
-  if (upright.matches) setPanelHeight(load("panel-height", Math.round(window.innerHeight / 3)));
+  if (upright.matches) setPanelHeight(load("panel-height", firstPanelHeight()));
+  else fitProblems();
 }
 upright.addEventListener("change", layOut);
 layOut();
 requestAnimationFrame(layOut);
+// until the handle is dragged, the first height follows the page as it settles and as it is resized
+new ResizeObserver(() => {
+  if (upright.matches && load("panel-height", null) === null) layOut();
+}).observe(app);
 
 /**
  * Drag a splitter: `axis` "x" or "y"; `get` the size when the drag starts; `set` the new size; or a

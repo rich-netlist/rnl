@@ -1350,6 +1350,12 @@ button.pool-open:hover { text-decoration: underline; }
   .app.sidebar-hidden #hide-sidebar, .app.sidebar-hidden #show-sidebar { display: none; }
   .view-tabs { flex-wrap: nowrap; }
   .side-head { height: auto; min-height: 32px; }
+  /* the netlist's file and options on one row, the options scrolled sideways, to leave it its lines */
+  .file-bar { flex-direction: row; align-items: center; gap: 8px; }
+  .netlist-file { width: auto; flex: 0 1 auto; min-width: 4em; }
+  .netlist-options, .rnl-filter-group { flex-wrap: nowrap; }
+  .netlist-options { flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: nowrap; }
+  .netlist-options > * { flex: none; }
 }
 
 /* a finger is bigger than a pointer: the controls a finger presses, the rows of the menus and lists */
