@@ -68,6 +68,7 @@
         "timeline_notes": "Release notes",
         "timeline_range": "{start} to {end}",
         "timeline_next": "Next",
+        "timeline_all": "Full timeline",
         "not_translated": "This page is not yet available in {language}; it is shown in English.",
         "partly_translated": "Parts of this page are not yet available in {language}; they are shown in English.",
         "help_translate": "Help translate it"

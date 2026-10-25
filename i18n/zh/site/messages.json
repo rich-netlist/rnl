@@ -47,5 +47,6 @@
   "timeline_spec": "语言标准 {series}，修订 {revision}",
   "timeline_notes": "发布说明",
   "timeline_range": "{start} 至 {end}",
-  "timeline_next": "接下来"
+  "timeline_next": "接下来",
+  "timeline_all": "完整时间线"
 }
