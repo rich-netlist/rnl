@@ -149,8 +149,13 @@ The page and both `llms` files name every file of the package, so that they cann
 
 All six pages share the standard page's seven primary links and the project's GitHub link, after Agent.
 The introduction, language tour, tools and agents pages put their first-level section links beside the content, below the full-width
-hero. Below 1000px, the top bar's Contents button opens that navigation; choosing an entry closes
-it. `test_build.py` compares both languages' primary links and current-page markers with
+hero. Below 1000px, the top bar's *On this page* button (the list icon, `#toc-btn`) opens that navigation; choosing an entry
+closes it. On a narrow screen (below 960px in English, 760px in Chinese: `nav_breakpoint` in `languages.json`) the primary links
+leave the top bar and become a menu: the button at the top left (`#menu-btn`, the three bars) opens them, one to a line with
+the current page marked, on every page, the standard's included; opening one panel closes the other, Escape and a choice
+close the menu, and the language switch and the theme button stay in the top bar. The rules of the menu are generated with
+each language's breakpoint (`scripts/site_i18n.py`), so that the standard's pages have them too; `tests/mobile-nav.spec.mjs`
+checks the menu at 390px. `test_build.py` compares both languages' primary links and current-page markers with
 `scripts/spec/page.html` and the publisher's labels, and checks the copied CSS values.
 
 After building the site and gallery, run the browser checks with Playwright's Chromium and WebKit

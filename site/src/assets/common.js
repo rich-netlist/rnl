@@ -119,11 +119,30 @@
         a.setAttribute('href', base.split(/[?#]/)[0] + location.search + (on ? on.getAttribute('href') : location.hash));
       });
     });
+    /* The menu of the pages of the site, which the top bar's links become on narrow screens */
+    var mb = $('#menu-btn'), nav = $('#primary-nav');
+    if (mb && nav) {
+      mb.addEventListener('click', function () {
+        var open = nav.classList.toggle('is-open');
+        mb.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) closeToc();
+      });
+      nav.addEventListener('click', function (e) {
+        if (e.target.closest('a')) closeMenu();
+      });
+      document.addEventListener('click', function (e) {
+        if (!nav.contains(e.target) && !mb.contains(e.target)) closeMenu();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && nav.classList.contains('is-open')) { closeMenu(); mb.focus({ preventScroll: true }); }
+      });
+    }
     var tb = $('#toc-btn'), toc = $('#toc');
     if (tb && toc) {
       tb.addEventListener('click', function () {
         var open = toc.classList.toggle('is-open');
         tb.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) closeMenu();
       });
       toc.addEventListener('click', function (e) {
         if (e.target.closest('a')) closeToc();
@@ -132,6 +151,13 @@
         if (e.key === 'Escape' && toc.classList.contains('is-open')) closeToc();
       });
     }
+  }
+
+  function closeMenu() {
+    var nav = $('#primary-nav'), mb = $('#menu-btn');
+    if (!nav || !mb) return;
+    nav.classList.remove('is-open');
+    mb.setAttribute('aria-expanded', 'false');
   }
 
   function closeToc() {

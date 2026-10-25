@@ -20,6 +20,7 @@
       },
       "messages": {
         "contents": "Contents",
+        "on_this_page": "On this page",
         "zip_label": "Markdown, chapters",
         "md_label": "Markdown",
         "sums_label": "SHA-256 checksums",
@@ -87,6 +88,7 @@
       },
       "messages": {
         "contents": "目录",
+        "on_this_page": "本页目录",
         "zip_label": "Markdown 分章包",
         "md_label": "Markdown 合订本",
         "sums_label": "SHA-256 校验值",

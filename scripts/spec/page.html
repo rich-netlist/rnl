@@ -102,6 +102,7 @@ button { font: inherit; color: inherit; }
 }
 .lang-link:hover { color: var(--ink); border-color: var(--line-2); text-decoration: none; }
 .toc-btn { display: none; }
+.menu-btn { display: none; }
 .progress { height: 2px; }
 .progress span { display: block; height: 100%; width: 0; background: var(--markup); }
 
@@ -235,6 +236,7 @@ $locale-css$
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
   <symbol id="i-zip" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M10 5v2M10 9v2M10 13v2"/></symbol>
   <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
@@ -243,7 +245,8 @@ $locale-css$
 <header class="topbar">
   <div class="topbar-in">
     <a class="brand" href="$site-root$"><span class="brand-mark">RNL</span><span class="brand-sub">Rich Netlist</span></a>
-    <nav class="pages" aria-label="$pages-label$">
+    <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="$pages-label$" aria-expanded="false" aria-controls="primary-nav"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <nav class="pages" id="primary-nav" aria-label="$pages-label$">
       <a href="$site-root$">$intro-label$</a>
       <a href="$site-root$language.html">$tour-label$</a>
       <a class="is-on" href="#top" aria-current="page">$spec-label$</a>
@@ -253,7 +256,7 @@ $locale-css$
       <a href="$site-root$agents.html">$agents-label$</a>
       <a href="https://github.com/rich-netlist/rnl">GitHub</a>
     </nav>
-    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="$contents-title$" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="$on-this-page-label$" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-list"/></svg></button>
     $language-menu$
     <button class="icon-btn" id="theme-btn" type="button" aria-label="$theme-label$"><svg class="ico"><use href="#i-moon"/></svg></button>
   </div>
@@ -326,8 +329,23 @@ $endif$
   });
 
   // Contents: open on narrow screens, mark the section in view
+  // The menu of the pages of the site on narrow screens, and the contents of this page: one open at a time
+  var nav = document.getElementById("primary-nav"), mb = document.getElementById("menu-btn");
+  function closeMenu() { nav.classList.remove("is-open"); mb.setAttribute("aria-expanded", "false"); }
+  mb.addEventListener("click", function () {
+    var open = nav.classList.toggle("is-open");
+    mb.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) { toc.classList.remove("is-open"); tb.setAttribute("aria-expanded", "false"); }
+  });
+  nav.addEventListener("click", function (e) { if (e.target.closest("a")) closeMenu(); });
+  document.addEventListener("click", function (e) { if (!nav.contains(e.target) && !mb.contains(e.target)) closeMenu(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && nav.classList.contains("is-open")) { closeMenu(); mb.focus(); } });
   var toc = document.getElementById("toc"), tb = document.getElementById("toc-btn");
-  tb.addEventListener("click", function () { tb.setAttribute("aria-expanded", toc.classList.toggle("is-open") ? "true" : "false"); });
+  tb.addEventListener("click", function () {
+    var open = toc.classList.toggle("is-open");
+    tb.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) closeMenu();
+  });
   toc.querySelectorAll("a").forEach(function (a) {
     a.addEventListener("click", function () { toc.classList.remove("is-open"); tb.setAttribute("aria-expanded", "false"); });
   });

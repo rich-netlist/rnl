@@ -219,6 +219,8 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-v
 }
 .lang-link:hover { color: var(--ink); border-color: var(--line-2); text-decoration: none; }
 .toc-btn { display: none; }
+/* the menu of the pages: its button is for narrow screens, whose width scripts/site_i18n.py sets for each language */
+.menu-btn { display: none; }
 .progress { height: 2px; }
 .progress span { display: block; height: 100%; width: 0; background: var(--markup); }
 
