@@ -175,9 +175,10 @@
       "kind": "external",
       "repository": "rich-netlist/rnl-packages",
       "url": "https://rich-netlist.github.io/rnl-packages/catalog.json",
+      "translation": "summaries/{lang}.json",
       "format": "package-catalog",
       "owner": "i18n",
-      "notes": "In metadata.json of rnl-packages, copied into each record of the immutable catalog; step 5 of decision 0015 keeps the summaries of other languages outside the record. Read with --online."
+      "notes": "A record of the immutable catalog has its English summary, from metadata.json of rnl-packages; the translations are in summaries/<lang>.json beside the catalog, keyed by the English, outside the records (decision 0012). The four 0.1 records also keep the Chinese they were published with. Read with --online."
     },
     {
       "id": "external-readmes",
@@ -185,7 +186,7 @@
       "kind": "untracked",
       "where": "README.zh.md beside README.md in rich-netlist/rnl-gallery and rich-netlist/rnl-packages",
       "owner": "i18n",
-      "notes": "Stamped in step 5 of decision 0015."
+      "notes": "Each README.zh.md starts with the stamp of its README.md, from step 5 of decision 0015, that tells when it falls behind; they are not read here."
     },
     {
       "id": "diagnostics",

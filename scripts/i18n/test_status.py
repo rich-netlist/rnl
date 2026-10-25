@@ -176,6 +176,19 @@ class Dictionaries(Repository):
         self.assertEqual(s["messages"].langs["ja"].stale, 1)  # the English changed; the ja of its name did not
 
 
+class External(Repository):
+    def test_package_summaries_in_their_records_and_beside_the_catalog(self):
+        self.write("published/catalog.json", json.dumps({"packages": [
+            {"name": "a", "version": "0.1", "summary": {"zh": "甲", "en": "A"}},
+            {"name": "a", "version": "0.2", "summary": {"en": "A"}},
+            {"name": "b", "version": "0.1", "summary": {"en": "Two  words"}}]}))
+        self.write("published/summaries/ja.json", json.dumps({"A": "エー", "Two words": None}))
+        self.surfaces({"id": "packages", "title": "P", "kind": "external", "repository": "x/y", "format": "package-catalog",
+                       "url": (self.root / "published/catalog.json").as_uri(), "translation": "summaries/{lang}.json"})
+        s = {s.id: s for s in status.survey(status.Project(self.root, online=True))}["packages"]
+        self.assertEqual((s.total, s.langs["zh"].done, s.langs["ja"].done), (3, 1, 2))  # no summaries/zh.json: a 404
+
+
 class Messages(Repository):
     SURFACE = {"id": "viewer", "title": "Viewer", "kind": "messages",
                "source": {"js": ["ui/*.js"], "commands": "ui/commands.json", "html": "ui/index.html", "rust": ["app/*.rs"]},
