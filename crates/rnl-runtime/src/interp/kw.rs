@@ -501,7 +501,7 @@ impl Interp<'_> {
                             _ => return self.fail(ctx, "a role is a name or [name, kind] (9.4)", at),
                         };
                         for k in &kinds {
-                            if !["instance", "terminal", "net", "point", "wire", "usage"].contains(&k.as_str()) {
+                            if !ROLE_KINDS.contains(&k.as_str()) {
                                 return self.fail(ctx, format!("unknown kind name {k} (9.4)"), at);
                             }
                         }
@@ -1043,16 +1043,14 @@ impl Interp<'_> {
         off: usize,
     ) -> R<()> {
         let Some(kinds) = kinds else { return Ok(()) };
-        let mut k = self.kind_of(obj);
-        if matches!(self.o(obj), ObjData::Bundle { .. }) {
-            k = "instance";
-        }
-        if let ObjData::Term { owner, .. } = self.o(obj) {
-            if matches!(self.o(*owner), ObjData::Bundle { .. }) {
-                k = "terminal";
-            }
-        }
-        if !kinds.iter().any(|x| x == k) {
+        let any = self.kind_of(obj);
+        // a TEXT is also a label or an annotation, by what it is attached to (5.1)
+        let k = match any {
+            "text" => self.obj_kind(obj).unwrap_or(any),
+            _ => any,
+        };
+        // "instance" also takes bundles, and "terminal" their terminals, which are terminals (11.8)
+        if !kinds.iter().any(|x| x == k || x == any || (x == "instance" && k == "bundle")) {
             let dl = self.label(dfn);
             let ol = self.label(obj);
             return self.fail(
@@ -2138,6 +2136,10 @@ impl Interp<'_> {
         out
     }
 }
+
+/// The kind names a role can be declared with (9.4), those of the word list (5.3).
+const ROLE_KINDS: [&str; 10] =
+    ["instance", "terminal", "net", "point", "wire", "usage", "bundle", "text", "annotation", "label"];
 
 /// One AS or ATTACH, applied once or once per member.
 #[derive(Debug)]

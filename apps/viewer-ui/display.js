@@ -85,7 +85,7 @@ export function displayFollows(path) {
  * (`ignored`) are told. Asked once per manifest in a page.
  */
 export async function offerDisplay(display, name, ignored = [], has = () => false) {
-  if (ignored.length) notice(m`This viewer leaves out display settings it does not know: ${ignored.join(", ")}.`);
+  if (ignored.length) notice(m`This viewer leaves out display settings it does not know or cannot read: ${ignored.join(", ")}.`);
   const list = items(display || {});
   if (!list.length) return;
   const known = scopes.get(name);

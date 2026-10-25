@@ -608,7 +608,7 @@
   "Panel": "面板",
   "Pages": "页面",
   " instance of {0} in {1} · a double tap opens it": "：{1} 中的 {0} 实例 · 双击打开",
-  "This viewer leaves out display settings it does not know: {0}.": "本查看器不认识这些显示设置，已忽略：{0}。",
+  "This viewer leaves out display settings it does not know or cannot read: {0}.": "本查看器不认识或读不懂这些显示设置，已忽略：{0}。",
   "Display Settings": "显示设置",
   "Apply Selected": "应用所选",
   "Don't Apply": "不应用",
