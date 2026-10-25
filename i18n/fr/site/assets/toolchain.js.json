@@ -40,7 +40,7 @@
   "Zoom, pan, search for devices": "Zoomer, déplacer la vue, rechercher des composants",
   "Highlight a net, descend into subcircuits": "Mettre un net en évidence, descendre dans les sous-circuits",
   "No solver needed when the file already has full geometry": "Aucun solveur nécessaire lorsque le fichier possède déjà une géométrie complète",
-  "Edit the text and draw it again on Apply; a file is written only on Save, which on the web is a download": "Modifie le texte et redessine lors d’Appliquer ; le fichier n’est écrit que lors d’Enregistrer (un téléchargement sur le web)",
+  "Edit the text and draw it again on Apply; a file is written only on Save, which on the web is a download": "Modifie le texte et redessine quand vous choisissez Appliquer ; le fichier n’est écrit que lorsque vous choisissez Enregistrer (un téléchargement sur le web)",
   "No built-in component library; symbols come from the standard package and RNL libraries": "Aucune bibliothèque de composants intégrée ; les symboles proviennent du paquet standard et des bibliothèques RNL",
   "apps/web and apps/desktop, sharing the page apps/viewer-ui": "apps/web et apps/desktop, partageant l’interface apps/viewer-ui",
   "Since 0.1 · edits; desktop solves": "Depuis 0.1 · édition ; résolution sur bureau",
