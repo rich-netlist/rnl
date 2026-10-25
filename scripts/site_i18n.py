@@ -128,7 +128,11 @@ class Languages:
         return errors
 
     def catalog_path(self, code, path):
-        found = [folder / code / "site" / (path + ".json") for folder in self.catalogs]
+        # a language takes its catalogs from the first folder that has a folder of its own, else from the
+        # first that has the file: a test's language beside its registry is not mixed with the repository's
+        # catalogs of the same code
+        own = [folder for folder in self.catalogs if (folder / code).is_dir()][:1]
+        found = [folder / code / "site" / (path + ".json") for folder in own or self.catalogs]
         return next((file for file in found if file.is_file()), found[0] if found else None)
 
     def catalog(self, code, path):

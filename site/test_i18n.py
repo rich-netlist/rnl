@@ -21,6 +21,8 @@ spec.loader.exec_module(build)
 
 def third_language():
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    # in place of the repository's own Japanese, if it has one
+    config["languages"] = [entry for entry in config["languages"] if entry["code"] != "ja"]
     config["languages"].append({"code": "ja", "name": "日本語", "short": "JA", "status": "published"})
     return config
 

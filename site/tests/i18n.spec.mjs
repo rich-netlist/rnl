@@ -148,10 +148,10 @@ for (const theme of ['light', 'dark']) for (const width of [1440, 390]) {
           fullPage: true, clip: { x: 0, y, width, height: top - y + box.height + 120 }, animations: 'disabled' });
       }
     }
-    for (const language of ['zh', 'en']) {
-      await page.goto(`/${language}/`);
-      await expect(page.locator('.translation-notice')).toHaveCount(0);
-    }
+    // English, the source, has none; how complete the repository's Chinese is, which a release in English
+    // alone changes until it is translated, is not this test's concern (decision 0015)
+    await page.goto('/en/');
+    await expect(page.locator('.translation-notice')).toHaveCount(0);
   });
 }
 

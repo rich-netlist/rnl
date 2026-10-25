@@ -1,0 +1,21 @@
+{
+  "RNL gallery · Rich Netlist": "RNL 圖庫 · Rich Netlist",
+  "Examples drawn with RNL: open one to look at it in the web viewer. The gallery is a list on GitHub, and a new entry shows up minutes after it is merged.": "以 RNL 繪製的原理圖範例：點選任一範例即可在網頁版檢視器中開啟。圖庫清單託管於 GitHub，新項目合併後數分鐘內即會顯示。",
+  "Skip to content": "跳至主要內容",
+  "On this page": "本頁目錄",
+  "Switch color theme": "切換色彩主題",
+  "Gallery": "圖庫",
+  "Some RNL examples, published under their own licences.": "依各自授權條款公開的 RNL 範例。",
+  "How to contribute": "如何貢獻",
+  "Gallery navigation": "圖庫導覽",
+  "Search the gallery": "搜尋圖庫",
+  "Search titles, descriptions and authors": "搜尋標題、說明與作者",
+  "Filter by tag": "依標籤篩選",
+  "Loading…": "載入中…",
+  "This page needs JavaScript to show the gallery. The list is in the <a href=\"https://github.com/rich-netlist/rnl-gallery/tree/main/entries\">rnl-gallery repository on GitHub</a>.": "本頁需要 JavaScript 才能顯示圖庫。清單位於 <a href=\"https://github.com/rich-netlist/rnl-gallery/tree/main/entries\">GitHub 上的 rnl-gallery 儲存庫</a>。",
+  "This page reads the index and the thumbnails from <a href=\"https://rich-netlist.github.io/rnl-gallery/\">rnl-gallery’s GitHub Pages</a>. Each design is under the licence of its own repository.": "本頁從 <a href=\"https://rich-netlist.github.io/rnl-gallery/\">rnl-gallery 的 GitHub Pages</a> 讀取索引與縮圖。每項設計皆依其所屬儲存庫的授權條款發布。",
+  "See also": "另見",
+  "Web viewer": "網頁版檢視器",
+  "Packages": "標準套件",
+  "The rnl-gallery repository": "rnl-gallery 儲存庫"
+}
