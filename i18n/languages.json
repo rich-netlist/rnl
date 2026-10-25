@@ -112,6 +112,7 @@
         "zh-hant"
       ],
       "status": "incubating",
+      "ai_translated": true,
       "codes": {
         "viewer": "zh-Hant"
       },
@@ -136,6 +137,7 @@
         "ja"
       ],
       "status": "incubating",
+      "ai_translated": true,
       "names": {
         "en": "Japanese",
         "viewer": "日本語"
@@ -157,6 +159,7 @@
         "ko"
       ],
       "status": "incubating",
+      "ai_translated": true,
       "names": {
         "en": "Korean",
         "viewer": "한국어"
@@ -178,6 +181,7 @@
         "es"
       ],
       "status": "incubating",
+      "ai_translated": true,
       "names": {
         "en": "Spanish",
         "viewer": "Español"
@@ -193,6 +197,7 @@
         "fr"
       ],
       "status": "incubating",
+      "ai_translated": true,
       "names": {
         "en": "French",
         "viewer": "Français"
@@ -208,6 +213,7 @@
         "de"
       ],
       "status": "incubating",
+      "ai_translated": true,
       "names": {
         "en": "German",
         "viewer": "Deutsch"
