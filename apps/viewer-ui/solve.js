@@ -71,7 +71,10 @@ export async function solve() {
     const r = solved.report;
     const discarded = r.levels.reduce((n, l) => n + l.facts.filter((f) => f.status !== "kept").length, 0);
     const later = unappliedPaths().length > 0 ? m(" Changes not applied yet are not in it.") : "";
-    status(m`Solved: ${r.levels.length} ${r.levels.length === 1 ? "level" : "levels"}, ${discarded} ${discarded === 1 ? "fact" : "facts"} not kept. A preview: the files are unchanged.${later}`, false);
+    // counts as whole phrases, which a language words as it counts (apps/viewer-ui/README.md)
+    const levels = r.levels.length === 1 ? m("1 level") : m`${r.levels.length} levels`;
+    const facts = discarded === 1 ? m("1 fact not kept") : m`${discarded} facts not kept`;
+    status(m`Solved: ${levels}, ${facts}. A preview: the files are unchanged.${later}`, false);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message === CANCELLED) status(m("The solve was cancelled; the netlist is shown as it was."), false);

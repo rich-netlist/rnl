@@ -43,6 +43,7 @@ test.describe("on the desktop", () => {
     expect(await solves(viewer)).toEqual([[T4, { options: "", hintsForLow: false }]]);
     expect(await viewer.builds()).toBe(builds);
     await expect(page.locator("#preview-badge")).toHaveText("Solved preview: the files are unchanged");
+    await expect(page.locator("#solve-step")).toHaveText(/^Solved: (1 level|\d+ levels), (1 fact|\d+ facts) not kept\. A preview: the files are unchanged\./);
     await expect(page.locator("#preview-close")).toBeVisible();
     // the Document shown is the solve's: the text has the record of the solver
     expect(await page.evaluate(() => window.viewer.doc.files[0].text.includes('@RNL(type="generated"'))).toBe(true);
