@@ -178,7 +178,8 @@ test('a language whose catalog cannot be read is left out, and the page starts w
   await page.route('**/locales/zh-CN.json', (route) => route.fulfill({ status: 500, body: 'unavailable' }));
   await viewer.open('04-hierarchy');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
-  await expect(page.locator('#note')).toContainText('The interface could not load 简体中文');
+  // in English, naming the language in English, whatever the interface's language (decision 0015)
+  await expect(page.locator('#note')).toHaveText('The interface could not load Chinese; it is offered in the other languages.');
   await expect(page.locator('.menu-item[data-id^="language-"]')).toHaveCount(1);
   await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
 });

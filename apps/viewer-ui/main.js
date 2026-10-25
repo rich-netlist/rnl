@@ -37,7 +37,7 @@ async function start() {
   await startSettings(shell);
   startNetlistColors();
   const unavailable = await startI18n(shell, load("language", null), value => save("language", value));
-  if (unavailable) note(unavailable, 12000); // a language left out, as its catalog could not be read
+  if (unavailable) note(unavailable, 12000); // a language left out, as its catalog could not be read; in English
   if (shell.embed) {
     const { startEmbed } = await import("./embed.js");
     await startEmbed();

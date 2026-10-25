@@ -9,7 +9,7 @@
  * @property {boolean} [embed] The web shell's canvas-only mode, with no persisted preferences.
  * @property {"desktop" | "web"} platform The platform, which picks the commands of commands.json it offers.
  * @property {(language: string) => Promise<void>} [setLanguage] Update native UI labels, preserving command IDs and state.
- * @property {() => Promise<Array<{code: string, lang: string, name: string, matches: string[]}>>} [uiLanguages] The UI languages, English first; without it the page reads locales/languages.json.
+ * @property {() => Promise<Array<{code: string, lang: string, name: string, english?: string, matches: string[]}>>} [uiLanguages] The UI languages, English first, each with `english`, its name in English; without it the page reads locales/languages.json.
  * @property {(code: string) => Promise<Record<string, string>>} [uiCatalog] A UI language's catalog, {English: translation}; without it the page reads locales/<code>.json.
  * @property {() => Promise<Record<string, string>>} [bundledFiles] Built-in package texts by path.
  * @property {() => Promise<Array<{name: string, version: string, path: string, description: string, builtin: boolean}>>} [publicPackages] Published package metadata for lookup hints.

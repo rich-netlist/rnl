@@ -615,7 +615,5 @@
   "Grid: dots": "网格：点",
   "Grid: lines": "网格：线",
   "Download": "下载",
-  "The manifest proposes these display settings. Those you keep apply while a file of it is shown; your own settings do not change.": "这份清单带了下面这些显示设置。勾选的在显示清单里的文件时生效，你自己的设置不会改变。",
-  "The interface's languages could not be loaded; it is shown in English.": "界面的语言列表无法读取，以英文显示。",
-  "The interface could not load {0}; it is offered in the other languages.": "界面无法加载{0}，只提供其他语言。"
+  "The manifest proposes these display settings. Those you keep apply while a file of it is shown; your own settings do not change.": "这份清单带了下面这些显示设置。勾选的在显示清单里的文件时生效，你自己的设置不会改变。"
 }

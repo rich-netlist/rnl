@@ -4,8 +4,8 @@
 // gives them (uiLanguages, uiCatalog), or the page reads them from locales/, where the web viewer's
 // build writes them (scripts/i18n/viewer-locales.mjs).
 let language = "en";
-// the languages offered, English first: { code, lang, name, matches } as viewer-locales.mjs gives them
-let languages = [{ code: "en", lang: "en", name: "English", matches: ["en"] }];
+// the languages offered, English first: { code, lang, name, english, matches } as viewer-locales.mjs gives them
+let languages = [{ code: "en", lang: "en", name: "English", english: "English", matches: ["en"] }];
 const catalogs = {}; // the catalog of each language but English, by its code
 let host = null;
 let persist = null;
@@ -113,7 +113,9 @@ async function locales(name) {
  * Take the languages and their catalogs, and show the interface in the saved language, else the one the
  * system asks for, else English. A language whose catalog cannot be read is left out, and the page
  * starts without it; without the list of languages, it starts in English alone (decision 0015: what
- * is missing shows in English). Resolves to a message that says what was left out, or null.
+ * is missing shows in English). Resolves to a line that says what was left out, or null: in English in
+ * every language, as every notice about translation itself, naming a language by its English name, and
+ * so not a text of the catalogs. The desktop app builds its catalogs in, and never leaves one out.
  */
 export async function startI18n(shell, saved, save) {
   host = shell;
@@ -124,7 +126,7 @@ export async function startI18n(shell, saved, save) {
     languages = await (host.uiLanguages ? host.uiLanguages() : locales("languages.json"));
   } catch (error) {
     console.warn(`The languages of the interface could not be read: ${error.message || error}`);
-    unavailable = m("The interface's languages could not be loaded; it is shown in English.");
+    unavailable = "The interface's languages could not be loaded; it is shown in English.";
   }
   // every catalog, as the static HTML is bound to the texts that any of them translates
   const failed = [];
@@ -138,7 +140,7 @@ export async function startI18n(shell, saved, save) {
   }));
   if (failed.length) {
     languages = languages.filter((l) => !failed.includes(l));
-    unavailable = m`The interface could not load ${failed.map((l) => l.name).join(", ")}; it is offered in the other languages.`;
+    unavailable = `The interface could not load ${failed.map((l) => l.english || l.name).join(", ")}; it is offered in the other languages.`;
   }
   if (!languages.length || languages[0].code !== english.code) languages = [english, ...languages.filter((l) => l.code !== english.code)];
   language = languages.some((l) => l.code === saved) ? saved : preferredLanguage();
