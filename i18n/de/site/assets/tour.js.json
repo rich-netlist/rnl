@@ -27,7 +27,7 @@
   "The net name under the grounds is gone: vss is no longer in $NAMED_GROUND_NET_SET.": "Der Netzname unter den Massen ist verschwunden: vss ist nicht mehr in $NAMED_GROUND_NET_SET.",
   "The supply and grounds stay: the textbook look, from three lines in the file.": "Versorgung und Massen bleiben: die klassische Lehrbuchdarstellung mit nur drei Zeilen in der Datei.",
   "sets for files to edit": "Mengen zur Bearbeitung durch Dateien",
-  "a stub for each unwired terminal on ground and supply nets": "ein Stummel für jeden unbeschalteten Anschluss an Masse- und Versorgungsnetzen",
+  "a stub for each unwired terminal on ground and supply nets": "ein Stummel für jeden Anschluss ohne gezeichnete Leitung an Masse- und Versorgungsnetzen",
   "one port tag for each port of a subcircuit, but not on supply and ground nets": "ein Portsymbol für jeden Port einer Teilschaltung, außer an Versorgungs- und Massenetzen",
   "on a ground net other than 0, the grounds show the net’s name": "an einem Massenetz, das nicht 0 heißt, zeigen die Massen den Namen des Netzes",
   "1 instance": "1 Instanz",
