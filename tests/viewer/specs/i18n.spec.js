@@ -184,6 +184,20 @@ test('a language whose catalog cannot be read is left out, and the page starts w
   await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
 });
 
+test('a system language takes the language that fits it longest, whatever the order of the list', async ({page,viewer}) => {
+  // Traditional Chinese after Simplified Chinese, as a registry lists them: zh-TW is not Simplified's zh
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'languages', { get: () => ['zh-TW','en-US'], configurable: true }));
+  await page.route('**/locales/languages.json', async (route) => {
+    const languages = await (await route.fetch()).json();
+    await route.fulfill({ json: [...languages, { code: 'zh-Hant', lang: 'zh-hant', name: '繁體中文', english: 'Traditional Chinese',
+      matches: ['zh-tw', 'zh-hk', 'zh-mo', 'zh-hant'] }] });
+  });
+  await page.route('**/locales/zh-Hant.json', (route) => route.fulfill({ json: { 'Library': '資源庫' } }));
+  await viewer.open('04-hierarchy');
+  await expect(page.locator('html')).toHaveAttribute('lang','zh-Hant');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName('資源庫');
+});
+
 test('without the list of languages the page starts in English alone (decision 0015)', async ({page,viewer}) => {
   await page.route('**/locales/languages.json', (route) => route.fulfill({ status: 500, body: 'unavailable' }));
   await viewer.open('04-hierarchy');

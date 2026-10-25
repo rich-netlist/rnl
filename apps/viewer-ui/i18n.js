@@ -42,10 +42,19 @@ export const uiLanguages = () => languages;
 export function preferredLanguage(wanted = navigator.languages) {
   return languageFor(wanted?.[0])?.code || "en";
 }
-/** The language offered that a browser or system language, such as "zh-TW", asks for, or undefined. */
+/** The language offered that a browser or system language, such as "zh-TW", asks for, or undefined: of
+ * those whose `matches` fit it, the one that fits it longest, in whatever order the registry lists them,
+ * so that zh-TW takes a Traditional Chinese that names zh-tw rather than the zh of Simplified Chinese,
+ * as the site's root does (site/build.py). */
 export function languageFor(wanted = "") {
   const tag = wanted.toLowerCase();
-  return languages.find((l) => l.matches.some((prefix) => tag === prefix || tag.startsWith(`${prefix}-`)));
+  let found, length = -1;
+  for (const l of languages) {
+    for (const prefix of l.matches) {
+      if ((tag === prefix || tag.startsWith(`${prefix}-`)) && prefix.length > length) [found, length] = [l, prefix.length];
+    }
+  }
+  return found;
 }
 /** Whether a text is in a catalog, and so shown translated in some language. */
 const translatable = (key) => Object.values(catalogs).some((catalog) => typeof catalog[key] === "string");
