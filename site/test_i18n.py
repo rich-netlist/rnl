@@ -234,7 +234,7 @@ class Catalogs(unittest.TestCase):
             self.assertEqual(registry.message("ja", "language_menu"), registry.message("en", "language_menu"))
 
     def test_notices_of_pages_not_wholly_translated_are_in_english(self):
-        """As every notice of the system, in every language, Chinese included (decision 0015)."""
+        """As every notice of the system, in every language (decision 0015)."""
         config = third_language()
         config["languages"][-1]["names"] = {"en": "Japanese"}
         directory = tempfile.TemporaryDirectory()

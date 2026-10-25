@@ -40,7 +40,7 @@ When you change the Rust crates, `cargo fmt --check`, `cargo clippy --all-target
 
 When you change the pages of the site, edit the English in `site/src/`; translations are in `i18n/<lang>/site/`, as described in [`site/README.md`](site/README.md). Missing translations fall back to English; `python site/build.py --check` must pass. Locale identities, fonts and the English of the shared interface messages live in `i18n/languages.json`.
 
-English is the project's only core language ([decision 0015](docs/decisions/0015-english-is-the-only-core-language.md)): new content of any kind may be published in English alone, and every other language, Chinese included, is a translation that follows it. A change to English text need not change any translation. `python scripts/i18n/status.py` shows how far each language is and which translations fell behind, and [`i18n/README.md`](i18n/README.md) describes where translations go and how they are checked.
+English is the project's only core language ([decision 0015](docs/decisions/0015-english-is-the-only-core-language.md)): new content of any kind may be published in English alone, and every other language is a translation that follows it. A change to English text need not change any translation. `python scripts/i18n/status.py` shows how far each language is and which translations fell behind, and [`i18n/README.md`](i18n/README.md) describes where translations go and how they are checked.
 
 Every Viewer, standard or core release needs a `timeline-summary` in English in its release notes before tagging; its
 translations follow in `i18n/<lang>/site/timeline.json.json`; see the [summary template and checklist](release-notes/README.md).
