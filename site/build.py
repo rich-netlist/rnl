@@ -1,4 +1,4 @@
-"""Build the static project site in the locales registered in site/languages.json.
+"""Build the static project site in the locales registered in i18n/languages.json.
 
 In src/, English text and its available translations are written side by side:
 

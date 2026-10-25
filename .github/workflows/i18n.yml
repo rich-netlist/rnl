@@ -1,0 +1,35 @@
+# Reports what there is to translate and how far each language is (decision 0015, scripts/i18n/status.py):
+# the table and the details go into the summary of the run, and translations that have fallen behind
+# their English source become warnings. Only a translation in a malformed format fails it, such as
+# invalid JSON or a placeholder the English does not have; a missing or stale translation never does,
+# since English is the only core language and every other one follows it. On a pull request it also
+# compares with the base, which shows an English text that changed while the translation written
+# beside it did not. Fast and light: Python's standard library and git, no build.
+name: Translations
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    name: Translation status
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the history tells when a document's source changed after it was translated
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Test the report
+        run: python -m unittest discover -s scripts/i18n -p 'test_*.py'
+      - name: Report and check
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: python scripts/i18n/status.py check --github --online --summary "$GITHUB_STEP_SUMMARY" ${BASE:+--base "$BASE"}

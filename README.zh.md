@@ -1,3 +1,4 @@
+<!-- translated from README.md sha256:6dc587e50141 -->
 # Rich Netlist（RNL）
 
 [English](README.md) | 中文

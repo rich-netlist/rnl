@@ -38,7 +38,9 @@ When you add files or change licensing, run [`reuse lint`](https://reuse.softwar
 
 When you change the Rust crates, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test --workspace` must pass. When a change is meant to alter the results of the [conformance corpus](tests/conformance/README.md), write its expected files again with `RNL_BLESS=1`, or `RNL_BLESS_0_3=1` for the cases of 0.3, and review the difference.
 
-When you change the pages of the site, edit `site/src/` and provide an English source with optional translations, as described in [`site/README.md`](site/README.md). Missing translations fall back to English; `python site/build.py --check` must pass. Locale identities, shared interface messages and fonts live in `site/languages.json`.
+When you change the pages of the site, edit `site/src/` and provide an English source with optional translations, as described in [`site/README.md`](site/README.md). Missing translations fall back to English; `python site/build.py --check` must pass. Locale identities, shared interface messages and fonts live in `i18n/languages.json`.
+
+English is the project's only core language ([decision 0015](docs/decisions/0015-english-is-the-only-core-language.md)): new content of any kind may be published in English alone, and every other language, Chinese included, is a translation that follows it. A change to English text need not change any translation. `python scripts/i18n/status.py` shows how far each language is and which translations fell behind, and [`i18n/README.md`](i18n/README.md) describes where translations go and how they are checked.
 
 Every Viewer, standard or core release needs an English `timeline-summary`, with translations when available, in its release
 notes before tagging; see the [summary template and checklist](release-notes/README.md).

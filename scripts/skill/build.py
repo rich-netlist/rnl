@@ -52,6 +52,8 @@ RULE = re.compile(r'#\s*@SELECT-INSTANCE\((\w+)="([^"]*)"\)\s*=>\s*@SET-SYMBOL\s
 ALIAS = re.compile(r'@ALIAS\("([^"]+)",\s*"([^"]+)"\)')
 PACKAGE = re.compile(r'@PACKAGE\(name="([^"]+)",\s*version="([^"]+)"\)')
 COUNTS = re.compile(r"(\d+) errors?, (\d+) warnings?, (\d+) hints?")
+# the first line of a translation: the source it was made from (decision 0015, scripts/i18n/status.py)
+TRANSLATED_FROM = re.compile(r"^<!-- translated from \S+ sha256:[0-9a-f]{12} -->\r?\n")
 
 
 class Failed(Exception):
@@ -457,8 +459,8 @@ def build_site(site: Path) -> None:
     (skill / "SHA256SUMS.txt").write_text("\n".join(sums) + "\n", encoding="utf-8", newline="\n")
     for src, dest in (("llms.txt", site / "llms.txt"), ("llms.zh.txt", site / "zh" / "llms.txt")):
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(read(SITE_SRC / src).replace("{{site}}", SITE_URL).replace("{{github}}", GITHUB),
-                        encoding="utf-8", newline="\n")
+        text = TRANSLATED_FROM.sub("", read(SITE_SRC / src))
+        dest.write_text(text.replace("{{site}}", SITE_URL).replace("{{github}}", GITHUB), encoding="utf-8", newline="\n")
     print(f"wrote {skill} ({len(manifest['files'])} files and rnl-skill.zip), {site / 'llms.txt'} and {site / 'zh' / 'llms.txt'}")
 
 
