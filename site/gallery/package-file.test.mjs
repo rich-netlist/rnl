@@ -111,6 +111,11 @@ test("terminal names come only from a comment that starts with them", () => {
   assert.equal(terminalNames(["MOS: terminals d g s b = 1 2 3 4 (SPICE order). NMOS drain up"]), null);
   assert.equal(terminalNames(["a generic op-amp: terminals in+ in- out = 1 2 3"]), null);
   assert.equal(terminalNames([]), null);
+  // a symbol that draws the usages of a definition starts its comment with that definition
+  assert.deepEqual(terminalNames(["draws $SPDT_SWITCH; com a b; from Analog Canvas simple-spdt-switch"]), ["com", "a", "b"]);
+  assert.deepEqual(terminalNames(["draws $IO_PORT; p; from Analog Canvas port"]), ["p"]);
+  assert.equal(terminalNames(["draws $IO_PORT; the port of a subcircuit, drawn filled"]), null);
+  assert.equal(terminalNames(["draws $IO_PORT"]), null);
 });
 
 test("parameters keep brackets and quoted commas", () => {
