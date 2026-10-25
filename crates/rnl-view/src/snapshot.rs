@@ -292,6 +292,12 @@ pub struct ObjectView {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional, type = "Record<string, string | number | boolean | unknown[]>"))]
     pub params: Option<Map<String, Value>>,
+    /// The style properties the document's records give it (9.3), each as it wins in the style
+    /// queue (8.3), such as `linecolor`; a package's, such as the standard package's defaults, are
+    /// left out. Only for an object that the document gives some.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional, type = "Record<string, string | number | boolean>"))]
+    pub style: Option<Map<String, Value>>,
     /// The id of its symbol in `symbols`.
     pub symbol: Slot<String>,
     /// Its registration point; null when it has none yet.
@@ -689,6 +695,7 @@ fn level_model(doc: &HostDocument, lv: &LevelView) -> LevelModel {
                 .as_ref()
                 .map(|_| o.attach.iter().map(|(role, a)| (role.clone(), attached(a))).collect()),
             params: (!o.params.is_empty()).then(|| o.params.iter().map(|(n, v)| (n.clone(), lit(v))).collect()),
+            style: (!o.own_style.is_empty()).then(|| style(&o.own_style)),
             symbol: Slot::of(o.symbol.as_ref().and_then(symbol_id)),
             at: Slot::of(o.at.map(xy)),
             orient: Slot::of(Some(o.orient.as_str().to_string())),

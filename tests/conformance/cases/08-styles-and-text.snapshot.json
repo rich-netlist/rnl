@@ -252,6 +252,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$VSRC",
               "source": null
@@ -304,6 +311,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#9a9a9a",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#9a9a9a"
+            },
             "symbol": {
               "value": "a symbol",
               "source": null
@@ -356,6 +370,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#c62828",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#c62828"
+            },
             "symbol": {
               "value": "$RES",
               "source": null
@@ -408,6 +429,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$OPAMP",
               "source": null
@@ -473,6 +501,13 @@
             "attach": {
               "p": "%ji"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$JUNCTION_DOT",
               "source": null
@@ -497,6 +532,13 @@
             "definition": "$JUNCTION",
             "attach": {
               "p": "%jo"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$JUNCTION_DOT",
@@ -523,6 +565,13 @@
             "attach": {
               "t": "#Vin:2"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": null,
               "source": null
@@ -547,6 +596,13 @@
             "definition": "$GND",
             "attach": {
               "p": "&0"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$GROUND",
@@ -587,6 +643,13 @@
             "attach": {
               "t": "#X1:1"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": null,
               "source": null
@@ -611,6 +674,13 @@
             "definition": "$GND",
             "attach": {
               "p": "&0"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$GROUND",
@@ -1819,6 +1889,13 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$VCVS",
               "source": null
@@ -1897,6 +1974,13 @@
             "attach": {
               "t": "#E1:2"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": null,
               "source": null
@@ -1921,6 +2005,13 @@
             "definition": "$GND",
             "attach": {
               "p": "&0"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$GROUND",
@@ -1961,6 +2052,13 @@
             "attach": {
               "p": "&inp"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$PORT_TAG",
               "source": null
@@ -2000,6 +2098,13 @@
             "attach": {
               "p": "&inn"
             },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
+            },
             "symbol": {
               "value": "$PORT_TAG",
               "source": null
@@ -2038,6 +2143,13 @@
             "definition": "$IOPORT",
             "attach": {
               "p": "&out"
+            },
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#37474f",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#37474f"
             },
             "symbol": {
               "value": "$PORT_TAG",

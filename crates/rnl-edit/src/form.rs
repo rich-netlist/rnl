@@ -175,15 +175,23 @@ fn placed(at: &Option<Point>, orient: &Option<String>) -> Vec<String> {
     out
 }
 
-/// The statements of a level op, in order (`use-package` writes none: it goes into the header).
-pub fn statements(op: &Op) -> Vec<String> {
+/// A style (9.3) of the properties given, in their order, with no base style.
+pub fn define_style(name: &str, props: &[(String, Literal)]) -> String {
+    let props: Vec<String> = props.iter().map(|(k, v)| format!("{}={}", role_name(k), literal(v))).collect();
+    format!("{name} = @DEFINE-STYLE({}) {{}}", props.join(", "))
+}
+
+/// The statements of a level op, in order (`use-package` writes none: it goes into the header);
+/// `style` names the style that the op's `style` is defined as in its level.
+pub fn statements(op: &Op, style: Option<&str>) -> Vec<String> {
     match op {
-        Op::Set { object, symbol, at, orient } => {
+        Op::Set { object, symbol, at, orient, .. } => {
             let mut facts: Vec<String> = symbol.iter().map(|s| format!("@SET-SYMBOL {s}")).collect();
+            facts.extend(style.map(|s| format!("@SET-STYLE {s}")));
             facts.extend(placed(at, orient));
             vec![format!("{object} {}", facts.join(" => "))]
         }
-        Op::AddUsage { name, definition, attach, params, symbol, at, orient } => {
+        Op::AddUsage { name, definition, attach, params, symbol, at, orient, .. } => {
             // each object with the role it fills, so that the roles are those of the request
             // whatever order it writes them in, and a role the definition lacks fails (9.4); the
             // parameters by name, so that one the definition lacks fails as well
@@ -194,6 +202,7 @@ pub fn statements(op: &Op) -> Vec<String> {
             let params = if params.is_empty() { String::new() } else { format!("({})", params.join(", ")) };
             let mut parts = vec![format!("{definition} @ATTACH{params} {}", roles.join(" "))];
             parts.extend(symbol.iter().map(|s| format!("@SET-SYMBOL {s}")));
+            parts.extend(style.map(|s| format!("@SET-STYLE {s}")));
             parts.extend(placed(at, orient));
             parts.extend(name.iter().cloned());
             vec![parts.join(" => ")]

@@ -202,11 +202,11 @@ fn refusals_name_the_op() {
     );
     assert_eq!(
         refused(json!([{"level": "subckt:rc_lowpass", "op": "set", "object": "#R1", "style": {}}])),
-        "op 0 (set): `style` is not written yet"
+        "op 0 (set): nothing to set: no `symbol`, `style`, `at` or `orient`"
     );
     assert_eq!(
         refused(json!([{"level": "subckt:rc_lowpass", "op": "set", "object": "#R1"}])),
-        "op 0 (set): nothing to set: no `symbol`, `at` or `orient`"
+        "op 0 (set): nothing to set: no `symbol`, `style`, `at` or `orient`"
     );
     assert_eq!(
         refused(json!([{"level": "subckt:rc_lowpass", "op": "set", "object": "#R1", "at": [0]}])),
@@ -865,4 +865,132 @@ fn parameters_that_a_record_cannot_hold_are_refused() {
         let out = write(&usage(params)).unwrap();
         assert!(out.contains("*   $NOTE @ATTACH #R1(dev)\n"), "{out}");
     }
+}
+
+/// What `ops` write into `net`, read back: the text, the diagnostics as rendered, and the
+/// snapshot's levels.
+fn written_and_snapshot(net: &str, ops: Value) -> (String, Vec<(Severity, String)>, Vec<Value>) {
+    let out = write(&request("spice", net, ops)).unwrap();
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let diagnostics = r.diagnostics().iter().map(|d| (d.severity, r.sink.render(d))).collect();
+    let parts = rnl_view::Parts { drawing: false, host: false, model: true };
+    let s = rnl_view::snapshot(entry("spice"), &files, &rnl_view::BuildOptions::default(), parts).unwrap();
+    let s = serde_json::to_value(s).unwrap();
+    (out, diagnostics, s["levels"].as_array().unwrap().clone())
+}
+
+/// The object `id` of the model of `level`.
+fn model_object<'a>(level: &'a Value, id: &str) -> &'a Value {
+    let objects = level["model"]["objects"].as_array().unwrap();
+    objects.iter().find(|o| o["id"] == id).unwrap_or_else(|| panic!("no {id} in {objects:?}"))
+}
+
+#[test]
+fn a_style_is_written_as_a_definition_that_set_style_gives_and_reads_back_as_given() {
+    let blue = json!({"linecolor": "#2275e2", "textcolor": "#2275e2"});
+    let wide = json!({"linewidth": 0.25, "linestyle": "dashed", "bold": true});
+    let net = "* styles\nR1 a 0 1k\nR2 a 0 1k\nR3 a 0 1k\nR4 a 0 1k\n.end\n";
+    let (out, diagnostics, levels) = written_and_snapshot(
+        net,
+        json!([
+            {"level": "file", "op": "set", "object": "#R1", "style": blue, "at": [0, 0]},
+            // the same properties in another order are the same style
+            {"level": "file", "op": "set", "object": "#R2", "style": {"textcolor": "#2275e2", "linecolor": "#2275e2"}, "at": [4, 0]},
+            {"level": "file", "op": "set", "object": "#R3", "symbol": "$RESISTOR", "style": wide, "at": [8, 0]},
+            {"level": "file", "op": "set", "object": "#R4", "at": [12, 0]},
+            {"level": "file", "op": "add-usage", "name": "%g", "definition": "$GROUND", "attach": {"p": "&0"},
+             "style": blue, "at": [0, -4]},
+        ]),
+    );
+    for line in [
+        r##"*   $style1 = @DEFINE-STYLE(linecolor="#2275e2", textcolor="#2275e2") {};"##,
+        r##"*   $style2 = @DEFINE-STYLE(linewidth=0.25, linestyle="dashed", bold=true) {};"##,
+        "*   #R1 @SET-STYLE $style1 => @PLACE(0, 0);",
+        "*   #R2 @SET-STYLE $style1 => @PLACE(4, 0);",
+        "*   #R3 @SET-SYMBOL $RESISTOR => @SET-STYLE $style2 => @PLACE(8, 0);",
+        "*   $GROUND @ATTACH &0(p) => @SET-STYLE $style1 => @PLACE(0, -4) => %g",
+    ] {
+        assert!(out.contains(line), "{line}\n{out}");
+    }
+    assert_eq!(out.matches("@DEFINE-STYLE").count(), 2, "{out}");
+    assert!(diagnostics.iter().all(|(s, _)| *s != Severity::Error), "{out}\n{diagnostics:?}");
+    let top = &levels[0];
+    for id in ["#R1", "#R2", "%g"] {
+        assert_eq!(model_object(top, id)["style"], blue, "{id}\n{out}");
+    }
+    assert_eq!(model_object(top, "#R3")["style"], wide, "{out}");
+    // the object's style passes to its labels (11.3): its name is drawn in the colour, as Analog
+    // Canvas colours an instance's labels with the instance
+    let files = MemoryProvider::new().with(entry("spice"), &out);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let drawn = r.model.levels[0].texts.iter().find(|t| t.object_id == "#R1::name").unwrap();
+    assert_eq!(drawn.style.get("textcolor").and_then(|v| v.str()), Some("#2275e2"), "{out}");
+    // an object the document gives no style has none: the standard package's are left out
+    assert!(model_object(top, "#R4").get("style").is_none(), "{}", model_object(top, "#R4"));
+}
+
+#[test]
+fn each_level_defines_the_styles_it_uses() {
+    // a subcircuit could see the style of the file level, but its own definition keeps it the same
+    // when its file is read on its own, and with its own name it hides nothing (6.8)
+    let blue = json!({"linecolor": "#2275e2"});
+    let net = "* levels\n.subckt cell a b\nR1 a b 1k\n.ends\nX1 n 0 cell\nR2 n 0 1k\n.end\n";
+    let (out, diagnostics, levels) = written_and_snapshot(
+        net,
+        json!([
+            {"level": "file", "op": "set", "object": "#R2", "style": blue, "at": [0, 0]},
+            {"level": "subckt:cell", "op": "set", "object": "#R1", "style": blue, "at": [0, 0]},
+            {"level": "subckt:cell", "op": "set", "object": "#R1", "style": blue},
+        ]),
+    );
+    assert!(out.contains(r##"*   $style1 = @DEFINE-STYLE(linecolor="#2275e2") {};"##), "{out}");
+    assert!(out.contains(r##"*   $style2 = @DEFINE-STYLE(linecolor="#2275e2") {};"##), "{out}");
+    assert_eq!(out.matches("@DEFINE-STYLE").count(), 2, "{out}");
+    let loud = diagnostics.iter().filter(|(s, m)| *s != Severity::Hint || m.contains("hides"));
+    assert_eq!(loud.count(), 0, "{out}\n{diagnostics:?}");
+    let level = |id: &str| levels.iter().find(|l| l["id"] == id).unwrap_or_else(|| panic!("no level {id}"));
+    assert_eq!(model_object(level("file:netlist.sp"), "#R2")["style"], blue);
+    assert_eq!(model_object(level("subckt:cell"), "#R1")["style"], blue);
+}
+
+#[test]
+fn a_style_property_the_language_lacks_fails_as_a_written_one_does() {
+    let net = "* styles\nR1 a 0 1k\n.end\n";
+    let ops = json!([{"level": "file", "op": "set", "object": "#R1", "style": {"colour": "#2275e2"}}]);
+    let (out, diagnostics, _) = written_and_snapshot(net, ops);
+    assert!(out.contains(r##"*   $style1 = @DEFINE-STYLE(colour="#2275e2") {};"##), "{out}");
+    let message = |d: &[(Severity, String)]| -> Vec<String> {
+        d.iter()
+            .filter(|(s, _)| *s == Severity::Error)
+            // what, without where: the record written by hand is on another line
+            .map(|(_, m)| m.split_once(": ").unwrap().1.lines().next().unwrap().to_string())
+            .collect()
+    };
+    let by_hand = "* styles\nR1 a 0 1k\n* @RNL { $style1 = @DEFINE-STYLE(colour=\"#2275e2\") {}; #R1 @SET-STYLE $style1 }\n.end\n";
+    let files = MemoryProvider::new().with(entry("spice"), by_hand);
+    let r = rnl_view::interpret(entry("spice"), Some("spice"), &files, &Options::default()).unwrap();
+    let by_hand: Vec<(Severity, String)> = r.diagnostics().iter().map(|d| (d.severity, r.sink.render(d))).collect();
+    assert!(!message(&by_hand).is_empty());
+    assert_eq!(message(&diagnostics), message(&by_hand), "{out}");
+}
+
+#[test]
+fn a_style_that_a_record_cannot_hold_is_refused() {
+    let set = |style: Value| {
+        request(
+            "spice",
+            "* styles\nR1 a 0 1k\n.end\n",
+            json!([{"level": "file", "op": "set", "object": "#R1", "style": style}]),
+        )
+    };
+    assert_eq!(
+        write(&set(json!({"linecolor": ["#000000"]}))).unwrap_err(),
+        "op 0 (set): `style` `linecolor` is not a string, number or boolean"
+    );
+    // an empty style sets nothing
+    assert_eq!(
+        write(&set(json!({}))).unwrap_err(),
+        "op 0 (set): nothing to set: no `symbol`, `style`, `at` or `orient`"
+    );
 }

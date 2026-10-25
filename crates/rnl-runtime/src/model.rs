@@ -384,6 +384,9 @@ pub struct ObjectInfo {
     /// A usage's parameters as the statement that applies it writes them, in the order of the
     /// definition; the definition's defaults are not among them (9.3).
     pub params: Vec<(String, Lit)>,
+    /// The style properties the document's own records give it, each as it wins in the style queue
+    /// (8.3); those a package gives, such as the standard package's defaults, are left out.
+    pub own_style: Style,
     /// The symbol it is drawn with.
     pub symbol: Option<SymbolInfo>,
     pub at: Option<Pt>,

@@ -324,6 +324,12 @@ export type ObjectView = {
    */
   params?: Record<string, string | number | boolean | unknown[]>,
   /**
+   * The style properties the document's records give it (9.3), each as it wins in the style
+   * queue (8.3), such as `linecolor`; a package's, such as the standard package's defaults, are
+   * left out. Only for an object that the document gives some.
+   */
+  style?: Record<string, string | number | boolean>,
+  /**
    * The id of its symbol in `symbols`.
    */
   symbol: Slot<string>,

@@ -17,17 +17,25 @@ pub struct LevelOp {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Op {
-    /// Facts about a host object: its symbol, position and orientation.
-    Set { object: String, symbol: Option<String>, at: Option<Point>, orient: Option<String> },
+    /// Facts about a host object: its symbol, style, position and orientation. The style is its
+    /// properties (9.3), written as a DEFINE-STYLE that a SET-STYLE gives the object (11.3).
+    Set {
+        object: String,
+        symbol: Option<String>,
+        style: Vec<(String, Literal)>,
+        at: Option<Point>,
+        orient: Option<String>,
+    },
     /// A usage of a definition (9.4), attached to objects or points: each role by its name, with
     /// what it is given, in the order the request writes them; and the parameters it writes, in the
-    /// order given.
+    /// order given; and its style, as for `Set`.
     AddUsage {
         name: Option<String>,
         definition: String,
         attach: Vec<(String, Attach)>,
         params: Vec<(String, Literal)>,
         symbol: Option<String>,
+        style: Vec<(String, Literal)>,
         at: Option<Point>,
         orient: Option<String>,
     },
@@ -184,7 +192,7 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
     let kind = obj.get("op").and_then(Value::as_str).ok_or_else(|| format!("op {k}: no \"op\""))?;
     // fields of the draft that this writer does not write yet: refused rather than left out
     let later: &[&str] = match kind {
-        "set" | "add-usage" => &["style", "layer"],
+        "set" | "add-usage" => &["layer"],
         "add-wire" => &["layer"],
         _ => &[],
     };
@@ -192,8 +200,8 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
         return Err(fail(kind, format!("`{f}` is not written yet")));
     }
     let allowed: &[&str] = match kind {
-        "set" => &["object", "symbol", "at", "orient"],
-        "add-usage" => &["name", "definition", "attach", "params", "symbol", "at", "orient"],
+        "set" => &["object", "symbol", "style", "at", "orient"],
+        "add-usage" => &["name", "definition", "attach", "params", "symbol", "style", "at", "orient"],
         "add-point" => &["name", "at", "junction"],
         "add-wire" => &["name", "nets", "via", "mode", "style"],
         "add-text" => {
@@ -223,11 +231,14 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
             let op = Op::Set {
                 object: r.string("object")?,
                 symbol: r.opt_string("symbol")?,
+                style: r.style()?,
                 at: r.opt_point("at")?,
                 orient: r.opt_string("orient")?,
             };
-            if let Op::Set { symbol: None, at: None, orient: None, .. } = op {
-                return Err(fail(kind, "nothing to set: no `symbol`, `at` or `orient`".into()));
+            if let Op::Set { symbol: None, at: None, orient: None, style, .. } = &op {
+                if style.is_empty() {
+                    return Err(fail(kind, "nothing to set: no `symbol`, `style`, `at` or `orient`".into()));
+                }
             }
             op
         }
@@ -237,6 +248,7 @@ pub fn parse(k: usize, value: &Value) -> Result<LevelOp, String> {
             attach: r.attach()?,
             params: r.params()?,
             symbol: r.opt_string("symbol")?,
+            style: r.style()?,
             at: r.opt_point("at")?,
             orient: r.opt_string("orient")?,
         },

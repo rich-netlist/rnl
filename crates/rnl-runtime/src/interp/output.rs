@@ -347,6 +347,7 @@ impl Interp<'_> {
                 host,
                 definition,
                 attach,
+                own_style: self.own_style_of(s, o),
                 params: match self.o(o) {
                     ObjData::Usage(u) => u.given.clone(),
                     _ => Vec::new(),
