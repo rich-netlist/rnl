@@ -76,7 +76,7 @@
   "Points, wires, text, primitives, constraints, usages and sets; the bodies applied by AS and ATTACH are expanded. Selections are not evaluated yet.": "점, 배선, 텍스트, 도형 요소, 제약, 용례, 집합을 생성하고 AS와 ATTACH로 적용된 정의 본문을 전개합니다. 선택식은 아직 평가하지 않습니다.",
   "Symbols": "심볼 배정",
   "SET-SYMBOL takes effect in order: the standard package’s rules first, the file’s after; what is written directly on an object beats what a rule gives.": "SET-SYMBOL이 순서대로 적용됩니다. 표준 패키지 규칙이 먼저, 파일에 적힌 구문이 나중에 적용되며, 객체에 직접 지정한 심볼이 규칙보다 우선합니다.",
-  "Generate": "규칙 생성",
+  "Generate": "규칙에 따른 생성",
   "AS and ATTACH applied to selections run once per object, at each level, such as the standard package adding a ground for every unwired ground terminal.": "선택 결과를 대상으로 하는 AS와 ATTACH가 각 레벨에서 객체마다 한 번씩 실행됩니다. 표준 패키지가 배선되지 않은 접지 단자마다 접지 심볼을 붙이는 과정이 여기서 일어납니다.",
   "New symbols": "새 객체 심볼 배정",
   "The same symbol queue runs again for the objects just generated.": "방금 생성된 객체들에 대해 동일한 심볼 배정 대기열을 한 번 더 실행합니다.",
