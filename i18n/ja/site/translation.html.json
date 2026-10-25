@@ -1,0 +1,15 @@
+{
+  "Translation status · Rich Netlist": "翻訳状況 · Rich Netlist",
+  "How far each language of RNL is translated, from the site and the viewers to the standard.": "サイトやビューアから言語標準まで、RNLの各言語の翻訳進捗状況。",
+  "Skip to content": "本文へスキップ",
+  "Switch color theme": "カラーテーマを切り替え",
+  "Translation status": "翻訳状況",
+  "English is the source of every text of RNL; every other language, Chinese included, is a translation that follows it.": "RNLのすべてのテキストは英語が原本であり、中国語を含む他のすべての言語は英語に追随する翻訳です。",
+  "This report was made from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">the list of what there is to translate</a> when the site was built; every pull request gets the same one. To translate a language or bring one up to date, start from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.": "このレポートはサイトのビルド時に<a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">翻訳対象一覧</a>から生成されたもので、すべてのプルリクエストでも同じレポートが生成されます。新しい言語を翻訳する場合や既存の翻訳を最新に更新する場合は、<a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>から始めてください。",
+  "How far each language is": "各言語の進捗状況",
+  "The report is in English, as the texts it counts are. A missing translation shows the English; a stale one was made from an English text that has changed since.": "このレポートは集計対象である原文と同様に英語で表記されています。未翻訳の箇所には英語が表示され、stale（要更新）と記された翻訳は、翻訳後に英語の原文が変更された箇所を示します。",
+  "Machine translation and AI models may make a first draft; a language is shown once a native speaker has reviewed it.": "初稿の作成には機械翻訳やAIモデルを使用できますが、サイト上に公開されるのは母語話者によるレビューを経た後になります。",
+  "See also": "関連項目",
+  "Decision 0015: English is the only core language": "決定記録 0015：英語を唯一のコア言語とする",
+  "Introduction": "紹介"
+}
