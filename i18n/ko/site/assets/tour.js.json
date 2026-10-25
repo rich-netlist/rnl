@@ -52,7 +52,7 @@
   "One straight segment.": "직선 선분 하나로 잇습니다.",
   "Horizontal first, then vertical: A → (x₂, y₁) → B.": "수평 이동 후 수직 이동: A → (x₂, y₁) → B.",
   "Vertical first, then horizontal: A → (x₁, y₂) → B.": "수직 이동 후 수평 이동: A → (x₁, y₂) → B.",
-  "When the horizontal run is longer: half of it, then the whole vertical run, then the other half; otherwise the axes swap. Bends may land on half units.": "수평 거리가 더 길면 수평으로 절반 이동한 뒤 수직 전체를 이동하고 나머지 수평 절반을 이동합니다. 수직이 더 길면 두 축이 바뀝니다. 꺾임점이 반 칸(0.5) 위치에 놓일 수 있습니다.",
+  "When the horizontal run is longer: half of it, then the whole vertical run, then the other half; otherwise the axes swap. Bends may land on half units.": "수평 거리가 더 길면 수평으로 절반 이동한 뒤 수직 전체를 이동하고 나머지 수평 절반을 이동합니다. 그렇지 않으면 두 축이 바뀝니다. 꺾임점이 반 칸(0.5) 위치에 놓일 수 있습니다.",
   "A horizontal run, a 45° diagonal, then the rest horizontally; when the vertical run is longer, the axes swap.": "수평 이동 후 45° 대각선으로 이동하고 남은 거리를 수평으로 이동합니다. 수직 거리가 더 길면 두 축이 바뀝니다.",
   "The hollow squares are bends added by the mode: they are not objects, cannot be referenced and cannot start a branch.": "빈 네모 표시는 라우팅 모드가 만들어 낸 꺾임점입니다. 이들은 객체가 아니므로 참조할 수 없고 여기서 분기선을 빼낼 수도 없습니다.",
   "M1 moved to x = 12: the label goes with it, the annotation stays.": "M1이 x = 12로 이동하면 라벨은 함께 따라가고 어노테이션은 제자리에 남습니다.",
