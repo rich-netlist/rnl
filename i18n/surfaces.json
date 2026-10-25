@@ -198,7 +198,7 @@
       "id": "developer-documents",
       "title": "docs/, the READMEs of crates, apps, packages and scripts, CONTRIBUTING.md",
       "kind": "not-translated",
-      "reason": "Documents for developers. docs/rnl-toolchain-architecture.md is a historical proposal in Chinese only and stays as it is."
+      "reason": "Documents for developers, in English only, docs/rnl-toolchain-architecture.md included."
     },
     {
       "id": "release-note-bodies",
