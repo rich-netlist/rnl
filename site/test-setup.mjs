@@ -19,6 +19,8 @@ export default function setup() {
   config.languages = config.languages.filter(entry => entry.code !== 'ja');
   config.languages.push({ code: 'ja', name: '日本語', names: { en: 'Japanese' }, short: 'JA', status: 'published' });
   const configPath = join(temp, 'languages.json');
+  // translated by AI, so its pages carry the notice under their top bar
+  config.languages.find((entry) => entry.code === 'ja').ai_translated = true;
   writeFileSync(configPath, JSON.stringify(config));
   mkdirSync(join(temp, 'ja', 'site'), { recursive: true });
   writeFileSync(join(temp, 'ja', 'site', 'messages.json'), JSON.stringify({ intro: 'ホーム' }));

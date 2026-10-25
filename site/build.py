@@ -607,7 +607,8 @@ def build_language(files, index, version, linux=False, macos=False):
         tokens = {"html-lang": I18N.locales[code]["html_lang"], "locale-code": code, "font-href": escape(I18N.font_url(code), quote=True),
                   "language-menu": I18N.menu(code, lambda target: "../" + target + "/" + ("" if page == "index.html" else page)),
                   "spec-root": "spec/" if I18N.standard(code) == code else "../" + I18N.standard(code) + "/spec/",
-                  "translation-notice": I18N.notice(code, *counts[page])}
+                  "translation-notice": I18N.notice(code, *counts[page]),
+                  "ai-translation-notice": I18N.ai_notice(code, page)}
         tokens.update({"nav-" + key: escape(I18N.message(code, key))
                        for key in ("intro", "tour", "spec", "packages", "gallery", "tools", "agents", "pages", "translation")})
         for key, value in tokens.items():
@@ -759,6 +760,8 @@ def build(version=None, incubating=False, online=False):
     for page in PAGES:
         if files[page].count("{{translation-notice}}") != 1:
             errors.append("src/%s needs exactly one {{translation-notice}} marker, after its hero" % page)
+        if files[page].count("</header>{{ai-translation-notice}}") != 1:
+            errors.append("src/%s needs exactly one {{ai-translation-notice}} marker, right after its top bar" % page)
     errors += check_examples(files, ex)
     if errors:
         raise BuildError("\n".join(errors))

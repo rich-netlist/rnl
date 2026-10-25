@@ -72,7 +72,9 @@
         "timeline_all": "Full timeline",
         "not_translated": "This page is not yet available in {language}; it is shown in English.",
         "partly_translated": "Parts of this page are not yet available in {language}; they are shown in English.",
-        "help_translate": "Help translate it"
+        "help_translate": "Help translate it",
+        "ai_translated": "Translated from English by AI; it may contain errors.",
+        "report_issue": "Report an issue"
       }
     },
     {

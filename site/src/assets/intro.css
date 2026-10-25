@@ -1308,6 +1308,11 @@ html[lang="zh-CN"] .tour-h1 { font-family: var(--f-body); font-weight: 900; lett
 .note .ico { color: var(--signal); margin-top: 3px; }
 /* a page not wholly in its language says so, below its hero (site_i18n.py, decision 0015); quieter when only parts are missing */
 .translation-notice .note { margin-block: 0 24px; max-width: none; }
+/* a language translated by AI: a band under the top bar of every page (site_i18n.py, ai_notice) */
+.ai-notice { border-bottom: 1px solid var(--line); background: var(--panel-2); color: var(--ink-2); font: 13.5px/1.5 var(--f-body); }
+.ai-notice p { display: flex; gap: 8px; align-items: flex-start; margin: 0 auto; padding-block: 8px; }
+.ai-notice .ico { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.ai-notice a { color: var(--markup); }
 .translation-notice.is-partial .note, .translation-notice.is-partial .note .ico { color: var(--ink-3); }
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 

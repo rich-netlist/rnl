@@ -85,7 +85,7 @@
       "source": "i18n/languages.json",
       "translation": "i18n/{lang}/site/messages.json",
       "catalog_key": "name",
-      "keep": ["not_translated", "partly_translated", "help_translate"],
+      "keep": ["not_translated", "partly_translated", "help_translate", "ai_translated", "report_issue"],
       "owner": "site",
       "notes": "The registry has the English; a language's translations are in its messages.json, keyed by the names of the messages. The notices of a page not wholly translated are in English in every language (decision 0015): their messages are not translated."
     },

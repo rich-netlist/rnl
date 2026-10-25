@@ -105,7 +105,7 @@ It reports, without failing:
 1. Run `python scripts/i18n/status.py files <lang>`, and choose what to start with. The site's navigation and introduction, the page for agents and the viewers are what a reader meets first.
 2. Write the translations in the places it lists, in the formats above. Translating with a machine or an AI model for a first draft is fine; a native speaker reviews the language before it is shown.
 3. Open a pull request titled `i18n(<lang>): …`. The summary of its checks shows how far the language is.
-4. A language is shown in the language menus of the site and the viewers, `published`, when the site's navigation, introduction and page for agents are fully translated, its other pages at least 80% and the viewers at least 95%, and a native speaker named in `languages.json` has reviewed it.
+4. A language is shown in the language menus of the site and the viewers, `published`, when the site's navigation, introduction and page for agents are fully translated, its other pages at least 80% and the viewers at least 95%, and a native speaker named in `languages.json` has reviewed it. A language translated by AI may be shown before that review with `"ai_translated": true` in its entry: every page of it then says, in English, that it was translated by AI and may contain errors, with a link to report one ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md), point 8). The review removes the field.
 
 Anyone may update a translation at any time, in a pull request of its own. A pull request that changes English text need not change any translation.
 
