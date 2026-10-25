@@ -176,7 +176,7 @@
   "; type pnp": "；類型 pnp",
   "The symbols of the other elements, such as F, H, B, S, W, J, T and U, and how every symbol looks, are in the <a href=\"packages.html\">gallery of the standard packages</a>.": "F、H、B、S、W、J、T、U 等其他元件的符號及各符號的外觀，請參閱<a href=\"packages.html\">標準套件圖庫</a>。",
   "Fill rules (excerpt)": "自動補齊規則（節選）",
-  "The standard package is RNL itself. A few sets are the hooks for a file: add to them or take from them, and the fill follows.": "標準套件本身即以 RNL 寫成。它透過幾個集合為檔案預留了擴充接口：只要向集合新增或移除成員，自動補齊行為就會隨之調整。",
+  "The standard package is RNL itself. A few sets are the hooks for a file: add to them or take from them, and the fill follows.": "標準套件本身即以 RNL 寫成。它透過幾個集合為檔案預留了擴充方式：只要向集合新增或移除成員，自動補齊行為就會隨之調整。",
   "T4 · Sets and selections": "T4 · 集合與篩選",
   "Braces write an ordered set. A set referenced inside another set contributes its members; to keep it as one member, wrap it in another pair of braces. Objects picked by a selection form a set too, and a selection is evaluated on its own level and once on each level below.": "大括號用來表示有序集合。在集合中引用另一個集合時，會將其成員展開併入；若要將其保留為單一成員，只需再套一層大括號。透過條件篩選出的物件同樣構成集合，且篩選會在所在層級及下方每個層級各評估一次。",
   "Spread, or one member": "展開一層，或保留為單一成員",

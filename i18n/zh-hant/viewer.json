@@ -264,7 +264,7 @@
   "Could not open the project: {0}": "無法開啟專案：{0}",
   "{0}{1} has no address on the web. Download Project keeps such files.": "{0}{1} 沒有網路位址。「下載專案」會保留這類檔案。",
   "{0} could not be fetched: {1}.": "無法擷取 {0}：{1}。",
-  "{0} is not what {1} holds now. Download Project keeps the file as it is shown.": "{0} 與目前顯示的 {1} 內容不同。「下載專案」會依目前顯示的內容保存此檔案。",
+  "{0} is not what {1} holds now. Download Project keeps the file as it is shown.": "{0} 與目前顯示的 {1} 內容不同。「下載專案」會依目前顯示的內容儲存此檔案。",
   "Downloaded the manifest of {0} files.": "已下載包含 {0} 個檔案的清單。",
   "Could not download the manifest: {0}": "無法下載清單：{0}",
   "Could not load the manifest: {0}": "無法載入清單：{0}",
