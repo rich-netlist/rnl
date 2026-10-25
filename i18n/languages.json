@@ -126,6 +126,27 @@
         "display": "\"IBM Plex Sans Condensed\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
         "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans TC\", monospace"
       }
+    },
+    {
+      "code": "ja",
+      "name": "日本語",
+      "short": "日本語",
+      "html_lang": "ja",
+      "matches": [
+        "ja"
+      ],
+      "status": "incubating",
+      "names": {
+        "en": "Japanese",
+        "viewer": "日本語"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+JP:wght@400;500;700;900",
+        "body": "\"Noto Sans JP\", \"Hiragino Sans\", \"Yu Gothic UI\", \"Meiryo\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans JP\", \"Hiragino Sans\", \"Yu Gothic UI\", \"Meiryo\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans JP\", monospace"
+      }
     }
   ]
 }
