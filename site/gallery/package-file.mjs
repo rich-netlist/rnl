@@ -371,10 +371,12 @@ export function resolve(symbol, symbols, seen = new Set()) {
 /**
  * The names of a symbol's terminals, when the comment right before it starts with them, in terminal
  * order and those without a pin in brackets, as the generated packages write them:
- * `a b y (vp) (vn); from Analog Canvas and-gate`. Null when it does not.
+ * `a b y (vp) (vn); from Analog Canvas and-gate`. A symbol that draws the usages of a definition says so first,
+ * `draws $SPDT_SWITCH; com a b; from Analog Canvas simple-spdt-switch`: that part is skipped. Null when the comment
+ * does not start with the names.
  */
 export function terminalNames(docs) {
-  const doc = docs[docs.length - 1];
+  const doc = docs[docs.length - 1]?.replace(/^\s*draws\s+\$[\w-]+\s*;/, "");
   if (!doc || !doc.includes(";")) return null;
   const head = doc.slice(0, doc.indexOf(";")).trim();
   if (!/^\(?[A-Za-z][\w+-]*\)?(?:\s+\(?[A-Za-z][\w+-]*\)?)*$/.test(head)) return null;
