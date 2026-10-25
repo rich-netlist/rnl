@@ -66,7 +66,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "scripts"))
-from site_i18n import LANGUAGES as I18N  # noqa: E402
+from site_i18n import LANGUAGES as I18N, SHOWN_IN_ENGLISH_BELOW  # noqa: E402
 SRC = HERE / "src"
 EXAMPLES = HERE / "examples"
 DEFAULT_OUT = HERE / "dist"
@@ -480,16 +480,44 @@ def check_examples_rnl(rnl):
     return errors
 
 
+def page_scripts(files):
+    """{page: the paths of the scripts it loads}, and {script: its page} for each script only one page loads."""
+    loads = {page: ["assets/" + name for name in SCRIPT_TAG.findall(files[page]) if "assets/" + name in files]
+             for page in PAGES}
+    users = {}
+    for page, scripts in loads.items():
+        for script in scripts:
+            users.setdefault(script, []).append(page)
+    return loads, {script: pages[0] for script, pages in users.items() if len(pages) == 1}
+
+
+def coverage(files, code):
+    """{page: (translated, all)} of the text groups a page shows in one language, its scripts' with its own."""
+    loads, _ = page_scripts(files)
+    found = {}
+    for page, scripts in loads.items():
+        counts = [I18N.coverage(files[path], code, path) for path in [page, *scripts]]
+        found[page] = (sum(c[0] for c in counts), sum(c[1] for c in counts))
+    return found
+
+
 def build_language(files, index, version, linux=False, macos=False):
     """Return {relative path: text} for one language, including the standalone pages. Both kinds
-    of release block are checked for Chinese before the ones that do not apply are dropped."""
+    of release block are checked for Chinese before the ones that do not apply are dropped. A page
+    less translated than site_i18n.SHOWN_IN_ENGLISH_BELOW is shown in English, with the scripts only
+    it loads, and every page not wholly translated says so (decision 0015)."""
     code, prefix = LANGS[index]
-    out = {path: localize(text, index) for path, text in files.items()}
+    counts = coverage(files, code)
+    english = {page for page, (done, total) in counts.items() if done < SHOWN_IN_ENGLISH_BELOW * total}
+    _, own = page_scripts(files)
+    out = {path: I18N.localize(text, code, path, english=(path if path in PAGES else own.get(path)) in english)
+           for path, text in files.items()}
     out = {path: text.replace("{{locale-css}}", I18N.css(code)) for path, text in out.items()}
     for page in PAGES:
         tokens = {"html-lang": I18N.locales[code]["html_lang"], "locale-code": code, "font-href": escape(I18N.font_url(code), quote=True),
                   "language-menu": I18N.menu(code, lambda target: "../" + target + "/" + ("" if page == "index.html" else page)),
-                  "spec-root": "spec/" if I18N.standard(code) == code else "../" + I18N.standard(code) + "/spec/"}
+                  "spec-root": "spec/" if I18N.standard(code) == code else "../" + I18N.standard(code) + "/spec/",
+                  "translation-notice": I18N.notice(code, *counts[page])}
         tokens.update({"nav-" + key: escape(I18N.message(code, key)) for key in ("intro", "tour", "spec", "packages", "gallery", "tools", "agents", "pages")})
         for key, value in tokens.items():
             out[page] = out[page].replace("{{" + key + "}}", value)
@@ -618,6 +646,10 @@ def build(version=None):
     errors = []
     for path, text in files.items():
         errors += check_groups(text, "src/" + path) + check_release(text, "src/" + path)
+        errors += [e for code in CODES for e in I18N.catalog_errors(code, path)]
+    for page in PAGES:
+        if files[page].count("{{translation-notice}}") != 1:
+            errors.append("src/%s needs exactly one {{translation-notice}} marker, after its hero" % page)
     errors += check_examples(files, ex)
     if errors:
         raise BuildError("\n".join(errors))

@@ -103,7 +103,7 @@ class Project:
         self.errors: list[str] = []
         self.config = json.loads(read(root / "i18n/languages.json"))
         try:
-            self.registry = site_i18n.Languages(self.config)
+            self.registry = site_i18n.Languages(self.config, catalogs=root / "i18n")
         except (KeyError, ValueError) as e:
             raise SystemExit(f"i18n/languages.json: {e}")
         self.entries = {entry["code"]: entry for entry in self.config["languages"]}
@@ -275,11 +275,23 @@ def inline(p: Project, s: dict) -> Surface:
     beside = s.get("inline", [])
     for lang in p.langs(s):
         st = out.langs[lang] = Lang()
-        catalogs = {}
+        for path in files:  # the catalogs, read as scripts/site_i18n.py reads them for the build
+            source = p.rel(path).removeprefix("site/src/")
+            out.errors += p.registry.catalog_errors(lang, source)
+            english = {norm(blocks["en"]) for rel, _, blocks in units if rel == p.rel(path)}
+            data = p.registry.catalog(lang, source)
+            unused = [key for key in data if key not in english]
+            for key in unused:
+                new = max((e for e in english if p.registry.translation({"en": e}, lang, source) is None),
+                          key=lambda e: difflib.SequenceMatcher(None, key, e).ratio(), default=None)
+                if new is not None and similar(key, new) and isinstance(data[key], str):
+                    st.stale += 1
+                    st.findings.append(Finding("changed", p.rel(path), f"{short(new, 50)!r} has no {lang}; it may be "
+                                                                       f"the English of {short(key, 50)!r}, translated {short(data[key], 30)!r}"))
+                else:
+                    st.findings.append(Finding("unused", p.rel(path), f"{short(key)!r} is not in the source"))
         for rel, line, blocks in units:
-            if lang not in beside and rel not in catalogs:
-                catalogs[rel] = catalog(p, p.translation(s, lang, path=rel.removeprefix("site/src/")), out.errors)
-            text = blocks.get(lang) if lang in beside else catalogs[rel].get(norm(blocks["en"]))
+            text = p.registry.translation(blocks, lang, rel.removeprefix("site/src/"))
             if text is None:
                 st.findings.append(Finding("missing", f"{rel}:{line}", short(blocks["en"])))
                 continue

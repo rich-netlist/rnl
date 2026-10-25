@@ -67,7 +67,10 @@
         "timeline_spec": "Language standard {series}, revision {revision}",
         "timeline_notes": "Release notes",
         "timeline_range": "{start} to {end}",
-        "timeline_next": "Next"
+        "timeline_next": "Next",
+        "not_translated": "This page is not yet available in {language}; it is shown in English.",
+        "partly_translated": "Parts of this page are not yet available in {language}; they are shown in English.",
+        "help_translate": "Help translate it"
       }
     },
     {
@@ -142,7 +145,10 @@
         "timeline_spec": "语言标准 {series}，修订 {revision}",
         "timeline_notes": "发布说明",
         "timeline_range": "{start} 至 {end}",
-        "timeline_next": "接下来"
+        "timeline_next": "接下来",
+        "not_translated": "本页尚无中文，以下是英文原文。",
+        "partly_translated": "本页有部分内容尚无中文，以英文显示。",
+        "help_translate": "参与翻译"
       }
     }
   ]
