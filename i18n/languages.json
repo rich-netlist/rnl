@@ -79,6 +79,10 @@
         "zh"
       ],
       "standard": "zh",
+      "status": "published",
+      "codes": {
+        "viewer": "zh-CN"
+      },
       "nav_breakpoint": 760,
       "fonts": {
         "google": "Noto+Sans+SC:wght@400;500;700;900",

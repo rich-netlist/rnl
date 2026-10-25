@@ -1,7 +1,7 @@
 # scripts/spec
 
 The website's locale identities, fonts and interface messages are configured in
-[`site/languages.json`](../../site/languages.json). The publisher shares the same native
+[`i18n/languages.json`](../../i18n/languages.json). The publisher shares the same native
 language menu, styling and keyboard behavior as the project site, including the downloaded
 HTML and comparison pages. Menu links keep the version, comparison, query and section.
 Missing interface translations inherit English. A site locale without its own standard

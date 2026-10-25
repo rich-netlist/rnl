@@ -1,0 +1,217 @@
+{
+  "format": 1,
+  "source_language": "en",
+  "surfaces": [
+    {
+      "id": "spec-0.3",
+      "title": "Language standard 0.3: the chapters",
+      "kind": "document",
+      "source": "spec/0.3/en/*.md",
+      "exclude": ["annex-a.md"],
+      "translation": "spec/0.3/{lang}/{name}",
+      "stamp": "spec",
+      "structure": "sections",
+      "owner": "language",
+      "notes": "Annex A is generated in each language from the word list and its fixed phrases (spec-phrases). Until step 4 of decision 0015, scripts/spec/build.py still stops on a Chinese chapter out of line; run it with --stamp, not this script's stamp."
+    },
+    {
+      "id": "spec-0.2",
+      "title": "Language standard 0.2: the chapters (frozen)",
+      "kind": "document",
+      "source": "spec/0.2/en/*.md",
+      "exclude": ["annex-a.md"],
+      "translation": "spec/0.2/{lang}/{name}",
+      "languages": ["zh"],
+      "stamp": "spec",
+      "structure": "sections",
+      "owner": "language",
+      "notes": "Frozen: no new translations (decision 0015, point 7)."
+    },
+    {
+      "id": "spec-phrases",
+      "title": "Fixed phrases of Annex A of the standard",
+      "kind": "untracked",
+      "where": "scripts/spec/spectools.py (ROLE_NOTE, TAKES_ZH and the other tables)",
+      "translation": "i18n/{lang}/spec.json",
+      "owner": "language",
+      "notes": "In code until step 4 of decision 0015, which moves them to i18n/{lang}/spec.json."
+    },
+    {
+      "id": "guide-0.3",
+      "title": "Short guide to the language 0.3",
+      "kind": "document",
+      "source": "spec/rnl-0.3-guide.md",
+      "translation": "spec/rnl-0.3-guide.{lang}.md",
+      "stamp": "repo",
+      "structure": "position",
+      "owner": "language",
+      "notes": "Stamped from step 4 of decision 0015, when scripts/spec/build.py learns to leave the stamp out of the page; until then the report judges it from the history."
+    },
+    {
+      "id": "principles",
+      "title": "Principles and boundaries of RNL",
+      "kind": "document",
+      "source": "spec/rich-netlist.md",
+      "translation": "spec/rich-netlist.{lang}.md",
+      "stamp": "repo",
+      "structure": "position",
+      "owner": "language",
+      "notes": "Stamped from step 4 of decision 0015, as the short guide."
+    },
+    {
+      "id": "readme",
+      "title": "The repository's README",
+      "kind": "document",
+      "source": "README.md",
+      "translation": "README.{lang}.md",
+      "stamp": "repo",
+      "structure": "position",
+      "owner": "i18n"
+    },
+    {
+      "id": "llms",
+      "title": "llms.txt, the plain-text entry for agents",
+      "kind": "document",
+      "source": "site/src/llms.txt",
+      "translation": "site/src/llms.{lang}.txt",
+      "stamp": "repo",
+      "owner": "site",
+      "notes": "Published as llms.txt and <lang>/llms.txt by scripts/skill/build.py, which leaves the stamp out."
+    },
+    {
+      "id": "site-pages",
+      "title": "Pages of the site, with the scripts of their demos and the summaries of the standard packages",
+      "kind": "inline",
+      "source": ["site/src/*.html", "site/src/assets/*.js"],
+      "translation": {"*": "i18n/{lang}/site/{path}.json"},
+      "inline": ["zh"],
+      "owner": "site",
+      "notes": "Chinese is still written in the source files, in <zh> blocks; step 3 of decision 0015 moves it to i18n/zh/site/."
+    },
+    {
+      "id": "site-messages",
+      "title": "Shared messages of the site and of the standard's pages",
+      "kind": "dictionary",
+      "format": "registry-messages",
+      "source": "i18n/languages.json",
+      "owner": "site"
+    },
+    {
+      "id": "site-timeline",
+      "title": "Milestones of the site's timeline",
+      "kind": "dictionary",
+      "format": "json",
+      "source": "site/src/timeline.json",
+      "owner": "site"
+    },
+    {
+      "id": "release-summaries",
+      "title": "One-sentence summaries of releases, for the timeline",
+      "kind": "dictionary",
+      "format": "release-summary",
+      "source": ["release-notes/core/*.md", "apps/desktop/release-notes/*.md"],
+      "owner": "site",
+      "notes": "Released notes are not changed afterwards; the summaries of standard releases are in the messages of their spec-* tags and are not counted here."
+    },
+    {
+      "id": "viewer",
+      "title": "Interface of the viewers, with the desktop app's native menus and file dialogs",
+      "kind": "messages",
+      "source": {
+        "js": ["apps/viewer-ui/*.js", "apps/viewer-ui/shells/*.js"],
+        "commands": "apps/viewer-ui/commands.json",
+        "html": "apps/viewer-ui/index.html",
+        "rust": ["apps/desktop/src/*.rs"]
+      },
+      "translation": {"zh": "apps/viewer-ui/locales/zh-CN.json", "*": "i18n/{lang}/viewer.json"},
+      "keep": ["RNL Viewer"],
+      "owner": "viewer",
+      "notes": "The scan finds the texts written in m(\"…\"), m`…`, the labels of commands.json, the static text of index.html and the desktop app's menu::text(…, \"…\"). Texts passed to m() through a variable are not found until step 2 of decision 0015 marks them; until then the catalog has entries the scan does not find."
+    },
+    {
+      "id": "viewer-other",
+      "title": "Other texts of the viewers",
+      "kind": "untracked",
+      "where": "the title of a project manifest (only its en and zh are read, apps/viewer-ui/manifest-bar.js); about 30 error messages returned by the desktop app's Rust code, shown as they are",
+      "owner": "viewer",
+      "notes": "Step 2 of decision 0015."
+    },
+    {
+      "id": "installers",
+      "title": "Installers and the desktop's integration",
+      "kind": "untracked",
+      "where": "apps/desktop/tauri.conf.json (the NSIS installer in English and Chinese, from Tauri's own texts; the MSI in English only), the short description in tauri.linux.conf.json and tauri.macos.conf.json, the file associations",
+      "owner": "viewer"
+    },
+    {
+      "id": "alias-0.3",
+      "title": "Alias package of the standard series 0.3",
+      "kind": "aliases",
+      "words": "spec/rnl-words-0.3.json",
+      "packages": "libraries/standard/0.3/*.rnl",
+      "translation": "libraries/standard/0.3/rnl-{lang}.rnl",
+      "optional": true,
+      "no_alias": ["$NMOS", "$PMOS", "$NPN", "$PNP", "x", "y", "dx", "dy"],
+      "owner": "language",
+      "notes": "Part of the language (16.5), not a translation of the interface: a file written with these words reads as one written with the English ones. Whether a language has an alias package is decided with the standard. no_alias lists the names that keep their English spelling on purpose."
+    },
+    {
+      "id": "gallery-entries",
+      "title": "Titles and descriptions of the entries of the gallery",
+      "kind": "external",
+      "repository": "rich-netlist/rnl-gallery",
+      "url": "https://rich-netlist.github.io/rnl-gallery/index.json",
+      "format": "gallery-index",
+      "owner": "testset",
+      "notes": "Each entry has its translations in its own entries/<id>.json. Read with --online."
+    },
+    {
+      "id": "public-package-summaries",
+      "title": "Summaries of the public packages",
+      "kind": "external",
+      "repository": "rich-netlist/rnl-packages",
+      "url": "https://rich-netlist.github.io/rnl-packages/catalog.json",
+      "format": "package-catalog",
+      "owner": "i18n",
+      "notes": "In metadata.json of rnl-packages, copied into each record of the immutable catalog; step 5 of decision 0015 keeps the summaries of other languages outside the record. Read with --online."
+    },
+    {
+      "id": "external-readmes",
+      "title": "READMEs of rnl-gallery and rnl-packages",
+      "kind": "untracked",
+      "where": "README.zh.md beside README.md in rich-netlist/rnl-gallery and rich-netlist/rnl-packages",
+      "owner": "i18n",
+      "notes": "Stamped in step 5 of decision 0015."
+    },
+    {
+      "id": "diagnostics",
+      "title": "Diagnostics of the core and the command line, and its usage text",
+      "kind": "not-translated",
+      "reason": "The standard leaves the wording and language of diagnostics open (7.6). They are free English text without codes, and tools, tests, documents and agents read and quote them as they are; the viewers show them as they are."
+    },
+    {
+      "id": "skill",
+      "title": "The skill package for agents, skills/rnl/",
+      "kind": "not-translated",
+      "reason": "Read by agents, and in English only; its guide to the language is a copy of the English short guide."
+    },
+    {
+      "id": "developer-documents",
+      "title": "docs/, the READMEs of crates, apps, packages and scripts, CONTRIBUTING.md",
+      "kind": "not-translated",
+      "reason": "Documents for developers. docs/rnl-toolchain-architecture.md is a historical proposal in Chinese only and stays as it is."
+    },
+    {
+      "id": "release-note-bodies",
+      "title": "Bodies of the release notes",
+      "kind": "not-translated",
+      "reason": "Released notes are records; only their one-sentence summary is translated (release-summaries)."
+    },
+    {
+      "id": "comments",
+      "title": "Comments in code and in package files, the tags of the gallery",
+      "kind": "not-translated",
+      "reason": "Code comments are in English; the comments of rnl-zh are in Chinese and stay so. Gallery tags are shown as written in every language."
+    }
+  ]
+}

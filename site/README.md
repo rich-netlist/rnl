@@ -16,7 +16,7 @@ The site also publishes the skill package for agents, at `skill/`, and `llms.txt
 ## One source, extensible locales
 
 Pages are built from one source in `src/`, using the locale registry in
-[`languages.json`](languages.json) and [`scripts/site_i18n.py`](../scripts/site_i18n.py).
+[`i18n/languages.json`](../i18n/languages.json), the project's one list of languages, and [`scripts/site_i18n.py`](../scripts/site_i18n.py).
 Only Chinese and English are enabled. The registry owns language codes, native names, URL
 directories, browser-language matching, fonts, navigation breakpoints and shared interface
 messages, including those of the language-standard pages. English is the fallback source.
@@ -47,7 +47,9 @@ This check applies to English, so it does not reject another locale's CJK transl
 
 ### Adding a language
 
-Add one entry to `languages` in `languages.json`, for example:
+English is the site's only core language, and every other language, Chinese included, is a translation ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). That decision moves the translations of the pages out of `src/` into catalogs in `i18n/<lang>/site/`, in a later step; until then they are written as below. [`i18n/README.md`](../i18n/README.md) covers every surface of the project, and `python scripts/i18n/status.py --lang <lang>` shows what a language has.
+
+Add one entry to `languages` in [`i18n/languages.json`](../i18n/languages.json), for example:
 
 ```json
 {"code": "ja", "name": "日本語", "short": "JA"}
@@ -150,7 +152,7 @@ The page and both `llms` files name every file of the package, so that they cann
 All six pages share the standard page's seven primary links and the project's GitHub link, after Agent.
 The introduction, language tour, tools and agents pages put their first-level section links beside the content, below the full-width
 hero. Below 1000px, the top bar's *On this page* button (the list icon, `#toc-btn`) opens that navigation; choosing an entry
-closes it. On a narrow screen (below 960px in English, 760px in Chinese: `nav_breakpoint` in `languages.json`) the primary links
+closes it. On a narrow screen (below 960px in English, 760px in Chinese: `nav_breakpoint` in `i18n/languages.json`) the primary links
 leave the top bar and become a menu: the button at the top left (`#menu-btn`, the three bars) opens them, one to a line with
 the current page marked, on every page, the standard's included; opening one panel closes the other, Escape and a choice
 close the menu, and the language switch and the theme button stay in the top bar. The rules of the menu are generated with

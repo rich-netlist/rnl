@@ -18,7 +18,7 @@ There are no core tags yet, so no core/CLI release is shown as having happened. 
 `runtime-v*` npm previews are curated historical milestones, not automatically generated.
 
 The summary block is JSON inside an HTML comment named `timeline-summary`. `en` must be a
-nonempty, single-paragraph string. Other language codes registered in `site/languages.json`
+nonempty, single-paragraph string. Other language codes registered in `i18n/languages.json`
 are optional and fall back to English when absent. Summaries are plain text; markup is escaped.
 Missing or invalid summaries fail the site build instead of silently leaving stale history.
 The generated entry links to its GitHub Release. The builder first reads the notes at the

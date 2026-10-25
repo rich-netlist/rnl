@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / "site/languages.json"
+CONFIG = ROOT / "i18n/languages.json"
 
 
 class Languages:

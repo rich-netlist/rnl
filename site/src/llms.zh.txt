@@ -1,3 +1,4 @@
+<!-- translated from site/src/llms.txt sha256:1b804ea606b2 -->
 # RNL（Rich Netlist）
 
 > RNL 把原理图的画法写进 SPICE 或 Spectre 网表的注释里（`@RNL` 记录），网表本身就是原理图的源文件。这个文件告诉 AI agent 怎样安装 RNL skill（一个教会 agent 读、写、检查和绘制 RNL 0.3 的文件夹），以及别的东西在哪里。English: {{site}}llms.txt
