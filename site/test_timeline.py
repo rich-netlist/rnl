@@ -109,6 +109,8 @@ class Timeline(unittest.TestCase):
         remove = lambda html: re.sub(r'\n<div class="wrap translation-notice[^"]*" lang="en">.*?</div>', '',
                                     re.sub(r'(<ol class="tl">).*?(</ol>)', r'\1\2', html, flags=re.S), flags=re.S)
         for index, (language, _) in enumerate(build.LANGS):
+            if language not in build.I18N.published:
+                continue  # an incubating language is built only with --incubating
             expected = build.build_language(template, index, None)
             for page in ("index.html", "rnl-intro-standalone.html"):
                 self.assertEqual(remove(actual[f"{language}/{page}"]), remove(expected[page]))
