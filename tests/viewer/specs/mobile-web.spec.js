@@ -25,8 +25,10 @@ test("a sample opens by its address, fits on the screen, and a finger drags and 
   const after = await over(page, point);
   expect(Math.abs(after.x - to.x)).toBeLessThanOrEqual(1);
   expect(Math.abs(after.y - to.y)).toBeLessThanOrEqual(1);
+  expect(await pageMoved(page)).toEqual(UNMOVED);
 
-  // a tap on an instance selects it, as a click does
+  // a tap on an instance selects it, as a click does; whether the status bar's name of it fits is
+  // mobile-layout.spec.js's question
   const at = await page.evaluate(() => {
     const doc = window.viewer.doc;
     const hit = doc.levels[window.viewer.level].hits.find((h) => h.kind === "box" && doc.objects[h.objects[0]].name === "X2");
@@ -35,5 +37,4 @@ test("a sample opens by its address, fits on the screen, and a finger drags and 
   });
   await fingers.tap(await over(page, at));
   await expect.poll(() => page.evaluate(() => window.viewer.selected !== null && window.viewer.doc.objects[window.viewer.selected].name)).toBe("X2");
-  expect(await pageMoved(page)).toEqual(UNMOVED);
 });
