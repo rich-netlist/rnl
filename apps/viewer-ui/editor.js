@@ -1,4 +1,4 @@
-import { append, m, setAttr, setText } from "./i18n.js";
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 // Editing the text (decision 0011): the netlist pane can be switched to edit, with a text box for
 // each file of the document, following source navigation. A change is shown as not applied until the user
 // exits editing or chooses Apply and Exit Editing, which builds the Document again from the texts in memory, as
@@ -330,7 +330,7 @@ export async function save(overwrite = false, encoding = "preserve") {
       : result || m("Saved."));
     return true;
   } catch (e) {
-    await inform({ title: m(shell.platform === "web" ? "Download File" : "Save"), paragraphs: [m`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
+    await inform({ title: shell.platform === "web" ? m("Download File") : m("Save"), paragraphs: [m`The changes were not saved: ${e instanceof Error ? e.message : String(e)}`] });
     return false;
   }
 }
@@ -345,11 +345,12 @@ async function changedOnDisk(names, encoding) {
   const choice = await decide({
     title: m("File Changed on Disk"),
     paragraphs: [
-      m`${many ? "These files were" : "This file was"} changed by another program since the viewer read ${many ? "them" : "it"}: ${names.join(", ")}.`,
+      many ? m`These files were changed by another program since the viewer read them: ${names.join(", ")}.`
+        : m`This file was changed by another program since the viewer read it: ${names.join(", ")}.`,
       m("Nothing was saved. Overwrite writes the text in the viewer over what is on disk; Reload reads the files again and drops the changes made here."),
     ],
-    action: "Overwrite",
-    others: ["Reload"],
+    action: tr("Overwrite"),
+    others: [tr("Reload")],
   });
   if (choice === "Overwrite") return save(true, encoding);
   if (choice === "Reload") {
@@ -414,9 +415,10 @@ export async function confirmLeave(what, signal) {
   const choice = await decide({
     signal,
     title: m("Changes Not Saved"),
-    paragraphs: [m`${files.length === 1 ? "This file has" : "These files have"} changes that are not saved: ${names}.`, m`Do you want to ${what}?`],
-    action: can ? "Save" : "Discard Changes",
-    others: can ? ["Don't Save"] : [],
+    paragraphs: [files.length === 1 ? m`This file has changes that are not saved: ${names}.` : m`These files have changes that are not saved: ${names}.`,
+      m`Do you want to ${what}?`],
+    action: can ? tr("Save") : tr("Discard Changes"),
+    others: can ? [tr("Don't Save")] : [],
   });
   if (choice === null) return false;
   if (choice === "Save") return save();

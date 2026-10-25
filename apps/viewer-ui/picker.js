@@ -2,9 +2,13 @@
 // for each, with its kind and its name, to choose from with the mouse or with the keys (Up and
 // Down, Home and End, Enter to choose, Escape to close). Clicking anywhere else closes it.
 
-import { m } from "./i18n.js";
+import { m, tr } from "./i18n.js";
 import { doc } from "./state.js";
 import { $, span } from "./util.js";
+
+/** The kinds of the objects of a Document, as the picker and the selection name them. */
+const OBJECT_KINDS = { instance: tr("instance"), net: tr("net"), usage: tr("usage") };
+export const kindName = (kind) => m(OBJECT_KINDS[kind] ?? kind);
 
 const list = $("pick-list");
 const GAP = 6; // pixels from the pointer to the list
@@ -34,7 +38,7 @@ export function openPicker(objects, x, y, onChoose) {
     row.tabIndex = -1;
     row.setAttribute("role", "option");
     row.dataset.object = String(o);
-    row.append(span("kind", m(obj.kind)), span("name", obj.name));
+    row.append(span("kind", kindName(obj.kind)), span("name", obj.name));
     row.addEventListener("pointermove", () => activate(k));
     row.addEventListener("click", () => choose(k));
     return row;

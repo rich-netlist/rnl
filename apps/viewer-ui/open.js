@@ -1,4 +1,4 @@
-import { append, m, setAttr, setText } from "./i18n.js";
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 // Opening a document: the shell reads a source and builds its Document, and the page shows it.
 // Reading the same source again keeps the level, the visit history to it while its circuits are
 // still there, the view, the selection and the text's scroll. File > Load from Clipboard opens the
@@ -248,7 +248,8 @@ function preview(title, text) {
   const size = document.createElement("p");
   size.className = "dialog-note";
   const more = lines.length > PREVIEW_LINES ? m`; the first ${PREVIEW_LINES} are shown` : "";
-  setText(size, m`${count(lines.length, "line")}, ${count(text.length, "character")}${more}.`);
+  const n = lines.length, c = text.length;
+  setText(size, m`${n === 1 ? m("{0} line", n) : m("{0} lines", n)}, ${c === 1 ? m("{0} character", c) : m("{0} characters", c)}${more}.`);
   const set = document.createElement("fieldset");
   const legend = document.createElement("legend");
   setText(legend, m("Read it as"));
@@ -273,14 +274,9 @@ function preview(title, text) {
     title,
     parts: [warning, box, size, set, alone],
     answer: () => inputs.find((i) => i.checked).value,
-    action: "Load",
+    action: tr("Load"),
     wide: true,
   });
-}
-
-/** A number of things, such as "1 line" or "12 lines". */
-function count(n, thing) {
-  return m`${n} ${m(thing + (n === 1 ? "" : "s"))}`;
 }
 
 /** What to keep when the same source is read again. */

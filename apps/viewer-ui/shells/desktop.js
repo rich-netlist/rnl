@@ -1,4 +1,4 @@
-import { m } from "../i18n.js";
+import { m, tr } from "../i18n.js";
 // The desktop shell: the page inside the RNL Viewer app (apps/desktop), which reads files and builds
 // documents natively and shows the menu bar itself. The only module that uses window.__TAURI__.
 
@@ -227,7 +227,7 @@ export default {
     const existing = await invoke("existing_files", { root: folder, paths: manifest.files.map((f) => f.path) });
     if (existing.length) {
       const shown = existing.slice(0, 5).join(", ") + (existing.length > 5 ? m`, and ${existing.length - 5} more` : "");
-      const choice = await decide({ title: m("Open Project"), paragraphs: [m`The folder already has files of this project: ${shown}.`, m("Replace them?")], action: "Replace" });
+      const choice = await decide({ title: m("Open Project"), paragraphs: [m`The folder already has files of this project: ${shown}.`, m("Replace them?")], action: tr("Replace") });
       if (choice !== "Replace") return null;
     }
     return `${folder.replace(/\\/g, "/").replace(/\/$/, "")}/`;

@@ -1,4 +1,4 @@
-import { append, m, setAttr, setText } from "./i18n.js";
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 // The Solve menu of the desktop viewer (decision 0010): the netlist shown solved as `rnl solve`
 // solves it, without its records of the solver, by the shell on a thread of its own, with its
 // progress and a Cancel button in the status bar; the result drawn as a preview over the file,
@@ -186,6 +186,9 @@ function group(parent, heading, items, open = true) {
 }
 
 const STATUS_ORDER = ["failed", "discarded", "undecided", "kept"];
+// what became of a fact (8.5), as a line and a count name it
+const STATUS_WORDS = { failed: tr("failed"), discarded: tr("discarded"), undecided: tr("undecided"), kept: tr("kept") };
+const STATUS_COUNTS = { failed: tr("{0} failed"), discarded: tr("{0} discarded"), undecided: tr("{0} undecided") };
 const STATUS_HEADINGS = {
   failed: m("Failed: they contradict themselves (8.5, 7.6)"),
   discarded: m("Discarded in the order of 8.5"),
@@ -215,7 +218,7 @@ function renderReport(report) {
     for (const status of STATUS_ORDER) {
       const facts = level.facts.filter((f) => f.status === status);
       const items = facts.map((f) => {
-        const parts = [span("st", m(status)), span("msg", f.text)];
+        const parts = [span("st", m(STATUS_WORDS[status])), span("msg", f.text)];
         if (f.why) parts.push(span("more", f.why));
         return line(`solve-line fact ${status}`, parts, f.at);
       });
@@ -234,7 +237,7 @@ function renderReport(report) {
   const n = (s) => report.levels.reduce((k, l) => k + l.facts.filter((f) => f.status === s).length, 0);
   for (const [s, cls] of [["failed", "n-error"], ["discarded", "n-warning"], ["undecided", "n-warning"]]) {
     const k = n(s);
-    if (k) append(counts, span(cls, m`${k} ${m(s)}`));
+    if (k) append(counts, span(cls, m(STATUS_COUNTS[s], k)));
   }
   if (counts.childElementCount === 0) append(counts, span("none", m("every fact kept")));
 }

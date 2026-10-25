@@ -1,4 +1,4 @@
-import { append, m, setAttr, setText } from "./i18n.js";
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 // Inspect the exact runtime symbol chosen on the navigation path, without rebuilding the circuit.
 import { current, doc, path } from "./state.js";
 import { colourDrawing } from "./background.js";
@@ -18,12 +18,12 @@ const node = (tag, text, cls) => {
 };
 const number = n => Number(n.toFixed(4));
 const point = p => `(${p.map(number).join(", ")})`;
-const direction = d => m(({0: "→ right", 90: "↑ up", 180: "← left", 270: "↓ down"})[d] || "—");
+const direction = d => m(({0: tr("→ right"), 90: tr("↑ up"), 180: tr("← left"), 270: tr("↓ down")})[d] || "—");
 // Provenance captions emitted by document/symbols.rs; names and diagnostic origins stay raw.
 function originText(origin) {
   if (origin.startsWith("Defined in ")) return m`Defined in ${origin.slice(11)}`;
   if (origin.startsWith("Package ")) return m`Package ${origin.slice(8)}`;
-  return ["Viewer default symbol", "Inline symbol"].includes(origin) ? m(origin) : origin;
+  return [tr("Viewer default symbol"), tr("Inline symbol")].includes(origin) ? m(origin) : origin;
 }
 
 function displayParts() {

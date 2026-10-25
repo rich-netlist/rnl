@@ -1,4 +1,4 @@
-import { append, m, setAttr, setText } from "./i18n.js";
+import { append, m, setAttr, setText, tr } from "./i18n.js";
 // The problems list: the errors, warnings and hints, the most serious first; clicking one shows
 // its line in the text. The line numbers of the lines they are on are coloured.
 
@@ -108,17 +108,21 @@ export function renderDiagnostics(list) {
   const counts = $("counts");
   counts.replaceChildren();
   const n = (s) => list.filter((d) => d.severity === s).length;
-  for (const [s, one, many] of [["error", "error", "errors"], ["warning", "warning", "warnings"], ["hint", "hint", "hints"]]) {
+  for (const [s, one, many] of [["error", tr("{0} error"), tr("{0} errors")], ["warning", tr("{0} warning"), tr("{0} warnings")],
+    ["hint", tr("{0} hint"), tr("{0} hints")]]) {
     const k = n(s);
-    if (k) append(counts, span(`n-${s}`, m`${k} ${m(k === 1 ? one : many)}`));
+    if (k) append(counts, span(`n-${s}`, m(k === 1 ? one : many, k)));
   }
   if (list.length === 0) append(counts, span("none", m("none")));
 }
 
+// the levels of diagnostics (7.6), as a row names them
+const SEVERITY = { error: tr("error"), warning: tr("warning"), hint: tr("hint") };
+
 function diagnosticRow(d) {
   const li = document.createElement("li");
   li.className = `diag ${d.severity}`;
-  append(li, span("sev", m(d.severity)), span("msg", d.message));
+  append(li, span("sev", m(SEVERITY[d.severity] ?? d.severity)), span("msg", d.message));
   if (d.file) {
     const loc = span("loc", `${d.file}:${d.line}${d.col ? `:${d.col}` : ""}`);
     if (d.full_path) setAttr(loc, "title", d.full_path);

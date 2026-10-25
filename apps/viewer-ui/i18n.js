@@ -13,12 +13,17 @@ class Message {
   toString() { return translate(this.key, this.values); }
 }
 
-/** Mark a UI string, or a template whose substituted values must remain literal. */
+/** Mark a UI string, or a template whose substituted values must remain literal. A string may have
+ * placeholders {0}, {1}… for the values after it, as a template's ${…} are. */
 export function m(source, ...values) {
   if (source instanceof Message) return source;
   if (Array.isArray(source)) return new Message(source.map((part, i) => part + (i < values.length ? `{${i}}` : "")).join(""), values);
-  return new Message(String(source));
+  return new Message(String(source), values);
 }
+
+/** Mark a UI string that is translated where it is shown, by m() of a variable, such as the label of a
+ * dialog's button or a name in a table: the scan of the catalog finds it here (scripts/i18n/status.py). */
+export const tr = (source) => source;
 
 export function translate(key, values = []) {
   const pattern = language === "zh-CN" && Object.hasOwn(chinese, key) ? chinese[key] : key;
