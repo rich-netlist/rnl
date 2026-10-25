@@ -1,0 +1,12 @@
+{
+  "RNL timeline · Rich Netlist": "RNL 타임라인 · Rich Netlist",
+  "Every release and milestone of RNL, the latest first.": "RNL의 모든 릴리스와 마일스톤을 최신순으로 정리했습니다.",
+  "Skip to content": "본문으로 건너뛰기",
+  "Switch color theme": "색상 테마 전환",
+  "Timeline": "타임라인",
+  "The <a href=\"./#status\">introduction</a> shows only the latest few, and what comes next.": "<a href=\"./#status\">소개 페이지</a>에는 최근 항목 몇 개와 다음 계획만 표시됩니다.",
+  "The dates are Shanghai dates. Each release links to its notes on GitHub.": "날짜는 상하이 시간(UTC+8) 기준입니다. 각 릴리스는 GitHub의 릴리스 노트로 연결됩니다.",
+  "See also": "함께 보기",
+  "Introduction": "소개",
+  "All releases on GitHub": "GitHub의 전체 릴리스"
+}
