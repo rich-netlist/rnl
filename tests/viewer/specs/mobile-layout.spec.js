@@ -161,6 +161,21 @@ async function twoPages(page, { lyingDown = false } = {}) {
   expect(await pageMoved(page)).toEqual(UNMOVED);
 }
 
+/**
+ * Expect the problems no higher than what they list, so that the netlist has the rest: below the
+ * last problem, the problems' box keeps no more than a few pixels empty. A longer list scrolls.
+ */
+async function problemsFit(page) {
+  await expect(page.locator("#problems-body")).toBeVisible();
+  const empty = await page.evaluate(() => {
+    const body = document.getElementById("problems-body");
+    const s = getComputedStyle(body);
+    const inner = body.getBoundingClientRect().bottom - parseFloat(s.paddingBottom) - parseFloat(s.borderBottomWidth);
+    return inner - document.getElementById("diags").getBoundingClientRect().bottom;
+  });
+  expect(empty).toBeLessThanOrEqual(4);
+}
+
 test.describe("on a phone held upright", () => {
   test.beforeEach(async ({ viewer }) => {
     await viewer.open("04-hierarchy");
@@ -178,6 +193,11 @@ test.describe("on a phone held upright", () => {
     await showView(page, "netlist");
     await expect(page.locator("#problems-body")).toBeVisible();
     expect(await netlistLines(page)).toBeGreaterThanOrEqual(5);
+  });
+
+  test("the problems take the height of what they list, and leave the rest to the netlist", async ({ page }) => {
+    await showView(page, "netlist");
+    await problemsFit(page);
   });
 
   test("the drawing and the side panel are two pages, each the whole screen above a low switch bar", async ({ page }) => {
@@ -353,10 +373,17 @@ test.describe("on a phone lying down", () => {
     expect(await pageMoved(page)).toEqual(UNMOVED);
   });
 
-  test("the drawing and the side panel are two pages here too, the switch bar beside the status bar, and the drawing has half the height", async ({ page }) => {
+  test("the drawing and the side panel are two pages here too, the switch bar beside the status bar, and the drawing has most of the height", async ({ page }) => {
     const size = page.viewportSize();
-    expect((await box(page.locator("#canvas"))).height).toBeGreaterThanOrEqual(0.5 * size.height);
+    expect((await box(page.locator("#canvas"))).height).toBeGreaterThanOrEqual(0.55 * size.height);
     await twoPages(page, { lyingDown: true });
+  });
+
+  test("the panel's page starts with the problems folded, and the netlist shows lines of the file", async ({ page }) => {
+    await showView(page, "netlist");
+    await expect(page.locator("#problems-head")).toBeVisible();
+    await expect(page.locator("#problems-head")).toHaveAttribute("aria-expanded", "false");
+    expect(await netlistLines(page)).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -375,6 +402,11 @@ test.describe("on a tablet upright", () => {
     await showView(page, "netlist");
     await expect(page.locator("#problems-body")).toBeVisible();
     expect(await netlistLines(page)).toBeGreaterThanOrEqual(5);
+  });
+
+  test("the problems take the height of what they list, and leave the rest to the netlist", async ({ page }) => {
+    await showView(page, "netlist");
+    await problemsFit(page);
   });
 
   test("the side panel is below the drawing, as wide as the screen, with no switch of pages, and the drawing is no lower than it", async ({ page }) => {
