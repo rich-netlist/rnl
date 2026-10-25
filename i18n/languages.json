@@ -147,6 +147,27 @@
         "display": "\"IBM Plex Sans Condensed\", \"Noto Sans JP\", \"Hiragino Sans\", \"Yu Gothic UI\", \"Meiryo\", sans-serif",
         "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans JP\", monospace"
       }
+    },
+    {
+      "code": "ko",
+      "name": "한국어",
+      "short": "한국어",
+      "html_lang": "ko",
+      "matches": [
+        "ko"
+      ],
+      "status": "incubating",
+      "names": {
+        "en": "Korean",
+        "viewer": "한국어"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+KR:wght@400;500;700;900",
+        "body": "\"Noto Sans KR\", \"Apple SD Gothic Neo\", \"Malgun Gothic\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans KR\", \"Apple SD Gothic Neo\", \"Malgun Gothic\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans KR\", monospace"
+      }
     }
   ]
 }
