@@ -1,7 +1,7 @@
 * Constraints and priority without a solver
-*! 四种原子约束对照写死的坐标检查：满足、按取舍次序丢弃、取舍次序在坐标之前（要求解器改坐标）、成员是自由点（未检查）、disabled；
-*! 优先级的覆盖顺序：记录头默认 < 语句参数 < PRIORITY 修改 < 外层用例的优先级 < 经 :: 写在局部对象上的 PRIORITY；
-*! PLACE 按坐标分单位丢弃、ORIENT 冲突、priority="disabled" 的 PLACE；编辑器在求解器之后写的 high PLACE 盖过求解结果；DISTANCE 的 exact 是精确距离。
+*! The four atomic constraints checked against fixed coordinates: satisfied, dropped by the order of precedence, the order of precedence before coordinates (the solver must move them), a member that is a free point (not checked), disabled;
+*! the order in which priorities override: the record header's default < a statement's parameter < a PRIORITY change < an outer usage's priority < a PRIORITY written on a local object through ::;
+*! PLACE dropped coordinate by coordinate, an ORIENT conflict, a PLACE with priority="disabled"; a high PLACE written by the editor after the solver overrides the solver's result; DISTANCE's exact is an exact distance.
 R1 a b 1k
 R2 b c 1k
 R3 c d 1k

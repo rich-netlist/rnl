@@ -1,8 +1,8 @@
 * Cycles of sets: the statement that closes a cycle fails, and the rest is drawn
 * @RNL(type="header") { @VERSION("0.2")}
-*! 集合依赖成环就是错误（5.2.2）：按位置的次序，闭合环的那条语句失效，诊断列出整个环，其余语句照常生效，整个解释不会失败。
-*! %row 加进 %col 之后又把 %col 加进 %row：后一条失效，%row 仍只有 R1、R2，对齐照常；%b = {%a} 之后 %b @REMOVE-FROM %a：删除那条失效，C1 照常定位。
-*! 两个包集合都含选择：顶层的规则把 $LEFT 加进 $RIGHT，子电路 cell 又把 $RIGHT 加进 $LEFT。环在 cell 里闭合，cell 的那条失效，顶层不受影响，也不再无限递归。
+*! A cycle of set dependencies is an error (5.2.2): in the order of position, the statement that closes the cycle fails, the diagnostic lists the whole cycle, the other statements take effect as usual, and the interpretation as a whole does not fail.
+*! %row is added to %col and then %col to %row: the latter fails, %row still has only R1 and R2, and the alignment holds; %b = {%a} and then %b @REMOVE-FROM %a: the removal fails, and C1 is placed as usual.
+*! Two package sets both with selections: the top level's rule adds $LEFT to $RIGHT, and the subcircuit cell adds $RIGHT to $LEFT. The cycle closes in cell, cell's statement fails, the top level is not affected, and there is no endless recursion any more.
 R1 a b 1k
 R2 b c 1k
 R3 c 0 1k

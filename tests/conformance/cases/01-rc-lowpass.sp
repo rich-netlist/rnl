@@ -1,5 +1,5 @@
 * RC low-pass filter
-*! 基本：标准包按元件字母配符号；地按 $GROUND_NET_SET 画在没接线的引脚上；导线的走法；汇合点，旁边的文字经角色取点的坐标 ${p::x}（13.6）；说明文字；写死的求解器块，地的 stub 是"求解器"写回的。
+*! Basics: the standard package gives symbols by element letter; ground drawn by $GROUND_NET_SET on unconnected pins; how wires run; a junction, with a text beside it taking a point's coordinate through a role, ${p::x} (13.6); a note; a fixed solver block, where the ground stub is written back by the "solver".
 V1 in 0 DC 0 AC 1
 R1 in out 1k
 C1 out 0 1n

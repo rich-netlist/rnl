@@ -1,5 +1,5 @@
 * Diagnostics showcase
-*! 故意写错的语句，各对应一条标准规则：错误（条目失效）、警告（合法但可能不是本意）、提示（覆盖与取舍）。其余语句照常生效，图照样画出来。
+*! Statements written wrong on purpose, each for one standard rule: errors (the item fails), warnings (valid but maybe not what was meant), hints (overrides and choices). The other statements take effect as usual and the drawing is still made.
 .model nch nmos level=1
 M1 d g 0 0 nch
 R1 a b 1k

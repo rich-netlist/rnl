@@ -1038,14 +1038,7 @@ fn a_label_that_the_scene_places_on_one_axis_keeps_its_owner_where_it_is() {
     let after = interpret_file(&f, None, &Layered { layers: vec![&mem, &fs] }, &Options::default()).unwrap();
     assert_eq!(anchors(&after), anchors(&before));
     let diagnostics = after.diagnostics();
-    assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
-    let hint = diagnostics[0];
-    assert_eq!(hint.severity, Severity::Hint);
-    assert_eq!(hint.loc, Some(rnl_runtime::diag::Loc::new("20-label-positions.sp", 2, 4)));
-    assert_eq!(
-        hint.message,
-        "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)"
-    );
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
 }
 
 #[test]

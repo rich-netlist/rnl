@@ -1,7 +1,7 @@
 * 4-bit register: subscripts, buses, bus pins and stacks
 * @RNL(type="header") { @VERSION("0.2")}
-*! 下标：#XI0<3:0>、&Q<3:0>、#XR:Q<3>、#RL<3:0>、步长与混写 &Q<0:3:2, 1>；总线导线收网络的集合，${net} 用逗号连起来；
-*! block symbol 的总线引脚（terminal= 收数组）；分接线与总线共用点；合画 BUNDLE 把迭代实例画成一个，接到合画的端子；标准包给总线加粗。
+*! Indices: #XI0<3:0>, &Q<3:0>, #XR:Q<3>, #RL<3:0>, a step and mixed &Q<0:3:2, 1>; a bus wire takes a set of nets, and ${net} joins them with commas;
+*! a bus pin of a block symbol (terminal= takes an array); taps sharing a point with the bus; BUNDLE drawing the iterated instances as one, wired to the bundle's terminals; the standard package draws buses thicker.
 .subckt dff d clk q
 * @RNL(type="generated", priority="high") {
 *   &d @SELECT-ANCESTOR-USAGE $IOPORT => @PLACE(-2, 1);

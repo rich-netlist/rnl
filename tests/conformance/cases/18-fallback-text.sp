@@ -1,6 +1,6 @@
 * Text the shipped fonts do not map: other scripts, emoji and combining marks
-*! 随核心发布的字体（Noto Sans SC，决定 0009）没有的字符：韩文、表情符号（零宽连接符连成的、带肤色的、带变体选择符的，其中 ⚠ 本身字体里有）、键帽、旗帜、阿拉伯文、天城文、泰文、字体里没有的组合符号（x̂、v⃗）和零宽空格；
-*! 和字体里有的字符（拉丁字母、Ω、汉字、字体里有的组合符号 x́）混排，有粗体、斜体、上划线、上下标、分式、居中、右对齐、竖排，也有实例的名字。期望文件只记下文字的内容；rnl-view 的测试检查这些字符自成一段、按类估计宽度、在 SVG 里居中而不拉伸。
+*! Characters the font shipped with the core (Noto Sans SC, decision 0009) lacks: Korean, emoji (joined by zero-width joiners, with skin tones, with variation selectors, where ⚠ itself is in the font), keycaps, flags, Arabic, Devanagari, Thai, combining marks the font lacks (x̂, v⃗) and a zero-width space;
+*! mixed with characters the font has (Latin letters, Ω, Chinese characters, a combining mark it has, x́), in bold, italic, overline, sub- and superscripts, fractions, centred, right-aligned and vertical, and in an instance's name. The expected file records only the texts' content; rnl-view's tests check that these characters form runs of their own, have widths estimated by class, and are centred in SVG without stretching.
 R1 a b 1k
 * @RNL(type="header") { @VERSION("0.2")}
 * @RNL {

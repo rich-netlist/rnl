@@ -1,6 +1,6 @@
 * Terminal names of T, O, U and Z in a file of 0.3
-*! 0.3 版的文件里，T、O 的端子默认叫 p1 n1 p2 n2，U 叫 a b ref，Z 叫 d g s，同 SPICE 的其他默认端子名一样由适配器给（6.12）。
-*! T1、O1 是两段传输线，U1 是分布 RC，Z1、Z2 是 MESFET；导线都按端子名接。Z2 的名字由头段记录的 DEVICE 给出：文件写的仍然盖过默认。
+*! In a file of version 0.3, the terminals of T and O are named p1 n1 p2 n2 by default, those of U a b ref, and those of Z d g s, given by the adapter like SPICE's other default terminal names (6.12).
+*! T1 and O1 are two transmission lines, U1 a distributed RC line, Z1 and Z2 MESFETs; every wire connects by terminal name. Z2's names come from the DEVICE of the header record: what the file writes still overrides the default.
 * @RNL(type="header") {
 *   @VERSION("0.3");
 *   @DEVICE(name="Z2", terminals=["drain", "gate", "source"])

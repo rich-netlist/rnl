@@ -297,12 +297,6 @@
     {
       "severity": "hint",
       "file": "11-conflict-hints.sp",
-      "line": 2,
-      "col": 4
-    },
-    {
-      "severity": "hint",
-      "file": "11-conflict-hints.sp",
       "line": 10,
       "col": 5
     },

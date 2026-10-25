@@ -1,8 +1,8 @@
 * Inverting amplifier: styles, layers, notes and rich text
 * @RNL(type="header") { @VERSION("0.2")}
-*! 样式：继承（{$base}）、直接指派盖过选择指派（与先后无关）、图元自己的参数最高、标签按项覆盖（只改颜色）；SET-SYMBOL 的直接与规则（匿名的嵌套定义，5.6）；
-*! 导线的线型参数；LAYER 背景；场景里的说明图元（框、箭头、只填充不描边的 linestyle="none"）；富文本：上下标嵌套、粗斜体、上划线、希腊字母、分式、换行、转义、${x}，不认识的记号给警告；
-*! 文字默认按基线对齐（锚点在第一行的基线上），另写 valign 的按文字框对齐；dx、dy 让文字跟着附着的点走。
+*! Styles: inheritance ({$base}), a direct assignment over one by selection (whatever the order), a graphic's own parameters highest, a label overridden item by item (only the color); SET-SYMBOL directly and by rule (an anonymous nested definition, 5.6);
+*! line style parameters of wires; a LAYER background; note graphics in the scene (a box, an arrow, linestyle="none" filling without a stroke); rich text: nested sub- and superscripts, bold italic, overline, Greek letters, fractions, line breaks, escapes, ${x}, and a warning for an unknown markup;
+*! a text is aligned on its baseline by default (the anchor on the first line's baseline), by its box when valign is written; dx and dy make a text follow the point it is attached to.
 .subckt opamp inp inn out
 E1 out 0 inp inn 1e5
 * @RNL(type="generated", priority="high") {

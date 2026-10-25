@@ -1,6 +1,6 @@
 * Ties: names equally close to an unknown one, and several overridden symbol statements
-*! 每次读都得到同一结果：找不到的名字有几个同样接近的候选时，提示取名字顺序里的第一个（$ABCV）；
-*! 六条 SET-SYMBOL $A 都被后面的 {…} @SET-SYMBOL $B 盖过，按书写顺序记为不生效（7.5、8.3）。
+*! Every reading gives the same result: when a name not found has several equally close candidates, the hint takes the first in the order of names ($ABCV);
+*! all six SET-SYMBOL $A are overridden by the later {...} @SET-SYMBOL $B, and recorded as without effect in the order written (7.5, 8.3).
 R1 a1 b1 1k
 R2 a2 b2 1k
 R3 a3 b3 1k

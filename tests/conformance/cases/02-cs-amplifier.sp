@@ -1,7 +1,7 @@
 * Common-source amplifier with PMOS load
-*! 模型类型选符号，直接的 SET-SYMBOL 盖过规则（三端符号）；&vdd 加进 $SUPPLY_NET_SET，电源、地由标准包补上；M1 源极的地贴在引脚上，
-*! 用一根两端都是端子、长度为 0 的导线接上（13.1），标准包就不再补它；CURRENT 与画在点上的电流箭头；
-*! 按键覆盖符号里的标签（只改内容 / 只改位置）；${w} 属性引用；富文本；导线直接指派样式。
+*! The model type chooses the symbol, and a direct SET-SYMBOL overrides the rules (a three-terminal symbol); &vdd added to $SUPPLY_NET_SET, the supply and ground added by the standard package; the ground at M1's source sits on the pin,
+*! connected by a wire of length 0 whose two ends are terminals (13.1), so the standard package no longer adds one; CURRENT, and a current arrow drawn at a point;
+*! the labels of a symbol overridden by key (only the content / only the position); the property reference ${w}; rich text; a style given to a wire directly.
 .model nch nmos level=1
 .model pch pmos level=1
 M1 out in 0 0 nch w=2u l=0.18u

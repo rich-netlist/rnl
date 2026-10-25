@@ -1,5 +1,5 @@
 // A standard series without rule packages drops nothing
-*! 头段记录钉住工具自带的标准包 0.2，钉的版本优先于按语言版本隐式用的 0.3（16.3）：0.2 系列没有方言的规则包，0.3 版的文件也就什么都不去掉；I0 照 0.2 的规则按名字画成电流源。
+*! The header record pins the tool's standard package 0.2, and a pinned version comes before the 0.3 implied by the language version (16.3): the 0.2 series has no dialect rule packages, so a file of version 0.3 leaves nothing out either; I0 is drawn as a current source by name, under the 0.2 rules.
 simulator lang=spectre
 // @RNL(type="header") { @VERSION("0.3"); @USE-PACKAGE(name="rnl-std", version="0.2")}
 subckt cell (p n)

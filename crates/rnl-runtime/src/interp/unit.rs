@@ -1237,7 +1237,7 @@ impl Interp<'_> {
                 || alias.chars().count() < 2
                 || orig.chars().count() < 2
             {
-                return bad(self, "the alias and the original of a name both carry `$`, such as @ALIAS(\"$差分对\", \"$DIFFPAIR\") (16.5)".into());
+                return bad(self, "the alias and the original of a name both carry `$`, such as @ALIAS(\"$DP\", \"$DIFFERENTIAL_PAIR\") (16.5)".into());
             }
             if alias == orig {
                 return bad(self, format!("the alias {alias} is the same as the original (16.5)"));

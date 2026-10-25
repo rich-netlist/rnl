@@ -574,12 +574,5 @@
       "unplaced": []
     }
   ],
-  "diagnostics": [
-    {
-      "severity": "hint",
-      "file": "20-label-positions.sp",
-      "line": 2,
-      "col": 4
-    }
-  ]
+  "diagnostics": []
 }
