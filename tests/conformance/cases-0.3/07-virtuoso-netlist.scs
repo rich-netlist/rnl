@@ -1,6 +1,6 @@
 // A netlist as Virtuoso writes it: the instances of subcircuits are named I0, I1 and so on
-*! Virtuoso 导出的 Spectre 网表，子电路的实例叫 I0、I1（16.3）：0.3 版的文件不用 SPICE 的规则包，它们按子电路画成方框，不画成电流源；真正的电流源 I2 按 master isource 画。
-*! 头段记录写在 simulator lang=spectre 之后，用 // 写（16.3）。子电路 inv 里的 M0、M1 按模型类型画成 P、N 型 MOS。
+*! A Spectre netlist exported by Virtuoso, where the instances of subcircuits are named I0 and I1 (16.3): a file of version 0.3 does not use the SPICE rule package, so they are drawn as subcircuit boxes, not as current sources; the real current source I2 is drawn by its master isource.
+*! The header record comes after simulator lang=spectre and is written with // (16.3). M0 and M1 in the subcircuit inv are drawn as P- and N-type MOS by model type.
 simulator lang=spectre
 // @RNL(type="header") { @VERSION("0.3")}
 global 0 vdd!

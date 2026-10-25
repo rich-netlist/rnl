@@ -1,6 +1,6 @@
 // Every element the Spectre adapter reads natively, each with its default symbol of the series 0.3
-*! 0.3 版的 Spectre 文件隐式用标准包 0.3（16.3），按 Spectre 的规则包 rnl-std-spectre 配符号：内置元件按 master，模型卡的实例按模型类型，P 型最后；不按名字，不用 rnl-std-spice。
-*! 除了子电路调用，Spectre 适配器原生读的每种元件各一行（取自 rnl-dev 的 std-0.3/sheet/native.scs），relay、transformer 也在内：端子按 Spectre 的名字，switch 是 t0、t1，relay 是 p n cp cn，transformer 是 p_plus p_minus s_plus s_minus。叫 M3 的电阻按 master 画成电阻：不按名字。
+*! A Spectre file of version 0.3 implicitly uses the standard package 0.3 (16.3) and gets its symbols from the Spectre rule package rnl-std-spectre: built-in elements by master, instances of model cards by model type, P-type last; not by name, and not with rnl-std-spice.
+*! Apart from subcircuit calls, one line for each kind of element the Spectre adapter reads natively (from std-0.3/sheet/native.scs in rnl-dev), relay and transformer included: terminals by their Spectre names, t0 t1 for switch, p n cp cn for relay, p_plus p_minus s_plus s_minus for transformer. The resistor named M3 is drawn as a resistor by its master, not by its name.
 simulator lang=spectre
 // @RNL(type="header") { @VERSION("0.3")}
 r1 (a1 b1) resistor r=1k

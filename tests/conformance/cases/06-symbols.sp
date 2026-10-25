@@ -1,6 +1,6 @@
 * Symbols: primitives, variants, usages inside symbols, eight orientations
-*! 符号：片段（%）与变体（并入后按端子覆盖引脚、图元累加）；全部图元（两种写法、填充、线端箭头、闭合折线）；固定文字与 `?` 上带键的文字；
-*! 体里画在点上的用例（箭头），嵌套的用例随符号合成姿态；同一个不对称符号的八种姿态，检查文字始终正读（9.2.5）。
+*! Symbols: fragments (%) and variants (pins overridden by terminal after merging, graphics added up); every graphic (both ways of writing, fill, arrowheads, closed polylines); fixed texts, and texts with a key on `?`;
+*! usages drawn at points in a body (arrows), nested usages taking the symbol's orientation; the eight orientations of one asymmetric symbol, checking that texts always read upright (9.2.5).
 R1 a1 b1 1k
 R2 a2 b2 1k
 R3 a3 b3 1k

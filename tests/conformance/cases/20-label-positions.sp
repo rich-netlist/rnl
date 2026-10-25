@@ -1,8 +1,8 @@
 * Label positions axis by axis: what the scene writes replaces what the symbol gives
-*! 符号给自己的标签定了位置：$TAG 的 name 在 (1, 1)，value 在 (1, -1)。场景里给同一个引用名写 PLACE 或偏移（dx、dy），按轴取代它（13.3）：
-*! 每一轴取后写的那种；两种都没写的轴，仍用符号给的位置，随元件转。偏移按场景的轴，不随元件转。
-*! R1 的 name 只写 x 的 PLACE；R2 转了 R90，name 只写 dx；R3 的 name 先写偏移、后写 x 的 PLACE；R4 的 value 先写 PLACE、后写 dy；R5 什么都没写，照符号。
-*! R6 的 name 写 dx、dy，是编辑器导出标签的常见写法；符号没有的引用名（R6 的 note）照旧按偏移放。
+*! A symbol places its own labels: $TAG's name at (1, 1), its value at (1, -1). A PLACE or an offset (dx, dy) written in the scene for the same reference name replaces it axis by axis (13.3):
+*! each axis takes the one written later; an axis with neither keeps the position the symbol gives, turning with the element. An offset is along the scene's axes and does not turn with the element.
+*! R1's name has a PLACE of x only; R2 is turned R90 and its name has dx only; R3's name has an offset and then a PLACE of x; R4's value has a PLACE and then dy; R5 has nothing written and follows the symbol.
+*! R6's name has dx and dy, as an editor commonly exports labels; a reference name the symbol lacks (R6's note) is placed by its offset as before.
 R1 a1 b1 1k
 R2 a2 b2 2k
 R3 a3 b3 3k

@@ -422,12 +422,6 @@
     {
       "severity": "hint",
       "file": "21-pipe-segments.sp",
-      "line": 2,
-      "col": 4
-    },
-    {
-      "severity": "hint",
-      "file": "21-pipe-segments.sp",
       "line": 11,
       "col": 5
     },

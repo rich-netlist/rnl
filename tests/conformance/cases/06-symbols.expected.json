@@ -2053,8 +2053,8 @@
     {
       "severity": "hint",
       "file": "06-symbols.sp",
-      "line": 2,
-      "col": 4
+      "line": 43,
+      "col": 23
     },
     {
       "severity": "hint",

@@ -1347,12 +1347,6 @@
     {
       "severity": "hint",
       "file": "07-virtuoso-netlist.scs",
-      "line": 2,
-      "col": 13
-    },
-    {
-      "severity": "hint",
-      "file": "07-virtuoso-netlist.scs",
       "line": 1,
       "col": 0
     },

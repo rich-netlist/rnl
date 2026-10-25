@@ -2125,8 +2125,8 @@
     {
       "severity": "hint",
       "file": "07-sets-and-selections.sp",
-      "line": 2,
-      "col": 4
+      "line": 26,
+      "col": 18
     }
   ]
 }

@@ -2191,8 +2191,8 @@
     {
       "severity": "hint",
       "file": "08-styles-and-text.sp",
-      "line": 3,
-      "col": 4
+      "line": 55,
+      "col": 32
     },
     {
       "severity": "warning",

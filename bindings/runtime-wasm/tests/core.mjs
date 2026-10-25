@@ -98,16 +98,7 @@ test("the same request gives the same Document every time", async () => {
   for (let k = 0; k < 6; k++) assert.deepEqual(core.build(request), first);
   assert.deepEqual(
     first.diagnostics.map(({ severity, file, line, col, message }) => [severity, file, line, col, message]),
-    [
-      [
-        "hint",
-        "16-ties.sp",
-        2,
-        4,
-        "non-ASCII characters in host comments have not been verified for the simulator/version used by this generic adapter; check compatibility before simulation (3.1)",
-      ],
-      ["error", "16-ties.sp", 32, 21, "$ABCZ cannot be found, did you mean $ABCV? (6.6)"],
-    ],
+    [["error", "16-ties.sp", 32, 21, "$ABCZ cannot be found, did you mean $ABCV? (6.6)"]],
   );
 });
 

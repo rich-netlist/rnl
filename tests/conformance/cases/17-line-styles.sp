@@ -1,7 +1,7 @@
 * Line styles: every style on every shape kind, in a symbol and on a wire
-*! 每种线型画在每种图元上：矩形、圆、椭圆、折线、闭合折线、圆弧、贝塞尔曲线；先是细线（线宽 0），再是给了线宽的双线、虚线、点线，
-*! 有平头、尖角、方头、斜角；线型 none 只填充不描边。双线在矩形、圆和椭圆上也画成两条线，中间是填充色（以前只在路径上这样画）；
-*! 符号里的双线框，实例样式给的双线（标准电阻的折线），双线导线。
+*! Each line style drawn on each graphic: rectangle, circle, ellipse, polyline, closed polyline, arc, Bezier curve; first thin lines (line width 0), then double, dashed and dotted lines with a line width,
+*! with butt, miter, square and bevel ends and joins; line style none fills without a stroke. Double lines on rectangles, circles and ellipses are also drawn as two lines with the fill between them (before, only paths were);
+*! a double-line box in a symbol, a double line given by an instance's style (the zigzag of the standard resistor), and a double-line wire.
 R1 a c 1k
 R2 a b 1k
 * @RNL(type="header") { @VERSION("0.2")}

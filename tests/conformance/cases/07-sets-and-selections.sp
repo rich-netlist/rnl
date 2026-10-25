@@ -1,7 +1,7 @@
 * Current mirror bank: sets, selections and generation rules
-*! 集合：命名、嵌套打散、ADD-TO / REMOVE-FROM、UNION、先用后定义（不分先后）；选择：按模型、管道里的 SELECT-TERMINAL(terminal=)、
-*! current=、global=、SELECT-WIRE；生成：按 CURRENT 选端子逐个 ATTACH 电流箭头、给没接线的端子补网名（标准包的 $LABEL_TERM_SET）、规则按键改标签内容；
-*! M3 的地画在源极引脚上：以用例为范围只取本种类的成员，标准包选得出这个端子，不再给它补地（10.1）。
+*! Sets: names, nesting flattened, ADD-TO / REMOVE-FROM, UNION, used before defined (order does not matter); selections: by model, SELECT-TERMINAL(terminal=) in a pipe,
+*! current=, global=, SELECT-WIRE; generating: an ATTACH of a current arrow to each terminal selected by CURRENT, net names added to unconnected terminals (the standard package's $LABEL_TERM_SET), a rule changing a label's content by key;
+*! M3's ground is drawn on its source pin: with a usage as the scope, only the members of this kind are taken, the standard package can select that terminal, and adds no ground to it (10.1).
 .global vdd!
 .model nch nmos level=1
 M0 bias bias 0 0 nch w=2u l=1u

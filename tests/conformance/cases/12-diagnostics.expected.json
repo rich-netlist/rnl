@@ -1287,8 +1287,8 @@
     {
       "severity": "hint",
       "file": "12-diagnostics.sp",
-      "line": 2,
-      "col": 4
+      "line": 14,
+      "col": 14
     },
     {
       "severity": "warning",

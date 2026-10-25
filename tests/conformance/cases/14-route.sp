@@ -1,6 +1,6 @@
 * Common-emitter amplifier, wiring left to the solver
-*! ROUTE（13.7，PR5）：只说"这些网络画成导线"，不写分叉点和汇合点，弱模型也写得出；求解器会写回具体的导线和圆点，原型不布线，画虚线飞线。
-*! 标准包的 $WIRE_NET_SET（全部网络去掉地、电源）配一条规则；out 先手写了一段，ROUTE 只补其余的；地、电源的 stub 是"求解器"写回的。
+*! ROUTE (13.7, PR5): it only says "draw these nets as wires", without branch or junction points, so a weak model can write it too; the solver writes back the actual wires and dots, and the prototype does not route but draws dashed flylines.
+*! One rule for the standard package's $WIRE_NET_SET (every net but ground and supplies); out has a segment written by hand first, and ROUTE adds only the rest; the ground and supply stubs are written back by the "solver".
 .model npn1 npn
 Q1 c b e npn1
 R1 vcc b 47k

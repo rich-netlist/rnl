@@ -1751,8 +1751,8 @@
     {
       "severity": "hint",
       "file": "02-cs-amplifier.sp",
-      "line": 2,
-      "col": 4
+      "line": 31,
+      "col": 21
     }
   ]
 }
