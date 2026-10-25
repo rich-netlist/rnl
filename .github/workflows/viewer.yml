@@ -89,14 +89,14 @@ jobs:
           test ! -s "$RUNNER_TEMP/system-cjk-fonts.txt"
       # the web server builds the web viewer's site and serves it; the global setup builds the rnl
       # command and writes the fixtures
-      - name: Test the page and the web viewer in Chromium and WebKit
+      - name: Test the page and the web viewer in Chromium and WebKit, on a desktop and on a phone
         env:
           CJK_ONLY: ${{ inputs.cjk_only }}
         run: |
           if [ "$CJK_ONLY" = true ]; then
             npx playwright test specs/cjk.spec.js specs/i18n.spec.js --project chromium --project webkit --workers 2
           else
-            npx playwright test --project chromium --project webkit --workers 2
+            npx playwright test --project chromium --project webkit --project mobile-chromium --project mobile-webkit --workers 2
           fi
       - name: Keep browser evidence and font transfer sizes
         if: always()
