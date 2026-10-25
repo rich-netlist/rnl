@@ -7,6 +7,7 @@ Six static pages, in Chinese and English, for circuit designers who have not wor
 - `tools.html`, the page of the tools: what the viewers of the first toolkit, 0.1, do; the web viewer, with a few samples to open in it; the desktop viewer for Windows and Linux, with the files of its newest release; the toolchain, its modules and how data flows through them; and the licences.
 - `gallery.html`, the gallery of circuits: a list of designs in public GitHub repositories, each shown by a thumbnail and opened in the web viewer. The page holds no data: it reads `index.json` and the thumbnails from the GitHub Pages of [rnl-gallery](https://github.com/rich-netlist/rnl-gallery), where its checks write them ([The circuit gallery](#the-circuit-gallery)).
 - `agents.html`, the entry for AI agents: how to get the RNL skill package and install it, what is in it, and how to check and draw the files an agent writes ([For agents](#for-agents)).
+- `timeline.html`, the full timeline: every release and milestone, the latest first, linked from the end of the homepage's short timeline and not one of the menu's tabs ([The timeline](#the-timeline)).
 - `packages.html`, the gallery of the standard packages: every package in [`libraries/`](../libraries/README.md), with what it is for, what it references and its text, every symbol as the core draws it, with its pins and box, and the rules that give elements their symbols ([The gallery](#the-gallery-of-the-standard-packages)).
 
 The site also publishes the skill package for agents, at `skill/`, and `llms.txt`, at `llms.txt` and `zh/llms.txt`; the web viewer itself, at `viewer/` ([`apps/web`](../apps/web/README.md)), one copy that the pages of both languages link to, with the conformance corpus as its samples; the pages of the language standard, at `zh/spec/<version>/` and `en/spec/<version>/` for each version, such as `zh/spec/0.3/`, with the short guide to the language as their first section and the principles of RNL as their last; and the gallery's data, at `gallery/`. [`pages.yml`](../.github/workflows/pages.yml) adds them to what `build.py` writes.
@@ -103,12 +104,17 @@ With a release, the build keeps the `<!--release-->` blocks and fills in `{{view
 
 `pages.yml` checks out the whole history, tags included, and runs again after each release of the desktop viewer, so that the published page links to the new files. `--viewer-version` sets the version for a local build or a test, whatever the tags say, and `--viewer-version none` builds the page as before the first release.
 
-## The homepage timeline
+## The timeline
 
-`build.py` fills the homepage's `{{timeline}}` marker from `src/timeline.json` and the
-repository's `viewer-v*`, `spec-*-r*` and `core-v*` tags. Shanghai dates come from tag creation
-times (commit times for lightweight tags), and only the latest published milestone gets
-`class="now"`. The existing timeline elements, styles and Next entries are retained.
+`build.py` makes the timeline from `src/timeline.json` and the repository's `viewer-v*`,
+`spec-*-r*` and `core-v*` tags. Shanghai dates come from tag creation times (commit times for
+lightweight tags), and only the latest published milestone gets `class="now"`.
+
+The homepage's `{{timeline}}` marker is filled with the latest `HOME_ENTRIES` (3) published
+entries, oldest first, a link to the full timeline and the Next entries. The full record is its own
+page, `timeline.html`, which `{{timeline-full}}` fills with every published entry, the latest
+first, and no Next. It is not one of the tabs of the menu; the homepage links to it and it links back.
+Its texts and the entries' are translated in the catalogs like those of any page.
 
 Release notes carry a one-sentence `timeline-summary` JSON block in English, translated in
 `i18n/<lang>/site/timeline.json.json` with the texts of `src/timeline.json` (notes released

@@ -220,7 +220,7 @@
   "Switch simulators or viewers, and the drawing is still there.": "换仿真器、换查看器，画法都还在。",
   "05 · Status": "05 · 现状",
   "Where things stand.": "现在走到哪一步。",
-  "The language is released as standard 0.3; <a href=\"tools.html\">the web and desktop viewers</a> read netlists, draw them and edit the text, and the solver has a first version. Below are only the released milestones and what comes next.": "语言已经发布为标准 0.3；<a href=\"tools.html\">网页版和桌面版查看器</a>能读网表、画图、改文本，求解器有了第一版。下面只列对外发布的节点和接下来的计划。",
+  "The language is released as standard 0.3; <a href=\"tools.html\">the web and desktop viewers</a> read netlists, draw them and edit the text, and the solver has a first version. Below are the latest released milestones and what comes next; every one is on the full timeline.": "语言已经发布为标准 0.3；<a href=\"tools.html\">网页版和桌面版查看器</a>能读网表、画图、改文本，求解器有了第一版。下面是最近发布的节点和接下来的计划；全部节点在完整时间线里。",
   "FAQ": "常见问题",
   "Will simulators complain about a netlist with RNL in it?": "加了 RNL 的网表，仿真器会报错吗？",
   "No. RNL is written only in the host netlist’s legal comments, and simulators skip it like any other comment, with no preprocessing. Which exact marker is safe in every vendor’s simulator is still being researched and verified.": "不会。RNL 只写在宿主网表的合法注释里，仿真器当普通注释跳过，不需要预处理。具体用哪个标记在各家仿真器里都安全，还在调研和验证。",

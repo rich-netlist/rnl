@@ -91,9 +91,10 @@ PAGES = {
     "packages.html": None,
     "gallery.html": None,
     "agents.html": None,
+    "timeline.html": None,
 }
 # Pages added after the Chinese pages moved to zh/ have no old address at the root.
-NEW_PAGES = ("agents.html", "gallery.html")
+NEW_PAGES = ("agents.html", "gallery.html", "timeline.html")
 
 GROUP = I18N.group
 CJK = re.compile("[%s]" % "".join("%s-%s" % (chr(a), chr(b)) for a, b in
@@ -116,6 +117,9 @@ RELEASE_MARK = re.compile(r"<!--/?(?:no-)?(?:(?:linux|macos)-)?release-->")
 FIELD = re.compile(r"\{\{(viewer-[a-z-]+)\}\}")
 FIELDS = ("viewer-version", "viewer-tag")
 TIMELINE = "{{timeline}}"
+TIMELINE_FULL = "{{timeline-full}}"
+# The homepage shows this many of the latest published entries; timeline.html has all of them.
+HOME_ENTRIES = 3
 # Release dates are modern Asia/Shanghai dates (UTC+08:00, without DST).
 SHANGHAI = timezone(timedelta(hours=8))
 RELEASE_VERSION = r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
@@ -246,7 +250,9 @@ def translations_beside(value, path):
     return []
 
 
-def timeline_html(data=None, tags=None):
+def timeline_html(data=None, tags=None, full=False):
+    """The rows of the timeline: for the homepage, its latest published entries, a link to the full timeline and
+    what comes next; for timeline.html (`full`), every published entry, the latest first."""
     if data is None:
         try:
             data = json.loads((SRC / "timeline.json").read_text(encoding="utf-8"))
@@ -275,16 +281,22 @@ def timeline_html(data=None, tags=None):
         return f' <a href="{escape(url, quote=True)}">{localized(labels)}</a>'
 
     rows = []
-    for index, event in enumerate(events):
+    shown = events if full else events[-HOME_ENTRIES:]
+    for event in shown:
         day = event["stamp"].date().isoformat()
         if event.get("start_date"):
             start = timeline_date(event["start_date"]).date().isoformat()
             day = localized({code: I18N.message(code, "timeline_range", start=start, end=day) for code in CODES})
-        current = ' class="now"' if index == len(events) - 1 else ""
+        current = ' class="now"' if event is events[-1] else ""
         # Handwritten descriptions retain their reviewed inline links/code. Release summaries are plain text.
         description = localized(event.get("summary", event.get("description")), html="summary" not in event)
         rows.append(f'        <li{current}><time>{day}</time><b>{localized(event["title"])}</b>'
                     f'<p>{description}{link(event)}</p></li>')
+    if full:
+        return "\n".join(reversed(rows))
+    if len(shown) < len(events):
+        rows.append('        <li class="tl-more"><a href="timeline.html">'
+                    + localized({code: I18N.message(code, "timeline_all") for code in CODES}) + '</a></li>')
     rows.append('        <li class="tl-sep">' + localized({code: I18N.message(code, "timeline_next") for code in CODES}) + '</li>')
     for event in data.get("next", []):
         title = localized(localized_values(event["title"], "next milestone title"))
@@ -670,6 +682,9 @@ def build(version=None):
     if files["index.html"].count(TIMELINE) != 1:
         raise BuildError("src/index.html needs exactly one {{timeline}} marker")
     files["index.html"] = files["index.html"].replace(TIMELINE, timeline_html())
+    if files["timeline.html"].count(TIMELINE_FULL) != 1:
+        raise BuildError("src/timeline.html needs exactly one {{timeline-full}} marker")
+    files["timeline.html"] = files["timeline.html"].replace(TIMELINE_FULL, timeline_html(full=True))
     ex = examples()
     errors = []
     for path, text in files.items():

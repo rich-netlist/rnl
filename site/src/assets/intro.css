@@ -959,6 +959,12 @@ html[lang="en"] .fam { grid-template-columns: 108px 1fr; }
 .tl li.next b { color: var(--ink-2); }
 .tl-sep { font: 700 13px var(--f-body); color: var(--markup); letter-spacing: .08em; padding-top: 6px; }
 .tl-sep::before { display: none; }
+.tl-more::before { display: none; }
+.tl-more a { font: 600 14.5px var(--f-body); color: var(--markup); text-decoration: none; }
+.tl-more a::after { content: " →"; }
+.tl-more a:hover { text-decoration: underline; }
+.tl-sheet { padding-block: 0 72px; }
+.tl-sheet .tl { max-width: 760px; }
 .faq { display: grid; gap: 10px; }
 .faq details { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 .faq summary { list-style: none; cursor: pointer; padding: 14px 16px; font: 600 15.5px var(--f-body); display: flex; gap: 10px; align-items: center; }
