@@ -61,7 +61,8 @@ test('native language picker works without JavaScript', async ({ browser, baseUR
   } finally { await context.close(); }
 });
 
-test('third locale inherits English content and switches without changing source templates', async ({ page }) => {
+/* The site built with a third locale (test-setup.mjs), served at /i18n-fixture/. */
+async function serveFixture(page) {
   const fixture = resolve(process.env.RNL_I18N_FIXTURE);
   await page.route('**/i18n-fixture/**', async route => {
     let path = decodeURIComponent(new URL(route.request().url()).pathname.split('/i18n-fixture/')[1]);
@@ -83,6 +84,14 @@ test('third locale inherits English content and switches without changing source
     }
     catch { await route.fulfill({ status: 404, body: 'Not found' }); }
   });
+  // the gallery page's entries, from rnl-gallery's Pages: none, as the notice is what is looked at here
+  await page.route('https://rich-netlist.github.io/rnl-gallery/**', route => route.fulfill({
+    headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' },
+    body: JSON.stringify({ format: 1, generated: '2026-10-25T00:00:00Z', entries: [] }) }));
+}
+
+test('third locale inherits English content and switches without changing source templates', async ({ page }) => {
+  await serveFixture(page);
   await page.addInitScript(() => Object.defineProperty(navigator, 'languages', { value: ['fr-FR', 'ja-JP'] }));
   await page.goto('/i18n-fixture/?review=1#status');
   await expect(page).toHaveURL(/\/i18n-fixture\/ja\/\?review=1#status$/);
@@ -100,6 +109,43 @@ test('third locale inherits English content and switches without changing source
   await expect(page.locator('.gl-sum').filter({ hasText: 'English catalog fallback.' })).toHaveCount(1);
   await expect(page.locator('.gl-sum').filter({ hasText: '日本語のカタログ説明。' })).toHaveCount(1);
 });
+
+for (const theme of ['light', 'dark']) for (const width of [1440, 390]) {
+  test(`a page not wholly translated says so below its hero: ${theme} ${width}px`, async ({ page }, info) => {
+    await serveFixture(page);
+    await page.setViewportSize({ width, height: 900 });
+    await page.addInitScript(theme => localStorage.setItem('rnl-intro-theme', theme), theme);
+    for (const [file, partial] of [['index.html', false], ['gallery.html', true]]) {
+      await page.goto(`/i18n-fixture/ja/${file}`);
+      const notice = page.locator('.translation-notice');
+      await expect(notice).toHaveCount(1);
+      await expect(notice).toBeVisible();
+      await expect(notice).toHaveAttribute('lang', 'ja');
+      await expect(notice).toHaveClass(partial ? /\bis-partial\b/ : /^wrap translation-notice$/);
+      await expect(notice).toContainText(partial ? 'Parts of this page are not yet available in 日本語' : 'This page is not yet available in 日本語');
+      await expect(notice.locator('a')).toHaveAttribute('href', /i18n\/README\.md$/);
+      // below the hero, before the page's first part, and within the width of the page
+      const box = await notice.boundingBox();
+      const hero = await page.locator('.hero').boundingBox();
+      expect(box.y).toBeGreaterThanOrEqual(hero.y + hero.height - 1);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      if (partial) await expect(page.locator('.hero h1')).toContainText('（訳）');
+      else await expect(page.locator('.hero')).toContainText('A netlist you can simulate');
+      if (process.env.RNL_I18N_SCREENSHOTS && info.project.name === 'chromium') {
+        mkdirSync(process.env.RNL_I18N_SCREENSHOTS, { recursive: true });
+        await page.evaluate(() => document.fonts.ready);
+        const y = Math.max(0, box.y - 160);
+        await page.screenshot({ path: join(process.env.RNL_I18N_SCREENSHOTS, `notice-${partial ? 'partial' : 'english'}-${theme}-${width}.png`),
+          clip: { x: 0, y, width, height: box.y - y + box.height + 120 }, animations: 'disabled' });
+      }
+    }
+    for (const language of ['zh', 'en']) {
+      await page.goto(`/${language}/`);
+      await expect(page.locator('.translation-notice')).toHaveCount(0);
+    }
+  });
+}
 
 test('unsupported browser languages fall back to English, including with blocked storage', async ({ page }) => {
   await page.addInitScript(() => {

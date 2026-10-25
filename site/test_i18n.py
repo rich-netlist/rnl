@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from site_i18n import CONFIG, Languages  # noqa: E402
+from site_i18n import CONFIG, Languages, norm  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("i18n_site_build", ROOT / "site/build.py")
 build = importlib.util.module_from_spec(spec)
@@ -103,6 +103,92 @@ class Localization(unittest.TestCase):
                                   capture_output=True, encoding="utf-8").stdout
             self.assertIn('data-language="ja"', menu)
             self.assertIn('href="../../../en/spec/0.3/compare-0.2.html"', menu)
+
+
+class Catalogs(unittest.TestCase):
+    """Translations from the catalogs in i18n/<lang>/site/, and the notices of pages not wholly translated."""
+
+    def registry(self, directory, catalogs):
+        for path, data in catalogs.items():
+            file = directory / "ja/site" / (path + ".json")
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        return Languages(third_language(), catalogs=directory)
+
+    def test_a_catalog_translates_by_the_english_and_a_block_beside_it_comes_first(self):
+        with tempfile.TemporaryDirectory() as directory:
+            registry = self.registry(Path(directory), {"page.html": {
+                "Two words": "二語", "Hello": None, "Empty": "", "Block wins": "訳"}})
+            text = '<en>Two\n  words</en>|<en>Hello</en>|<en>Empty</en>|<ja>枠</ja><en>Block wins</en>'
+            self.assertEqual(registry.localize(text, "ja", "page.html"), "二語|Hello||枠")
+            self.assertEqual(registry.localize(text, "ja", "other.html"), "Two\n  words|Hello|Empty|枠")
+            self.assertEqual(registry.localize(text, "ja", "page.html", english=True), "Two\n  words|Hello|Empty|Block wins")
+            self.assertEqual(registry.localize(text, "zh", "page.html"), "Two\n  words|Hello|Empty|Block wins")
+            self.assertEqual(registry.coverage(text, "ja", "page.html"), (3, 4))
+            self.assertEqual(registry.coverage(text, "en", "page.html"), (4, 4))
+            self.assertEqual(registry.catalog_errors("ja", "page.html"), [])
+
+    def test_malformed_catalogs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            registry = self.registry(Path(directory), {
+                "a.html": {"Hello <b>{name}</b>": "<b>{name}</b> {count}",
+                           '<a href="tools.html">Tools</a>': '<a href="index.html">ツール</a>',
+                           "<code>x</code> and y": "x と y",
+                           "Plain": "It's \"quoted\""},
+                "b.html": ["not an object"]})
+            errors = "\n".join(registry.catalog_errors("ja", "a.html"))
+            for part in ("a placeholder", "its links", "its tags", "straight quotes"):
+                self.assertIn(part, errors)
+            self.assertIn("an object", registry.catalog_errors("ja", "b.html")[0])
+            (Path(directory) / "ja/site/c.html.json").write_text("{", encoding="utf-8")
+            self.assertIn("not valid JSON", registry.catalog_errors("ja", "c.html")[0])
+
+    def test_notices_of_pages_not_wholly_translated(self):
+        registry = Languages(third_language())
+        self.assertEqual(registry.notice("ja", 10, 10), "")
+        self.assertEqual(registry.notice("en", 0, 10), "")
+        partial, english = registry.notice("ja", 8, 10), registry.notice("ja", 7, 10)
+        self.assertIn('class="wrap translation-notice is-partial" lang="ja"', partial)
+        self.assertIn("not yet available in 日本語", partial)
+        self.assertIn('class="wrap translation-notice" lang="ja"', english)
+        self.assertIn("i18n/README.md", english)
+        self.assertIn("本页尚无中文", registry.notice("zh", 0, 10))
+        self.assertIn("本页有部分内容尚无中文", registry.notice("zh", 9, 10))
+
+    def test_whole_site_of_a_language_with_catalogs_only(self):
+        """agents.html translated wholly, gallery.html but for two texts, index.html hardly at all."""
+        registry = Languages(third_language())
+        sources = build.sources()
+
+        def as_japanese(path, leave=0, only=None):
+            groups = [dict(registry.block.findall(m.group())) for m in registry.group.finditer(sources[path])]
+            entries = {norm(g["en"]): "（訳）" + g["en"] for g in groups}
+            keys = list(entries)[:only] if only else list(entries)[leave:]
+            return {key: entries[key] for key in keys}
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            catalogs = {"agents.html": as_japanese("agents.html"), "assets/agents.js": as_japanese("assets/agents.js"),
+                        "assets/common.js": as_japanese("assets/common.js"),
+                        "gallery.html": as_japanese("gallery.html"), "assets/circuits.js": as_japanese("assets/circuits.js", leave=2),
+                        "index.html": as_japanese("index.html", only=1)}
+            self.registry(directory, catalogs)
+            config = directory / "languages.json"
+            config.write_text(json.dumps(third_language()), encoding="utf-8")
+            env = dict(os.environ, RNL_SITE_LANGUAGES=str(config), PYTHONDONTWRITEBYTECODE="1")
+            subprocess.run([sys.executable, "site/build.py", "--out", str(directory / "dist")], cwd=ROOT,
+                           env=env, check=True, capture_output=True, text=True)
+            page = lambda lang, name: (directory / "dist" / lang / name).read_text(encoding="utf-8")
+            self.assertNotIn("translation-notice", page("ja", "agents.html"))
+            self.assertIn("（訳）", page("ja", "agents.html"))
+            self.assertIn('translation-notice is-partial', page("ja", "gallery.html"))
+            index = page("ja", "index.html")
+            self.assertIn('class="wrap translation-notice" lang="ja"', index)
+            self.assertNotIn("（訳）", index)  # shown in English: its one translated text too
+            self.assertIn("A netlist you can simulate", index)
+            self.assertIn('<html lang="ja" data-locale="ja">', index)
+            for lang in ("en", "zh"):
+                for name in build.PAGES:
+                    self.assertNotIn("translation-notice", page(lang, name), (lang, name))
 
 
 if __name__ == "__main__":
