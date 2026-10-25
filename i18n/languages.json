@@ -99,6 +99,33 @@
         "display": "\"IBM Plex Sans Condensed\", \"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
         "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans SC\", monospace"
       }
+    },
+    {
+      "code": "zh-hant",
+      "name": "繁體中文",
+      "short": "繁中",
+      "html_lang": "zh-Hant",
+      "matches": [
+        "zh-tw",
+        "zh-hk",
+        "zh-mo",
+        "zh-hant"
+      ],
+      "status": "incubating",
+      "codes": {
+        "viewer": "zh-Hant"
+      },
+      "names": {
+        "en": "Traditional Chinese",
+        "viewer": "繁體中文"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+TC:wght@400;500;700;900",
+        "body": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans TC\", monospace"
+      }
     }
   ]
 }
