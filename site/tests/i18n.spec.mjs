@@ -135,9 +135,12 @@ for (const theme of ['light', 'dark']) for (const width of [1440, 390]) {
       if (process.env.RNL_I18N_SCREENSHOTS && info.project.name === 'chromium') {
         mkdirSync(process.env.RNL_I18N_SCREENSHOTS, { recursive: true });
         await page.evaluate(() => document.fonts.ready);
-        const y = Math.max(0, box.y - 160);
+        // the notice with the end of the hero above it and the start of the page below, where a tall hero
+        // puts it out of the viewport: a clip of the whole page, in its own coordinates
+        const top = await notice.evaluate(el => el.getBoundingClientRect().top + scrollY);
+        const y = Math.max(0, top - 160);
         await page.screenshot({ path: join(process.env.RNL_I18N_SCREENSHOTS, `notice-${partial ? 'partial' : 'english'}-${theme}-${width}.png`),
-          clip: { x: 0, y, width, height: box.y - y + box.height + 120 }, animations: 'disabled' });
+          fullPage: true, clip: { x: 0, y, width, height: top - y + box.height + 120 }, animations: 'disabled' });
       }
     }
     for (const language of ['zh', 'en']) {
