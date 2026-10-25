@@ -128,17 +128,38 @@ class Catalogs(unittest.TestCase):
             self.assertEqual(registry.coverage(text, "en", "page.html"), (4, 4))
             self.assertEqual(registry.catalog_errors("ja", "page.html"), [])
 
-    def test_malformed_catalogs(self):
+    def test_a_context_tells_two_ways_of_one_english_apart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            registry = self.registry(Path(directory), {"page.html": {"Yes": "はい", "readable|Yes": "読める"}})
+            text = '<en>Yes</en>|<en ctx=readable>Yes</en>|<en ctx=other>Yes</en>'
+            self.assertEqual(registry.errors(text, "page.html"), [])
+            self.assertEqual(registry.parts("<zh>看得懂</zh><en ctx=readable>Yes</en>"), ({"zh": "看得懂", "en": "Yes"}, "readable"))
+            self.assertEqual(registry.localize(text, "ja", "page.html"), "はい|読める|Yes")
+            self.assertEqual(registry.localize(text, "en", "page.html"), "Yes|Yes|Yes")
+            self.assertEqual(registry.coverage(text, "ja", "page.html"), (2, 3))
+
+    def test_malformed_catalogs_and_what_is_only_other(self):
         with tempfile.TemporaryDirectory() as directory:
             registry = self.registry(Path(directory), {
                 "a.html": {"Hello <b>{name}</b>": "<b>{name}</b> {count}",
+                           "<b>Bold</b> text": "<b>太字",
                            '<a href="tools.html">Tools</a>': '<a href="index.html">ツール</a>',
                            "<code>x</code> and y": "x と y",
-                           "Plain": "It's \"quoted\""},
+                           "readable|Plain": "It's \"quoted\""},
+                "assets/c.js": {"Plain": "It's here"},
                 "b.html": ["not an object"]})
             errors = "\n".join(registry.catalog_errors("ja", "a.html"))
-            for part in ("a placeholder", "its links", "its tags", "straight quotes"):
-                self.assertIn(part, errors)
+            self.assertIn("a placeholder", errors)
+            self.assertIn("do not open and close", errors)
+            # in a page's text other tags and links, and quotes, are the translator's: they are only other
+            for part in ("links", "tags", "straight quotes"):
+                self.assertNotIn(part, errors)
+            self.assertEqual(len(registry.catalog_errors("ja", "a.html")), 2)
+            self.assertEqual(registry.differences('<a href="tools.html">Tools</a>', '<a href="index.html">ツール</a>'),
+                             ["its links are not those of the English"])
+            self.assertEqual(registry.differences("<code>x</code> and y", "x と y"), ["its tags are not those of the English"])
+            # in a script's string, a straight quote would end the string
+            self.assertIn("straight quotes", registry.catalog_errors("ja", "assets/c.js")[0])
             self.assertIn("an object", registry.catalog_errors("ja", "b.html")[0])
             (Path(directory) / "ja/site/c.html.json").write_text("{", encoding="utf-8")
             self.assertIn("not valid JSON", registry.catalog_errors("ja", "c.html")[0])
@@ -161,7 +182,7 @@ class Catalogs(unittest.TestCase):
         sources = build.sources()
 
         def as_japanese(path, leave=0, only=None):
-            groups = [dict(registry.block.findall(m.group())) for m in registry.group.finditer(sources[path])]
+            groups = [registry.parts(m.group())[0] for m in registry.group.finditer(sources[path])]
             entries = {norm(g["en"]): "（訳）" + g["en"] for g in groups}
             keys = list(entries)[:only] if only else list(entries)[leave:]
             return {key: entries[key] for key in keys}

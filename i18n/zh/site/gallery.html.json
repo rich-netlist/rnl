@@ -1,0 +1,21 @@
+{
+  "RNL gallery · Rich Netlist": "RNL 图库 · Rich Netlist",
+  "Examples drawn with RNL: open one to look at it in the web viewer. The gallery is a list on GitHub, and a new entry shows up minutes after it is merged.": "用 RNL 画出原理图的案例：点开一个，就在网页版查看器里看它。图库是 GitHub 上的一张列表，新条目合并几分钟后就出现。",
+  "Skip to content": "跳到正文",
+  "On this page": "本页目录",
+  "Switch color theme": "切换配色",
+  "Gallery": "图库",
+  "Some RNL examples, published under their own licences.": "一些 RNL 案例，按各自许可证公开。",
+  "How to contribute": "如何贡献",
+  "Gallery navigation": "图库导航",
+  "Search the gallery": "搜索图库",
+  "Search titles, descriptions and authors": "搜索标题、说明、作者",
+  "Filter by tag": "按标签筛选",
+  "Loading…": "正在载入……",
+  "This page needs JavaScript to show the gallery. The list is in the <a href=\"https://github.com/rich-netlist/rnl-gallery/tree/main/entries\">rnl-gallery repository on GitHub</a>.": "这一页要用 JavaScript 显示图库。列表在 <a href=\"https://github.com/rich-netlist/rnl-gallery/tree/main/entries\">GitHub 的 rnl-gallery 仓库</a>里。",
+  "This page reads the index and the thumbnails from <a href=\"https://rich-netlist.github.io/rnl-gallery/\">rnl-gallery’s GitHub Pages</a>. Each design is under the licence of its own repository.": "这一页读 <a href=\"https://rich-netlist.github.io/rnl-gallery/\">rnl-gallery 的 GitHub Pages</a> 上的索引和缩略图。每个设计按它自己仓库的许可证。",
+  "See also": "另见",
+  "Web viewer": "网页版查看器",
+  "Packages": "标准包",
+  "The rnl-gallery repository": "rnl-gallery 仓库"
+}

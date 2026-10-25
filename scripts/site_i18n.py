@@ -4,7 +4,8 @@ Language groups end with their required <en> block; translations before it are o
 An explicit empty block is intentional, while an absent block falls back to English.
 A translation may also come from the catalog of its source file, <registry folder>/<code>/site/<path
 under site/src>.json, keyed by the English with its runs of white space as one space; the block
-beside the English comes first (decision 0015, i18n/README.md).
+beside the English comes first (decision 0015, i18n/README.md). Where one English text is said in two
+ways, its block names a context, <en ctx=NAME>, and the catalog's key is NAME|English.
 """
 from collections import Counter
 from html import escape
@@ -22,6 +23,10 @@ HELP_URL = "https://github.com/rich-netlist/rnl/blob/main/i18n/README.md"
 PLACEHOLDER = re.compile(r"\{\{?[a-z][a-z0-9_-]*\}?\}")
 MARKUP_TAG = re.compile(r"<(/?[a-zA-Z][a-zA-Z0-9]*)\b")
 HREF = re.compile(r"\bhref=\"([^\"]*)\"")
+CONTEXT = r"(?: ctx=([a-z0-9-]+))?"  # the context an English block may name: <en ctx=readable>
+CONTEXT_KEY = re.compile(r"^[a-z0-9-]+\|")
+ELEMENT = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)\b[^<>]*?(/?)>")
+VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 
 
 def norm(text):
@@ -29,10 +34,28 @@ def norm(text):
     return " ".join(text.split())
 
 
+def unclosed(text):
+    """The elements a text closes without opening them, and those it opens without closing them, in
+    order: what a translation must leave as its English does, so that the page around it holds."""
+    opened, closed = [], []
+    for close, name, alone in ELEMENT.findall(text):
+        name = name.lower()
+        if alone or name in VOID:
+            continue
+        if not close:
+            opened.append(name)
+        elif opened and opened[-1] == name:
+            opened.pop()
+        else:
+            closed.append(name)
+    return closed, opened
+
+
 class Languages:
     def __init__(self, config, catalogs=None):
-        """catalogs: the folder of the languages' folders of catalogs, that of the registry; None for none."""
-        self.catalogs = Path(catalogs) if catalogs else None
+        """catalogs: the folders of the languages' folders of catalogs, the first that has a catalog giving
+        it, such as the registry's own and then the repository's i18n/; one folder, or None for none."""
+        self.catalogs = [Path(c) for c in ([catalogs] if isinstance(catalogs, (str, Path)) else catalogs or [])]
         self._catalogs = {}
         self.default = config["default"]
         self.legacy = config["legacy"]
@@ -65,12 +88,12 @@ class Languages:
         if any(self.locales[locale["standard"]]["standard"] != locale["standard"] for locale in self.locales.values()):
             raise ValueError("Standard language fallbacks must point directly to a published language")
         tags = "|".join(map(re.escape, self.codes))
-        self.tag = re.compile(rf"</?(?:{tags})>")
+        self.tag = re.compile(rf"</?(?:{tags})(?: ctx=[a-z0-9-]+)?>")
         body = rf"(?:(?!{self.tag.pattern}).)*?"
-        block = lambda code: rf"<{re.escape(code)}>{body}</{re.escape(code)}>"
+        block = lambda code: rf"<{re.escape(code)}(?: ctx=[a-z0-9-]+)?>{body}</{re.escape(code)}>"
         translated = "|".join(block(code) for code in self.codes if code != self.default)
         self.group = re.compile(rf"(?:(?:{translated})\s*)*{block(self.default)}", re.S)
-        self.block = re.compile(rf"<({tags})>({body})</\1>", re.S)
+        self.block = re.compile(rf"<({tags}){CONTEXT}>({body})</\1>", re.S)
 
     def text(self, values, code):
         """A missing dictionary entry falls back; an explicit empty string stays empty."""
@@ -95,12 +118,13 @@ class Languages:
         return errors
 
     def catalog_path(self, code, path):
-        return self.catalogs / code / "site" / (path + ".json") if self.catalogs else None
+        found = [folder / code / "site" / (path + ".json") for folder in self.catalogs]
+        return next((file for file in found if file.is_file()), found[0] if found else None)
 
     def catalog(self, code, path):
         """{English: translation, or None where there is none yet} for one source file, such as
         "index.html" or "assets/intro.js", in one language; {} when it has none."""
-        if code == self.default or path is None or self.catalogs is None:
+        if code == self.default or path is None or not self.catalogs:
             return {}
         if (code, path) not in self._catalogs:
             file = self.catalog_path(code, path)
@@ -111,29 +135,42 @@ class Languages:
             self._catalogs[code, path] = data if isinstance(data, dict) else {}
         return self._catalogs[code, path]
 
-    def translation(self, blocks, code, path=None):
+    def parts(self, group):
+        """{language: text} of a translation group, and the context its English names, or ""."""
+        found = self.block.findall(group)
+        return {code: text for code, _, text in found}, next((ctx for code, ctx, _ in found if code == self.default), "")
+
+    def key(self, blocks, context=""):
+        """The key of a group in a catalog: its English, with its context before it when it names one."""
+        english = norm(blocks[self.default])
+        return f"{context}|{english}" if context else english
+
+    def translation(self, blocks, code, path=None, context=""):
         """The text of one group in one language, or None where it has none: its block beside the English,
         else its catalog's entry. An explicit empty text is a translation."""
         if code in blocks:
             return blocks[code]
-        value = self.catalog(code, path).get(norm(blocks[self.default]))
+        value = self.catalog(code, path).get(self.key(blocks, context))
         return value if isinstance(value, str) else None
 
     def coverage(self, text, code, path=None):
         """(translated, all) of the groups of a text in one language."""
-        found = [dict(self.block.findall(m.group())) for m in self.group.finditer(text)]
+        found = [self.parts(m.group()) for m in self.group.finditer(text)]
         if code == self.default:
             return len(found), len(found)
-        return sum(self.translation(blocks, code, path) is not None for blocks in found), len(found)
+        return sum(self.translation(blocks, code, path, context) is not None for blocks, context in found), len(found)
 
     def catalog_errors(self, code, path):
-        """What is malformed in the catalog of one source file: not an object of texts or null; a
-        placeholder, a tag or a link that its English does not have; more straight quotes or backslashes
-        than its English, which a script's string could not hold."""
+        """What is malformed in the catalog of one source file, as would break the page: not an object of
+        texts or null; a placeholder that its English does not have; elements it does not open and close
+        as its English does; in a script, more straight quotes or backslashes than its English, which the
+        script's string could not hold. Other tags and links than the English's are the translator's
+        choice, such as a link to the page in the same language, and are only reported
+        (scripts/i18n/status.py)."""
         file = self.catalog_path(code, path)
         if file is None or code == self.default or not file.is_file():
             return []
-        name = file.relative_to(self.catalogs.parent).as_posix() if self.catalogs.parent in file.parents else str(file)
+        name = next((file.relative_to(folder.parent).as_posix() for folder in self.catalogs if folder in file.parents), str(file))
         try:
             data = json.loads(file.read_text(encoding="utf-8"))
         except ValueError as e:
@@ -145,23 +182,31 @@ class Languages:
             if not isinstance(value, str):
                 continue
             where = f"{name}: {key[:60]!r}"
-            if not set(PLACEHOLDER.findall(value)) <= set(PLACEHOLDER.findall(key)):
+            english = CONTEXT_KEY.sub("", key)
+            if not set(PLACEHOLDER.findall(value)) <= set(PLACEHOLDER.findall(english)):
                 errors.append(f"{where}: a placeholder that the English does not have")
-            if Counter(MARKUP_TAG.findall(value)) != Counter(MARKUP_TAG.findall(key)):
-                errors.append(f"{where}: its tags are not those of the English")
-            if Counter(HREF.findall(value)) != Counter(HREF.findall(key)):
-                errors.append(f"{where}: its links are not those of the English")
-            if any(value.count(c) > key.count(c) for c in "'\"\\"):
+            if unclosed(value) != unclosed(english):
+                errors.append(f"{where}: its elements do not open and close as those of the English do")
+            if path.endswith(".js") and any(value.count(c) > english.count(c) for c in "'\"\\"):
                 errors.append(f"{where}: more straight quotes or backslashes than the English; use ’ “ ”")
         return errors
+
+    def differences(self, english, value):
+        """What a translation has other than its English, which is not an error: its tags and its links."""
+        found = []
+        if Counter(MARKUP_TAG.findall(value)) != Counter(MARKUP_TAG.findall(english)):
+            found.append("its tags are not those of the English")
+        if Counter(HREF.findall(value)) != Counter(HREF.findall(english)):
+            found.append("its links are not those of the English")
+        return found
 
     def localize(self, text, code, path=None, english=False):
         """The text in one language: each group as its translation, or as its English where it has none,
         or everywhere when english is set, as for a page shown in English."""
         def one(m):
-            blocks = dict(self.block.findall(m.group()))
+            blocks, context = self.parts(m.group())
             self.text(blocks, code)  # checks the group
-            value = None if english else self.translation(blocks, code, path)
+            value = None if english else self.translation(blocks, code, path, context)
             return blocks[self.default] if value is None else value
         return self.group.sub(one, text)
 
@@ -228,7 +273,8 @@ class Languages:
 
 def load(path=None):
     path = Path(path or os.environ.get("RNL_SITE_LANGUAGES", CONFIG))
-    return Languages(json.loads(path.read_text(encoding="utf-8")), catalogs=path.parent)
+    # a registry elsewhere, as tests make, reads its own catalogs and then the repository's
+    return Languages(json.loads(path.read_text(encoding="utf-8")), catalogs=dict.fromkeys([path.parent, ROOT / "i18n"]))
 
 
 def asset(name):

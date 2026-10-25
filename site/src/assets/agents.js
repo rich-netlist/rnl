@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var DONE = '<zh>已复制</zh><en>Copied</en>';
+  var DONE = '<en>Copied</en>';
 
   // the text to copy: the lines of a command block, or the text of the element
   function textOf(el) {

@@ -639,6 +639,11 @@ def build(version=None):
     """Build every page in every language, with the files of the desktop viewer's release `version`,
     or None for no release yet, and the pages at the root that lead to them."""
     files = sources()
+    errors = [f"src/{path}: a translation written beside the English: translations go into i18n/<lang>/site/{path}.json; "
+              f"python scripts/i18n/migrate_site.py moves them there" for path, text in files.items()
+              if any(len(I18N.parts(m.group())[0]) > 1 for m in GROUP.finditer(text))]
+    if errors:
+        raise BuildError("\n".join(errors))
     if files["index.html"].count(TIMELINE) != 1:
         raise BuildError("src/index.html needs exactly one {{timeline}} marker")
     files["index.html"] = files["index.html"].replace(TIMELINE, timeline_html())

@@ -168,13 +168,13 @@
 
     var meta = el('p', 'cg-meta');
     if (entry.license) meta.appendChild(el('span', 'chip', entry.license));
-    if (entry.files > 1) meta.appendChild(el('span', 'cg-files', fill('<zh>{n} 个文件</zh><en>{n} files</en>', { n: entry.files })));
+    if (entry.files > 1) meta.appendChild(el('span', 'cg-files', fill('<en>{n} files</en>', { n: entry.files })));
     var s = entry.source && sourceUrl(entry.source.url);
     if (s) {
       var link = el('a', 'cg-src', entry.source.repo + '@' + String(entry.source.commit || '').slice(0, 7));
       link.href = s;
       link.rel = 'noopener noreferrer';
-      link.title = fill('<zh>在 GitHub 上看来源</zh><en>See the source on GitHub</en>');
+      link.title = fill('<en>See the source on GitHub</en>');
       meta.appendChild(link);
     }
     body.appendChild(meta);
@@ -214,7 +214,7 @@
       tagBar.appendChild(label);
     });
     if (state.tags.length) {
-      var clear = el('button', 'cg-clear', fill('<zh>清除标签</zh><en>Clear tags</en>'));
+      var clear = el('button', 'cg-clear', fill('<en>Clear tags</en>'));
       clear.type = 'button';
       clear.addEventListener('click', function () { state.tags = []; render(); saveUrl(); });
       tagBar.appendChild(clear);
@@ -226,17 +226,17 @@
     var shown = state.entries.filter(matches);
     main.textContent = '';
     if (!state.entries.length) {
-      main.appendChild(el('p', 'gl-status', fill('<zh>图库里还没有条目。</zh><en>There are no entries yet.</en>')));
+      main.appendChild(el('p', 'gl-status', fill('<en>There are no entries yet.</en>')));
     } else if (!shown.length) {
-      main.appendChild(el('p', 'gl-status', fill('<zh>没有找到。</zh><en>Nothing found.</en>')));
+      main.appendChild(el('p', 'gl-status', fill('<en>Nothing found.</en>')));
     } else {
       var grid = el('div', 'cg-grid');
       shown.forEach(function (e) { grid.appendChild(card(e)); });
       main.appendChild(grid);
     }
     renderTagBar();
-    counts.textContent = state.entries.length ? fill('<zh>{n} 个条目</zh><en>{n} entries</en>', { n: shown.length }) +
-      (shown.length !== state.entries.length ? fill('<zh>，共 {t} 个</zh><en> of {t}</en>', { t: state.entries.length }) : '') : '';
+    counts.textContent = state.entries.length ? fill('<en>{n} entries</en>', { n: shown.length }) +
+      (shown.length !== state.entries.length ? fill('<en> of {t}</en>', { t: state.entries.length }) : '') : '';
   }
 
   function notice(text, kind) {
@@ -272,15 +272,15 @@
       if (!error.format) { try { var saved = P.store(KEY); if (saved) old = accept(saved); } catch (e) { old = null; } }
       if (error.format) {
         main.textContent = '';
-        notice(fill('<zh>图库的数据比这一页新，请刷新页面。</zh><en>The gallery’s data is newer than this page. Reload the page.</en>'), 'error');
+        notice(fill('<en>The gallery’s data is newer than this page. Reload the page.</en>'), 'error');
       } else if (old) {
         state.entries = old;
         render();
-        notice(fill('<zh>暂时读不到图库的最新内容，这是上次读到的。</zh><en>The latest gallery cannot be read right now; this is what was read last time.</en>'), 'warn');
+        notice(fill('<en>The latest gallery cannot be read right now; this is what was read last time.</en>'), 'warn');
       } else {
         main.textContent = '';
         var p = el('p', 'gl-status cg-notice cg-error');
-        p.appendChild(document.createTextNode(fill('<zh>暂时读不到图库。可以直接去 GitHub 上看列表：</zh><en>The gallery cannot be read right now. The list is on GitHub: </en>')));
+        p.appendChild(document.createTextNode(fill('<en>The gallery cannot be read right now. The list is on GitHub: </en>')));
         var a = el('a', '', 'rich-netlist/rnl-gallery');
         a.href = 'https://github.com/rich-netlist/rnl-gallery/tree/main/entries';
         p.appendChild(a);

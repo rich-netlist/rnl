@@ -3,10 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title><zh>给 agent · Rich Netlist</zh><en>For agents · Rich Netlist</en></title>
-<meta name="description" content="<zh>给 AI agent 的入口：下载 RNL skill 包，agent 就知道怎样读、写、检查和绘制 RNL 0.3。</zh>
-  <en>The entry for AI agents: download the RNL skill package, and an agent knows how to read, write, check and draw RNL 0.3.</en>">
-<link rel="alternate" type="text/plain" href="<zh>llms.txt</zh><en>../llms.txt</en>" title="llms.txt">
+<title><en>For agents · Rich Netlist</en></title>
+<meta name="description" content="<en>The entry for AI agents: download the RNL skill package, and an agent knows how to read, write, check and draw RNL 0.3.</en>">
+<link rel="alternate" type="text/plain" href="<en>../llms.txt</en>" title="llms.txt">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{{font-href}}">
@@ -49,7 +48,7 @@
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></symbol>
 </svg>
 
-<a class="skip" href="#main"><zh>跳到正文</zh><en>Skip to content</en></a>
+<a class="skip" href="#main"><en>Skip to content</en></a>
 
 <header class="topbar">
   <div class="topbar-in">
@@ -65,9 +64,9 @@
       <a class="is-on" aria-current="page" href="agents.html">{{nav-agents}}</a>
       <a href="https://github.com/rich-netlist/rnl">GitHub</a>
     </nav>
-    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>本页目录</zh><en>On this page</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-list"/></svg></button>
+    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<en>On this page</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-list"/></svg></button>
     {{language-menu}}
-    <button class="icon-btn" id="theme-btn" type="button" aria-label="<zh>切换配色</zh><en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="<en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
   </div>
   <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
 </header>
@@ -79,38 +78,37 @@
   <div class="wrap">
     <div class="hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow"><span>RICH NETLIST · AGENT SKILL</span><span class="chip chip-ok"><zh>RNL 0.3 · 标准包 0.3</zh><en>RNL 0.3 · packages 0.3</en></span></p>
-        <h1 id="agents-title" class="tour-h1"><zh>给 agent</zh><en>For agents</en></h1>
-        <p class="thesis"><zh>下载 skill 包，agent 就会读、写、检查和绘制 RNL。</zh><en>Download the skill package, and your agent can read, write, check and draw RNL.</en></p>
-        <p class="lead"><zh>RNL 把原理图的画法写进 SPICE 或 Spectre 网表的注释里，网表本身还是电路的唯一定义。skill 包是一个 Agent Skills 格式的文件夹：语言简明指南、标准包参考、检查和绘制的工具、几个都能通过 <code>rnl check</code> 的例子。包里的文字都是英文，因为 agent 读的是英文；中文版的简明指南在<a href="spec/0.3/">语言标准 0.3 的中文页面</a>里。这一页说明怎样取得它、装上它；给 agent 读的纯文本入口是 <a href="llms.txt">llms.txt</a>。</zh>
-          <en>RNL writes the drawing of a schematic into the comments of a SPICE or Spectre netlist, and the netlist alone still defines the circuit. The skill package is a folder in the Agent Skills format: a short guide to the language, a reference to the standard packages, the tools to check and draw files, and examples that all read with <code>rnl check</code>. This page says how to get it and install it; the plain-text entry that an agent reads is <a href="../llms.txt">llms.txt</a>.</en></p>
+        <p class="eyebrow"><span>RICH NETLIST · AGENT SKILL</span><span class="chip chip-ok"><en>RNL 0.3 · packages 0.3</en></span></p>
+        <h1 id="agents-title" class="tour-h1"><en>For agents</en></h1>
+        <p class="thesis"><en>Download the skill package, and your agent can read, write, check and draw RNL.</en></p>
+        <p class="lead"><en>RNL writes the drawing of a schematic into the comments of a SPICE or Spectre netlist, and the netlist alone still defines the circuit. The skill package is a folder in the Agent Skills format: a short guide to the language, a reference to the standard packages, the tools to check and draw files, and examples that all read with <code>rnl check</code>. This page says how to get it and install it; the plain-text entry that an agent reads is <a href="../llms.txt">llms.txt</a>.</en></p>
         <div class="cta">
-          <a class="btn btn-primary" href="../skill/rnl-skill.zip"><svg class="ico"><use href="#i-download"/></svg><zh>下载 rnl-skill.zip</zh><en>Download rnl-skill.zip</en></a>
-          <a class="btn" href="<zh>llms.txt</zh><en>../llms.txt</en>"><svg class="ico"><use href="#i-file"/></svg>llms.txt</a>
+          <a class="btn btn-primary" href="../skill/rnl-skill.zip"><svg class="ico"><use href="#i-download"/></svg><en>Download rnl-skill.zip</en></a>
+          <a class="btn" href="<en>../llms.txt</en>"><svg class="ico"><use href="#i-file"/></svg>llms.txt</a>
           <a class="btn" href="../skill/rnl/SKILL.md"><svg class="ico"><use href="#i-book"/></svg>SKILL.md</a>
         </div>
       </div>
-      <dl class="titleblock" aria-label="<zh>skill 包信息</zh><en>Skill package facts</en>">
-        <div class="tb-main"><dt><zh>包</zh><en>Package</en></dt><dd>rnl</dd></div>
-        <div><dt><zh>格式</zh><en>Format</en></dt><dd><zh>Agent Skills：<code>SKILL.md</code> 加参考文件</zh><en>Agent Skills: <code>SKILL.md</code> with reference files</en></dd></div>
-        <div><dt><zh>语言</zh><en>Language</en></dt><dd>RNL 0.3</dd></div>
-        <div><dt><zh>标准包</zh><en>Packages</en></dt><dd><zh>系列 0.3</zh><en>Series 0.3</en></dd></div>
-        <div><dt><zh>下载</zh><en>Download</en></dt><dd><span class="mono">rnl-skill.zip</span></dd></div>
-        <div><dt><zh>许可</zh><en>Licence</en></dt><dd>MIT · CC-BY-4.0 · CC0-1.0</dd></div>
+      <dl class="titleblock" aria-label="<en>Skill package facts</en>">
+        <div class="tb-main"><dt><en>Package</en></dt><dd>rnl</dd></div>
+        <div><dt><en>Format</en></dt><dd><en>Agent Skills: <code>SKILL.md</code> with reference files</en></dd></div>
+        <div><dt><en>Language</en></dt><dd>RNL 0.3</dd></div>
+        <div><dt><en>Packages</en></dt><dd><en>Series 0.3</en></dd></div>
+        <div><dt><en>Download</en></dt><dd><span class="mono">rnl-skill.zip</span></dd></div>
+        <div><dt><en>Licence</en></dt><dd>MIT · CC-BY-4.0 · CC0-1.0</dd></div>
       </dl>
     </div>
   </div>
 </section>{{translation-notice}}
 
 <div class="layout">
-<nav id="toc" aria-label="<zh>目录</zh><en>Contents</en>">
-  <p class="toc-title"><zh>目录</zh><en>Contents</en></p>
+<nav id="toc" aria-label="<en>Contents</en>">
+  <p class="toc-title"><en>Contents</en></p>
   <ul>
-    <li><a href="#tell"><zh>一句话</zh><en>One sentence</en></a></li>
-    <li><a href="#install"><zh>安装</zh><en>Install</en></a></li>
-    <li><a href="#files"><zh>包里有什么</zh><en>What is in it</en></a></li>
-    <li><a href="#tools"><zh>检查和绘制</zh><en>Check and draw</en></a></li>
-    <li><a href="#facts"><zh>版本和许可</zh><en>Versions and licence</en></a></li>
+    <li><a href="#tell"><en>One sentence</en></a></li>
+    <li><a href="#install"><en>Install</en></a></li>
+    <li><a href="#files"><en>What is in it</en></a></li>
+    <li><a href="#tools"><en>Check and draw</en></a></li>
+    <li><a href="#facts"><en>Versions and licence</en></a></li>
   </ul>
 </nav>
 <main id="main" class="page-content">
@@ -119,17 +117,15 @@
 <section id="tell" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>01 · 一句话</zh><en>01 · One sentence</en></p>
-      <h2><zh>把这句话交给 agent，<span class="mk">剩下的它自己做。</span></zh><en>Give your agent this sentence. <span class="mk">It does the rest.</span></en></h2>
-      <p class="lead"><zh>Claude Code，或者任何能读网页、能写文件的 agent：它读到 llms.txt，就知道从哪里下载 skill 包、解压到哪里，装好以后按 <code>SKILL.md</code> 的做法读写 RNL。</zh>
-        <en>Claude Code, or any agent that can read a web page and write files: it reads llms.txt, learns where to download the skill package and where to unpack it, and then follows <code>SKILL.md</code> to read and write RNL.</en></p>
+      <p class="sheet-no"><en>01 · One sentence</en></p>
+      <h2><en>Give your agent this sentence. <span class="mk">It does the rest.</span></en></h2>
+      <p class="lead"><en>Claude Code, or any agent that can read a web page and write files: it reads llms.txt, learns where to download the skill package and where to unpack it, and then follows <code>SKILL.md</code> to read and write RNL.</en></p>
     </header>
     <div class="agent-box">
-      <p class="agent-prompt" id="prompt"><zh>读一下 https://rich-netlist.github.io/rnl/zh/llms.txt，按里面说的装好 RNL skill，然后帮我处理我的 RNL 网表。</zh><en>Read https://rich-netlist.github.io/rnl/llms.txt, install the RNL skill it describes, and then help me with my RNL netlist.</en></p>
-      <button class="btn btn-sm copy-btn" type="button" data-copy="prompt"><svg class="ico"><use href="#i-copy"/></svg><span class="copy-label"><zh>复制</zh><en>Copy</en></span></button>
+      <p class="agent-prompt" id="prompt"><en>Read https://rich-netlist.github.io/rnl/llms.txt, install the RNL skill it describes, and then help me with my RNL netlist.</en></p>
+      <button class="btn btn-sm copy-btn" type="button" data-copy="prompt"><svg class="ico"><use href="#i-copy"/></svg><span class="copy-label"><en>Copy</en></span></button>
     </div>
-    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh><a href="llms.txt">llms.txt</a> 是给 agent 读的纯文本：怎样安装、包里有哪些文件、怎样检查文件、标准在哪里。英文版在 <a href="../llms.txt">/rnl/llms.txt</a>，中文版在 <a href="llms.txt">/rnl/zh/llms.txt</a>；两个版本说的是同一件事。</zh>
-      <en><a href="../llms.txt">llms.txt</a> is the plain text meant for agents: how to install, which files the package has, how to check files, where the standard is. The English text is at <a href="../llms.txt">/rnl/llms.txt</a> and a Chinese one at <a href="../zh/llms.txt">/rnl/zh/llms.txt</a>; both say the same.</en></span></p>
+    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><en><a href="../llms.txt">llms.txt</a> is the plain text meant for agents: how to install, which files the package has, how to check files, where the standard is. The English text is at <a href="../llms.txt">/rnl/llms.txt</a> and a Chinese one at <a href="../zh/llms.txt">/rnl/zh/llms.txt</a>; both say the same.</en></span></p>
   </div>
 </section>
 
@@ -137,40 +133,36 @@
 <section id="install" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>02 · 安装</zh><en>02 · Install</en></p>
-      <h2><zh>解压到 agent 存放 skill 的目录，<span class="mk">得到 rnl/SKILL.md。</span></zh><en>Unpack it where your agent keeps skills. <span class="mk">You get rnl/SKILL.md.</span></en></h2>
-      <p class="lead"><zh>skill 就是文件夹 <code>rnl/</code>。Claude Code 把个人的 skill 放在 <code>~/.claude/skills/</code>（所有项目都能用），项目里的放在 <code>.claude/skills/</code>；别的 agent 有它自己的目录，照它的说明放。下面两组命令把 zip 解压到 Claude Code 的个人目录。</zh>
-        <en>The skill is the folder <code>rnl/</code>. Claude Code keeps personal skills in <code>~/.claude/skills/</code>, where every project sees them, and a project’s own in <code>.claude/skills/</code>; other agents have a directory of their own, as their documentation says. The commands below unpack the zip into Claude Code’s personal directory.</en></p>
+      <p class="sheet-no"><en>02 · Install</en></p>
+      <h2><en>Unpack it where your agent keeps skills. <span class="mk">You get rnl/SKILL.md.</span></en></h2>
+      <p class="lead"><en>The skill is the folder <code>rnl/</code>. Claude Code keeps personal skills in <code>~/.claude/skills/</code>, where every project sees them, and a project’s own in <code>.claude/skills/</code>; other agents have a directory of their own, as their documentation says. The commands below unpack the zip into Claude Code’s personal directory.</en></p>
     </header>
 
     <div class="cmd-grid">
       <div class="cmd">
         <div class="cmd-head"><h3><svg class="ico"><use href="#i-netlist"/></svg>macOS · Linux · Git Bash</h3>
-          <button class="btn btn-sm copy-btn" type="button" data-copy="cmd-sh"><svg class="ico"><use href="#i-copy"/></svg><span class="copy-label"><zh>复制</zh><en>Copy</en></span></button></div>
+          <button class="btn btn-sm copy-btn" type="button" data-copy="cmd-sh"><svg class="ico"><use href="#i-copy"/></svg><span class="copy-label"><en>Copy</en></span></button></div>
         <div class="minicode term" id="cmd-sh"><div>mkdir -p ~/.claude/skills</div><div>curl -fL https://rich-netlist.github.io/rnl/skill/rnl-skill.zip -o /tmp/rnl-skill.zip</div><div>unzip -o /tmp/rnl-skill.zip -d ~/.claude/skills</div></div>
       </div>
       <div class="cmd">
         <div class="cmd-head"><h3><svg class="ico"><use href="#i-netlist"/></svg>Windows PowerShell</h3>
-          <button class="btn btn-sm copy-btn" type="button" data-copy="cmd-ps"><svg class="ico"><use href="#i-copy"/></svg><span class="copy-label"><zh>复制</zh><en>Copy</en></span></button></div>
+          <button class="btn btn-sm copy-btn" type="button" data-copy="cmd-ps"><svg class="ico"><use href="#i-copy"/></svg><span class="copy-label"><en>Copy</en></span></button></div>
         <div class="minicode term" id="cmd-ps"><div>New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null</div><div>Invoke-WebRequest https://rich-netlist.github.io/rnl/skill/rnl-skill.zip -OutFile "$env:TEMP\rnl-skill.zip"</div><div>Expand-Archive -Force "$env:TEMP\rnl-skill.zip" "$HOME\.claude\skills"</div></div>
       </div>
     </div>
 
     <div class="facts tools-facts">
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-download"/></svg><zh>手动下载</zh><en>By hand</en></h3>
-        <p><zh><a href="../skill/rnl-skill.zip">rnl-skill.zip</a> 里是文件夹 <code>rnl/</code> 和它的全部文件。解压后把 <code>rnl/</code> 放进你的 agent 存放 skill 的目录。zip 和每个文件的 SHA-256 在 <a href="../skill/SHA256SUMS.txt">SHA256SUMS.txt</a>，每个文件的大小和地址在 <a href="../skill/manifest.json">manifest.json</a>。</zh>
-          <en><a href="../skill/rnl-skill.zip">rnl-skill.zip</a> holds the folder <code>rnl/</code> with all its files. Unpack it and put <code>rnl/</code> where your agent keeps skills. The SHA-256 of the zip and of each file is in <a href="../skill/SHA256SUMS.txt">SHA256SUMS.txt</a>, and the size and address of each file in <a href="../skill/manifest.json">manifest.json</a>.</en></p>
+        <h3><svg class="ico"><use href="#i-download"/></svg><en>By hand</en></h3>
+        <p><en><a href="../skill/rnl-skill.zip">rnl-skill.zip</a> holds the folder <code>rnl/</code> with all its files. Unpack it and put <code>rnl/</code> where your agent keeps skills. The SHA-256 of the zip and of each file is in <a href="../skill/SHA256SUMS.txt">SHA256SUMS.txt</a>, and the size and address of each file in <a href="../skill/manifest.json">manifest.json</a>.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-eye"/></svg><zh>不安装，直接读</zh><en>Without installing</en></h3>
-        <p><zh>不能解压或写文件的 agent，直接读纯文本就行：先读 <a href="../skill/rnl/SKILL.md">SKILL.md</a>，它指向 <code>references/</code> 下的文件。所有文件都在 <code>skill/rnl/</code> 下，列在<a href="#files">下面</a>。</zh>
-          <en>An agent that cannot unpack or write files reads the plain text as it is: <a href="../skill/rnl/SKILL.md">SKILL.md</a> first, which points to the files under <code>references/</code>. Every file is under <code>skill/rnl/</code>, listed <a href="#files">below</a>.</en></p>
+        <h3><svg class="ico"><use href="#i-eye"/></svg><en>Without installing</en></h3>
+        <p><en>An agent that cannot unpack or write files reads the plain text as it is: <a href="../skill/rnl/SKILL.md">SKILL.md</a> first, which points to the files under <code>references/</code>. Every file is under <code>skill/rnl/</code>, listed <a href="#files">below</a>.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-link"/></svg><zh>从仓库取</zh><en>From the repository</en></h3>
-        <p><zh>skill 的源文件在仓库的 <a href="https://github.com/rich-netlist/rnl/tree/main/skills/rnl"><code>skills/rnl/</code></a>：克隆仓库，把那个文件夹复制过去，也一样。这里的 zip 总是照 <code>main</code> 的最新内容生成。</zh>
-          <en>The skill’s source is <a href="https://github.com/rich-netlist/rnl/tree/main/skills/rnl"><code>skills/rnl/</code></a> in the repository: clone it and copy that folder, which comes to the same. The zip here is always built from the newest <code>main</code>.</en></p>
+        <h3><svg class="ico"><use href="#i-link"/></svg><en>From the repository</en></h3>
+        <p><en>The skill’s source is <a href="https://github.com/rich-netlist/rnl/tree/main/skills/rnl"><code>skills/rnl/</code></a> in the repository: clone it and copy that folder, which comes to the same. The zip here is always built from the newest <code>main</code>.</en></p>
       </div>
     </div>
   </div>
@@ -180,47 +172,41 @@
 <section id="files" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>03 · 包里有什么</zh><en>03 · What is in it</en></p>
-      <h2><zh>一份简明指南，一份生成的参考，<span class="mk">和能跑通的例子。</span></zh><en>A short guide, a generated reference, <span class="mk">and examples that read.</span></en></h2>
-      <p class="lead"><zh>每个文件都能当纯文本读。参考文件是从标准包的文件里生成的，所以和标准包保持一致；包里每个 SPICE 或 Spectre 例子，在 CI 里都用 <code>rnl check</code> 读过。</zh>
-        <en>Every file reads as plain text. The reference is generated from the files of the standard packages, so it stays in step with them, and every SPICE or Spectre example in the package is read by <code>rnl check</code> in CI.</en></p>
+      <p class="sheet-no"><en>03 · What is in it</en></p>
+      <h2><en>A short guide, a generated reference, <span class="mk">and examples that read.</span></en></h2>
+      <p class="lead"><en>Every file reads as plain text. The reference is generated from the files of the standard packages, so it stays in step with them, and every SPICE or Spectre example in the package is read by <code>rnl check</code> in CI.</en></p>
     </header>
 
     <div class="panel dl">
-      <div class="ph"><svg class="ico"><use href="#i-download"/></svg><span class="ph-title">skill/rnl/</span><span class="ph-right"><a class="chip" href="../skill/rnl-skill.zip"><zh>整包 zip</zh><en>The whole zip</en></a></span></div>
+      <div class="ph"><svg class="ico"><use href="#i-download"/></svg><span class="ph-title">skill/rnl/</span><span class="ph-right"><a class="chip" href="../skill/rnl-skill.zip"><en>The whole zip</en></a></span></div>
       <ul class="dl-list">
         <li>
-          <a class="dl-file" href="../skill/rnl/SKILL.md"><svg class="ico"><use href="#i-book"/></svg><span><b><zh>从这里开始</zh><en>Start here</en></b><code>SKILL.md</code></span></a>
-          <p><zh>RNL 是什么，一个完整的例子，工作的步骤，省时间的规则。</zh><en>What RNL is, a complete example, the steps of the work, the rules that save time.</en></p>
+          <a class="dl-file" href="../skill/rnl/SKILL.md"><svg class="ico"><use href="#i-book"/></svg><span><b><en>Start here</en></b><code>SKILL.md</code></span></a>
+          <p><en>What RNL is, a complete example, the steps of the work, the rules that save time.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="../skill/rnl/references/language.md"><svg class="ico"><use href="#i-file"/></svg><span><b><zh>语言简明指南</zh><en>Short guide to the language</en></b><code>references/language.md</code></span></a>
-          <p><zh>读写 RNL 0.3 文件所需要的全部：文件的形状、语句、对象和引用、定义、布局、导线、文字、包。英文。同一份指南，另有中文版，也在<a href="spec/0.3/">语言标准 0.3 的页面</a>里。</zh>
-            <en>All that reading and writing a file of RNL 0.3 takes: the shape of a file, statements, objects and references, definitions, layout, wires, text, packages. The same guide is also a section of the <a href="spec/0.3/">page of the language standard 0.3</a>.</en></p>
+          <a class="dl-file" href="../skill/rnl/references/language.md"><svg class="ico"><use href="#i-file"/></svg><span><b><en>Short guide to the language</en></b><code>references/language.md</code></span></a>
+          <p><en>All that reading and writing a file of RNL 0.3 takes: the shape of a file, statements, objects and references, definitions, layout, wires, text, packages. The same guide is also a section of the <a href="spec/0.3/">page of the language standard 0.3</a>.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="../skill/rnl/references/packages.md"><svg class="ico"><use href="#i-layers"/></svg><span><b><zh>标准包参考</zh><en>The standard packages</en></b><code>references/packages.md</code></span></a>
-          <p><zh>系列 0.3 的每个包、定义和它们的角色、符号和引脚、元件默认配哪个符号、集合，以及中文代称包 <code>rnl-zh</code> 是什么。图库在<a href="packages.html">标准包页面</a>。</zh>
-            <en>Every package of the series 0.3, the definitions with their roles, the symbols with their pins, which symbol an instance gets by default, the sets, and what the alias package <code>rnl-zh</code> is. The gallery with the drawings is on the <a href="packages.html">page of the packages</a>.</en></p>
+          <a class="dl-file" href="../skill/rnl/references/packages.md"><svg class="ico"><use href="#i-layers"/></svg><span><b><en>The standard packages</en></b><code>references/packages.md</code></span></a>
+          <p><en>Every package of the series 0.3, the definitions with their roles, the symbols with their pins, which symbol an instance gets by default, the sets, and what the alias package <code>rnl-zh</code> is. The gallery with the drawings is on the <a href="packages.html">page of the packages</a>.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="../skill/rnl/references/tools.md"><svg class="ico"><use href="#i-cpu"/></svg><span><b><zh>检查和绘制</zh><en>Check and draw</en></b><code>references/tools.md</code></span></a>
-          <p><zh><code>rnl</code> 命令（从源码构建）、npm 包 <code>@rich-netlist/runtime</code>、网页版和桌面版查看器，各怎么用，附一个完整的检查脚本。</zh>
-            <en>The <code>rnl</code> command built from source, the npm package <code>@rich-netlist/runtime</code>, the web viewer and the desktop viewer, how to use each, with a complete checking script.</en></p>
+          <a class="dl-file" href="../skill/rnl/references/tools.md"><svg class="ico"><use href="#i-cpu"/></svg><span><b><en>Check and draw</en></b><code>references/tools.md</code></span></a>
+          <p><en>The <code>rnl</code> command built from source, the npm package <code>@rich-netlist/runtime</code>, the web viewer and the desktop viewer, how to use each, with a complete checking script.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="../skill/rnl/examples/ota5t.sp"><svg class="ico"><use href="#i-netlist"/></svg><span><b><zh>例子：只写结构</zh><en>Example: structure only</en></b><code>examples/ota5t.sp</code></span></a>
-          <p><zh>五管运放，SPICE：写了差分对和电流镜，没放位置；同一个电路的 Spectre 写法是 <a href="../skill/rnl/examples/ota5t.scs"><code>examples/ota5t.scs</code></a>。</zh>
-            <en>A five-transistor OTA in SPICE: the differential pair and the current mirror written, nothing placed; the same circuit in Spectre is <a href="../skill/rnl/examples/ota5t.scs"><code>examples/ota5t.scs</code></a>.</en></p>
+          <a class="dl-file" href="../skill/rnl/examples/ota5t.sp"><svg class="ico"><use href="#i-netlist"/></svg><span><b><en>Example: structure only</en></b><code>examples/ota5t.sp</code></span></a>
+          <p><en>A five-transistor OTA in SPICE: the differential pair and the current mirror written, nothing placed; the same circuit in Spectre is <a href="../skill/rnl/examples/ota5t.scs"><code>examples/ota5t.scs</code></a>.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="../skill/rnl/examples/ota5t-placed.sp"><svg class="ico"><use href="#i-netlist"/></svg><span><b><zh>例子：放好、连好</zh><en>Example: placed and wired</en></b><code>examples/ota5t-placed.sp</code></span></a>
-          <p><zh>同一个电路，每个对象都有位置，导线、端口、地和电源都写好，<code>rnl render</code> 能把它完整画出来。</zh>
-            <en>The same circuit with every object placed, and the wires, ports, grounds and supplies written, which <code>rnl render</code> draws completely.</en></p>
+          <a class="dl-file" href="../skill/rnl/examples/ota5t-placed.sp"><svg class="ico"><use href="#i-netlist"/></svg><span><b><en>Example: placed and wired</en></b><code>examples/ota5t-placed.sp</code></span></a>
+          <p><en>The same circuit with every object placed, and the wires, ports, grounds and supplies written, which <code>rnl render</code> draws completely.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="../skill/rnl/LICENSE.md"><svg class="ico"><use href="#i-shield"/></svg><span><b><zh>许可</zh><en>Licences</en></b><code>LICENSE.md</code></span></a>
-          <p><zh>每个文件属于哪种许可，和许可全文（<code>LICENSES/</code>）。</zh><en>Which licence each file is under, and the full texts (<code>LICENSES/</code>).</en></p>
+          <a class="dl-file" href="../skill/rnl/LICENSE.md"><svg class="ico"><use href="#i-shield"/></svg><span><b><en>Licences</en></b><code>LICENSE.md</code></span></a>
+          <p><en>Which licence each file is under, and the full texts (<code>LICENSES/</code>).</en></p>
         </li>
       </ul>
     </div>
@@ -231,31 +217,26 @@
 <section id="tools" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>04 · 检查和绘制</zh><en>04 · Check and draw</en></p>
-      <h2><zh>写完就检查，<span class="mk">用能跑的第一个工具。</span></zh><en>Check what you write. <span class="mk">Use the first tool you can run.</span></en></h2>
-      <p class="lead"><zh>四个工具用的是同一个核心，读文件的结果相同。能自己运行的有前两个；后两个是给人用的。细节和命令都在 <a href="../skill/rnl/references/tools.md"><code>references/tools.md</code></a>。</zh>
-        <en>The four tools are one core, so they read a file the same way. An agent can run the first two itself; the other two are for a person. The details and the commands are in <a href="../skill/rnl/references/tools.md"><code>references/tools.md</code></a>.</en></p>
+      <p class="sheet-no"><en>04 · Check and draw</en></p>
+      <h2><en>Check what you write. <span class="mk">Use the first tool you can run.</span></en></h2>
+      <p class="lead"><en>The four tools are one core, so they read a file the same way. An agent can run the first two itself; the other two are for a person. The details and the commands are in <a href="../skill/rnl/references/tools.md"><code>references/tools.md</code></a>.</en></p>
     </header>
     <div class="facts tools-facts tools-four">
       <div class="fact">
         <h3><svg class="ico"><use href="#i-cpu"/></svg><code>rnl</code></h3>
-        <p><zh>下载最新核心发布里 Windows、Linux 或 macOS 的压缩包，也可以从源码构建（Rust 1.85 或更新）：<code>cargo build --release -p rnl-cli</code>。<code>rnl check FILE</code> 打印诊断，有错误时退出码为 1；<code>rnl render FILE -o DIR</code> 为每一层写 SVG。最完整，也是 CI 用的那个。</zh>
-          <en>Download the archive for Windows, Linux or macOS from the latest core release, or build it from source (Rust 1.85 or later): <code>cargo build --release -p rnl-cli</code>. <code>rnl check FILE</code> prints the diagnostics and exits 1 on errors; <code>rnl render FILE -o DIR</code> writes an SVG for each level. The most complete, and the one the CI uses.</en></p>
+        <p><en>Download the archive for Windows, Linux or macOS from the latest core release, or build it from source (Rust 1.85 or later): <code>cargo build --release -p rnl-cli</code>. <code>rnl check FILE</code> prints the diagnostics and exits 1 on errors; <code>rnl render FILE -o DIR</code> writes an SVG for each level. The most complete, and the one the CI uses.</en></p>
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-netlist"/></svg>npm</h3>
-        <p><zh><code>npm i @rich-netlist/runtime</code>（Node 18 或更新）：同一个核心编译成 WebAssembly，给出诊断和每层的 SVG。版本号和 <code>rnl</code> 命令相同，随核心一起发布。</zh>
-          <en><code>npm i @rich-netlist/runtime</code> (Node 18 or later): the same core as WebAssembly, giving the diagnostics and an SVG for each level. It has the version of the <code>rnl</code> command and is released with the core.</en></p>
+        <p><en><code>npm i @rich-netlist/runtime</code> (Node 18 or later): the same core as WebAssembly, giving the diagnostics and an SVG for each level. It has the version of the <code>rnl</code> command and is released with the core.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-globe"/></svg><zh>网页版</zh><en>Web viewer</en></h3>
-        <p><zh>给有浏览器的人：<a href="../viewer/" target="_blank" rel="noopener">rich-netlist.github.io/rnl/viewer/</a>。打开文件、看图、看问题列表，文件不会上传。agent 不能操作浏览器时，请人在这里打开文件。</zh>
-          <en>For a person with a browser: <a href="../viewer/" target="_blank" rel="noopener">rich-netlist.github.io/rnl/viewer/</a>. Open a file, see the drawing and the problems; nothing is uploaded. An agent that cannot drive a browser asks the person to open the file there.</en></p>
+        <h3><svg class="ico"><use href="#i-globe"/></svg><en>Web viewer</en></h3>
+        <p><en>For a person with a browser: <a href="../viewer/" target="_blank" rel="noopener">rich-netlist.github.io/rnl/viewer/</a>. Open a file, see the drawing and the problems; nothing is uploaded. An agent that cannot drive a browser asks the person to open the file there.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-monitor"/></svg><zh>桌面版</zh><en>Desktop viewer</en></h3>
-        <p><zh>Windows 10、11 和 Linux x86_64：下载在<a href="tools.html#desktop">工具页</a>。</zh>
-          <en>Windows 10 and 11, and Linux x86_64: the download is on the <a href="tools.html#desktop">page of the tools</a>.</en></p>
+        <h3><svg class="ico"><use href="#i-monitor"/></svg><en>Desktop viewer</en></h3>
+        <p><en>Windows 10 and 11, and Linux x86_64: the download is on the <a href="tools.html#desktop">page of the tools</a>.</en></p>
       </div>
     </div>
   </div>
@@ -265,14 +246,14 @@
 <section id="facts" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>05 · 版本和许可</zh><en>05 · Versions and licence</en></p>
-      <h2><zh>跟着 main，<span class="mk">按文件标明许可。</span></zh><en>It follows main, <span class="mk">and each file says its licence.</span></en></h2>
+      <p class="sheet-no"><en>05 · Versions and licence</en></p>
+      <h2><en>It follows main, <span class="mk">and each file says its licence.</span></en></h2>
     </header>
     <ul class="rules">
-      <li><b><zh>版本</zh><en>Versions</en></b><span><zh>skill 对应语言 0.3（修订 1）和标准包系列 0.3。语言和工具包都还是草案，0.x 的各版之间不保证兼容：遇到 0.2 的文件，名字不同，要用系列 0.2 读。</zh><en>The skill follows language 0.3 (revision 1) and the standard packages of series 0.3. Both the language and the toolkit are still drafts, and versions 0.x make no promise of compatibility: a file of 0.2 has other names and is read with the series 0.2.</en></span></li>
-      <li><b><zh>保持一致</zh><en>Kept in step</en></b><span><zh>zip 和这些文件在每次发布网站时重新生成，总是 <code>main</code> 的当前内容。标准包参考由包文件生成，指南和标准一起维护，例子在 CI 里用 <code>rnl check</code> 读过。</zh><en>The zip and the files are written again whenever the site is published, so they are always the current <code>main</code>. The reference is generated from the package files, the guide is kept with the standard, and the examples are read by <code>rnl check</code> in CI.</en></span></li>
-      <li><b><zh>许可</zh><en>Licence</en></b><span><zh>SKILL.md 和工具说明按 MIT，语言指南按 CC-BY-4.0（引用时请注明出处），标准包参考和例子按 CC0-1.0。包里不含代码，也不含字体。全文在包里的 <code>LICENSE.md</code> 和 <code>LICENSES/</code>。</zh><en>SKILL.md and the tool notes are MIT, the guide to the language is CC-BY-4.0 (credit the source when you reuse it), and the reference to the packages and the examples are CC0-1.0. The package holds no code and no fonts. The terms are in <code>LICENSE.md</code> and <code>LICENSES/</code> in the package.</en></span></li>
-      <li><b><zh>出错了</zh><en>Found a mistake</en></b><span><zh>skill 或指南和标准不一致时，以<a href="spec/0.3/">标准</a>为准；请到 <a href="https://github.com/rich-netlist/rnl/issues">GitHub</a> 报告。</zh><en>Where the skill or the guide differs from the <a href="spec/0.3/">standard</a>, the standard prevails; please report it on <a href="https://github.com/rich-netlist/rnl/issues">GitHub</a>.</en></span></li>
+      <li><b><en>Versions</en></b><span><en>The skill follows language 0.3 (revision 1) and the standard packages of series 0.3. Both the language and the toolkit are still drafts, and versions 0.x make no promise of compatibility: a file of 0.2 has other names and is read with the series 0.2.</en></span></li>
+      <li><b><en>Kept in step</en></b><span><en>The zip and the files are written again whenever the site is published, so they are always the current <code>main</code>. The reference is generated from the package files, the guide is kept with the standard, and the examples are read by <code>rnl check</code> in CI.</en></span></li>
+      <li><b><en>Licence</en></b><span><en>SKILL.md and the tool notes are MIT, the guide to the language is CC-BY-4.0 (credit the source when you reuse it), and the reference to the packages and the examples are CC0-1.0. The package holds no code and no fonts. The terms are in <code>LICENSE.md</code> and <code>LICENSES/</code> in the package.</en></span></li>
+      <li><b><en>Found a mistake</en></b><span><en>Where the skill or the guide differs from the <a href="spec/0.3/">standard</a>, the standard prevails; please report it on <a href="https://github.com/rich-netlist/rnl/issues">GitHub</a>.</en></span></li>
     </ul>
   </div>
 </section>
@@ -284,17 +265,16 @@
   <div class="wrap foot-grid">
     <div>
       <span class="brand-mark">RNL</span>
-      <p><zh>Rich Netlist（RNL）给 agent 的入口。skill 包和纯文本入口在构建网站时从仓库的 <code>skills/rnl/</code> 生成，总是 <code>main</code> 的当前内容。</zh>
-        <en>The entry of Rich Netlist (RNL) for agents. The skill package and the plain-text entry are written from <code>skills/rnl/</code> in the repository when the site is built, so they are always the current <code>main</code>.</en></p>
+      <p><en>The entry of Rich Netlist (RNL) for agents. The skill package and the plain-text entry are written from <code>skills/rnl/</code> in the repository when the site is built, so they are always the current <code>main</code>.</en></p>
     </div>
     <div>
-      <h4><zh>另见</zh><en>See also</en></h4>
+      <h4><en>See also</en></h4>
       <ul>
-        <li><a href="./"><zh>介绍页</zh><en>Introduction</en></a><zh>：动机、工具链、设计原则和现状</zh><en>: motivation, toolchain, principles and status</en></li>
-        <li><a href="language.html"><zh>语言导览</zh><en>Language tour</en></a><zh>：九个可以动手试的小节</zh><en>: nine hands-on sections</en></li>
-        <li><a href="packages.html"><zh>标准包图库</zh><en>Standard packages</en></a><zh>：每个符号画出来的样子和定义原文</zh><en>: every symbol as it is drawn, and the text that defines it</en></li>
-        <li><a href="spec/0.3/"><zh>语言标准 0.3</zh><en>Language standard 0.3</en></a><zh>：正式文本，另有 PDF 和 Markdown 下载</zh><en>: the formal text, also as PDF and Markdown downloads</en></li>
-        <li><a href="tools.html"><zh>工具</zh><en>Tools</en></a><zh>：网页版和桌面版查看器</zh><en>: the web and desktop viewers</en></li>
+        <li><a href="./"><en>Introduction</en></a><en>: motivation, toolchain, principles and status</en></li>
+        <li><a href="language.html"><en>Language tour</en></a><en>: nine hands-on sections</en></li>
+        <li><a href="packages.html"><en>Standard packages</en></a><en>: every symbol as it is drawn, and the text that defines it</en></li>
+        <li><a href="spec/0.3/"><en>Language standard 0.3</en></a><en>: the formal text, also as PDF and Markdown downloads</en></li>
+        <li><a href="tools.html"><en>Tools</en></a><en>: the web and desktop viewers</en></li>
       </ul>
     </div>
   </div>

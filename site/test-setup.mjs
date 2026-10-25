@@ -21,12 +21,12 @@ export default function setup() {
   // Its catalogs, beside its registry as i18n/<lang>/site/ is beside i18n/languages.json: the gallery page
   // and its scripts but for two texts, so that it is shown translated with the quieter notice; the other
   // pages have none and are shown in English with the notice that they are not translated (decision 0015).
-  const englishTexts = file => [...readFileSync(join(root, 'site/src', file), 'utf8').matchAll(/<en>([\s\S]*?)<\/en>/g)]
-    .map(m => m[1].split(/\s+/).filter(Boolean).join(' '));
+  const englishTexts = file => [...readFileSync(join(root, 'site/src', file), 'utf8').matchAll(/<en(?: ctx=([a-z0-9-]+))?>([\s\S]*?)<\/en>/g)]
+    .map(m => (m[1] ? `${m[1]}|` : '') + m[2].split(/\s+/).filter(Boolean).join(' '));
   for (const [file, leave] of [['gallery.html', 0], ['assets/circuits.js', 2], ['assets/common.js', 0]]) {
     const path = join(temp, 'ja', 'site', `${file}.json`);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify(Object.fromEntries(englishTexts(file).slice(leave).map(en => [en, `（訳）${en}`]))));
+    writeFileSync(path, JSON.stringify(Object.fromEntries(englishTexts(file).slice(leave).map(key => [key, `（訳）${key.replace(/^[a-z0-9-]+\|/, '')}`]))));
   }
   execFileSync(process.env.PYTHON || 'python', ['site/build.py', '--out', join(temp, 'dist')], {
     cwd: root, stdio: 'pipe', env: { ...process.env, RNL_SITE_LANGUAGES: configPath },
