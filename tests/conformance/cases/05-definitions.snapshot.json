@@ -385,6 +385,10 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "linecolor": "#9a9a9a",
+              "textcolor": "#9a9a9a"
+            },
             "symbol": {
               "value": "$CAP",
               "source": null
@@ -489,6 +493,10 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "linecolor": "#9a9a9a",
+              "textcolor": "#9a9a9a"
+            },
             "symbol": {
               "value": "$CAP",
               "source": null
@@ -593,6 +601,10 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "linecolor": "#9a9a9a",
+              "textcolor": "#9a9a9a"
+            },
             "symbol": {
               "value": "$CAP",
               "source": null

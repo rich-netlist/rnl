@@ -263,6 +263,9 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "linestyle": "double"
+            },
             "symbol": {
               "value": "$RES",
               "source": null

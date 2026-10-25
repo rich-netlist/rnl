@@ -358,6 +358,14 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            },
             "symbol": {
               "value": "$NMOS",
               "source": null
@@ -423,6 +431,14 @@
             ],
             "definition": null,
             "attach": null,
+            "style": {
+              "fillcolor": "#ffffff",
+              "linecolor": "#1f4fd8",
+              "linestyle": "bold",
+              "linewidth": 0.0,
+              "size": 1.0,
+              "textcolor": "#1d1d1f"
+            },
             "symbol": {
               "value": "$NMOS",
               "source": null

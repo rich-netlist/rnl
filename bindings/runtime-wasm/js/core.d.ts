@@ -108,7 +108,20 @@ export interface RunStyle {
  * record, whatever its level.
  */
 export type Op = { level?: string } & (
-  | { op: "set"; object: string; symbol?: string; at?: Point; orient?: string }
+  | {
+      op: "set";
+      object: string;
+      symbol?: string;
+      /**
+       * Style properties (9.3), such as `{ linecolor: "#2275e2" }`: written as a
+       * `$styleN = @DEFINE-STYLE(…) {}` that `@SET-STYLE` gives the object, one definition in each
+       * level for the styles of the same properties and values. One the language does not know
+       * fails as a written one does.
+       */
+      style?: Record<string, Literal>;
+      at?: Point;
+      orient?: string;
+    }
   | {
       op: "add-usage";
       name?: string;
@@ -125,6 +138,8 @@ export type Op = { level?: string } & (
        */
       params?: Record<string, ParameterValue>;
       symbol?: string;
+      /** Style properties, written as for `set`. */
+      style?: Record<string, Literal>;
       at?: Point;
       orient?: string;
     }
