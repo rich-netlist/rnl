@@ -29,4 +29,4 @@ RNL is a personal project of its maintainer, who holds the copyright in the docu
 
 Note (2026-10-25): the top-level `examples/` held only its README and was removed. Examples are now in `site/examples/`, `skills/rnl/examples/` and the [rnl-gallery](https://github.com/rich-netlist/rnl-gallery) repository; the table above and the line on `examples/` are kept as decided.
 
-Note (2026-10-25): the symbols of the standard packages of the series 0.3 are generated from Analog Canvas's component definitions; the maintainers have confirmed that these definitions may be published here as part of the standard packages under CC0-1.0. Analog Canvas's code itself remains AGPL-3.0 and has not been copied here.
+Note (2026-10-25): the symbols of the standard packages of the series 0.3 are generated from Analog Canvas's component definitions; the maintainer has confirmed that these definitions may be published here as part of the standard packages under CC0-1.0. Analog Canvas's code itself remains AGPL-3.0 and has not been copied here.
