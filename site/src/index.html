@@ -699,8 +699,8 @@ M5 tail vbias vss vss nch W=4u L=1u"></div><p class="bubble-note"><en>The netlis
           <p><en>Language models are good at reading and writing text such as netlists. RNL makes the drawing text too, so a model can write it directly and edit it in place. In the first writing trial, 11 models wrote 264 runs from a reference, and most produced usable RNL. Free text between statements helps people read, but it never changes what machines understand.</en></p>
         </details>
         <details>
-          <summary><en>Can RNL be written in Chinese?</en><svg class="ico"><use href="#i-next"/></svg></summary>
-          <p><en>Yes. Keywords and the names in the standard package have Chinese aliases; write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the file’s header record and use them, as in <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is only another spelling: the two can be mixed, and machines read exactly the same thing; the header record itself is always read in standard spelling.</en></p>
+          <summary><en>Can RNL be written in other languages?</en><svg class="ico"><use href="#i-next"/></svg></summary>
+          <p><en>Keywords and the names in the standard package can have aliases, other spellings in the style of another language. A file declares a few with <code>@ALIAS</code> in its header record, or loads an alias package, a language’s aliases collected in one package file, with <code>@USE-ALIASES(name=…, version=…)</code>, or with <code>path=…</code> for one of its own. The standard series has one so far, Chinese, <code>rnl-zh</code>, which comes with the tools: write <code>@USE-ALIASES(name="rnl-zh", version="0.3")</code> in the header record and use its aliases, as in <code lang="zh-CN">#M1 @位于(10, 20)</code>. An alias is only another spelling: the two can be mixed, and machines read exactly the same thing; the header record itself is always read in standard spelling.</en></p>
         </details>
         <details>
           <summary><en>Can I use it now?</en><svg class="ico"><use href="#i-next"/></svg></summary>
