@@ -753,6 +753,8 @@ impl Interp<'_> {
                 )
             })
             .collect();
+        let given: Vec<(String, Lit)> =
+            d.params.iter().filter_map(|(n, _)| get(&p, n).map(|v| (n.clone(), written_in(v, ctx.unit)))).collect();
         // roles (5.2.1, 9.4)
         let mut filled: Vec<(String, ArgV)> = Vec::new();
         let labeled = objs.iter().filter(|a| a.role.is_some()).count();
@@ -840,7 +842,7 @@ impl Interp<'_> {
                 seg.start,
             );
         }
-        let app = Rc::new(Application { dfn, filled, params, priority, seg_start: seg.start, seg: seg.clone() });
+        let app = Rc::new(Application { dfn, filled, params, given, priority, seg_start: seg.start, seg: seg.clone() });
         if let Some(rname) = lazy_roles.first().cloned() {
             let key = ("gen", ptr_seg(seg), self.frame_key(ctx), 0usize);
             let gen = match self.node_memo.get(&key) {
@@ -987,6 +989,7 @@ impl Interp<'_> {
             roles: rmap,
             role_sets: rsets,
             params: app.params.clone(),
+            given: app.given.clone(),
             locals: Vec::new(),
             parent,
             generated,
@@ -1175,6 +1178,7 @@ impl Interp<'_> {
             roles: vec![(first.unwrap(), pt)],
             role_sets: Vec::new(),
             params: app.params.clone(),
+            given: app.given.clone(),
             locals: Vec::new(),
             parent: None,
             generated: false,
@@ -2141,6 +2145,8 @@ pub struct Application {
     pub dfn: ObjId,
     pub filled: Vec<(String, ArgV)>,
     pub params: Vec<(String, Option<Lit>)>,
+    /// The parameters the statement writes, without the definition's defaults.
+    pub given: Vec<(String, Lit)>,
     pub priority: Option<Priority>,
     pub seg_start: usize,
     pub seg: Segment,

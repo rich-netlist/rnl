@@ -1038,6 +1038,9 @@
                 "#CL"
               ]
             },
+            "params": {
+              "direction": "从左到右"
+            },
             "symbol": {
               "value": null,
               "source": null
@@ -1391,6 +1394,9 @@
             "definition": "$GND_STUB",
             "attach": {
               "t": "#R3:2"
+            },
+            "params": {
+              "gap": 3.0
             },
             "symbol": {
               "value": null,

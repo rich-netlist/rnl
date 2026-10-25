@@ -749,6 +749,9 @@
               "r": "#R2",
               "c": "#C2"
             },
+            "params": {
+              "drop": 2.0
+            },
             "symbol": {
               "value": null,
               "source": null
@@ -799,6 +802,9 @@
             "attach": {
               "r": "#R3",
               "c": "#C3"
+            },
+            "params": {
+              "drop": 0.8
             },
             "symbol": {
               "value": null,
