@@ -164,17 +164,25 @@ class Catalogs(unittest.TestCase):
             (Path(directory) / "ja/site/c.html.json").write_text("{", encoding="utf-8")
             self.assertIn("not valid JSON", registry.catalog_errors("ja", "c.html")[0])
 
-    def test_notices_of_pages_not_wholly_translated(self):
-        registry = Languages(third_language())
+    def test_notices_of_pages_not_wholly_translated_are_in_english(self):
+        """As every notice of the system, in every language, Chinese included (decision 0015)."""
+        config = third_language()
+        config["languages"][-1]["names"] = {"en": "Japanese"}
+        config["languages"][-1]["messages"]["not_translated"] = "この頁はまだ訳されていません"  # not used
+        registry = Languages(config)
         self.assertEqual(registry.notice("ja", 10, 10), "")
         self.assertEqual(registry.notice("en", 0, 10), "")
         partial, english = registry.notice("ja", 8, 10), registry.notice("ja", 7, 10)
-        self.assertIn('class="wrap translation-notice is-partial" lang="ja"', partial)
-        self.assertIn("not yet available in 日本語", partial)
-        self.assertIn('class="wrap translation-notice" lang="ja"', english)
+        self.assertIn('class="wrap translation-notice is-partial" lang="en"', partial)
+        self.assertIn("Parts of this page are not yet available in Japanese; they are shown in English.", partial)
+        self.assertIn('class="wrap translation-notice" lang="en"', english)
+        self.assertIn("This page is not yet available in Japanese; it is shown in English.", english)
+        self.assertNotIn("訳されて", english)
+        self.assertIn(">Help translate it</a>", english)
         self.assertIn("i18n/README.md", english)
-        self.assertIn("本页尚无中文", registry.notice("zh", 0, 10))
-        self.assertIn("本页有部分内容尚无中文", registry.notice("zh", 9, 10))
+        plain = Languages(third_language())
+        self.assertIn("not yet available in Chinese", plain.notice("zh", 0, 10))
+        self.assertIn("not yet available in 日本語", plain.notice("ja", 0, 10))  # no English name: its own
 
     def test_whole_site_of_a_language_with_catalogs_only(self):
         """agents.html translated wholly, gallery.html but for two texts, index.html hardly at all."""
@@ -203,7 +211,7 @@ class Catalogs(unittest.TestCase):
             self.assertIn("（訳）", page("ja", "agents.html"))
             self.assertIn('translation-notice is-partial', page("ja", "gallery.html"))
             index = page("ja", "index.html")
-            self.assertIn('class="wrap translation-notice" lang="ja"', index)
+            self.assertIn('class="wrap translation-notice" lang="en"', index)
             self.assertNotIn("（訳）", index)  # shown in English: its one translated text too
             self.assertIn("A netlist you can simulate", index)
             self.assertIn('<html lang="ja" data-locale="ja">', index)

@@ -1,7 +1,7 @@
 # 0015. English is the only core language; every other language, Chinese included, is a translation
 
 - Date: 2026-10-25
-- Status: accepted
+- Status: accepted; point 8 amended on 2026-10-25: the notices are in English
 
 ## Context
 
@@ -16,7 +16,7 @@ The project has been written in English and Chinese. The two languages are kept 
 
 Only the chapters of the standard show when a translation has fallen behind its source. Elsewhere nothing does. For example, the catalog of the viewers holds sentences that the interface no longer has, and `site/src/llms.zh.txt` missed the changes that #178 made to `llms.txt`. At least eight places in the code assume that there are exactly two languages.
 
-The user asked for one entry from which a later maintainer of another language can see how much there is to translate, and for one way to submit the support of a language: “这个阶段需要开始考虑多语言的长期可维护性, 包括网站, 文档, viewer等……我希望做到的效果是有一个统一的入口能让后继其他语言的维护者能清晰跟踪到底有多少地方需要翻译, 并且能统一提交语言支持”. Reviewing the plan for it, they decided: “从现在起中文完全降级成一种多语言支持, 项目核心只保留英语一种语言. 新发内容可以先只上线英文, 其他语言后继跟进(包括中文)”.
+The user asked that the project now plan for keeping its languages up over time, across the site, the documents and the viewers: one entry from which a later maintainer of another language can follow how much there is to translate, and one way to submit the support of a language. Reviewing the plan for it, they decided that from now on Chinese becomes merely one of the supported languages and the core of the project keeps English as its one language: new content may first be published in English alone, and the other languages, Chinese included, follow.
 
 ## Decision
 
@@ -35,8 +35,9 @@ The user asked for one entry from which a later maintainer of another language c
 7. **The standard.** The English text remains normative. A translation of the standard is published as a form of a release, the PDF and the combined Markdown, only when every part of it is complete and in line with the English. The site shows the Chinese pages of the standard as they are. A chapter whose English has changed since it was translated carries a notice that it may differ from the English and that the English prevails. Version 0.2 is frozen and gets no new translations.
 8. **When a language is shown.**
    - A language is `published` when the site's navigation, introduction and page for agents are fully translated, the other pages at least 80% and the viewers at least 95%, and a native speaker named in the registry has reviewed it. A draft may be made by machine translation or by an AI model; it is shown only after that review. Chinese meets this today and stays shown.
-   - A page of a published language that is less than 80% translated is shown in English, with a notice in that language that the page is not yet translated, such as “本页尚无中文”.
+   - A page of a published language that is less than 80% translated is shown in English, with a notice that the page is not yet translated.
    - A page between 80% and 100% is shown translated, with the English where the translation is missing, and a notice that part of it is not yet translated.
+   - These notices, as every notice of the system, such as that of point 7, are in English, in every language, Chinese included. The user decided so on reading the first draft, which had them in each language: they are all in English, since by the principle a notice in Chinese was itself a fault; and they asked that the project be checked for Chinese embedded elsewhere. Their texts are therefore no translatable message.
 9. **Not translated**:
    - the diagnostics of the core and the command line, whose wording and language the standard leaves open (7.6), and the command line's usage text;
    - the skill package, which is in English only;

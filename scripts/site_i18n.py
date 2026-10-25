@@ -60,6 +60,7 @@ class Languages:
         self.default = config["default"]
         self.legacy = config["legacy"]
         entries = config["languages"]
+        self.entries = {entry["code"]: entry for entry in entries}  # as written, without English's keys
         self.codes = [entry["code"] for entry in entries]
         if (self.default != "en" or self.legacy not in self.codes or "en" not in self.codes
                 or len(set(self.codes)) != len(self.codes)
@@ -210,16 +211,21 @@ class Languages:
             return blocks[self.default] if value is None else value
         return self.group.sub(one, text)
 
+    def english_name(self, code):
+        """A language's name in English, `names.en` of its entry, else its name in itself."""
+        entry = self.entries[code]
+        return (entry.get("names") or {}).get("en") or entry["name"]
+
     def notice(self, code, translated, total):
-        """The notice of a page not wholly translated, in its language, or "" for one that is."""
+        """The notice of a page not wholly translated, or "" for one that is. Like every notice of the
+        system it is in English, in every language (decision 0015): its messages are English's only."""
         if code == self.default or translated >= total:
             return ""
         partial = translated >= SHOWN_IN_ENGLISH_BELOW * total
-        locale = self.locales[code]
-        text = self.message(code, "partly_translated" if partial else "not_translated", language=locale["name"])
-        return (f'\n<div class="wrap translation-notice{" is-partial" if partial else ""}" lang="{locale["html_lang"]}">'
+        text = self.message(self.default, "partly_translated" if partial else "not_translated", language=self.english_name(code))
+        return (f'\n<div class="wrap translation-notice{" is-partial" if partial else ""}" lang="{self.locales[self.default]["html_lang"]}">'
                 f'<p class="note"><svg class="ico"><use href="#i-info"/></svg><span>{escape(text)} '
-                f'<a href="{HELP_URL}">{escape(self.message(code, "help_translate"))}</a></span></p></div>')
+                f'<a href="{HELP_URL}">{escape(self.message(self.default, "help_translate"))}</a></span></p></div>')
 
     def markup(self, values, html=False):
         self.text(values, self.default)

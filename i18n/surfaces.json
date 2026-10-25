@@ -93,7 +93,9 @@
       "kind": "dictionary",
       "format": "registry-messages",
       "source": "i18n/languages.json",
-      "owner": "site"
+      "keep": ["not_translated", "partly_translated", "help_translate"],
+      "owner": "site",
+      "notes": "The notices of a page not wholly translated are in English in every language (decision 0015): their messages are not translated."
     },
     {
       "id": "site-timeline",
