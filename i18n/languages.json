@@ -99,6 +99,126 @@
         "display": "\"IBM Plex Sans Condensed\", \"Noto Sans SC\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
         "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans SC\", monospace"
       }
+    },
+    {
+      "code": "zh-hant",
+      "name": "繁體中文",
+      "short": "繁中",
+      "html_lang": "zh-Hant",
+      "matches": [
+        "zh-tw",
+        "zh-hk",
+        "zh-mo",
+        "zh-hant"
+      ],
+      "status": "incubating",
+      "ai_translated": true,
+      "codes": {
+        "viewer": "zh-Hant"
+      },
+      "names": {
+        "en": "Traditional Chinese",
+        "viewer": "繁體中文"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+TC:wght@400;500;700;900",
+        "body": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans TC\", monospace"
+      }
+    },
+    {
+      "code": "ja",
+      "name": "日本語",
+      "short": "日本語",
+      "html_lang": "ja",
+      "matches": [
+        "ja"
+      ],
+      "status": "incubating",
+      "ai_translated": true,
+      "names": {
+        "en": "Japanese",
+        "viewer": "日本語"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+JP:wght@400;500;700;900",
+        "body": "\"Noto Sans JP\", \"Hiragino Sans\", \"Yu Gothic UI\", \"Meiryo\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans JP\", \"Hiragino Sans\", \"Yu Gothic UI\", \"Meiryo\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans JP\", monospace"
+      }
+    },
+    {
+      "code": "ko",
+      "name": "한국어",
+      "short": "한국어",
+      "html_lang": "ko",
+      "matches": [
+        "ko"
+      ],
+      "status": "incubating",
+      "ai_translated": true,
+      "names": {
+        "en": "Korean",
+        "viewer": "한국어"
+      },
+      "nav_breakpoint": 760,
+      "fonts": {
+        "google": "Noto+Sans+KR:wght@400;500;700;900",
+        "body": "\"Noto Sans KR\", \"Apple SD Gothic Neo\", \"Malgun Gothic\", system-ui, sans-serif",
+        "display": "\"IBM Plex Sans Condensed\", \"Noto Sans KR\", \"Apple SD Gothic Neo\", \"Malgun Gothic\", sans-serif",
+        "mono": "\"IBM Plex Mono\", \"Cascadia Mono\", \"SFMono-Regular\", Consolas, \"Noto Sans KR\", monospace"
+      }
+    },
+    {
+      "code": "es",
+      "name": "Español",
+      "short": "ES",
+      "html_lang": "es",
+      "matches": [
+        "es"
+      ],
+      "status": "incubating",
+      "ai_translated": true,
+      "names": {
+        "en": "Spanish",
+        "viewer": "Español"
+      },
+      "nav_breakpoint": 1080
+    },
+    {
+      "code": "fr",
+      "name": "Français",
+      "short": "FR",
+      "html_lang": "fr",
+      "matches": [
+        "fr"
+      ],
+      "status": "incubating",
+      "ai_translated": true,
+      "names": {
+        "en": "French",
+        "viewer": "Français"
+      },
+      "nav_breakpoint": 1080
+    },
+    {
+      "code": "de",
+      "name": "Deutsch",
+      "short": "DE",
+      "html_lang": "de",
+      "matches": [
+        "de"
+      ],
+      "status": "incubating",
+      "ai_translated": true,
+      "names": {
+        "en": "German",
+        "viewer": "Deutsch"
+      },
+      "nav_breakpoint": 1080
     }
   ]
 }

@@ -1,0 +1,15 @@
+{
+  "Translation status · Rich Netlist": "翻譯進度 · Rich Netlist",
+  "How far each language of RNL is translated, from the site and the viewers to the standard.": "RNL 各語言的翻譯進度：從網站、檢視器到語言標準。",
+  "Skip to content": "跳至主要內容",
+  "Switch color theme": "切換色彩主題",
+  "Translation status": "翻譯進度",
+  "English is the source of every text of RNL; every other language, Chinese included, is a translation that follows it.": "RNL 的所有文本皆以英文為唯一來源；包含中文在內的其他所有語言，皆為依循英文原文的譯本。",
+  "This report was made from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">the list of what there is to translate</a> when the site was built; every pull request gets the same one. To translate a language or bring one up to date, start from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.": "本報告於網站建置時根據<a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">待翻譯內容清單</a>產生；每個 Pull Request 也會產生相同的報告。若要翻譯新語言或將現有語言更新至最新狀態，請從 <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a> 開始。",
+  "How far each language is": "各語言翻譯進度",
+  "The report is in English, as the texts it counts are. A missing translation shows the English; a stale one was made from an English text that has changed since.": "本報告以英文撰寫，與其所統計的原文一致。缺少譯文處會顯示英文；標示為 stale（過時）的譯文，代表其所依據的英文原文後來有所變更。",
+  "Machine translation and AI models may make a first draft; a language is shown once a native speaker has reviewed it.": "初稿可使用機器翻譯或 AI 模型產生；經母語人士審校後，該語言才會公開顯示。",
+  "See also": "另見",
+  "Decision 0015: English is the only core language": "決策 0015：英文是唯一的核心語言",
+  "Introduction": "介紹"
+}

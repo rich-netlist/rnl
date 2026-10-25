@@ -389,8 +389,12 @@ def translation_status_html(online=False):
     language: titles and notes come from i18n/surfaces.json."""
     status, project, surfaces = translation_survey(online)
     langs = project.languages
-    head = "".join(f'<th scope="col">{escape(I18N.english_name(code))} <span lang="{I18N.locales[code]["html_lang"]}">'
-                   f'{escape(I18N.locales[code]["name"])}</span><small>{escape(project.state(code))}</small></th>' for code in langs)
+    def name(code):
+        # its English name, where the registry gives one, and its own, marked with its language
+        own = f'<span lang="{I18N.locales[code]["html_lang"]}">{escape(I18N.locales[code]["name"])}</span>'
+        english = I18N.english_name(code)
+        return own if english == I18N.locales[code]["name"] else f"{escape(english)} {own}"
+    head = "".join(f'<th scope="col">{name(code)}<small>{escape(project.state(code))}</small></th>' for code in langs)
 
     def cell(surface, code):
         st = surface.langs.get(code)
