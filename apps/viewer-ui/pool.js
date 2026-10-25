@@ -9,6 +9,7 @@ import { shell } from "./shell.js";
 import { navigate } from "./navigation.js";
 import { $, load, save, settingsPath } from "./util.js";
 import { showManifestBar } from "./manifest-bar.js";
+import { displayFollows } from "./display.js";
 import { chooseFormat, chosenFormat, formatInfo, formatList, setFormatList } from "./formats.js";
 import { sourcePath } from "./source-path.js";
 
@@ -116,6 +117,8 @@ export async function sourceOpened(source, doc, add, applied = false) {
   // the bar stays while the file shown is one of the manifest's, whichever opened it, and goes with another file
   const shown = source?.path || doc?.path;
   showManifestBar(source?.external || (external && shown && (shown in external.files || external.pool.includes(shown)) ? external : null));
+  // and a manifest's display settings, the same way: those of the manifest a file is one of
+  displayFollows(shown && filePath(shown));
   documentFormats(doc);
   const held = source.temporary || (source.text !== undefined && !source.path && !source.readonly);
   if (held) {

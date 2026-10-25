@@ -181,3 +181,23 @@ test("a file is decoded as client.js decodeText decodes it: UTF-8 without a BOM,
     assert.equal(read.files["/d/a.sp"], decodeText(bytes));
   }
 });
+
+test("display settings are given as proposed, and those of another shape are left out and named", async () => {
+  const display = {
+    view: { center: [12.5, -4], scale: 2 }, background: "dark", colors: { component: "#2275e2", net: "red" },
+    usages: false, currents: true, grid: "dots", zoomToFit: true,
+  };
+  const checked = checkManifest(manifest({ display }));
+  assert.deepEqual(checked.display, { view: { center: [12.5, -4], scale: 2 }, background: "dark", colors: { component: "#2275E2" },
+    usages: false, currents: true, grid: "dots", zoomToFit: true });
+  // a setting this module does not know is kept, for a newer viewer, and named
+  assert.deepEqual(checked.displayIgnored, ["colors.net", "zoomToFit"]);
+  assert.deepEqual(checkManifest(manifest({ display: { view: { fit: true }, background: "sepia" } })).display, { view: { fit: true } });
+  assert.deepEqual(checkManifest(manifest()).display, {});
+  // a manifest written with them reads them back
+  const encode = (text) => new TextEncoder().encode(text);
+  const written = await writeManifest({ archive: true, entry: "top.scs", display: { background: "light" },
+    files: Object.entries(FILES).map(([path, text]) => ({ path, bytes: encode(text) })) });
+  const read = await loadManifest(written, { readFile: async (path) => encode(FILES[path]) });
+  assert.deepEqual(read.display, { background: "light" });
+});

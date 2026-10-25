@@ -43,6 +43,50 @@ export const MANIFEST_LIMITS = Object.freeze({
 });
 const ID = /^[A-Za-z0-9_.-]{1,64}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
+const COLOUR = /^#[0-9a-f]{6}$/i;
+
+/**
+ * The display settings a manifest proposes, as a viewer offers them to apply (`display`): the view
+ * of its level, `{ fit: true }` or `{ center: [x, y], scale }` in the drawing's units and pixels per
+ * unit; the `background`, "light" or "dark"; `colors`, by the viewer's names, each "#RRGGBB";
+ * whether `usages` and `currents` are shown; the `grid`, "none", "dots" or "lines". One of these of
+ * another shape is left out; one this module does not know is kept as it is, for a newer viewer and
+ * so that writing the manifest again loses nothing. Both are named in `ignored`, so that a manifest
+ * written for a newer viewer still opens.
+ */
+function displaySettings(display) {
+  const out = {}, ignored = [];
+  if (display === undefined) return { display: out, ignored };
+  if (!display || typeof display !== "object" || Array.isArray(display)) return { display: out, ignored: ["display"] };
+  const finite = (n) => typeof n === "number" && Number.isFinite(n);
+  for (const [key, value] of Object.entries(display)) {
+    let ok = false;
+    if (key === "view") {
+      if (value?.fit === true) { out.view = { fit: true }; ok = true; }
+      else if (Array.isArray(value?.center) && value.center.length === 2 && value.center.every(finite) && finite(value.scale) && value.scale > 0) {
+        out.view = { center: [value.center[0], value.center[1]], scale: value.scale };
+        ok = true;
+      }
+    } else if (key === "background") {
+      if (value === "light" || value === "dark") { out.background = value; ok = true; }
+    } else if (key === "colors") {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        const colors = Object.entries(value).filter(([, c]) => typeof c === "string" && COLOUR.test(c));
+        for (const [name] of Object.entries(value)) if (!colors.some(([n]) => n === name)) ignored.push(`colors.${name}`);
+        if (colors.length) out.colors = Object.fromEntries(colors.map(([n, c]) => [n, c.toUpperCase()]));
+        ok = true;
+      }
+    } else if (key === "usages" || key === "currents") {
+      if (typeof value === "boolean") { out[key] = value; ok = true; }
+    } else if (key === "grid") {
+      if (["none", "dots", "lines"].includes(value)) { out.grid = value; ok = true; }
+    } else {
+      out[key] = value;
+    }
+    if (!ok) ignored.push(key);
+  }
+  return { display: out, ignored };
+}
 
 /** What is wrong with a manifest or one of its files; `file` names that file when there is one. */
 export class ManifestError extends Error {
@@ -147,7 +191,9 @@ export function checkManifest(manifest, { archive = false, limits = {} } = {}) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) throw new ManifestError("The manifest's settings are not an object.");
   if (settings.autoInclude !== undefined && typeof settings.autoInclude !== "boolean") throw new ManifestError("The manifest's autoInclude is not true or false.");
   if (level !== undefined && typeof level !== "string") throw new ManifestError("The manifest's level is not a name.");
-  return { ...manifest, id, base, entry: entryPath, level: level ?? null, files, pool, formats: { ...formats }, paths, settings: { ...settings } };
+  const { display, ignored } = displaySettings(manifest.display);
+  return { ...manifest, id, base, entry: entryPath, level: level ?? null, files, pool, formats: { ...formats }, paths, settings: { ...settings },
+    display, displayIgnored: ignored };
 }
 
 async function sha256Hex(bytes) {
@@ -204,8 +250,10 @@ async function inParallel(items, limit, work) {
  *   looked for;
  * - `formats`: the format chosen for some files, `{ path: name }`, as a build takes them;
  * - `entry`: the path to open; `level`: the level to show, a subcircuit's name or "(top)", or null;
- * - `paths`: the search paths it records, `[{ path, subfolders }]`; `settings`; and the manifest's
- *   `id`, `title`, `description`, `author`, `source` and `license` as it gives them.
+ * - `paths`: the search paths it records, `[{ path, subfolders }]`; `settings`;
+ * - `display`: the display settings it proposes (displaySettings), which a viewer asks before it
+ *   applies, and `displayIgnored`, the names of those it left out; and the manifest's `id`, `title`,
+ *   `description`, `author`, `source` and `license` as it gives them.
  * Rejects with a ManifestError that names the file, when a file is the trouble.
  */
 export async function loadManifest(json, { fetch = globalThis.fetch, readFile, onProgress, signal, concurrency = 6, root, limits } = {}) {
@@ -259,6 +307,8 @@ export async function loadManifest(json, { fetch = globalThis.fetch, readFile, o
     formats: Object.fromEntries(Object.entries(manifest.formats).map(([path, name]) => [root + path, name])),
     paths: manifest.paths.map((dir) => ({ path: root + dir.path, subfolders: dir.subfolders })),
     settings: manifest.settings,
+    display: manifest.display,
+    displayIgnored: manifest.displayIgnored,
   };
 }
 
@@ -292,7 +342,7 @@ export async function readManifest(url, options = {}) {
  * else each needs a `url` or the manifest a `base` (a manifest of links). What it gives is checked
  * as a reader checks it, so a manifest this writes is one it reads.
  */
-export async function writeManifest({ files, entry, pool = [], formats = {}, level, paths = [], settings = {}, archive = false, ...rest }) {
+export async function writeManifest({ files, entry, pool = [], formats = {}, level, paths = [], settings = {}, display = {}, archive = false, ...rest }) {
   const listed = await Promise.all(files.map(async (file) => ({
     path: file.path, sha256: await sha256Hex(file.bytes), size: file.bytes.length, ...(file.url !== undefined && { url: file.url }),
   })));
@@ -306,6 +356,7 @@ export async function writeManifest({ files, entry, pool = [], formats = {}, lev
     ...(level !== undefined && level !== null && { level }),
     ...(paths.length && { paths }),
     ...(Object.keys(settings).length && { settings }),
+    ...(Object.keys(display).length && { display }),
   };
   checkManifest(manifest, { archive });
   return manifest;
