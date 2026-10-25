@@ -188,9 +188,10 @@ test("display settings are given as proposed, and those of another shape are lef
     usages: false, currents: true, grid: "dots", zoomToFit: true,
   };
   const checked = checkManifest(manifest({ display }));
-  assert.deepEqual(checked.display, { view: { center: [12.5, -4], scale: 2 }, background: "dark", colors: { component: "#2275E2" },
+  assert.deepEqual(checked.display, { view: { center: [12.5, -4], scale: 2 }, background: "dark", colors: { component: "#2275e2" },
     usages: false, currents: true, grid: "dots", zoomToFit: true });
-  // a setting this module does not know is kept, for a newer viewer, and named
+  // a colour is kept as written; a setting this module does not know is kept, for a newer viewer,
+  // and named with those of another shape
   assert.deepEqual(checked.displayIgnored, ["colors.net", "zoomToFit"]);
   assert.deepEqual(checkManifest(manifest({ display: { view: { fit: true }, background: "sepia" } })).display, { view: { fit: true } });
   assert.deepEqual(checkManifest(manifest()).display, {});

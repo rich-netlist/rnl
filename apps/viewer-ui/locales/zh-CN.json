@@ -601,7 +601,7 @@
   "Current directions: {0}": "电流方向：{0}",
   "View: the whole level, fitted to the window": "视图：整层，适应窗口",
   "View: the part of the level it shows": "视图：清单指定的那一部分",
-  "This viewer leaves out display settings it does not know: {0}.": "本查看器不认识这些显示设置，已忽略：{0}。",
+  "This viewer leaves out display settings it does not know or cannot read: {0}.": "本查看器不认识或读不懂这些显示设置，已忽略：{0}。",
   "Display Settings": "显示设置",
   "Apply Selected": "应用所选",
   "Don't Apply": "不应用",

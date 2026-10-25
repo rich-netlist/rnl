@@ -91,7 +91,10 @@ export interface ManifestRead {
   settings: { autoInclude?: boolean };
   /** The display settings of the shapes this module reads; empty when none. */
   display: DisplaySettings;
-  /** The names of the display settings left out, of another shape or unknown. */
+  /**
+   * The names of the display settings a viewer will not apply: those of another shape, left out of
+   * `display`, and those this module does not know, kept in `display` as the manifest gives them.
+   */
   displayIgnored: string[];
 }
 
