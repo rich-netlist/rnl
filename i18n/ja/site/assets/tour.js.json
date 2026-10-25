@@ -3,7 +3,7 @@
   "M1 and M2 have the same y, so they sit in a row. “, i.e., same y” is only a gloss.": "M1とM2は同じy座標を持ち、横一列に並びます。「, i.e., same y」は補足説明（グロス）にすぎません。",
   "M1, M2 and M3 run strictly from left to right. With \"x\" only the axis is fixed, and the reverse holds too.": "M1、M2、M3は左から右へ厳密な順序で並びます。\"x\"とだけ書いた場合は軸のみが定まり、逆順でも成立します。",
   "From M1 up to M2 is at least 4 units: M2’s y exceeds M1’s by 4 or more.": "M1から上方向にM2まで少なくとも4グリッド離れます（M2のy座標がM1より4以上大きくなります）。",
-  "M1 (in_p) and M2 (in_n) together form a differential pair. This application is a usage, named %dp.": "M1（in_p）とM2（in_n）は合わさって差動対を成します。この適用は%dpという名前の使用例（usage）になります。",
+  "M1 (in_p) and M2 (in_n) together form a differential pair. This application is a usage, named %dp.": "M1（in_p）とM2（in_n）は合わさって差動対を成します。この適用は%dpという名前の適用オブジェクト（usage）になります。",
   "A ground is added on net c, at (24, 38), and named %g0. =&gt; hands each part’s result to the next.": "ネットc上の(24, 38)にグラウンドが追加され、%g0と名付けられます。=&gt;は各部分の結果を次へと渡します。",
   "On this level and on every level below, instances of model nch are drawn with $NMOS. This is a rule, evaluated once per level.": "このレベルおよび下位のすべてのレベルにおいて、モデルnchのインスタンスは$NMOSで描画されます。これはルールであり、各レベルで1回ずつ評価されます。",
   "Net n1 has a wire running through R1’s terminal 2, the point %j and R2’s terminal 1, in that order.": "ネットn1には、R1の端子2、点%j、R2の端子1をこの順に通る配線があります。",
