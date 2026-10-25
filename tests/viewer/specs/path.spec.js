@@ -365,6 +365,8 @@ test("a long path keeps the level shown in a narrow bar, and leaves the levels b
 
   // wide again, the whole path and the kind
   await page.setViewportSize({ width: 1200, height: 800 });
+  // no phone now: the side panel is back beside the drawing before it is hidden
+  await expect(page.locator("#sidebar")).toBeVisible();
   await page.keyboard.press("Control+B");
   await expect.poll(() => segments(page)).toEqual([TOP, "bank XK1", "block XB2", "cell XC1", "leaf XL2"]);
   await expect(more).toBeHidden();

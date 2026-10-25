@@ -1356,6 +1356,8 @@ button.pool-open:hover { text-decoration: underline; }
   .netlist-options, .rnl-filter-group { flex-wrap: nowrap; }
   .netlist-options { flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: nowrap; }
   .netlist-options > * { flex: none; }
+  /* the problems as tall as what they hold, at most their height: a few leave the netlist the rest */
+  .problems-body { height: auto; max-height: var(--problems-h); }
 }
 
 /* a finger is bigger than a pointer: the controls a finger presses, the rows of the menus and lists */
@@ -1424,4 +1426,16 @@ html { -webkit-tap-highlight-color: transparent; }
   .netlist-options-button { display: inline-block; flex: none; min-height: 44px; min-width: 44px; margin-left: auto; border-color: var(--line); }
   .netlist-options { display: none; flex-basis: 100%; }
   .file-bar.options-open .netlist-options { display: flex; }
+  .problems-body { height: auto; max-height: var(--problems-h); }
+}
+
+/* a phone lying down: the status bar and the switch bar share the bottom row, the switch at its end */
+@media (pointer: coarse) and (max-height: 499px) {
+  body:not(.embed) { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto; }
+  body.menubar-shown:not(.embed) { grid-template-rows: auto minmax(0, 1fr) auto; }
+  body:not(.embed) > .menubar, body:not(.embed) > .app { grid-column: 1 / -1; }
+  body:not(.embed) > .statusbar { grid-column: 1; grid-row: -2; }
+  body:not(.embed) > .page-switch { grid-column: 2; grid-row: -2; border-left: 1px solid var(--line); }
+  /* buttons of one width, so that the row stays as it is when the page shown, in bold, changes */
+  body:not(.embed) > .page-switch button { flex: none; width: 96px; padding: 0 8px; }
 }

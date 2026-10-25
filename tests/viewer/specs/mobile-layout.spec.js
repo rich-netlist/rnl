@@ -1,11 +1,12 @@
 // The page on a phone and a tablet (the projects mobile-chromium and mobile-webkit). On a phone,
 // upright or lying down, the drawing and the side panel are two pages, each the whole screen above a
-// low switch bar, `#page-switch`: switching keeps each page as it was, Show in Netlist and Show in
-// Drawing go from one to the other, and opening a level or a file goes to the drawing. On a tablet
-// upright the side panel is below the drawing, folds to its tabs and drags taller or lower; lying
-// down it is beside the drawing. Everywhere the controls are big enough for a finger, the menus open
-// with a tap and fit on the screen, the netlist shows lines of the file, and the page never scrolls
-// sideways. A narrow desktop window keeps its mouse (tests/viewer/README.md#mobile).
+// low switch bar, `#page-switch` (lying down, at the end of the status bar's row): switching keeps
+// each page as it was, Show in Netlist and Show in Drawing go from one to the other, and opening a
+// level or a file goes to the drawing. On a tablet upright the side panel is below the drawing, folds
+// to its tabs and drags taller or lower; lying down it is beside the drawing. Everywhere the controls
+// are big enough for a finger, the menus open with a tap and fit on the screen, the netlist shows
+// lines of the file, and the page never scrolls sideways. A narrow desktop window keeps its mouse
+// (tests/viewer/README.md#mobile).
 
 import { canvasMiddle, expect, pageMoved, test, UNMOVED } from "../mobile.js";
 
@@ -113,13 +114,12 @@ function netlistLines(page) {
  * Drawing there. Nothing goes under the bar; the side panel's buttons and handle of a wider screen
  * are not there; `#app` names the page in `data-page`; and the page does not move.
  */
-async function twoPages(page) {
+async function twoPages(page, { lyingDown = false } = {}) {
   const size = page.viewportSize();
   const bar = page.locator("#page-switch");
   await expect(bar).toBeVisible();
   const b = await box(bar);
   expect(Math.abs(b.y + b.height - size.height)).toBeLessThanOrEqual(1);
-  expect(Math.abs(b.width - size.width)).toBeLessThanOrEqual(1);
   expect(b.height).toBeLessThanOrEqual(SWITCH_BAR);
   bigEnough(await boxes(bar.locator("[role=tab]")), TARGET, ROW);
   for (const sel of ["#hide-sidebar", "#show-sidebar", "#vsplit"]) await expect(page.locator(sel), sel).toBeHidden();
@@ -127,6 +127,16 @@ async function twoPages(page) {
     const r = await box(page.locator(sel));
     expect(r.y + r.height, sel).toBeLessThanOrEqual(b.y + 0.5);
   };
+  // the status bar above the switch bar, both as wide as the screen; lying down they share the
+  // bottom row, the switch at its end
+  const status = async () => {
+    const r = await box(page.locator(".statusbar"));
+    if (!lyingDown) return above(".statusbar");
+    expect(Math.abs(r.y + r.height - size.height)).toBeLessThanOrEqual(1);
+    expect(r.x + r.width).toBeLessThanOrEqual(b.x + 1);
+  };
+  if (lyingDown) expect(Math.abs(b.x + b.width - size.width)).toBeLessThanOrEqual(1);
+  else expect(Math.abs(b.width - size.width)).toBeLessThanOrEqual(1);
 
   await expect(page.locator("#page-drawing")).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#app")).toHaveAttribute("data-page", "drawing");
@@ -136,7 +146,7 @@ async function twoPages(page) {
   const canvas = await box(page.locator("#canvas"));
   expect(Math.abs(canvas.width - size.width)).toBeLessThanOrEqual(1);
   await above("#canvas");
-  await above(".statusbar");
+  await status();
 
   await toPage(page, "panel");
   await expect(page.locator("#page-drawing")).toHaveAttribute("aria-selected", "false");
@@ -147,7 +157,7 @@ async function twoPages(page) {
   const panel = await box(page.locator("#sidebar"));
   expect(Math.abs(panel.width - size.width)).toBeLessThanOrEqual(1);
   await above("#sidebar");
-  await above(".statusbar");
+  await status();
   expect(await pageMoved(page)).toEqual(UNMOVED);
 }
 
@@ -343,10 +353,10 @@ test.describe("on a phone lying down", () => {
     expect(await pageMoved(page)).toEqual(UNMOVED);
   });
 
-  test("the drawing and the side panel are two pages here too, and the drawing has half the height", async ({ page }) => {
+  test("the drawing and the side panel are two pages here too, the switch bar beside the status bar, and the drawing has half the height", async ({ page }) => {
     const size = page.viewportSize();
     expect((await box(page.locator("#canvas"))).height).toBeGreaterThanOrEqual(0.5 * size.height);
-    await twoPages(page);
+    await twoPages(page, { lyingDown: true });
   });
 });
 
