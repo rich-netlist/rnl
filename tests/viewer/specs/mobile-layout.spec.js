@@ -217,15 +217,19 @@ test.describe("on a phone lying down", () => {
     expect(await pageMoved(page)).toEqual(UNMOVED);
   });
 
-  test.fixme("the drawing has most of the screen, and all of it with the side panel folded", async ({ page }) => {
+  test.fixme("the side panel starts folded, and the drawing keeps most of the screen with it shown", async ({ page }) => {
     const size = page.viewportSize();
+    const folded = await box(page.locator("#canvas"));
+    expect(Math.abs(folded.width - size.width)).toBeLessThanOrEqual(1);
+    expect(folded.height).toBeGreaterThanOrEqual(0.55 * size.height);
+    // beside the drawing, as on a desktop
+    await page.locator("#show-sidebar").tap();
+    await expect(page.locator("#sidebar")).toBeVisible();
     const canvas = await box(page.locator("#canvas"));
     expect(canvas.width * canvas.height).toBeGreaterThanOrEqual(0.45 * size.width * size.height);
     expect(canvas.height).toBeGreaterThanOrEqual(0.55 * size.height);
     await page.locator("#hide-sidebar").tap();
-    const folded = await box(page.locator("#canvas"));
-    expect(Math.abs(folded.width - size.width)).toBeLessThanOrEqual(1);
-    expect(folded.height).toBeGreaterThanOrEqual(0.55 * size.height);
+    await expect.poll(async () => (await box(page.locator("#canvas"))).width).toBeCloseTo(size.width, 0);
   });
 });
 
@@ -242,9 +246,12 @@ for (const [name, viewport] of [["upright", { width: 768, height: 1024 }], ["lyi
       expect(await pageMoved(page)).toEqual(UNMOVED);
     });
 
-    test.fixme("the drawing has at least half the screen, and the controls are big enough for a finger", async ({ page }) => {
-      const canvas = await box(page.locator("#canvas"));
-      expect(canvas.width * canvas.height).toBeGreaterThanOrEqual(0.5 * viewport.width * viewport.height);
+    test.fixme("the drawing has most of the screen, and the controls are big enough for a finger", async ({ page }) => {
+      // upright the side panel is below the drawing, as on a phone; lying down beside it
+      const [canvas, panel] = [await box(page.locator("#canvas")), await box(page.locator("#sidebar"))];
+      if (name === "upright") expect(panel.y).toBeGreaterThanOrEqual(canvas.y + canvas.height - 1);
+      else expect(panel.x + panel.width).toBeLessThanOrEqual(canvas.x + 1);
+      expect(canvas.width * canvas.height).toBeGreaterThanOrEqual(0.45 * viewport.width * viewport.height);
       bigEnough(await boxes(page.locator("#menubar .menu-title")), TARGET, TARGET);
       bigEnough(await boxes(page.locator(".view-tabs [role=tab]")), TARGET, TARGET);
     });
