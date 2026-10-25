@@ -1,7 +1,12 @@
 // Explicit UI messages only. Netlists, filenames, SVG content and core diagnostics stay raw.
 // The English source is the catalog key and fallback; message values never carry action identity.
+// The languages and their catalogs come from i18n/ of the repository (decision 0015): the shell
+// gives them (uiLanguages, uiCatalog), or the page reads them from locales/, where the web viewer's
+// build writes them (scripts/i18n/viewer-locales.mjs).
 let language = "en";
-let chinese = {};
+// the languages offered, English first: { code, lang, name, matches } as viewer-locales.mjs gives them
+let languages = [{ code: "en", lang: "en", name: "English", matches: ["en"] }];
+const catalogs = {}; // the catalog of each language but English, by its code
 let host = null;
 let persist = null;
 let switching = Promise.resolve();
@@ -26,11 +31,21 @@ export function m(source, ...values) {
 export const tr = (source) => source;
 
 export function translate(key, values = []) {
-  const pattern = language === "zh-CN" && Object.hasOwn(chinese, key) ? chinese[key] : key;
+  const catalog = catalogs[language];
+  const pattern = catalog && typeof catalog[key] === "string" ? catalog[key] : key;
   return pattern.replace(/\{(\d+)\}/g, (match, index) => index < values.length ? String(values[index]) : match);
 }
 export const locale = () => language;
-export const preferredLanguage = (languages = navigator.languages) => /^zh\b/i.test(languages?.[0] || "") ? "zh-CN" : "en";
+/** The languages offered, English first, each { code, lang, name, matches }. */
+export const uiLanguages = () => languages;
+/** The language the browser or the system asks for first, if it is offered, else English. */
+export function preferredLanguage(wanted = navigator.languages) {
+  const first = (wanted?.[0] || "").toLowerCase();
+  const found = languages.find((l) => l.matches.some((prefix) => first === prefix || first.startsWith(`${prefix}-`)));
+  return found ? found.code : "en";
+}
+/** Whether a text is in a catalog, and so shown translated in some language. */
+const translatable = (key) => Object.values(catalogs).some((catalog) => typeof catalog[key] === "string");
 
 function textNode(value) {
   const node = document.createTextNode(String(value ?? ""));
@@ -56,14 +71,14 @@ function bindStatic() {
     const node = walk.currentNode;
     if (node.nodeType === Node.TEXT_NODE && !node.parentElement.closest("script,style,svg")) {
       const key = node.data.trim();
-      if (Object.hasOwn(chinese, key)) {
+      if (translatable(key)) {
         const value = m`${node.data.match(/^\s*/)[0]}${m(key)}${node.data.match(/\s*$/)[0]}`;
         texts.set(node, value); node.data = String(value);
       }
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       for (const attr of ["title", "placeholder", "aria-label"]) {
         const value = node.getAttribute(attr);
-        if (value && Object.hasOwn(chinese, value)) setAttr(node, attr, m(value));
+        if (value && translatable(value)) setAttr(node, attr, m(value));
       }
     }
   }
@@ -84,13 +99,22 @@ function refresh() {
   window.dispatchEvent(new Event("language-changed"));
 }
 
-export async function startI18n(shell, saved, save) {
-  const response = await fetch("locales/zh-CN.json");
+/** A file of locales/ that the web viewer's build writes. */
+async function locales(name) {
+  const response = await fetch(`locales/${name}`);
   if (!response.ok) throw new Error(`Cannot load UI translations (${response.status}).`);
-  chinese = await response.json();
+  return response.json();
+}
+
+export async function startI18n(shell, saved, save) {
   host = shell;
   persist = save;
-  language = ["en", "zh-CN"].includes(saved) ? saved : preferredLanguage();
+  languages = await (host.uiLanguages ? host.uiLanguages() : locales("languages.json"));
+  // every catalog, as the static HTML is bound to the texts that any of them translates
+  await Promise.all(languages.slice(1).map(async ({ code }) => {
+    catalogs[code] = await (host.uiCatalog ? host.uiCatalog(code) : locales(`${code}.json`));
+  }));
+  language = languages.some((l) => l.code === saved) ? saved : preferredLanguage();
   await host.setLanguage?.(language);
   bindStatic();
   refresh();
@@ -98,7 +122,7 @@ export async function startI18n(shell, saved, save) {
 
 /** Serialize native-menu updates and settings writes when users switch quickly. */
 export function setLanguage(next) {
-  if (!["en", "zh-CN"].includes(next)) return Promise.reject(new Error("Unsupported UI language"));
+  if (!languages.some((l) => l.code === next)) return Promise.reject(new Error("Unsupported UI language"));
   const change = async () => {
     await host?.setLanguage?.(next);
     language = next;

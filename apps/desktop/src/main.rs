@@ -480,6 +480,8 @@ fn main() {
             menu::set_view_check,
             menu::set_command_enabled,
             menu::set_ui_language,
+            menu::ui_languages,
+            menu::ui_catalog,
             solve::solve_preview,
             solve::solver_defaults,
             solve::check_solver_options,

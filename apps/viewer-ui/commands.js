@@ -1,4 +1,4 @@
-import { m, locale, setLanguage, translate } from "./i18n.js";
+import { m, locale, setLanguage, translate, uiLanguages } from "./i18n.js";
 // The commands and the keys that run them. Both come from the command table, commands.json, which
 // the desktop viewer also builds its native menu from: the menus, their items and submenus, and per
 // item its id, its label, its keys and the platforms that offer it. A command runs by its id,
@@ -38,6 +38,7 @@ export async function startCommands() {
   const response = await fetch("commands.json");
   if (!response.ok) throw new Error(`The page could not load its command table (${response.status}).`);
   table = await response.json();
+  for (const menu of table.menus) addLanguages(menu.items);
   for (const [id, checked] of checks) shell.setCheck(id, checked);
   shell.onCommand(command);
   setEnabled("descend-new-window", false);
@@ -45,10 +46,23 @@ export async function startCommands() {
   languageChecks();
 }
 
+/**
+ * The submenu that the table marks with "languages" lists English, and after it each language that
+ * i18n.js offers, by its name in itself, as the item language-<code> of i18n/languages.json.
+ */
+function addLanguages(items) {
+  for (const item of items) {
+    if (item === "-" || !item.items) continue;
+    if (item.languages) {
+      item.items = [...item.items, ...uiLanguages().slice(1).map((l) => ({ id: `language-${l.lang}`, label: l.name, check: true, radio: true }))];
+    }
+    addLanguages(item.items);
+  }
+}
+
 function languageChecks() {
   if (!table) return;
-  setCheck("language-en", locale() === "en");
-  setCheck("language-zh", locale() === "zh-CN");
+  for (const l of uiLanguages()) setCheck(`language-${l.lang}`, locale() === l.code);
 }
 window.addEventListener("language-changed", languageChecks);
 
@@ -59,10 +73,10 @@ window.addEventListener("language-changed", languageChecks);
 export function command(id, options = {}) {
   if (!isEnabled(id)) return;
   if (shell?.embed && !["fit", "zoom-in", "zoom-out", "descend", "descend-new-window", "ascend"].includes(id)) return;
+  const language = uiLanguages().find((l) => `language-${l.lang}` === id);
+  if (language) return setLanguage(language.code).catch(error =>
+    inform({ title: m("Language"), paragraphs: [m`Could not change language: ${error.message || error}`] }));
   switch (id) {
-    case "language-en":
-    case "language-zh": return setLanguage(id === "language-en" ? "en" : "zh-CN").catch(error =>
-      inform({ title: m("Language"), paragraphs: [m`Could not change language: ${error.message || error}`] }));
     case "new-window": return duplicateWindow();
     case "open": pickAndOpen("file"); break;
     case "include-file": includeFiles("file"); break;

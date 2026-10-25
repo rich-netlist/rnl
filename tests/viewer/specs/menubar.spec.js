@@ -19,7 +19,16 @@ const entry = (page, text) => page.locator("#menubar .menu-item.opens", { hasTex
  * entries, and no menu or submenu left without items.
  */
 async function webMenus(page) {
-  const table = await page.evaluate(() => fetch("commands.json").then((r) => r.json()));
+  // the Language submenu lists English and then the languages of i18n/ that the page offers (commands.js)
+  const table = await page.evaluate(async () => {
+    const [table, languages] = await Promise.all(["commands.json", "locales/languages.json"].map((f) => fetch(f).then((r) => r.json())));
+    const add = (items) => items.filter((i) => i.items).forEach((i) => {
+      if (i.languages) i.items.push(...languages.slice(1).map((l) => ({ id: `language-${l.lang}`, label: l.name, check: true, radio: true })));
+      add(i.items);
+    });
+    for (const m of table.menus) add(m.items);
+    return table;
+  });
   const plain = (label) => label.replace("&", "");
   const entries = (items) => {
     const shown = [];

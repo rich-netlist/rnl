@@ -205,8 +205,36 @@ async function version() {
   return params.get("version") || "0.1.0";
 }
 
+// A language only these tests offer, with `pseudo` in the URL: every text the catalogs translate, its
+// letters accented and made 40% longer, in brackets ［…］, its placeholders, its shortcut after a tab
+// and its & kept. A text of the interface that no catalog has shows as plain English among them, and
+// one that a longer language would not fit shows so (decision 0015).
+const PSEUDO = { code: "qps-ploc", lang: "qps", name: "Pseudo", matches: [] };
+const ACCENTS = Object.fromEntries([..."abcdefghijklmnopqrstuvwxyz"].map((c, i) => [c, [..."áƀçðéƒĝĥíĵķĺɱñóþǫŕšţúṽŵẋýž"][i]]));
+export function pseudo(text) {
+  const [label, keys] = text.split("\t");
+  const body = label.split(/(\{\d+\})/).map((part, i) => i % 2 ? part : [...part].map((c) => {
+    const a = ACCENTS[c.toLowerCase()];
+    return !a ? c : c === c.toLowerCase() ? a : a.toUpperCase();
+  }).join("")).join("");
+  return `［${body}${"·".repeat(Math.ceil(label.length * 0.4))}］${keys === undefined ? "" : `\t${keys}`}`;
+}
+const locales = async (name) => (await fetch(`locales/${name}`)).json();
+
 /** @type {import("../../apps/viewer-ui/shell.js").Shell} */
 export default {
+  async uiLanguages() {
+    const languages = await locales("languages.json");
+    return params.has("pseudo") ? [...languages, PSEUDO] : languages;
+  },
+  async uiCatalog(code) {
+    if (code !== PSEUDO.code) return locales(`${code}.json`);
+    const keys = new Set();
+    for (const { code: other } of (await locales("languages.json")).slice(1)) {
+      for (const key of Object.keys(await locales(`${other}.json`))) keys.add(key);
+    }
+    return Object.fromEntries([...keys].map((key) => [key, pseudo(key)]));
+  },
   // Most fixtures exercise same-document UI. A test can supply independent file fixtures.
   sourceForFile(src, document, index) { return fake.fileSources?.[document.files[index].path] || src; },
   newWindow(session) { fake.calls.push(["newWindow", JSON.parse(JSON.stringify(session))]); },

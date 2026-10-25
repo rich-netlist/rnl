@@ -1,4 +1,4 @@
-import { append, locale, m, setAttr, setText } from "./i18n.js";
+import { append, locale, m, setAttr, setText, uiLanguages } from "./i18n.js";
 // Files opened by an external manifest, ?manifest= (shells/web.js): the slim bar above the drawing
 // that says where they come from, with what the manifest gives of its title, author and source, and
 // the level the manifest names.
@@ -29,7 +29,9 @@ export function showManifestBar(external) {
   const bar = $("manifest-bar");
   shownExternal = external;
   const { repo, commit, url } = external?.source || {};
-  const title = external && ((locale() === "zh-CN" && external.title?.zh) || external.title?.en);
+  // a manifest writes its title in the codes of i18n/languages.json, such as zh
+  const lang = uiLanguages().find((l) => l.code === locale())?.lang;
+  const title = external && ((lang && external.title?.[lang]) || external.title?.en);
   const people = authors(external?.author);
   const shown = !!(title || people.length || (repo && commit));
   bar.hidden = !shown;

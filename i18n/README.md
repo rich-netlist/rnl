@@ -111,7 +111,7 @@ Anyone may update a translation at any time, in a pull request of its own. A pul
 | --- | --- | --- |
 | 1 | This folder, the report, stamps on `README.zh.md` and `site/src/llms.zh.txt` | done |
 | 2a | The viewers: every text of the interface written where the scan finds it, `tr()` marking those that reach `m()` through a variable; counts as whole phrases; the entries the interface no longer has removed | done |
-| 2b | The viewers: the catalog in `i18n/<lang>/viewer.json`, the language menu from `languages.json`, a manifest's title in any language. Until then the viewers have only English and Chinese | to come |
+| 2b | The viewers: the catalog in `i18n/<lang>/viewer.json`, the language menu from `languages.json`, a manifest's title in any language, public packages' summaries in English alone; a pseudo language in the page's tests | done |
 | 3a | The site reads the catalogs in `i18n/<lang>/site/` and checks their format; a page under 80% translated is shown in English, and every page not wholly translated says so ([site/README.md](../site/README.md#adding-a-language)) | done |
 | 3b | The site: the Chinese of `site/src/`, the summaries of the packages among it, moved into `i18n/zh/site/`; the build refuses a translation written beside the English | done |
 | 3c–3d | The site: the timeline's and the shared messages' Chinese moved; `incubating` respected; a page of this report. Until then the site builds and publishes the pages of every registered language | to come |

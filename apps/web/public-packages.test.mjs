@@ -13,6 +13,15 @@ test('catalog URLs resolve relative to their own location and unsupported record
   for (const data of [{ schemaVersion: 2, packages: [] }, { schemaVersion: 1, packages: [pkg, pkg] },
     { schemaVersion: 1, packages: [{ ...pkg, version: '0.1.1' }] }]) assert.throws(() => validateCatalog(data, url));
 });
+test('a summary needs English only; its other languages are optional texts (decision 0015)', () => {
+  const url = 'https://example.test/catalog.json';
+  for (const summary of [{ en: 'Summary' }, { en: 'Summary', ja: '概要' }]) {
+    assert.deepEqual(validateCatalog({ schemaVersion: 1, packages: [{ ...pkg, summary }] }, url)[0].summary, summary);
+  }
+  for (const summary of [{ zh: '简介' }, { en: 'Summary', zh: null }, undefined]) {
+    assert.throws(() => validateCatalog({ schemaVersion: 1, packages: [{ ...pkg, summary }] }, url));
+  }
+});
 test('package verification rejects altered raw bytes, including line-ending changes', async () => {
   assert.deepEqual(new Uint8Array(await readPublicPackage(pkg, async () => new Response(bytes))), bytes);
   await assert.rejects(readPublicPackage(pkg, async () => new Response('a public package\n')), /SHA-256 mismatch/);

@@ -154,3 +154,21 @@ test('symbol labels switch live and obsolete source tooltips stay removed after 
   await expect(line).not.toHaveAttribute('title');
   await expect(page.locator('.symbol-preview > svg')).toHaveAttribute('viewBox',svg);
 });
+
+test('a pseudo language shows every text of the menu bar and the panel tabs translated (decision 0015)', async ({page,viewer}) => {
+  // only the fake shell offers it, with ?pseudo: every text of the catalogs, its letters accented, in ［…］
+  await viewer.open('04-hierarchy', {pseudo: '1'});
+  await language(page,'qps');
+  await expect(page.locator('html')).toHaveAttribute('lang','qps-ploc');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName(/^［/);
+  // every title and entry of the web's menu bar but the names of the languages, which are their own
+  const plain = await page.evaluate(() => [...document.querySelectorAll('.menu-title, .menu-item')]
+    .filter((el) => !el.dataset.id?.startsWith('language-'))
+    .map((el) => (el.querySelector('.label') ?? el).textContent.trim())
+    .filter((text) => /[A-Za-z]/.test(text) && !text.startsWith('［')));
+  expect(plain).toEqual([]);
+  for (const tab of ['files','netlist','hierarchy','symbol']) await expect(page.locator(`#tab-${tab}`)).toHaveAccessibleName(/^［/);
+  await language(page,'en');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
+});

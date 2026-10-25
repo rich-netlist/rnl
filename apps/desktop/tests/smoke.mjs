@@ -29,6 +29,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runtimeVersion } from "./webview2.mjs";
+import { uiCatalog, uiLanguages } from "../../../scripts/i18n/viewer-locales.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const manifest = path.join(root, "apps", "desktop", "Cargo.toml");
@@ -37,8 +38,15 @@ const cases = path.join(root, "tests", "conformance", "cases");
 let netlist = null;
 let netlistInclude = null;
 const TOP = "04-hierarchy.sp";
-/** The command table, which the native menu is built from. */
+/** The command table, which the native menu is built from, with the languages of i18n/ in its Language
+ * menu after English, as the app is built with them (build.rs). */
 const table = JSON.parse(fs.readFileSync(path.join(root, "apps", "viewer-ui", "commands.json"), "utf8"));
+for (const menu of table.menus) (function addLanguages(items) {
+  for (const item of items.filter((i) => i.items)) {
+    if (item.languages) item.items.push(...uiLanguages(root).slice(1).map((l) => ({ id: `language-${l.lang}`, label: l.name, check: true, radio: true })));
+    addLanguages(item.items);
+  }
+})(menu.items);
 const tauriConf = JSON.parse(fs.readFileSync(path.join(root, "apps", "desktop", "tauri.conf.json"), "utf8"));
 /** The app's version, which Tauri reports. */
 const version = tauriConf.version;
@@ -461,7 +469,7 @@ async function drive(app, port, profile, t0, session) {
   await page.evaluate(`window.localeDocument = window.viewer.doc; window.localeSvg = document.querySelector('#canvas > svg')`);
   chooseItem(app.pid, at("language-zh"));
   await until("Chinese UI", () => page.evaluate(`document.documentElement.lang === 'zh-CN' && window.viewer.checked('language-zh')`));
-  const catalog = JSON.parse(fs.readFileSync(path.join(root, "apps/viewer-ui/locales/zh-CN.json"), "utf8"));
+  const catalog = uiCatalog(root, "zh-CN");
   const translatedMenu = items => items.map(item => {
     const [label, keys] = item.text.split('\t');
     return { ...item, text: (catalog[label] || label) + (keys ? '\t' + keys : ''),
