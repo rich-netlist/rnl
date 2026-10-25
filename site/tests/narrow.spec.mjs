@@ -41,7 +41,7 @@ test('narrow: segmented buttons with long labels wrap onto more lines', async ({
 });
 
 test('narrow: the buttons of the gallery of packages wrap', async ({ page }) => {
-  await page.goto('/en/packages.html');
+  await page.goto('/en/packages.html', { waitUntil: 'domcontentloaded' }); // the page's data is not what is tested
   await page.locator('.gl-tog').evaluateAll((buttons, text) => buttons.forEach(b => { b.append(text); }), LABEL);
   expect(await wide(page)).toBeLessThanOrEqual(WIDTH);
 });
