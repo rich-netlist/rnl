@@ -58,7 +58,8 @@
 <header class="topbar">
   <div class="topbar-in">
     <a class="brand" href="./"><span class="brand-logo theme-logo"><img class="logo-light" src="assets/brand/rnl-logo-small.svg" width="24" height="24" alt=""><img class="logo-dark" src="assets/brand/rnl-logo-small-dark.svg" width="24" height="24" alt=""></span><span class="brand-mark">RNL</span><span class="brand-sub">Rich Netlist</span></a>
-    <nav class="pages" aria-label="{{nav-pages}}">
+    <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="{{nav-pages}}" aria-expanded="false" aria-controls="primary-nav"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <nav class="pages" id="primary-nav" aria-label="{{nav-pages}}">
       <a href="./">{{nav-intro}}</a>
       <a href="language.html">{{nav-tour}}</a>
       <a href="{{spec-root}}">{{nav-spec}}</a>
@@ -68,7 +69,7 @@
       <a href="agents.html">{{nav-agents}}</a>
       <a href="https://github.com/rich-netlist/rnl">GitHub</a>
     </nav>
-    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>目录</zh><en>Contents</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-menu"/></svg></button>
+    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>本页目录</zh><en>On this page</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-list"/></svg></button>
     {{language-menu}}
     <button class="icon-btn" id="theme-btn" type="button" aria-label="<zh>切换配色</zh><en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
   </div>

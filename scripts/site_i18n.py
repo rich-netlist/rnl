@@ -95,9 +95,18 @@ class Languages:
         fonts = locale["fonts"]
         return (f':root {{ --f-body: {fonts["body"]}; --f-disp: {fonts["display"]}; --f-mono: {fonts["mono"]}; }}\n'
                 f'@media (max-width: {locale["nav_breakpoint"]}px) {{\n'
-                '  .pages, .brand-sub { display: none; }\n'
+                '  .brand-sub { display: none; }\n'
                 '  .topbar-in { gap: 10px; }\n'
-                '  .language-menu { margin-left: auto; }\n}\n')
+                '  .language-menu { margin-left: auto; }\n'
+                '  .menu-btn { display: inline-grid; }\n'
+                # the links of the pages become a menu: a panel below the top bar, one link to a line
+                '  .pages {\n'
+                '    display: none; position: fixed; z-index: 45; top: 66px; left: 12px; right: 12px; margin: 0; padding: 8px;\n'
+                '    flex-direction: column; gap: 2px; max-height: calc(100dvh - 78px); overflow-y: auto;\n'
+                '    border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow);\n  }\n'
+                '  .pages.is-open { display: flex; }\n'
+                '  .pages a { padding: 12px 14px; border-radius: 8px; font-size: 16px; }\n'
+                '  .pages a.is-on { color: var(--markup); background: var(--markup-2); box-shadow: none; border-radius: 8px; font-weight: 600; }\n}\n')
 
     def menu(self, code, href):
         locale = self.locales[code]
