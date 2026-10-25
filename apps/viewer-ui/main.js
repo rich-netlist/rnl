@@ -20,7 +20,7 @@ import { showManifestLevel } from "./manifest-bar.js";
 import { offerDisplay } from "./display.js";
 import { restoreSession } from "./navigation.js";
 import {
-  setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth, phone,
+  setIndexHeight, setPane, setProblems, setProblemsHeight, setShowFailed, setSidebar, setSidebarWidth, phone, lowPhone,
 } from "./panels.js";
 import { loadShell } from "./shell.js";
 import { startSolvePanel } from "./solve.js";
@@ -48,7 +48,7 @@ async function start() {
   setProblemsHeight(load("problems-height", 180));
   // a phone starts on the drawing's page; the side panel's is a tap away
   setSidebar(phone.matches ? false : load("sidebar-shown", true));
-  setProblems(load("problems-shown", true));
+  setProblems(lowPhone.matches ? false : load("problems-shown", true), !lowPhone.matches);
   startSolvePanel();
   setPane(load("side-pane", "netlist"));
   setShowFailed(load("show-failed", true));

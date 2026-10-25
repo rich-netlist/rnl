@@ -30,6 +30,9 @@ const uprightScreen = matchMedia("(max-width: 1023px) and (max-aspect-ratio: 4/5
 const embedded = () => document.body.classList.contains("embed");
 export const upright = { get matches() { return !embedded() && uprightScreen.matches && !phone.matches; } };
 const onPhone = () => !embedded() && phone.matches;
+// a phone lying down: its netlist pane is too low for the problems as well, which start folded to
+// their heading there, a tap away; that fold is not kept as the user's choice
+export const lowPhone = matchMedia("(pointer: coarse) and (max-height: 499px)");
 const CANVAS_MIN = 80; // the drawing keeps a strip of this many pixels above the side panel
 const HANDLE = 24; // the handle between them
 const PROBLEMS_MIN = 60;
@@ -115,10 +118,10 @@ export function setShowFailed(shown) {
 
 $("show-failed").addEventListener("change", () => setShowFailed($("show-failed").checked));
 
-export function setProblems(shown) {
+export function setProblems(shown, keep = true) {
   $("problems-head").setAttribute("aria-expanded", String(shown));
   netlistPane.classList.toggle("problems-folded", !shown);
-  save("problems-shown", shown);
+  if (keep) save("problems-shown", shown);
   setCheck("toggle-problems", shown);
 }
 
@@ -201,6 +204,9 @@ uprightScreen.addEventListener("change", layOut);
 phone.addEventListener("change", () => {
   setSidebar(onPhone() ? false : load("sidebar-shown", true));
   layOut();
+});
+lowPhone.addEventListener("change", () => {
+  if (!embedded()) setProblems(lowPhone.matches ? false : load("problems-shown", true), false);
 });
 layOut();
 requestAnimationFrame(layOut);
