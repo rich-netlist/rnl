@@ -30,7 +30,7 @@
 .gl-heading h2 { font: 700 20px/1.35 var(--f-body); overflow-wrap: anywhere; }
 .gl-heading p { margin: 8px 0 0; font-size: 13.5px; color: var(--ink-3); }
 .gl-bar { position: sticky; top: 59px; z-index: 30; padding-block: 12px; border-bottom: 1px solid var(--line); background: var(--paper); }
-.gl-toggles { display: flex; gap: 6px; }
+.gl-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
 .gl-tog {
   display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; cursor: pointer;
   border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink-3); font-size: 13.5px;
