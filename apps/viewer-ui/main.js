@@ -10,7 +10,7 @@ import { startUsages } from "./usages.js";
 import { startNetlistColors } from "./netlist-colors.js";
 import { setBackground } from "./background.js";
 import { command, isChecked, runStartupShortcuts, setCheck, startCommands } from "./commands.js";
-import { closeRequested } from "./editor.js";
+import { closeRequested, note } from "./editor.js";
 import { dirtyPaths, unappliedPaths } from "./edits.js";
 import { gridState, setGrid } from "./grid.js";
 import { setHoverNames } from "./hover.js";
@@ -36,7 +36,8 @@ async function start() {
   const shell = await loadShell();
   await startSettings(shell);
   startNetlistColors();
-  await startI18n(shell, load("language", null), value => save("language", value));
+  const unavailable = await startI18n(shell, load("language", null), value => save("language", value));
+  if (unavailable) note(unavailable, 12000); // a language left out, as its catalog could not be read
   if (shell.embed) {
     const { startEmbed } = await import("./embed.js");
     await startEmbed();

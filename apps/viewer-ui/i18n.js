@@ -40,9 +40,12 @@ export const locale = () => language;
 export const uiLanguages = () => languages;
 /** The language the browser or the system asks for first, if it is offered, else English. */
 export function preferredLanguage(wanted = navigator.languages) {
-  const first = (wanted?.[0] || "").toLowerCase();
-  const found = languages.find((l) => l.matches.some((prefix) => first === prefix || first.startsWith(`${prefix}-`)));
-  return found ? found.code : "en";
+  return languageFor(wanted?.[0])?.code || "en";
+}
+/** The language offered that a browser or system language, such as "zh-TW", asks for, or undefined. */
+export function languageFor(wanted = "") {
+  const tag = wanted.toLowerCase();
+  return languages.find((l) => l.matches.some((prefix) => tag === prefix || tag.startsWith(`${prefix}-`)));
 }
 /** Whether a text is in a catalog, and so shown translated in some language. */
 const translatable = (key) => Object.values(catalogs).some((catalog) => typeof catalog[key] === "string");
@@ -106,18 +109,43 @@ async function locales(name) {
   return response.json();
 }
 
+/**
+ * Take the languages and their catalogs, and show the interface in the saved language, else the one the
+ * system asks for, else English. A language whose catalog cannot be read is left out, and the page
+ * starts without it; without the list of languages, it starts in English alone (decision 0015: what
+ * is missing shows in English). Resolves to a message that says what was left out, or null.
+ */
 export async function startI18n(shell, saved, save) {
   host = shell;
   persist = save;
-  languages = await (host.uiLanguages ? host.uiLanguages() : locales("languages.json"));
+  const english = languages[0];
+  let unavailable = null;
+  try {
+    languages = await (host.uiLanguages ? host.uiLanguages() : locales("languages.json"));
+  } catch (error) {
+    console.warn(`The languages of the interface could not be read: ${error.message || error}`);
+    unavailable = m("The interface's languages could not be loaded; it is shown in English.");
+  }
   // every catalog, as the static HTML is bound to the texts that any of them translates
-  await Promise.all(languages.slice(1).map(async ({ code }) => {
-    catalogs[code] = await (host.uiCatalog ? host.uiCatalog(code) : locales(`${code}.json`));
+  const failed = [];
+  await Promise.all(languages.slice(1).map(async (l) => {
+    try {
+      catalogs[l.code] = await (host.uiCatalog ? host.uiCatalog(l.code) : locales(`${l.code}.json`));
+    } catch (error) {
+      console.warn(`The interface's catalog of ${l.code} could not be read: ${error.message || error}`);
+      failed.push(l);
+    }
   }));
+  if (failed.length) {
+    languages = languages.filter((l) => !failed.includes(l));
+    unavailable = m`The interface could not load ${failed.map((l) => l.name).join(", ")}; it is offered in the other languages.`;
+  }
+  if (!languages.length || languages[0].code !== english.code) languages = [english, ...languages.filter((l) => l.code !== english.code)];
   language = languages.some((l) => l.code === saved) ? saved : preferredLanguage();
   await host.setLanguage?.(language);
   bindStatic();
   refresh();
+  return unavailable;
 }
 
 /** Serialize native-menu updates and settings writes when users switch quickly. */

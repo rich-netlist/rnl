@@ -172,3 +172,21 @@ test('a pseudo language shows every text of the menu bar and the panel tabs tran
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
 });
+
+test('a language whose catalog cannot be read is left out, and the page starts without it (decision 0015)', async ({page,viewer}) => {
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'languages', { get: () => ['zh-CN','en-US'], configurable: true }));
+  await page.route('**/locales/zh-CN.json', (route) => route.fulfill({ status: 500, body: 'unavailable' }));
+  await viewer.open('04-hierarchy');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.locator('#note')).toContainText('The interface could not load 简体中文');
+  await expect(page.locator('.menu-item[data-id^="language-"]')).toHaveCount(1);
+  await expect(page.locator('#tab-files')).toHaveAccessibleName('Library');
+});
+
+test('without the list of languages the page starts in English alone (decision 0015)', async ({page,viewer}) => {
+  await page.route('**/locales/languages.json', (route) => route.fulfill({ status: 500, body: 'unavailable' }));
+  await viewer.open('04-hierarchy');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.locator('#note')).toContainText("The interface's languages could not be loaded");
+  await expect(page.locator('.menu-item[data-id^="language-"]')).toHaveCount(1);
+});

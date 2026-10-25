@@ -1,4 +1,4 @@
-import { m, locale, setLanguage, translate, uiLanguages } from "./i18n.js";
+import { languageFor, m, locale, setLanguage, translate, uiLanguages } from "./i18n.js";
 // The commands and the keys that run them. Both come from the command table, commands.json, which
 // the desktop viewer also builds its native menu from: the menus, their items and submenus, and per
 // item its id, its label, its keys and the platforms that offer it. A command runs by its id,
@@ -164,17 +164,17 @@ function about() {
   }
 }
 
-/** The project site's page of the tools, which offers the desktop viewer, in each of its languages. */
-const TOOLS = { zh: "https://rich-netlist.github.io/rnl/zh/tools.html", en: "https://rich-netlist.github.io/rnl/en/tools.html" };
+/** The project site's page of the tools, which offers the desktop viewer, in a language of the site. */
+const TOOLS = (lang) => `https://rich-netlist.github.io/rnl/${lang}/tools.html`;
 
 /**
- * Show the site's page of the tools through the shell (Help > Desktop Viewer, on the web): in
- * Chinese when the browser's languages put Chinese before English, else in English, the site's
- * default.
+ * Show the site's page of the tools through the shell (Help > Desktop Viewer, on the web): in the
+ * first of the browser's languages that the project's list of languages offers (i18n/languages.json,
+ * by its matches), else in English, the site's default.
  */
 function toolsPage() {
-  const first = navigator.languages.find((language) => /^(en|zh)\b/i.test(language)) || "";
-  if (shell.browse) shell.browse(/^zh/i.test(first) ? TOOLS.zh : TOOLS.en);
+  const language = navigator.languages.map((wanted) => languageFor(wanted)).find(Boolean);
+  if (shell.browse) shell.browse(TOOLS(language?.lang || "en"));
 }
 
 /** Set the state of a check-mark command, such as "toggle-netlist", in the menus that show it. */
