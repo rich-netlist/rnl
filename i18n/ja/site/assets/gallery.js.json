@@ -31,7 +31,7 @@
   "no pins": "ピンなし",
   "The build noted something": "ビルド時の通知あり",
   "{s}, {n} pins": "{s}、ピン {n} 個",
-  "; terminal {t}{m} pointing {d}": "；端子 {t}{m} は{d}向き",
+  "; terminal {t}{m} pointing {d}": "、端子 {t}{m} は{d}向き",
   "Brought in by rnl-std: every netlist has it by default": "rnl-stdによって読み込まれ、すべてのネットリストにデフォルトで含まれます",
   "by default": "デフォルトで有効",
   "A file has it when its header record names it with USE-PACKAGE": "ヘッダーレコードでUSE-PACKAGEにより指定された場合に読み込まれます",

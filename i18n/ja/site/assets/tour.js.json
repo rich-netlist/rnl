@@ -64,7 +64,7 @@
   "M1 has no property ' + esc(key) + ': the text fails": "M1には属性 ' + esc(key) + ' がありません：このテキストは無効になります",
   "\\\\frac needs two braces right after it": "\\\\frac の直後には2組の波括弧が必要です",
   "unknown command \\\\' + esc(name) + ': shown as written": "不明なコマンド \\\\' + esc(name) + '：記述どおりに表示されます",
-  ";": "；",
+  ";": "。",
   "No warnings": "警告なし",
   "unchanged": "変換なし",
   "90° counterclockwise": "反時計回りに90°回転",
