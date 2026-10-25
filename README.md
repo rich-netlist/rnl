@@ -60,7 +60,7 @@ Every form is built from the chapters of one commit and names its revision ([dec
 | [`docs/`](docs/README.md) | Toolchain architecture proposal, roadmap, and decision records. |
 | [`site/`](site/README.md) | The [project site](https://rich-netlist.github.io/rnl/en/), in Chinese and English, built from one bilingual source by `site/build.py`: the introduction, the language tour (with the language at a glance and examples), the gallery of the standard packages, the tools (with the toolchain) and the page for agents; [`pages.yml`](.github/workflows/pages.yml) adds the pages of the standard (with their short guide and the principles), the web viewer and the skill package. |
 
-Start with the [documentation map](docs/README.md), the [toolchain architecture proposal](docs/rnl-toolchain-architecture.md) (in Chinese), and the [roadmap](docs/roadmap.md). Each component directory has a README that says what it holds and what is still to do.
+Start with the [documentation map](docs/README.md), the [toolchain architecture proposal](docs/rnl-toolchain-architecture.md), and the [roadmap](docs/roadmap.md). Each component directory has a README that says what it holds and what is still to do.
 
 ## Downloading and release lines
 

@@ -1,4 +1,4 @@
-<!-- translated from README.md sha256:6dc587e50141 -->
+<!-- translated from README.md sha256:85328132c7b5 -->
 # Rich Netlist（RNL）
 
 [English](README.md) | 中文
@@ -63,7 +63,7 @@ M5 tail vbias vss  vss nch W=4u L=1u
 | [`docs/`](docs/README.md) | 工具链架构提案、路线图和决定记录。 |
 | [`site/`](site/README.md) | [项目网站](https://rich-netlist.github.io/rnl/zh/)，中英文两版由 `site/build.py` 从同一份双语源生成：介绍页、语言导览（含“一览”和例子）、标准包图库、工具页（含工具链）和给 agent 页；[`pages.yml`](.github/workflows/pages.yml) 再加上语言标准的网页（含简明指南和设计原则）、网页版查看器和 skill 包。 |
 
-建议从[文档地图](docs/README.md)、[工具链架构提案](docs/rnl-toolchain-architecture.md)（中文）和[路线图](docs/roadmap.md)读起。每个组件目录里都有一份 README，说明它现在有什么、还有什么要做。
+建议从[文档地图](docs/README.md)、[工具链架构提案](docs/rnl-toolchain-architecture.md)和[路线图](docs/roadmap.md)读起。每个组件目录里都有一份 README，说明它现在有什么、还有什么要做。
 
 ## 下载和发版线
 

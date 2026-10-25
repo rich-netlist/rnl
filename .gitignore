@@ -19,3 +19,7 @@ apps/viewer-ui/fonts/
 .rnl-packages/
 scripts/__pycache__/
 scripts/skill/__pycache__/
+
+# Python bytecode, wherever a script runs
+__pycache__/
+*.pyc
