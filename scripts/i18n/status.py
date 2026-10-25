@@ -241,10 +241,9 @@ def stale_text(p: Project, source: str, stamped: str) -> str:
 
 # --- inline: translations written beside the English in the site's source files ----------------------------
 
-def groups(p: Project, text: str) -> list[tuple[int, dict[str, str]]]:
-    """(line, {language: text}) of each translation group, as scripts/site_i18n.py reads them."""
-    return [(text.count("\n", 0, m.start()) + 1, dict(p.registry.block.findall(m.group())))
-            for m in p.registry.group.finditer(text)]
+def groups(p: Project, text: str) -> list[tuple[int, dict[str, str], str]]:
+    """(line, {language: text}, context) of each translation group, as scripts/site_i18n.py reads them."""
+    return [(text.count("\n", 0, m.start()) + 1, *p.registry.parts(m.group())) for m in p.registry.group.finditer(text)]
 
 
 def catalog(p: Project, rel: str, errors: list[str]) -> dict:
@@ -270,7 +269,7 @@ def inline(p: Project, s: dict) -> Surface:
     for path in files:
         rel, text = p.rel(path), read(path)
         out.errors += p.registry.errors(text, rel)
-        units += [(rel, line, blocks) for line, blocks in groups(p, text)]
+        units += [(rel, line, blocks, context) for line, blocks, context in groups(p, text)]
     out.total = len(units)
     beside = s.get("inline", [])
     for lang in p.langs(s):
@@ -278,11 +277,11 @@ def inline(p: Project, s: dict) -> Surface:
         for path in files:  # the catalogs, read as scripts/site_i18n.py reads them for the build
             source = p.rel(path).removeprefix("site/src/")
             out.errors += p.registry.catalog_errors(lang, source)
-            english = {norm(blocks["en"]) for rel, _, blocks in units if rel == p.rel(path)}
+            english = {p.registry.key(blocks, context) for rel, _, blocks, context in units if rel == p.rel(path)}
             data = p.registry.catalog(lang, source)
             unused = [key for key in data if key not in english]
             for key in unused:
-                new = max((e for e in english if p.registry.translation({"en": e}, lang, source) is None),
+                new = max((e for e in english if not isinstance(data.get(e), str)),
                           key=lambda e: difflib.SequenceMatcher(None, key, e).ratio(), default=None)
                 if new is not None and similar(key, new) and isinstance(data[key], str):
                     st.stale += 1
@@ -290,8 +289,8 @@ def inline(p: Project, s: dict) -> Surface:
                                                                        f"the English of {short(key, 50)!r}, translated {short(data[key], 30)!r}"))
                 else:
                     st.findings.append(Finding("unused", p.rel(path), f"{short(key)!r} is not in the source"))
-        for rel, line, blocks in units:
-            text = p.registry.translation(blocks, lang, rel.removeprefix("site/src/"))
+        for rel, line, blocks, context in units:
+            text = p.registry.translation(blocks, lang, rel.removeprefix("site/src/"), context)
             if text is None:
                 st.findings.append(Finding("missing", f"{rel}:{line}", short(blocks["en"])))
                 continue
@@ -300,11 +299,12 @@ def inline(p: Project, s: dict) -> Surface:
             if not set(SITE_PLACEHOLDER.findall(text)) <= set(SITE_PLACEHOLDER.findall(en)):
                 st.findings.append(Finding("differs", f"{rel}:{line}", "placeholders differ from the English: "
                                            f"{sorted(set(SITE_PLACEHOLDER.findall(en)))} and {sorted(set(SITE_PLACEHOLDER.findall(text)))}"))
+            st.findings += [Finding("differs", f"{rel}:{line}", f"{d}: {short(en, 40)!r}") for d in p.registry.differences(en, text)]
         if p.base and lang in beside:
             for path in files:
                 old = p.at_base(p.rel(path))
                 if old is not None:
-                    for (_, before), (line, after) in changed_pairs(groups(p, old), groups(p, read(path))):
+                    for (_, before, _), (line, after, _) in changed_pairs(groups(p, old), groups(p, read(path))):
                         if lang in after and norm(before.get(lang, "")) == norm(after[lang]):
                             st.stale += 1
                             st.findings.append(Finding("changed", f"{p.rel(path)}:{line}",

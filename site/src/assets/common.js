@@ -59,7 +59,7 @@
     function paintBtn() {
       var dark = effective() === 'dark';
       btn.innerHTML = icon(dark ? 'sun' : 'moon');
-      btn.setAttribute('aria-label', dark ? '<zh>切换到浅色</zh><en>Switch to light theme</en>' : '<zh>切换到深色</zh><en>Switch to dark theme</en>');
+      btn.setAttribute('aria-label', dark ? '<en>Switch to light theme</en>' : '<en>Switch to dark theme</en>');
     }
     btn.addEventListener('click', function () {
       var next = effective() === 'dark' ? 'light' : 'dark';

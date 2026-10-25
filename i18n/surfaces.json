@@ -83,10 +83,9 @@
       "title": "Pages of the site, with the scripts of their demos and the summaries of the standard packages",
       "kind": "inline",
       "source": ["site/src/*.html", "site/src/assets/*.js"],
-      "translation": {"*": "i18n/{lang}/site/{path}.json"},
-      "inline": ["zh"],
+      "translation": "i18n/{lang}/site/{path}.json",
       "owner": "site",
-      "notes": "A translation is the block beside the English, else the entry of i18n/{lang}/site/{path}.json, as site/build.py reads them. Chinese is still written in the source files, in <zh> blocks, until steps 3b-3d of decision 0015 move it to i18n/zh/site/. The timeline is counted in site-timeline."
+      "notes": "The source files hold the English only; a group that names a context, <en ctx=NAME>, has the key NAME|English. site/build.py refuses a translation written beside the English, which scripts/i18n/migrate_site.py moves into the catalogs. The timeline is counted in site-timeline."
     },
     {
       "id": "site-messages",

@@ -1,0 +1,12 @@
+{
+  "{n} files": "{n} 个文件",
+  "See the source on GitHub": "在 GitHub 上看来源",
+  "Clear tags": "清除标签",
+  "There are no entries yet.": "图库里还没有条目。",
+  "Nothing found.": "没有找到。",
+  "{n} entries": "{n} 个条目",
+  "of {t}": "，共 {t} 个",
+  "The gallery’s data is newer than this page. Reload the page.": "图库的数据比这一页新，请刷新页面。",
+  "The latest gallery cannot be read right now; this is what was read last time.": "暂时读不到图库的最新内容，这是上次读到的。",
+  "The gallery cannot be read right now. The list is on GitHub:": "暂时读不到图库。可以直接去 GitHub 上看列表："
+}

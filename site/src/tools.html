@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title><zh>RNL 工具 · Rich Netlist</zh><en>RNL tools · Rich Netlist</en></title>
-<meta name="description" content="<zh>Rich Netlist（RNL）的查看器：在浏览器里打开带 RNL 记录的 SPICE 或 Spectre 网表，或者下载 Windows、Linux 和 macOS 的桌面版。</zh>
-  <en>The Rich Netlist (RNL) viewers: open a SPICE or Spectre netlist with RNL records in the browser, or download the desktop viewer for Windows, Linux and macOS.</en>">
+<title><en>RNL tools · Rich Netlist</en></title>
+<meta name="description" content="<en>The Rich Netlist (RNL) viewers: open a SPICE or Spectre netlist with RNL records in the browser, or download the desktop viewer for Windows, Linux and macOS.</en>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{{font-href}}">
@@ -53,7 +52,7 @@
   <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/></symbol>
 </svg>
 
-<a class="skip" href="#main"><zh>跳到正文</zh><en>Skip to content</en></a>
+<a class="skip" href="#main"><en>Skip to content</en></a>
 
 <header class="topbar">
   <div class="topbar-in">
@@ -69,9 +68,9 @@
       <a href="agents.html">{{nav-agents}}</a>
       <a href="https://github.com/rich-netlist/rnl">GitHub</a>
     </nav>
-    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<zh>本页目录</zh><en>On this page</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-list"/></svg></button>
+    <button class="icon-btn toc-btn" id="toc-btn" type="button" aria-label="<en>On this page</en>" aria-expanded="false" aria-controls="toc"><svg class="ico"><use href="#i-list"/></svg></button>
     {{language-menu}}
-    <button class="icon-btn" id="theme-btn" type="button" aria-label="<zh>切换配色</zh><en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="<en>Switch color theme</en>"><svg class="ico"><use href="#i-moon"/></svg></button>
   </div>
   <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
 </header>
@@ -83,39 +82,38 @@
   <div class="wrap">
     <div class="hero-grid">
       <div class="hero-copy">
-        <p class="eyebrow"><span>RICH NETLIST · TOOLKIT 0.1</span><span class="chip chip-ok"><zh>可编辑 · 桌面版可求解预览</zh><en>Edits text · solves on the desktop</en></span></p>
-        <h1 id="tools-title" class="tour-h1"><zh>工具</zh><en>Tools</en></h1>
-        <p class="thesis"><zh>在浏览器里打开网表，或者把查看器下载到 Windows、Linux 或 macOS。</zh><en>Open a netlist in your browser, or download the viewer for Windows, Linux or macOS.</en></p>
-        <p class="lead"><zh>RNL 工具链带两个查看器：网页版不用安装，打开就能用；桌面版给 Windows 10、11 和 Linux。它们读带 RNL 记录的网表，画成原理图，也能改网表的文本，应用后重画。网页版保存时下载文件；桌面版把文件写回原处，还能求解，结果作为预览显示，不写进文件。</zh>
-          <en>The RNL toolkit comes with two viewers: the web viewer, with nothing to install, and the desktop viewer for Windows 10 and 11, Linux and macOS. They read netlists with RNL records and draw them as schematics, and they edit the netlist’s text and draw it again when you apply the changes. The web viewer saves by downloading the file; the desktop viewer writes it back where it was read, and it also solves, showing the result as a preview that writes nothing into the files.</en></p>
+        <p class="eyebrow"><span>RICH NETLIST · TOOLKIT 0.1</span><span class="chip chip-ok"><en>Edits text · solves on the desktop</en></span></p>
+        <h1 id="tools-title" class="tour-h1"><en>Tools</en></h1>
+        <p class="thesis"><en>Open a netlist in your browser, or download the viewer for Windows, Linux or macOS.</en></p>
+        <p class="lead"><en>The RNL toolkit comes with two viewers: the web viewer, with nothing to install, and the desktop viewer for Windows 10 and 11, Linux and macOS. They read netlists with RNL records and draw them as schematics, and they edit the netlist’s text and draw it again when you apply the changes. The web viewer saves by downloading the file; the desktop viewer writes it back where it was read, and it also solves, showing the result as a preview that writes nothing into the files.</en></p>
         <div class="cta">
-          <a class="btn btn-primary" href="../viewer/" target="_blank" rel="noopener"><svg class="ico"><use href="#i-globe"/></svg><zh>打开网页版</zh><en>Open the web viewer</en></a>
-          <a class="btn" href="#desktop"><svg class="ico"><use href="#i-download"/></svg><zh>下载桌面版</zh><en>Download the desktop viewer</en></a>
+          <a class="btn btn-primary" href="../viewer/" target="_blank" rel="noopener"><svg class="ico"><use href="#i-globe"/></svg><en>Open the web viewer</en></a>
+          <a class="btn" href="#desktop"><svg class="ico"><use href="#i-download"/></svg><en>Download the desktop viewer</en></a>
         </div>
       </div>
-      <dl class="titleblock" aria-label="<zh>查看器信息</zh><en>Viewer facts</en>">
-        <div class="tb-main"><dt><zh>工具</zh><en>Tool</en></dt><dd>RNL Viewer</dd></div>
-        <div><dt><zh>读取</zh><en>Reads</en></dt><dd><zh>带 RNL 记录的 SPICE、Spectre 网表</zh><en>SPICE and Spectre netlists with RNL records</en></dd></div>
-        <div><dt><zh>网页版</zh><en>Web</en></dt><dd><zh>Chrome、Edge 109+ · Safari 16+ · Firefox 114+</zh><en>Chrome, Edge 109+ · Safari 16+ · Firefox 114+</en></dd></div>
-        <div><dt><zh>桌面版</zh><en>Desktop</en></dt><dd><!--release--><span class="mono">{{viewer-version}}</span> · Windows 10/11 x64<!--/release--><!--linux-release--> · Linux x86_64<!--/linux-release--><!--macos-release--> · macOS arm64 / x86_64<!--/macos-release--><!--no-release--><zh>Windows 10/11 x64 · 即将发布</zh><en>Windows 10/11 x64 · coming soon</en><!--/no-release--></dd></div>
-        <div><dt><zh>语言</zh><en>Language</en></dt><dd>RNL 0.3</dd></div>
-        <div><dt><zh>许可</zh><en>Licence</en></dt><dd><zh>MIT · 字体 OFL-1.1</zh><en>MIT · fonts OFL-1.1</en></dd></div>
+      <dl class="titleblock" aria-label="<en>Viewer facts</en>">
+        <div class="tb-main"><dt><en>Tool</en></dt><dd>RNL Viewer</dd></div>
+        <div><dt><en>Reads</en></dt><dd><en>SPICE and Spectre netlists with RNL records</en></dd></div>
+        <div><dt><en>Web</en></dt><dd><en>Chrome, Edge 109+ · Safari 16+ · Firefox 114+</en></dd></div>
+        <div><dt><en>Desktop</en></dt><dd><!--release--><span class="mono">{{viewer-version}}</span> · Windows 10/11 x64<!--/release--><!--linux-release--> · Linux x86_64<!--/linux-release--><!--macos-release--> · macOS arm64 / x86_64<!--/macos-release--><!--no-release--><en>Windows 10/11 x64 · coming soon</en><!--/no-release--></dd></div>
+        <div><dt><en>Language</en></dt><dd>RNL 0.3</dd></div>
+        <div><dt><en>Licence</en></dt><dd><en>MIT · fonts OFL-1.1</en></dd></div>
       </dl>
     </div>
   </div>
 </section>{{translation-notice}}
 
 <div class="layout">
-<nav id="toc" aria-label="<zh>目录</zh><en>Contents</en>">
-  <p class="toc-title"><zh>目录</zh><en>Contents</en></p>
+<nav id="toc" aria-label="<en>Contents</en>">
+  <p class="toc-title"><en>Contents</en></p>
   <ul>
-    <li><a href="#viewers"><zh>查看器</zh><en>Viewers</en></a></li>
-    <li><a href="#web"><zh>网页版</zh><en>Web</en></a></li>
-    <li><a href="#desktop"><zh>桌面版</zh><en>Desktop</en></a></li>
-    <li><a href="#cli"><zh>命令行</zh><en>Command line</en></a></li>
-    <li><a href="#virtuoso"><zh>Virtuoso 导出</zh><en>Virtuoso</en></a></li>
-    <li><a href="#toolchain"><zh>工具链</zh><en>Toolchain</en></a></li>
-    <li><a href="#licences"><zh>许可</zh><en>Licences</en></a></li>
+    <li><a href="#viewers"><en>Viewers</en></a></li>
+    <li><a href="#web"><en>Web</en></a></li>
+    <li><a href="#desktop"><en>Desktop</en></a></li>
+    <li><a href="#cli"><en>Command line</en></a></li>
+    <li><a href="#virtuoso"><en>Virtuoso</en></a></li>
+    <li><a href="#toolchain"><en>Toolchain</en></a></li>
+    <li><a href="#licences"><en>Licences</en></a></li>
   </ul>
 </nav>
 <main id="main" class="page-content">
@@ -124,67 +122,55 @@
 <section id="viewers" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>01 · 查看器</zh><en>01 · Viewers</en></p>
-      <h2><zh>打开网表，看到原理图，<span class="mk">保存了才写。</span></zh><en>Open a netlist, see the schematic. <span class="mk">Nothing is written until you save.</span></en></h2>
-      <p class="lead"><zh>查看器打开一份带 RNL 记录的 SPICE 或 Spectre 网表，连同它 include 的文件，画出电路的每一层，旁边是网表文本、问题列表和层次结构。剪贴板里的网表文本也能直接打开：File › Load from Clipboard 先显示要打开的内容，确认后再打开。</zh>
-        <en>A viewer opens a SPICE or Spectre netlist with RNL records, with the files it includes, draws each level of the circuit, and shows the netlist text, the problems and the hierarchy beside it. A netlist’s text in the clipboard opens too: File › Load from Clipboard shows the text first, and opens it when you confirm.</en></p>
+      <p class="sheet-no"><en>01 · Viewers</en></p>
+      <h2><en>Open a netlist, see the schematic. <span class="mk">Nothing is written until you save.</span></en></h2>
+      <p class="lead"><en>A viewer opens a SPICE or Spectre netlist with RNL records, with the files it includes, draws each level of the circuit, and shows the netlist text, the problems and the hierarchy beside it. A netlist’s text in the clipboard opens too: File › Load from Clipboard shows the text first, and opens it when you confirm.</en></p>
     </header>
 
     <div class="facts tools-facts">
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-eye"/></svg><zh>画出每一层</zh><en>Draws every level</en></h3>
-        <p><zh>顶层和每个子电路各是一张图，一次显示一层；拖动平移，滚轮缩放。双击子电路实例进入它的图，退格键回到上一层。</zh>
-          <en>The top level and each subcircuit are drawings of their own, shown one at a time; drag to move, scroll to zoom. Double-click a subcircuit instance to open its drawing; Backspace goes back up.</en></p>
+        <h3><svg class="ico"><use href="#i-eye"/></svg><en>Draws every level</en></h3>
+        <p><en>The top level and each subcircuit are drawings of their own, shown one at a time; drag to move, scroll to zoom. Double-click a subcircuit instance to open its drawing; Backspace goes back up.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-netlist"/></svg><zh>网表文本</zh><en>The netlist text</en></h3>
-        <p><zh>网表和它 include 的文件分标签页显示，RNL 记录和网表语句都有高亮；没有生效的语句带底色。画子电路时，它的定义之外的文本变暗；进入子电路，文本就滚到它的定义开头。</zh>
-          <en>The netlist and the files it includes, in tabs, with the RNL records and the netlist’s statements highlighted; statements that do not take effect have a soft background. While a subcircuit is drawn, the text outside its definition is dimmed, and entering it brings the start of its definition into view.</en></p>
+        <h3><svg class="ico"><use href="#i-netlist"/></svg><en>The netlist text</en></h3>
+        <p><en>The netlist and the files it includes, in tabs, with the RNL records and the netlist’s statements highlighted; statements that do not take effect have a soft background. While a subcircuit is drawn, the text outside its definition is dimmed, and entering it brings the start of its definition into view.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-warn"/></svg><zh>问题列表</zh><en>Problems</en></h3>
-        <p><zh>错误、警告和提示列在文本下方，点一条就跳到它所在的行；有问题的行号也会着色。</zh>
-          <en>Errors, warnings and hints are listed below the text; click one to see its line. The line numbers of those lines are coloured too.</en></p>
+        <h3><svg class="ico"><use href="#i-warn"/></svg><en>Problems</en></h3>
+        <p><en>Errors, warnings and hints are listed below the text; click one to see its line. The line numbers of those lines are coloured too.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-layers"/></svg><zh>层次结构</zh><en>Hierarchy</en></h3>
-        <p><zh>从顶层展开的实例树，下面是所有子电路的索引，按首字母分组，可以搜索；点一个就打开它的图。</zh>
-          <en>The tree of instances under the top level, and below it every subcircuit by name, grouped by initial, with a search box; pick one to open its drawing.</en></p>
+        <h3><svg class="ico"><use href="#i-layers"/></svg><en>Hierarchy</en></h3>
+        <p><en>The tree of instances under the top level, and below it every subcircuit by name, grouped by initial, with a search box; pick one to open its drawing.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-link"/></svg><zh>图和文本联动</zh><en>Drawing and text, linked</en></h3>
-        <p><zh>在图上点一个实例或一根导线，文本里会标出它的语句和每一处引用；反过来点文本，图上也会选中它。</zh>
-          <en>Click an instance or a wire in the drawing, and the text marks its statement and every place that names it; click the text, and the drawing selects it.</en></p>
+        <h3><svg class="ico"><use href="#i-link"/></svg><en>Drawing and text, linked</en></h3>
+        <p><en>Click an instance or a wire in the drawing, and the text marks its statement and every place that names it; click the text, and the drawing selects it.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-list"/></svg><zh>没画出来的对象</zh><en>Objects not drawn</en></h3>
-        <p><zh>没写位置的对象画不出来，侧栏的 Not drawn 视图把它们列出来：每个都带着符号和各端子上的网络，可以按名字搜索；点一个，网表里就显示它的语句。状态栏说明这一层还缺什么，点它也会打开这个视图。</zh>
-          <en>Objects without a position are not drawn, and the Not drawn view of the side panel lists them, each with its symbol and the nets at its terminals, searchable by name; pick one to see its statement in the netlist. The status bar says what the level lacks, and a click on it opens the view.</en></p>
+        <h3><svg class="ico"><use href="#i-list"/></svg><en>Objects not drawn</en></h3>
+        <p><en>Objects without a position are not drawn, and the Not drawn view of the side panel lists them, each with its symbol and the nets at its terminals, searchable by name; pick one to see its statement in the netlist. The status bar says what the level lacks, and a click on it opens the view.</en></p>
       </div>
     </div>
-    <h3 class="sub-h"><zh>改文本，应用，保存</zh><en>Edit, apply, save</en></h3>
-    <p class="sub-lead"><zh>两个查看器都能改网表的文本。改了不会自己生效：应用了才重画，保存了才写文件，也不会自己求解。</zh>
-      <en>Both viewers edit the netlist’s text. A change does nothing by itself: it is drawn when you apply it and written when you save it, and nothing solves by itself.</en></p>
+    <h3 class="sub-h"><en>Edit, apply, save</en></h3>
+    <p class="sub-lead"><en>Both viewers edit the netlist’s text. A change does nothing by itself: it is drawn when you apply it and written when you save it, and nothing solves by itself.</en></p>
     <div class="facts tools-facts">
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-pencil"/></svg><zh>改文本</zh><en>Edit the text</en></h3>
-        <p><zh>Edit › Edit Text（Ctrl+E）把网表换成文本框，每个文件一个标签页，带行号。改过、还没保存的文件，标签上有一个点；还没应用的修改，文本上方会注明。</zh>
-          <en>Edit › Edit Text (Ctrl+E) turns the netlist into a text box per file, each in its tab, with line numbers. A file with changes not saved has a dot on its tab, and the bar above the text says when changes are not applied yet.</en></p>
+        <h3><svg class="ico"><use href="#i-pencil"/></svg><en>Edit the text</en></h3>
+        <p><en>Edit › Edit Text (Ctrl+E) turns the netlist into a text box per file, each in its tab, with line numbers. A file with changes not saved has a dot on its tab, and the bar above the text says when changes are not applied yet.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-eye"/></svg><zh>应用</zh><en>Apply</en></h3>
-        <p><zh>Edit › Apply Changes（Ctrl+Enter）按改过的文本重新构建网表、重画，问题列表和层次结构也跟着更新；层级、视图和选择保持不变。构建失败时修改还在，查看器会说明原因。</zh>
-          <en>Edit › Apply Changes (Ctrl+Enter) builds the netlist again from the edited text and draws it, with the problems and the hierarchy made again, keeping the level, the view and the selection. If the build fails, the changes stay and the viewer says why.</en></p>
+        <h3><svg class="ico"><use href="#i-eye"/></svg><en>Apply</en></h3>
+        <p><en>Edit › Apply Changes (Ctrl+Enter) builds the netlist again from the edited text and draws it, with the problems and the hierarchy made again, keeping the level, the view and the selection. If the build fails, the changes stay and the viewer says why.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-download"/></svg><zh>保存</zh><en>Save</en></h3>
-        <p><zh>File › Save（Ctrl+S）：桌面版把改过的文件写回原处，编码和换行照旧，别的文件不动；网页版写不了它读进来的文件，保存就是下载当前显示的文件。有没保存的修改时，打开别的文件、重新读取或关闭窗口之前会先问。</zh>
-          <en>File › Save (Ctrl+S): the desktop viewer writes the edited files back where they were read, each in its encoding and with its line ends, and no other file; the web viewer cannot write a file it read, so Save downloads the file shown. With changes not saved, opening another file, reading it again or closing asks first.</en></p>
+        <h3><svg class="ico"><use href="#i-download"/></svg><en>Save</en></h3>
+        <p><en>File › Save (Ctrl+S): the desktop viewer writes the edited files back where they were read, each in its encoding and with its line ends, and no other file; the web viewer cannot write a file it read, so Save downloads the file shown. With changes not saved, opening another file, reading it again or closing asks first.</en></p>
       </div>
     </div>
 
-    <p class="pivot"><svg class="ico"><use href="#i-cpu"/></svg><zh>两个查看器画出的图相同：同一个 Rust 核心决定每条线、每段文字放在哪里，在桌面上直接运行，在浏览器里编译成 WebAssembly 运行，文字都用它随附的字体排。</zh>
-      <en>Both viewers draw the same schematic: one Rust core decides where every line and every piece of text goes, natively on the desktop and as WebAssembly in the browser, and lays out text in the fonts it ships.</en></p>
+    <p class="pivot"><svg class="ico"><use href="#i-cpu"/></svg><en>Both viewers draw the same schematic: one Rust core decides where every line and every piece of text goes, natively on the desktop and as WebAssembly in the browser, and lays out text in the fonts it ships.</en></p>
   </div>
 </section>
 
@@ -192,56 +178,46 @@
 <section id="web" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>02 · 网页版</zh><en>02 · Web viewer</en></p>
-      <h2><zh>网页版：不用安装，打开就能用。</zh><en>The web viewer: nothing to install.</en></h2>
-      <p><zh>Library 是侧栏第一个页签：打开文件也会加入 Files 组并去重；Include File / Include Folder 只加入、不打开，Exclude 只移出搜索池，当前文件照样开着。Files 默认展开，内置标准包 0.3、0.2 在默认折叠的 Built-in 组，只读且不可移出。折叠状态只在本次运行保留，当前根文件的行整行高亮。粘贴文本在单独的 temporary · not searched 行，不参与查找，点击可回到最近应用的文本，下次粘贴覆盖，关闭后清空。网页版 Include Public Package 可从本站包库加入 SKY130 等包，不使用 GitHub API；浏览器不能搜索任意本地目录，使用文件池代替 PATH。</zh>
-        <en>Library is the first sidebar tab: opened files also join Files without duplicates. Include File / Include Folder add without opening; Exclude removes from search while leaving the current document open. Files starts expanded; the read-only Built-in group (standard series 0.3 and 0.2) starts collapsed. Collapse state lasts for the session, and root-file rows are highlighted. Clipboard text has one temporary · not searched row outside lookup; click to return to its last applied text. The next paste replaces it, and closing clears it. Include Public Package adds packages such as SKY130 from this site, without the GitHub API. Browsers use the file pool instead of searching arbitrary local PATH directories.</en></p>
-      <p class="lead"><zh>网页版是一个静态网页，RNL 核心编译成 WebAssembly，在页面里运行。它能打开电脑上的文件或整个文件夹，也能打开网上的网表；把文件拖到页面上也行。</zh>
-        <en>The web viewer is a static web page, with the RNL core compiled to WebAssembly running inside it. It opens files or a whole folder from your computer, or a netlist on the web; files dropped on the page open too.</en></p>
+      <p class="sheet-no"><en>02 · Web viewer</en></p>
+      <h2><en>The web viewer: nothing to install.</en></h2>
+      <p><en>Library is the first sidebar tab: opened files also join Files without duplicates. Include File / Include Folder add without opening; Exclude removes from search while leaving the current document open. Files starts expanded; the read-only Built-in group (standard series 0.3 and 0.2) starts collapsed. Collapse state lasts for the session, and root-file rows are highlighted. Clipboard text has one temporary · not searched row outside lookup; click to return to its last applied text. The next paste replaces it, and closing clears it. Include Public Package adds packages such as SKY130 from this site, without the GitHub API. Browsers use the file pool instead of searching arbitrary local PATH directories.</en></p>
+      <p class="lead"><en>The web viewer is a static web page, with the RNL core compiled to WebAssembly running inside it. It opens files or a whole folder from your computer, or a netlist on the web; files dropped on the page open too.</en></p>
     </header>
 
     <a class="tour-cta tool-cta" href="../viewer/" target="_blank" rel="noopener">
       <span class="tour-cta-ico"><svg class="ico"><use href="#i-globe"/></svg></span>
-      <span class="tour-cta-body"><b><zh>打开网页版查看器</zh><en>Open the web viewer</en></b><span class="mono">rich-netlist.github.io/rnl/viewer/</span></span>
+      <span class="tour-cta-body"><b><en ctx=cta>Open the web viewer</en></b><span class="mono">rich-netlist.github.io/rnl/viewer/</span></span>
       <svg class="ico tour-cta-arrow"><use href="#i-arrow"/></svg>
     </a>
 
-    <h3 class="sub-h"><zh>试试这几个例子</zh><en>Try these samples</en></h3>
-    <p class="sub-lead"><zh>例子来自 RNL 的一致性测试语料，和网页版一起发布。点一个，查看器就会打开它。</zh>
-      <en>The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.</en></p>
+    <h3 class="sub-h"><en>Try these samples</en></h3>
+    <p class="sub-lead"><en>The samples come from RNL’s conformance corpus and are published with the web viewer. Click one and the viewer opens it.</en></p>
     <ol class="tour-map samples">
-      <li><a href="../viewer/?url=samples/cases/04-hierarchy.sp" target="_blank" rel="noopener"><span class="n">04</span><b><zh>层次</zh><en>Hierarchy</en></b><span><zh>两级缓冲器：每个子电路一张图，在上一层画成方块符号，另有一个 include 进来的文件。</zh><en>A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.</en></span></a></li>
-      <li><a href="../viewer/?url=samples/cases/15-chinese.sp" target="_blank" rel="noopener"><span class="n">15</span><b><zh>中文</zh><en>Chinese</en></b><span><zh>五管运放，RNL 用中文代称包 rnl-zh 写成，图上的标注也是中文。</zh><en>A five-transistor OTA written with the Chinese alias package rnl-zh, with Chinese labels in the drawing.</en></span></a></li>
-      <li><a href="../viewer/?url=samples/cases/17-line-styles.sp" target="_blank" rel="noopener"><span class="n">17</span><b><zh>线型</zh><en>Line styles</en></b><span><zh>每种线型画在每种图形上：虚线、点线、粗线和双线，画在矩形、圆、椭圆、圆弧和曲线上，也画在导线上。</zh><en>Every line style on every kind of shape: dashed, dotted, bold and double lines on rectangles, circles, ellipses, arcs and curves, and on a wire.</en></span></a></li>
+      <li><a href="../viewer/?url=samples/cases/04-hierarchy.sp" target="_blank" rel="noopener"><span class="n">04</span><b><en ctx=sample>Hierarchy</en></b><span><en>A two-stage buffer: a drawing for each subcircuit, drawn as a block symbol one level up, and a file it includes.</en></span></a></li>
+      <li><a href="../viewer/?url=samples/cases/15-chinese.sp" target="_blank" rel="noopener"><span class="n">15</span><b><en>Chinese</en></b><span><en>A five-transistor OTA written with the Chinese alias package rnl-zh, with Chinese labels in the drawing.</en></span></a></li>
+      <li><a href="../viewer/?url=samples/cases/17-line-styles.sp" target="_blank" rel="noopener"><span class="n">17</span><b><en>Line styles</en></b><span><en>Every line style on every kind of shape: dashed, dotted, bold and double lines on rectangles, circles, ellipses, arcs and curves, and on a wire.</en></span></a></li>
     </ol>
 
     <div class="facts">
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-shield"/></svg><zh>文件只在浏览器里</zh><en>Your files stay in the browser</en></h3>
-        <p><zh>从电脑上打开的文件只在页面里读取，不会上传到任何地方：这个网站只有静态文件，没有接收文件的服务器。</zh>
-          <en>Files you open from your computer are read in the page and uploaded nowhere: the site is only static files, with no server to receive them.</en></p>
+        <h3><svg class="ico"><use href="#i-shield"/></svg><en>Your files stay in the browser</en></h3>
+        <p><en>Files you open from your computer are read in the page and uploaded nowhere: the site is only static files, with no server to receive them.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-link"/></svg><zh>从网址打开</zh><en>Open a URL</en></h3>
-        <p><zh>File › Open URL 从别的网站读取网表，它 include 的文件也从同一处读取。那个网站要允许跨源读取（CORS）；GitHub 的 raw 文件链接是允许的。</zh>
-          <en>File › Open URL reads a netlist from another web server, and the files it includes from the same place. That server has to allow cross-origin reads (CORS), as GitHub’s raw file links do.</en></p>
+        <h3><svg class="ico"><use href="#i-link"/></svg><en>Open a URL</en></h3>
+        <p><en>File › Open URL reads a netlist from another web server, and the files it includes from the same place. That server has to allow cross-origin reads (CORS), as GitHub’s raw file links do.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-globe"/></svg><zh>浏览器</zh><en>Browsers</en></h3>
-        <p><zh>Chrome 和 Edge 109 及以后的版本，Safari 16 及以后，Firefox 114 及以后（从这一版起支持 module Worker）。</zh>
-          <en>Chrome and Edge 109 or later, Safari 16 or later, and Firefox 114 or later, the first with module Workers.</en></p>
+        <h3><svg class="ico"><use href="#i-globe"/></svg><en>Browsers</en></h3>
+        <p><en>Chrome and Edge 109 or later, Safari 16 or later, and Firefox 114 or later, the first with module Workers.</en></p>
       </div>
     </div>
 
-    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>网页版也能改文本、应用后重画，见<a href="#viewers">上面</a>。网页写不了它读进来的文件，所以 File › Save 是下载：下载当前显示的文件，换行照旧，编码是 UTF-8。求解只有桌面版有，网页版没有 Solve 菜单。</zh>
-      <en>The web viewer edits the text and draws it again when the changes are applied, as <a href="#viewers">above</a>. A page cannot write the files it read, so File › Save is a download: of the file shown, with the line ends it had, in UTF-8. Only the desktop viewer solves; the web viewer has no Solve menu.</en></span></p>
-    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>网址里也可以带上要打开的网表，方便把链接发给别人：<a href="../viewer/?url=https://raw.githubusercontent.com/rich-netlist/rnl/main/tests/conformance/cases/04-hierarchy.sp" target="_blank" rel="noopener"><code>viewer/?url=https://raw.githubusercontent.com/…/04-hierarchy.sp</code></a> 打开 GitHub 上的一份网表，连同它 include 的文件。</zh>
-      <en>The viewer’s address can name the netlist to open, so a link can be shared: <a href="../viewer/?url=https://raw.githubusercontent.com/rich-netlist/rnl/main/tests/conformance/cases/04-hierarchy.sp" target="_blank" rel="noopener"><code>viewer/?url=https://raw.githubusercontent.com/…/04-hierarchy.sp</code></a> opens a netlist on GitHub with the file it includes.</en></span></p>
-    <h3 class="sub-h" id="embedding"><zh>嵌入其他网页</zh><en>Embedding in another page</en></h3>
-    <p><zh>用 <code>viewer/?embed=1</code> 在 iframe 中显示只有画布的交互查看器，通过 postMessage 切换网表、层级和背景，无需重新加载。见 <a href="https://github.com/rich-netlist/rnl/blob/main/apps/web/README.md#embedding">嵌入接口与示例</a>，或打开<a href="../viewer/embed-demo.html" target="_blank" rel="noopener">演示页</a>。</zh>
-      <en>Use <code>viewer/?embed=1</code> in an iframe for a canvas-only interactive viewer. Switch netlists, levels and backgrounds through postMessage without reloading. See the <a href="https://github.com/rich-netlist/rnl/blob/main/apps/web/README.md#embedding">embedding API and example</a>, or try the <a href="../viewer/embed-demo.html" target="_blank" rel="noopener">demo</a>.</en></p>
-    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>这里的网页版按 main 分支的最新提交构建，Help › About 显示它的版本和提交；Help › Desktop Viewer 回到这一页。</zh>
-      <en>The web viewer here is built from the newest commit of the main branch; Help › About names its version and commit, and Help › Desktop Viewer leads back to this page.</en></span></p>
+    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><en>The web viewer edits the text and draws it again when the changes are applied, as <a href="#viewers">above</a>. A page cannot write the files it read, so File › Save is a download: of the file shown, with the line ends it had, in UTF-8. Only the desktop viewer solves; the web viewer has no Solve menu.</en></span></p>
+    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><en>The viewer’s address can name the netlist to open, so a link can be shared: <a href="../viewer/?url=https://raw.githubusercontent.com/rich-netlist/rnl/main/tests/conformance/cases/04-hierarchy.sp" target="_blank" rel="noopener"><code>viewer/?url=https://raw.githubusercontent.com/…/04-hierarchy.sp</code></a> opens a netlist on GitHub with the file it includes.</en></span></p>
+    <h3 class="sub-h" id="embedding"><en>Embedding in another page</en></h3>
+    <p><en>Use <code>viewer/?embed=1</code> in an iframe for a canvas-only interactive viewer. Switch netlists, levels and backgrounds through postMessage without reloading. See the <a href="https://github.com/rich-netlist/rnl/blob/main/apps/web/README.md#embedding">embedding API and example</a>, or try the <a href="../viewer/embed-demo.html" target="_blank" rel="noopener">demo</a>.</en></p>
+    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><en>The web viewer here is built from the newest commit of the main branch; Help › About names its version and commit, and Help › Desktop Viewer leads back to this page.</en></span></p>
   </div>
 </section>
 
@@ -249,34 +225,32 @@
 <section id="desktop" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>03 · 桌面版</zh><en>03 · Desktop viewer</en></p>
-      <h2><zh>桌面版：Windows、Linux 和 macOS。</zh><en>The desktop viewer for Windows, Linux and macOS.</en></h2>
-      <p class="lead"><zh>桌面版 RNL Viewer 按路径读写磁盘上的文件：网表 include 的文件放在哪里都能找到，文件改了按 F5 重新读取，改过的文本保存时写回原处，File › Save As 把网表另存为新文件。窗口里的页面和网页版相同，另外多一个 Solve 菜单，能<a href="#solve">求解</a>。</zh>
-        <en>The desktop RNL Viewer reads and writes files on disk by their paths: the files a netlist includes are found wherever they are, F5 reads a changed file again, edited text is saved back where it was read, and File › Save As saves the netlist under a new name. Its window shows the same page as the web viewer, with a Solve menu besides, which <a href="#solve">solves</a>.</en></p>
+      <p class="sheet-no"><en>03 · Desktop viewer</en></p>
+      <h2><en>The desktop viewer for Windows, Linux and macOS.</en></h2>
+      <p class="lead"><en>The desktop RNL Viewer reads and writes files on disk by their paths: the files a netlist includes are found wherever they are, F5 reads a changed file again, edited text is saved back where it was read, and File › Save As saves the netlist under a new name. Its window shows the same page as the web viewer, with a Solve menu besides, which <a href="#solve">solves</a>.</en></p>
     </header>
-      <p><zh>桌面版 Library 在 Files 与 Built-in 之间按顺序显示各个 PATH 目录组，默认折叠，可添加、删除和排序。展开可看目录下及一层版本号子目录中的 .rnl 文件，点击打开也加入 Files；切到 Library 或修改 PATH 时重新扫描。所有设置（含求解、显示和 PATH）保存到 Tauri 应用配置目录的 settings.json，首次启动迁移旧版浏览器存储设置，具体路径固定显示在 Library 底部。include 先找相对位置，仅纯文件名找不到时按文件池、PATH 的顺序回退并提示所用文件；包按文件池、PATH、内置包顺序搜索，同版本取先出现的。目录内先找包名.rnl 和版本/包名.rnl，再扫描其他 .rnl 并验证 PACKAGE 头，因此文件名可与包名不同。用户自己的 rnl-std 可以覆盖内置包。</zh>
-        <en>The desktop Library shows ordered PATH groups between Files and Built-in, initially collapsed, with add, move and remove controls. Expand a group to see direct .rnl files and those in one version-number subdirectory; opening a row also adds it to Files. Directories rescan on entering Library and after PATH changes. All settings, including solver, display and PATH, live in settings.json in Tauri’s application configuration directory; old browser settings migrate on first start, and the exact path is fixed at the bottom of Library. Includes try their relative location first; bare filenames fall back to the pool, then PATH, with a hint naming the selected file. Packages search the pool, PATH and built-ins, taking the first copy of the selected version. Each directory prefers name.rnl and version/name.rnl, then scans other .rnl files and checks their PACKAGE headers, so filenames may differ from package names. A user’s rnl-std can override the bundled copy.</en></p>
+      <p><en>The desktop Library shows ordered PATH groups between Files and Built-in, initially collapsed, with add, move and remove controls. Expand a group to see direct .rnl files and those in one version-number subdirectory; opening a row also adds it to Files. Directories rescan on entering Library and after PATH changes. All settings, including solver, display and PATH, live in settings.json in Tauri’s application configuration directory; old browser settings migrate on first start, and the exact path is fixed at the bottom of Library. Includes try their relative location first; bare filenames fall back to the pool, then PATH, with a hint naming the selected file. Packages search the pool, PATH and built-ins, taking the first copy of the selected version. Each directory prefers name.rnl and version/name.rnl, then scans other .rnl files and checks their PACKAGE headers, so filenames may differ from package names. A user’s rnl-std can override the bundled copy.</en></p>
 
 
 <!--release-->
     <div class="panel dl">
-      <div class="ph"><svg class="ico"><use href="#i-download"/></svg><span class="ph-title">RNL Viewer {{viewer-version}} · Windows x64</span><span class="ph-right"><a class="chip" href="https://github.com/rich-netlist/rnl/releases/tag/{{viewer-tag}}"><zh>发布页和说明</zh><en>Release page and notes</en></a></span></div>
+      <div class="ph"><svg class="ico"><use href="#i-download"/></svg><span class="ph-title">RNL Viewer {{viewer-version}} · Windows x64</span><span class="ph-right"><a class="chip" href="https://github.com/rich-netlist/rnl/releases/tag/{{viewer-tag}}"><en>Release page and notes</en></a></span></div>
       <ul class="dl-list">
         <li>
-          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-windows-x64-setup.exe"><svg class="ico"><use href="#i-download"/></svg><span><b><zh>安装程序</zh><en>Installer</en></b><code>RNL-Viewer-{{viewer-version}}-windows-x64-setup.exe</code></span></a>
-          <p><zh>为当前用户安装，大多数人选这个。</zh><en>Installs for the current user; the one most people want.</en></p>
+          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-windows-x64-setup.exe"><svg class="ico"><use href="#i-download"/></svg><span><b><en>Installer</en></b><code>RNL-Viewer-{{viewer-version}}-windows-x64-setup.exe</code></span></a>
+          <p><en>Installs for the current user; the one most people want.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-windows-x64.msi"><svg class="ico"><use href="#i-download"/></svg><span><b><zh>MSI 安装包</zh><en>MSI package</en></b><code>RNL-Viewer-{{viewer-version}}-windows-x64.msi</code></span></a>
-          <p><zh>Windows Installer 安装包，适合管理员部署。</zh><en>A Windows Installer package, for administrators who deploy it.</en></p>
+          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-windows-x64.msi"><svg class="ico"><use href="#i-download"/></svg><span><b><en>MSI package</en></b><code>RNL-Viewer-{{viewer-version}}-windows-x64.msi</code></span></a>
+          <p><en>A Windows Installer package, for administrators who deploy it.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-windows-x64.exe"><svg class="ico"><use href="#i-download"/></svg><span><b><zh>免安装版</zh><en>Portable</en></b><code>RNL-Viewer-{{viewer-version}}-windows-x64.exe</code></span></a>
-          <p><zh>单个文件，下载后直接运行，不用安装。</zh><en>A single file that runs as it is, with nothing to install.</en></p>
+          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-windows-x64.exe"><svg class="ico"><use href="#i-download"/></svg><span><b><en>Portable</en></b><code>RNL-Viewer-{{viewer-version}}-windows-x64.exe</code></span></a>
+          <p><en>A single file that runs as it is, with nothing to install.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/SHA256SUMS.txt"><svg class="ico"><use href="#i-check"/></svg><span><b><zh>校验和</zh><en>Checksums</en></b><code>SHA256SUMS.txt</code></span></a>
-          <p><zh>上面各个文件的 SHA-256。在 PowerShell 里用 <code>Get-FileHash 文件名</code> 算出来对照。</zh><en>The SHA-256 of each file above; compare with what <code>Get-FileHash FILE</code> gives in PowerShell.</en></p>
+          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/SHA256SUMS.txt"><svg class="ico"><use href="#i-check"/></svg><span><b><en>Checksums</en></b><code>SHA256SUMS.txt</code></span></a>
+          <p><en>The SHA-256 of each file above; compare with what <code>Get-FileHash FILE</code> gives in PowerShell.</en></p>
         </li>
       </ul>
     </div>
@@ -287,21 +261,21 @@
       <ul class="dl-list">
         <li>
           <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage"><svg class="ico"><use href="#i-download"/></svg><span><b>AppImage</b><code>RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage</code></span></a>
-          <p><zh>Ubuntu 22.04 及更新版本的 x86_64 系统。在下载目录运行 <code>chmod +x RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage</code>，再运行 <code>./RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage</code>。若缺少 FUSE，使用 <code>./RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage --appimage-extract-and-run</code>。</zh><en>For x86_64 systems on Ubuntu 22.04 or newer. In the download directory, run <code>chmod +x RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage</code>, then <code>./RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage</code>. Without FUSE, use <code>./RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage --appimage-extract-and-run</code>.</en></p>
+          <p><en>For x86_64 systems on Ubuntu 22.04 or newer. In the download directory, run <code>chmod +x RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage</code>, then <code>./RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage</code>. Without FUSE, use <code>./RNL-Viewer-{{viewer-version}}-linux-x86_64.AppImage --appimage-extract-and-run</code>.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-linux-x86_64.deb"><svg class="ico"><use href="#i-download"/></svg><span><b><zh>Debian 安装包</zh><en>Debian package</en></b><code>RNL-Viewer-{{viewer-version}}-linux-x86_64.deb</code></span></a>
-          <p><zh>Ubuntu 22.04 及更新版本；其他 Debian 系发行版需要兼容的 glibc 和 WebKitGTK 4.1。在下载目录运行 <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-x86_64.deb</code>，从应用菜单打开 RNL Viewer，或运行 <code>rnl-viewer</code>。卸载用 <code>sudo apt remove rnl-viewer</code>。</zh><en>Ubuntu 22.04 or newer; other Debian-based distributions need compatible glibc and WebKitGTK 4.1. In the download directory, run <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-x86_64.deb</code>, then open RNL Viewer from the application menu or run <code>rnl-viewer</code>. Uninstall with <code>sudo apt remove rnl-viewer</code>.</en></p>
+          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-linux-x86_64.deb"><svg class="ico"><use href="#i-download"/></svg><span><b><en>Debian package</en></b><code>RNL-Viewer-{{viewer-version}}-linux-x86_64.deb</code></span></a>
+          <p><en>Ubuntu 22.04 or newer; other Debian-based distributions need compatible glibc and WebKitGTK 4.1. In the download directory, run <code>sudo apt install ./RNL-Viewer-{{viewer-version}}-linux-x86_64.deb</code>, then open RNL Viewer from the application menu or run <code>rnl-viewer</code>. Uninstall with <code>sudo apt remove rnl-viewer</code>.</en></p>
         </li>
         <li>
-          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/SHA256SUMS.txt"><svg class="ico"><use href="#i-check"/></svg><span><b><zh>校验和</zh><en>Checksums</en></b><code>SHA256SUMS.txt</code></span></a>
-          <p><zh>下载校验和与要使用的包，在同一目录运行 <code>sha256sum --check --ignore-missing SHA256SUMS.txt</code>。</zh><en>Download the checksums and the package you want into one directory, then run <code>sha256sum --check --ignore-missing SHA256SUMS.txt</code>.</en></p>
+          <a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/SHA256SUMS.txt"><svg class="ico"><use href="#i-check"/></svg><span><b><en>Checksums</en></b><code>SHA256SUMS.txt</code></span></a>
+          <p><en>Download the checksums and the package you want into one directory, then run <code>sha256sum --check --ignore-missing SHA256SUMS.txt</code>.</en></p>
         </li>
       </ul>
     </div>
 <!--/linux-release-->
 <!--no-linux-release-->
-    <p><zh>当前发布尚无 Linux 安装包；下一个包含 Linux 构建的 <code>viewer-v</code> 正式标签发布后，这里会显示下载链接。</zh><en>The current release has no Linux packages yet. Download links appear here after the next stable <code>viewer-v</code> tag with Linux builds is released.</en></p>
+    <p><en>The current release has no Linux packages yet. Download links appear here after the next stable <code>viewer-v</code> tag with Linux builds is released.</en></p>
 <!--/no-linux-release-->
 <!--macos-release-->
     <div class="panel dl" id="macos-downloads">
@@ -311,46 +285,41 @@
         <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/download/{{viewer-tag}}/RNL-Viewer-{{viewer-version}}-macos-x86_64.dmg"><svg class="ico"><use href="#i-download"/></svg><span><b>Intel</b><code>RNL-Viewer-{{viewer-version}}-macos-x86_64.dmg</code></span></a></li>
       </ul>
       <div class="macos-notes">
-      <p><zh>打开适合芯片的 DMG，把 RNL Viewer 拖进“应用程序”，再推出磁盘映像。文件仅做临时签名，尚未经 Apple 公证；如果系统阻止打开，可在“系统设置 → 隐私与安全性”中选“仍要打开”，或对你信任的下载在终端运行 <code>xattr -dr com.apple.quarantine "/Applications/RNL Viewer.app"</code> 后再打开。卸载时退出应用并把它移到废纸篓。</zh><en>Open the DMG for your chip, drag RNL Viewer into Applications, then eject the image. The app is ad-hoc signed and is not notarized by Apple. If macOS blocks it, choose Open Anyway in System Settings → Privacy &amp; Security, or for a download you trust run <code>xattr -dr com.apple.quarantine "/Applications/RNL Viewer.app"</code> in Terminal and open it again. To uninstall, quit and move the app to Trash.</en></p>
-      <p><zh>Finder 中右键网表 →“打开方式”选择 RNL Viewer；在“显示简介”中可设置此类文件的默认应用。文件也可拖入窗口。大部分快捷键用 Cmd；编辑文本保持物理 Control+Q，Cmd+Q 退出。设置文件在 <code>~/Library/Application Support/io.github.rich-netlist.viewer/settings.json</code>，卸载时可按需删除这个目录。校验下载用同一发布中的 <code>SHA256SUMS.txt</code> 和 <code>shasum -a 256</code>。</zh><en>In Finder, use Open With → RNL Viewer; Get Info can set it as the default for that file type. Files can also be dropped onto the window. Most shortcuts use Cmd; editing keeps physical Control+Q, and Cmd+Q quits. Settings live in <code>~/Library/Application Support/io.github.rich-netlist.viewer/settings.json</code>; optionally remove that directory after uninstalling. Verify downloads with the release’s <code>SHA256SUMS.txt</code> and <code>shasum -a 256</code>.</en></p>
+      <p><en>Open the DMG for your chip, drag RNL Viewer into Applications, then eject the image. The app is ad-hoc signed and is not notarized by Apple. If macOS blocks it, choose Open Anyway in System Settings → Privacy &amp; Security, or for a download you trust run <code>xattr -dr com.apple.quarantine "/Applications/RNL Viewer.app"</code> in Terminal and open it again. To uninstall, quit and move the app to Trash.</en></p>
+      <p><en>In Finder, use Open With → RNL Viewer; Get Info can set it as the default for that file type. Files can also be dropped onto the window. Most shortcuts use Cmd; editing keeps physical Control+Q, and Cmd+Q quits. Settings live in <code>~/Library/Application Support/io.github.rich-netlist.viewer/settings.json</code>; optionally remove that directory after uninstalling. Verify downloads with the release’s <code>SHA256SUMS.txt</code> and <code>shasum -a 256</code>.</en></p>
       </div>
     </div>
 <!--/macos-release-->
 <!--no-macos-release-->
-    <p id="no-macos-download"><zh>所选发布尚无 macOS 安装包；包含 Mac 构建的正式标签发布后，这里才会显示下载链接。可先从源代码构建，见 <a href="https://github.com/rich-netlist/rnl/blob/main/apps/desktop/README.md">桌面版 README</a>。</zh><en>The selected release has no macOS packages. Download links appear after a stable tag with Mac builds is published. Until then, build from source as described in the <a href="https://github.com/rich-netlist/rnl/blob/main/apps/desktop/README.md">desktop README</a>.</en></p>
+    <p id="no-macos-download"><en>The selected release has no macOS packages. Download links appear after a stable tag with Mac builds is published. Until then, build from source as described in the <a href="https://github.com/rich-netlist/rnl/blob/main/apps/desktop/README.md">desktop README</a>.</en></p>
 <!--/no-macos-release-->
 
 <!--no-release-->
     <div class="panel dl dl-soon">
-      <p><svg class="ico"><use href="#i-info"/></svg><span><zh>第一个版本即将发布。发布以后，安装程序和免安装版的下载链接会出现在这里，也可以在 <a href="https://github.com/rich-netlist/rnl/releases">GitHub Releases</a> 找到。</zh>
-        <en>The first release is coming. Once it is out, its installers and the portable file are linked here, and they are on the <a href="https://github.com/rich-netlist/rnl/releases">GitHub releases page</a>.</en></span></p>
+      <p><svg class="ico"><use href="#i-info"/></svg><span><en>The first release is coming. Once it is out, its installers and the portable file are linked here, and they are on the <a href="https://github.com/rich-netlist/rnl/releases">GitHub releases page</a>.</en></span></p>
     </div>
 <!--/no-release-->
 
     <ul class="rules dl-notes">
-      <li><b><zh>Linux 中文字体</zh><en>Chinese fonts on Linux</en></b><span><zh>界面和网表使用随包提供的 Noto Sans SC 网页字体作为回退。GTK 原生菜单、原生提示框和系统文件对话框需要系统中文字体：Debian/Ubuntu 可运行 <code>sudo apt install fonts-noto-cjk</code> 后重启应用，AppImage 也一样。</zh><en>The UI and netlist fall back to the bundled Noto Sans SC web fonts. GTK native menus, native tooltips and system file dialogs need system Chinese fonts: on Debian/Ubuntu, run <code>sudo apt install fonts-noto-cjk</code> and restart the app. This also applies to AppImage.</en></span></li>
-      <li><b>WebView2</b><span><zh>桌面版需要 Microsoft Edge WebView2 运行时，Windows 10 和 11 一般都自带。如果没有，可以从<a href="https://developer.microsoft.com/microsoft-edge/webview2/">微软的网站</a>下载。</zh><en>The desktop viewer needs the Microsoft Edge WebView2 runtime, which Windows 10 and 11 have. Where it is missing, it can be downloaded from <a href="https://developer.microsoft.com/microsoft-edge/webview2/">Microsoft</a>.</en></span></li>
-      <li><b><zh>SmartScreen 提示</zh><en>SmartScreen</en></b><span><zh>这些文件还没有代码签名，运行时 Windows SmartScreen 可能提示“Windows 已保护你的电脑”：点“更多信息”，再点“仍要运行”。</zh><en>The files are not code-signed yet, so Windows SmartScreen may say that it protected your PC: choose More info, then Run anyway.</en></span></li>
-      <li><b><zh>更新</zh><en>Updates</en></b><span><zh>菜单 Help › Check for Updates 检查有没有更新的版本。</zh><en>Help › Check for Updates looks for a newer release.</en></span></li>
+      <li><b><en>Chinese fonts on Linux</en></b><span><en>The UI and netlist fall back to the bundled Noto Sans SC web fonts. GTK native menus, native tooltips and system file dialogs need system Chinese fonts: on Debian/Ubuntu, run <code>sudo apt install fonts-noto-cjk</code> and restart the app. This also applies to AppImage.</en></span></li>
+      <li><b>WebView2</b><span><en>The desktop viewer needs the Microsoft Edge WebView2 runtime, which Windows 10 and 11 have. Where it is missing, it can be downloaded from <a href="https://developer.microsoft.com/microsoft-edge/webview2/">Microsoft</a>.</en></span></li>
+      <li><b><en>SmartScreen</en></b><span><en>The files are not code-signed yet, so Windows SmartScreen may say that it protected your PC: choose More info, then Run anyway.</en></span></li>
+      <li><b><en>Updates</en></b><span><en>Help › Check for Updates looks for a newer release.</en></span></li>
     </ul>
-    <h3 class="sub-h" id="solve"><zh>求解，先作为预览</zh><en>Solving, as a preview</en></h3>
-    <p class="sub-lead"><zh>桌面版的 Solve 菜单用 <code>rnl solve</code> 的求解器排出没写位置的对象。结果只在窗口里显示，文件不变。</zh>
-      <en>The desktop viewer’s Solve menu places the objects without a position with the solver of <code>rnl solve</code>. The result is shown in the window only, and the files stay as they are.</en></p>
+    <h3 class="sub-h" id="solve"><en>Solving, as a preview</en></h3>
+    <p class="sub-lead"><en>The desktop viewer’s Solve menu places the objects without a position with the solver of <code>rnl solve</code>. The result is shown in the window only, and the files stay as they are.</en></p>
     <div class="facts tools-facts">
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-solver"/></svg><zh>求解预览</zh><en>A solved preview</en></h3>
-        <p><zh>Solve › Solve（F9）照 <code>rnl solve</code> 的做法求解当前的网表，连同它 include 的文件，用的是已经应用的文本。求解在后台进行，窗口照常能用；状态栏显示正在解哪一层，可以取消。图上方注明这是预览、文件没有改动，侧栏的 Solve 视图列出求解报告，点一行就显示它在网表里的位置。Solve › Close Preview 回到文件本来的样子。</zh>
-          <en>Solve › Solve (F9) solves the netlist shown, with the files it includes, as <code>rnl solve</code> does, from the text applied. It runs in the background, so the window stays usable, and the status bar shows the level being solved, with a Cancel button. The bar above the drawing says that this is a preview and the files are unchanged, and the Solve view of the side panel has the solve’s report, each line shown in the netlist when clicked. Solve › Close Preview shows the file as written.</en></p>
+        <h3><svg class="ico"><use href="#i-solver"/></svg><en>A solved preview</en></h3>
+        <p><en>Solve › Solve (F9) solves the netlist shown, with the files it includes, as <code>rnl solve</code> does, from the text applied. It runs in the background, so the window stays usable, and the status bar shows the level being solved, with a Cancel button. The bar above the drawing says that this is a preview and the files are unchanged, and the Solve view of the side panel has the solve’s report, each line shown in the netlist when clicked. Solve › Close Preview shows the file as written.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-download"/></svg><zh>另存求解副本</zh><en>Save a solved copy</en></h3>
-        <p><zh>Solve › Save Solved Copy As（Ctrl+Shift+S）把求解结果另存到你选的地方：网表不 include 别的文件时存成一个文件，默认名是 <code>名字-solved.扩展名</code>；否则存成一个文件夹，放求解后的文件和其余读到的文件，和 <code>rnl solve -o DIR</code> 写的一样。会覆盖任何一个读进来的文件时，查看器拒绝保存。</zh>
-          <en>Solve › Save Solved Copy As (Ctrl+Shift+S) saves the result where you choose: one file, offered as <code>NAME-solved.EXT</code>, for a netlist that includes no other file; otherwise a folder with the files solved and the other files read, as <code>rnl solve -o DIR</code> writes them. A place that would replace any file that was read is refused.</en></p>
+        <h3><svg class="ico"><use href="#i-download"/></svg><en>Save a solved copy</en></h3>
+        <p><en>Solve › Save Solved Copy As (Ctrl+Shift+S) saves the result where you choose: one file, offered as <code>NAME-solved.EXT</code>, for a netlist that includes no other file; otherwise a folder with the files solved and the other files read, as <code>rnl solve -o DIR</code> writes them. A place that would replace any file that was read is refused.</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-cpu"/></svg><zh>求解设置</zh><en>The solver’s settings</en></h3>
-        <p><zh>Solve › Settings 设定求解器的选项：每层的时限、容差、网格、束宽、搜索和布线的工作量，以及给布局排序的目标：哪些开着，谁先谁后，同一级里各占多少权重。约束的优先级（low、normal、high）写在网表里，不在这里设。Restore Defaults 恢复求解器的默认值；设定下次启动还在。</zh>
-          <en>Solve › Settings sets the solver’s options: the time limit of each level, the tolerance, the grid, the beam, the work of the search and the router, and the objectives that rank the placements: which are on, which counts first, and the weights of those that share a level. The priority of a constraint (low, normal, high) is written in the netlist, not set here. Restore Defaults brings back the solver’s defaults, and the settings stay for the next start.</en></p>
+        <h3><svg class="ico"><use href="#i-cpu"/></svg><en>The solver’s settings</en></h3>
+        <p><en>Solve › Settings sets the solver’s options: the time limit of each level, the tolerance, the grid, the beam, the work of the search and the router, and the objectives that rank the placements: which are on, which counts first, and the weights of those that share a level. The priority of a constraint (low, normal, high) is written in the netlist, not set here. Restore Defaults brings back the solver’s defaults, and the settings stay for the next start.</en></p>
       </div>
     </div>
   </div>
@@ -359,21 +328,21 @@
 <section id="cli" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>04 · 命令行</zh><en>04 · Command line</en></p>
-      <h2><zh>下载，解包，运行。</zh><en>Download, extract, run.</en></h2>
-      <p class="lead"><zh>用 <code>rnl</code> 检查网表、绘制 SVG 和求解布局。无需安装 Rust；Windows 版也不需要另装 VC++ 运行库。命令行与 npm 包共用核心版本，独立于 Viewer 和语言标准。</zh><en>Use <code>rnl</code> to check netlists, render SVGs and solve layouts. No Rust installation is needed; Windows also needs no separate VC++ runtime. The CLI and npm package share the core version, independently of Viewer and the language standard.</en></p>
+      <p class="sheet-no"><en>04 · Command line</en></p>
+      <h2><en>Download, extract, run.</en></h2>
+      <p class="lead"><en>Use <code>rnl</code> to check netlists, render SVGs and solve layouts. No Rust installation is needed; Windows also needs no separate VC++ runtime. The CLI and npm package share the core version, independently of Viewer and the language standard.</en></p>
     </header>
     <div class="panel dl">
-      <div class="ph"><svg class="ico"><use href="#i-term"/></svg><span class="ph-title">RNL core · CLI</span><span class="ph-right"><a class="chip" href="https://github.com/rich-netlist/rnl/releases/latest"><zh>核心发布页</zh><en>Core release</en></a></span></div>
+      <div class="ph"><svg class="ico"><use href="#i-term"/></svg><span class="ph-title">RNL core · CLI</span><span class="ph-right"><a class="chip" href="https://github.com/rich-netlist/rnl/releases/latest"><en>Core release</en></a></span></div>
       <ul class="dl-list">
-        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-pc-windows-msvc.zip"><svg class="ico"><use href="#i-download"/></svg><span><b>Windows x64</b><code>.zip · MSVC</code></span></a><p><zh>解包后运行 <code>.\rnl.exe --version</code>。</zh><en>Extract, then run <code>.\rnl.exe --version</code>.</en></p></li>
-        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-unknown-linux-musl.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b>Linux x86_64</b><code>.tar.gz · musl</code></span></a><p><zh>静态链接，解包后运行 <code>./rnl --version</code>。</zh><en>Statically linked. Extract, then run <code>./rnl --version</code>.</en></p></li>
-        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-aarch64-apple-darwin.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b>macOS · Apple Silicon</b><code>.tar.gz · arm64</code></span></a><p><zh>适用于 Apple Silicon 芯片的 Mac。</zh><en>For Macs with Apple Silicon.</en></p></li>
-        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-apple-darwin.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b>macOS · Intel</b><code>.tar.gz · x86_64</code></span></a><p><zh>适用于 Intel 芯片的 Mac。</zh><en>For Macs with Intel processors.</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-pc-windows-msvc.zip"><svg class="ico"><use href="#i-download"/></svg><span><b>Windows x64</b><code>.zip · MSVC</code></span></a><p><en>Extract, then run <code>.\rnl.exe --version</code>.</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-unknown-linux-musl.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b>Linux x86_64</b><code>.tar.gz · musl</code></span></a><p><en>Statically linked. Extract, then run <code>./rnl --version</code>.</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-aarch64-apple-darwin.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b>macOS · Apple Silicon</b><code>.tar.gz · arm64</code></span></a><p><en>For Macs with Apple Silicon.</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl/releases/latest/download/rnl-x86_64-apple-darwin.tar.gz"><svg class="ico"><use href="#i-download"/></svg><span><b>macOS · Intel</b><code>.tar.gz · x86_64</code></span></a><p><en>For Macs with Intel processors.</en></p></li>
       </ul>
     </div>
-    <p><a href="https://github.com/rich-netlist/rnl/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a><zh>：下载后先校验 SHA256，再运行程序。<code>rnl --version</code> 显示核心版本和构建提交；用 <code>rnl check my.sp</code> 检查网表，<code>rnl render my.sp -o svg</code> 导出图。</zh><en>: verify the archive's SHA256 before running it. <code>rnl --version</code> shows the core version and build commit; use <code>rnl check my.sp</code> to check a netlist and <code>rnl render my.sp -o svg</code> to export drawings.</en></p>
-    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><zh>下载链接在首次 <code>core-v*</code> 发布后可用，并始终指向最新核心版本。文件没有代码签名：Windows 可能提示 SmartScreen；macOS 浏览器下载的文件可能需要先执行 <code>xattr -d com.apple.quarantine rnl</code>。Linux arm64 暂需从源码编译。下载、解包和校验命令见 <a href="https://github.com/rich-netlist/rnl/blob/main/skills/rnl/references/tools.md">CLI 使用说明</a>。</zh><en>Downloads become available with the first <code>core-v*</code> release and follow the latest core. Files are unsigned: Windows may show SmartScreen; macOS browser downloads may need <code>xattr -d com.apple.quarantine rnl</code>. Linux arm64 currently needs a source build. See the <a href="https://github.com/rich-netlist/rnl/blob/main/skills/rnl/references/tools.md">CLI guide</a> for download, extraction and checksum commands.</en></span></p>
+    <p><a href="https://github.com/rich-netlist/rnl/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a><en>: verify the archive's SHA256 before running it. <code>rnl --version</code> shows the core version and build commit; use <code>rnl check my.sp</code> to check a netlist and <code>rnl render my.sp -o svg</code> to export drawings.</en></p>
+    <p class="note"><svg class="ico"><use href="#i-info"/></svg><span><en>Downloads become available with the first <code>core-v*</code> release and follow the latest core. Files are unsigned: Windows may show SmartScreen; macOS browser downloads may need <code>xattr -d com.apple.quarantine rnl</code>. Linux arm64 currently needs a source build. See the <a href="https://github.com/rich-netlist/rnl/blob/main/skills/rnl/references/tools.md">CLI guide</a> for download, extraction and checksum commands.</en></span></p>
   </div>
 </section>
 
@@ -381,15 +350,15 @@
 <section id="virtuoso" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>05 · Virtuoso 导出</zh><en>05 · Virtuoso export</en></p>
-      <h2><zh>把 Virtuoso 原理图导出成 RNL。</zh><en>Export Virtuoso schematics to RNL.</en></h2>
-      <p class="lead"><zh><code>rnl-virtuoso</code> 在 Virtuoso 的原理图编辑器里加 <b>RNL → Export RNL...</b>，在 CIW 里加 <b>File → Export → RNL...</b>。可以导出单个 cell 或整个库，保留层次、自定义 block 符号、位置、朝向、导线和总线，图用 <code>eda-symbol</code> 和 <code>eda-style</code> 两个包画。</zh><en><code>rnl-virtuoso</code> adds <b>RNL → Export RNL...</b> to Virtuoso’s schematic editor and <b>File → Export → RNL...</b> to the CIW. It exports one cell or a whole library, keeping hierarchy, custom block symbols, placement, orientation, wires and buses, and draws with the <code>eda-symbol</code> and <code>eda-style</code> packages.</en></p>
+      <p class="sheet-no"><en>05 · Virtuoso export</en></p>
+      <h2><en>Export Virtuoso schematics to RNL.</en></h2>
+      <p class="lead"><en><code>rnl-virtuoso</code> adds <b>RNL → Export RNL...</b> to Virtuoso’s schematic editor and <b>File → Export → RNL...</b> to the CIW. It exports one cell or a whole library, keeping hierarchy, custom block symbols, placement, orientation, wires and buses, and draws with the <code>eda-symbol</code> and <code>eda-style</code> packages.</en></p>
     </header>
     <div class="panel dl">
-      <div class="ph"><svg class="ico"><use href="#i-term"/></svg><span class="ph-title">rnl-virtuoso</span><span class="ph-right"><a class="chip" href="https://github.com/rich-netlist/rnl-virtuoso"><zh>代码仓库</zh><en>Repository</en></a></span></div>
+      <div class="ph"><svg class="ico"><use href="#i-term"/></svg><span class="ph-title">rnl-virtuoso</span><span class="ph-right"><a class="chip" href="https://github.com/rich-netlist/rnl-virtuoso"><en>Repository</en></a></span></div>
       <ul class="dl-list">
-        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl-virtuoso/releases/latest"><svg class="ico"><use href="#i-download"/></svg><span><b>Linux x86-64</b><code>.tar.gz</code></span></a><p><zh>在发布页下载，解包到装 Virtuoso 的主机上；需要该主机上 Cadence 自带的导出程序和许可。</zh><en>Download it from the releases page and extract it on the Virtuoso host; Cadence’s own exporters and their licences are needed there.</en></p></li>
-        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl-virtuoso#install"><svg class="ico"><use href="#i-book"/></svg><span><b><zh>安装与使用</zh><en>Install and use</en></b><code>README</code></span></a><p><zh>安装步骤、菜单用法和选项都写在它的 README 里（<a href="https://github.com/rich-netlist/rnl-virtuoso/blob/main/README.zh.md">中文</a>）。</zh><en>The steps, the menus and the options are in its README (<a href="https://github.com/rich-netlist/rnl-virtuoso/blob/main/README.zh.md">also in Chinese</a>).</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl-virtuoso/releases/latest"><svg class="ico"><use href="#i-download"/></svg><span><b>Linux x86-64</b><code>.tar.gz</code></span></a><p><en>Download it from the releases page and extract it on the Virtuoso host; Cadence’s own exporters and their licences are needed there.</en></p></li>
+        <li><a class="dl-file" href="https://github.com/rich-netlist/rnl-virtuoso#install"><svg class="ico"><use href="#i-book"/></svg><span><b><en>Install and use</en></b><code>README</code></span></a><p><en>The steps, the menus and the options are in its README (<a href="https://github.com/rich-netlist/rnl-virtuoso/blob/main/README.zh.md">also in Chinese</a>).</en></p></li>
       </ul>
     </div>
   </div>
@@ -399,17 +368,16 @@
 <section id="toolchain" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>06 · 工具链</zh><en>06 · Toolchain</en></p>
-      <h2><zh>RNL 工具链：读、解、画、改。</zh><en>The RNL toolchain: read, solve, draw, edit.</en></h2>
-      <p class="lead"><zh>工具链把“读懂 RNL”和“把意图变成坐标”分成独立模块：没有求解器也能看图，需要时再求解。已经有的有：运行库、宿主适配器、渲染器和命令行，上面的两个查看器，还有求解器的第一版，在 <code>rnl solve</code> 和桌面版查看器里。选一条路径看数据怎么流动，点一个模块看它做什么。</zh>
-        <en>The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.</en></p>
+      <p class="sheet-no"><en>06 · Toolchain</en></p>
+      <h2><en>The RNL toolchain: read, solve, draw, edit.</en></h2>
+      <p class="lead"><en>The toolchain keeps “understanding RNL” and “turning intent into coordinates” in separate modules: you can view a drawing without a solver and solve only when needed. What exists today: the runtime, the host adapters, the renderer and the command line, the two viewers above, and a first version of the solver, in <code>rnl solve</code> and the desktop viewer. Pick a path to see how data flows; click a module to see what it does.</en></p>
     </header>
 
     <div class="flows">
-      <span class="seg" id="flow-seg" role="group" aria-label="<zh>使用路径</zh><en>Usage path</en>">
-        <button type="button" data-flow="open" aria-pressed="false"><zh>打开即看</zh><en>Open and view</en></button>
-        <button type="button" data-flow="solve" aria-pressed="true"><zh>自动出图</zh><en>Auto-draw</en></button>
-        <button type="button" data-flow="edit" aria-pressed="false"><zh>编辑联动</zh><en>Edit live</en></button>
+      <span class="seg" id="flow-seg" role="group" aria-label="<en>Usage path</en>">
+        <button type="button" data-flow="open" aria-pressed="false"><en>Open and view</en></button>
+        <button type="button" data-flow="solve" aria-pressed="true"><en>Auto-draw</en></button>
+        <button type="button" data-flow="edit" aria-pressed="false"><en>Edit live</en></button>
       </span>
       <p class="flow-cap" id="flow-cap" aria-live="polite"></p>
     </div>
@@ -418,27 +386,26 @@
       <div class="tgraph" id="tgraph">
         <svg class="twires" id="twires" aria-hidden="true"></svg>
         <div class="tgrid">
-          <button type="button" class="tmod is-file tm-file" data-mod="file"><svg class="ico"><use href="#i-netlist"/></svg><span class="nm"><zh>网表 + RNL</zh><en>Netlist + RNL</en></span><span class="sub">.sp / .scs</span></button>
-          <button type="button" class="tmod tm-adapter" data-mod="adapter"><svg class="ico"><use href="#i-layers"/></svg><span class="nm"><zh>宿主适配器</zh><en>Host adapter</en></span><span class="sub"><zh>Host adapter</zh><en></en></span></button>
-          <button type="button" class="tmod tm-runtime" data-mod="runtime"><svg class="ico"><use href="#i-cpu"/></svg><span class="nm"><zh>运行库</zh><en>Runtime</en></span><span class="sub"><zh>Runtime</zh><en></en></span></button>
-          <button type="button" class="tmod tm-render" data-mod="render"><svg class="ico"><use href="#i-pencil"/></svg><span class="nm"><zh>统一渲染器</zh><en>Renderer</en></span><span class="sub"><zh>Renderer</zh><en></en></span></button>
-          <button type="button" class="tmod tm-viewer" data-mod="viewer"><svg class="ico"><use href="#i-eye"/></svg><span class="nm"><zh>查看器</zh><en>Viewer</en></span><span class="sub"><zh>Viewer</zh><en></en></span></button>
-          <button type="button" class="tmod tm-stdlib" data-mod="stdlib"><svg class="ico"><use href="#i-book"/></svg><span class="nm"><zh>标准库</zh><en>Standard library</en></span><span class="sub"><zh>Standard library</zh><en></en></span></button>
-          <button type="button" class="tmod tm-solver" data-mod="solver"><svg class="ico"><use href="#i-solver"/></svg><span class="nm"><zh>求解器</zh><en>Solver</en></span><span class="sub"><zh>Solver</zh><en></en></span></button>
-          <button type="button" class="tmod tm-cli" data-mod="cli"><svg class="ico"><use href="#i-term"/></svg><span class="nm"><zh>命令行</zh><en>CLI</en></span><span class="sub"><zh>CLI</zh><en></en></span></button>
-          <button type="button" class="tmod tm-editor" data-mod="editor"><svg class="ico"><use href="#i-pencil"/></svg><span class="nm"><zh>编辑器</zh><en>Editor</en></span><span class="sub"><zh>Editor</zh><en></en></span></button>
+          <button type="button" class="tmod is-file tm-file" data-mod="file"><svg class="ico"><use href="#i-netlist"/></svg><span class="nm"><en>Netlist + RNL</en></span><span class="sub">.sp / .scs</span></button>
+          <button type="button" class="tmod tm-adapter" data-mod="adapter"><svg class="ico"><use href="#i-layers"/></svg><span class="nm"><en>Host adapter</en></span><span class="sub"><en ctx=host-adapter></en></span></button>
+          <button type="button" class="tmod tm-runtime" data-mod="runtime"><svg class="ico"><use href="#i-cpu"/></svg><span class="nm"><en>Runtime</en></span><span class="sub"><en ctx=runtime></en></span></button>
+          <button type="button" class="tmod tm-render" data-mod="render"><svg class="ico"><use href="#i-pencil"/></svg><span class="nm"><en>Renderer</en></span><span class="sub"><en ctx=renderer></en></span></button>
+          <button type="button" class="tmod tm-viewer" data-mod="viewer"><svg class="ico"><use href="#i-eye"/></svg><span class="nm"><en>Viewer</en></span><span class="sub"><en ctx=viewer></en></span></button>
+          <button type="button" class="tmod tm-stdlib" data-mod="stdlib"><svg class="ico"><use href="#i-book"/></svg><span class="nm"><en>Standard library</en></span><span class="sub"><en ctx=standard-library></en></span></button>
+          <button type="button" class="tmod tm-solver" data-mod="solver"><svg class="ico"><use href="#i-solver"/></svg><span class="nm"><en>Solver</en></span><span class="sub"><en ctx=solver></en></span></button>
+          <button type="button" class="tmod tm-cli" data-mod="cli"><svg class="ico"><use href="#i-term"/></svg><span class="nm"><en>CLI</en></span><span class="sub"><en ctx=cli></en></span></button>
+          <button type="button" class="tmod tm-editor" data-mod="editor"><svg class="ico"><use href="#i-pencil"/></svg><span class="nm"><en>Editor</en></span><span class="sub"><en ctx=editor></en></span></button>
         </div>
       </div>
       <div class="panel tdetail" id="tdetail" aria-live="polite"></div>
     </div>
 
     <div class="apps">
-      <span class="lbl"><zh>前端外壳</zh><en>App shells</en></span>
-      <a class="chip" href="#web"><svg class="ico"><use href="#i-globe"/></svg><zh>网页版 · WebAssembly</zh><en>Web viewer · WebAssembly</en></a>
-      <a class="chip" href="#desktop"><svg class="ico"><use href="#i-monitor"/></svg><zh>桌面版 · Tauri 2</zh><en>Desktop viewer · Tauri 2</en></a>
-      <span class="chip"><svg class="ico"><use href="#i-phone"/></svg><zh>手机浏览器</zh><en>Mobile browsers</en></span>
-      <span class="lbl"><zh>两个查看器共用一个页面；核心用 Rust 编写，在桌面上直接运行，在浏览器里编译成 WebAssembly 运行。核心的 WebAssembly 版本已在 npm 上发布预览，包名 @rich-netlist/runtime。</zh>
-        <en>The two viewers share one page; the core is written in Rust and runs natively on the desktop and as WebAssembly in the browser. Previews of the core as WebAssembly are on npm as @rich-netlist/runtime.</en></span>
+      <span class="lbl"><en>App shells</en></span>
+      <a class="chip" href="#web"><svg class="ico"><use href="#i-globe"/></svg><en>Web viewer · WebAssembly</en></a>
+      <a class="chip" href="#desktop"><svg class="ico"><use href="#i-monitor"/></svg><en>Desktop viewer · Tauri 2</en></a>
+      <span class="chip"><svg class="ico"><use href="#i-phone"/></svg><en>Mobile browsers</en></span>
+      <span class="lbl"><en>The two viewers share one page; the core is written in Rust and runs natively on the desktop and as WebAssembly in the browser. Previews of the core as WebAssembly are on npm as @rich-netlist/runtime.</en></span>
     </div>
   </div>
 </section>
@@ -447,26 +414,22 @@
 <section id="licences" class="sheet">
   <div class="wrap">
     <header class="sheet-head">
-      <p class="sheet-no"><zh>07 · 许可</zh><en>07 · Licences</en></p>
-      <h2><zh>开源，可以自由使用。</zh><en>Open source, free to use.</en></h2>
-      <p class="lead"><zh>查看器和整个 RNL 工具链的源代码都在 GitHub 上公开。</zh>
-        <en>The source of the viewers and of the whole RNL toolkit is public on GitHub.</en></p>
+      <p class="sheet-no"><en>07 · Licences</en></p>
+      <h2><en>Open source, free to use.</en></h2>
+      <p class="lead"><en>The source of the viewers and of the whole RNL toolkit is public on GitHub.</en></p>
     </header>
     <div class="facts">
       <div class="fact">
         <h3><svg class="ico"><use href="#i-file"/></svg>MIT</h3>
-        <p><zh>查看器的代码按 <a href="https://github.com/rich-netlist/rnl/blob/main/LICENSE">MIT 许可</a>发布：可以自由使用、修改和分发，保留版权声明即可。</zh>
-          <en>The viewers’ code is under the <a href="https://github.com/rich-netlist/rnl/blob/main/LICENSE">MIT licence</a>: use, change and share it freely, keeping the copyright notice.</en></p>
+        <p><en>The viewers’ code is under the <a href="https://github.com/rich-netlist/rnl/blob/main/LICENSE">MIT licence</a>: use, change and share it freely, keeping the copyright notice.</en></p>
       </div>
       <div class="fact">
         <h3><svg class="ico"><use href="#i-book"/></svg>OFL-1.1</h3>
-        <p><zh>图中的文字用 Noto Sans SC 排版和显示，版权 2014-2021 Adobe，按 <a href="https://github.com/rich-netlist/rnl/blob/main/LICENSES/OFL-1.1.txt">SIL Open Font License 1.1</a> 发布。核心带着这套字体的字宽数据，桌面版内置字体，网页版按需加载（<a href="https://github.com/rich-netlist/rnl/blob/main/docs/decisions/0009-fonts-shipped-with-the-core.md">决定 0009</a>）。</zh>
-          <en>Text in the drawings is laid out and drawn in Noto Sans SC, copyright 2014-2021 Adobe, under the <a href="https://github.com/rich-netlist/rnl/blob/main/LICENSES/OFL-1.1.txt">SIL Open Font License 1.1</a>. The core carries the fonts’ metrics, the desktop viewer has the fonts inside, and the web viewer loads what a drawing needs (<a href="https://github.com/rich-netlist/rnl/blob/main/docs/decisions/0009-fonts-shipped-with-the-core.md">decision 0009</a>).</en></p>
+        <p><en>Text in the drawings is laid out and drawn in Noto Sans SC, copyright 2014-2021 Adobe, under the <a href="https://github.com/rich-netlist/rnl/blob/main/LICENSES/OFL-1.1.txt">SIL Open Font License 1.1</a>. The core carries the fonts’ metrics, the desktop viewer has the fonts inside, and the web viewer loads what a drawing needs (<a href="https://github.com/rich-netlist/rnl/blob/main/docs/decisions/0009-fonts-shipped-with-the-core.md">decision 0009</a>).</en></p>
       </div>
       <div class="fact">
-        <h3><svg class="ico"><use href="#i-git"/></svg><zh>源代码</zh><en>Source</en></h3>
-        <p><zh>在 <a href="https://github.com/rich-netlist/rnl">GitHub</a> 上：网页版在 <code>apps/web</code>，桌面版在 <code>apps/desktop</code>，两者共用的页面在 <code>apps/viewer-ui</code>，核心在 <code>crates</code>。每个版本改了什么，写在<!--release--><a href="https://github.com/rich-netlist/rnl/releases/tag/{{viewer-tag}}">它的发布说明</a><!--/release--><!--no-release--><a href="https://github.com/rich-netlist/rnl/releases">它的发布说明</a><!--/no-release-->里。</zh>
-          <en>On <a href="https://github.com/rich-netlist/rnl">GitHub</a>: the web viewer is in <code>apps/web</code>, the desktop viewer in <code>apps/desktop</code>, the page they share in <code>apps/viewer-ui</code> and the core in <code>crates</code>. What each release changes is in <!--release--><a href="https://github.com/rich-netlist/rnl/releases/tag/{{viewer-tag}}">its release notes</a><!--/release--><!--no-release--><a href="https://github.com/rich-netlist/rnl/releases">its release notes</a><!--/no-release-->.</en></p>
+        <h3><svg class="ico"><use href="#i-git"/></svg><en>Source</en></h3>
+        <p><en>On <a href="https://github.com/rich-netlist/rnl">GitHub</a>: the web viewer is in <code>apps/web</code>, the desktop viewer in <code>apps/desktop</code>, the page they share in <code>apps/viewer-ui</code> and the core in <code>crates</code>. What each release changes is in <!--release--><a href="https://github.com/rich-netlist/rnl/releases/tag/{{viewer-tag}}">its release notes</a><!--/release--><!--no-release--><a href="https://github.com/rich-netlist/rnl/releases">its release notes</a><!--/no-release-->.</en></p>
       </div>
     </div>
   </div>
@@ -479,17 +442,16 @@
   <div class="wrap foot-grid">
     <div>
       <span class="brand-mark">RNL</span>
-      <p><zh>Rich Netlist（RNL）的工具。桌面版的版本号和下载链接在构建网站时取自仓库里最新的发布标签，网页版随网站一起发布。</zh>
-        <en>The tools of Rich Netlist (RNL). The desktop viewer’s version and download links are taken from the newest release tag of the repository when the site is built; the web viewer is published with the site.</en></p>
+      <p><en>The tools of Rich Netlist (RNL). The desktop viewer’s version and download links are taken from the newest release tag of the repository when the site is built; the web viewer is published with the site.</en></p>
     </div>
     <div>
-      <h4><zh>另见</zh><en>See also</en></h4>
+      <h4><en>See also</en></h4>
       <ul>
-        <li><a href="./"><zh>介绍页</zh><en>Introduction</en></a><zh>：动机、工具链、设计原则和现状</zh><en>: motivation, toolchain, principles and status</en></li>
-        <li><a href="language.html"><zh>语言导览</zh><en>Language tour</en></a><zh>：九个可以动手试的小节</zh><en>: nine hands-on sections</en></li>
-        <li><a href="packages.html"><zh>标准包图库</zh><en>Standard packages</en></a><zh>：每个符号画出来的样子和定义原文</zh><en>: every symbol as it is drawn, and the text that defines it</en></li>
-        <li><a href="spec/0.3/"><zh>语言标准 0.3</zh><en>Language standard 0.3</en></a><zh>：正式文本，另有 PDF 和 Markdown 下载</zh><en>: the formal text, also as PDF and Markdown downloads</en></li>
-        <li><zh>路线图：</zh><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a></li>
+        <li><a href="./"><en>Introduction</en></a><en>: motivation, toolchain, principles and status</en></li>
+        <li><a href="language.html"><en>Language tour</en></a><en>: nine hands-on sections</en></li>
+        <li><a href="packages.html"><en>Standard packages</en></a><en>: every symbol as it is drawn, and the text that defines it</en></li>
+        <li><a href="spec/0.3/"><en>Language standard 0.3</en></a><en>: the formal text, also as PDF and Markdown downloads</en></li>
+        <li><en>Roadmap: </en><a href="https://github.com/rich-netlist/rnl/blob/main/docs/roadmap.md"><code>docs/roadmap.md</code></a></li>
       </ul>
     </div>
   </div>

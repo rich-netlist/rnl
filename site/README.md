@@ -17,29 +17,36 @@ The site also publishes the skill package for agents, at `skill/`, and `llms.txt
 
 Pages are built from one source in `src/`, using the locale registry in
 [`i18n/languages.json`](../i18n/languages.json), the project's one list of languages, and [`scripts/site_i18n.py`](../scripts/site_i18n.py).
-Only Chinese and English are enabled. The registry owns language codes, native names, URL
-directories, browser-language matching, fonts, navigation breakpoints and shared interface
-messages, including those of the language-standard pages. English is the fallback source.
-Text remains next to its translations:
+The registry owns language codes, native names, URL directories, browser-language matching, fonts,
+navigation breakpoints and shared interface messages, including those of the language-standard pages.
+
+English is the site's only core language, and every other language, Chinese included, is a translation ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). `src/` holds the English, each text a group that the build translates:
 
 ```html
-<h2><zh>同一件事，两种做法。</zh><en>Same task, two ways.</en></h2>
-<button aria-label="<zh>切换配色</zh><en>Switch color theme</en>">…</button>
+<h2><en>Same task, two ways.</en></h2>
+<button aria-label="<en>Switch color theme</en>">…</button>
 ```
 
 ```js
-cap: '<zh><b>只有网表</b>：网表里只有器件和连接。</zh><en><b>Netlist only</b>: the netlist holds only devices and connections.</en>'
+cap: '<en><b>Netlist only</b>: the netlist holds only devices and connections.</en>'
 ```
 
-The same markup works in HTML text, attribute values, and JavaScript strings. Structure, drawings, and behavior exist once, so a change to the layout or to a demo applies to both languages at the same time.
+The same markup works in HTML text, attribute values, and JavaScript strings. Structure, drawings, and behavior exist once, so a change to the layout or to a demo applies to every language at the same time. A change to English text need not change any translation.
 
-When you edit text:
+A translation is in the catalog of the group's source file, `i18n/<lang>/site/<path under src/>.json`, such as `i18n/zh/site/index.html.json` or `i18n/zh/site/assets/intro.js.json`: an object keyed by the English of each group, with its runs of white space as one space.
 
-- Every group ends with its required `<en>` block. Optional translations precede it, in any order, with only whitespace between blocks. Missing translations use the English text; English itself must be present. Duplicate, nested and unclosed language blocks fail the build.
-- An empty block is allowed where one language needs no text, for example `<zh>Host adapter</zh><en></en>` for a gloss the English page does not need.
-- For a phrase with a number or name in it, translate the whole phrase and use a placeholder, as `fill('<zh>交叉 {crossings} 处</zh><en>{crossings} crossings</en>', m)` does in `intro.js`, rather than splitting it into fragments.
+```json
+{"Same task, two ways.": "同一件事，两种做法。", "Introduction": null}
+```
+
+- A text is the translation, `null` one not made yet, which shows in English, and `""` one left out on purpose.
+- Where one English text is said two ways in a language in the same file, the group of the other way names a context, `<en ctx=readable>Yes</en>`, and its key is `readable|Yes`. An English left empty, for a note that only a translation has, names one too, as the module notes of `tools.html` do: `<en ctx=host-adapter></en>`, key `host-adapter|`.
+- A translation keeps the placeholders of its English, and opens and closes elements as it does. In a script it has no more straight quotes and backslashes than its English, since the group stands in a string there; `build.py` fails otherwise. Other tags and links are the translator's, such as a link to the page in the same language; `python scripts/i18n/status.py` reports them.
+- For a phrase with a number or name in it, translate the whole phrase and use a placeholder, as `fill('<en>{crossings} crossings</en>', m)` does in `intro.js`, rather than splitting it into fragments.
 - Links to another page are relative to that language's directory. Shared destinations such as the viewer use `../viewer/`. Language menus, fonts, HTML language attributes and primary navigation labels are generated from the registry rather than translated in each template.
 - Code comments are in English and are not translated.
+
+`build.py` refuses a translation written beside the English, such as `<zh>…</zh><en>…</en>`: [`scripts/i18n/migrate_site.py`](../scripts/i18n/migrate_site.py) moves such blocks into the catalogs, as it moved the Chinese of `src/` in step 3b of decision 0015, keeping every page as it was.
 
 The English source still checks for accidentally leaked Chinese. Intentionally quoted text
 uses an HTML `lang` attribute; Chinese examples in scripts use `/*zh-CN*/` and `/*/zh-CN*/`.
@@ -47,15 +54,7 @@ This check applies to English, so it does not reject another locale's CJK transl
 
 ### Adding a language
 
-English is the site's only core language, and every other language, Chinese included, is a translation ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)). [`i18n/README.md`](../i18n/README.md) covers every surface of the project, and `python scripts/i18n/status.py --lang <lang>` shows what a language has.
-
-A translation of a group comes from the block beside its English, such as `<zh>…</zh>`, or else from the catalog of its source file: `i18n/<lang>/site/<path under src/>.json`, such as `i18n/ja/site/index.html.json` or `i18n/ja/site/assets/intro.js.json`, an object keyed by the English of each group with its runs of white space as one space:
-
-```json
-{"Same task, two ways.": "同じことを二通りに。", "Introduction": null}
-```
-
-A text is the translation, `null` one not made yet, `""` one left out on purpose. A translation keeps the placeholders, tags and links of its English, and has no more straight quotes and backslashes than it, since a group may stand in a script's string; `build.py` fails on a catalog that does not. Decision 0015 moves the Chinese blocks of `src/` into such catalogs in a later step; until then they stay beside the English, and a third language writes catalogs, not blocks.
+[`i18n/README.md`](../i18n/README.md) covers every surface of the project, and `python scripts/i18n/status.py --lang <lang>` shows what a language has.
 
 A page that a language has not wholly translated says so, below its hero, where each page has its `{{translation-notice}}` marker: the groups of the page and of the scripts it loads are counted. Under 80% (`SHOWN_IN_ENGLISH_BELOW` in [`scripts/site_i18n.py`](../scripts/site_i18n.py)) the page is shown in English, with the scripts that only it loads, under the notice that it is not yet in that language; from 80% it is shown translated, with the English where a translation is missing, under a quieter notice that parts of it are not. The notices are the messages `not_translated`, `partly_translated` and `help_translate` of the registry, and link to `i18n/README.md`. An English page, and one wholly translated, has none.
 
@@ -83,7 +82,7 @@ the saved choice, then supported browser preferences, then English. Old root URL
 redirect to their original Chinese pages.
 
 `RNL_SITE_LANGUAGES=/absolute/path/languages.json` selects a temporary registry for local
-checks. Browser tests generate a third-locale fixture in an OS temporary directory and
+checks; its catalogs are those beside it, then those of `i18n/`. Browser tests generate a third-locale fixture in an OS temporary directory and
 remove it afterwards; it is never included in the deployed site. Set `RNL_I18N_SCREENSHOTS`
 to capture the open menu in both languages and themes at 1440px and 390px.
 

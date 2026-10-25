@@ -38,7 +38,7 @@ GUIDE = (SPEC / "rnl-0.3-guide.md", "references/language.md")
 GUIDE_NOTE = (f"> The short guide to the language RNL {SERIES}, for reading and writing RNL files. It is not the standard, "
               f"which prevails where the two differ: {SITE_URL}en/spec/{SERIES}/. Licence: CC-BY-4.0, see `LICENSE.md`.")
 LICENSE_TEXTS = ("MIT", "CC-BY-4.0", "CC0-1.0")  # the licences of what the package holds, copied to LICENSES/
-GALLERY_JS = ROOT / "site" / "src" / "assets" / "gallery.js"  # what each package is for, in both languages
+GALLERY_JS = ROOT / "site" / "src" / "assets" / "gallery.js"  # what each package is for, in English
 SITE_SRC = ROOT / "site" / "src"
 # the package files the reference is written from: the series, and the packages outside it that the
 # catalog lists with it
@@ -46,7 +46,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from packages import require as require_public_package
 LIBRARIES = [ROOT / "libraries" / "standard" / SERIES]
 ALLOWED_FRONT = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
-SUMMARY_LINE = re.compile(r"^\s*'([\w-]+(?: [\d.]+)?)':\s*'<zh>.*?</zh><en>(.*?)</en>'", re.M)
+SUMMARY_LINE = re.compile(r"^\s*'([\w-]+(?: [\d.]+)?)':\s*'<en>(.*?)</en>'", re.M)
 FENCE = re.compile(r"^(```+)([^\n]*)\n(.*?)^\1[ \t]*$", re.M | re.S)
 RULE = re.compile(r'#\s*@SELECT-INSTANCE\((\w+)="([^"]*)"\)\s*=>\s*@SET-SYMBOL\s+(\$\w+)')
 ALIAS = re.compile(r'@ALIAS\("([^"]+)",\s*"([^"]+)"\)')
