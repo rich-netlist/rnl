@@ -198,6 +198,21 @@
         "viewer": "Français"
       },
       "nav_breakpoint": 1080
+    },
+    {
+      "code": "de",
+      "name": "Deutsch",
+      "short": "DE",
+      "html_lang": "de",
+      "matches": [
+        "de"
+      ],
+      "status": "incubating",
+      "names": {
+        "en": "German",
+        "viewer": "Deutsch"
+      },
+      "nav_breakpoint": 1080
     }
   ]
 }
