@@ -65,7 +65,7 @@
   "Web viewer": "Webビューア",
   "For a person with a browser: <a href=\"../viewer/\" target=\"_blank\" rel=\"noopener\">rich-netlist.github.io/rnl/viewer/</a>. Open a file, see the drawing and the problems; nothing is uploaded. An agent that cannot drive a browser asks the person to open the file there.": "ブラウザを使う人間向け：<a href=\"../viewer/\" target=\"_blank\" rel=\"noopener\">rich-netlist.github.io/rnl/viewer/</a>。ファイルを開いて回路図と問題一覧を確認でき、ファイルが外部へアップロードされることはありません。ブラウザを直接操作できないエージェントは、ここでファイルを開くようユーザーに案内します。",
   "Desktop viewer": "デスクトップビューア",
-  "Windows 10 and 11, and Linux x86_64: the download is on the <a href=\"tools.html#desktop\">page of the tools</a>.": "Windows 10/11、Linux x86_64、macOSに対応。ダウンロードは<a href=\"tools.html#desktop\">ツールのページ</a>にあります。",
+  "Windows 10 and 11, and Linux x86_64: the download is on the <a href=\"tools.html#desktop\">page of the tools</a>.": "Windows 10/11、Linux x86_64に対応。ダウンロードは<a href=\"tools.html#desktop\">ツールのページ</a>にあります。",
   "05 · Versions and licence": "05 · バージョンとライセンス",
   "It follows main, <span class=\"mk\">and each file says its licence.</span>": "mainブランチに追随し、<span class=\"mk\">ファイルごとにライセンスを明記。</span>",
   "Versions": "バージョン",
