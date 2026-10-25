@@ -108,6 +108,18 @@ fn literal(v: &Literal) -> String {
         Literal::Str(s) => quote(s),
         Literal::Num(n) => num(*n),
         Literal::Bool(b) => b.to_string(),
+        Literal::List(items) => format!("[{}]", items.iter().map(literal).collect::<Vec<_>>().join(", ")),
+    }
+}
+
+/// A usage's parameter as the snapshot reads it back: a number exactly, in the shortest form that
+/// reads back the same, never `-0`; a list in brackets.
+fn parameter(v: &Literal) -> String {
+    match v {
+        Literal::Num(n) if *n == 0.0 => "0".into(),
+        Literal::Num(n) => format!("{n}"),
+        Literal::List(items) => format!("[{}]", items.iter().map(parameter).collect::<Vec<_>>().join(", ")),
+        _ => literal(v),
     }
 }
 
@@ -171,12 +183,16 @@ pub fn statements(op: &Op) -> Vec<String> {
             facts.extend(placed(at, orient));
             vec![format!("{object} {}", facts.join(" => "))]
         }
-        Op::AddUsage { name, definition, attach, symbol, at, orient } => {
+        Op::AddUsage { name, definition, attach, params, symbol, at, orient } => {
             // each object with the role it fills, so that the roles are those of the request
-            // whatever order it writes them in, and a role the definition lacks fails (9.4)
+            // whatever order it writes them in, and a role the definition lacks fails (9.4); the
+            // parameters by name, so that one the definition lacks fails as well
             let roles: Vec<String> =
                 attach.iter().map(|(role, a)| format!("{}({})", given(a), role_name(role))).collect();
-            let mut parts = vec![format!("{definition} @ATTACH {}", roles.join(" "))];
+            let params: Vec<String> =
+                params.iter().map(|(k, v)| format!("{}={}", role_name(k), parameter(v))).collect();
+            let params = if params.is_empty() { String::new() } else { format!("({})", params.join(", ")) };
+            let mut parts = vec![format!("{definition} @ATTACH{params} {}", roles.join(" "))];
             parts.extend(symbol.iter().map(|s| format!("@SET-SYMBOL {s}")));
             parts.extend(placed(at, orient));
             parts.extend(name.iter().cloned());

@@ -84,6 +84,8 @@ export type Point = [number, number];
 
 /** A style property's value. */
 export type Literal = string | number | boolean;
+/** The value of a usage's parameter: a literal, or a list of them. */
+export type ParameterValue = Literal | ParameterValue[];
 
 /** A vertex of a wire: a pin, a named point, a role of a usage, or coordinates. */
 export type Vertex = { terminal: string } | { point: string } | { usage: string; role: string } | { at: Point };
@@ -116,6 +118,12 @@ export type Op = { level?: string } & (
        * a set role (9.4) with the list of its members, written `{#M3 #M9}(ref)`, `{}` for none.
        */
       attach: Record<string, string | Point | (string | Point)[]>;
+      /**
+       * The parameters it writes, `@ATTACH(name="M1", n=2)`, in the order given, as the snapshot
+       * gives them back in `ObjectView.params`; a string may not hold a line break. One the
+       * definition does not declare fails as a written one does (9.4).
+       */
+      params?: Record<string, ParameterValue>;
       symbol?: string;
       at?: Point;
       orient?: string;
