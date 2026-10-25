@@ -155,6 +155,26 @@ class Dictionaries(Repository):
         self.assertEqual((s["messages"].total, s["messages"].langs["zh"].done, s["messages"].langs["ja"].done), (2, 1, 0))
         self.assertEqual((s["notes"].total, s["notes"].langs["zh"].done), (1, 1))
 
+    def test_translations_in_a_catalog_by_the_english_or_by_the_name(self):
+        self.surfaces(
+            {"id": "timeline", "title": "T", "kind": "dictionary", "format": "json", "source": "timeline.json",
+             "translation": "i18n/{lang}/site/timeline.json.json"},
+            {"id": "messages", "title": "M", "kind": "dictionary", "format": "registry-messages", "source": "i18n/languages.json",
+             "translation": "i18n/{lang}/site/messages.json", "catalog_key": "name"})
+        self.write("timeline.json", json.dumps({"milestones": [{"id": "a", "title": {"en": "Two  words"}},
+                                                               {"id": "b", "title": {"en": "Only English"}}]}))
+        self.write("i18n/ja/site/timeline.json.json", json.dumps({"Two words": "二語", "Only English": None}))
+        self.write("i18n/ja/site/messages.json", json.dumps({"tools": "ツール"}))
+        self.commit()
+        _, s = self.survey()
+        self.assertEqual(s["timeline"].langs["ja"].done, 1)  # null is not yet; the key's spaces are folded
+        self.assertEqual((s["messages"].langs["ja"].done, s["messages"].langs["zh"].done), (1, 1))
+        registry = json.loads(json.dumps(REGISTRY))
+        registry["languages"][0]["messages"]["tools"] = "Tools and downloads"
+        self.write("i18n/languages.json", json.dumps(registry))
+        _, s = self.survey(base="HEAD")
+        self.assertEqual(s["messages"].langs["ja"].stale, 1)  # the English changed; the ja of its name did not
+
 
 class Messages(Repository):
     SURFACE = {"id": "viewer", "title": "Viewer", "kind": "messages",

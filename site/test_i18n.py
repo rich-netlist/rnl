@@ -21,13 +21,23 @@ spec.loader.exec_module(build)
 
 def third_language():
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
-    config["languages"].append({"code": "ja", "name": "日本語", "short": "JA", "messages": {"intro": "ホーム"}})
+    config["languages"].append({"code": "ja", "name": "日本語", "short": "JA"})
     return config
+
+
+def third_messages(directory, messages=None):
+    """The catalog of the third language's shared messages, in `directory` as i18n/ja/site/ is in i18n/."""
+    file = Path(directory) / "ja/site/messages.json"
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text(json.dumps(messages or {"intro": "ホーム"}, ensure_ascii=False), encoding="utf-8")
+    return directory
 
 
 class Localization(unittest.TestCase):
     def setUp(self):
-        self.registry = Languages(third_language())
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.registry = Languages(third_language(), catalogs=third_messages(directory.name))
 
     def test_optional_translations_and_intentional_empty_blocks(self):
         text = '<zh>中文</zh><en>English</en> / <en>Fallback</en> / <zh></zh><en>Visible</en>'
@@ -75,11 +85,26 @@ class Localization(unittest.TestCase):
                 patch.object(build, "git_text", return_value='<!-- timeline-summary\n{"en":"English only."}\n-->'):
             self.assertEqual(build.release_summary("spec-0.4-r1"), {"en": "English only."})
 
-    def test_whole_site_builds_a_third_locale_from_only_one_registry_entry(self):
+    def test_the_build_refuses_translations_in_the_registry_and_the_timeline(self):
+        config = third_language()
+        config["languages"][-1]["messages"] = {"intro": "ホーム"}
+        with patch.object(build, "I18N", Languages(config)), self.assertRaises(build.BuildError) as raised:
+            build.build()
+        self.assertIn("i18n/ja/site/messages.json", str(raised.exception))
+        data = {"milestones": [{"id": "one", "date": "2026-10-22", "title": {"en": "Title", "zh": "标题"},
+                                "summary": {"en": "Summary."}}]}
+        with tempfile.TemporaryDirectory() as directory, patch.object(build, "SRC", Path(directory)):
+            (Path(directory) / "timeline.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            with self.assertRaises(build.BuildError) as raised:
+                build.timeline_html(tags=[])
+        self.assertIn("src/timeline.json.milestones[one].title: a translation written beside the English", str(raised.exception))
+
+    def test_whole_site_builds_a_third_locale_from_one_registry_entry_and_its_catalogs(self):
         with tempfile.TemporaryDirectory() as directory:
             directory = Path(directory)
             config = directory / "languages.json"
             config.write_text(json.dumps(third_language()), encoding="utf-8")
+            third_messages(directory)
             env = dict(os.environ, RNL_SITE_LANGUAGES=str(config), PYTHONDONTWRITEBYTECODE="1")
             subprocess.run([sys.executable, "site/build.py", "--out", str(directory / "dist")], cwd=ROOT,
                            env=env, check=True, capture_output=True, text=True)
@@ -164,12 +189,24 @@ class Catalogs(unittest.TestCase):
             (Path(directory) / "ja/site/c.html.json").write_text("{", encoding="utf-8")
             self.assertIn("not valid JSON", registry.catalog_errors("ja", "c.html")[0])
 
+    def test_the_timeline_and_the_shared_messages_from_their_catalogs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            registry = self.registry(Path(directory), {"timeline.json": {"Two words": "二語", "Not yet": None},
+                                                       "messages": {"tools": "ツール"}})
+            self.assertEqual(registry.with_catalog({"en": "Two\n  words"}, "timeline.json"), {"en": "Two\n  words", "ja": "二語"})
+            self.assertEqual(registry.with_catalog({"en": "Not yet"}, "timeline.json"), {"en": "Not yet"})
+            # released notes keep the translations written in them
+            self.assertEqual(registry.with_catalog({"en": "Two words", "ja": "既に"}, "timeline.json")["ja"], "既に")
+            self.assertEqual(registry.message("ja", "tools"), "ツール")
+            self.assertEqual(registry.message("ja", "language_menu"), registry.message("en", "language_menu"))
+
     def test_notices_of_pages_not_wholly_translated_are_in_english(self):
         """As every notice of the system, in every language, Chinese included (decision 0015)."""
         config = third_language()
         config["languages"][-1]["names"] = {"en": "Japanese"}
-        config["languages"][-1]["messages"]["not_translated"] = "この頁はまだ訳されていません"  # not used
-        registry = Languages(config)
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        registry = Languages(config, catalogs=third_messages(directory.name, {"not_translated": "この頁はまだ訳されていません"}))  # not used
         self.assertEqual(registry.notice("ja", 10, 10), "")
         self.assertEqual(registry.notice("en", 0, 10), "")
         partial, english = registry.notice("ja", 8, 10), registry.notice("ja", 7, 10)

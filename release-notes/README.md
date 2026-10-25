@@ -4,7 +4,7 @@ The homepage history is built by `site/build.py` from `site/src/timeline.json` a
 Dates use Asia/Shanghai (UTC+08:00): annotated tags use their creation time; lightweight tags
 use the commit time. Fetch tags and full history before building, as Pages CI already does.
 
-Every new release needs a one-sentence English summary, with translations when available. Copy the block in
+Every new release needs a one-sentence summary in English. Copy the block in
 [`TEMPLATE.md`](TEMPLATE.md) into the release notes before tagging:
 
 | Release | Tag | Summary source |
@@ -18,8 +18,12 @@ There are no core tags yet, so no core/CLI release is shown as having happened. 
 `runtime-v*` npm previews are curated historical milestones, not automatically generated.
 
 The summary block is JSON inside an HTML comment named `timeline-summary`. `en` must be a
-nonempty, single-paragraph string. Other language codes registered in `i18n/languages.json`
-are optional and fall back to English when absent. Summaries are plain text; markup is escaped.
+nonempty, single-paragraph string, and is the only key of a new summary: a release may be
+published in English alone ([decision 0015](../docs/decisions/0015-english-is-the-only-core-language.md)).
+Its translations follow later, in the catalog of the timeline, `i18n/<lang>/site/timeline.json.json`,
+keyed by the English sentence with its runs of white space as one space; a language without one
+shows the English. Notes released earlier keep the translations written beside their `en`, which
+come before the catalog's. Summaries are plain text; markup is escaped.
 Missing or invalid summaries fail the site build instead of silently leaving stale history.
 The generated entry links to its GitHub Release. The builder first reads the notes at the
 tag; for old tags without a summary, it accepts a backfill in the current checkout. This PR
@@ -28,8 +32,10 @@ backfills Viewer 0.1.2–0.1.4 without moving tags or editing existing GitHub Re
 ## Editorial milestones
 
 Add non-release milestones to `site/src/timeline.json`, with a unique `id`, an ISO `date`,
-localized `title` and `description` (reviewed inline HTML is supported), and a `url` with
-optional localized `link_label`. Each dictionary needs `en`; other languages are optional.
+`title` and `description` (reviewed inline HTML is supported), and a `url` with optional
+`link_label`. Each text is a dictionary with its English alone, `{"en": "…"}`; its translations
+are in `i18n/<lang>/site/timeline.json.json`, keyed by the English, and the build refuses one
+written beside it.
 A plain-text `summary` can be used instead of `description`.
 Use a timezone-qualified PR merge timestamp for `date`; it is converted to Shanghai time.
 A date alone is interpreted as midnight in Shanghai. `start_date` gives a date range.

@@ -1,15 +1,17 @@
 """Build the static project site in the locales registered in i18n/languages.json.
 
-In src/, English text and its available translations are written side by side:
+The pages in src/ are written in English, with each text to translate marked:
 
-    <zh>网表定义电路</zh><en>The netlist defines the circuit</en>
+    <en>The netlist defines the circuit</en>
 
-The same markup is used in HTML text, in attribute values and in JavaScript strings. Only
-whitespace may separate the blocks of a group. Optional translations precede the required English
-block, which ends the group. An absent translation falls back to English; an explicit empty block
-remains empty. The shared scripts/site_i18n.py registry generates menus, fonts and locale output.
-The build checks that
-- groups have an English source and no duplicate, stray or nested language tags;
+The same markup is used in HTML text, in attribute values and in JavaScript strings. The
+translations are in the catalogs of i18n/<lang>/site/, one for each file, such as index.html.json,
+keyed by the English (decision 0015); timeline.json.json has those of the timeline and of the
+releases' summaries, and messages.json the shared messages. A text without a translation is shown
+in English; an empty translation remains empty. The shared scripts/site_i18n.py registry generates
+menus, fonts and locale output. The build checks that
+- groups have an English source, no translation beside it and no duplicate, stray or nested
+  language tags;
 - the English pages contain no Chinese characters, apart from Chinese content meant for every page:
   elements marked lang="zh-CN", and in scripts the blocks between /*zh-CN*/ and /*/zh-CN*/ (RNL
   written with the Chinese alias package, for example).
@@ -232,18 +234,36 @@ def timeline_events(data, tags, summary=release_summary):
     return sorted(events, key=lambda event: (event["stamp"], event["id"]))
 
 
+def translations_beside(value, path):
+    """The places in `value`, the data of a timeline, of the dictionaries with a translation beside their English."""
+    if isinstance(value, dict):
+        if isinstance(value.get(I18N.default), str):
+            return [path] if set(value) - {I18N.default} else []
+        return [found for key, v in value.items() for found in translations_beside(v, f"{path}.{key}")]
+    if isinstance(value, list):
+        return [found for i, v in enumerate(value)
+                for found in translations_beside(v, f"{path}[{v.get('id', i) if isinstance(v, dict) else i}]")]
+    return []
+
+
 def timeline_html(data=None, tags=None):
     if data is None:
         try:
             data = json.loads((SRC / "timeline.json").read_text(encoding="utf-8"))
         except (OSError, ValueError) as error:
             raise BuildError(f"src/timeline.json: {error}") from error
+        beside = translations_beside(data, "src/timeline.json")
+        if beside:
+            raise BuildError("\n".join(f"{where}: a translation written beside the English: translations go into "
+                                       f"i18n/<lang>/site/timeline.json.json, keyed by the English" for where in beside))
     events = timeline_events(data, timeline_tags() if tags is None else tags)
     if not events:
         raise BuildError("The timeline has no published milestones")
 
     def localized(values, html=False):
-        return I18N.markup(values, html)
+        # translations of the timeline's texts, its milestones' and the releases' summaries, are in the
+        # catalog of timeline.json (decision 0015); released notes may still carry their own
+        return I18N.markup(I18N.with_catalog(values, "timeline.json"), html)
 
     def link(event):
         url = event.get("url")
@@ -631,7 +651,7 @@ def redirects():
             continue
         for name in (page, single):
             if name and name != "index.html":
-                out[name] = redirect(MOVED + name, I18N.locales[I18N.legacy]["html_lang"], "这一页已移到 " + MOVED + name)
+                out[name] = redirect(MOVED + name, "en", "This page has moved to " + MOVED + name)
     return out
 
 
@@ -642,6 +662,9 @@ def build(version=None):
     errors = [f"src/{path}: a translation written beside the English: translations go into i18n/<lang>/site/{path}.json; "
               f"python scripts/i18n/migrate_site.py moves them there" for path, text in files.items()
               if any(len(I18N.parts(m.group())[0]) > 1 for m in GROUP.finditer(text))]
+    errors += [f"i18n/languages.json: the shared messages of {code} written in the registry: translations go into "
+               f"i18n/{code}/site/messages.json" for code, entry in I18N.entries.items()
+               if code != I18N.default and entry.get("messages")]
     if errors:
         raise BuildError("\n".join(errors))
     if files["index.html"].count(TIMELINE) != 1:
@@ -692,23 +715,17 @@ def write(result, out):
             target.write_text(text, encoding="utf-8", newline="\n")
 
 
-GUIDE = """RNL introduction pages / RNL 介绍页
+GUIDE = """RNL introduction pages
 
-rnl-intro/ is the complete site: open rnl-intro/zh/index.html (Chinese) or rnl-intro/en/index.html
-(English), or upload the folder to any static host, where its root leads to the pages in the
-browser's language.
+rnl-intro/ is the complete site: open rnl-intro/en/index.html, or the index.html in the folder of
+another language, such as rnl-intro/zh/index.html, or upload the folder to any static host, where
+its root leads to the pages in the browser's language.
 .nojekyll makes GitHub Pages publish it as is.
 language.html next to each index.html is the language tour, tools.html the page of the viewers, and
 packages.html the gallery of the standard packages; the web viewer itself, the pages of the standard
 and the gallery's data are published with the site, not packed here.
 The *-standalone.html files in each language folder are single files with everything inlined.
 Fonts load from Google Fonts; offline, system fonts are used and the pages still work.
-
-rnl-intro/ 是完整站点：打开 rnl-intro/zh/index.html（中文）或 rnl-intro/en/index.html（英文），
-或把整个目录上传到任意静态主机，根目录按浏览器语言跳到中文页或英文页；.nojekyll 让 GitHub Pages 原样发布。每个 index.html 旁边的
-language.html 是语言导览，tools.html 是查看器的介绍页，packages.html 是标准包图库；网页版查看器本身、
-语言标准的网页和图库的数据随网站发布，不在这个包里。各语言目录里的 *-standalone.html 是内联了全部样式和脚本的单文件版。
-字体从 Google Fonts 加载，离线时退回系统字体，页面照常可用。
 """
 
 

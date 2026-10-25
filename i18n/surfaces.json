@@ -93,9 +93,11 @@
       "kind": "dictionary",
       "format": "registry-messages",
       "source": "i18n/languages.json",
+      "translation": "i18n/{lang}/site/messages.json",
+      "catalog_key": "name",
       "keep": ["not_translated", "partly_translated", "help_translate"],
       "owner": "site",
-      "notes": "The notices of a page not wholly translated are in English in every language (decision 0015): their messages are not translated."
+      "notes": "The registry has the English; a language's translations are in its messages.json, keyed by the names of the messages. The notices of a page not wholly translated are in English in every language (decision 0015): their messages are not translated."
     },
     {
       "id": "site-timeline",
@@ -103,6 +105,7 @@
       "kind": "dictionary",
       "format": "json",
       "source": "site/src/timeline.json",
+      "translation": "i18n/{lang}/site/timeline.json.json",
       "owner": "site"
     },
     {
@@ -111,8 +114,9 @@
       "kind": "dictionary",
       "format": "release-summary",
       "source": ["release-notes/core/*.md", "apps/desktop/release-notes/*.md"],
+      "translation": "i18n/{lang}/site/timeline.json.json",
       "owner": "site",
-      "notes": "Released notes are not changed afterwards; the summaries of standard releases are in the messages of their spec-* tags and are not counted here."
+      "notes": "Released notes keep the translations written in them; a later release's summary is English alone in its notes, and its translations go into the catalog of the timeline. The summaries of standard releases are in the messages of their spec-* tags and are not counted here."
     },
     {
       "id": "viewer",
