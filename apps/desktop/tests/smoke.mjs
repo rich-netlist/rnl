@@ -38,8 +38,15 @@ const cases = path.join(root, "tests", "conformance", "cases");
 let netlist = null;
 let netlistInclude = null;
 const TOP = "04-hierarchy.sp";
-/** The command table, which the native menu is built from. */
+/** The command table, which the native menu is built from, with the languages of i18n/ in its Language
+ * menu after English, as the app is built with them (build.rs). */
 const table = JSON.parse(fs.readFileSync(path.join(root, "apps", "viewer-ui", "commands.json"), "utf8"));
+for (const menu of table.menus) (function addLanguages(items) {
+  for (const item of items.filter((i) => i.items)) {
+    if (item.languages) item.items.push(...uiLanguages(root).slice(1).map((l) => ({ id: `language-${l.lang}`, label: l.name, check: true, radio: true })));
+    addLanguages(item.items);
+  }
+})(menu.items);
 const tauriConf = JSON.parse(fs.readFileSync(path.join(root, "apps", "desktop", "tauri.conf.json"), "utf8"));
 /** The app's version, which Tauri reports. */
 const version = tauriConf.version;
@@ -354,9 +361,7 @@ function tableMenus(marks) {
       }
       let next;
       if (item.items) {
-        // the Language menu lists English and then the languages of i18n/, as the app is built (build.rs)
-        const inner = entries(item.languages ? [...item.items, ...uiLanguages(root).slice(1)
-          .map((l) => ({ id: `language-${l.lang}`, label: l.name, check: true }))] : item.items);
+        const inner = entries(item.items);
         if (inner.length === 0) continue;
         next = { text: item.label, separator: false, checked: false, items: inner };
       } else {
