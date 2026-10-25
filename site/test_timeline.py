@@ -104,7 +104,10 @@ class Timeline(unittest.TestCase):
         template = build.sources()
         with patch.object(build, "has_linux_release", return_value=False):
             actual = build.build(None)
-        remove = lambda html: re.sub(r'(<ol class="tl">).*?(</ol>)', r'\1\2', html, flags=re.S)
+        # the timeline, and the notice its texts may bring: a release published in English alone leaves a
+        # language's homepage partly translated until its summary is translated (decision 0015)
+        remove = lambda html: re.sub(r'\n<div class="wrap translation-notice[^"]*" lang="en">.*?</div>', '',
+                                    re.sub(r'(<ol class="tl">).*?(</ol>)', r'\1\2', html, flags=re.S), flags=re.S)
         for index, (language, _) in enumerate(build.LANGS):
             expected = build.build_language(template, index, None)
             for page in ("index.html", "rnl-intro-standalone.html"):

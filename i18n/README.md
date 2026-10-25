@@ -13,6 +13,8 @@ English is the project's only core language ([decision 0015](../docs/decisions/0
 
 ## How far each language is
 
+The site shows it on [translation.html](https://rich-netlist.github.io/rnl/en/translation.html), built with each deployment. Locally:
+
 ```bash
 python scripts/i18n/status.py
 ```
@@ -117,11 +119,11 @@ Anyone may update a translation at any time, in a pull request of its own. A pul
 | 3a | The site reads the catalogs in `i18n/<lang>/site/` and checks their format; a page under 80% translated is shown in English, and every page not wholly translated says so ([site/README.md](../site/README.md#adding-a-language)) | done |
 | 3b | The site: the Chinese of `site/src/`, the summaries of the packages among it, moved into `i18n/zh/site/`; the build refuses a translation written beside the English | done |
 | 3c | The site: the Chinese of the timeline and of the shared messages moved into `i18n/zh/site/timeline.json.json` and `messages.json`, the releases' summaries in English alone; the build refuses a translation written in `languages.json` or `site/src/timeline.json` | done |
-| 3d | The site: `incubating` respected; a page of this report. Until then the site builds and publishes the pages of every registered language | to come |
+| 3d | The site: an `incubating` language built only on demand and offered nowhere; the page of this report, [translation.html](https://rich-netlist.github.io/rnl/en/translation.html), linked from every footer; the site's tests independent of how complete a translation is | done |
 | 4 | The standard: a stale Chinese chapter reported rather than stopping the build, with a notice on its page; the fixed phrases of Annex A in `i18n/<lang>/spec.json`; translations of the standard in further languages; stamps on the short guide and the principles | to come |
 | 5 | rnl-packages: the summaries of new records in English alone, their translations in `summaries/<lang>.json` outside the immutable records, read by the site's gallery and the report; rnl-gallery: a warning for a translation left as it was when its entry's English changed | done |
 
-Until step 3d, register a new language in `languages.json` only once it may be shown, as the site builds and publishes the pages of every language registered there.
+A new language is registered as `incubating`: the site builds its pages only with `python site/build.py --incubating`, and neither the site's nor the viewers' menus offer it until its `status` is `published`.
 
 ## Not translated
 

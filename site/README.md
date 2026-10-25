@@ -63,11 +63,16 @@ A page that a language has not wholly translated says so, below its hero, where 
 Add one entry to `languages` in [`i18n/languages.json`](../i18n/languages.json), for example:
 
 ```json
-{"code": "ja", "name": "日本語", "short": "JA"}
+{"code": "ja", "name": "日本語", "short": "JA", "names": {"en": "Japanese"}, "status": "incubating"}
 ```
 
-This creates `ja/` pages, adds Japanese to every menu and browser-language negotiation,
-and inherits English interface messages, fonts and content. Add translations progressively,
+An `incubating` language, or one without a `status`, is built only by `python site/build.py
+--incubating`, for a preview or a test: its `ja/` pages list it in their language menu, and no
+other page does, nor does the root's browser-language negotiation. Pages CI builds without the
+flag, so it is not deployed. Once it may be shown (the thresholds are in
+[`i18n/README.md`](../i18n/README.md)), its `status` becomes `published`: every menu offers it, the
+root leads browsers that ask for it there, and the site publishes its pages. Either way it
+inherits English interface messages, fonts and content. Add translations progressively,
 in its catalogs as above; there is no need to list every group. Translations of the shared UI
 messages go in `i18n/<lang>/site/messages.json`, keyed by the names of the messages in the
 registry's English, such as `{"intro": "…"}`; font settings and `nav_breakpoint` can be overridden
@@ -85,6 +90,12 @@ or an outside click and remembers the explicit choice. Switching preserves the p
 query string and current section, including package-gallery filters. The root entry uses
 the saved choice, then supported browser preferences, then English. Old root URLs still
 redirect to their original Chinese pages.
+
+[`translation.html`](src/translation.html), linked from the footer of every page, shows how far each
+language is: the build fills its `{{translation-status}}` marker with the report of
+[`scripts/i18n/status.py`](../scripts/i18n/status.py), in English as the texts it counts are, and
+its heading and introduction are translated as any page's. With `--online`, as Pages CI builds it,
+the report also counts the entries of rnl-gallery and the summaries of rnl-packages.
 
 `RNL_SITE_LANGUAGES=/absolute/path/languages.json` selects a temporary registry for local
 checks; its catalogs are those beside it, then those of `i18n/`. Browser tests generate a third-locale fixture in an OS temporary directory and
@@ -239,7 +250,7 @@ node --test site/gallery/package-file.test.mjs   # the tests of reading package 
 | `gallery/` | The gallery's data, for both languages: `index.js`, the groups, and one script per group, such as `standard-0.2.js`. Not written by `build.py`: `pages.yml` writes it with `node site/gallery/build.mjs`, after building the web viewer and so the core. |
 | `zh/spec/<version>/`, `en/spec/<version>/`, and `zh/spec/`, `en/spec/` | The language standard: for each version in `spec/`, one page per language with its PDF and Markdown downloads, and next to it the pages that compare it with each earlier version, such as `compare-0.2.html`; `zh/spec/` and `en/spec/` lead to the newest version, which the top bar links to. The old addresses of the Chinese pages of 0.2, `spec/0.2/` and `spec/`, lead to them, and the downloads are copied there. Not written by `build.py`: [`pages.yml`](../.github/workflows/pages.yml) adds them with `python scripts/spec/build.py --site site/dist` ([decision 0007](../docs/decisions/0007-publishing-the-standard.md)). |
 | `skill/`, `llms.txt`, `zh/llms.txt` | The skill package for agents as a zip and as plain-text files, and the plain-text entry for agents, in English and in Chinese ([For agents](#for-agents)). Not written by `build.py`: `pages.yml` adds them with `python3 scripts/skill/build.py --site site/dist`. |
-| `viewer/` | The web viewer with its samples, one copy for both languages, its interface in English. Not written by `build.py`: `pages.yml` builds it with `node apps/web/build.mjs --samples` and copies `apps/web/dist/` here. |
+| `viewer/` | The web viewer with its samples, one copy for every language, its interface in each published language of `i18n/languages.json` that has a catalog of the viewers, chosen in its own menu. Not written by `build.py`: `pages.yml` builds it with `node apps/web/build.mjs --samples` and copies `apps/web/dist/` here. |
 | `zh/rnl-intro-standalone.html`, `zh/rnl-language-standalone.html`, `zh/rnl-tools-standalone.html`, and the same under `en/` | Single-file pages with the styles and scripts inlined; their links to the other pages, the languages and the web viewer point to the published site |
 
 [`pages.yml`](../.github/workflows/pages.yml) publishes `site/dist/` to GitHub Pages, at <https://rich-netlist.github.io/rnl/>, which leads to the Chinese pages at <https://rich-netlist.github.io/rnl/zh/> or the English ones at <https://rich-netlist.github.io/rnl/en/> by the browser's language, whenever `site/`, `spec/` or `scripts/spec/` changes on `main`, or what the web viewer is built from, the package files in `libraries/` among it; after a revision of the standard is released; and after a release of the desktop viewer. The web viewer is at <https://rich-netlist.github.io/rnl/viewer/>. The language switch keeps the reader on the same section.

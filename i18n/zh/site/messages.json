@@ -11,6 +11,7 @@
   "gallery": "图库",
   "tools": "工具",
   "agents": "Agent",
+  "translation": "翻译进度",
   "pages": "页面",
   "guide_note": "这是标准的简版：读写 RNL 文件需要知道的东西。它不是正式文本，与下面的正文不一致时，以正文为准。同一份指南也在[给 AI agent 的 skill 包]({agents})里。",
   "principles_note": "这是 RNL 的设计原则，即 [`spec/rich-netlist.zh.md`](https://github.com/rich-netlist/rnl/blob/main/spec/rich-netlist.zh.md) 的原文，放在这里方便和标准一起读。它们不是标准的一部分，也不随标准编版本；标准引用它们时写作“原则”。以英文版为准。",

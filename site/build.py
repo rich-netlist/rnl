@@ -50,11 +50,19 @@ Usage, from the repository root (standard library only, and git for the tags):
     python site/build.py --viewer-version 0.1.0   link the files of this release of the desktop
                                       viewer, whatever the tags say; "none" for no release yet
     python site/build.py --check --rnl PATH       also check and render site/examples/*.sp with rnl
+    python site/build.py --incubating             also build the languages that are not published yet
+    python site/build.py --online                 the translation status also reads rnl-gallery and rnl-packages
+
+A language is shown, in the menus and to the browsers that ask for it, once i18n/languages.json says it
+is `published`; one that is `incubating`, or has no status, is built only with --incubating, for a
+preview or a test, and its own pages list it in their menu (decision 0015).
 """
 import argparse
 from base64 import b64encode
 from datetime import date, datetime, timedelta, timezone
+from functools import lru_cache
 from html import escape
+import importlib.util
 import json
 import os
 import re
@@ -92,9 +100,10 @@ PAGES = {
     "gallery.html": None,
     "agents.html": None,
     "timeline.html": None,
+    "translation.html": None,
 }
 # Pages added after the Chinese pages moved to zh/ have no old address at the root.
-NEW_PAGES = ("agents.html", "gallery.html", "timeline.html")
+NEW_PAGES = ("agents.html", "gallery.html", "timeline.html", "translation.html")
 
 GROUP = I18N.group
 CJK = re.compile("[%s]" % "".join("%s-%s" % (chr(a), chr(b)) for a, b in
@@ -118,6 +127,8 @@ FIELD = re.compile(r"\{\{(viewer-[a-z-]+)\}\}")
 FIELDS = ("viewer-version", "viewer-tag")
 TIMELINE = "{{timeline}}"
 TIMELINE_FULL = "{{timeline-full}}"
+# translation.html: the report of scripts/i18n/status.py, how far each language is (decision 0015)
+TRANSLATION_STATUS = "{{translation-status}}"
 # The homepage shows this many of the latest published entries; timeline.html has all of them.
 HOME_ENTRIES = 3
 # Release dates are modern Asia/Shanghai dates (UTC+08:00, without DST).
@@ -362,6 +373,49 @@ def newest_viewer_release():
     return "%d.%d.%d" % max(versions) if versions else None
 
 
+@lru_cache(maxsize=None)
+def translation_survey(online=False):
+    """scripts/i18n/status.py's survey of the repository, once a build: (its module, project, surfaces)."""
+    spec = importlib.util.spec_from_file_location("i18n_status", ROOT / "scripts/i18n/status.py")
+    status = sys.modules[spec.name] = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(status)
+    project = status.Project(ROOT, online=online)
+    return status, project, status.survey(project)
+
+
+def translation_status_html(online=False):
+    """The report of translation.html: a table of the surfaces counted, a column for each language but
+    English, and the surfaces that are not counted, with why. In English, as its texts are, in every
+    language: titles and notes come from i18n/surfaces.json."""
+    status, project, surfaces = translation_survey(online)
+    langs = project.languages
+    head = "".join(f'<th scope="col">{escape(I18N.english_name(code))} <span lang="{I18N.locales[code]["html_lang"]}">'
+                   f'{escape(I18N.locales[code]["name"])}</span><small>{escape(project.state(code))}</small></th>' for code in langs)
+
+    def cell(surface, code):
+        st = surface.langs.get(code)
+        if not surface.checked:
+            return '<td class="ts-none">not read here</td>'
+        if st is None:
+            return '<td class="ts-none">—</td>'
+        share = st.done / surface.total if surface.total else 1
+        stale = f'<small class="ts-stale">{st.stale} stale</small>' if st.stale else ""
+        return (f'<td><span class="ts-count">{st.done} / {surface.total}</span>{stale}'
+                f'<span class="ts-bar" aria-hidden="true"><i style="width:{share * 100:.0f}%"></i></span></td>')
+    rows = "".join(f'<tr><th scope="row">{escape(s.title)}<small><code>{escape(s.id)}</code>, '
+                   f'{escape(status.UNITS[s.kind])}s</small></th>{"".join(cell(s, code) for code in langs)}</tr>'
+                   for s in surfaces if s.kind in status.UNITS)
+    sentence = lambda note: note if note.endswith((".", "!", "?")) else note + "."
+    others = "".join(f'<li><b>{escape(s.title)}</b>: {escape(" ".join(sentence(n) for n in s.notes if n))}</li>'
+                     for s in surfaces if s.kind not in status.UNITS)
+    errors = project.errors + [e for s in surfaces for e in s.errors]
+    problems = (f'<p class="note ts-errors">Format errors: {escape("; ".join(errors))}</p>' if errors else "")
+    return (f'<div class="ts-report" lang="en">{problems}\n'
+            f'<div class="matrix-wrap"><table class="matrix ts-table"><thead><tr><th scope="col">Surface</th>{head}</tr></thead>'
+            f'<tbody>{rows}</tbody></table></div>\n'
+            f'<h3>Not counted</h3>\n<ul class="ts-others">{others}</ul></div>')
+
+
 def has_linux_release(version):
     """Only link Linux files when the selected tag includes the Linux bundle configuration.
     Earlier Windows-only tags must keep working even after this site change is deployed."""
@@ -550,7 +604,8 @@ def build_language(files, index, version, linux=False, macos=False):
                   "language-menu": I18N.menu(code, lambda target: "../" + target + "/" + ("" if page == "index.html" else page)),
                   "spec-root": "spec/" if I18N.standard(code) == code else "../" + I18N.standard(code) + "/spec/",
                   "translation-notice": I18N.notice(code, *counts[page])}
-        tokens.update({"nav-" + key: escape(I18N.message(code, key)) for key in ("intro", "tour", "spec", "packages", "gallery", "tools", "agents", "pages")})
+        tokens.update({"nav-" + key: escape(I18N.message(code, key))
+                       for key in ("intro", "tour", "spec", "packages", "gallery", "tools", "agents", "pages", "translation")})
         for key, value in tokens.items():
             out[page] = out[page].replace("{{" + key + "}}", value)
         if I18N.standard(code) != code:
@@ -618,20 +673,22 @@ def redirect(target, lang, text):
 
 
 def home():
-    """Choose a saved locale, then the browser's supported preferences, then English."""
-    choices = sorted([(match, code) for code in CODES for match in I18N.locales[code]["matches"]],
+    """Choose a saved locale, then the browser's supported preferences, then English: among the published
+    languages, as an incubating one is not offered."""
+    codes = I18N.published
+    choices = sorted([(match, code) for code in codes for match in I18N.locales[code]["matches"]],
                      key=lambda item: len(item[0]), reverse=True)
     alternates = "\n".join(f'<link rel="alternate" hreflang="{I18N.locales[code]["html_lang"]}" href="{SITE_URL}{DIRS[code]}">'
-                           for code in CODES)
+                           for code in codes)
     links = " · ".join(f'<a href="{DIRS[code]}" hreflang="{I18N.locales[code]["html_lang"]}" lang="{I18N.locales[code]["html_lang"]}">{escape(I18N.locales[code]["name"])}</a>'
-                       for code in CODES)
+                       for code in codes)
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Rich Netlist (RNL)</title>
 {alternates}
 <link rel="alternate" hreflang="x-default" href="{SITE_URL}{HOME}">
 <script>
-var codes = {json.dumps(CODES)}, choices = {json.dumps(choices)}, selected;
+var codes = {json.dumps(codes)}, choices = {json.dumps(choices)}, selected;
 try {{ selected = localStorage.getItem('rnl-site-language'); }} catch (error) {{}}
 if (codes.indexOf(selected) === -1) {{
   var preferences = navigator.languages || [navigator.language || ''];
@@ -667,9 +724,11 @@ def redirects():
     return out
 
 
-def build(version=None):
-    """Build every page in every language, with the files of the desktop viewer's release `version`,
-    or None for no release yet, and the pages at the root that lead to them."""
+def build(version=None, incubating=False, online=False):
+    """Build every page in every published language, and with `incubating` in the others too, with the
+    files of the desktop viewer's release `version`, or None for no release yet, and the pages at the
+    root that lead to them. `online` lets the report of translation.html read what other repositories
+    publish."""
     files = sources()
     errors = [f"src/{path}: a translation written beside the English: translations go into i18n/<lang>/site/{path}.json; "
               f"python scripts/i18n/migrate_site.py moves them there" for path, text in files.items()
@@ -685,6 +744,9 @@ def build(version=None):
     if files["timeline.html"].count(TIMELINE_FULL) != 1:
         raise BuildError("src/timeline.html needs exactly one {{timeline-full}} marker")
     files["timeline.html"] = files["timeline.html"].replace(TIMELINE_FULL, timeline_html(full=True))
+    if files["translation.html"].count(TRANSLATION_STATUS) != 1:
+        raise BuildError("src/translation.html needs exactly one {{translation-status}} marker")
+    files["translation.html"] = files["translation.html"].replace(TRANSLATION_STATUS, translation_status_html(online))
     ex = examples()
     errors = []
     for path, text in files.items():
@@ -700,6 +762,8 @@ def build(version=None):
     linux = has_linux_release(version)
     macos = has_macos_release(version)
     for index, (code, prefix) in enumerate(LANGS):
+        if code not in I18N.published and not incubating:
+            continue
         for path, text in build_language(files, index, version, linux, macos).items():
             result[prefix + path] = text
         # Brand images are copied verbatim; only prose and scripts need localization.
@@ -766,6 +830,10 @@ def main():
                          "newest tag viewer-vX.Y.Z; none for no release yet")
     ap.add_argument("--rnl", metavar="PATH",
                     help="also check and render site/examples/*.sp with this rnl command")
+    ap.add_argument("--incubating", action="store_true",
+                    help="also build the pages of the languages not yet published, for a preview or a test")
+    ap.add_argument("--online", action="store_true",
+                    help="let the translation status read what rnl-gallery and rnl-packages publish")
     args = ap.parse_args()
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(errors="backslashreplace")
@@ -778,7 +846,8 @@ def main():
     else:
         ap.error("--viewer-version takes a version such as 0.1.0, or none")
     try:
-        result = build(version)
+        # a check reads every language, published or not
+        result = build(version, incubating=args.incubating or args.check, online=args.online)
         if args.rnl is not None:
             rnl = find_rnl(args.rnl)
             rnl_errors = check_examples_rnl(rnl)
@@ -799,6 +868,9 @@ def main():
     write(result, out)
     print("built %d files into %s (%d text groups)" % (len(result), out, groups))
     for code, prefix in LANGS:
+        if code not in I18N.published and not args.incubating:
+            print("  %s: not built, as it is not published (--incubating builds it)" % code)
+            continue
         for page in PAGES:
             print("  %s: %s" % (code, out / prefix / page))
     print("  the root uses a saved language or supported browser preferences, falling back to %s; "

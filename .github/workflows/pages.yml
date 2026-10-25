@@ -118,7 +118,8 @@ jobs:
         run: |
           python3 -m unittest discover -s site -p 'test_*.py'
           python3 -m unittest discover -s scripts -p 'test_packages.py'
-          python3 site/build.py
+          # --online: the translation status also counts what rnl-gallery and rnl-packages publish
+          python3 site/build.py --online
 
       # Normally under half a minute, about 12 with slow downloads; one run hung here for over 1.5 hours.
       - uses: ./.github/actions/install-spec-tools
