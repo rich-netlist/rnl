@@ -113,8 +113,6 @@ The page on a phone and a tablet, the web viewer's: touch on the drawing, the la
 
 Chromium gets its fingers through the DevTools protocol's `Input.dispatchTouchEvent`, so the browser makes the pointer events, honours `touch-action` and recognises taps and double taps as a phone's does, and the tests can tell whether the page itself scrolled or zoomed (`visualViewport.scale`). WebKit has no way in Playwright to put down more than one finger: there the tests send the page pointer events of their own, `pointerType` "touch", to the element under each finger at its press, as a browser captures a touch pointer, and let the page capture them (`mobile.js`); they test what the page does with two fingers, not how WebKit makes them, and a gesture's effect on the page itself is tested in Chromium only. Taps are Playwright's `touchscreen.tap` in both. What only a real phone shows, such as Safari's own gestures, the on-screen keyboard and the notch, is checked by hand, on screenshots and on devices.
 
-What the page does not do yet is marked `test.fixme`, each test until the change that makes it pass.
-
 ## Known failures
 
 No test is marked as failing. The three that were, an initial of the subcircuit index that scrolled to the end of the list, a double click on a tree row that did not fold the tree in Firefox, and the file tabs that the failed statements' box covered at the narrowest side panel, pass since the page was fixed.
