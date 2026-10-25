@@ -35,7 +35,7 @@
   "Statements read as facts: notation, sentences, Chinese.": "敘述即為陳述事實：記號、標準例句、中文寫法。",
   "AS says what things are; ATTACH says what is added to them.": "AS 說明「是什麼」；ATTACH 說明「附加上什麼」。",
   "Write nothing, and it still draws.": "即使什麼都不寫，依然能繪出原理圖。",
-  "Sets spread one level; selections are rules.": "集合在嵌套時展開一層；篩選即是規則。",
+  "Sets spread one level; selections are rules.": "集合在巢狀時展開一層；篩選即是規則。",
   "Only a shared point joins wires.": "唯有共用同一個點物件，連線才會相接。",
   "Text on an object is a label; on a point, an annotation.": "附著於物件上的文字是標籤；附著於點上的是標註。",
   "x right, y up; eight orientation codes.": "x 向右、y 向上；共八種朝向代碼。",
