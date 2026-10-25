@@ -119,7 +119,7 @@ Anyone may update a translation at any time, in a pull request of its own. A pul
 | 3c | The site: the Chinese of the timeline and of the shared messages moved into `i18n/zh/site/timeline.json.json` and `messages.json`, the releases' summaries in English alone; the build refuses a translation written in `languages.json` or `site/src/timeline.json` | done |
 | 3d | The site: `incubating` respected; a page of this report. Until then the site builds and publishes the pages of every registered language | to come |
 | 4 | The standard: a stale Chinese chapter reported rather than stopping the build, with a notice on its page; the fixed phrases of Annex A in `i18n/<lang>/spec.json`; translations of the standard in further languages; stamps on the short guide and the principles | to come |
-| 5 | rnl-packages: summaries in further languages outside the immutable records; rnl-gallery: a warning for an entry whose English changed alone | to come |
+| 5 | rnl-packages: the summaries of new records in English alone, their translations in `summaries/<lang>.json` outside the immutable records, read by the site's gallery and the report; rnl-gallery: a warning for a translation left as it was when its entry's English changed; their `README.zh.md` stamped | done |
 
 Until step 3d, register a new language in `languages.json` only once it may be shown, as the site builds and publishes the pages of every language registered there.
 

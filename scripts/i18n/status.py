@@ -25,6 +25,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -631,7 +632,18 @@ def external(p: Project, s: dict) -> Surface:
     out.total = len(units)
     for lang in p.langs(s):
         st = out.langs[lang] = Lang()
+        # a summary's translation in its record, else in summaries/<lang>.json beside the catalog, by its English
+        beside = {}
+        if s.get("translation"):
+            try:
+                with urllib.request.urlopen(urllib.parse.urljoin(s["url"], s["translation"].format(lang=lang)), timeout=20) as r:
+                    beside = json.loads(r.read().decode("utf-8"))
+                beside = beside if isinstance(beside, dict) else {}
+            except (OSError, ValueError):
+                pass  # none yet: a 404, as every language has until its first translation
         for name, texts in units.items():
+            if lang not in texts and isinstance(beside.get(norm(texts.get("en", ""))), str):
+                texts = {**texts, lang: beside[norm(texts["en"])]}
             if lang in texts:
                 st.done += 1
             else:

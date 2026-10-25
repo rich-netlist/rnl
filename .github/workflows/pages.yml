@@ -193,7 +193,7 @@ jobs:
       # its reading of package files run first.
       - name: Build the gallery of the standard packages
         run: |
-          node --test site/gallery/package-file.test.mjs
+          node --test site/gallery/package-file.test.mjs site/gallery/public-packages.test.mjs
           node site/gallery/build.mjs
 
       - name: Use the locked offline catalog for browser tests
