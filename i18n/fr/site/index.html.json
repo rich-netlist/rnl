@@ -190,7 +190,7 @@
   "Colleagues and AI can read and edit it": "Collègues et IA peuvent le lire et le modifier",
   "Send a single .sp file. The simulator runs it, a viewer in the browser draws it, and the drawing and the circuit come from the same file.": "Envoyez un unique fichier .sp. Le simulateur l’exécute, une visionneuse dans le navigateur le dessine, et le schéma comme le circuit proviennent du même fichier.",
   "The drawing travels with the circuit, not with the tool.": "Le schéma voyage avec le circuit, et non avec l’outil.",
-  "Design a five-transistor OTA for me and draw the schematic.": "Conçois-moi un OTA à cinq transistors et dessine le schéma.",
+  "Design a five-transistor OTA for me and draw the schematic.": "Concevez-moi un OTA à cinq transistors et dessinez le schéma.",
   "The netlist is there, but the schematic can only be described in words or sketched in ASCII.": "La netlist est là, mais le schéma ne peut être décrit qu’avec des mots ou esquissé en ASCII.",
   "Language models write netlists well but cannot produce schematics. You read the text, or redraw it yourself.": "Les modèles de langue écrivent bien les netlists mais ne peuvent pas produire de schémas. Vous lisez le texte, ou vous le redessinez vous-même.",
   "The five-transistor OTA drawn from it": "L’OTA à cinq transistors dessiné à partir du fichier",
