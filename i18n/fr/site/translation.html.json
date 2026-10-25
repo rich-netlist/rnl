@@ -1,0 +1,15 @@
+{
+  "Translation status · Rich Netlist": "État de la traduction · Rich Netlist",
+  "How far each language of RNL is translated, from the site and the viewers to the standard.": "L’avancement de la traduction de chaque langue de RNL, du site et des visionneuses jusqu’à la norme.",
+  "Skip to content": "Aller au contenu",
+  "Switch color theme": "Changer de thème de couleur",
+  "Translation status": "État de la traduction",
+  "English is the source of every text of RNL; every other language, Chinese included, is a translation that follows it.": "L’anglais est la source de chaque texte de RNL ; toutes les autres langues, y compris le chinois, sont des traductions qui le suivent.",
+  "This report was made from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">the list of what there is to translate</a> when the site was built; every pull request gets the same one. To translate a language or bring one up to date, start from <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.": "Ce rapport a été généré à partir de <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/surfaces.json\">la liste des éléments à traduire</a> lors de la construction du site ; chaque pull request reçoit le même rapport. Pour traduire une langue ou la mettre à jour, commencez par <a href=\"https://github.com/rich-netlist/rnl/blob/main/i18n/README.md\">i18n/README.md</a>.",
+  "How far each language is": "Avancement de chaque langue",
+  "The report is in English, as the texts it counts are. A missing translation shows the English; a stale one was made from an English text that has changed since.": "Le rapport lui-même est en anglais, comme les textes qu’il recense. Une traduction manquante affiche l’anglais ; une traduction marquée « stale » (obsolète) a été établie à partir d’un texte anglais qui a changé depuis.",
+  "Machine translation and AI models may make a first draft; a language is shown once a native speaker has reviewed it.": "La traduction automatique et les modèles d’IA peuvent produire un premier jet ; une langue est affichée dès qu’un locuteur natif l’a relue.",
+  "See also": "Voir aussi",
+  "Decision 0015: English is the only core language": "Décision 0015 : l’anglais est la seule langue du cœur",
+  "Introduction": "Introduction"
+}
