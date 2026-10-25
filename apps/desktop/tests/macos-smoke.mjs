@@ -44,10 +44,11 @@ async function observe(label,check) {
 }
 const text=r=>r.words.map(w=>w.text).join(' ');
 const drawn=(r,left=0.38)=>{
-  const labels=r.words.filter(w=>w.x>left), amps=labels.filter(w=>/\bamp\b/.test(w.text));
+  const labels=r.words.filter(w=>w.x>left), amps=labels.filter(w=>/\bam[il]?p\b/.test(w.text));
   // X1/X2 are only ~10 pixels high on the runner's 1024px desktop and Vision can omit them.
   // Two separated stage names plus a source/supply/third-instance label prove the schematic
-  // independently of source text. Individual tiny labels can be omitted by Vision.
+  // independently of source text. Individual tiny labels can be omitted by Vision, and a grid dot
+  // just above "amp" can be read into it as "amip" (Intel runner, 1200x800 at 107%).
   return r.circuitInk>200 && r.circuitDensity<0.35 && amps.length>=2 &&
     Math.max(...amps.map(w=>w.x))-Math.min(...amps.map(w=>w.x))>0.08 &&
     labels.some(w=>/\b(?:Vin|Vdd|X3)\b/i.test(w.text));
